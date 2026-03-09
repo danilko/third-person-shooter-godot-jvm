@@ -1,0 +1,70 @@
+[gd_scene load_steps=6 format=3 uid="uid://jvsaup8qx28"]
+
+[ext_resource type="Texture2D" uid="uid://cjnj1vweebmy5" path="res://addons/kenney_prototype_textures/orange/texture_01.png" id="1_umubf"]
+[ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lj72b"]
+albedo_texture = ExtResource("1_umubf")
+uv1_scale = Vector3(10, 10, 10)
+
+[sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_lj72b"]
+data = PackedVector3Array(-50, -0.5, 50, -50, -0.5, -50, -50, 0.5, -50, 50, -0.5, -50, -50, -0.5, -50, -50, -0.5, 50, -50, 0.5, -50, -50, -0.5, -50, 50, -0.5, -50, -50, 0.5, -50, -50, 0.5, 50, -50, -0.5, 50, -50, -0.5, 50, -50, 0.5, 50, 50, 0.5, 50, 50, 0.5, 50, -50, 0.5, 50, -50, 0.5, -50, -50, -0.5, 50, 50, -0.5, 50, 50, -0.5, -50, 50, 0.5, 50, 50, -0.5, 50, -50, -0.5, 50, 50, -0.5, -50, 50, -0.5, 50, 50, 0.5, 50, 50, -0.5, -50, 50, 0.5, -50, -50, 0.5, -50, -50, 0.5, -50, 50, 0.5, -50, 50, 0.5, 50, 50, 0.5, 50, 50, 0.5, -50, 50, -0.5, -50)
+
+[sub_resource type="Environment" id="Environment_x8bpg"]
+background_mode = 2
+ambient_light_source = 3
+ambient_light_color = Color(0.6156863, 0.6156863, 0.6156863, 0.72156864)
+tonemap_mode = 2
+glow_enabled = true
+glow_normalized = true
+glow_strength = 0.75
+
+[node name="World" type="Node3D"]
+
+[node name="Player" parent="." instance=ExtResource("2_lj72b")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7612269, 4.1552534)
+
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+
+[node name="CSGBox3D" type="CSGBox3D" parent="StaticBody3D"]
+size = Vector3(100, 1, 100)
+material = SubResource("StandardMaterial3D_lj72b")
+
+[node name="CSGBox3D" type="CSGBox3D" parent="StaticBody3D/CSGBox3D"]
+size = Vector3(100, 1, 100)
+material = SubResource("StandardMaterial3D_lj72b")
+
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+shape = SubResource("ConcavePolygonShape3D_lj72b")
+
+[node name="StaticBody3D2" type="StaticBody3D" parent="."]
+
+[node name="CSGBox3D" type="CSGBox3D" parent="StaticBody3D2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8199883, -2.3455791)
+size = Vector3(15, 5, 0.25)
+material = SubResource("StandardMaterial3D_lj72b")
+
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="StaticBody3D2"]
+shape = SubResource("ConcavePolygonShape3D_lj72b")
+
+[node name="StaticBody3D3" type="StaticBody3D" parent="."]
+
+[node name="CSGBox3D" type="CSGBox3D" parent="StaticBody3D3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2770534, -21.148846)
+size = Vector3(15, 1.8553467, 10)
+material = SubResource("StandardMaterial3D_lj72b")
+
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="StaticBody3D3"]
+shape = SubResource("ConcavePolygonShape3D_lj72b")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_x8bpg")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment"]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 4.677, 0)
+light_energy = 0.7
+sky_mode = 1
+
+[node name="DirectionalLight3D2" type="DirectionalLight3D" parent="WorldEnvironment"]
+transform = Transform3D(0.9658932, -0.07774715, -0.24699299, 0.078457184, 0.996893, -0.00698126, 0.24676836, -0.012635224, 0.9689921, 0, 4.677, 0)
+light_energy = 0.03
