@@ -39,13 +39,17 @@ public class Player extends CharacterBody3D {
   @RegisterProperty
   public Dictionary<String, NodePath> stances = new Dictionary<>(String.class, NodePath.class);
 
+  @Export
+  @RegisterProperty
+  public Dictionary<String, StrafingState> strafingStates = new Dictionary<>(String.class, StrafingState.class);
+
   // Internal State
   private int airJumpCounter = 0;
   private Vector3 movementDirection = new Vector3();
   private String currentStanceName = "Upright";
   private String currentMovementStateName = "";
   private SceneTreeTimer stanceAntispamTimer;
-  private StrafingState strafingState = new StrafingState();
+  private boolean currentStrafing = false;
 
   @RegisterFunction
   @Override
@@ -68,22 +72,15 @@ public class Player extends CharacterBody3D {
 
     Input input = Input.INSTANCE;
 
-    // Update staring
-    boolean isAiming = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
-    StrafingState.StrafingStateType desired = isAiming
-                                                ? StrafingState.StrafingStateType.STRAFING
-                                                : StrafingState.StrafingStateType.NOT_STRAFING;
+    // Update strafing
+    boolean strafing = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
 
-    if (strafingState.getStrafingStateType() != desired) {
-      strafingState.setStrafingStateType(desired);
-
+    if (currentStrafing != strafing) {
+      currentStrafing = strafing;
       setStrafingState();
     }
 
     if (event.isActionPressed("movement", false) || event.isActionReleased("movement", false)) {
-
-
-
       movementDirection.setX(input.getActionStrength("left") - input.getActionStrength("right"));
       movementDirection.setZ(input.getActionStrength("forward") - input.getActionStrength("back"));
       String movementState = "Idle";
@@ -130,7 +127,8 @@ public class Player extends CharacterBody3D {
   }
 
   private void setStrafingState() {
-    changedStrafingState.emit(strafingState);
+
+    changedStrafingState.emit(strafingStates.get(currentStrafing ? "Strafing" : "NoStrafing"));
   }
 
   @RegisterFunction
@@ -294,9 +292,5 @@ public class Player extends CharacterBody3D {
 
   public void setStanceAntispamTimer(SceneTreeTimer stanceAntispamTimer) {
     this.stanceAntispamTimer = stanceAntispamTimer;
-  }
-
-  public StrafingState getStrafingState() {
-    return strafingState;
   }
 }
