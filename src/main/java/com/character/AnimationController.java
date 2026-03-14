@@ -29,7 +29,7 @@ public class AnimationController extends Node {
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
   private String currentStanceName = "Upright";
-  private boolean strafing = false;
+  private boolean combat = false;
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
   private MovementState currentMovementState = null;
@@ -75,8 +75,8 @@ public class AnimationController extends Node {
 
 
   @RegisterFunction
-  public void onSetStrafingState(StrafingState strafingState) {
-      strafing = strafingState.isStrafing();
+  public void onSetCombatState(CombatState combatState) {
+      combat = combatState.isCombat();
   }
 
   @RegisterFunction
@@ -96,7 +96,7 @@ public class AnimationController extends Node {
 
     tween = createTween();
 
-    if (strafing) {
+    if (combat) {
       int id = Math.min(movementState.getId(), 1);
       // The animation is opposite of the direction calculation
       animationDirection.setX(id * movementDirection.getX() * -1);

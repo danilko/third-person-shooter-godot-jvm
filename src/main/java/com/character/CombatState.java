@@ -5,12 +5,12 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterProperty;
 import godot.api.Resource;
 
-@RegisterClass(className = "StrafingState")
-public class StrafingState extends Resource {
+@RegisterClass(className = "CombatState")
+public class CombatState extends Resource {
 
   @Export
   @RegisterProperty
-  public boolean strafing = false;
+  public boolean combat = false;
 
   @Export
   @RegisterProperty
@@ -22,12 +22,12 @@ public class StrafingState extends Resource {
 
 
   // Default constructor is required for Godot to instantiate the Resource
-  public StrafingState() {
+  public CombatState() {
     super();
   }
 
-  public boolean isStrafing() {
-    return strafing;
+  public boolean isCombat() {
+    return combat;
   }
 
   public float getMovementSpeedFactor() {

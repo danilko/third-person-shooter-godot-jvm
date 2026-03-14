@@ -1,4 +1,4 @@
-[gd_scene load_steps=53 format=3 uid="uid://bwxj3ecw2ta4k"]
+[gd_scene load_steps=56 format=3 uid="uid://bwxj3ecw2ta4k"]
 
 [ext_resource type="Script" uid="uid://do4hfd78xb1p2" path="res://src/main/java/com/character/Player.java" id="1_i0ahk"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
@@ -6,10 +6,13 @@
 [ext_resource type="Resource" uid="uid://cemhpckfs3peb" path="res://src/main/resources/com/character/jumpstates/AirJump.tres" id="3_ttk2h"]
 [ext_resource type="Resource" uid="uid://i3rr4c4emq7j" path="res://src/main/resources/com/character/jumpstates/GroundJump.tres" id="4_6f0xc"]
 [ext_resource type="Script" uid="uid://cdhqufum5menr" path="res://src/main/java/com/character/MovementController.java" id="4_ige6o"]
+[ext_resource type="Script" path="res://gdj/com/character/CombatState.gdj" id="5_3qk6j"]
 [ext_resource type="Script" uid="uid://7bdq2ojknfoy" path="res://src/main/java/com/character/AnimationController.java" id="5_jn40o"]
 [ext_resource type="Script" uid="uid://c2tjt3k1y4cg4" path="res://src/main/java/com/character/CameraController.java" id="5_u0j3k"]
+[ext_resource type="Resource" uid="uid://hfsbhmhtpqq8" path="res://src/main/resources/com/character/strafingstates/Combat.tres" id="6_j83q5"]
 [ext_resource type="Script" uid="uid://bor7f5iyg250q" path="res://gdj/com/character/stances/Stance.gdj" id="7_2iqcg"]
 [ext_resource type="Resource" uid="uid://7ik6f781r71n" path="res://src/main/resources/com/character/movementstates/crawl/CrawlIdle.tres" id="7_d7d1u"]
+[ext_resource type="Resource" uid="uid://c2wokahkmhfdd" path="res://src/main/resources/com/character/strafingstates/NoCombat.tres" id="7_dnye5"]
 [ext_resource type="Resource" uid="uid://dv4pugkv3xrms" path="res://src/main/resources/com/character/movementstates/crouch/CrouchIdle.tres" id="8_ttk2h"]
 [ext_resource type="Resource" uid="uid://i6kix7q2sxsp" path="res://src/main/resources/com/character/movementstates/crouch/CrouchWalk.tres" id="9_gguhd"]
 [ext_resource type="Resource" uid="uid://cmplp30ynbkn2" path="res://src/main/resources/com/character/movementstates/crouch/CrouchSprint.tres" id="10_gguhd"]
@@ -204,25 +207,29 @@ stances = Dictionary[String, NodePath]({
 "Crouch": NodePath("Stances/Crouch"),
 "Upright": NodePath("Stances/Upright")
 })
+combat_states = Dictionary[String, ExtResource("5_3qk6j")]({
+"Combat": ExtResource("6_j83q5"),
+"NoCombat": ExtResource("7_dnye5")
+})
 
 [node name="MeshRoot" type="Node3D" parent="."]
 
 [node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(4.1246634e-10, -0.01568844, -0.080805)
+bones/0/position = Vector3(6.330122e-10, -0.017545875, -0.080805)
 bones/0/rotation = Quaternion(0.49999994, 0.5, 0.50000006, 0.49999994)
-bones/1/rotation = Quaternion(0.4452743, 0.071639225, 0.6918293, -0.5638891)
+bones/1/rotation = Quaternion(0.40784773, 0.072960444, 0.7466821, -0.5203873)
 bones/2/position = Vector3(9.615773e-09, 0.082558654, 2.7734737e-07)
-bones/2/rotation = Quaternion(0.46472213, -0.020730497, -0.032342885, 0.8846228)
+bones/2/rotation = Quaternion(0.45794967, -0.03411241, 0.05504092, 0.8866166)
 bones/3/position = Vector3(-1.0930023e-08, 0.062253766, -1.1402478e-07)
-bones/3/rotation = Quaternion(-0.103888564, -0.059261438, 0.027461339, 0.9924421)
+bones/3/rotation = Quaternion(-0.10291735, -0.05884755, 0.029218562, 0.99251765)
 bones/4/position = Vector3(-4.8997775e-09, 0.08556744, 6.0373327e-07)
-bones/4/rotation = Quaternion(-0.04680577, -0.19284889, 0.036483895, 0.9794322)
+bones/4/rotation = Quaternion(-0.05442968, -0.19457042, 0.021887818, 0.97913265)
 bones/5/position = Vector3(0.021079967, 0.21339308, 0.002515259)
 bones/5/rotation = Quaternion(-0.00047389846, -0.018184228, -0.67505306, 0.73754495)
 bones/6/position = Vector3(7.8207626e-07, 0.12742597, -1.4310157e-07)
-bones/6/rotation = Quaternion(-0.09531671, 0.05772168, -0.65476376, 0.7475743)
+bones/6/rotation = Quaternion(-0.14228773, 0.071838506, -0.6547137, 0.7388798)
 bones/7/position = Vector3(-8.812152e-06, 0.21891485, 5.022073e-07)
 bones/7/rotation = Quaternion(0.3027673, -0.06968061, 0.017427513, 0.95035404)
 bones/8/position = Vector3(3.9147208e-06, 0.19730072, -1.0427817e-06)
@@ -260,7 +267,7 @@ bones/23/rotation = Quaternion(0.21349443, 0.14238712, 0.26183492, 0.9303701)
 bones/24/position = Vector3(-0.021079993, 0.2133929, 0.0025152704)
 bones/24/rotation = Quaternion(-0.00047393717, 0.018184144, 0.6750538, 0.73754424)
 bones/25/position = Vector3(-1.0291499e-06, 0.12742594, -1.3907786e-07)
-bones/25/rotation = Quaternion(-0.13380834, -0.08049446, 0.65568507, 0.73871046)
+bones/25/rotation = Quaternion(-0.08860815, -0.07588965, 0.65355015, 0.747838)
 bones/26/position = Vector3(9.009113e-06, 0.21891469, 5.0244086e-07)
 bones/26/rotation = Quaternion(0.30276734, 0.06968071, -0.017427515, 0.9503541)
 bones/27/position = Vector3(-3.7767309e-06, 0.19730061, -1.0299036e-06)
@@ -296,21 +303,21 @@ bones/41/rotation = Quaternion(0.2914769, -0.39089307, 0.25898007, 0.8337705)
 bones/42/position = Vector3(-3.5298262e-06, 0.030804988, 6.395837e-06)
 bones/42/rotation = Quaternion(0.21353132, -0.14242001, -0.26180342, 0.9303655)
 bones/43/position = Vector3(-5.6178515e-09, 0.27671474, -0.016780255)
-bones/43/rotation = Quaternion(0.19344191, -0.10756046, 0.031614233, 0.9746854)
+bones/43/rotation = Quaternion(0.19419755, -0.11316232, 0.03295512, 0.9738561)
 bones/44/position = Vector3(5.1289806e-10, 0.10856673, -1.8166644e-06)
 bones/44/rotation = Quaternion(-0.21635218, -3.545634e-08, -1.3662817e-08, 0.9763155)
 bones/45/position = Vector3(0.08844692, -0.004813332, -0.010240662)
-bones/45/rotation = Quaternion(0.9483323, 0.08912988, -0.25357565, -0.16858551)
+bones/45/rotation = Quaternion(0.9579024, 0.17576832, -0.20911206, -0.08832251)
 bones/46/position = Vector3(2.3124135e-06, 0.34780714, -1.4624995e-06)
-bones/46/rotation = Quaternion(0.23606971, 0.21966878, -0.04033826, 0.9457217)
-bones/47/rotation = Quaternion(-0.5880591, 0.01108847, -0.045255125, 0.80747473)
-bones/48/rotation = Quaternion(-0.41432822, 0.020838775, 0.026480045, 0.90950364)
+bones/46/rotation = Quaternion(0.36964396, 0.22296049, -0.0067455396, 0.9020014)
+bones/47/rotation = Quaternion(-0.49834344, 0.0017683977, -0.005446716, 0.86696076)
+bones/48/rotation = Quaternion(-0.36510527, 0.020468282, 0.031260338, 0.93021613)
 bones/49/position = Vector3(-0.08844691, -0.0048132897, -0.010240681)
-bones/49/rotation = Quaternion(0.9570677, -0.07672139, 0.23312645, -0.15423149)
+bones/49/rotation = Quaternion(0.9313952, -0.10442299, 0.2163028, -0.2735178)
 bones/50/position = Vector3(-2.30093e-06, 0.34780744, -1.4577587e-06)
-bones/50/rotation = Quaternion(0.36330137, -0.20772943, 0.16053261, 0.8939183)
-bones/51/rotation = Quaternion(-0.51744026, 0.009170617, 0.023268862, 0.8553538)
-bones/52/rotation = Quaternion(-0.32628724, -0.020141004, -0.034898534, 0.9444116)
+bones/50/rotation = Quaternion(0.111833654, -0.10215195, -0.04273478, 0.98753834)
+bones/51/rotation = Quaternion(-0.55563825, 0.0042040627, -0.05449774, 0.82962555)
+bones/52/rotation = Quaternion(-0.365782, -0.020473571, -0.031195953, 0.9299523)
 
 [node name="AnimationTree" type="AnimationTree" parent="MeshRoot"]
 root_node = NodePath("../Model")
@@ -412,6 +419,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, 0)
 shape = SubResource("CylinderShape3D_gguhd")
 disabled = true
 
+[connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
+[connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]
 [connection signal="changed_movement_direction" from="." to="MovementController" method="on_set_movement_direction"]
 [connection signal="changed_movement_direction" from="." to="AnimationController" method="on_set_movement_direction"]
 [connection signal="changed_movement_state" from="." to="CameraRoot" method="on_set_movement_state"]
@@ -419,8 +428,6 @@ disabled = true
 [connection signal="changed_movement_state" from="." to="AnimationController" method="on_set_movement_state"]
 [connection signal="changed_stance" from="." to="CameraRoot" method="on_set_stance"]
 [connection signal="changed_stance" from="." to="AnimationController" method="on_set_stance"]
-[connection signal="changed_strafing_state" from="." to="MovementController" method="on_set_strafing_state"]
-[connection signal="changed_strafing_state" from="." to="AnimationController" method="on_set_strafing_state"]
 [connection signal="pressed_jump" from="." to="MovementController" method="jump"]
 [connection signal="pressed_jump" from="." to="AnimationController" method="jump"]
 [connection signal="set_cam_rotation" from="CameraRoot" to="MovementController" method="on_set_cam_rotation"]
