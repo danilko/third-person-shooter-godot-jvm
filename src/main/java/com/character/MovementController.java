@@ -37,7 +37,7 @@ public class MovementController extends Node {
   private double speed = 0.0;
   private double camRotation = 0.0;
   private double playerInitRotation = 0.0;
-  private boolean strafing = false;
+  private boolean combat = false;
   private float strafingMovementSpeedFactor = 1.0f;
   private float strafingMovementAccelerationFactor = 1.0f;
 
@@ -74,7 +74,7 @@ public class MovementController extends Node {
 
     // Handle Mesh Rotation
     double targetRotation;
-    if (strafing) {
+    if (combat) {
       // Face camera direction regardless of movement
       targetRotation = camRotation - playerInitRotation;
     } else {
@@ -106,10 +106,10 @@ public class MovementController extends Node {
   }
 
   @RegisterFunction
-  public void onSetStrafingState(StrafingState strafingState) {
-    strafing = strafingState.isStrafing();
-    strafingMovementSpeedFactor = strafingState.getMovementSpeedFactor();
-    strafingMovementAccelerationFactor = strafingState.getStrafingMovementAccelerationFactor();
+  public void onSetCombatState(CombatState combatState) {
+    combat = combatState.isCombat();
+    strafingMovementSpeedFactor = combatState.getMovementSpeedFactor();
+    strafingMovementAccelerationFactor = combatState.getStrafingMovementAccelerationFactor();
   }
 
   @RegisterFunction

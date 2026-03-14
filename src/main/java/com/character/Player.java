@@ -4,10 +4,8 @@ import godot.api.CharacterBody3D;
 import godot.annotation.*;
 import godot.api.*;
 import godot.core.*;
-import godot.global.GD;
 
 import java.lang.Math;
-import java.lang.Object;
 
 @RegisterClass
 public class Player extends CharacterBody3D {
@@ -26,7 +24,7 @@ public class Player extends CharacterBody3D {
   public final Signal1<Vector3> changedMovementDirection = Signal1.create(this, "changedMovementDirection");
 
   @RegisterSignal
-  public final Signal1<StrafingState> changedStrafingState= Signal1.create(this, "changedStrafingState");
+  public final Signal1<CombatState> changedCombatState= Signal1.create(this, "changedCombatState");
   // Exports
   @RegisterProperty
   public int maxAirJump = 1;
@@ -41,7 +39,7 @@ public class Player extends CharacterBody3D {
 
   @Export
   @RegisterProperty
-  public Dictionary<String, StrafingState> strafingStates = new Dictionary<>(String.class, StrafingState.class);
+  public Dictionary<String, CombatState> combatStates = new Dictionary<>(String.class, CombatState.class);
 
   // Internal State
   private int airJumpCounter = 0;
@@ -49,7 +47,7 @@ public class Player extends CharacterBody3D {
   private String currentStanceName = "Upright";
   private String currentMovementStateName = "";
   private SceneTreeTimer stanceAntispamTimer;
-  private boolean currentStrafing = false;
+  private boolean combat = false;
 
   @RegisterFunction
   @Override
@@ -62,7 +60,7 @@ public class Player extends CharacterBody3D {
     changedMovementDirection.emit(Vector3.Companion.getBACK());
     setMovementState("Idle");
     setStance(currentStanceName);
-    setStrafingState();
+    setCombatState();
   }
 
   @RegisterFunction
@@ -72,12 +70,12 @@ public class Player extends CharacterBody3D {
 
     Input input = Input.INSTANCE;
 
-    // Update strafing
-    boolean strafing = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
+    // Update combat
+    boolean currentCombat = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
 
-    if (currentStrafing != strafing) {
-      currentStrafing = strafing;
-      setStrafingState();
+    if (combat != currentCombat) {
+      combat = currentCombat;
+      setCombatState();
     }
 
     if (event.isActionPressed("movement", false) || event.isActionReleased("movement", false)) {
@@ -126,9 +124,9 @@ public class Player extends CharacterBody3D {
     }
   }
 
-  private void setStrafingState() {
+  private void setCombatState() {
 
-    changedStrafingState.emit(strafingStates.get(currentStrafing ? "Strafing" : "NoStrafing"));
+    changedCombatState.emit(combatStates.get(combat ? "Combat" : "NoCombat"));
   }
 
   @RegisterFunction

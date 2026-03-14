@@ -1,10 +1,7 @@
-[gd_scene load_steps=11 format=3 uid="uid://jvsaup8qx28"]
+[gd_scene load_steps=8 format=3 uid="uid://jvsaup8qx28"]
 
 [ext_resource type="Texture2D" uid="uid://cjnj1vweebmy5" path="res://addons/kenney_prototype_textures/orange/texture_01.png" id="1_umubf"]
-[ext_resource type="Script" uid="uid://mtsj57twt27p" path="res://gdj/com/character/StrafingState.gdj" id="2_kj2pm"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
-[ext_resource type="Resource" uid="uid://hfsbhmhtpqq8" path="res://src/main/resources/com/character/strafingstates/Strafing.tres" id="3_uecv0"]
-[ext_resource type="Resource" uid="uid://c2wokahkmhfdd" path="res://src/main/resources/com/character/strafingstates/NoStrafing.tres" id="4_uecv0"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lj72b"]
 albedo_texture = ExtResource("1_umubf")
@@ -32,10 +29,6 @@ glow_strength = 0.75
 
 [node name="Player" parent="." instance=ExtResource("2_lj72b")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7612269, 4.1552534)
-strafing_states = Dictionary[String, ExtResource("2_kj2pm")]({
-"NoStrafing": ExtResource("4_uecv0"),
-"Strafing": ExtResource("3_uecv0")
-})
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
 
