@@ -29,7 +29,7 @@ public class AnimationController extends Node {
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
   private String currentStanceName = "Upright";
-  private StrafingState.StrafingStateType strafingStateType = StrafingState.StrafingStateType.NOT_STRAFING;
+  private boolean strafing = false;
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
   private MovementState currentMovementState = null;
@@ -76,7 +76,7 @@ public class AnimationController extends Node {
 
   @RegisterFunction
   public void onSetStrafingState(StrafingState strafingState) {
-    this.strafingStateType = strafingState.getStrafingStateType();
+      strafing = strafingState.isStrafing();
   }
 
   @RegisterFunction
@@ -96,16 +96,15 @@ public class AnimationController extends Node {
 
     tween = createTween();
 
-    if (strafingStateType == StrafingState.StrafingStateType.STRAFING) {
+    if (strafing) {
       int id = Math.min(movementState.getId(), 1);
-      animationDirection.setX(id * movementDirection.getX());
+      // The animation is opposite of the direction calculation
+      animationDirection.setX(id * movementDirection.getX() * -1);
       animationDirection.setY(id * movementDirection.getY());
     } else {
       animationDirection.setX(0.0f);
       animationDirection.setY(movementState.getId());
     }
-
-    GD.print("starf:" + (strafingStateType == StrafingState.StrafingStateType.STRAFING) + "," + animationDirection);
 
     String blendPath = "parameters/" + currentStanceName + "MovementBlend/blend_position";
     tween.tweenProperty(animationTree, new NodePath(blendPath), animationDirection, 0.25);
