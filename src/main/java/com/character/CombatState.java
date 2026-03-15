@@ -14,11 +14,11 @@ public class CombatState extends Resource {
 
   @Export
   @RegisterProperty
-  public float movementSpeedFactor = 1.0f;
+  public double combatSpeedFactor = 1.0f;
 
   @Export
   @RegisterProperty
-  public float strafingMovementAccelerationFactor = 1.0f;
+  public double combatAccelerationFactor = 1.0f;
 
 
   // Default constructor is required for Godot to instantiate the Resource
@@ -30,11 +30,11 @@ public class CombatState extends Resource {
     return combat;
   }
 
-  public float getMovementSpeedFactor() {
-    return movementSpeedFactor;
+  public double getCombatSpeedFactor() {
+    return combatSpeedFactor;
   }
 
-  public float getStrafingMovementAccelerationFactor() {
-    return strafingMovementAccelerationFactor;
+  public double getCombatAccelerationFactor() {
+    return combatAccelerationFactor;
   }
 }

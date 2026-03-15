@@ -4,8 +4,10 @@ import godot.api.CharacterBody3D;
 import godot.annotation.*;
 import godot.api.*;
 import godot.core.*;
+import godot.global.GD;
 
 import java.lang.Math;
+import java.util.Objects;
 
 @RegisterClass
 public class Player extends CharacterBody3D {
@@ -13,6 +15,12 @@ public class Player extends CharacterBody3D {
   // Signal Definitions
   @RegisterSignal
   public final Signal1<JumpState> pressedJump = Signal1.create(this, "pressedJump");
+
+  @RegisterSignal
+  public final Signal1<RollState> pressedRoll = Signal1.create(this, "pressedRoll");
+
+  @RegisterSignal
+  public final Signal0 completedRoll = Signal0.create(this, "completedRoll");
 
   @RegisterSignal
   public final Signal1<Stance> changedStance = Signal1.create(this, "changedStance");
@@ -41,12 +49,17 @@ public class Player extends CharacterBody3D {
   @RegisterProperty
   public Dictionary<String, CombatState> combatStates = new Dictionary<>(String.class, CombatState.class);
 
+  @Export
+  @RegisterProperty
+  public RollState rollState = null;
+
   // Internal State
   private int airJumpCounter = 0;
   private Vector3 movementDirection = new Vector3();
   private String currentStanceName = "Upright";
   private String currentMovementStateName = "";
   private SceneTreeTimer stanceAntispamTimer;
+  private SceneTreeTimer rollCooldownTimer;
   private boolean combat = false;
 
   @RegisterFunction
@@ -55,6 +68,7 @@ public class Player extends CharacterBody3D {
     SceneTree tree = getTree();
     if (tree != null) {
       stanceAntispamTimer = tree.createTimer(0.25f);
+      rollCooldownTimer = tree.createTimer(0.0f);
     }
 
     changedMovementDirection.emit(Vector3.Companion.getBACK());
@@ -115,7 +129,15 @@ public class Player extends CharacterBody3D {
       }
     }
 
-    if (isOnFloor()) {
+    if (input.isActionPressed("roll", false)) {
+      if (isOnFloor() && isMovementOngoing() && rollState != null) {
+        if (rollCooldownTimer == null || rollCooldownTimer.getTimeLeft() <= 0) {
+          roll(true);
+        }
+      }
+    }
+
+    if (isOnFloor() && (rollCooldownTimer == null || rollCooldownTimer.getTimeLeft() <= 0)) {
       for (String stanceKey : stances.keys()) {
         if (event.isActionPressed(stanceKey.toLowerCase(), false)) {
           setStance(stanceKey);
@@ -127,6 +149,52 @@ public class Player extends CharacterBody3D {
   private void setCombatState() {
 
     changedCombatState.emit(combatStates.get(combat ? "Combat" : "NoCombat"));
+  }
+
+  private void roll(boolean isRoll) {
+    SceneTree tree = getTree();
+    if (tree != null && isRoll) {
+      rollCooldownTimer = Objects.requireNonNull(tree.createTimer(rollState.getRollDuration()));
+      rollCooldownTimer.getTimeout().connect(Callable.create(this, StringNames.toGodotName("completedRoll")), 1);
+    }
+
+    // If not crouch, then disable collider to enable crouch
+    if (! currentStanceName.equals("Crouch")) {
+
+      String disabledStanceColliderName = currentStanceName;
+      String enabledStanceColliderName = "Crouch";
+
+      if(!isRoll) {
+        disabledStanceColliderName = enabledStanceColliderName;
+        enabledStanceColliderName = currentStanceName;
+      }
+
+      NodePath disabledStancePath = stances.get(disabledStanceColliderName);
+      if (disabledStancePath != null) {
+        Stance currentStanceNode = (Stance) getNode(disabledStancePath);
+        if (currentStanceNode != null && currentStanceNode.getCollider() != null) {
+          currentStanceNode.getCollider().setDisabled(true);
+        }
+      }
+
+      NodePath enabledStanceStancePath = stances.get(enabledStanceColliderName);
+      if (enabledStanceStancePath != null) {
+        Stance currentStanceNode = (Stance) getNode(enabledStanceStancePath);
+        if (currentStanceNode != null && currentStanceNode.getCollider() != null) {
+          currentStanceNode.getCollider().setDisabled(false);
+        }
+      }
+    }
+
+    if (isRoll) {
+      pressedRoll.emit(rollState);
+    }
+  }
+
+  @RegisterFunction
+  public void completedRoll() {
+    completedRoll.emit();
+    roll(false);
   }
 
   @RegisterFunction
@@ -210,6 +278,10 @@ public class Player extends CharacterBody3D {
 
   public Signal1<JumpState> getPressedJump() {
     return pressedJump;
+  }
+
+  public Signal1<RollState> getPressedRoll() {
+    return pressedRoll;
   }
 
 
