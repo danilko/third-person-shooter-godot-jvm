@@ -1,6 +1,7 @@
-[gd_scene load_steps=8 format=3 uid="uid://jvsaup8qx28"]
+[gd_scene load_steps=9 format=3 uid="uid://jvsaup8qx28"]
 
 [ext_resource type="Texture2D" uid="uid://cjnj1vweebmy5" path="res://addons/kenney_prototype_textures/orange/texture_01.png" id="1_umubf"]
+[ext_resource type="Resource" uid="uid://drollstate01" path="res://src/main/resources/com/character/rollstates/Roll.tres" id="2_hbo2n"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lj72b"]
@@ -29,6 +30,7 @@ glow_strength = 0.75
 
 [node name="Player" parent="." instance=ExtResource("2_lj72b")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7612269, 4.1552534)
+roll_state = ExtResource("2_hbo2n")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
 

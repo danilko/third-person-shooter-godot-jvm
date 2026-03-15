@@ -38,8 +38,11 @@ public class MovementController extends Node {
   private double camRotation = 0.0;
   private double playerInitRotation = 0.0;
   private boolean combat = false;
-  private float strafingMovementSpeedFactor = 1.0f;
-  private float strafingMovementAccelerationFactor = 1.0f;
+  private double combatSpeedFactor = 1.0;
+  private double combatAccelerationFactor = 1.0;
+  private boolean rolling = false;
+  private double rollTimer = 0.0;
+  private double rollSpeed = 0.0;
 
   @RegisterFunction
   @Override
@@ -56,8 +59,13 @@ public class MovementController extends Node {
 
     // Calculate horizontal velocity
     Vector3 normDir = direction.normalized();
-    velocity.setX(speed * normDir.getX());
-    velocity.setZ(speed * normDir.getZ());
+    if (rolling) {
+      velocity.setX(rollSpeed * normDir.getX());
+      velocity.setZ(rollSpeed * normDir.getZ());
+    } else {
+      velocity.setX(speed * normDir.getX());
+      velocity.setZ(speed * normDir.getZ());
+    }
 
     // Handle Gravity
     if (!player.isOnFloor()) {
@@ -74,7 +82,10 @@ public class MovementController extends Node {
 
     // Handle Mesh Rotation
     double targetRotation;
-    if (combat) {
+    if (rolling && direction.lengthSquared() > 0.001) {
+      // During roll: always face movement direction, even in combat
+      targetRotation = atan2(direction.getX(), direction.getZ()) - playerInitRotation;
+    } else if (combat) {
       // Face camera direction regardless of movement
       targetRotation = camRotation - playerInitRotation;
     } else {
@@ -94,6 +105,18 @@ public class MovementController extends Node {
   }
 
   @RegisterFunction
+  public void roll(RollState rollState) {
+    rolling = true;
+    rollTimer = rollState.getRollDuration();
+    rollSpeed = rollState.getRollSpeed();
+  }
+
+  @RegisterFunction
+  public void completedRoll() {
+    rolling = false;
+  }
+
+  @RegisterFunction
   public void jump(JumpState jumpState) {
     velocity.setY(2.0 * jumpState.getJumpHeight() / jumpState.getApexDuration());
     jumpGravity = velocity.getY() / jumpState.getApexDuration();
@@ -101,15 +124,15 @@ public class MovementController extends Node {
 
   @RegisterFunction
   public void onSetMovementState(MovementState movementState) {
-    speed = movementState.getMovementSpeed() * strafingMovementSpeedFactor;
-    acceleration = movementState.getAcceleration() * strafingMovementAccelerationFactor;
+    speed = movementState.getMovementSpeed() * combatSpeedFactor;
+    acceleration = movementState.getAcceleration() * combatSpeedFactor;
   }
 
   @RegisterFunction
   public void onSetCombatState(CombatState combatState) {
     combat = combatState.isCombat();
-    strafingMovementSpeedFactor = combatState.getMovementSpeedFactor();
-    strafingMovementAccelerationFactor = combatState.getStrafingMovementAccelerationFactor();
+    combatSpeedFactor = combatState.getCombatSpeedFactor();
+    combatAccelerationFactor = combatState.getCombatAccelerationFactor();
   }
 
   @RegisterFunction

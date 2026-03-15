@@ -53,8 +53,25 @@ public class AnimationController extends Node {
   public void jump(JumpState jumpState) {
     if (animationTree == null) return;
 
+    if (tween != null && tween.isValid()) {
+      tween.kill();
+    }
+
     // Request a OneShot animation fire
     String path = "parameters/" + jumpState.getAnimationName() + "/request";
+    animationTree.set(path, AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
+  }
+
+  @RegisterFunction
+  public void roll(RollState rollState) {
+    if (animationTree == null) return;
+
+    if (tween != null && tween.isValid()) {
+      tween.kill();
+    }
+
+    // Request a OneShot animation fire
+    String path = "parameters/" + rollState.getAnimationName() + "/request";
     animationTree.set(path, AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
   }
 
