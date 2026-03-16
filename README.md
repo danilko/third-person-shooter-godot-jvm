@@ -26,7 +26,10 @@ V CRAWL
 MOUSE RIGHT/LEFT FIRE/AIM
 
 ## Models/Codes
-Base codes reference following:
+Base codes and models reference following:
 https://github.com/JohnnyRouddro/Godot_Third_Person_Controller
 https://github.com/JohnnyRouddro/Godot_Third_Person_Shooter
 https://johnnyrouddro.itch.io/godot-4-third-person-controller
+
+Additional Model references:
+https://quaternius.itch.io/50-lowpoly-guns 
