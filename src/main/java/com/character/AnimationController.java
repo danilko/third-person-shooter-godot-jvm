@@ -96,6 +96,13 @@ public class AnimationController extends Node {
       combat = combatState.isCombat();
 
       animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
+      // Update neck to T pose so crawl and other will not have issue
+      animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
+
+      if ("crawl".equalsIgnoreCase(currentStanceName)) {
+        animationTree.set("parameters/SpineFront/blend_amount", combat ? 1 : 0);
+      }
+      animationTree.set("parameters/SpineFront/blend_amount", 0);
 
       aimLookAtModifier.setActive(combat);
   }
