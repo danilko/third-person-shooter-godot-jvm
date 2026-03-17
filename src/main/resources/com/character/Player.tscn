@@ -1,4 +1,4 @@
-[gd_scene load_steps=75 format=3 uid="uid://bwxj3ecw2ta4k"]
+[gd_scene load_steps=79 format=3 uid="uid://bwxj3ecw2ta4k"]
 
 [ext_resource type="Script" uid="uid://do4hfd78xb1p2" path="res://src/main/java/com/character/Player.java" id="1_i0ahk"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
@@ -28,6 +28,12 @@ filters = ["Godot_Chan_Stealth/Skeleton3D:pelvis"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_2iqcg"]
 animation = &"air_jump"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_3f5w5"]
+animation = &"aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_733dx"]
+animation = &"T"
 
 [sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_j83q5"]
 input_0/name = "Combat"
@@ -128,6 +134,10 @@ filters = ["Godot_Chan_Stealth/Skeleton3D:clavicle_l", "Godot_Chan_Stealth/Skele
 
 [sub_resource type="AnimationNodeTimeScale" id="AnimationNodeTimeScale_ige6o"]
 
+[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_3f5w5"]
+filter_enabled = true
+filters = ["Godot_Chan_Stealth/Skeleton3D:head_2", "Godot_Chan_Stealth/Skeleton3D:neck_01"]
+
 [sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_ige6o"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_j83q5"]
@@ -139,6 +149,10 @@ timeline_length = 1.0
 stretch_time_scale = true
 start_offset = 0.0
 loop_mode = 0
+
+[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_1oyrj"]
+filter_enabled = true
+filters = ["Godot_Chan_Stealth/Skeleton3D:spine_01"]
 
 [sub_resource type="Curve" id="Curve_ige6o"]
 _data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
@@ -245,8 +259,8 @@ blend_point_1/node = SubResource("AnimationNodeAnimation_d6yvc")
 blend_point_1/pos = 1.0
 
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jn40o"]
-graph_offset = Vector2(389.78687, 487.37762)
-nodes/output/position = Vector2(1820, 140)
+graph_offset = Vector2(-750.7827, 98.49005)
+nodes/output/position = Vector2(2560, 160)
 nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_u0wnu")
 nodes/UprightMovementBlend/position = Vector2(-260, -120)
 nodes/CrawlMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_d6yvc")
@@ -281,7 +295,15 @@ nodes/WeaponHold/node = SubResource("AnimationNodeBlendSpace1D_3qk6j")
 nodes/WeaponHold/position = Vector2(1020, 840)
 nodes/CombatTransition/node = SubResource("AnimationNodeTransition_j83q5")
 nodes/CombatTransition/position = Vector2(1280, 620)
-node_connections = [&"output", 0, &"Roll", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"Holster", &"Roll", 1, &"RollAnimation", &"Holster", 0, &"AirJump", &"Holster", 1, &"CombatTransition", &"CombatTransition", 0, &"WeaponAim", &"CombatTransition", 1, &"WeaponHold"]
+nodes/NeckFront/node = SubResource("AnimationNodeBlend2_3f5w5")
+nodes/NeckFront/position = Vector2(2000, 120)
+nodes/Animation/node = SubResource("AnimationNodeAnimation_733dx")
+nodes/Animation/position = Vector2(1800, 360)
+nodes/SpineFront/node = SubResource("AnimationNodeBlend2_1oyrj")
+nodes/SpineFront/position = Vector2(2300, 120)
+"nodes/Animation 2/node" = SubResource("AnimationNodeAnimation_3f5w5")
+"nodes/Animation 2/position" = Vector2(2120, 380)
+node_connections = [&"output", 0, &"SpineFront", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"Holster", &"Roll", 1, &"RollAnimation", &"Holster", 0, &"AirJump", &"Holster", 1, &"CombatTransition", &"CombatTransition", 0, &"WeaponAim", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Roll", &"NeckFront", 1, &"Animation", &"SpineFront", 0, &"NeckFront", &"SpineFront", 1, &"Animation 2"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_yfjlo"]
 radius = 0.35
@@ -319,15 +341,15 @@ combat_states = Dictionary[String, ExtResource("5_3qk6j")]({
 [node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(8.578573e-10, -0.019870795, -0.080805)
+bones/0/position = Vector3(8.613687e-10, -0.019396782, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.46073675, 0.089631274, 0.6727318, -0.5719439)
+bones/1/rotation = Quaternion(0.46745127, 0.08483151, 0.66559356, -0.5755678)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.42482284, -0.1692148, -0.062063865, 0.88715273)
+bones/2/rotation = Quaternion(0.42300543, -0.16528696, -0.07341906, 0.8878944)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.09833832, -0.11514626, 0.028605849, 0.988055)
+bones/3/rotation = Quaternion(-0.09833303, -0.118130736, 0.027950443, 0.98772186)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.057896033, -0.06542424, 0.0056203622, 0.99616075)
+bones/4/rotation = Quaternion(-0.05784693, -0.064969204, 0.0059163296, 0.9961916)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.112705514, -0.14391057, -0.6632347, 0.7257458)
 bones/6/position = Vector3(1.0724269e-06, 0.12742595, -1.4746742e-07)
@@ -405,24 +427,24 @@ bones/41/rotation = Quaternion(0.19331649, -0.5937154, -0.22193715, 0.7489156)
 bones/42/position = Vector3(-3.2651706e-06, 0.030804794, 6.3835973e-06)
 bones/42/rotation = Quaternion(0.21353129, -0.14241995, -0.26180324, 0.9303656)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19544192, -0.021987734, 0.0063671866, 0.9804481)
+bones/43/rotation = Quaternion(0.1954403, -0.021955999, 0.0063592438, 0.9804492)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.9618548, 0.0195848, -0.24823658, -0.11327197)
+bones/45/rotation = Quaternion(0.96398014, -3.380328e-05, -0.2522967, -0.08419437)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.14811154, 0.22687463, -0.017390562, 0.96243876)
-bones/47/rotation = Quaternion(-0.46827567, 0.021105504, -0.023808222, 0.8830094)
-bones/48/rotation = Quaternion(-0.32641426, 0.020142261, 0.034886744, 0.944368)
+bones/46/rotation = Quaternion(0.14601567, 0.22688201, -0.016976152, 0.96276474)
+bones/47/rotation = Quaternion(-0.4547527, 0.02177191, -0.023928251, 0.89002997)
+bones/48/rotation = Quaternion(-0.3086229, 0.0199825, 0.036517225, 0.9502732)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.9313459, -0.1388333, 0.20848517, -0.26429933)
+bones/49/rotation = Quaternion(0.9256003, -0.15456672, 0.20180018, -0.28044608)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.26519024, -0.20219064, 0.042187948, 0.9418139)
-bones/51/rotation = Quaternion(-0.62505746, -0.0072204974, 0.008286843, 0.7805013)
-bones/52/rotation = Quaternion(-0.39580515, -0.020705212, -0.028301546, 0.9176648)
+bones/50/rotation = Quaternion(0.28281337, -0.20224869, 0.046968546, 0.9364326)
+bones/51/rotation = Quaternion(-0.6419809, -0.005690955, 0.008548626, 0.76665187)
+bones/52/rotation = Quaternion(-0.40932828, -0.02080335, -0.026974505, 0.91175115)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8"]
-transform = Transform3D(-0.6254072, 0.064537995, 0.77762496, 0.7231808, 0.4222089, 0.5465795, -0.2930451, 0.90419793, -0.31072545, -0.15522921, 1.1007013, 0.15090433)
+transform = Transform3D(-0.62700903, 0.06448011, 0.7763388, 0.72204, 0.42220685, 0.54808736, -0.29243475, 0.904203, -0.3112849, -0.15718207, 1.1006975, 0.15015882)
 bone_name = "hand_r"
 bone_idx = 27
 
@@ -442,7 +464,7 @@ root_node = NodePath("../Model")
 tree_root = SubResource("AnimationNodeBlendTree_jn40o")
 anim_player = NodePath("../Model/AnimationPlayer")
 parameters/UprightMovementBlend/blend_position = Vector2(-0.8934037, 0.855814)
-parameters/CrawlMovementBlend/blend_position = Vector2(0, 0)
+parameters/CrawlMovementBlend/blend_position = Vector2(1, 0)
 parameters/CrouchMovementBlend/blend_position = Vector2(1, 0)
 parameters/StanceTransition/current_state = "Upright"
 parameters/StanceTransition/transition_request = ""
@@ -464,6 +486,8 @@ parameters/WeaponHold/blend_position = 1.0
 parameters/CombatTransition/current_state = "Combat"
 parameters/CombatTransition/transition_request = ""
 parameters/CombatTransition/current_index = 0
+parameters/NeckFront/blend_amount = 0.0
+parameters/SpineFront/blend_amount = 0.0
 
 [node name="UprightCollision" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
