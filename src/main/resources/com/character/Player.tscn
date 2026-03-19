@@ -1,4 +1,4 @@
-[gd_scene load_steps=79 format=3 uid="uid://bwxj3ecw2ta4k"]
+[gd_scene load_steps=83 format=3 uid="uid://bwxj3ecw2ta4k"]
 
 [ext_resource type="Script" uid="uid://do4hfd78xb1p2" path="res://src/main/java/com/character/Player.java" id="1_i0ahk"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
@@ -259,7 +259,6 @@ blend_point_1/node = SubResource("AnimationNodeAnimation_d6yvc")
 blend_point_1/pos = 1.0
 
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jn40o"]
-graph_offset = Vector2(-750.7827, 98.49005)
 nodes/output/position = Vector2(2560, 160)
 nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_u0wnu")
 nodes/UprightMovementBlend/position = Vector2(-260, -120)
@@ -320,6 +319,22 @@ height = 0.94
 height = 0.48
 radius = 0.7
 
+[sub_resource type="Animation" id="Animation_dnye5"]
+length = 0.001
+
+[sub_resource type="Animation" id="Animation_j83q5"]
+resource_name = "ShoulderLeft"
+
+[sub_resource type="Animation" id="Animation_y2cl2"]
+resource_name = "ShoulderRight"
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_k4e70"]
+_data = {
+&"RESET": SubResource("Animation_dnye5"),
+&"ShoulderLeft": SubResource("Animation_j83q5"),
+&"ShoulderRight": SubResource("Animation_y2cl2")
+}
+
 [node name="Player" type="CharacterBody3D"]
 script = ExtResource("1_i0ahk")
 jump_states = Dictionary[String, ExtResource("2_ige6o")]({
@@ -336,20 +351,50 @@ combat_states = Dictionary[String, ExtResource("5_3qk6j")]({
 "NoCombat": ExtResource("7_dnye5")
 })
 
+[node name="AnimationTree" type="AnimationTree" parent="."]
+root_node = NodePath("../MeshRoot/Model")
+tree_root = SubResource("AnimationNodeBlendTree_jn40o")
+anim_player = NodePath("../MeshRoot/Model/AnimationPlayer")
+parameters/UprightMovementBlend/blend_position = Vector2(-0.8934037, 0.855814)
+parameters/CrawlMovementBlend/blend_position = Vector2(1, 0)
+parameters/CrouchMovementBlend/blend_position = Vector2(1, 0)
+parameters/StanceTransition/current_state = "Upright"
+parameters/StanceTransition/transition_request = ""
+parameters/StanceTransition/current_index = 0
+parameters/MovementAnimSpeed/scale = 1.0
+parameters/OnFloorBlend/blend_amount = 1.0
+parameters/GroundJump/active = false
+parameters/GroundJump/internal_active = false
+parameters/GroundJump/request = 0
+parameters/AirJump/active = false
+parameters/AirJump/internal_active = false
+parameters/AirJump/request = 0
+parameters/Roll/active = false
+parameters/Roll/internal_active = false
+parameters/Roll/request = 0
+parameters/Holster/blend_amount = 1.0
+parameters/WeaponAim/blend_position = 1.0
+parameters/WeaponHold/blend_position = 1.0
+parameters/CombatTransition/current_state = "Combat"
+parameters/CombatTransition/transition_request = ""
+parameters/CombatTransition/current_index = 0
+parameters/NeckFront/blend_amount = 0.0
+parameters/SpineFront/blend_amount = 0.0
+
 [node name="MeshRoot" type="Node3D" parent="."]
 
 [node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(8.613687e-10, -0.019396782, -0.080805)
+bones/0/position = Vector3(8.8085567e-10, -0.019803053, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.46745127, 0.08483151, 0.66559356, -0.5755678)
+bones/1/rotation = Quaternion(0.46724293, 0.08588795, 0.662213, -0.5794663)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.42300543, -0.16528696, -0.07341906, 0.8878944)
+bones/2/rotation = Quaternion(0.42281365, -0.15892433, -0.07639012, 0.88889605)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.09833303, -0.118130736, 0.027950443, 0.98772186)
+bones/3/rotation = Quaternion(-0.098028086, -0.1246819, 0.029285174, 0.986908)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.05784693, -0.064969204, 0.0059163296, 0.9961916)
+bones/4/rotation = Quaternion(-0.057727907, -0.06386202, 0.0066365898, 0.9962656)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.112705514, -0.14391057, -0.6632347, 0.7257458)
 bones/6/position = Vector3(1.0724269e-06, 0.12742595, -1.4746742e-07)
@@ -427,24 +472,24 @@ bones/41/rotation = Quaternion(0.19331649, -0.5937154, -0.22193715, 0.7489156)
 bones/42/position = Vector3(-3.2651706e-06, 0.030804794, 6.3835973e-06)
 bones/42/rotation = Quaternion(0.21353129, -0.14241995, -0.26180324, 0.9303656)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.1954403, -0.021955999, 0.0063592438, 0.9804492)
+bones/43/rotation = Quaternion(0.19543639, -0.021878786, 0.0063399198, 0.9804518)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.96398014, -3.380328e-05, -0.2522967, -0.08419437)
+bones/45/rotation = Quaternion(0.96330786, -0.0023495853, -0.253257, -0.08884514)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.14601567, 0.22688201, -0.016976152, 0.96276474)
-bones/47/rotation = Quaternion(-0.4547527, 0.02177191, -0.023928251, 0.89002997)
-bones/48/rotation = Quaternion(-0.3086229, 0.0199825, 0.036517225, 0.9502732)
+bones/46/rotation = Quaternion(0.17992638, 0.22607084, -0.026246067, 0.9569898)
+bones/47/rotation = Quaternion(-0.47085783, 0.021317964, -0.024325117, 0.88161594)
+bones/48/rotation = Quaternion(-0.32057232, 0.020090474, 0.03542466, 0.94634825)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.9256003, -0.15456672, 0.20180018, -0.28044608)
+bones/49/rotation = Quaternion(0.92900753, -0.15467161, 0.20252387, -0.268339)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.28281337, -0.20224869, 0.046968546, 0.9364326)
-bones/51/rotation = Quaternion(-0.6419809, -0.005690955, 0.008548626, 0.76665187)
-bones/52/rotation = Quaternion(-0.40932828, -0.02080335, -0.026974505, 0.91175115)
+bones/50/rotation = Quaternion(0.29384798, -0.20343915, 0.050812073, 0.9325686)
+bones/51/rotation = Quaternion(-0.6313077, -0.006222476, 0.008856836, 0.7754569)
+bones/52/rotation = Quaternion(-0.400265, -0.020738006, -0.027865525, 0.91574097)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8"]
-transform = Transform3D(-0.62700903, 0.06448011, 0.7763388, 0.72204, 0.42220685, 0.54808736, -0.29243475, 0.904203, -0.3112849, -0.15718207, 1.1006975, 0.15015882)
+transform = Transform3D(-0.6216911, 0.057476968, 0.7811508, 0.69841146, 0.49214455, 0.5196298, -0.3545724, 0.8686136, -0.34610456, -0.15788516, 1.1142609, 0.13919371)
 bone_name = "hand_r"
 bone_idx = 27
 
@@ -455,39 +500,9 @@ transform = Transform3D(-0.22872102, 0.7304517, 0.6435271, 0.89219904, 0.4217406
 transform = Transform3D(0.16, 0, 0, 0, 0.16, 0, 0, 0, 0.16, 0, 0, 0)
 
 [node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9"]
-target_node = NodePath("../../../../../CameraRoot/CamYaw/CamPitch/SpringArm/Camera/SpineIKTarget")
+target_node = NodePath("../../../../../CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget")
 bone_name = "spine_03"
 bone = 4
-
-[node name="AnimationTree" type="AnimationTree" parent="MeshRoot"]
-root_node = NodePath("../Model")
-tree_root = SubResource("AnimationNodeBlendTree_jn40o")
-anim_player = NodePath("../Model/AnimationPlayer")
-parameters/UprightMovementBlend/blend_position = Vector2(-0.8934037, 0.855814)
-parameters/CrawlMovementBlend/blend_position = Vector2(1, 0)
-parameters/CrouchMovementBlend/blend_position = Vector2(1, 0)
-parameters/StanceTransition/current_state = "Upright"
-parameters/StanceTransition/transition_request = ""
-parameters/StanceTransition/current_index = 0
-parameters/MovementAnimSpeed/scale = 1.0
-parameters/OnFloorBlend/blend_amount = 1.0
-parameters/GroundJump/active = false
-parameters/GroundJump/internal_active = false
-parameters/GroundJump/request = 0
-parameters/AirJump/active = false
-parameters/AirJump/internal_active = false
-parameters/AirJump/request = 0
-parameters/Roll/active = false
-parameters/Roll/internal_active = false
-parameters/Roll/request = 0
-parameters/Holster/blend_amount = 1.0
-parameters/WeaponAim/blend_position = 1.0
-parameters/WeaponHold/blend_position = 1.0
-parameters/CombatTransition/current_state = "Combat"
-parameters/CombatTransition/transition_request = ""
-parameters/CombatTransition/current_index = 0
-parameters/NeckFront/blend_amount = 0.0
-parameters/SpineFront/blend_amount = 0.0
 
 [node name="UprightCollision" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
@@ -498,30 +513,32 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.27, 0)
 target_position = Vector3(0, 1.02, 0)
 
 [node name="CameraRoot" type="Node3D" parent="." node_paths=PackedStringArray("player")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
 script = ExtResource("5_u0j3k")
 player = NodePath("..")
 
-[node name="CamYaw" type="Node3D" parent="CameraRoot"]
+[node name="Yaw" type="Node3D" parent="CameraRoot"]
 
-[node name="CamPitch" type="Node3D" parent="CameraRoot/CamYaw"]
-transform = Transform3D(1, 0, 0, 0, 0.94942546, -0.31399244, 0, 0.31399244, 0.94942546, 0, 0.8, 0)
+[node name="Pitch" type="Node3D" parent="CameraRoot/Yaw"]
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 
-[node name="SpringArm" type="SpringArm3D" parent="CameraRoot/CamYaw/CamPitch"]
-transform = Transform3D(-1, 0, 1.509958e-07, 0, 1, 0, -1.509958e-07, 0, -1, 0, 0, 0)
+[node name="Pivot" type="Node3D" parent="CameraRoot/Yaw/Pitch"]
+transform = Transform3D(-1, 0, 1.509958e-07, 0, 0.9999995, 0, -1.509957e-07, 0, -0.9999995, 0, 0.4, 0)
+
+[node name="SpringArm" type="SpringArm3D" parent="CameraRoot/Yaw/Pitch/Pivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 1.4210855e-14, 0, 1, 0, 0, 0)
 shape = SubResource("SphereShape3D_3mnk3")
-spring_length = 3.0
 
-[node name="Camera" type="Camera3D" parent="CameraRoot/CamYaw/CamPitch/SpringArm"]
-transform = Transform3D(1, 0, -1.4210855e-14, 0, 1, 2.9802322e-08, 2.842171e-14, -2.9802322e-08, 1, 0, 0, -2.2)
+[node name="Camera" type="Camera3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm"]
+transform = Transform3D(1, -2.5410988e-21, 8.526513e-14, 0, 1.0000002, 2.980233e-08, 2.842171e-14, -2.980233e-08, 1.0000002, 0, 0, -2.2)
 doppler_tracking = 1
 fov = 65.0
 far = 8192.0
 
-[node name="SpineIKTarget" type="Marker3D" parent="CameraRoot/CamYaw/CamPitch/SpringArm/Camera"]
-transform = Transform3D(1, -2.4868996e-14, 4.2632564e-14, 3.5527137e-15, 1, -1.7881393e-07, 1.4210855e-14, 2.0861626e-07, 1, -2.842171e-14, -1.1920929e-07, -3.5762787e-07)
+[node name="SpineIKTarget" type="Marker3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera"]
+transform = Transform3D(1, -2.4868996e-14, 4.2632564e-14, 3.5527133e-15, 1, -1.7881393e-07, 1.4210855e-14, 2.0861626e-07, 1, 0, 0, -20)
 
-[node name="RayCast3D" type="RayCast3D" parent="CameraRoot/CamYaw/CamPitch/SpringArm/Camera"]
+[node name="RayCast3D" type="RayCast3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera"]
 transform = Transform3D(1, 0, 7.1054274e-15, 3.5527137e-15, -5.9604645e-08, -0.99999994, 1.4210855e-14, 0.99999994, -5.9604645e-08, -2.842171e-14, -1.1920929e-07, -3.5762787e-07)
 target_position = Vector3(0, -1000, 0)
 
@@ -532,7 +549,7 @@ mesh_root = NodePath("../MeshRoot")
 
 [node name="AnimationController" type="Node" parent="." node_paths=PackedStringArray("animation_tree", "player", "aim_look_at_modifier")]
 script = ExtResource("5_jn40o")
-animation_tree = NodePath("../MeshRoot/AnimationTree")
+animation_tree = NodePath("../AnimationTree")
 player = NodePath("..")
 aim_look_at_modifier = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/AimModifier")
 
@@ -553,6 +570,7 @@ script = ExtResource("7_2iqcg")
 idle_state = ExtResource("11_kuqdj")
 walk_state = ExtResource("12_agpyf")
 sprint_state = ExtResource("13_jwg7l")
+camera_height = 1.2
 collider = NodePath("../../UprightCollision")
 col_raycast = NodePath("../../UprightCollision/RayCast3D")
 
@@ -579,6 +597,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, 0)
 shape = SubResource("CylinderShape3D_gguhd")
 disabled = true
 
+[node name="CamAnimation" type="AnimationPlayer" parent="."]
+libraries = {
+&"": SubResource("AnimationLibrary_k4e70")
+}
+
+[connection signal="changed_combat_state" from="." to="CameraRoot" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]
 [connection signal="changed_movement_direction" from="." to="MovementController" method="on_set_movement_direction"]
@@ -588,7 +612,6 @@ disabled = true
 [connection signal="changed_movement_state" from="." to="AnimationController" method="on_set_movement_state"]
 [connection signal="changed_stance" from="." to="CameraRoot" method="on_set_stance"]
 [connection signal="changed_stance" from="." to="AnimationController" method="on_set_stance"]
-[connection signal="completed_roll" from="." to="MovementController" method="completed_roll"]
 [connection signal="pressed_jump" from="." to="MovementController" method="jump"]
 [connection signal="pressed_jump" from="." to="AnimationController" method="jump"]
 [connection signal="pressed_roll" from="." to="MovementController" method="roll"]
