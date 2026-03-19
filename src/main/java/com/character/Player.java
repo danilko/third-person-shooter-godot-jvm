@@ -74,10 +74,10 @@ public class Player extends CharacterBody3D {
       rollCooldownTimer = tree.createTimer(0.0f);
     }
 
-    rayCast3D = (RayCast3D) getNode("CameraRoot/CamYaw/CamPitch/SpringArm/Camera/RayCast3D");
+    rayCast3D = (RayCast3D) getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
 
     rayCast3D.addException(this);
-    marker3D = (Marker3D)getNode("CameraRoot/CamYaw/CamPitch/SpringArm/Camera/SpineIKTarget");
+    marker3D = (Marker3D)getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
     changedMovementDirection.emit(Vector3.Companion.getBACK());
     setMovementState("Idle");
     setStance(currentStanceName);
