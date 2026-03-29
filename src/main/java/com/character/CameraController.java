@@ -18,9 +18,7 @@ public class CameraController extends Node3D {
   @RegisterProperty
   public CharacterBody3D player;
 
-  @Export
-  @RegisterProperty
-  public int shoulderDirection = 1;
+  private int shoulderDirection = 1;
 
   private Node3D yawNode;
   private Node3D pitchNode;
@@ -43,6 +41,7 @@ public class CameraController extends Node3D {
   private float springArmLengthTarget = 3;
 
   private double movementFov = 0.0;
+  private double cameraFov = 0.0;
   private boolean combat = false;
 
   private Tween tween;
@@ -74,6 +73,18 @@ public class CameraController extends Node3D {
       yaw += -mouseMotion.getRelative().getX() * yawSensitivity;
       pitch += mouseMotion.getRelative().getY() * pitchSensitivity;
     }
+
+    if(event.isActionPressed("shoulder")) {
+      changeShoulderDirection();
+    }
+  }
+
+  public void changeShoulderDirection() {
+    shoulderDirection = shoulderDirection * -1;
+
+    positionOffsetTarget.setX(positionOffsetTarget.getX() * shoulderDirection);
+
+    setCamearFov();
   }
 
   @RegisterFunction
@@ -115,6 +126,7 @@ public class CameraController extends Node3D {
   @RegisterFunction
   public void onSetCombatState(CombatState combatState) {
     combat = combatState.isCombat();
+    cameraFov = combatState.cameraFov;
     positionOffsetTarget.setX(combatState.cameraShoulderOffset * shoulderDirection);
     springArmLengthTarget = (float) combatState.cameraDistance;
 
@@ -135,7 +147,7 @@ public class CameraController extends Node3D {
     double targetFov = movementFov;
     // move to combat
     if(combat) {
-      targetFov *= 0.9;
+      targetFov = cameraFov;
     }
 
     tween = createTween();

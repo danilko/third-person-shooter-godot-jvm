@@ -6,6 +6,7 @@ import godot.api.*;
 import godot.annotation.Export;
 import godot.annotation.RegisterProperty;
 import godot.core.NodePath;
+import godot.core.VariantArray;
 import godot.core.Vector2;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -25,6 +26,16 @@ public class AnimationController extends Node {
   @Export
   public LookAtModifier3D aimLookAtModifier;
 
+  @RegisterProperty
+  @Export
+  public Node3D pistol;
+  @RegisterProperty
+  @Export
+  public Node3D rifle;
+
+
+  private int weapon = 0;
+
   private double onFloorBlend = 1.0;
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
@@ -33,6 +44,7 @@ public class AnimationController extends Node {
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
   private MovementState currentMovementState = null;
+
 
   @RegisterFunction
   @Override
@@ -79,6 +91,54 @@ public class AnimationController extends Node {
   public void onSetMovementState(MovementState movementState) {
     currentMovementState = movementState;
     updateAnimationBlend(movementState);
+  }
+
+  @RegisterFunction
+  public void onSetWeapon(int weapon) {
+    if (animationTree == null) return;
+
+    // ensure weapon is display (for init purpose)
+    if(this.weapon == 0) {
+      pistol.setVisible(true);
+    }
+    else {
+      rifle.setVisible(true);
+    }
+
+    // No need to switch weapon
+    if (weapon == this.weapon) {
+      return;
+    }
+
+
+    // Request a OneShot switch animation
+    // First put away original weapon
+    // Equip new weapon, equip it
+    animationTree.set("parameters/WeaponChangeAnimation/blend_position", this.weapon);
+    animationTree.set("parameters/WeaponChangeScale/transition_request", -1);
+    animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
+    if(this.weapon == 0) {
+      pistol.setVisible(false);
+    }
+    else {
+      rifle.setVisible(false);
+    }
+
+    this.weapon = weapon;
+    // Equip new weapon, equip it
+    if(this.weapon == 0) {
+      pistol.setVisible(true);
+    }
+    else {
+      rifle.setVisible(true);
+    }
+    animationTree.set("parameters/WeaponChangeAnimation/blend_position", this.weapon);
+    animationTree.set("parameters/WeaponChangeScale/transition_request", 1);
+    animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
+
+    animationTree.set("parameters/WeaponAim/blend_position", this.weapon );
+    animationTree.set("parameters/WeaponHold/blend_position", this.weapon );
+
   }
 
   @RegisterFunction

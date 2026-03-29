@@ -131,8 +131,8 @@ public class MovementController extends Node {
   @RegisterFunction
   public void onSetCombatState(CombatState combatState) {
     combat = combatState.isCombat();
-    combatSpeedFactor = combatState.getCombatSpeedFactor();
-    combatAccelerationFactor = combatState.getCombatAccelerationFactor();
+    combatSpeedFactor = combatState.getSpeedFactor();
+    combatAccelerationFactor = combatState.getAccelerationFactor();
   }
 
   @RegisterFunction

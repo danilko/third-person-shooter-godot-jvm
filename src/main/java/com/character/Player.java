@@ -8,6 +8,7 @@ import godot.global.GD;
 
 import java.lang.Math;
 import java.util.Objects;
+import java.util.Vector;
 
 @RegisterClass
 public class Player extends CharacterBody3D {
@@ -33,6 +34,11 @@ public class Player extends CharacterBody3D {
 
   @RegisterSignal
   public final Signal1<CombatState> changedCombatState= Signal1.create(this, "changedCombatState");
+
+
+  @RegisterSignal
+  public final Signal1<Integer> changedWeapon =  Signal1.create(this, "changedWeapon");
+
   // Exports
   @RegisterProperty
   public int maxAirJump = 1;
@@ -57,13 +63,17 @@ public class Player extends CharacterBody3D {
   private int airJumpCounter = 0;
   private Vector3 movementDirection = new Vector3();
   private String currentStanceName = "Upright";
-  private String currentMovementStateName = "";
+  private String currentMovementStateName = "Idle";
   private SceneTreeTimer stanceAntispamTimer;
   private SceneTreeTimer rollCooldownTimer;
   private boolean combat = false;
 
   private RayCast3D rayCast3D;
   private Marker3D  marker3D;
+
+  private Control radialMenu;
+
+  private int weapon = 0;
 
   @RegisterFunction
   @Override
@@ -78,10 +88,14 @@ public class Player extends CharacterBody3D {
 
     rayCast3D.addException(this);
     marker3D = (Marker3D)getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
+
+    radialMenu =  (Control) getNode(new NodePath("RadialMenu"));
+
     changedMovementDirection.emit(Vector3.Companion.getBACK());
     setMovementState("Idle");
     setStance(currentStanceName);
     setCombatState();
+    setWeapon(0);
   }
 
   @RegisterFunction
@@ -231,8 +245,7 @@ public class Player extends CharacterBody3D {
     return Math.abs(movementDirection.getX()) > 0 || Math.abs(movementDirection.getZ()) > 0;
   }
 
-  private void setMovementState(String state) {
-
+  public void setMovementState(String state) {
 
     NodePath path = stances.get(currentStanceName);
 
@@ -378,5 +391,10 @@ public class Player extends CharacterBody3D {
 
   public void setStanceAntispamTimer(SceneTreeTimer stanceAntispamTimer) {
     this.stanceAntispamTimer = stanceAntispamTimer;
+  }
+
+  public void setWeapon(int weapon) {
+    this.weapon = weapon;
+    changedWeapon.emit(weapon);
   }
 }
