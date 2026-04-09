@@ -1,5 +1,6 @@
 package com.ui;
 
+import com.character.MovementType;
 import com.character.Player;
 import com.character.WeaponController;
 import godot.annotation.Export;
@@ -48,7 +49,7 @@ public class RadialMenu extends Control {
     player.setProcessInput(false);
     // Stop the player movement to prevent infinite move
     player.setMovementDirection(Vector3.Companion.getZERO());
-    player.setMovementState("Idle");
+    player.setMovementState(MovementType.IDLE);
     camera.setProcessInput(false);
     show();
     animationPlayer.play("Zoom");
@@ -58,7 +59,7 @@ public class RadialMenu extends Control {
     Input.setMouseMode(Input.MouseMode.CAPTURED);
     // Restore to Idle and let the player's _input re-derive the correct movement state
     // from current key presses on the next frame, avoiding stale cached state.
-    player.setMovementState("Idle");
+    player.setMovementState(MovementType.IDLE);
     player.setProcessInput(true);
     camera.setProcessInput(true);
     hide();

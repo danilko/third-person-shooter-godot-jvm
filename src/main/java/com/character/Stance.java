@@ -106,15 +106,11 @@ public class Stance extends Node {
     this.higherStances = higherStances;
   }
 
-  @RegisterFunction
-  public MovementState getMovementState(String stateName) {
-    switch (stateName) {
-      case "Idle":
-        return idleState;
-      case "Walk":
-        return walkState;
-      case "Sprint":
-        return sprintState;
+  public MovementState getMovementState(MovementType type) {
+    switch (type) {
+      case IDLE:   return idleState;
+      case WALK:   return walkState;
+      case SPRINT: return sprintState;
       default:
         return idleState;
     }

@@ -65,8 +65,8 @@ public class Player extends CharacterBody3D {
   // Internal State
   private int airJumpCounter = 0;
   private Vector3 movementDirection = new Vector3();
-  private String currentStanceName = "Upright";
-  private String currentMovementStateName = "Idle";
+  private StanceName currentStanceName = StanceName.UPRIGHT;
+  private MovementType currentMovementType = MovementType.IDLE;
   private boolean isRolling = false;
   private Timer stanceAntispamTimer;
   private Timer rollTimer;
@@ -106,7 +106,7 @@ public class Player extends CharacterBody3D {
     marker3D = (Marker3D) getNode(spineIKTargetPath);
 
     changedMovementDirection.emit(Vector3.Companion.getBACK());
-    setMovementState("Idle");
+    setMovementState(MovementType.IDLE);
     setStance(currentStanceName);
     setCombatState();
     setWeapon(0);
@@ -121,21 +121,15 @@ public class Player extends CharacterBody3D {
 
 
     if (event.isActionPressed("movement", false) || event.isActionReleased("movement", false)) {
-      String movementState = "Idle";
+      MovementType movementType = MovementType.IDLE;
       movementDirection.setX(input.getActionStrength("left") - input.getActionStrength("right"));
       movementDirection.setZ(input.getActionStrength("forward") - input.getActionStrength("back"));
 
       if (isMovementOngoing()) {
-
-        if (input.isActionPressed("walk", false)) {
-          movementState = "Walk";
-        } else {
-
-          movementState = "Sprint";
-        }
+        movementType = input.isActionPressed("walk", false) ? MovementType.WALK : MovementType.SPRINT;
       }
 
-      setMovementState(movementState);
+      setMovementState(movementType);
     }
 
     if (input.isActionPressed("reload", false)) {
@@ -171,17 +165,17 @@ public class Player extends CharacterBody3D {
 
       if (input.isActionPressed("jump", false)) {
         if (airJumpCounter <= maxAirJump) {
-          if (isStanceBlocked("Upright")) return;
+          if (isStanceBlocked(StanceName.UPRIGHT)) return;
 
-          if (!currentStanceName.equals("Upright")) {
-            setStance("Upright");
+          if (currentStanceName != StanceName.UPRIGHT) {
+            setStance(StanceName.UPRIGHT);
             return;
           }
 
           String jumpName = (airJumpCounter > 0) ? "AirJump" : "GroundJump";
           JumpState state = jumpStates.get(jumpName);
           if (state != null) {
-            getPressedJump().emit(state);
+            pressedJump.emit(state);
           }
           airJumpCounter++;
         }
@@ -201,7 +195,7 @@ public class Player extends CharacterBody3D {
     if (isOnFloor() && (rollTimer == null || rollTimer.getTimeLeft() <= 0)) {
       for (String stanceKey : stances.keys()) {
         if (event.isActionPressed(stanceKey.toLowerCase(), false)) {
-          setStance(stanceKey);
+          setStance(StanceName.fromKey(stanceKey));
         }
       }
     }
@@ -216,18 +210,13 @@ public class Player extends CharacterBody3D {
 
     isRolling = isRoll;
 
-    // If not crouch, then disable collider to enable crouch
-    if (!currentStanceName.equals("Crouch")) {
+    // If not crouch, swap to crouch collider during roll
+    if (currentStanceName != StanceName.CROUCH) {
 
-      String disabledStanceColliderName = currentStanceName;
-      String enabledStanceColliderName = "Crouch";
+      StanceName disabledStanceName = isRoll ? currentStanceName : StanceName.CROUCH;
+      StanceName enabledStanceName  = isRoll ? StanceName.CROUCH  : currentStanceName;
 
-      if (!isRoll) {
-        disabledStanceColliderName = enabledStanceColliderName;
-        enabledStanceColliderName = currentStanceName;
-      }
-
-      NodePath disabledStancePath = stances.get(disabledStanceColliderName);
+      NodePath disabledStancePath = stances.get(disabledStanceName.getKey());
       if (disabledStancePath != null) {
         Stance currentStanceNode = (Stance) getNode(disabledStancePath);
         if (currentStanceNode != null && currentStanceNode.getCollider() != null) {
@@ -235,9 +224,9 @@ public class Player extends CharacterBody3D {
         }
       }
 
-      NodePath enabledStanceStancePath = stances.get(enabledStanceColliderName);
-      if (enabledStanceStancePath != null) {
-        Stance currentStanceNode = (Stance) getNode(enabledStanceStancePath);
+      NodePath enabledStancePath = stances.get(enabledStanceName.getKey());
+      if (enabledStancePath != null) {
+        Stance currentStanceNode = (Stance) getNode(enabledStancePath);
         if (currentStanceNode != null && currentStanceNode.getCollider() != null) {
           currentStanceNode.getCollider().setDisabled(false);
         }
@@ -286,19 +275,17 @@ public class Player extends CharacterBody3D {
     return Math.abs(movementDirection.getX()) > 0 || Math.abs(movementDirection.getZ()) > 0;
   }
 
-  public void setMovementState(String state) {
-
-    NodePath path = stances.get(currentStanceName);
-
+  public void setMovementState(MovementType type) {
+    NodePath path = stances.get(currentStanceName.getKey());
     if (path == null) return;
 
     Stance stanceNode = (Stance) getNode(path);
     if (stanceNode == null) return;
-    currentMovementStateName = state;
-    changedMovementState.emit(stanceNode.getMovementState(state));
+    currentMovementType = type;
+    changedMovementState.emit(stanceNode.getMovementState(type));
   }
 
-  private void setStance(String stanceName) {
+  private void setStance(StanceName stanceName) {
     if (stanceAntispamTimer.getTimeLeft() > 0) {
       return;
     }
@@ -308,12 +295,12 @@ public class Player extends CharacterBody3D {
       stanceAntispamTimer.start();
     }
 
-    String nextStanceName = (stanceName.equals(currentStanceName)) ? "Upright" : stanceName;
+    StanceName nextStanceName = (stanceName == currentStanceName) ? StanceName.UPRIGHT : stanceName;
 
     if (isStanceBlocked(nextStanceName)) return;
 
     // Disable current collider
-    NodePath currentPath = stances.get(currentStanceName);
+    NodePath currentPath = stances.get(currentStanceName.getKey());
     if (currentPath != null) {
       Stance currentStanceNode = (Stance) getNode(currentPath);
       if (currentStanceNode != null && currentStanceNode.getCollider() != null) {
@@ -323,7 +310,7 @@ public class Player extends CharacterBody3D {
 
     // Update name and enable new collider
     currentStanceName = nextStanceName;
-    NodePath nextPath = stances.get(currentStanceName);
+    NodePath nextPath = stances.get(currentStanceName.getKey());
     if (nextPath != null) {
       Stance nextStanceNode = (Stance) getNode(nextPath);
       if (nextStanceNode != null) {
@@ -334,96 +321,19 @@ public class Player extends CharacterBody3D {
       }
     }
 
-    setMovementState(currentMovementStateName);
+    setMovementState(currentMovementType);
   }
 
-  private boolean isStanceBlocked(String stanceName) {
-    NodePath path = stances.get(stanceName);
+  private boolean isStanceBlocked(StanceName stanceName) {
+    NodePath path = stances.get(stanceName.getKey());
     if (path == null) return false;
 
     Stance stanceNode = (Stance) getNode(path);
     return (stanceNode != null) && stanceNode.isBlocked();
   }
 
-
-  public Signal1<JumpState> getPressedJump() {
-    return pressedJump;
-  }
-
-  public Signal1<RollState> getPressedRoll() {
-    return pressedRoll;
-  }
-
-
-  public Signal1<Stance> getChangedStance() {
-    return changedStance;
-  }
-
-
-  public Signal1<MovementState> getChangedMovementState() {
-    return changedMovementState;
-  }
-
-
-  public Signal1<Vector3> getChangedMovementDirection() {
-    return changedMovementDirection;
-  }
-
-
-  public int getMaxAirJump() {
-    return maxAirJump;
-  }
-
-  public void setMaxAirJump(int maxAirJump) {
-    this.maxAirJump = maxAirJump;
-  }
-
-  public Dictionary<String, JumpState> getJumpStates() {
-    return jumpStates;
-  }
-
-  public void setJumpStates(Dictionary<String, JumpState> jumpStates) {
-    this.jumpStates = jumpStates;
-  }
-
-  public Dictionary<String, NodePath> getStances() {
-    return stances;
-  }
-
-  public void setStances(Dictionary<String, NodePath> stances) {
-    this.stances = stances;
-  }
-
-  public int getAirJumpCounter() {
-    return airJumpCounter;
-  }
-
-  public void setAirJumpCounter(int airJumpCounter) {
-    this.airJumpCounter = airJumpCounter;
-  }
-
-  public Vector3 getMovementDirection() {
-    return movementDirection;
-  }
-
   public void setMovementDirection(Vector3 movementDirection) {
     this.movementDirection = movementDirection;
-  }
-
-  public String getCurrentStanceName() {
-    return currentStanceName;
-  }
-
-  public void setCurrentStanceName(String currentStanceName) {
-    this.currentStanceName = currentStanceName;
-  }
-
-  public String getCurrentMovementStateName() {
-    return currentMovementStateName;
-  }
-
-  public void setCurrentMovementStateName(String currentMovementStateName) {
-    this.currentMovementStateName = currentMovementStateName;
   }
 
 

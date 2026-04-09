@@ -45,6 +45,7 @@ public class MovementController extends Node {
   private double rollTimer = 0.0;
   private double rollSpeed = 0.0;
   private Stance stance;
+  private MovementType currentMovementType = MovementType.IDLE;
 
   @RegisterProperty
   @Export
@@ -118,7 +119,7 @@ public class MovementController extends Node {
     float baseSpread = weaponStats.getSpread() + weaponStats.getMovementSpread() + (float) velocity.length();
     float jumpContrib = weaponStats.jumpSpread * (player.isOnFloor() ? 1 : 0);
     float aimContrib = combat ? weaponStats.getAimSpread() * 2 : 0;
-    float crouchContrib = "Idle".equalsIgnoreCase(stance.getName().toString()) ? weaponStats.crouchSpread * 2 : 0;
+    float crouchContrib = currentMovementType == MovementType.IDLE ? weaponStats.crouchSpread * 2 : 0;
     crosshair.setPositionX(baseSpread + jumpContrib + aimContrib + crouchContrib);
   }
 
@@ -150,6 +151,7 @@ public class MovementController extends Node {
   public void onSetMovementState(MovementState movementState) {
     speed = movementState.getMovementSpeed() * combatSpeedFactor;
     acceleration = movementState.getAcceleration() * combatAccelerationFactor;
+    currentMovementType = MovementType.fromId(movementState.getId());
   }
 
   @RegisterFunction
