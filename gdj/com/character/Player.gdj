@@ -6,7 +6,8 @@ fqName = com.character.Player
 relativeSourcePath = src/main/java/com/character/Player.java
 baseType = CharacterBody3D
 supertypes = [
-    godot.api.CharacterBody3D,
+    com.character.Character,
+	godot.api.CharacterBody3D,
 	godot.api.PhysicsBody3D,
 	godot.api.CollisionObject3D,
 	godot.api.Node3D,
@@ -30,21 +31,21 @@ signals = [
 	reload_weapon
 ]
 properties = [
-    max_air_jump,
+    ray_cast_node_path,
+	health_label_path,
+	max_air_jump,
 	jump_states,
 	stances,
 	combat_states,
 	roll_state,
 	weapon_controller,
-	ray_cast_node_path,
-	spine_i_k_target_path,
-	health_label_path
+	aim_target_path,
+	aim_ray_path
 ]
 functions = [
     _physics_process,
 	_ready,
-	_input,
-	on_player_died,
-	on_player_damaged,
-	completed_roll
+	completed_roll,
+	on_died,
+	on_player_damaged
 ]
