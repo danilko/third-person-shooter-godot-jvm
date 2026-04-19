@@ -4,6 +4,7 @@ import godot.annotation.*;
 import godot.api.*;
 import godot.core.NodePath;
 import godot.core.Signal1;
+import godot.core.StringName;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -12,7 +13,7 @@ public class CameraController extends Node3D {
 
   // Define the Signal
   @RegisterSignal
-  public Signal1<Double> setCamRotation = Signal1.create(this, "setCamRotation");
+  public Signal1<Double> setCamRotation = new Signal1<>(this, new StringName("set_cam_rotation"));
 
   @Export
   @RegisterProperty

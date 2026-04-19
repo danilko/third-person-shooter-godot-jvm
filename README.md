@@ -3,7 +3,7 @@
 A technical exploration of 3D game mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. This project adapts and refactors traditional GDScript-based third-person controllers into a Java/Kotlin-compatible architecture.
 
 ## 🛠 Tech Stack
-* **Engine:** Godot 4.5.1 (Custom [Utopia-Rise](https://github.com/utopia-rise/godot-kotlin-jvm) build required)
+* **Engine:** Godot 4.6 (Custom [Utopia-Rise](https://github.com/utopia-rise/godot-kotlin-jvm) build required)
 * **Language:** Java / Kotlin
 * **JDK:** Amazon Corretto 25
 
@@ -23,6 +23,7 @@ This project is based on Johnny Rouddro's Third Person Controller tutorial ([You
   * Use Navigation 3D Agent for movement
   * Use basic state machine for state
   * Basic damage systems for player and enemy
+  * Simple choose of weapon and re-fill
 
 > **Note:** This is an experimental codebase. You may encounter "crunch-time" bugs or unstable animations. It is provided as-is for educational purposes.
 
@@ -45,16 +46,17 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 
 ## 🎮 Controls
 
-| Action | Input |
-| :--- | :--- |
-| **Move** | `W` `A` `S` `D` |
-| **Jump / Double Jump** | `Space` |
-| **Roll** | `Ctrl` + Direction |
-| **Crouch / Crawl** | `C` / `V` |
-| **Aim / Fire** | `Mouse Right` / `Mouse Left` |
-| **Reload** | `R` |
-| **Switch Weapon** | `G` |
-| **Swap Camera Shoulder** | `Q` |
+| Action                   | Input                        |
+|:-------------------------|:-----------------------------|
+| **Move**                 | `W` `A` `S` `D`              |
+| **Jump / Double Jump**   | `Space`                      |
+| **Roll**                 | `Ctrl` + Direction           |
+| **Crouch / Crawl**       | `C` / `V`                    |
+| **Aim / Fire**           | `Mouse Right` / `Mouse Left` |
+| **Reload**               | `R`                          |
+| **Switch Weapon**        | `G`                          |
+| **Swap Camera Shoulder** | `Q`                          |
+| **Menu**                 | `Esc`                        |
 
 ---
 
