@@ -6,6 +6,7 @@ import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
+import godot.api.Area3D;
 import godot.api.NavigationAgent3D;
 import godot.api.RayCast3D;
 import godot.core.Vector3;
@@ -30,6 +31,12 @@ public class Enemy extends Character {
     @Export
     @RegisterProperty
     public float patrolRadius = 8.0f;
+
+    @Export
+    @RegisterProperty
+    public Area3D ammoRefill;
+
+    private static final float AMMO_REFILL_ARRIVAL_THRESHOLD = 1.5f;
 
     // ── AI state ──────────────────────────────────────────────────────────────
     private NavigationAgent3D navAgent;
@@ -97,12 +104,38 @@ public class Enemy extends Character {
         if (player == null) return false;
         float dist = (float) getGlobalPosition().distanceTo(player.getGlobalPosition());
         if (dist > detectionRange) return false;
+        return hasLineOfSight();
+    }
 
+    /** Pure LoS raycast with no distance limit — use when already engaged with the player. */
+    public boolean hasLineOfSight() {
+        if (player == null) return false;
         sightRay.setTargetPosition(sightRay.toLocal(player.getGlobalPosition()));
         sightRay.forceRaycastUpdate();
-
         if (!sightRay.isColliding()) return false;
         return sightRay.getCollider() == player;
+    }
+
+    /**
+     * Returns the best weapon index: prefers weapon 2 (index 1) if it has ammo,
+     * falls back to weapon 1 (index 0), returns -1 if all weapons are dry.
+     */
+    public int selectBestWeapon() {
+        if (weaponController == null) return 0;
+        int count = weaponController.getWeaponCount();
+        if (count > 1 && weaponController.hasAmmoForWeapon(1)) return 1;
+        if (count > 0 && weaponController.hasAmmoForWeapon(0)) return 0;
+        return -1;
+    }
+
+    public boolean hasAnyAmmo() {
+        return selectBestWeapon() >= 0;
+    }
+
+    public boolean isAtAmmoRefill() {
+        if (ammoRefill == null) return false;
+        return (float) getGlobalPosition().distanceTo(ammoRefill.getGlobalPosition())
+                <= AMMO_REFILL_ARRIVAL_THRESHOLD;
     }
 
     /** Pick a new random patrol destination within patrolRadius. */

@@ -40,7 +40,7 @@ public class GameManager extends Node {
         Node eventBusNode = getNodeOrNull("/root/EventBus");
         if (eventBusNode instanceof EventBus) {
             EventBus bus = (EventBus) eventBusNode;
-            bus.playerDied.connect(Callable.create(this, StringNames.toGodotName("onPlayerDied")), 1);
+            bus.playerDied.connectUnsafe(Callable.createUnsafe(this, StringNames.toGodotName("onPlayerDied")), godot.api.Object.ConnectFlags.DEFAULT);
         }
     }
 

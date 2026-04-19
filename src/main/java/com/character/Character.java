@@ -16,34 +16,34 @@ public class Character extends CharacterBody3D {
 
     // ── Signals ──────────────────────────────────────────────────────────────
     @RegisterSignal
-    public final Signal1<JumpState> pressedJump = Signal1.create(this, "pressedJump");
+    public final Signal1<JumpState> pressedJump = new Signal1<>(this, new StringName("pressed_jump"));
 
     @RegisterSignal
-    public final Signal1<RollState> pressedRoll = Signal1.create(this, "pressedRoll");
+    public final Signal1<RollState> pressedRoll = new Signal1<>(this, new StringName("pressed_roll"));
 
     @RegisterSignal
-    public final Signal1<Stance> changedStance = Signal1.create(this, "changedStance");
+    public final Signal1<Stance> changedStance = new Signal1<>(this, new StringName("changed_stance"));
 
     @RegisterSignal
-    public final Signal0 fireWeapon = Signal0.create(this, "fireWeapon");
+    public final Signal0 fireWeapon = new Signal0(this, new StringName("fire_weapon"));
 
     @RegisterSignal
-    public final Signal0 notFireWeapon = Signal0.create(this, "notFireWeapon");
+    public final Signal0 notFireWeapon = new Signal0(this, new StringName("not_fire_weapon"));
 
     @RegisterSignal
-    public final Signal1<MovementState> changedMovementState = Signal1.create(this, "changedMovementState");
+    public final Signal1<MovementState> changedMovementState = new Signal1<>(this, new StringName("changed_movement_state"));
 
     @RegisterSignal
-    public final Signal1<Vector3> changedMovementDirection = Signal1.create(this, "changedMovementDirection");
+    public final Signal1<Vector3> changedMovementDirection = new Signal1<>(this, new StringName("changed_movement_direction"));
 
     @RegisterSignal
-    public final Signal1<CombatState> changedCombatState = Signal1.create(this, "changedCombatState");
+    public final Signal1<CombatState> changedCombatState = new Signal1<>(this, new StringName("changed_combat_state"));
 
     @RegisterSignal
-    public final Signal1<Integer> changedWeapon = Signal1.create(this, "changedWeapon");
+    public final Signal1<Integer> changedWeapon = new Signal1<>(this, new StringName("changed_weapon"));
 
     @RegisterSignal
-    public final Signal0 reloadWeapon = Signal0.create(this, "reloadWeapon");
+    public final Signal0 reloadWeapon = new Signal0(this, new StringName("reload_weapon"));
 
     // ── Exports ───────────────────────────────────────────────────────────────
     @RegisterProperty
@@ -196,7 +196,7 @@ public class Character extends CharacterBody3D {
 
         // ── Reload ─────────────────────────────────────────────────────────
         if (input.reload) {
-            reloadWeapon.emitSignal();
+            reloadWeapon.emit();
         }
 
         // ── Jump ───────────────────────────────────────────────────────────

@@ -1,12 +1,10 @@
-[gd_scene load_steps=108 format=3 uid="uid://char_base_scene1"]
+[gd_scene format=3 uid="uid://dhp225d838mq7"]
 
-[ext_resource type="Script" path="res://src/main/java/com/character/Character.java" id="1_char"]
+[ext_resource type="Script" uid="uid://dlns4ymekq8lp" path="res://src/main/java/com/character/Character.java" id="1_char"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
-[ext_resource type="Script" uid="uid://dgjf58g3rfgvx" path="res://gdj/com/character/jumpstates/JumpState.gdj" id="2_ige6o"]
 [ext_resource type="Resource" uid="uid://cemhpckfs3peb" path="res://src/main/resources/com/character/jumpstates/AirJump.tres" id="3_ttk2h"]
 [ext_resource type="Resource" uid="uid://i3rr4c4emq7j" path="res://src/main/resources/com/character/jumpstates/GroundJump.tres" id="4_6f0xc"]
 [ext_resource type="Script" uid="uid://cdhqufum5menr" path="res://src/main/java/com/character/MovementController.java" id="4_ige6o"]
-[ext_resource type="Script" uid="uid://cynnu6moxlqc6" path="res://gdj/com/character/CombatState.gdj" id="5_3qk6j"]
 [ext_resource type="Resource" uid="uid://hfsbhmhtpqq8" path="res://src/main/resources/com/character/combatstates/Combat.tres" id="6_j83q5"]
 [ext_resource type="Script" uid="uid://bor7f5iyg250q" path="res://gdj/com/character/stances/Stance.gdj" id="7_2iqcg"]
 [ext_resource type="Resource" uid="uid://7ik6f781r71n" path="res://src/main/resources/com/character/movementstates/crawl/CrawlIdle.tres" id="7_d7d1u"]
@@ -29,7 +27,7 @@
 [ext_resource type="Texture2D" uid="uid://ca77s5fasgwv2" path="res://assets/ui/flash1.png" id="16_jxrhs"]
 [ext_resource type="Resource" uid="uid://cmkj336jpwf0o" path="res://src/main/resources/com/character/movementstates/crawl/CrawlWalk.tres" id="16_u0j3k"]
 [ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="31_4afhp"]
-[ext_resource type="Script" path="res://src/main/java/com/character/Health.java" id="40_hlth1"]
+[ext_resource type="Script" uid="uid://djt55pliyvi0y" path="res://src/main/java/com/character/Health.java" id="40_hlth1"]
 [ext_resource type="Resource" uid="uid://drollstate01" path="res://src/main/resources/com/character/rollstates/Roll.tres" id="50_roll"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_ige6o"]
@@ -501,9 +499,9 @@ albedo_color = Color(1, 0, 0, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_pwn40"]
 material = SubResource("StandardMaterial3D_v5nep")
 
-[node name="Character" type="CharacterBody3D" node_paths=PackedStringArray("weapon_controller")]
+[node name="Character" type="CharacterBody3D" unique_id=802038165 node_paths=PackedStringArray("weapon_controller")]
 script = ExtResource("1_char")
-jump_states = Dictionary[String, ExtResource("2_ige6o")]({
+jump_states = Dictionary[String, Object]({
 "AirJump": ExtResource("3_ttk2h"),
 "GroundJump": ExtResource("4_6f0xc")
 })
@@ -512,14 +510,14 @@ stances = Dictionary[String, NodePath]({
 "Crouch": NodePath("Stances/Crouch"),
 "Upright": NodePath("Stances/Upright")
 })
-combat_states = Dictionary[String, ExtResource("5_3qk6j")]({
+combat_states = Dictionary[String, Object]({
 "Combat": ExtResource("6_j83q5"),
 "NoCombat": ExtResource("7_dnye5")
 })
-weapon_controller = NodePath("WeaponController")
 roll_state = ExtResource("50_roll")
+weapon_controller = NodePath("WeaponController")
 
-[node name="AnimationTree" type="AnimationTree" parent="."]
+[node name="AnimationTree" type="AnimationTree" parent="." unique_id=1655806234]
 root_node = NodePath("../MeshRoot/Model")
 tree_root = SubResource("AnimationNodeBlendTree_jn40o")
 anim_player = NodePath("../MeshRoot/Model/AnimationPlayer")
@@ -558,20 +556,20 @@ parameters/WeaponChangeScale/scale = 1.0
 parameters/WeaponChangeAnimation/blend_position = 0.0
 parameters/WeaponChangeSeek/seek_request = -1.0
 
-[node name="MeshRoot" type="Node3D" parent="."]
+[node name="MeshRoot" type="Node3D" parent="." unique_id=1850647392]
 
-[node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
+[node name="Model" parent="MeshRoot" unique_id=2091451191 instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(9.532519e-10, -0.021401027, -0.080805)
+bones/0/position = Vector3(1.1400778e-10, -0.010298377, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.42342722, 0.11225701, 0.7547489, -0.48832566)
+bones/1/rotation = Quaternion(0.44084156, 0.10081334, 0.71475184, -0.53350276)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.4433443, -0.111096986, 0.061994866, 0.88727665)
+bones/2/rotation = Quaternion(0.43412817, -0.1628505, -0.00257526, 0.8860056)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.096337326, -0.18121211, 0.05108045, 0.97738034)
+bones/3/rotation = Quaternion(-0.09815853, -0.12598756, 0.03537353, 0.9865297)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.05814877, -0.054741975, 0.0069956873, 0.99678135)
+bones/4/rotation = Quaternion(-0.058047228, -0.06335825, 0.005217779, 0.9962877)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -649,38 +647,38 @@ bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19534875, -0.020153461, 0.005908083, 0.980509)
+bones/43/rotation = Quaternion(0.19541773, -0.021510793, 0.0062478185, 0.9804643)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.9298018, 0.15946794, -0.22523935, -0.24352762)
+bones/45/rotation = Quaternion(0.9680603, 0.06468169, -0.2313239, -0.07186772)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.38423553, 0.20706135, -0.08597576, 0.89559853)
-bones/47/rotation = Quaternion(-0.5625247, 0.019638777, -0.028977107, 0.8260391)
-bones/48/rotation = Quaternion(-0.4515217, 0.021083867, 0.022736829, 0.89172125)
+bones/46/rotation = Quaternion(0.43257126, 0.21593715, -0.07574487, 0.87207574)
+bones/47/rotation = Quaternion(-0.5409981, 0.017277637, -0.018587293, 0.84064084)
+bones/48/rotation = Quaternion(-0.3806202, 0.020590544, 0.029774236, 0.9240226)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.952821, 0.022913365, 0.27180186, -0.13315721)
+bones/49/rotation = Quaternion(0.94237167, -0.067613386, 0.23638715, -0.22690369)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.17504771, -0.21755353, 0.019241925, 0.96003056)
-bones/51/rotation = Quaternion(-0.5146585, -0.024468407, 0.026050813, 0.85665)
-bones/52/rotation = Quaternion(-0.2953858, -0.019859584, -0.037715644, 0.9544267)
+bones/50/rotation = Quaternion(0.20620728, -0.20516257, 0.025961272, 0.9564063)
+bones/51/rotation = Quaternion(-0.5910321, -0.01407659, 0.013359683, 0.80641454)
+bones/52/rotation = Quaternion(-0.35349315, -0.020373443, -0.032360576, 0.93465525)
 
-[node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8"]
-transform = Transform3D(-0.7129703, 0.041959494, 0.69993776, 0.68708736, 0.24102682, 0.6854321, -0.13994342, 0.9696107, -0.20067489, -0.1352418, 1.1916941, 0.3648964)
+[node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1709979392]
+transform = Transform3D(0.7238521, -0.035606187, -0.6890361, 0.6768854, 0.23010865, 0.6991969, 0.13365725, -0.97251344, 0.19066589, 0.11744116, 1.1970512, -0.44401306)
 bone_name = "hand_r"
 bone_idx = 27
 
-[node name="Rifile" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment"]
+[node name="Rifile" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=815868397]
 transform = Transform3D(-0.22872102, 0.7304517, 0.6435271, 0.89219904, 0.4217406, -0.16160382, -0.38944525, 0.537192, -0.74816924, -0.041, 0.021, 0.044)
 visible = false
 script = ExtResource("9_u0wnu")
 fire_audio = ExtResource("10_ufc68")
 reload_audio = ExtResource("11_4t16q")
 
-[node name="AssaultRifle2_12" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile" instance=ExtResource("9_j83q5")]
+[node name="AssaultRifle2_12" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile" unique_id=268130724 instance=ExtResource("9_j83q5")]
 transform = Transform3D(0.16, 0, 0, 0, 0.16, 0, 0, 0, 0.16, 0, 0, 0)
 
-[node name="Pistol" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment"]
+[node name="Pistol" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=233421788]
 visible = false
 script = ExtResource("9_u0wnu")
 spread = 25.0
@@ -698,68 +696,67 @@ recoil = 0.5
 fire_audio = ExtResource("13_rgjax")
 reload_audio = ExtResource("14_d6yvc")
 
-[node name="Pistol_52" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Pistol" instance=ExtResource("10_1qhsf")]
+[node name="Pistol_52" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Pistol" unique_id=1927507842 instance=ExtResource("10_1qhsf")]
 transform = Transform3D(-0.026545947, 0.107987374, 0.11503909, 0.15446925, 0.04156776, -0.003375052, -0.032164898, 0.11050269, -0.11115124, -0.011984825, 0.045636475, 0.009359002)
 
-[node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9"]
+[node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=178617702]
 target_node = NodePath("../../../../../AimTarget")
 bone_name = "spine_03"
 bone = 4
 
-[node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10"]
-transform = Transform3D(0.99913794, -0.013781813, -0.03915969, 7.190881e-05, 0.943859, -0.3303485, 0.041513935, 0.33006084, 0.94304615, -0.0059430995, 1.2413404, -0.07544946)
+[node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=374203861]
+transform = Transform3D(-0.99876547, 0.031342153, 0.038544226, 0.016268415, 0.9394321, -0.3423487, -0.046939496, -0.34129924, -0.93878204, -0.0121001415, 1.2540635, -0.0046315324)
 bone_name = "neck_01"
 bone_idx = 43
 
-[node name="OmniLight3D" type="OmniLight3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment"]
+[node name="OmniLight3D" type="OmniLight3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment" unique_id=1534281871]
 transform = Transform3D(0.23895359, 0.60108936, -0.7626222, 0.9260551, 0.095186725, 0.36518714, 0.29210156, -0.793493, -0.53389686, -0.0009861216, 0.36780286, 0.985576)
 light_color = Color(1, 0.9882353, 0.73333335, 1)
 shadow_enabled = true
 shadow_reverse_cull_face = true
 omni_range = 15.0
 
-[node name="MuzzleFlash" type="GPUParticles3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment"]
+[node name="MuzzleFlash" type="GPUParticles3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment" unique_id=781174153]
 transform = Transform3D(-0.773, 3.0363992e-08, 6.037208e-08, 0, 0.6905761, -0.3473236, -6.757781e-08, -0.3473236, -0.6905761, -0.112, 0.279, 0.659)
 amount = 1
 speed_scale = 8.0
 process_material = SubResource("ParticleProcessMaterial_8ulcr")
 draw_pass_1 = SubResource("QuadMesh_v5nep")
 
-[node name="Streaks" type="GPUParticles3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment"]
+[node name="Streaks" type="GPUParticles3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment" unique_id=1901128315]
 transform = Transform3D(-0.9996138, -0.025621599, 0.010813087, -0.027782144, 0.93733233, -0.34732836, -0.0012353025, -0.3474946, -0.93768096, -0.13395381, 2.5486934, 6.661838)
 amount = 1
+lifetime = 0.5
 speed_scale = 6.0
 process_material = SubResource("ParticleProcessMaterial_jxrhs")
 draw_pass_1 = SubResource("BoxMesh_jxrhs")
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment"]
-libraries = {
-&"": SubResource("AnimationLibrary_8ulcr")
-}
+[node name="AnimationPlayer" type="AnimationPlayer" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment" unique_id=2064557164]
+libraries/ = SubResource("AnimationLibrary_8ulcr")
 
-[node name="UprightCollision" type="CollisionShape3D" parent="."]
+[node name="UprightCollision" type="CollisionShape3D" parent="." unique_id=1192960009]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
 shape = SubResource("CapsuleShape3D_yfjlo")
 
-[node name="RayCast3D" type="RayCast3D" parent="UprightCollision"]
+[node name="RayCast3D" type="RayCast3D" parent="UprightCollision" unique_id=150935415]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.27, 0)
 target_position = Vector3(0, 1.02, 0)
 
-[node name="MovementController" type="Node" parent="." node_paths=PackedStringArray("player", "mesh_root", "weapon_controller")]
+[node name="MovementController" type="Node" parent="." unique_id=349324944 node_paths=PackedStringArray("player", "mesh_root", "weapon_controller")]
 script = ExtResource("4_ige6o")
 player = NodePath("..")
 mesh_root = NodePath("../MeshRoot")
 weapon_controller = NodePath("../WeaponController")
 
-[node name="AnimationController" type="Node" parent="." node_paths=PackedStringArray("animation_tree", "player", "aim_look_at_modifier")]
+[node name="AnimationController" type="Node" parent="." unique_id=1235095298 node_paths=PackedStringArray("animation_tree", "player", "aim_look_at_modifier")]
 script = ExtResource("13_4afhp")
 animation_tree = NodePath("../AnimationTree")
 player = NodePath("..")
 aim_look_at_modifier = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/AimModifier")
 
-[node name="Stances" type="Node" parent="."]
+[node name="Stances" type="Node" parent="." unique_id=1821526874]
 
-[node name="Crouch" type="Node" parent="Stances" node_paths=PackedStringArray("collider", "col_raycast", "higher_stances")]
+[node name="Crouch" type="Node" parent="Stances" unique_id=1942246071 node_paths=PackedStringArray("collider", "col_raycast", "higher_stances")]
 script = ExtResource("7_2iqcg")
 idle_state = ExtResource("8_ttk2h")
 walk_state = ExtResource("9_gguhd")
@@ -769,7 +766,7 @@ collider = NodePath("../../CrouchCollision")
 col_raycast = NodePath("../../CrouchCollision/RayCast3D")
 higher_stances = [NodePath("../Upright")]
 
-[node name="Upright" type="Node" parent="Stances" node_paths=PackedStringArray("collider", "col_raycast")]
+[node name="Upright" type="Node" parent="Stances" unique_id=963536893 node_paths=PackedStringArray("collider", "col_raycast")]
 script = ExtResource("7_2iqcg")
 idle_state = ExtResource("11_kuqdj")
 walk_state = ExtResource("12_agpyf")
@@ -778,7 +775,7 @@ camera_height = 1.2
 collider = NodePath("../../UprightCollision")
 col_raycast = NodePath("../../UprightCollision/RayCast3D")
 
-[node name="Crawl" type="Node" parent="Stances" node_paths=PackedStringArray("collider", "higher_stances")]
+[node name="Crawl" type="Node" parent="Stances" unique_id=1531972803 node_paths=PackedStringArray("collider", "higher_stances")]
 script = ExtResource("7_2iqcg")
 idle_state = ExtResource("7_d7d1u")
 walk_state = ExtResource("15_bgnjm")
@@ -787,57 +784,55 @@ camera_height = 0.7
 collider = NodePath("../../CrawlCollision")
 higher_stances = [NodePath("../Crouch"), NodePath("../Upright")]
 
-[node name="CrouchCollision" type="CollisionShape3D" parent="."]
+[node name="CrouchCollision" type="CollisionShape3D" parent="." unique_id=521225264]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.47, 0)
 shape = SubResource("CapsuleShape3D_gguhd")
 disabled = true
 
-[node name="RayCast3D" type="RayCast3D" parent="CrouchCollision"]
+[node name="RayCast3D" type="RayCast3D" parent="CrouchCollision" unique_id=892151405]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
 target_position = Vector3(0, 0.46, 0)
 
-[node name="CrawlCollision" type="CollisionShape3D" parent="."]
+[node name="CrawlCollision" type="CollisionShape3D" parent="." unique_id=1080545347]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, 0)
 shape = SubResource("CylinderShape3D_gguhd")
 disabled = true
 
-[node name="WeaponController" type="Node" parent="." node_paths=PackedStringArray("pistol", "rifle", "animation_controller", "weapon_audio", "neck_bone_attachement")]
+[node name="WeaponController" type="Node" parent="." unique_id=384125234 node_paths=PackedStringArray("animation_controller", "weapon_audio", "neck_bone_attachement")]
 script = ExtResource("31_4afhp")
-pistol = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Pistol")
-rifle = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile")
 animation_controller = NodePath("../AnimationController")
+ray_cast_path = NodePath("AimRay")
 weapon_audio = NodePath("../WeaponAudio")
 neck_bone_attachement = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment")
-ray_cast_path = NodePath("AimRay")
 
-[node name="TransitionTimer" type="Timer" parent="WeaponController"]
+[node name="TransitionTimer" type="Timer" parent="WeaponController" unique_id=402280787]
 process_callback = 0
 wait_time = 0.1
 one_shot = true
 
-[node name="FireTimer" type="Timer" parent="WeaponController"]
+[node name="FireTimer" type="Timer" parent="WeaponController" unique_id=250728270]
 process_callback = 0
 wait_time = 0.15
 one_shot = true
 
-[node name="ReloadTimer" type="Timer" parent="WeaponController"]
+[node name="ReloadTimer" type="Timer" parent="WeaponController" unique_id=333238122]
 process_callback = 0
 one_shot = true
 
-[node name="RollTimer" type="Timer" parent="."]
+[node name="RollTimer" type="Timer" parent="." unique_id=832343372]
 process_callback = 0
 one_shot = true
 
-[node name="StanceAntispamTimer" type="Timer" parent="."]
+[node name="StanceAntispamTimer" type="Timer" parent="." unique_id=37994442]
 process_callback = 0
 wait_time = 0.25
 one_shot = true
 
-[node name="WeaponAudio" type="AudioStreamPlayer3D" parent="."]
+[node name="WeaponAudio" type="AudioStreamPlayer3D" parent="." unique_id=2081946510]
 
-[node name="Splatters" type="Node3D" parent="."]
+[node name="Splatters" type="Node3D" parent="." unique_id=803029593]
 
-[node name="1" type="GPUParticles3D" parent="Splatters"]
+[node name="1" type="GPUParticles3D" parent="Splatters" unique_id=494165612]
 emitting = false
 amount = 12
 one_shot = true
@@ -846,7 +841,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="2" type="GPUParticles3D" parent="Splatters"]
+[node name="2" type="GPUParticles3D" parent="Splatters" unique_id=1076129506]
 emitting = false
 amount = 12
 one_shot = true
@@ -855,7 +850,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="3" type="GPUParticles3D" parent="Splatters"]
+[node name="3" type="GPUParticles3D" parent="Splatters" unique_id=1136115317]
 emitting = false
 amount = 12
 one_shot = true
@@ -864,7 +859,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="4" type="GPUParticles3D" parent="Splatters"]
+[node name="4" type="GPUParticles3D" parent="Splatters" unique_id=1410260350]
 emitting = false
 amount = 12
 one_shot = true
@@ -873,7 +868,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="5" type="GPUParticles3D" parent="Splatters"]
+[node name="5" type="GPUParticles3D" parent="Splatters" unique_id=575479207]
 emitting = false
 amount = 12
 one_shot = true
@@ -882,7 +877,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="6" type="GPUParticles3D" parent="Splatters"]
+[node name="6" type="GPUParticles3D" parent="Splatters" unique_id=1137450202]
 emitting = false
 amount = 12
 one_shot = true
@@ -891,7 +886,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="7" type="GPUParticles3D" parent="Splatters"]
+[node name="7" type="GPUParticles3D" parent="Splatters" unique_id=951209438]
 emitting = false
 amount = 12
 one_shot = true
@@ -900,7 +895,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="8" type="GPUParticles3D" parent="Splatters"]
+[node name="8" type="GPUParticles3D" parent="Splatters" unique_id=104436306]
 emitting = false
 amount = 12
 one_shot = true
@@ -909,7 +904,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="9" type="GPUParticles3D" parent="Splatters"]
+[node name="9" type="GPUParticles3D" parent="Splatters" unique_id=1201948672]
 emitting = false
 amount = 12
 one_shot = true
@@ -918,7 +913,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="10" type="GPUParticles3D" parent="Splatters"]
+[node name="10" type="GPUParticles3D" parent="Splatters" unique_id=868075090]
 emitting = false
 amount = 12
 one_shot = true
@@ -927,7 +922,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="11" type="GPUParticles3D" parent="Splatters"]
+[node name="11" type="GPUParticles3D" parent="Splatters" unique_id=1771137122]
 emitting = false
 amount = 12
 one_shot = true
@@ -936,7 +931,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="12" type="GPUParticles3D" parent="Splatters"]
+[node name="12" type="GPUParticles3D" parent="Splatters" unique_id=849164090]
 emitting = false
 amount = 12
 one_shot = true
@@ -945,7 +940,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="13" type="GPUParticles3D" parent="Splatters"]
+[node name="13" type="GPUParticles3D" parent="Splatters" unique_id=1661790236]
 emitting = false
 amount = 12
 one_shot = true
@@ -954,7 +949,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="14" type="GPUParticles3D" parent="Splatters"]
+[node name="14" type="GPUParticles3D" parent="Splatters" unique_id=1336533397]
 emitting = false
 amount = 12
 one_shot = true
@@ -963,7 +958,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="15" type="GPUParticles3D" parent="Splatters"]
+[node name="15" type="GPUParticles3D" parent="Splatters" unique_id=129493949]
 emitting = false
 amount = 12
 one_shot = true
@@ -972,7 +967,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="0" type="GPUParticles3D" parent="Splatters"]
+[node name="0" type="GPUParticles3D" parent="Splatters" unique_id=465178984]
 emitting = false
 amount = 12
 one_shot = true
@@ -981,14 +976,14 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="AimTarget" type="Marker3D" parent="."]
+[node name="AimTarget" type="Marker3D" parent="." unique_id=1645804093]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, -5)
 
-[node name="AimRay" type="RayCast3D" parent="."]
+[node name="AimRay" type="RayCast3D" parent="." unique_id=1114767811]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
 target_position = Vector3(0, 0, -1000)
 
-[node name="Health" type="Node" parent="."]
+[node name="Health" type="Node" parent="." unique_id=1822801054]
 script = ExtResource("40_hlth1")
 
 [connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
