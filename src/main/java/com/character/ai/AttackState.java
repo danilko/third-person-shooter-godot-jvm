@@ -35,16 +35,44 @@ public class AttackState implements EnemyAIState {
             return ChaseState.INSTANCE;
         }
 
-        // Face and aim at the player while standing still
-        Vector3 toPlayer = enemy.getPlayer().getGlobalPosition()
-                                .minus(enemy.getGlobalPosition())
-                                .normalized();
-        input.movementDirection.setX(toPlayer.getX());
-        input.movementDirection.setZ(toPlayer.getZ());
-        input.movementType = MovementType.IDLE;
-        input.wantCombat   = true;
-        Vector3 pp = enemy.getPlayer().getGlobalPosition();
-        input.aimTargetPosition = new Vector3(pp.getX(), pp.getY(), pp.getZ());
+        // Compute horizontal vector to player
+        Vector3 playerPos = enemy.getPlayer().getGlobalPosition();
+        Vector3 enemyPos  = enemy.getGlobalPosition();
+        float dx = (float) (playerPos.getX() - enemyPos.getX());
+        float dz = (float) (playerPos.getZ() - enemyPos.getZ());
+        float hDist = (float) Math.sqrt(dx * dx + dz * dz);
+
+        // Always face the player horizontally
+        if (hDist > 0.01f) {
+            input.movementDirection.setX(dx / hDist);
+            input.movementDirection.setZ(dz / hDist);
+        }
+
+        // Compute vertical pitch from eye to player (same coordinate frame as CameraController)
+        Vector3 eyePos = enemyPos.plus(new Vector3(0, Enemy.EYE_HEIGHT, 0));
+        float dy = (float) (playerPos.getY() - eyePos.getY());
+        float pitchDeg = (hDist > 0.01f)
+                ? (float) Math.toDegrees(Math.atan2(dy, hDist))
+                : 0f;
+
+        boolean pitchOutOfRange = pitchDeg > enemy.aimPitchMax || pitchDeg < enemy.aimPitchMin;
+        float clampedPitch = Math.max(enemy.aimPitchMin, Math.min(enemy.aimPitchMax, pitchDeg));
+
+        // Clamp aim target Y so the spine modifier stays within achievable angles
+        float clampedY = (float) (eyePos.getY() + hDist * (float) Math.tan(Math.toRadians(clampedPitch)));
+        input.aimTargetPosition = new Vector3(playerPos.getX(), clampedY, playerPos.getZ());
+        input.wantCombat = true;
+
+        if (pitchOutOfRange && hDist > 0.01f) {
+            // Retreat away from the player to reduce the extreme vertical angle.
+            // The spine LookAtModifier keeps the upper body aimed at the clamped target
+            // while the body backs away to bring the player into the valid pitch range.
+            input.movementDirection.setX(-dx / hDist);
+            input.movementDirection.setZ(-dz / hDist);
+            input.movementType = MovementType.WALK;
+        } else {
+            input.movementType = MovementType.IDLE;
+        }
 
         // Require line-of-sight before firing; fall back to chase if occluded
         if (!enemy.hasLineOfSight()) {
