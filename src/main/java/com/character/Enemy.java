@@ -15,6 +15,9 @@ import godot.global.GD;
 @RegisterClass(className = "Enemy")
 public class Enemy extends Character {
 
+    /** Matches the AimRay node's Y-offset in the scene. */
+    public static final float EYE_HEIGHT = 1.4f;
+
     // ── Inspector-tunable properties ──────────────────────────────────────────
     @Export
     @RegisterProperty
@@ -23,6 +26,16 @@ public class Enemy extends Character {
     @Export
     @RegisterProperty
     public float detectionRange = 12.0f;
+
+    /** Vertical aim limit (degrees downward) — matches CameraController.pitchMin. */
+    @Export
+    @RegisterProperty
+    public float aimPitchMin = -55.0f;
+
+    /** Vertical aim limit (degrees upward) — matches CameraController.pitchMax. */
+    @Export
+    @RegisterProperty
+    public float aimPitchMax = 75.0f;
 
     @Export
     @RegisterProperty
