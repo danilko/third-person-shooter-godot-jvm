@@ -977,6 +977,6 @@ script = ExtResource("40_hlth1")
 [connection signal="timeout" from="WeaponController/ReloadTimer" to="WeaponController" method="on_weapon_reload_complete"]
 [connection signal="timeout" from="RollTimer" to="." method="completed_roll"]
 [connection signal="timeout" from="RollTimer" to="MovementController" method="completed_roll"]
-[connection signal="died" from="Health" to="." method="on_player_died"]
+[connection signal="died" from="Health" to="." method="on_died"]
 
 [editable path="MeshRoot/Model"]
