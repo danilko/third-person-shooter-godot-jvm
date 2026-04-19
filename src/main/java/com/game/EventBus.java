@@ -5,6 +5,7 @@ import godot.annotation.RegisterSignal;
 import godot.api.Node;
 import godot.core.Signal0;
 import godot.core.Signal1;
+import godot.core.StringName;
 
 /**
  * Global event bus — registered as an AutoLoad singleton named "EventBus".
@@ -24,17 +25,17 @@ public class EventBus extends Node {
 
     /** Emitted by Player.onDied(). Payload: none — the player is a singleton. */
     @RegisterSignal
-    public final Signal0 playerDied = Signal0.create(this, "playerDied");
+    public final Signal0 playerDied = new Signal0(this, new StringName("player_died"));
 
     /** Emitted by Enemy.onDied(). Payload: the enemy's score value. */
     @RegisterSignal
-    public final Signal1<Integer> enemyKilled = Signal1.create(this, "enemyKilled");
+    public final Signal1<Integer> enemyKilled = new Signal1<>(this, new StringName("enemy_killed"));
 
     /** Emitted by Health.takeDamage() for the player character. Payload: new currentHealth. */
     @RegisterSignal
-    public final Signal1<Float> playerHealthChanged = Signal1.create(this, "playerHealthChanged");
+    public final Signal1<Float> playerHealthChanged = new Signal1<>(this, new StringName("player_health_changed"));
 
     /** Emitted by AmmoRefill.onBodyEntered(). Payload: weapon index that was refilled. */
     @RegisterSignal
-    public final Signal1<Integer> ammoPickedUp = Signal1.create(this, "ammoPickedUp");
+    public final Signal1<Integer> ammoPickedUp = new Signal1<>(this, new StringName("ammo_picked_up"));
 }

@@ -46,6 +46,21 @@ public class AttackState implements EnemyAIState {
         Vector3 pp = enemy.getPlayer().getGlobalPosition();
         input.aimTargetPosition = new Vector3(pp.getX(), pp.getY(), pp.getZ());
 
+        // Require line-of-sight before firing; fall back to chase if occluded
+        if (!enemy.hasLineOfSight()) {
+            return ChaseState.INSTANCE;
+        }
+
+        // Weapon management: prefer weapon 2, fall back to weapon 1, seek ammo if all dry
+        int bestWeapon = enemy.selectBestWeapon();
+        if (bestWeapon < 0) {
+            return RefillAmmoState.INSTANCE;
+        }
+        if (enemy.weaponController != null && bestWeapon != enemy.weaponController.getWeapon()) {
+            input.desiredWeapon = bestWeapon;
+            return this;
+        }
+
         // Fire on cooldown (driven by attackTimer on Enemy)
         enemy.advanceAttackTimer(-delta);
         if (enemy.isAttackReady()) {

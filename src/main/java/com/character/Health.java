@@ -8,6 +8,7 @@ import godot.annotation.RegisterSignal;
 import godot.api.Node;
 import godot.core.Signal0;
 import godot.core.Signal1;
+import godot.core.StringName;
 
 @RegisterClass(className = "Health")
 public class Health extends Node {
@@ -19,10 +20,10 @@ public class Health extends Node {
     private float currentHealth;
 
     @RegisterSignal
-    public final Signal1<Float> damaged = Signal1.create(this, "damaged");
+    public final Signal1<Float> damaged = new Signal1<>(this, new StringName("damaged"));
 
     @RegisterSignal
-    public final Signal0 died = Signal0.create(this, "died");
+    public final Signal0 died = new Signal0(this, new StringName("died"));
 
     @RegisterFunction
     @Override

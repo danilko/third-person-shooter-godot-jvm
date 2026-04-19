@@ -6,6 +6,7 @@ import godot.api.Object;
 import godot.core.NodePath;
 import godot.core.Signal1;
 import godot.core.Signal2;
+import godot.core.StringName;
 import godot.core.VariantArray;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -38,11 +39,11 @@ public class WeaponController extends Node {
 
 
   @RegisterSignal
-  public final Signal1<Float> weaponFired = Signal1.create(this, "weaponFired");
+  public final Signal1<Float> weaponFired = new Signal1<>(this, new StringName("weapon_fired"));
 
   /** Emitted whenever magazine or backup ammo count changes (mag, ammoBackup). */
   @RegisterSignal
-  public final Signal2<Integer, Integer> ammoChanged = Signal2.create(this, "ammoChanged");
+  public final Signal2<Integer, Integer> ammoChanged = new Signal2<>(this, new StringName("ammo_changed"));
 
   @RegisterProperty
   @Export
@@ -218,6 +219,12 @@ public class WeaponController extends Node {
 
  public boolean isWeaponReloading(){
     return reloadTimer.getTimeLeft() > 0;
+  }
+
+  public boolean hasAmmoForWeapon(int index) {
+    if (index < 0 || index >= weapons.size()) return false;
+    WeaponStats stats = weapons.get(index);
+    return stats.getMag() > 0 || stats.getAmmoBackup() > 0;
   }
 
   @RegisterFunction

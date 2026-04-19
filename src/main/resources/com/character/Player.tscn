@@ -1,4 +1,4 @@
-[gd_scene load_steps=126 format=3 uid="uid://bwxj3ecw2ta4k"]
+[gd_scene format=3 uid="uid://bwxj3ecw2ta4k"]
 
 [ext_resource type="Script" uid="uid://do4hfd78xb1p2" path="res://src/main/java/com/character/Player.java" id="1_i0ahk"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
@@ -7,7 +7,7 @@
 [ext_resource type="Resource" uid="uid://i3rr4c4emq7j" path="res://src/main/resources/com/character/jumpstates/GroundJump.tres" id="4_6f0xc"]
 [ext_resource type="Script" uid="uid://cdhqufum5menr" path="res://src/main/java/com/character/MovementController.java" id="4_ige6o"]
 [ext_resource type="Script" uid="uid://cynnu6moxlqc6" path="res://gdj/com/character/CombatState.gdj" id="5_3qk6j"]
-[ext_resource type="Script" uid="uid://c2tjt3k1y4cg4" path="res://src/main/java/com/character/CameraController.java" id="5_u0j3k"]
+[ext_resource type="Script" uid="uid://cb87jxnlmqdt" path="res://src/main/java/com/character/CameraController.java" id="5_u0j3k"]
 [ext_resource type="Resource" uid="uid://hfsbhmhtpqq8" path="res://src/main/resources/com/character/combatstates/Combat.tres" id="6_j83q5"]
 [ext_resource type="Script" uid="uid://bor7f5iyg250q" path="res://gdj/com/character/stances/Stance.gdj" id="7_2iqcg"]
 [ext_resource type="Resource" uid="uid://7ik6f781r71n" path="res://src/main/resources/com/character/movementstates/crawl/CrawlIdle.tres" id="7_d7d1u"]
@@ -41,7 +41,7 @@
 [ext_resource type="Script" uid="uid://defb2urvdtr8u" path="res://gdj/com/ui/Crosshair.gdj" id="29_sy336"]
 [ext_resource type="Script" uid="uid://daim07aoitehv" path="res://src/main/java/com/ui/CharacterHUD.java" id="30_pk7bh"]
 [ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="31_4afhp"]
-[ext_resource type="Script" uid="uid://b8wux304md2q" path="res://src/main/java/com/character/Health.java" id="40_hlth1"]
+[ext_resource type="Script" uid="uid://djt55pliyvi0y" path="res://src/main/java/com/character/Health.java" id="40_hlth1"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_ige6o"]
 filters = ["Godot_Chan_Stealth/Skeleton3D:pelvis"]
@@ -568,7 +568,7 @@ albedo_color = Color(1, 0, 0, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_pwn40"]
 material = SubResource("StandardMaterial3D_v5nep")
 
-[node name="Player" type="CharacterBody3D" node_paths=PackedStringArray("weapon_controller")]
+[node name="Player" type="CharacterBody3D" unique_id=1575643164 node_paths=PackedStringArray("weapon_controller")]
 script = ExtResource("1_i0ahk")
 jump_states = Dictionary[String, ExtResource("2_ige6o")]({
 "AirJump": ExtResource("3_ttk2h"),
@@ -585,7 +585,7 @@ combat_states = Dictionary[String, ExtResource("5_3qk6j")]({
 })
 weapon_controller = NodePath("WeaponController")
 
-[node name="AnimationTree" type="AnimationTree" parent="."]
+[node name="AnimationTree" type="AnimationTree" parent="." unique_id=45599612]
 root_node = NodePath("../MeshRoot/Model")
 tree_root = SubResource("AnimationNodeBlendTree_jn40o")
 anim_player = NodePath("../MeshRoot/Model/AnimationPlayer")
@@ -624,20 +624,20 @@ parameters/WeaponChangeScale/scale = 1.0
 parameters/WeaponChangeAnimation/blend_position = 0.0
 parameters/WeaponChangeSeek/seek_request = -1.0
 
-[node name="MeshRoot" type="Node3D" parent="."]
+[node name="MeshRoot" type="Node3D" parent="." unique_id=994819245]
 
-[node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
+[node name="Model" parent="MeshRoot" unique_id=159922343 instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(1.0305049e-09, -0.022623908, -0.080805)
+bones/0/position = Vector3(6.629176e-10, -0.01684073, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.42724073, 0.11008493, 0.7521968, -0.48943502)
+bones/1/rotation = Quaternion(0.4619489, 0.087394096, 0.67704767, -0.5661907)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.44314653, -0.109991595, 0.057191115, 0.8878357)
+bones/2/rotation = Quaternion(0.42482144, -0.17837393, -0.058947515, 0.88557035)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.09642782, -0.18158562, 0.050432198, 0.97733575)
+bones/3/rotation = Quaternion(-0.098773114, -0.10538448, 0.0266162, 0.98915595)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.05817399, -0.054898936, 0.0069518206, 0.99677163)
+bones/4/rotation = Quaternion(-0.058066197, -0.067104876, 0.004570771, 0.9960444)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -715,28 +715,28 @@ bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19534776, -0.020133724, 0.0059031444, 0.9805097)
+bones/43/rotation = Quaternion(0.19544752, -0.022098023, 0.006394786, 0.9804444)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.92809325, 0.1563172, -0.22711067, -0.25025687)
+bones/45/rotation = Quaternion(0.96615404, 0.011149487, -0.24704647, -0.07341811)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.35053194, 0.20993464, -0.07729844, 0.9094394)
-bones/47/rotation = Quaternion(-0.55579984, 0.019758428, -0.029138273, 0.83057034)
-bones/48/rotation = Quaternion(-0.44825953, 0.021063624, 0.023069855, 0.8933574)
+bones/46/rotation = Quaternion(0.14944915, 0.22707818, -0.017298771, 0.96218574)
+bones/47/rotation = Quaternion(-0.44868773, 0.02192207, -0.023309834, 0.8931156)
+bones/48/rotation = Quaternion(-0.31039605, 0.019998698, 0.036355738, 0.94970137)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.95295966, 0.017035864, 0.2696624, -0.13733175)
+bones/49/rotation = Quaternion(0.92357, -0.14215028, 0.20595208, -0.2905092)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.17959926, -0.2176745, 0.020423014, 0.9591376)
-bones/51/rotation = Quaternion(-0.51872975, -0.024344362, 0.026219895, 0.85418934)
-bones/52/rotation = Quaternion(-0.298134, -0.019885348, -0.037467886, 0.95358115)
+bones/50/rotation = Quaternion(0.2556519, -0.20015396, 0.0383611, 0.94504446)
+bones/51/rotation = Quaternion(-0.64863276, -0.005781441, 0.007890975, 0.76103866)
+bones/52/rotation = Quaternion(-0.4079883, -0.020793796, -0.027106656, 0.9123478)
 
-[node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8"]
-transform = Transform3D(-0.71388376, 0.04176182, 0.69901776, 0.68614787, 0.24113682, 0.68633366, -0.13989648, 0.9695919, -0.20079865, -0.13642865, 1.190354, 0.36425352)
+[node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1377854886]
+transform = Transform3D(-0.7050488, 0.044756666, 0.7077451, 0.69525075, 0.24030787, 0.6774056, -0.13975835, 0.9696641, -0.20054609, -0.14635995, 1.1986314, 0.37947845)
 bone_name = "hand_r"
 bone_idx = 27
 
-[node name="Pistol" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment"]
+[node name="Pistol" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=791976497]
 transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
 visible = false
 script = ExtResource("9_u0wnu")
@@ -755,109 +755,107 @@ recoil = 0.5
 fire_audio = ExtResource("13_rgjax")
 reload_audio = ExtResource("14_d6yvc")
 
-[node name="Pistol_52" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Pistol" instance=ExtResource("10_1qhsf")]
+[node name="Pistol_52" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Pistol" unique_id=1963895502 instance=ExtResource("10_1qhsf")]
 transform = Transform3D(-0.026545947, 0.107987374, 0.11503909, 0.15446925, 0.04156776, -0.003375052, -0.032164898, 0.11050269, -0.11115124, -0.011984825, 0.045636475, 0.009359002)
 
-[node name="Rifile" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment"]
+[node name="Rifile" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=369406522]
 transform = Transform3D(-0.22872102, 0.7304517, 0.6435271, 0.89219904, 0.4217406, -0.16160382, -0.38944525, 0.537192, -0.74816924, -0.041, 0.021, 0.044)
 visible = false
 script = ExtResource("9_u0wnu")
 fire_audio = ExtResource("10_ufc68")
 reload_audio = ExtResource("11_4t16q")
 
-[node name="AssaultRifle2_12" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile" instance=ExtResource("9_j83q5")]
+[node name="AssaultRifle2_12" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile" unique_id=1114699538 instance=ExtResource("9_j83q5")]
 transform = Transform3D(0.16, 0, 0, 0, 0.16, 0, 0, 0, 0.16, 0, 0, 0)
 
-[node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9"]
+[node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=353292672]
 target_node = NodePath("../../../../../CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget")
 bone_name = "spine_03"
 bone = 4
 
-[node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10"]
-transform = Transform3D(0.9991436, -0.014956971, -0.038577635, 0.0013744852, 0.9438597, -0.3303433, 0.041352723, 0.3300073, 0.9430721, -0.007248107, 1.2401438, -0.07611079)
+[node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=1958644969]
+transform = Transform3D(0.9989058, -0.004663134, -0.046533335, -0.010978724, 0.94382733, -0.3302563, 0.045459352, 0.33040586, 0.94274354, -0.016516637, 1.2468923, -0.060861204)
 bone_name = "neck_01"
 bone_idx = 43
 
-[node name="OmniLight3D" type="OmniLight3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment"]
+[node name="OmniLight3D" type="OmniLight3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment" unique_id=413500933]
 transform = Transform3D(0.23895359, 0.60108936, -0.7626222, 0.9260551, 0.095186725, 0.36518714, 0.29210156, -0.793493, -0.53389686, -0.0009861216, 0.36780286, 0.985576)
 light_color = Color(1, 0.9882353, 0.73333335, 1)
 shadow_enabled = true
 shadow_reverse_cull_face = true
 omni_range = 15.0
 
-[node name="MuzzleFlash" type="GPUParticles3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment"]
+[node name="MuzzleFlash" type="GPUParticles3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment" unique_id=18665672]
 transform = Transform3D(-0.773, 3.0363992e-08, 6.037208e-08, 0, 0.6905761, -0.3473236, -6.757781e-08, -0.3473236, -0.6905761, -0.112, 0.279, 0.659)
 amount = 1
 speed_scale = 8.0
 process_material = SubResource("ParticleProcessMaterial_8ulcr")
 draw_pass_1 = SubResource("QuadMesh_v5nep")
 
-[node name="Streaks" type="GPUParticles3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment"]
+[node name="Streaks" type="GPUParticles3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment" unique_id=1231677019]
 transform = Transform3D(-0.9996138, -0.025621599, 0.010813087, -0.027782144, 0.93733233, -0.34732836, -0.0012353025, -0.3474946, -0.93768096, -0.13395381, 2.5486934, 6.661838)
 amount = 1
 speed_scale = 6.0
 process_material = SubResource("ParticleProcessMaterial_jxrhs")
 draw_pass_1 = SubResource("BoxMesh_jxrhs")
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment"]
-libraries = {
-&"": SubResource("AnimationLibrary_8ulcr")
-}
+[node name="AnimationPlayer" type="AnimationPlayer" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment" unique_id=2043040099]
+libraries/ = SubResource("AnimationLibrary_8ulcr")
 
-[node name="UprightCollision" type="CollisionShape3D" parent="."]
+[node name="UprightCollision" type="CollisionShape3D" parent="." unique_id=2066868698]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
 shape = SubResource("CapsuleShape3D_yfjlo")
 
-[node name="RayCast3D" type="RayCast3D" parent="UprightCollision"]
+[node name="RayCast3D" type="RayCast3D" parent="UprightCollision" unique_id=1154507998]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.27, 0)
 target_position = Vector3(0, 1.02, 0)
 
-[node name="CameraRoot" type="Node3D" parent="." node_paths=PackedStringArray("player")]
+[node name="CameraRoot" type="Node3D" parent="." unique_id=1945688108 node_paths=PackedStringArray("player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
 script = ExtResource("5_u0j3k")
 player = NodePath("..")
 
-[node name="Yaw" type="Node3D" parent="CameraRoot"]
+[node name="Yaw" type="Node3D" parent="CameraRoot" unique_id=1671558584]
 
-[node name="Pitch" type="Node3D" parent="CameraRoot/Yaw"]
+[node name="Pitch" type="Node3D" parent="CameraRoot/Yaw" unique_id=643544584]
 transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 
-[node name="Pivot" type="Node3D" parent="CameraRoot/Yaw/Pitch"]
+[node name="Pivot" type="Node3D" parent="CameraRoot/Yaw/Pitch" unique_id=1611848527]
 transform = Transform3D(-1, 0, 1.509958e-07, 0, 0.9999995, 0, -1.509957e-07, 0, -0.9999995, 0, 0.4, 0)
 
-[node name="SpringArm" type="SpringArm3D" parent="CameraRoot/Yaw/Pitch/Pivot"]
+[node name="SpringArm" type="SpringArm3D" parent="CameraRoot/Yaw/Pitch/Pivot" unique_id=588223935]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 1.4210855e-14, 0, 1, 0, 0, 0)
 shape = SubResource("SphereShape3D_3mnk3")
 
-[node name="Camera" type="Camera3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm"]
+[node name="Camera" type="Camera3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm" unique_id=1227212050]
 transform = Transform3D(1, -2.5410988e-21, 8.526513e-14, 0, 1.0000002, 2.980233e-08, 2.842171e-14, -2.980233e-08, 1.0000002, 0, 0, 0)
 doppler_tracking = 1
 fov = 65.0
 far = 8192.0
 
-[node name="SpineIKTarget" type="Marker3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera"]
+[node name="SpineIKTarget" type="Marker3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" unique_id=1416140619]
 transform = Transform3D(1, -2.4868996e-14, 4.2632564e-14, 3.5527133e-15, 1, -1.7881393e-07, 1.4210855e-14, 2.0861626e-07, 1, 0, 0, -20)
 
-[node name="RayCast3D" type="RayCast3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera"]
+[node name="RayCast3D" type="RayCast3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" unique_id=847198473]
 transform = Transform3D(1, 0, 7.1054274e-15, 3.5527137e-15, -5.9604645e-08, -0.99999994, 1.4210855e-14, 0.99999994, -5.9604645e-08, -2.842171e-14, -1.1920929e-07, -3.5762787e-07)
 target_position = Vector3(0, -1000, 0)
 
-[node name="MovementController" type="Node" parent="." node_paths=PackedStringArray("player", "mesh_root", "weapon_controller", "crosshair")]
+[node name="MovementController" type="Node" parent="." unique_id=547279287 node_paths=PackedStringArray("player", "mesh_root", "weapon_controller", "crosshair")]
 script = ExtResource("4_ige6o")
 player = NodePath("..")
 mesh_root = NodePath("../MeshRoot")
 weapon_controller = NodePath("../WeaponController")
 crosshair = NodePath("../UI/Crosshair")
 
-[node name="AnimationController" type="Node" parent="." node_paths=PackedStringArray("animation_tree", "player", "aim_look_at_modifier")]
+[node name="AnimationController" type="Node" parent="." unique_id=127340461 node_paths=PackedStringArray("animation_tree", "player", "aim_look_at_modifier")]
 script = ExtResource("13_4afhp")
 animation_tree = NodePath("../AnimationTree")
 player = NodePath("..")
 aim_look_at_modifier = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/AimModifier")
 
-[node name="Stances" type="Node" parent="."]
+[node name="Stances" type="Node" parent="." unique_id=765015835]
 
-[node name="Crouch" type="Node" parent="Stances" node_paths=PackedStringArray("collider", "col_raycast", "higher_stances")]
+[node name="Crouch" type="Node" parent="Stances" unique_id=488285110 node_paths=PackedStringArray("collider", "col_raycast", "higher_stances")]
 script = ExtResource("7_2iqcg")
 idle_state = ExtResource("8_ttk2h")
 walk_state = ExtResource("9_gguhd")
@@ -867,7 +865,7 @@ collider = NodePath("../../CrouchCollision")
 col_raycast = NodePath("../../CrouchCollision/RayCast3D")
 higher_stances = [NodePath("../Upright")]
 
-[node name="Upright" type="Node" parent="Stances" node_paths=PackedStringArray("collider", "col_raycast")]
+[node name="Upright" type="Node" parent="Stances" unique_id=1904854645 node_paths=PackedStringArray("collider", "col_raycast")]
 script = ExtResource("7_2iqcg")
 idle_state = ExtResource("11_kuqdj")
 walk_state = ExtResource("12_agpyf")
@@ -876,7 +874,7 @@ camera_height = 1.2
 collider = NodePath("../../UprightCollision")
 col_raycast = NodePath("../../UprightCollision/RayCast3D")
 
-[node name="Crawl" type="Node" parent="Stances" node_paths=PackedStringArray("collider", "higher_stances")]
+[node name="Crawl" type="Node" parent="Stances" unique_id=1259760859 node_paths=PackedStringArray("collider", "higher_stances")]
 script = ExtResource("7_2iqcg")
 idle_state = ExtResource("7_d7d1u")
 walk_state = ExtResource("15_bgnjm")
@@ -885,21 +883,21 @@ camera_height = 0.7
 collider = NodePath("../../CrawlCollision")
 higher_stances = [NodePath("../Crouch"), NodePath("../Upright")]
 
-[node name="CrouchCollision" type="CollisionShape3D" parent="."]
+[node name="CrouchCollision" type="CollisionShape3D" parent="." unique_id=2099622834]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.47, 0)
 shape = SubResource("CapsuleShape3D_gguhd")
 disabled = true
 
-[node name="RayCast3D" type="RayCast3D" parent="CrouchCollision"]
+[node name="RayCast3D" type="RayCast3D" parent="CrouchCollision" unique_id=87041861]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
 target_position = Vector3(0, 0.46, 0)
 
-[node name="CrawlCollision" type="CollisionShape3D" parent="."]
+[node name="CrawlCollision" type="CollisionShape3D" parent="." unique_id=846622320]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, 0)
 shape = SubResource("CylinderShape3D_gguhd")
 disabled = true
 
-[node name="UI" type="Control" parent="."]
+[node name="UI" type="Control" parent="." unique_id=1616245982]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -908,7 +906,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("30_pk7bh")
 
-[node name="Crosshair" type="Control" parent="UI"]
+[node name="Crosshair" type="Control" parent="UI" unique_id=2091775217]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -923,38 +921,38 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("29_sy336")
 
-[node name="Center" type="Node2D" parent="UI/Crosshair"]
+[node name="Center" type="Node2D" parent="UI/Crosshair" unique_id=1058332206]
 
-[node name="Border" type="Line2D" parent="UI/Crosshair/Center"]
+[node name="Border" type="Line2D" parent="UI/Crosshair/Center" unique_id=576878727]
 points = PackedVector2Array(-0.1, 0, 0.1, 0)
 width = 6.0
 default_color = Color(0.15686275, 0.29411766, 0.6509804, 0.4117647)
 begin_cap_mode = 2
 end_cap_mode = 2
 
-[node name="Dot" type="Line2D" parent="UI/Crosshair/Center"]
+[node name="Dot" type="Line2D" parent="UI/Crosshair/Center" unique_id=437652447]
 points = PackedVector2Array(-0.1, 0, 0.1, 0)
 width = 2.0
 default_color = Color(0.10980392, 0.8235294, 1, 1)
 begin_cap_mode = 2
 end_cap_mode = 2
 
-[node name="Reticle" type="Node2D" parent="UI/Crosshair"]
+[node name="Reticle" type="Node2D" parent="UI/Crosshair" unique_id=1350582932]
 
-[node name="Lines" type="Node2D" parent="UI/Crosshair/Reticle"]
+[node name="Lines" type="Node2D" parent="UI/Crosshair/Reticle" unique_id=659984193]
 
-[node name="LinePivot" parent="UI/Crosshair/Reticle/Lines" instance=ExtResource("29_cet18")]
+[node name="LinePivot" parent="UI/Crosshair/Reticle/Lines" unique_id=1807034973 instance=ExtResource("29_cet18")]
 
-[node name="LinePivot2" parent="UI/Crosshair/Reticle/Lines" instance=ExtResource("29_cet18")]
+[node name="LinePivot2" parent="UI/Crosshair/Reticle/Lines" unique_id=1783738741 instance=ExtResource("29_cet18")]
 rotation = 1.5707964
 
-[node name="LinePivot3" parent="UI/Crosshair/Reticle/Lines" instance=ExtResource("29_cet18")]
+[node name="LinePivot3" parent="UI/Crosshair/Reticle/Lines" unique_id=1275410537 instance=ExtResource("29_cet18")]
 rotation = 3.1415927
 
-[node name="LinePivot4" parent="UI/Crosshair/Reticle/Lines" instance=ExtResource("29_cet18")]
+[node name="LinePivot4" parent="UI/Crosshair/Reticle/Lines" unique_id=504203517 instance=ExtResource("29_cet18")]
 rotation = 4.712389
 
-[node name="Mag" type="Control" parent="UI"]
+[node name="Mag" type="Control" parent="UI" unique_id=911275195]
 layout_mode = 1
 anchor_left = 0.034722224
 anchor_top = -0.061728396
@@ -965,7 +963,7 @@ offset_right = 40.0
 offset_bottom = 560.0
 grow_vertical = 0
 
-[node name="ColorRect" type="ColorRect" parent="UI/Mag"]
+[node name="ColorRect" type="ColorRect" parent="UI/Mag" unique_id=211275931]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -974,7 +972,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0.35235986, 0.64161503, 0.28235295)
 
-[node name="Mag" type="Label" parent="UI/Mag/ColorRect"]
+[node name="Mag" type="Label" parent="UI/Mag/ColorRect" unique_id=321338645]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -987,7 +985,7 @@ grow_vertical = 2
 text = "40"
 label_settings = SubResource("LabelSettings_cet18")
 
-[node name="Slash" type="Label" parent="UI/Mag/ColorRect"]
+[node name="Slash" type="Label" parent="UI/Mag/ColorRect" unique_id=210065513]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -1001,7 +999,7 @@ text = "/"
 label_settings = SubResource("LabelSettings_cet18")
 clip_text = true
 
-[node name="AmmoBackup" type="Label" parent="UI/Mag/ColorRect"]
+[node name="AmmoBackup" type="Label" parent="UI/Mag/ColorRect" unique_id=1249640069]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -1014,7 +1012,7 @@ grow_vertical = 2
 text = "40"
 label_settings = SubResource("LabelSettings_d6yvc")
 
-[node name="Health" type="Control" parent="UI"]
+[node name="Health" type="Control" parent="UI" unique_id=1730242652]
 layout_mode = 1
 anchor_left = 0.034722224
 anchor_top = -0.061728396
@@ -1026,7 +1024,7 @@ offset_right = 238.0
 offset_bottom = 560.0
 grow_vertical = 0
 
-[node name="ColorRect" type="ColorRect" parent="UI/Health"]
+[node name="ColorRect" type="ColorRect" parent="UI/Health" unique_id=1440267123]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -1035,7 +1033,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0.35235986, 0.64161503, 0.28235295)
 
-[node name="Health" type="Label" parent="UI/Health/ColorRect"]
+[node name="Health" type="Label" parent="UI/Health/ColorRect" unique_id=2036673660]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -1048,7 +1046,7 @@ grow_vertical = 2
 text = "100"
 label_settings = SubResource("LabelSettings_cet18")
 
-[node name="Slash" type="Label" parent="UI/Health/ColorRect"]
+[node name="Slash" type="Label" parent="UI/Health/ColorRect" unique_id=1713194659]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -1062,7 +1060,7 @@ text = "/"
 label_settings = SubResource("LabelSettings_cet18")
 clip_text = true
 
-[node name="Total" type="Label" parent="UI/Health/ColorRect"]
+[node name="Total" type="Label" parent="UI/Health/ColorRect" unique_id=454324509]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -1075,7 +1073,7 @@ grow_vertical = 2
 text = "100"
 label_settings = SubResource("LabelSettings_d6yvc")
 
-[node name="RadialMenu" type="Control" parent="." node_paths=PackedStringArray("player", "camera", "weapon_controller")]
+[node name="RadialMenu" type="Control" parent="." unique_id=1050306215 node_paths=PackedStringArray("player", "camera", "weapon_controller")]
 visible = false
 layout_mode = 3
 anchors_preset = 15
@@ -1088,7 +1086,7 @@ player = NodePath("..")
 camera = NodePath("../CameraRoot")
 weapon_controller = NodePath("../WeaponController")
 
-[node name="Panel" type="Panel" parent="RadialMenu"]
+[node name="Panel" type="Panel" parent="RadialMenu" unique_id=1746263855]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -1096,7 +1094,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Blur" type="TextureRect" parent="RadialMenu/Panel"]
+[node name="Blur" type="TextureRect" parent="RadialMenu/Panel" unique_id=1059936426]
 material = SubResource("ShaderMaterial_wev4p")
 layout_mode = 1
 anchors_preset = 15
@@ -1106,7 +1104,7 @@ grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("25_psjdo")
 
-[node name="Circle" type="Control" parent="RadialMenu/Panel"]
+[node name="Circle" type="Control" parent="RadialMenu/Panel" unique_id=837324231]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -1121,99 +1119,97 @@ grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(0.8, 0.8)
 
-[node name="0" parent="RadialMenu/Panel/Circle" instance=ExtResource("23_dnye5")]
+[node name="0" parent="RadialMenu/Panel/Circle" unique_id=851538717 instance=ExtResource("23_dnye5")]
 layout_mode = 1
 script = ExtResource("24_y2cl2")
 
-[node name="1" parent="RadialMenu/Panel/Circle" instance=ExtResource("23_dnye5")]
+[node name="1" parent="RadialMenu/Panel/Circle" unique_id=918354907 instance=ExtResource("23_dnye5")]
 layout_mode = 1
 rotation = 1.0471976
 script = ExtResource("24_y2cl2")
 index = 1
 
-[node name="2" parent="RadialMenu/Panel/Circle" instance=ExtResource("23_dnye5")]
+[node name="2" parent="RadialMenu/Panel/Circle" unique_id=1513972075 instance=ExtResource("23_dnye5")]
 layout_mode = 1
 rotation = 2.0943952
 script = ExtResource("24_y2cl2")
 index = 2
 
-[node name="3" parent="RadialMenu/Panel/Circle" instance=ExtResource("23_dnye5")]
+[node name="3" parent="RadialMenu/Panel/Circle" unique_id=1923203331 instance=ExtResource("23_dnye5")]
 layout_mode = 1
 rotation = 3.1415927
 script = ExtResource("24_y2cl2")
 index = 3
 
-[node name="4" parent="RadialMenu/Panel/Circle" instance=ExtResource("23_dnye5")]
+[node name="4" parent="RadialMenu/Panel/Circle" unique_id=2115274014 instance=ExtResource("23_dnye5")]
 layout_mode = 1
 rotation = 4.1887903
 script = ExtResource("24_y2cl2")
 index = 4
 
-[node name="5" parent="RadialMenu/Panel/Circle" instance=ExtResource("23_dnye5")]
+[node name="5" parent="RadialMenu/Panel/Circle" unique_id=1044050712 instance=ExtResource("23_dnye5")]
 layout_mode = 1
 rotation = 5.2359877
 script = ExtResource("24_y2cl2")
 index = 5
 
-[node name="Icons" type="Control" parent="RadialMenu/Panel/Circle"]
+[node name="Icons" type="Control" parent="RadialMenu/Panel/Circle" unique_id=2027416132]
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="Pistol" type="Sprite2D" parent="RadialMenu/Panel/Circle/Icons"]
+[node name="Pistol" type="Sprite2D" parent="RadialMenu/Panel/Circle/Icons" unique_id=509155327]
 position = Vector2(25.999985, -153)
 scale = Vector2(0.35, 0.35)
 texture = ExtResource("26_5qqj5")
 
-[node name="AssultRifle" type="Sprite2D" parent="RadialMenu/Panel/Circle/Icons"]
+[node name="AssultRifle" type="Sprite2D" parent="RadialMenu/Panel/Circle/Icons" unique_id=305999881]
 position = Vector2(176, -48)
 scale = Vector2(0.35, 0.35)
 texture = ExtResource("27_8mmyv")
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="RadialMenu"]
-libraries = {
-&"": SubResource("AnimationLibrary_psjdo")
-}
+[node name="AnimationPlayer" type="AnimationPlayer" parent="RadialMenu" unique_id=221410025]
+libraries/ = SubResource("AnimationLibrary_psjdo")
 
-[node name="WeaponController" type="Node" parent="." node_paths=PackedStringArray("animation_controller", "weapon_audio", "neck_bone_attachement")]
+[node name="WeaponController" type="Node" parent="." unique_id=310271894 node_paths=PackedStringArray("animation_controller", "weapon_audio", "neck_bone_attachement")]
 script = ExtResource("31_4afhp")
 animation_controller = NodePath("../AnimationController")
 weapon_audio = NodePath("../WeaponAudio")
 neck_bone_attachement = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment")
 
-[node name="TransitionTimer" type="Timer" parent="WeaponController"]
+[node name="TransitionTimer" type="Timer" parent="WeaponController" unique_id=510751726]
 process_callback = 0
 wait_time = 0.1
 one_shot = true
 
-[node name="FireTimer" type="Timer" parent="WeaponController"]
+[node name="FireTimer" type="Timer" parent="WeaponController" unique_id=261987164]
 process_callback = 0
 wait_time = 0.15
 one_shot = true
 
-[node name="ReloadTimer" type="Timer" parent="WeaponController"]
+[node name="ReloadTimer" type="Timer" parent="WeaponController" unique_id=1557400816]
 process_callback = 0
 one_shot = true
 
-[node name="RollTimer" type="Timer" parent="."]
+[node name="RollTimer" type="Timer" parent="." unique_id=402103297]
 process_callback = 0
 one_shot = true
 
-[node name="StanceAntispamTimer" type="Timer" parent="."]
+[node name="StanceAntispamTimer" type="Timer" parent="." unique_id=2107233730]
 process_callback = 0
 wait_time = 0.25
 one_shot = true
 
-[node name="WeaponAudio" type="AudioStreamPlayer3D" parent="."]
+[node name="WeaponAudio" type="AudioStreamPlayer3D" parent="." unique_id=144400236]
 
-[node name="AimStayTimer" type="Timer" parent="."]
+[node name="AimStayTimer" type="Timer" parent="." unique_id=139926006]
 process_callback = 0
 wait_time = 0.5
 one_shot = true
 
-[node name="Splatters" type="Node3D" parent="."]
+[node name="Splatters" type="Node3D" parent="." unique_id=682703891]
 
-[node name="1" type="GPUParticles3D" parent="Splatters"]
+[node name="1" type="GPUParticles3D" parent="Splatters" unique_id=196159800]
 emitting = false
 amount = 12
 one_shot = true
@@ -1222,7 +1218,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="2" type="GPUParticles3D" parent="Splatters"]
+[node name="2" type="GPUParticles3D" parent="Splatters" unique_id=738517778]
 emitting = false
 amount = 12
 one_shot = true
@@ -1231,7 +1227,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="3" type="GPUParticles3D" parent="Splatters"]
+[node name="3" type="GPUParticles3D" parent="Splatters" unique_id=1247110497]
 emitting = false
 amount = 12
 one_shot = true
@@ -1240,7 +1236,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="4" type="GPUParticles3D" parent="Splatters"]
+[node name="4" type="GPUParticles3D" parent="Splatters" unique_id=2136927381]
 emitting = false
 amount = 12
 one_shot = true
@@ -1249,7 +1245,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="5" type="GPUParticles3D" parent="Splatters"]
+[node name="5" type="GPUParticles3D" parent="Splatters" unique_id=91116290]
 emitting = false
 amount = 12
 one_shot = true
@@ -1258,7 +1254,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="6" type="GPUParticles3D" parent="Splatters"]
+[node name="6" type="GPUParticles3D" parent="Splatters" unique_id=1758565817]
 emitting = false
 amount = 12
 one_shot = true
@@ -1267,7 +1263,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="7" type="GPUParticles3D" parent="Splatters"]
+[node name="7" type="GPUParticles3D" parent="Splatters" unique_id=547069219]
 emitting = false
 amount = 12
 one_shot = true
@@ -1276,7 +1272,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="8" type="GPUParticles3D" parent="Splatters"]
+[node name="8" type="GPUParticles3D" parent="Splatters" unique_id=2079078373]
 emitting = false
 amount = 12
 one_shot = true
@@ -1285,7 +1281,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="9" type="GPUParticles3D" parent="Splatters"]
+[node name="9" type="GPUParticles3D" parent="Splatters" unique_id=722481696]
 emitting = false
 amount = 12
 one_shot = true
@@ -1294,7 +1290,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="10" type="GPUParticles3D" parent="Splatters"]
+[node name="10" type="GPUParticles3D" parent="Splatters" unique_id=2089153216]
 emitting = false
 amount = 12
 one_shot = true
@@ -1303,7 +1299,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="11" type="GPUParticles3D" parent="Splatters"]
+[node name="11" type="GPUParticles3D" parent="Splatters" unique_id=1342964177]
 emitting = false
 amount = 12
 one_shot = true
@@ -1312,7 +1308,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="12" type="GPUParticles3D" parent="Splatters"]
+[node name="12" type="GPUParticles3D" parent="Splatters" unique_id=2005186549]
 emitting = false
 amount = 12
 one_shot = true
@@ -1321,7 +1317,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="13" type="GPUParticles3D" parent="Splatters"]
+[node name="13" type="GPUParticles3D" parent="Splatters" unique_id=227988182]
 emitting = false
 amount = 12
 one_shot = true
@@ -1330,7 +1326,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="14" type="GPUParticles3D" parent="Splatters"]
+[node name="14" type="GPUParticles3D" parent="Splatters" unique_id=1182522877]
 emitting = false
 amount = 12
 one_shot = true
@@ -1339,7 +1335,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="15" type="GPUParticles3D" parent="Splatters"]
+[node name="15" type="GPUParticles3D" parent="Splatters" unique_id=160911120]
 emitting = false
 amount = 12
 one_shot = true
@@ -1348,7 +1344,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="0" type="GPUParticles3D" parent="Splatters"]
+[node name="0" type="GPUParticles3D" parent="Splatters" unique_id=1164878262]
 emitting = false
 amount = 12
 one_shot = true
@@ -1357,7 +1353,7 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="Health" type="Node" parent="."]
+[node name="Health" type="Node" parent="." unique_id=1272974998]
 script = ExtResource("40_hlth1")
 
 [connection signal="changed_combat_state" from="." to="CameraRoot" method="on_set_combat_state"]

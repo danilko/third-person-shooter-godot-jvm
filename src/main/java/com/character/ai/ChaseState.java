@@ -32,14 +32,15 @@ public class ChaseState implements EnemyAIState {
 
         float dist = (float) enemy.getGlobalPosition()
                                   .distanceTo(enemy.getPlayer().getGlobalPosition());
-        if (dist <= enemy.attackRange) {
+        if (dist <= enemy.attackRange && enemy.hasLineOfSight()) {
+            if (!enemy.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
             return AttackState.INSTANCE;
         }
 
         input.wantCombat   = true;
         input.movementType = MovementType.SPRINT;
 
-        if (enemy.canSeePlayer()) {
+        if (enemy.hasLineOfSight()) {
             enemy.resetLostPlayerTimer();
             enemy.getNavAgent().setTargetPosition(enemy.getPlayer().getGlobalPosition());
             Vector3 pp = enemy.getPlayer().getGlobalPosition();
