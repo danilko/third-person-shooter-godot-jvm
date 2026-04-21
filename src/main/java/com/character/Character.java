@@ -71,11 +71,11 @@ public class Character extends CharacterBody3D {
 
     @RegisterProperty
     @Export
-    public NodePath aimTargetPath = new NodePath("AimTarget");
+    public NodePath aimTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget");
 
     @RegisterProperty
     @Export
-    public NodePath aimRayPath = new NodePath("AimRay");
+    public NodePath aimRayPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay");
 
     // ── Protected state ───────────────────────────────────────────────────────
     protected int airJumpCounter = 0;

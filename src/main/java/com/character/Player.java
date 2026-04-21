@@ -13,17 +13,12 @@ import godot.global.GD;
 @RegisterClass
 public class Player extends Character {
 
-    // ── Player-specific exports ───────────────────────────────────────────────
-    @RegisterProperty
-    @Export
-    public NodePath rayCastNodePath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
 
     @RegisterProperty
     @Export
     public NodePath hudPath = new NodePath("UI");
 
     // ── Player-specific nodes ─────────────────────────────────────────────────
-    private RayCast3D rayCast3D;
     private CharacterHUD hud;
     private Timer aimStayTimer;
 
@@ -34,9 +29,7 @@ public class Player extends Character {
         super._ready();
 
         aimStayTimer = (Timer) getNode("AimStayTimer");
-
-        rayCast3D = (RayCast3D) getNode(rayCastNodePath);
-        rayCast3D.addException(this);
+        aimRay.addException(this);
 
         if (hasNode(hudPath)) {
             hud = (CharacterHUD) getNode(hudPath);
@@ -90,16 +83,16 @@ public class Player extends Character {
         // ── Aim target: derive from camera raycast ─────────────────────────
         if (input.wantCombat) {
             // Reset horizontal spread rotation added by WeaponController
-            Vector3 rayDeg = rayCast3D.getRotationDegrees();
-            rayCast3D.setRotationDegrees(new Vector3(rayDeg.getX(), 0.0f, 0.0f));
+            Vector3 rayDeg = aimRay.getRotationDegrees();
+            aimRay.setRotationDegrees(new Vector3(rayDeg.getX(), 0.0f, 0.0f));
 
-            if (rayCast3D.isColliding() &&
-                    rayCast3D.getCollisionPoint()
-                             .minus(rayCast3D.getGlobalTransform().getOrigin())
+            if (aimRay.isColliding() &&
+                  aimRay.getCollisionPoint()
+                             .minus(aimRay.getGlobalTransform().getOrigin())
                              .length() > 0.1) {
-                input.aimTargetPosition = rayCast3D.getCollisionPoint();
+                input.aimTargetPosition = aimRay.getCollisionPoint();
             } else {
-                input.aimTargetPosition = rayCast3D.toGlobal(rayCast3D.getTargetPosition());
+                input.aimTargetPosition = aimRay.toGlobal(aimRay.getTargetPosition());
             }
         }
 

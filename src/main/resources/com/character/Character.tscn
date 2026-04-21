@@ -26,6 +26,7 @@
 [ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="31_4afhp"]
 [ext_resource type="Script" uid="uid://djt55pliyvi0y" path="res://src/main/java/com/character/Health.java" id="40_hlth1"]
 [ext_resource type="Resource" uid="uid://drollstate01" path="res://src/main/resources/com/character/rollstates/Roll.tres" id="50_roll"]
+[ext_resource type="Script" uid="uid://cb87jxnlmqdt" path="res://src/main/java/com/character/CameraController.java" id="60_cam"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_ige6o"]
 filters = ["Godot_Chan_Stealth/Skeleton3D:pelvis"]
@@ -496,6 +497,9 @@ albedo_color = Color(1, 0, 0, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_pwn40"]
 material = SubResource("StandardMaterial3D_v5nep")
 
+[sub_resource type="SphereShape3D" id="SphereShape3D_cam"]
+radius = 0.1
+
 [node name="Character" type="CharacterBody3D" unique_id=802038165 node_paths=PackedStringArray("weapon_controller")]
 script = ExtResource("1_char")
 jump_states = Dictionary[String, ExtResource("2_arx8k")]({
@@ -513,6 +517,8 @@ combat_states = Dictionary[String, ExtResource("5_gapvf")]({
 })
 roll_state = ExtResource("50_roll")
 weapon_controller = NodePath("WeaponController")
+aim_target_path = NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget")
+aim_ray_path = NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay")
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1655806234]
 root_node = NodePath("../MeshRoot/Model")
@@ -558,15 +564,15 @@ parameters/WeaponChangeSeek/seek_request = -1.0
 [node name="Model" parent="MeshRoot" unique_id=2091451191 instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(6.407188e-10, -0.0175709, -0.080805)
+bones/0/position = Vector3(1.9497592e-10, -0.0147714745, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.42506635, 0.110547096, 0.7516259, -0.4920942)
+bones/1/rotation = Quaternion(0.44596952, 0.10320858, 0.7205843, -0.52078557)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.44236308, -0.11759126, 0.055524375, 0.88735795)
+bones/2/rotation = Quaternion(0.43915802, -0.10994023, 0.013244888, 0.89155924)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.09665453, -0.17627236, 0.04947481, 0.9783345)
+bones/3/rotation = Quaternion(-0.09628833, -0.15209782, 0.03710568, 0.9829639)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.057907797, -0.054525897, 0.007465809, 0.9968039)
+bones/4/rotation = Quaternion(-0.058550384, -0.07344475, 0.0072269654, 0.99555284)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -644,24 +650,24 @@ bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19535868, -0.02034833, 0.005956863, 0.9805027)
+bones/43/rotation = Quaternion(0.19533, -0.019785453, 0.0058159614, 0.9805208)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.93569285, 0.15364638, -0.22332165, -0.22583017)
+bones/45/rotation = Quaternion(0.9133067, 0.12099338, -0.23549904, -0.30947015)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.41410077, 0.2036857, -0.09260298, 0.88230246)
-bones/47/rotation = Quaternion(-0.4863725, 0.022856917, -0.02734908, 0.87302434)
-bones/48/rotation = Quaternion(-0.4480009, 0.021062007, 0.023096213, 0.8934865)
+bones/46/rotation = Quaternion(0.17225808, 0.22229035, -0.032912586, 0.95907825)
+bones/47/rotation = Quaternion(-0.5880115, 0.018947866, -0.032881584, 0.8079618)
+bones/48/rotation = Quaternion(-0.47988093, 0.021249335, 0.019802049, 0.87685275)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.95431954, 0.018887646, 0.26849383, -0.12972502)
+bones/49/rotation = Quaternion(0.9635599, -0.005052225, 0.25430435, -0.08280272)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.20921622, -0.21511471, 0.027778443, 0.9535107)
-bones/51/rotation = Quaternion(-0.5282211, -0.023286132, 0.024182104, 0.848443)
-bones/52/rotation = Quaternion(-0.29835328, -0.0198874, -0.037448086, 0.9535132)
+bones/50/rotation = Quaternion(0.2683523, -0.21927075, 0.051840894, 0.93660027)
+bones/51/rotation = Quaternion(-0.5020827, -0.026484547, 0.031788107, 0.8638293)
+bones/52/rotation = Quaternion(-0.2711709, -0.019626457, -0.039875753, 0.9615046)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1709979392]
-transform = Transform3D(0.7156144, -0.03915762, -0.6973976, 0.68546337, 0.2313347, 0.69037974, 0.13429858, -0.9720859, 0.19238767, 0.12093941, 1.1910197, -0.45273352)
+transform = Transform3D(-0.71457547, 0.0832233, 0.6945905, 0.6974846, 0.16115369, 0.6982441, -0.05382576, 0.9834139, -0.17320348, -0.12192381, 1.1653712, 0.39215213)
 bone_name = "hand_r"
 bone_idx = 27
 
@@ -671,12 +677,11 @@ transform = Transform3D(1, 0, 1.6763806e-08, 0, 0.99999994, -1.4901161e-08, 2.60
 [node name="Rifile" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1788483088 instance=ExtResource("10_omh8y")]
 
 [node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=178617702]
-target_node = NodePath("../../../../../AimTarget")
 bone_name = "spine_03"
 bone = 4
 
 [node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=374203861]
-transform = Transform3D(-0.99903345, 0.018555576, 0.03985595, 0.0038982262, 0.94038117, -0.3400996, -0.04379035, -0.33961552, -0.93954456, -0.008956688, 1.245683, -0.013158258)
+transform = Transform3D(0.9999864, 0.0050749797, -0.0011946894, -0.0051230006, 0.91386867, -0.4059775, -0.0009685308, 0.40597808, 0.91388226, -0.010669753, 1.2504958, -0.047692984)
 bone_name = "neck_01"
 bone_idx = 43
 
@@ -772,7 +777,7 @@ disabled = true
 [node name="WeaponController" type="Node" parent="." unique_id=384125234 node_paths=PackedStringArray("animation_controller", "weapon_audio", "neck_bone_attachement")]
 script = ExtResource("31_4afhp")
 animation_controller = NodePath("../AnimationController")
-ray_cast_path = NodePath("AimRay")
+ray_cast_path = NodePath("../CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay")
 weapon_audio = NodePath("../WeaponAudio")
 neck_bone_attachement = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment")
 
@@ -947,24 +952,50 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
-[node name="AimTarget" type="Marker3D" parent="." unique_id=1645804093]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, -5)
-
-[node name="AimRay" type="RayCast3D" parent="." unique_id=1114767811]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
-target_position = Vector3(0, 0, -1000)
-
 [node name="Health" type="Node" parent="." unique_id=1822801054]
 script = ExtResource("40_hlth1")
 
+[node name="CameraRoot" type="Node3D" parent="." unique_id=1945688108 node_paths=PackedStringArray("player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
+script = ExtResource("60_cam")
+player = NodePath("..")
+
+[node name="Yaw" type="Node3D" parent="CameraRoot" unique_id=1671558584]
+
+[node name="Pitch" type="Node3D" parent="CameraRoot/Yaw" unique_id=643544584]
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
+
+[node name="Pivot" type="Node3D" parent="CameraRoot/Yaw/Pitch" unique_id=1611848527]
+transform = Transform3D(-1, 0, 1.509958e-07, 0, 0.9999995, 0, -1.509957e-07, 0, -0.9999995, 0, 0.4, 0)
+
+[node name="SpringArm" type="SpringArm3D" parent="CameraRoot/Yaw/Pitch/Pivot" unique_id=588223935]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 1.4210855e-14, 0, 1, 0, 0, 0)
+shape = SubResource("SphereShape3D_cam")
+
+[node name="Camera" type="Camera3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm" unique_id=1227212050]
+transform = Transform3D(1, -2.5410988e-21, 8.526513e-14, 0, 1.0000002, 2.980233e-08, 2.842171e-14, -2.980233e-08, 1.0000002, 0, 0, 0)
+doppler_tracking = 1
+fov = 65.0
+far = 8192.0
+
+[node name="AimTarget" type="Marker3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" unique_id=1416140619]
+transform = Transform3D(1, -2.4868996e-14, 4.2632564e-14, 3.5527133e-15, 1, -1.7881393e-07, 1.4210855e-14, 2.0861626e-07, 1, 0, 0, -20)
+
+[node name="AimRay" type="RayCast3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" unique_id=847198473]
+transform = Transform3D(1, 0, 7.1054274e-15, 3.5527137e-15, -5.9604645e-08, -0.99999994, 1.4210855e-14, 0.99999994, -5.9604645e-08, -2.842171e-14, -1.1920929e-07, -3.5762787e-07)
+target_position = Vector3(0, -1000, 0)
+
 [connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]
+[connection signal="changed_combat_state" from="." to="CameraRoot" method="on_set_combat_state"]
 [connection signal="changed_movement_direction" from="." to="MovementController" method="on_set_movement_direction"]
 [connection signal="changed_movement_direction" from="." to="AnimationController" method="on_set_movement_direction"]
 [connection signal="changed_movement_state" from="." to="MovementController" method="on_set_movement_state"]
 [connection signal="changed_movement_state" from="." to="AnimationController" method="on_set_movement_state"]
+[connection signal="changed_movement_state" from="." to="CameraRoot" method="on_set_movement_state"]
 [connection signal="changed_stance" from="." to="MovementController" method="on_set_stance"]
 [connection signal="changed_stance" from="." to="AnimationController" method="on_set_stance"]
+[connection signal="changed_stance" from="." to="CameraRoot" method="on_set_stance"]
 [connection signal="changed_weapon" from="." to="WeaponController" method="on_set_weapon"]
 [connection signal="fire_weapon" from="." to="WeaponController" method="on_weapon_fire"]
 [connection signal="not_fire_weapon" from="." to="WeaponController" method="on_weapon_not_fire"]
@@ -978,5 +1009,6 @@ script = ExtResource("40_hlth1")
 [connection signal="timeout" from="RollTimer" to="." method="completed_roll"]
 [connection signal="timeout" from="RollTimer" to="MovementController" method="completed_roll"]
 [connection signal="died" from="Health" to="." method="on_died"]
+[connection signal="set_cam_rotation" from="CameraRoot" to="MovementController" method="on_set_cam_rotation"]
 
 [editable path="MeshRoot/Model"]
