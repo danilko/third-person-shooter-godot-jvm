@@ -8,6 +8,7 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.Area3D;
 import godot.api.NavigationAgent3D;
+import godot.core.Transform3D;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -118,21 +119,28 @@ public class Enemy extends Character {
     }
 
     /** Returns true when the player is within detectionRange AND visible via LoS raycast. */
-    public boolean canSeePlayer() {
+    public boolean canSeePlayer(double delta) {
         if (player == null) return false;
         float dist = (float) getGlobalPosition().distanceTo(player.getGlobalPosition());
         if (dist > detectionRange) return false;
-        return hasLineOfSight();
+        return hasLineOfSight(delta);
     }
 
     /** Pure LoS raycast with no distance limit — use when already engaged with the player. */
-    public boolean hasLineOfSight() {
+    public boolean hasLineOfSight(double delta) {
         if (player == null) return false;
         // Aim at the player's upper body, not their feet — avoids false negatives
         // when low cover blocks the ankle but the torso is clearly visible.
         Vector3 playerBodyPos = player.getGlobalPosition()
                                       .plus(new Vector3(0, PLAYER_BODY_HEIGHT, 0));
-        cameraRoot.lookAt(playerBodyPos);
+
+        Transform3D targetTransform = cameraRoot.getGlobalTransform().lookingAt(playerBodyPos, Vector3.Companion.getUP(), true);
+        float turnSpeed = 0.1f; // Adjust for difficulty (lower = slower/easier)
+
+        cameraRoot.setGlobalTransform(
+          cameraRoot.getGlobalTransform().interpolateWith(targetTransform, (float)delta * turnSpeed)
+        );
+
         aimRay.setTargetPosition(aimRay.toLocal(playerBodyPos));
         aimRay.forceRaycastUpdate();
         if (!aimRay.isColliding()) return false;

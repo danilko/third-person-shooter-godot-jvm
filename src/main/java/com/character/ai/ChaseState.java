@@ -37,14 +37,14 @@ public class ChaseState implements EnemyAIState {
         // combat animation and LookAtModifier activate on the same frame.
         input.wantCombat = true;
 
-        if (dist <= enemy.attackRange && enemy.hasLineOfSight()) {
+        if (dist <= enemy.attackRange && enemy.hasLineOfSight(delta)) {
             if (!enemy.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
             return AttackState.INSTANCE;
         }
 
         input.movementType = MovementType.SPRINT;
 
-        if (enemy.hasLineOfSight()) {
+        if (enemy.hasLineOfSight(delta)) {
             enemy.resetLostPlayerTimer();
             enemy.getNavAgent().setTargetPosition(enemy.getPlayer().getGlobalPosition());
             Vector3 pp = enemy.getPlayer().getGlobalPosition();

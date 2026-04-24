@@ -78,7 +78,7 @@ public class AttackState implements EnemyAIState {
         }
 
         // Require line-of-sight before firing; fall back to chase if occluded
-        if (!enemy.hasLineOfSight()) {
+        if (!enemy.hasLineOfSight(delta)) {
             return ChaseState.INSTANCE;
         }
 

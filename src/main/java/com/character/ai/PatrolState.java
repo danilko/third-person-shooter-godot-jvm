@@ -34,7 +34,7 @@ public class PatrolState implements EnemyAIState {
             input.desiredWeapon = bestWeapon;
         }
 
-        if (enemy.canSeePlayer()) {
+        if (enemy.canSeePlayer(delta)) {
             // Prime combat mode this frame so the animation and LookAtModifier
             // start immediately rather than lagging one extra frame.
             input.wantCombat = true;
