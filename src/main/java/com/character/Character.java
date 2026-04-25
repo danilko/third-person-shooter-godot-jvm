@@ -132,13 +132,6 @@ public class Character extends CharacterBody3D {
         }
         if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
             physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
-            for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
-                Node child = physicalBoneSimulator.getChild(i);
-                if (child instanceof PhysicalBone3D bone) {
-                    // let the character's own bone to be exception list
-                    aimRay.addException(bone);
-                }
-            }
         }
 
         changedMovementDirection.emit(Vector3.Companion.getBACK());
