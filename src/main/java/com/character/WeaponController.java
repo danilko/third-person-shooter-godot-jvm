@@ -2,6 +2,7 @@ package com.character;
 import com.util.ObjectPool;
 import godot.annotation.*;
 import godot.api.*;
+import godot.api.CharacterBody3D;
 import godot.api.Object;
 import godot.core.NodePath;
 import godot.core.Signal1;
@@ -30,7 +31,7 @@ public class WeaponController extends Node {
 
   @RegisterProperty
   @Export
-  public NodePath recoilPitchPath = new NodePath("CameraRoot/Yaw/Pitch");
+  public NodePath cameraControllerPath = new NodePath("CameraRoot");
 
 
   @RegisterProperty
@@ -82,6 +83,39 @@ public class WeaponController extends Node {
   private int weapon = 0;
   private int pendingWeapon = 0;
   private boolean isWeaponFired = false;
+
+  // Bloom: increases per shot, decays toward 0 while not firing.
+  private float currentBloom = 0.0f;
+
+  @Export
+  @RegisterProperty
+  public float bloomPerShot = 0.5f;
+
+  @Export
+  @RegisterProperty
+  public float bloomDecaySpeed = 4.0f;
+
+  // Converts WeaponStats.spread (crosshair-pixel units) into actual degrees for the aimRay.
+  // Default 0.1 → base spread of 18 units becomes ±0.9° half-angle (~16 cm at 10 m).
+  @Export
+  @RegisterProperty
+  public float ballisticSpreadScale = 0.1f;
+
+  @RegisterFunction
+  @Override
+  public void _physicsProcess(double delta) {
+    currentBloom = Math.max(0f, currentBloom - bloomDecaySpeed * (float) delta);
+  }
+
+  private float computeCurrentSpread() {
+    WeaponStats stats = getCurrentWeaponStats();
+    float speed = (float) ((CharacterBody3D) getOwner()).getVelocity().length();
+    // Convert crosshair-unit values to degrees; velocity contributes 0.1°/m/s directly.
+    float baseDeg   = stats.getSpread() * ballisticSpreadScale;
+    float movingDeg = speed * 0.1f;
+    float bloomDeg  = currentBloom * ballisticSpreadScale;
+    return Math.max(0f, baseDeg + movingDeg + bloomDeg);
+  }
 
   @RegisterFunction
   @Override
@@ -160,32 +194,54 @@ public class WeaponController extends Node {
     weaponAudio.play();
 
 
-    if (getOwner().hasNode(recoilPitchPath)) {
-      ((Node3D) getOwner().getNode(recoilPitchPath)).rotateX((float) GD.degToRad(getCurrentWeaponStats().getRecoil()));
+    // Route recoil through CameraController so it accumulates and recovers properly
+    if (getOwner().hasNode(cameraControllerPath)) {
+      Node camNode = getOwner().getNode(cameraControllerPath);
+      if (camNode instanceof CameraController cam) {
+        float recoil = getCurrentWeaponStats().getRecoil();
+        float horizRecoil = (float) GD.randfRange(-recoil * 0.3f, recoil * 0.3f);
+        cam.applyRecoil(recoil, horizRecoil);
+      }
     }
-//
-//    // Apply spread and check for collision
-//    if(aimRay3D != null) {
-//      Vector3 currentRotationDegree = aimRay3D.getRotationDegrees();
-//      float spread = getCurrentWeaponStats().getSpread();
-//      aimRay3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
-//    }
 
-    // final check for collision point
-    if(aimRay3D != null && aimRay3D.isColliding() &&  (aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin())).length() > 0.1) {
-      // Apply damage if the hit body has a Health node
-      Object collider = aimRay3D.getCollider();
-      if (collider instanceof godot.api.Node) {
-        godot.api.Node hitNode = (godot.api.Node) collider;
-        if (hitNode.getOwner().hasNode(new NodePath("Health"))) {
-          ((Health) hitNode.getOwner().getNode(new NodePath("Health"))).takeDamage(hitNode, getCurrentWeaponStats().damage);
-        }
+    // Accumulate per-shot bloom (capped at 3× base spread)
+    currentBloom = Math.min(currentBloom + bloomPerShot, getCurrentWeaponStats().getSpread() * 3f);
+
+    if (aimRay3D != null) {
+      // Player: apply angular spread + force update. Enemy: snapAimRay already
+      // positioned the ray (with scatter baked in) and called forceRaycastUpdate —
+      // rotating it again would override that carefully placed aim.
+      boolean applySpread = getOwner() instanceof Character
+          && ((Character) getOwner()).useWeaponSpread;
+
+      Vector3 savedRot = null;
+      if (applySpread) {
+        savedRot = aimRay3D.getRotationDegrees();
+        float halfSpread = computeCurrentSpread() * 0.5f;
+        float pitchOff = (float) GD.randfRange(-halfSpread, halfSpread);
+        float yawOff   = (float) GD.randfRange(-halfSpread, halfSpread);
+        aimRay3D.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
+        aimRay3D.forceRaycastUpdate();
       }
 
-      GPUParticles3D splatter = splatterPool.acquire();
-      splatter.setGlobalPosition(aimRay3D.getCollisionPoint());
-      splatter.setEmitting(true);
-      splatterPool.release(splatter); // immediately back; particle keeps emitting
+      if (aimRay3D.isColliding() &&
+          (aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin())).length() > 0.1) {
+        Object collider = aimRay3D.getCollider();
+        if (collider instanceof godot.api.Node hitNode) {
+          if (hitNode.getOwner().hasNode(new NodePath("Health"))) {
+            ((Health) hitNode.getOwner().getNode(new NodePath("Health")))
+                .takeDamage(hitNode, getCurrentWeaponStats().damage);
+          }
+        }
+        GPUParticles3D splatter = splatterPool.acquire();
+        splatter.setGlobalPosition(aimRay3D.getCollisionPoint());
+        splatter.setEmitting(true);
+        splatterPool.release(splatter);
+      }
+
+      if (savedRot != null) {
+        aimRay3D.setRotationDegrees(savedRot);
+      }
     }
   }
 

@@ -75,6 +75,15 @@ public class CameraController extends Node3D {
   private double cameraFov = 0.0;
   protected boolean combat = false;
 
+  // Recoil offsets added per shot, decaying toward zero each frame.
+  // Kept separate from pitch/yaw (mouse intent) so recovery never fights mouse aim.
+  private double recoilPitch = 0.0;
+  private double recoilYaw   = 0.0;
+
+  @Export
+  @RegisterProperty
+  public double recoilRecoverySpeed = 8.0;
+
   private Tween tween;
 
   @RegisterFunction
@@ -128,19 +137,33 @@ public class CameraController extends Node3D {
 
     springArm.setLength(GD.lerp(springArm.getLength(), springArmLengthTarget, followSpeedWeight));
 
-    // Clamp pitch
+    // Clamp clean mouse-intent pitch
     pitch = GD.clamp(pitch, pitchMin, pitchMax);
+
+    // Decay recoil offsets toward zero each frame
+    recoilPitch = GD.lerp(recoilPitch, 0.0, recoilRecoverySpeed * delta);
+    recoilYaw   = GD.lerp(recoilYaw,   0.0, recoilRecoverySpeed * delta);
+
+    // Display values: mouse aim + per-shot kick, pitch clamped
+    double displayPitch = GD.clamp(pitch + recoilPitch, pitchMin, pitchMax);
+    double displayYaw   = yaw + recoilYaw;
 
     // Rotation interpolation
     Vector3 yawRot = yawNode.getRotationDegrees();
-    yawRot.setY(GD.lerp(yawRot.getY(), yaw, yawAcceleration * delta));
+    yawRot.setY(GD.lerp(yawRot.getY(), displayYaw, yawAcceleration * delta));
     yawNode.setRotationDegrees(yawRot);
 
     Vector3 pitchRot = pitchNode.getRotationDegrees();
-    pitchRot.setX(GD.lerp(pitchRot.getX(), pitch, pitchAcceleration * delta));
+    pitchRot.setX(GD.lerp(pitchRot.getX(), displayPitch, pitchAcceleration * delta));
     pitchNode.setRotationDegrees(pitchRot);
 
     setCamRotation.emit(yawNode.getRotation().getY());
+  }
+
+  /** Adds a per-shot kick (degrees) that decays back to zero at recoilRecoverySpeed. */
+  public void applyRecoil(double pitchKick, double yawKick) {
+    recoilPitch += pitchKick;
+    recoilYaw   += yawKick;
   }
 
   @RegisterFunction

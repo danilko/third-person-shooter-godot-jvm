@@ -93,6 +93,9 @@ public class Character extends CharacterBody3D {
     protected boolean isRolling = false;
     protected boolean combat = false;
 
+    // False for AI-controlled characters whose accuracy is managed by their own system.
+    protected boolean useWeaponSpread = true;
+
     protected Timer stanceAntispamTimer;
     protected Timer rollTimer;
     protected Health healthNode;

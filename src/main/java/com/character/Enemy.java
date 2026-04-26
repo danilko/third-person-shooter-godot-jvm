@@ -115,6 +115,7 @@ public class Enemy extends Character {
     @RegisterFunction
     @Override
     public void _ready() {
+        useWeaponSpread = false; // accuracy managed by hitChance + aimScatterRadius
         super._ready();
         navAgent  = (NavigationAgent3D) getNode("NavigationAgent3D");
         sightRay  = (RayCast3D)         getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SightRay");
