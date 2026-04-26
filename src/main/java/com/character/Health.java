@@ -10,6 +10,7 @@ import godot.api.PhysicalBone3D;
 import godot.core.Signal0;
 import godot.core.Signal1;
 import godot.core.StringName;
+import godot.global.GD;
 
 @RegisterClass(className = "Health")
 public class Health extends Node {

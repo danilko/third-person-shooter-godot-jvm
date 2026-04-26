@@ -132,6 +132,13 @@ public class Character extends CharacterBody3D {
         }
         if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
             physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
+
+            for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+                Node child = physicalBoneSimulator.getChild(i);
+                if (child instanceof PhysicalBone3D bone) {
+                   aimRay.addException(bone);
+                }
+            }
         }
 
         changedMovementDirection.emit(Vector3.Companion.getBACK());
@@ -343,17 +350,37 @@ public class Character extends CharacterBody3D {
 
     // ── Ragdoll ───────────────────────────────────────────────────────────────
     protected void enableRagdoll() {
+        // Stop Character's own input/apply cycle
         setPhysicsProcess(false);
+
+        // Stop MovementController — it is a separate Node with its own
+        // _physicsProcess that applies gravity and calls moveAndSlide().
+        // Without this, the CharacterBody3D keeps falling even after death.
+        if (hasNode("MovementController")) {
+            getNode("MovementController").setPhysicsProcess(false);
+        }
+
+        // Disable all CharacterBody3D stance capsules so the frozen corpse
+        // shell doesn't block navigation or other characters.
+        for (int i = 0; i < getChildCount(); i++) {
+            Node child = getChild(i);
+            if (child instanceof CollisionShape3D shape) {
+                shape.setDisabled(true);
+            }
+        }
+
         if (physicalBoneSimulator == null) return;
         for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
             Node child = physicalBoneSimulator.getChild(i);
             if (child instanceof PhysicalBone3D bone) {
-                // Allow ragdoll bones to rest on world geometry (layer 1)
-                bone.setCollisionLayer(1);
+                // setCollisionMaskValue adds layer 1 (world) to what the bone
+                // *detects*, so it rests on the floor.
+                // setCollisionLayer would only change what others detect the
+                // bone as — bones would still fall through everything.
+                bone.setCollisionMaskValue(1, true);
             }
         }
         physicalBoneSimulator.physicalBonesStartSimulation();
-        GD.print("enableRagdoll");
     }
 
     /**

@@ -3,6 +3,7 @@ package com.character.ai;
 import com.character.CharacterInput;
 import com.character.Enemy;
 import com.character.MovementType;
+import godot.api.Node3D;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -25,7 +26,9 @@ public class AttackState implements EnemyAIState {
     }
 
     @Override
-    public void exit(Enemy enemy) {}
+    public void exit(Enemy enemy) {
+        enemy.clearCameraAimTarget();
+    }
 
     @Override
     public EnemyAIState update(Enemy enemy, CharacterInput input, double delta) {
@@ -69,7 +72,7 @@ public class AttackState implements EnemyAIState {
         // ── Aim camera toward current target (smooth tracking) ───────────────
         if (enemy.getCurrentAimTarget() == null) {
             // Before first shot decision, track the exact player position
-            enemy.setCurrentAimTarget(playerPos.plus(new Vector3(0, Enemy.PLAYER_BODY_HEIGHT, 0)));
+            enemy.setCurrentAimTarget(((Node3D)enemy.getPlayer().getNode("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone neck_01")).getGlobalPosition());
         }
         enemy.aimAtPosition(enemy.getCurrentAimTarget(), delta);
         input.aimTargetPosition = enemy.getCurrentAimTarget();
@@ -108,6 +111,7 @@ public class AttackState implements EnemyAIState {
             Vector3 newTarget = enemy.computeAimTarget(isHit, hDist);
             enemy.setCurrentAimTarget(newTarget);
             enemy.aimAtPosition(newTarget, delta);
+            enemy.snapAimRay(newTarget);
             input.aimTargetPosition = newTarget;
             input.fire = true;
         }

@@ -7,7 +7,6 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
-import godot.core.Transform3D;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -30,7 +29,7 @@ public class Enemy extends Character {
 
     @Export
     @RegisterProperty
-    public float detectionRange = 12.0f;
+    public float detectionRange = 120.0f;
 
     @Export
     @RegisterProperty
@@ -42,11 +41,11 @@ public class Enemy extends Character {
 
     @Export
     @RegisterProperty
-    public float attackRange = 15.0f;
+    public float attackRange = 150.0f;
 
     @Export
     @RegisterProperty
-    public float patrolRadius = 8.0f;
+    public float patrolRadius = 80.0f;
 
     @Export
     @RegisterProperty
@@ -56,12 +55,12 @@ public class Enemy extends Character {
     /** Per-shot probability of actually hitting the player (0 = always miss, 1 = always hit). */
     @Export
     @RegisterProperty
-    public float hitChance = 0.65f;
+    public float hitChance = 0.9f;
 
     /** Seconds from first LoS contact before the enemy starts firing. */
     @Export
     @RegisterProperty
-    public float reactionTime = 0.3f;
+    public float reactionTime = 0.1f;
 
     /**
      * Maximum aim scatter radius (world units) for a miss at 10 m.
@@ -74,7 +73,7 @@ public class Enemy extends Character {
     /** Seconds between lateral strafe direction changes while in attack stance. */
     @Export
     @RegisterProperty
-    public float strafeChangeDuration = 1.2f;
+    public float strafeChangeDuration = 1f;
 
     // ── Constants ─────────────────────────────────────────────────────────────
     private static final float  AMMO_REFILL_ARRIVAL_THRESHOLD = 1.5f;
@@ -119,6 +118,13 @@ public class Enemy extends Character {
         super._ready();
         navAgent  = (NavigationAgent3D) getNode("NavigationAgent3D");
         sightRay  = (RayCast3D)         getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SightRay");
+
+        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            Node child = physicalBoneSimulator.getChild(i);
+            if (child instanceof PhysicalBone3D bone) {
+                sightRay.addException(bone);
+            }
+        }
         spawnPosition = new Vector3(getGlobalPosition());
         transitionTo(PatrolState.INSTANCE);
     }
@@ -168,8 +174,7 @@ public class Enemy extends Character {
      */
     public boolean hasLineOfSight() {
         if (player == null || sightRay == null) return false;
-        Vector3 playerBodyPos = player.getGlobalPosition()
-                                      .plus(new Vector3(0, PLAYER_BODY_HEIGHT, 0));
+        Vector3 playerBodyPos = ((Node3D)player.getNode("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone neck_01")).getGlobalPosition();
         sightRay.setTargetPosition(sightRay.toLocal(playerBodyPos));
         sightRay.forceRaycastUpdate();
         if (!sightRay.isColliding()) return false;
@@ -177,17 +182,33 @@ public class Enemy extends Character {
     }
 
     /**
-     * Smoothly rotates the CameraRoot (and thus the weapon AimRay) toward a world-space target.
-     * Call from attack/chase states each frame to drive where bullets go.
+     * Tells the EnemyCameraController to smoothly drive Yaw/Pitch toward {@code target}
+     * each frame.  CameraController's existing lerp provides the smooth tracking;
+     * call {@link #snapAimRay} on the fire frame to guarantee the AimRay collision
+     * is accurate regardless of how far the camera has converged.
      */
     public void aimAtPosition(Vector3 target, double delta) {
-        if (cameraRoot == null || target == null) return;
-        Transform3D targetTransform = cameraRoot.getGlobalTransform()
-                .lookingAt(target, Vector3.Companion.getUP(), true);
-        // Turn speed: 8 gives responsive but not instant tracking; lower = more lenient enemy
-        float turnSpeed = 8.0f;
-        cameraRoot.setGlobalTransform(
-                cameraRoot.getGlobalTransform().interpolateWith(targetTransform, (float)(delta * turnSpeed)));
+        if (!(cameraRoot instanceof EnemyCameraController cam) || target == null) return;
+        cam.setAimTarget(target);
+    }
+
+    /** Clears the EnemyCameraController aim override so the camera reverts to body-facing. */
+    public void clearCameraAimTarget() {
+        if (cameraRoot instanceof EnemyCameraController cam) {
+            cam.clearAimTarget();
+        }
+    }
+
+    /**
+     * Forces the AimRay to point at {@code worldTarget} and updates collision immediately.
+     * Mirrors the pattern used by {@link #hasLineOfSight()} for the SightRay.
+     * Call just before setting {@code input.fire = true} so WeaponController reads the
+     * correct collision result on the same frame.
+     */
+    public void snapAimRay(Vector3 worldTarget) {
+        if (aimRay == null || worldTarget == null) return;
+        aimRay.setTargetPosition(aimRay.toLocal(worldTarget));
+        aimRay.forceRaycastUpdate();
     }
 
     /**
@@ -196,7 +217,7 @@ public class Enemy extends Character {
      * scatter radius that scales linearly with distance (close shots are harder to miss).
      */
     public Vector3 computeAimTarget(boolean isHit, float hDist) {
-        Vector3 base = player.getGlobalPosition().plus(new Vector3(0, PLAYER_BODY_HEIGHT, 0));
+        Vector3 base = ((Node3D)player.getNode("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone neck_01")).getGlobalPosition();
         if (isHit) return base;
         float maxOffset = aimScatterRadius * (hDist / 10f);
         float offset    = GD.randf() * maxOffset;

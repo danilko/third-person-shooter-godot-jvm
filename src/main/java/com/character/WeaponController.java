@@ -163,13 +163,13 @@ public class WeaponController extends Node {
     if (getOwner().hasNode(recoilPitchPath)) {
       ((Node3D) getOwner().getNode(recoilPitchPath)).rotateX((float) GD.degToRad(getCurrentWeaponStats().getRecoil()));
     }
-
-    // Apply spread and check for collision
-    if(aimRay3D != null) {
-      Vector3 currentRotationDegree = aimRay3D.getRotationDegrees();
-      float spread = getCurrentWeaponStats().getSpread();
-      aimRay3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
-    }
+//
+//    // Apply spread and check for collision
+//    if(aimRay3D != null) {
+//      Vector3 currentRotationDegree = aimRay3D.getRotationDegrees();
+//      float spread = getCurrentWeaponStats().getSpread();
+//      aimRay3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
+//    }
 
     // final check for collision point
     if(aimRay3D != null && aimRay3D.isColliding() &&  (aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin())).length() > 0.1) {
