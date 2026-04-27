@@ -22,13 +22,11 @@ properties = [
 	camera_controller_path,
 	weapon_attachment_path,
 	weapon_audio,
-	neck_bone_attachement,
-	bloom_per_shot,
-	bloom_decay_speed,
-	ballistic_spread_scale
+	neck_bone_attachement
 ]
 functions = [
     _physics_process,
+	on_set_stance,
 	_ready,
 	on_weapon_fire,
 	on_weapon_reload,

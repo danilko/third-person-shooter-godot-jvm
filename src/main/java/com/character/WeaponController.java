@@ -46,6 +46,7 @@ public class WeaponController extends Node {
   @RegisterSignal
   public final Signal2<Integer, Integer> ammoChanged = new Signal2<>(this, new StringName("ammo_changed"));
 
+
   @RegisterProperty
   @Export
   public AudioStreamPlayer3D weaponAudio;
@@ -84,37 +85,52 @@ public class WeaponController extends Node {
   private int pendingWeapon = 0;
   private boolean isWeaponFired = false;
 
-  // Bloom: increases per shot, decays toward 0 while not firing.
+  // Bloom: accumulated per shot, decays toward 0 while not firing.
+  // Rates and cap are per-weapon (stored in WeaponStats).
   private float currentBloom = 0.0f;
 
-  @Export
-  @RegisterProperty
-  public float bloomPerShot = 0.5f;
+  // Spread increase per m/s of character velocity (applied before stance multiplier).
+  private static final float MOVEMENT_SPREAD_PER_MPS = 0.12f;
 
-  @Export
-  @RegisterProperty
-  public float bloomDecaySpeed = 4.0f;
+  // Stance spread multipliers: proportion of (base + movement + bloom) that lands.
+  private static final float CROUCH_SPREAD_MULT = 0.7f;
+  private static final float CRAWL_SPREAD_MULT  = 0.5f;
+  private static final float JUMP_SPREAD_MULT   = 2.0f;
 
-  // Converts WeaponStats.spread (crosshair-pixel units) into actual degrees for the aimRay.
-  // Default 0.1 → base spread of 18 units becomes ±0.9° half-angle (~16 cm at 10 m).
-  @Export
-  @RegisterProperty
-  public float ballisticSpreadScale = 0.1f;
+  private StanceName currentStance = StanceName.UPRIGHT;
 
   @RegisterFunction
   @Override
   public void _physicsProcess(double delta) {
-    currentBloom = Math.max(0f, currentBloom - bloomDecaySpeed * (float) delta);
+    if (!weapons.isEmpty()) {
+      currentBloom = Math.max(0f, currentBloom - getCurrentWeaponStats().getBloomDecaySpeed() * (float) delta);
+    }
   }
 
-  private float computeCurrentSpread() {
+  /**
+   * Current total spread in degrees: (base + movement + bloom) × stance multiplier.
+   * Used by WeaponController for ballistics and by MovementController for the crosshair.
+   */
+  public float getCurrentSpreadDeg() {
+    if (weapons.isEmpty()) return 0f;
     WeaponStats stats = getCurrentWeaponStats();
     float speed = (float) ((CharacterBody3D) getOwner()).getVelocity().length();
-    // Convert crosshair-unit values to degrees; velocity contributes 0.1°/m/s directly.
-    float baseDeg   = stats.getSpread() * ballisticSpreadScale;
-    float movingDeg = speed * 0.1f;
-    float bloomDeg  = currentBloom * ballisticSpreadScale;
-    return Math.max(0f, baseDeg + movingDeg + bloomDeg);
+    float raw  = stats.getSpread() + speed * MOVEMENT_SPREAD_PER_MPS + currentBloom;
+    return Math.max(0f, raw * stanceMultiplier());
+  }
+
+  private float stanceMultiplier() {
+    if (!((CharacterBody3D) getOwner()).isOnFloor()) return JUMP_SPREAD_MULT;
+    return switch (currentStance) {
+      case CROUCH -> CROUCH_SPREAD_MULT;
+      case CRAWL  -> CRAWL_SPREAD_MULT;
+      default     -> 1.0f;
+    };
+  }
+
+  @RegisterFunction
+  public void onSetStance(Stance stance) {
+    currentStance = StanceName.fromKey(String.valueOf(stance.getName()));
   }
 
   @RegisterFunction
@@ -204,8 +220,9 @@ public class WeaponController extends Node {
       }
     }
 
-    // Accumulate per-shot bloom (capped at 3× base spread)
-    currentBloom = Math.min(currentBloom + bloomPerShot, getCurrentWeaponStats().getSpread() * 3f);
+    // Accumulate per-shot bloom (per-weapon rate and cap)
+    WeaponStats stats = getCurrentWeaponStats();
+    currentBloom = Math.min(currentBloom + stats.getBloomPerShot(), stats.getBloomMax());
 
     if (aimRay3D != null) {
       // Player: apply angular spread + force update. Enemy: snapAimRay already
@@ -217,7 +234,7 @@ public class WeaponController extends Node {
       Vector3 savedRot = null;
       if (applySpread) {
         savedRot = aimRay3D.getRotationDegrees();
-        float halfSpread = computeCurrentSpread() * 0.5f;
+        float halfSpread = getCurrentSpreadDeg() * 0.5f;
         float pitchOff = (float) GD.randfRange(-halfSpread, halfSpread);
         float yawOff   = (float) GD.randfRange(-halfSpread, halfSpread);
         aimRay3D.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
@@ -229,8 +246,10 @@ public class WeaponController extends Node {
         Object collider = aimRay3D.getCollider();
         if (collider instanceof godot.api.Node hitNode) {
           if (hitNode.getOwner().hasNode(new NodePath("Health"))) {
-            ((Health) hitNode.getOwner().getNode(new NodePath("Health")))
-                .takeDamage(hitNode, getCurrentWeaponStats().damage);
+            Health health = (Health) hitNode.getOwner().getNode(new NodePath("Health"));
+            String weaponName = getCurrentWeaponStats().getName().toString();
+            String attackerName = getOwner().getName().toString();
+            health.takeDamage(hitNode, getCurrentWeaponStats().damage, weaponName, attackerName);
           }
         }
         GPUParticles3D splatter = splatterPool.acquire();

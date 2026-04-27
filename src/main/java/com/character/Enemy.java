@@ -75,6 +75,15 @@ public class Enemy extends Character {
     @RegisterProperty
     public float strafeChangeDuration = 1f;
 
+    /**
+     * Seconds the enemy keeps firing at the last known player position after losing
+     * line of sight. After this window, the enemy transitions to SearchState.
+     * Shorter = more conservative; longer = more aggressive suppression fire.
+     */
+    @Export
+    @RegisterProperty
+    public float suppressionDuration = 1.5f;
+
     // ── Constants ─────────────────────────────────────────────────────────────
     private static final float  AMMO_REFILL_ARRIVAL_THRESHOLD = 1.5f;
     private static final double LOST_PLAYER_TIMEOUT           = 3.0;
@@ -296,11 +305,29 @@ public class Enemy extends Character {
     public void advanceAttackTimer(double delta) { attackTimer = Math.max(0.0, attackTimer + delta); }
     public boolean isAttackReady()               { return attackTimer <= 0.0; }
 
-    // ── Lost-player timer helpers ─────────────────────────────────────────────
+    // ── Lost-player / suppression timer helpers ──────────────────────────────
 
     public void resetLostPlayerTimer()               { lostPlayerTimer = 0.0; }
     public void advanceLostPlayerTimer(double delta) { lostPlayerTimer += delta; }
     public boolean isPlayerLost()                    { return lostPlayerTimer >= LOST_PLAYER_TIMEOUT; }
+    /** True once the suppression-fire window has elapsed after losing LoS. */
+    public boolean isSuppressExpired()               { return lostPlayerTimer >= suppressionDuration; }
+
+    /**
+     * Aim position for a suppression shot when the enemy has no line of sight.
+     * Scatters around {@link #lastKnownPlayerPosition} with twice the normal radius
+     * to model firing blind through/around cover.
+     */
+    public Vector3 computeSuppressTarget(float hDist) {
+        if (lastKnownPlayerPosition == null) return null;
+        float maxOffset = aimScatterRadius * 2f * (hDist / 10f);
+        float offset    = GD.randf() * maxOffset;
+        float angle     = GD.randf() * (float)(Math.PI * 2.0);
+        return lastKnownPlayerPosition.plus(new Vector3(
+                offset * (float) Math.cos(angle),
+                offset * (float) Math.sin(angle),
+                0f));
+    }
 
     // ── Under-attack helpers ──────────────────────────────────────────────────
 

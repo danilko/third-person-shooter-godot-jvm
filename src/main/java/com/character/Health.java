@@ -1,5 +1,6 @@
 package com.character;
 
+import com.game.EventBus;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -10,7 +11,6 @@ import godot.api.PhysicalBone3D;
 import godot.core.Signal0;
 import godot.core.Signal1;
 import godot.core.StringName;
-import godot.global.GD;
 
 @RegisterClass(className = "Health")
 public class Health extends Node {
@@ -18,6 +18,11 @@ public class Health extends Node {
     @Export
     @RegisterProperty
     public float maxHealth = 100.0f;
+
+    /** Display name used in kill notifications. Falls back to the owner node name if empty. */
+    @Export
+    @RegisterProperty
+    public String displayName = "";
 
     private float currentHealth;
 
@@ -33,12 +38,23 @@ public class Health extends Node {
         currentHealth = maxHealth;
     }
 
-    public void takeDamage(Node hitNode, float baseDamage) {
+    public void takeDamage(Node hitNode, float baseDamage, String weaponName) {
+        takeDamage(hitNode, baseDamage, weaponName, "");
+    }
+
+    public void takeDamage(Node hitNode, float baseDamage, String weaponName, String attackerName) {
         if (currentHealth <= 0) return;
+        boolean headshot = (hitNode instanceof PhysicalBone3D)
+                && "Physical Bone neck_01".equals(hitNode.getName().toString());
         float damage = baseDamage * getDamageMultiplier(hitNode);
         currentHealth = Math.max(0.0f, currentHealth - damage);
         damaged.emit(damage);
         if (currentHealth <= 0) {
+            Node busNode = getNodeOrNull("/root/EventBus");
+            if (busNode instanceof EventBus bus) {
+                String victimName = displayName.isEmpty() ? getOwner().getName().toString() : displayName;
+                bus.characterEliminated.emit(attackerName, victimName, weaponName, headshot);
+            }
             died.emit();
         }
     }

@@ -131,13 +131,10 @@ public class MovementController extends Node {
     // Update only the Y axis
     meshRoot.setRotation(new Vector3(currentRot.getX(), newY, currentRot.getZ()));
 
-    WeaponStats weaponStats = weaponController.getCurrentWeaponStats();
-    float baseSpread = weaponStats.getSpread() + weaponStats.getMovementSpread() + (float) velocity.length();
-    float jumpContrib = weaponStats.jumpSpread * (player.isOnFloor() ? 1 : 0);
-    float aimContrib = combat ? weaponStats.getAimSpread() * 2 : 0;
-    float crouchContrib = currentMovementType == MovementType.IDLE ? weaponStats.crouchSpread * 2 : 0;
+    // Mirror actual ballistic spread so the crosshair reflects true accuracy.
+    // Scale: 1° spread → 15 px arm offset, matching the visual range of the old pixel-unit system.
     if (crosshair != null) {
-      crosshair.setPositionX(baseSpread + jumpContrib + aimContrib + crouchContrib);
+      crosshair.setPositionX(weaponController.getCurrentSpreadDeg() * 8.0f);
     }
   }
 
