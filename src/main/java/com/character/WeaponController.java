@@ -1,5 +1,6 @@
 package com.character;
-import com.util.ObjectPool;
+import com.environment.HitInfo;
+import com.environment.ImpactManager;
 import godot.annotation.*;
 import godot.api.*;
 import godot.api.CharacterBody3D;
@@ -8,7 +9,6 @@ import godot.core.NodePath;
 import godot.core.Signal1;
 import godot.core.Signal2;
 import godot.core.StringName;
-import godot.core.VariantArray;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -24,10 +24,6 @@ public class WeaponController extends Node {
   @RegisterProperty
   @Export
   public NodePath aimRayPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay");
-
-  @RegisterProperty
-  @Export
-  public NodePath splattersPath = new NodePath("Splatters");
 
   @RegisterProperty
   @Export
@@ -65,9 +61,8 @@ public class WeaponController extends Node {
 
   private RayCast3D aimRay3D;
 
-  // Round-robin VFX pool: acquire → position → emit → release immediately.
-  // Particles continue emitting independently; the pool just tracks order.
-  private ObjectPool<GPUParticles3D> splatterPool;
+  // Lazily resolved on first hit — avoids _ready() ordering issues.
+  private ImpactManager impactManager;
 
   public int getWeapon() {
     return weapon;
@@ -156,17 +151,6 @@ public class WeaponController extends Node {
       aimRay3D = (RayCast3D) getOwner().getNode(aimRayPath);
     }
 
-    ArrayList<GPUParticles3D> splatterNodes = new ArrayList<>();
-    for (Node splatterNode : getOwner().getNode(splattersPath).getChildren()) {
-      splatterNodes.add((GPUParticles3D) splatterNode);
-    }
-    int poolSize = splatterNodes.size();
-    int[] idx = {0};
-    // Factory cycles through the pre-existing scene nodes; reset is a no-op
-    // because particles continue emitting fire-and-forget after release.
-    splatterPool = new ObjectPool<>(poolSize,
-        () -> splatterNodes.get(idx[0]++),
-        p -> {});  // no reset — particle keeps playing after release
     emitInitialAmmoState();
   }
 
@@ -244,18 +228,18 @@ public class WeaponController extends Node {
       if (aimRay3D.isColliding() &&
           (aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin())).length() > 0.1) {
         Object collider = aimRay3D.getCollider();
-        if (collider instanceof godot.api.Node hitNode) {
-          if (hitNode.getOwner().hasNode(new NodePath("Health"))) {
-            Health health = (Health) hitNode.getOwner().getNode(new NodePath("Health"));
-            String weaponName = getCurrentWeaponStats().getName().toString();
-            String attackerName = getOwner().getName().toString();
-            health.takeDamage(hitNode, getCurrentWeaponStats().damage, weaponName, attackerName);
-          }
+        godot.api.Node hitNode = (collider instanceof godot.api.Node n) ? n : null;
+
+        ImpactManager im = getImpactManager();
+        if (im != null) {
+          HitInfo info = new HitInfo(hitNode,
+                                     aimRay3D.getCollisionPoint(),
+                                     aimRay3D.getCollisionNormal());
+          im.processHit(info,
+                        getCurrentWeaponStats().damage,
+                        getCurrentWeaponStats().getName().toString(),
+                        getOwner().getName().toString());
         }
-        GPUParticles3D splatter = splatterPool.acquire();
-        splatter.setGlobalPosition(aimRay3D.getCollisionPoint());
-        splatter.setEmitting(true);
-        splatterPool.release(splatter);
       }
 
       if (savedRot != null) {
@@ -348,6 +332,14 @@ public class WeaponController extends Node {
     ammoChanged.emit(weapons.get(weapon).getMag(), weapons.get(weapon).getAmmoBackup());
   }
 
+
+  /** Lazily find and cache the world-level ImpactManager (group lookup). */
+  private ImpactManager getImpactManager() {
+    if (impactManager != null) return impactManager;
+    Node found = getTree().getFirstNodeInGroup("impact_manager");
+    if (found instanceof ImpactManager im) impactManager = im;
+    return impactManager;
+  }
 
   /** Emit initial ammo state so HUD listeners can populate on first frame. */
   private void emitInitialAmmoState() {

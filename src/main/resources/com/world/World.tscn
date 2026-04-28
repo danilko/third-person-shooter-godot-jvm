@@ -5,8 +5,11 @@
 [ext_resource type="Script" uid="uid://b722ufsi6a0p5" path="res://gdj/com/environment/AmmoRefil.gdj" id="4_kj2pm"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
 [ext_resource type="PackedScene" uid="uid://dbnx63f3e5s88" path="res://src/main/resources/com/character/Enemy.tscn" id="6_enemy"]
-[ext_resource type="Script" uid="uid://be3bdglh1u53c" path="res://gdj/com/character/Enemy.gdj" id="7_lagp7"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/ui/PauseMenu.tscn" id="7_pmenu"]
+[ext_resource type="Script" uid="uid://dbbua5exey73l" path="res://gdj/com/environment/ParticleManager.gdj" id="8_pctl"]
+[ext_resource type="Script" uid="uid://csrrl6d8m7lmj" path="res://gdj/com/environment/ImpactManager.gdj" id="9_imct"]
+[ext_resource type="Script" uid="uid://cr22di64fbwp1" path="res://gdj/com/environment/DecalManager.gdj" id="10_dcal"]
+[ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="10_m0gj3"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
 vertices = PackedVector3Array(-49.688828, 0.81998825, -49.59558, -49.688828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.59558, -49.688828, 0.81998825, -47.59558, -49.688828, 0.81998825, 40.90442, -44.188828, 0.81998825, 40.90442, -44.188828, 0.81998825, -47.59558, -8.1888275, 0.81998825, -26.595581, -6.4388275, 0.81998825, -26.845581, -6.6888275, 0.81998825, -47.59558, -42.688828, 0.81998825, -47.59558, -42.688828, 0.81998825, -24.595581, -8.1888275, 0.81998825, -24.595581, 6.3111725, 0.81998825, -26.845581, 6.5611725, 0.81998825, -47.59558, 22.561172, 0.81998825, -9.595581, 23.811172, 0.81998825, -8.095581, 24.561172, 0.81998825, -8.095581, 8.0611725, 0.81998825, -26.595581, 8.0611725, 0.81998825, -16.095581, 25.311172, 0.81998825, -7.345581, 33.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, -47.59558, -7.1888275, 3.5699883, -25.845581, -7.1888275, 3.5699883, -16.595581, 7.0611725, 3.5699883, -16.595581, 7.0611725, 3.5699883, -25.845581, -42.688828, 0.81998825, -17.845581, -8.1888275, 0.81998825, -17.845581, 0.8111725, 0.81998825, -7.845581, 1.5611725, 0.81998825, -8.095581, 1.5611725, 0.81998825, -15.595581, -7.9388275, 0.81998825, -15.595581, 10.3111725, 0.81998825, 40.90442, 10.3111725, 0.81998825, 5.154419, 9.5611725, 0.81998825, 4.904419, 1.0611725, 0.81998825, -6.345581, -42.688828, 0.81998825, 40.90442, 7.5611725, 0.81998825, -15.595581, 23.311172, 0.81998825, -7.845581, 23.561172, 0.81998825, -6.595581, 2.8111725, 0.81998825, -7.345581, 4.8111725, 0.81998825, -4.595581, 7.5611725, 0.81998825, -1.095581, 27.561172, 0.81998825, -1.345581, 11.3111725, 0.81998825, 4.154419, 29.811172, 0.81998825, 1.654419, 33.561172, 0.81998825, 5.154419, 47.811172, 0.81998825, 40.90442, 11.0611725, 0.81998825, 5.154419, 32.311172, 0.81998825, 5.154419, -49.688828, 0.81998825, 42.40442, -49.688828, 0.81998825, 49.65442, -44.188828, 0.81998825, 49.65442, -44.188828, 0.81998825, 42.40442, -42.688828, 0.81998825, 42.40442, -42.688828, 0.81998825, 49.65442, 47.811172, 0.81998825, 49.65442, 47.811172, 0.81998825, 42.40442)
@@ -55,6 +58,21 @@ size = Vector3(2, 0.1, 2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hbo2n"]
 size = Vector3(2, 0.1, 2)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flesh"]
+direction = Vector3(0, 1, 0)
+initial_velocity_max = 4.0
+scale_min = 0.099999994
+scale_max = 0.29999998
+scale_over_velocity_max = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flesh"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_flesh"]
+material = SubResource("StandardMaterial3D_flesh")
+
+[sub_resource type="ImageTexture" id="ImageTexture_03hhr"]
 
 [node name="World" type="Node3D" unique_id=822990337]
 
@@ -187,10 +205,7 @@ font_size = 60
 
 [node name="Enemy" parent="." unique_id=1159876964 node_paths=PackedStringArray("player", "ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.75, -5)
-script = ExtResource("7_lagp7")
 player = NodePath("../Player")
-aim_pitch_min = -55.0
-aim_pitch_max = 75.0
 attack_range = 15.0
 patrol_radius = 8.0
 ammo_refill = NodePath("../AmmoRefill")
@@ -198,5 +213,33 @@ ammo_refill = NodePath("../AmmoRefill")
 [node name="PauseMenu" parent="." unique_id=1764356925 instance=ExtResource("7_pmenu")]
 grow_horizontal = 2
 grow_vertical = 2
+
+[node name="ParticleManager" type="Node" parent="." unique_id=201400001]
+script = ExtResource("8_pctl")
+pool_size_per_type = 40
+
+[node name="FLESH" type="Node" parent="ParticleManager" unique_id=201400002]
+
+[node name="1" type="GPUParticles3D" parent="ParticleManager/FLESH" unique_id=201400010]
+emitting = false
+amount = 12
+one_shot = true
+speed_scale = 2.0
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_flesh")
+draw_pass_1 = SubResource("BoxMesh_flesh")
+
+[node name="ImpactManager" type="Node" parent="." unique_id=201500001]
+script = ExtResource("9_imct")
+
+[node name="DecalManager" type="Node" parent="." unique_id=201600001]
+script = ExtResource("10_dcal")
+pool_size = 40
+decal_lifetime = 5.0
+
+[node name="1" type="Decal" parent="DecalManager" unique_id=201600010]
+size = Vector3(0.1, 0.1, 0.1)
+texture_albedo = SubResource("ImageTexture_03hhr")
+texture_normal = ExtResource("10_m0gj3")
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

@@ -1,8 +1,8 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = WeaponController
-fqName = com.character.WeaponController
+registeredName = ParticleManager
+fqName = com.environment.ParticleManager
 baseType = Node
 supertypes = [
     godot.api.Node,
@@ -12,25 +12,11 @@ supertypes = [
 	godot.common.interop.NativePointer
 ]
 signals = [
-    weapon_fired,
-	ammo_changed
+    
 ]
 properties = [
-    animation_controller,
-	aim_ray_path,
-	camera_controller_path,
-	weapon_attachment_path,
-	weapon_audio,
-	neck_bone_attachement
+    pool_size_per_type
 ]
 functions = [
-    _physics_process,
-	on_set_stance,
-	_ready,
-	on_weapon_fire,
-	on_weapon_reload,
-	on_weapon_reload_complete,
-	on_weapon_not_fire,
-	on_set_weapon,
-	on_weapon_transition_complete
+    _ready
 ]
