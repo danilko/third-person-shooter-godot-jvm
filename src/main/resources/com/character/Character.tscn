@@ -2,11 +2,9 @@
 
 [ext_resource type="Script" uid="uid://1ckrskf53226" path="res://gdj/com/character/Character.gdj" id="1_gapvf"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
-[ext_resource type="Script" uid="uid://dgjf58g3rfgvx" path="res://gdj/com/character/jumpstates/JumpState.gdj" id="2_arx8k"]
 [ext_resource type="Resource" uid="uid://cemhpckfs3peb" path="res://src/main/resources/com/character/jumpstates/AirJump.tres" id="3_ttk2h"]
 [ext_resource type="Resource" uid="uid://i3rr4c4emq7j" path="res://src/main/resources/com/character/jumpstates/GroundJump.tres" id="4_6f0xc"]
 [ext_resource type="Script" uid="uid://dq365bfvm36hb" path="res://src/main/java/com/character/MovementController.java" id="4_ige6o"]
-[ext_resource type="Script" uid="uid://cynnu6moxlqc6" path="res://gdj/com/character/CombatState.gdj" id="5_gapvf"]
 [ext_resource type="Resource" uid="uid://hfsbhmhtpqq8" path="res://src/main/resources/com/character/combatstates/Combat.tres" id="6_j83q5"]
 [ext_resource type="Script" uid="uid://bor7f5iyg250q" path="res://gdj/com/character/stances/Stance.gdj" id="7_2iqcg"]
 [ext_resource type="Resource" uid="uid://7ik6f781r71n" path="res://src/main/resources/com/character/movementstates/crawl/CrawlIdle.tres" id="7_d7d1u"]
@@ -288,7 +286,7 @@ blend_point_1/node = SubResource("AnimationNodeAnimation_d6yvc")
 blend_point_1/pos = 1.0
 
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jn40o"]
-graph_offset = Vector2(2055.525, -24.98877)
+graph_offset = Vector2(-476.901, -12.827728)
 nodes/output/position = Vector2(2740, 140)
 nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_u0wnu")
 nodes/UprightMovementBlend/position = Vector2(-260, -120)
@@ -565,7 +563,7 @@ albedo_color = Color(1, 0, 0.28627452, 1)
 collision_layer = 2
 collision_mask = 3
 script = ExtResource("1_gapvf")
-jump_states = Dictionary[String, ExtResource("2_arx8k")]({
+jump_states = Dictionary[String, Object]({
 "AirJump": ExtResource("3_ttk2h"),
 "GroundJump": ExtResource("4_6f0xc")
 })
@@ -574,7 +572,7 @@ stances = Dictionary[String, NodePath]({
 "Crouch": NodePath("Stances/Crouch"),
 "Upright": NodePath("Stances/Upright")
 })
-combat_states = Dictionary[String, ExtResource("5_gapvf")]({
+combat_states = Dictionary[String, Object]({
 "Combat": ExtResource("6_j83q5"),
 "NoCombat": ExtResource("7_dnye5")
 })
@@ -585,7 +583,7 @@ weapon_controller = NodePath("WeaponController")
 root_node = NodePath("../MeshRoot/Model")
 tree_root = SubResource("AnimationNodeBlendTree_jn40o")
 anim_player = NodePath("../MeshRoot/Model/AnimationPlayer")
-parameters/UprightMovementBlend/blend_position = Vector2(-0.8934037, 0.855814)
+parameters/UprightMovementBlend/blend_position = Vector2(1, 0)
 parameters/CrawlMovementBlend/blend_position = Vector2(1, 0)
 parameters/CrouchMovementBlend/blend_position = Vector2(1, 0)
 parameters/StanceTransition/current_state = "Upright"
@@ -625,15 +623,15 @@ parameters/WeaponChangeSeek/seek_request = -1.0
 [node name="Model" parent="MeshRoot" unique_id=2091451191 instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(6.838971e-10, -0.016395668, -0.080805)
-bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.4766983, 0.08158242, 0.6547746, -0.58083844)
-bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.42268127, -0.13961309, -0.08745596, 0.8911791)
-bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.09753375, -0.13825902, 0.030531906, 0.98510885)
-bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.05697406, -0.06365361, 0.009387352, 0.9963002)
+bones/0/position = Vector3(3.6462208e-10, -0.018715518, -0.080805)
+bones/0/rotation = Quaternion(0.49999997, 0.5000001, 0.5, 0.49999994)
+bones/1/rotation = Quaternion(0.6598487, 0.6397119, 0.3941079, 0.006882891)
+bones/2/position = Vector3(2.4214355e-08, 0.0825587, 3.2458252e-07)
+bones/2/rotation = Quaternion(0.49943733, 0.05111361, 0.1074308, 0.8581425)
+bones/3/position = Vector3(-1.3038486e-08, 0.062253747, -1.8112739e-07)
+bones/3/rotation = Quaternion(-0.12196639, 0.18883298, -0.0884881, 0.9703795)
+bones/4/position = Vector3(-9.31321e-09, 0.08556752, 6.146259e-07)
+bones/4/rotation = Quaternion(-0.058405995, 0.15925398, -0.038467474, 0.9847575)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -710,25 +708,25 @@ bones/41/position = Vector3(4.929734e-08, 0.026442649, 3.605732e-07)
 bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
-bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19541438, -0.021444283, 0.0062311757, 0.98046654)
-bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
-bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
-bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.9553604, 0.00012436508, -0.2606546, -0.13908923)
-bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.14715283, 0.22596513, -0.019385971, 0.9627617)
-bones/47/rotation = Quaternion(-0.48737353, 0.020866375, -0.026153874, 0.87255234)
-bones/48/rotation = Quaternion(-0.35345823, 0.020373289, 0.03236381, 0.9346683)
-bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.9398901, -0.15808395, 0.19825307, -0.22871774)
-bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.4185136, -0.20412767, 0.08949787, 0.8804365)
-bones/51/rotation = Quaternion(-0.4843441, -0.016820613, 0.010151836, 0.874657)
-bones/52/rotation = Quaternion(-0.3749113, -0.020545995, -0.030323287, 0.9263369)
+bones/43/position = Vector3(1.1025434e-09, 0.27671498, -0.016780134)
+bones/43/rotation = Quaternion(0.19361442, 0.06719329, -0.018721305, 0.97859496)
+bones/44/position = Vector3(1.2225705e-09, 0.10856654, -1.9502177e-06)
+bones/44/rotation = Quaternion(-0.21635221, -3.64633e-08, -1.6094317e-08, 0.97631544)
+bones/45/position = Vector3(0.088446945, -0.0048131733, -0.010240487)
+bones/45/rotation = Quaternion(0.929401, 0.2210607, -0.23679963, -0.17683873)
+bones/46/position = Vector3(2.2943764e-06, 0.3478073, -1.4470876e-06)
+bones/46/rotation = Quaternion(0.22925736, 0.22213113, -0.040734302, 0.94680494)
+bones/47/rotation = Quaternion(-0.61906135, 0.0929511, 0.06800897, 0.7768514)
+bones/48/rotation = Quaternion(-0.48935777, 0.021300307, 0.018805029, 0.87162006)
+bones/49/position = Vector3(-0.08844688, -0.004813279, -0.010240567)
+bones/49/rotation = Quaternion(0.9211347, -0.06037312, 0.35732058, -0.14208505)
+bones/50/position = Vector3(-2.2555025e-06, 0.3478073, -1.423674e-06)
+bones/50/rotation = Quaternion(0.14660262, -0.22563073, 0.022149066, 0.9628644)
+bones/51/rotation = Quaternion(-0.4661114, 0.13814157, 0.16539247, 0.8580806)
+bones/52/rotation = Quaternion(-0.26294145, -0.019544771, -0.04060054, 0.96375906)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1709979392]
-transform = Transform3D(-0.708788, 0.04699294, 0.70385474, 0.6627596, 0.3860878, 0.64162755, -0.2415978, 0.9212642, -0.3047997, -0.1477715, 1.2578892, 0.3409593)
+transform = Transform3D(-0.740507, 0.033283543, 0.6712239, 0.6280987, 0.3895302, 0.6736157, -0.23904186, 0.9204117, -0.30935526, -0.13234523, 1.2447171, 0.35105407)
 bone_name = "hand_r"
 bone_idx = 27
 
@@ -737,13 +735,13 @@ transform = Transform3D(1, 0, 1.6763806e-08, 0, 0.99999994, -1.4901161e-08, 2.60
 
 [node name="Rifile" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1788483088 instance=ExtResource("10_omh8y")]
 
-[node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=178617702]
+[node name="SpineAimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=178617703]
 target_node = NodePath("../../../../../CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget")
 bone_name = "spine_03"
 bone = 4
 
 [node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=374203861]
-transform = Transform3D(0.9991527, -0.0073721786, -0.04049096, -0.00012778863, 0.98326665, -0.18217216, 0.041156225, 0.18202285, 0.9824326, -0.019685615, 1.2387102, -0.102113634)
+transform = Transform3D(0.99014056, 0.030269, 0.1367669, -0.005784299, 0.9843763, -0.175982, -0.13995682, 0.17345579, 0.974846, -0.005703897, 1.2308155, -0.09263046)
 bone_name = "neck_01"
 bone_idx = 43
 
@@ -775,11 +773,11 @@ libraries/ = SubResource("AnimationLibrary_8ulcr")
 [node name="PhysicalBoneSimulator3D" type="PhysicalBoneSimulator3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="11" unique_id=939471750]
 
 [node name="Physical Bone pelvis" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1746322989]
-transform = Transform3D(0.71938586, 0.53173286, 0.4469275, 0.12934554, 0.5296205, -0.8383149, -0.68246156, 0.6608799, 0.31222427, -0.019114476, 0.7945374, -0.04517091)
+transform = Transform3D(0.5108912, -0.68940675, -0.5135256, -0.12895143, 0.5291501, -0.8386726, 0.84991866, 0.49469027, 0.18143816, 0.02193762, 0.79230505, -0.03935613)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.368821e-05, 0.00023134997, 0.04259576)
-body_offset = Transform3D(0.99999976, -0.00051030517, -0.00018367171, -0.0001835227, 0.0002373606, -0.9999998, 0.00051033497, 0.9999999, 0.0002373755, 7.162988e-05, 0.042595685, -0.00024142861)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.846266e-05, 4.271059e-05, 0.042584505)
+body_offset = Transform3D(0.9999999, -0.00049325824, -0.00012861192, -0.00012855232, 0.00021149963, -0.99999994, 0.00049322844, 1.0000001, 0.00021146983, 8.396059e-05, 0.04258448, -5.1677227e-05)
 bone_name = "pelvis"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -790,11 +788,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_gapvf")
 
 [node name="Physical Bone spine_01" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1338132887]
-transform = Transform3D(0.8954361, 0.41516235, -0.16073109, -0.014843041, -0.33299753, -0.9428109, -0.44494262, 0.84661263, -0.29201573, -0.03189911, 0.8574923, -0.048337854)
+transform = Transform3D(0.6043857, -0.67653716, 0.4207321, 0.082348615, -0.4722207, -0.87762547, 0.7924246, 0.5650709, -0.2296915, 0.029231757, 0.8531927, -0.039475385)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.832219e-06, -4.67542e-06, 0.03111124)
-body_offset = Transform3D(0.9999998, 0.0001385212, -7.639825e-05, -7.632375e-05, 0.00024338067, -0.99999994, -0.00013840199, 0.9999999, 0.00024321675, -1.4547259e-06, 0.03111124, -2.8908253e-06)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.7574074e-06, -5.037454e-05, 0.031155866)
+body_offset = Transform3D(1.0000001, 0.00020569563, -0.00016239285, -0.00016260147, 0.00050747395, -0.99999994, -0.00020542741, 0.99999976, 0.00050729513, -1.6875565e-06, 0.031155884, 3.4570694e-05)
 bone_name = "spine_01"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -805,11 +803,11 @@ transform = Transform3D(1.59891, 0.0074106753, 0.058582187, -0.05863923, 0.01259
 shape = SubResource("CapsuleShape3D_omh8y")
 
 [node name="Physical Bone spine_02" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=757714071]
-transform = Transform3D(0.9841677, 0.17157821, -0.04443959, -0.020863924, -0.13683675, -0.9903739, -0.17600755, 0.97562116, -0.13109052, -0.024984311, 0.9293385, -0.033627026)
+transform = Transform3D(0.876698, -0.4591687, 0.1434046, 0.047185585, -0.21458967, -0.9755638, 0.47872153, 0.8620415, -0.16646416, 0.009931964, 0.922395, -0.025065273)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.1549188e-06, 1.6130887e-05, 0.04289895)
-body_offset = Transform3D(1, 7.639825e-05, -2.4959445e-07, -9.872019e-08, -1.28299e-05, -1.0000001, -7.624924e-05, 1, -1.3038516e-05, 2.1643937e-06, 0.042898953, -1.5571713e-05)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5561638e-06, -0.00014369057, 0.042982332)
+body_offset = Transform3D(1.0000001, 7.921457e-05, 4.2170286e-06, 3.97861e-06, -1.7479062e-05, -1.0000002, -7.9125166e-05, 1.0000002, -1.771748e-05, 3.3862889e-06, 0.04298234, 0.00014445186)
 bone_name = "spine_02"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -820,11 +818,11 @@ transform = Transform3D(1.5999871, 0.0019086637, -0.006096244, 0.0061021447, -0.
 shape = SubResource("CapsuleShape3D_3tgi5")
 
 [node name="Physical Bone spine_03" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=820002353]
-transform = Transform3D(-0.1142271, -0.987244, -0.11091176, 0.20849487, 0.08533336, -0.97429365, 0.9713301, -0.13441525, 0.19608791, -0.011186892, 1.0761912, -0.049079124)
+transform = Transform3D(-0.11917436, -0.9908227, -0.063781254, 0.20457272, 0.038356613, -0.9780996, 0.9715696, -0.1296123, 0.19812414, 0.01073165, 1.0691711, -0.0392874)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.786097e-06, -7.6518045e-06, 0.107357986)
-body_offset = Transform3D(-0.11847137, -0.9880718, -0.09837922, -1.9952655e-05, 0.09907922, -0.9950794, 0.9929575, -0.11788667, -0.011757925, 0.010555275, 0.10683048, 0.001252681)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.00012309744, -7.4645504e-07, 0.10753035)
+body_offset = Transform3D(-0.11853345, -0.98806375, -0.09838762, -5.349517e-05, 0.099092804, -0.99507827, 0.99295026, -0.117944665, -0.011798695, 0.010564327, 0.107001185, 0.0013908595)
 bone_name = "spine_03"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -835,11 +833,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_5k7ut")
 
 [node name="Physical Bone upperarm_l" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=2139273424]
-transform = Transform3D(-0.76379466, -0.49031204, 0.41977593, -0.56348246, 0.82371074, -0.06315169, -0.31480992, -0.28477123, -0.9054281, 0.07285425, 1.207524, 0.07244205)
+transform = Transform3D(-0.73787534, -0.53003156, 0.4178596, -0.59950936, 0.7991003, -0.045026563, -0.31004623, -0.2837347, -0.90739524, 0.089264736, 1.2042338, 0.08118822)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.661425e-06, 5.078171e-05, 0.10948392)
-body_offset = Transform3D(1, -0.00033211708, 0.00017955899, 0.00017929077, -0.00031778216, -0.9999997, 0.00033231825, 0.99999946, -0.00031790137, -1.1980534e-05, 0.10948391, -1.5974045e-05)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5781508e-05, 0.00017417007, 0.10911328)
+body_offset = Transform3D(1, -0.0003221482, 0.0001962483, 0.00019592047, -0.0004951954, -1, 0.00032246113, 0.9999999, -0.000495404, 1.4424324e-05, 0.109113365, -0.00012010336)
 bone_name = "upperarm_l"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -850,11 +848,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_j8ul5")
 
 [node name="Physical Bone lowerarm_l" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=131082064]
-transform = Transform3D(-0.72200006, 0.39195046, 0.57016736, 0.3928634, 0.9105778, -0.12847799, -0.5695388, 0.13123679, -0.81142014, -0.029356662, 1.2270727, 0.25162524)
+transform = Transform3D(-0.74260837, 0.3490924, 0.5715483, 0.35721138, 0.928339, -0.10289232, -0.5665095, 0.12775485, -0.8140919, -0.013174396, 1.2193207, 0.2611623)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1820513e-05, 7.843606e-06, 0.09870584)
-body_offset = Transform3D(0.99999964, 0.00061659515, -0.00018337369, -0.00018340349, -3.939122e-05, -0.9999999, -0.0006171018, 0.9999999, -3.9473176e-05, -3.7252903e-06, 0.09870583, -3.9339066e-06)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.4864668e-05, 9.96954e-05, 0.098763816)
+body_offset = Transform3D(0.99999976, 0.0007022023, -0.00019294024, -0.00019282103, -7.669628e-05, -1.0000002, -0.000702247, 0.9999998, -7.6800585e-05, 7.3850155e-05, 0.09876382, -9.214878e-05)
 bone_name = "lowerarm_l"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -865,11 +863,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_smfsy")
 
 [node name="Physical Bone hand_l" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1030953935]
-transform = Transform3D(-0.13554311, -0.82877916, 0.5429118, -0.95966965, 0.24604268, 0.13600443, -0.2462971, -0.50258154, -0.8287035, -0.11012231, 1.2335484, 0.36920717)
+transform = Transform3D(-0.091169015, -0.84183526, 0.53197896, -0.96546495, 0.20564327, 0.1599636, -0.24406089, -0.49902332, -0.8315107, -0.09374027, 1.2222282, 0.37908027)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1116266e-05, 5.375943e-05, 0.045311723)
-body_offset = Transform3D(-0.3343379, 0.92892647, 0.1591017, -1.6152859e-05, 0.168811, -0.9856483, -0.9424532, -0.3295425, -0.056425005, -0.007262826, 0.044652343, 0.0025639534)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.8706384e-05, -0.00021336152, 0.045410853)
+body_offset = Transform3D(-0.33444434, 0.92893183, 0.15884757, -4.2527914e-05, 0.16853899, -0.9856952, -0.9424155, -0.32966685, -0.05632776, -0.007034838, 0.044797212, 0.0024322271)
 bone_name = "hand_l"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -880,11 +878,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_b1xfb")
 
 [node name="Physical Bone upperarm_r" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1444960253]
-transform = Transform3D(-0.92270154, 0.38489053, -0.021939334, 0.3854752, 0.9202893, -0.066907905, -0.005561685, -0.0701931, -0.99751794, -0.16578059, 1.2019727, 0.041176185)
+transform = Transform3D(-0.9398811, 0.34067744, -0.023716666, 0.34149873, 0.93729997, -0.069623545, -0.0014895399, -0.07353706, -0.9972914, -0.14918429, 1.1874807, 0.05144236)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.4012387e-06, 5.691578e-05, 0.10945961)
-body_offset = Transform3D(0.9999999, -8.700154e-06, 3.3255666e-05, 3.3194665e-05, 6.838888e-05, -1, 8.704403e-06, 0.9999999, 6.812811e-05, -2.3841858e-07, 0.1094596, -6.4373016e-05)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.4881465e-06, 4.60633e-05, 0.109449014)
+body_offset = Transform3D(1.0000001, -6.8103676e-05, 4.2971107e-05, 4.3135253e-05, 0.00010411441, -1, 6.8385096e-05, 0.99999976, 0.000104121864, 1.7881393e-06, 0.10944901, -5.7458878e-05)
 bone_name = "upperarm_r"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -895,11 +893,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_ov0gm")
 
 [node name="Physical Bone lowerarm_r" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1558192436]
-transform = Transform3D(-0.9960845, 0.039659083, -0.079011686, 0.05802755, 0.9675606, -0.24588491, 0.06669702, -0.24950701, -0.9660734, -0.15556721, 1.2336603, 0.24564031)
+transform = Transform3D(-0.9973697, -0.007346074, -0.072109565, 0.0110212425, 0.9679132, -0.2510432, 0.07163997, -0.2511776, -0.9652863, -0.1394684, 1.2199701, 0.2558148)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.513087e-07, -3.9274313e-05, 0.09864219)
-body_offset = Transform3D(0.9999999, 1.5735626e-05, 6.891787e-06, 6.735325e-06, 4.7892332e-05, -0.9999998, -1.5741214e-05, 0.9999999, 4.7683716e-05, -1.4305115e-06, 0.09864217, 3.4570694e-05)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.2827695e-06, -3.6918176e-05, 0.09864138)
+body_offset = Transform3D(1.0000001, 1.7156824e-05, 2.0489097e-06, 2.2798777e-06, 8.304417e-05, -1.0000001, -1.686439e-05, 1.0000001, 8.301437e-05, 5.081296e-06, 0.098641396, 2.8729439e-05)
 bone_name = "lowerarm_r"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -910,11 +908,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_4tnd7")
 
 [node name="Physical Bone hand_r" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1300020775]
-transform = Transform3D(0.90020335, 0.43462926, 0.02704288, 0.3833545, -0.7614824, -0.52267, -0.20657498, 0.48087627, -0.8521061, -0.14899817, 1.2815579, 0.37958828)
+transform = Transform3D(0.8800191, 0.47255906, 0.047479503, 0.425131, -0.73921716, -0.5223233, -0.21173094, 0.47983956, -0.8514247, -0.13444701, 1.2683522, 0.38963634)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0502525e-05, -1.9246014e-05, 0.045320123)
-body_offset = Transform3D(-0.33407328, -0.9289181, -0.15970515, 1.8179417e-06, 0.1694394, -0.98554057, 0.94254684, -0.329243, -0.05660373, 0.007223487, 0.04466808, 0.0025490522)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.9341783e-05, -4.8622605e-05, 0.045294847)
+body_offset = Transform3D(-0.33402365, -0.92893666, -0.15970363, 1.1667609e-05, 0.16943094, -0.9855424, 0.94256455, -0.32919616, -0.056582868, 0.0071787834, 0.04464823, 0.002574563)
 bone_name = "hand_r"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -925,11 +923,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_xsk5s")
 
 [node name="Physical Bone neck_01" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=931085682]
-transform = Transform3D(0.9991527, -0.040491257, 0.007370365, -0.00012869659, -0.18215403, -0.98327005, 0.04115638, 0.98243594, -0.18200491, -0.020087209, 1.2922204, -0.09221811)
+transform = Transform3D(0.9901425, 0.13675779, -0.030250356, -0.00577314, -0.175944, -0.9843833, -0.13994443, 0.9748544, -0.17342012, -0.004011362, 1.2846967, -0.0829014)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.761386e-07, 9.105574e-06, 0.05441892)
-body_offset = Transform3D(1, -1.6763806e-07, -1.0738149e-06, -8.64733e-07, 1.8447638e-05, -1, 3.1664968e-07, 1, 1.8328428e-05, -8.177012e-07, 0.05441892, -1.0102987e-05)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.260791e-06, -0.00023582301, 0.054778084)
+body_offset = Transform3D(1.0000002, -1.0415912e-05, 1.3509765e-05, 1.3191253e-05, 3.8579106e-05, -1.0000001, 1.0371208e-05, 1.0000002, 3.8579106e-05, 2.5182962e-06, 0.0547781, 0.00023370981)
 bone_name = "neck_01"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -940,11 +938,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_7w47k")
 
 [node name="Physical Bone thigh_l" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1093952325]
-transform = Transform3D(0.32390732, -0.9161284, -0.23620506, -0.0910219, -0.27868247, 0.9560602, -0.94170016, -0.28817505, -0.17365502, 0.1013578, 0.59468555, -0.06715432)
+transform = Transform3D(0.9073091, 0.41901308, -0.034904055, 0.1214766, -0.18175334, 0.975812, 0.4025341, -0.8896032, -0.2158067, 0.05591064, 0.5660394, 0.07677646)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.9921e-06, -1.1173739e-05, 0.17386527)
-body_offset = Transform3D(1.0000001, 0.00013437867, 3.5122037e-05, 3.5122037e-05, 1.6059726e-05, -0.9999999, -0.00013428926, 0.999999, 1.592189e-05, 2.8871e-06, 0.17386526, 8.404255e-06)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3948833e-05, -4.1739168e-05, 0.17391215)
+body_offset = Transform3D(1, 0.0002156496, 2.1480024e-05, 2.1643937e-05, 9.3102455e-05, -1.0000001, -0.00021547079, 0.99999917, 9.295344e-05, 1.0222197e-05, 0.17391217, 2.5570393e-05)
 bone_name = "thigh_l"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -955,11 +953,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_fyiul")
 
 [node name="Physical Bone calf_l" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=2004858163]
-transform = Transform3D(0.701228, -0.7128937, -0.007864043, 0.013258376, 0.0020112523, 0.9999101, -0.71281385, -0.7012692, 0.01086216, 0.14384806, 0.2504582, -0.03889932)
+transform = Transform3D(0.63178664, 0.6823459, -0.36776307, 0.16480076, 0.3453571, 0.9238881, 0.7574209, -0.6443078, 0.10574087, 0.12744287, 0.23196264, 0.09548579)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.24302e-06, -1.2861767e-05, 0.1779459)
-body_offset = Transform3D(0.99999964, 1.7344952e-05, 1.9695144e-05, 1.9862782e-05, 4.659267e-05, -0.9999995, -1.6599894e-05, 0.99999917, 4.686322e-05, 4.7385693e-06, 0.17794581, 4.5225024e-06)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2698253e-05, -3.079733e-05, 0.1779458)
+body_offset = Transform3D(0.9999999, -9.986758e-05, 2.257526e-06, 2.6747584e-06, 8.162856e-05, -0.9999999, 0.00010049343, 0.9999995, 8.2053244e-05, 1.2293458e-05, 0.17794578, 1.6197562e-05)
 bone_name = "calf_l"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -970,11 +968,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_k035p")
 
 [node name="Physical Bone foot_l" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=404403200]
-transform = Transform3D(0.70699, -0.3234839, -0.6289065, 0.07931922, -0.8473819, 0.52502614, -0.7027615, -0.42107254, -0.573432, 0.18146025, 0.042268693, -0.007813625)
+transform = Transform3D(0.45538637, 0.5442827, 0.7045422, 0.090244114, -0.8155031, 0.5716737, 0.8857084, -0.19675161, -0.4204873, 0.15231052, 0.034625247, 0.100848235)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.793011e-06, 4.9935998e-06, 0.057582486)
-body_offset = Transform3D(0.99999976, 0.00016334653, 3.7908554e-05, 3.7312508e-05, -0.00010351837, -0.99999964, -0.00016283989, 0.9999995, -0.00010406971, 1.6093254e-06, 0.057582464, 9.983778e-07)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.9804955e-05, 1.20538525e-05, 0.057569794)
+body_offset = Transform3D(0.9999999, 0.00016219914, 1.7285347e-05, 1.6719103e-05, -0.00024715066, -0.9999998, -0.00016152859, 0.9999999, -0.00024750084, -2.0802021e-05, 0.057569787, 2.1979213e-06)
 bone_name = "foot_l"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -985,11 +983,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_uqpdv")
 
 [node name="Physical Bone thigh_r" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=461211121]
-transform = Transform3D(0.9597614, -0.2788961, 0.0327875, -0.05353105, -0.06708781, 0.9963101, -0.2756673, -0.9579751, -0.0793179, -0.07259762, 0.56482077, 0.037242375)
+transform = Transform3D(-0.17429867, 0.9429572, 0.28363994, 0.065466665, -0.27631482, 0.9588349, 0.9825142, 0.1856926, -0.013570956, -0.08998378, 0.5918777, -0.10869127)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.787748e-07, -7.017542e-06, 0.17387551)
-body_offset = Transform3D(0.99999994, -2.6345253e-05, -3.5464764e-06, -3.585592e-06, 4.1268766e-05, -0.99999994, 2.6136637e-05, 0.99999905, 4.1216612e-05, 1.0952353e-06, 0.17387551, -1.4901161e-07)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.3108574e-05, 3.6367597e-05, 0.17387702)
+body_offset = Transform3D(1.0000001, 0.0001924932, 2.2152439e-05, 2.2103079e-05, 5.6000426e-06, -0.99999994, -0.00019271672, 0.99999934, 5.4601114e-06, -2.6967376e-05, 0.173877, -3.7312508e-05)
 bone_name = "thigh_r"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -1000,11 +998,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_7v7jl")
 
 [node name="Physical Bone calf_r" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=870937235]
-transform = Transform3D(0.743505, -0.40595594, 0.5314133, -0.0638923, 0.74790174, 0.6607275, -0.66567117, -0.5252074, 0.53013116, -0.17283443, 0.27398828, -0.04329896)
+transform = Transform3D(0.26672432, 0.9637625, -0.004475293, -0.040722996, 0.015909342, 0.9990438, 0.96291214, -0.26628703, 0.0434907, -0.13845487, 0.24746095, -0.11401808)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2192007e-05, -8.524075e-06, 0.1779059)
-body_offset = Transform3D(0.9999996, -0.00039193034, 9.9509954e-05, 9.897351e-05, 2.5451183e-05, -0.99999946, 0.0003914237, 0.9999995, 2.6017427e-05, 4.4852495e-06, 0.1779058, 3.9041042e-06)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.0343674e-05, -3.274586e-05, 0.17780772)
+body_offset = Transform3D(0.9999997, -0.00042796135, 0.00011609495, 0.00011590496, 7.044338e-05, -0.99999964, 0.0004272163, 0.9999996, 7.057376e-05, -3.1292439e-07, 0.17780766, 2.0205975e-05)
 bone_name = "calf_r"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -1015,11 +1013,11 @@ transform = Transform3D(1.6, 0, 0, 0, -6.9938224e-08, 1.6, 0, -1.6, -6.9938224e-
 shape = SubResource("CapsuleShape3D_dv0kd")
 
 [node name="Physical Bone foot_r" type="PhysicalBone3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1666808336]
-transform = Transform3D(0.7170574, -0.6943634, -0.060730707, -0.071931355, -0.16038297, 0.98443043, -0.6932926, -0.7015247, -0.1649503, -0.26392367, 0.09966986, -0.12817852)
+transform = Transform3D(-0.1349111, 0.5342855, 0.8344687, -0.19804902, -0.8397142, 0.50562495, 0.9708633, -0.09705129, 0.21910152, -0.1857541, 0.040413894, -0.13434638)
 collision_layer = 8
 joint_type = 1
-joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0569029e-06, 4.5882052e-06, 0.057594746)
-body_offset = Transform3D(0.99999964, -6.458163e-05, 3.516674e-06, 3.5837293e-06, -9.970367e-05, -0.9999998, 6.374717e-05, 0.9999994, -9.984523e-05, -1.2591481e-06, 0.05759473, 1.1622906e-06)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2668125e-05, 3.70251e-05, 0.057610523)
+body_offset = Transform3D(1.0000002, -1.847744e-06, 9.211898e-05, 9.229779e-05, -9.2081726e-05, -0.99999976, 1.5124679e-06, 0.99999994, -9.252317e-05, 7.3611736e-06, 0.05761051, -3.169477e-05)
 bone_name = "foot_r"
 joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
@@ -1043,11 +1041,12 @@ player = NodePath("..")
 mesh_root = NodePath("../MeshRoot")
 weapon_controller = NodePath("../WeaponController")
 
-[node name="AnimationController" type="Node" parent="." unique_id=1235095298 node_paths=PackedStringArray("animation_tree", "player", "aim_look_at_modifier")]
+[node name="AnimationController" type="Node" parent="." unique_id=1235095298 node_paths=PackedStringArray("animation_tree", "player", "aim_ik", "aim_spine_modifier")]
 script = ExtResource("13_4afhp")
 animation_tree = NodePath("../AnimationTree")
 player = NodePath("..")
-aim_look_at_modifier = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/AimModifier")
+aim_ik = NodePath("")
+aim_spine_modifier = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/SpineAimModifier")
 
 [node name="Stances" type="Node" parent="." unique_id=1821526874]
 
@@ -1057,6 +1056,7 @@ idle_state = ExtResource("8_ttk2h")
 walk_state = ExtResource("9_gguhd")
 sprint_state = ExtResource("10_gguhd")
 camera_height = 0.85
+spine_aim_max_angle = 0.0
 collider = NodePath("../../CrouchCollision")
 col_raycast = NodePath("../../CrouchCollision/RayCast3D")
 higher_stances = [NodePath("../Upright")]
@@ -1076,6 +1076,7 @@ idle_state = ExtResource("7_d7d1u")
 walk_state = ExtResource("15_bgnjm")
 sprint_state = ExtResource("16_u0j3k")
 camera_height = 0.7
+spine_aim_max_angle = 0.0
 collider = NodePath("../../CrawlCollision")
 higher_stances = [NodePath("../Crouch"), NodePath("../Upright")]
 
@@ -1168,6 +1169,9 @@ collision_mask = 9
 transform = Transform3D(1, -1.4210855e-14, 8.4703295e-22, 0, 0.99999994, 0, -4.2351647e-22, 0, 0.99999994, 0, 0, 0)
 visible = false
 mesh = SubResource("BoxMesh_gapvf")
+
+[node name="WeaponIKTarget" type="Marker3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" unique_id=1900000001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4858435e-07, 0, -0.9840301)
 
 [connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]
