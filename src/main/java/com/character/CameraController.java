@@ -37,14 +37,6 @@ public class CameraController extends Node3D {
 
   @Export
   @RegisterProperty
-  public double yawAcceleration = 15.0;
-
-  @Export
-  @RegisterProperty
-  public double pitchAcceleration = 15.0;
-
-  @Export
-  @RegisterProperty
   public double pitchMax = 75.0;
 
   @Export
@@ -144,17 +136,12 @@ public class CameraController extends Node3D {
     recoilPitch = GD.lerp(recoilPitch, 0.0, recoilRecoverySpeed * delta);
     recoilYaw   = GD.lerp(recoilYaw,   0.0, recoilRecoverySpeed * delta);
 
-    // Display values: mouse aim + per-shot kick, pitch clamped
-    double displayPitch = GD.clamp(pitch + recoilPitch, pitchMin, pitchMax);
-    double displayYaw   = yaw + recoilYaw;
-
-    // Rotation interpolation
     Vector3 yawRot = yawNode.getRotationDegrees();
-    yawRot.setY(GD.lerp(yawRot.getY(), displayYaw, yawAcceleration * delta));
+    yawRot.setY(yaw + recoilYaw);
     yawNode.setRotationDegrees(yawRot);
 
     Vector3 pitchRot = pitchNode.getRotationDegrees();
-    pitchRot.setX(GD.lerp(pitchRot.getX(), displayPitch, pitchAcceleration * delta));
+    pitchRot.setX(GD.clamp(pitch + recoilPitch, pitchMin, pitchMax));
     pitchNode.setRotationDegrees(pitchRot);
 
     setCamRotation.emit(yawNode.getRotation().getY());

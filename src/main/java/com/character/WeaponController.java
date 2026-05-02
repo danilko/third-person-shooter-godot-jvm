@@ -317,6 +317,7 @@ public class WeaponController extends Node {
 
     // unequip current weapon
     animationController.onWeaponTransition(this.weapon, false);
+    transitionTimer.setWaitTime(1.0 / weapons.get(pendingWeapon).getSwitchSpeed());
     transitionTimer.start();
   }
 
