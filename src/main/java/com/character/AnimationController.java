@@ -21,7 +21,20 @@ public class AnimationController extends Node {
 
   @RegisterProperty
   @Export
-  public LookAtModifier3D aimLookAtModifier;
+  public TwoBoneIK3D aimIk;
+
+  @RegisterProperty
+  @Export
+  public LookAtModifier3D aimSpineModifier;
+
+  @RegisterProperty
+  @Export
+  public Marker3D weaponIKTarget;
+
+  /** Base weapon hold position in camera-local space (upright, no stance offset). */
+  @Export
+  @RegisterProperty
+  public Vector3 weaponIKBasePosition = new Vector3(0.1f, -0.15f, -0.5f);
 
   @Export
   @RegisterProperty
@@ -43,6 +56,7 @@ public class AnimationController extends Node {
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
   private String currentStanceName = "Upright";
+  private Stance currentStance = null;
   private boolean combat = false;
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
@@ -52,7 +66,7 @@ public class AnimationController extends Node {
   @RegisterFunction
   @Override
   public void _physicsProcess(double delta) {
-    if (player == null || animationTree == null || aimLookAtModifier == null) return;
+    if (player == null || animationTree == null) return;
 
     // Calculate floor blend target
     onFloorBlendTarget = player.isOnFloor() ? 1.0 : 0.0;
@@ -118,21 +132,30 @@ public class AnimationController extends Node {
   public void onSetStance(Stance stance) {
     if (animationTree == null) return;
 
-    // Update the transition and keep track of the current stance name
     animationTree.set("parameters/StanceTransition/transition_request", stance.getName().toString());
     this.currentStanceName = stance.getName().toString();
+    this.currentStance = stance;
+    updateAimModifiers();
   }
-
 
   @RegisterFunction
   public void onSetCombatState(CombatState combatState) {
-      combat = combatState.isCombat();
+    combat = combatState.isCombat();
+    animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
+    animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
+    if (aimIk != null) aimIk.setActive(combat);
+    updateAimModifiers();
+  }
 
-      animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
-      // Update neck to T pose so crawl and other will not have issue
-      animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
-
-      aimLookAtModifier.setActive(combat);
+  private void updateAimModifiers() {
+    if (currentStance == null) return;
+    if (weaponIKTarget != null) {
+      weaponIKTarget.setPosition(weaponIKBasePosition.plus(currentStance.getWeaponIKOffset()));
+    }
+    // Enable spine modifier only in combat and when the stance permits it (angle > 0).
+    if (aimSpineModifier != null) {
+      aimSpineModifier.setActive(combat && currentStance.getSpineAimMaxAngle() > 0);
+    }
   }
 
   @RegisterFunction

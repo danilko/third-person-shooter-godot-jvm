@@ -8,6 +8,7 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.core.VariantArray;
+import godot.core.Vector3;
 import godot.global.GD;
 
 @RegisterClass
@@ -30,6 +31,21 @@ public class Stance extends Node {
   @Export
   @RegisterProperty
   public double cameraHeight = 1.3;
+
+  // --- Aim / IK ---
+
+  /** Local offset added to WeaponIKTarget's base position for this stance. */
+  @Export
+  @RegisterProperty
+  public Vector3 weaponIKOffset = new Vector3(0, 0, 0);
+
+  /**
+   * Max rotation angle (degrees) allowed for the spine LookAtModifier3D in this stance.
+   * Set to 0 to disable the spine aim modifier entirely for stances where it produces artefacts.
+   */
+  @Export
+  @RegisterProperty
+  public float spineAimMaxAngle = 60.0f;
 
   // --- Collision ---
   @Export
@@ -95,13 +111,14 @@ public class Stance extends Node {
     this.sprintState = sprintState;
   }
 
-  public double getCameraHeight() {
-    return cameraHeight;
-  }
+  public double getCameraHeight() { return cameraHeight; }
+  public void setCameraHeight(double v) { this.cameraHeight = v; }
 
-  public void setCameraHeight(double cameraHeight) {
-    this.cameraHeight = cameraHeight;
-  }
+  public Vector3 getWeaponIKOffset() { return weaponIKOffset; }
+  public void setWeaponIKOffset(Vector3 v) { this.weaponIKOffset = v; }
+
+  public float getSpineAimMaxAngle() { return spineAimMaxAngle; }
+  public void setSpineAimMaxAngle(float v) { this.spineAimMaxAngle = v; }
 
   public CollisionShape3D getCollider() {
     return collider;
