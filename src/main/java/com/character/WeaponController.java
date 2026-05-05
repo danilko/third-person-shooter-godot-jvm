@@ -1,4 +1,5 @@
 package com.character;
+import com.environment.BulletTracerManager;
 import com.environment.HitInfo;
 import com.environment.ImpactManager;
 import godot.annotation.*;
@@ -63,6 +64,7 @@ public class WeaponController extends Node {
 
   // Lazily resolved on first hit — avoids _ready() ordering issues.
   private ImpactManager impactManager;
+  private BulletTracerManager bulletTracerManager;
 
   public int getWeapon() {
     return weapon;
@@ -138,8 +140,8 @@ public class WeaponController extends Node {
     // Discover all WeaponStats children dynamically — add more weapon nodes to
     // the scene without touching this class.
     for (Node child : getOwner().getNode(weaponAttachmentPath).getChildren()) {
-      if (child instanceof WeaponStats) {
-        weapons.add((WeaponStats) child);
+      if (child.getChild(0) instanceof WeaponStats) {
+        weapons.add((WeaponStats) child.getChild(0));
       }
     }
 
@@ -184,11 +186,10 @@ public class WeaponController extends Node {
 
     weaponFired.emit((weapons.get(weapon).getFireRate() * 0.2f));
 
-    ((GPUParticles3D)neckBoneAttachement.getNode("MuzzleFlash")).setSpeedScale(getCurrentWeaponStats().getFireRate());
-    ((GPUParticles3D)neckBoneAttachement.getNode("Streaks")).getProcessMaterial().set("directional_velocity_max", 8000.0f/ getCurrentWeaponStats().getFireRate());
+    GPUParticles3D muzzleFlashFx = (GPUParticles3D) neckBoneAttachement.getNode("MuzzleFlash");
+    muzzleFlashFx.setSpeedScale(getCurrentWeaponStats().getFireRate());
+    muzzleFlashFx.setGlobalPosition(weaponMuzzle().getGlobalPosition());
     muzzleFlashAnimationPlayer.setSpeedScale(GD.clamp(getCurrentWeaponStats().getFireRate(), 5, 10));
-
-
     muzzleFlashAnimationPlayer.play("MuzzleFlash");
 
     weaponAudio.play();
@@ -245,6 +246,19 @@ public class WeaponController extends Node {
       if (savedRot != null) {
         aimRay3D.setRotationDegrees(savedRot);
       }
+
+      // World-space bullet tracer: muzzle → hit point (or 200 m along aim if no hit).
+      Vector3 muzzlePos = weaponMuzzle().getGlobalPosition();
+      Vector3 tracerEnd;
+      if (aimRay3D.isColliding()) {
+        tracerEnd = aimRay3D.getCollisionPoint();
+      } else {
+        Vector3 rayDir = aimRay3D.toGlobal(aimRay3D.getTargetPosition())
+            .minus(aimRay3D.getGlobalPosition()).normalized();
+        tracerEnd = muzzlePos.plus(rayDir.times(200f));
+      }
+      BulletTracerManager tm = getBulletTracerManager();
+      if (tm != null) tm.spawnTracer(muzzlePos, tracerEnd);
     }
   }
 
@@ -340,6 +354,17 @@ public class WeaponController extends Node {
     Node found = getTree().getFirstNodeInGroup("impact_manager");
     if (found instanceof ImpactManager im) impactManager = im;
     return impactManager;
+  }
+
+  private BulletTracerManager getBulletTracerManager() {
+    if (bulletTracerManager != null) return bulletTracerManager;
+    Node found = getTree().getFirstNodeInGroup("bullet_tracer_manager");
+    if (found instanceof BulletTracerManager tm) bulletTracerManager = tm;
+    return bulletTracerManager;
+  }
+
+  private Marker3D weaponMuzzle() {
+    return (Marker3D) weapons.get(weapon).getNode(new NodePath("Muzzle"));
   }
 
   /** Emit initial ammo state so HUD listeners can populate on first frame. */

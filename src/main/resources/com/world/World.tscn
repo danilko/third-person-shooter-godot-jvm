@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://dbbua5exey73l" path="res://gdj/com/environment/ParticleManager.gdj" id="8_pctl"]
 [ext_resource type="Script" uid="uid://csrrl6d8m7lmj" path="res://gdj/com/environment/ImpactManager.gdj" id="9_imct"]
 [ext_resource type="Script" uid="uid://cr22di64fbwp1" path="res://gdj/com/environment/DecalManager.gdj" id="10_dcal"]
+[ext_resource type="Script" path="res://gdj/com/environment/BulletTracerManager.gdj" id="11_btrc"]
 [ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="10_m0gj3"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
@@ -73,6 +74,14 @@ albedo_color = Color(1, 0, 0, 1)
 material = SubResource("StandardMaterial3D_flesh")
 
 [sub_resource type="ImageTexture" id="ImageTexture_03hhr"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tracer"]
+shading_mode = 0
+albedo_color = Color(1, 0.95, 0.6, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_tracer"]
+material = SubResource("StandardMaterial3D_tracer")
+size = Vector3(0.01, 0.01, 1)
 
 [node name="World" type="Node3D" unique_id=822990337]
 
@@ -242,5 +251,11 @@ decal_lifetime = 5.0
 size = Vector3(0.1, 0.1, 0.1)
 texture_albedo = SubResource("ImageTexture_03hhr")
 texture_normal = ExtResource("10_m0gj3")
+
+[node name="BulletTracerManager" type="Node3D" parent="." unique_id=201700001]
+script = ExtResource("11_btrc")
+
+[node name="1" type="MeshInstance3D" parent="BulletTracerManager" unique_id=201700002]
+mesh = SubResource("BoxMesh_tracer")
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]
