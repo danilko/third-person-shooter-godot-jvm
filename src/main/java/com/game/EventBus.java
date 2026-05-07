@@ -60,6 +60,14 @@ public class EventBus extends Node {
             new Signal2<>(this, new StringName("pickup_interact_changed"));
 
     /**
+     * Emitted by HUDManager when the active player's ammo state changes.
+     * Payload: magazine (current loaded rounds), reserve (unloaded backup rounds).
+     */
+    @RegisterSignal
+    public final Signal2<Integer, Integer> playerAmmoChanged =
+            new Signal2<>(this, new StringName("player_ammo_changed"));
+
+    /**
      * Emitted by WeaponController when a weapon is equipped from the world.
      * Payload: weaponName, weaponIcon.
      */

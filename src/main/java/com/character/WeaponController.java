@@ -155,7 +155,8 @@ public class WeaponController extends Node {
 
     weapons[targetSlot] = item;
 
-    if (targetSlot == activeSlotIndex) {
+    if (targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null) {
+      activeSlotIndex = targetSlot;
       showWeapon(activeSlotIndex);
       animationController.onWeaponTransition(item.weaponPoseIndex, true);
       ammoChanged.emit(item.getMagazine(), item.getReserve());

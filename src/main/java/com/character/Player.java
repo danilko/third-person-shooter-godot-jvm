@@ -1,11 +1,8 @@
 package com.character;
 
 import com.game.EventBus;
-import com.ui.CharacterHUD;
-import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
@@ -14,12 +11,7 @@ import godot.global.GD;
 public class Player extends Character {
 
 
-    @RegisterProperty
-    @Export
-    public NodePath hudPath = new NodePath("UI");
-
     // ── Player-specific nodes ─────────────────────────────────────────────────
-    private CharacterHUD hud;
     private Timer aimStayTimer;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -32,11 +24,6 @@ public class Player extends Character {
         GD.print("HAS TIMER "+ hasNode("AimStayTimer"));
 
         aimRay.addException(this);
-
-        if (hasNode(hudPath)) {
-            hud = (CharacterHUD) getNode(hudPath);
-            hud.onHealthChanged(healthNode.getCurrentHealth());
-        }
     }
 
     // ── Input gathering (human input → CharacterInput) ────────────────────────
@@ -133,10 +120,4 @@ public class Player extends Character {
         }
     }
 
-    @RegisterFunction
-    public void onPlayerDamaged(float amount) {
-        if (hud != null) {
-            hud.onHealthChanged(healthNode.getCurrentHealth());
-        }
-    }
 }

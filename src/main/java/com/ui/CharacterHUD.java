@@ -64,6 +64,12 @@ public class CharacterHUD extends Control {
 
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) {
+      bus.playerAmmoChanged.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onAmmoChanged")),
+          godot.api.Object.ConnectFlags.DEFAULT);
+      bus.playerHealthChanged.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onHealthChanged")),
+          godot.api.Object.ConnectFlags.DEFAULT);
       bus.characterEliminated.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onCharacterEliminated")),
           godot.api.Object.ConnectFlags.DEFAULT);
