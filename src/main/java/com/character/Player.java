@@ -91,6 +91,9 @@ public class Player extends Character {
         // ── Reload ────────────────────────────────────────────────────────
         input.reload = inp.isActionJustPressed("reload", false);
 
+        // ── Drop ──────────────────────────────────────────────────────────
+        input.drop = inp.isActionJustPressed("drop", false);
+
         // ── Jump ──────────────────────────────────────────────────────────
         input.jump = inp.isActionJustPressed("jump", false);
 

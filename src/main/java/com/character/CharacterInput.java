@@ -46,6 +46,9 @@ public class CharacterInput {
     /** Trigger a weapon reload this tick. */
     public boolean reload;
 
+    /** Drop the currently active weapon this tick. */
+    public boolean drop;
+
     // ── Body actions (one-shot per tick) ─────────────────────────────────────
 
     /** Attempt a jump this tick. */
@@ -96,6 +99,7 @@ public class CharacterInput {
         wantCombat        = false;
         fire              = false;
         reload            = false;
+        drop              = false;
         jump              = false;
         roll              = false;
         desiredStance     = null;
@@ -118,6 +122,7 @@ public class CharacterInput {
         c.wantCombat        = wantCombat;
         c.fire              = fire;
         c.reload            = reload;
+        c.drop              = drop;
         c.jump              = jump;
         c.roll              = roll;
         c.desiredStance     = desiredStance;

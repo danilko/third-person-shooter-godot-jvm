@@ -8,6 +8,8 @@ import godot.core.Signal1;
 import godot.core.Signal2;
 import godot.core.StringName;
 import godot.core.Vector3;
+import java.util.ArrayList;
+import java.util.List;
 
 @RegisterClass(className = "WeaponController")
 public class WeaponController extends Node {
@@ -50,6 +52,11 @@ public class WeaponController extends Node {
   private int activeSlotIndex  = 0;
   private int pendingSlotIndex = 0;
 
+  // Weapons queued for equip/drop; processed in _process (idle) to avoid
+  // reparenting a RigidBody3D (CollisionObject) during a physics callback.
+  private final List<WeaponItem> pendingEquips = new ArrayList<>();
+  private WeaponItem pendingDrop;
+
   private RayCast3D aimRay;
   private CameraController cam;
 
@@ -86,6 +93,22 @@ public class WeaponController extends Node {
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  @RegisterFunction
+  @Override
+  public void _process(double delta) {
+    // Process equips first (deferred from Area3D body_entered signals)
+    if (!pendingEquips.isEmpty()) {
+      for (WeaponItem item : new ArrayList<>(pendingEquips)) equipWeapon(item);
+      pendingEquips.clear();
+    }
+    // Then process any pending drop
+    if (pendingDrop != null) {
+      WeaponItem toDrop = pendingDrop;
+      pendingDrop = null;
+      returnWeaponToWorld(toDrop);
+    }
+  }
 
   @RegisterFunction
   @Override
@@ -126,6 +149,15 @@ public class WeaponController extends Node {
   }
 
   // ── Runtime equip / drop ─────────────────────────────────────────────────
+
+  /**
+   * Queues {@code item} to be equipped in the next idle frame (_process).
+   * Called from WeaponItem.onCharacterEntered which runs inside an Area3D
+   * body_entered signal (physics context) where reparent() is forbidden.
+   */
+  public void requestEquip(WeaponItem item) {
+    if (!pendingEquips.contains(item)) pendingEquips.add(item);
+  }
 
   /**
    * Equips {@code item} into the first free slot whose type matches the weapon's
@@ -174,11 +206,13 @@ public class WeaponController extends Node {
    * Removes the currently active weapon from the inventory and returns it to the
    * world at the character's feet with a throw impulse.
    */
+  @RegisterFunction
   public void dropCurrentWeapon() {
     WeaponItem current = weapons[activeSlotIndex];
     if (current == null) return;
     weapons[activeSlotIndex] = null;
-    returnWeaponToWorld(current);
+    current.hide();       // hide immediately — reparent is deferred to _process
+    pendingDrop = current;
     activateFirstAvailableSlot();
   }
 
@@ -310,6 +344,7 @@ public class WeaponController extends Node {
 
   private void returnWeaponToWorld(WeaponItem item) {
     if (item instanceof FirearmItem fi) fi.setup(null, null, null, null, null);
+    item.show(); // always visible when it lands in the world, regardless of which slot it was in
 
     CharacterBody3D character = (CharacterBody3D) getOwner();
     Vector3 dropPos = character.getGlobalPosition().plus(new Vector3(0, 1.0f, 0));
@@ -318,9 +353,13 @@ public class WeaponController extends Node {
         .plus(new Vector3(0, 4.0f, 0))
         .plus(character.getVelocity().times(0.3f));
 
-    item.reparent(getTree().getCurrentScene(), false);
-    item.setGlobalPosition(dropPos);
+    // keepGlobalTransform=true so the weapon stays at its hand position in world
+    // space after reparent. Unfreeze the physics body first so the position
+    // assignment and impulse are applied to a live dynamic body (Jolt Physics
+    // does not propagate setGlobalPosition reliably on a still-frozen body).
+    item.reparent(getTree().getCurrentScene(), true);
     item.onReturnedToWorld();
+    item.setGlobalPosition(dropPos);
     item.applyCentralImpulse(impulse);
   }
 
@@ -331,6 +370,8 @@ public class WeaponController extends Node {
         return;
       }
     }
+    // No weapons remain — clear HUD ammo display
+    ammoChanged.emit(0, 0);
   }
 
   private void emitInitialAmmoState() {

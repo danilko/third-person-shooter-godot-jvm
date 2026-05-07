@@ -12,6 +12,7 @@ import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.RigidBody3D;
 import godot.core.NodePath;
+import godot.core.StringName;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,13 +54,25 @@ public class Pickup extends RigidBody3D {
   @RegisterProperty @Export public boolean pauseOnPickup   = false;
   @RegisterProperty @Export public boolean requireInteract = false;
 
+  /**
+   * Seconds the pickup ignores all body_entered events after being returned to the
+   * world (e.g. after a character drops it). Prevents the dropping character from
+   * immediately re-acquiring the item. Industry standard: 0.3–0.5 s.
+   */
+  @RegisterProperty @Export public float pickupCooldownAfterDrop = 0.5f;
+
   private final List<Node3D> overlappingBodies = new ArrayList<>();
+  /** True while held in a character's inventory; blocks body_entered re-triggering. */
+  protected boolean equipped = false;
+  private float pickupCooldown = 0f;
 
   // ── Tick ─────────────────────────────────────────────────────────────────
 
   @RegisterFunction
   @Override
   public void _process(double delta) {
+    if (pickupCooldown > 0f) pickupCooldown -= (float) delta;
+
     if (requireInteract && !overlappingBodies.isEmpty()
         && Input.INSTANCE.isActionJustPressed("interact", false)) {
       triggerInteract();
@@ -77,6 +90,7 @@ public class Pickup extends RigidBody3D {
 
   @RegisterFunction
   public void onBodyEntered(Node3D body) {
+    if (equipped || pickupCooldown > 0f) return;
     Node character = resolveCharacter(body);
     if (character == null || !isAlive(character)) return;
 
@@ -112,8 +126,9 @@ public class Pickup extends RigidBody3D {
     emitInteractPrompt(false);
     setVisible(false);
     setFreezeEnabled(true);
+    // setMonitoring must be deferred — this method can be called from body signals.
     Node areaNode = getNodeOrNull(PICKUP_AREA);
-    if (areaNode instanceof Area3D area) area.setMonitoring(false);
+    if (areaNode instanceof Area3D area) area.setDeferred(new StringName("monitoring"), false);
   }
 
   @RegisterFunction
@@ -130,18 +145,20 @@ public class Pickup extends RigidBody3D {
   // ── Equip / return lifecycle (used by WeaponItem) ─────────────────────────
 
   /** Called after this pickup is reparented into a character's inventory marker.
-   *  Freezes physics and disables detection without hiding the node. */
+   *  Freezes physics; sets the equipped flag so onBodyEntered ignores further
+   *  contacts without touching Area3D monitoring (which is blocked inside body signals). */
   public void onPickedUp() {
+    equipped = true;
     overlappingBodies.clear();
     emitInteractPrompt(false);
     setFreezeEnabled(true);
-    Node areaNode = getNodeOrNull(PICKUP_AREA);
-    if (areaNode instanceof Area3D area) area.setMonitoring(false);
   }
 
   /** Called after this pickup is reparented back into the world scene.
-   *  Re-enables physics and detection. */
+   *  Re-enables physics and detection. Safe to call from _process (not a signal). */
   public void onReturnedToWorld() {
+    equipped = false;
+    pickupCooldown = pickupCooldownAfterDrop;
     setFreezeEnabled(false);
     Node areaNode = getNodeOrNull(PICKUP_AREA);
     if (areaNode instanceof Area3D area) area.setMonitoring(true);

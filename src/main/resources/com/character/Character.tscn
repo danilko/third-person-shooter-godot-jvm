@@ -1133,6 +1133,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4858435e-07, 0, -0.9840301
 [connection signal="pressed_roll" from="." to="MovementController" method="roll"]
 [connection signal="pressed_roll" from="." to="AnimationController" method="roll"]
 [connection signal="reload_weapon" from="." to="WeaponController" method="on_weapon_reload"]
+[connection signal="drop_weapon" from="." to="WeaponController" method="drop_current_weapon"]
 [connection signal="timeout" from="WeaponController/TransitionTimer" to="WeaponController" method="on_weapon_transition_complete"]
 [connection signal="timeout" from="WeaponController/ReloadTimer" to="WeaponController" method="on_weapon_reload_complete"]
 [connection signal="timeout" from="RollTimer" to="." method="completed_roll"]

@@ -219,13 +219,6 @@ text = "AMMO REFILL"
 font = ExtResource("5_uecv0")
 font_size = 60
 
-[node name="Enemy" parent="." unique_id=1159876964 node_paths=PackedStringArray("player", "ammo_refill") instance=ExtResource("6_enemy")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.75, -5)
-player = NodePath("../Player")
-attack_range = 15.0
-patrol_radius = 8.0
-ammo_refill = NodePath("../AmmoRefill")
-
 [node name="PauseMenu" parent="." unique_id=1764356925 instance=ExtResource("7_pmenu")]
 grow_horizontal = 2
 grow_vertical = 2
@@ -287,5 +280,10 @@ transform = Transform3D(1, 0, 0, 0, -4.3711385e-08, -1, 0, 0.9999999, -4.371139e
 
 [node name="Rifle2" parent="." unique_id=995514556 instance=ExtResource("13_ijvcp")]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.74753, 0.6910143, -4.92147)
+
+[node name="Enemy" parent="." unique_id=1865541393 node_paths=PackedStringArray("player", "ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0463448, 0.89418125, -4.9451065)
+player = NodePath("../Player")
+ammo_refill = NodePath("../AmmoRefill")
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

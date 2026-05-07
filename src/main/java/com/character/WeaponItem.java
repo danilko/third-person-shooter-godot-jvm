@@ -76,7 +76,11 @@ public class WeaponItem extends Pickup implements WeaponAction {
   protected void onCharacterEntered(Node character) {
     Node wcNode = character.getNodeOrNull(WEAPON_CONTROLLER_PATH);
     if (wcNode instanceof WeaponController wc) {
-      wc.equipWeapon(this);
+      // Set equipped immediately to prevent re-triggering during the deferred frame,
+      // then queue the actual equip so reparent() runs in _process (idle), not
+      // inside the Area3D body_entered signal (physics callback).
+      equipped = true;
+      wc.requestEquip(this);
     }
   }
 

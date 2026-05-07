@@ -45,6 +45,9 @@ public class Character extends CharacterBody3D {
     @RegisterSignal
     public final Signal0 reloadWeapon = new Signal0(this, new StringName("reload_weapon"));
 
+    @RegisterSignal
+    public final Signal0 dropWeapon = new Signal0(this, new StringName("drop_weapon"));
+
     // ── Exports ───────────────────────────────────────────────────────────────
     @RegisterProperty
     public int maxAirJump = 1;
@@ -221,6 +224,11 @@ public class Character extends CharacterBody3D {
         // ── Reload ─────────────────────────────────────────────────────────
         if (input.reload) {
             reloadWeapon.emit();
+        }
+
+        // ── Drop ────────────────────────────────────────────────────────────
+        if (input.drop) {
+            dropWeapon.emit();
         }
 
         // ── Jump ───────────────────────────────────────────────────────────
