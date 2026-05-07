@@ -136,7 +136,7 @@ public class Character extends CharacterBody3D {
         if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
             physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
 
-            for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            if (aimRay != null) for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
                 Node child = physicalBoneSimulator.getChild(i);
                 if (child instanceof PhysicalBone3D bone) {
                    aimRay.addException(bone);

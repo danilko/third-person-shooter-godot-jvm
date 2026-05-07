@@ -3,6 +3,7 @@ package com.ui;
 import com.character.MovementType;
 import com.character.Player;
 import com.character.WeaponController;
+import com.character.WeaponItem;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -51,8 +52,21 @@ public class RadialMenu extends Control {
     player.setMovementDirection(Vector3.Companion.getZERO());
     player.setMovementState(MovementType.IDLE);
     camera.setProcessInput(false);
+    refreshItems();
     show();
     animationPlayer.play("Zoom");
+  }
+
+  private void refreshItems() {
+    refreshItemsIn(this);
+  }
+
+  private void refreshItemsIn(Node node) {
+    for (int i = 0; i < node.getChildCount(); i++) {
+      Node child = node.getChild(i);
+      if (child instanceof RadialMenuItem item) item.refresh();
+      else refreshItemsIn(child);
+    }
   }
 
   public void hideRadialMenu() {
@@ -71,6 +85,10 @@ public class RadialMenu extends Control {
 
   public int getWeaponCount() {
     return weaponController.getWeaponCount();
+  }
+
+  public WeaponItem getWeaponItem(int slotOrdinal) {
+    return weaponController.getWeaponItem(slotOrdinal);
   }
 
 }

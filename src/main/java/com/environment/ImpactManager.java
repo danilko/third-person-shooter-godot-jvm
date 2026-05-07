@@ -5,6 +5,7 @@ import com.character.Health;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Node;
+import godot.api.Texture2D;
 import godot.core.NodePath;
 
 /**
@@ -40,13 +41,14 @@ public class ImpactManager extends Node {
      * @param info         hit geometry: node, world point, surface normal
      * @param damage       base damage from WeaponStats
      * @param weaponName   display name for kill notifications
+     * @param weaponIcon   icon shown in kill feed (may be null)
      * @param attackerName display name for kill notifications
      */
     public void processHit(HitInfo info, float damage,
-                           String weaponName, String attackerName) {
+                           String weaponName, Texture2D weaponIcon, String attackerName) {
         spawnImpactParticles(info);
         spawnDecal(info);
-        applyDamage(info, damage, weaponName, attackerName);
+        applyDamage(info, damage, weaponName, weaponIcon, attackerName);
     }
 
     // ── Private helpers (one per effect type) ────────────────────────────────
@@ -64,12 +66,12 @@ public class ImpactManager extends Node {
     }
 
     private void applyDamage(HitInfo info, float damage,
-                             String weaponName, String attackerName) {
+                             String weaponName, Texture2D weaponIcon, String attackerName) {
         if (info.hitNode == null) return;
         Node owner = info.hitNode.getOwner();
         if (owner == null || !owner.hasNode(new NodePath("Health"))) return;
         Health health = (Health) owner.getNode(new NodePath("Health"));
-        health.takeDamage(info.hitNode, damage, weaponName, attackerName);
+        health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName);
     }
 
     /**

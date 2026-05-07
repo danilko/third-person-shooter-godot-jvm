@@ -8,6 +8,7 @@ import godot.annotation.RegisterProperty;
 import godot.annotation.RegisterSignal;
 import godot.api.Node;
 import godot.api.PhysicalBone3D;
+import godot.api.Texture2D;
 import godot.core.Signal0;
 import godot.core.Signal1;
 import godot.core.StringName;
@@ -39,10 +40,11 @@ public class Health extends Node {
     }
 
     public void takeDamage(Node hitNode, float baseDamage, String weaponName) {
-        takeDamage(hitNode, baseDamage, weaponName, "");
+        takeDamage(hitNode, baseDamage, weaponName, null, "");
     }
 
-    public void takeDamage(Node hitNode, float baseDamage, String weaponName, String attackerName) {
+    public void takeDamage(Node hitNode, float baseDamage, String weaponName,
+                           Texture2D weaponIcon, String attackerName) {
         if (currentHealth <= 0) return;
         boolean headshot = (hitNode instanceof PhysicalBone3D)
                 && "Physical Bone neck_01".equals(hitNode.getName().toString());
@@ -53,7 +55,7 @@ public class Health extends Node {
             Node busNode = getNodeOrNull("/root/EventBus");
             if (busNode instanceof EventBus bus) {
                 String victimName = displayName.isEmpty() ? getOwner().getName().toString() : displayName;
-                bus.characterEliminated.emit(attackerName, victimName, weaponName, headshot);
+                bus.characterEliminated.emit(attackerName, victimName, weaponName, weaponIcon, headshot);
             }
             died.emit();
         }

@@ -18,13 +18,16 @@ signals = [
 ]
 properties = [
     health_label_path,
-	mag_label_path,
-	ammo_backup_label_path
+	magazine_label_path,
+	reserve_label_path,
+	notification_icon_path
 ]
 functions = [
     _ready,
 	_process,
 	on_ammo_changed,
 	on_health_changed,
+	on_pickup_interact_changed,
+	on_weapon_picked_up,
 	on_character_eliminated
 ]

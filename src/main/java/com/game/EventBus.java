@@ -3,9 +3,12 @@ package com.game;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterSignal;
 import godot.api.Node;
+import godot.api.Texture2D;
 import godot.core.Signal0;
 import godot.core.Signal1;
+import godot.core.Signal2;
 import godot.core.Signal4;
+import godot.core.Signal5;
 import godot.core.StringName;
 
 /**
@@ -42,9 +45,25 @@ public class EventBus extends Node {
 
     /**
      * Emitted by Health when any character is eliminated.
-     * Payload: attackerName, victimName, weaponName, headshot.
+     * Payload: attackerName, victimName, weaponName, weaponIcon, headshot.
      */
     @RegisterSignal
-    public final Signal4<String, String, String, Boolean> characterEliminated =
-            new Signal4<>(this, new StringName("character_eliminated"));
+    public final Signal5<String, String, String, Texture2D, Boolean> characterEliminated =
+            new Signal5<>(this, new StringName("character_eliminated"));
+
+    /**
+     * Emitted by Pickup when a character enters or leaves interact range.
+     * Payload: inRange, itemLabel (empty string when leaving).
+     */
+    @RegisterSignal
+    public final Signal2<Boolean, String> pickupInteractChanged =
+            new Signal2<>(this, new StringName("pickup_interact_changed"));
+
+    /**
+     * Emitted by WeaponController when a weapon is equipped from the world.
+     * Payload: weaponName, weaponIcon.
+     */
+    @RegisterSignal
+    public final Signal2<String, Texture2D> weaponPickedUp =
+            new Signal2<>(this, new StringName("weapon_picked_up"));
 }

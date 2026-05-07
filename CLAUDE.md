@@ -30,8 +30,12 @@ src/main/java/
     Enemy.java            # AI FSM owner — all mutable AI state lives here
     CharacterInput.java   # per-tick input snapshot (shared by player, AI, network)
     Health.java           # damage, bone multipliers, headshot, death signal
-    WeaponController.java # firing, reload, bloom/spread, recoil; calls ParticleController for VFX
-    WeaponStats.java      # Resource: per-weapon stats (spread, bloom, fire rate…)
+    WeaponController.java # slot-based inventory: equip/drop, rate-limit, reload, switch timing
+    WeaponAction.java     # interface: useWeapon / stopUseWeapon / canUse / onReloadComplete
+    WeaponItem.java       # Node3D base for all equippable items: stats, ammo, audio exports
+    FirearmItem.java      # hitscan firearm: bloom, spread, recoil, muzzle flash, bullet tracer
+    WeaponSlot.java       # enum: PRIMARY / SECONDARY / UTILITY / MELEE
+    WeaponType.java       # enum: RANGED / THROWN / MELEE
     AnimationController.java  # AnimationTree parameter writes
     MovementController.java   # physics: velocity, gravity, mesh rotation, crosshair
     CameraController.java     # base camera: recoil, shoulder swap, FoV tween
@@ -45,7 +49,10 @@ src/main/java/
     JumpState.java        # Resource: jump height, apex duration, animation name
     RollState.java        # Resource: roll speed, duration, animation name
   com/environment/
-    AmmoRefill.java       # Area3D: fills all weapons when Player enters
+    Pickup.java           # RigidBody3D base for all world pickups: physics body + PickupArea (Area3D)
+                          #   removeOnPickup / pauseOnPickup / respawnTime countdown
+    WeaponPickup.java     # Pickup: finds WeaponItem child and equips it via WeaponController
+    AmmoRefill.java       # Area3D (static station, no physics): fills all weapons on entry
     SurfaceType.java      # enum: FLESH / METAL / STONE / WOOD / DEFAULT
     HittableBody.java     # StaticBody3D subclass: attach to world geometry needing non-default particles
     HitInfo.java          # immutable hit snapshot (node, point, normal) — network-serializable
@@ -296,4 +303,10 @@ Enemy input is world-space (set directly by AI FSM).
 - `PhysicalBoneSimulator3D` children must be added to `aimRay.addException()` in both
   `Character._ready()` and `Enemy._ready()` (for SightRay) to prevent self-hits.
 - Weapon scenes are discovered dynamically: `WeaponController` iterates children of
-  `WeaponAttachment` at `_ready()` — add a new weapon by adding a `WeaponStats` child node.
+  `WeaponAttachment` at `_ready()` — add a new weapon by adding a `Marker3D` wrapper with a
+  `WeaponItem` subclass scene (e.g. `FirearmItem`) as its only child.
+- `WeaponPickup` finds its `WeaponItem` child lazily in `onCharacterEntered` (not `_ready()`)
+  because `WeaponController.spawnPickup()` reparents the weapon after `addChild()`, so `_ready()`
+  fires before the weapon is attached.
+- `Pickup.pause()` calls `setFreezeEnabled(true)` (not `setFreeze`) — the Kotlin/JVM binding
+  exposes the Godot 4 `freeze` property as `setFreezeEnabled / isFreezeEnabled`.

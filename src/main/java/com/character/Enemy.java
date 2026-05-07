@@ -273,7 +273,7 @@ public class Enemy extends Character {
         float bestDamage = -1f;
         for (int i = 0; i < count; i++) {
             if (!weaponController.hasAmmoForWeapon(i)) continue;
-            WeaponStats stats = weaponController.getWeaponStats(i);
+            WeaponItem stats = weaponController.getWeaponStats(i);
             if (stats != null && stats.damage > bestDamage) {
                 bestDamage = stats.damage;
                 bestIndex  = i;
