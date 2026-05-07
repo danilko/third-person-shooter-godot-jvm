@@ -265,6 +265,7 @@ public class WeaponController extends Node {
 
   // ── State queries ─────────────────────────────────────────────────────────
 
+  public int  getSlotCount()             { return slotTypes.length; }
   public boolean isWeaponReloading()     { return reloadTimer.getTimeLeft() > 0; }
   public boolean isWeaponTransitioning() { return transitionTimer.getTimeLeft() > 0; }
 

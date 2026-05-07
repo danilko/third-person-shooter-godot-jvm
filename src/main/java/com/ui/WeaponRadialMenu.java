@@ -9,41 +9,57 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
+import godot.core.NodePath;
 import godot.core.Vector3;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Radial weapon-selection overlay.
  *
- * References (character, weaponController, camera) are injected by HUDManager
- * when a controllable entity is wired in. The menu is context-agnostic: it
- * shows whatever weapons are in the active WeaponController, so the same scene
- * works for the player on foot, a robot, or powered armour.
+ * Items are generated dynamically: one template node ("0" in the circle container)
+ * is cloned once per weapon slot and spaced evenly at 2π/slotCount radians each.
  *
- * For a carrier with a fundamentally different UI (ship, turret) swap the
- * entire HUD context via HUDManager.activateHUD() instead.
+ * References (character, weaponController, camera) are injected by HUDManager
+ * via wireCharacter(). The menu is context-agnostic — robot, powered armour, or
+ * player on foot all work without scene changes.
  */
 @RegisterClass(className = "WeaponRadialMenu")
 public class WeaponRadialMenu extends Control {
 
   @Export @RegisterProperty public Character character;
 
+  /** Path to the container that holds the radial items (the rotating circle). */
+  @RegisterProperty @Export
+  public NodePath circleContainerPath = new NodePath("Panel/Circle");
+
+  /** Scene used to instantiate each weapon slot item. Set to WeaponRadialMenuItem.tscn. */
+  @RegisterProperty @Export
+  public PackedScene weaponItemTemplate;
+
   private WeaponController cachedWeaponController;
   private Node             cachedCamera;
   private AnimationPlayer  animationPlayer;
 
-  /** Set or update the active character; clears cached weapon controller and camera. */
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  /** Set or update the active character; rebuilds items for the new slot layout. */
   public void wireCharacter(Character c) {
     character = c;
     cachedWeaponController = null;
     cachedCamera = null;
+    buildItems();
   }
 
   @RegisterFunction
   @Override
   public void _ready() {
     animationPlayer = (AnimationPlayer) getNode("AnimationPlayer");
+    buildItems();
     hide();
   }
+
+  // ── Input / show / hide ───────────────────────────────────────────────────
 
   @RegisterFunction
   @Override
@@ -79,17 +95,43 @@ public class WeaponRadialMenu extends Control {
     hide();
   }
 
-  private void refreshItems() {
-    refreshItemsIn(this);
-  }
+  // ── Dynamic item building ─────────────────────────────────────────────────
 
-  private void refreshItemsIn(Node node) {
-    for (int i = 0; i < node.getChildCount(); i++) {
-      Node child = node.getChild(i);
-      if (child instanceof WeaponRadialMenuItem item) item.refresh();
-      else refreshItemsIn(child);
+  /**
+   * Clones the first WeaponRadialMenuItem in the circle container to produce
+   * exactly slotCount items spaced at 2π/slotCount radians each.
+   * Called on _ready() and whenever wireCharacter() provides a new controller.
+   */
+  public void buildItems() {
+    WeaponController wc = getWeaponController();
+    if (wc == null || weaponItemTemplate == null) return;
+
+    Node circle = getNodeOrNull(circleContainerPath);
+    if (circle == null) return;
+
+    // Remove existing items synchronously so the child list is clean before adding new ones
+    List<Node> toRemove = new ArrayList<>();
+    for (int i = 0; i < circle.getChildCount(); i++) {
+      if (circle.getChild(i) instanceof WeaponRadialMenuItem) toRemove.add(circle.getChild(i));
+    }
+    for (Node old : toRemove) {
+      circle.removeChild(old);
+      old.queueFree();
+    }
+
+    int slotCount = wc.getSlotCount();
+    double step = (Math.PI * 2.0) / slotCount;
+
+    for (int i = 0; i < slotCount; i++) {
+      Node instance = weaponItemTemplate.instantiate();
+      if (instance instanceof WeaponRadialMenuItem item) {
+        item.setRotation((float) (i * step));
+        circle.addChild(item);
+      }
     }
   }
+
+  // ── Accessors ─────────────────────────────────────────────────────────────
 
   public Character getCharacter() { return character; }
 
@@ -104,6 +146,18 @@ public class WeaponRadialMenu extends Control {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
+
+  private void refreshItems() {
+    refreshItemsIn(this);
+  }
+
+  private void refreshItemsIn(Node node) {
+    for (int i = 0; i < node.getChildCount(); i++) {
+      Node child = node.getChild(i);
+      if (child instanceof WeaponRadialMenuItem item) item.refresh();
+      else refreshItemsIn(child);
+    }
+  }
 
   private WeaponController getWeaponController() {
     if (cachedWeaponController == null && character != null) {
