@@ -265,10 +265,10 @@ script = ExtResource("11_btrc")
 mesh = SubResource("BoxMesh_tracer")
 
 [node name="Pistol" parent="." unique_id=358619058 instance=ExtResource("12_ej8ck")]
-transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 2.0067604, 2.389717)
+transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10, -4.3711214e-08, 1, -0.004708648, -0.9999888, -4.3711307e-08, 0.3772924, 0.9677863, 3.4917908)
 
 [node name="Rifle" parent="." unique_id=1788483088 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4691124, 2.985052)
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.002087593, 0.726562, 3.2870467)
 
 [node name="HUDManager" type="CanvasLayer" parent="." unique_id=1946570621]
 script = ExtResource("14_cl06x")
@@ -281,5 +281,11 @@ notification_icon_path = NodePath("Notification/WeaponIcon")
 
 [node name="WeaponRadialMenu" parent="HUDManager" unique_id=1303740167 node_paths=PackedStringArray("character") instance=ExtResource("17_nmpqt")]
 character = NodePath("../../Player")
+
+[node name="Pistol2" parent="." unique_id=1577587948 instance=ExtResource("12_ej8ck")]
+transform = Transform3D(1, 0, 0, 0, -4.3711385e-08, -1, 0, 0.9999999, -4.371139e-08, 5.122735, 0.89575815, -5.1626945)
+
+[node name="Rifle2" parent="." unique_id=995514556 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.74753, 0.6910143, -4.92147)
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

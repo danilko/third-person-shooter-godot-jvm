@@ -77,18 +77,26 @@ public class Pickup extends RigidBody3D {
 
   @RegisterFunction
   public void onBodyEntered(Node3D body) {
-    if (requireInteract) {
-      Node character = resolveCharacter(body);
-      if (character != null && isAlive(character)) {
-        overlappingBodies.add(body);
-        emitInteractPrompt(true);
-      }
-      return;
-    }
     Node character = resolveCharacter(body);
     if (character == null || !isAlive(character)) return;
-    onCharacterEntered(character);
-    applyPostPickup();
+
+    if (shouldAutoPickup(character)) {
+      onCharacterEntered(character);
+      applyPostPickup();
+    } else {
+      overlappingBodies.add(body);
+      emitInteractPrompt(true);
+    }
+  }
+
+  /**
+   * Returns true when this pickup should be collected immediately on body enter,
+   * bypassing the interact prompt. Default: auto-pickup when requireInteract is false.
+   * Subclasses can override for context-sensitive behaviour (e.g. WeaponItem checks
+   * whether the target slot is free).
+   */
+  protected boolean shouldAutoPickup(Node character) {
+    return !requireInteract;
   }
 
   @RegisterFunction

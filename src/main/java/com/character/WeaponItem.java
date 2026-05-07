@@ -61,6 +61,17 @@ public class WeaponItem extends Pickup implements WeaponAction {
 
   // ── Pickup callbacks ──────────────────────────────────────────────────────
 
+  /**
+   * Auto-pickup when the character's matching slot is free; otherwise show the
+   * interact prompt so the player consciously chooses to swap their current weapon.
+   */
+  @Override
+  protected boolean shouldAutoPickup(Node character) {
+    Node wcNode = character.getNodeOrNull(WEAPON_CONTROLLER_PATH);
+    if (wcNode instanceof WeaponController wc) return wc.isSlotFreeFor(getSlotType());
+    return false;
+  }
+
   @Override
   protected void onCharacterEntered(Node character) {
     Node wcNode = character.getNodeOrNull(WEAPON_CONTROLLER_PATH);
