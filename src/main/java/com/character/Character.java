@@ -113,8 +113,11 @@ public class Character extends CharacterBody3D {
     protected Node3D cameraRoot;
     protected PhysicalBoneSimulator3D physicalBoneSimulator;
 
-    // ── Tick counter (stamped onto every CharacterInput for network ordering) ─
+    // ── Tick counter (stamped onto every UserCommand for network ordering) ─────
     protected long currentTick = 0;
+
+    // ── Controller (generates UserCommand each tick) ──────────────────────────
+    protected Controller controller;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     @RegisterFunction
@@ -156,6 +159,10 @@ public class Character extends CharacterBody3D {
             }
         }
 
+        for (Node child : getChildren()) {
+            if (child instanceof Controller c) { controller = c; break; }
+        }
+
         changedMovementDirection.emit(Vector3.Companion.getBACK());
         setMovementState(MovementType.IDLE);
         setStance(currentStanceName);
@@ -163,27 +170,26 @@ public class Character extends CharacterBody3D {
         setWeapon(0);
     }
 
+    public boolean isCombat() { return combat; }
+
     // ── Physics loop: gather → apply ─────────────────────────────────────────
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
-        CharacterInput input = gatherInput(delta);
-        input.tick = currentTick++;
-        applyInput(input, delta);
+        UserCommand cmd;
+        if (controller != null) {
+            if (!controller.isAuthority()) return; // non-authority: state via MultiplayerSynchronizer
+            cmd = controller.gatherInput(delta);
+        } else {
+            cmd = gatherInput(delta); // fallback: subclass override
+        }
+        cmd.tick = currentTick++;
+        applyInput(cmd, delta);
     }
 
-    /**
-     * Produce a CharacterInput for this tick.
-     *
-     * Override in subclasses:
-     *   - Player  : sample Input singleton (keyboard/mouse)
-     *   - Enemy   : run AI FSM and translate decisions into fields
-     *   - Network : pop from received-input buffer (future)
-     *
-     * The base implementation returns an empty (no-op) input.
-     */
-    protected CharacterInput gatherInput(double delta) {
-        return new CharacterInput();
+    /** Fallback input path when no Controller child is present. Returns empty command. */
+    protected UserCommand gatherInput(double delta) {
+        return new UserCommand();
     }
 
     /**
@@ -192,7 +198,7 @@ public class Character extends CharacterBody3D {
      * All signal emissions and state transitions live here so that any
      * input source (local, AI, network) produces identical results.
      */
-    protected void applyInput(CharacterInput input, double delta) {
+    protected void applyInput(UserCommand input, double delta) {
 
         // ── Movement direction ─────────────────────────────────────────────
         if (input.movementDirection.lengthSquared() > 0.001) {

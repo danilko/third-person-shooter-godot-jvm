@@ -1,61 +1,57 @@
 package com.character.ai;
 
 import com.character.AICharacter;
-import com.character.CharacterInput;
+import com.character.AIController;
 import com.character.MovementType;
+import com.character.UserCommand;
 import godot.core.Vector3;
 
-/**
- * AI character wanders within its patrol radius.
- * Transitions to {@link ChaseState} or {@link AttackState} when a hostile target is spotted.
- * Transitions to {@link SearchState} immediately when hit (even without visual contact).
- */
 public class PatrolState implements AIState {
 
     public static final PatrolState INSTANCE = new PatrolState();
-
     private PatrolState() {}
 
     @Override
-    public void enter(AICharacter c) {
-        c.clearTarget();
-        c.setNextPatrolTarget();
+    public void enter(AICharacter body, AIController ctrl) {
+        body.clearTarget();
+        ctrl.clearLastKnownPosition();
+        body.setNextPatrolTarget();
     }
 
     @Override
-    public void exit(AICharacter c) {}
+    public void exit(AICharacter body, AIController ctrl) {}
 
     @Override
-    public AIState update(AICharacter c, CharacterInput input, double delta) {
-        int bestWeapon = c.selectBestWeapon();
-        if (bestWeapon >= 0 && c.weaponController != null
-                && bestWeapon != c.weaponController.getWeapon()
-                && !c.weaponController.isWeaponTransitioning()) {
-            input.desiredWeapon = bestWeapon;
+    public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
+        int bestWeapon = body.selectBestWeapon();
+        if (bestWeapon >= 0 && body.weaponController != null
+                && bestWeapon != body.weaponController.getWeapon()
+                && !body.weaponController.isWeaponTransitioning()) {
+            cmd.desiredWeapon = bestWeapon;
         }
 
-        if (c.canSeeTarget()) {
-            input.wantCombat = true;
-            float dist = (float) c.getGlobalPosition()
-                                   .distanceTo(c.getTarget().getGlobalPosition());
-            if (dist <= c.attackRange && c.hasAnyAmmo()) return AttackState.INSTANCE;
+        if (body.canSeeTarget()) {
+            cmd.wantCombat = true;
+            float dist = (float) body.getGlobalPosition()
+                                     .distanceTo(body.getTarget().getGlobalPosition());
+            if (dist <= body.attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
             return ChaseState.INSTANCE;
         }
 
-        if (c.isUnderAttack() && c.hasLastKnownPosition()) return SearchState.INSTANCE;
+        if (ctrl.isUnderAttack() && ctrl.hasLastKnownPosition()) return SearchState.INSTANCE;
 
-        input.wantCombat   = false;
-        input.movementType = MovementType.WALK;
+        cmd.wantCombat   = false;
+        cmd.movementType = MovementType.WALK;
 
-        if (!c.getNavAgent().isNavigationFinished()) {
-            Vector3 dir = c.getNavAgent()
-                           .getNextPathPosition()
-                           .minus(c.getGlobalPosition())
-                           .normalized();
-            input.movementDirection.setX(dir.getX());
-            input.movementDirection.setZ(dir.getZ());
+        if (!body.getNavAgent().isNavigationFinished()) {
+            Vector3 dir = body.getNavAgent()
+                              .getNextPathPosition()
+                              .minus(body.getGlobalPosition())
+                              .normalized();
+            cmd.movementDirection.setX(dir.getX());
+            cmd.movementDirection.setZ(dir.getZ());
         } else {
-            c.setNextPatrolTarget();
+            body.setNextPatrolTarget();
         }
 
         return this;

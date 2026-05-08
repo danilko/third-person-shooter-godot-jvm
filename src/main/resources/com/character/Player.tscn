@@ -2,6 +2,7 @@
 
 [ext_resource type="PackedScene" uid="uid://dhp225d838mq7" path="res://src/main/resources/com/character/Character.tscn" id="1_base"]
 [ext_resource type="Script" uid="uid://ceteilad77rgr" path="res://gdj/com/character/Player.gdj" id="2_agpyf"]
+[ext_resource type="Script" uid="uid://playercontroller" path="res://gdj/com/character/PlayerController.gdj" id="5_pctrl"]
 [ext_resource type="Script" uid="uid://crvwop0mvksx7" path="res://src/main/java/com/character/PlayerCameraController.java" id="3_camera"]
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="3_mk2ub"]
 
@@ -14,6 +15,9 @@ metadata/_custom_type_script = "uid://cplrp8cx4gus0"
 [node name="Player" unique_id=73893577 instance=ExtResource("1_base")]
 script = ExtResource("2_agpyf")
 character_info = SubResource("Resource_ige6o")
+
+[node name="PlayerController" type="Node" parent="." unique_id=100000001]
+script = ExtResource("5_pctrl")
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
 bones/0/position = Vector3(4.3259507e-10, -0.017840642, -0.080805)

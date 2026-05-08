@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://buot6337wcthb" path="res://gdj/com/character/AICharacter.gdj" id="2_x1vpt"]
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="3_fqupk"]
 [ext_resource type="Script" uid="uid://bd5tmrvs8w03p" path="res://gdj/com/character/AICameraController.gdj" id="4_x1vpt"]
+[ext_resource type="Script" uid="uid://charactercontroller" path="res://gdj/com/character/CharacterController.gdj" id="5_cctrl"]
 
 [sub_resource type="Resource" id="Resource_be1gi"]
 script = ExtResource("3_fqupk")
@@ -24,6 +25,9 @@ aim_scatter_radius = 1.5
 strafe_change_duration = 1.2
 suppression_duration = 1.5
 character_info = SubResource("Resource_be1gi")
+
+[node name="CharacterController" type="Node" parent="." unique_id=100000002]
+script = ExtResource("5_cctrl")
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
 bones/0/position = Vector3(4.0179754e-10, -0.018237036, -0.080805)

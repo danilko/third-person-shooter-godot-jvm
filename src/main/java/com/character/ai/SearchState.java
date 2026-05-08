@@ -1,71 +1,66 @@
 package com.character.ai;
 
 import com.character.AICharacter;
-import com.character.CharacterInput;
+import com.character.AIController;
 import com.character.MovementType;
+import com.character.UserCommand;
 import godot.core.Vector3;
 
-/**
- * AI sprints to the target's last known position and searches the area.
- * Triggered when LoS is lost during combat or when the AI is hit while patrolling.
- * Re-engages immediately if the target is spotted; gives up after {@link #SEARCH_TIMEOUT}.
- */
 public class SearchState implements AIState {
 
     public static final SearchState INSTANCE = new SearchState();
-
     private SearchState() {}
 
     private static final double SEARCH_TIMEOUT = 5.0;
 
     @Override
-    public void enter(AICharacter c) {
-        c.resetSearchTimer();
-        if (c.hasLastKnownPosition() && c.getNavAgent() != null)
-            c.getNavAgent().setTargetPosition(c.getLastKnownTargetPosition());
+    public void enter(AICharacter body, AIController ctrl) {
+        ctrl.resetSearchTimer();
+        if (ctrl.hasLastKnownPosition() && body.getNavAgent() != null)
+            body.getNavAgent().setTargetPosition(ctrl.getLastKnownTargetPosition());
     }
 
     @Override
-    public void exit(AICharacter c) {}
+    public void exit(AICharacter body, AIController ctrl) {}
 
     @Override
-    public AIState update(AICharacter c, CharacterInput input, double delta) {
-        if (c.canSeeTarget()) {
-            float dist = (float) c.getGlobalPosition()
-                                   .distanceTo(c.getTarget().getGlobalPosition());
-            if (dist <= c.attackRange && c.hasAnyAmmo()) return AttackState.INSTANCE;
+    public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
+        if (body.canSeeTarget()) {
+            float dist = (float) body.getGlobalPosition()
+                                     .distanceTo(body.getTarget().getGlobalPosition());
+            if (dist <= body.attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
             return ChaseState.INSTANCE;
         }
 
-        c.advanceSearchTimer(delta);
-        if (c.isSearchTimedOut(SEARCH_TIMEOUT)) return PatrolState.INSTANCE;
+        ctrl.advanceSearchTimer(delta);
+        if (ctrl.isSearchTimedOut(SEARCH_TIMEOUT)) return PatrolState.INSTANCE;
 
-        input.wantCombat = true;
+        cmd.wantCombat = true;
 
-        boolean arrivedAtLastKnown = !c.hasLastKnownPosition()
-                || c.getNavAgent().isNavigationFinished();
+        boolean arrived = !ctrl.hasLastKnownPosition()
+                || body.getNavAgent().isNavigationFinished();
 
-        if (arrivedAtLastKnown) {
-            if (c.needsStrafeUpdate()) c.refreshStrafe();
-            c.tickStrafeTimer(delta);
-            input.movementDirection.setX(c.getStrafeX());
-            input.movementDirection.setZ(c.getStrafeZ());
-            input.movementType = MovementType.WALK;
+        if (arrived) {
+            if (ctrl.needsStrafeUpdate()) ctrl.refreshStrafe();
+            ctrl.tickStrafeTimer(delta);
+            cmd.movementDirection.setX(ctrl.getStrafeX());
+            cmd.movementDirection.setZ(ctrl.getStrafeZ());
+            cmd.movementType = MovementType.WALK;
 
-            if (c.hasLastKnownPosition()) {
-                Vector3 lookTarget = c.getLastKnownTargetPosition()
+            if (ctrl.hasLastKnownPosition()) {
+                Vector3 look = ctrl.getLastKnownTargetPosition()
                         .plus(new Vector3(0, AICharacter.TARGET_BODY_HEIGHT, 0));
-                c.aimAtPosition(lookTarget, delta);
-                input.aimTargetPosition = lookTarget;
+                body.aimAtPosition(look, delta);
+                cmd.aimTargetPosition = look;
             }
         } else {
-            input.movementType = MovementType.SPRINT;
-            Vector3 dir = c.getNavAgent()
-                           .getNextPathPosition()
-                           .minus(c.getGlobalPosition())
-                           .normalized();
-            input.movementDirection.setX(dir.getX());
-            input.movementDirection.setZ(dir.getZ());
+            cmd.movementType = MovementType.SPRINT;
+            Vector3 dir = body.getNavAgent()
+                              .getNextPathPosition()
+                              .minus(body.getGlobalPosition())
+                              .normalized();
+            cmd.movementDirection.setX(dir.getX());
+            cmd.movementDirection.setZ(dir.getZ());
         }
 
         return this;

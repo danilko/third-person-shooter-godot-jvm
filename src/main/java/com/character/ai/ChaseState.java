@@ -1,70 +1,63 @@
 package com.character.ai;
 
 import com.character.AICharacter;
-import com.character.CharacterInput;
+import com.character.AIController;
 import com.character.MovementType;
+import com.character.UserCommand;
 import godot.core.Vector3;
 
-/**
- * AI character sprints toward the target and enters attack range.
- * Navigates toward last known target position when LoS is broken.
- * Falls back to {@link PatrolState} after losing the target for too long.
- */
 public class ChaseState implements AIState {
 
     public static final ChaseState INSTANCE = new ChaseState();
-
     private ChaseState() {}
 
     @Override
-    public void enter(AICharacter c) {
-        c.resetLostTargetTimer();
+    public void enter(AICharacter body, AIController ctrl) {
+        ctrl.resetLostTargetTimer();
     }
 
     @Override
-    public void exit(AICharacter c) {}
+    public void exit(AICharacter body, AIController ctrl) {}
 
     @Override
-    public AIState update(AICharacter c, CharacterInput input, double delta) {
-        if (c.getTarget() == null) return PatrolState.INSTANCE;
+    public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
+        if (body.getTarget() == null) return PatrolState.INSTANCE;
 
-        float dist = (float) c.getGlobalPosition()
-                               .distanceTo(c.getTarget().getGlobalPosition());
+        float dist = (float) body.getGlobalPosition()
+                                 .distanceTo(body.getTarget().getGlobalPosition());
+        cmd.wantCombat = true;
 
-        input.wantCombat = true;
-
-        if (dist <= c.attackRange && c.hasLineOfSight()) {
-            if (!c.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
+        if (dist <= body.attackRange && body.hasLineOfSight()) {
+            if (!body.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
             return AttackState.INSTANCE;
         }
 
-        input.movementType = MovementType.SPRINT;
+        cmd.movementType = MovementType.SPRINT;
 
-        if (c.hasLineOfSight()) {
-            c.resetLostTargetTimer();
-            Vector3 targetPos = c.getTarget().getGlobalPosition();
-            c.setLastKnownTargetPosition(new Vector3(targetPos));
-            c.getNavAgent().setTargetPosition(targetPos);
+        if (body.hasLineOfSight()) {
+            ctrl.resetLostTargetTimer();
+            Vector3 targetPos = body.getTarget().getGlobalPosition();
+            ctrl.setLastKnownTargetPosition(new Vector3(targetPos));
+            body.getNavAgent().setTargetPosition(targetPos);
 
             Vector3 aimTarget = new Vector3(targetPos.getX(),
                     targetPos.getY() + AICharacter.TARGET_BODY_HEIGHT,
                     targetPos.getZ());
-            c.aimAtPosition(aimTarget, delta);
-            input.aimTargetPosition = aimTarget;
+            body.aimAtPosition(aimTarget, delta);
+            cmd.aimTargetPosition = aimTarget;
         } else {
-            c.advanceLostTargetTimer(delta);
-            if (c.isTargetLost()) return PatrolState.INSTANCE;
-            if (c.hasLastKnownPosition())
-                c.getNavAgent().setTargetPosition(c.getLastKnownTargetPosition());
+            ctrl.advanceLostTargetTimer(delta);
+            if (ctrl.isTargetLost()) return PatrolState.INSTANCE;
+            if (ctrl.hasLastKnownPosition())
+                body.getNavAgent().setTargetPosition(ctrl.getLastKnownTargetPosition());
         }
 
-        Vector3 dir = c.getNavAgent()
-                       .getNextPathPosition()
-                       .minus(c.getGlobalPosition())
-                       .normalized();
-        input.movementDirection.setX(dir.getX());
-        input.movementDirection.setZ(dir.getZ());
-
+        Vector3 dir = body.getNavAgent()
+                          .getNextPathPosition()
+                          .minus(body.getGlobalPosition())
+                          .normalized();
+        cmd.movementDirection.setX(dir.getX());
+        cmd.movementDirection.setZ(dir.getZ());
         return this;
     }
 }
