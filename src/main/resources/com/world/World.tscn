@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
 [ext_resource type="Script" uid="uid://bsd1d5cijxeiu" path="res://gdj/com/environment/AmmoRefill.gdj" id="3_m0gj3"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
-[ext_resource type="PackedScene" uid="uid://dbnx63f3e5s88" path="res://src/main/resources/com/character/Enemy.tscn" id="6_enemy"]
+[ext_resource type="PackedScene" uid="uid://new_aicharacter_scene" path="res://src/main/resources/com/character/AICharacter.tscn" id="6_enemy"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/ui/PauseMenu.tscn" id="7_pmenu"]
 [ext_resource type="Script" uid="uid://dbbua5exey73l" path="res://gdj/com/environment/ParticleManager.gdj" id="8_pctl"]
 [ext_resource type="Script" uid="uid://csrrl6d8m7lmj" path="res://gdj/com/environment/ImpactManager.gdj" id="9_imct"]
@@ -281,9 +281,8 @@ transform = Transform3D(1, 0, 0, 0, -4.3711385e-08, -1, 0, 0.9999999, -4.371139e
 [node name="Rifle2" parent="." unique_id=995514556 instance=ExtResource("13_ijvcp")]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.74753, 0.6910143, -4.92147)
 
-[node name="Enemy" parent="." unique_id=1865541393 node_paths=PackedStringArray("player", "ammo_refill") instance=ExtResource("6_enemy")]
+[node name="AICharacter" parent="." unique_id=1865541393 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0463448, 0.89418125, -4.9451065)
-player = NodePath("../Player")
 ammo_refill = NodePath("../AmmoRefill")
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

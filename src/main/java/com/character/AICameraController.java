@@ -6,8 +6,8 @@ import godot.core.Vector2;
 import godot.core.Vector3;
 import godot.global.GD;
 
-@RegisterClass(className = "EnemyCameraController")
-public class EnemyCameraController extends CameraController {
+@RegisterClass(className = "AICameraController")
+public class AICameraController extends CameraController {
 
   // World-space aim target; null = fall back to body-facing direction.
   private Vector3 aimTarget = null;
@@ -29,16 +29,16 @@ public class EnemyCameraController extends CameraController {
    * Camera forward = (cos(p)*sin(y), -sin(p), cos(p)*cos(y)).
    * Inverting: targetYaw = atan2(dx, dz), targetPitch = -atan2(dy, hDist).
    *
-   * Without an aim target, falls back to tracking the enemy body's facing direction.
+   * Without an aim target, falls back to tracking the character body's facing direction.
    */
   @Override
   protected Vector2 gatherLookInput(double delta) {
     if (aimTarget != null) {
-      Vector3 myPos  = getGlobalPosition();
-      double  dx     = aimTarget.getX() - myPos.getX();
-      double  dy     = aimTarget.getY() - myPos.getY();
-      double  dz     = aimTarget.getZ() - myPos.getZ();
-      double  hDist  = Math.sqrt(dx * dx + dz * dz);
+      Vector3 myPos = getGlobalPosition();
+      double  dx    = aimTarget.getX() - myPos.getX();
+      double  dy    = aimTarget.getY() - myPos.getY();
+      double  dz    = aimTarget.getZ() - myPos.getZ();
+      double  hDist = Math.sqrt(dx * dx + dz * dz);
 
       double targetYawDeg   = Math.toDegrees(Math.atan2(dx, dz));
       double targetPitchDeg = (hDist > 0.01) ? -Math.toDegrees(Math.atan2(dy, hDist)) : 0.0;

@@ -1,74 +1,67 @@
 package com.character.ai;
 
+import com.character.AICharacter;
 import com.character.CharacterInput;
-import com.character.Enemy;
 import com.character.MovementType;
 import godot.core.Vector3;
 
 /**
- * Enemy sprints toward the player and enters attack range.
- * Navigates toward {@link Enemy#lastKnownPlayerPosition} even when LoS is broken.
- * Falls back to {@link PatrolState} after losing the player for too long.
+ * AI character sprints toward the target and enters attack range.
+ * Navigates toward last known target position when LoS is broken.
+ * Falls back to {@link PatrolState} after losing the target for too long.
  */
-public class ChaseState implements EnemyAIState {
+public class ChaseState implements AIState {
 
     public static final ChaseState INSTANCE = new ChaseState();
 
     private ChaseState() {}
 
     @Override
-    public void enter(Enemy enemy) {
-        enemy.resetLostPlayerTimer();
+    public void enter(AICharacter c) {
+        c.resetLostTargetTimer();
     }
 
     @Override
-    public void exit(Enemy enemy) {}
+    public void exit(AICharacter c) {}
 
     @Override
-    public EnemyAIState update(Enemy enemy, CharacterInput input, double delta) {
-        if (enemy.getPlayer() == null) return PatrolState.INSTANCE;
+    public AIState update(AICharacter c, CharacterInput input, double delta) {
+        if (c.getTarget() == null) return PatrolState.INSTANCE;
 
-        float dist = (float) enemy.getGlobalPosition()
-                                  .distanceTo(enemy.getPlayer().getGlobalPosition());
+        float dist = (float) c.getGlobalPosition()
+                               .distanceTo(c.getTarget().getGlobalPosition());
 
-        // Always in combat while chasing — set before any early return so the
-        // combat animation and LookAtModifier activate on the same frame.
         input.wantCombat = true;
 
-        if (dist <= enemy.attackRange && enemy.hasLineOfSight()) {
-            if (!enemy.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
+        if (dist <= c.attackRange && c.hasLineOfSight()) {
+            if (!c.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
             return AttackState.INSTANCE;
         }
 
         input.movementType = MovementType.SPRINT;
 
-        if (enemy.hasLineOfSight()) {
-            enemy.resetLostPlayerTimer();
-            Vector3 playerPos = enemy.getPlayer().getGlobalPosition();
-            enemy.setLastKnownPlayerPosition(new Vector3(playerPos));
-            enemy.getNavAgent().setTargetPosition(playerPos);
+        if (c.hasLineOfSight()) {
+            c.resetLostTargetTimer();
+            Vector3 targetPos = c.getTarget().getGlobalPosition();
+            c.setLastKnownTargetPosition(new Vector3(targetPos));
+            c.getNavAgent().setTargetPosition(targetPos);
 
-            // Aim camera at player while chasing
-            Vector3 aimTarget = new Vector3(playerPos.getX(),
-                    playerPos.getY() + Enemy.PLAYER_BODY_HEIGHT,
-                    playerPos.getZ());
-            enemy.aimAtPosition(aimTarget, delta);
+            Vector3 aimTarget = new Vector3(targetPos.getX(),
+                    targetPos.getY() + AICharacter.TARGET_BODY_HEIGHT,
+                    targetPos.getZ());
+            c.aimAtPosition(aimTarget, delta);
             input.aimTargetPosition = aimTarget;
         } else {
-            enemy.advanceLostPlayerTimer(delta);
-            if (enemy.isPlayerLost()) {
-                return PatrolState.INSTANCE;
-            }
-            // LoS broken but not yet timed out — keep navigating toward last known position
-            if (enemy.hasLastKnownPosition()) {
-                enemy.getNavAgent().setTargetPosition(enemy.getLastKnownPlayerPosition());
-            }
+            c.advanceLostTargetTimer(delta);
+            if (c.isTargetLost()) return PatrolState.INSTANCE;
+            if (c.hasLastKnownPosition())
+                c.getNavAgent().setTargetPosition(c.getLastKnownTargetPosition());
         }
 
-        Vector3 dir = enemy.getNavAgent()
-                           .getNextPathPosition()
-                           .minus(enemy.getGlobalPosition())
-                           .normalized();
+        Vector3 dir = c.getNavAgent()
+                       .getNextPathPosition()
+                       .minus(c.getGlobalPosition())
+                       .normalized();
         input.movementDirection.setX(dir.getX());
         input.movementDirection.setZ(dir.getZ());
 

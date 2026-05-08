@@ -4,6 +4,7 @@ import com.character.Character;
 import com.character.Health;
 import com.character.Player;
 import com.character.WeaponController;
+import com.character.CharacterInfo;
 import com.game.EventBus;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
@@ -98,6 +99,16 @@ public class HUDManager extends CanvasLayer {
     }
 
     wireWeaponRadialMenu(newPlayer, wcNode);
+    wireCharacterHUD(newPlayer);
+  }
+
+  private void wireCharacterHUD(Node newPlayer) {
+    if (!(newPlayer instanceof Character c)) return;
+    CharacterInfo info = c.characterInfo;
+    if (info == null) return;
+    for (Node child : getChildren()) {
+      if (child instanceof CharacterHUD hud) hud.setPlayerCharacterId(info.characterId);
+    }
   }
 
   private void wireWeaponRadialMenu(Node newPlayer, Node wcNode) {

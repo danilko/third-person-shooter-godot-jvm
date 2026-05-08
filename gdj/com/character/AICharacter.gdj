@@ -1,8 +1,8 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = Enemy
-fqName = com.character.Enemy
+registeredName = AICharacter
+fqName = com.character.AICharacter
 baseType = CharacterBody3D
 supertypes = [
     com.character.Character,
@@ -30,8 +30,7 @@ signals = [
 	drop_weapon
 ]
 properties = [
-    player,
-	detection_range,
+    detection_range,
 	aim_pitch_min,
 	aim_pitch_max,
 	attack_range,
@@ -47,6 +46,7 @@ properties = [
 	stances,
 	combat_states,
 	roll_state,
+	character_info,
 	weapon_controller,
 	camera_root_path,
 	aim_target_path,

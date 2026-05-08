@@ -1,49 +1,46 @@
 package com.character.ai;
 
+import com.character.AICharacter;
 import com.character.CharacterInput;
-import com.character.Enemy;
 import com.character.MovementType;
 import godot.core.Vector3;
 
 /**
- * Enemy sprints to the nearest ammo refill station.
+ * AI sprints to the nearest ammo refill station.
  * Fills all weapons on arrival, then returns to {@link PatrolState}.
  * Aborts immediately if ammo becomes available (e.g., picked up mid-path).
  */
-public class RefillAmmoState implements EnemyAIState {
+public class RefillAmmoState implements AIState {
 
     public static final RefillAmmoState INSTANCE = new RefillAmmoState();
 
     private RefillAmmoState() {}
 
     @Override
-    public void enter(Enemy enemy) {
-        if (enemy.ammoRefill != null) {
-            enemy.getNavAgent().setTargetPosition(enemy.ammoRefill.getGlobalPosition());
-        }
+    public void enter(AICharacter c) {
+        if (c.ammoRefill != null)
+            c.getNavAgent().setTargetPosition(c.ammoRefill.getGlobalPosition());
     }
 
     @Override
-    public void exit(Enemy enemy) {}
+    public void exit(AICharacter c) {}
 
     @Override
-    public EnemyAIState update(Enemy enemy, CharacterInput input, double delta) {
-        if (enemy.ammoRefill == null || enemy.hasAnyAmmo()) {
-            return PatrolState.INSTANCE;
-        }
+    public AIState update(AICharacter c, CharacterInput input, double delta) {
+        if (c.ammoRefill == null || c.hasAnyAmmo()) return PatrolState.INSTANCE;
 
-        if (enemy.isAtAmmoRefill()) {
-            enemy.weaponController.fillWeaponAmmo();
+        if (c.isAtAmmoRefill()) {
+            c.weaponController.fillWeaponAmmo();
             return PatrolState.INSTANCE;
         }
 
         input.wantCombat = false;
         input.movementType = MovementType.SPRINT;
 
-        Vector3 dir = enemy.getNavAgent()
-                           .getNextPathPosition()
-                           .minus(enemy.getGlobalPosition())
-                           .normalized();
+        Vector3 dir = c.getNavAgent()
+                       .getNextPathPosition()
+                       .minus(c.getGlobalPosition())
+                       .normalized();
         input.movementDirection.setX(dir.getX());
         input.movementDirection.setZ(dir.getZ());
 

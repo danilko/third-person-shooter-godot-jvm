@@ -10,6 +10,7 @@ import godot.core.*;
 import godot.global.GD;
 
 import java.lang.Math;
+import java.util.UUID;
 
 @RegisterClass
 public class Character extends CharacterBody3D {
@@ -70,6 +71,10 @@ public class Character extends CharacterBody3D {
 
     @RegisterProperty
     @Export
+    public CharacterInfo characterInfo;
+
+    @RegisterProperty
+    @Export
     public WeaponController weaponController;
 
     @RegisterProperty
@@ -125,6 +130,10 @@ public class Character extends CharacterBody3D {
             }
         }
         healthNode = (Health) getNode("Health");
+        if (characterInfo == null) characterInfo = new CharacterInfo();
+        if (characterInfo.characterId.isEmpty())
+            characterInfo.characterId = UUID.randomUUID().toString();
+        addToGroup(new StringName("characters"), false);
         if (hasNode(aimTargetPath)) {
             aimTarget = (Marker3D)  getNode(aimTargetPath);
         }

@@ -41,6 +41,7 @@ public class CharacterHUD extends Control {
   private Label eliminatedNotificationLabel;
   private TextureRect notificationIcon;
   private Label interactPromptLabel;
+  private String playerCharacterId = "";
   private double killNotificationTimer = 0.0;
   private static final double KILL_NOTIFICATION_DURATION = 3.0;
 
@@ -125,9 +126,15 @@ public class CharacterHUD extends Control {
     }
   }
 
+  /** Called by HUDManager.wirePlayer() to bind this HUD to a specific character. */
+  public void setPlayerCharacterId(String id) {
+    playerCharacterId = id != null ? id : "";
+  }
+
   /** Receive EventBus.weaponPickedUp — brief HUD notification of the item name and icon. */
   @RegisterFunction
-  public void onWeaponPickedUp(String weaponName, Texture2D weaponIcon) {
+  public void onWeaponPickedUp(String characterId, String weaponName, Texture2D weaponIcon) {
+    if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(characterId)) return;
     showNotification("Picked up " + weaponName, weaponIcon);
   }
 

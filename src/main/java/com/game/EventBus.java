@@ -7,6 +7,7 @@ import godot.api.Texture2D;
 import godot.core.Signal0;
 import godot.core.Signal1;
 import godot.core.Signal2;
+import godot.core.Signal3;
 import godot.core.Signal4;
 import godot.core.Signal5;
 import godot.core.StringName;
@@ -69,9 +70,9 @@ public class EventBus extends Node {
 
     /**
      * Emitted by WeaponController when a weapon is equipped from the world.
-     * Payload: weaponName, weaponIcon.
+     * Payload: characterId (picker), weaponName, weaponIcon.
      */
     @RegisterSignal
-    public final Signal2<String, Texture2D> weaponPickedUp =
-            new Signal2<>(this, new StringName("weapon_picked_up"));
+    public final Signal3<String, String, Texture2D> weaponPickedUp =
+            new Signal3<>(this, new StringName("weapon_picked_up"));
 }

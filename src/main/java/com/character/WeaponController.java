@@ -197,7 +197,11 @@ public class WeaponController extends Node {
     }
 
     Node busNode = getNodeOrNull("/root/EventBus");
-    if (busNode instanceof EventBus bus) bus.weaponPickedUp.emit(item.getDisplayName(), item.weaponIcon);
+    if (busNode instanceof EventBus bus) {
+      String characterId = (getOwner() instanceof Character c && c.characterInfo != null)
+          ? c.characterInfo.characterId : "";
+      bus.weaponPickedUp.emit(characterId, item.getDisplayName(), item.weaponIcon);
+    }
 
     if (displaced != null) returnWeaponToWorld(displaced);
   }
