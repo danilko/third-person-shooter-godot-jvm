@@ -514,6 +514,23 @@ size = Vector3(0.2, 0.2, 0.2)
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gapvf"]
 albedo_color = Color(1, 0, 0.28627452, 1)
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_net01"]
+properties/0/path = NodePath(".:global_position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:velocity")
+properties/1/spawn = false
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:combat")
+properties/2/spawn = true
+properties/2/replication_mode = 2
+properties/3/path = NodePath(".:stance_ordinal")
+properties/3/spawn = true
+properties/3/replication_mode = 2
+properties/4/path = NodePath("Health:sync_health")
+properties/4/spawn = true
+properties/4/replication_mode = 2
+
 [node name="Character" type="CharacterBody3D" unique_id=802038165 node_paths=PackedStringArray("weapon_controller")]
 collision_layer = 2
 collision_mask = 3
@@ -1118,6 +1135,10 @@ mesh = SubResource("BoxMesh_gapvf")
 
 [node name="WeaponIKTarget" type="Marker3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" unique_id=1900000001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.4858435e-07, 0, -0.9840301)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1900000099]
+root_path = NodePath("..")
+replication_config = SubResource("SceneReplicationConfig_net01")
 
 [connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]

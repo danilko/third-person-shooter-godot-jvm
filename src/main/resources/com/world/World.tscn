@@ -18,6 +18,7 @@
 [ext_resource type="Script" uid="uid://x2aupnfxbw7s" path="res://gdj/com/ui/CharacterHUD.gdj" id="14_ijvcp"]
 [ext_resource type="PackedScene" uid="uid://dtlryojg3n01y" path="res://src/main/resources/com/ui/FootHUD.tscn" id="15_8dp8o"]
 [ext_resource type="PackedScene" uid="uid://3v8l2bjm8pek" path="res://src/main/resources/com/ui/WeaponRadialMenu.tscn" id="17_nmpqt"]
+[ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="19_hs4nr"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
 vertices = PackedVector3Array(-49.688828, 0.81998825, -49.59558, -49.688828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.59558, -49.688828, 0.81998825, -47.59558, -49.688828, 0.81998825, 40.90442, -44.188828, 0.81998825, 40.90442, -44.188828, 0.81998825, -47.59558, -8.1888275, 0.81998825, -26.595581, -6.4388275, 0.81998825, -26.845581, -6.6888275, 0.81998825, -47.59558, -42.688828, 0.81998825, -47.59558, -42.688828, 0.81998825, -24.595581, -8.1888275, 0.81998825, -24.595581, 6.3111725, 0.81998825, -26.845581, 6.5611725, 0.81998825, -47.59558, 22.561172, 0.81998825, -9.595581, 23.811172, 0.81998825, -8.095581, 24.561172, 0.81998825, -8.095581, 8.0611725, 0.81998825, -26.595581, 8.0611725, 0.81998825, -16.095581, 25.311172, 0.81998825, -7.345581, 33.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, -47.59558, -7.1888275, 3.5699883, -25.845581, -7.1888275, 3.5699883, -16.595581, 7.0611725, 3.5699883, -16.595581, 7.0611725, 3.5699883, -25.845581, -42.688828, 0.81998825, -17.845581, -8.1888275, 0.81998825, -17.845581, 0.8111725, 0.81998825, -7.845581, 1.5611725, 0.81998825, -8.095581, 1.5611725, 0.81998825, -15.595581, -7.9388275, 0.81998825, -15.595581, 10.3111725, 0.81998825, 40.90442, 10.3111725, 0.81998825, 5.154419, 9.5611725, 0.81998825, 4.904419, 1.0611725, 0.81998825, -6.345581, -42.688828, 0.81998825, 40.90442, 7.5611725, 0.81998825, -15.595581, 23.311172, 0.81998825, -7.845581, 23.561172, 0.81998825, -6.595581, 2.8111725, 0.81998825, -7.345581, 4.8111725, 0.81998825, -4.595581, 7.5611725, 0.81998825, -1.095581, 27.561172, 0.81998825, -1.345581, 11.3111725, 0.81998825, 4.154419, 29.811172, 0.81998825, 1.654419, 33.561172, 0.81998825, 5.154419, 47.811172, 0.81998825, 40.90442, 11.0611725, 0.81998825, 5.154419, 32.311172, 0.81998825, 5.154419, -49.688828, 0.81998825, 42.40442, -49.688828, 0.81998825, 49.65442, -44.188828, 0.81998825, 49.65442, -44.188828, 0.81998825, 42.40442, -42.688828, 0.81998825, 42.40442, -42.688828, 0.81998825, 49.65442, 47.811172, 0.81998825, 49.65442, 47.811172, 0.81998825, 42.40442)
@@ -102,6 +103,18 @@ albedo_color = Color(1, 0.9882353, 0.8392157, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_hs4nr"]
 material = SubResource("StandardMaterial3D_kfoa7")
 size = Vector3(0.01, 0.02, 1)
+
+[sub_resource type="Resource" id="Resource_hs4nr"]
+script = ExtResource("19_hs4nr")
+display_name = "test enemy"
+faction = "enemy"
+metadata/_custom_type_script = "uid://cplrp8cx4gus0"
+
+[sub_resource type="Resource" id="Resource_imhx0"]
+script = ExtResource("19_hs4nr")
+display_name = "test player2"
+faction = "player"
+metadata/_custom_type_script = "uid://cplrp8cx4gus0"
 
 [node name="World" type="Node3D" unique_id=822990337]
 
@@ -289,14 +302,14 @@ transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10
 [node name="Rifle" parent="." unique_id=1788483088 instance=ExtResource("13_ijvcp")]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.002087593, 0.726562, 3.2870467)
 
+[node name="Rifle4" parent="." unique_id=2145921233 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, -5.8946953, 0.726562, 3.4050605)
+
 [node name="HUDManager" type="CanvasLayer" parent="." unique_id=1946570621]
 script = ExtResource("14_cl06x")
 
 [node name="FootHUD" parent="HUDManager" unique_id=1962846644 instance=ExtResource("15_8dp8o")]
 script = ExtResource("14_ijvcp")
-magazine_label_path = NodePath("Magazine/ColorRect/Magazine")
-reserve_label_path = NodePath("Magazine/ColorRect/Reserve")
-notification_icon_path = NodePath("Notification/WeaponIcon")
 
 [node name="WeaponRadialMenu" parent="HUDManager" unique_id=1303740167 node_paths=PackedStringArray("character") instance=ExtResource("17_nmpqt")]
 character = NodePath("../../Player")
@@ -307,10 +320,41 @@ transform = Transform3D(1, 0, 0, 0, -0.004537884, -0.9999897, 0, 0.99998957, -0.
 [node name="Rifle2" parent="." unique_id=995514556 instance=ExtResource("13_ijvcp")]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.74753, 0.6910143, -4.9726653)
 
-[node name="AICharacter" parent="." unique_id=1865541393 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+[node name="AICharacter-E1" parent="." unique_id=1107363167 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0463448, 0.89418125, -4.9451065)
 ammo_refill = NodePath("../AmmoRefill")
 aim_body_part = "CHEST"
 aim_scatter_radius = 2.5
+character_info = SubResource("Resource_hs4nr")
+
+[node name="Rifle5" parent="." unique_id=1210622816 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 15.167509, 0.6910143, -1.19309)
+
+[node name="AICharacter-E2" parent="." unique_id=1865541393 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.466324, 0.89418125, -1.1655312)
+ammo_refill = NodePath("../AmmoRefill")
+aim_body_part = "CHEST"
+aim_scatter_radius = 2.5
+character_info = SubResource("Resource_hs4nr")
+
+[node name="Rifle3" parent="." unique_id=913745768 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 6.264246, 0.6910143, 5.317204)
+
+[node name="AICharacter-P1" parent="." unique_id=817366872 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5630608, 0.89418125, 5.344763)
+ammo_refill = NodePath("../AmmoRefill")
+aim_body_part = "CHEST"
+aim_scatter_radius = 2.5
+character_info = SubResource("Resource_imhx0")
+
+[node name="Rifle6" parent="." unique_id=1288307646 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, -2.4562712, 0.6910143, -6.0412784)
+
+[node name="AICharacter-P2" parent="." unique_id=294236911 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.1574564, 0.89418125, -6.0137196)
+ammo_refill = NodePath("../AmmoRefill")
+aim_body_part = "CHEST"
+aim_scatter_radius = 2.5
+character_info = SubResource("Resource_imhx0")
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

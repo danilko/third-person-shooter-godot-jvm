@@ -10,6 +10,7 @@ import godot.core.Signal2;
 import godot.core.Signal3;
 import godot.core.Signal4;
 import godot.core.Signal5;
+import godot.core.Signal7;
 import godot.core.StringName;
 
 /**
@@ -46,11 +47,11 @@ public class EventBus extends Node {
 
     /**
      * Emitted by Health when any character is eliminated.
-     * Payload: attackerName, victimName, weaponName, weaponIcon, headshot.
+     * Payload: attackerName, attackerFaction, victimName, victimFaction, weaponName, weaponIcon, headshot.
      */
     @RegisterSignal
-    public final Signal5<String, String, String, Texture2D, Boolean> characterEliminated =
-            new Signal5<>(this, new StringName("character_eliminated"));
+    public final Signal7<String, String, String, String, String, Texture2D, Boolean> characterEliminated =
+            new Signal7<>(this, new StringName("character_eliminated"));
 
     /**
      * Emitted by Pickup when a character enters or leaves interact range.

@@ -99,10 +99,18 @@ public class Character extends CharacterBody3D {
     protected StanceName currentStanceName = StanceName.UPRIGHT;
     protected MovementType currentMovementType = MovementType.IDLE;
     protected boolean isRolling = false;
-    protected boolean combat = false;
 
     // False for AI-controlled characters whose accuracy is managed by their own system.
     protected boolean useWeaponSpread = true;
+
+    // ── Network-synced state (MultiplayerSynchronizer reads these) ────────────
+    @RegisterProperty
+    @Export
+    public boolean combat = false;
+
+    @RegisterProperty
+    @Export
+    public int stanceOrdinal = StanceName.UPRIGHT.ordinal();
 
     protected Timer stanceAntispamTimer;
     protected Timer rollTimer;
@@ -347,6 +355,7 @@ public class Character extends CharacterBody3D {
         }
 
         currentStanceName = next;
+        stanceOrdinal = currentStanceName.ordinal();
         NodePath nextPath = stances.get(currentStanceName.getKey());
         if (nextPath != null) {
             Stance s = (Stance) getNode(nextPath);
@@ -399,10 +408,16 @@ public class Character extends CharacterBody3D {
         for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
             Node child = physicalBoneSimulator.getChild(i);
             if (child instanceof PhysicalBone3D bone) {
-                // setCollisionMaskValue adds layer 1 (world) to what the bone
-                // *detects*, so it rests on the floor.
-                // setCollisionLayer would only change what others detect the
-                // bone as — bones would still fall through everything.
+                // Layer 4 (value 8) is the character-detection layer used by SightRay
+                // and AimRay (both collision_mask = 9 = layers 1+4). Removing dead bones
+                // from this layer makes the ragdoll transparent to raycasts from living
+                // characters — fixes dead bodies blocking hasLineOfSight() and
+                // performHitscan(), which caused the "not disappearing" and suppression-
+                // fire-into-dead-body symptoms.
+                bone.setCollisionLayerValue(4, false);
+                // Layer 1 (world) in the MASK means the bone can detect the floor so
+                // the ragdoll physically rests on world geometry. Ragdoll joint constraints
+                // work independently of collision layers, so the skeleton stays intact.
                 bone.setCollisionMaskValue(1, true);
             }
         }

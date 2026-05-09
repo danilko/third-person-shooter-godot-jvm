@@ -38,12 +38,12 @@ public class CharacterHUD extends Control {
   private Label healthLabel;
   private Label magazineLabel;
   private Label reserveLabel;
-  private Label eliminatedNotificationLabel;
+  private Label pickupNotificationLabel;
   private TextureRect notificationIcon;
   private Label interactPromptLabel;
   private String playerCharacterId = "";
-  private double killNotificationTimer = 0.0;
-  private static final double KILL_NOTIFICATION_DURATION = 3.0;
+  private double pickupTimer = 0.0;
+  private static final double PICKUP_NOTIFICATION_DURATION = 3.0;
 
   @RegisterFunction
   @Override
@@ -57,7 +57,7 @@ public class CharacterHUD extends Control {
     if (hasNode(reserveLabelPath)) {
       reserveLabel = (Label) getNode(reserveLabelPath);
     }
-    eliminatedNotificationLabel = (Label) getNode("Notification/EliminatedNotification");
+    pickupNotificationLabel = (Label) getNode("Notification/EliminatedNotification");
     Node iconNode = getNodeOrNull(notificationIconPath);
     if (iconNode instanceof TextureRect tr) notificationIcon = tr;
     Node promptNode = getNodeOrNull("InteractPrompt");
@@ -71,9 +71,6 @@ public class CharacterHUD extends Control {
       bus.playerHealthChanged.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onHealthChanged")),
           godot.api.Object.ConnectFlags.DEFAULT);
-      bus.characterEliminated.connectUnsafe(
-          Callable.createUnsafe(this, StringNames.toGodotName("onCharacterEliminated")),
-          godot.api.Object.ConnectFlags.DEFAULT);
       bus.pickupInteractChanged.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onPickupInteractChanged")),
           godot.api.Object.ConnectFlags.DEFAULT);
@@ -86,10 +83,10 @@ public class CharacterHUD extends Control {
   @RegisterFunction
   @Override
   public void _process(double delta) {
-    if (killNotificationTimer > 0) {
-      killNotificationTimer -= delta;
-      if (killNotificationTimer <= 0) {
-        if (eliminatedNotificationLabel != null) eliminatedNotificationLabel.setVisible(false);
+    if (pickupTimer > 0) {
+      pickupTimer -= delta;
+      if (pickupTimer <= 0) {
+        if (pickupNotificationLabel != null) pickupNotificationLabel.setVisible(false);
         if (notificationIcon != null) notificationIcon.setVisible(false);
       }
     }
@@ -138,24 +135,16 @@ public class CharacterHUD extends Control {
     showNotification("Picked up " + weaponName, weaponIcon);
   }
 
-  /** Receive EventBus.characterEliminated — any character killed by any source. */
-  @RegisterFunction
-  public void onCharacterEliminated(String attackerName, String victimName,
-                                    String weaponName, Texture2D weaponIcon, boolean headshot) {
-    StringBuilder sb = new StringBuilder(victimName).append(" Eliminated");
-    if (headshot) sb.append(" - Headshot");
-    showNotification(sb.toString(), weaponIcon);
-  }
-
+  /** Show a transient pickup notification (weapon icon + item name). */
   private void showNotification(String text, Texture2D icon) {
-    if (eliminatedNotificationLabel != null) {
-      eliminatedNotificationLabel.setText(text);
-      eliminatedNotificationLabel.setVisible(true);
+    if (pickupNotificationLabel != null) {
+      pickupNotificationLabel.setText(text);
+      pickupNotificationLabel.setVisible(true);
     }
     if (notificationIcon != null) {
       notificationIcon.setTexture(icon);
       notificationIcon.setVisible(icon != null);
     }
-    killNotificationTimer = KILL_NOTIFICATION_DURATION;
+    pickupTimer = PICKUP_NOTIFICATION_DURATION;
   }
 }

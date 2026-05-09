@@ -45,10 +45,11 @@ public class ImpactManager extends Node {
      * @param attackerName display name for kill notifications
      */
     public void processHit(HitInfo info, float damage,
-                           String weaponName, Texture2D weaponIcon, String attackerName) {
+                           String weaponName, Texture2D weaponIcon,
+                           String attackerName, String attackerFaction) {
         spawnImpactParticles(info);
         spawnDecal(info);
-        applyDamage(info, damage, weaponName, weaponIcon, attackerName);
+        applyDamage(info, damage, weaponName, weaponIcon, attackerName, attackerFaction);
         applyHitImpulse(info, damage);
     }
 
@@ -67,12 +68,13 @@ public class ImpactManager extends Node {
     }
 
     private void applyDamage(HitInfo info, float damage,
-                             String weaponName, Texture2D weaponIcon, String attackerName) {
+                             String weaponName, Texture2D weaponIcon,
+                             String attackerName, String attackerFaction) {
         if (info.hitNode == null) return;
         Node owner = info.hitNode.getOwner();
         if (owner == null || !owner.hasNode(new NodePath("Health"))) return;
         Health health = (Health) owner.getNode(new NodePath("Health"));
-        health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName);
+        health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction);
     }
 
     /**

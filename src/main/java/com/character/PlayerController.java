@@ -14,14 +14,27 @@ import godot.core.Vector3;
  * getOwner() for aimRay, aimStayTimer, and combat state.
  *
  * Network (Phase 4): on the owning client this runs locally for prediction;
- * the resulting UserCommand is also sent to the server. isAuthority() returns
- * true only on the owning client via the parent Controller implementation.
+ * the resulting UserCommand is stamped with a monotone sequenceNumber and stored
+ * in the predictionBuffer ring buffer. When the server sends back a corrected
+ * state, reconcile(serverAck) discards acknowledged entries and the caller
+ * replays unacknowledged commands against the snapped server state.
+ *
+ * Phase 4 TODO (actual transport):
+ *   - After stamping sequenceNumber, serialize the UserCommand and send to server
+ *     via rpc_id(1, "server_receive_cmd", ...) or a PackedByteArray RPC.
+ *   - Wire reconcile() to a signal/RPC from the server indicating divergence.
  */
 @RegisterClass(className = "PlayerController")
 public class PlayerController extends Controller {
 
+    private static final int BUFFER_SIZE = 64;
+
     private Player body;
     private Timer  aimStayTimer;
+
+    // ── Client-side prediction state ──────────────────────────────────────────
+    private int            localSequence   = 0;
+    private final UserCommand[] predictionBuffer = new UserCommand[BUFFER_SIZE];
 
     @RegisterFunction
     @Override
@@ -88,6 +101,35 @@ public class PlayerController extends Controller {
             }
         }
 
+        // ── Sequence stamp + prediction buffer (Phase 4) ──────────────────────
+        cmd.sequenceNumber = ++localSequence;
+        predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();
+        // Phase 4 TODO: rpc_id(1, "server_receive_cmd", serialize(cmd))
+
         return cmd;
+    }
+
+    /**
+     * Discard prediction buffer entries confirmed by the server, then replay
+     * any unacknowledged commands against the snapped server state.
+     *
+     * Called by the network layer when the server sends a state correction.
+     * @param serverAck The last sequenceNumber the server confirmed processing.
+     */
+    public void reconcile(int serverAck) {
+        // Discard entries the server has already processed
+        for (int seq = serverAck; seq >= Math.max(0, serverAck - BUFFER_SIZE + 1); seq--) {
+            predictionBuffer[seq % BUFFER_SIZE] = null;
+        }
+        // Phase 4 TODO:
+        //   1. Snap body to server-authoritative state (MultiplayerSynchronizer
+        //      already wrote global_position, velocity, etc. to the body).
+        //   2. Replay unacknowledged commands (serverAck+1 … localSequence):
+        //        for (int seq = serverAck + 1; seq <= localSequence; seq++) {
+        //            UserCommand cmd = predictionBuffer[seq % BUFFER_SIZE];
+        //            if (cmd != null) body.applyInput(cmd, fixedDelta);
+        //        }
+        //   applyInput() is deterministic so replaying produces the corrected
+        //   predicted state without touching any authoritative server data.
     }
 }

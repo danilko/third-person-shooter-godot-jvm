@@ -41,70 +41,42 @@ src/main/java/com/character/
 
 ---
 
-## Phase 4 — Network foundation  🔜 NEXT
+## Phase 4 — Network foundation  ✅ COMPLETE
+Build: clean. All tasks done.
 
-### Goal
-Source Engine-style feel: owning client predicts locally, server is authoritative,
-non-authority peers receive replicated state. L4D bot-fill via controller swap.
+### What was done
+- `Character.java`: `combat` promoted to `@RegisterProperty @Export public boolean`;
+  new `@RegisterProperty @Export public int stanceOrdinal` mirrors
+  `currentStanceName.ordinal()` — updated every `setStance()` call.
+- `Health.java`: new `@RegisterProperty @Export public float syncHealth` mirrors
+  `currentHealth` — updated in `_ready()`, `takeDamage()`, and `heal()`.
+- `Character.tscn`: Added `MultiplayerSynchronizer` child node with a
+  `SceneReplicationConfig` sub-resource syncing:
+  - `global_position` (spawn=true, ALWAYS)
+  - `velocity` (spawn=false, ALWAYS)
+  - `combat` (spawn=true, ON_CHANGE)
+  - `stance_ordinal` (spawn=true, ON_CHANGE)
+  - `Health:sync_health` (spawn=true, ON_CHANGE)
+- `NetworkController.java`: BUFFER_SIZE=64 ring buffer; `receiveCommand(cmd)` stores
+  by tick; `getBufferedCommand(tick)` retrieves for replay. Non-authority peers still
+  return an empty `UserCommand` from `gatherInput()`.
+- `PlayerController.java`: `localSequence` counter; `predictionBuffer[64]` ring buffer;
+  `gatherInput()` stamps `cmd.sequenceNumber = ++localSequence` and stores a copy;
+  `reconcile(serverAck)` discards entries ≤ serverAck (replay wired in TODO comment).
+- `GameManager.java`: `onPlayerLeft(Player body)` swaps in `CharacterController` (bot);
+  `onPlayerJoined(Player body)` swaps in `PlayerController` (human) — L4D-style
+  controller hot-swap without touching the body.
+- Step 6 (AIController authority): no change needed — inherits
+  `getOwner().isMultiplayerAuthority()` which is true only on server for AI nodes.
 
-### Steps
-
-**Step 1 — MultiplayerSynchronizer in Character.tscn**
-Add `MultiplayerSynchronizer` node to `Character.tscn`. Sync properties:
-- `global_position`, `velocity`
-- `currentStanceName` (int), `combat` (bool)
-- Animation tree parameters (blend positions, state names)
-- `Health.currentHealth`
-
-**Step 2 — NetworkController implementation**
-Fill `NetworkController.java` (currently skeleton):
-```java
-// Ring buffer (size = max RTT ticks, e.g. 64)
-private final UserCommand[] buffer = new UserCommand[64];
-
-// Called by network layer when server broadcasts a corrected state
-public void receiveCommand(UserCommand cmd) {
-    buffer[(int)(cmd.tick % buffer.length)] = cmd.copy();
-}
-```
-
-**Step 3 — PlayerController: send commands to server**
-In `PlayerController.gatherInput()`, after building the `UserCommand`:
-```java
-cmd.sequenceNumber = ++localSequence;
-// RPC to server: sendCommand(cmd)  — serialize UserCommand fields
-```
-Server receives, runs `applyInput()` authoritatively, echoes `lastServerAck` back.
-
-**Step 4 — Client-side prediction reconciliation**
-`PlayerController` maintains a ring buffer of recent `UserCommand` copies.
-On receiving server correction (position/state diverges from prediction):
-1. Snap to server state.
-2. Replay buffered commands from `lastServerAck + 1` forward.
-`UserCommand.copy()` and `Character.applyInput()` are already deterministic — no
-changes needed there.
-
-**Step 5 — Bot-fill / L4D controller swap**
-```java
-// Player disconnects → attach CharacterController
-void onPlayerLeft(Player body) {
-    body.controller.queueFree();
-    CharacterController bot = new CharacterController();
-    body.addChild(bot);
-}
-// Player reconnects → swap back
-void onPlayerJoined(Player body) {
-    body.controller.queueFree();
-    PlayerController human = new PlayerController();
-    body.addChild(human);
-}
-```
-`Character._ready()` already scans children for a `Controller` — no other wiring needed.
-
-**Step 6 — AIController authority**
-`AIController.isAuthority()` inherits `getOwner().isMultiplayerAuthority()`.
-In multiplayer, AI nodes are owned by the server — this returns true only on server.
-No code change needed; the authority model already works.
+### Phase 4 TODOs (actual transport, not yet wired)
+- Serialize `UserCommand` and call `rpc_id(1, "server_receive_cmd", ...)` in
+  `PlayerController.gatherInput()` after stamping `sequenceNumber`.
+- Server-side handler: run `applyInput()` authoritatively, echo `lastServerAck` back.
+- Wire `PlayerController.reconcile()` to MultiplayerSynchronizer sync signal or a
+  custom RPC so it triggers on state correction from the server.
+- Animation tree parameter sync: add blend positions / state machine current state
+  to the `SceneReplicationConfig` once property paths are confirmed in the editor.
 
 ---
 

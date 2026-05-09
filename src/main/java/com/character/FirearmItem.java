@@ -160,8 +160,16 @@ public class FirearmItem extends WeaponItem {
       ImpactManager im = getImpactManager();
       if (im != null) {
         HitInfo info = new HitInfo(hitNode, aimRay3D.getCollisionPoint(), aimRay3D.getCollisionNormal());
-        String attackerName = owningCharacter != null ? owningCharacter.getName().toString() : "";
-        im.processHit(info, damage, getDisplayName(), weaponIcon, attackerName);
+        String attackerName;
+        String attackerFaction;
+        if (owningCharacter instanceof Character c && c.characterInfo != null) {
+          attackerName    = c.characterInfo.displayName;
+          attackerFaction = c.characterInfo.faction;
+        } else {
+          attackerName    = owningCharacter != null ? owningCharacter.getName().toString() : "";
+          attackerFaction = "";
+        }
+        im.processHit(info, damage, getDisplayName(), weaponIcon, attackerName, attackerFaction);
       }
     }
 
