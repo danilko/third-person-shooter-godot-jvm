@@ -30,7 +30,6 @@ public class PlayerController extends Controller {
         aimStayTimer = (Timer) body.getNode("AimStayTimer");
     }
 
-    @RegisterFunction
     @Override
     public UserCommand gatherInput(double delta) {
         UserCommand cmd = new UserCommand();

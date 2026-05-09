@@ -1,7 +1,9 @@
 package com.character;
 
+import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
+import godot.annotation.RegisterProperty;
 import godot.core.Vector2;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -11,6 +13,16 @@ public class AICameraController extends CameraController {
 
   // World-space aim target; null = fall back to body-facing direction.
   private Vector3 aimTarget = null;
+
+  /**
+   * Maximum camera rotation speed in degrees per second.
+   * Caps how fast the AI can swing its aim, making it look like it's actually tracking
+   * rather than teleporting. Does not affect shot accuracy — snapAimRay() handles that.
+   * Lower values make the AI feel slower to react visually; 0 = unlimited (old behaviour).
+   */
+  @Export
+  @RegisterProperty
+  public float aimTrackingDegreesPerSec = 90.0f;
 
   @RegisterFunction
   @Override
@@ -45,6 +57,14 @@ public class AICameraController extends CameraController {
 
       double deltaYaw   = GD.wrapf(targetYawDeg - yaw,  -180.0, 180.0);
       double deltaPitch = targetPitchDeg - pitch;
+
+      // Clamp rotation speed so the camera tracks at a finite rate rather than snapping.
+      if (aimTrackingDegreesPerSec > 0f) {
+        double cap = aimTrackingDegreesPerSec * delta;
+        deltaYaw   = GD.clamp(deltaYaw,   -cap, cap);
+        deltaPitch = GD.clamp(deltaPitch, -cap, cap);
+      }
+
       return new Vector2((float) deltaYaw, (float) deltaPitch);
     }
 

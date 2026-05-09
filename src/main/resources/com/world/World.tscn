@@ -4,7 +4,8 @@
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
 [ext_resource type="Script" uid="uid://bsd1d5cijxeiu" path="res://gdj/com/environment/AmmoRefill.gdj" id="3_m0gj3"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
-[ext_resource type="PackedScene" uid="uid://new_aicharacter_scene" path="res://src/main/resources/com/character/AICharacter.tscn" id="6_enemy"]
+[ext_resource type="PackedScene" uid="uid://cgsslc7gj25cj" path="res://src/main/resources/com/character/AICharacter.tscn" id="6_enemy"]
+[ext_resource type="Script" uid="uid://ciyfqqv4fmm45" path="res://gdj/com/character/Controller.gdj" id="7_kfoa7"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/ui/PauseMenu.tscn" id="7_pmenu"]
 [ext_resource type="Script" uid="uid://dbbua5exey73l" path="res://gdj/com/environment/ParticleManager.gdj" id="8_pctl"]
 [ext_resource type="Script" uid="uid://csrrl6d8m7lmj" path="res://gdj/com/environment/ImpactManager.gdj" id="9_imct"]
@@ -79,15 +80,28 @@ albedo_color = Color(1, 0, 0, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_flesh"]
 material = SubResource("StandardMaterial3D_flesh")
 
-[sub_resource type="ImageTexture" id="ImageTexture_03hhr"]
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_hs4nr"]
+direction = Vector3(0, 1, 0)
+initial_velocity_max = 4.0
+scale_min = 0.099999994
+scale_max = 0.29999998
+scale_over_velocity_max = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tracer"]
 shading_mode = 0
-albedo_color = Color(1, 0.95, 0.6, 1)
+albedo_color = Color(0.9999996, 0.8597612, 0.82278657, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_tracer"]
 material = SubResource("StandardMaterial3D_tracer")
-size = Vector3(0.01, 0.01, 1)
+size = Vector3(0.02, 0.1, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kfoa7"]
+shading_mode = 0
+albedo_color = Color(1, 0.9882353, 0.8392157, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_hs4nr"]
+material = SubResource("StandardMaterial3D_kfoa7")
+size = Vector3(0.01, 0.02, 1)
 
 [node name="World" type="Node3D" unique_id=822990337]
 
@@ -238,6 +252,19 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_flesh")
 draw_pass_1 = SubResource("BoxMesh_flesh")
 
+[node name="DEFAULT" type="Node" parent="ParticleManager" unique_id=1074195676]
+script = ExtResource("7_kfoa7")
+metadata/_custom_type_script = "uid://ciyfqqv4fmm45"
+
+[node name="1" type="GPUParticles3D" parent="ParticleManager/DEFAULT" unique_id=536993378]
+emitting = false
+amount = 5
+one_shot = true
+speed_scale = 2.0
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_hs4nr")
+draw_pass_1 = SubResource("BoxMesh_tracer")
+
 [node name="ImpactManager" type="Node" parent="." unique_id=201500001]
 script = ExtResource("9_imct")
 
@@ -248,14 +275,13 @@ decal_lifetime = 5.0
 
 [node name="1" type="Decal" parent="DecalManager" unique_id=201600010]
 size = Vector3(0.1, 0.1, 0.1)
-texture_albedo = SubResource("ImageTexture_03hhr")
-texture_normal = ExtResource("10_m0gj3")
+texture_albedo = ExtResource("10_m0gj3")
 
 [node name="BulletTracerManager" type="Node3D" parent="." unique_id=201700001]
 script = ExtResource("11_btrc")
 
 [node name="1" type="MeshInstance3D" parent="BulletTracerManager" unique_id=201700002]
-mesh = SubResource("BoxMesh_tracer")
+mesh = SubResource("BoxMesh_hs4nr")
 
 [node name="Pistol" parent="." unique_id=358619058 instance=ExtResource("12_ej8ck")]
 transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10, -4.3711214e-08, 1, -0.004708648, -0.9999888, -4.3711307e-08, 0.3772924, 0.9677863, 3.4917908)
@@ -276,13 +302,15 @@ notification_icon_path = NodePath("Notification/WeaponIcon")
 character = NodePath("../../Player")
 
 [node name="Pistol2" parent="." unique_id=1577587948 instance=ExtResource("12_ej8ck")]
-transform = Transform3D(1, 0, 0, 0, -4.3711385e-08, -1, 0, 0.9999999, -4.371139e-08, 5.122735, 0.89575815, -5.1626945)
+transform = Transform3D(1, 0, 0, 0, -0.004537884, -0.9999897, 0, 0.99998957, -0.0045378846, 5.122735, 0.89575815, -5.1626945)
 
 [node name="Rifle2" parent="." unique_id=995514556 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.74753, 0.6910143, -4.92147)
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.74753, 0.6910143, -4.9726653)
 
 [node name="AICharacter" parent="." unique_id=1865541393 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0463448, 0.89418125, -4.9451065)
 ammo_refill = NodePath("../AmmoRefill")
+aim_body_part = "CHEST"
+aim_scatter_radius = 2.5
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

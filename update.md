@@ -1,129 +1,170 @@
-# Character Identity & Faction System — Implementation Plan
-
+# Architecture Roadmap — Brain/Body Split + Network + Vehicle
 Branch: `issue-21`
 
 ---
 
-## Phase 1 — CharacterInfo / Faction / weaponPickedUp filter  ✅ COMPLETE
+## Phase 3 — Controller/UserCommand refactor  ✅ COMPLETE
+Build: clean. All tasks done.
 
-All steps done. Build successful. Notes:
-- `CharacterHUD` is NOT owned by Player — lives under HUDManager (CanvasLayer) in
-  World.tscn. Player characterId is injected via `HUDManager.wirePlayer()` →
-  `CharacterHUD.setPlayerCharacterId()`.
-- Faction guard placed in `Enemy.canSeePlayer()` — single LoS gate for all AI states.
-- Both Player.tscn and Enemy.tscn already have CharacterInfo resources configured
-  (character_id = "player"/"enemy", faction = "player"/"enemy").
+### What was done
+- `CharacterInput` → `UserCommand` (≈ Source `CUserCmd`). Added `sequenceNumber`,
+  `lastServerAck` (network reconciliation), `throttle`/`steering`/`handbrake`/`enterExit`
+  (vehicle Phase 5 stubs).
+- `Controller` (abstract Node) — `isAuthority()` delegates to `isMultiplayerAuthority()`.
+- `PlayerController` — keyboard/mouse, child of `Player`. Extracted from `Player.gatherInput()`.
+- `AIController` (abstract) — owns all FSM timers + memory: `lastKnownTargetPosition`,
+  `currentAimTarget`, strafe state, `computeSuppressTarget`, `refreshStrafe`, all
+  reset/advance/check helpers. Read body config via `getBody().suppressionDuration` etc.
+- `CharacterController` — concrete, caches `AICharacter` owner, starts `PatrolState`.
+- `NetworkController` — skeleton, `isAuthority()=false`, ready for Phase 4.
+- `AIState` interface: `enter/exit/update(AICharacter body, AIController ctrl, UserCommand cmd, delta)`.
+  All 5 FSM states updated — body calls = hardware, ctrl calls = memory/state.
+- `Character._physicsProcess`: checks `controller.isAuthority()`, early-returns for
+  non-authority peers (state arrives via `MultiplayerSynchronizer`).
+- `Player`: removed `gatherInput()`. Added `isCombat()` getter.
+- `AICharacter`: removed FSM/timers/memory. Kept hardware (NavAgent, SightRay, sensing).
+  Added `isDead()` getter, `getCharacterController()`.
+- `Player.tscn`: `PlayerController` child node added.
+- `AICharacter.tscn`: `CharacterController` child node added.
+- `CharacterInput.java` deleted.
 
----
-
-## Phase 2 — Rename Enemy → AICharacter; dynamic target discovery
-
-### Motivation
-
-- `Enemy` implies faction: any AI character could be neutral or friendly.
-- The hardcoded `@Export Character player` field is redundant now that
-  `Faction.areHostile()` determines targeting — the AI should discover hostile
-  characters dynamically from the scene instead of requiring inspector wiring.
-
-### Design decisions
-
-- **`Enemy` → `AICharacter`**: class, file, Godot class name, scene file.
-- **`EnemyAIState` → `AIState`**: the interface is generic to any AI character.
-- **`EnemyCameraController`**: keep name — camera-concern only, not faction-related.
-- **`EventBus.enemyKilled`**: keep name for now — changing signal names also requires
-  updating scene signal connections; defer to a dedicated cleanup pass.
-- **Target discovery**: `Character` nodes self-register into the Godot group
-  `"characters"` in `_ready()`. `AICharacter.discoverTarget()` scans that group,
-  filters by `Faction.areHostile()` and distance, returns the nearest hostile.
-- **`currentTarget`** replaces `player`: runtime field, not exported. Set lazily
-  by `canSeeTarget()` → `discoverTarget()`. Cleared in `PatrolState.enter()`.
-- All AI state method signatures change from `Enemy` to `AICharacter`.
-
-### Files to create
-
-#### `src/main/java/com/character/ai/AIState.java`
-Rename of `EnemyAIState.java`:
-- Interface name: `AIState`
-- Method signatures: `enter/exit/update` take `AICharacter` instead of `Enemy`
-- Return type of `update`: `AIState`
-
-#### `src/main/java/com/character/AICharacter.java`
-Rename + refactor of `Enemy.java`:
-- `@RegisterClass(className = "AICharacter")`
-- Remove `@Export Character player`
-- Add `private Character currentTarget`
-- Add private `discoverTarget()` scanning `"characters"` group
-- `getPlayer()` → `getTarget()` returns `currentTarget`
-- `canSeePlayer()` → `canSeeTarget()`: calls `discoverTarget()` if null,
-  then checks detectionRange + `hasLineOfSight()`
-- `hasLineOfSight()`: replace all `player` refs with `currentTarget`
-- `computeAimTarget()`, `computeSuppressTarget()`: replace `player` refs
-- `clearCameraAimTarget()` → unchanged (camera concern)
-- Field `private EnemyAIState currentState` → `private AIState currentState`
-- `transitionTo(EnemyAIState)` → `transitionTo(AIState)`
-- `gatherInput` → unchanged logic, just type references updated
-- `onEnemyDamaged` → keep name (connected by scene signal)
-
-#### `src/main/resources/com/character/AICharacter.tscn`
-Copy of `Enemy.tscn` with:
-- Script ext_resource path: `gdj/com/character/AICharacter.gdj`
-- Node name: `"AICharacter"` (was `"Enemy"`)
-- Signal connection: `damaged → on_enemy_damaged` (method name stays — signal connection)
-- No other structural changes needed
-
-### Files to modify
-
-#### `src/main/java/com/character/Character.java`
-In `_ready()`, after existing setup, add:
-```java
-addToGroup(new StringName("characters"), false);
+### Key files created
+```
+src/main/java/com/character/
+  UserCommand.java
+  Controller.java
+  PlayerController.java
+  AIController.java
+  CharacterController.java
+  NetworkController.java
 ```
 
-#### `src/main/java/com/character/ai/PatrolState.java`
-- Import `AICharacter` instead of `Enemy`, `AIState` instead of `EnemyAIState`
-- All method signatures: `Enemy enemy` → `AICharacter c`
-- `enemy.canSeePlayer()` → `c.canSeeTarget()`
-- `enemy.getPlayer()` → `c.getTarget()`
-- Implement `enter(AICharacter c)`: call `c.clearTarget()` then `c.setNextPatrolTarget()`
+---
 
-#### `src/main/java/com/character/ai/ChaseState.java`
-- Same import/type/method rename pattern
-- `enemy.getPlayer()` → `c.getTarget()`
-- `enemy.canSeePlayer()` → `c.canSeeTarget()`
+## Phase 4 — Network foundation  🔜 NEXT
 
-#### `src/main/java/com/character/ai/AttackState.java`
-- Same import/type/method rename pattern
-- `enemy.getPlayer()` → `c.getTarget()`
+### Goal
+Source Engine-style feel: owning client predicts locally, server is authoritative,
+non-authority peers receive replicated state. L4D bot-fill via controller swap.
 
-#### `src/main/java/com/character/ai/SearchState.java`
-- Same import/type/method rename pattern
-- `enemy.canSeePlayer()` → `c.canSeeTarget()`
-- `enemy.getPlayer()` → `c.getTarget()`
+### Steps
 
-#### `src/main/java/com/character/ai/RefillAmmoState.java`
-- Same import/type/method rename pattern
+**Step 1 — MultiplayerSynchronizer in Character.tscn**
+Add `MultiplayerSynchronizer` node to `Character.tscn`. Sync properties:
+- `global_position`, `velocity`
+- `currentStanceName` (int), `combat` (bool)
+- Animation tree parameters (blend positions, state names)
+- `Health.currentHealth`
 
-#### `src/main/resources/com/world/World.tscn`
-- Update ext_resource path: `Enemy.tscn` → `AICharacter.tscn`  
-- Node name: `"Enemy"` → `"AICharacter"`
-- Remove `node_paths=PackedStringArray("player", "ammo_refill")` → `PackedStringArray("ammo_refill")`
-- Remove `player = NodePath("../Player")`
-- Keep `ammo_refill = NodePath(...)` unchanged
+**Step 2 — NetworkController implementation**
+Fill `NetworkController.java` (currently skeleton):
+```java
+// Ring buffer (size = max RTT ticks, e.g. 64)
+private final UserCommand[] buffer = new UserCommand[64];
 
-### Files to delete
-- `src/main/java/com/character/Enemy.java`
-- `src/main/java/com/character/ai/EnemyAIState.java`
-- `src/main/resources/com/character/Enemy.tscn`
+// Called by network layer when server broadcasts a corrected state
+public void receiveCommand(UserCommand cmd) {
+    buffer[(int)(cmd.tick % buffer.length)] = cmd.copy();
+}
+```
+
+**Step 3 — PlayerController: send commands to server**
+In `PlayerController.gatherInput()`, after building the `UserCommand`:
+```java
+cmd.sequenceNumber = ++localSequence;
+// RPC to server: sendCommand(cmd)  — serialize UserCommand fields
+```
+Server receives, runs `applyInput()` authoritatively, echoes `lastServerAck` back.
+
+**Step 4 — Client-side prediction reconciliation**
+`PlayerController` maintains a ring buffer of recent `UserCommand` copies.
+On receiving server correction (position/state diverges from prediction):
+1. Snap to server state.
+2. Replay buffered commands from `lastServerAck + 1` forward.
+`UserCommand.copy()` and `Character.applyInput()` are already deterministic — no
+changes needed there.
+
+**Step 5 — Bot-fill / L4D controller swap**
+```java
+// Player disconnects → attach CharacterController
+void onPlayerLeft(Player body) {
+    body.controller.queueFree();
+    CharacterController bot = new CharacterController();
+    body.addChild(bot);
+}
+// Player reconnects → swap back
+void onPlayerJoined(Player body) {
+    body.controller.queueFree();
+    PlayerController human = new PlayerController();
+    body.addChild(human);
+}
+```
+`Character._ready()` already scans children for a `Controller` — no other wiring needed.
+
+**Step 6 — AIController authority**
+`AIController.isAuthority()` inherits `getOwner().isMultiplayerAuthority()`.
+In multiplayer, AI nodes are owned by the server — this returns true only on server.
+No code change needed; the authority model already works.
 
 ---
 
-## Execution checklist
+## Phase 5 — Vehicle support  📋 PLANNED
 
-- [ ] Step 1: Update `Character.java` — addToGroup("characters")
-- [ ] Step 2: Create `AIState.java` (rename of EnemyAIState)
-- [ ] Step 3: Create `AICharacter.java` (rename + refactor of Enemy)
-- [ ] Step 4: Create `AICharacter.tscn` (copy + update of Enemy.tscn)
-- [ ] Step 5: Update all 5 AI state files (PatrolState, ChaseState, AttackState, SearchState, RefillAmmoState)
-- [ ] Step 6: Update `World.tscn` — new scene path, remove player export, rename node
-- [ ] Step 7: Delete `Enemy.java`, `EnemyAIState.java`, `Enemy.tscn`
-- [ ] Step 8: `./gradlew build` — confirm clean compile
+### Design
+
+```
+Controllable (interface)
+  void applyCommand(UserCommand cmd, double delta)
+  CharacterInfo getCharacterInfo()
+
+Character implements Controllable   ← already effectively does this
+VehicleBody implements Controllable ← new (RigidBody3D base)
+```
+
+`UserCommand` already has vehicle fields (`throttle`, `steering`, `handbrake`, `enterExit`).
+`Character.applyInput()` ignores them; `VehicleBody.applyCommand()` reads them.
+
+**Control transfer (enter/exit vehicle):**
+```java
+// Player walks to vehicle, presses interact (enterExit = true):
+Controller ctrl = playerBody.detachController();
+ctrl.setTarget(vehicle);       // Brain now generates vehicle-field UserCommands
+vehicle.attachController(ctrl);
+playerBody.attachController(new IdleController());
+
+// Player exits:
+Controller ctrl = vehicle.detachController();
+ctrl.setTarget(playerBody);
+playerBody.attachController(ctrl);
+vehicle.attachController(new VehicleAIController()); // or leave empty
+```
+
+**Faction / targeting:**
+`VehicleBody.characterInfo` has a faction. `AICharacter.discoverTarget()` scans
+the `"characters"` group — add vehicles to the same group so AI can target them.
+
+### Steps (implement when ready)
+- [ ] `Controllable.java` interface
+- [ ] `VehicleBody.java` (RigidBody3D, implements Controllable)
+- [ ] `GroundVehicle.java` (car/tank — physics tuning)
+- [ ] `VehicleAIController.java` (route/waypoint FSM)
+- [ ] `HumanBrain`→`PlayerController`: generate vehicle fields when target is Vehicle
+- [ ] `VehicleBody.tscn` base scene
+- [ ] Add vehicles to `"characters"` group for faction targeting
+
+---
+
+## Terminology reference
+| Term | Equivalent | Notes |
+|---|---|---|
+| `UserCommand` | Source `CUserCmd` | Per-tick command struct |
+| `Controller` | Unreal `AController` / Source `CBotController` | Generates UserCommand |
+| `PlayerController` | Unreal `APlayerController` | Keyboard/mouse |
+| `AIController` | Unreal `AAIController` / Source `CAI_BaseNPC` | FSM + memory |
+| `CharacterController` | L4D `SurvivorBot` | On-foot AI concrete controller |
+| `NetworkController` | — | Non-authority placeholder |
+| `Character` | Unreal `APawn` / Source `CBaseCombatCharacter` | Body |
+| `Player` | Unreal `ACharacter` | Human-controlled body |
+| `AICharacter` | L4D `CTerrorPlayer` (NPC) | AI-controlled body |
+| `Faction` | — | String-based; `areHostile()` for targeting |
+| `CharacterInfo` | — | id + displayName + faction per character |

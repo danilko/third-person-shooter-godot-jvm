@@ -49,6 +49,7 @@ public class ImpactManager extends Node {
         spawnImpactParticles(info);
         spawnDecal(info);
         applyDamage(info, damage, weaponName, weaponIcon, attackerName);
+        applyHitImpulse(info, damage);
     }
 
     // ── Private helpers (one per effect type) ────────────────────────────────
@@ -87,6 +88,20 @@ public class ImpactManager extends Node {
         if (owner instanceof Character)       return SurfaceType.FLESH;
         if (owner instanceof HittableBody hb) return hb.getSurfaceType();
         return SurfaceType.DEFAULT;
+    }
+
+    /**
+     * Applies directional physics to the hit character.
+     * hitNormal points from the surface toward the shooter, so negating it gives the
+     * bullet travel direction — the direction the character should be pushed.
+     * applyDamage() is called first, so if this hit killed the character the ragdoll
+     * simulation is already running (died signal fires synchronously in takeDamage).
+     */
+    private void applyHitImpulse(HitInfo info, float damage) {
+        if (info.hitNode == null || info.hitNormal == null) return;
+        Node owner = info.hitNode.getOwner();
+        if (!(owner instanceof Character character)) return;
+        character.applyHitImpulse(info.hitNode, info.hitNormal.times(-1f), damage);
     }
 
     // ── Lazy singleton lookups ────────────────────────────────────────────────

@@ -21,7 +21,10 @@ public class ChaseState implements AIState {
 
     @Override
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
-        if (body.getTarget() == null) return PatrolState.INSTANCE;
+        if (body.getTarget() == null || !body.getTarget().isAlive()) {
+            body.clearTarget();
+            return PatrolState.INSTANCE;
+        }
 
         float dist = (float) body.getGlobalPosition()
                                  .distanceTo(body.getTarget().getGlobalPosition());

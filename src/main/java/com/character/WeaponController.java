@@ -8,6 +8,7 @@ import godot.core.Signal1;
 import godot.core.Signal2;
 import godot.core.StringName;
 import godot.core.Vector3;
+import godot.global.GD;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,7 +56,10 @@ public class WeaponController extends Node {
   // Weapons queued for equip/drop; processed in _process (idle) to avoid
   // reparenting a RigidBody3D (CollisionObject) during a physics callback.
   private final List<WeaponItem> pendingEquips = new ArrayList<>();
-  private WeaponItem pendingDrop;
+  private final List<WeaponItem> pendingDrops  = new ArrayList<>();
+  // True when pendingDrops was populated by dropAllWeapons() (death); false for a
+  // manual single-weapon drop. Controls which physics parameters are used.
+  private boolean isDeathDrop = false;
 
   private RayCast3D aimRay;
   private CameraController cam;
@@ -102,11 +106,16 @@ public class WeaponController extends Node {
       for (WeaponItem item : new ArrayList<>(pendingEquips)) equipWeapon(item);
       pendingEquips.clear();
     }
-    // Then process any pending drop
-    if (pendingDrop != null) {
-      WeaponItem toDrop = pendingDrop;
-      pendingDrop = null;
-      returnWeaponToWorld(toDrop);
+    // Then process any pending drops (single manual drop or full death-drop batch)
+    if (!pendingDrops.isEmpty()) {
+      List<WeaponItem> batch = new ArrayList<>(pendingDrops);
+      boolean death = isDeathDrop;
+      pendingDrops.clear();
+      isDeathDrop = false;
+      for (WeaponItem item : batch) {
+        if (death) returnWeaponToWorldOnDeath(item);
+        else       returnWeaponToWorld(item);
+      }
     }
   }
 
@@ -216,8 +225,25 @@ public class WeaponController extends Node {
     if (current == null) return;
     weapons[activeSlotIndex] = null;
     current.hide();       // hide immediately — reparent is deferred to _process
-    pendingDrop = current;
+    pendingDrops.add(current);
     activateFirstAvailableSlot();
+  }
+
+  /**
+   * Releases every carried weapon back into the world. Called on character death.
+   * Safe to invoke from a physics callback — actual reparenting is deferred to _process().
+   * Each weapon spawns at hip height + 0.5 m extra and is thrown in a random radial
+   * direction so weapons fan out rather than pile on one spot.
+   */
+  public void dropAllWeapons() {
+    for (int i = 0; i < weapons.length; i++) {
+      WeaponItem item = weapons[i];
+      if (item == null) continue;
+      weapons[i] = null;
+      item.hide();
+      pendingDrops.add(item);
+    }
+    isDeathDrop = true;
   }
 
   // ── Signal handlers ───────────────────────────────────────────────────────
@@ -346,24 +372,44 @@ public class WeaponController extends Node {
     }
   }
 
+  // Manual drop: throw forward at chest height (1.0 m).
   private void returnWeaponToWorld(WeaponItem item) {
-    if (item instanceof FirearmItem fi) fi.setup(null, null, null, null, null);
-    item.show(); // always visible when it lands in the world, regardless of which slot it was in
-
     CharacterBody3D character = (CharacterBody3D) getOwner();
-    Vector3 dropPos = character.getGlobalPosition().plus(new Vector3(0, 1.0f, 0));
-    Vector3 forward = character.getGlobalTransform().getBasis().getZ().times(-1f);
-    Vector3 impulse = forward.times(3.0f)
+    Vector3 spawnPos = character.getGlobalPosition().plus(new Vector3(0, 1.0f, 0));
+    Vector3 forward  = character.getGlobalTransform().getBasis().getZ().times(-1f);
+    Vector3 impulse  = forward.times(3.0f)
         .plus(new Vector3(0, 4.0f, 0))
         .plus(character.getVelocity().times(0.3f));
+    returnWeaponToWorld(item, spawnPos, impulse);
+  }
 
-    // keepGlobalTransform=true so the weapon stays at its hand position in world
-    // space after reparent. Unfreeze the physics body first so the position
-    // assignment and impulse are applied to a live dynamic body (Jolt Physics
-    // does not propagate setGlobalPosition reliably on a still-frozen body).
+  // Death drop: spawn higher (1.5 m) and scatter each weapon in a random direction
+  // so multiple weapons fan out instead of piling on the same spot.
+  private void returnWeaponToWorldOnDeath(WeaponItem item) {
+    CharacterBody3D character = (CharacterBody3D) getOwner();
+    Vector3 spawnPos = character.getGlobalPosition().plus(new Vector3(0, 1.5f, 0));
+    float   angle    = GD.randf() * (float) (Math.PI * 2.0);
+    Vector3 scatter  = new Vector3((float) Math.cos(angle), 0f, (float) Math.sin(angle)).times(2.5f);
+    Vector3 impulse  = scatter
+        .plus(new Vector3(0, (float) GD.randfRange(3.0f, 6.0f), 0))
+        .plus(character.getVelocity().times(0.4f));
+    returnWeaponToWorld(item, spawnPos, impulse);
+  }
+
+  /**
+   * Shared mechanics for both drop variants: clears character refs, re-enables physics,
+   * places the weapon at spawnPos, and applies impulse.
+   *
+   * keepGlobalTransform=true so the weapon stays at its hand position in world space
+   * after reparent. Jolt Physics does not reliably propagate setGlobalPosition on a
+   * frozen body, so onReturnedToWorld() unfreezes before we set position.
+   */
+  private void returnWeaponToWorld(WeaponItem item, Vector3 spawnPos, Vector3 impulse) {
+    if (item instanceof FirearmItem fi) fi.setup(null, null, null, null, null);
+    item.show();
     item.reparent(getTree().getCurrentScene(), true);
     item.onReturnedToWorld();
-    item.setGlobalPosition(dropPos);
+    item.setGlobalPosition(spawnPos);
     item.applyCentralImpulse(impulse);
   }
 

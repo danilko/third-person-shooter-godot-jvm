@@ -33,9 +33,20 @@ public class AICharacter extends Character {
     @Export @RegisterProperty public float  patrolRadius         =  80.0f;
     @Export @RegisterProperty public Area3D ammoRefill;
 
-    @Export @RegisterProperty public float hitChance            = 0.9f;
-    @Export @RegisterProperty public float reactionTime         = 0.1f;
-    @Export @RegisterProperty public float aimScatterRadius     = 1.5f;
+    /**
+     * Which body part the AI tries to hit on a successful accuracy roll.
+     * Maps directly to the damage multipliers in Health.getDamageMultiplier():
+     *   HEAD  → neck_01        (4.0× — hardest, one-shot potential)
+     *   CHEST → spine_03       (1.0× — balanced)
+     *   BODY  → spine_01       (0.75× — forgiving)
+     *   LEGS  → thigh_l/r      (0.5× — easiest)
+     * On a miss the shot scatters by aimScatterRadius regardless of body part.
+     */
+    @Export @RegisterProperty public String aimBodyPart         = "CHEST";
+
+    @Export @RegisterProperty public float hitChance            = 0.5f;
+    @Export @RegisterProperty public float reactionTime         = 0.6f;
+    @Export @RegisterProperty public float aimScatterRadius     = 2.5f;
     @Export @RegisterProperty public float strafeChangeDuration = 1f;
     @Export @RegisterProperty public float suppressionDuration  = 1.5f;
 
@@ -64,6 +75,11 @@ public class AICharacter extends Character {
             if (child instanceof PhysicalBone3D bone) sightRay.addException(bone);
         }
         spawnPosition = new Vector3(getGlobalPosition());
+
+        // Start the FSM now that all body hardware is ready.
+        // AIController._ready() intentionally leaves currentState null so this
+        // is the only place the FSM starts.
+        if (controller instanceof AIController aiCtrl) aiCtrl.start();
     }
 
     // ── Controller access ─────────────────────────────────────────────────────
@@ -89,7 +105,7 @@ public class AICharacter extends Character {
         float closestDist = Float.MAX_VALUE;
         Character closest = null;
         for (Node node : getTree().getNodesInGroup(new StringName("characters"))) {
-            if (!(node instanceof Character c) || c == this) continue;
+            if (!(node instanceof Character c) || c == this || !c.isAlive()) continue;
             String tf = c.characterInfo != null ? c.characterInfo.faction : Faction.NEUTRAL;
             if (!Faction.areHostile(myFaction, tf)) continue;
             float dist = (float) getGlobalPosition().distanceTo(c.getGlobalPosition());
@@ -100,6 +116,7 @@ public class AICharacter extends Character {
 
     /** Discovers a target if none set, then checks detectionRange and LoS. */
     public boolean canSeeTarget() {
+        if (currentTarget != null && !currentTarget.isAlive()) currentTarget = null;
         if (currentTarget == null) currentTarget = discoverTarget();
         if (currentTarget == null) return false;
         float dist = (float) getGlobalPosition().distanceTo(currentTarget.getGlobalPosition());
@@ -137,13 +154,40 @@ public class AICharacter extends Character {
         aimRay.forceRaycastUpdate();
     }
 
-    /** Hit: aims at target neck. Miss: random scatter scaling with distance. */
+    private static final String BONE_BASE_PATH =
+            "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone ";
+
+    /**
+     * Returns the world position of the target bone determined by aimBodyPart.
+     * Used both for initial aim tracking and per-shot accuracy resolution.
+     */
+    public Vector3 getAimBonePosition() {
+        String boneName;
+        switch (aimBodyPart.toUpperCase()) {
+            case "HEAD":  boneName = "neck_01";  break;
+            case "BODY":  boneName = "spine_01"; break;
+            case "LEGS":  boneName = godot.global.GD.randf() > 0.5f ? "thigh_l" : "thigh_r"; break;
+            default:      boneName = "spine_03"; break;  // CHEST
+        }
+        return ((Node3D) currentTarget.getNode(BONE_BASE_PATH + boneName)).getGlobalPosition();
+    }
+
+    /**
+     * Hit: returns exact aim-bone position. Miss: random scatter combining two terms:
+     *   aimScatterRadius × (hDist/10)  — per-AI tuning knob, scales with distance
+     *   hDist × tan(weaponSpreadDeg)   — live weapon physics (bloom, stance, velocity)
+     * The weapon term means burst fire degrades AI accuracy just like it does for the
+     * player, and a shotgun-AI is naturally less accurate than a sniper-AI at range.
+     */
     public Vector3 computeAimTarget(boolean isHit, float hDist) {
-        Vector3 base = ((Node3D) currentTarget.getNode(
-                "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone neck_01"))
-                .getGlobalPosition();
+        Vector3 base = getAimBonePosition();
         if (isHit) return base;
-        float maxOffset = aimScatterRadius * (hDist / 10f);
+        float weaponSpreadM = 0f;
+        if (weaponController != null) {
+            float spreadDeg = weaponController.getCurrentSpreadDeg();
+            weaponSpreadM = hDist * (float) Math.tan(Math.toRadians(spreadDeg));
+        }
+        float maxOffset = aimScatterRadius * (hDist / 10f) + weaponSpreadM;
         float offset    = godot.global.GD.randf() * maxOffset;
         float angle     = godot.global.GD.randf() * (float) (Math.PI * 2.0);
         return base.plus(new Vector3(

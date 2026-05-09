@@ -17,10 +17,10 @@ import godot.api.Node;
  *   Non-authority peers receive state via MultiplayerSynchronizer instead.
  */
 @RegisterClass(className = "Controller")
-public abstract class Controller extends Node {
+public class Controller extends Node {
 
     /** Produce a UserCommand for the current tick. Only called when isAuthority(). */
-    public abstract UserCommand gatherInput(double delta);
+    public UserCommand gatherInput(double delta) { return new UserCommand(); }
 
     /**
      * Whether this peer may run the simulation for the owned entity.

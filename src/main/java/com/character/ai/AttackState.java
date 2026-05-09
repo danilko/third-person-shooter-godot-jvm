@@ -4,7 +4,6 @@ import com.character.AICharacter;
 import com.character.AIController;
 import com.character.MovementType;
 import com.character.UserCommand;
-import godot.api.Node3D;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -28,7 +27,10 @@ public class AttackState implements AIState {
 
     @Override
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
-        if (body.getTarget() == null) return PatrolState.INSTANCE;
+        if (body.getTarget() == null || !body.getTarget().isAlive()) {
+            body.clearTarget();
+            return PatrolState.INSTANCE;
+        }
 
         Vector3 targetPos = body.getTarget().getGlobalPosition();
         Vector3 myPos     = body.getGlobalPosition();
@@ -72,11 +74,7 @@ public class AttackState implements AIState {
 
         // ── Aim initialisation ────────────────────────────────────────────────
         if (ctrl.getCurrentAimTarget() == null) {
-            Vector3 initial = hasLoS
-                    ? ((Node3D) body.getTarget().getNode(
-                            "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone neck_01"))
-                            .getGlobalPosition()
-                    : ctrl.getLastKnownTargetPosition();
+            Vector3 initial = hasLoS ? body.getAimBonePosition() : ctrl.getLastKnownTargetPosition();
             ctrl.setCurrentAimTarget(initial);
         }
         body.aimAtPosition(ctrl.getCurrentAimTarget(), delta);

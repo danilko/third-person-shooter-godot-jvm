@@ -409,6 +409,35 @@ public class Character extends CharacterBody3D {
         physicalBoneSimulator.physicalBonesStartSimulation();
     }
 
+    // Velocity change per damage point applied to an alive character (m/s per dmg).
+    private static final float ALIVE_HIT_VELOCITY_SCALE = 0.05f;
+    // Impulse magnitude per damage point applied to the hit ragdoll bone (N·s per dmg).
+    private static final float DEATH_BONE_IMPULSE_SCALE = 0.3f;
+
+    /**
+     * Applies a physics response to a bullet hit.
+     *
+     * While alive: adds a small velocity kick in the bullet direction — simulates the
+     * stagger seen in CS/L4D where shots push the target back from the shooter.
+     *
+     * On death: pushes the specific PhysicalBone3D that was struck so the ragdoll
+     * falls away from the shooter. Requires the ragdoll to already be started —
+     * ImpactManager calls this after applyDamage(), by which point the synchronous
+     * died-signal chain has already called enableRagdoll().
+     *
+     * @param hitNode    the node returned by AimRay (typically a PhysicalBone3D)
+     * @param bulletDir  world-space bullet travel direction (hitNormal negated)
+     * @param damage     base damage value used to scale the impulse magnitude
+     */
+    public void applyHitImpulse(Node hitNode, Vector3 bulletDir, float damage) {
+        Vector3 dir = bulletDir.normalized();
+        if (isAlive()) {
+            setVelocity(getVelocity().plus(dir.times(damage * ALIVE_HIT_VELOCITY_SCALE)));
+        } else if (hitNode instanceof PhysicalBone3D bone) {
+            bone.applyCentralImpulse(dir.times(damage * DEATH_BONE_IMPULSE_SCALE));
+        }
+    }
+
     /**
      * Apply a physics impulse to a named bone during ragdoll.
      * Only has effect when the ragdoll is active (call after enableRagdoll or on death).
@@ -424,6 +453,10 @@ public class Character extends CharacterBody3D {
         }
     }
 
+    public boolean isAlive() {
+        return healthNode == null || !healthNode.isDead();
+    }
+
     // ── Override in subclasses ────────────────────────────────────────────────
     @RegisterFunction
     public void onDied() {
@@ -431,6 +464,8 @@ public class Character extends CharacterBody3D {
         // Disable animation tree
         AnimationTree animationTree = (AnimationTree) getNode("AnimationTree");
         animationTree.setActive(false);
+
+        if (weaponController != null) weaponController.dropAllWeapons();
 
         enableRagdoll();
 

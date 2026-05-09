@@ -20,18 +20,28 @@ import godot.global.GD;
  * data sources unambiguous.
  */
 @RegisterClass(className = "AIController")
-public abstract class AIController extends Controller {
+public class AIController extends Controller {
 
     // ── FSM ───────────────────────────────────────────────────────────────────
     private AIState currentState;
 
-    protected abstract AICharacter getBody();
-    protected abstract AIState     initialState();
+    /** Override in subclasses to return the AICharacter body this controller drives. */
+    protected AICharacter getBody() { return null; }
+
+    /** Override in subclasses to supply the initial FSM state. */
+    protected AIState initialState() { return PatrolState.INSTANCE; }
 
     @RegisterFunction
     @Override
     public void _ready() {
-        transitionTo(initialState());
+        // FSM is started by the owning body's _ready() via start() once
+        // body hardware (NavAgent, spawnPosition, etc.) is fully initialized.
+        // Children fire _ready() before parents, so body is not ready yet here.
+    }
+
+    /** Called by AICharacter._ready() after body initialization is complete. */
+    public void start() {
+        if (currentState == null) transitionTo(initialState());
     }
 
     @Override
