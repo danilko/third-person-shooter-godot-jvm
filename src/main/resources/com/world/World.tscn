@@ -6,7 +6,6 @@
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
 [ext_resource type="PackedScene" uid="uid://cgsslc7gj25cj" path="res://src/main/resources/com/character/AICharacter.tscn" id="6_enemy"]
 [ext_resource type="Script" uid="uid://ciyfqqv4fmm45" path="res://gdj/com/character/Controller.gdj" id="7_kfoa7"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/ui/PauseMenu.tscn" id="7_pmenu"]
 [ext_resource type="Script" uid="uid://dbbua5exey73l" path="res://gdj/com/environment/ParticleManager.gdj" id="8_pctl"]
 [ext_resource type="Script" uid="uid://csrrl6d8m7lmj" path="res://gdj/com/environment/ImpactManager.gdj" id="9_imct"]
 [ext_resource type="Script" uid="uid://cr22di64fbwp1" path="res://gdj/com/environment/DecalManager.gdj" id="10_dcal"]
@@ -17,6 +16,7 @@
 [ext_resource type="Script" uid="uid://bf5eaphw77cc4" path="res://src/main/java/com/ui/HUDManager.java" id="14_cl06x"]
 [ext_resource type="PackedScene" uid="uid://dtlryojg3n01y" path="res://src/main/resources/com/ui/FootHUD.tscn" id="15_8dp8o"]
 [ext_resource type="PackedScene" uid="uid://3v8l2bjm8pek" path="res://src/main/resources/com/ui/WeaponRadialMenu.tscn" id="17_nmpqt"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/ui/MenuManager.tscn" id="18_kfoa7"]
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="19_hs4nr"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
@@ -117,9 +117,6 @@ faction = "player"
 metadata/_custom_type_script = "uid://cplrp8cx4gus0"
 
 [node name="World" type="Node3D" unique_id=822990337]
-
-[node name="Player" parent="." unique_id=131388266 instance=ExtResource("2_lj72b")]
-transform = Transform3D(-4.3711392e-08, 0, -1.0000001, 0, 1, 0, 1.0000001, 0, -4.3711392e-08, 0, 0.7612269, 4.1552534)
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=689824235]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.031542182, 0, 0.004375696)
@@ -246,10 +243,6 @@ text = "AMMO REFILL"
 font = ExtResource("5_uecv0")
 font_size = 60
 
-[node name="PauseMenu" parent="." unique_id=1764356925 instance=ExtResource("7_pmenu")]
-grow_horizontal = 2
-grow_vertical = 2
-
 [node name="ParticleManager" type="Node" parent="." unique_id=201400001]
 script = ExtResource("8_pctl")
 pool_size_per_type = 40
@@ -296,54 +289,72 @@ script = ExtResource("11_btrc")
 [node name="1" type="MeshInstance3D" parent="BulletTracerManager" unique_id=201700002]
 mesh = SubResource("BoxMesh_hs4nr")
 
-[node name="Pistol" parent="." unique_id=358619058 instance=ExtResource("12_ej8ck")]
-transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10, -4.3711214e-08, 1, -0.004708648, -0.9999888, -4.3711307e-08, 0.3772924, 0.6055342, 3.597293)
-
-[node name="Rifle" parent="." unique_id=1788483088 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.002087593, 0.726562, 3.3925488)
-
 [node name="HUDManager" type="CanvasLayer" parent="." unique_id=1946570621]
 script = ExtResource("14_cl06x")
+player_path = NodePath("../Characters/Player")
 
 [node name="FootHUD" parent="HUDManager" unique_id=1962846644 instance=ExtResource("15_8dp8o")]
 feed_entry_path = NodePath("FeedEntry")
+metadata/_edit_use_anchors_ = true
 
 [node name="WeaponRadialMenu" parent="HUDManager" unique_id=1303740167 node_paths=PackedStringArray("character") instance=ExtResource("17_nmpqt")]
-character = NodePath("../../Player")
+character = NodePath("../../Characters/Player")
+metadata/_edit_use_anchors_ = true
 
-[node name="Pistol2" parent="." unique_id=1577587948 instance=ExtResource("12_ej8ck")]
-transform = Transform3D(1, 0, 0, 0, -0.004537884, -0.9999897, 0, 0.99998957, -0.0045378846, 5.122735, 0.89575815, -5.1626945)
+[node name="Characters" type="Node" parent="." unique_id=1369023945]
 
-[node name="Rifle2" parent="." unique_id=995514556 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.74753, 0.6910143, -4.9726653)
+[node name="Player" parent="Characters" unique_id=131388266 instance=ExtResource("2_lj72b")]
+transform = Transform3D(-4.3711392e-08, 0, -1.0000001, 0, 1, 0, 1.0000001, 0, -4.3711392e-08, 0.010113716, 0.75241303, 3.8685875)
 
-[node name="AICharacter-E1" parent="." unique_id=1107363167 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0463448, 0.89418125, -4.9451065)
-ammo_refill = NodePath("../AmmoRefill")
+[node name="Pistol" parent="Characters" unique_id=358619058 instance=ExtResource("12_ej8ck")]
+transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10, -4.3711214e-08, 1, -0.004708648, -0.9999888, -4.3711307e-08, 0.3874061, 0.59672034, 3.628375)
+
+[node name="Rifle" parent="Characters" unique_id=1788483088 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.012201309, 0.71774817, 3.423631)
+
+[node name="Pistol2" parent="Characters" unique_id=1577587948 instance=ExtResource("12_ej8ck")]
+transform = Transform3D(1, 0, 0, 0, -0.004537884, -0.9999897, 0, 0.99998957, -0.0045378846, 5.1328487, 0.8869443, -5.1316123)
+
+[node name="Rifle2" parent="Characters" unique_id=995514556 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.7576437, 0.68220043, -4.941583)
+
+[node name="AICharacter-E1" parent="Characters" unique_id=1107363167 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0564585, 0.8853674, -4.9140244)
+ammo_refill = NodePath("../../AmmoRefill")
 character_info = SubResource("Resource_hs4nr")
 
-[node name="Rifle5" parent="." unique_id=1210622816 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 15.167509, 0.6910143, -1.19309)
+[node name="Rifle5" parent="Characters" unique_id=1210622816 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 15.177623, 0.68220043, -1.1620078)
 
-[node name="AICharacter-E2" parent="." unique_id=1865541393 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.466324, 0.89418125, -1.1655312)
-ammo_refill = NodePath("../AmmoRefill")
+[node name="AICharacter-E2" parent="Characters" unique_id=1865541393 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.476438, 0.8853674, -1.134449)
+ammo_refill = NodePath("../../AmmoRefill")
 character_info = SubResource("Resource_hs4nr")
 
-[node name="Rifle3" parent="." unique_id=913745768 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 6.264246, 0.6910143, 5.317204)
+[node name="Rifle7" parent="Characters" unique_id=1655091831 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 8.876812, 0.68220043, -7.5097747)
 
-[node name="AICharacter-P1" parent="." unique_id=817366872 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5630608, 0.89418125, 5.344763)
-ammo_refill = NodePath("../AmmoRefill")
+[node name="AICharacter-E3" parent="Characters" unique_id=810055418 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.175625, 0.8853674, -7.482216)
+ammo_refill = NodePath("../../AmmoRefill")
+character_info = SubResource("Resource_hs4nr")
+
+[node name="Rifle3" parent="Characters" unique_id=913745768 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 6.2743597, 0.68220043, 5.348286)
+
+[node name="AICharacter-P1" parent="Characters" unique_id=817366872 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5731745, 0.8853674, 5.375845)
+ammo_refill = NodePath("../../AmmoRefill")
 character_info = SubResource("Resource_imhx0")
 
-[node name="Rifle6" parent="." unique_id=1288307646 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, -2.4562712, 0.6910143, -6.0412784)
+[node name="Rifle6" parent="Characters" unique_id=1288307646 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, -2.4461575, 0.68220043, -6.010196)
 
-[node name="AICharacter-P2" parent="." unique_id=294236911 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.1574564, 0.89418125, -6.0137196)
-ammo_refill = NodePath("../AmmoRefill")
+[node name="AICharacter-P2" parent="Characters" unique_id=294236911 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.1473427, 0.8853674, -5.9826374)
+ammo_refill = NodePath("../../AmmoRefill")
 character_info = SubResource("Resource_imhx0")
+
+[node name="MenuManager" parent="." unique_id=349614519 instance=ExtResource("18_kfoa7")]
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

@@ -27,8 +27,10 @@ public class AttackState implements AIState {
 
     @Override
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
-        if (body.getTarget() == null || !body.getTarget().isAlive()) {
-            body.clearTarget();
+        // Re-evaluate nearest live hostile each frame so a closer threat that
+        // appears mid-combat (e.g. a player walking in) is not ignored.
+        body.refreshTarget();
+        if (body.getTarget() == null) {
             return PatrolState.INSTANCE;
         }
 

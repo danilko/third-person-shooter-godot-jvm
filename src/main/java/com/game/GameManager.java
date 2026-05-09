@@ -5,6 +5,7 @@ import com.character.Player;
 import com.character.PlayerController;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
+import godot.api.Input;
 import godot.api.Node;
 import godot.core.Callable;
 import godot.core.StringNames;
@@ -53,8 +54,7 @@ public class GameManager extends Node {
     public void onPlayerDied() {
         if (currentState != GameState.PLAYING) return;
         transitionTo(GameState.GAME_OVER);
-        // TODO: show game-over UI (get game-over screen node and call show())
-        GD.print("GameManager: player died — game over");
+        // MenuManager.onPlayerDied() (same signal) owns the pause + game-over UI.
     }
 
     public void pauseGame() {
@@ -70,6 +70,8 @@ public class GameManager extends Node {
     }
 
     public void restartLevel() {
+        if (getTree() != null) getTree().setPause(false);
+        Input.INSTANCE.setMouseMode(Input.MouseMode.CAPTURED);
         transitionTo(GameState.PLAYING);
         if (getTree() != null) getTree().reloadCurrentScene();
     }

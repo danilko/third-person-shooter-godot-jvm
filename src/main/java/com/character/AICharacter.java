@@ -97,8 +97,8 @@ public class AICharacter extends Character {
     public NavigationAgent3D getNavAgent() { return navAgent; }
 
     /**
-     * Scans the "characters" group for the nearest hostile character.
-     * Result is cached in currentTarget; called lazily by canSeeTarget().
+     * Scans the "characters" group for the nearest live hostile character.
+     * Returns null when no hostiles are reachable.
      */
     private Character discoverTarget() {
         String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
@@ -114,10 +114,22 @@ public class AICharacter extends Character {
         return closest;
     }
 
-    /** Discovers a target if none set, then checks detectionRange and LoS. */
+    /**
+     * Re-evaluates the nearest live hostile and caches it as currentTarget.
+     * Called by AttackState and ChaseState each frame so a closer threat that
+     * appears mid-combat is never ignored.
+     */
+    public void refreshTarget() {
+        currentTarget = discoverTarget();
+    }
+
+    /**
+     * Always rediscovers the nearest live hostile, then checks detectionRange and LoS.
+     * Calling discoverTarget() unconditionally prevents the stale-target bug where
+     * a cached (farther) target blocks detection of a new hostile that walked nearby.
+     */
     public boolean canSeeTarget() {
-        if (currentTarget != null && !currentTarget.isAlive()) currentTarget = null;
-        if (currentTarget == null) currentTarget = discoverTarget();
+        currentTarget = discoverTarget();
         if (currentTarget == null) return false;
         float dist = (float) getGlobalPosition().distanceTo(currentTarget.getGlobalPosition());
         if (dist > detectionRange) return false;

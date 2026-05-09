@@ -39,9 +39,14 @@ horizontal_alignment = 1
 layout_mode = 2
 text = "Resume"
 
+[node name="Restart" type="Button" parent="CenterContainer/Panel/VBoxContainer"]
+layout_mode = 2
+text = "Restart"
+
 [node name="Quit" type="Button" parent="CenterContainer/Panel/VBoxContainer"]
 layout_mode = 2
 text = "Quit"
 
 [connection signal="pressed" from="CenterContainer/Panel/VBoxContainer/Resume" to="." method="on_resume_pressed"]
+[connection signal="pressed" from="CenterContainer/Panel/VBoxContainer/Restart" to="." method="on_restart_pressed"]
 [connection signal="pressed" from="CenterContainer/Panel/VBoxContainer/Quit" to="." method="on_quit_pressed"]
