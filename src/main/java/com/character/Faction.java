@@ -1,5 +1,7 @@
 package com.character;
 
+import godot.core.Color;
+
 /**
  * Faction identifier constants and hostility logic.
  *
@@ -27,5 +29,15 @@ public final class Faction {
         if (factionA == null || factionB == null)                    return false;
         if (NEUTRAL.equals(factionA) || NEUTRAL.equals(factionB))   return false;
         return !factionA.equals(factionB);
+    }
+
+    /**
+     * Canonical display colour for a faction string.
+     * Used by kill-feed entries and character nameplates to tint name labels.
+     */
+    public static Color color(String faction) {
+        if (PLAYER.equals(faction))  return new Color(0.45f, 0.78f, 1.00f, 1f); // cyan-blue
+        if (ENEMY.equals(faction))   return new Color(1.00f, 0.35f, 0.35f, 1f); // red
+        return                              new Color(0.85f, 0.85f, 0.85f, 1f); // neutral grey
     }
 }

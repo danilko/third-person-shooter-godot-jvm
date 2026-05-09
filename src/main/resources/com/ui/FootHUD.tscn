@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://dtlryojg3n01y"]
 
-[ext_resource type="Script" uid="uid://cqdippbvyvxlb" path="res://src/main/java/com/ui/CharacterHUD.java" id="1_yai6d"]
+[ext_resource type="Script" uid="uid://x2aupnfxbw7s" path="res://gdj/com/ui/CharacterHUD.gdj" id="1_2lu2a"]
 [ext_resource type="Script" uid="uid://defb2urvdtr8u" path="res://gdj/com/ui/Crosshair.gdj" id="2_o0pri"]
 [ext_resource type="PackedScene" uid="uid://2cwjeq8se2u2" path="res://src/main/resources/com/ui/LinePivot.tscn" id="3_2k6t6"]
 [ext_resource type="FontFile" uid="uid://btgb34w8m7xgt" path="res://assets/ui/DSEG7ClassicMini-Bold.ttf" id="4_f5mbb"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/ui/KillFeed.tscn" id="5_killfeed"]
+[ext_resource type="PackedScene" uid="uid://bkillfeedmain" path="res://src/main/resources/com/ui/Feed.tscn" id="5_2lu2a"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_large"]
 font = ExtResource("4_f5mbb")
@@ -25,7 +25,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_yai6d")
+script = ExtResource("1_2lu2a")
+feed_entry_path = NodePath("")
 
 [node name="Crosshair" type="Control" parent="." unique_id=1365259185]
 layout_mode = 1
@@ -214,18 +215,6 @@ offset_bottom = 86.0
 expand_mode = 3
 stretch_mode = 4
 
-[node name="KillFeed" parent="." instance=ExtResource("5_killfeed") unique_id=1900001001]
-layout_mode = 1
-anchor_left = 1.0
-anchor_top = 0.0
-anchor_right = 1.0
-anchor_bottom = 0.0
-offset_left = -310.0
-offset_top = 20.0
-offset_right = -10.0
-offset_bottom = 20.0
-grow_horizontal = 0
-
 [node name="InteractPrompt" type="Label" parent="." unique_id=500797350]
 layout_mode = 1
 anchors_preset = 7
@@ -240,3 +229,10 @@ offset_bottom = -169.0
 grow_horizontal = 2
 grow_vertical = 0
 horizontal_alignment = 1
+
+[node name="Feed" parent="." unique_id=1649474957 instance=ExtResource("5_2lu2a")]
+layout_mode = 0
+offset_left = 858.0
+offset_top = 33.0
+offset_right = 1108.0
+offset_bottom = 33.0

@@ -199,6 +199,10 @@ public class WeaponController extends Node {
     if (targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null) {
       activeSlotIndex = targetSlot;
       showWeapon(activeSlotIndex);
+      if (item.getReloadAudio() != null) {
+        weaponAudio.setStream(item.getReloadAudio());
+        weaponAudio.play();
+      }
       animationController.onWeaponTransition(item.weaponPoseIndex, true);
       ammoChanged.emit(item.getMagazine(), item.getReserve());
     } else {

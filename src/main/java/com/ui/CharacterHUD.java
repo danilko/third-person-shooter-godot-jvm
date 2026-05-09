@@ -7,9 +7,9 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.core.Callable;
-import godot.core.Key;
 import godot.core.NodePath;
 import godot.core.StringNames;
+import godot.global.GD;
 
 /**
  * Owns all in-game HUD labels (health, ammo, kill notifications).
@@ -35,15 +35,26 @@ public class CharacterHUD extends Control {
   @RegisterProperty @Export
   public NodePath notificationIconPath = new NodePath("Notification/WeaponIcon");
 
+  /** Path to the {@link Feed} sibling node that receives kill-feed entries. */
+  @RegisterProperty @Export
+  public NodePath feedEntryPath = new NodePath("FeedEntry");
+
+  /** Scene for {@link DefeatedFeedEntry} rows. Falls back to hard-coded path if null. */
+  @RegisterProperty @Export
+  public PackedScene defeatedEntryScene;
+
   private Label healthLabel;
   private Label magazineLabel;
   private Label reserveLabel;
   private Label pickupNotificationLabel;
   private TextureRect notificationIcon;
   private Label interactPromptLabel;
+  private Feed feed;
   private String playerCharacterId = "";
   private double pickupTimer = 0.0;
   private static final double PICKUP_NOTIFICATION_DURATION = 3.0;
+  private static final String DEFEATED_ENTRY_SCENE_PATH =
+          "res://src/main/resources/com/ui/DefeatedFeedEntry.tscn";
 
   @RegisterFunction
   @Override
@@ -63,6 +74,12 @@ public class CharacterHUD extends Control {
     Node promptNode = getNodeOrNull("InteractPrompt");
     if (promptNode instanceof Label l) interactPromptLabel = l;
 
+    // Scan children for a Feed node — more robust than a path that can be
+    // cleared in the inspector (same pattern Character uses to find Controller).
+    for (Node child : getChildren()) {
+      if (child instanceof Feed f) { feed = f; break; }
+    }
+
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) {
       bus.playerAmmoChanged.connectUnsafe(
@@ -70,6 +87,9 @@ public class CharacterHUD extends Control {
           godot.api.Object.ConnectFlags.DEFAULT);
       bus.playerHealthChanged.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onHealthChanged")),
+          godot.api.Object.ConnectFlags.DEFAULT);
+      bus.characterEliminated.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onCharacterEliminated")),
           godot.api.Object.ConnectFlags.DEFAULT);
       bus.pickupInteractChanged.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onPickupInteractChanged")),
@@ -133,6 +153,27 @@ public class CharacterHUD extends Control {
   public void onWeaponPickedUp(String characterId, String weaponName, Texture2D weaponIcon) {
     if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(characterId)) return;
     showNotification("Picked up " + weaponName, weaponIcon);
+  }
+
+  /** Push a {@link DefeatedFeedEntry} row to the kill feed. */
+  @RegisterFunction
+  public void onCharacterEliminated(String attackerName, String attackerFaction,
+                                    String victimName,   String victimFaction,
+                                    String weaponName,   Texture2D weaponIcon,
+                                    boolean headshot) {
+    if (feed == null) return;
+    PackedScene scene = resolveDefeatedEntryScene();
+    if (scene == null) return;
+    DefeatedFeedEntry entry = (DefeatedFeedEntry) scene.instantiate();
+    entry.lifespan = feed.entryLifespan;
+    feed.push(entry);
+    entry.populate(attackerName, attackerFaction, victimName, victimFaction, weaponIcon, headshot);
+  }
+
+  private PackedScene resolveDefeatedEntryScene() {
+    if (defeatedEntryScene != null) return defeatedEntryScene;
+    godot.api.Object loaded = GD.load(DEFEATED_ENTRY_SCENE_PATH);
+    return (loaded instanceof PackedScene ps) ? ps : null;
   }
 
   /** Show a transient pickup notification (weapon icon + item name). */

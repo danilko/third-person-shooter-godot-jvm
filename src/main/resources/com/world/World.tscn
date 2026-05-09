@@ -15,7 +15,6 @@
 [ext_resource type="PackedScene" uid="uid://bb60nshfmm7so" path="res://src/main/resources/com/weapon/Pistol.tscn" id="12_ej8ck"]
 [ext_resource type="PackedScene" uid="uid://chmmjlji5vapb" path="res://src/main/resources/com/weapon/Rifle.tscn" id="13_ijvcp"]
 [ext_resource type="Script" uid="uid://bf5eaphw77cc4" path="res://src/main/java/com/ui/HUDManager.java" id="14_cl06x"]
-[ext_resource type="Script" uid="uid://x2aupnfxbw7s" path="res://gdj/com/ui/CharacterHUD.gdj" id="14_ijvcp"]
 [ext_resource type="PackedScene" uid="uid://dtlryojg3n01y" path="res://src/main/resources/com/ui/FootHUD.tscn" id="15_8dp8o"]
 [ext_resource type="PackedScene" uid="uid://3v8l2bjm8pek" path="res://src/main/resources/com/ui/WeaponRadialMenu.tscn" id="17_nmpqt"]
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="19_hs4nr"]
@@ -80,6 +79,7 @@ albedo_color = Color(1, 0, 0, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_flesh"]
 material = SubResource("StandardMaterial3D_flesh")
+size = Vector3(0.5, 0.5, 0.5)
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_hs4nr"]
 direction = Vector3(0, 1, 0)
@@ -90,11 +90,11 @@ scale_over_velocity_max = 1.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tracer"]
 shading_mode = 0
-albedo_color = Color(0.9999996, 0.8597612, 0.82278657, 1)
+albedo_color = Color(1.685791, 1.5852925, 1.0005594, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_tracer"]
+[sub_resource type="BoxMesh" id="BoxMesh_kfoa7"]
 material = SubResource("StandardMaterial3D_tracer")
-size = Vector3(0.02, 0.1, 0.2)
+size = Vector3(0.1, 0.5, 0.2)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kfoa7"]
 shading_mode = 0
@@ -276,7 +276,7 @@ one_shot = true
 speed_scale = 2.0
 explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_hs4nr")
-draw_pass_1 = SubResource("BoxMesh_tracer")
+draw_pass_1 = SubResource("BoxMesh_kfoa7")
 
 [node name="ImpactManager" type="Node" parent="." unique_id=201500001]
 script = ExtResource("9_imct")
@@ -297,19 +297,16 @@ script = ExtResource("11_btrc")
 mesh = SubResource("BoxMesh_hs4nr")
 
 [node name="Pistol" parent="." unique_id=358619058 instance=ExtResource("12_ej8ck")]
-transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10, -4.3711214e-08, 1, -0.004708648, -0.9999888, -4.3711307e-08, 0.3772924, 0.9677863, 3.4917908)
+transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10, -4.3711214e-08, 1, -0.004708648, -0.9999888, -4.3711307e-08, 0.3772924, 0.6055342, 3.597293)
 
 [node name="Rifle" parent="." unique_id=1788483088 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.002087593, 0.726562, 3.2870467)
-
-[node name="Rifle4" parent="." unique_id=2145921233 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, -5.8946953, 0.726562, 3.4050605)
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.002087593, 0.726562, 3.3925488)
 
 [node name="HUDManager" type="CanvasLayer" parent="." unique_id=1946570621]
 script = ExtResource("14_cl06x")
 
 [node name="FootHUD" parent="HUDManager" unique_id=1962846644 instance=ExtResource("15_8dp8o")]
-script = ExtResource("14_ijvcp")
+feed_entry_path = NodePath("FeedEntry")
 
 [node name="WeaponRadialMenu" parent="HUDManager" unique_id=1303740167 node_paths=PackedStringArray("character") instance=ExtResource("17_nmpqt")]
 character = NodePath("../../Player")
@@ -323,8 +320,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.74
 [node name="AICharacter-E1" parent="." unique_id=1107363167 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0463448, 0.89418125, -4.9451065)
 ammo_refill = NodePath("../AmmoRefill")
-aim_body_part = "CHEST"
-aim_scatter_radius = 2.5
 character_info = SubResource("Resource_hs4nr")
 
 [node name="Rifle5" parent="." unique_id=1210622816 instance=ExtResource("13_ijvcp")]
@@ -333,8 +328,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 15.1
 [node name="AICharacter-E2" parent="." unique_id=1865541393 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.466324, 0.89418125, -1.1655312)
 ammo_refill = NodePath("../AmmoRefill")
-aim_body_part = "CHEST"
-aim_scatter_radius = 2.5
 character_info = SubResource("Resource_hs4nr")
 
 [node name="Rifle3" parent="." unique_id=913745768 instance=ExtResource("13_ijvcp")]
@@ -343,8 +336,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 6.26
 [node name="AICharacter-P1" parent="." unique_id=817366872 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5630608, 0.89418125, 5.344763)
 ammo_refill = NodePath("../AmmoRefill")
-aim_body_part = "CHEST"
-aim_scatter_radius = 2.5
 character_info = SubResource("Resource_imhx0")
 
 [node name="Rifle6" parent="." unique_id=1288307646 instance=ExtResource("13_ijvcp")]
@@ -353,8 +344,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, -2.4
 [node name="AICharacter-P2" parent="." unique_id=294236911 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.1574564, 0.89418125, -6.0137196)
 ammo_refill = NodePath("../AmmoRefill")
-aim_body_part = "CHEST"
-aim_scatter_radius = 2.5
 character_info = SubResource("Resource_imhx0")
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]
