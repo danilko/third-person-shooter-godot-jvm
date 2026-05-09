@@ -51,7 +51,7 @@ public class CharacterNameplate extends Node3D {
 
         // ViewportTexture → Sprite3D is wired in the .tscn via:
         //   sub_resource ViewportTexture { resource_local_to_scene=true, viewport_path="HealthUI" }
-        // resource_local_to_scene causes Godot to clone the resource per instance,
+        // resource_local_to_scene causACTes Godot to clone the resource per instance,
         // setting each clone's local_scene to its own CharacterNameplate so
         // get_node("HealthUI") resolves to the correct sibling SubViewport.
 

@@ -1,5 +1,6 @@
 package com.character;
 
+import com.vehicle.VehicleBody;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Input;
@@ -10,43 +11,75 @@ import godot.core.Vector3;
  * Translates human keyboard/mouse input into a UserCommand each tick.
  *
  * Equivalent to Unreal's APlayerController / Source Engine's CBasePlayer command
- * generation. Lives as a child node of Player. Accesses the Player body via
- * getOwner() for aimRay, aimStayTimer, and combat state.
+ * generation. Lives as a child node of a Controllable (Player or VehicleBody).
+ * Detects the body type each tick via getControllable() and generates the
+ * appropriate command fields:
+ *   Player body     → movement, combat, weapon, jump, stance fields
+ *   VehicleBody     → throttle, steering, handbrake fields
+ *
+ * Hot-swap (Phase 5): call setTarget(newBody) before reparenting so gatherInput()
+ * immediately generates the correct command type for the incoming body.
  *
  * Network (Phase 4): on the owning client this runs locally for prediction;
  * the resulting UserCommand is stamped with a monotone sequenceNumber and stored
  * in the predictionBuffer ring buffer. When the server sends back a corrected
  * state, reconcile(serverAck) discards acknowledged entries and the caller
  * replays unacknowledged commands against the snapped server state.
- *
- * Phase 4 TODO (actual transport):
- *   - After stamping sequenceNumber, serialize the UserCommand and send to server
- *     via rpc_id(1, "server_receive_cmd", ...) or a PackedByteArray RPC.
- *   - Wire reconcile() to a signal/RPC from the server indicating divergence.
  */
 @RegisterClass(className = "PlayerController")
 public class PlayerController extends Controller {
 
     private static final int BUFFER_SIZE = 64;
 
-    private Player body;
-    private Timer  aimStayTimer;
-
     // ── Client-side prediction state ──────────────────────────────────────────
-    private int            localSequence   = 0;
+    private int              localSequence    = 0;
     private final UserCommand[] predictionBuffer = new UserCommand[BUFFER_SIZE];
+
+    // ── Cached body references (re-resolved when body type changes) ───────────
+    private Player     cachedPlayer;
+    private Timer      cachedAimStayTimer;
+    private VehicleBody cachedVehicle;
 
     @RegisterFunction
     @Override
     public void _ready() {
-        body = (Player) getOwner();
-        aimStayTimer = (Timer) body.getNode("AimStayTimer");
+        resolveBody();
+    }
+
+    private void resolveBody() {
+        Controllable c = getControllable();
+        if (c instanceof Player p) {
+            cachedPlayer       = p;
+            cachedAimStayTimer = (Timer) p.getNode("AimStayTimer");
+            cachedVehicle      = null;
+        } else if (c instanceof VehicleBody v) {
+            cachedVehicle      = v;
+            cachedPlayer       = null;
+            cachedAimStayTimer = null;
+        } else {
+            cachedPlayer  = null;
+            cachedVehicle = null;
+        }
     }
 
     @Override
     public UserCommand gatherInput(double delta) {
+        // Re-resolve if the body has changed (hot-swap or first tick after reparent).
+        Controllable c = getControllable();
+        if (c instanceof Player p && p != cachedPlayer) resolveBody();
+        else if (c instanceof VehicleBody v && v != cachedVehicle) resolveBody();
+
+        if (cachedVehicle != null) return gatherVehicleInput();
+        if (cachedPlayer  != null) return gatherCharacterInput();
+        return new UserCommand();
+    }
+
+    // ── Character (on-foot) input ─────────────────────────────────────────────
+
+    private UserCommand gatherCharacterInput() {
         UserCommand cmd = new UserCommand();
         Input inp = Input.INSTANCE;
+        Player body = cachedPlayer;
 
         // ── Movement ──────────────────────────────────────────────────────────
         float moveX = inp.getActionStrength("left")    - inp.getActionStrength("right");
@@ -63,6 +96,7 @@ public class PlayerController extends Controller {
         boolean aimOrFire = inp.isActionPressed("aim", false)
                          || inp.isActionPressed("fire", false);
 
+        Timer aimStayTimer = cachedAimStayTimer;
         if (aimOrFire) {
             aimStayTimer.stop();
         } else if (body.isCombat() && (inp.isActionJustReleased("aim", false)
@@ -104,32 +138,47 @@ public class PlayerController extends Controller {
         // ── Sequence stamp + prediction buffer (Phase 4) ──────────────────────
         cmd.sequenceNumber = ++localSequence;
         predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();
-        // Phase 4 TODO: rpc_id(1, "server_receive_cmd", serialize(cmd))
 
         return cmd;
     }
 
+    // ── Vehicle input ─────────────────────────────────────────────────────────
+
+    /**
+     * Maps keyboard to vehicle throttle/steering/handbrake using the same
+     * directional action bindings as on-foot movement so no extra mappings
+     * are needed in the input map.
+     *
+     *   forward / back  → throttle (+1 / -1)
+     *   left / right    → steering (-1 / +1, negated to match Godot convention)
+     *   jump            → handbrake
+     *   use             → enter/exit vehicle (enterExit)
+     */
+    private UserCommand gatherVehicleInput() {
+        UserCommand cmd = new UserCommand();
+        Input inp = Input.INSTANCE;
+
+        cmd.throttle  = inp.getActionStrength("forward") - inp.getActionStrength("back");
+        cmd.steering  = -(inp.getActionStrength("right") - inp.getActionStrength("left"));
+        cmd.handbrake = inp.isActionPressed("jump", false);
+        cmd.enterExit = inp.isActionJustPressed("use", false);
+
+        cmd.sequenceNumber = ++localSequence;
+        predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();
+
+        return cmd;
+    }
+
+    // ── Reconciliation (Phase 4) ──────────────────────────────────────────────
+
     /**
      * Discard prediction buffer entries confirmed by the server, then replay
      * any unacknowledged commands against the snapped server state.
-     *
-     * Called by the network layer when the server sends a state correction.
-     * @param serverAck The last sequenceNumber the server confirmed processing.
      */
     public void reconcile(int serverAck) {
-        // Discard entries the server has already processed
         for (int seq = serverAck; seq >= Math.max(0, serverAck - BUFFER_SIZE + 1); seq--) {
             predictionBuffer[seq % BUFFER_SIZE] = null;
         }
-        // Phase 4 TODO:
-        //   1. Snap body to server-authoritative state (MultiplayerSynchronizer
-        //      already wrote global_position, velocity, etc. to the body).
-        //   2. Replay unacknowledged commands (serverAck+1 … localSequence):
-        //        for (int seq = serverAck + 1; seq <= localSequence; seq++) {
-        //            UserCommand cmd = predictionBuffer[seq % BUFFER_SIZE];
-        //            if (cmd != null) body.applyInput(cmd, fixedDelta);
-        //        }
-        //   applyInput() is deterministic so replaying produces the corrected
-        //   predicted state without touching any authoritative server data.
+        // Phase 4 TODO: snap body to server state, then replay unacknowledged commands.
     }
 }
