@@ -66,6 +66,7 @@ public class UserCommand {
     public float   throttle;
     public float   steering;
     public boolean handbrake;
+    public boolean drift;
     public boolean enterExit;
 
     // ── Construction ──────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ public class UserCommand {
         throttle          = 0f;
         steering          = 0f;
         handbrake         = false;
+        drift             = false;
         enterExit         = false;
     }
 
@@ -117,6 +119,7 @@ public class UserCommand {
         c.throttle        = throttle;
         c.steering        = steering;
         c.handbrake       = handbrake;
+        c.drift           = drift;
         c.enterExit       = enterExit;
         return c;
     }

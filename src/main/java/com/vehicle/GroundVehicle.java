@@ -1,27 +1,20 @@
 package com.vehicle;
 
-import com.character.UserCommand;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterProperty;
 
 /**
- * Concrete ground vehicle (car / tank) with speed-cap physics.
+ * Concrete ground vehicle (car / tank) with top-speed clamping.
  *
- * Extends VehicleBody with two tunable limits:
- *   maxSpeed         — clamps forward engine force once the vehicle reaches this speed
- *   reverseSpeedFactor — reverse top speed as a fraction of maxSpeed
- *
- * All other tuning (engineForce, brakeStrength, maxSteerAngle) is inherited
- * and set per-instance in the editor.
- *
- * Add VehicleWheel3D children in the scene and configure each wheel's
- * use_as_traction / use_as_steering flags to complete the vehicle setup.
+ * Overrides getThrottleInput() to zero the throttle once the vehicle reaches
+ * maxSpeed (forward) or maxSpeed × reverseSpeedFactor (reverse).
+ * All suspension, steering, drift, and force physics are inherited from Vehicle.
  */
 @RegisterClass(className = "GroundVehicle")
-public class GroundVehicle extends VehicleBody {
+public class GroundVehicle extends Vehicle {
 
-    /** Forward top speed in m/s — engine force is zeroed above this. */
+    /** Forward top speed in m/s (~100 km/h at 28). */
     @RegisterProperty @Export public float maxSpeed = 28.0f;
 
     /**
@@ -31,19 +24,14 @@ public class GroundVehicle extends VehicleBody {
     @RegisterProperty @Export public float reverseSpeedFactor = 0.4f;
 
     @Override
-    public void applyCommand(UserCommand cmd, double delta) {
-        float speedSq    = (float) getLinearVelocity().lengthSquared();
-        float maxFwd     = maxSpeed;
-        float maxRev     = maxSpeed * reverseSpeedFactor;
-
-        UserCommand capped = cmd.copy();
-
-        if (capped.throttle > 0f && speedSq > maxFwd * maxFwd) {
-            capped.throttle = 0f;
-        } else if (capped.throttle < 0f && speedSq > maxRev * maxRev) {
-            capped.throttle = 0f;
-        }
-
-        super.applyCommand(capped, delta);
+    protected float getThrottleInput(float raw) {
+        // Cap on the signed forward component (velocity projected onto desiredForward)
+        // rather than total speed. On a slope, vertical velocity would otherwise add
+        // to total speed and falsely cut the throttle while the vehicle is still
+        // below maxSpeed in the travel direction.
+        float fwdSpd = (float) getLinearVelocity().dot(desiredForward);
+        if (raw > 0f && fwdSpd >  maxSpeed)                    return 0f;
+        if (raw < 0f && fwdSpd < -maxSpeed * reverseSpeedFactor) return 0f;
+        return raw;
     }
 }

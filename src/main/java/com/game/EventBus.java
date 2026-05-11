@@ -76,4 +76,18 @@ public class EventBus extends Node {
     @RegisterSignal
     public final Signal3<String, String, Texture2D> weaponPickedUp =
             new Signal3<>(this, new StringName("weapon_picked_up"));
+
+    /**
+     * Emitted by Vehicle.tryEnter() when a character boards a vehicle.
+     * Payload: the Vehicle node (cast to Node3D / Vehicle as needed).
+     */
+    @RegisterSignal
+    public final Signal1<Node> vehicleEntered =
+            new Signal1<>(this, new StringName("vehicle_entered"));
+
+    /**
+     * Emitted by Vehicle.tryExit() when the occupant leaves the vehicle.
+     */
+    @RegisterSignal
+    public final Signal0 vehicleExited = new Signal0(this, new StringName("vehicle_exited"));
 }

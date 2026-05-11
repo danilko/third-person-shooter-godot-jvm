@@ -3,10 +3,9 @@
 
 registeredName = GroundVehicle
 fqName = com.vehicle.GroundVehicle
-baseType = VehicleBody3D
+baseType = RigidBody3D
 supertypes = [
-    com.vehicle.VehicleBody,
-	godot.api.VehicleBody3D,
+    com.vehicle.Vehicle,
 	godot.api.RigidBody3D,
 	godot.api.PhysicsBody3D,
 	godot.api.CollisionObject3D,
@@ -25,12 +24,35 @@ properties = [
     max_speed,
 	reverse_speed_factor,
 	character_info,
-	engine_force,
-	brake_strength,
-	max_steer_angle,
-	idle_brake
+	engine_power,
+	max_turn_angle_degree,
+	turn_spring_response,
+	normal_body_angle,
+	max_drift_angle,
+	drift_angle_lerp_speed,
+	drift_turn_rate_degree,
+	visual_lean_factor,
+	lateral_force_factor,
+	turn_slide_reduction,
+	drift_lateral_factor,
+	max_drift_reduction,
+	max_drift_lateral_speed,
+	drag_force_factor,
+	brake_power,
+	min_speed_for_turn,
+	max_spring_length,
+	spring_stiffness,
+	spring_damper_stiffness,
+	wheel_radius,
+	wheels_path,
+	driver_seat_path,
+	camera_controller_path,
+	vehicle_cam_path
 ]
 functions = [
     _ready,
-	_physics_process
+	_integrate_forces,
+	_physics_process,
+	on_entrance_body_entered,
+	on_entrance_body_exited
 ]

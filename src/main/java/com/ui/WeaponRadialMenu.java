@@ -37,8 +37,6 @@ public class WeaponRadialMenu extends Control {
   @RegisterProperty @Export
   public PackedScene weaponItemTemplate;
 
-  private WeaponController cachedWeaponController;
-  private Node             cachedCamera;
   private AnimationPlayer  animationPlayer;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -46,8 +44,6 @@ public class WeaponRadialMenu extends Control {
   /** Set or update the active character; rebuilds items for the new slot layout. */
   public void wireCharacter(Character c) {
     character = c;
-    cachedWeaponController = null;
-    cachedCamera = null;
     buildItems();
   }
 
@@ -160,17 +156,10 @@ public class WeaponRadialMenu extends Control {
   }
 
   private WeaponController getWeaponController() {
-    if (cachedWeaponController == null && character != null) {
-      Node wc = character.getNodeOrNull("WeaponController");
-      if (wc instanceof WeaponController w) cachedWeaponController = w;
-    }
-    return cachedWeaponController;
+    return character != null ? character.weaponController : null;
   }
 
   private Node getCamera() {
-    if (cachedCamera == null && character != null) {
-      cachedCamera = character.getNodeOrNull("CameraRoot");
-    }
-    return cachedCamera;
+    return character != null ? character.getCameraRoot() : null;
   }
 }

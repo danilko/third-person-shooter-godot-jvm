@@ -572,6 +572,17 @@ public class Character extends CharacterBody3D implements Controllable {
         }
     }
 
+    public Node3D getCameraRoot() { return cameraRoot; }
+
+    /**
+     * Makes this character's Camera3D the active viewport camera.
+     * Called by Vehicle.tryExit() when the player leaves the vehicle.
+     */
+    public void makeCameraActive() {
+        Node camNode = getNodeOrNull("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera");
+        if (camNode instanceof Camera3D cam) cam.makeCurrent();
+    }
+
     public boolean isAlive() {
         return healthNode == null || !healthNode.isDead();
     }

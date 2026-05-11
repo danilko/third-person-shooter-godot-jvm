@@ -6,6 +6,7 @@ import com.character.Player;
 import com.character.WeaponController;
 import com.character.CharacterInfo;
 import com.game.EventBus;
+import godot.api.Node3D;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -60,6 +61,16 @@ public class HUDManager extends CanvasLayer {
   public void _ready() {
     Node found = getNodeOrNull(playerPath);
     if (found != null) wirePlayer(found);
+
+    Node busNode = getNodeOrNull("/root/EventBus");
+    if (busNode instanceof EventBus bus) {
+      bus.vehicleEntered.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onVehicleEntered")),
+          Object.ConnectFlags.DEFAULT);
+      bus.vehicleExited.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onVehicleExited")),
+          Object.ConnectFlags.DEFAULT);
+    }
 
     if (!initialHUD.isEmpty()) activateHUD(initialHUD);
   }
@@ -119,6 +130,24 @@ public class HUDManager extends CanvasLayer {
   }
 
   public Control getActiveHUD() { return activeHUD; }
+
+  // ── Vehicle HUD switching ─────────────────────────────────────────────────
+
+  @RegisterFunction
+  public void onVehicleEntered(Node vehicle) {
+    Node vhudNode = getNodeOrNull("VehicleHUD");
+    if (vhudNode instanceof VehicleHUD hud && vehicle instanceof Node3D v) {
+      hud.setVehicle(v);
+    }
+    activateHUD("VehicleHUD");
+  }
+
+  @RegisterFunction
+  public void onVehicleExited() {
+    Node vhudNode = getNodeOrNull("VehicleHUD");
+    if (vhudNode instanceof VehicleHUD hud) hud.setVehicle(null);
+    activateHUD("FootHUD");
+  }
 
   // ── Signal relays — player → EventBus ─────────────────────────────────────
 

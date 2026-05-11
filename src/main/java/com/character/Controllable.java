@@ -6,7 +6,7 @@ package com.character;
  * Equivalent to Unreal's APawn interface for controller possession.
  * The two implementations diverge in what fields of UserCommand they consume:
  *   Character.applyCommand() reads movement/combat/weapon fields.
- *   VehicleBody.applyCommand() reads throttle/steering/handbrake.
+ *   Vehicle.applyCommand() reads throttle/steering/handbrake/drift.
  */
 public interface Controllable {
 

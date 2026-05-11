@@ -32,14 +32,14 @@ public class VehicleAIController extends Controller {
     /** Distance from waypoint considered "arrived" — NavigationAgent3D stops. */
     @RegisterProperty @Export public float arrivalThreshold = 3.0f;
 
-    private VehicleBody    vehicleBody;
+    private Vehicle        vehicleBody;
     private NavigationAgent3D navAgent;
 
     @RegisterFunction
     @Override
     public void _ready() {
         Node owner = getOwner();
-        if (owner instanceof VehicleBody v) {
+        if (owner instanceof Vehicle v) {
             vehicleBody = v;
         }
         if (vehicleBody != null) {

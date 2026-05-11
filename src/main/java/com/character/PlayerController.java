@@ -1,6 +1,6 @@
 package com.character;
 
-import com.vehicle.VehicleBody;
+import com.vehicle.Vehicle;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Input;
@@ -11,11 +11,11 @@ import godot.core.Vector3;
  * Translates human keyboard/mouse input into a UserCommand each tick.
  *
  * Equivalent to Unreal's APlayerController / Source Engine's CBasePlayer command
- * generation. Lives as a child node of a Controllable (Player or VehicleBody).
+ * generation. Lives as a child node of a Controllable (Player or Vehicle).
  * Detects the body type each tick via getControllable() and generates the
  * appropriate command fields:
- *   Player body     → movement, combat, weapon, jump, stance fields
- *   VehicleBody     → throttle, steering, handbrake fields
+ *   Player body → movement, combat, weapon, jump, stance fields
+ *   Vehicle     → throttle, steering, handbrake, drift fields
  *
  * Hot-swap (Phase 5): call setTarget(newBody) before reparenting so gatherInput()
  * immediately generates the correct command type for the incoming body.
@@ -38,7 +38,7 @@ public class PlayerController extends Controller {
     // ── Cached body references (re-resolved when body type changes) ───────────
     private Player     cachedPlayer;
     private Timer      cachedAimStayTimer;
-    private VehicleBody cachedVehicle;
+    private Vehicle     cachedVehicle;
 
     @RegisterFunction
     @Override
@@ -52,7 +52,7 @@ public class PlayerController extends Controller {
             cachedPlayer       = p;
             cachedAimStayTimer = (Timer) p.getNode("AimStayTimer");
             cachedVehicle      = null;
-        } else if (c instanceof VehicleBody v) {
+        } else if (c instanceof Vehicle v) {
             cachedVehicle      = v;
             cachedPlayer       = null;
             cachedAimStayTimer = null;
@@ -67,7 +67,7 @@ public class PlayerController extends Controller {
         // Re-resolve if the body has changed (hot-swap or first tick after reparent).
         Controllable c = getControllable();
         if (c instanceof Player p && p != cachedPlayer) resolveBody();
-        else if (c instanceof VehicleBody v && v != cachedVehicle) resolveBody();
+        else if (c instanceof Vehicle v && v != cachedVehicle) resolveBody();
 
         if (cachedVehicle != null) return gatherVehicleInput();
         if (cachedPlayer  != null) return gatherCharacterInput();
@@ -135,6 +135,10 @@ public class PlayerController extends Controller {
             }
         }
 
+        // ── Vehicle enter (press "use" near a vehicle) ────────────────────────
+        // Requires an "use" action in Project Settings → Input Map.
+        cmd.enterExit = inp.isActionJustPressed("interact", false);
+
         // ── Sequence stamp + prediction buffer (Phase 4) ──────────────────────
         cmd.sequenceNumber = ++localSequence;
         predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();
@@ -152,7 +156,8 @@ public class PlayerController extends Controller {
      *   forward / back  → throttle (+1 / -1)
      *   left / right    → steering (-1 / +1, negated to match Godot convention)
      *   jump            → handbrake
-     *   use             → enter/exit vehicle (enterExit)
+     *   drift           → drift mode (engage arcade slide)
+     *   interact             → enter/exit vehicle (interact)
      */
     private UserCommand gatherVehicleInput() {
         UserCommand cmd = new UserCommand();
@@ -161,7 +166,8 @@ public class PlayerController extends Controller {
         cmd.throttle  = inp.getActionStrength("forward") - inp.getActionStrength("back");
         cmd.steering  = -(inp.getActionStrength("right") - inp.getActionStrength("left"));
         cmd.handbrake = inp.isActionPressed("jump", false);
-        cmd.enterExit = inp.isActionJustPressed("use", false);
+        cmd.drift     = inp.isActionPressed("drift", false);
+        cmd.enterExit = inp.isActionJustPressed("interact", false);
 
         cmd.sequenceNumber = ++localSequence;
         predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();

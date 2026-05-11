@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://vehicle_wheel"]
+
+[ext_resource type="Script" path="res://gdj/com/vehicle/VehicleWheel.gdj" id="1_vw"]
+
+[node name="VehicleWheel" type="Node3D"]
+script = ExtResource("1_vw")
+
+; Target overridden at runtime to maxSpringLength * 1.5 = 0.75 m below wheel node.
+; The static value here is a fallback only.
+[node name="Ray" type="RayCast3D" parent="."]
+target_position = Vector3(0, -1.0, 0)
