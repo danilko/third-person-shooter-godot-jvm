@@ -1,0 +1,96 @@
+[gd_scene format=3 uid="uid://3v8l2bjm8pek"]
+
+[ext_resource type="Script" uid="uid://8mauc1oc3f4s" path="res://gdj/com/ui/WeaponRadialMenu.gdj" id="1_q6lnr"]
+[ext_resource type="Shader" uid="uid://dswkn851xk1ed" path="res://src/main/resources/com/character/RadialMenuBlur.gdshader" id="2_2v5xc"]
+[ext_resource type="Texture2D" uid="uid://cojrr0xkfleny" path="res://assets/ui/white.png" id="3_bs8y5"]
+[ext_resource type="PackedScene" uid="uid://q7tixj8eexyh" path="res://src/main/resources/com/ui/RadiaMenuItem.tscn" id="4_iu8gn"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_wev4p"]
+shader = ExtResource("2_2v5xc")
+shader_parameter/blur_amount = 2.0
+
+[sub_resource type="Animation" id="Animation_radial_reset"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Panel/Circle:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0.8, 0.8)]
+}
+
+[sub_resource type="Animation" id="Animation_radial_zoom"]
+resource_name = "Zoom"
+step = 1.0
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Panel/Circle:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 0.26),
+"update": 0,
+"values": [Vector2(0.8, 0.8), Vector2(1.1, 1.1)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_radial"]
+_data = {
+&"RESET": SubResource("Animation_radial_reset"),
+&"Zoom": SubResource("Animation_radial_zoom")
+}
+
+[node name="WeaponRadialMenu" type="Control" unique_id=1303740167]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_q6lnr")
+weapon_item_template = ExtResource("4_iu8gn")
+
+[node name="Panel" type="Panel" parent="." unique_id=1070943171]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Blur" type="TextureRect" parent="Panel" unique_id=333610366]
+material = SubResource("ShaderMaterial_wev4p")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_bs8y5")
+
+[node name="Circle" type="Control" parent="Panel" unique_id=1185540228]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(0.8, 0.8)
+
+[node name="0" parent="Panel/Circle" unique_id=703522310 instance=ExtResource("4_iu8gn")]
+layout_mode = 1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1806817277]
+libraries/ = SubResource("AnimationLibrary_radial")

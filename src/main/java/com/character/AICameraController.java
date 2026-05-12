@@ -1,0 +1,77 @@
+package com.character;
+
+import godot.annotation.Export;
+import godot.annotation.RegisterClass;
+import godot.annotation.RegisterFunction;
+import godot.annotation.RegisterProperty;
+import godot.core.Vector2;
+import godot.core.Vector3;
+import godot.global.GD;
+
+@RegisterClass(className = "AICameraController")
+public class AICameraController extends CameraController {
+
+  // World-space aim target; null = fall back to body-facing direction.
+  private Vector3 aimTarget = null;
+
+  /**
+   * Maximum camera rotation speed in degrees per second.
+   * Caps how fast the AI can swing its aim, making it look like it's actually tracking
+   * rather than teleporting. Does not affect shot accuracy — snapAimRay() handles that.
+   * Lower values make the AI feel slower to react visually; 0 = unlimited (old behaviour).
+   */
+  @Export
+  @RegisterProperty
+  public float aimTrackingDegreesPerSec = 90.0f;
+
+  @RegisterFunction
+  @Override
+  public void _ready() {
+    super._ready();
+    camera.clearCurrent(false);
+  }
+
+  public void setAimTarget(Vector3 worldTarget) { this.aimTarget = worldTarget; }
+  public void clearAimTarget()                  { this.aimTarget = null; }
+
+  /**
+   * When an aim target is set, drives Yaw/Pitch toward that world position so the
+   * AimRay converges on the target across frames.
+   *
+   * Camera forward = (cos(p)*sin(y), -sin(p), cos(p)*cos(y)).
+   * Inverting: targetYaw = atan2(dx, dz), targetPitch = -atan2(dy, hDist).
+   *
+   * Without an aim target, falls back to tracking the character body's facing direction.
+   */
+  @Override
+  protected Vector2 gatherLookInput(double delta) {
+    if (aimTarget != null) {
+      Vector3 myPos = getGlobalPosition();
+      double  dx    = aimTarget.getX() - myPos.getX();
+      double  dy    = aimTarget.getY() - myPos.getY();
+      double  dz    = aimTarget.getZ() - myPos.getZ();
+      double  hDist = Math.sqrt(dx * dx + dz * dz);
+
+      double targetYawDeg   = Math.toDegrees(Math.atan2(dx, dz));
+      double targetPitchDeg = (hDist > 0.01) ? -Math.toDegrees(Math.atan2(dy, hDist)) : 0.0;
+
+      double deltaYaw   = GD.wrapf(targetYawDeg - yaw,  -180.0, 180.0);
+      double deltaPitch = targetPitchDeg - pitch;
+
+      // Clamp rotation speed so the camera tracks at a finite rate rather than snapping.
+      if (aimTrackingDegreesPerSec > 0f) {
+        double cap = aimTrackingDegreesPerSec * delta;
+        deltaYaw   = GD.clamp(deltaYaw,   -cap, cap);
+        deltaPitch = GD.clamp(deltaPitch, -cap, cap);
+      }
+
+      return new Vector2((float) deltaYaw, (float) deltaPitch);
+    }
+
+    // Default: track character body facing, pitch stays level.
+    double characterYawDeg = Math.toDegrees(player.getRotation().getY());
+    double targetYaw       = -characterYawDeg;
+    double deltaYaw        = GD.wrapf(targetYaw - yaw, -180.0, 180.0);
+    return new Vector2((float) deltaYaw, 0f);
+  }
+}

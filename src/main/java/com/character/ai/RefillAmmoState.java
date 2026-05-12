@@ -1,52 +1,42 @@
 package com.character.ai;
 
-import com.character.CharacterInput;
-import com.character.Enemy;
+import com.character.AICharacter;
+import com.character.AIController;
 import com.character.MovementType;
+import com.character.UserCommand;
 import godot.core.Vector3;
 
-/**
- * Enemy sprints to the nearest ammo refill station.
- * Fills all weapons on arrival, then returns to {@link PatrolState}.
- * Aborts immediately if ammo becomes available (e.g., picked up mid-path).
- */
-public class RefillAmmoState implements EnemyAIState {
+public class RefillAmmoState implements AIState {
 
     public static final RefillAmmoState INSTANCE = new RefillAmmoState();
-
     private RefillAmmoState() {}
 
     @Override
-    public void enter(Enemy enemy) {
-        if (enemy.ammoRefill != null) {
-            enemy.getNavAgent().setTargetPosition(enemy.ammoRefill.getGlobalPosition());
-        }
+    public void enter(AICharacter body, AIController ctrl) {
+        if (body.ammoRefill != null)
+            body.getNavAgent().setTargetPosition(body.ammoRefill.getGlobalPosition());
     }
 
     @Override
-    public void exit(Enemy enemy) {}
+    public void exit(AICharacter body, AIController ctrl) {}
 
     @Override
-    public EnemyAIState update(Enemy enemy, CharacterInput input, double delta) {
-        if (enemy.ammoRefill == null || enemy.hasAnyAmmo()) {
+    public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
+        if (body.ammoRefill == null || body.hasAnyAmmo()) return PatrolState.INSTANCE;
+
+        if (body.isAtAmmoRefill()) {
+            body.weaponController.fillWeaponAmmo();
             return PatrolState.INSTANCE;
         }
 
-        if (enemy.isAtAmmoRefill()) {
-            enemy.weaponController.fillWeaponAmmo();
-            return PatrolState.INSTANCE;
-        }
-
-        input.wantCombat = false;
-        input.movementType = MovementType.SPRINT;
-
-        Vector3 dir = enemy.getNavAgent()
-                           .getNextPathPosition()
-                           .minus(enemy.getGlobalPosition())
-                           .normalized();
-        input.movementDirection.setX(dir.getX());
-        input.movementDirection.setZ(dir.getZ());
-
+        cmd.wantCombat = false;
+        cmd.movementType = MovementType.SPRINT;
+        Vector3 dir = body.getNavAgent()
+                          .getNextPathPosition()
+                          .minus(body.getGlobalPosition())
+                          .normalized();
+        cmd.movementDirection.setX(dir.getX());
+        cmd.movementDirection.setZ(dir.getZ());
         return this;
     }
 }

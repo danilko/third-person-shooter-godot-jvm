@@ -196,6 +196,8 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 | **Aim / Fire**           | `Mouse Right` / `Mouse Left` |
 | **Reload**               | `R`                          |
 | **Switch Weapon**        | `G`                          |
+| **Drop Weapon**          | `F`                          |
+| **Equip/Use**            | `E`                          |
 | **Swap Camera Shoulder** | `Q`                          |
 | **Menu**                 | `Esc`                        |
 

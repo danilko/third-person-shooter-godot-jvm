@@ -1,7 +1,11 @@
 package com.game;
 
+import com.character.CharacterController;
+import com.character.Player;
+import com.character.PlayerController;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
+import godot.api.Input;
 import godot.api.Node;
 import godot.core.Callable;
 import godot.core.StringNames;
@@ -50,8 +54,7 @@ public class GameManager extends Node {
     public void onPlayerDied() {
         if (currentState != GameState.PLAYING) return;
         transitionTo(GameState.GAME_OVER);
-        // TODO: show game-over UI (get game-over screen node and call show())
-        GD.print("GameManager: player died — game over");
+        // MenuManager.onPlayerDied() (same signal) owns the pause + game-over UI.
     }
 
     public void pauseGame() {
@@ -67,6 +70,8 @@ public class GameManager extends Node {
     }
 
     public void restartLevel() {
+        if (getTree() != null) getTree().setPause(false);
+        Input.INSTANCE.setMouseMode(Input.MouseMode.CAPTURED);
         transitionTo(GameState.PLAYING);
         if (getTree() != null) getTree().reloadCurrentScene();
     }
@@ -84,6 +89,34 @@ public class GameManager extends Node {
 
     public boolean isPlaying() {
         return currentState == GameState.PLAYING;
+    }
+
+    // ── Bot-fill / L4D controller swap (Phase 4, Step 5) ─────────────────────
+
+    /**
+     * Called when the owning player disconnects.
+     * Replaces the PlayerController with a CharacterController (AI bot) so the
+     * game continues without a human driver.
+     */
+    public void onPlayerLeft(Player body) {
+        Node ctrl = body.getNodeOrNull("PlayerController");
+        if (ctrl != null) ctrl.queueFree();
+        CharacterController bot = new CharacterController();
+        body.addChild(bot);
+        GD.print("GameManager: player left — bot attached to " + body.getName());
+    }
+
+    /**
+     * Called when a player reconnects or takes control of a body.
+     * Removes the AI CharacterController and reattaches a PlayerController so
+     * the human drives the body again.
+     */
+    public void onPlayerJoined(Player body) {
+        Node ctrl = body.getNodeOrNull("CharacterController");
+        if (ctrl != null) ctrl.queueFree();
+        PlayerController human = new PlayerController();
+        body.addChild(human);
+        GD.print("GameManager: player joined — PlayerController attached to " + body.getName());
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

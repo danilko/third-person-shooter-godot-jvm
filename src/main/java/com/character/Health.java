@@ -8,6 +8,7 @@ import godot.annotation.RegisterProperty;
 import godot.annotation.RegisterSignal;
 import godot.api.Node;
 import godot.api.PhysicalBone3D;
+import godot.api.Texture2D;
 import godot.core.Signal0;
 import godot.core.Signal1;
 import godot.core.StringName;
@@ -24,6 +25,11 @@ public class Health extends Node {
     @RegisterProperty
     public String displayName = "";
 
+    /** Network-synced mirror of currentHealth — read by MultiplayerSynchronizer on remote peers. */
+    @Export
+    @RegisterProperty
+    public float syncHealth = 100.0f;
+
     private float currentHealth;
 
     @RegisterSignal
@@ -36,24 +42,41 @@ public class Health extends Node {
     @Override
     public void _ready() {
         currentHealth = maxHealth;
+        syncHealth = maxHealth;
     }
 
     public void takeDamage(Node hitNode, float baseDamage, String weaponName) {
-        takeDamage(hitNode, baseDamage, weaponName, "");
+        takeDamage(hitNode, baseDamage, weaponName, null, "", "");
     }
 
-    public void takeDamage(Node hitNode, float baseDamage, String weaponName, String attackerName) {
+    public void takeDamage(Node hitNode, float baseDamage, String weaponName,
+                           Texture2D weaponIcon, String attackerName, String attackerFaction) {
         if (currentHealth <= 0) return;
         boolean headshot = (hitNode instanceof PhysicalBone3D)
                 && "Physical Bone neck_01".equals(hitNode.getName().toString());
         float damage = baseDamage * getDamageMultiplier(hitNode);
         currentHealth = Math.max(0.0f, currentHealth - damage);
+        syncHealth = currentHealth;
         damaged.emit(damage);
         if (currentHealth <= 0) {
             Node busNode = getNodeOrNull("/root/EventBus");
             if (busNode instanceof EventBus bus) {
-                String victimName = displayName.isEmpty() ? getOwner().getName().toString() : displayName;
-                bus.characterEliminated.emit(attackerName, victimName, weaponName, headshot);
+                Node owner = getOwner();
+                String victimName;
+                String victimFaction;
+                if (owner instanceof Character c && c.characterInfo != null) {
+                    victimName    = c.characterInfo.displayName;
+                    victimFaction = c.characterInfo.faction;
+                } else if (!displayName.isEmpty()) {
+                    victimName    = displayName;
+                    victimFaction = "";
+                } else {
+                    victimName    = owner != null ? owner.getName().toString() : "Unknown";
+                    victimFaction = "";
+                }
+                bus.characterEliminated.emit(
+                        attackerName, attackerFaction, victimName, victimFaction,
+                        weaponName, weaponIcon, headshot);
             }
             died.emit();
         }
@@ -62,6 +85,7 @@ public class Health extends Node {
     @RegisterFunction
     public void heal(float amount) {
         currentHealth = Math.min(maxHealth, currentHealth + amount);
+        syncHealth = currentHealth;
     }
 
     public float getCurrentHealth() {

@@ -1,141 +1,115 @@
 package com.character.ai;
 
-import com.character.CharacterInput;
-import com.character.Enemy;
+import com.character.AICharacter;
+import com.character.AIController;
 import com.character.MovementType;
-import godot.api.Node3D;
+import com.character.UserCommand;
 import godot.core.Vector3;
 import godot.global.GD;
 
-/**
- * CS 1.6-style attack: enemy strafes laterally, waits for a reaction delay,
- * then fires with per-shot hit/miss accuracy controlled by {@link Enemy#hitChance}.
- *
- * When line of sight is lost the enemy does not immediately retreat — instead it
- * fires suppression shots at the last known player position for up to
- * {@link Enemy#suppressionDuration} seconds before transitioning to SearchState.
- * This makes enemies feel aggressive at close range (tight scatter) and naturally
- * more conservative at long range (wide scatter, hard to hit through cover).
- */
-public class AttackState implements EnemyAIState {
+public class AttackState implements AIState {
 
     public static final AttackState INSTANCE = new AttackState();
-
     private AttackState() {}
 
     @Override
-    public void enter(Enemy enemy) {
-        enemy.resetAttackTimer();
-        enemy.resetReactionTimer();
-        enemy.resetLostPlayerTimer();
-        enemy.setCurrentAimTarget(null);
+    public void enter(AICharacter body, AIController ctrl) {
+        ctrl.resetAttackTimer();
+        ctrl.resetReactionTimer();
+        ctrl.resetLostTargetTimer();
+        ctrl.setCurrentAimTarget(null);
     }
 
     @Override
-    public void exit(Enemy enemy) {
-        enemy.clearCameraAimTarget();
+    public void exit(AICharacter body, AIController ctrl) {
+        body.clearCameraAimTarget();
     }
 
     @Override
-    public EnemyAIState update(Enemy enemy, CharacterInput input, double delta) {
-        if (enemy.getPlayer() == null) return PatrolState.INSTANCE;
+    public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
+        // Re-evaluate nearest live hostile each frame so a closer threat that
+        // appears mid-combat (e.g. a player walking in) is not ignored.
+        body.refreshTarget();
+        if (body.getTarget() == null) {
+            return PatrolState.INSTANCE;
+        }
 
-        Vector3 playerPos = enemy.getPlayer().getGlobalPosition();
-        Vector3 enemyPos  = enemy.getGlobalPosition();
-        float dx    = (float)(playerPos.getX() - enemyPos.getX());
-        float dz    = (float)(playerPos.getZ() - enemyPos.getZ());
+        Vector3 targetPos = body.getTarget().getGlobalPosition();
+        Vector3 myPos     = body.getGlobalPosition();
+        float dx    = (float) (targetPos.getX() - myPos.getX());
+        float dz    = (float) (targetPos.getZ() - myPos.getZ());
         float hDist = (float) Math.sqrt(dx * dx + dz * dz);
-        float dist  = (float) enemyPos.distanceTo(playerPos);
+        float dist  = (float) myPos.distanceTo(targetPos);
 
-        if (dist > enemy.attackRange) return ChaseState.INSTANCE;
+        if (dist > body.attackRange) return ChaseState.INSTANCE;
 
-        input.wantCombat = true;
-        enemy.advanceReactionTimer(delta);
+        cmd.wantCombat = true;
+        ctrl.advanceReactionTimer(delta);
 
-        // ── LoS tracking: clear shot resets timer; lost shot advances it ─────
-        boolean hasLoS = enemy.hasLineOfSight();
+        boolean hasLoS = body.hasLineOfSight();
         if (hasLoS) {
-            enemy.setLastKnownPlayerPosition(new Vector3(playerPos));
-            enemy.resetLostPlayerTimer();
+            ctrl.setLastKnownTargetPosition(new Vector3(targetPos));
+            ctrl.resetLostTargetTimer();
         } else {
-            enemy.advanceLostPlayerTimer(delta);
-            if (!enemy.hasLastKnownPosition() || enemy.isSuppressExpired()) {
-                return SearchState.INSTANCE;
-            }
+            ctrl.advanceLostTargetTimer(delta);
+            if (!ctrl.hasLastKnownPosition() || ctrl.isSuppressExpired()) return SearchState.INSTANCE;
         }
 
-        // ── Movement: retreat on extreme pitch, strafe otherwise ─────────────
-        Vector3 eyePos = enemyPos.plus(new Vector3(0, Enemy.EYE_HEIGHT, 0));
-        float targetY  = (float)playerPos.getY() + Enemy.PLAYER_BODY_HEIGHT;
-        float dy       = targetY - (float)eyePos.getY();
+        // ── Movement ──────────────────────────────────────────────────────────
+        Vector3 eyePos = myPos.plus(new Vector3(0, AICharacter.EYE_HEIGHT, 0));
+        float targetY  = (float) targetPos.getY() + AICharacter.TARGET_BODY_HEIGHT;
+        float dy       = targetY - (float) eyePos.getY();
         float pitchDeg = (hDist > 0.01f) ? (float) Math.toDegrees(Math.atan2(dy, hDist)) : 0f;
-        boolean pitchOutOfRange = pitchDeg > enemy.aimPitchMax || pitchDeg < enemy.aimPitchMin;
+        boolean pitchOut = pitchDeg > body.aimPitchMax || pitchDeg < body.aimPitchMin;
 
-        if (pitchOutOfRange && hDist > 0.01f) {
-            input.movementDirection.setX(-dx / hDist);
-            input.movementDirection.setZ(-dz / hDist);
-            input.movementType = MovementType.WALK;
+        if (pitchOut && hDist > 0.01f) {
+            cmd.movementDirection.setX(-dx / hDist);
+            cmd.movementDirection.setZ(-dz / hDist);
+            cmd.movementType = MovementType.WALK;
         } else {
-            if (enemy.needsStrafeUpdate()) {
-                enemy.refreshStrafe();
-            }
-            enemy.tickStrafeTimer(delta);
-            input.movementDirection.setX(enemy.getStrafeX());
-            input.movementDirection.setZ(enemy.getStrafeZ());
-            input.movementType = MovementType.WALK;
+            if (ctrl.needsStrafeUpdate()) ctrl.refreshStrafe();
+            ctrl.tickStrafeTimer(delta);
+            cmd.movementDirection.setX(ctrl.getStrafeX());
+            cmd.movementDirection.setZ(ctrl.getStrafeZ());
+            cmd.movementType = MovementType.WALK;
         }
 
-        // ── Aim camera toward current target each frame ───────────────────────
-        if (enemy.getCurrentAimTarget() == null) {
-            // Initialise aim toward the player (or last known position if no LoS yet)
-            Vector3 initialTarget = hasLoS
-                    ? ((Node3D) enemy.getPlayer().getNode("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone neck_01")).getGlobalPosition()
-                    : enemy.getLastKnownPlayerPosition();
-            enemy.setCurrentAimTarget(initialTarget);
+        // ── Aim initialisation ────────────────────────────────────────────────
+        if (ctrl.getCurrentAimTarget() == null) {
+            Vector3 initial = hasLoS ? body.getAimBonePosition() : ctrl.getLastKnownTargetPosition();
+            ctrl.setCurrentAimTarget(initial);
         }
-        enemy.aimAtPosition(enemy.getCurrentAimTarget(), delta);
-        input.aimTargetPosition = enemy.getCurrentAimTarget();
+        body.aimAtPosition(ctrl.getCurrentAimTarget(), delta);
+        cmd.aimTargetPosition = ctrl.getCurrentAimTarget();
 
-        // ── Weapon management: always prefer highest-damage weapon with ammo ──
-        int bestWeapon = enemy.selectBestWeapon();
+        // ── Weapon selection ──────────────────────────────────────────────────
+        int bestWeapon = body.selectBestWeapon();
         if (bestWeapon < 0) return RefillAmmoState.INSTANCE;
-        if (enemy.weaponController != null && bestWeapon != enemy.weaponController.getWeapon()) {
-            if (!enemy.weaponController.isWeaponTransitioning()) {
-                input.desiredWeapon = bestWeapon;
-            }
+        if (body.weaponController != null && bestWeapon != body.weaponController.getWeapon()) {
+            if (!body.weaponController.isWeaponTransitioning()) cmd.desiredWeapon = bestWeapon;
             return this;
         }
 
-        // ── Reaction delay: don't fire immediately on first LoS contact ───────
-        if (!enemy.isReactionReady()) {
-            return this;
-        }
+        if (!ctrl.isReactionReady()) return this;
 
-        // ── Fire on cooldown ─────────────────────────────────────────────────
-        enemy.advanceAttackTimer(-delta);
-        if (enemy.isAttackReady()) {
-            double fireRate = (enemy.weaponController != null
-                    && enemy.weaponController.getCurrentWeaponStats() != null)
-                    ? enemy.weaponController.getCurrentWeaponStats().getFireRate()
-                    : 0.0;
-            enemy.resetAttackTimer(fireRate > 0.0 ? 1.0 / fireRate : 1.5);
+        // ── Fire on cooldown ──────────────────────────────────────────────────
+        ctrl.advanceAttackTimer(-delta);
+        if (ctrl.isAttackReady()) {
+            double fireRate = (body.weaponController != null
+                    && body.weaponController.getCurrentWeaponStats() != null)
+                    ? body.weaponController.getCurrentWeaponStats().getFireRate() : 0.0;
+            ctrl.resetAttackTimer(fireRate > 0.0 ? 1.0 / fireRate : 1.5);
 
-            Vector3 newTarget;
-            if (hasLoS) {
-                // Clear shot: normal hit/miss accuracy roll
-                boolean isHit = GD.randf() < enemy.hitChance;
-                newTarget = enemy.computeAimTarget(isHit, hDist);
-            } else {
-                // No LoS: suppression fire at last known position with extra scatter
-                newTarget = enemy.computeSuppressTarget(hDist);
-                if (newTarget == null) return SearchState.INSTANCE;
-            }
+            Vector3 newTarget = hasLoS
+                    ? body.computeAimTarget(GD.randf() < body.hitChance, hDist)
+                    : ctrl.computeSuppressTarget(hDist);
+            if (newTarget == null) return SearchState.INSTANCE;
 
-            enemy.setCurrentAimTarget(newTarget);
-            enemy.aimAtPosition(newTarget, delta);
-            enemy.snapAimRay(newTarget);
-            input.aimTargetPosition = newTarget;
-            input.fire = true;
+            ctrl.setCurrentAimTarget(newTarget);
+            body.aimAtPosition(newTarget, delta);
+            body.snapAimRay(newTarget);
+            cmd.aimTargetPosition = newTarget;
+            cmd.fire = true;
         }
 
         return this;
