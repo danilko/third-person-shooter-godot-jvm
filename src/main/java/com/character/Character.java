@@ -10,9 +10,10 @@ import godot.core.*;
 import godot.global.GD;
 
 import java.lang.Math;
+import java.util.UUID;
 
 @RegisterClass
-public class Character extends CharacterBody3D {
+public class Character extends CharacterBody3D implements Controllable {
 
     // ── Signals ──────────────────────────────────────────────────────────────
     @RegisterSignal
@@ -45,6 +46,9 @@ public class Character extends CharacterBody3D {
     @RegisterSignal
     public final Signal0 reloadWeapon = new Signal0(this, new StringName("reload_weapon"));
 
+    @RegisterSignal
+    public final Signal0 dropWeapon = new Signal0(this, new StringName("drop_weapon"));
+
     // ── Exports ───────────────────────────────────────────────────────────────
     @RegisterProperty
     public int maxAirJump = 1;
@@ -64,6 +68,19 @@ public class Character extends CharacterBody3D {
     @Export
     @RegisterProperty
     public RollState rollState = null;
+
+    @RegisterProperty
+    @Export
+    public CharacterInfo characterInfo;
+
+    /**
+     * How long (seconds) the ragdoll simulates before all physics are frozen.
+     * 0 or less skips the ragdoll entirely and freezes the mesh at the last
+     * animation pose — cheapest option for large crowd scenes.
+     */
+    @RegisterProperty
+    @Export
+    public float ragdollDuration = 3.0f;
 
     @RegisterProperty
     @Export
@@ -91,10 +108,18 @@ public class Character extends CharacterBody3D {
     protected StanceName currentStanceName = StanceName.UPRIGHT;
     protected MovementType currentMovementType = MovementType.IDLE;
     protected boolean isRolling = false;
-    protected boolean combat = false;
 
     // False for AI-controlled characters whose accuracy is managed by their own system.
     protected boolean useWeaponSpread = true;
+
+    // ── Network-synced state (MultiplayerSynchronizer reads these) ────────────
+    @RegisterProperty
+    @Export
+    public boolean combat = false;
+
+    @RegisterProperty
+    @Export
+    public int stanceOrdinal = StanceName.UPRIGHT.ordinal();
 
     protected Timer stanceAntispamTimer;
     protected Timer rollTimer;
@@ -105,8 +130,15 @@ public class Character extends CharacterBody3D {
     protected Node3D cameraRoot;
     protected PhysicalBoneSimulator3D physicalBoneSimulator;
 
-    // ── Tick counter (stamped onto every CharacterInput for network ordering) ─
+    // ── Ragdoll freeze state ──────────────────────────────────────────────────
+    private double  ragdollFreezeCountdown = -1.0;
+    private boolean ragdollFrozen          = false;
+
+    // ── Tick counter (stamped onto every UserCommand for network ordering) ─────
     protected long currentTick = 0;
+
+    // ── Controller (generates UserCommand each tick) ──────────────────────────
+    protected Controller controller;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     @RegisterFunction
@@ -122,6 +154,10 @@ public class Character extends CharacterBody3D {
             }
         }
         healthNode = (Health) getNode("Health");
+        if (characterInfo == null) characterInfo = new CharacterInfo();
+        if (characterInfo.characterId.isEmpty())
+            characterInfo.characterId = UUID.randomUUID().toString();
+        addToGroup(new StringName("characters"), false);
         if (hasNode(aimTargetPath)) {
             aimTarget = (Marker3D)  getNode(aimTargetPath);
         }
@@ -136,12 +172,16 @@ public class Character extends CharacterBody3D {
         if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
             physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
 
-            for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            if (aimRay != null) for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
                 Node child = physicalBoneSimulator.getChild(i);
                 if (child instanceof PhysicalBone3D bone) {
                    aimRay.addException(bone);
                 }
             }
+        }
+
+        for (Node child : getChildren()) {
+            if (child instanceof Controller c) { controller = c; break; }
         }
 
         changedMovementDirection.emit(Vector3.Companion.getBACK());
@@ -151,27 +191,35 @@ public class Character extends CharacterBody3D {
         setWeapon(0);
     }
 
+    public boolean isCombat() { return combat; }
+
     // ── Physics loop: gather → apply ─────────────────────────────────────────
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
-        CharacterInput input = gatherInput(delta);
-        input.tick = currentTick++;
-        applyInput(input, delta);
+        UserCommand cmd;
+        if (controller != null) {
+            if (!controller.isAuthority()) return; // non-authority: state via MultiplayerSynchronizer
+            cmd = controller.gatherInput(delta);
+        } else {
+            cmd = gatherInput(delta); // fallback: subclass override
+        }
+        cmd.tick = currentTick++;
+        applyInput(cmd, delta);
     }
 
-    /**
-     * Produce a CharacterInput for this tick.
-     *
-     * Override in subclasses:
-     *   - Player  : sample Input singleton (keyboard/mouse)
-     *   - Enemy   : run AI FSM and translate decisions into fields
-     *   - Network : pop from received-input buffer (future)
-     *
-     * The base implementation returns an empty (no-op) input.
-     */
-    protected CharacterInput gatherInput(double delta) {
-        return new CharacterInput();
+    /** Counts down the ragdoll-settle timer and freezes physics when it expires. */
+    @RegisterFunction
+    @Override
+    public void _process(double delta) {
+        if (ragdollFreezeCountdown <= 0) return;
+        ragdollFreezeCountdown -= delta;
+        if (ragdollFreezeCountdown <= 0) freezeRagdoll();
+    }
+
+    /** Fallback input path when no Controller child is present. Returns empty command. */
+    protected UserCommand gatherInput(double delta) {
+        return new UserCommand();
     }
 
     /**
@@ -180,7 +228,7 @@ public class Character extends CharacterBody3D {
      * All signal emissions and state transitions live here so that any
      * input source (local, AI, network) produces identical results.
      */
-    protected void applyInput(CharacterInput input, double delta) {
+    protected void applyInput(UserCommand input, double delta) {
 
         // ── Movement direction ─────────────────────────────────────────────
         if (input.movementDirection.lengthSquared() > 0.001) {
@@ -221,6 +269,11 @@ public class Character extends CharacterBody3D {
         // ── Reload ─────────────────────────────────────────────────────────
         if (input.reload) {
             reloadWeapon.emit();
+        }
+
+        // ── Drop ────────────────────────────────────────────────────────────
+        if (input.drop) {
+            dropWeapon.emit();
         }
 
         // ── Jump ───────────────────────────────────────────────────────────
@@ -324,6 +377,7 @@ public class Character extends CharacterBody3D {
         }
 
         currentStanceName = next;
+        stanceOrdinal = currentStanceName.ordinal();
         NodePath nextPath = stances.get(currentStanceName.getKey());
         if (nextPath != null) {
             Stance s = (Stance) getNode(nextPath);
@@ -351,6 +405,41 @@ public class Character extends CharacterBody3D {
         changedWeapon.emit(weapon);
     }
 
+    // ── Controllable implementation ───────────────────────────────────────────
+
+    @Override
+    public void applyCommand(UserCommand cmd, double delta) {
+        applyInput(cmd, delta);
+    }
+
+    @Override
+    public CharacterInfo getCharacterInfo() {
+        return characterInfo;
+    }
+
+    /**
+     * Remove the current Controller child and return it so the caller can
+     * reparent it to a different Controllable (vehicle hot-swap).
+     * If no controller is attached, returns null.
+     */
+    public Controller detachController() {
+        if (controller == null) return null;
+        Controller ctrl = controller;
+        removeChild(ctrl);
+        controller = null;
+        return ctrl;
+    }
+
+    /**
+     * Add ctrl as a child controller, replacing any existing one.
+     * The outgoing controller is freed unless the caller retains a reference.
+     */
+    public void attachController(Controller ctrl) {
+        if (controller != null) removeChild(controller);
+        controller = ctrl;
+        addChild(ctrl);
+    }
+
     // ── Ragdoll ───────────────────────────────────────────────────────────────
     protected void enableRagdoll() {
         // Stop Character's own input/apply cycle
@@ -372,18 +461,100 @@ public class Character extends CharacterBody3D {
             }
         }
 
+        if (physicalBoneSimulator == null) {
+            ragdollFrozen = true; // nothing to freeze later
+            return;
+        }
+
+        if (ragdollDuration > 0) {
+            // Simulate ragdoll briefly so the body tumbles naturally, then freeze.
+            for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+                Node child = physicalBoneSimulator.getChild(i);
+                if (child instanceof PhysicalBone3D bone) {
+                    // Layer 4 (value 8) is the character-detection layer used by SightRay
+                    // and AimRay (both collision_mask = 9 = layers 1+4). Removing dead bones
+                    // from this layer makes the ragdoll transparent to raycasts from living
+                    // characters — fixes dead bodies blocking hasLineOfSight() and
+                    // performHitscan(), which caused the "not disappearing" and suppression-
+                    // fire-into-dead-body symptoms.
+                    bone.setCollisionLayerValue(4, false);
+                    // Layer 1 (world) in the MASK means the bone can detect the floor so
+                    // the ragdoll physically rests on world geometry.
+                    bone.setCollisionMaskValue(1, true);
+                }
+            }
+            physicalBoneSimulator.physicalBonesStartSimulation();
+            ragdollFreezeCountdown = ragdollDuration;
+        } else {
+            // ragdollDuration == 0: skip simulation, freeze at animation pose immediately.
+            freezeRagdoll();
+        }
+    }
+
+    /**
+     * Freezes all ragdoll physics and stops the bone simulator.
+     *
+     * Called automatically after ragdollDuration seconds (via _process), or
+     * immediately when ragdollDuration <= 0. After this:
+     *   - PhysicalBone3D rigid bodies are frozen in place (no gravity, no collision)
+     *   - PhysicalBoneSimulator3D modifier is deactivated
+     *   - Skeleton retains the last bone transforms → mesh stays at the frozen pose
+     *   - No ongoing physics or modifier processing cost
+     */
+    private void freezeRagdoll() {
+        if (ragdollFrozen) return;
+        ragdollFrozen = true;
+        setProcess(false);
+
         if (physicalBoneSimulator == null) return;
+
         for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
             Node child = physicalBoneSimulator.getChild(i);
             if (child instanceof PhysicalBone3D bone) {
-                // setCollisionMaskValue adds layer 1 (world) to what the bone
-                // *detects*, so it rests on the floor.
-                // setCollisionLayer would only change what others detect the
-                // bone as — bones would still fall through everything.
-                bone.setCollisionMaskValue(1, true);
+                // Switch from DYNAMIC → STATIC in the physics server.
+                // STATIC bodies are not simulated (no gravity, no velocity integration)
+                // but stay exactly at their current world transform and remain solid
+                // so the corpse rests on the floor rather than falling through it.
+                // This is the same technique used by CS-style engines for settled ragdolls.
+                PhysicsServer3D.bodySetMode(bone.getRid(), PhysicsServer3D.BodyMode.STATIC);
+                // Static bodies don't move so they don't need a collision mask
+                // (they never query what they're touching). Keep the layer so
+                // bullets and characters can still physically interact with the corpse.
+                bone.setCollisionMask(0);
             }
         }
-        physicalBoneSimulator.physicalBonesStartSimulation();
+        // Leave the simulator active — it copies the now-static bone world transforms
+        // to the skeleton each frame, keeping the mesh at the frozen ragdoll pose.
+        // Cost is a handful of matrix copies, not physics simulation.
+    }
+
+    // Velocity change per damage point applied to an alive character (m/s per dmg).
+    private static final float ALIVE_HIT_VELOCITY_SCALE = 0.05f;
+    // Impulse magnitude per damage point applied to the hit ragdoll bone (N·s per dmg).
+    private static final float DEATH_BONE_IMPULSE_SCALE = 0.3f;
+
+    /**
+     * Applies a physics response to a bullet hit.
+     *
+     * While alive: adds a small velocity kick in the bullet direction — simulates the
+     * stagger seen in CS/L4D where shots push the target back from the shooter.
+     *
+     * On death: pushes the specific PhysicalBone3D that was struck so the ragdoll
+     * falls away from the shooter. Requires the ragdoll to already be started —
+     * ImpactManager calls this after applyDamage(), by which point the synchronous
+     * died-signal chain has already called enableRagdoll().
+     *
+     * @param hitNode    the node returned by AimRay (typically a PhysicalBone3D)
+     * @param bulletDir  world-space bullet travel direction (hitNormal negated)
+     * @param damage     base damage value used to scale the impulse magnitude
+     */
+    public void applyHitImpulse(Node hitNode, Vector3 bulletDir, float damage) {
+        Vector3 dir = bulletDir.normalized();
+        if (isAlive()) {
+            setVelocity(getVelocity().plus(dir.times(damage * ALIVE_HIT_VELOCITY_SCALE)));
+        } else if (hitNode instanceof PhysicalBone3D bone) {
+            bone.applyCentralImpulse(dir.times(damage * DEATH_BONE_IMPULSE_SCALE));
+        }
     }
 
     /**
@@ -401,6 +572,21 @@ public class Character extends CharacterBody3D {
         }
     }
 
+    public Node3D getCameraRoot() { return cameraRoot; }
+
+    /**
+     * Makes this character's Camera3D the active viewport camera.
+     * Called by Vehicle.tryExit() when the player leaves the vehicle.
+     */
+    public void makeCameraActive() {
+        Node camNode = getNodeOrNull("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera");
+        if (camNode instanceof Camera3D cam) cam.makeCurrent();
+    }
+
+    public boolean isAlive() {
+        return healthNode == null || !healthNode.isDead();
+    }
+
     // ── Override in subclasses ────────────────────────────────────────────────
     @RegisterFunction
     public void onDied() {
@@ -408,6 +594,8 @@ public class Character extends CharacterBody3D {
         // Disable animation tree
         AnimationTree animationTree = (AnimationTree) getNode("AnimationTree");
         animationTree.setActive(false);
+
+        if (weaponController != null) weaponController.dropAllWeapons();
 
         enableRagdoll();
 

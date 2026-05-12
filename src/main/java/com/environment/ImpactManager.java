@@ -5,6 +5,7 @@ import com.character.Health;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Node;
+import godot.api.Texture2D;
 import godot.core.NodePath;
 
 /**
@@ -40,13 +41,16 @@ public class ImpactManager extends Node {
      * @param info         hit geometry: node, world point, surface normal
      * @param damage       base damage from WeaponStats
      * @param weaponName   display name for kill notifications
+     * @param weaponIcon   icon shown in kill feed (may be null)
      * @param attackerName display name for kill notifications
      */
     public void processHit(HitInfo info, float damage,
-                           String weaponName, String attackerName) {
+                           String weaponName, Texture2D weaponIcon,
+                           String attackerName, String attackerFaction) {
         spawnImpactParticles(info);
         spawnDecal(info);
-        applyDamage(info, damage, weaponName, attackerName);
+        applyDamage(info, damage, weaponName, weaponIcon, attackerName, attackerFaction);
+        applyHitImpulse(info, damage);
     }
 
     // ── Private helpers (one per effect type) ────────────────────────────────
@@ -64,12 +68,13 @@ public class ImpactManager extends Node {
     }
 
     private void applyDamage(HitInfo info, float damage,
-                             String weaponName, String attackerName) {
+                             String weaponName, Texture2D weaponIcon,
+                             String attackerName, String attackerFaction) {
         if (info.hitNode == null) return;
         Node owner = info.hitNode.getOwner();
         if (owner == null || !owner.hasNode(new NodePath("Health"))) return;
         Health health = (Health) owner.getNode(new NodePath("Health"));
-        health.takeDamage(info.hitNode, damage, weaponName, attackerName);
+        health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction);
     }
 
     /**
@@ -85,6 +90,20 @@ public class ImpactManager extends Node {
         if (owner instanceof Character)       return SurfaceType.FLESH;
         if (owner instanceof HittableBody hb) return hb.getSurfaceType();
         return SurfaceType.DEFAULT;
+    }
+
+    /**
+     * Applies directional physics to the hit character.
+     * hitNormal points from the surface toward the shooter, so negating it gives the
+     * bullet travel direction — the direction the character should be pushed.
+     * applyDamage() is called first, so if this hit killed the character the ragdoll
+     * simulation is already running (died signal fires synchronously in takeDamage).
+     */
+    private void applyHitImpulse(HitInfo info, float damage) {
+        if (info.hitNode == null || info.hitNormal == null) return;
+        Node owner = info.hitNode.getOwner();
+        if (!(owner instanceof Character character)) return;
+        character.applyHitImpulse(info.hitNode, info.hitNormal.times(-1f), damage);
     }
 
     // ── Lazy singleton lookups ────────────────────────────────────────────────

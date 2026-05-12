@@ -13,6 +13,7 @@ supertypes = [
 	godot.api.Node,
 	godot.api.Object,
 	godot.core.KtObject,
+	com.character.Controllable,
 	godot.common.interop.NativeWrapper,
 	godot.common.interop.NativePointer
 ]
@@ -26,25 +27,30 @@ signals = [
 	changed_movement_direction,
 	changed_combat_state,
 	changed_weapon,
-	reload_weapon
+	reload_weapon,
+	drop_weapon
 ]
 properties = [
-    hud_path,
-	max_air_jump,
+    max_air_jump,
 	jump_states,
 	stances,
 	combat_states,
 	roll_state,
+	character_info,
+	ragdoll_duration,
 	weapon_controller,
 	camera_root_path,
 	aim_target_path,
 	aim_ray_path,
-	physical_bone_simulator_path
+	physical_bone_simulator_path,
+	combat,
+	stance_ordinal
 ]
 functions = [
     _ready,
+	emit_player_spawned,
 	on_died,
-	on_player_damaged,
 	_physics_process,
+	_process,
 	completed_roll
 ]

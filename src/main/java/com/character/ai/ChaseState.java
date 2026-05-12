@@ -1,77 +1,67 @@
 package com.character.ai;
 
-import com.character.CharacterInput;
-import com.character.Enemy;
+import com.character.AICharacter;
+import com.character.AIController;
 import com.character.MovementType;
+import com.character.UserCommand;
 import godot.core.Vector3;
 
-/**
- * Enemy sprints toward the player and enters attack range.
- * Navigates toward {@link Enemy#lastKnownPlayerPosition} even when LoS is broken.
- * Falls back to {@link PatrolState} after losing the player for too long.
- */
-public class ChaseState implements EnemyAIState {
+public class ChaseState implements AIState {
 
     public static final ChaseState INSTANCE = new ChaseState();
-
     private ChaseState() {}
 
     @Override
-    public void enter(Enemy enemy) {
-        enemy.resetLostPlayerTimer();
+    public void enter(AICharacter body, AIController ctrl) {
+        ctrl.resetLostTargetTimer();
     }
 
     @Override
-    public void exit(Enemy enemy) {}
+    public void exit(AICharacter body, AIController ctrl) {}
 
     @Override
-    public EnemyAIState update(Enemy enemy, CharacterInput input, double delta) {
-        if (enemy.getPlayer() == null) return PatrolState.INSTANCE;
+    public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
+        // Re-evaluate nearest live hostile each frame so a closer threat is not ignored.
+        body.refreshTarget();
+        if (body.getTarget() == null) {
+            return PatrolState.INSTANCE;
+        }
 
-        float dist = (float) enemy.getGlobalPosition()
-                                  .distanceTo(enemy.getPlayer().getGlobalPosition());
+        float dist = (float) body.getGlobalPosition()
+                                 .distanceTo(body.getTarget().getGlobalPosition());
+        cmd.wantCombat = true;
 
-        // Always in combat while chasing — set before any early return so the
-        // combat animation and LookAtModifier activate on the same frame.
-        input.wantCombat = true;
-
-        if (dist <= enemy.attackRange && enemy.hasLineOfSight()) {
-            if (!enemy.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
+        if (dist <= body.attackRange && body.hasLineOfSight()) {
+            if (!body.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
             return AttackState.INSTANCE;
         }
 
-        input.movementType = MovementType.SPRINT;
+        cmd.movementType = MovementType.SPRINT;
 
-        if (enemy.hasLineOfSight()) {
-            enemy.resetLostPlayerTimer();
-            Vector3 playerPos = enemy.getPlayer().getGlobalPosition();
-            enemy.setLastKnownPlayerPosition(new Vector3(playerPos));
-            enemy.getNavAgent().setTargetPosition(playerPos);
+        if (body.hasLineOfSight()) {
+            ctrl.resetLostTargetTimer();
+            Vector3 targetPos = body.getTarget().getGlobalPosition();
+            ctrl.setLastKnownTargetPosition(new Vector3(targetPos));
+            body.getNavAgent().setTargetPosition(targetPos);
 
-            // Aim camera at player while chasing
-            Vector3 aimTarget = new Vector3(playerPos.getX(),
-                    playerPos.getY() + Enemy.PLAYER_BODY_HEIGHT,
-                    playerPos.getZ());
-            enemy.aimAtPosition(aimTarget, delta);
-            input.aimTargetPosition = aimTarget;
+            Vector3 aimTarget = new Vector3(targetPos.getX(),
+                    targetPos.getY() + AICharacter.TARGET_BODY_HEIGHT,
+                    targetPos.getZ());
+            body.aimAtPosition(aimTarget, delta);
+            cmd.aimTargetPosition = aimTarget;
         } else {
-            enemy.advanceLostPlayerTimer(delta);
-            if (enemy.isPlayerLost()) {
-                return PatrolState.INSTANCE;
-            }
-            // LoS broken but not yet timed out — keep navigating toward last known position
-            if (enemy.hasLastKnownPosition()) {
-                enemy.getNavAgent().setTargetPosition(enemy.getLastKnownPlayerPosition());
-            }
+            ctrl.advanceLostTargetTimer(delta);
+            if (ctrl.isTargetLost()) return PatrolState.INSTANCE;
+            if (ctrl.hasLastKnownPosition())
+                body.getNavAgent().setTargetPosition(ctrl.getLastKnownTargetPosition());
         }
 
-        Vector3 dir = enemy.getNavAgent()
-                           .getNextPathPosition()
-                           .minus(enemy.getGlobalPosition())
-                           .normalized();
-        input.movementDirection.setX(dir.getX());
-        input.movementDirection.setZ(dir.getZ());
-
+        Vector3 dir = body.getNavAgent()
+                          .getNextPathPosition()
+                          .minus(body.getGlobalPosition())
+                          .normalized();
+        cmd.movementDirection.setX(dir.getX());
+        cmd.movementDirection.setZ(dir.getZ());
         return this;
     }
 }

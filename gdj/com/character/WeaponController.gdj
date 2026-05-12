@@ -24,13 +24,14 @@ properties = [
 	neck_bone_attachement
 ]
 functions = [
-    _physics_process,
-	on_set_stance,
+    _process,
 	_ready,
+	drop_current_weapon,
 	on_weapon_fire,
+	on_weapon_not_fire,
 	on_weapon_reload,
 	on_weapon_reload_complete,
-	on_weapon_not_fire,
 	on_set_weapon,
-	on_weapon_transition_complete
+	on_weapon_transition_complete,
+	on_set_stance
 ]

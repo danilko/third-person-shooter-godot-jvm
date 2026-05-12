@@ -1,68 +1,57 @@
 package com.character.ai;
 
-import com.character.CharacterInput;
-import com.character.Enemy;
+import com.character.AICharacter;
+import com.character.AIController;
 import com.character.MovementType;
+import com.character.UserCommand;
 import godot.core.Vector3;
 
-/**
- * Enemy wanders within its patrol radius.
- * Transitions to {@link ChaseState} or {@link AttackState} when the player is spotted.
- * Transitions to {@link SearchState} immediately when hit (even without visual contact).
- */
-public class PatrolState implements EnemyAIState {
+public class PatrolState implements AIState {
 
     public static final PatrolState INSTANCE = new PatrolState();
-
     private PatrolState() {}
 
     @Override
-    public void enter(Enemy enemy) {
-        enemy.setNextPatrolTarget();
+    public void enter(AICharacter body, AIController ctrl) {
+        body.clearTarget();
+        ctrl.clearLastKnownPosition();
+        body.setNextPatrolTarget();
     }
 
     @Override
-    public void exit(Enemy enemy) {}
+    public void exit(AICharacter body, AIController ctrl) {}
 
     @Override
-    public EnemyAIState update(Enemy enemy, CharacterInput input, double delta) {
-        // Keep best-damage weapon equipped while idle — guard against restarting
-        // the transitionTimer every frame, which would prevent the switch from completing.
-        int bestWeapon = enemy.selectBestWeapon();
-        if (bestWeapon >= 0 && enemy.weaponController != null
-                && bestWeapon != enemy.weaponController.getWeapon()
-                && !enemy.weaponController.isWeaponTransitioning()) {
-            input.desiredWeapon = bestWeapon;
+    public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
+        int bestWeapon = body.selectBestWeapon();
+        if (bestWeapon >= 0 && body.weaponController != null
+                && bestWeapon != body.weaponController.getWeapon()
+                && !body.weaponController.isWeaponTransitioning()) {
+            cmd.desiredWeapon = bestWeapon;
         }
 
-        if (enemy.canSeePlayer()) {
-            // Prime combat mode this frame so animation and LookAtModifier start immediately.
-            input.wantCombat = true;
-            float dist = (float) enemy.getGlobalPosition()
-                                      .distanceTo(enemy.getPlayer().getGlobalPosition());
-            if (dist <= enemy.attackRange && enemy.hasAnyAmmo()) {
-                return AttackState.INSTANCE;
-            }
+        if (body.canSeeTarget()) {
+            cmd.wantCombat = true;
+            float dist = (float) body.getGlobalPosition()
+                                     .distanceTo(body.getTarget().getGlobalPosition());
+            if (dist <= body.attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
             return ChaseState.INSTANCE;
         }
 
-        // React to being hit even without visual contact — search toward attacker
-        if (enemy.isUnderAttack() && enemy.hasLastKnownPosition()) {
-            return SearchState.INSTANCE;
-        }
+        if (ctrl.isUnderAttack() && ctrl.hasLastKnownPosition()) return SearchState.INSTANCE;
 
-        input.wantCombat   = false;
-        input.movementType = MovementType.WALK;
+        cmd.wantCombat   = false;
+        cmd.movementType = MovementType.WALK;
 
-        if (!enemy.getNavAgent().isNavigationFinished()) {
-            Vector3 dir = enemy.getNavAgent()
-                               .getNextPathPosition()
-                               .minus(enemy.getGlobalPosition())
-                               .normalized();
-            input.movementDirection.setX(dir.getX());
-            input.movementDirection.setZ(dir.getZ());
+        if (!body.getNavAgent().isNavigationFinished()) {
+            Vector3 dir = body.getNavAgent()
+                              .getNextPathPosition()
+                              .minus(body.getGlobalPosition())
+                              .normalized();
+            cmd.movementDirection.setX(dir.getX());
+            cmd.movementDirection.setZ(dir.getZ());
         } else {
-            enemy.setNextPatrolTarget();
+            body.setNextPatrolTarget();
         }
 
         return this;

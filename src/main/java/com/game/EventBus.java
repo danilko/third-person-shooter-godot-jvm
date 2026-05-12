@@ -1,11 +1,17 @@
 package com.game;
 
+import com.character.CharacterInfo;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterSignal;
 import godot.api.Node;
+import godot.api.Texture2D;
 import godot.core.Signal0;
 import godot.core.Signal1;
+import godot.core.Signal2;
+import godot.core.Signal3;
 import godot.core.Signal4;
+import godot.core.Signal5;
+import godot.core.Signal7;
 import godot.core.StringName;
 
 /**
@@ -28,6 +34,15 @@ public class EventBus extends Node {
     @RegisterSignal
     public final Signal0 playerDied = new Signal0(this, new StringName("player_died"));
 
+    /**
+     * Emitted by Player once after _ready() completes (deferred so all sibling
+     * _ready() callbacks — including HUDManager — finish connecting first).
+     * HUDManagers subscribe to this instead of relying on a scene-path export
+     * so they work unchanged regardless of where the Player lives in the tree.
+     */
+    @RegisterSignal
+    public final Signal1<Node> playerSpawned = new Signal1<>(this, new StringName("player_spawned"));
+
     /** Emitted by Enemy.onDied(). Payload: the enemy's score value. */
     @RegisterSignal
     public final Signal1<Integer> enemyKilled = new Signal1<>(this, new StringName("enemy_killed"));
@@ -42,9 +57,52 @@ public class EventBus extends Node {
 
     /**
      * Emitted by Health when any character is eliminated.
-     * Payload: attackerName, victimName, weaponName, headshot.
+     * Payload: attackerName, attackerFaction, victimName, victimFaction, weaponName, weaponIcon, headshot.
      */
     @RegisterSignal
-    public final Signal4<String, String, String, Boolean> characterEliminated =
-            new Signal4<>(this, new StringName("character_eliminated"));
+    public final Signal7<String, String, String, String, String, Texture2D, Boolean> characterEliminated =
+            new Signal7<>(this, new StringName("character_eliminated"));
+
+    /**
+     * Emitted by Pickup when a character enters or leaves interact range.
+     * Payload: inRange, itemLabel (empty string when leaving).
+     */
+    @RegisterSignal
+    public final Signal2<Boolean, String> pickupInteractChanged =
+            new Signal2<>(this, new StringName("pickup_interact_changed"));
+
+    /**
+     * Emitted by HUDManager when the active player's ammo state changes.
+     * Payload: magazine (current loaded rounds), reserve (unloaded backup rounds).
+     */
+    @RegisterSignal
+    public final Signal2<Integer, Integer> playerAmmoChanged =
+            new Signal2<>(this, new StringName("player_ammo_changed"));
+
+    /**
+     * Emitted by WeaponController when a weapon is equipped from the world.
+     * Payload: characterId (picker), weaponName, weaponIcon.
+     */
+    @RegisterSignal
+    public final Signal3<String, String, Texture2D> weaponPickedUp =
+            new Signal3<>(this, new StringName("weapon_picked_up"));
+
+    /**
+     * Emitted by Vehicle.tryEnter() when a character boards a vehicle.
+     * Payload: vehicle node, occupant CharacterInfo.
+     * Passing CharacterInfo (data) rather than the Character node keeps signal
+     * recipients decoupled from the live character object — same principle as
+     * characterEliminated. Recipients filter on occupantInfo.characterId.
+     */
+    @RegisterSignal
+    public final Signal2<Node, CharacterInfo> vehicleEntered =
+            new Signal2<>(this, new StringName("vehicle_entered"));
+
+    /**
+     * Emitted by Vehicle.tryExit() when the occupant leaves the vehicle.
+     * Payload: occupant CharacterInfo — same filter as vehicleEntered.
+     */
+    @RegisterSignal
+    public final Signal1<CharacterInfo> vehicleExited =
+            new Signal1<>(this, new StringName("vehicle_exited"));
 }

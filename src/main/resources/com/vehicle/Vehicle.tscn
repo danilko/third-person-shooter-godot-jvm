@@ -1,0 +1,98 @@
+[gd_scene format=3 uid="uid://c7aoav51c2882"]
+
+[ext_resource type="Script" uid="uid://dq2glpynwti1i" path="res://gdj/com/vehicle/Vehicle.gdj" id="1_v"]
+[ext_resource type="Script" uid="uid://oymron85jta" path="res://gdj/com/character/Health.gdj" id="2_h"]
+[ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="3_ci"]
+[ext_resource type="PackedScene" uid="uid://bc6iw5u86mxqe" path="res://src/main/resources/com/vehicle/WheelPlaceholder.tscn" id="3_jeqgg"]
+[ext_resource type="Texture2D" uid="uid://bm6rbs4svcjx8" path="res://addons/kenney_prototype_textures/dark/texture_01.png" id="4_dark"]
+[ext_resource type="Texture2D" uid="uid://nee8v4hetv5c" path="res://addons/kenney_prototype_textures/dark/texture_03.png" id="4_yyb6n"]
+[ext_resource type="PackedScene" uid="uid://ds0yoqtkt2t1n" path="res://src/main/resources/com/vehicle/VehicleWheel.tscn" id="5_p3n1p"]
+
+[sub_resource type="Resource" id="Resource_charinfo"]
+script = ExtResource("3_ci")
+display_name = "Vehicle"
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_collision"]
+size = Vector3(1.8, 0.5, 4.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_texture = ExtResource("4_yyb6n")
+
+[sub_resource type="BoxMesh" id="BoxMesh_chassis"]
+material = SubResource("StandardMaterial3D_body")
+size = Vector3(1.8, 0.5, 4.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_accent"]
+albedo_texture = ExtResource("4_dark")
+
+[sub_resource type="BoxMesh" id="BoxMesh_cabin"]
+material = SubResource("StandardMaterial3D_accent")
+size = Vector3(1.7, 0.55, 2.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_entrance"]
+size = Vector3(4, 2.5, 7)
+
+[node name="VehicleRoot" type="Node3D" unique_id=500123202]
+
+[node name="Vehicle" type="RigidBody3D" parent="." unique_id=1519263251]
+mass = 1200.0
+script = ExtResource("1_v")
+character_info = SubResource("Resource_charinfo")
+default_wheel_scene = ExtResource("3_jeqgg")
+min_speed_for_turn = 1.17
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Vehicle" unique_id=1653067823]
+shape = SubResource("BoxShape3D_collision")
+
+[node name="Health" type="Node" parent="Vehicle" unique_id=450985]
+script = ExtResource("2_h")
+max_health = 500.0
+
+[node name="BodyMesh" type="Node3D" parent="Vehicle" unique_id=2000000001]
+
+[node name="Chassis" type="MeshInstance3D" parent="Vehicle/BodyMesh" unique_id=847646866]
+mesh = SubResource("BoxMesh_chassis")
+
+[node name="Cabin" type="MeshInstance3D" parent="Vehicle/BodyMesh/Chassis" unique_id=847646867]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.525, -0.3)
+mesh = SubResource("BoxMesh_cabin")
+
+[node name="DriverSeat" type="Marker3D" parent="Vehicle" unique_id=1653067824]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.5, -0.3)
+
+[node name="EntranceArea" type="Area3D" parent="Vehicle" unique_id=1653067825]
+collision_layer = 0
+collision_mask = 11
+
+[node name="EntranceShape" type="CollisionShape3D" parent="Vehicle/EntranceArea" unique_id=1653067826]
+shape = SubResource("BoxShape3D_entrance")
+
+[node name="Wheels" type="Marker3D" parent="Vehicle" unique_id=1952437078]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1920929e-07, 0)
+
+[node name="BackRight" parent="Vehicle/Wheels" unique_id=602057335 instance=ExtResource("5_p3n1p")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, -0.3, 2)
+
+[node name="BackLeft" parent="Vehicle/Wheels" unique_id=1918960343 instance=ExtResource("5_p3n1p")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, -0.3, 2)
+
+[node name="FrontRight" parent="Vehicle/Wheels" unique_id=1837445748 instance=ExtResource("5_p3n1p")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, -0.3, -2)
+is_front_wheel = true
+
+[node name="FrontLeft" parent="Vehicle/Wheels" unique_id=1956086151 instance=ExtResource("5_p3n1p")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, -0.3, -2)
+is_front_wheel = true
+
+[node name="CameraController" type="Node3D" parent="." unique_id=1698678202]
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraController" unique_id=1786511246]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 7)
+collision_mask = 3
+
+[node name="Camera3D" type="Camera3D" parent="CameraController/SpringArm3D" unique_id=1379134565]
+transform = Transform3D(1, 0, 0, 0, 0.9862856, 0.1650476, 0, -0.1650476, 0.9862856, 0, 0, 0)
+fov = 70.0
+
+[connection signal="body_entered" from="Vehicle/EntranceArea" to="Vehicle" method="on_entrance_body_entered"]
+[connection signal="body_exited" from="Vehicle/EntranceArea" to="Vehicle" method="on_entrance_body_exited"]
