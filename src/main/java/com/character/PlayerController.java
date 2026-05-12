@@ -167,7 +167,9 @@ public class PlayerController extends Controller {
         cmd.steering  = -(inp.getActionStrength("right") - inp.getActionStrength("left"));
         cmd.handbrake = inp.isActionPressed("jump", false);
         cmd.drift     = inp.isActionPressed("drift", false);
-        cmd.enterExit = inp.isActionJustPressed("interact", false);
+        cmd.enterExit    = inp.isActionJustPressed("interact", false);
+        // "reload" (R) has no meaning while driving — reuse it as a flip-upright reset.
+        cmd.resetVehicle = inp.isActionJustPressed("reload", false);
 
         cmd.sequenceNumber = ++localSequence;
         predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();

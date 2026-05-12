@@ -1,5 +1,6 @@
 package com.game;
 
+import com.character.CharacterInfo;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterSignal;
 import godot.api.Node;
@@ -32,6 +33,15 @@ public class EventBus extends Node {
     /** Emitted by Player.onDied(). Payload: none — the player is a singleton. */
     @RegisterSignal
     public final Signal0 playerDied = new Signal0(this, new StringName("player_died"));
+
+    /**
+     * Emitted by Player once after _ready() completes (deferred so all sibling
+     * _ready() callbacks — including HUDManager — finish connecting first).
+     * HUDManagers subscribe to this instead of relying on a scene-path export
+     * so they work unchanged regardless of where the Player lives in the tree.
+     */
+    @RegisterSignal
+    public final Signal1<Node> playerSpawned = new Signal1<>(this, new StringName("player_spawned"));
 
     /** Emitted by Enemy.onDied(). Payload: the enemy's score value. */
     @RegisterSignal
@@ -79,15 +89,20 @@ public class EventBus extends Node {
 
     /**
      * Emitted by Vehicle.tryEnter() when a character boards a vehicle.
-     * Payload: the Vehicle node (cast to Node3D / Vehicle as needed).
+     * Payload: vehicle node, occupant CharacterInfo.
+     * Passing CharacterInfo (data) rather than the Character node keeps signal
+     * recipients decoupled from the live character object — same principle as
+     * characterEliminated. Recipients filter on occupantInfo.characterId.
      */
     @RegisterSignal
-    public final Signal1<Node> vehicleEntered =
-            new Signal1<>(this, new StringName("vehicle_entered"));
+    public final Signal2<Node, CharacterInfo> vehicleEntered =
+            new Signal2<>(this, new StringName("vehicle_entered"));
 
     /**
      * Emitted by Vehicle.tryExit() when the occupant leaves the vehicle.
+     * Payload: occupant CharacterInfo — same filter as vehicleEntered.
      */
     @RegisterSignal
-    public final Signal0 vehicleExited = new Signal0(this, new StringName("vehicle_exited"));
+    public final Signal1<CharacterInfo> vehicleExited =
+            new Signal1<>(this, new StringName("vehicle_exited"));
 }

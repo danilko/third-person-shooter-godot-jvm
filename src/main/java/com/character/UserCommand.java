@@ -68,6 +68,7 @@ public class UserCommand {
     public boolean handbrake;
     public boolean drift;
     public boolean enterExit;
+    public boolean resetVehicle;
 
     // ── Construction ──────────────────────────────────────────────────────────
     public UserCommand() {
@@ -90,6 +91,7 @@ public class UserCommand {
         handbrake         = false;
         drift             = false;
         enterExit         = false;
+        resetVehicle      = false;
     }
 
     /** Shallow copy for prediction rollback buffer. */
@@ -121,6 +123,7 @@ public class UserCommand {
         c.handbrake       = handbrake;
         c.drift           = drift;
         c.enterExit       = enterExit;
+        c.resetVehicle    = resetVehicle;
         return c;
     }
 }

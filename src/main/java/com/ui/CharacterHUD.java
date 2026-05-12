@@ -136,7 +136,7 @@ public class CharacterHUD extends Control {
   public void onPickupInteractChanged(boolean inRange, String label) {
     if (interactPromptLabel == null) return;
     if (inRange) {
-      interactPromptLabel.setText(String.format("[ %s ]  Pick up: %s", "E", label));
+      interactPromptLabel.setText("[ E ]  " + label);
       interactPromptLabel.setVisible(true);
     } else {
       interactPromptLabel.setVisible(false);

@@ -13,11 +13,10 @@
 [ext_resource type="Script" uid="uid://fqq4oyin7clk" path="res://gdj/com/environment/BulletTracerManager.gdj" id="11_btrc"]
 [ext_resource type="PackedScene" uid="uid://bb60nshfmm7so" path="res://src/main/resources/com/weapon/Pistol.tscn" id="12_ej8ck"]
 [ext_resource type="PackedScene" uid="uid://chmmjlji5vapb" path="res://src/main/resources/com/weapon/Rifle.tscn" id="13_ijvcp"]
-[ext_resource type="Script" uid="uid://bf5eaphw77cc4" path="res://src/main/java/com/ui/HUDManager.java" id="14_cl06x"]
-[ext_resource type="PackedScene" uid="uid://dtlryojg3n01y" path="res://src/main/resources/com/ui/FootHUD.tscn" id="15_8dp8o"]
-[ext_resource type="PackedScene" uid="uid://3v8l2bjm8pek" path="res://src/main/resources/com/ui/WeaponRadialMenu.tscn" id="17_nmpqt"]
+[ext_resource type="PackedScene" uid="uid://fg0ucxit12ax" path="res://src/main/resources/com/ui/HUDManager.tscn" id="17_nmpqt"]
 [ext_resource type="PackedScene" uid="uid://menumgr001" path="res://src/main/resources/com/ui/MenuManager.tscn" id="18_kfoa7"]
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="19_hs4nr"]
+[ext_resource type="PackedScene" uid="uid://c7aoav51c2882" path="res://src/main/resources/com/vehicle/Vehicle.tscn" id="19_imhx0"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
 vertices = PackedVector3Array(-49.688828, 0.81998825, -49.59558, -49.688828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.59558, -49.688828, 0.81998825, -47.59558, -49.688828, 0.81998825, 40.90442, -44.188828, 0.81998825, 40.90442, -44.188828, 0.81998825, -47.59558, -8.1888275, 0.81998825, -26.595581, -6.4388275, 0.81998825, -26.845581, -6.6888275, 0.81998825, -47.59558, -42.688828, 0.81998825, -47.59558, -42.688828, 0.81998825, -24.595581, -8.1888275, 0.81998825, -24.595581, 6.3111725, 0.81998825, -26.845581, 6.5611725, 0.81998825, -47.59558, 22.561172, 0.81998825, -9.595581, 23.811172, 0.81998825, -8.095581, 24.561172, 0.81998825, -8.095581, 8.0611725, 0.81998825, -26.595581, 8.0611725, 0.81998825, -16.095581, 25.311172, 0.81998825, -7.345581, 33.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, -47.59558, -7.1888275, 3.5699883, -25.845581, -7.1888275, 3.5699883, -16.595581, 7.0611725, 3.5699883, -16.595581, 7.0611725, 3.5699883, -25.845581, -42.688828, 0.81998825, -17.845581, -8.1888275, 0.81998825, -17.845581, 0.8111725, 0.81998825, -7.845581, 1.5611725, 0.81998825, -8.095581, 1.5611725, 0.81998825, -15.595581, -7.9388275, 0.81998825, -15.595581, 10.3111725, 0.81998825, 40.90442, 10.3111725, 0.81998825, 5.154419, 9.5611725, 0.81998825, 4.904419, 1.0611725, 0.81998825, -6.345581, -42.688828, 0.81998825, 40.90442, 7.5611725, 0.81998825, -15.595581, 23.311172, 0.81998825, -7.845581, 23.561172, 0.81998825, -6.595581, 2.8111725, 0.81998825, -7.345581, 4.8111725, 0.81998825, -4.595581, 7.5611725, 0.81998825, -1.095581, 27.561172, 0.81998825, -1.345581, 11.3111725, 0.81998825, 4.154419, 29.811172, 0.81998825, 1.654419, 33.561172, 0.81998825, 5.154419, 47.811172, 0.81998825, 40.90442, 11.0611725, 0.81998825, 5.154419, 32.311172, 0.81998825, 5.154419, -49.688828, 0.81998825, 42.40442, -49.688828, 0.81998825, 49.65442, -44.188828, 0.81998825, 49.65442, -44.188828, 0.81998825, 42.40442, -42.688828, 0.81998825, 42.40442, -42.688828, 0.81998825, 49.65442, 47.811172, 0.81998825, 49.65442, 47.811172, 0.81998825, 42.40442)
@@ -289,19 +288,6 @@ script = ExtResource("11_btrc")
 [node name="1" type="MeshInstance3D" parent="BulletTracerManager" unique_id=201700002]
 mesh = SubResource("BoxMesh_hs4nr")
 
-[node name="HUDManager" type="CanvasLayer" parent="." unique_id=1946570621]
-script = ExtResource("14_cl06x")
-player_path = NodePath("../Characters/Player")
-
-[node name="FootHUD" parent="HUDManager" unique_id=1962846644 instance=ExtResource("15_8dp8o")]
-feed_entry_path = NodePath("FeedEntry")
-metadata/_edit_use_anchors_ = true
-
-[node name="WeaponRadialMenu" parent="HUDManager" unique_id=1303740167 node_paths=PackedStringArray("character") instance=ExtResource("17_nmpqt")]
-visible = false
-character = NodePath("../../Characters/Player")
-metadata/_edit_use_anchors_ = true
-
 [node name="Characters" type="Node" parent="." unique_id=1369023945]
 
 [node name="Player" parent="Characters" unique_id=131388266 instance=ExtResource("2_lj72b")]
@@ -357,5 +343,10 @@ ammo_refill = NodePath("../../AmmoRefill")
 character_info = SubResource("Resource_imhx0")
 
 [node name="MenuManager" parent="." unique_id=349614519 instance=ExtResource("18_kfoa7")]
+
+[node name="VehicleRoot" parent="." unique_id=500123202 instance=ExtResource("19_imhx0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.3230138, 10.67893)
+
+[node name="HUDManager" parent="." unique_id=828289775 instance=ExtResource("17_nmpqt")]
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

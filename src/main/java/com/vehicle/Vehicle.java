@@ -47,6 +47,16 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     @RegisterProperty @Export public CharacterInfo characterInfo;
 
+    /**
+     * Wheel visual scene applied to every wheel that does not have its own
+     * wheelScene set. Build one scene in the editor with the correct scale,
+     * rotation, and pivot for the imported asset; assign it here to share it
+     * across all four wheels without repeating the same setting per wheel.
+     * Per-wheel overrides still work: leave this null and set wheelScene on
+     * individual VehicleWheel nodes, or mix both for front/rear differences.
+     */
+    @RegisterProperty @Export public PackedScene defaultWheelScene;
+
     /** Engine thrust in Newtons (force = throttle × enginePower × 2). */
     @RegisterProperty @Export public float enginePower = 10000f;
 
@@ -153,6 +163,11 @@ public class Vehicle extends RigidBody3D implements Controllable {
     protected Controller controller;
     protected Health     healthNode;
     protected Character  occupant;
+    // True for the one physics frame in which tryEnter() was called.
+    // Prevents Vehicle._physicsProcess — running later in the same frame —
+    // from reading the still-true isActionJustPressed("interact") and
+    // immediately calling tryExit().
+    private boolean justEntered = false;
 
     private Node3D   driverSeatNode;
     private Camera3D vehicleCamera;
@@ -169,6 +184,9 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     // Set by _integrateForces each step; gates force application in _physicsProcess.
     private boolean isOnGround = false;
+
+    // Shared by _integrateForces and _physicsProcess — keeps both caps identical.
+    private static final float MAX_TILT = 3.0f;
 
     // desiredForward: world-space horizontal unit vector derived from vehicleYaw each frame.
     // Protected so GroundVehicle can use it for a direction-aware throttle cap.
@@ -208,7 +226,11 @@ public class Vehicle extends RigidBody3D implements Controllable {
         if (wheels != null) {
             int count = 0;
             for (Node child : wheels.getChildren()) {
-                if (child instanceof VehicleWheel w) { w.setVehicle(this); count++; }
+                if (child instanceof VehicleWheel w) {
+                    w.setVehicle(this);
+                    w.applyDefaultScene(defaultWheelScene);
+                    count++;
+                }
             }
             GD.print("[Vehicle] _ready: " + count + " wheel(s) initialised");
         } else {
@@ -265,6 +287,21 @@ public class Vehicle extends RigidBody3D implements Controllable {
     @Override
     public void _integrateForces(PhysicsDirectBodyState3D state) {
         if (wheels == null) return;
+
+        // Cap pitch/roll in-step (state.setAngularVelocity takes effect immediately,
+        // unlike Node.setAngularVelocity which queues for the next step).
+        // A wall collision can inject large X/Z angular velocity during this step;
+        // capping it here ensures the suspension rays fire from a near-level body
+        // rather than waiting one extra step for the _physicsProcess cap to kick in.
+        // isOnGround here is the previous frame's value — the suspension loop below
+        // will overwrite it. Using the previous-frame value is intentional: it mirrors
+        // exactly what _physicsProcess sees and keeps both caps in sync.
+        Vector3 av = state.getAngularVelocity();
+        float avX = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getX()));
+        float avZ = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getZ()));
+        float avY = isOnGround ? vehicleYawRate : 0f;
+        state.setAngularVelocity(new Vector3(avX, avY, avZ));
+
         float delta = (float) state.getStep();
         isOnGround = false;
         for (Node child : wheels.getChildren()) {
@@ -280,9 +317,16 @@ public class Vehicle extends RigidBody3D implements Controllable {
     @Override
     public void _physicsProcess(double delta) {
         if (controller == null || !controller.isAuthority()) return;
+        // Consume the just-entered flag before reading any input so the same
+        // isActionJustPressed("interact") that triggered tryEnter() this frame
+        // cannot also trigger tryExit() in the same frame.
+        boolean enteredThisFrame = justEntered;
+        justEntered = false;
         UserCommand cmd = controller.gatherInput(delta);
-        if (cmd.enterExit && occupant != null) { tryExit(); return; }
+        if (cmd.enterExit && occupant != null && !enteredThisFrame) { tryExit(); return; }
+        if (cmd.resetVehicle)                                       { resetOrientation(); return; }
         applyDriving(cmd, (float) delta);
+        updateWheelVisuals((float) delta, cmd.steering);
     }
 
     /** Overrideable so subclasses can cap throttle (e.g. GroundVehicle). */
@@ -325,8 +369,12 @@ public class Vehicle extends RigidBody3D implements Controllable {
         float travelFwd = (float) getLinearVelocity().dot(desiredForward); // prev-frame forward
         float steerSign = travelFwd < -0.5f ? -1f : 1f;
 
+        // Steering only accumulates on the ground. In air, steerSign depends on
+        // the projection of velocity onto desiredForward; as vehicleYaw rotates that
+        // projection flips sign, which inverts steerSign and oscillates vehicleYaw
+        // at the camera rate — the "horizontal shatter" effect.
         float steerDelta = 0f;
-        if (speed >= minSpeedForTurn) {
+        if (isOnGround && speed >= minSpeedForTurn) {
             steerDelta  = steerSign * cmd.steering * turnRateRad * speedScale;
             vehicleYaw += steerDelta * delta;
         }
@@ -350,17 +398,13 @@ public class Vehicle extends RigidBody3D implements Controllable {
         }
 
         // ── 3. Physics body: drive Y at vehicleYawRate; cap X/Z ──────────
-        // Y is set to vehicleYawRate so the body physically follows the camera handle.
-        // X/Z (pitch/roll) come from suspension for terrain feel, but are capped at
-        // ±MAX_TILT to absorb collision spikes: a wall hit can inject 10+ rad/s into
-        // X/Z in one step, making the suspension rays aim sideways and fire erratic
-        // forces. Normal suspension tilting stays well under 1 rad/s, so the cap
-        // only triggers on genuine impacts.
-        final float MAX_TILT = 3.0f;
+        // Y is only forced on the ground. Airborne: leave Y free (0) so the body
+        // doesn't yaw while the steerSign oscillation is suppressed above.
         Vector3 av  = getAngularVelocity();
         float   avX = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getX()));
         float   avZ = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getZ()));
-        setAngularVelocity(new Vector3(avX, vehicleYawRate, avZ));
+        float   avY = isOnGround ? vehicleYawRate : 0f;
+        setAngularVelocity(new Vector3(avX, avY, avZ));
 
         if (!isOnGround) return;
 
@@ -476,6 +520,45 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     }
 
+    /**
+     * Flip the vehicle upright and lift it off the ground so the suspension
+     * raycasts start from a clean airborne state on the next physics tick.
+     *
+     * Heading (vehicleYaw) is preserved so the vehicle faces the same direction.
+     * All velocities are zeroed; drift and visual lean state are cleared.
+     * Lifting by maxSpringLength * 2 + 1 m guarantees every wheel ray reports
+     * "not colliding" next frame, which resets lastSpringLength to maxSpringLength
+     * and prevents a carry-over damper spike when the vehicle lands.
+     */
+    private void resetOrientation() {
+        setLinearVelocity(new Vector3(0f, 0f, 0f));
+        setAngularVelocity(new Vector3(0f, 0f, 0f));
+        vehicleYawRate    = 0f;
+        isDrifting        = false;
+        currentDriftAngle = 0f;
+        driftBoosterTimer = 0f;
+        currentRollVisual = 0f;
+        currentLatFactor  = lateralForceFactor;
+
+        setRotation(new Vector3(0f, vehicleYaw, 0f));
+        Vector3 pos = getGlobalPosition();
+        setGlobalPosition(new Vector3(pos.getX(), pos.getY() + maxSpringLength * 2f + 1.0f, pos.getZ()));
+    }
+
+    /**
+     * Updates spin and steer rotation on every wheel each physics frame.
+     * Called after applyDriving so desiredForward is already current.
+     * forwardSpeed is signed: positive = forward, negative = reverse.
+     */
+    private void updateWheelVisuals(float delta, float steering) {
+        if (wheels == null) return;
+        float forwardSpeed = (float) getLinearVelocity().dot(desiredForward);
+        for (Node child : wheels.getChildren()) {
+            if (child instanceof VehicleWheel w)
+                w.updateVisual(delta, forwardSpeed, steering);
+        }
+    }
+
     /** Subclass hook to cap raw throttle (e.g. GroundVehicle speed limit). */
     protected float getThrottleInput(float raw) { return raw; }
 
@@ -496,8 +579,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Node mc = c.getNodeOrNull("MovementController");
         if (mc != null) mc.setPhysicsProcess(false);
         if (vehicleCamera != null) vehicleCamera.makeCurrent();
+        justEntered = true;
+        emitEnterPrompt(false);
         Node busNode = getNodeOrNull("/root/EventBus");
-        if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this);
+        if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this, c.characterInfo);
         GD.print("[Vehicle] " + c.getName() + " entered");
     }
 
@@ -517,23 +602,44 @@ public class Vehicle extends RigidBody3D implements Controllable {
         if (ctrl != null) c.attachController(ctrl);
         c.makeCameraActive();
         Node busNode = getNodeOrNull("/root/EventBus");
-        if (busNode instanceof EventBus bus) bus.vehicleExited.emit();
-        GD.print("[Vehicle] " + c.getName() + " exited");
+        if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
     }
 
     // ── EntranceArea signals ──────────────────────────────────────────────────
 
     @RegisterFunction
     public void onEntranceBodyEntered(Node3D body) {
-        if (body instanceof Player p && occupant == null) {
+        // Resolve through ragdoll bones — body may be a PhysicalBone3D whose owner
+        // is the Character, same pattern as Pickup.resolveCharacter().
+        Character c = resolveCharacter(body);
+        if (c == null || occupant != null) return;
+        if (c instanceof Player p) {
             p.nearbyVehicle = this;
-            GD.print("[Vehicle] entrance: " + p.getName() + " in range");
+            emitEnterPrompt(true);
         }
     }
 
     @RegisterFunction
     public void onEntranceBodyExited(Node3D body) {
-        if (body instanceof Player p) p.nearbyVehicle = null;
+        Character c = resolveCharacter(body);
+        if (c == null) return;
+        if (c instanceof Player p) {
+            p.nearbyVehicle = null;
+            emitEnterPrompt(false);
+        }
+    }
+
+    private Character resolveCharacter(Node3D body) {
+        if (body instanceof Character c) return c;
+        Node owner = body.getOwner();
+        if (owner instanceof Character c) return c;
+        return null;
+    }
+
+    private void emitEnterPrompt(boolean inRange) {
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus)
+            bus.pickupInteractChanged.emit(inRange, inRange ? "Enter vehicle" : "");
     }
 
     // ── Controller hot-swap ───────────────────────────────────────────────────

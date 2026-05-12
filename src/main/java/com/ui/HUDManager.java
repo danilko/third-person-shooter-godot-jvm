@@ -39,10 +39,6 @@ import godot.core.StringNames;
 @RegisterClass(className = "HUDManager")
 public class HUDManager extends CanvasLayer {
 
-  /** Path to the player node whose signals this manager relays. */
-  @RegisterProperty @Export
-  public NodePath playerPath = new NodePath("../Player");
-
   /** Name of the HUD child to show on startup. */
   @RegisterProperty @Export
   public String initialHUD = "FootHUD";
@@ -52,18 +48,21 @@ public class HUDManager extends CanvasLayer {
   public NodePath radialMenuPath = new NodePath("WeaponRadialMenu");
 
   private Control activeHUD;
-  private Node player;
+  private Node    player;
+  private String  playerCharacterId = "";
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @RegisterFunction
   @Override
   public void _ready() {
-    Node found = getNodeOrNull(playerPath);
-    if (found != null) wirePlayer(found);
-
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) {
+      // playerSpawned fires deferred from Player._ready() so this connection
+      // is always in place before the signal arrives, regardless of tree order.
+      bus.playerSpawned.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onPlayerSpawned")),
+          Object.ConnectFlags.DEFAULT);
       bus.vehicleEntered.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onVehicleEntered")),
           Object.ConnectFlags.DEFAULT);
@@ -73,6 +72,11 @@ public class HUDManager extends CanvasLayer {
     }
 
     if (!initialHUD.isEmpty()) activateHUD(initialHUD);
+  }
+
+  @RegisterFunction
+  public void onPlayerSpawned(Node spawnedPlayer) {
+    wirePlayer(spawnedPlayer);
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -93,6 +97,8 @@ public class HUDManager extends CanvasLayer {
    */
   public void wirePlayer(Node newPlayer) {
     player = newPlayer;
+    playerCharacterId = (newPlayer instanceof Character c && c.characterInfo != null)
+            ? c.characterInfo.characterId : "";
 
     Node wcNode = player.getNodeOrNull("WeaponController");
     if (wcNode instanceof WeaponController wc) {
@@ -134,7 +140,8 @@ public class HUDManager extends CanvasLayer {
   // ── Vehicle HUD switching ─────────────────────────────────────────────────
 
   @RegisterFunction
-  public void onVehicleEntered(Node vehicle) {
+  public void onVehicleEntered(Node vehicle, CharacterInfo occupantInfo) {
+    if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
     Node vhudNode = getNodeOrNull("VehicleHUD");
     if (vhudNode instanceof VehicleHUD hud && vehicle instanceof Node3D v) {
       hud.setVehicle(v);
@@ -143,7 +150,8 @@ public class HUDManager extends CanvasLayer {
   }
 
   @RegisterFunction
-  public void onVehicleExited() {
+  public void onVehicleExited(CharacterInfo occupantInfo) {
+    if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
     Node vhudNode = getNodeOrNull("VehicleHUD");
     if (vhudNode instanceof VehicleHUD hud) hud.setVehicle(null);
     activateHUD("FootHUD");

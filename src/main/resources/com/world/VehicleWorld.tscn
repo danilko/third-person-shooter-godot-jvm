@@ -9,15 +9,12 @@
 [ext_resource type="Script" uid="uid://cr22di64fbwp1" path="res://gdj/com/environment/DecalManager.gdj" id="7_nk837"]
 [ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="8_vcp0j"]
 [ext_resource type="Script" uid="uid://fqq4oyin7clk" path="res://gdj/com/environment/BulletTracerManager.gdj" id="9_nyjfp"]
-[ext_resource type="Script" uid="uid://bf5eaphw77cc4" path="res://src/main/java/com/ui/HUDManager.java" id="10_m83r1"]
-[ext_resource type="PackedScene" uid="uid://dtlryojg3n01y" path="res://src/main/resources/com/ui/FootHUD.tscn" id="11_mywig"]
-[ext_resource type="PackedScene" uid="uid://3v8l2bjm8pek" path="res://src/main/resources/com/ui/WeaponRadialMenu.tscn" id="12_m0l0y"]
+[ext_resource type="PackedScene" uid="uid://fg0ucxit12ax" path="res://src/main/resources/com/ui/HUDManager.tscn" id="10_k1j05"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="13_owcx3"]
 [ext_resource type="PackedScene" uid="uid://bb60nshfmm7so" path="res://src/main/resources/com/weapon/Pistol.tscn" id="14_fn20c"]
 [ext_resource type="PackedScene" uid="uid://chmmjlji5vapb" path="res://src/main/resources/com/weapon/Rifle.tscn" id="15_02kux"]
 [ext_resource type="PackedScene" uid="uid://c7aoav51c2882" path="res://src/main/resources/com/vehicle/Vehicle.tscn" id="16_xld5c"]
 [ext_resource type="PackedScene" uid="uid://menumgr001" path="res://src/main/resources/com/ui/MenuManager.tscn" id="18_52xd8"]
-[ext_resource type="PackedScene" uid="uid://vehiclehud001" path="res://src/main/resources/com/ui/VehicleHUD.tscn" id="19_vhud"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
 vertices = PackedVector3Array(-49.688828, 0.81998825, -49.59558, -49.688828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.59558, -49.688828, 0.81998825, -47.59558, -49.688828, 0.81998825, 40.90442, -44.188828, 0.81998825, 40.90442, -44.188828, 0.81998825, -47.59558, -8.1888275, 0.81998825, -26.595581, -6.4388275, 0.81998825, -26.845581, -6.6888275, 0.81998825, -47.59558, -42.688828, 0.81998825, -47.59558, -42.688828, 0.81998825, -24.595581, -8.1888275, 0.81998825, -24.595581, 6.3111725, 0.81998825, -26.845581, 6.5611725, 0.81998825, -47.59558, 22.561172, 0.81998825, -9.595581, 23.811172, 0.81998825, -8.095581, 24.561172, 0.81998825, -8.095581, 8.0611725, 0.81998825, -26.595581, 8.0611725, 0.81998825, -16.095581, 25.311172, 0.81998825, -7.345581, 33.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, -47.59558, -7.1888275, 3.5699883, -25.845581, -7.1888275, 3.5699883, -16.595581, 7.0611725, 3.5699883, -16.595581, 7.0611725, 3.5699883, -25.845581, -42.688828, 0.81998825, -17.845581, -8.1888275, 0.81998825, -17.845581, 0.8111725, 0.81998825, -7.845581, 1.5611725, 0.81998825, -8.095581, 1.5611725, 0.81998825, -15.595581, -7.9388275, 0.81998825, -15.595581, 10.3111725, 0.81998825, 40.90442, 10.3111725, 0.81998825, 5.154419, 9.5611725, 0.81998825, 4.904419, 1.0611725, 0.81998825, -6.345581, -42.688828, 0.81998825, 40.90442, 7.5611725, 0.81998825, -15.595581, 23.311172, 0.81998825, -7.845581, 23.561172, 0.81998825, -6.595581, 2.8111725, 0.81998825, -7.345581, 4.8111725, 0.81998825, -4.595581, 7.5611725, 0.81998825, -1.095581, 27.561172, 0.81998825, -1.345581, 11.3111725, 0.81998825, 4.154419, 29.811172, 0.81998825, 1.654419, 33.561172, 0.81998825, 5.154419, 47.811172, 0.81998825, 40.90442, 11.0611725, 0.81998825, 5.154419, 32.311172, 0.81998825, 5.154419, -49.688828, 0.81998825, 42.40442, -49.688828, 0.81998825, 49.65442, -44.188828, 0.81998825, 49.65442, -44.188828, 0.81998825, 42.40442, -42.688828, 0.81998825, 42.40442, -42.688828, 0.81998825, 49.65442, 47.811172, 0.81998825, 49.65442, 47.811172, 0.81998825, 42.40442)
@@ -277,19 +274,7 @@ script = ExtResource("9_nyjfp")
 [node name="1" type="MeshInstance3D" parent="BulletTracerManager" unique_id=201700002]
 mesh = SubResource("BoxMesh_hs4nr")
 
-[node name="HUDManager" type="CanvasLayer" parent="." unique_id=1946570621]
-script = ExtResource("10_m83r1")
-player_path = NodePath("")
-
-[node name="FootHUD" parent="HUDManager" unique_id=1962846644 instance=ExtResource("11_mywig")]
-feed_entry_path = NodePath("FeedEntry")
-metadata/_edit_use_anchors_ = true
-
-[node name="VehicleHUD" parent="HUDManager" unique_id=200000001 instance=ExtResource("19_vhud")]
-visible = false
-
-[node name="WeaponRadialMenu" parent="HUDManager" unique_id=1303740167 instance=ExtResource("12_m0l0y")]
-metadata/_edit_use_anchors_ = true
+[node name="HUDManager" parent="." unique_id=828289775 instance=ExtResource("10_k1j05")]
 
 [node name="Characters" type="Node" parent="." unique_id=1369023945]
 

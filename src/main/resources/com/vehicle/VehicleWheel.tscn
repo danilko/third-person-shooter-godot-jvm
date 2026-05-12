@@ -1,11 +1,8 @@
-[gd_scene format=3 uid="uid://vehicle_wheel"]
+[gd_scene format=3 uid="uid://ds0yoqtkt2t1n"]
 
-[ext_resource type="Script" path="res://gdj/com/vehicle/VehicleWheel.gdj" id="1_vw"]
+[ext_resource type="Script" uid="uid://cvco5bq71vg1v" path="res://gdj/com/vehicle/VehicleWheel.gdj" id="1_vw"]
 
-[node name="VehicleWheel" type="Node3D"]
+[node name="VehicleWheel" type="Node3D" unique_id=1201668086]
 script = ExtResource("1_vw")
 
-; Target overridden at runtime to maxSpringLength * 1.5 = 0.75 m below wheel node.
-; The static value here is a fallback only.
-[node name="Ray" type="RayCast3D" parent="."]
-target_position = Vector3(0, -1.0, 0)
+[node name="Ray" type="RayCast3D" parent="." unique_id=863867655]

@@ -5,6 +5,8 @@ import com.vehicle.Vehicle;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Node;
+import godot.core.StringName;
+import godot.core.StringNames;
 
 /**
  * Human-controlled character body.
@@ -31,6 +33,15 @@ public class Player extends Character {
     public void _ready() {
         super._ready();
         aimRay.addException(this);
+        // Deferred so all sibling _ready() calls (e.g. HUDManager) finish
+        // connecting to playerSpawned before this fires.
+        callDeferred(StringNames.toGodotName("emitPlayerSpawned"));
+    }
+
+    @RegisterFunction
+    public void emitPlayerSpawned() {
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.playerSpawned.emit(this);
     }
 
     @Override

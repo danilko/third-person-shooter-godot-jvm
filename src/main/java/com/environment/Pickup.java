@@ -200,7 +200,7 @@ public class Pickup extends RigidBody3D {
   private void emitInteractPrompt(boolean inRange) {
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) {
-      bus.pickupInteractChanged.emit(inRange, inRange ? getInteractLabel() : "");
+      bus.pickupInteractChanged.emit(inRange, inRange ? "Pick up: " + getInteractLabel() : "");
     }
   }
 }
