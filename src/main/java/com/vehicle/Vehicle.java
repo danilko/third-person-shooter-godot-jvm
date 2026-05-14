@@ -22,19 +22,17 @@ import godot.global.GD;
  *     body) is written each frame: global position = vehicle pos + yaw-rotated offset,
  *     rotation Y = vehicleYaw only. Roll and pitch from suspension are excluded.
  *
- *  2. Hovercraft physics body
- *     The RigidBody3D (Vehicle) is orientation-free in the Y axis: its Y angular
- *     velocity is zeroed each frame, so it never steers — it only translates and
- *     tilts with the terrain via the raycast suspension. Forces are applied in
- *     world space along desiredForward / moveFwd.
+ *  2. Physics body tracks full heading (moveFwd)
+ *     The RigidBody3D's Y angular velocity = steering rate + drift-angle rate each frame,
+ *     so the body always faces moveFwd (desiredForward + drift offset). VehicleWheel
+ *     positions (children of the body) therefore align with the visual chassis corners
+ *     including during drift, so suspension raycasts fire from the correct corners.
+ *     X/Z angular velocity is capped to prevent flipping from wall collisions.
  *
- *  3. BodyMesh poses the chassis
- *     BodyMesh (Node3D, parent of Chassis mesh + CollisionShape3D) rotates its
- *     local Y each frame to face moveFwd (desiredForward + drift offset). This
- *     makes both the visual mesh and the collision shape track the car's actual
- *     heading, including the drift slip angle.
- *     After drift / a turn: the drift angle decays, BodyMesh springs back to
- *     align with the CameraController direction.
+ *  3. BodyMesh provides visual lean only
+ *     BodyMesh (Node3D, parent of Chassis mesh + CollisionShape3D) keeps local Y = 0 —
+ *     the body already faces moveFwd. BodyMesh only applies X (nose-down pitch) and
+ *     Z (sideways roll) for the cornering lean effect.
  *
  * Physics split:
  *   _integrateForces → suspension only via state.applyForce() (same-step).
@@ -196,9 +194,9 @@ public class Vehicle extends RigidBody3D implements Controllable {
     // "handle" direction. desiredForward is derived from it each frame.
     private float vehicleYaw     = 0f;
 
-    // Current yaw rotation rate (rad/s) — written each frame so _integrateForces
-    // can set the body's Y angular velocity to match, making the physics body
-    // physically rotate with the camera instead of staying frozen at spawn direction.
+    // Total body yaw rate (rad/s) = steering rate + drift-angle rate. Written each
+    // frame; consumed by _integrateForces to drive the body's Y angular velocity so
+    // the body faces moveFwd (desiredForward + drift offset) at all times.
     private float vehicleYawRate = 0f;
 
     // Drift / turn state
@@ -334,12 +332,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
         final Vector3 worldUp = new Vector3(0f, 1f, 0f);
         float speed = (float) getLinearVelocity().length();
 
-        // physBodyFwd is used only for BodyMesh posing (step 6). It must NOT be
-        // used to measure "how fast are we going forward" because the body's Y is
-        // zeroed every frame — its facing stays at the spawn direction, not the
-        // travel direction. Use total `speed` for gate / scale decisions instead.
-        Vector3 physBodyFwd = getGlobalTransform().getBasis().getColumn(2).times(-1f);
-
         // ── 1. Drift entry/exit ───────────────────────────────────────────
         // Track last non-zero steering so neutral-entry drift has a default direction.
         if (!isDrifting && Math.abs(cmd.steering) > 0.05f)
@@ -378,7 +370,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
             steerDelta  = steerSign * cmd.steering * turnRateRad * speedScale;
             vehicleYaw += steerDelta * delta;
         }
-        vehicleYawRate = steerDelta; // rad/s — consumed by _integrateForces next step
+        vehicleYawRate = steerDelta; // steering rate only — drift rate is added below
 
         // Normalize to [-π, π] to prevent float precision loss after many full rotations.
         while (vehicleYaw >  (float) Math.PI) vehicleYaw -= (float)(2.0 * Math.PI);
@@ -397,23 +389,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
             cameraControllerNode.setRotation(new Vector3(0f, vehicleYaw, 0f));
         }
 
-        // ── 3. Physics body: drive Y at vehicleYawRate; cap X/Z ──────────
-        // Y is only forced on the ground. Airborne: leave Y free (0) so the body
-        // doesn't yaw while the steerSign oscillation is suppressed above.
-        Vector3 av  = getAngularVelocity();
-        float   avX = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getX()));
-        float   avZ = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getZ()));
-        float   avY = isOnGround ? vehicleYawRate : 0f;
-        setAngularVelocity(new Vector3(avX, avY, avZ));
-
-        if (!isOnGround) return;
-
-        // ── 4. Chassis visual offset ──────────────────────────────────────
-        // Normal: direct proportional to steering — hold = fixed lean, release = springs to 0.
-        // Drift: direction-locked.
-        //   • Steer same as drift direction (or neutral) → hold at maxDriftAngle.
-        //   • Counter-steer → reduce angle by up to maxDriftReduction degrees
-        //     (proportional to how hard you counter-steer).
+        // ── 4. Chassis visual offset (computed before body yaw so the drift rate ──
+        // is included in the body's Y angular velocity this same frame, keeping
+        // wheel positions aligned with the visual chassis corners during drift).
+        float prevDriftAngle = currentDriftAngle;
         float targetOffset;
         if (isDrifting) {
             float withDrift  = cmd.steering * driftDirection;   // +1 = same dir, -1 = counter
@@ -425,6 +404,19 @@ public class Vehicle extends RigidBody3D implements Controllable {
             targetOffset = cmd.steering * normalBodyAngle;
         }
         currentDriftAngle += (targetOffset - currentDriftAngle) * Math.min(1f, driftAngleLerpSpeed * delta);
+        float driftAngleRateRad = (float) Math.toRadians(currentDriftAngle - prevDriftAngle) / delta;
+
+        // ── 3. Physics body: drive Y at total yaw rate (steering + drift); cap X/Z ──
+        // Adding the drift-angle rate makes the body face moveFwd so wheel positions
+        // (children of the body) align with the visual chassis including during drift.
+        vehicleYawRate += driftAngleRateRad;
+        Vector3 av  = getAngularVelocity();
+        float   avX = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getX()));
+        float   avZ = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getZ()));
+        float   avY = isOnGround ? vehicleYawRate : 0f;
+        setAngularVelocity(new Vector3(avX, avY, avZ));
+
+        if (!isOnGround) return;
 
         // ── 5. Visual direction = desiredForward + chassis offset ─────────
         float   offsetRad = (float) Math.toRadians(currentDriftAngle);
@@ -441,12 +433,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Vector3 surfaceMoveFwd = projectOntoPlane(moveFwd,        vehicleUp);
 
         // ── 6. Pose BodyMesh ──────────────────────────────────────────────
-        // Y: face moveFwd (drift lean in world XZ plane).
-        // Z: visual roll — left side down for right turn, right side down for left turn.
-        // X: nose-down pitch = −|roll| × 0.4. Combined with Z roll this places the
-        //    peak of the lean at the front outer corner rather than rolling the whole
-        //    body uniformly sideways, giving the "front wheel pressed" effect.
-        //    (Godot: negative X rotation = rotate +Y toward +Z = nose goes down.)
+        // Y = 0: the RigidBody3D tracks moveFwd directly (steering + drift rate),
+        // so BodyMesh needs no additional yaw. Only X (nose-down pitch) and
+        // Z (sideways roll) are applied for the cornering lean effect.
+        // (Godot: negative X rotation = rotate +Y toward +Z = nose goes down.)
         {
             float targetRoll = vehicleYawRate * visualLeanFactor;
             float rollLerp   = Math.abs(targetRoll) >= Math.abs(currentRollVisual) ? 8f : 2f;
@@ -454,21 +444,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
         }
 
         if (bodyMeshNode != null) {
-            Vector3 bodyFwdFlat = new Vector3(physBodyFwd.getX(), 0f, physBodyFwd.getZ());
-            if ((float) bodyFwdFlat.length() > 0.001f) bodyFwdFlat = bodyFwdFlat.normalized();
-
-            float sinA        = (float) bodyFwdFlat.cross(moveFwd).getY();
-            float cosA        = (float) bodyFwdFlat.dot(moveFwd);
-            float targetAngle = (float) Math.atan2(sinA, cosA);
-
-            float currentY = (float) bodyMeshNode.getRotation().getY();
-            float diff     = targetAngle - currentY;
-            while (diff >  (float) Math.PI) diff -= (float)(2.0 * Math.PI);
-            while (diff < -(float) Math.PI) diff += (float)(2.0 * Math.PI);
             bodyMeshNode.setRotation(new Vector3(
-                -Math.abs(currentRollVisual) * 0.4f,   // nose-down pitch during any turn
-                currentY + diff * Math.min(1f, turnSpringResponse * delta),
-                currentRollVisual));                    // sideways roll
+                -Math.abs(currentRollVisual) * 0.4f,
+                0f,
+                currentRollVisual));
         }
 
         // ── 7. Throttle and drag along surfaceFwd ────────────────────────
