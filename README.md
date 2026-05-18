@@ -15,25 +15,30 @@ Watch the gameplay demo on **YouTube**: [third-person-shooter-godot-jvm](https:/
 * **JDK:** 17 (configured via Gradle JVM toolchain)
 
 ## ✨ Features & Modifications
-This project is based on Johnny Rouddro's Third Person Controller tutorial ([YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) but introduces several architectural changes and gameplay tweaks:
+This project is based on:
+ - Johnny Rouddro's Third Person Controller tutorial ([YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) with several architectural changes and gameplay tweaks.
+ - octodemy's Custom Raycast Vehicle Physics in Godot ([YouTube](https://www.youtube.com/@octodemy)) with several architectural changes and gameplay tweaks.
 
 * **Input-Driven Character Architecture:** `Character` (base) → `Player` / `Enemy`. All state transitions go through a `CharacterInput` snapshot, making human input, AI, and future network input interchangeable.
 * **Movement Mechanics:**
-    * Added **Double Jump** capability.
-    * **Crawl-to-Shoot** mechanics (Experimental/Beta animation).
-    * Dynamic **Physics Body transformation** during dodge rolls.
+	* Added **Double Jump** capability.
+	* **Crawl-to-Shoot** mechanics (Experimental/Beta animation).
+	* Dynamic **Physics Body transformation** during dodge rolls.
 * **Combat & Ballistics:**
-    * Bloom spread system: per-shot accumulation, movement penalty, stance multipliers, camera recoil.
-    * Dynamic crosshair that tracks the live spread value from `WeaponController`.
-    * Toggleable over-the-shoulder camera (Left/Right swap).
+	* Bloom spread system: per-shot accumulation, movement penalty, stance multipliers, camera recoil.
+	* Dynamic crosshair that tracks the live spread value from `WeaponController`.
+	* Toggleable over-the-shoulder camera (Left/Right swap).
 * **Enemy AI (5-state FSM):**
-    * CS 1.6-inspired accuracy: configurable hit chance, reaction delay, aim scatter, and suppression fire.
-    * Navigation via `NavigationAgent3D`; separate SightRay (LoS) and AimRay (fire direction).
-    * Ammo management with a dedicated `RefillAmmoState`.
+	* CS 1.6-inspired accuracy: configurable hit chance, reaction delay, aim scatter, and suppression fire.
+	* Navigation via `NavigationAgent3D`; separate SightRay (LoS) and AimRay (fire direction).
+	* Ammo management with a dedicated `RefillAmmoState`.
+* **Drivable Vehicle:**
+	* Player able to enter and exit vehicle
+	* Arcade driving vehicle
 * **Game Systems:**
-    * `EventBus` AutoLoad singleton for decoupled kill/death events.
-    * `GameManager` AutoLoad singleton (PLAYING / PAUSED / GAME_OVER).
-    * `AmmoRefill` environment trigger that replenishes all weapons on contact.
+	* `EventBus` AutoLoad singleton for decoupled kill/death events.
+	* `GameManager` AutoLoad singleton (PLAYING / PAUSED / GAME_OVER).
+	* `AmmoRefill` environment trigger that replenishes all weapons on contact.
 
 ---
 
@@ -43,14 +48,14 @@ This project is based on Johnny Rouddro's Third Person Controller tutorial ([You
 
 ```
 Character._physicsProcess()
-    │
-    ├── gatherInput(delta) → CharacterInput   ← overridden per subclass
-    │       Player   : polls Input singleton (keyboard/mouse)
-    │       Enemy    : AI FSM writes decisions into struct fields
-    │       (Network): future — inject a deserialized snapshot here
-    │
-    └── applyInput(input, delta)              ← shared in base class
-            all signal emissions and state transitions live here
+	│
+	├── gatherInput(delta) → CharacterInput   ← overridden per subclass
+	│       Player   : polls Input singleton (keyboard/mouse)
+	│       Enemy    : AI FSM writes decisions into struct fields
+	│       (Network): future — inject a deserialized snapshot here
+	│
+	└── applyInput(input, delta)              ← shared in base class
+			all signal emissions and state transitions live here
 ```
 
 `CharacterInput` carries a monotonically-increasing `tick` counter so inputs are totally ordered and can be replayed for client-side prediction in the future.
@@ -59,8 +64,8 @@ Character._physicsProcess()
 
 ```
 CharacterBody3D (Character.tscn)   ← shared ragdoll, health, weapon controller
-    ├── Player.tscn                 ← HUD wiring, keyboard/mouse input
-    └── Enemy.tscn                  ← AI FSM, NavigationAgent3D, SightRay
+	├── Player.tscn                 ← HUD wiring, keyboard/mouse input
+	└── Enemy.tscn                  ← AI FSM, NavigationAgent3D, SightRay
 ```
 
 ---
@@ -81,9 +86,9 @@ The enemy uses a **5-state singleton FSM**. States are stateless objects; all mu
 
 ```
 Patrol ──(sees player, in range)──► Attack ──(out of range)──► Chase
-       ──(sees player, out of range)► Chase  ──(in range + LoS)► Attack
-       ──(hit without LoS)─────────► Search  ──(sees player)──► Attack/Chase
-                                             ──(timeout 5 s)──► Patrol
+	   ──(sees player, out of range)► Chase  ──(in range + LoS)► Attack
+	   ──(hit without LoS)─────────► Search  ──(sees player)──► Attack/Chase
+											 ──(timeout 5 s)──► Patrol
 Attack ──(no ammo)─────────────────► RefillAmmo ──────────────► Patrol
 ```
 

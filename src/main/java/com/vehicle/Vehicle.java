@@ -11,7 +11,9 @@ import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
 
+import java.lang.Object;
 import java.util.ArrayList;
+import java.util.Collection;
 
 /**
  * Arcade-drift vehicle — hybrid steering + bounded-impulse grip.
@@ -40,98 +42,29 @@ public class Vehicle extends RigidBody3D implements Controllable {
     // ── Inspector exports ─────────────────────────────────────────────────────
 
     @RegisterProperty @Export public CharacterInfo characterInfo;
-    @RegisterProperty @Export public PackedScene    defaultWheelScene;
 
-    @RegisterProperty @Export public float springStrength       = 15000f;
-    /**
-     * Hover spring damper (N·s/m). Critical damping ≈ 4243 for this vehicle mass/spring.
-     * The old default (2000) was severely underdamped — the spring overshot on slope
-     * transitions, briefly disconnecting wheels from ground and killing thrust.
-     * 4500 = slight overdamping: smooth approach, no bounce, no slope speed drop.
-     */
+    @RegisterProperty @Export public float springStrength       = 10000f;
     @RegisterProperty @Export public float springDamping = 4500f;
     @RegisterProperty @Export public float wheelRadius           = 0.4f;
-    /** Engine thrust (N). */
-    @RegisterProperty @Export public float enginePower           = 24000f;
+    @RegisterProperty @Export public float restDistance          = 0.5f;
+    @RegisterProperty @Export public float overExtend            = 0.3f;
 
-    /** Camera / steering rotation rate used for camera auto-rotation during drift (degrees/s). */
-    @RegisterProperty @Export public float maxTurnAngleDegree    = 90f;
+    @RegisterProperty @Export public float zTraction = 0.05f;
+    @RegisterProperty @Export public float zBrakeTraction = 0.25f;
 
-    /**
-     * Fraction of steer rate lost at max speed (0 = constant, 0.5 = halved at top speed).
-     * Only applies during normal (non-drift) direct steering.
-     */
-    @RegisterProperty @Export public float steerSpeedSensitivity = 0.5f;
-
-    /** Angular velocity lerp blend toward target per frame (0–1). ~0.3 = smooth ramp. */
-    @RegisterProperty @Export public float alignBlend            = 0.3f;
-
-    /**
-     * Max yaw tracking rate used for yaw-alignment during drift (degrees/s).
-     * Vehicle rotates up to this rate to align with effectiveFwd.
-     */
-    @RegisterProperty @Export public float alignMaxDegPerSec     = 120f;
-
-    @RegisterProperty @Export public float dragForceFactor       = 0.5f;
-    @RegisterProperty @Export public float brakePower            = 12f;
+    @RegisterProperty @Export public float maxSpeed           = 20.0f;
+    @RegisterProperty @Export public float acceleration = 9000.0f;
+    @RegisterProperty @Export public Curve accelerationCurve;
+    @RegisterProperty @Export public float tireMaxTurnSpeed = 2.0f;
+    @RegisterProperty @Export public float tireMaxTurnDegrees = 25.0f;
 
     @RegisterProperty @Export public NodePath wheelsPath           = new NodePath("Wheels");
     @RegisterProperty @Export public NodePath driverSeatPath       = new NodePath("DriverSeat");
     @RegisterProperty @Export public NodePath cameraControllerPath = new NodePath("../CameraController");
     @RegisterProperty @Export public NodePath vehicleCamPath       = new NodePath("../CameraController/SpringArm3D/Camera3D");
 
-    // ── Grip ──────────────────────────────────────────────────────────────────
-
-    /**
-     * Max lateral deceleration at full grip (m/s²).
-     * At 60 fps: 120 → up to 2 m/s lateral correction per frame.
-     */
-    @RegisterProperty @Export public float normalGripAccel  = 120f;
-
-    /**
-     * Max lateral deceleration while drifting (m/s²).
-     * At 60 fps: 8 → 0.13 m/s correction per frame → 5 m/s slide lasts ~38 frames.
-     */
-    @RegisterProperty @Export public float driftGripAccel   = 8f;
-
-    /** Seconds to restore full grip after drift release. */
-    @RegisterProperty @Export public float driftExitDuration = 0.35f;
-
-    // ── Drift ─────────────────────────────────────────────────────────────────
-
-    /**
-     * Initial thrust-angle offset from camFwd when drift starts (radians).
-     * π/4 = 45°.  Steering adjusts this angle between 5° and 45° during drift.
-     */
-    @RegisterProperty @Export public float driftInitAngle  = (float)(Math.PI / 4f);
-
-    /** Drag fraction during drift (lower = faster slide). */
-    @RegisterProperty @Export public float driftDragScale  = 0.15f;
-
-    /** Hard speed cap during drift = getMaxSpeed() × this. */
-    @RegisterProperty @Export public float driftSpeedCapFactor = 1.1f;
-
-    // ── Natural oversteer ─────────────────────────────────────────────────────
-
-    /** Speed (m/s) above which full steering can trigger natural traction loss (~50 km/h). */
-    @RegisterProperty @Export public float naturalDriftSpeed     = 14f;
-
-    /** Steering magnitude [0–1] required for natural oversteer. */
-    @RegisterProperty @Export public float naturalDriftThreshold = 0.75f;
-
-    // ── Camera (normal mode) ──────────────────────────────────────────────────
-
-    /**
-     * Proportional-controller gain for camera following vehicle heading (normal mode).
-     * Higher = snaps quickly; lower = cinematic lag.
-     */
-    @RegisterProperty @Export public float camFollowSpeed = 6f;
-
-    // ── Roll ──────────────────────────────────────────────────────────────────
-
-    @RegisterProperty @Export public float rollAngleDeg = 10f;
-    @RegisterProperty @Export public float rollSpring   = 10000f;
-    @RegisterProperty @Export public float rollDamp     = 3000f;
+    /** How quickly the camera yaw catches up to the vehicle heading (rad/s blend factor). */
+    @RegisterProperty @Export public float cameraYawLagSpeed = 3.0f;
 
 
     // ── Runtime state ─────────────────────────────────────────────────────────
@@ -142,10 +75,14 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     private Node3D   driverSeatNode;
     private Camera3D vehicleCamera;
-    private ArrayList<VehicleWheel> wheels = new ArrayList<>();
+    private final ArrayList<VehicleWheel> wheels = new ArrayList<>();
     protected Node3D cameraControllerNode = null;
 
 
+    private boolean slipping = false;
+    private boolean braking = false;
+    private boolean handBraking = false;
+    private UserCommand cmd = new UserCommand();
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     @RegisterFunction
@@ -164,6 +101,8 @@ public class Vehicle extends RigidBody3D implements Controllable {
                     w.springStrength = springStrength;
                     w.springDamping = springDamping;
                     w.wheelRadius = wheelRadius;
+                    w.restDistance = restDistance;
+                    w.overExtend = overExtend;
 
                     wheels.add(w);
                 }
@@ -194,14 +133,68 @@ public class Vehicle extends RigidBody3D implements Controllable {
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
-            for(VehicleWheel w : wheels) {
-                w.applyWheelSuspension((float) delta);
+            boolean isGrounded = false;
+
+            // set default in case controller is null
+        cmd.motor = 0;
+        cmd.steering = 0;
+        cmd.handbrake = false;
+        cmd.brake = false;
+
+        if(controller != null && controller.isAuthority()) {
+            UserCommand currentCmd = controller.gatherInput(delta);
+
+            if(currentCmd.reload) {
+                resetOrientation();
+            }
+            if(currentCmd.enterExit) {
+                tryExit();
             }
 
-            if(controller == null || controller.isAuthority()) return;
+            cmd.motor = currentCmd.motor;
+            cmd.steering = currentCmd.steering;
+            cmd.handbrake = currentCmd.handbrake;
+            cmd.brake = currentCmd.brake;
+        }
 
-        UserCommand cmd = controller.gatherInput(delta);
+        if(cmd.handbrake) {
+            slipping = true;
+            handBraking = true;
+        }
+        else {
+            handBraking = false;
+        }
+        braking = cmd.brake;
 
+        for(VehicleWheel w : wheels) {
+            w.applyWheelPhysics((float) delta, (float) getPhysicsProcessDeltaTime(), cmd);
+            w.applyWheelSteering((float) delta, cmd.steering);
+            w.applySkidMark();
+
+            if (w.isColliding()) {
+                isGrounded = true;
+            }
+        }
+
+
+        setCenterOfMassMode(CenterOfMassMode.CUSTOM);
+        if(isGrounded) {
+            setCenterOfMass(new Vector3(0f, -0.3f, 0f));
+        }
+        else {
+            setCenterOfMass(Vector3.Companion.getDOWN().times(0.5f));
+        }
+
+        cameraControllerNode.setGlobalPosition(getGlobalPosition());
+
+        // Lazy yaw follow — lerp camera heading toward vehicle heading so sharp
+        // turns let the player see the side of the car before the camera catches up.
+        float vehicleYaw = (float) getGlobalRotation().getY();
+        float camYaw     = (float) cameraControllerNode.getGlobalRotation().getY();
+        float laggedYaw  = (float) GD.lerpAngle(camYaw, vehicleYaw, cameraYawLagSpeed * (float) delta);
+        Vector3 camRot   = cameraControllerNode.getGlobalRotation();
+        camRot.setY(laggedYaw);
+        cameraControllerNode.setGlobalRotation(camRot);
 
     }
 
@@ -230,6 +223,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Controller ctrl = c.detachController();
         if (ctrl != null) attachController(ctrl);
         c.setVisible(false);
+        c.setProcess(false);
         c.setPhysicsProcess(false);
         Node mc = c.getNodeOrNull("MovementController");
         if (mc != null) mc.setPhysicsProcess(false);
@@ -248,8 +242,9 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Vector3 exitPos = getGlobalPosition()
             .minus(right.times(1.5f)).plus(new Vector3(0f, 0.8f, 0f));
         c.setGlobalPosition(exitPos);
-        c.setVisible(true);
+        c.setProcess(true);
         c.setPhysicsProcess(true);
+        c.setVisible(true);
         Node mc = c.getNodeOrNull("MovementController");
         if (mc != null) mc.setPhysicsProcess(true);
         Controller ctrl = detachController();
@@ -305,5 +300,26 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     public boolean isAlive() {
         return healthNode == null || !healthNode.isDead();
+    }
+
+
+    public boolean isSlipping() {
+        return slipping;
+    }
+
+    public void setSlipping(boolean slipping) {
+        this.slipping = slipping;
+    }
+
+    public ArrayList<VehicleWheel> getWheels() {
+        return wheels;
+    }
+
+    public boolean isBraking() {
+        return braking;
+    }
+
+    public boolean isHandbraking() {
+        return handBraking;
     }
 }

@@ -163,10 +163,10 @@ public class PlayerController extends Controller {
         UserCommand cmd = new UserCommand();
         Input inp = Input.INSTANCE;
 
-        cmd.throttle  = inp.getActionStrength("forward") - inp.getActionStrength("back");
+        cmd.motor = inp.getActionStrength("forward") - inp.getActionStrength("back");
         cmd.steering  = -(inp.getActionStrength("right") - inp.getActionStrength("left"));
-        cmd.handbrake = inp.isActionPressed("jump", false);
-        cmd.drift     = inp.isActionPressed("drift", false);
+        cmd.handbrake = inp.isActionPressed("handbrake", false);
+        cmd.brake     = inp.isActionPressed("brake", false);
         cmd.enterExit    = inp.isActionJustPressed("interact", false);
         // "reload" (R) has no meaning while driving — reuse it as a flip-upright reset.
         cmd.resetVehicle = inp.isActionJustPressed("reload", false);

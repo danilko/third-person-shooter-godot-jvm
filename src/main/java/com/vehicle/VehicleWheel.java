@@ -1,29 +1,14 @@
 package com.vehicle;
 
+import com.character.UserCommand;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
-import godot.api.Node3D;
-import godot.api.PackedScene;
-import godot.api.RayCast3D;
+import godot.api.*;
 import godot.core.Vector3;
 import godot.global.GD;
 
-/**
- * Per-wheel hover spring for the hovercraft vehicle.
- *
- * Each wheel fires a raycast downward. When the ground is within hoverHeight,
- * an upward spring+damper force is applied to the Vehicle RigidBody3D at the
- * wheel's offset from the body center — the torque from the four corners keeps
- * the chassis level without any explicit angular constraint.
- *
- * Forces are applied via Vehicle.applyForce() (queued for next integration step),
- * which is correct for a hovercraft where one-frame precision is not critical.
- *
- * Scene setup: add a RayCast3D child named "Ray"; the target length is set
- * automatically by setVehicle(). Optionally set wheelScene for a rolling visual.
- */
 @RegisterClass(className = "VehicleWheel")
 public class VehicleWheel extends RayCast3D {
 
@@ -37,20 +22,31 @@ public class VehicleWheel extends RayCast3D {
     /** Override visual radius (metres); 0 = use Vehicle.wheelRadius. */
     @RegisterProperty @Export public float wheelRadius = 0.4f;
 
-    /** Enables steering rotation on this wheel. */
-    @RegisterProperty @Export public boolean isFrontWheel = false;
-
-
-    @RegisterProperty @Export public float springStrength = 100.0f;
-    @RegisterProperty @Export public float springDamping = 2.0f;
+    @RegisterProperty @Export public float springStrength = 10000.0f;
+    @RegisterProperty @Export public float springDamping = 4500.0f;
     @RegisterProperty @Export public float restDistance = 0.5f;
-    @RegisterProperty @Export public float overExtend = 0.2f;
+    @RegisterProperty @Export public float overExtend = 0.3f;
+    @RegisterProperty @Export public float zTraction = 0.05f;
+    @RegisterProperty @Export public float zBrakeTraction = 0.25f;
+
+
+    @RegisterProperty @Export public boolean isMotor = false;
+
+    @RegisterProperty @Export public boolean isSteer = false;
+
+    @RegisterProperty @Export public Curve gripCurve;
+
 
 
     // ── Runtime state ─────────────────────────────────────────────────────────
 
     private Vehicle   vehicle;
     private Node3D wheelMesh;
+    private GPUParticles3D skidMark;
+
+    private float tireMaxTurnMinRad;
+    private float tireMaxTurnMaxRad;
+    private float gripFactor;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -59,23 +55,121 @@ public class VehicleWheel extends RayCast3D {
     public void _ready() {
         vehicle = (Vehicle) getOwner().getNode("Vehicle");
         wheelMesh = (Node3D) getNode("Wheel");
+        skidMark = (GPUParticles3D) getNode("SkidMark");
+
+        springStrength = vehicle.springStrength;
+        springDamping = vehicle.springDamping;
+        wheelRadius = vehicle.wheelRadius;
+        restDistance = vehicle.restDistance;
+        overExtend = vehicle.overExtend;
+        zTraction = vehicle.zTraction;
+        zBrakeTraction = vehicle.zBrakeTraction;
+        tireMaxTurnMinRad = (float) GD.degToRad(-vehicle.tireMaxTurnDegrees);
+        tireMaxTurnMaxRad = (float) GD.degToRad(vehicle.tireMaxTurnDegrees);
+
+        Vector3 targetPosition = getTargetPosition();
+        targetPosition.setY(-(restDistance + wheelRadius + overExtend));
+        setTargetPosition(targetPosition);
     }
-
-    // ── Public API ────────────────────────────────────────────────────────────
-
-    /**
-     * Called by Vehicle._ready() — configures the ray length from hoverHeight.
-     */
-    public void setVehicle(Vehicle v) {
-        vehicle = v;
-    }
-
 
     private Vector3 getPointVelocity(Vector3 point) {
         return vehicle.getLinearVelocity().plus(vehicle.getAngularVelocity().cross(point.minus(vehicle.getGlobalPosition())));
     }
 
-    /**
+    public void applyWheelPhysics(float delta, float getPhysicsProcessDeltaTime, UserCommand cmd) {
+        Vector3 targetPosition = getTargetPosition();
+        targetPosition.setY(-(restDistance + wheelRadius + overExtend));
+        setTargetPosition(targetPosition);
+
+        // Rotates wheel visuals
+        Vector3 forwardDir = getGlobalBasis().getZ().times(-1);
+        double speed = forwardDir.dot(vehicle.getLinearVelocity());
+        wheelMesh.rotateX((float) ((-speed * getPhysicsProcessDeltaTime ) /wheelRadius));
+
+        if (!isColliding()) {return;}
+
+        // From here now, wheel is colliding
+        Vector3 contact    = getCollisionPoint();
+        double  springLen    = getGlobalPosition().distanceTo(contact) - wheelRadius;
+        double springCompression =  restDistance - springLen;
+
+        Vector3 wheelMeshPosition = wheelMesh.getPosition();
+        wheelMeshPosition.setY(GD.moveToward(wheelMeshPosition.getY(), -springLen, 5 * getPhysicsProcessDeltaTime())); // Local y position of the wheel
+        wheelMesh.setPosition(wheelMeshPosition);
+
+        contact = wheelMesh.getGlobalPosition(); // Contact is now the wheel origin point
+        Vector3 forcePosition = contact.minus(vehicle.getGlobalPosition());
+
+        // Spring Suspension Force
+        double springForceMagnitude = springStrength * springCompression;
+        Vector3 tireVelocity = getPointVelocity(contact); // Center of the wheel
+        double springDampForceMagnitude = springDamping * getGlobalBasis().getY().dot(tireVelocity);
+
+        Vector3 yForce = getCollisionNormal().times(springForceMagnitude - springDampForceMagnitude);
+
+        // Acceleration
+        if(isMotor && cmd.motor != 0) {
+            double speedRatio = speed / vehicle.maxSpeed;
+            double accelerationRatio = vehicle.accelerationCurve.sampleBaked((float) speedRatio);
+            Vector3 accelerationForce = forwardDir.times(vehicle.acceleration *  cmd.motor  * accelerationRatio);
+
+            vehicle.applyForce(accelerationForce, forcePosition);
+        }
+
+        // Tire X traction
+        float steeringXSpeed = (float) getGlobalBasis().getX().dot(tireVelocity);
+
+        gripFactor = (float) GD.abs(steeringXSpeed/tireVelocity.length());
+        double xTraction = gripCurve.sampleBaked(gripFactor);
+
+        if(cmd.handbrake && gripFactor < 0.2f) {
+            vehicle.setSlipping(false);
+        }
+
+        if(cmd.handbrake) {
+            xTraction = 0.01f;
+        }
+        else if (vehicle.isSlipping()) {
+            xTraction = 0.1;
+        }
+
+        double gravity =  -vehicle.getGravity().getY();
+        Vector3 xForce = getGlobalBasis().getX().times(-1 * steeringXSpeed * xTraction * ((vehicle.getMass() *gravity)/4.0));
+
+        // z force traction
+        double forwardSpeed = forwardDir.dot(tireVelocity);
+        float zFriction = zTraction;
+
+        if (vehicle.isBraking()) {
+            zFriction = zBrakeTraction;
+        }
+
+        Vector3 zForce = vehicle.getGlobalBasis().getZ().times(forwardSpeed * zFriction * ((vehicle.getMass() *gravity)/vehicle.getWheels().size()));
+
+
+        vehicle.applyForce(xForce, forcePosition);
+        vehicle.applyForce(yForce, forcePosition);
+        vehicle.applyForce(zForce, forcePosition);
+    }
+
+
+    public void applySkidMark() {
+
+        skidMark.setGlobalPosition(getCollisionPoint().plus(Vector3.Companion.getUP().times(0.01)));
+        skidMark.lookAt(skidMark.getGlobalPosition().plus(vehicle.getGlobalBasis().getZ()));
+
+        if(!vehicle.isHandbraking() && gripFactor < 0.2f) {
+            vehicle.setSlipping(false);
+            skidMark.setEmitting(false);
+        }
+
+        if(vehicle.isHandbraking() && !skidMark.isEmitting()) {
+            skidMark.setEmitting(true);
+        }
+
+    }
+
+/**
      * Applies an upward spring+damper force to the vehicle at this wheel's position.
      * Called from Vehicle._physicsProcess each frame.
      * Returns true when the wheel is within hoverHeight of the ground.
@@ -93,20 +187,103 @@ public class VehicleWheel extends RayCast3D {
         double  springLen    = getGlobalPosition().distanceTo(contact) - wheelRadius;
         double compression =  restDistance - springLen;
 
-        Vector3 wheelMeshPositiontion = wheelMesh.getPosition();
-        wheelMeshPositiontion.setY(-springLen);
-        wheelMesh.setPosition(wheelMeshPositiontion);
+        Vector3 wheelMeshPosition = wheelMesh.getPosition();
+        wheelMeshPosition.setY(-springLen);
+        wheelMesh.setPosition(wheelMeshPosition);
 
         double springForceMagnitude = springStrength * compression;
 
-        // damping force
+        // damping force = damping * relative velocity
         Vector3 worldVelocity = getPointVelocity(contact);
         double relativeVelocity = springUpDir.dot(worldVelocity);
         double springDampForceMagnitude = springDamping * relativeVelocity;
 
-        Vector3 springForce = springUpDir.times(springForceMagnitude - springDampForceMagnitude);
+        Vector3 springForce = getCollisionNormal().times(springForceMagnitude - springDampForceMagnitude);
+
+        contact = wheelMesh.getGlobalPosition();
         Vector3 forcePosOffset = contact.minus(vehicle.getGlobalPosition());
 
         vehicle.applyForce(springForce, forcePosOffset);
     }
+
+    public void applyWheelAcceleration(float processedDeltaTime, float motor) {
+        Vector3 forwardDir = getGlobalBasis().getZ().times(-1);
+        double velocity = forwardDir.dot(vehicle.getLinearVelocity());
+        wheelMesh.rotateX((float) ((-velocity * processedDeltaTime ) /wheelRadius));
+
+        if (!isColliding()) {return;}
+
+        Vector3 contact    = getCollisionPoint();
+        Vector3 forcePosition = contact.minus(vehicle.getGlobalPosition());
+
+        if(isMotor && motor != 0) {
+            double speedRatio = velocity / vehicle.maxSpeed;
+            double accelerationRatio = vehicle.accelerationCurve.sampleBaked((float) speedRatio);
+            Vector3 forceVector = forwardDir.times(vehicle.acceleration * motor * accelerationRatio);
+
+            vehicle.applyForce(forceVector, forcePosition);
+        }
+    }
+
+    public void applyWheelSteering(float delta, float steering) {
+        if(!isSteer) {return;}
+
+        Vector3 rotation = getRotation();
+
+        if (steering != 0) {
+            float rotationValue = (float) GD.clamp(getRotation().getY() + (steering * delta), tireMaxTurnMinRad, tireMaxTurnMaxRad);
+            rotation.setY(rotationValue);
+                   }
+        else {
+            rotation.setY((float) GD.moveToward(getRotation().getY(), 0, vehicle.tireMaxTurnSpeed * delta));
+        }
+
+        setRotation(rotation);
+    }
+
+    public void applyWheelTraction(boolean handbrake) {
+        if (!isColliding()) {return;}
+
+        Vector3 steerSideDir = getGlobalBasis().getX();
+        Vector3 tireVelocity = getPointVelocity(wheelMesh.getGlobalPosition());
+        float steeringXVelocity = (float) steerSideDir.dot(tireVelocity);
+
+        float gripFactor = (float) GD.abs(steeringXVelocity/tireVelocity.length());
+        double xTraction = gripCurve.sampleBaked(gripFactor);
+
+        skidMark.setGlobalPosition(getCollisionPoint().plus(Vector3.Companion.getUP().times(0.01)));
+        skidMark.lookAt(skidMark.getGlobalPosition().plus(vehicle.getGlobalBasis().getZ()));
+
+        boolean isSlipping = true;
+
+        if(!handbrake && gripFactor < 0.2f) {
+            isSlipping = false;
+            skidMark.setEmitting(false);
+        }
+
+        if(handbrake) {
+           xTraction = 0.01f;
+           if (!skidMark.isEmitting()) {
+               skidMark.setEmitting(true);
+           }
+        }
+        else if (isSlipping) {
+            xTraction = 0.1;
+        }
+
+        float gravity = Float.parseFloat(String.valueOf(ProjectSettings.getSetting("physics/3d/default_gravity", 9.85)));
+        Vector3 xForce = steerSideDir.times(-1 * steeringXVelocity * xTraction * ((vehicle.getMass() *gravity)/4.0));
+
+        // z force tracktion
+        float forwardVelocity = (float)-getGlobalBasis().getZ().dot(tireVelocity);
+        float zTraction = 0.05f;
+        Vector3 zForce = vehicle.getGlobalBasis().getZ().times(forwardVelocity * zTraction * ((vehicle.getMass() *gravity)/4.0));
+
+        Vector3 forcePosition = getGlobalPosition().minus(vehicle.getGlobalPosition());
+
+        vehicle.applyForce(xForce, forcePosition);
+        vehicle.applyForce(zForce, forcePosition);
+
+    }
+
 }
