@@ -185,6 +185,12 @@ public class Vehicle extends RigidBody3D implements Controllable {
             setCenterOfMass(Vector3.Companion.getDOWN().times(0.5f));
         }
 
+        // Teleport occupant to driver seat every frame so their hitbox rides with the car.
+        if (occupant != null && driverSeatNode != null) {
+            occupant.setGlobalPosition(driverSeatNode.getGlobalPosition());
+            occupant.setGlobalRotation(getGlobalRotation());
+        }
+
         cameraControllerNode.setGlobalPosition(getGlobalPosition());
 
         // Lazy yaw follow — lerp camera heading toward vehicle heading so sharp
@@ -222,7 +228,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
         occupant = c;
         Controller ctrl = c.detachController();
         if (ctrl != null) attachController(ctrl);
-        c.setVisible(false);
         c.setProcess(false);
         c.setPhysicsProcess(false);
         Node mc = c.getNodeOrNull("MovementController");
@@ -242,9 +247,9 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Vector3 exitPos = getGlobalPosition()
             .minus(right.times(1.5f)).plus(new Vector3(0f, 0.8f, 0f));
         c.setGlobalPosition(exitPos);
+        c.setGlobalRotation(new Vector3(0f, getGlobalRotation().getY(), 0f));
         c.setProcess(true);
         c.setPhysicsProcess(true);
-        c.setVisible(true);
         Node mc = c.getNodeOrNull("MovementController");
         if (mc != null) mc.setPhysicsProcess(true);
         Controller ctrl = detachController();
