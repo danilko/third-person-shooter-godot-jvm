@@ -3,9 +3,10 @@
 
 registeredName = VehicleWheel
 fqName = com.vehicle.VehicleWheel
-baseType = Node3D
+baseType = RayCast3D
 supertypes = [
-    godot.api.Node3D,
+    godot.api.RayCast3D,
+	godot.api.Node3D,
 	godot.api.Node,
 	godot.api.Object,
 	godot.core.KtObject,
@@ -17,9 +18,12 @@ signals = [
 ]
 properties = [
     wheel_scene,
-	wheel_visual_radius,
+	wheel_radius,
 	is_front_wheel,
-	max_steer_angle_deg
+	spring_strength,
+	spring_damping,
+	rest_distance,
+	over_extend
 ]
 functions = [
     _ready
