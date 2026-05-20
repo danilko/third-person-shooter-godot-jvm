@@ -1,8 +1,6 @@
 [gd_scene format=3 uid="uid://dtlryojg3n01y"]
 
 [ext_resource type="Script" uid="uid://x2aupnfxbw7s" path="res://gdj/com/ui/CharacterHUD.gdj" id="1_2lu2a"]
-[ext_resource type="Script" uid="uid://defb2urvdtr8u" path="res://gdj/com/ui/Crosshair.gdj" id="2_o0pri"]
-[ext_resource type="PackedScene" uid="uid://2cwjeq8se2u2" path="res://src/main/resources/com/ui/LinePivot.tscn" id="3_2k6t6"]
 [ext_resource type="FontFile" uid="uid://btgb34w8m7xgt" path="res://assets/ui/DSEG7ClassicMini-Bold.ttf" id="4_f5mbb"]
 [ext_resource type="PackedScene" uid="uid://bkillfeedmain" path="res://src/main/resources/com/ui/Feed.tscn" id="5_2lu2a"]
 
@@ -27,48 +25,6 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_2lu2a")
 feed_entry_path = NodePath("")
-
-[node name="Crosshair" type="Control" parent="." unique_id=1365259185]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("2_o0pri")
-
-[node name="Center" type="Node2D" parent="Crosshair" unique_id=248629432]
-
-[node name="Border" type="Line2D" parent="Crosshair/Center" unique_id=2144872917]
-points = PackedVector2Array(-0.1, 0, 0.1, 0)
-width = 6.0
-default_color = Color(0.15686275, 0.29411766, 0.6509804, 0.4117647)
-begin_cap_mode = 2
-end_cap_mode = 2
-
-[node name="Dot" type="Line2D" parent="Crosshair/Center" unique_id=69333938]
-points = PackedVector2Array(-0.1, 0, 0.1, 0)
-width = 2.0
-default_color = Color(0.10980392, 0.8235294, 1, 1)
-begin_cap_mode = 2
-end_cap_mode = 2
-
-[node name="Reticle" type="Node2D" parent="Crosshair" unique_id=701957523]
-
-[node name="Lines" type="Node2D" parent="Crosshair/Reticle" unique_id=1204117301]
-
-[node name="LinePivot" parent="Crosshair/Reticle/Lines" unique_id=1616160498 instance=ExtResource("3_2k6t6")]
-
-[node name="LinePivot2" parent="Crosshair/Reticle/Lines" unique_id=23047935 instance=ExtResource("3_2k6t6")]
-rotation = 1.5707964
-
-[node name="LinePivot3" parent="Crosshair/Reticle/Lines" unique_id=1780781293 instance=ExtResource("3_2k6t6")]
-rotation = 3.1415927
-
-[node name="LinePivot4" parent="Crosshair/Reticle/Lines" unique_id=1430289086 instance=ExtResource("3_2k6t6")]
-rotation = 4.712389
 
 [node name="Magazine" type="Control" parent="." unique_id=1902918573]
 layout_mode = 1

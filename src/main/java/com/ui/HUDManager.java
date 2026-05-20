@@ -1,11 +1,14 @@
 package com.ui;
 
 import com.character.Character;
+import com.character.CombatState;
 import com.character.Health;
 import com.character.Player;
 import com.character.WeaponController;
 import com.character.CharacterInfo;
 import com.game.EventBus;
+import com.vehicle.Vehicle;
+import com.vehicle.VehicleWeaponMode;
 import godot.api.Node3D;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
@@ -47,9 +50,10 @@ public class HUDManager extends CanvasLayer {
   @RegisterProperty @Export
   public NodePath radialMenuPath = new NodePath("WeaponRadialMenu");
 
-  private Control activeHUD;
-  private Node    player;
-  private String  playerCharacterId = "";
+  private Control  activeHUD;
+  private Node     player;
+  private String   playerCharacterId = "";
+  private Crosshair crosshair;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -71,12 +75,22 @@ public class HUDManager extends CanvasLayer {
           Object.ConnectFlags.DEFAULT);
     }
 
+    // Cache the crosshair — it lives as a sibling of FootHUD/VehicleHUD so it
+    // persists across HUD context switches.
+    Node ch = getNodeOrNull("Crosshair");
+    if (ch instanceof Crosshair c) crosshair = c;
+
     if (!initialHUD.isEmpty()) activateHUD(initialHUD);
   }
 
   @RegisterFunction
   public void onPlayerSpawned(Node spawnedPlayer) {
     wirePlayer(spawnedPlayer);
+  }
+
+  @RegisterFunction
+  public void onPlayerCombatStateChanged(CombatState state) {
+    if (crosshair != null) crosshair.setShowCrosshair(state.isCombat());
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -104,6 +118,15 @@ public class HUDManager extends CanvasLayer {
     if (wcNode instanceof WeaponController wc) {
       wc.ammoChanged.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onPlayerAmmoChanged")),
+          Object.ConnectFlags.DEFAULT);
+      // Wire crosshair spread source once — self-managed from here on.
+      if (crosshair != null) crosshair.weaponController = wc;
+    }
+
+    // Drive crosshair visibility from the player's combat-state changes.
+    if (newPlayer instanceof Character c) {
+      c.changedCombatState.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onPlayerCombatStateChanged")),
           Object.ConnectFlags.DEFAULT);
     }
 
@@ -147,6 +170,13 @@ public class HUDManager extends CanvasLayer {
       hud.setVehicle(v);
     }
     activateHUD("VehicleHUD");
+    // VEHICLE_WEAPON: combat state is not forced on (no character weapon), but the
+    // vehicle fires its own gun — show crosshair with fixed spread (null weapon controller).
+    if (crosshair != null && vehicle instanceof Vehicle v
+            && v.getWeaponMode() == VehicleWeaponMode.VEHICLE_WEAPON) {
+      crosshair.weaponController = null;
+      crosshair.setShowCrosshair(true);
+    }
   }
 
   @RegisterFunction
@@ -155,6 +185,13 @@ public class HUDManager extends CanvasLayer {
     Node vhudNode = getNodeOrNull("VehicleHUD");
     if (vhudNode instanceof VehicleHUD hud) hud.setVehicle(null);
     activateHUD("FootHUD");
+    // Restore crosshair weapon controller and visibility from the player's state.
+    if (crosshair != null) {
+      Node wcNode = player != null ? player.getNodeOrNull("WeaponController") : null;
+      crosshair.weaponController = wcNode instanceof WeaponController wc ? wc : null;
+      boolean inCombat = player instanceof Character c && c.combat;
+      crosshair.setShowCrosshair(inCombat);
+    }
   }
 
   // ── Signal relays — player → EventBus ─────────────────────────────────────

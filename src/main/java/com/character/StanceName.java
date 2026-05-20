@@ -11,7 +11,8 @@ import godot.annotation.RegisterClass;
 public enum StanceName {
     UPRIGHT("Upright"),
     CROUCH("Crouch"),
-    CRAWL("Crawl");
+    CRAWL("Crawl"),
+    DRIVE_CARRIER("DriveCarrier");
 
     private final String key;
 

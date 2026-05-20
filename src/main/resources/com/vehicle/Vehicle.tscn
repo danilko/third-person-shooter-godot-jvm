@@ -126,5 +126,12 @@ transform = Transform3D(1, 0, 0, 0, 0.9862856, 0.1650476, 0, -0.1650476, 0.98628
 current = true
 fov = 70.0
 
+[node name="AimRay" type="RayCast3D" parent="CameraController/Camera3D" unique_id=1379134566]
+target_position = Vector3(0, 0, -200)
+collision_mask = 11
+
+[node name="VehicleWeaponMount" type="Marker3D" parent="." unique_id=1379134567]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -2)
+
 [connection signal="body_entered" from="EntranceArea" to="." method="on_entrance_body_entered"]
 [connection signal="body_exited" from="EntranceArea" to="." method="on_entrance_body_exited"]

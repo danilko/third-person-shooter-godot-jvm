@@ -48,15 +48,6 @@ data = PackedVector3Array(-7.5, -2.5, 0.125, -7.5, -2.5, -0.125, -7.5, 2.5, -0.1
 [sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_hbo2n"]
 data = PackedVector3Array(-7.5, -0.92767334, 5, -7.5, -0.92767334, -5, -7.5, 0.92767334, -5, 7.5, -0.92767334, -5, -7.5, -0.92767334, -5, -7.5, -0.92767334, 5, -7.5, 0.92767334, -5, -7.5, -0.92767334, -5, 7.5, -0.92767334, -5, -7.5, 0.92767334, -5, -7.5, 0.92767334, 5, -7.5, -0.92767334, 5, -7.5, -0.92767334, 5, -7.5, 0.92767334, 5, 7.5, 0.92767334, 5, 7.5, 0.92767334, 5, -7.5, 0.92767334, 5, -7.5, 0.92767334, -5, -7.5, -0.92767334, 5, 7.5, -0.92767334, 5, 7.5, -0.92767334, -5, 7.5, 0.92767334, 5, 7.5, -0.92767334, 5, -7.5, -0.92767334, 5, 7.5, -0.92767334, -5, 7.5, -0.92767334, 5, 7.5, 0.92767334, 5, 7.5, -0.92767334, -5, 7.5, 0.92767334, -5, -7.5, 0.92767334, -5, -7.5, 0.92767334, -5, 7.5, 0.92767334, -5, 7.5, 0.92767334, 5, 7.5, 0.92767334, 5, 7.5, 0.92767334, -5, 7.5, -0.92767334, -5)
 
-[sub_resource type="Environment" id="Environment_x8bpg"]
-background_mode = 2
-ambient_light_source = 3
-ambient_light_color = Color(0.6156863, 0.6156863, 0.6156863, 0.72156864)
-tonemap_mode = 2
-glow_enabled = true
-glow_normalized = true
-glow_strength = 0.75
-
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hbo2n"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_kj2pm"]
@@ -203,18 +194,6 @@ material = SubResource("StandardMaterial3D_lj72b")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2770534, -21.148846)
 shape = SubResource("ConcavePolygonShape3D_hbo2n")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=543689444]
-environment = SubResource("Environment_x8bpg")
-
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=336851902]
-transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 4.677, 0)
-light_energy = 0.7
-sky_mode = 1
-
-[node name="DirectionalLight3D2" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=7119178]
-transform = Transform3D(0.9658932, -0.07774715, -0.24699299, 0.078457184, 0.996893, -0.00698126, 0.24676836, -0.012635224, 0.9689921, 0, 4.677, 0)
-light_energy = 0.03
-
 [node name="AmmoRefill" type="Area3D" parent="." unique_id=671726989]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75007653, 0)
 collision_mask = 11
@@ -298,4 +277,15 @@ acceleration = 16000.0
 [node name="Player" parent="." unique_id=73893577 instance=ExtResource("13_owcx3")]
 transform = Transform3D(0.9998968, 0, -0.014363566, 0, 1, 0, 0.014363566, 0, 0.9998968, 0, 1.0789046, 15.990971)
 
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=336851902]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 4.677, 0)
+light_energy = 0.7
+sky_mode = 1
+
+[node name="DirectionalLight3D2" type="DirectionalLight3D" parent="." unique_id=7119178]
+transform = Transform3D(0.9658933, -0.07774716, -0.24699299, 0.07845719, 0.99689305, -0.006981262, 0.24676839, -0.012635224, 0.9689921, 0, 4.677, 0)
+light_energy = 0.03
+
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]
+
+[editable path="HUDManager"]

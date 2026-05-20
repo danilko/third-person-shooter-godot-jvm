@@ -1,11 +1,11 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = HUDManager
-fqName = com.ui.HUDManager
-baseType = CanvasLayer
+registeredName = VehicleCameraController
+fqName = com.vehicle.VehicleCameraController
+baseType = Node3D
 supertypes = [
-    godot.api.CanvasLayer,
+    godot.api.Node3D,
 	godot.api.Node,
 	godot.api.Object,
 	godot.core.KtObject,
@@ -16,15 +16,16 @@ signals = [
     
 ]
 properties = [
-    initial_h_u_d,
-	radial_menu_path
+    min_distance,
+	max_distance,
+	height,
+	aim_recovery_speed,
+	camera_sensitivity,
+	min_pitch,
+	max_pitch
 ]
 functions = [
     _ready,
-	on_player_spawned,
-	on_player_combat_state_changed,
-	on_vehicle_entered,
-	on_vehicle_exited,
-	on_player_ammo_changed,
-	on_player_health_damaged
+	_input,
+	_physics_process
 ]

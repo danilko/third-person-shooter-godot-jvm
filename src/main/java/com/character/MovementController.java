@@ -1,6 +1,5 @@
 package com.character;
 
-import com.ui.Crosshair;
 import godot.api.CharacterBody3D;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -67,10 +66,6 @@ public class MovementController extends Node {
   @Export
   public WeaponController weaponController;
 
-  @RegisterProperty
-  @Export
-  public Crosshair crosshair;
-
   @RegisterFunction
   @Override
   public void _ready() {
@@ -109,17 +104,21 @@ public class MovementController extends Node {
     player.moveAndSlide();
 
     // Handle Mesh Rotation
+    // atan2(-dx, -dz) maps a world-space movement direction to the Y rotation needed
+    // for a -Z-forward mesh (Godot convention).  The old formula atan2(dx, dz) was
+    // correct for a +Z-forward mesh; negating both components shifts it by π, which
+    // is the rotation needed to flip from +Z to -Z facing convention.
     double targetRotation;
     if (rolling && direction.lengthSquared() > 0.001) {
       // During roll: always face movement direction, even in combat
-      targetRotation = atan2(direction.getX(), direction.getZ()) - playerInitRotation;
+      targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
     } else if (combat && !worldSpaceMovement) {
       // Face camera direction (Player only — set faceCameraInCombat=false for AI/Enemy)
       targetRotation = camRotation;
     } else {
       // Face movement direction (only when actually moving)
       if (direction.lengthSquared() > 0.001) {
-        targetRotation = atan2(direction.getX(), direction.getZ()) - playerInitRotation;
+        targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
       } else {
         targetRotation = meshRoot.getRotation().getY(); // hold current facing
       }
@@ -131,11 +130,6 @@ public class MovementController extends Node {
     // Update only the Y axis
     meshRoot.setRotation(new Vector3(currentRot.getX(), newY, currentRot.getZ()));
 
-    // Mirror actual ballistic spread so the crosshair reflects true accuracy.
-    // Scale: 1° spread → 15 px arm offset, matching the visual range of the old pixel-unit system.
-    if (crosshair != null) {
-      crosshair.setPositionX(weaponController.getCurrentSpreadDeg() * 8.0f);
-    }
   }
 
 

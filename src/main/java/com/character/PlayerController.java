@@ -82,8 +82,10 @@ public class PlayerController extends Controller {
         Player body = cachedPlayer;
 
         // ── Movement ──────────────────────────────────────────────────────────
-        float moveX = inp.getActionStrength("left")    - inp.getActionStrength("right");
-        float moveZ = inp.getActionStrength("forward") - inp.getActionStrength("back");
+        // Signs match Godot's -Z-forward convention: W → moveZ = -1 (world -Z = forward).
+        // Left/right: D (+X) = camera-right, A (-X) = camera-left.
+        float moveX = inp.getActionStrength("right") - inp.getActionStrength("left");
+        float moveZ = inp.getActionStrength("back")  - inp.getActionStrength("forward");
         cmd.movementDirection.setX(moveX);
         cmd.movementDirection.setZ(moveZ);
 
@@ -129,6 +131,8 @@ public class PlayerController extends Controller {
         cmd.roll    = inp.isActionJustPressed("roll", false);
 
         for (String stanceKey : body.stances.keys()) {
+            // DRIVE_CARRIER is set programmatically on vehicle entry, not by player input.
+            if (StanceName.DRIVE_CARRIER.getKey().equals(stanceKey)) continue;
             if (inp.isActionJustPressed(stanceKey.toLowerCase(), false)) {
                 cmd.desiredStance = StanceName.fromKey(stanceKey);
                 break;
@@ -163,12 +167,15 @@ public class PlayerController extends Controller {
         UserCommand cmd = new UserCommand();
         Input inp = Input.INSTANCE;
 
-        cmd.motor = inp.getActionStrength("forward") - inp.getActionStrength("back");
-        cmd.steering  = -(inp.getActionStrength("right") - inp.getActionStrength("left"));
-        cmd.handbrake = inp.isActionPressed("handbrake", false);
-        cmd.brake     = inp.isActionPressed("brake", false);
+        cmd.motor        = inp.getActionStrength("forward") - inp.getActionStrength("back");
+        cmd.steering     = -(inp.getActionStrength("right") - inp.getActionStrength("left"));
+        cmd.handbrake    = inp.isActionPressed("handbrake", false);
+        cmd.brake        = inp.isActionPressed("brake", false);
         cmd.enterExit    = inp.isActionJustPressed("interact", false);
-        // "reload" (R) has no meaning while driving — reuse it as a flip-upright reset.
+        // Weapon inputs: relayed to the occupant by Vehicle when weaponMode != NONE.
+        cmd.fire         = inp.isActionPressed("fire", false);
+        cmd.reload       = inp.isActionJustPressed("reload", false);
+        // When there is no PASSENGER_WEAPON, "reload" doubles as a flip-upright reset.
         cmd.resetVehicle = inp.isActionJustPressed("reload", false);
 
         cmd.sequenceNumber = ++localSequence;
