@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dq2glpynwti1i" path="res://gdj/com/vehicle/Vehicle.gdj" id="1_v"]
 [ext_resource type="Script" uid="uid://oymron85jta" path="res://gdj/com/character/Health.gdj" id="2_h"]
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="3_ci"]
+[ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="3_i1sta"]
 [ext_resource type="PackedScene" uid="uid://ds0yoqtkt2t1n" path="res://src/main/resources/com/vehicle/VehicleWheel.tscn" id="5_p3n1p"]
 [ext_resource type="Script" uid="uid://djm7aunxpr7f6" path="res://gdj/com/vehicle/VehicleCameraController.gdj" id="5_x00le"]
 [ext_resource type="Curve" uid="uid://cofnaffaigrhj" path="res://src/main/resources/com/vehicle/VehicleWheelFrontGrip.tres" id="6_i1sta"]
@@ -62,10 +63,10 @@ character_info = SubResource("Resource_x00le")
 spring_strength = 12000.0
 wheel_radius = 0.33
 max_speed = 180.0
-acceleration = 12000.0
+acceleration = 16000.0
 acceleration_curve = SubResource("Curve_yyb6n")
 tire_max_turn_degrees = 12.0
-vehicle_cam_path = NodePath("CameraController/Camera3D")
+vehicle_icon = ExtResource("3_i1sta")
 
 [node name="Health" type="Node" parent="." unique_id=450985]
 script = ExtResource("2_h")
@@ -77,7 +78,7 @@ max_health = 500.0
 mesh = SubResource("ArrayMesh_p3n1p")
 
 [node name="DriverSeat" type="Marker3D" parent="." unique_id=1653067824]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.19195074, -0.3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, -0.15868372, -0.3)
 
 [node name="EntranceArea" type="Area3D" parent="." unique_id=1653067825]
 collision_layer = 0

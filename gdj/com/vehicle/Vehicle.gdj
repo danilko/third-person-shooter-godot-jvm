@@ -38,11 +38,17 @@ properties = [
 	vehicle_cam_path,
 	weapon_mode_index,
 	vehicle_aim_ray_path,
-	vehicle_weapon_path
+	vehicle_weapon_path,
+	vehicle_collision_min_speed,
+	vehicle_collision_damage_scale,
+	vehicle_explosion_occupant_damage,
+	vehicle_icon
 ]
 functions = [
     _ready,
 	_physics_process,
+	_integrate_forces,
+	on_vehicle_destruction,
 	on_entrance_body_entered,
 	on_entrance_body_exited
 ]

@@ -66,6 +66,16 @@ public class MovementController extends Node {
   @Export
   public WeaponController weaponController;
 
+  /** Downward speed (m/s) required before any fall damage is dealt. 0 disables fall damage. */
+  @Export
+  @RegisterProperty
+  public float fallDamageThreshold = 10.0f;
+
+  /** Damage per m/s above fallDamageThreshold on landing. */
+  @Export
+  @RegisterProperty
+  public float fallDamageScale = 5.0f;
+
   @RegisterFunction
   @Override
   public void _ready() {
@@ -78,6 +88,8 @@ public class MovementController extends Node {
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || meshRoot == null) return;
+
+    boolean wasOnFloor = player.isOnFloor();
 
     // Calculate horizontal velocity
     Vector3 normDir = direction.normalized();
@@ -101,7 +113,20 @@ public class MovementController extends Node {
 
     // Apply movement using lerp
     player.setVelocity( GD.lerp(player.getVelocity(), velocity, acceleration * delta));
+    float appliedVelocityY = (float) player.getVelocity().getY();
     player.moveAndSlide();
+
+    // Fall damage: compare velocity just before landing to the configured threshold.
+    if (fallDamageThreshold > 0 && !wasOnFloor && player.isOnFloor()
+            && appliedVelocityY < -fallDamageThreshold) {
+      float fallSpeed = -appliedVelocityY;
+      float damage = (fallSpeed - fallDamageThreshold) * fallDamageScale;
+      if (player instanceof Character c && c.healthNode != null) {
+        String attackerName    = (c.characterInfo != null) ? c.characterInfo.displayName : "";
+        String attackerFaction = (c.characterInfo != null) ? c.characterInfo.faction     : "";
+        c.healthNode.takeDamage(null, damage, "Fall", null, attackerName, attackerFaction);
+      }
+    }
 
     // Handle Mesh Rotation
     // atan2(-dx, -dz) maps a world-space movement direction to the Y rotation needed

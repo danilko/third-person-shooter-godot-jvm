@@ -82,6 +82,18 @@ public class Vehicle extends RigidBody3D implements Controllable {
     @RegisterProperty @Export public NodePath vehicleWeaponPath =
             new NodePath("VehicleWeaponMount/WeaponItem");
 
+    /** Minimum vehicle speed (m/s) needed to deal collision damage to characters. 0 disables it. */
+    @RegisterProperty @Export public float vehicleCollisionMinSpeed = 5.0f;
+
+    /** Damage per m/s above vehicleCollisionMinSpeed on collision. */
+    @RegisterProperty @Export public float vehicleCollisionDamageScale = 100.0f;
+
+    /** Damage dealt to the occupant when the vehicle is destroyed. */
+    @RegisterProperty @Export public float vehicleExplosionOccupantDamage = 50.0f;
+
+    /** Optional icon shown in the kill feed when this vehicle deals collision damage. */
+    @RegisterProperty @Export public Texture2D vehicleIcon;
+
     // ── Runtime state ─────────────────────────────────────────────────────────
 
     protected Controller             controller;
@@ -100,6 +112,9 @@ public class Vehicle extends RigidBody3D implements Controllable {
     private boolean justEntered = false;
     private UserCommand cmd = new UserCommand();
 
+    // Characters currently touching the vehicle body — used to detect new contacts each frame.
+    private final java.util.HashSet<Character> activeCollisions = new java.util.HashSet<>();
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     @RegisterFunction
@@ -107,9 +122,16 @@ public class Vehicle extends RigidBody3D implements Controllable {
     public void _ready() {
         if (characterInfo == null) characterInfo = new CharacterInfo();
         addToGroup(new StringName("characters"), false);
+        setContactMonitor(true);
+        setMaxContactsReported(8);
 
         Node h = getNodeOrNull("Health");
-        if (h instanceof Health hn) healthNode = hn;
+        if (h instanceof Health hn) {
+            healthNode = hn;
+            healthNode.died.connectUnsafe(
+                    Callable.createUnsafe(this, StringNames.toGodotName("onVehicleDestruction")),
+                    godot.api.Object.ConnectFlags.DEFAULT);
+        }
 
         Node wheelsNode = getNodeOrNull("Wheels");
         if (wheelsNode != null) {
@@ -237,9 +259,65 @@ public class Vehicle extends RigidBody3D implements Controllable {
                 else          vehicleWeaponItem.stopUseWeapon();
             }
         }
+
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────
+
+    /**
+     * Detects new character contacts and applies one-time speed-proportional damage.
+     * PhysicsDirectBodyState3D.getContactColliderObject is the correct API for iterating
+     * contacts on a RigidBody3D — the equivalent getter does not exist on the body itself.
+     * Requires contact_monitor=true and max_contacts_reported>0 (set in _ready).
+     */
+    @RegisterFunction
+    @Override
+    public void _integrateForces(PhysicsDirectBodyState3D state) {
+        if (vehicleCollisionMinSpeed <= 0) return;
+
+        int count = state.getContactCount();
+        java.util.HashSet<Character> currentContacts = new java.util.HashSet<>();
+
+        for (int i = 0; i < count; i++) {
+            // getContactColliderObject returns godot.api.Object; widened to java.lang.Object here.
+            Object obj = state.getContactColliderObject(i);
+            Character character = null;
+            if (obj instanceof Character c) {
+                character = c;
+            } else if (obj instanceof Node3D n3d) {
+                Node owner = n3d.getOwner();
+                if (owner instanceof Character c) character = c;
+            }
+            if (character == null || character == occupant || !character.isAlive()) continue;
+            currentContacts.add(character);
+        }
+
+        float speed = (float) GD.abs(getGlobalBasis().getZ().dot(getLinearVelocity()));
+        if (speed >= vehicleCollisionMinSpeed) {
+            for (Character character : currentContacts) {
+                if (!activeCollisions.contains(character)) {
+                    applyVehicleCollisionDamage(character, speed);
+                }
+            }
+        }
+
+        activeCollisions.clear();
+        activeCollisions.addAll(currentContacts);
+    }
+
+    private void applyVehicleCollisionDamage(Character character, float speed) {
+        float damage = (speed - vehicleCollisionMinSpeed) * vehicleCollisionDamageScale;
+        Node healthNode = character.getNodeOrNull("Health");
+        if (!(healthNode instanceof Health health)) return;
+
+        String attackerName    = (occupant != null) ? occupant.getCharacterInfo().displayName: "";
+        String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
+        health.takeDamage(null, damage, "Vehicle", vehicleIcon, attackerName, attackerFaction);
+
+        // Knockback in the direction the vehicle is travelling.
+        Vector3 knockbackDir = getLinearVelocity().normalized();
+        character.applyHitImpulse(null, knockbackDir, damage);
+    }
 
     /** Returns the typed weapon mode from the inspector int. */
     public VehicleWeaponMode getWeaponMode() {
@@ -318,8 +396,42 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
         if (camController != null) camController.setPassengerAimMode(false);
         c.makeCameraActive();
+        // Mark the exiting character as already-known so the next _integrateForces call does
+        // not treat them as a new contact and apply spurious collision damage on exit.
+        activeCollisions.add(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
+    }
+
+    /**
+     * Called when the vehicle's Health node reaches zero.
+     *
+     * Ejects the occupant first (restoring their physics and stance) so that the
+     * exitDriveState / makeCameraActive chain runs on a live vehicle scene, then
+     * applies explosion damage to the ejected character, and finally removes the
+     * vehicle from the scene tree.
+     *
+     * Ordering matters: tryExit() must come before queueFree() so that reparenting
+     * the controller and querying global transforms still work on the intact vehicle.
+     * Damage is applied after ejection so that if the blast kills the character,
+     * enableRagdoll() fires on a fully-restored CharacterBody3D (not mid-drive-state).
+     */
+    @RegisterFunction
+    public void onVehicleDestruction() {
+        if (occupant != null) {
+            Character ejected = occupant;
+            tryExit();
+            if (ejected.isAlive()) {
+                Node occHealth = ejected.getNodeOrNull("Health");
+                if (occHealth instanceof Health health) {
+                    String attackerName    = (characterInfo != null) ? characterInfo.displayName : getName().toString();
+                    String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
+                    health.takeDamage(null, vehicleExplosionOccupantDamage, "Vehicle Explosion",
+                            null, attackerName, attackerFaction);
+                }
+            }
+        }
+        queueFree();
     }
 
     // ── EntranceArea signals ──────────────────────────────────────────────────

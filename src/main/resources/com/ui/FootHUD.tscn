@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://x2aupnfxbw7s" path="res://gdj/com/ui/CharacterHUD.gdj" id="1_2lu2a"]
 [ext_resource type="FontFile" uid="uid://btgb34w8m7xgt" path="res://assets/ui/DSEG7ClassicMini-Bold.ttf" id="4_f5mbb"]
-[ext_resource type="PackedScene" uid="uid://bkillfeedmain" path="res://src/main/resources/com/ui/Feed.tscn" id="5_2lu2a"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_large"]
 font = ExtResource("4_f5mbb")
@@ -24,7 +23,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_2lu2a")
-feed_entry_path = NodePath("")
 
 [node name="Magazine" type="Control" parent="." unique_id=1902918573]
 layout_mode = 1
@@ -185,10 +183,3 @@ offset_bottom = -169.0
 grow_horizontal = 2
 grow_vertical = 0
 horizontal_alignment = 1
-
-[node name="Feed" parent="." unique_id=1649474957 instance=ExtResource("5_2lu2a")]
-layout_mode = 0
-offset_left = 858.0
-offset_top = 33.0
-offset_right = 1108.0
-offset_bottom = 33.0

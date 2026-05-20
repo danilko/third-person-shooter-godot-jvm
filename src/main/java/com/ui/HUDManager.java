@@ -18,9 +18,12 @@ import godot.api.CanvasLayer;
 import godot.api.Control;
 import godot.api.Node;
 import godot.api.Object;
+import godot.api.PackedScene;
+import godot.api.Texture2D;
 import godot.core.Callable;
 import godot.core.NodePath;
 import godot.core.StringNames;
+import godot.global.GD;
 
 /**
  * World-level HUD manager. Lives as a CanvasLayer in World.tscn so all HUD
@@ -50,16 +53,30 @@ public class HUDManager extends CanvasLayer {
   @RegisterProperty @Export
   public NodePath radialMenuPath = new NodePath("WeaponRadialMenu");
 
-  private Control  activeHUD;
-  private Node     player;
-  private String   playerCharacterId = "";
+  /** Scene for {@link DefeatedFeedEntry} rows. Falls back to hard-coded path if null. */
+  @RegisterProperty @Export
+  public PackedScene defeatedEntryScene;
+
+  private static final String DEFEATED_ENTRY_SCENE_PATH =
+          "res://src/main/resources/com/ui/DefeatedFeedEntry.tscn";
+
+  private Control   activeHUD;
+  private Node      player;
+  private String    playerCharacterId = "";
   private Crosshair crosshair;
+  private Feed      feed;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @RegisterFunction
   @Override
   public void _ready() {
+    // Scan children for the Feed — must be a direct child of HUDManager so it
+    // stays visible across HUD context switches (FootHUD ↔ VehicleHUD).
+    for (Node child : getChildren()) {
+      if (child instanceof Feed f) { feed = f; break; }
+    }
+
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) {
       // playerSpawned fires deferred from Player._ready() so this connection
@@ -72,6 +89,9 @@ public class HUDManager extends CanvasLayer {
           Object.ConnectFlags.DEFAULT);
       bus.vehicleExited.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onVehicleExited")),
+          Object.ConnectFlags.DEFAULT);
+      bus.characterEliminated.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onCharacterEliminated")),
           Object.ConnectFlags.DEFAULT);
     }
 
@@ -220,5 +240,26 @@ public class HUDManager extends CanvasLayer {
   private void emitHealth(float currentHealth) {
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) bus.playerHealthChanged.emit(currentHealth);
+  }
+
+  /** Push a {@link DefeatedFeedEntry} row to the kill feed for any character elimination. */
+  @RegisterFunction
+  public void onCharacterEliminated(String attackerName, String attackerFaction,
+                                    String victimName,   String victimFaction,
+                                    String weaponName,   Texture2D weaponIcon,
+                                    boolean headshot) {
+    if (feed == null) return;
+    PackedScene scene = resolveDefeatedEntryScene();
+    if (scene == null) return;
+    DefeatedFeedEntry entry = (DefeatedFeedEntry) scene.instantiate();
+    entry.lifespan = feed.entryLifespan;
+    feed.push(entry);
+    entry.populate(attackerName, attackerFaction, victimName, victimFaction, weaponIcon, headshot);
+  }
+
+  private PackedScene resolveDefeatedEntryScene() {
+    if (defeatedEntryScene != null) return defeatedEntryScene;
+    godot.api.Object loaded = GD.load(DEFEATED_ENTRY_SCENE_PATH);
+    return (loaded instanceof PackedScene ps) ? ps : null;
   }
 }

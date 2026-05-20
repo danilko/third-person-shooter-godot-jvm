@@ -5,12 +5,12 @@
 [ext_resource type="PackedScene" uid="uid://b2f5ebr71dm77" path="res://src/main/resources/com/ui/VehicleHUD.tscn" id="3_r6hxn"]
 [ext_resource type="PackedScene" uid="uid://3v8l2bjm8pek" path="res://src/main/resources/com/ui/WeaponRadialMenu.tscn" id="4_k520o"]
 [ext_resource type="PackedScene" uid="uid://bljcljd5jac81" path="res://src/main/resources/com/ui/Crosshair.tscn" id="5_0rj32"]
+[ext_resource type="PackedScene" uid="uid://bkillfeedmain" path="res://src/main/resources/com/ui/Feed.tscn" id="5_r6hxn"]
 
 [node name="HUDManager" type="CanvasLayer" unique_id=828289775]
 script = ExtResource("1_fuvei")
 
 [node name="FootHUD" parent="." unique_id=1962846644 instance=ExtResource("2_0rj32")]
-feed_entry_path = NodePath("FeedEntry")
 metadata/_edit_use_anchors_ = true
 
 [node name="VehicleHUD" parent="." unique_id=100000001 instance=ExtResource("3_r6hxn")]
@@ -18,5 +18,7 @@ visible = false
 
 [node name="WeaponRadialMenu" parent="." unique_id=1303740167 instance=ExtResource("4_k520o")]
 metadata/_edit_use_anchors_ = true
+
+[node name="Feed" parent="." unique_id=1649474957 instance=ExtResource("5_r6hxn")]
 
 [node name="Crosshair" parent="." unique_id=938896149 instance=ExtResource("5_0rj32")]
