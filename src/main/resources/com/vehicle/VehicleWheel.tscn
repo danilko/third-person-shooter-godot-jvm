@@ -2,10 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cvco5bq71vg1v" path="res://gdj/com/vehicle/VehicleWheel.gdj" id="1_vw"]
 [ext_resource type="Texture2D" uid="uid://bm6rbs4svcjx8" path="res://addons/kenney_prototype_textures/dark/texture_01.png" id="2_85r7d"]
-
-[sub_resource type="Curve" id="Curve_85r7d"]
-_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.5, 0.85), 0.0, 0.0, 0, 0, Vector2(0.9, 0), 0.0, 0.0, 0, 0]
-point_count = 3
+[ext_resource type="Curve" uid="uid://hfw4oidf0fv0" path="res://src/main/resources/com/vehicle/VehicleWheelRearGrip.tres" id="2_vrt2d"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vrt2d"]
 albedo_texture = ExtResource("2_85r7d")
@@ -36,7 +33,7 @@ size = Vector2(0.6, 1)
 
 [node name="VehicleWheel" type="RayCast3D" unique_id=1557561577]
 script = ExtResource("1_vw")
-grip_curve = SubResource("Curve_85r7d")
+grip_curve = ExtResource("2_vrt2d")
 
 [node name="Wheel" type="MeshInstance3D" parent="." unique_id=1119163112]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, -0.5, 0)

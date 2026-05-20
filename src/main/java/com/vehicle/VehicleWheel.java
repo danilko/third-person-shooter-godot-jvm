@@ -53,7 +53,7 @@ public class VehicleWheel extends RayCast3D {
     @RegisterFunction
     @Override
     public void _ready() {
-        vehicle = (Vehicle) getOwner().getNode("Vehicle");
+        vehicle = (Vehicle) getOwner();
         wheelMesh = (Node3D) getNode("Wheel");
         skidMark = (GPUParticles3D) getNode("SkidMark");
 
@@ -77,6 +77,7 @@ public class VehicleWheel extends RayCast3D {
     }
 
     public void applyWheelPhysics(float delta, float getPhysicsProcessDeltaTime, UserCommand cmd) {
+        forceRaycastUpdate();
         Vector3 targetPosition = getTargetPosition();
         targetPosition.setY(-(restDistance + wheelRadius + overExtend));
         setTargetPosition(targetPosition);

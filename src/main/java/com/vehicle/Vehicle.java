@@ -60,11 +60,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     @RegisterProperty @Export public NodePath wheelsPath           = new NodePath("Wheels");
     @RegisterProperty @Export public NodePath driverSeatPath       = new NodePath("DriverSeat");
-    @RegisterProperty @Export public NodePath cameraControllerPath = new NodePath("../CameraController");
-    @RegisterProperty @Export public NodePath vehicleCamPath       = new NodePath("../CameraController/SpringArm3D/Camera3D");
-
-    /** How quickly the camera yaw catches up to the vehicle heading (rad/s blend factor). */
-    @RegisterProperty @Export public float cameraYawLagSpeed = 3.0f;
+    @RegisterProperty @Export public NodePath vehicleCamPath       = new NodePath("CameraController/SpringArm3D/Camera3D");
 
 
     // ── Runtime state ─────────────────────────────────────────────────────────
@@ -76,7 +72,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
     private Node3D   driverSeatNode;
     private Camera3D vehicleCamera;
     private final ArrayList<VehicleWheel> wheels = new ArrayList<>();
-    protected Node3D cameraControllerNode = null;
 
 
     private boolean slipping = false;
@@ -117,10 +112,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
         Node cam = getNodeOrNull(vehicleCamPath.getPath());
         if (cam instanceof Camera3D c) vehicleCamera = c;
-
-        Node cc = getNodeOrNull(cameraControllerPath.getPath());
-        if (cc instanceof Node3D n) cameraControllerNode = n;
-        else GD.printErr("[Vehicle] CameraController node missing at " + cameraControllerPath.getPath());
 
         for (Node child : getChildren()) {
             if (child instanceof Controller c) { controller = c; break; }
@@ -191,17 +182,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
             occupant.setGlobalRotation(getGlobalRotation());
         }
 
-        cameraControllerNode.setGlobalPosition(getGlobalPosition());
-
-        // Lazy yaw follow — lerp camera heading toward vehicle heading so sharp
-        // turns let the player see the side of the car before the camera catches up.
-        float vehicleYaw = (float) getGlobalRotation().getY();
-        float camYaw     = (float) cameraControllerNode.getGlobalRotation().getY();
-        float laggedYaw  = (float) GD.lerpAngle(camYaw, vehicleYaw, cameraYawLagSpeed * (float) delta);
-        Vector3 camRot   = cameraControllerNode.getGlobalRotation();
-        camRot.setY(laggedYaw);
-        cameraControllerNode.setGlobalRotation(camRot);
-
     }
 
 
@@ -226,6 +206,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
     public void tryEnter(Character c) {
         if (occupant != null) return;
         occupant = c;
+        c.setCollisionLayer(0);
         Controller ctrl = c.detachController();
         if (ctrl != null) attachController(ctrl);
         c.setProcess(false);
@@ -248,6 +229,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
             .minus(right.times(1.5f)).plus(new Vector3(0f, 0.8f, 0f));
         c.setGlobalPosition(exitPos);
         c.setGlobalRotation(new Vector3(0f, getGlobalRotation().getY(), 0f));
+        c.setCollisionLayer(2);
         c.setProcess(true);
         c.setPhysicsProcess(true);
         Node mc = c.getNodeOrNull("MovementController");
