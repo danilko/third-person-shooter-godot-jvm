@@ -11,8 +11,8 @@ import godot.core.Vector3;
 import godot.global.GD;
 
 /**
- * Hitscan firearm. Owns: bloom accumulation/decay, spread calculation, recoil,
- * muzzle flash, fire audio, and semi-auto lock.
+ * Hitscan firearm. Owns: spread calculation, recoil, muzzle flash, fire audio,
+ * and semi-auto lock.
  *
  * WeaponController injects character-level references via setup() during _ready(),
  * then orchestrates rate-limiting, reload timing, and HUD signals.
@@ -32,12 +32,14 @@ public class FirearmItem extends WeaponItem {
   private ImpactManager impactManager;
   private BulletTracerManager bulletTracerManager;
 
-  // Per-weapon runtime state
   private float currentBloom = 0f;
   private boolean isWeaponFired = false;
   private StanceName currentStance = StanceName.UPRIGHT;
 
-  private static final float MOVEMENT_SPREAD_PER_MPS = 0.12f;
+  // Added to spread per m/s of horizontal+vertical speed before the stance multiplier,
+  // so crouching/crawling reduces the movement penalty the same way it reduces base spread.
+  private static final float MOVEMENT_SPREAD_PER_MPS = 0.03f;
+
   private static final float CROUCH_SPREAD_MULT = 0.7f;
   private static final float CRAWL_SPREAD_MULT  = 0.5f;
   private static final float JUMP_SPREAD_MULT   = 2.0f;
@@ -103,8 +105,7 @@ public class FirearmItem extends WeaponItem {
   public float getCurrentSpreadDeg() {
     if (owningCharacter == null) return 0f;
     float speed = (float) owningCharacter.getVelocity().length();
-    float raw = spread + speed * MOVEMENT_SPREAD_PER_MPS + currentBloom;
-    return Math.max(0f, raw * stanceMultiplier(owningCharacter));
+    return (spread + currentBloom + speed * MOVEMENT_SPREAD_PER_MPS) * stanceMultiplier(owningCharacter);
   }
 
   @Override
@@ -144,11 +145,15 @@ public class FirearmItem extends WeaponItem {
     // positioned the ray (with scatter baked in) — rotating it again would override that.
     boolean applySpread = owningCharacter instanceof Character c && c.useWeaponSpread;
     Vector3 savedRot = null;
-    if (applySpread) {
+    if (applySpread && spread > 0f) {
       savedRot = aimRay3D.getRotationDegrees();
       float halfSpread = getCurrentSpreadDeg() * 0.5f;
-      float pitchOff = (float) GD.randfRange(-halfSpread, halfSpread);
-      float yawOff   = (float) GD.randfRange(-halfSpread, halfSpread);
+      // Circular cone: pick a random angle and a sqrt-distributed radius so
+      // shots fill the disk uniformly (no diagonal bulge from a square pattern).
+      double coneAngle  = GD.randfRange(0, (float)(2.0 * Math.PI));
+      double coneRadius = Math.sqrt(GD.randf()) * halfSpread;
+      float pitchOff = (float)(Math.cos(coneAngle) * coneRadius);
+      float yawOff   = (float)(Math.sin(coneAngle) * coneRadius);
       aimRay3D.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
       aimRay3D.forceRaycastUpdate();
     }

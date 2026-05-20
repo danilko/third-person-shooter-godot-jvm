@@ -124,12 +124,18 @@ CameraController (Node3D, top-level)
                                 └── SightRay (RayCast3D) ← LoS only (Enemy)
 ```
 
-`PlayerCameraController.gatherLookInput` → mouse velocity.
+`PlayerCameraController._input` accumulates `InputEventMouseMotion.getRelative()` deltas into
+`pendingYaw / pendingPitch` on every mouse event; `gatherLookInput` consumes and resets them
+each physics tick. This captures every mouse event between physics steps rather than sampling
+only the last velocity (`getLastMouseVelocity`), which dropped intermediate events.
 `EnemyCameraController.gatherLookInput` → derives yaw/pitch delta from `aimTarget` world position.
 
 Recoil is stored as `recoilPitch / recoilYaw` on `CameraController` and decays via
 `GD.lerp(…, 0, recoilRecoverySpeed * delta)` each frame — fully separate from the
-mouse-intent `pitch/yaw` so recovery never fights aim.
+mouse-intent `pitch/yaw` so recovery never fights aim. `recoilPitch` is **subtracted** per shot
+(`recoilPitch -= pitchKick`) because negative pitch = look up in Godot's convention.
+`recoilRecoverySpeed = 8.0` gives a snappy per-shot kick that clears in ~0.3 s; sustained fire
+builds a learnable upward drift (~1.7° at full spray) rather than a persistent offset.
 
 ---
 
@@ -170,24 +176,53 @@ Vector3 currentAimTarget   // where AimRay is tracking this frame
 
 ## Combat / Weapon System
 
-### Spread formula (WeaponController)
+### Spread formula (FirearmItem)
 
 ```
-totalSpreadDeg = (baseSpread + velocity_m_s × 0.12 + currentBloom) × stanceMultiplier
+totalSpreadDeg = (spread + currentBloom + speed_m_s × 0.03) × stanceMultiplier
 ```
 
 Stance multipliers: UPRIGHT 1.0×, CROUCH 0.7×, CRAWL 0.5×, airborne 2.0×.
+The multiplier applies to the **entire** expression — crouching reduces both the base
+accuracy penalty and the movement penalty proportionally.
 
-Bloom: `currentBloom += bloomPerShot` per shot; decays by `bloomDecaySpeed` deg/s when not firing.
+Bloom accumulation: `currentBloom += bloomPerShot` on each shot; decays at `bloomDecaySpeed`
+deg/s every physics frame. Key relationship: if `bloomDecaySpeed < bloomPerShot × fireRate`
+bloom accumulates during sustained fire; if greater, each shot clears before the next (semi-auto).
+
+Current weapon values:
+
+| Weapon | `spread` | `bloomPerShot` | `bloomDecaySpeed` | `bloomMax` | `recoil` |
+|:-------|:--------:|:--------------:|:-----------------:|:----------:|:--------:|
+| Rifle  | 0.01°    | 0.05°          | 0.3°/s            | 0.25°      | 1.0°     |
+| Pistol | 0.05°    | 0.05°          | 2.0°/s            | 0.2°       | 0.5°     |
+
+- Rifle: first shot 0.01° (~1 cm at 50 m); full spray 0.26°; bloom accumulates over ~1.25 s of fire.
+- Pistol: first shot 0.05° (5 px crosshair gap from draw — visibly less precise than rifle); bloom
+  clears between taps so sustained semi-auto accuracy stays near base spread.
+
+Spread is applied as a **circular cone** in `performHitscan`: random angle + `sqrt(rand) ×
+halfSpread` radius → uniform disk distribution (no diagonal bulge from independent pitch/yaw
+sampling). The block is skipped entirely when `spread == 0` (no wasted raycast work).
 
 Enemy bypasses spread entirely (`useWeaponSpread = false`); accuracy is controlled
 by `hitChance` + `aimScatterRadius` in `AttackState`.
 
 ### Crosshair
 
-`MovementController._physicsProcess` sets `crosshair.setPositionX(weaponController.getCurrentSpreadDeg() × 8.0f)`.
-`Crosshair._process` lerps the four reticle line arms toward that position
-(fast expand: `crosshairExpandSpeed = 60`, slow contract: `crosshairContractSpeed = 1`).
+`Crosshair._process` reads `weaponController.getCurrentSpreadDeg() × spreadPixelsPerDeg` every
+frame (default `spreadPixelsPerDeg = 100 px/deg`, exported so it can be tuned per scene).
+Arms snap outward at `crosshairExpandSpeed = 60` (near-instant on shot) and contract at
+`crosshairContractSpeed = 8` (fast enough to track bloom recovery, giving a clear "you can shoot
+accurately again" signal). Example pixel values at scale 100:
+
+| Situation | Spread° | Arm offset |
+|:----------|:-------:|:----------:|
+| Rifle still, no bloom | 0.01° | 1 px |
+| Pistol still, no bloom | 0.05° | 5 px |
+| Rifle full spray, standing | 0.26° | 26 px |
+| Rifle sprinting (6 m/s) | 0.195° | 19.5 px |
+| Rifle full spray + sprint | 0.44° | 44 px |
 
 ### Hit detection, damage, and impact VFX
 

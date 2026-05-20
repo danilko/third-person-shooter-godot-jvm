@@ -25,8 +25,8 @@ This project is based on:
 	* **Crawl-to-Shoot** mechanics (Experimental/Beta animation).
 	* Dynamic **Physics Body transformation** during dodge rolls.
 * **Combat & Ballistics:**
-	* Bloom spread system: per-shot accumulation, movement penalty, stance multipliers, camera recoil.
-	* Dynamic crosshair that tracks the live spread value from `WeaponController`.
+	* Arcade-style shooting: recoil-only challenge by default; optional bloom accumulation and movement/stance spread modifiers for each weapon.
+	* Dynamic crosshair that tracks live spread from `WeaponController` via a configurable pixel-per-degree scale.
 	* Toggleable over-the-shoulder camera (Left/Right swap).
 * **Enemy AI (5-state FSM):**
 	* CS 1.6-inspired accuracy: configurable hit chance, reaction delay, aim scatter, and suppression fire.
@@ -112,11 +112,13 @@ LoS is detected via a dedicated **SightRay** that is completely independent of t
 
 ### Weapon Ballistics (Spread & Bloom)
 
-`WeaponController` computes a live spread value each frame:
+`FirearmItem` computes a live spread value each frame:
 
 ```
-totalSpreadDeg = (baseSpread + velocity × 0.12°/(m/s) + currentBloom) × stanceMultiplier
+totalSpreadDeg = (spread + currentBloom + speed_m_s × 0.03) × stanceMultiplier
 ```
+
+The stance multiplier scales the **entire** expression — crouching and crawling reduce both the base accuracy penalty and the movement penalty at the same time.
 
 | Stance / Condition | Multiplier |
 |:-------------------|:----------:|
@@ -125,9 +127,16 @@ totalSpreadDeg = (baseSpread + velocity × 0.12°/(m/s) + currentBloom) × stanc
 | Crawl | 0.5× |
 | Airborne | 2.0× |
 
-The crosshair (`Crosshair.java`) reads this value from `WeaponController.getCurrentSpreadDeg()` each frame and lerps the reticle arms accordingly (fast expand on shot, slow contract during recovery).
+**Bloom** (`currentBloom`) accumulates per shot and decays continuously. The key tuning relationship: if `bloomDecaySpeed < bloomPerShot × fireRate` bloom builds during sustained fire (full-auto); if greater, each shot clears before the next (semi-auto tap-fire).
 
-Camera recoil is routed through `CameraController.applyRecoil()` so it accumulates and recovers independently of spread.
+| Weapon | Base spread | Bloom/shot | Bloom decay | Bloom cap | Recoil/shot |
+|:-------|:-----------:|:----------:|:-----------:|:---------:|:-----------:|
+| Rifle  | 0.01°       | 0.05°      | 0.3°/s      | 0.25°     | 1.0°        |
+| Pistol | 0.05°       | 0.05°      | 2.0°/s      | 0.2°      | 0.5°        |
+
+**Crosshair** (`Crosshair.java`) reads `getCurrentSpreadDeg() × spreadPixelsPerDeg` (default **100 px/deg**) every frame and lerps the four reticle arms: instant snap outward on each shot, fast contract during recovery. At scale 100 the pistol's 0.05° base spread produces a 5 px arm gap from the moment it is drawn — giving an immediate visual "this is less precise than the rifle" signal without any shots fired.
+
+**Camera recoil** is routed through `CameraController.applyRecoil()`: each shot subtracts from `recoilPitch` (negative = look up in Godot's convention) and adds a small random `recoilYaw`. Both decay via exponential lerp at `recoilRecoverySpeed = 8.0`, clearing in ~0.3 s — producing a snappy per-shot kick and a learnable upward drift during sustained spray, independent of spread.
 
 ### Skeleton Hitbox & Damage Zones
 

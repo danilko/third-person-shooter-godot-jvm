@@ -32,8 +32,9 @@ public class Crosshair extends Control {
      */
     @Export @RegisterProperty public double crosshairExpandSpeed  = 60.0;
 
-    /** Lerp speed when arms drift inward (bloom recovery between shots). */
-    @Export @RegisterProperty public double crosshairContractSpeed = 1.0;
+    // Fast enough to track bloom recovery (~0.5s) so the player gets clear visual
+    // feedback when they have first-shot accuracy again — same as CS crosshair behaviour.
+    @Export @RegisterProperty public double crosshairContractSpeed = 8.0;
 
     /**
      * Optional weapon controller for self-managed spread.
@@ -49,9 +50,15 @@ public class Crosshair extends Control {
      */
     @Export @RegisterProperty public boolean showCrosshair = true;
 
+    /**
+     * Pixels per degree of spread. Increase for small spread values (e.g. 0.015°)
+     * so the arms move a visible distance. At 100 px/deg: 0.015° → 1.5 px at rest,
+     * 0.265° at max bloom → 26.5 px open.
+     */
+    @Export @RegisterProperty public float spreadPixelsPerDeg = 100f;
+
     private VariantArray<Node> lines;
-    // Default matches weapon rest spread: 0.5° × 8 px/° = 4 px.
-    private float positionX = 4.0f;
+    private float positionX = 0f;
 
     /** External override — still usable but overwritten next frame if weaponController is set. */
     public void setPositionX(float positionX) {
@@ -79,7 +86,7 @@ public class Crosshair extends Control {
     public void _process(double delta) {
         // Self-managed spread: read live from weapon controller when available.
         if (weaponController != null) {
-            positionX = weaponController.getCurrentSpreadDeg() * 8.0f;
+            positionX = weaponController.getCurrentSpreadDeg() * spreadPixelsPerDeg;
         }
 
         // Target: 0 when hidden (arms collapse to centre), positionX when shown.
