@@ -77,6 +77,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
     private boolean slipping = false;
     private boolean braking = false;
     private boolean handBraking = false;
+    private boolean justEntered = false;
     private UserCommand cmd = new UserCommand();
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -138,9 +139,15 @@ public class Vehicle extends RigidBody3D implements Controllable {
             if(currentCmd.reload) {
                 resetOrientation();
             }
-            if(currentCmd.enterExit) {
+            // Guard: skip exit on the same frame tryEnter ran. isActionJustPressed
+            // stays true for the whole physics frame, so if Vehicle._physicsProcess
+            // runs after Player._physicsProcess in the same frame (possible with
+            // multiple characters in the scene), the interact press that triggered
+            // entry would immediately call tryExit without this flag.
+            if(currentCmd.enterExit && !justEntered) {
                 tryExit();
             }
+            justEntered = false;
 
             cmd.motor = currentCmd.motor;
             cmd.steering = currentCmd.steering;
@@ -206,6 +213,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
     public void tryEnter(Character c) {
         if (occupant != null) return;
         occupant = c;
+        justEntered = true;
         c.setCollisionLayer(0);
         Controller ctrl = c.detachController();
         if (ctrl != null) attachController(ctrl);
