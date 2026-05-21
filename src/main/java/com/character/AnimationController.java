@@ -135,7 +135,16 @@ public class AnimationController extends Node {
     animationTree.set("parameters/StanceTransition/transition_request", stance.getName().toString());
     this.currentStanceName = stance.getName().toString();
     this.currentStance = stance;
-    updateAimModifiers();
+
+    if (StanceName.DRIVE_CARRIER.getKey().equals(this.currentStanceName)) {
+      // Movement is disabled while driving; skip movement-blend update.
+      // Spine IK is suppressed by the DriveCarrier Stance's spineAimMaxAngle = 0.
+      // If the vehicle mode is PASSENGER_WEAPON, onSetCombatState("Combat") fires
+      // separately and will re-activate aimIk for the weapon hold pose.
+      updateAimModifiers();
+    } else {
+      updateAimModifiers();
+    }
   }
 
   @RegisterFunction

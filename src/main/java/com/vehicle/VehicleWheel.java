@@ -1,223 +1,290 @@
 package com.vehicle;
 
+import com.character.UserCommand;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
-import godot.api.Node;
-import godot.api.Node3D;
-import godot.api.PackedScene;
-import godot.api.PhysicsDirectBodyState3D;
-import godot.api.RayCast3D;
+import godot.api.*;
 import godot.core.Vector3;
 import godot.global.GD;
 
-/**
- * Per-wheel raycast suspension — applies spring + damper force to the Vehicle.
- *
- * Wheels sit under a "Wheels" container that is a direct child of Vehicle.
- * Vehicle._ready() calls setVehicle(this) then applyDefaultScene(scene) on each
- * wheel, guaranteeing both are set before any physics tick.
- *
- * Forces are applied via PhysicsDirectBodyState3D.applyForce() so they take
- * effect in the CURRENT integration step. Using body.applyForce() inside
- * _integrateForces queues for the next step, which delays suspension by one
- * frame and makes the spring numerically unstable.
- *
- * Scene setup: add a RayCast3D child named "Ray". Target position is
- * overridden by setVehicle() based on the Vehicle's maxSpringLength.
- *
- * Wheel visual: assign wheelScene (or set defaultWheelScene on the Vehicle).
- * Build the scene with the correct local transform for the imported asset —
- * code never touches the instantiated scene's own transform.
- */
 @RegisterClass(className = "VehicleWheel")
-public class VehicleWheel extends Node3D {
+public class VehicleWheel extends RayCast3D {
 
-    private static final float MAX_SPRING_VEL  = 8f;
-    private static final float TWO_PI          = (float)(2.0 * Math.PI);
+    private static final float TWO_PI = (float)(2.0 * Math.PI);
 
     // ── Inspector exports ─────────────────────────────────────────────────────
 
-    /**
-     * Scene for this wheel's visual. If null, Vehicle.defaultWheelScene is used.
-     * The scene is instantiated under a Node3D pivot — set scale, rotation, and
-     * pivot offset in the scene; code never modifies the instantiated transform.
-     */
+    /** Visual scene for this wheel. Null = use Vehicle.defaultWheelScene. */
     @RegisterProperty @Export public PackedScene wheelScene;
 
-    /**
-     * Visual radius of the wheel (metres). Used to position the axle so the
-     * wheel bottom sits on the ground: axle_Y = hit_point_Y + wheelVisualRadius.
-     * 0 = inherit vehicle.wheelRadius (fine when physics and visual radii match).
-     */
-    @RegisterProperty @Export public float wheelVisualRadius = 0f;
+    /** Override visual radius (metres); 0 = use Vehicle.wheelRadius. */
+    @RegisterProperty @Export public float wheelRadius = 0.4f;
 
-    /** Mark front wheels to enable steering Y rotation. */
-    @RegisterProperty @Export public boolean isFrontWheel = false;
+    @RegisterProperty @Export public float springStrength = 10000.0f;
+    @RegisterProperty @Export public float springDamping = 4500.0f;
+    @RegisterProperty @Export public float restDistance = 0.5f;
+    @RegisterProperty @Export public float overExtend = 0.3f;
+    @RegisterProperty @Export public float zTraction = 0.05f;
+    @RegisterProperty @Export public float zBrakeTraction = 0.25f;
 
-    /** Max steering angle for front wheels (degrees). */
-    @RegisterProperty @Export public float maxSteerAngleDeg = 30f;
+
+    @RegisterProperty @Export public boolean isMotor = false;
+
+    @RegisterProperty @Export public boolean isSteer = false;
+
+    @RegisterProperty @Export public Curve gripCurve;
+
+
 
     // ── Runtime state ─────────────────────────────────────────────────────────
 
-    private float     lastSpringLength = -1f;
     private Vehicle   vehicle;
-    private RayCast3D ray;
-    private Node3D    meshPivot;   // spring position + steer/spin rotation
-    private float     spinAngle   = 0f;
+    private Node3D wheelMesh;
+    private GPUParticles3D skidMark;
+
+    private float tireMaxTurnMinRad;
+    private float tireMaxTurnMaxRad;
+    private float gripFactor;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     @RegisterFunction
     @Override
     public void _ready() {
-        Node r = getNodeOrNull("Ray");
-        if (r instanceof RayCast3D rc) ray = rc;
-        buildMeshPivot();
+        vehicle = (Vehicle) getOwner();
+        wheelMesh = (Node3D) getNode("Wheel");
+        skidMark = (GPUParticles3D) getNode("SkidMark");
+
+        springStrength = vehicle.springStrength;
+        springDamping = vehicle.springDamping;
+        wheelRadius = vehicle.wheelRadius;
+        restDistance = vehicle.restDistance;
+        overExtend = vehicle.overExtend;
+        zTraction = vehicle.zTraction;
+        zBrakeTraction = vehicle.zBrakeTraction;
+        tireMaxTurnMinRad = (float) GD.degToRad(-vehicle.tireMaxTurnDegrees);
+        tireMaxTurnMaxRad = (float) GD.degToRad(vehicle.tireMaxTurnDegrees);
+
+        Vector3 targetPosition = getTargetPosition();
+        targetPosition.setY(-(restDistance + wheelRadius + overExtend));
+        setTargetPosition(targetPosition);
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
-
-    /**
-     * Called by Vehicle._ready() after the wheel container is located.
-     * Configures the ray exception and target length from Vehicle exports.
-     */
-    public void setVehicle(Vehicle v) {
-        vehicle = v;
-        if (ray != null && v != null) {
-            ray.addException(v);
-            ray.setTargetPosition(new Vector3(0f, -(v.maxSpringLength * 1.5f), 0f));
-        }
-        GD.print("[VehicleWheel] " + getName() + " setVehicle OK, ray=" + (ray != null));
+    private Vector3 getPointVelocity(Vector3 point) {
+        return vehicle.getLinearVelocity().plus(vehicle.getAngularVelocity().cross(point.minus(vehicle.getGlobalPosition())));
     }
 
-    /**
-     * Called by Vehicle._ready() to supply a shared scene when this wheel's own
-     * wheelScene export is null. No-op if the wheel already has a scene assigned.
-     */
-    public void applyDefaultScene(PackedScene defaultScene) {
-        if (wheelScene != null || defaultScene == null) return;
-        wheelScene = defaultScene;
-        buildMeshPivot();
-    }
+    public void applyWheelPhysics(float delta, float getPhysicsProcessDeltaTime, UserCommand cmd) {
+        forceRaycastUpdate();
+        Vector3 targetPosition = getTargetPosition();
+        targetPosition.setY(-(restDistance + wheelRadius + overExtend));
+        setTargetPosition(targetPosition);
 
-    /**
-     * Updates wheel visuals each physics frame.
-     * Called by Vehicle._physicsProcess after applyDriving so desiredForward is current.
-     *
-     * @param delta        physics step seconds
-     * @param forwardSpeed vehicle speed projected onto heading (m/s, signed)
-     * @param steering     raw steering input in [-1, 1]
-     */
-    public void updateVisual(float delta, float forwardSpeed, float steering) {
-        if (meshPivot == null || vehicle == null) return;
+        // Rotates wheel visuals
+        Vector3 forwardDir = getGlobalBasis().getZ().times(-1);
+        double speed = forwardDir.dot(vehicle.getLinearVelocity());
+        wheelMesh.rotateX((float) ((-speed * getPhysicsProcessDeltaTime ) /wheelRadius));
 
-        float vr = effectiveVisualRadius();
+        if (!isColliding()) {return;}
 
-        // Spin: accumulate angle, normalise to avoid float precision loss over time.
-        spinAngle += (forwardSpeed / vr) * delta;
-        if      (spinAngle >  TWO_PI) spinAngle -= TWO_PI;
-        else if (spinAngle < -TWO_PI) spinAngle += TWO_PI;
+        // From here now, wheel is colliding
+        Vector3 contact    = getCollisionPoint();
+        double  springLen    = getGlobalPosition().distanceTo(contact) - wheelRadius;
+        double springCompression =  restDistance - springLen;
 
-        // Steer: front wheels only, direct mapping to degrees.
-        float steerRad = isFrontWheel
-                ? (float) Math.toRadians(steering * maxSteerAngleDeg)
-                : 0f;
+        Vector3 wheelMeshPosition = wheelMesh.getPosition();
+        wheelMeshPosition.setY(GD.moveToward(wheelMeshPosition.getY(), -springLen, 5 * getPhysicsProcessDeltaTime())); // Local y position of the wheel
+        wheelMesh.setPosition(wheelMeshPosition);
 
-        // Godot YXZ Euler order: Y (steer) applied first, then X (spin around
-        // the steered axle) — physically correct for a steerable rolling wheel.
-        meshPivot.setRotation(new Vector3(spinAngle, steerRad, 0f));
-    }
+        contact = wheelMesh.getGlobalPosition(); // Contact is now the wheel origin point
+        Vector3 forcePosition = contact.minus(vehicle.getGlobalPosition());
 
-    // ── Suspension ────────────────────────────────────────────────────────────
+        // Spring Suspension Force
+        double springForceMagnitude = springStrength * springCompression;
+        Vector3 tireVelocity = getPointVelocity(contact); // Center of the wheel
+        double springDampForceMagnitude = springDamping * getGlobalBasis().getY().dot(tireVelocity);
 
-    /**
-     * Fires the ray and applies spring + damper suspension force through the
-     * physics state so it is effective in the current integration step.
-     * Returns true if the wheel is in contact with the ground this tick.
-     */
-    public boolean applySuspension(float delta, PhysicsDirectBodyState3D state) {
-        if (ray == null || vehicle == null) return false;
+        Vector3 yForce = getCollisionNormal().times(springForceMagnitude - springDampForceMagnitude);
 
-        ray.forceRaycastUpdate();
-        if (!ray.isColliding()) {
-            lastSpringLength = vehicle.maxSpringLength;
-            positionMesh(vehicle.maxSpringLength);
-            return false;
+        // Acceleration
+        if(isMotor && cmd.motor != 0) {
+            double speedRatio = speed / vehicle.maxSpeed;
+            double accelerationRatio = vehicle.accelerationCurve.sampleBaked((float) speedRatio);
+            Vector3 accelerationForce = forwardDir.times(vehicle.acceleration *  cmd.motor  * accelerationRatio);
+
+            vehicle.applyForce(accelerationForce, forcePosition);
         }
 
-        // Reject wall/ceiling contacts (normal upward component < 0.3 ≈ 72° from
-        // horizontal) to prevent spurious lateral suspension forces and the
-        // lastSpringLength = 0 → damper spike cycle on wall bounces.
-        if ((float) ray.getCollisionNormal().dot(new Vector3(0f, 1f, 0f)) < 0.3f) {
-            lastSpringLength = vehicle.maxSpringLength;
-            return false;
+        // Tire X traction
+        float steeringXSpeed = (float) getGlobalBasis().getX().dot(tireVelocity);
+
+        gripFactor = (float) GD.abs(steeringXSpeed/tireVelocity.length());
+        double xTraction = gripCurve.sampleBaked(gripFactor);
+
+        if(cmd.handbrake && gripFactor < 0.2f) {
+            vehicle.setSlipping(false);
         }
 
-        Vector3 collisionPoint = ray.getCollisionPoint();
-        float   distance       = (float) collisionPoint.distanceTo(getGlobalPosition());
+        if(cmd.handbrake) {
+            xTraction = 0.01f;
+        }
+        else if (vehicle.isSlipping()) {
+            xTraction = 0.1;
+        }
 
-        float springLength = Math.max(0f,
-            Math.min(vehicle.maxSpringLength, distance - vehicle.wheelRadius));
+        double gravity =  -vehicle.getGravity().getY();
+        Vector3 xForce = getGlobalBasis().getX().times(-1 * steeringXSpeed * xTraction * ((vehicle.getMass() *gravity)/4.0));
 
-        if (lastSpringLength < 0f) lastSpringLength = springLength;
+        // z force traction
+        double forwardSpeed = forwardDir.dot(tireVelocity);
+        float zFriction = zTraction;
 
-        float springVelocity = (lastSpringLength - springLength) / delta;
-        springVelocity = Math.max(-MAX_SPRING_VEL, Math.min(MAX_SPRING_VEL, springVelocity));
+        if (vehicle.isBraking()) {
+            zFriction = zBrakeTraction;
+        }
 
-        float springForce = vehicle.springStiffness * (vehicle.maxSpringLength - springLength);
-        float damperForce = vehicle.springDamperStiffness * springVelocity;
+        Vector3 zForce = vehicle.getGlobalBasis().getZ().times(forwardSpeed * zFriction * ((vehicle.getMass() *gravity)/vehicle.getWheels().size()));
 
-        Vector3 suspensionDir = getGlobalTransform().getBasis().getColumn(1);
-        Vector3 force         = suspensionDir.times(springForce + damperForce);
 
-        Vector3 bodyOrigin = state.getTransform().getOrigin();
-        Vector3 forceOffset = new Vector3(
-            collisionPoint.getX() - bodyOrigin.getX(),
-            collisionPoint.getY() + vehicle.wheelRadius - bodyOrigin.getY(),
-            collisionPoint.getZ() - bodyOrigin.getZ());
-
-        state.applyForce(force, forceOffset);
-
-        lastSpringLength = springLength;
-        positionMesh(springLength);
-        return true;
+        vehicle.applyForce(xForce, forcePosition);
+        vehicle.applyForce(yForce, forcePosition);
+        vehicle.applyForce(zForce, forcePosition);
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
 
-    private void buildMeshPivot() {
-        if (wheelScene == null || meshPivot != null) return;
-        meshPivot = new Node3D();
-        Node sceneRoot = wheelScene.instantiate();
-        meshPivot.addChild(sceneRoot);
-        addChild(meshPivot);
+    public void applySkidMark() {
+
+        skidMark.setGlobalPosition(getCollisionPoint().plus(Vector3.Companion.getUP().times(0.01)));
+        skidMark.lookAt(skidMark.getGlobalPosition().plus(vehicle.getGlobalBasis().getZ()));
+
+        if(!vehicle.isHandbraking() && gripFactor < 0.2f) {
+            vehicle.setSlipping(false);
+            skidMark.setEmitting(false);
+        }
+
+        if(vehicle.isHandbraking() && !skidMark.isEmitting()) {
+            skidMark.setEmitting(true);
+        }
+
     }
 
-    /**
-     * Returns wheelVisualRadius when explicitly set; falls back to vehicle.wheelRadius.
-     * Allows the visual wheel to differ in size from the physics capsule without
-     * requiring a matching vehicle.wheelRadius change.
+/**
+     * Applies an upward spring+damper force to the vehicle at this wheel's position.
+     * Called from Vehicle._physicsProcess each frame.
+     * Returns true when the wheel is within hoverHeight of the ground.
      */
-    private float effectiveVisualRadius() {
-        return (wheelVisualRadius > 0f && vehicle != null)
-                ? wheelVisualRadius
-                : (vehicle != null ? vehicle.wheelRadius : 0.35f);
+    public void applyWheelSuspension(float delta) {
+        if (vehicle == null) {return;}
+
+        if (!isColliding()) {return;}
+        Vector3 targetPosition = getTargetPosition();
+        targetPosition.setY(-(restDistance + wheelRadius + overExtend));
+        setTargetPosition(targetPosition);
+
+        Vector3 contact    = getCollisionPoint();
+        Vector3 springUpDir = getGlobalTransform().getBasis().getY().normalized();
+        double  springLen    = getGlobalPosition().distanceTo(contact) - wheelRadius;
+        double compression =  restDistance - springLen;
+
+        Vector3 wheelMeshPosition = wheelMesh.getPosition();
+        wheelMeshPosition.setY(-springLen);
+        wheelMesh.setPosition(wheelMeshPosition);
+
+        double springForceMagnitude = springStrength * compression;
+
+        // damping force = damping * relative velocity
+        Vector3 worldVelocity = getPointVelocity(contact);
+        double relativeVelocity = springUpDir.dot(worldVelocity);
+        double springDampForceMagnitude = springDamping * relativeVelocity;
+
+        Vector3 springForce = getCollisionNormal().times(springForceMagnitude - springDampForceMagnitude);
+
+        contact = wheelMesh.getGlobalPosition();
+        Vector3 forcePosOffset = contact.minus(vehicle.getGlobalPosition());
+
+        vehicle.applyForce(springForce, forcePosOffset);
     }
 
-    /**
-     * Positions the mesh pivot so the wheel visual sits correctly on the ground.
-     *
-     * In wheel-local space the attachment point is Y = 0 (top of suspension).
-     * The ray hit point is at Y = -(springLength + physicsRadius).
-     * The wheel axle (centre of visual) should be visualRadius above the hit point:
-     *   axleY = -(springLength + physicsRadius) + visualRadius
-     * When physicsRadius == visualRadius this reduces to the simpler -springLength.
-     */
-    private void positionMesh(float springLength) {
-        if (meshPivot == null || vehicle == null) return;
-        float axleY = -(springLength + vehicle.wheelRadius) + effectiveVisualRadius();
-        meshPivot.setPosition(new Vector3(0f, axleY, 0f));
+    public void applyWheelAcceleration(float processedDeltaTime, float motor) {
+        Vector3 forwardDir = getGlobalBasis().getZ().times(-1);
+        double velocity = forwardDir.dot(vehicle.getLinearVelocity());
+        wheelMesh.rotateX((float) ((-velocity * processedDeltaTime ) /wheelRadius));
+
+        if (!isColliding()) {return;}
+
+        Vector3 contact    = getCollisionPoint();
+        Vector3 forcePosition = contact.minus(vehicle.getGlobalPosition());
+
+        if(isMotor && motor != 0) {
+            double speedRatio = velocity / vehicle.maxSpeed;
+            double accelerationRatio = vehicle.accelerationCurve.sampleBaked((float) speedRatio);
+            Vector3 forceVector = forwardDir.times(vehicle.acceleration * motor * accelerationRatio);
+
+            vehicle.applyForce(forceVector, forcePosition);
+        }
     }
+
+    public void applyWheelSteering(float delta, float steering) {
+        if(!isSteer) {return;}
+
+        Vector3 rotation = getRotation();
+
+        if (steering != 0) {
+            float rotationValue = (float) GD.clamp(getRotation().getY() + (steering * delta), tireMaxTurnMinRad, tireMaxTurnMaxRad);
+            rotation.setY(rotationValue);
+                   }
+        else {
+            rotation.setY((float) GD.moveToward(getRotation().getY(), 0, vehicle.tireMaxTurnSpeed * delta));
+        }
+
+        setRotation(rotation);
+    }
+
+    public void applyWheelTraction(boolean handbrake) {
+        if (!isColliding()) {return;}
+
+        Vector3 steerSideDir = getGlobalBasis().getX();
+        Vector3 tireVelocity = getPointVelocity(wheelMesh.getGlobalPosition());
+        float steeringXVelocity = (float) steerSideDir.dot(tireVelocity);
+
+        float gripFactor = (float) GD.abs(steeringXVelocity/tireVelocity.length());
+        double xTraction = gripCurve.sampleBaked(gripFactor);
+
+        skidMark.setGlobalPosition(getCollisionPoint().plus(Vector3.Companion.getUP().times(0.01)));
+        skidMark.lookAt(skidMark.getGlobalPosition().plus(vehicle.getGlobalBasis().getZ()));
+
+        boolean isSlipping = true;
+
+        if(!handbrake && gripFactor < 0.2f) {
+            isSlipping = false;
+            skidMark.setEmitting(false);
+        }
+
+        if(handbrake) {
+           xTraction = 0.01f;
+           if (!skidMark.isEmitting()) {
+               skidMark.setEmitting(true);
+           }
+        }
+        else if (isSlipping) {
+            xTraction = 0.1;
+        }
+
+        float gravity = Float.parseFloat(String.valueOf(ProjectSettings.getSetting("physics/3d/default_gravity", 9.85)));
+        Vector3 xForce = steerSideDir.times(-1 * steeringXVelocity * xTraction * ((vehicle.getMass() *gravity)/4.0));
+
+        // z force tracktion
+        float forwardVelocity = (float)-getGlobalBasis().getZ().dot(tireVelocity);
+        float zTraction = 0.05f;
+        Vector3 zForce = vehicle.getGlobalBasis().getZ().times(forwardVelocity * zTraction * ((vehicle.getMass() *gravity)/4.0));
+
+        Vector3 forcePosition = getGlobalPosition().minus(vehicle.getGlobalPosition());
+
+        vehicle.applyForce(xForce, forcePosition);
+        vehicle.applyForce(zForce, forcePosition);
+
+    }
+
 }

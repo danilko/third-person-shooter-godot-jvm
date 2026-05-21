@@ -11,34 +11,35 @@ import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
 
+import java.lang.Object;
+import java.util.ArrayList;
+import java.util.Collection;
+
 /**
- * Arcade vehicle — physics inspired by the Parking Garage Rally Circuit talk.
+ * Arcade-drift vehicle — hybrid steering + bounded-impulse grip.
  *
- * Three core concepts, now reflected directly in the scene-node structure:
+ * Two distinct control modes:
  *
- *  1. Camera drives, car follows (Mario Kart theory)
- *     vehicleYaw accumulates steering input each frame. desiredForward is derived
- *     from vehicleYaw. CameraController (sibling Node3D, NOT a child of the physics
- *     body) is written each frame: global position = vehicle pos + yaw-rotated offset,
- *     rotation Y = vehicleYaw only. Roll and pitch from suspension are excluded.
+ *   NORMAL:  direct vehicle steering, camera auto-follows vehicle heading.
+ *            Lateral grip pulls velocity toward heading (bounded impulse, stable).
  *
- *  2. Hovercraft physics body
- *     The RigidBody3D (Vehicle) is orientation-free in the Y axis: its Y angular
- *     velocity is zeroed each frame, so it never steers — it only translates and
- *     tilts with the terrain via the raycast suspension. Forces are applied in
- *     world space along desiredForward / moveFwd.
+ *   DRIFT:   camera auto-rotates at fixed rate in drift direction (same as original).
+ *            Vehicle yaw-aligns to (camFwd + driftAngle offset).
+ *            Left/right steering adjusts the drift arc angle [5°–45°].
+ *            Low grip lets velocity diverge from heading — the gap IS the slide.
+ *            The camera sweeping ahead while the car body lags behind creates the
+ *            visible "car sideways" effect without any camera-velocity blend tricks.
  *
- *  3. BodyMesh poses the chassis
- *     BodyMesh (Node3D, parent of Chassis mesh + CollisionShape3D) rotates its
- *     local Y each frame to face moveFwd (desiredForward + drift offset). This
- *     makes both the visual mesh and the collision shape track the car's actual
- *     heading, including the drift slip angle.
- *     After drift / a turn: the drift angle decays, BodyMesh springs back to
- *     align with the CameraController direction.
+ * Lateral grip in both modes uses a BOUNDED IMPULSE:
+ *   correction = clamp(-lateralSlip, -gripAccel×dt, +gripAccel×dt)
+ *   applyImpulse(vehRight × correction × mass)
+ * This is frame-rate independent and never produces the runaway 200 kN+ forces
+ * from the old (-slip/dt)×mass×damp formula.
  *
- * Physics split:
- *   _integrateForces → suspension only via state.applyForce() (same-step).
- *   _physicsProcess  → all driving via body.applyXxx() (next-step queue).
+ * Weapon modes (set weaponModeIndex in the inspector):
+ *   0 = NONE            — no shooting while occupied
+ *   1 = PASSENGER_WEAPON — occupant fires their own weapon via vehicle camera aim
+ *   2 = VEHICLE_WEAPON  — vehicle's own FirearmItem fires; occupant weapon disabled
  */
 @RegisterClass(className = "Vehicle")
 public class Vehicle extends RigidBody3D implements Controllable {
@@ -47,169 +48,72 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     @RegisterProperty @Export public CharacterInfo characterInfo;
 
-    /**
-     * Wheel visual scene applied to every wheel that does not have its own
-     * wheelScene set. Build one scene in the editor with the correct scale,
-     * rotation, and pivot for the imported asset; assign it here to share it
-     * across all four wheels without repeating the same setting per wheel.
-     * Per-wheel overrides still work: leave this null and set wheelScene on
-     * individual VehicleWheel nodes, or mix both for front/rear differences.
-     */
-    @RegisterProperty @Export public PackedScene defaultWheelScene;
+    @RegisterProperty @Export public float springStrength       = 10000f;
+    @RegisterProperty @Export public float springDamping        = 4500f;
+    @RegisterProperty @Export public float wheelRadius          = 0.4f;
+    @RegisterProperty @Export public float restDistance         = 0.5f;
+    @RegisterProperty @Export public float overExtend           = 0.3f;
 
-    /** Engine thrust in Newtons (force = throttle × enginePower × 2). */
-    @RegisterProperty @Export public float enginePower = 10000f;
+    @RegisterProperty @Export public float zTraction            = 0.05f;
+    @RegisterProperty @Export public float zBrakeTraction       = 0.25f;
 
-    /**
-     * How fast CameraController rotates per second (degrees/s).
-     * This is the steering rate of the "camera direction" the player controls.
-     */
-    @RegisterProperty @Export public float maxTurnAngleDegree = 90f;
+    @RegisterProperty @Export public float maxSpeed             = 20.0f;
+    @RegisterProperty @Export public float acceleration         = 9000.0f;
+    @RegisterProperty @Export public Curve accelerationCurve;
+    @RegisterProperty @Export public float tireMaxTurnSpeed     = 2.0f;
+    @RegisterProperty @Export public float tireMaxTurnDegrees   = 25.0f;
 
-    /**
-     * BodyMesh spring response — how quickly the chassis mesh rotates to face
-     * the target direction each frame.
-     * Factor applied per second: newAngle = currentAngle + diff × min(1, response × delta).
-     * 6 = very snappy (nearly instant). 3 = visible lag / floaty feel.
-     */
-    @RegisterProperty @Export public float turnSpringResponse = 3f;
+    @RegisterProperty @Export public NodePath wheelsPath        = new NodePath("Wheels");
+    @RegisterProperty @Export public NodePath driverSeatPath    = new NodePath("DriverSeat");
+    @RegisterProperty @Export public NodePath vehicleCamPath    = new NodePath("CameraController/Camera3D");
 
     /**
-     * Max chassis visual offset from desiredForward during normal driving (degrees).
-     * Proportional to steering input: full steer = this angle; release = springs to 0.
+     * Weapon mode: 0 = NONE, 1 = PASSENGER_WEAPON, 2 = VEHICLE_WEAPON.
+     * Set in the inspector for each vehicle type.  Default is PASSENGER_WEAPON (1)
+     * so a car/boat works immediately without inspector changes.
      */
-    @RegisterProperty @Export public float normalBodyAngle = 10f;
+    @RegisterProperty @Export public int weaponModeIndex = 1;
 
-    /**
-     * Max chassis visual offset from desiredForward during drift (degrees).
-     * Same direct-proportional logic as normalBodyAngle but larger.
-     */
-    @RegisterProperty @Export public float maxDriftAngle = 35f;
+    /** Path to the RayCast3D under the vehicle camera used for passenger aiming. */
+    @RegisterProperty @Export public NodePath vehicleAimRayPath =
+            new NodePath("CameraController/Camera3D/AimRay");
 
-    /** How fast the chassis visual offset springs toward its target each second. */
-    @RegisterProperty @Export public float driftAngleLerpSpeed = 6f;
+    /** Path to the vehicle-owned weapon node (for VEHICLE_WEAPON mode). */
+    @RegisterProperty @Export public NodePath vehicleWeaponPath =
+            new NodePath("VehicleWeaponMount/WeaponItem");
 
-    /**
-     * Camera turn rate while drifting (degrees/s). Higher than maxTurnAngleDegree
-     * so the handle can swing wider during a drift.
-     */
-    @RegisterProperty @Export public float driftTurnRateDegree = 150f;
+    /** Minimum vehicle speed (m/s) needed to deal collision damage to characters. 0 disables it. */
+    @RegisterProperty @Export public float vehicleCollisionMinSpeed = 5.0f;
 
-    /**
-     * Visual roll angle (radians) applied to BodyMesh per rad/s of yaw rate.
-     * Leans the chassis mesh into corners without touching the physics body.
-     * 0 = no lean. 0.10–0.20 = subtle. 0.25+ = aggressive.
-     * Builds up quickly when steering, decays slowly when released.
-     */
-    @RegisterProperty @Export public float visualLeanFactor = 0.15f;
+    /** Damage per m/s above vehicleCollisionMinSpeed on collision. */
+    @RegisterProperty @Export public float vehicleCollisionDamageScale = 100.0f;
 
-    /** Lateral correction strength (relative to movement direction). 6 = strong grip. */
-    @RegisterProperty @Export public float lateralForceFactor = 6f;
+    /** Damage dealt to the occupant when the vehicle is destroyed. */
+    @RegisterProperty @Export public float vehicleExplosionOccupantDamage = 50.0f;
 
-    /**
-     * Lateral grip reduction at full steering input (0–1).
-     * 0 = full grip always (no sliding on turns).
-     * 0.5 = grip drops to 50% of lateralForceFactor at full steer.
-     * 1.0 = zero grip at full steer (identical to drift sliding).
-     */
-    @RegisterProperty @Export public float turnSlideReduction = 0.4f;
-
-    /** Lateral correction during drift. 0.3 = noticeable slide without runaway. */
-    @RegisterProperty @Export public float driftLateralFactor = 0.3f;
-
-    /**
-     * Max degrees by which counter-steering reduces the locked drift angle.
-     * At full counter-steer the drift angle becomes (maxDriftAngle − maxDriftReduction).
-     * 0 = counter-steer has no effect; maxDriftAngle = counter-steer cancels drift entirely.
-     */
-    @RegisterProperty @Export public float maxDriftReduction = 10f;
-
-    /** Hard cap on lateral speed (m/s) during drift. 10–14 = strong visible slip. */
-    @RegisterProperty @Export public float maxDriftLateralSpeed = 12f;
-
-    /** Longitudinal drag coefficient. */
-    @RegisterProperty @Export public float dragForceFactor = 0.3f;
-
-    /** Braking deceleration in m/s² (force = brakePower × mass). */
-    @RegisterProperty @Export public float brakePower = 12f;
-
-    /** Minimum forward speed (m/s) before steering and BodyMesh posing activate. */
-    @RegisterProperty @Export public float minSpeedForTurn = 1f;
-
-    /** Maximum spring compression travel in metres. */
-    @RegisterProperty @Export public float maxSpringLength = 0.5f;
-
-    /**
-     * Spring stiffness (N/m). Higher values pitch the nose up faster when the
-     * front wheels hit a slope, helping the chassis clear the transition edge.
-     * 25000 is roughly 2× the minimum needed to support vehicle weight at rest
-     * with half the spring travel used — gives a firm, responsive suspension.
-     */
-    @RegisterProperty @Export public float springStiffness = 25000f;
-
-    /** Spring damper coefficient (N·s/m). Scale with springStiffness to prevent bounce. */
-    @RegisterProperty @Export public float springDamperStiffness = 4000f;
-
-    /** Wheel radius in metres. */
-    @RegisterProperty @Export public float wheelRadius = 0.35f;
-
-    @RegisterProperty @Export public NodePath wheelsPath            = new NodePath("Wheels");
-    @RegisterProperty @Export public NodePath driverSeatPath       = new NodePath("DriverSeat");
-    @RegisterProperty @Export public NodePath cameraControllerPath = new NodePath("../CameraController");
-    @RegisterProperty @Export public NodePath vehicleCamPath       = new NodePath("../CameraController/SpringArm3D/Camera3D");
+    /** Optional icon shown in the kill feed when this vehicle deals collision damage. */
+    @RegisterProperty @Export public Texture2D vehicleIcon;
 
     // ── Runtime state ─────────────────────────────────────────────────────────
 
-    protected Controller controller;
-    protected Health     healthNode;
-    protected Character  occupant;
-    // True for the one physics frame in which tryEnter() was called.
-    // Prevents Vehicle._physicsProcess — running later in the same frame —
-    // from reading the still-true isActionJustPressed("interact") and
-    // immediately calling tryExit().
+    protected Controller             controller;
+    protected Health                 healthNode;
+    protected Character              occupant;
+
+    private Node3D                   driverSeatNode;
+    private Camera3D                 vehicleCamera;
+    private VehicleCameraController  camController;
+    private WeaponItem               vehicleWeaponItem;
+    private final ArrayList<VehicleWheel> wheels = new ArrayList<>();
+
+    private boolean slipping    = false;
+    private boolean braking     = false;
+    private boolean handBraking = false;
     private boolean justEntered = false;
+    private UserCommand cmd = new UserCommand();
 
-    private Node3D   driverSeatNode;
-    private Camera3D vehicleCamera;
-    private Node     wheels               = null;
-
-    // Scene nodes that implement the "camera drives, car poses" concept.
-    private Node3D   cameraControllerNode = null; // player steers this
-    private Node3D   bodyMeshNode         = null; // chassis mesh + collision pivot
-
-    // Camera offset constants — match the CameraController's original local offset.
-    private static final float CAM_HEIGHT       = 2.5f;
-    private static final float CAM_DISTANCE     = 7.0f;
-    private static final float CAM_FOLLOW_SPEED = 12.0f;
-
-    // Set by _integrateForces each step; gates force application in _physicsProcess.
-    private boolean isOnGround = false;
-
-    // Shared by _integrateForces and _physicsProcess — keeps both caps identical.
-    private static final float MAX_TILT = 3.0f;
-
-    // desiredForward: world-space horizontal unit vector derived from vehicleYaw each frame.
-    // Protected so GroundVehicle can use it for a direction-aware throttle cap.
-    protected Vector3 desiredForward = new Vector3(0f, 0f, -1f);
-
-    // CameraController yaw (radians). Accumulated from steering input — this IS the
-    // "handle" direction. desiredForward is derived from it each frame.
-    private float vehicleYaw     = 0f;
-
-    // Current yaw rotation rate (rad/s) — written each frame so _integrateForces
-    // can set the body's Y angular velocity to match, making the physics body
-    // physically rotate with the camera instead of staying frozen at spawn direction.
-    private float vehicleYawRate = 0f;
-
-    // Drift / turn state
-    private boolean isDrifting        = false;
-    private float   driftDirection    = 1f;   // +1 = right, -1 = left — locked at drift entry
-    private float   currentDriftAngle = 0f;   // current chassis visual offset (degrees, signed)
-    private float   driftBoosterTimer = 0f;   // seconds of banked boost available on drift exit
-    private float   currentRollVisual = 0f;   // lerped BodyMesh Z-roll for cornering lean (radians)
-
-    // Lateral factor lerped to avoid ABS-clip on drift exit
-    private float currentLatFactor = 6f;      // initialised in _ready to lateralForceFactor
+    // Characters currently touching the vehicle body — used to detect new contacts each frame.
+    private final java.util.HashSet<Character> activeCollisions = new java.util.HashSet<>();
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -218,23 +122,32 @@ public class Vehicle extends RigidBody3D implements Controllable {
     public void _ready() {
         if (characterInfo == null) characterInfo = new CharacterInfo();
         addToGroup(new StringName("characters"), false);
+        setContactMonitor(true);
+        setMaxContactsReported(8);
 
         Node h = getNodeOrNull("Health");
-        if (h instanceof Health hn) healthNode = hn;
+        if (h instanceof Health hn) {
+            healthNode = hn;
+            healthNode.died.connectUnsafe(
+                    Callable.createUnsafe(this, StringNames.toGodotName("onVehicleDestruction")),
+                    godot.api.Object.ConnectFlags.DEFAULT);
+        }
 
-        wheels = getNodeOrNull("Wheels");
-        if (wheels != null) {
-            int count = 0;
-            for (Node child : wheels.getChildren()) {
+        Node wheelsNode = getNodeOrNull("Wheels");
+        if (wheelsNode != null) {
+            for (Node child : wheelsNode.getChildren()) {
                 if (child instanceof VehicleWheel w) {
-                    w.setVehicle(this);
-                    w.applyDefaultScene(defaultWheelScene);
-                    count++;
+                    w.springStrength = springStrength;
+                    w.springDamping  = springDamping;
+                    w.wheelRadius    = wheelRadius;
+                    w.restDistance   = restDistance;
+                    w.overExtend     = overExtend;
+                    wheels.add(w);
                 }
             }
-            GD.print("[Vehicle] _ready: " + count + " wheel(s) initialised");
+            GD.print("[Vehicle] _ready: " + wheels.size() + " wheel(s) initialised");
         } else {
-            GD.printErr("[Vehicle] Wheels node missing — suspension disabled!");
+            GD.printErr("[Vehicle] Wheels node missing — hover disabled!");
         }
 
         Node seat = getNodeOrNull(driverSeatPath.getPath());
@@ -243,343 +156,215 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Node cam = getNodeOrNull(vehicleCamPath.getPath());
         if (cam instanceof Camera3D c) vehicleCamera = c;
 
-        Node cc = getNodeOrNull(cameraControllerPath.getPath());
-        if (cc instanceof Node3D n) cameraControllerNode = n;
-        else GD.printErr("[Vehicle] CameraController node missing at " + cameraControllerPath.getPath());
+        Node camCtrl = getNodeOrNull("CameraController");
+        if (camCtrl instanceof VehicleCameraController vcc) camController = vcc;
 
-        Node bm = getNodeOrNull("BodyMesh");
-        if (bm instanceof Node3D n) bodyMeshNode = n;
-        else GD.printErr("[Vehicle] BodyMesh node missing — chassis won't pose!");
+        // Cache vehicle weapon for VEHICLE_WEAPON mode and inject the vehicle AimRay.
+        Node vw = getNodeOrNull(vehicleWeaponPath.getPath());
+        if (vw instanceof WeaponItem wi) {
+            vehicleWeaponItem = wi;
+            if (wi instanceof FirearmItem fi && getWeaponMode() == VehicleWeaponMode.VEHICLE_WEAPON) {
+                Node aimRayNode = getNodeOrNull(vehicleAimRayPath.getPath());
+                RayCast3D vRay = aimRayNode instanceof RayCast3D r ? r : null;
+                fi.setup(null, vRay, null, null, null);
+            }
+        }
 
         for (Node child : getChildren()) {
             if (child instanceof Controller c) { controller = c; break; }
         }
-
-        currentLatFactor = lateralForceFactor;
-
-        // Low chassis friction: wheel grip comes from raycast suspension forces, not
-        // from the body's PhysicsMaterial. Setting body friction low lets the chassis
-        // slide over slope faces and ledge lips instead of catching on them.
-        PhysicsMaterial mat = new PhysicsMaterial();
-        mat.setFriction(0.1f);
-        mat.setBounce(0.0f);
-        setPhysicsMaterialOverride(mat);
-
-        // Seed desiredForward and vehicleYaw from body facing so the camera
-        // rig starts correctly aligned without a one-frame lerp artifact.
-        Vector3 bFwd = getGlobalTransform().getBasis().getColumn(2).times(-1f);
-        Vector3 flat = new Vector3(bFwd.getX(), 0f, bFwd.getZ());
-        if ((float) flat.length() > 0.001f) desiredForward = flat.normalized();
-        vehicleYaw = (float) Math.atan2(-desiredForward.getX(), -desiredForward.getZ());
-
-        if (cameraControllerNode != null) {
-            cameraControllerNode.setGlobalPosition(
-                getGlobalPosition()
-                    .plus(new Vector3(0f, CAM_HEIGHT, 0f))
-                    .plus(desiredForward.times(-CAM_DISTANCE)));
-            cameraControllerNode.setRotation(new Vector3(0f, vehicleYaw, 0f));
-        }
     }
 
-    // ── _integrateForces — suspension only ────────────────────────────────────
-
-    @RegisterFunction
-    @Override
-    public void _integrateForces(PhysicsDirectBodyState3D state) {
-        if (wheels == null) return;
-
-        // Cap pitch/roll in-step (state.setAngularVelocity takes effect immediately,
-        // unlike Node.setAngularVelocity which queues for the next step).
-        // A wall collision can inject large X/Z angular velocity during this step;
-        // capping it here ensures the suspension rays fire from a near-level body
-        // rather than waiting one extra step for the _physicsProcess cap to kick in.
-        // isOnGround here is the previous frame's value — the suspension loop below
-        // will overwrite it. Using the previous-frame value is intentional: it mirrors
-        // exactly what _physicsProcess sees and keeps both caps in sync.
-        Vector3 av = state.getAngularVelocity();
-        float avX = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getX()));
-        float avZ = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getZ()));
-        float avY = isOnGround ? vehicleYawRate : 0f;
-        state.setAngularVelocity(new Vector3(avX, avY, avZ));
-
-        float delta = (float) state.getStep();
-        isOnGround = false;
-        for (Node child : wheels.getChildren()) {
-            if (child instanceof VehicleWheel w && w.applySuspension(delta, state)) {
-                isOnGround = true;
-            }
-        }
-    }
-
-    // ── _physicsProcess — driving ─────────────────────────────────────────────
+    // ── Physics ───────────────────────────────────────────────────────────────
 
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
-        if (controller == null || !controller.isAuthority()) return;
-        // Consume the just-entered flag before reading any input so the same
-        // isActionJustPressed("interact") that triggered tryEnter() this frame
-        // cannot also trigger tryExit() in the same frame.
-        boolean enteredThisFrame = justEntered;
-        justEntered = false;
-        UserCommand cmd = controller.gatherInput(delta);
-        if (cmd.enterExit && occupant != null && !enteredThisFrame) { tryExit(); return; }
-        if (cmd.resetVehicle)                                       { resetOrientation(); return; }
-        applyDriving(cmd, (float) delta);
-        updateWheelVisuals((float) delta, cmd.steering);
-    }
+        boolean isGrounded = false;
 
-    /** Overrideable so subclasses can cap throttle (e.g. GroundVehicle). */
-    protected void applyDriving(UserCommand cmd, float delta) {
-        final Vector3 worldUp = new Vector3(0f, 1f, 0f);
-        float speed = (float) getLinearVelocity().length();
+        cmd.motor     = 0;
+        cmd.steering  = 0;
+        cmd.handbrake = false;
+        cmd.brake     = false;
+        cmd.fire      = false;
+        cmd.reload    = false;
 
-        // physBodyFwd is used only for BodyMesh posing (step 6). It must NOT be
-        // used to measure "how fast are we going forward" because the body's Y is
-        // zeroed every frame — its facing stays at the spawn direction, not the
-        // travel direction. Use total `speed` for gate / scale decisions instead.
-        Vector3 physBodyFwd = getGlobalTransform().getBasis().getColumn(2).times(-1f);
+        if (controller != null && controller.isAuthority()) {
+            UserCommand currentCmd = controller.gatherInput(delta);
 
-        // ── 1. Drift entry/exit ───────────────────────────────────────────
-        // Track last non-zero steering so neutral-entry drift has a default direction.
-        if (!isDrifting && Math.abs(cmd.steering) > 0.05f)
-            driftDirection = Math.signum(cmd.steering);
+            // R key: flip-right reset only when the occupant is NOT using it to reload.
+            if (currentCmd.resetVehicle && getWeaponMode() != VehicleWeaponMode.PASSENGER_WEAPON) {
+                resetOrientation();
+            }
+            // Guard: skip exit on the same frame tryEnter ran. isActionJustPressed
+            // stays true for the whole physics frame, so if Vehicle._physicsProcess
+            // runs after Player._physicsProcess in the same frame (possible with
+            // multiple characters in the scene), the interact press that triggered
+            // entry would immediately call tryExit without this flag.
+            if (currentCmd.enterExit && !justEntered) {
+                tryExit();
+            }
+            justEntered = false;
 
-        if (cmd.drift && !isDrifting) {
-            isDrifting = true;
-            driftBoosterTimer = 0f;
-            // Lock direction from current steer; fall back to last non-zero (default right).
-            if (Math.abs(cmd.steering) > 0.05f)
-                driftDirection = Math.signum(cmd.steering);
-            // Neutral entry: driftDirection keeps its last non-zero value (or 1 if never steered).
-        } else if (!cmd.drift) {
-            isDrifting = false;
+            cmd.motor     = currentCmd.motor;
+            cmd.steering  = currentCmd.steering;
+            cmd.handbrake = currentCmd.handbrake;
+            cmd.brake     = currentCmd.brake;
+            cmd.fire      = currentCmd.fire;
+            cmd.reload    = currentCmd.reload;
         }
 
-        // ── 2. Rotate the handle (CameraController = vehicleYaw) ─────────
-        // Drift mode allows faster handle rotation so the car can swing wider.
-        // Camera moves with the handle immediately — it IS the steering reference.
-        // speedScale uses total speed so steering slows correctly at high speed
-        // regardless of which world direction the vehicle is facing.
-        float turnRateRad = (float) Math.toRadians(isDrifting ? driftTurnRateDegree : maxTurnAngleDegree);
-        float speedScale  = Math.max(0.35f, 1f - speed / 60f);
-
-        // Flip steer direction when reversing so steering feels natural in reverse gear,
-        // matching normal vehicle behaviour (handle turns opposite direction to travel).
-        float travelFwd = (float) getLinearVelocity().dot(desiredForward); // prev-frame forward
-        float steerSign = travelFwd < -0.5f ? -1f : 1f;
-
-        // Steering only accumulates on the ground. In air, steerSign depends on
-        // the projection of velocity onto desiredForward; as vehicleYaw rotates that
-        // projection flips sign, which inverts steerSign and oscillates vehicleYaw
-        // at the camera rate — the "horizontal shatter" effect.
-        float steerDelta = 0f;
-        if (isOnGround && speed >= minSpeedForTurn) {
-            steerDelta  = steerSign * cmd.steering * turnRateRad * speedScale;
-            vehicleYaw += steerDelta * delta;
-        }
-        vehicleYawRate = steerDelta; // rad/s — consumed by _integrateForces next step
-
-        // Normalize to [-π, π] to prevent float precision loss after many full rotations.
-        while (vehicleYaw >  (float) Math.PI) vehicleYaw -= (float)(2.0 * Math.PI);
-        while (vehicleYaw < -(float) Math.PI) vehicleYaw += (float)(2.0 * Math.PI);
-
-        desiredForward = new Vector3(-(float) Math.sin(vehicleYaw), 0f, -(float) Math.cos(vehicleYaw));
-
-        // CameraController follows vehicleYaw directly — camera IS the handle.
-        if (cameraControllerNode != null) {
-            Vector3 targetPos = getGlobalPosition()
-                .plus(new Vector3(0f, CAM_HEIGHT, 0f))
-                .plus(desiredForward.times(-CAM_DISTANCE));
-            Vector3 smoothedPos = cameraControllerNode.getGlobalPosition()
-                .lerp(targetPos, Math.min(1f, CAM_FOLLOW_SPEED * delta));
-            cameraControllerNode.setGlobalPosition(smoothedPos);
-            cameraControllerNode.setRotation(new Vector3(0f, vehicleYaw, 0f));
-        }
-
-        // ── 3. Physics body: drive Y at vehicleYawRate; cap X/Z ──────────
-        // Y is only forced on the ground. Airborne: leave Y free (0) so the body
-        // doesn't yaw while the steerSign oscillation is suppressed above.
-        Vector3 av  = getAngularVelocity();
-        float   avX = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getX()));
-        float   avZ = (float) Math.max(-MAX_TILT, Math.min(MAX_TILT, av.getZ()));
-        float   avY = isOnGround ? vehicleYawRate : 0f;
-        setAngularVelocity(new Vector3(avX, avY, avZ));
-
-        if (!isOnGround) return;
-
-        // ── 4. Chassis visual offset ──────────────────────────────────────
-        // Normal: direct proportional to steering — hold = fixed lean, release = springs to 0.
-        // Drift: direction-locked.
-        //   • Steer same as drift direction (or neutral) → hold at maxDriftAngle.
-        //   • Counter-steer → reduce angle by up to maxDriftReduction degrees
-        //     (proportional to how hard you counter-steer).
-        float targetOffset;
-        if (isDrifting) {
-            float withDrift  = cmd.steering * driftDirection;   // +1 = same dir, -1 = counter
-            float driftAngle = withDrift >= 0f
-                ? maxDriftAngle
-                : maxDriftAngle - maxDriftReduction * Math.min(1f, Math.abs(withDrift));
-            targetOffset = driftDirection * driftAngle;
+        if (cmd.handbrake) {
+            slipping    = true;
+            handBraking = true;
         } else {
-            targetOffset = cmd.steering * normalBodyAngle;
+            handBraking = false;
         }
-        currentDriftAngle += (targetOffset - currentDriftAngle) * Math.min(1f, driftAngleLerpSpeed * delta);
+        braking = cmd.brake;
 
-        // ── 5. Visual direction = desiredForward + chassis offset ─────────
-        float   offsetRad = (float) Math.toRadians(currentDriftAngle);
-        Vector3 moveFwd   = desiredForward.rotated(worldUp, offsetRad);
-
-        // ── 5b. Slope-aware force directions ─────────────────────────────
-        // The body's local +Y tilts with the terrain via suspension.
-        // Projecting desiredForward / moveFwd onto this plane gives directions
-        // that follow the slope surface — horizontal forces alone cannot climb.
-        Vector3 vehicleUp = getGlobalTransform().getBasis().getColumn(1);
-        if ((float) vehicleUp.length() < 0.001f) vehicleUp = new Vector3(0f, 1f, 0f);
-        else vehicleUp = vehicleUp.normalized();
-        Vector3 surfaceFwd     = projectOntoPlane(desiredForward, vehicleUp);
-        Vector3 surfaceMoveFwd = projectOntoPlane(moveFwd,        vehicleUp);
-
-        // ── 6. Pose BodyMesh ──────────────────────────────────────────────
-        // Y: face moveFwd (drift lean in world XZ plane).
-        // Z: visual roll — left side down for right turn, right side down for left turn.
-        // X: nose-down pitch = −|roll| × 0.4. Combined with Z roll this places the
-        //    peak of the lean at the front outer corner rather than rolling the whole
-        //    body uniformly sideways, giving the "front wheel pressed" effect.
-        //    (Godot: negative X rotation = rotate +Y toward +Z = nose goes down.)
-        {
-            float targetRoll = vehicleYawRate * visualLeanFactor;
-            float rollLerp   = Math.abs(targetRoll) >= Math.abs(currentRollVisual) ? 8f : 2f;
-            currentRollVisual += (targetRoll - currentRollVisual) * Math.min(1f, rollLerp * delta);
+        for (VehicleWheel w : wheels) {
+            w.applyWheelPhysics((float) delta, (float) getPhysicsProcessDeltaTime(), cmd);
+            w.applyWheelSteering((float) delta, cmd.steering);
+            w.applySkidMark();
+            if (w.isColliding()) isGrounded = true;
         }
 
-        if (bodyMeshNode != null) {
-            Vector3 bodyFwdFlat = new Vector3(physBodyFwd.getX(), 0f, physBodyFwd.getZ());
-            if ((float) bodyFwdFlat.length() > 0.001f) bodyFwdFlat = bodyFwdFlat.normalized();
-
-            float sinA        = (float) bodyFwdFlat.cross(moveFwd).getY();
-            float cosA        = (float) bodyFwdFlat.dot(moveFwd);
-            float targetAngle = (float) Math.atan2(sinA, cosA);
-
-            float currentY = (float) bodyMeshNode.getRotation().getY();
-            float diff     = targetAngle - currentY;
-            while (diff >  (float) Math.PI) diff -= (float)(2.0 * Math.PI);
-            while (diff < -(float) Math.PI) diff += (float)(2.0 * Math.PI);
-            bodyMeshNode.setRotation(new Vector3(
-                -Math.abs(currentRollVisual) * 0.4f,   // nose-down pitch during any turn
-                currentY + diff * Math.min(1f, turnSpringResponse * delta),
-                currentRollVisual));                    // sideways roll
-        }
-
-        // ── 7. Throttle and drag along surfaceFwd ────────────────────────
-        // Forces follow the slope surface so the vehicle can climb.
-        float throttle  = getThrottleInput(cmd.throttle);
-        float desFwdSpd = (float) getLinearVelocity().dot(surfaceFwd);
-        applyCentralForce(surfaceFwd.times(throttle * enginePower * 2f));
-        applyCentralForce(surfaceFwd.times(-desFwdSpd * getMass() * dragForceFactor));
-
-        // ── 8. Lateral correction ─────────────────────────────────────────
-        // Non-drift: correct relative to moveFwd (the small lean angle) — gives
-        //   grip that naturally accounts for the turn lean.
-        // Drift: correct relative to surfaceFwd (camera direction) instead of the
-        //   35°-offset surfaceMoveFwd. Using the offset during drift makes the
-        //   correction force fight the throttle force, causing bumpiness. Using
-        //   the camera direction gives clean perpendicular sliding.
-        Vector3 moveRight = (isDrifting ? surfaceFwd : surfaceMoveFwd).cross(vehicleUp);
-        float   latSpeed  = (float) getLinearVelocity().dot(moveRight);
-
-        if (isDrifting) {
-            currentLatFactor = driftLateralFactor;
+        setCenterOfMassMode(CenterOfMassMode.CUSTOM);
+        if (isGrounded) {
+            setCenterOfMass(new Vector3(0f, -0.3f, 0f));
         } else {
-            // Reduce lateral grip proportionally to steer input so turning causes visible
-            // sideslip. At full steer, grip drops to lateralForceFactor*(1-turnSlideReduction).
-            // turnSlideReduction=0 = grippy always; 1.0 = fully slidey at max steer.
-            float steerStrength = Math.abs(cmd.steering);
-            float targetLat = lateralForceFactor * (1f - steerStrength * turnSlideReduction);
-            currentLatFactor += (targetLat - currentLatFactor) * Math.min(1f, 8f * delta);
+            setCenterOfMass(Vector3.Companion.getDOWN().times(0.5f));
         }
 
-        if (isDrifting && Math.abs(latSpeed) > maxDriftLateralSpeed) {
-            float excess = Math.abs(latSpeed) - maxDriftLateralSpeed;
-            applyCentralImpulse(moveRight.times(-(float) Math.copySign(excess, latSpeed) * getMass()));
-            latSpeed = (float) Math.copySign(maxDriftLateralSpeed, latSpeed);
+        // Teleport occupant to driver seat every frame so their hitbox rides with the car.
+        if (occupant != null && driverSeatNode != null) {
+            occupant.setGlobalPosition(driverSeatNode.getGlobalPosition());
+            Vector3 seatRot = driverSeatNode.getGlobalRotation();
+            occupant.setGlobalRotation(new Vector3(
+                    (float) seatRot.getX(),
+                    (float) seatRot.getY(),
+                    (float) seatRot.getZ()));
         }
-        applyCentralImpulse(moveRight.times(-latSpeed * getMass() * currentLatFactor * delta));
 
-        // ── 9. Braking ────────────────────────────────────────────────────
-        if (cmd.handbrake && speed > 0.5f)
-            applyCentralForce(getLinearVelocity().normalized().times(-brakePower * getMass()));
-
-        // ── 10. Drift exit boost along surfaceFwd ─────────────────────────
-        if (isDrifting) {
-            driftBoosterTimer = Math.min(driftBoosterTimer + delta, 3f);
-        } else if (driftBoosterTimer > 0f) {
-            driftBoosterTimer -= delta;
-            applyCentralForce(surfaceFwd.times(getMass() * 4f));
+        // Relay weapon commands to occupant based on weapon mode.
+        if (occupant != null) {
+            VehicleWeaponMode mode = getWeaponMode();
+            if (mode == VehicleWeaponMode.PASSENGER_WEAPON) {
+                Vector3 aimTarget = camController != null
+                        ? camController.getAimTarget()
+                        : occupant.getGlobalPosition().plus(new Vector3(0f, 0f, -20f));
+                occupant.applyPassengerWeaponInput(cmd.fire, cmd.reload, aimTarget);
+            } else if (mode == VehicleWeaponMode.VEHICLE_WEAPON && vehicleWeaponItem != null) {
+                if (cmd.fire) vehicleWeaponItem.useWeapon();
+                else          vehicleWeaponItem.stopUseWeapon();
+            }
         }
 
     }
+
+    // ── Utilities ─────────────────────────────────────────────────────────────
 
     /**
-     * Flip the vehicle upright and lift it off the ground so the suspension
-     * raycasts start from a clean airborne state on the next physics tick.
-     *
-     * Heading (vehicleYaw) is preserved so the vehicle faces the same direction.
-     * All velocities are zeroed; drift and visual lean state are cleared.
-     * Lifting by maxSpringLength * 2 + 1 m guarantees every wheel ray reports
-     * "not colliding" next frame, which resets lastSpringLength to maxSpringLength
-     * and prevents a carry-over damper spike when the vehicle lands.
+     * Detects new character contacts and applies one-time speed-proportional damage.
+     * PhysicsDirectBodyState3D.getContactColliderObject is the correct API for iterating
+     * contacts on a RigidBody3D — the equivalent getter does not exist on the body itself.
+     * Requires contact_monitor=true and max_contacts_reported>0 (set in _ready).
      */
+    @RegisterFunction
+    @Override
+    public void _integrateForces(PhysicsDirectBodyState3D state) {
+        if (vehicleCollisionMinSpeed <= 0) return;
+
+        int count = state.getContactCount();
+        java.util.HashSet<Character> currentContacts = new java.util.HashSet<>();
+
+        for (int i = 0; i < count; i++) {
+            // getContactColliderObject returns godot.api.Object; widened to java.lang.Object here.
+            Object obj = state.getContactColliderObject(i);
+            Character character = null;
+            if (obj instanceof Character c) {
+                character = c;
+            } else if (obj instanceof Node3D n3d) {
+                Node owner = n3d.getOwner();
+                if (owner instanceof Character c) character = c;
+            }
+            if (character == null || character == occupant || !character.isAlive()) continue;
+            currentContacts.add(character);
+        }
+
+        float speed = (float) GD.abs(getGlobalBasis().getZ().dot(getLinearVelocity()));
+        if (speed >= vehicleCollisionMinSpeed) {
+            for (Character character : currentContacts) {
+                if (!activeCollisions.contains(character)) {
+                    applyVehicleCollisionDamage(character, speed);
+                }
+            }
+        }
+
+        activeCollisions.clear();
+        activeCollisions.addAll(currentContacts);
+    }
+
+    private void applyVehicleCollisionDamage(Character character, float speed) {
+        float damage = (speed - vehicleCollisionMinSpeed) * vehicleCollisionDamageScale;
+        Node healthNode = character.getNodeOrNull("Health");
+        if (!(healthNode instanceof Health health)) return;
+
+        String attackerName    = (occupant != null) ? occupant.getCharacterInfo().displayName: "";
+        String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
+        health.takeDamage(null, damage, "Vehicle", vehicleIcon, attackerName, attackerFaction);
+
+        // Knockback in the direction the vehicle is travelling.
+        Vector3 knockbackDir = getLinearVelocity().normalized();
+        character.applyHitImpulse(null, knockbackDir, damage);
+    }
+
+    /** Returns the typed weapon mode from the inspector int. */
+    public VehicleWeaponMode getWeaponMode() {
+        VehicleWeaponMode[] values = VehicleWeaponMode.values();
+        int idx = Math.max(0, Math.min(weaponModeIndex, values.length - 1));
+        return values[idx];
+    }
+
     private void resetOrientation() {
         setLinearVelocity(new Vector3(0f, 0f, 0f));
         setAngularVelocity(new Vector3(0f, 0f, 0f));
-        vehicleYawRate    = 0f;
-        isDrifting        = false;
-        currentDriftAngle = 0f;
-        driftBoosterTimer = 0f;
-        currentRollVisual = 0f;
-        currentLatFactor  = lateralForceFactor;
-
-        setRotation(new Vector3(0f, vehicleYaw, 0f));
-        Vector3 pos = getGlobalPosition();
-        setGlobalPosition(new Vector3(pos.getX(), pos.getY() + maxSpringLength * 2f + 1.0f, pos.getZ()));
+        setRotation(new Vector3(0f, 0f, 0f));
+        Vector3 p = getGlobalPosition();
+        setGlobalPosition(new Vector3((float) p.getX(), (float) p.getY() + 7f, (float) p.getZ()));
     }
-
-    /**
-     * Updates spin and steer rotation on every wheel each physics frame.
-     * Called after applyDriving so desiredForward is already current.
-     * forwardSpeed is signed: positive = forward, negative = reverse.
-     */
-    private void updateWheelVisuals(float delta, float steering) {
-        if (wheels == null) return;
-        float forwardSpeed = (float) getLinearVelocity().dot(desiredForward);
-        for (Node child : wheels.getChildren()) {
-            if (child instanceof VehicleWheel w)
-                w.updateVisual(delta, forwardSpeed, steering);
-        }
-    }
-
-    /** Subclass hook to cap raw throttle (e.g. GroundVehicle speed limit). */
-    protected float getThrottleInput(float raw) { return raw; }
 
     // ── Controllable ──────────────────────────────────────────────────────────
 
     @Override public void applyCommand(UserCommand cmd, double delta) { }
-    @Override public CharacterInfo getCharacterInfo() { return characterInfo; }
+    @Override public CharacterInfo getCharacterInfo()                 { return characterInfo; }
 
     // ── Enter / Exit ──────────────────────────────────────────────────────────
 
     public void tryEnter(Character c) {
         if (occupant != null) return;
-        occupant = c;
+        occupant    = c;
+        justEntered = true;
+
+        VehicleWeaponMode mode = getWeaponMode();
+
+        // Character handles collision, stance, combat state, and physics disabling.
+        c.enterDriveState(mode);
+
         Controller ctrl = c.detachController();
         if (ctrl != null) attachController(ctrl);
-        c.setVisible(false);
-        c.setPhysicsProcess(false);
-        Node mc = c.getNodeOrNull("MovementController");
-        if (mc != null) mc.setPhysicsProcess(false);
+
+        // For PASSENGER_WEAPON: swap the character's AimRay to the vehicle camera ray.
+        if (mode == VehicleWeaponMode.PASSENGER_WEAPON) {
+            Node aimRayNode = getNodeOrNull(vehicleAimRayPath.getPath());
+            if (aimRayNode instanceof RayCast3D vRay) {
+                Node wc = c.getNodeOrNull("WeaponController");
+                if (wc instanceof WeaponController wcn) wcn.overrideAimRay(vRay);
+            }
+        }
+
+        if (camController != null) camController.setPassengerAimMode(mode == VehicleWeaponMode.PASSENGER_WEAPON);
         if (vehicleCamera != null) vehicleCamera.makeCurrent();
-        justEntered = true;
         emitEnterPrompt(false);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this, c.characterInfo);
@@ -590,50 +375,85 @@ public class Vehicle extends RigidBody3D implements Controllable {
         if (occupant == null) return;
         Character c = occupant;
         occupant = null;
+
+        // Restore AimRay before re-enabling character physics.
+        if (getWeaponMode() == VehicleWeaponMode.PASSENGER_WEAPON) {
+            Node wc = c.getNodeOrNull("WeaponController");
+            if (wc instanceof WeaponController wcn) wcn.restoreAimRay();
+        }
+
         Vector3 right   = getGlobalTransform().getBasis().getColumn(0);
         Vector3 exitPos = getGlobalPosition()
-            .minus(right.times(1.5f)).plus(new Vector3(0f, 0.8f, 0f));
+                .minus(right.times(1.5f)).plus(new Vector3(0f, 0.8f, 0f));
         c.setGlobalPosition(exitPos);
-        c.setVisible(true);
-        c.setPhysicsProcess(true);
-        Node mc = c.getNodeOrNull("MovementController");
-        if (mc != null) mc.setPhysicsProcess(true);
+        c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
+
+        // Character handles collision restore, stance restore, and physics re-enabling.
+        c.exitDriveState();
+
         Controller ctrl = detachController();
         if (ctrl != null) c.attachController(ctrl);
+
+        if (camController != null) camController.setPassengerAimMode(false);
         c.makeCameraActive();
+        // Mark the exiting character as already-known so the next _integrateForces call does
+        // not treat them as a new contact and apply spurious collision damage on exit.
+        activeCollisions.add(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
+    }
+
+    /**
+     * Called when the vehicle's Health node reaches zero.
+     *
+     * Ejects the occupant first (restoring their physics and stance) so that the
+     * exitDriveState / makeCameraActive chain runs on a live vehicle scene, then
+     * applies explosion damage to the ejected character, and finally removes the
+     * vehicle from the scene tree.
+     *
+     * Ordering matters: tryExit() must come before queueFree() so that reparenting
+     * the controller and querying global transforms still work on the intact vehicle.
+     * Damage is applied after ejection so that if the blast kills the character,
+     * enableRagdoll() fires on a fully-restored CharacterBody3D (not mid-drive-state).
+     */
+    @RegisterFunction
+    public void onVehicleDestruction() {
+        if (occupant != null) {
+            Character ejected = occupant;
+            tryExit();
+            if (ejected.isAlive()) {
+                Node occHealth = ejected.getNodeOrNull("Health");
+                if (occHealth instanceof Health health) {
+                    String attackerName    = (characterInfo != null) ? characterInfo.displayName : getName().toString();
+                    String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
+                    health.takeDamage(null, vehicleExplosionOccupantDamage, "Vehicle Explosion",
+                            null, attackerName, attackerFaction);
+                }
+            }
+        }
+        queueFree();
     }
 
     // ── EntranceArea signals ──────────────────────────────────────────────────
 
     @RegisterFunction
     public void onEntranceBodyEntered(Node3D body) {
-        // Resolve through ragdoll bones — body may be a PhysicalBone3D whose owner
-        // is the Character, same pattern as Pickup.resolveCharacter().
         Character c = resolveCharacter(body);
         if (c == null || occupant != null) return;
-        if (c instanceof Player p) {
-            p.nearbyVehicle = this;
-            emitEnterPrompt(true);
-        }
+        if (c instanceof Player p) { p.nearbyVehicle = this; emitEnterPrompt(true); }
     }
 
     @RegisterFunction
     public void onEntranceBodyExited(Node3D body) {
         Character c = resolveCharacter(body);
         if (c == null) return;
-        if (c instanceof Player p) {
-            p.nearbyVehicle = null;
-            emitEnterPrompt(false);
-        }
+        if (c instanceof Player p) { p.nearbyVehicle = null; emitEnterPrompt(false); }
     }
 
     private Character resolveCharacter(Node3D body) {
         if (body instanceof Character c) return c;
         Node owner = body.getOwner();
-        if (owner instanceof Character c) return c;
-        return null;
+        return owner instanceof Character c ? c : null;
     }
 
     private void emitEnterPrompt(boolean inRange) {
@@ -646,10 +466,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     public Controller detachController() {
         if (controller == null) return null;
-        Controller ctrl = controller;
-        removeChild(ctrl);
+        Controller c = controller;
+        removeChild(c);
         controller = null;
-        return ctrl;
+        return c;
     }
 
     public void attachController(Controller ctrl) {
@@ -658,18 +478,13 @@ public class Vehicle extends RigidBody3D implements Controllable {
         addChild(ctrl);
     }
 
-    // ── Internal ─────────────────────────────────────────────────────────────
-
-    /** Projects v onto the plane defined by normal, returns normalised result.
-     *  Falls back to v unchanged when the projection is near-zero (e.g. v is
-     *  parallel to normal, which can happen on a near-vertical wall). */
-    private Vector3 projectOntoPlane(Vector3 v, Vector3 normal) {
-        Vector3 projected = v.minus(normal.times((float) normal.dot(v)));
-        float len = (float) projected.length();
-        return len < 0.001f ? v : projected.times(1f / len);
-    }
-
     public boolean isAlive() {
         return healthNode == null || !healthNode.isDead();
     }
+
+    public boolean isSlipping()     { return slipping; }
+    public void setSlipping(boolean slipping) { this.slipping = slipping; }
+    public ArrayList<VehicleWheel> getWheels() { return wheels; }
+    public boolean isBraking()      { return braking; }
+    public boolean isHandbraking()  { return handBraking; }
 }

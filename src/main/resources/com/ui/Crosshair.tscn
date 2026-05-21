@@ -1,0 +1,46 @@
+[gd_scene format=3 uid="uid://bljcljd5jac81"]
+
+[ext_resource type="Script" uid="uid://defb2urvdtr8u" path="res://gdj/com/ui/Crosshair.gdj" id="1_86yii"]
+[ext_resource type="PackedScene" uid="uid://2cwjeq8se2u2" path="res://src/main/resources/com/ui/LinePivot.tscn" id="2_a037w"]
+
+[node name="Crosshair" type="Control" unique_id=938896149]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_86yii")
+
+[node name="Center" type="Node2D" parent="." unique_id=97180060]
+
+[node name="Border" type="Line2D" parent="Center" unique_id=708531749]
+points = PackedVector2Array(-0.1, 0, 0.1, 0)
+width = 6.0
+default_color = Color(0.15686275, 0.29411766, 0.6509804, 0.4117647)
+begin_cap_mode = 2
+end_cap_mode = 2
+
+[node name="Dot" type="Line2D" parent="Center" unique_id=1114024449]
+points = PackedVector2Array(-0.1, 0, 0.1, 0)
+width = 2.0
+default_color = Color(0.10980392, 0.8235294, 1, 1)
+begin_cap_mode = 2
+end_cap_mode = 2
+
+[node name="Reticle" type="Node2D" parent="." unique_id=1437730315]
+
+[node name="Lines" type="Node2D" parent="Reticle" unique_id=320656023]
+
+[node name="LinePivot" parent="Reticle/Lines" unique_id=1616160498 instance=ExtResource("2_a037w")]
+
+[node name="LinePivot2" parent="Reticle/Lines" unique_id=1225852627 instance=ExtResource("2_a037w")]
+rotation = 1.5707964
+
+[node name="LinePivot3" parent="Reticle/Lines" unique_id=178345274 instance=ExtResource("2_a037w")]
+rotation = 3.1415927
+
+[node name="LinePivot4" parent="Reticle/Lines" unique_id=1488546608 instance=ExtResource("2_a037w")]
+rotation = 4.712389

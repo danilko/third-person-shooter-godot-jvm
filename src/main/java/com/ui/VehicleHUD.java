@@ -1,16 +1,11 @@
 package com.ui;
 
 import com.character.Health;
-import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
-import godot.api.Control;
-import godot.api.Label;
-import godot.api.Node;
-import godot.api.Node3D;
-import godot.api.RigidBody3D;
+import com.vehicle.Vehicle;
+import godot.annotation.*;
+import godot.api.*;
 import godot.core.NodePath;
+import godot.global.GD;
 
 /**
  * In-vehicle HUD — shown by HUDManager when the player boards a vehicle.
@@ -32,15 +27,18 @@ public class VehicleHUD extends Control {
     @RegisterProperty @Export
     public NodePath healthLabelPath = new NodePath("Health/ColorRect/Health");
 
-    private Label speedLabel;
+    private RichTextLabel speedLabel;
     private Label healthLabel;
-    private Node3D vehicle;
+    private Vehicle vehicle;
 
     @RegisterFunction
     @Override
     public void _ready() {
         Node s = getNodeOrNull(speedLabelPath);
-        if (s instanceof Label l) speedLabel = l;
+        if (s instanceof RichTextLabel l) { speedLabel = l;}
+        else {
+            GD.print("speedLabelPath not found or not text label" + s.getName());
+        }
         Node h = getNodeOrNull(healthLabelPath);
         if (h instanceof Label l) healthLabel = l;
     }
@@ -50,10 +48,17 @@ public class VehicleHUD extends Control {
     public void _process(double delta) {
         if (vehicle == null) return;
 
-        if (speedLabel != null && vehicle instanceof RigidBody3D rb) {
-            float ms  = (float) rb.getLinearVelocity().length();
-            float kmh = ms * 3.6f;
-            speedLabel.setText(String.format("%3.0f", kmh));
+        if (speedLabel != null) {
+
+            var speed = -vehicle.getGlobalBasis().getZ().dot(vehicle.getLinearVelocity());
+
+            // Car motor
+            var speedRatio = speed / vehicle.maxSpeed;
+            var accelerationRatio = vehicle.accelerationCurve.sampleBaked((float) speedRatio);
+            var accelerationForce = accelerationRatio * vehicle.acceleration;
+
+            speedLabel.setText(String.format("Speed: %4.1f m/s | %4.1f km/h | %4.1f mph\nMotoRatio: %.0f\nAccelForce: %.0f", speed, speed*3.6, speed*2.237, speedRatio * 100, accelerationForce));
+
         }
 
         if (healthLabel != null) {
@@ -66,7 +71,7 @@ public class VehicleHUD extends Control {
 
     /** Called by HUDManager when the player enters/exits a vehicle. */
     public void setVehicle(Node3D v) {
-        vehicle = v;
+        vehicle = (Vehicle) v;
         if (v == null) {
             if (speedLabel  != null) speedLabel.setText("---");
             if (healthLabel != null) healthLabel.setText("---");

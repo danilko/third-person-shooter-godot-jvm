@@ -71,9 +71,20 @@ public class ImpactManager extends Node {
                              String weaponName, Texture2D weaponIcon,
                              String attackerName, String attackerFaction) {
         if (info.hitNode == null) return;
-        Node owner = info.hitNode.getOwner();
-        if (owner == null || !owner.hasNode(new NodePath("Health"))) return;
-        Health health = (Health) owner.getNode(new NodePath("Health"));
+        // hitNode can be either the health-owner itself (e.g. a Vehicle/RigidBody3D whose
+        // AimRay collider IS the body) or a child of the owner (e.g. a PhysicalBone3D inside
+        // a Character). Check the node itself first, then fall back to its scene owner.
+        Node healthOwner = null;
+        if (info.hitNode.hasNode(new NodePath("Health"))) {
+            healthOwner = info.hitNode;
+        } else {
+            Node owner = info.hitNode.getOwner();
+            if (owner != null && owner.hasNode(new NodePath("Health"))) {
+                healthOwner = owner;
+            }
+        }
+        if (healthOwner == null) return;
+        Health health = (Health) healthOwner.getNode(new NodePath("Health"));
         health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction);
     }
 

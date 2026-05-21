@@ -1,6 +1,5 @@
 package com.character;
 
-import com.ui.Crosshair;
 import godot.api.CharacterBody3D;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -67,9 +66,15 @@ public class MovementController extends Node {
   @Export
   public WeaponController weaponController;
 
-  @RegisterProperty
+  /** Downward speed (m/s) required before any fall damage is dealt. 0 disables fall damage. */
   @Export
-  public Crosshair crosshair;
+  @RegisterProperty
+  public float fallDamageThreshold = 10.0f;
+
+  /** Damage per m/s above fallDamageThreshold on landing. */
+  @Export
+  @RegisterProperty
+  public float fallDamageScale = 5.0f;
 
   @RegisterFunction
   @Override
@@ -83,6 +88,8 @@ public class MovementController extends Node {
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || meshRoot == null) return;
+
+    boolean wasOnFloor = player.isOnFloor();
 
     // Calculate horizontal velocity
     Vector3 normDir = direction.normalized();
@@ -106,20 +113,37 @@ public class MovementController extends Node {
 
     // Apply movement using lerp
     player.setVelocity( GD.lerp(player.getVelocity(), velocity, acceleration * delta));
+    float appliedVelocityY = (float) player.getVelocity().getY();
     player.moveAndSlide();
 
+    // Fall damage: compare velocity just before landing to the configured threshold.
+    if (fallDamageThreshold > 0 && !wasOnFloor && player.isOnFloor()
+            && appliedVelocityY < -fallDamageThreshold) {
+      float fallSpeed = -appliedVelocityY;
+      float damage = (fallSpeed - fallDamageThreshold) * fallDamageScale;
+      if (player instanceof Character c && c.healthNode != null) {
+        String attackerName    = (c.characterInfo != null) ? c.characterInfo.displayName : "";
+        String attackerFaction = (c.characterInfo != null) ? c.characterInfo.faction     : "";
+        c.healthNode.takeDamage(null, damage, "Fall", null, attackerName, attackerFaction);
+      }
+    }
+
     // Handle Mesh Rotation
+    // atan2(-dx, -dz) maps a world-space movement direction to the Y rotation needed
+    // for a -Z-forward mesh (Godot convention).  The old formula atan2(dx, dz) was
+    // correct for a +Z-forward mesh; negating both components shifts it by π, which
+    // is the rotation needed to flip from +Z to -Z facing convention.
     double targetRotation;
     if (rolling && direction.lengthSquared() > 0.001) {
       // During roll: always face movement direction, even in combat
-      targetRotation = atan2(direction.getX(), direction.getZ()) - playerInitRotation;
+      targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
     } else if (combat && !worldSpaceMovement) {
       // Face camera direction (Player only — set faceCameraInCombat=false for AI/Enemy)
       targetRotation = camRotation;
     } else {
       // Face movement direction (only when actually moving)
       if (direction.lengthSquared() > 0.001) {
-        targetRotation = atan2(direction.getX(), direction.getZ()) - playerInitRotation;
+        targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
       } else {
         targetRotation = meshRoot.getRotation().getY(); // hold current facing
       }
@@ -131,11 +155,6 @@ public class MovementController extends Node {
     // Update only the Y axis
     meshRoot.setRotation(new Vector3(currentRot.getX(), newY, currentRot.getZ()));
 
-    // Mirror actual ballistic spread so the crosshair reflects true accuracy.
-    // Scale: 1° spread → 15 px arm offset, matching the visual range of the old pixel-unit system.
-    if (crosshair != null) {
-      crosshair.setPositionX(weaponController.getCurrentSpreadDeg() * 8.0f);
-    }
   }
 
 
