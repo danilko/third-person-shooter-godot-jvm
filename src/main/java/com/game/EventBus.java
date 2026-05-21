@@ -10,7 +10,6 @@ import godot.core.Signal1;
 import godot.core.Signal2;
 import godot.core.Signal3;
 import godot.core.Signal4;
-import godot.core.Signal5;
 import godot.core.Signal7;
 import godot.core.StringName;
 
@@ -105,4 +104,5 @@ public class EventBus extends Node {
     @RegisterSignal
     public final Signal1<CharacterInfo> vehicleExited =
             new Signal1<>(this, new StringName("vehicle_exited"));
+
 }

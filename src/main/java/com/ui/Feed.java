@@ -2,7 +2,9 @@ package com.ui;
 
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
+import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
+import godot.api.Control;
 import godot.api.Node;
 import godot.api.VBoxContainer;
 
@@ -27,7 +29,7 @@ import godot.api.VBoxContainer;
  * </pre>
  */
 @RegisterClass(className = "Feed")
-public class Feed extends VBoxContainer {
+public class Feed extends Control {
 
     /** Maximum number of rows visible at once. Oldest is evicted when exceeded. */
     @RegisterProperty
@@ -39,6 +41,14 @@ public class Feed extends VBoxContainer {
     @Export
     public float entryLifespan = 4.0f;
 
+    private VBoxContainer vBoxContainer;
+
+    @RegisterFunction
+    @Override
+    public void _ready() {
+        vBoxContainer = (VBoxContainer) getNode("VBoxContainer");
+    }
+
     /**
      * Add an entry to the bottom of the feed.
      *
@@ -49,9 +59,9 @@ public class Feed extends VBoxContainer {
     public void push(FeedEntry entry) {
         if (getChildCount() >= maxEntries) {
             Node oldest = getChild(0);
-            removeChild(oldest);
+            vBoxContainer.removeChild(oldest);
             oldest.queueFree();
         }
-        addChild(entry);
+        vBoxContainer.addChild(entry);
     }
 }

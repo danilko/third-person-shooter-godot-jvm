@@ -1,12 +1,11 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = CharacterHUD
-fqName = com.ui.CharacterHUD
-baseType = Control
+registeredName = VehicleCameraController
+fqName = com.vehicle.VehicleCameraController
+baseType = Node3D
 supertypes = [
-    godot.api.Control,
-	godot.api.CanvasItem,
+    godot.api.Node3D,
 	godot.api.Node,
 	godot.api.Object,
 	godot.core.KtObject,
@@ -17,16 +16,16 @@ signals = [
     
 ]
 properties = [
-    health_label_path,
-	magazine_label_path,
-	reserve_label_path,
-	notification_icon_path
+    min_distance,
+	max_distance,
+	height,
+	aim_recovery_speed,
+	camera_sensitivity,
+	min_pitch,
+	max_pitch
 ]
 functions = [
     _ready,
-	_process,
-	on_ammo_changed,
-	on_health_changed,
-	on_pickup_interact_changed,
-	on_weapon_picked_up
+	_input,
+	_physics_process
 ]

@@ -31,10 +31,14 @@ public class WeaponItem extends Pickup implements WeaponAction {
   // Icon shown in the kill feed and radial menu. Set in the inspector per weapon scene.
   @RegisterProperty @Export public Texture2D weaponIcon = null;
 
-  @RegisterProperty @Export public float spread = 1.0f;
-  @RegisterProperty @Export public float bloomPerShot = 0.4f;
-  @RegisterProperty @Export public float bloomDecaySpeed = 3.0f;
-  @RegisterProperty @Export public float bloomMax = 4.0f;
+  @RegisterProperty @Export public float spread = 0.0f;
+  // Inaccuracy added per shot; decays at bloomDecaySpeed when not firing.
+  // Set bloomDecaySpeed lower than (bloomPerShot × fireRate) for bloom to
+  // accumulate during full-auto. Set it higher for semi-auto tap-fire weapons
+  // where each shot clears before the next.
+  @RegisterProperty @Export public float bloomPerShot    = 0.0f;
+  @RegisterProperty @Export public float bloomDecaySpeed = 1.0f;
+  @RegisterProperty @Export public float bloomMax        = 0.25f;
   @RegisterProperty @Export public float reloadSpeed = 0.8f;
   @RegisterProperty @Export public float switchSpeed = 1.2f;
   @RegisterProperty @Export public float fireRate = 8.0f;
@@ -116,14 +120,12 @@ public class WeaponItem extends Pickup implements WeaponAction {
   public float getSpread() { return spread; }
   public void setSpread(float spread) { this.spread = spread; }
 
-  public float getBloomPerShot() { return bloomPerShot; }
-  public void setBloomPerShot(float bloomPerShot) { this.bloomPerShot = bloomPerShot; }
-
+  public float getBloomPerShot()    { return bloomPerShot; }
+  public void  setBloomPerShot(float v)    { bloomPerShot    = v; }
   public float getBloomDecaySpeed() { return bloomDecaySpeed; }
-  public void setBloomDecaySpeed(float bloomDecaySpeed) { this.bloomDecaySpeed = bloomDecaySpeed; }
-
-  public float getBloomMax() { return bloomMax; }
-  public void setBloomMax(float bloomMax) { this.bloomMax = bloomMax; }
+  public void  setBloomDecaySpeed(float v) { bloomDecaySpeed = v; }
+  public float getBloomMax()        { return bloomMax; }
+  public void  setBloomMax(float v)        { bloomMax        = v; }
 
   public float getReloadSpeed() { return reloadSpeed; }
   public void setReloadSpeed(float reloadSpeed) { this.reloadSpeed = reloadSpeed; }

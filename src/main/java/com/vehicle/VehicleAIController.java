@@ -68,7 +68,7 @@ public class VehicleAIController extends Controller {
         Vector3 right   = vehicleBody.getGlobalTransform().getBasis().getColumn(0);
         float steerDot  = (float) toNext.normalized().dot(right);
 
-        cmd.throttle = cruiseThrottle;
+        cmd.motor = cruiseThrottle;
         cmd.steering = Math.max(-1f, Math.min(1f, steerDot));
 
         return cmd;

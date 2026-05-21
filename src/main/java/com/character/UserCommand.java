@@ -63,10 +63,10 @@ public class UserCommand {
     public int lastServerAck;
 
     // ── Vehicle fields (Phase 5) — ignored by Character.applyInput ────────────
-    public float   throttle;
+    public float motor;
     public float   steering;
     public boolean handbrake;
-    public boolean drift;
+    public boolean brake;
     public boolean enterExit;
     public boolean resetVehicle;
 
@@ -86,10 +86,10 @@ public class UserCommand {
         tick              = 0;
         sequenceNumber    = 0;
         lastServerAck     = 0;
-        throttle          = 0f;
+        motor = 0f;
         steering          = 0f;
         handbrake         = false;
-        drift             = false;
+        brake             = false;
         enterExit         = false;
         resetVehicle      = false;
     }
@@ -118,10 +118,10 @@ public class UserCommand {
         c.tick            = tick;
         c.sequenceNumber  = sequenceNumber;
         c.lastServerAck   = lastServerAck;
-        c.throttle        = throttle;
+        c.motor = motor;
         c.steering        = steering;
         c.handbrake       = handbrake;
-        c.drift           = drift;
+        c.brake           = brake;
         c.enterExit       = enterExit;
         c.resetVehicle    = resetVehicle;
         return c;

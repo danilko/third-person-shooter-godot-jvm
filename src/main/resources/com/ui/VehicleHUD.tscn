@@ -1,11 +1,11 @@
 [gd_scene format=3 uid="uid://b2f5ebr71dm77"]
 
-[ext_resource type="Script" uid="uid://vehiclehudgdj" path="res://gdj/com/ui/VehicleHUD.gdj" id="1_vhud"]
+[ext_resource type="Script" uid="uid://qsw1m4geaksj" path="res://gdj/com/ui/VehicleHUD.gdj" id="1_vhud"]
 [ext_resource type="FontFile" uid="uid://btgb34w8m7xgt" path="res://assets/ui/DSEG7ClassicMini-Bold.ttf" id="2_font"]
 
-[sub_resource type="LabelSettings" id="LabelSettings_large"]
+[sub_resource type="LabelSettings" id="LabelSettings_health"]
 font = ExtResource("2_font")
-font_size = 48
+font_size = 30
 outline_size = 8
 outline_color = Color(0.023529412, 0.46666667, 1, 1)
 
@@ -13,12 +13,6 @@ outline_color = Color(0.023529412, 0.46666667, 1, 1)
 font = ExtResource("2_font")
 font_size = 18
 outline_size = 3
-outline_color = Color(0.023529412, 0.46666667, 1, 1)
-
-[sub_resource type="LabelSettings" id="LabelSettings_health"]
-font = ExtResource("2_font")
-font_size = 30
-outline_size = 8
 outline_color = Color(0.023529412, 0.46666667, 1, 1)
 
 [node name="VehicleHUD" type="Control" unique_id=100000001]
@@ -32,6 +26,7 @@ script = ExtResource("1_vhud")
 
 [node name="Speed" type="Control" parent="." unique_id=100000002]
 layout_mode = 1
+anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
@@ -48,47 +43,29 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = 24.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0.35235986, 0.64161503, 0.28235295)
 
-[node name="SpeedValue" type="Label" parent="Speed/ColorRect" unique_id=100000004]
-layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 10.0
-offset_top = -24.0
-offset_right = 145.0
-offset_bottom = 24.0
-grow_vertical = 2
-text = "  0"
-label_settings = SubResource("LabelSettings_large")
-
-[node name="SpeedUnit" type="Label" parent="Speed/ColorRect" unique_id=100000005]
-layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 155.0
-offset_top = -9.0
-offset_right = 225.0
-offset_bottom = 9.0
-grow_vertical = 2
-text = "km/h"
-label_settings = SubResource("LabelSettings_unit")
+[node name="SpeedValue" type="RichTextLabel" parent="Speed/ColorRect" unique_id=1969966065]
+layout_mode = 0
+offset_left = -114.0
+offset_right = 320.0
+offset_bottom = 84.0
+text = "test
+test
+test"
 
 [node name="Health" type="Control" parent="." unique_id=100000006]
 layout_mode = 1
-anchor_left = 0.0
+anchors_preset = 2
 anchor_top = 1.0
-anchor_right = 0.0
 anchor_bottom = 1.0
 offset_left = 20.0
 offset_top = -120.0
 offset_right = 220.0
 offset_bottom = -50.0
-grow_horizontal = 1
 grow_vertical = 0
 
 [node name="ColorRect" type="ColorRect" parent="Health" unique_id=100000007]

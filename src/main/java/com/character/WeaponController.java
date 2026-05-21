@@ -62,6 +62,7 @@ public class WeaponController extends Node {
   private boolean isDeathDrop = false;
 
   private RayCast3D aimRay;
+  private RayCast3D originalAimRay;
   private CameraController cam;
 
   private Timer transitionTimer;
@@ -359,6 +360,26 @@ public class WeaponController extends Node {
       if (slotTypes[i] == type) return i;
     }
     return -1;
+  }
+
+  /**
+   * Replaces the AimRay used by the currently equipped weapon with {@code vehicleRay}.
+   * Saves the original ray so {@link #restoreAimRay()} can undo the swap.
+   * Called by Vehicle when PASSENGER_WEAPON occupant enters so the weapon fires along
+   * the vehicle camera's forward direction rather than the character's camera ray.
+   */
+  public void overrideAimRay(RayCast3D vehicleRay) {
+    originalAimRay = aimRay;
+    aimRay = vehicleRay;
+    injectCharacterRefs(getCurrentWeaponItem());
+  }
+
+  /** Restores the character's original AimRay after exiting PASSENGER_WEAPON mode. */
+  public void restoreAimRay() {
+    if (originalAimRay == null) return;
+    aimRay = originalAimRay;
+    originalAimRay = null;
+    injectCharacterRefs(getCurrentWeaponItem());
   }
 
   private void injectCharacterRefs(WeaponItem item) {

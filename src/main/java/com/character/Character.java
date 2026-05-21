@@ -1,5 +1,6 @@
 package com.character;
 
+import com.vehicle.VehicleWeaponMode;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -111,6 +112,11 @@ public class Character extends CharacterBody3D implements Controllable {
 
     // False for AI-controlled characters whose accuracy is managed by their own system.
     protected boolean useWeaponSpread = true;
+
+    // ── Vehicle / drive state ─────────────────────────────────────────────────
+    public VehicleWeaponMode vehicleWeaponMode = VehicleWeaponMode.NONE;
+    private StanceName preDriveStance  = StanceName.UPRIGHT;
+    private boolean    preDriveCombat  = false;
 
     // ── Network-synced state (MultiplayerSynchronizer reads these) ────────────
     @RegisterProperty
@@ -395,6 +401,88 @@ public class Character extends CharacterBody3D implements Controllable {
         if (path == null) return false;
         Stance s = (Stance) getNode(path);
         return (s != null) && s.isBlocked();
+    }
+
+    /**
+     * Immediately transitions to {@code next} stance, bypassing the anti-spam timer
+     * and toggle logic.  Used for forced transitions (vehicle enter/exit) that must
+     * happen the same frame regardless of how recently the last stance changed.
+     */
+    protected void forceSetStance(StanceName next) {
+        NodePath currentPath = stances.get(currentStanceName.getKey());
+        if (currentPath != null) {
+            Stance s = (Stance) getNode(currentPath);
+            if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
+        }
+        currentStanceName = next;
+        stanceOrdinal     = next.ordinal();
+        NodePath nextPath = stances.get(next.getKey());
+        if (nextPath != null) {
+            Stance s = (Stance) getNode(nextPath);
+            if (s != null) {
+                if (s.getCollider() != null) s.getCollider().setDisabled(false);
+                changedStance.emit(s);
+            }
+        }
+    }
+
+    /**
+     * Puts the character into the DRIVE_CARRIER state for the given weapon mode.
+     * Called by {@code Vehicle.tryEnter}.  Handles collision, stance, combat state,
+     * and physics processing — Vehicle only needs to hot-swap the controller after
+     * this returns.
+     */
+    public void enterDriveState(VehicleWeaponMode mode) {
+        preDriveStance    = currentStanceName;
+        preDriveCombat    = combat;
+        vehicleWeaponMode = mode;
+        setCollisionLayer(0);
+        forceSetStance(StanceName.DRIVE_CARRIER);
+        // Reset the MeshRoot local rotation so the mesh aligns with the body.
+        // MovementController normally controls this; since it is disabled the mesh
+        // would otherwise stay at whatever facing angle it had when the player stopped.
+        Node meshRoot = getNodeOrNull("MeshRoot");
+        if (meshRoot instanceof Node3D mr) mr.setRotation(Vector3.Companion.getZERO());
+        if (mode == VehicleWeaponMode.PASSENGER_WEAPON) {
+            combat = true;
+            setCombatState();
+        }
+        setProcess(false);
+        setPhysicsProcess(false);
+        Node mc = getNodeOrNull("MovementController");
+        if (mc != null) mc.setPhysicsProcess(false);
+    }
+
+    /**
+     * Restores the character's pre-drive state.
+     * Called by {@code Vehicle.tryExit} before the controller is returned.
+     */
+    public void exitDriveState() {
+        setCollisionLayer(2);
+        setProcess(true);
+        setPhysicsProcess(true);
+        Node mc = getNodeOrNull("MovementController");
+        if (mc != null) mc.setPhysicsProcess(true);
+        forceSetStance(preDriveStance);
+        combat = preDriveCombat;
+        setCombatState();
+        vehicleWeaponMode = VehicleWeaponMode.NONE;
+    }
+
+    /**
+     * Relays fire/reload commands from the vehicle controller to this character's
+     * weapon system each physics frame.  Only called when
+     * {@code vehicleWeaponMode == PASSENGER_WEAPON}.
+     *
+     * @param fire      true while the fire button is held
+     * @param reload    true on the frame the reload button is just-pressed
+     * @param aimTarget world-space point the vehicle camera is aimed at (unused here;
+     *                  the vehicle already injected its AimRay into WeaponController)
+     */
+    public void applyPassengerWeaponInput(boolean fire, boolean reload, Vector3 aimTarget) {
+        if (fire) fireWeapon.emit();
+        else      notFireWeapon.emit();
+        if (reload) reloadWeapon.emit();
     }
 
     public void setMovementDirection(Vector3 movementDirection) {

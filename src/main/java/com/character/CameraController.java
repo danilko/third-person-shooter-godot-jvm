@@ -149,7 +149,8 @@ public class CameraController extends Node3D {
 
   /** Adds a per-shot kick (degrees) that decays back to zero at recoilRecoverySpeed. */
   public void applyRecoil(double pitchKick, double yawKick) {
-    recoilPitch += pitchKick;
+    // Looking up is negative pitch, so kick upward by subtracting.
+    recoilPitch -= pitchKick;
     recoilYaw   += yawKick;
   }
 
