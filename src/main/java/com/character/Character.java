@@ -11,6 +11,7 @@ import godot.core.*;
 import godot.global.GD;
 
 import java.lang.Math;
+import java.util.ArrayList;
 import java.util.UUID;
 
 @RegisterClass
@@ -141,9 +142,9 @@ public class Character extends CharacterBody3D implements Controllable {
 
     @Export
     @RegisterProperty
-    public NodePath headMeshPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/head");
+    public VariantArray<NodePath> headMeshPaths = new VariantArray<>(NodePath.class);
 
-    protected Node3D headMesh;
+    protected ArrayList<Node3D> headMeshes = new ArrayList<>();
 
     protected Timer stanceAntispamTimer;
     protected Timer rollTimer;
@@ -206,9 +207,12 @@ public class Character extends CharacterBody3D implements Controllable {
         if (activeCameraPath != null && !activeCameraPath.isEmpty() && hasNode(activeCameraPath)) {
             activeCamera = (Camera3D) getNode(activeCameraPath);
         }
-        if (headMeshPath != null && !headMeshPath.isEmpty() && hasNode(headMeshPath)) {
-            headMesh = (Node3D) getNode(headMeshPath);
+        for(NodePath headMeshPath : headMeshPaths) {
+            if (headMeshPath != null && !headMeshPath.isEmpty() && hasNode(headMeshPath)) {
+                headMeshes.add((Node3D) getNode(headMeshPath));
+            }
         }
+
         if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
             physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
 
@@ -713,7 +717,7 @@ public class Character extends CharacterBody3D implements Controllable {
     }
 
     public void setHeadVisible(boolean visible) {
-        if (headMesh != null) headMesh.setVisible(visible);
+        for(Node3D headMesh : headMeshes) {headMesh.setVisible(visible);};
     }
 
     public void applyRecoil(double pitchKick, double yawKick) {
