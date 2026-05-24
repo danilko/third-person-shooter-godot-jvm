@@ -55,6 +55,9 @@ public class AttackState implements AIState {
             if (!ctrl.hasLastKnownPosition() || ctrl.isSuppressExpired()) return SearchState.INSTANCE;
         }
 
+        // ── Still-phase tick (stop-to-shoot) ─────────────────────────────────
+        ctrl.tickStillTimer(delta);
+
         // ── Movement ──────────────────────────────────────────────────────────
         Vector3 eyePos = myPos.plus(new Vector3(0, AICharacter.EYE_HEIGHT, 0));
         float targetY  = (float) targetPos.getY() + AICharacter.TARGET_BODY_HEIGHT;
@@ -62,7 +65,10 @@ public class AttackState implements AIState {
         float pitchDeg = (hDist > 0.01f) ? (float) Math.toDegrees(Math.atan2(dy, hDist)) : 0f;
         boolean pitchOut = pitchDeg > body.aimPitchMax || pitchDeg < body.aimPitchMin;
 
-        if (pitchOut && hDist > 0.01f) {
+        if (ctrl.isStillPhase()) {
+            // Hold position during post-shot still window — movement direction stays zero.
+            cmd.movementType = MovementType.WALK;
+        } else if (pitchOut && hDist > 0.01f) {
             cmd.movementDirection.setX(-dx / hDist);
             cmd.movementDirection.setZ(-dz / hDist);
             cmd.movementType = MovementType.WALK;
@@ -101,7 +107,7 @@ public class AttackState implements AIState {
             ctrl.resetAttackTimer(fireRate > 0.0 ? 1.0 / fireRate : 1.5);
 
             Vector3 newTarget = hasLoS
-                    ? body.computeAimTarget(GD.randf() < body.hitChance, hDist)
+                    ? body.computeAimTarget(GD.randf() < body.computeEffectiveHitChance(), hDist)
                     : ctrl.computeSuppressTarget(hDist);
             if (newTarget == null) return SearchState.INSTANCE;
 
@@ -109,6 +115,9 @@ public class AttackState implements AIState {
             body.aimAtPosition(newTarget, delta);
             body.snapAimRay(newTarget);
             cmd.aimTargetPosition = newTarget;
+            cmd.movementDirection.setX(0);
+            cmd.movementDirection.setZ(0);
+            ctrl.startStillPhase(body.shootStillDuration);
             cmd.fire = true;
         }
 

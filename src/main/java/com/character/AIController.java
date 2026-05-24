@@ -72,6 +72,7 @@ public class AIController extends Controller {
     double underAttackTimer = 0.0;
     double strafeTimer      = 0.0;
     double searchTimer      = 0.0;
+    double stillTimer       = 0.0;
 
     float   strafeX = 0f;
     float   strafeZ = 0f;
@@ -129,6 +130,11 @@ public class AIController extends Controller {
         strafeZ = (float) Math.sin(angle);
         strafeTimer = getBody().strafeChangeDuration;
     }
+
+    // ── Still-phase helpers (stop-to-shoot) ──────────────────────────────────
+    public void    startStillPhase(double duration) { stillTimer = duration; }
+    public void    tickStillTimer(double delta)     { if (stillTimer > 0) stillTimer = Math.max(0.0, stillTimer - delta); }
+    public boolean isStillPhase()                   { return stillTimer > 0.0; }
 
     // ── Search-timer helpers ──────────────────────────────────────────────────
     public void    resetSearchTimer()               { searchTimer = 0.0; }
