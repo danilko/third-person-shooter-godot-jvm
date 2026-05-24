@@ -58,7 +58,22 @@ public class AICharacter extends Character {
      */
     @Export @RegisterProperty public float moveAccuracyPenalty  = 0.75f;
 
-    private static final float AMMO_REFILL_ARRIVAL_THRESHOLD = 1.5f;
+    /**
+     * When true, the AI crouches once it has LoS, is in its firing position,
+     * and has completed its reaction delay.  Returns to UPRIGHT when repositioning
+     * or losing sight.  Trade-off: slower strafing, better effective accuracy.
+     */
+    @Export @RegisterProperty public boolean useCombatCrouch = true;
+
+    private static final float  AMMO_REFILL_ARRIVAL_THRESHOLD = 1.5f;
+
+    // ── Sensor throttle constants ─────────────────────────────────────────────
+    // Cached once — avoids a StringName allocation on every group scan.
+    private static final StringName CHARACTERS_GROUP     = new StringName("characters");
+    // Target rediscovery interval: new enemies can't teleport in, 0.4 s is imperceptible.
+    private static final double     TARGET_SCAN_INTERVAL = 0.4;
+    // LoS cache interval: ~3 physics frames at 60 Hz — no gameplay impact.
+    private static final double     LOS_CACHE_INTERVAL   = 0.05;
 
     // ── AI hardware ───────────────────────────────────────────────────────────
     private NavigationAgent3D navAgent;
@@ -67,6 +82,16 @@ public class AICharacter extends Character {
     private boolean   isDead        = false;
     private Character currentTarget;
     private Vector3   spawnPosition;
+
+    // ── Sensor cache ─────────────────────────────────────────────────────────
+    private double    targetScanTimer     = 0.0;
+    private double    losCacheTimer       = 0.0;
+    private boolean   cachedLoS           = false;
+    // Bone nodes resolved once per target — priority-ordered by aimBodyPart so
+    // the LoS walk naturally expresses bot difficulty without extra logic.
+    private Character cachedTargetForBone = null;
+    private Node3D[]  cachedBoneNodes     = null;   // priority list: [preferred, fallback...]
+    private Node3D    cachedVisibleBone   = null;   // first bone confirmed exposed in last check
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     @RegisterFunction
@@ -79,6 +104,10 @@ public class AICharacter extends Character {
         // aimRay serves as the LoS ray (same camera origin as the former SightRay).
         // Bone exceptions are already added by Character._ready() via aimRayPath.
         spawnPosition = new Vector3(getGlobalPosition());
+
+        // Stagger each AI's scan timers so every bot doesn't expire on the same frame.
+        targetScanTimer = godot.global.GD.randfRange(0f, (float) TARGET_SCAN_INTERVAL);
+        losCacheTimer   = godot.global.GD.randfRange(0f, (float) LOS_CACHE_INTERVAL);
 
         // Start the FSM now that all body hardware is ready.
         // AIController._ready() intentionally leaves currentState null so this
@@ -100,15 +129,12 @@ public class AICharacter extends Character {
 
     public NavigationAgent3D getNavAgent() { return navAgent; }
 
-    /**
-     * Scans the "characters" group for the nearest live hostile character.
-     * Returns null when no hostiles are reachable.
-     */
+    /** Full group scan for nearest live hostile. Called at most once per TARGET_SCAN_INTERVAL. */
     private Character discoverTarget() {
         String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
         float closestDist = Float.MAX_VALUE;
         Character closest = null;
-        for (Node node : getTree().getNodesInGroup(new StringName("characters"))) {
+        for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
             if (!(node instanceof Character c) || c == this || !c.isAlive()) continue;
             String tf = c.characterInfo != null ? c.characterInfo.faction : Faction.NEUTRAL;
             if (!Faction.areHostile(myFaction, tf)) continue;
@@ -119,37 +145,104 @@ public class AICharacter extends Character {
     }
 
     /**
-     * Re-evaluates the nearest live hostile and caches it as currentTarget.
-     * Called by AttackState and ChaseState each frame so a closer threat that
-     * appears mid-combat is never ignored.
+     * Throttled target refresh — runs the full group scan at most once per
+     * TARGET_SCAN_INTERVAL seconds.  Clears the LoS and bone caches whenever
+     * the closest hostile changes so stale data is never used.
      */
-    public void refreshTarget() {
+    public void refreshTarget(double delta) {
+        targetScanTimer -= delta;
+        if (targetScanTimer > 0) return;
+        targetScanTimer = TARGET_SCAN_INTERVAL;
+        Character previous = currentTarget;
         currentTarget = discoverTarget();
+        if (currentTarget != previous) {
+            cachedTargetForBone = null;
+            cachedBoneNodes     = null;
+            cachedVisibleBone   = null;
+            cachedLoS           = false;
+            losCacheTimer       = 0;
+        }
     }
 
     /**
-     * Always rediscovers the nearest live hostile, then checks detectionRange and LoS.
-     * Calling discoverTarget() unconditionally prevents the stale-target bug where
-     * a cached (farther) target blocks detection of a new hostile that walked nearby.
+     * Throttled visibility check for patrol detection.  Shares the same scan
+     * timer as refreshTarget so the two never double-scan on the same frame.
      */
-    public boolean canSeeTarget() {
-        currentTarget = discoverTarget();
+    public boolean canSeeTarget(double delta) {
+        targetScanTimer -= delta;
+        if (targetScanTimer <= 0) {
+            targetScanTimer = TARGET_SCAN_INTERVAL;
+            Character previous = currentTarget;
+            currentTarget = discoverTarget();
+            if (currentTarget != previous) {
+                cachedTargetForBone = null;
+                cachedBoneNodes     = null;
+                cachedVisibleBone   = null;
+                cachedLoS           = false;
+                losCacheTimer       = 0;
+            }
+        }
         if (currentTarget == null) return false;
         float dist = (float) getGlobalPosition().distanceTo(currentTarget.getGlobalPosition());
         if (dist > detectionRange) return false;
-        return hasLineOfSight();
+        return hasLineOfSight(delta);
     }
 
-    /** Pure LoS check. Uses aimRay (same camera origin as the former SightRay). */
-    public boolean hasLineOfSight() {
+    /**
+     * Builds the priority-ordered bone list for the current target based on
+     * aimBodyPart.  Called once per target; the result is cached in cachedBoneNodes.
+     *
+     * Priority order expresses difficulty:
+     *   HEAD  → [neck_01, spine_03, spine_01]  hardest target first, body fallbacks
+     *   CHEST → [spine_03, spine_01, neck_01]  centre-mass first, head is last resort
+     *   BODY  → [spine_01, spine_03, thigh_l]  lower torso first, escalates upward
+     *   LEGS  → [thigh_l,  thigh_r,  spine_01] legs first, torso only if both legs covered
+     */
+    private void resolveTargetBones() {
+        cachedTargetForBone = currentTarget;
+        cachedVisibleBone   = null;
+        String[] names;
+        switch (aimBodyPart.toUpperCase()) {
+            case "HEAD":  names = new String[]{"neck_01",  "spine_03", "spine_01"}; break;
+            case "BODY":  names = new String[]{"spine_01", "spine_03", "thigh_l"};  break;
+            case "LEGS":  names = new String[]{"thigh_l",  "thigh_r",  "spine_01"}; break;
+            default:      names = new String[]{"spine_03", "spine_01", "neck_01"};  break; // CHEST
+        }
+        cachedBoneNodes = new Node3D[names.length];
+        for (int i = 0; i < names.length; i++) {
+            cachedBoneNodes[i] = (Node3D) currentTarget.getNodeOrNull(BONE_BASE_PATH + names[i]);
+        }
+    }
+
+    /**
+     * LoS check with a short result cache (~3 frames at 60 Hz).
+     * Walks the priority bone list in order — stops at the first exposed bone
+     * and stores it in cachedVisibleBone so getAimBonePosition() can use it.
+     * At most 3 forceRaycastUpdate calls per LOS_CACHE_INTERVAL in the worst case
+     * (all bones behind cover); typically 1 call when the preferred bone is clear.
+     */
+    public boolean hasLineOfSight(double delta) {
         if (currentTarget == null || aimRay == null) return false;
-        Vector3 bodyPos = ((Node3D) currentTarget.getNode(
-                "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone neck_01"))
-                .getGlobalPosition();
-        aimRay.setTargetPosition(aimRay.toLocal(bodyPos));
-        aimRay.forceRaycastUpdate();
-        if (!aimRay.isColliding()) return false;
-        return aimRay.getCollider() instanceof Node3D n && n.getOwner() == currentTarget;
+        losCacheTimer -= delta;
+        if (losCacheTimer > 0) return cachedLoS;
+        losCacheTimer = LOS_CACHE_INTERVAL;
+        if (currentTarget != cachedTargetForBone) resolveTargetBones();
+        if (cachedBoneNodes == null) { cachedLoS = false; return false; }
+        cachedVisibleBone = null;
+        for (Node3D bone : cachedBoneNodes) {
+            if (bone == null) continue;
+            aimRay.setTargetPosition(aimRay.toLocal(bone.getGlobalPosition()));
+            aimRay.forceRaycastUpdate();
+            if (aimRay.isColliding()
+                    && aimRay.getCollider() instanceof Node3D n
+                    && n.getOwner() == currentTarget) {
+                cachedVisibleBone = bone;
+                cachedLoS = true;
+                return true;
+            }
+        }
+        cachedLoS = false;
+        return false;
     }
 
     // ── Aim hardware ──────────────────────────────────────────────────────────
@@ -163,6 +256,17 @@ public class AICharacter extends Character {
         if (cameraRoot instanceof AICameraController cam) cam.clearAimTarget();
     }
 
+    /**
+     * AI-accessible direct stance transition.  Checks ceiling blocking and updates
+     * movement speed — both skipped in the base-class vehicle path.
+     * No antispam timer, no toggle: the AI drives stance directly.
+     */
+    public void forceSetStance(StanceName stanceName) {
+        if (isStanceBlocked(stanceName)) return;
+        super.forceSetStance(stanceName);
+        setMovementState(currentMovementType);
+    }
+
     public void snapAimRay(Vector3 worldTarget) {
         if (aimRay == null || worldTarget == null) return;
         aimRay.setTargetPosition(aimRay.toLocal(worldTarget));
@@ -173,18 +277,16 @@ public class AICharacter extends Character {
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone ";
 
     /**
-     * Returns the world position of the target bone determined by aimBodyPart.
-     * Used both for initial aim tracking and per-shot accuracy resolution.
+     * Returns the world position to aim at on the current target.
+     * Prefers the bone last confirmed exposed by hasLineOfSight() — no additional
+     * raycast needed since we already know it's clear.  Falls back to the first
+     * (preferred) bone in the priority list if the LoS result is stale.
      */
     public Vector3 getAimBonePosition() {
-        String boneName;
-        switch (aimBodyPart.toUpperCase()) {
-            case "HEAD":  boneName = "neck_01";  break;
-            case "BODY":  boneName = "spine_01"; break;
-            case "LEGS":  boneName = godot.global.GD.randf() > 0.5f ? "thigh_l" : "thigh_r"; break;
-            default:      boneName = "spine_03"; break;  // CHEST
-        }
-        return ((Node3D) currentTarget.getNode(BONE_BASE_PATH + boneName)).getGlobalPosition();
+        if (cachedVisibleBone != null) return cachedVisibleBone.getGlobalPosition();
+        if (cachedBoneNodes != null && cachedBoneNodes.length > 0 && cachedBoneNodes[0] != null)
+            return cachedBoneNodes[0].getGlobalPosition();
+        return ((Node3D) currentTarget.getNode(BONE_BASE_PATH + "neck_01")).getGlobalPosition();
     }
 
     /**

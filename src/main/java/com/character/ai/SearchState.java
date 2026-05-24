@@ -25,7 +25,7 @@ public class SearchState implements AIState {
 
     @Override
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
-        if (body.canSeeTarget()) {
+        if (body.canSeeTarget(delta)) {
             float dist = (float) body.getGlobalPosition()
                                      .distanceTo(body.getTarget().getGlobalPosition());
             if (dist <= body.attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;

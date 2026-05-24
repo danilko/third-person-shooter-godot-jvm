@@ -30,7 +30,7 @@ public class PatrolState implements AIState {
             cmd.desiredWeapon = bestWeapon;
         }
 
-        if (body.canSeeTarget()) {
+        if (body.canSeeTarget(delta)) {
             cmd.wantCombat = true;
             float dist = (float) body.getGlobalPosition()
                                      .distanceTo(body.getTarget().getGlobalPosition());

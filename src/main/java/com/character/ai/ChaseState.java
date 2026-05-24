@@ -22,7 +22,7 @@ public class ChaseState implements AIState {
     @Override
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
         // Re-evaluate nearest live hostile each frame so a closer threat is not ignored.
-        body.refreshTarget();
+        body.refreshTarget(delta);
         if (body.getTarget() == null) {
             return PatrolState.INSTANCE;
         }
@@ -31,14 +31,17 @@ public class ChaseState implements AIState {
                                  .distanceTo(body.getTarget().getGlobalPosition());
         cmd.wantCombat = true;
 
-        if (dist <= body.attackRange && body.hasLineOfSight()) {
+        // Evaluate LoS once and reuse — avoids two forced raycasts per frame.
+        boolean hasLoS = body.hasLineOfSight(delta);
+
+        if (dist <= body.attackRange && hasLoS) {
             if (!body.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
             return AttackState.INSTANCE;
         }
 
         cmd.movementType = MovementType.SPRINT;
 
-        if (body.hasLineOfSight()) {
+        if (hasLoS) {
             ctrl.resetLostTargetTimer();
             Vector3 targetPos = body.getTarget().getGlobalPosition();
             ctrl.setLastKnownTargetPosition(new Vector3(targetPos));

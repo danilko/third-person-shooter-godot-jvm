@@ -74,11 +74,16 @@ public class AIController extends Controller {
     double searchTimer      = 0.0;
     double stillTimer       = 0.0;
 
-    float   strafeX = 0f;
-    float   strafeZ = 0f;
+    float   strafeX        = 0f;
+    float   strafeZ        = 0f;
+    float   strafeFlipSide = 1f;   // alternates ±1 each refresh — no random flips
+
+    double stanceHoldTimer = 0.0;  // minimum time to hold a stance before switching
 
     Vector3 lastKnownTargetPosition = null;
     Vector3 currentAimTarget        = null;
+
+    StanceName intendedAttackStance = StanceName.UPRIGHT;
 
     // ── Attack-timer helpers ──────────────────────────────────────────────────
     public void    resetAttackTimer()             { attackTimer = 0.0; }
@@ -114,20 +119,20 @@ public class AIController extends Controller {
     public float   getStrafeZ()                  { return strafeZ; }
 
     public void refreshStrafe() {
+        strafeFlipSide = -strafeFlipSide;  // alternate left / right — predictable, no random flips
         if (lastKnownTargetPosition != null) {
             Vector3 toTarget = lastKnownTargetPosition.minus(getBody().getGlobalPosition());
             double len = toTarget.length();
             if (len > 0.1) {
-                float side = GD.randf() > 0.5f ? 1f : -1f;
-                strafeX = side * (float) (toTarget.getZ() / len);
-                strafeZ = side * (float) (-toTarget.getX() / len);
+                strafeX = strafeFlipSide * (float) (toTarget.getZ() / len);
+                strafeZ = strafeFlipSide * (float) (-toTarget.getX() / len);
                 strafeTimer = getBody().strafeChangeDuration;
                 return;
             }
         }
-        float angle = GD.randf() * (float) (Math.PI * 2.0);
-        strafeX = (float) Math.cos(angle);
-        strafeZ = (float) Math.sin(angle);
+        // Fallback: no known position yet — use current flip side along world X
+        strafeX = strafeFlipSide;
+        strafeZ = 0f;
         strafeTimer = getBody().strafeChangeDuration;
     }
 
@@ -150,6 +155,13 @@ public class AIController extends Controller {
     // ── Aim-target helpers ────────────────────────────────────────────────────
     public Vector3 getCurrentAimTarget()           { return currentAimTarget; }
     public void    setCurrentAimTarget(Vector3 t)  { currentAimTarget = t; }
+
+    // ── Combat-stance tracker + debounce ─────────────────────────────────────
+    public StanceName getIntendedAttackStance()             { return intendedAttackStance; }
+    public void       setIntendedAttackStance(StanceName s) { intendedAttackStance = s; }
+    public boolean    canChangeStance()                     { return stanceHoldTimer <= 0.0; }
+    public void       startStanceHoldTimer(double d)        { stanceHoldTimer = d; }
+    public void       tickStanceHoldTimer(double delta)     { if (stanceHoldTimer > 0) stanceHoldTimer = Math.max(0.0, stanceHoldTimer - delta); }
 
     // ── Suppression fire ──────────────────────────────────────────────────────
     public Vector3 computeSuppressTarget(float hDist) {
