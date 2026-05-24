@@ -89,15 +89,23 @@ public class Character extends CharacterBody3D implements Controllable {
 
     @RegisterProperty
     @Export
-    public NodePath cameraRootPath = new NodePath("CameraRoot");
+    public NodePath cameraRootPath = new NodePath("TPSCameraController");
 
     @RegisterProperty
     @Export
-    public NodePath aimTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget");
+    public NodePath fpsCameraRootPath = new NodePath("FPSCameraController");
 
     @RegisterProperty
     @Export
-    public NodePath aimRayPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay");
+    public NodePath aimTargetPath = new NodePath("ActiveCamera/AimRay/AimTarget");
+
+    @RegisterProperty
+    @Export
+    public NodePath aimRayPath = new NodePath("ActiveCamera/AimRay");
+
+    @RegisterProperty
+    @Export
+    public NodePath activeCameraPath = new NodePath("ActiveCamera");
 
     @RegisterProperty
     @Export
@@ -127,6 +135,16 @@ public class Character extends CharacterBody3D implements Controllable {
     @Export
     public int stanceOrdinal = StanceName.UPRIGHT.ordinal();
 
+    @Export
+    @RegisterProperty
+    public double ikTargetLerpSpeed = 12.0;
+
+    @Export
+    @RegisterProperty
+    public NodePath headMeshPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/head");
+
+    protected Node3D headMesh;
+
     protected Timer stanceAntispamTimer;
     protected Timer rollTimer;
     protected Health healthNode;
@@ -134,6 +152,10 @@ public class Character extends CharacterBody3D implements Controllable {
     protected RayCast3D aimRay;
 
     protected Node3D cameraRoot;
+    protected FPSCameraController fpsCameraController;
+    public boolean isFpsMode = false;
+    public final ControlRotation controlRotation = new ControlRotation();
+    public Camera3D activeCamera;
     protected PhysicalBoneSimulator3D physicalBoneSimulator;
 
     // ── Ragdoll freeze state ──────────────────────────────────────────────────
@@ -174,6 +196,18 @@ public class Character extends CharacterBody3D implements Controllable {
 
         if (hasNode(cameraRootPath)) {
             cameraRoot = (Node3D) getNode(cameraRootPath);
+        }
+        if (fpsCameraRootPath != null && !fpsCameraRootPath.isEmpty() && hasNode(fpsCameraRootPath)) {
+            Node fpsNode = getNode(fpsCameraRootPath);
+            if (fpsNode instanceof FPSCameraController fpsCtrl) {
+                fpsCameraController = fpsCtrl;
+            }
+        }
+        if (activeCameraPath != null && !activeCameraPath.isEmpty() && hasNode(activeCameraPath)) {
+            activeCamera = (Camera3D) getNode(activeCameraPath);
+        }
+        if (headMeshPath != null && !headMeshPath.isEmpty() && hasNode(headMeshPath)) {
+            headMesh = (Node3D) getNode(headMeshPath);
         }
         if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
             physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
@@ -257,6 +291,10 @@ public class Character extends CharacterBody3D implements Controllable {
         }
 
         // ── Aim target ─────────────────────────────────────────────────────
+        // Set directly so the spine IK always matches the actual bullet direction.
+        // Lerping caused the weapon to visually lag behind the crosshair when
+        // strafing: the bullet hit the new point while the weapon still pointed
+        // at the previous lerped target.
         if (input.aimTargetPosition != null && aimTarget != null) {
             aimTarget.setGlobalPosition(input.aimTargetPosition);
         }
@@ -667,12 +705,27 @@ public class Character extends CharacterBody3D implements Controllable {
      * Called by Vehicle.tryExit() when the player leaves the vehicle.
      */
     public void makeCameraActive() {
-        Node camNode = getNodeOrNull("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera");
-        if (camNode instanceof Camera3D cam) cam.makeCurrent();
+        if (activeCamera != null) activeCamera.makeCurrent();
     }
 
     public boolean isAlive() {
         return healthNode == null || !healthNode.isDead();
+    }
+
+    public void setHeadVisible(boolean visible) {
+        if (headMesh != null) headMesh.setVisible(visible);
+    }
+
+    public void applyRecoil(double pitchKick, double yawKick) {
+        controlRotation.recoilPitch -= pitchKick;
+        controlRotation.recoilYaw   += yawKick;
+    }
+
+    public void setCameraMode(boolean fps) {
+        isFpsMode = fps;
+        // ActiveCamera is the single rendering camera — no makeCurrent() switching needed.
+        // Controllers write their proxy transform to it each frame based on isFpsMode.
+        setHeadVisible(!fps);
     }
 
     // ── Override in subclasses ────────────────────────────────────────────────

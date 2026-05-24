@@ -2,15 +2,11 @@ package com.character;
 
 import godot.annotation.*;
 import godot.api.*;
-import godot.core.NodePath;
-import godot.core.Signal1;
-import godot.core.StringName;
-import godot.core.Vector2;
-import godot.core.Vector3;
+import godot.core.*;
 import godot.global.GD;
 
-@RegisterClass(className = "CameraController")
-public class CameraController extends Node3D {
+@RegisterClass(className = "TPSCameraController")
+public class TPSCameraController extends Node3D {
 
   @RegisterSignal
   public Signal1<Double> setCamRotation = new Signal1<>(this, new StringName("set_cam_rotation"));
@@ -25,7 +21,9 @@ public class CameraController extends Node3D {
   protected Node3D pitchNode;
   protected Node3D pivotNode;
   protected SpringArm3D springArm;
-  protected Camera3D camera;
+  protected Node3D proxyNode;
+  protected Camera3D activeCamera;
+  protected Character character;
 
   @Export
   @RegisterProperty
@@ -55,8 +53,7 @@ public class CameraController extends Node3D {
   @RegisterProperty
   public double fovTweenDuration = 0.5;
 
-  protected double yaw = 0.0;
-  protected double pitch = 0.0;
+  protected ControlRotation controlRotation;
 
   private Vector3 positionOffset = new Vector3(0, 0.8, 0);
   private Vector3 positionOffsetTarget = new Vector3(0, 0.8, 0);
@@ -67,11 +64,6 @@ public class CameraController extends Node3D {
   private double cameraFov = 0.0;
   protected boolean combat = false;
 
-  // Recoil offsets added per shot, decaying toward zero each frame.
-  // Kept separate from pitch/yaw (mouse intent) so recovery never fights mouse aim.
-  private double recoilPitch = 0.0;
-  private double recoilYaw   = 0.0;
-
   @Export
   @RegisterProperty
   public double recoilRecoverySpeed = 8.0;
@@ -81,14 +73,24 @@ public class CameraController extends Node3D {
   @RegisterFunction
   @Override
   public void _ready() {
-    yawNode = (Node3D) getNode(new NodePath("Yaw"));
-    pitchNode = (Node3D) getNode(new NodePath("Yaw/Pitch"));
-    pivotNode = (Node3D) getNode(new NodePath("Yaw/Pitch/Pivot"));
+    yawNode   = (Node3D)      getNode(new NodePath("Yaw"));
+    pitchNode = (Node3D)      getNode(new NodePath("Yaw/Pitch"));
+    pivotNode = (Node3D)      getNode(new NodePath("Yaw/Pitch/Pivot"));
     springArm = (SpringArm3D) getNode(new NodePath("Yaw/Pitch/Pivot/SpringArm"));
-    camera = (Camera3D) getNode(new NodePath("Yaw/Pitch/Pivot/SpringArm/Camera"));
-
+    proxyNode = (Node3D)      getNode(new NodePath("Yaw/Pitch/Pivot/SpringArm/Proxy"));
     if (player != null) {
       springArm.addExcludedObject(player.getRid());
+    }
+
+
+    if (player instanceof Character c) {
+      character    = c;
+      activeCamera = c.activeCamera;
+      controlRotation = c.controlRotation;
+      controlRotation.pitchMin = pitchMin;
+      controlRotation.pitchMax = pitchMax;
+    } else {
+      controlRotation = new ControlRotation();
     }
 
     setAsTopLevel(true);
@@ -104,7 +106,7 @@ public class CameraController extends Node3D {
 
   public void changeShoulderDirection() {
     shoulderDirection = shoulderDirection * -1;
-    positionOffsetTarget.setX(positionOffsetTarget.getX() * shoulderDirection);
+    positionOffsetTarget.setX(-positionOffsetTarget.getX());
     setCameraFov();
   }
 
@@ -112,51 +114,54 @@ public class CameraController extends Node3D {
   @Override
   public void _physicsProcess(double delta) {
     Vector2 lookDelta = gatherLookInput(delta);
-    yaw   += lookDelta.getX();
-    pitch += lookDelta.getY();
+    controlRotation.yaw   += lookDelta.getX();
+    controlRotation.pitch += lookDelta.getY();
 
-    // Position interpolation
+    // TPS positioning: smooth shoulder-offset follow.
     positionOffset = positionOffset.lerp(positionOffsetTarget, shoulderOffsetLerpSpeed * delta);
-
-    // Apply shoulder offset along yaw's right vector (camera-relative), not world X.
     Vector3 playerBase = player.getGlobalPosition().plus(new Vector3(0, positionOffset.getY(), 0));
     Vector3 yawRight   = yawNode.getGlobalTransform().getBasis().getX();
     Vector3 targetPos  = playerBase.plus(yawRight.times(positionOffset.getX()));
-
-    // Tighten follow speed in combat to prevent SpringArm casting from wrong position.
-    float followSpeedWeight = combat ? 1 : (float) (followLerpSpeed * delta);
+    float followSpeedWeight = combat ? 1.0f : (float) (followLerpSpeed * delta);
     setGlobalPosition(getGlobalPosition().lerp(targetPos, followSpeedWeight));
-
     springArm.setLength(GD.lerp(springArm.getLength(), springArmLengthTarget, followSpeedWeight));
 
     // Clamp clean mouse-intent pitch
-    pitch = GD.clamp(pitch, pitchMin, pitchMax);
+    controlRotation.pitch = GD.clamp(controlRotation.pitch, pitchMin, pitchMax);
 
     // Decay recoil offsets toward zero each frame
-    recoilPitch = GD.lerp(recoilPitch, 0.0, recoilRecoverySpeed * delta);
-    recoilYaw   = GD.lerp(recoilYaw,   0.0, recoilRecoverySpeed * delta);
+    controlRotation.recoilPitch = GD.lerp(controlRotation.recoilPitch, 0.0, recoilRecoverySpeed * delta);
+    controlRotation.recoilYaw   = GD.lerp(controlRotation.recoilYaw,   0.0, recoilRecoverySpeed * delta);
 
     Vector3 yawRot = yawNode.getRotationDegrees();
-    yawRot.setY(yaw + recoilYaw);
+    yawRot.setY(controlRotation.yaw + controlRotation.recoilYaw);
     yawNode.setRotationDegrees(yawRot);
 
     Vector3 pitchRot = pitchNode.getRotationDegrees();
-    pitchRot.setX(GD.clamp(pitch + recoilPitch, pitchMin, pitchMax));
+    pitchRot.setX(GD.clamp(controlRotation.pitch + controlRotation.recoilPitch, pitchMin, pitchMax));
     pitchNode.setRotationDegrees(pitchRot);
 
     setCamRotation.emit(yawNode.getRotation().getY());
+
+    // Write this frame's TPS view transform to the shared ActiveCamera when in TPS mode.
+    // The Proxy is a child of SpringArm; Godot's SpringArm3D C++ positions it at
+    // (0, 0, -current_spring_length) in local space each physics step, correctly
+    // handling collision shortening. Reading its global transform is always exact.
+    if (activeCamera != null && (character == null || !character.isFpsMode)) {
+        activeCamera.setGlobalTransform(proxyNode.getGlobalTransform());
+    }
   }
 
   /** Adds a per-shot kick (degrees) that decays back to zero at recoilRecoverySpeed. */
   public void applyRecoil(double pitchKick, double yawKick) {
-    // Looking up is negative pitch, so kick upward by subtracting.
-    recoilPitch -= pitchKick;
-    recoilYaw   += yawKick;
+    // TPS: double-180°Y cancellation makes positive pitch = look down, so subtract to kick up.
+    controlRotation.recoilPitch -= pitchKick;
+    controlRotation.recoilYaw   += yawKick;
   }
 
   @RegisterFunction
   public void onSetCombatState(CombatState combatState) {
-    combat = combatState.isCombat();
+    combat    = combatState.isCombat();
     cameraFov = combatState.cameraFov;
     positionOffsetTarget.setX(combatState.cameraShoulderOffset * shoulderDirection);
     springArmLengthTarget = (float) combatState.cameraDistance;
@@ -170,6 +175,13 @@ public class CameraController extends Node3D {
   }
 
   private void setCameraFov() {
+    // activeCamera is assigned from character.activeCamera in _ready(), but _ready() runs
+    // bottom-up: this node's _ready() fires before Character._ready() assigns activeCamera.
+    // Resolve it lazily here so the first changedMovementState/changedCombatState signal
+    // from Character._ready() still applies the correct FoV.
+    if (activeCamera == null && character != null) activeCamera = character.activeCamera;
+    if (activeCamera == null) return;
+
     if (tween != null && tween.isValid()) {
       tween.kill();
     }
@@ -177,7 +189,7 @@ public class CameraController extends Node3D {
     double targetFov = combat ? cameraFov : movementFov;
 
     tween = createTween();
-    tween.tweenProperty(camera, "fov", targetFov, fovTweenDuration)
+    tween.tweenProperty(activeCamera, "fov", targetFov, fovTweenDuration)
          .setTrans(Tween.TransitionType.SINE)
          .setEase(Tween.EaseType.OUT);
   }

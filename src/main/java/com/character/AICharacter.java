@@ -50,11 +50,18 @@ public class AICharacter extends Character {
     @Export @RegisterProperty public float strafeChangeDuration = 1f;
     @Export @RegisterProperty public float suppressionDuration  = 1.5f;
 
+    /** How long (seconds) the AI stops after each shot before resuming strafe. */
+    @Export @RegisterProperty public float shootStillDuration   = 0.25f;
+    /**
+     * Fraction of hitChance lost when moving at full walk speed (0 = no penalty, 1 = zero accuracy).
+     * At half walk speed the penalty is halved. Stationary AI always fires at full hitChance.
+     */
+    @Export @RegisterProperty public float moveAccuracyPenalty  = 0.75f;
+
     private static final float AMMO_REFILL_ARRIVAL_THRESHOLD = 1.5f;
 
     // ── AI hardware ───────────────────────────────────────────────────────────
     private NavigationAgent3D navAgent;
-    private RayCast3D         sightRay;
 
     // ── Body state ────────────────────────────────────────────────────────────
     private boolean   isDead        = false;
@@ -68,12 +75,9 @@ public class AICharacter extends Character {
         useWeaponSpread = false;
         super._ready();
         navAgent = (NavigationAgent3D) getNode("NavigationAgent3D");
-        sightRay = (RayCast3D) getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SightRay");
 
-        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
-            Node child = physicalBoneSimulator.getChild(i);
-            if (child instanceof PhysicalBone3D bone) sightRay.addException(bone);
-        }
+        // aimRay serves as the LoS ray (same camera origin as the former SightRay).
+        // Bone exceptions are already added by Character._ready() via aimRayPath.
         spawnPosition = new Vector3(getGlobalPosition());
 
         // Start the FSM now that all body hardware is ready.
@@ -136,17 +140,16 @@ public class AICharacter extends Character {
         return hasLineOfSight();
     }
 
-    /** Pure LoS check — never moves the camera. */
+    /** Pure LoS check. Uses aimRay (same camera origin as the former SightRay). */
     public boolean hasLineOfSight() {
-        if (currentTarget == null || sightRay == null) return false;
+        if (currentTarget == null || aimRay == null) return false;
         Vector3 bodyPos = ((Node3D) currentTarget.getNode(
                 "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone neck_01"))
                 .getGlobalPosition();
-        sightRay.setTargetPosition(sightRay.toLocal(bodyPos));
-        sightRay.forceRaycastUpdate();
-        if (!sightRay.isColliding()) return false;
-        return sightRay.getCollider() instanceof Node3D
-                && ((Node3D) sightRay.getCollider()).getOwner() == currentTarget;
+        aimRay.setTargetPosition(aimRay.toLocal(bodyPos));
+        aimRay.forceRaycastUpdate();
+        if (!aimRay.isColliding()) return false;
+        return aimRay.getCollider() instanceof Node3D n && n.getOwner() == currentTarget;
     }
 
     // ── Aim hardware ──────────────────────────────────────────────────────────
@@ -182,6 +185,18 @@ public class AICharacter extends Character {
             default:      boneName = "spine_03"; break;  // CHEST
         }
         return ((Node3D) currentTarget.getNode(BONE_BASE_PATH + boneName)).getGlobalPosition();
+    }
+
+    /**
+     * hitChance scaled down by current velocity — stationary = full accuracy,
+     * walking at reference speed (4 m/s) = hitChance × (1 − moveAccuracyPenalty).
+     * The stillTimer in AttackState keeps velocity near zero at fire time so the
+     * AI naturally fires at full hitChance after its stop-to-shoot pause.
+     */
+    public float computeEffectiveHitChance() {
+        float speed       = (float) getVelocity().length();
+        float moveFactor  = Math.min(1.0f, speed / 4.0f);
+        return hitChance * (1.0f - moveFactor * moveAccuracyPenalty);
     }
 
     /**

@@ -23,7 +23,6 @@ public class FirearmItem extends WeaponItem {
   // Injected by WeaponController after weapon discovery
   private CharacterBody3D owningCharacter;
   private RayCast3D aimRay3D;
-  private CameraController cameraController;
   private GPUParticles3D muzzleFlashFx;
   private AnimationPlayer muzzleFlashAnimPlayer;
   private AudioStreamPlayer3D weaponAudio;
@@ -49,11 +48,10 @@ public class FirearmItem extends WeaponItem {
    * Provides all character-level references that cannot be resolved from inside the
    * weapon sub-scene. Pass null for all arguments to clear refs when returning to a pickup.
    */
-  public void setup(CharacterBody3D character, RayCast3D aimRay, CameraController cam,
+  public void setup(CharacterBody3D character, RayCast3D aimRay,
                     BoneAttachment3D neckAttachment, AudioStreamPlayer3D audio) {
     this.owningCharacter = character;
     this.aimRay3D = aimRay;
-    this.cameraController = cam;
     this.muzzleFlashFx = neckAttachment != null ? (GPUParticles3D) neckAttachment.getNode("MuzzleFlash") : null;
     this.muzzleFlashAnimPlayer = neckAttachment != null ? (AnimationPlayer) neckAttachment.getNode("AnimationPlayer") : null;
     this.weaponAudio = audio;
@@ -133,9 +131,9 @@ public class FirearmItem extends WeaponItem {
   }
 
   private void applyRecoil() {
-    if (cameraController == null) return;
+    if (!(owningCharacter instanceof Character c)) return;
     float horizRecoil = (float) GD.randfRange(-recoil * 0.3f, recoil * 0.3f);
-    cameraController.applyRecoil(recoil, horizRecoil);
+    c.applyRecoil(recoil, horizRecoil);
   }
 
   private void performHitscan() {

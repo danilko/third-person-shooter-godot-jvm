@@ -201,20 +201,38 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 
 ## 🎮 Controls
 
-| Action                   | Input                        |
-|:-------------------------|:-----------------------------|
-| **Move**                 | `W` `A` `S` `D`              |
-| **Jump / Double Jump**   | `Space`                      |
-| **Roll**                 | `Ctrl` + Direction           |
-| **Crouch / Crawl**       | `C` / `V`                    |
-| **Aim / Fire**           | `Mouse Right` / `Mouse Left` |
-| **Reload**               | `R`                          |
-| **Switch Weapon**        | `G`                          |
-| **Drop Weapon**          | `F`                          |
-| **Equip/Use**            | `E`                          |
-| **Swap Camera Shoulder** | `Q`                          |
-| **Menu**                 | `Esc`                        |
+### On Foot
 
+| Action                                  | Input                        |
+|:----------------------------------------|:-----------------------------|
+| **Move**                                | `W` `A` `S` `D`              |
+| **Jump / Double Jump**                  | `Space`                      |
+| **Roll (Third Person)**                 | `C` + Direction              |
+| **Crouch (Hold) / Crawl (Hold)**        | `Ctrl` / `Shift`             |
+| **Aim (Third Person) / Fire**           | `Mouse Right` / `Mouse Left` |
+| **Reload**                              | `R`                          |
+| **Switch Weapon**                       | `G`                          |
+| **Drop Weapon**                         | `F`                          |
+| **Equip/Use/Enter**                     | `E`                          |
+| **Swap Camera Shoulder (Third Person)** | `Q`                          |
+| **View Change to FPS/TPS**              | `Q`                          |
+| **Menu**                                | `Esc`                        |
+
+### On Vehicle
+
+| Action                                  | Input                        |
+|:----------------------------------------|:-----------------------------|
+| **Accelerate/Back**                     | `W` `S`                      |
+| **Steer**                               | `A` `D`                      |
+| **Handbreak**                           | `Space`                      |
+| **Ctrl**                                | `Break`                      |
+| **Aim (Hold to change angle) / Fire**   | `Mouse Right` / `Mouse Left` |
+| **Reload**                              | `R`                          |
+| **Switch Weapon**                       | `G`                          |
+| **Drop Weapon**                         | `F`                          |
+| **Exit**                                | `E`                          |
+| **Swap Camera Shoulder (Third Person)** | `Q`                          |
+| **Menu**                                | `Esc`                        |
 ---
 
 ## 📚 Credits & Assets

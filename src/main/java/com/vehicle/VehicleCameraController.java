@@ -1,5 +1,6 @@
 package com.vehicle;
 
+import com.character.CameraMode;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -48,15 +49,18 @@ public class VehicleCameraController extends Node3D {
     @RegisterProperty @Export public float minPitch          = -1.2f;
     @RegisterProperty @Export public float maxPitch          =  0.2f;
 
+    @RegisterProperty @Export public Node3D fpsCameraMount;
+
     private static final float DEFAULT_PITCH = -0.3f;
 
     private Node3D    target;
     private Camera3D  camera3D;
     private RayCast3D aimRay;
 
-    private boolean passengerAimMode = false;
-    private float   yaw   = 0f;
-    private float   pitch = DEFAULT_PITCH;
+    private CameraMode cameraMode       = CameraMode.TPS;
+    private boolean    passengerAimMode = false;
+    private float      yaw              = 0f;
+    private float      pitch            = DEFAULT_PITCH;
 
     @RegisterFunction
     @Override
@@ -82,6 +86,16 @@ public class VehicleCameraController extends Node3D {
         } else {
             pitch = DEFAULT_PITCH;
         }
+    }
+
+    public void setCameraMode(CameraMode mode) {
+        cameraMode = mode;
+        if (mode == CameraMode.FPS) {
+            // Seed from vehicle heading so the cockpit camera starts facing forward.
+            yaw   = (float) target.getGlobalRotation().getY();
+            pitch = DEFAULT_PITCH;
+        }
+        // TPS: follow-cam resumes naturally on next _physicsProcess — nothing to reset.
     }
 
     /**
@@ -115,37 +129,40 @@ public class VehicleCameraController extends Node3D {
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
+        // View toggle — once-per-press, same pattern as PlayerCameraController.
+        if (camera3D.isCurrent() && INSTANCE.isActionJustPressed("view", false)) {
+            setCameraMode(cameraMode == CameraMode.FPS ? CameraMode.TPS : CameraMode.FPS);
+        }
+
         Vector3 vehiclePos = target.getGlobalPosition();
         float   vehicleYaw = (float) target.getGlobalRotation().getY();
 
-        // ── Position: world-space distance clamping ──────────────────────────
-        // Camera maintains its current world-space offset from the vehicle,
-        // clamped to [minDistance, maxDistance] at a fixed height.  No explicit
-        // yaw-follow parameter needed — the vehicle driving forward naturally
-        // pulls the camera back into position, giving the organic drag-through-
-        // turns feel of the original follow-cam.
-        Vector3 fromTarget = camera3D.getGlobalPosition().minus(vehiclePos);
-        float len = (float) fromTarget.length();
-        if (len < 0.001f) {
-            // Camera exactly at vehicle centre — push it back along world +Z.
-            fromTarget = new Vector3(0f, 0f, minDistance);
-        } else if (len < minDistance) {
-            fromTarget = fromTarget.normalized().times(minDistance);
-        } else if (len > maxDistance) {
-            fromTarget = fromTarget.normalized().times(maxDistance);
+        // ── Position: mode-dependent ─────────────────────────────────────────
+        if (cameraMode == CameraMode.FPS) {
+            if (fpsCameraMount != null)
+                camera3D.setGlobalPosition(fpsCameraMount.getGlobalPosition());
+        } else {
+            // TPS: world-space distance clamping — original follow-cam logic.
+            // Camera maintains its current world-space offset from the vehicle,
+            // clamped to [minDistance, maxDistance] at a fixed height.
+            Vector3 fromTarget = camera3D.getGlobalPosition().minus(vehiclePos);
+            float len = (float) fromTarget.length();
+            if (len < 0.001f) {
+                fromTarget = new Vector3(0f, 0f, minDistance);
+            } else if (len < minDistance) {
+                fromTarget = fromTarget.normalized().times(minDistance);
+            } else if (len > maxDistance) {
+                fromTarget = fromTarget.normalized().times(maxDistance);
+            }
+            fromTarget.setY(height);
+            camera3D.setGlobalPosition(vehiclePos.plus(fromTarget));
         }
-        fromTarget.setY(height);
-        camera3D.setGlobalPosition(vehiclePos.plus(fromTarget));
 
-        // ── Orientation ──────────────────────────────────────────────────────
+        // ── Orientation: identical in both modes ─────────────────────────────
         if (passengerAimMode && isAimingOrFiring()) {
-            // Active aim: camera looks where the player is pointing.
             camera3D.setGlobalRotation(new Vector3(pitch, yaw, 0f));
         } else {
-            // Follow / recovery: always look at the vehicle centre.
             if (passengerAimMode) {
-                // Bleed aim angles back toward vehicle heading while the player
-                // is not shooting, so the next aim starts from a sensible angle.
                 yaw   = (float) GD.lerpAngle(yaw,   vehicleYaw,   aimRecoverySpeed * delta);
                 pitch = (float) GD.lerp(pitch, (double) DEFAULT_PITCH, aimRecoverySpeed * delta);
             }

@@ -1,8 +1,10 @@
 package com.character;
 
 import com.vehicle.Vehicle;
+import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
+import godot.annotation.RegisterProperty;
 import godot.api.Input;
 import godot.api.Timer;
 import godot.core.Vector3;
@@ -30,6 +32,10 @@ import godot.core.Vector3;
 public class PlayerController extends Controller {
 
     private static final int BUFFER_SIZE = 64;
+
+    @Export
+    @RegisterProperty
+    public float minIkDist = 1.5f;
 
     // ── Client-side prediction state ──────────────────────────────────────────
     private int              localSequence    = 0;
@@ -81,6 +87,8 @@ public class PlayerController extends Controller {
         Input inp = Input.INSTANCE;
         Player body = cachedPlayer;
 
+        boolean isFps = body.isFpsMode;
+
         // ── Movement ──────────────────────────────────────────────────────────
         // Signs match Godot's -Z-forward convention: W → moveZ = -1 (world -Z = forward).
         // Left/right: D (+X) = camera-right, A (-X) = camera-left.
@@ -95,31 +103,43 @@ public class PlayerController extends Controller {
         }
 
         // ── Combat / aim ──────────────────────────────────────────────────────
-        boolean aimOrFire = inp.isActionPressed("aim", false)
-                         || inp.isActionPressed("fire", false);
+        if (isFps) {
+            cmd.wantCombat = true;
+        } else {
+            boolean aimOrFire = inp.isActionPressed("aim", false)
+                             || inp.isActionPressed("fire", false);
 
-        Timer aimStayTimer = cachedAimStayTimer;
-        if (aimOrFire) {
-            aimStayTimer.stop();
-        } else if (body.isCombat() && (inp.isActionJustReleased("aim", false)
-                                    || inp.isActionJustReleased("fire", false))) {
-            aimStayTimer.start();
+            Timer aimStayTimer = cachedAimStayTimer;
+            if (aimOrFire) {
+                aimStayTimer.stop();
+            } else if (body.isCombat() && (inp.isActionJustReleased("aim", false)
+                                        || inp.isActionJustReleased("fire", false))) {
+                aimStayTimer.start();
+            }
+            cmd.wantCombat = aimOrFire || (body.isCombat() && !aimStayTimer.isStopped());
         }
 
-        cmd.wantCombat = aimOrFire || (body.isCombat() && !aimStayTimer.isStopped());
-
-        // ── Aim target ────────────────────────────────────────────────────────
+        // ── Aim target (IK-clamped; hitscan still uses aimRay directly) ─────────
         if (cmd.wantCombat) {
             Vector3 rayDeg = body.aimRay.getRotationDegrees();
             body.aimRay.setRotationDegrees(new Vector3(rayDeg.getX(), 0.0f, 0.0f));
 
-            if (body.aimRay.isColliding() &&
-                    body.aimRay.getCollisionPoint()
-                               .minus(body.aimRay.getGlobalTransform().getOrigin())
-                               .length() > 0.1) {
-                cmd.aimTargetPosition = body.aimRay.getCollisionPoint();
+            Vector3 rayOrigin = body.aimRay.getGlobalTransform().getOrigin();
+            Vector3 farPoint  = body.aimRay.toGlobal(body.aimRay.getTargetPosition());
+
+            if (body.aimRay.isColliding()) {
+                Vector3 hit  = body.aimRay.getCollisionPoint();
+                float   dist = (float) hit.minus(rayOrigin).length();
+                if (dist >= minIkDist) {
+                    cmd.aimTargetPosition = hit;
+                } else {
+                    // Too close: push along the ray direction to keep IK pose natural.
+                    // Bullets still hit the real collision point via aimRay.
+                    Vector3 dir = farPoint.minus(rayOrigin).normalized();
+                    cmd.aimTargetPosition = rayOrigin.plus(dir.times(minIkDist));
+                }
             } else {
-                cmd.aimTargetPosition = body.aimRay.toGlobal(body.aimRay.getTargetPosition());
+                cmd.aimTargetPosition = farPoint;
             }
         }
 
@@ -128,13 +148,23 @@ public class PlayerController extends Controller {
         cmd.reload  = inp.isActionJustPressed("reload", false);
         cmd.drop    = inp.isActionJustPressed("drop", false);
         cmd.jump    = inp.isActionJustPressed("jump", false);
-        cmd.roll    = inp.isActionJustPressed("roll", false);
+        cmd.roll    = !isFps && inp.isActionJustPressed("roll", false);
 
+        // Hold-to-hold crouch/crawl.
+        // setStance() has a built-in toggle (same == current → UPRIGHT), so we must only
+        // call it on the key-press and key-release edges — not every frame while held.
+        // justPressed  → enter the stance (fires once per press, toggle goes standing→crouched)
+        // justReleased → request UPRIGHT (fires once on release, toggle goes crouched→standing)
+        // neither      → desiredStance stays null, applyInput skips the setStance call
         for (String stanceKey : body.stances.keys()) {
-            // DRIVE_CARRIER is set programmatically on vehicle entry, not by player input.
             if (StanceName.DRIVE_CARRIER.getKey().equals(stanceKey)) continue;
-            if (inp.isActionJustPressed(stanceKey.toLowerCase(), false)) {
+            String key = stanceKey.toLowerCase();
+            if (inp.isActionJustPressed(key, false)) {
                 cmd.desiredStance = StanceName.fromKey(stanceKey);
+                break;
+            }
+            if (inp.isActionJustReleased(key, false)) {
+                cmd.desiredStance = StanceName.UPRIGHT;
                 break;
             }
         }

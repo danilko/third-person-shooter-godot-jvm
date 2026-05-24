@@ -18,10 +18,7 @@ public class WeaponController extends Node {
   @RegisterProperty @Export public AnimationController animationController;
 
   @RegisterProperty @Export
-  public NodePath aimRayPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay");
-
-  @RegisterProperty @Export
-  public NodePath cameraControllerPath = new NodePath("CameraRoot");
+  public NodePath aimRayPath = new NodePath("ActiveCamera/AimRay");
 
   @RegisterProperty @Export
   public NodePath weaponAttachmentPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment");
@@ -63,7 +60,6 @@ public class WeaponController extends Node {
 
   private RayCast3D aimRay;
   private RayCast3D originalAimRay;
-  private CameraController cam;
 
   private Timer transitionTimer;
   private Timer fireTimer;
@@ -132,8 +128,6 @@ public class WeaponController extends Node {
     if (getOwner().hasNode(aimRayPath)) {
       aimRay = (RayCast3D) getOwner().getNode(aimRayPath);
     }
-    Node camNode = getOwner().getNode(cameraControllerPath);
-    if (camNode instanceof CameraController c) cam = c;
 
     // Discover weapons pre-placed inside attachment markers in the scene
     Node attachment = getOwner().getNodeOrNull(weaponAttachmentPath);
@@ -384,7 +378,7 @@ public class WeaponController extends Node {
 
   private void injectCharacterRefs(WeaponItem item) {
     if (item instanceof FirearmItem fi) {
-      fi.setup((CharacterBody3D) getOwner(), aimRay, cam, neckBoneAttachement, weaponAudio);
+      fi.setup((CharacterBody3D) getOwner(), aimRay, neckBoneAttachement, weaponAudio);
     }
   }
 
@@ -430,7 +424,7 @@ public class WeaponController extends Node {
    * frozen body, so onReturnedToWorld() unfreezes before we set position.
    */
   private void returnWeaponToWorld(WeaponItem item, Vector3 spawnPos, Vector3 impulse) {
-    if (item instanceof FirearmItem fi) fi.setup(null, null, null, null, null);
+    if (item instanceof FirearmItem fi) fi.setup(null, null, null, null);
     item.show();
     item.reparent(getTree().getCurrentScene(), true);
     item.onReturnedToWorld();

@@ -166,7 +166,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
             if (wi instanceof FirearmItem fi && getWeaponMode() == VehicleWeaponMode.VEHICLE_WEAPON) {
                 Node aimRayNode = getNodeOrNull(vehicleAimRayPath.getPath());
                 RayCast3D vRay = aimRayNode instanceof RayCast3D r ? r : null;
-                fi.setup(null, vRay, null, null, null);
+                fi.setup(null, vRay, null, null);
             }
         }
 
