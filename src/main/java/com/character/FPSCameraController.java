@@ -4,7 +4,6 @@ import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
-import godot.api.Node;
 import godot.api.Node3D;
 import godot.core.Vector3;
 import godot.global.GD;

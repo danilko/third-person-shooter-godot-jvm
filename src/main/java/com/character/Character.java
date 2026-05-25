@@ -10,7 +10,6 @@ import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
 
-import java.lang.Math;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -136,10 +135,6 @@ public class Character extends CharacterBody3D implements Controllable {
     @RegisterProperty
     @Export
     public int stanceOrdinal = StanceName.UPRIGHT.ordinal();
-
-    @Export
-    @RegisterProperty
-    public double ikTargetLerpSpeed = 12.0;
 
     @Export
     @RegisterProperty

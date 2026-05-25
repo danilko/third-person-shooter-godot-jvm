@@ -48,10 +48,6 @@ public class AnimationController extends Node {
   @RegisterProperty
   public double floorBlendSpeed = 10.0;
 
-  private int weapon = 0;
-  private int pendingWeapon = -1;
-  private static final double WEAPON_SWAP_DELAY = 0.3;
-
   private double onFloorBlend = 1.0;
   private double onFloorBlendTarget = 1.0;
   private Tween tween;

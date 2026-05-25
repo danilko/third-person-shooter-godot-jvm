@@ -43,28 +43,13 @@ public class MovementController extends Node {
   @RegisterProperty
   public boolean worldSpaceMovement = false;
 
-  /**
-   * When true the character faces the camera direction in combat (Player).
-   * When false it faces the movement direction regardless of combat state (Enemy/AI).
-   */
-  @Export
-  @RegisterProperty
-  public boolean faceCameraInCombat = true;
-
   private double camRotation = 0.0;
   private double playerInitRotation = 0.0;
   private boolean combat = false;
   private double combatSpeedFactor = 1.0;
   private double combatAccelerationFactor = 1.0;
   private boolean rolling = false;
-  private double rollTimer = 0.0;
   private double rollSpeed = 0.0;
-  private Stance stance;
-  private MovementType currentMovementType = MovementType.IDLE;
-
-  @RegisterProperty
-  @Export
-  public WeaponController weaponController;
 
   /** Downward speed (m/s) required before any fall damage is dealt. 0 disables fall damage. */
   @Export
@@ -138,7 +123,7 @@ public class MovementController extends Node {
       // During roll: always face movement direction, even in combat
       targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
     } else if (combat && !worldSpaceMovement) {
-      // Face camera direction (Player only — set faceCameraInCombat=false for AI/Enemy)
+      // Face camera direction (Player only; worldSpaceMovement=true prevents this for AI/Enemy)
       targetRotation = camRotation;
     } else {
       // Face movement direction (only when actually moving)
@@ -160,13 +145,11 @@ public class MovementController extends Node {
 
   @RegisterFunction
   public void onSetStance(Stance stance) {
-    this.stance = stance;
   }
 
   @RegisterFunction
   public void roll(RollState rollState) {
     rolling = true;
-    rollTimer = rollState.getRollDuration();
     rollSpeed = rollState.getRollSpeed();
   }
 
@@ -185,7 +168,6 @@ public class MovementController extends Node {
   public void onSetMovementState(MovementState movementState) {
     speed = movementState.getMovementSpeed() * combatSpeedFactor;
     acceleration = movementState.getAcceleration() * combatAccelerationFactor;
-    currentMovementType = MovementType.fromId(movementState.getId());
   }
 
   @RegisterFunction

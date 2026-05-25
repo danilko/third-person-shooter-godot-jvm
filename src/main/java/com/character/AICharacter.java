@@ -76,7 +76,8 @@ public class AICharacter extends Character {
     private static final double     LOS_CACHE_INTERVAL   = 0.05;
 
     // ── AI hardware ───────────────────────────────────────────────────────────
-    private NavigationAgent3D navAgent;
+    private NavigationAgent3D  navAgent;
+    private AICameraController aiCamera;
 
     // ── Body state ────────────────────────────────────────────────────────────
     private boolean   isDead        = false;
@@ -100,6 +101,7 @@ public class AICharacter extends Character {
         useWeaponSpread = false;
         super._ready();
         navAgent = (NavigationAgent3D) getNode("NavigationAgent3D");
+        if (cameraRoot instanceof AICameraController ac) aiCamera = ac;
 
         // aimRay serves as the LoS ray (same camera origin as the former SightRay).
         // Bone exceptions are already added by Character._ready() via aimRayPath.
@@ -248,12 +250,12 @@ public class AICharacter extends Character {
     // ── Aim hardware ──────────────────────────────────────────────────────────
 
     public void aimAtPosition(Vector3 target, double delta) {
-        if (!(cameraRoot instanceof AICameraController cam) || target == null) return;
-        cam.setAimTarget(target);
+        if (aiCamera == null || target == null) return;
+        aiCamera.setAimTarget(target);
     }
 
     public void clearCameraAimTarget() {
-        if (cameraRoot instanceof AICameraController cam) cam.clearAimTarget();
+        if (aiCamera != null) aiCamera.clearAimTarget();
     }
 
     /**
