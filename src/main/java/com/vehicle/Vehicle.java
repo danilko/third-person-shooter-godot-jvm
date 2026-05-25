@@ -238,10 +238,16 @@ public class Vehicle extends RigidBody3D implements Controllable {
             setCenterOfMass(Vector3.Companion.getDOWN().times(0.5f));
         }
 
-        // Keep occupant hitbox pinned to the driver seat each frame (position only).
-        // Rotation was aligned once in tryEnter; exitDriveState restores pre-entry rotation.
+        // Keep occupant pinned to the driver seat each frame.
+        // Yaw is synced to vehicle heading so SpineAimModifier can reach aim targets that are
+        // in the vehicle's forward arc. Only Y is written; X/Z are untouched (no roll/pitch
+        // artefacts). preDriveRotation in Character saves the pre-entry rotation and restores
+        // it in exitDriveState, so this per-frame sync does not corrupt on-foot movement.
         if (occupant != null && driverSeatNode != null) {
             occupant.setGlobalPosition(driverSeatNode.getGlobalPosition());
+            Vector3 occRot = occupant.getGlobalRotation();
+            occRot.setY((float) getGlobalRotation().getY());
+            occupant.setGlobalRotation(occRot);
         }
 
         // Relay weapon commands to occupant based on weapon mode.
