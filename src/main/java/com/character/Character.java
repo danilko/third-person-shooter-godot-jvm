@@ -124,8 +124,9 @@ public class Character extends CharacterBody3D implements Controllable {
 
     // ── Vehicle / drive state ─────────────────────────────────────────────────
     public VehicleWeaponMode vehicleWeaponMode = VehicleWeaponMode.NONE;
-    private StanceName preDriveStance  = StanceName.UPRIGHT;
-    private boolean    preDriveCombat  = false;
+    private StanceName preDriveStance    = StanceName.UPRIGHT;
+    private boolean    preDriveCombat    = false;
+    private Vector3    preDriveRotation  = Vector3.Companion.getZERO();
 
     // ── Network-synced state (MultiplayerSynchronizer reads these) ────────────
     @RegisterProperty
@@ -477,6 +478,7 @@ public class Character extends CharacterBody3D implements Controllable {
     public void enterDriveState(VehicleWeaponMode mode) {
         preDriveStance    = currentStanceName;
         preDriveCombat    = combat;
+        preDriveRotation  = getGlobalRotation();
         vehicleWeaponMode = mode;
         setCollisionLayer(0);
         forceSetStance(StanceName.DRIVE_CARRIER);
@@ -500,6 +502,8 @@ public class Character extends CharacterBody3D implements Controllable {
      * Called by {@code Vehicle.tryExit} before the controller is returned.
      */
     public void exitDriveState() {
+        // Restore body rotation so MovementController's playerInitRotation stays valid.
+        setGlobalRotation(preDriveRotation);
         setCollisionLayer(2);
         setProcess(true);
         setPhysicsProcess(true);
@@ -521,7 +525,10 @@ public class Character extends CharacterBody3D implements Controllable {
      * @param aimTarget world-space point the vehicle camera is aimed at (unused here;
      *                  the vehicle already injected its AimRay into WeaponController)
      */
-    public void applyPassengerWeaponInput(boolean fire, boolean reload, Vector3 aimTarget) {
+    public void applyPassengerWeaponInput(boolean fire, boolean reload, Vector3 aimTargetPos) {
+        if (aimTargetPos != null && aimTarget != null) {
+            aimTarget.setGlobalPosition(aimTargetPos);
+        }
         if (fire) fireWeapon.emit();
         else      notFireWeapon.emit();
         if (reload) reloadWeapon.emit();

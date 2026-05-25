@@ -144,7 +144,7 @@ Damage is resolved against the character's **physical ragdoll skeleton** (`Physi
 
 | Body Zone | Bones | Damage Multiplier |
 |:----------|:------|:-----------------:|
-| **Head / Neck** | `neck_01` | **4.0×** |
+| **Head / Neck** | `head_2` | **4.0×** |
 | **Upper Torso** | `spine_03`, `clavicle_l`, `clavicle_r` | 1.0× |
 | **Mid / Lower Torso** | `spine_02`, `spine_01`, `pelvis` | 0.75× |
 | **Arms** | `upperarm_l/r`, `lowerarm_l/r`, `hand_l/r` | 0.75× |
@@ -154,10 +154,10 @@ The hitbox colliders are the same bones that drive the ragdoll on death — no s
 
 ### Headshot Detection
 
-A hit is classified as a **headshot** when the colliding bone is `Physical Bone neck_01`. This single bone covers both the neck capsule and the head sphere in the ragdoll setup.
+A hit is classified as a **headshot** when the colliding bone is `Physical Bone head_2`. This single bone covers both the neck capsule and the head sphere in the ragdoll setup.
 
 ```
-hit bone == "Physical Bone neck_01"  →  headshot = true  →  4× damage
+hit bone == "Physical Bone head_2"  →  headshot = true  →  4× damage
 ```
 
 Headshot detection lives in `Health.takeDamage()` and is bone-name driven, so it works identically for both player and enemy characters.

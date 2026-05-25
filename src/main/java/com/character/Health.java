@@ -54,7 +54,7 @@ public class Health extends Node {
                            Texture2D weaponIcon, String attackerName, String attackerFaction) {
         if (currentHealth <= 0) return;
         boolean headshot = (hitNode instanceof PhysicalBone3D)
-                && "Physical Bone neck_01".equals(hitNode.getName().toString());
+                && "Physical Bone head_2".equals(hitNode.getName().toString());
         float damage = baseDamage * getDamageMultiplier(hitNode);
         currentHealth = Math.max(0.0f, currentHealth - damage);
         syncHealth = currentHealth;
@@ -103,8 +103,8 @@ public class Health extends Node {
         if (!(hitNode instanceof PhysicalBone3D)) return 1.0f;
         String nodeName = hitNode.getName().toString();
         switch (nodeName) {
-            // Head — neck_01 PhysicalBone3D covers both neck capsule and head sphere
-            case "Physical Bone neck_01":
+            // Head — head_2 PhysicalBone3D covers both neck capsule and head sphere
+            case "Physical Bone head_2":
                 return 4.0f;
             // Upper body
             case "Physical Bone spine_03":

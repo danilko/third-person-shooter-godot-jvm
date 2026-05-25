@@ -65,7 +65,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     @RegisterProperty @Export public NodePath wheelsPath        = new NodePath("Wheels");
     @RegisterProperty @Export public NodePath driverSeatPath    = new NodePath("DriverSeat");
-    @RegisterProperty @Export public NodePath vehicleCamPath    = new NodePath("CameraController/Camera3D");
+    @RegisterProperty @Export public NodePath vehicleCamPath    = new NodePath("ActiveCamera");
 
     /**
      * Weapon mode: 0 = NONE, 1 = PASSENGER_WEAPON, 2 = VEHICLE_WEAPON.
@@ -76,7 +76,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     /** Path to the RayCast3D under the vehicle camera used for passenger aiming. */
     @RegisterProperty @Export public NodePath vehicleAimRayPath =
-            new NodePath("CameraController/Camera3D/AimRay");
+            new NodePath("ActiveCamera/AimRay");
 
     /** Path to the vehicle-owned weapon node (for VEHICLE_WEAPON mode). */
     @RegisterProperty @Export public NodePath vehicleWeaponPath =
@@ -156,6 +156,8 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Node cam = getNodeOrNull(vehicleCamPath.getPath());
         if (cam instanceof Camera3D c) vehicleCamera = c;
 
+        // "CameraController" is the VehicleCameraController node.
+        // "ActiveCamera" is a sibling Camera3D — these look up DIFFERENT nodes.
         Node camCtrl = getNodeOrNull("CameraController");
         if (camCtrl instanceof VehicleCameraController vcc) camController = vcc;
 
@@ -236,14 +238,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
             setCenterOfMass(Vector3.Companion.getDOWN().times(0.5f));
         }
 
-        // Teleport occupant to driver seat every frame so their hitbox rides with the car.
+        // Keep occupant hitbox pinned to the driver seat each frame (position only).
+        // Rotation was aligned once in tryEnter; exitDriveState restores pre-entry rotation.
         if (occupant != null && driverSeatNode != null) {
             occupant.setGlobalPosition(driverSeatNode.getGlobalPosition());
-            Vector3 seatRot = driverSeatNode.getGlobalRotation();
-            occupant.setGlobalRotation(new Vector3(
-                    (float) seatRot.getX(),
-                    (float) seatRot.getY(),
-                    (float) seatRot.getZ()));
         }
 
         // Relay weapon commands to occupant based on weapon mode.
@@ -350,6 +348,8 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
         // Character handles collision, stance, combat state, and physics disabling.
         c.enterDriveState(mode);
+        // Align character body to vehicle heading once — exitDriveState restores the pre-entry rotation.
+        c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
 
         Controller ctrl = c.detachController();
         if (ctrl != null) attachController(ctrl);
@@ -386,9 +386,8 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Vector3 exitPos = getGlobalPosition()
                 .minus(right.times(1.5f)).plus(new Vector3(0f, 0.8f, 0f));
         c.setGlobalPosition(exitPos);
-        c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
 
-        // Character handles collision restore, stance restore, and physics re-enabling.
+        // exitDriveState restores the character body rotation saved on entry.
         c.exitDriveState();
 
         Controller ctrl = detachController();

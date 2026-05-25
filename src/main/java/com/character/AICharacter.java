@@ -36,7 +36,7 @@ public class AICharacter extends Character {
     /**
      * Which body part the AI tries to hit on a successful accuracy roll.
      * Maps directly to the damage multipliers in Health.getDamageMultiplier():
-     *   HEAD  → neck_01        (4.0× — hardest, one-shot potential)
+     *   HEAD  → head_2        (4.0× — hardest, one-shot potential)
      *   CHEST → spine_03       (1.0× — balanced)
      *   BODY  → spine_01       (0.75× — forgiving)
      *   LEGS  → thigh_l/r      (0.5× — easiest)
@@ -193,8 +193,8 @@ public class AICharacter extends Character {
      * aimBodyPart.  Called once per target; the result is cached in cachedBoneNodes.
      *
      * Priority order expresses difficulty:
-     *   HEAD  → [neck_01, spine_03, spine_01]  hardest target first, body fallbacks
-     *   CHEST → [spine_03, spine_01, neck_01]  centre-mass first, head is last resort
+     *   HEAD  → [head_2, spine_03, spine_01]  hardest target first, body fallbacks
+     *   CHEST → [spine_03, spine_01, head_2]  centre-mass first, head is last resort
      *   BODY  → [spine_01, spine_03, thigh_l]  lower torso first, escalates upward
      *   LEGS  → [thigh_l,  thigh_r,  spine_01] legs first, torso only if both legs covered
      */
@@ -203,10 +203,10 @@ public class AICharacter extends Character {
         cachedVisibleBone   = null;
         String[] names;
         switch (aimBodyPart.toUpperCase()) {
-            case "HEAD":  names = new String[]{"neck_01",  "spine_03", "spine_01"}; break;
+            case "HEAD":  names = new String[]{"head_2",  "spine_03", "spine_01"}; break;
             case "BODY":  names = new String[]{"spine_01", "spine_03", "thigh_l"};  break;
             case "LEGS":  names = new String[]{"thigh_l",  "thigh_r",  "spine_01"}; break;
-            default:      names = new String[]{"spine_03", "spine_01", "neck_01"};  break; // CHEST
+            default:      names = new String[]{"spine_03", "spine_01", "head_2"};  break; // CHEST
         }
         cachedBoneNodes = new Node3D[names.length];
         for (int i = 0; i < names.length; i++) {
@@ -286,7 +286,7 @@ public class AICharacter extends Character {
         if (cachedVisibleBone != null) return cachedVisibleBone.getGlobalPosition();
         if (cachedBoneNodes != null && cachedBoneNodes.length > 0 && cachedBoneNodes[0] != null)
             return cachedBoneNodes[0].getGlobalPosition();
-        return ((Node3D) currentTarget.getNode(BONE_BASE_PATH + "neck_01")).getGlobalPosition();
+        return ((Node3D) currentTarget.getNode(BONE_BASE_PATH + "head_2")).getGlobalPosition();
     }
 
     /**
