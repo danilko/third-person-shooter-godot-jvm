@@ -1,11 +1,14 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = CharacterHUD
-fqName = com.ui.CharacterHUD
-baseType = Control
+registeredName = WeaponSlotItem
+fqName = com.ui.WeaponSlotItem
+baseType = HBoxContainer
 supertypes = [
-    godot.api.Control,
+    godot.api.HBoxContainer,
+	godot.api.BoxContainer,
+	godot.api.Container,
+	godot.api.Control,
 	godot.api.CanvasItem,
 	godot.api.Node,
 	godot.api.Object,
@@ -17,14 +20,10 @@ signals = [
     
 ]
 properties = [
-    health_label_path,
-	notification_icon_path
+    key_label_path,
+	icon_path,
+	ammo_label_path
 ]
 functions = [
-    _ready,
-	_process,
-	on_ammo_changed,
-	on_health_changed,
-	on_pickup_interact_changed,
-	on_weapon_picked_up
+    _ready
 ]

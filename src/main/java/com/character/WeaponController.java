@@ -47,8 +47,9 @@ public class WeaponController extends Node {
   };
 
   private WeaponItem[] weapons;
-  private int activeSlotIndex  = 0;
-  private int pendingSlotIndex = 0;
+  private int     activeSlotIndex  = 0;
+  private int     pendingSlotIndex = 0;
+  private boolean isUnarmed        = false;
 
   // Weapons queued for equip/drop; processed in _process (idle) to avoid
   // reparenting a RigidBody3D (CollisionObject) during a physics callback.
@@ -67,12 +68,14 @@ public class WeaponController extends Node {
 
   // ── Accessors ─────────────────────────────────────────────────────────────
 
-  public int getWeapon() { return activeSlotIndex; }
+  public int getWeapon() { return isUnarmed ? -1 : activeSlotIndex; }
+
+  public boolean isUnarmed() { return isUnarmed; }
 
   public WeaponItem getCurrentWeaponStats() { return getCurrentWeaponItem(); }
 
   public WeaponItem getCurrentWeaponItem() {
-    return weapons[activeSlotIndex];
+    return isUnarmed ? null : weapons[activeSlotIndex];
   }
 
   public int getWeaponCount() {
@@ -191,7 +194,8 @@ public class WeaponController extends Node {
 
     weapons[targetSlot] = item;
 
-    if (targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null) {
+    if (isUnarmed || targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null) {
+      isUnarmed = false;
       activeSlotIndex = targetSlot;
       showWeapon(activeSlotIndex);
       if (item.getReloadAudio() != null) {
@@ -202,6 +206,11 @@ public class WeaponController extends Node {
       ammoChanged.emit(item.getMagazine(), item.getReserve());
     } else {
       item.hide();
+      // Notify HUD so the newly stocked slot appears immediately without waiting
+      // for the player to manually switch to it.
+      WeaponItem active = getCurrentWeaponItem();
+      ammoChanged.emit(active != null ? active.getMagazine() : 0,
+                       active != null ? active.getReserve()  : 0);
     }
 
     Node busNode = getNodeOrNull("/root/EventBus");
@@ -292,8 +301,20 @@ public class WeaponController extends Node {
 
   @RegisterFunction
   public void onSetWeapon(int slotIndex) {
+    if (isWeaponTransitioning()) return;
+    if (slotIndex == -1) { unequipCurrent(); return; }
     if (slotIndex < 0 || slotIndex >= weapons.length) return;
     if (weapons[slotIndex] == null) return;
+
+    if (isUnarmed) {
+      // Re-equip from empty hands — skip put-down animation, just draw the new weapon.
+      isUnarmed = false;
+      pendingSlotIndex = slotIndex;
+      transitionTimer.setWaitTime(1.0 / weapons[pendingSlotIndex].getSwitchSpeed());
+      transitionTimer.start();
+      return;
+    }
+
     if (slotIndex == activeSlotIndex) { showWeapon(activeSlotIndex); return; }
 
     pendingSlotIndex = slotIndex;
@@ -302,6 +323,15 @@ public class WeaponController extends Node {
     if (current != null) animationController.onWeaponTransition(current.weaponPoseIndex, false);
     transitionTimer.setWaitTime(1.0 / weapons[pendingSlotIndex].getSwitchSpeed());
     transitionTimer.start();
+  }
+
+  private void unequipCurrent() {
+    if (isUnarmed) return;
+    WeaponItem current = weapons[activeSlotIndex];
+    if (current != null) animationController.onWeaponTransition(current.weaponPoseIndex, false);
+    isUnarmed = true;
+    showWeapon(-1);
+    ammoChanged.emit(0, 0);
   }
 
   @RegisterFunction

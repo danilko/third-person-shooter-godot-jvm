@@ -5,15 +5,14 @@ import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
-import godot.api.Control;
-import godot.api.Label;
-import godot.api.Node;
-import godot.api.RichTextLabel;
-import godot.api.TextureRect;
+import godot.api.*;
 import godot.core.NodePath;
+import godot.global.GD;
 
 @RegisterClass(className = "WeaponRadialMenuItem")
 public class WeaponRadialMenuItem extends Control {
+
+    private static final int   SLOT_COUNT            = 5;
 
   @Export @RegisterProperty public int      index        = 0;
 
@@ -27,15 +26,21 @@ public class WeaponRadialMenuItem extends Control {
   @RegisterProperty @Export public NodePath weaponNamePath = new NodePath("Axis/WeaponName");
   @RegisterProperty @Export public NodePath magazinePath   = new NodePath("Axis/Magazine");
   @RegisterProperty @Export public NodePath reservePath    = new NodePath("Axis/Reserve");
+  @RegisterProperty @Export public NodePath keyLabelPath    = new NodePath("Axis/KeyLabel");
+
+    private final String[]             keyTexts  = new String[SLOT_COUNT];
 
   private WeaponRadialMenu radialMenu;
 
   @RegisterFunction
   @Override
   public void _ready() {
+      resolveKeyTexts();
+
     radialMenu = findRadialMenu();
     index = deriveSiblingIndex();
     counterRotateContent();
+
   }
 
   /**
@@ -79,21 +84,53 @@ public class WeaponRadialMenuItem extends Control {
     setNodeText(getNodeOrNull(weaponNamePath), weapon != null ? weapon.getDisplayName() : "");
     setNodeText(getNodeOrNull(magazinePath),   weapon != null ? String.valueOf(weapon.getMagazine()) : "--");
     setNodeText(getNodeOrNull(reservePath),    weapon != null ? String.valueOf(weapon.getReserve()) : "--");
+    setNodeText(getNodeOrNull(keyLabelPath), String.format("[%s]", weapon != null ? keyTexts[index] : "?"));
   }
+
+    private void resolveKeyTexts() {
+        for (int i = 0; i < SLOT_COUNT; i++) {
+            keyTexts[i] = resolveKeyText("weapon_slot_" + (i + 1), String.valueOf(i + 1));
+        }
+    }
+
+    private String resolveKeyText(String action, String fallback) {
+        try {
+            for (InputEvent ev : InputMap.INSTANCE.actionGetEvents(action)) {
+                if (ev instanceof InputEventKey iek) {
+                    String text = iek.asTextPhysicalKeycode();
+                    return text.isEmpty() ? fallback : text;
+                }
+            }
+        } catch (Exception ignored) {
+            // Action not registered yet — happens in editor headless runs.
+        }
+        return fallback;
+    }
 
   @RegisterFunction
   public void onClicked() {
     WeaponRadialMenu rm = getRadialMenu();
+    GD.print("Click menu item " + this.getName());
     if (rm == null || rm.getCharacter() == null) return;
+
+      GD.print("Click menu item " + this.getName() + " set weapon " + index);
+
     rm.getCharacter().setWeapon(index);
     rm.hideRadialMenu();
   }
 
   @RegisterFunction
   public void onHover() {
-    WeaponRadialMenu rm = getRadialMenu();
-    if (rm == null || rm.getCharacter() == null) return;
-    rm.getCharacter().setWeapon(index);
+
+      WeaponRadialMenu rm = getRadialMenu();
+    // visual highlight is handled by Button's texture_hover — switching on hover
+      GD.print("hover menu item " + this.getName());
+      if (rm == null || rm.getCharacter() == null) return;
+
+      GD.print("hover menu item " + this.getName() + " set weapon " + index);
+
+      rm.getCharacter().setWeapon(index);
+      rm.hideRadialMenu();
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

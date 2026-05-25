@@ -1,10 +1,10 @@
-[gd_scene format=3 uid="uid://q7tixj8eexyh"]
+[gd_scene format=3 uid="uid://d1cc140g0a36y"]
 
-[ext_resource type="Texture2D" uid="uid://c0fhq8v7smdwl" path="res://assets/ui/radial_menu.png" id="1_55vp6"]
-[ext_resource type="Script" uid="uid://dgom5d5lml1qp" path="res://gdj/com/ui/WeaponRadialMenuItem.gdj" id="1_f7opg"]
-[ext_resource type="Texture2D" uid="uid://dowvrkhhp42bs" path="res://assets/ui/radial_menu_hover.png" id="2_qv767"]
-[ext_resource type="BitMap" uid="uid://di830knvfek2x" path="res://assets/ui/radial_menu_click_mask.bmp" id="3_f7opg"]
-[ext_resource type="Texture2D" uid="uid://dilbj38px75ln" path="res://assets/ui/rifle.png" id="5_f7opg"]
+[ext_resource type="Script" uid="uid://dgom5d5lml1qp" path="res://gdj/com/ui/WeaponRadialMenuItem.gdj" id="1_ukhr0"]
+[ext_resource type="Texture2D" uid="uid://c0fhq8v7smdwl" path="res://assets/ui/radial_menu.png" id="2_duvsx"]
+[ext_resource type="Texture2D" uid="uid://dowvrkhhp42bs" path="res://assets/ui/radial_menu_hover.png" id="3_sjmqh"]
+[ext_resource type="BitMap" uid="uid://di830knvfek2x" path="res://assets/ui/radial_menu_click_mask.bmp" id="4_him2a"]
+[ext_resource type="Texture2D" uid="uid://dilbj38px75ln" path="res://assets/ui/rifle.png" id="5_82qbf"]
 
 [node name="WeaponRaidalMenuItem" type="Control" unique_id=703522310]
 layout_mode = 3
@@ -17,7 +17,7 @@ grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
-script = ExtResource("1_f7opg")
+script = ExtResource("1_ukhr0")
 
 [node name="Button" type="TextureButton" parent="." unique_id=470368989]
 layout_mode = 1
@@ -32,9 +32,9 @@ offset_right = 120.5
 offset_bottom = -74.0
 grow_horizontal = 2
 grow_vertical = 0
-texture_normal = ExtResource("1_55vp6")
-texture_hover = ExtResource("2_qv767")
-texture_click_mask = ExtResource("3_f7opg")
+texture_normal = ExtResource("2_duvsx")
+texture_hover = ExtResource("3_sjmqh")
+texture_click_mask = ExtResource("4_him2a")
 
 [node name="Axis" type="Control" parent="." unique_id=1485413124]
 anchors_preset = 0
@@ -47,7 +47,7 @@ offset_left = -57.0
 offset_top = -40.0
 offset_right = 76.0
 offset_bottom = 4.0
-texture = ExtResource("5_f7opg")
+texture = ExtResource("5_82qbf")
 expand_mode = 3
 stretch_mode = 4
 

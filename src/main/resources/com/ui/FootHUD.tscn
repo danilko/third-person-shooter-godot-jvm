@@ -23,66 +23,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_2lu2a")
-
-[node name="Magazine" type="Control" parent="." unique_id=1902918573]
-layout_mode = 1
-anchor_left = 0.034722224
-anchor_top = -0.061728396
-anchor_right = 0.15625
-anchor_bottom = 0.061728396
-offset_top = 560.0
-offset_right = 40.0
-offset_bottom = 560.0
-grow_vertical = 0
-
-[node name="ColorRect" type="ColorRect" parent="Magazine" unique_id=1506503489]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0, 0.35235986, 0.64161503, 0.28235295)
-
-[node name="Magazine" type="Label" parent="Magazine/ColorRect" unique_id=1290456315]
-layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 10.0
-offset_top = -11.5
-offset_right = 50.0
-offset_bottom = 11.5
-grow_vertical = 2
-text = "40"
-label_settings = SubResource("LabelSettings_large")
-
-[node name="Slash" type="Label" parent="Magazine/ColorRect" unique_id=169346462]
-layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 80.0
-offset_top = -19.0
-offset_right = 120.0
-offset_bottom = 19.0
-grow_vertical = 2
-text = "/"
-label_settings = SubResource("LabelSettings_large")
-clip_text = true
-
-[node name="Reserve" type="Label" parent="Magazine/ColorRect" unique_id=1290965878]
-layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 120.0
-offset_top = -5.0
-offset_right = 180.0
-offset_bottom = 25.0
-grow_vertical = 2
-text = "40"
-label_settings = SubResource("LabelSettings_small")
+magazine_label_path = NodePath("")
+reserve_label_path = NodePath("")
 
 [node name="Health" type="Control" parent="." unique_id=974714568]
 layout_mode = 1
@@ -90,11 +32,10 @@ anchor_left = 0.034722224
 anchor_top = -0.061728396
 anchor_right = 0.15625
 anchor_bottom = 0.061728396
-offset_left = 198.0
+offset_left = -10.0
 offset_top = 560.0
-offset_right = 238.0
+offset_right = 29.99968
 offset_bottom = 560.0
-grow_vertical = 0
 
 [node name="ColorRect" type="ColorRect" parent="Health" unique_id=1412301142]
 layout_mode = 1

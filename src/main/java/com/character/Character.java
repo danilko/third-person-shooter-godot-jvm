@@ -165,6 +165,9 @@ public class Character extends CharacterBody3D implements Controllable {
     // ── Controller (generates UserCommand each tick) ──────────────────────────
     protected Controller controller;
 
+    // ── UI input lock (set by radial menu / pause / any overlay that must own the mouse) ──
+    public boolean inputBlocked = false;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     @RegisterFunction
     @Override
@@ -240,7 +243,10 @@ public class Character extends CharacterBody3D implements Controllable {
         UserCommand cmd;
         if (controller != null) {
             if (!controller.isAuthority()) return; // non-authority: state via MultiplayerSynchronizer
-            cmd = controller.gatherInput(delta);
+            // inputBlocked is set by UI overlays (radial menu, pause) that own the mouse.
+            // _physicsProcess still runs while blocked — we return an empty command so the
+            // character stays still without interrupting physics (gravity, collision).
+            cmd = inputBlocked ? new UserCommand() : controller.gatherInput(delta);
         } else {
             cmd = gatherInput(delta); // fallback: subclass override
         }
@@ -351,8 +357,10 @@ public class Character extends CharacterBody3D implements Controllable {
             setStance(input.desiredStance);
         }
 
-        // ── Weapon switch ──────────────────────────────────────────────────
-        if (input.desiredWeapon >= 0) {
+        // ── Weapon switch / unequip ────────────────────────────────────────
+        if (input.wantUnequip) {
+            setWeapon(-1);
+        } else if (input.desiredWeapon >= 0) {
             setWeapon(input.desiredWeapon);
         }
     }

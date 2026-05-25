@@ -169,6 +169,17 @@ public class PlayerController extends Controller {
             }
         }
 
+        // ── Weapon slot quick-switch (keys 1–5) and unequip (key 0) ──────────
+        cmd.wantUnequip = inp.isActionJustPressed("weapon_unequip", false);
+        if (!cmd.wantUnequip) {
+            for (int i = 0; i < 5; i++) {
+                if (inp.isActionJustPressed("weapon_slot_" + (i + 1), false)) {
+                    cmd.desiredWeapon = i;
+                    break;
+                }
+            }
+        }
+
         // ── Vehicle enter (press "use" near a vehicle) ────────────────────────
         // Requires an "use" action in Project Settings → Input Map.
         cmd.enterExit = inp.isActionJustPressed("interact", false);
