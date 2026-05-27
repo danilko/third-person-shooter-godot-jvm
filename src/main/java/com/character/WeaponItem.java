@@ -7,6 +7,7 @@ import godot.annotation.RegisterProperty;
 import godot.api.AudioStreamWAV;
 import godot.api.Node;
 import godot.api.Texture2D;
+import godot.core.PackedStringArray;
 import godot.core.Vector3;
 
 import static godot.global.GD.min;
@@ -14,8 +15,7 @@ import static godot.global.GD.min;
 @RegisterClass(className = "WeaponItem")
 public class WeaponItem extends Pickup implements WeaponAction {
 
-  // Internal identifier: used for marker lookup ("Marker" + weaponId), event bus payloads,
-  // save keys. No spaces. If empty, falls back to weaponName for marker lookup.
+  // Internal identifier used for event bus payloads and save keys. No spaces.
   @RegisterProperty @Export public String weaponId = "";
 
   // Human-readable display name: HUD, kill feed, inventory, interact prompt.
@@ -30,6 +30,15 @@ public class WeaponItem extends Pickup implements WeaponAction {
 
   // Icon shown in the kill feed and radial menu. Set in the inspector per weapon scene.
   @RegisterProperty @Export public Texture2D weaponIcon = null;
+
+  // Name of the Marker3D socket to attach to when this weapon is the active (held) weapon.
+  // Must match a node name registered in WeaponController.socketPaths.
+  @RegisterProperty @Export public String holdSocket = "";
+
+  // Names of Marker3D sockets to try (in order) when parking this weapon in inventory.
+  // Each name must match a node registered in WeaponController.socketPaths.
+  // The first socket with no other weapon in it is used. Empty array = hide when inactive.
+  @RegisterProperty @Export public PackedStringArray holsterSockets = new PackedStringArray();
 
   @RegisterProperty @Export public float spread = 0.0f;
   // Inaccuracy added per shot; decays at bloomDecaySpeed when not firing.

@@ -7,10 +7,13 @@ import godot.core.NodePath;
 import godot.core.Signal1;
 import godot.core.Signal2;
 import godot.core.StringName;
+import godot.core.VariantArray;
 import godot.core.Vector3;
 import godot.global.GD;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RegisterClass(className = "WeaponController")
 public class WeaponController extends Node {
@@ -23,6 +26,18 @@ public class WeaponController extends Node {
   @RegisterProperty @Export
   public NodePath weaponAttachmentPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment");
 
+  /**
+   * All weapon socket Marker3D nodes for this character, listed as NodePaths from the
+   * scene root. Each Marker3D node name becomes a key in the socket registry.
+   *
+   * WeaponItem.holdSocket / WeaponItem.holsterSockets reference these names.
+   * Example: a rifle with holdSocket="MarkerRifle" attaches to the Marker3D named
+   * "MarkerRifle" registered here. A shovel with holsterSockets=["MarkerBack"] parks at
+   * the Marker3D named "MarkerBack". No code changes needed for new weapons or poses.
+   */
+  @RegisterProperty @Export
+  public VariantArray<NodePath> socketPaths = new VariantArray<>(NodePath.class);
+
   @RegisterSignal
   public final Signal1<Float> weaponFired = new Signal1<>(this, new StringName("weapon_fired"));
 
@@ -34,16 +49,17 @@ public class WeaponController extends Node {
 
   /**
    * Defines the type of each slot by index.
-   * Override in a subclass or replace in _ready() before calling super to customise
-   * the layout — e.g. add a second PRIMARY slot by inserting WeaponSlotType.PRIMARY
-   * at position 1 and shifting the rest.
+   * Layout: two PRIMARY, one SECONDARY, one MELEE, one THROWABLE, one CONSUMABLE, one OFFHAND.
+   * Override in a subclass or replace in _ready() before calling super to customise.
    */
   protected WeaponSlotType[] slotTypes = {
-      WeaponSlotType.PRIMARY,
-      WeaponSlotType.SECONDARY,
-      WeaponSlotType.MELEE,
-      WeaponSlotType.THROWABLE,
-      WeaponSlotType.OFFHAND
+      WeaponSlotType.PRIMARY,     // slot 0 — first long weapon   (key 1)
+      WeaponSlotType.PRIMARY,     // slot 1 — second long weapon  (key 2)
+      WeaponSlotType.SECONDARY,   // slot 2 — sidearm             (key 3)
+      WeaponSlotType.MELEE,       // slot 3 — melee               (key 4)
+      WeaponSlotType.THROWABLE,   // slot 4 — throwable           (key 5)
+      WeaponSlotType.CONSUMABLE,  // slot 5 — health / consumable (key 6)
+      WeaponSlotType.OFFHAND,     // slot 6 — shield / torch      (key 0)
   };
 
   private WeaponItem[] weapons;
@@ -58,6 +74,9 @@ public class WeaponController extends Node {
   // True when pendingDrops was populated by dropAllWeapons() (death); false for a
   // manual single-weapon drop. Controls which physics parameters are used.
   private boolean isDeathDrop = false;
+
+  // Populated in _ready() from socketPaths: node name → Marker3D node.
+  private final Map<String, Node> socketMap = new HashMap<>();
 
   private RayCast3D aimRay;
   private RayCast3D originalAimRay;
@@ -132,6 +151,14 @@ public class WeaponController extends Node {
       aimRay = (RayCast3D) getOwner().getNode(aimRayPath);
     }
 
+    // Build socket registry: node name → Marker3D node.
+    for (java.lang.Object obj : socketPaths) {
+      NodePath p = (NodePath) obj;
+      if (p == null || p.toString().isEmpty()) continue;
+      Node socket = getOwner().getNodeOrNull(p);
+      if (socket != null) socketMap.put(socket.getName().toString(), socket);
+    }
+
     // Discover weapons pre-placed inside attachment markers in the scene
     Node attachment = getOwner().getNodeOrNull(weaponAttachmentPath);
     if (attachment != null) for (Node child : attachment.getChildren()) {
@@ -146,7 +173,7 @@ public class WeaponController extends Node {
       }
     }
 
-    if (weapons[activeSlotIndex] != null) weapons[activeSlotIndex].show();
+    showWeapon(activeSlotIndex);
 
     if (neckBoneAttachement != null) {
       ((AnimationPlayer) neckBoneAttachement.getNode("AnimationPlayer")).play("MuzzleFlash");
@@ -178,26 +205,16 @@ public class WeaponController extends Node {
     if (targetSlot < 0) return;
 
     WeaponItem displaced = weapons[targetSlot];
-
-    Node attachment = getOwner().getNodeOrNull(weaponAttachmentPath);
-    if (attachment == null) return;
-
-    String markerKey = item.weaponId.isEmpty() ? item.weaponName : item.weaponId;
-    Node marker = markerKey.isEmpty() ? null : attachment.getNodeOrNull(new NodePath("Marker" + markerKey));
-    Node target = (marker != null) ? marker : attachment;
+    boolean willBeActive = isUnarmed || targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null;
 
     item.onPickedUp();
-    item.reparent(target, false);
-    item.setPosition(Vector3.Companion.getZERO());
-    item.setRotation(Vector3.Companion.getZERO());
     injectCharacterRefs(item);
-
     weapons[targetSlot] = item;
 
-    if (isUnarmed || targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null) {
+    if (willBeActive) {
       isUnarmed = false;
       activeSlotIndex = targetSlot;
-      showWeapon(activeSlotIndex);
+      moveWeaponToHand(item);
       if (item.getReloadAudio() != null) {
         weaponAudio.setStream(item.getReloadAudio());
         weaponAudio.play();
@@ -205,9 +222,8 @@ public class WeaponController extends Node {
       animationController.onWeaponTransition(item.weaponPoseIndex, true);
       ammoChanged.emit(item.getMagazine(), item.getReserve());
     } else {
-      item.hide();
-      // Notify HUD so the newly stocked slot appears immediately without waiting
-      // for the player to manually switch to it.
+      // Weapon goes into an inactive slot — mount at its holster socket.
+      moveWeaponToHolster(item);
       WeaponItem active = getCurrentWeaponItem();
       ammoChanged.emit(active != null ? active.getMagazine() : 0,
                        active != null ? active.getReserve()  : 0);
@@ -414,17 +430,55 @@ public class WeaponController extends Node {
 
   private void showWeapon(int slotIndex) {
     for (int i = 0; i < weapons.length; i++) {
-      if (weapons[i] != null) {
-        if (i == slotIndex) weapons[i].show();
-        else weapons[i].hide();
-      }
+      if (weapons[i] == null) continue;
+      if (i == slotIndex) moveWeaponToHand(weapons[i]);
+      else moveWeaponToHolster(weapons[i]);
     }
   }
 
-  // Manual drop: throw forward at chest height (1.0 m).
+  /** Returns the Marker3D registered under {@code socketName}, or null if not found. */
+  private Node resolveSocket(String socketName) {
+    return (socketName == null || socketName.isEmpty()) ? null : socketMap.get(socketName);
+  }
+
+  /** Reparents {@code item} to its holdSocket Marker3D and shows it.
+   *  If holdSocket is empty or not registered, shows the weapon at its current position. */
+  private void moveWeaponToHand(WeaponItem item) {
+    Node target = resolveSocket(item.holdSocket);
+    if (target != null) reparentWeapon(item, target);
+    item.show();
+  }
+
+  /** Reparents {@code item} to the first free socket in its holsterSockets list and shows it.
+   *  A socket is considered free when it has no children or already holds this weapon.
+   *  Hides the weapon if the list is empty, none of the names are registered, or all
+   *  registered sockets are occupied by other weapons. */
+  private void moveWeaponToHolster(WeaponItem item) {
+    for (String socketName : item.holsterSockets) {
+      Node target = resolveSocket(socketName);
+      if (target == null) continue;
+      if (target.getChildCount() > 0 && !target.getChild(0).equals(item)) continue;
+      reparentWeapon(item, target);
+      item.show();
+      return;
+    }
+    item.hide();
+  }
+
+  /** Reparents {@code item} to {@code target}, zeroing local transform. Skips reparent
+   *  if {@code item} is already a child of {@code target} to avoid re-triggering _ready. */
+  private void reparentWeapon(WeaponItem item, Node target) {
+    Node current = item.getParent();
+    if (current != null && current.equals(target)) return;
+    item.reparent(target, false);
+    item.setPosition(Vector3.Companion.getZERO());
+    item.setRotation(Vector3.Companion.getZERO());
+  }
+
+  // Manual drop: throw forward at chest height (1.3 m gives clearance when crouching/crawling).
   private void returnWeaponToWorld(WeaponItem item) {
     CharacterBody3D character = (CharacterBody3D) getOwner();
-    Vector3 spawnPos = character.getGlobalPosition().plus(new Vector3(0, 1.0f, 0));
+    Vector3 spawnPos = character.getGlobalPosition().plus(new Vector3(0, 1.3f, 0));
     Vector3 forward  = character.getGlobalTransform().getBasis().getZ().times(-1f);
     Vector3 impulse  = forward.times(3.0f)
         .plus(new Vector3(0, 4.0f, 0))
@@ -459,6 +513,10 @@ public class WeaponController extends Node {
     item.reparent(getTree().getCurrentScene(), true);
     item.onReturnedToWorld();
     item.setGlobalPosition(spawnPos);
+    // Reset any residual velocity from the frozen/equipped state before applying
+    // the intended throw impulse, otherwise the weapon can tunnel through thin floors.
+    item.setLinearVelocity(Vector3.Companion.getZERO());
+    item.setAngularVelocity(Vector3.Companion.getZERO());
     item.applyCentralImpulse(impulse);
   }
 

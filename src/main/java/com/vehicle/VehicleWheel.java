@@ -143,6 +143,10 @@ public class VehicleWheel extends RayCast3D {
 
         if (vehicle.isBraking()) {
             zFriction = zBrakeTraction;
+        } else if (Math.abs(cmd.motor) < 0.01f && Math.abs(forwardSpeed) < 0.5f) {
+            // No throttle + near-stationary: hold position on slopes (parking friction).
+            // Uses zBrakeTraction (5× stronger than zTraction) to counteract gravity.
+            zFriction = zBrakeTraction;
         }
 
         Vector3 zForce = vehicle.getGlobalBasis().getZ().times(forwardSpeed * zFriction * ((vehicle.getMass() *gravity)/vehicle.getWheels().size()));

@@ -11,8 +11,9 @@
 [ext_resource type="Script" uid="uid://cr22di64fbwp1" path="res://gdj/com/environment/DecalManager.gdj" id="10_dcal"]
 [ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="10_m0gj3"]
 [ext_resource type="Script" uid="uid://fqq4oyin7clk" path="res://gdj/com/environment/BulletTracerManager.gdj" id="11_btrc"]
-[ext_resource type="PackedScene" uid="uid://bb60nshfmm7so" path="res://src/main/resources/com/weapon/Pistol.tscn" id="12_ej8ck"]
-[ext_resource type="PackedScene" uid="uid://chmmjlji5vapb" path="res://src/main/resources/com/weapon/Rifle.tscn" id="13_ijvcp"]
+[ext_resource type="PackedScene" uid="uid://bb60nshfmm7so" path="res://src/main/resources/com/weapon/PI52.tscn" id="12_ej8ck"]
+[ext_resource type="PackedScene" uid="uid://chmmjlji5vapb" path="res://src/main/resources/com/weapon/AR212.tscn" id="13_ijvcp"]
+[ext_resource type="PackedScene" uid="uid://b4prneetdkcsn" path="res://src/main/resources/com/weapon/AR4.tscn" id="15_kfoa7"]
 [ext_resource type="PackedScene" uid="uid://fg0ucxit12ax" path="res://src/main/resources/com/ui/HUDManager.tscn" id="17_nmpqt"]
 [ext_resource type="PackedScene" uid="uid://menumgr001" path="res://src/main/resources/com/ui/MenuManager.tscn" id="18_kfoa7"]
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="19_hs4nr"]
@@ -334,9 +335,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 4.75
 [node name="AICharacter-E1" parent="Characters" unique_id=1107363167 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.0564585, 0.8853674, -4.9140244)
 ammo_refill = NodePath("../../AmmoRefill")
-shoot_still_duration = 0.25
-move_accuracy_penalty = 0.75
-use_combat_crouch = true
 character_info = SubResource("Resource_hs4nr")
 
 [node name="Rifle5" parent="Characters" unique_id=1210622816 instance=ExtResource("13_ijvcp")]
@@ -345,9 +343,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 15.1
 [node name="AICharacter-E2" parent="Characters" unique_id=1865541393 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.476438, 0.8853674, -1.134449)
 ammo_refill = NodePath("../../AmmoRefill")
-shoot_still_duration = 0.25
-move_accuracy_penalty = 0.75
-use_combat_crouch = true
 character_info = SubResource("Resource_hs4nr")
 
 [node name="Rifle7" parent="Characters" unique_id=1655091831 instance=ExtResource("13_ijvcp")]
@@ -356,9 +351,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 8.87
 [node name="AICharacter-E3" parent="Characters" unique_id=810055418 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.175625, 0.8853674, -7.482216)
 ammo_refill = NodePath("../../AmmoRefill")
-shoot_still_duration = 0.25
-move_accuracy_penalty = 0.75
-use_combat_crouch = true
 character_info = SubResource("Resource_hs4nr")
 
 [node name="Rifle3" parent="Characters" unique_id=913745768 instance=ExtResource("13_ijvcp")]
@@ -367,9 +359,6 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 6.27
 [node name="AICharacter-P1" parent="Characters" unique_id=817366872 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5731745, 0.8853674, 5.375845)
 ammo_refill = NodePath("../../AmmoRefill")
-shoot_still_duration = 0.25
-move_accuracy_penalty = 0.75
-use_combat_crouch = true
 character_info = SubResource("Resource_imhx0")
 
 [node name="Rifle6" parent="Characters" unique_id=1288307646 instance=ExtResource("13_ijvcp")]
@@ -378,10 +367,10 @@ transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, -2.4
 [node name="AICharacter-P2" parent="Characters" unique_id=294236911 node_paths=PackedStringArray("ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.1473427, 0.8853674, -5.9826374)
 ammo_refill = NodePath("../../AmmoRefill")
-shoot_still_duration = 0.25
-move_accuracy_penalty = 0.75
-use_combat_crouch = true
 character_info = SubResource("Resource_imhx0")
+
+[node name="AR4" parent="Characters" unique_id=1938467393 instance=ExtResource("15_kfoa7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.638225, 1.0820607, 0)
 
 [node name="MenuManager" parent="." unique_id=349614519 instance=ExtResource("18_kfoa7")]
 

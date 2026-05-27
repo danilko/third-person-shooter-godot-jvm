@@ -169,10 +169,13 @@ public class PlayerController extends Controller {
             }
         }
 
-        // ── Weapon slot quick-switch (keys 1–5) and unequip (key 0) ──────────
-        cmd.wantUnequip = inp.isActionJustPressed("weapon_unequip", false);
-        if (!cmd.wantUnequip) {
-            for (int i = 0; i < 5; i++) {
+        // ── Weapon slot quick-switch ──────────────────────────────────────────
+        // Keys 1–6 → slots 0–5 (PRIMARY×2, SECONDARY, MELEE, THROWABLE, CONSUMABLE)
+        // Key 0    → slot 6 (OFFHAND) via weapon_unequip binding
+        if (inp.isActionJustPressed("weapon_unequip", false)) {
+            cmd.desiredWeapon = 6;
+        } else {
+            for (int i = 0; i < 6; i++) {
                 if (inp.isActionJustPressed("weapon_slot_" + (i + 1), false)) {
                     cmd.desiredWeapon = i;
                     break;
