@@ -291,8 +291,6 @@ public class Character extends CharacterBody3D implements Controllable {
                 Node asmNode = visualsInstance.getNodeOrNull(meshConfig.aimSpineModifierPath);
                 if (asmNode instanceof LookAtModifier3D asm) {
                     ac.aimSpineModifier = asm;
-                    // Fix the target_node path: SpineAimModifier is now deeper in the
-                    // hierarchy, so update it to point at the AimTarget absolutely.
                     if (aimTarget != null) asm.setTargetNode(aimTarget.getPath());
                 }
             }

@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://5scryv00gkj7"]
+[gd_scene format=3 uid="uid://xtgua1twvjqw"]
 
 [ext_resource type="Texture2D" uid="uid://ca77s5fasgwv2" path="res://assets/ui/flash1.png" id="1_flash"]
 
@@ -19,6 +19,7 @@ particles_anim_loop = false
 
 [sub_resource type="QuadMesh" id="QM_flash"]
 material = SubResource("STD_flash")
+size = Vector2(0.5, 0.5)
 
 [sub_resource type="Animation" id="Anim_flash"]
 resource_name = "MuzzleFlash"
@@ -81,21 +82,21 @@ _data = {
 &"RESET": SubResource("Anim_RESET")
 }
 
-[node name="MuzzleVFX" type="Node3D"]
+[node name="MuzzleVFX" type="Node3D" unique_id=1360960525]
 
-[node name="MuzzleFlash" type="GPUParticles3D" parent="."]
+[node name="MuzzleFlash" type="GPUParticles3D" parent="." unique_id=383608251]
 visible = false
 amount = 1
 speed_scale = 8.0
 process_material = SubResource("PPM_muzzle")
 draw_pass_1 = SubResource("QM_flash")
 
-[node name="OmniLight3D" type="OmniLight3D" parent="."]
+[node name="OmniLight3D" type="OmniLight3D" parent="." unique_id=1882051284]
 visible = false
 light_color = Color(1, 0.9882353, 0.73333335, 1)
 shadow_enabled = true
 shadow_reverse_cull_face = true
 omni_range = 15.0
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=801289318]
 libraries/ = SubResource("AL_muzzle")

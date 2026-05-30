@@ -31,6 +31,7 @@ public class MeshConfig extends Resource {
     public NodePath aimSpineModifierPath = new NodePath(
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/SpineAimModifier");
 
+
     @Export @RegisterProperty
     public NodePath fpsCameraMarkerPath = new NodePath(
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment/MarkerFPSCamera");

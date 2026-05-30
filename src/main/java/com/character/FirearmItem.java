@@ -198,16 +198,12 @@ public class FirearmItem extends WeaponItem {
 
   private void spawnBulletTracer(RayCast3D ray) {
     Vector3 muzzlePos = weaponMuzzle().getGlobalPosition();
-    // Project the aim ray's world-space direction from the muzzle position.
-    // This makes the tracer appear straight toward the crosshair regardless of distance,
-    // while still starting from the gun barrel tip.
-    Vector3 rayDir = ray.toGlobal(ray.getTargetPosition())
-        .minus(ray.getGlobalPosition()).normalized();
-    float dist = ray.isColliding()
-        ? (float) ray.getCollisionPoint().minus(muzzlePos).length()
-        : 200f;
+    Vector3 rayOrigin = ray.getGlobalPosition();
+    Vector3 rayDir    = ray.toGlobal(ray.getTargetPosition()).minus(rayOrigin).normalized();
+    Vector3 tracerEnd = ray.isColliding() ? ray.getCollisionPoint()
+                                          : rayOrigin.plus(rayDir.times(200f));
     BulletTracerManager tm = getBulletTracerManager();
-    if (tm != null) tm.spawnTracer(muzzlePos, muzzlePos.plus(rayDir.times(dist)));
+    if (tm != null) tm.spawnTracer(muzzlePos, tracerEnd);
   }
 
   /**

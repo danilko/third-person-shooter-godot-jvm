@@ -33,10 +33,6 @@ public class PlayerController extends Controller {
 
     private static final int BUFFER_SIZE = 64;
 
-    @Export
-    @RegisterProperty
-    public float minIkDist = 1.5f;
-
     // ── Client-side prediction state ──────────────────────────────────────────
     private int              localSequence    = 0;
     private final UserCommand[] predictionBuffer = new UserCommand[BUFFER_SIZE];
@@ -119,28 +115,17 @@ public class PlayerController extends Controller {
             cmd.wantCombat = aimOrFire || (body.isCombat() && !aimStayTimer.isStopped());
         }
 
-        // ── Aim target (IK-clamped; hitscan still uses aimRay directly) ─────────
+        // ── Aim target (spine IK look direction — always far, never the hit point) ──
+        // AimTarget drives SpineAimModifier: it represents WHERE THE CAMERA LOOKS,
+        // not where the bullet lands. Placing it at the AimRay's far end (2000 m along
+        // camera forward) means the spine always tracks camera direction cleanly.
+        // Actual bullet impact is read from AimRay.isColliding() at fire time in
+        // FirearmItem.performHitscan() — AimTarget plays no part in hit detection.
+        // This prevents the spine from snapping upward when aiming near a wall.
         if (cmd.wantCombat) {
             Vector3 rayDeg = body.aimRay.getRotationDegrees();
             body.aimRay.setRotationDegrees(new Vector3(rayDeg.getX(), 0.0f, 0.0f));
-
-            Vector3 rayOrigin = body.aimRay.getGlobalTransform().getOrigin();
-            Vector3 farPoint  = body.aimRay.toGlobal(body.aimRay.getTargetPosition());
-
-            if (body.aimRay.isColliding()) {
-                Vector3 hit  = body.aimRay.getCollisionPoint();
-                float   dist = (float) hit.minus(rayOrigin).length();
-                if (dist >= minIkDist) {
-                    cmd.aimTargetPosition = hit;
-                } else {
-                    // Too close: push along the ray direction to keep IK pose natural.
-                    // Bullets still hit the real collision point via aimRay.
-                    Vector3 dir = farPoint.minus(rayOrigin).normalized();
-                    cmd.aimTargetPosition = rayOrigin.plus(dir.times(minIkDist));
-                }
-            } else {
-                cmd.aimTargetPosition = farPoint;
-            }
+            cmd.aimTargetPosition = body.aimRay.toGlobal(body.aimRay.getTargetPosition());
         }
 
         // ── Weapon / body actions ─────────────────────────────────────────────
