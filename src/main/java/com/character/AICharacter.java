@@ -212,7 +212,7 @@ public class AICharacter extends Character {
         }
         cachedBoneNodes = new Node3D[names.length];
         for (int i = 0; i < names.length; i++) {
-            cachedBoneNodes[i] = (Node3D) currentTarget.getNodeOrNull(BONE_BASE_PATH + names[i]);
+            cachedBoneNodes[i] = currentTarget.getPhysicalBoneNode(names[i]);
         }
     }
 
@@ -237,7 +237,7 @@ public class AICharacter extends Character {
             aimRay.forceRaycastUpdate();
             if (aimRay.isColliding()
                     && aimRay.getCollider() instanceof Node3D n
-                    && n.getOwner() == currentTarget) {
+                    && currentTarget.isAncestorOf(n)) {
                 cachedVisibleBone = bone;
                 cachedLoS = true;
                 return true;
@@ -275,9 +275,6 @@ public class AICharacter extends Character {
         aimRay.forceRaycastUpdate();
     }
 
-    private static final String BONE_BASE_PATH =
-            "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone ";
-
     /**
      * Returns the world position to aim at on the current target.
      * Prefers the bone last confirmed exposed by hasLineOfSight() — no additional
@@ -288,7 +285,8 @@ public class AICharacter extends Character {
         if (cachedVisibleBone != null) return cachedVisibleBone.getGlobalPosition();
         if (cachedBoneNodes != null && cachedBoneNodes.length > 0 && cachedBoneNodes[0] != null)
             return cachedBoneNodes[0].getGlobalPosition();
-        return ((Node3D) currentTarget.getNode(BONE_BASE_PATH + "head_2")).getGlobalPosition();
+        Node3D headBone = currentTarget.getPhysicalBoneNode("head_2");
+        return headBone != null ? headBone.getGlobalPosition() : currentTarget.getGlobalPosition();
     }
 
     /**

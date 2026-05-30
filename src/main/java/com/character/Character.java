@@ -111,6 +111,17 @@ public class Character extends CharacterBody3D implements Controllable {
     @Export
     public NodePath physicalBoneSimulatorPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D");
 
+    /**
+     * Packed scene whose root is a {@link CharacterVisuals} node containing the mesh,
+     * AnimationTree, and PhysicalBoneSimulator3D.  Instantiated in {@code _ready()} and
+     * attached to the {@code VisualsMount} Marker3D.  Swapping this one field swaps the
+     * entire character appearance; the embedded {@link MeshConfig} wires all dependent
+     * component references automatically.
+     */
+    @RegisterProperty
+    @Export
+    public PackedScene characterVisuals;
+
     // ── Protected state ───────────────────────────────────────────────────────
     protected int airJumpCounter = 0;
     protected Vector3 movementDirection = new Vector3();
@@ -155,6 +166,10 @@ public class Character extends CharacterBody3D implements Controllable {
     public Camera3D activeCamera;
     protected PhysicalBoneSimulator3D physicalBoneSimulator;
 
+    // ── Visuals scene (B2: mesh-swap foundation) ──────────────────────────────
+    protected CharacterVisuals visualsInstance;
+    protected MeshConfig meshConfig;
+
     // ── Ragdoll freeze state ──────────────────────────────────────────────────
     private double  ragdollFreezeCountdown = -1.0;
     private boolean ragdollFrozen          = false;
@@ -187,13 +202,11 @@ public class Character extends CharacterBody3D implements Controllable {
             characterInfo.characterId = UUID.randomUUID().toString();
         addToGroup(new StringName("characters"), false);
         if (hasNode(aimTargetPath)) {
-            aimTarget = (Marker3D)  getNode(aimTargetPath);
+            aimTarget = (Marker3D) getNode(aimTargetPath);
         }
         if (hasNode(aimRayPath)) {
             aimRay = (RayCast3D) getNode(aimRayPath);
-
         }
-
         if (hasNode(cameraRootPath)) {
             cameraRoot = (Node3D) getNode(cameraRootPath);
         }
@@ -206,20 +219,28 @@ public class Character extends CharacterBody3D implements Controllable {
         if (activeCameraPath != null && !activeCameraPath.isEmpty() && hasNode(activeCameraPath)) {
             activeCamera = (Camera3D) getNode(activeCameraPath);
         }
-        for(NodePath headMeshPath : headMeshPaths) {
-            if (headMeshPath != null && !headMeshPath.isEmpty() && hasNode(headMeshPath)) {
-                headMeshes.add((Node3D) getNode(headMeshPath));
+
+        // ── Visuals instantiation (B2) ─────────────────────────────────────
+        if (characterVisuals != null && hasNode("VisualsMount")) {
+            Node mount = getNode("VisualsMount");
+            Node vis = characterVisuals.instantiate();
+            mount.addChild(vis);
+            if (vis instanceof CharacterVisuals cv) {
+                visualsInstance = cv;
+                meshConfig = cv.meshConfig;
             }
-        }
-
-        if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
-            physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
-
-            if (aimRay != null) for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
-                Node child = physicalBoneSimulator.getChild(i);
-                if (child instanceof PhysicalBone3D bone) {
-                   aimRay.addException(bone);
+            wireFromMeshConfig();
+        } else {
+            // Legacy fallback: visuals embedded directly in Character scene.
+            for (NodePath headMeshPath : headMeshPaths) {
+                if (headMeshPath != null && !headMeshPath.isEmpty() && hasNode(headMeshPath)) {
+                    headMeshes.add((Node3D) getNode(headMeshPath));
                 }
+            }
+            if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty()
+                    && hasNode(physicalBoneSimulatorPath)) {
+                physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
+                addPhysicalBoneExceptions(physicalBoneSimulator);
             }
         }
 
@@ -232,6 +253,117 @@ public class Character extends CharacterBody3D implements Controllable {
         setStance(currentStanceName);
         setCombatState();
         setWeapon(0);
+    }
+
+    /**
+     * Resolves all mesh-dependent node references from the newly instantiated
+     * {@link CharacterVisuals} scene and wires them into sibling components.
+     * Called in _ready() immediately after addChild(visualsInstance).
+     */
+    private void wireFromMeshConfig() {
+        if (meshConfig == null || visualsInstance == null) return;
+
+        // ── Physical bone simulator ────────────────────────────────────────
+        if (!meshConfig.physicalBoneSimulatorPath.isEmpty()) {
+            Node n = visualsInstance.getNodeOrNull(meshConfig.physicalBoneSimulatorPath);
+            if (n instanceof PhysicalBoneSimulator3D sim) {
+                physicalBoneSimulator = sim;
+                addPhysicalBoneExceptions(sim);
+            }
+        }
+
+        // ── Head meshes (FPS mode visibility) ─────────────────────────────
+        headMeshes.clear();
+        for (NodePath p : meshConfig.headMeshPaths) {
+            if (p == null || p.isEmpty()) continue;
+            Node n = visualsInstance.getNodeOrNull(p);
+            if (n instanceof Node3D n3d) headMeshes.add(n3d);
+        }
+
+        // ── AnimationController ────────────────────────────────────────────
+        Node acNode = getNodeOrNull("AnimationController");
+        if (acNode instanceof AnimationController ac) {
+            if (!meshConfig.animationTreePath.isEmpty()) {
+                Node atNode = visualsInstance.getNodeOrNull(meshConfig.animationTreePath);
+                if (atNode instanceof AnimationTree at) ac.animationTree = at;
+            }
+            if (!meshConfig.aimSpineModifierPath.isEmpty()) {
+                Node asmNode = visualsInstance.getNodeOrNull(meshConfig.aimSpineModifierPath);
+                if (asmNode instanceof LookAtModifier3D asm) {
+                    ac.aimSpineModifier = asm;
+                    // Fix the target_node path: SpineAimModifier is now deeper in the
+                    // hierarchy, so update it to point at the AimTarget absolutely.
+                    if (aimTarget != null) asm.setTargetNode(aimTarget.getPath());
+                }
+            }
+        }
+
+        // ── WeaponController ──────────────────────────────────────────────
+        if (weaponController != null) {
+            if (!meshConfig.neckAttachmentPath.isEmpty()) {
+                Node neckNode = visualsInstance.getNodeOrNull(meshConfig.neckAttachmentPath);
+                if (neckNode instanceof BoneAttachment3D ba) weaponController.neckBoneAttachement = ba;
+            }
+            weaponController.postInitFromVisuals(visualsInstance, meshConfig);
+        }
+
+        // ── FPSCameraController ────────────────────────────────────────────
+        if (fpsCameraController != null && !meshConfig.fpsCameraMarkerPath.isEmpty()) {
+            Node fpsMountNode = visualsInstance.getNodeOrNull(meshConfig.fpsCameraMarkerPath);
+            if (fpsMountNode instanceof Node3D fpsMark) fpsCameraController.fpsCameraMount = fpsMark;
+        }
+
+        // ── MovementController ─────────────────────────────────────────────
+        Node mcNode = getNodeOrNull("MovementController");
+        if (mcNode instanceof MovementController mc && !meshConfig.meshRootPath.isEmpty()) {
+            Node mr = visualsInstance.getNodeOrNull(meshConfig.meshRootPath);
+            if (mr instanceof Node3D mrN) mc.meshRoot = mrN;
+        }
+
+        // ── Stance colliders ──────────────────────────────────────────────
+        // CharacterVisuals owns the authoring shapes (so sizes can be edited in
+        // mesh context). Character.tscn owns the live physics shapes (direct
+        // children of CharacterBody3D, required until godot#77937 lands).
+        // We copy the Shape3D resource + transform from the visual into the
+        // existing character-level collider so both stay in sync.
+        if (!meshConfig.stanceColliderPaths.isEmpty()) {
+            for (StanceName sn : StanceName.values()) {
+                String key = sn.getKey();
+                NodePath stancePath = stances.get(key);
+                if (stancePath == null || stancePath.isEmpty()) continue;
+                Node stanceNode = getNodeOrNull(stancePath);
+                if (!(stanceNode instanceof Stance stance)) continue;
+                NodePath cp = (NodePath) meshConfig.stanceColliderPaths.get(key);
+                if (cp != null && !cp.isEmpty()) {
+                    Node cn = visualsInstance.getNodeOrNull(cp);
+                    CollisionShape3D charShape = stance.getCollider();
+                    if (cn instanceof CollisionShape3D visShape && charShape != null) {
+                        if (visShape.getShape() != null) charShape.setShape(visShape.getShape());
+                        charShape.setTransform(visShape.getTransform());
+                    }
+                }
+                NodePath rp = (NodePath) meshConfig.stanceRaycastPaths.get(key);
+                if (rp != null && !rp.isEmpty()) {
+                    Node rn = visualsInstance.getNodeOrNull(rp);
+                    RayCast3D charRay = stance.getColRaycast();
+                    if (rn instanceof RayCast3D visRay && charRay != null) {
+                        charRay.setTransform(visRay.getTransform());
+                        charRay.setTargetPosition(visRay.getTargetPosition());
+                    }
+                }
+            }
+        }
+
+        // ── Health ────────────────────────────────────────────────────────
+        if (healthNode != null) healthNode.meshConfig = meshConfig;
+    }
+
+    private void addPhysicalBoneExceptions(PhysicalBoneSimulator3D sim) {
+        if (aimRay == null) return;
+        for (int i = 0; i < sim.getChildCount(); i++) {
+            Node child = sim.getChild(i);
+            if (child instanceof PhysicalBone3D bone) aimRay.addException(bone);
+        }
     }
 
     public boolean isCombat() { return combat; }
@@ -488,7 +620,11 @@ public class Character extends CharacterBody3D implements Controllable {
         // Reset the MeshRoot local rotation so the mesh aligns with the body.
         // MovementController normally controls this; since it is disabled the mesh
         // would otherwise stay at whatever facing angle it had when the player stopped.
-        Node meshRoot = getNodeOrNull("MeshRoot");
+        Node meshRoot = null;
+        if (visualsInstance != null && meshConfig != null && !meshConfig.meshRootPath.isEmpty()) {
+            meshRoot = visualsInstance.getNodeOrNull(meshConfig.meshRootPath);
+        }
+        if (meshRoot == null) meshRoot = getNodeOrNull("MeshRoot");
         if (meshRoot instanceof Node3D mr) mr.setRotation(Vector3.Companion.getZERO());
         if (mode == VehicleWeaponMode.PASSENGER_WEAPON) {
             combat = true;
@@ -730,6 +866,17 @@ public class Character extends CharacterBody3D implements Controllable {
         for(Node3D headMesh : headMeshes) {headMesh.setVisible(visible);};
     }
 
+    /**
+     * Looks up a physical bone node by bone name within this character's
+     * physicalBoneSimulator.  Works with both B2 (bones inside CharacterVisuals)
+     * and any legacy embedded setup where physicalBoneSimulator was resolved in _ready().
+     */
+    public Node3D getPhysicalBoneNode(String boneName) {
+        if (physicalBoneSimulator == null) return null;
+        Node n = physicalBoneSimulator.getNodeOrNull(new NodePath("Physical Bone " + boneName));
+        return (n instanceof Node3D nd) ? nd : null;
+    }
+
     public void applyRecoil(double pitchKick, double yawKick) {
         controlRotation.recoilPitch -= pitchKick;
         controlRotation.recoilYaw   += yawKick;
@@ -746,9 +893,14 @@ public class Character extends CharacterBody3D implements Controllable {
     @RegisterFunction
     public void onDied() {
         GD.print(getName() + " died");
-        // Disable animation tree
-        AnimationTree animationTree = (AnimationTree) getNode("AnimationTree");
-        animationTree.setActive(false);
+        // Disable animation tree — prefer meshConfig path, fall back to legacy position.
+        AnimationTree animationTree = null;
+        if (visualsInstance != null && meshConfig != null && !meshConfig.animationTreePath.isEmpty()) {
+            Node atNode = visualsInstance.getNodeOrNull(meshConfig.animationTreePath);
+            if (atNode instanceof AnimationTree at) animationTree = at;
+        }
+        if (animationTree == null) animationTree = (AnimationTree) getNodeOrNull("AnimationTree");
+        if (animationTree != null) animationTree.setActive(false);
 
         if (weaponController != null) weaponController.dropAllWeapons();
 

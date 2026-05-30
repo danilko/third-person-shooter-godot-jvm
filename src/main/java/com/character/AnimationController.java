@@ -97,26 +97,11 @@ public class AnimationController extends Node {
     updateAnimationBlend(movementState);
   }
 
-  public void onWeaponTransition(int animationWeaponIndex, boolean isEquipping) {
-    // If unequipping, we stay on the current weapon's pose.
-    if (!isEquipping) {
-      animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
-      animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
-    }
-    // 2. CONFIGURE: Tell the transition which weapon's specific animation to play
+  public void onWeaponEquip(int animationWeaponIndex) {
+    animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
+    animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
     animationTree.set("parameters/WeaponChangeAnimation/blend_position", animationWeaponIndex);
-    // 3. DIRECTION: 1 for Equip (In), 0 or -1 for Unequip (Out)
-    int state = isEquipping ? 1 : -1;
-    animationTree.set("parameters/WeaponChangeScale/transition_request", state);
-
-    // 4. EXECUTE: Fire the actual movement
     animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
-
-    // If equipping, change to correct weapon pose
-    if (isEquipping) {
-      animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
-      animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
-    }
   }
 
   @RegisterFunction
@@ -145,6 +130,7 @@ public class AnimationController extends Node {
 
   @RegisterFunction
   public void onSetCombatState(CombatState combatState) {
+    if (animationTree == null) return;
     combat = combatState.isCombat();
     animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
     animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);

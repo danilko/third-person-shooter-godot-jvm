@@ -71,18 +71,11 @@ public class ImpactManager extends Node {
                              String weaponName, Texture2D weaponIcon,
                              String attackerName, String attackerFaction) {
         if (info.hitNode == null) return;
-        // hitNode can be either the health-owner itself (e.g. a Vehicle/RigidBody3D whose
-        // AimRay collider IS the body) or a child of the owner (e.g. a PhysicalBone3D inside
-        // a Character). Check the node itself first, then fall back to its scene owner.
-        Node healthOwner = null;
-        if (info.hitNode.hasNode(new NodePath("Health"))) {
-            healthOwner = info.hitNode;
-        } else {
-            Node owner = info.hitNode.getOwner();
-            if (owner != null && owner.hasNode(new NodePath("Health"))) {
-                healthOwner = owner;
-            }
-        }
+        // Walk up the parent chain looking for a node that owns a Health child.
+        // getOwner() is not used here because CharacterVisuals is instantiated at
+        // runtime (addChild), so bones inside it report CharacterVisuals as owner,
+        // not the Character body that contains it.
+        Node healthOwner = walkToHealthOwner(info.hitNode);
         if (healthOwner == null) return;
         Health health = (Health) healthOwner.getNode(new NodePath("Health"));
         health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction);
@@ -93,13 +86,19 @@ public class ImpactManager extends Node {
      *   1. Character subclass        → FLESH  (automatic)
      *   2. HittableBody script       → reads surfaceType property directly
      *   3. Everything else           → DEFAULT
+     *
+     * Walks the parent chain instead of using getOwner() because CharacterVisuals
+     * is instantiated at runtime, making getOwner() point to CharacterVisuals root
+     * rather than the Character body.
      */
     private SurfaceType resolveSurfaceType(Node hitNode) {
         if (hitNode == null) return SurfaceType.DEFAULT;
-        Node owner = hitNode.getOwner();
-        if (owner == null)                    return SurfaceType.DEFAULT;
-        if (owner instanceof Character)       return SurfaceType.FLESH;
-        if (owner instanceof HittableBody hb) return hb.getSurfaceType();
+        Node current = hitNode;
+        while (current != null) {
+            if (current instanceof Character)       return SurfaceType.FLESH;
+            if (current instanceof HittableBody hb) return hb.getSurfaceType();
+            current = current.getParent();
+        }
         return SurfaceType.DEFAULT;
     }
 
@@ -112,9 +111,24 @@ public class ImpactManager extends Node {
      */
     private void applyHitImpulse(HitInfo info, float damage) {
         if (info.hitNode == null || info.hitNormal == null) return;
-        Node owner = info.hitNode.getOwner();
-        if (!(owner instanceof Character character)) return;
-        character.applyHitImpulse(info.hitNode, info.hitNormal.times(-1f), damage);
+        Node current = info.hitNode;
+        while (current != null) {
+            if (current instanceof Character character) {
+                character.applyHitImpulse(info.hitNode, info.hitNormal.times(-1f), damage);
+                return;
+            }
+            current = current.getParent();
+        }
+    }
+
+    // Walk up the parent chain looking for the first node that has a direct "Health" child.
+    private static Node walkToHealthOwner(Node start) {
+        Node current = start;
+        while (current != null) {
+            if (current.hasNode(new NodePath("Health"))) return current;
+            current = current.getParent();
+        }
+        return null;
     }
 
     // ── Lazy singleton lookups ────────────────────────────────────────────────

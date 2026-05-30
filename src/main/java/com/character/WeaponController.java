@@ -151,17 +151,63 @@ public class WeaponController extends Node {
       aimRay = (RayCast3D) getOwner().getNode(aimRayPath);
     }
 
-    // Build socket registry: node name → Marker3D node.
-    for (java.lang.Object obj : socketPaths) {
+    // Build socket registry from legacy owner-relative paths (no CharacterVisuals).
+    // When using CharacterVisuals, Character._ready() calls postInitFromVisuals() instead.
+    if (!socketPaths.isEmpty()) {
+      for (java.lang.Object obj : socketPaths) {
+        NodePath p = (NodePath) obj;
+        if (p == null || p.toString().isEmpty()) continue;
+        Node socket = getOwner().getNodeOrNull(p);
+        if (socket != null) socketMap.put(socket.getName().toString(), socket);
+      }
+
+      // Discover weapons pre-placed inside attachment markers in the scene.
+      discoverPrePlacedWeapons(getOwner(), weaponAttachmentPath);
+      showWeapon(activeSlotIndex);
+    }
+
+    if (neckBoneAttachement != null) {
+      ((AnimationPlayer) neckBoneAttachement.getNode("AnimationPlayer")).play("MuzzleFlash");
+    }
+
+    emitInitialAmmoState();
+  }
+
+  /**
+   * Wires all mesh-dependent references from a newly instantiated CharacterVisuals scene.
+   * Called by Character._ready() after addChild(visualsInstance) and after setting
+   * neckBoneAttachement.  Safe to call with a null config (no-op).
+   */
+  public void postInitFromVisuals(Node visualsRoot, MeshConfig config) {
+    if (visualsRoot == null || config == null) return;
+
+    // Rebuild socket map from visuals-relative paths in meshConfig.
+    socketMap.clear();
+    for (java.lang.Object obj : config.socketPaths) {
       NodePath p = (NodePath) obj;
       if (p == null || p.toString().isEmpty()) continue;
-      Node socket = getOwner().getNodeOrNull(p);
+      Node socket = visualsRoot.getNodeOrNull(p);
       if (socket != null) socketMap.put(socket.getName().toString(), socket);
     }
 
-    // Discover weapons pre-placed inside attachment markers in the scene
-    Node attachment = getOwner().getNodeOrNull(weaponAttachmentPath);
-    if (attachment != null) for (Node child : attachment.getChildren()) {
+    // Discover weapons pre-placed in the weapon attachment node.
+    discoverPrePlacedWeapons(visualsRoot, config.weaponAttachmentPath);
+    showWeapon(activeSlotIndex);
+
+    // Start muzzle-flash loop now that neckBoneAttachement is resolved.
+    if (neckBoneAttachement != null) {
+      Node apNode = neckBoneAttachement.getNodeOrNull("AnimationPlayer");
+      if (apNode instanceof AnimationPlayer ap) ap.play("MuzzleFlash");
+    }
+
+    emitInitialAmmoState();
+  }
+
+  private void discoverPrePlacedWeapons(Node root, NodePath attachPath) {
+    if (attachPath == null || attachPath.isEmpty()) return;
+    Node attachment = root.getNodeOrNull(attachPath);
+    if (attachment == null) return;
+    for (Node child : attachment.getChildren()) {
       if (child.getChildCount() > 0 && child.getChild(0) instanceof WeaponItem w) {
         int slot = findFreeSlot(w.getSlotType());
         if (slot < 0) slot = findFirstSlot(w.getSlotType());
@@ -172,14 +218,6 @@ public class WeaponController extends Node {
         w.hide();
       }
     }
-
-    showWeapon(activeSlotIndex);
-
-    if (neckBoneAttachement != null) {
-      ((AnimationPlayer) neckBoneAttachement.getNode("AnimationPlayer")).play("MuzzleFlash");
-    }
-
-    emitInitialAmmoState();
   }
 
   // ── Runtime equip / drop ─────────────────────────────────────────────────
@@ -219,7 +257,7 @@ public class WeaponController extends Node {
         weaponAudio.setStream(item.getReloadAudio());
         weaponAudio.play();
       }
-      animationController.onWeaponTransition(item.weaponPoseIndex, true);
+      animationController.onWeaponEquip(item.weaponPoseIndex);
       ammoChanged.emit(item.getMagazine(), item.getReserve());
     } else {
       // Weapon goes into an inactive slot — mount at its holster socket.
@@ -335,16 +373,12 @@ public class WeaponController extends Node {
 
     pendingSlotIndex = slotIndex;
     showWeapon(activeSlotIndex);
-    WeaponItem current = weapons[activeSlotIndex];
-    if (current != null) animationController.onWeaponTransition(current.weaponPoseIndex, false);
     transitionTimer.setWaitTime(1.0 / weapons[pendingSlotIndex].getSwitchSpeed());
     transitionTimer.start();
   }
 
   private void unequipCurrent() {
     if (isUnarmed) return;
-    WeaponItem current = weapons[activeSlotIndex];
-    if (current != null) animationController.onWeaponTransition(current.weaponPoseIndex, false);
     isUnarmed = true;
     showWeapon(-1);
     ammoChanged.emit(0, 0);
@@ -355,7 +389,7 @@ public class WeaponController extends Node {
     activeSlotIndex = pendingSlotIndex;
     showWeapon(activeSlotIndex);
     WeaponItem next = weapons[activeSlotIndex];
-    if (next != null) animationController.onWeaponTransition(next.weaponPoseIndex, true);
+    if (next != null) animationController.onWeaponEquip(next.weaponPoseIndex);
     if (next != null) ammoChanged.emit(next.getMagazine(), next.getReserve());
   }
 
