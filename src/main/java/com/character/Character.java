@@ -622,7 +622,11 @@ public class Character extends CharacterBody3D implements Controllable {
         }
         if (meshRoot == null) meshRoot = getNodeOrNull("MeshRoot");
         if (meshRoot instanceof Node3D mr) mr.setRotation(Vector3.Companion.getZERO());
-        if (mode == VehicleWeaponMode.PASSENGER_WEAPON) {
+        // Show character weapon for any mode where the vehicle has no weapon of its own.
+        // PASSENGER_WEAPON: character fires their weapon via vehicle camera → must be in combat.
+        // NONE: vehicle has no weapon; character still holds their weapon visually while riding.
+        // VEHICLE_WEAPON: vehicle fires its own weapon; leave the character's combat state as-is.
+        if (mode != VehicleWeaponMode.VEHICLE_WEAPON) {
             combat = true;
             setCombatState();
         }
@@ -660,13 +664,14 @@ public class Character extends CharacterBody3D implements Controllable {
      * @param aimTarget world-space point the vehicle camera is aimed at (unused here;
      *                  the vehicle already injected its AimRay into WeaponController)
      */
-    public void applyPassengerWeaponInput(boolean fire, boolean reload, Vector3 aimTargetPos) {
+    public void applyPassengerWeaponInput(boolean fire, boolean reload, int desiredWeapon, Vector3 aimTargetPos) {
         if (aimTargetPos != null && aimTarget != null) {
             aimTarget.setGlobalPosition(aimTargetPos);
         }
         if (fire) fireWeapon.emit();
         else      notFireWeapon.emit();
         if (reload) reloadWeapon.emit();
+        if (desiredWeapon >= 0) setWeapon(desiredWeapon);
     }
 
     public void setMovementDirection(Vector3 movementDirection) {

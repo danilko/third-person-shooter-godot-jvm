@@ -21,8 +21,8 @@ import godot.global.GD;
 public class FirearmItem extends WeaponItem {
 
   // Injected by WeaponController after weapon discovery
+  private WeaponController weaponController;
   private CharacterBody3D owningCharacter;
-  private RayCast3D aimRay3D;
   private GPUParticles3D muzzleFlashFx;
   private AnimationPlayer muzzleFlashAnimPlayer;
   private AudioStreamPlayer3D weaponAudio;
@@ -60,14 +60,13 @@ public class FirearmItem extends WeaponItem {
 
   /**
    * Called by WeaponController after weapon discovery or pickup.
-   * Provides character-level references that cannot be resolved from inside the
-   * weapon sub-scene. Pass null for all arguments to clear refs when returning to a pickup.
-   * VFX refs are weapon-local and are resolved in _ready(), not here.
+   * Every weapon is always owned by a WeaponController — character or vehicle.
+   * Pass nulls to clear refs when returning to a world pickup.
    */
-  public void setup(CharacterBody3D character, RayCast3D aimRay, AudioStreamPlayer3D audio) {
-    this.owningCharacter = character;
-    this.aimRay3D        = aimRay;
-    this.weaponAudio     = audio;
+  public void setup(WeaponController controller, CharacterBody3D character, AudioStreamPlayer3D audio) {
+    this.weaponController = controller;
+    this.owningCharacter  = character;
+    this.weaponAudio      = audio;
   }
 
   @RegisterFunction
@@ -150,14 +149,15 @@ public class FirearmItem extends WeaponItem {
   }
 
   private void performHitscan() {
-    if (aimRay3D == null) return;
+    RayCast3D ray = getEffectiveAimRay();
+    if (ray == null) return;
 
     // Player: apply angular spread + force update. Enemy: snapAimRay already
     // positioned the ray (with scatter baked in) — rotating it again would override that.
     boolean applySpread = owningCharacter instanceof Character c && c.useWeaponSpread;
     Vector3 savedRot = null;
     if (applySpread && spread > 0f) {
-      savedRot = aimRay3D.getRotationDegrees();
+      savedRot = ray.getRotationDegrees();
       float halfSpread = getCurrentSpreadDeg() * 0.5f;
       // Circular cone: pick a random angle and a sqrt-distributed radius so
       // shots fill the disk uniformly (no diagonal bulge from a square pattern).
@@ -165,17 +165,17 @@ public class FirearmItem extends WeaponItem {
       double coneRadius = Math.sqrt(GD.randf()) * halfSpread;
       float pitchOff = (float)(Math.cos(coneAngle) * coneRadius);
       float yawOff   = (float)(Math.sin(coneAngle) * coneRadius);
-      aimRay3D.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
-      aimRay3D.forceRaycastUpdate();
+      ray.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
+      ray.forceRaycastUpdate();
     }
 
-    if (aimRay3D.isColliding() &&
-        aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin()).length() > 0.1) {
-      Object collider = aimRay3D.getCollider();
+    if (ray.isColliding() &&
+        ray.getCollisionPoint().minus(ray.getGlobalTransform().getOrigin()).length() > 0.1) {
+      Object collider = ray.getCollider();
       Node hitNode = (collider instanceof Node n) ? n : null;
       ImpactManager im = getImpactManager();
       if (im != null) {
-        HitInfo info = new HitInfo(hitNode, aimRay3D.getCollisionPoint(), aimRay3D.getCollisionNormal());
+        HitInfo info = new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal());
         String attackerName;
         String attackerFaction;
         if (owningCharacter instanceof Character c && c.characterInfo != null) {
@@ -190,24 +190,33 @@ public class FirearmItem extends WeaponItem {
     }
 
     if (savedRot != null) {
-      aimRay3D.setRotationDegrees(savedRot);
+      ray.setRotationDegrees(savedRot);
     }
 
-    spawnBulletTracer();
+    spawnBulletTracer(ray);
   }
 
-  private void spawnBulletTracer() {
+  private void spawnBulletTracer(RayCast3D ray) {
     Vector3 muzzlePos = weaponMuzzle().getGlobalPosition();
-    Vector3 tracerEnd;
-    if (aimRay3D.isColliding()) {
-      tracerEnd = aimRay3D.getCollisionPoint();
-    } else {
-      Vector3 rayDir = aimRay3D.toGlobal(aimRay3D.getTargetPosition())
-          .minus(aimRay3D.getGlobalPosition()).normalized();
-      tracerEnd = muzzlePos.plus(rayDir.times(200f));
-    }
+    // Project the aim ray's world-space direction from the muzzle position.
+    // This makes the tracer appear straight toward the crosshair regardless of distance,
+    // while still starting from the gun barrel tip.
+    Vector3 rayDir = ray.toGlobal(ray.getTargetPosition())
+        .minus(ray.getGlobalPosition()).normalized();
+    float dist = ray.isColliding()
+        ? (float) ray.getCollisionPoint().minus(muzzlePos).length()
+        : 200f;
     BulletTracerManager tm = getBulletTracerManager();
-    if (tm != null) tm.spawnTracer(muzzlePos, tracerEnd);
+    if (tm != null) tm.spawnTracer(muzzlePos, muzzlePos.plus(rayDir.times(dist)));
+  }
+
+  /**
+   * Every weapon belongs to a WeaponController (character or vehicle) that owns the
+   * authoritative AimRay. Reading it live means vehicle overrides, weapon switches,
+   * and enter/exit transitions are all automatically transparent.
+   */
+  private RayCast3D getEffectiveAimRay() {
+    return weaponController != null ? weaponController.getAimRay() : null;
   }
 
   private float stanceMultiplier(CharacterBody3D character) {

@@ -222,6 +222,18 @@ public class PlayerController extends Controller {
         // When there is no PASSENGER_WEAPON, "reload" doubles as a flip-upright reset.
         cmd.resetVehicle = inp.isActionJustPressed("reload", false);
 
+        // Weapon slot switching — relayed to the occupant for PASSENGER_WEAPON mode.
+        if (inp.isActionJustPressed("weapon_unequip", false)) {
+            cmd.desiredWeapon = 6;
+        } else {
+            for (int i = 0; i < 6; i++) {
+                if (inp.isActionJustPressed("weapon_slot_" + (i + 1), false)) {
+                    cmd.desiredWeapon = i;
+                    break;
+                }
+            }
+        }
+
         cmd.sequenceNumber = ++localSequence;
         predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();
 

@@ -74,13 +74,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
      */
     @RegisterProperty @Export public int weaponModeIndex = 1;
 
-    /** Path to the RayCast3D under the vehicle camera used for passenger aiming. */
-    @RegisterProperty @Export public NodePath vehicleAimRayPath =
-            new NodePath("ActiveCamera/AimRay");
-
-    /** Path to the vehicle-owned weapon node (for VEHICLE_WEAPON mode). */
-    @RegisterProperty @Export public NodePath vehicleWeaponPath =
-            new NodePath("VehicleWeaponMount/WeaponItem");
 
     /** Minimum vehicle speed (m/s) needed to deal collision damage to characters. 0 disables it. */
     @RegisterProperty @Export public float vehicleCollisionMinSpeed = 5.0f;
@@ -103,7 +96,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
     private Node3D                   driverSeatNode;
     private Camera3D                 vehicleCamera;
     private VehicleCameraController  camController;
-    private WeaponItem               vehicleWeaponItem;
+    private WeaponController         vehicleWeaponController;
     private final ArrayList<VehicleWheel> wheels = new ArrayList<>();
 
     private boolean slipping    = false;
@@ -161,16 +154,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Node camCtrl = getNodeOrNull("CameraController");
         if (camCtrl instanceof VehicleCameraController vcc) camController = vcc;
 
-        // Cache vehicle weapon for VEHICLE_WEAPON mode and inject the vehicle AimRay.
-        Node vw = getNodeOrNull(vehicleWeaponPath.getPath());
-        if (vw instanceof WeaponItem wi) {
-            vehicleWeaponItem = wi;
-            if (wi instanceof FirearmItem fi && getWeaponMode() == VehicleWeaponMode.VEHICLE_WEAPON) {
-                Node aimRayNode = getNodeOrNull(vehicleAimRayPath.getPath());
-                RayCast3D vRay = aimRayNode instanceof RayCast3D r ? r : null;
-                fi.setup(null, vRay, null);
-            }
-        }
+        // Discover vehicle's own WeaponController (for VEHICLE_WEAPON mode).
+        // The WeaponController's _ready() handles AimRay wiring and weapon discovery automatically.
+        Node wc = getNodeOrNull("WeaponController");
+        if (wc instanceof WeaponController vwc) vehicleWeaponController = vwc;
 
         for (Node child : getChildren()) {
             if (child instanceof Controller c) { controller = c; break; }
@@ -257,10 +244,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
                 Vector3 aimTarget = camController != null
                         ? camController.getAimTarget()
                         : occupant.getGlobalPosition().plus(new Vector3(0f, 0f, -20f));
-                occupant.applyPassengerWeaponInput(cmd.fire, cmd.reload, aimTarget);
-            } else if (mode == VehicleWeaponMode.VEHICLE_WEAPON && vehicleWeaponItem != null) {
-                if (cmd.fire) vehicleWeaponItem.useWeapon();
-                else          vehicleWeaponItem.stopUseWeapon();
+                occupant.applyPassengerWeaponInput(cmd.fire, cmd.reload, cmd.desiredWeapon, aimTarget);
+            } else if (mode == VehicleWeaponMode.VEHICLE_WEAPON && vehicleWeaponController != null) {
+                if (cmd.fire) vehicleWeaponController.onWeaponFire();
+                else          vehicleWeaponController.onWeaponNotFire();
             }
         }
 
@@ -361,9 +348,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
         if (ctrl != null) attachController(ctrl);
 
         // For PASSENGER_WEAPON: swap the character's AimRay to the vehicle camera ray.
-        if (mode == VehicleWeaponMode.PASSENGER_WEAPON) {
-            Node aimRayNode = getNodeOrNull(vehicleAimRayPath.getPath());
-            if (aimRayNode instanceof RayCast3D vRay) {
+        // The vehicle's WeaponController already resolved this ray in _ready().
+        if (mode == VehicleWeaponMode.PASSENGER_WEAPON && vehicleWeaponController != null) {
+            RayCast3D vRay = vehicleWeaponController.getAimRay();
+            if (vRay != null) {
                 Node wc = c.getNodeOrNull("WeaponController");
                 if (wc instanceof WeaponController wcn) wcn.overrideAimRay(vRay);
             }

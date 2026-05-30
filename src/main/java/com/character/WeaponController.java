@@ -114,6 +114,9 @@ public class WeaponController extends Node {
     return w != null ? w.getCurrentSpreadDeg() : 0f;
   }
 
+  /** The active AimRay for all character-owned weapons. May be the vehicle ray when overridden. */
+  public RayCast3D getAimRay() { return aimRay; }
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @RegisterFunction
@@ -150,20 +153,20 @@ public class WeaponController extends Node {
       aimRay = (RayCast3D) getOwner().getNode(aimRayPath);
     }
 
-    // Build socket registry from legacy owner-relative paths (no CharacterVisuals).
-    // When using CharacterVisuals, Character._ready() calls postInitFromVisuals() instead.
-    if (!socketPaths.isEmpty()) {
-      for (java.lang.Object obj : socketPaths) {
-        NodePath p = (NodePath) obj;
-        if (p == null || p.toString().isEmpty()) continue;
-        Node socket = getOwner().getNodeOrNull(p);
-        if (socket != null) socketMap.put(socket.getName().toString(), socket);
-      }
-
-      // Discover weapons pre-placed inside attachment markers in the scene.
-      discoverPrePlacedWeapons(getOwner(), weaponAttachmentPath);
-      showWeapon(activeSlotIndex);
+    // Build socket registry from owner-relative socket paths (no CharacterVisuals).
+    // Characters using CharacterVisuals skip this — postInitFromVisuals() rebuilds from visuals root.
+    for (java.lang.Object obj : socketPaths) {
+      NodePath p = (NodePath) obj;
+      if (p == null || p.toString().isEmpty()) continue;
+      Node socket = getOwner().getNodeOrNull(p);
+      if (socket != null) socketMap.put(socket.getName().toString(), socket);
     }
+
+    // Discover weapons pre-placed in the weapon attachment (e.g. vehicle weapon mounts).
+    // For CharacterVisuals characters the attachment lives inside the visuals sub-scene, so
+    // getNodeOrNull returns null here — postInitFromVisuals() re-discovers correctly later.
+    discoverPrePlacedWeapons(getOwner(), weaponAttachmentPath);
+    showWeapon(activeSlotIndex);
 
     emitInitialAmmoState();
   }
@@ -246,7 +249,7 @@ public class WeaponController extends Node {
         weaponAudio.setStream(item.getReloadAudio());
         weaponAudio.play();
       }
-      animationController.onWeaponEquip(item.weaponPoseIndex);
+      if (animationController != null) animationController.onWeaponEquip(item.weaponPoseIndex);
       ammoChanged.emit(item.getMagazine(), item.getReserve());
     } else {
       // Weapon goes into an inactive slot — mount at its holster socket.
@@ -331,7 +334,7 @@ public class WeaponController extends Node {
       weaponAudio.play();
     }
     reloadTimer.start();
-    animationController.onWeaponReload();
+    if (animationController != null) animationController.onWeaponReload();
   }
 
   @RegisterFunction
@@ -378,8 +381,10 @@ public class WeaponController extends Node {
     activeSlotIndex = pendingSlotIndex;
     showWeapon(activeSlotIndex);
     WeaponItem next = weapons[activeSlotIndex];
-    if (next != null) animationController.onWeaponEquip(next.weaponPoseIndex);
-    if (next != null) ammoChanged.emit(next.getMagazine(), next.getReserve());
+    if (next != null) {
+      animationController.onWeaponEquip(next.weaponPoseIndex);
+      ammoChanged.emit(next.getMagazine(), next.getReserve());
+    }
   }
 
   @RegisterFunction
@@ -434,7 +439,7 @@ public class WeaponController extends Node {
   public void overrideAimRay(RayCast3D vehicleRay) {
     originalAimRay = aimRay;
     aimRay = vehicleRay;
-    injectCharacterRefs(getCurrentWeaponItem());
+    // No re-injection needed: FirearmItem.getEffectiveAimRay() reads this field live.
   }
 
   /** Restores the character's original AimRay after exiting PASSENGER_WEAPON mode. */
@@ -442,12 +447,13 @@ public class WeaponController extends Node {
     if (originalAimRay == null) return;
     aimRay = originalAimRay;
     originalAimRay = null;
-    injectCharacterRefs(getCurrentWeaponItem());
+    // No re-injection needed: FirearmItem.getEffectiveAimRay() reads this field live.
   }
 
   private void injectCharacterRefs(WeaponItem item) {
     if (item instanceof FirearmItem fi) {
-      fi.setup((CharacterBody3D) getOwner(), aimRay, weaponAudio);
+      CharacterBody3D character = getOwner() instanceof CharacterBody3D c ? c : null;
+      fi.setup(this, character, weaponAudio);
     }
   }
 
