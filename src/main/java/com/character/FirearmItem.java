@@ -44,17 +44,30 @@ public class FirearmItem extends WeaponItem {
   private static final float JUMP_SPREAD_MULT   = 2.0f;
 
   /**
-   * Called by WeaponController after weapon discovery or pickup.
-   * Provides all character-level references that cannot be resolved from inside the
-   * weapon sub-scene. Pass null for all arguments to clear refs when returning to a pickup.
+   * Discovers weapon-local VFX nodes from the weapon scene. Called once on _ready();
+   * VFX live under Muzzle/MuzzleVFX and never change regardless of equip state.
    */
-  public void setup(CharacterBody3D character, RayCast3D aimRay,
-                    BoneAttachment3D neckAttachment, AudioStreamPlayer3D audio) {
+  @RegisterFunction
+  @Override
+  public void _ready() {
+    Node muzzle = getNodeOrNull("Muzzle");
+    Node vfx    = (muzzle != null) ? muzzle.getNodeOrNull("MuzzleVFX") : null;
+    if (vfx != null) {
+      muzzleFlashFx         = (GPUParticles3D)  vfx.getNodeOrNull("MuzzleFlash");
+      muzzleFlashAnimPlayer = (AnimationPlayer) vfx.getNodeOrNull("AnimationPlayer");
+    }
+  }
+
+  /**
+   * Called by WeaponController after weapon discovery or pickup.
+   * Provides character-level references that cannot be resolved from inside the
+   * weapon sub-scene. Pass null for all arguments to clear refs when returning to a pickup.
+   * VFX refs are weapon-local and are resolved in _ready(), not here.
+   */
+  public void setup(CharacterBody3D character, RayCast3D aimRay, AudioStreamPlayer3D audio) {
     this.owningCharacter = character;
-    this.aimRay3D = aimRay;
-    this.muzzleFlashFx = neckAttachment != null ? (GPUParticles3D) neckAttachment.getNode("MuzzleFlash") : null;
-    this.muzzleFlashAnimPlayer = neckAttachment != null ? (AnimationPlayer) neckAttachment.getNode("AnimationPlayer") : null;
-    this.weaponAudio = audio;
+    this.aimRay3D        = aimRay;
+    this.weaponAudio     = audio;
   }
 
   @RegisterFunction
@@ -124,8 +137,8 @@ public class FirearmItem extends WeaponItem {
 
   private void triggerMuzzleFlash() {
     if (muzzleFlashFx == null) return;
+    // VFX nodes are children of the weapon's Muzzle marker — position is automatic.
     muzzleFlashFx.setSpeedScale(fireRate);
-    muzzleFlashFx.setGlobalPosition(weaponMuzzle().getGlobalPosition());
     muzzleFlashAnimPlayer.setSpeedScale((float) GD.clamp(fireRate, 5, 10));
     muzzleFlashAnimPlayer.play("MuzzleFlash");
   }

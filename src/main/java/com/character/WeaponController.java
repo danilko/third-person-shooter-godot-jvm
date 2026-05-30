@@ -45,7 +45,6 @@ public class WeaponController extends Node {
   public final Signal2<Integer, Integer> ammoChanged = new Signal2<>(this, new StringName("ammo_changed"));
 
   @RegisterProperty @Export public AudioStreamPlayer3D weaponAudio;
-  @RegisterProperty @Export public BoneAttachment3D neckBoneAttachement;
 
   /**
    * Defines the type of each slot by index.
@@ -166,17 +165,13 @@ public class WeaponController extends Node {
       showWeapon(activeSlotIndex);
     }
 
-    if (neckBoneAttachement != null) {
-      ((AnimationPlayer) neckBoneAttachement.getNode("AnimationPlayer")).play("MuzzleFlash");
-    }
-
     emitInitialAmmoState();
   }
 
   /**
    * Wires all mesh-dependent references from a newly instantiated CharacterVisuals scene.
    * Called by Character._ready() after addChild(visualsInstance) and after setting
-   * neckBoneAttachement.  Safe to call with a null config (no-op).
+   * Safe to call with a null config (no-op).
    */
   public void postInitFromVisuals(Node visualsRoot, MeshConfig config) {
     if (visualsRoot == null || config == null) return;
@@ -193,12 +188,6 @@ public class WeaponController extends Node {
     // Discover weapons pre-placed in the weapon attachment node.
     discoverPrePlacedWeapons(visualsRoot, config.weaponAttachmentPath);
     showWeapon(activeSlotIndex);
-
-    // Start muzzle-flash loop now that neckBoneAttachement is resolved.
-    if (neckBoneAttachement != null) {
-      Node apNode = neckBoneAttachement.getNodeOrNull("AnimationPlayer");
-      if (apNode instanceof AnimationPlayer ap) ap.play("MuzzleFlash");
-    }
 
     emitInitialAmmoState();
   }
@@ -458,7 +447,7 @@ public class WeaponController extends Node {
 
   private void injectCharacterRefs(WeaponItem item) {
     if (item instanceof FirearmItem fi) {
-      fi.setup((CharacterBody3D) getOwner(), aimRay, neckBoneAttachement, weaponAudio);
+      fi.setup((CharacterBody3D) getOwner(), aimRay, weaponAudio);
     }
   }
 
@@ -542,7 +531,7 @@ public class WeaponController extends Node {
    * frozen body, so onReturnedToWorld() unfreezes before we set position.
    */
   private void returnWeaponToWorld(WeaponItem item, Vector3 spawnPos, Vector3 impulse) {
-    if (item instanceof FirearmItem fi) fi.setup(null, null, null, null);
+    if (item instanceof FirearmItem fi) fi.setup(null, null, null);
     item.show();
     item.reparent(getTree().getCurrentScene(), true);
     item.onReturnedToWorld();

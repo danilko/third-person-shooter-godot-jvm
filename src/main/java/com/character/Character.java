@@ -300,10 +300,6 @@ public class Character extends CharacterBody3D implements Controllable {
 
         // ── WeaponController ──────────────────────────────────────────────
         if (weaponController != null) {
-            if (!meshConfig.neckAttachmentPath.isEmpty()) {
-                Node neckNode = visualsInstance.getNodeOrNull(meshConfig.neckAttachmentPath);
-                if (neckNode instanceof BoneAttachment3D ba) weaponController.neckBoneAttachement = ba;
-            }
             weaponController.postInitFromVisuals(visualsInstance, meshConfig);
         }
 

@@ -5,6 +5,7 @@
 [ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="3_gt4sh"]
 [ext_resource type="AudioStream" uid="uid://c333cb6cupk6h" path="res://assets/audio/Rifle_reload.wav" id="4_bxm8d"]
 [ext_resource type="PackedScene" uid="uid://dlfyhi6367wjr" path="res://assets/AssaultRifle_4.glb" id="5_fu3cl"]
+[ext_resource type="PackedScene" uid="uid://5scryv00gkj7" path="res://src/main/resources/com/weapon/MuzzleVFX.tscn" id="6_muzzle"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_fu3cl"]
 size = Vector3(0.215, 0.625, 0.105)
@@ -51,6 +52,8 @@ shape = SubResource("BoxShape3D_v5ooh")
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=491564192]
 transform = Transform3D(1, 2.9802322e-08, 0, -2.9802322e-08, 0.9999999, 2.9802322e-08, 1.7881393e-07, -2.9802322e-08, 1, 0.28739956, 0.006740451, 0)
+
+[node name="MuzzleVFX" parent="Muzzle" instance=ExtResource("6_muzzle")]
 
 [node name="AssaultRifle_42" parent="." unique_id=791353034 instance=ExtResource("5_fu3cl")]
 transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, -0.10526501, -0.052679118, 0)

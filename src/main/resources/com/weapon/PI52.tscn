@@ -5,6 +5,7 @@
 [ext_resource type="AudioStream" uid="uid://c0v8ncowcuy0l" path="res://assets/audio/Pistol_fire.wav" id="3_t6cmh"]
 [ext_resource type="AudioStream" uid="uid://b11jauobcpulr" path="res://assets/audio/Pistol_reload.wav" id="4_l5qg7"]
 [ext_resource type="PackedScene" uid="uid://b813tvx5x2wet" path="res://assets/Pistol_5.glb" id="5_28o6u"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/weapon/MuzzleVFX.tscn" id="6_muzzle"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body"]
 size = Vector3(0.25, 0.16063085, 0.064)
@@ -52,7 +53,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.006863282, 0)
 shape = SubResource("BoxShape3D_area")
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=1222425939]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.155, 0.053707544, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.09566823, 0.010032324, -3.3154213e-10)
+
+[node name="MuzzleVFX" parent="Muzzle" unique_id=1454172846 instance=ExtResource("6_muzzle")]
 
 [node name="Pistol_52" parent="." unique_id=509308939 instance=ExtResource("5_28o6u")]
 transform = Transform3D(0.1, 0, 0, 0, 0.10000002, 0, 0, 0, 0.1, -0.05852431, -0.043783948, -3.2703007e-10)
