@@ -48,23 +48,22 @@ public class WeaponController extends Node {
 
   /**
    * Defines the type of each slot by index.
-   * Layout: two PRIMARY, one SECONDARY, one MELEE, one THROWABLE, one CONSUMABLE, one OFFHAND.
-   * Override in a subclass or replace in _ready() before calling super to customise.
+   * Slot 0 is always FIST — permanent, non-droppable, auto-populated in _ready().
+   * Slots 1–6 are the standard weapon inventory.
    */
   protected WeaponSlotType[] slotTypes = {
-      WeaponSlotType.PRIMARY,     // slot 0 — first long weapon   (key 1)
-      WeaponSlotType.PRIMARY,     // slot 1 — second long weapon  (key 2)
-      WeaponSlotType.SECONDARY,   // slot 2 — sidearm             (key 3)
-      WeaponSlotType.MELEE,       // slot 3 — melee               (key 4)
-      WeaponSlotType.THROWABLE,   // slot 4 — throwable           (key 5)
-      WeaponSlotType.CONSUMABLE,  // slot 5 — health / consumable (key 6)
-      WeaponSlotType.OFFHAND,     // slot 6 — shield / torch      (key 0)
+      WeaponSlotType.FIST,        // slot 0 — permanent fist (key: weapon_unequip)
+      WeaponSlotType.PRIMARY,     // slot 1 — first long weapon  (key 1)
+      WeaponSlotType.PRIMARY,     // slot 2 — second long weapon (key 2)
+      WeaponSlotType.SECONDARY,   // slot 3 — sidearm            (key 3)
+      WeaponSlotType.MELEE,       // slot 4 — melee              (key 4)
+      WeaponSlotType.THROWABLE,   // slot 5 — throwable          (key 5)
+      WeaponSlotType.CONSUMABLE,  // slot 6 — consumable         (key 6)
   };
 
   private WeaponItem[] weapons;
-  private int     activeSlotIndex  = 0;
-  private int     pendingSlotIndex = 0;
-  private boolean isUnarmed        = false;
+  private int activeSlotIndex  = 0;
+  private int pendingSlotIndex = 0;
 
   // Weapons queued for equip/drop; processed in _process (idle) to avoid
   // reparenting a RigidBody3D (CollisionObject) during a physics callback.
@@ -86,14 +85,13 @@ public class WeaponController extends Node {
 
   // ── Accessors ─────────────────────────────────────────────────────────────
 
-  public int getWeapon() { return isUnarmed ? -1 : activeSlotIndex; }
+  public int getWeapon() { return activeSlotIndex; }
 
-  public boolean isUnarmed() { return isUnarmed; }
-
-  public WeaponItem getCurrentWeaponStats() { return getCurrentWeaponItem(); }
+  /** True when a real weapon (slot > 0) is active. False when fist is active. */
+  public boolean isArmed() { return activeSlotIndex > 0; }
 
   public WeaponItem getCurrentWeaponItem() {
-    return isUnarmed ? null : weapons[activeSlotIndex];
+    return weapons[activeSlotIndex];
   }
 
   public int getWeaponCount() {
@@ -101,8 +99,6 @@ public class WeaponController extends Node {
     for (WeaponItem w : weapons) if (w != null) n++;
     return n;
   }
-
-  public WeaponItem getWeaponStats(int slotIndex) { return getWeaponItem(slotIndex); }
 
   public WeaponItem getWeaponItem(int slotIndex) {
     if (slotIndex < 0 || slotIndex >= weapons.length) return null;
@@ -192,6 +188,12 @@ public class WeaponController extends Node {
     discoverPrePlacedWeapons(visualsRoot, config.weaponAttachmentPath);
     showWeapon(activeSlotIndex);
 
+    // Sync animation tree to the initial weapon pose (no transition fires on first discovery).
+    WeaponItem initial = weapons[activeSlotIndex];
+    if (initial != null && animationController != null) {
+      animationController.onWeaponEquip(initial.weaponPoseIndex);
+    }
+
     emitInitialAmmoState();
   }
 
@@ -227,6 +229,7 @@ public class WeaponController extends Node {
    * Equips {@code item} into the first free slot whose type matches the weapon's
    * {@link WeaponItem#getSlotType()}. Falls back to the first slot of that type
    * (displacing the current occupant) if no free slot exists.
+   * FIST slot (0) is structurally protected — no other weapon type maps to it.
    */
   public void equipWeapon(WeaponItem item) {
     WeaponSlotType type = item.getSlotType();
@@ -235,14 +238,14 @@ public class WeaponController extends Node {
     if (targetSlot < 0) return;
 
     WeaponItem displaced = weapons[targetSlot];
-    boolean willBeActive = isUnarmed || targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null;
+    boolean willBeActive = targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null;
 
     item.onPickedUp();
     injectCharacterRefs(item);
     weapons[targetSlot] = item;
 
     if (willBeActive) {
-      isUnarmed = false;
+      boolean wasArmed = isArmed();
       activeSlotIndex = targetSlot;
       moveWeaponToHand(item);
       if (item.getReloadAudio() != null) {
@@ -251,6 +254,7 @@ public class WeaponController extends Node {
       }
       if (animationController != null) animationController.onWeaponEquip(item.weaponPoseIndex);
       ammoChanged.emit(item.getMagazine(), item.getReserve());
+      if (wasArmed != isArmed()) emitArmedStateChanged(isArmed());
     } else {
       // Weapon goes into an inactive slot — mount at its holster socket.
       moveWeaponToHolster(item);
@@ -272,11 +276,12 @@ public class WeaponController extends Node {
   /**
    * Removes the currently active weapon from the inventory and returns it to the
    * world at the character's feet with a throw impulse.
+   * No-op if the active weapon is not droppable (e.g. fist at slot 0).
    */
   @RegisterFunction
   public void dropCurrentWeapon() {
     WeaponItem current = weapons[activeSlotIndex];
-    if (current == null) return;
+    if (current == null || !current.isDroppable) return;
     weapons[activeSlotIndex] = null;
     current.hide();       // hide immediately — reparent is deferred to _process
     pendingDrops.add(current);
@@ -284,15 +289,16 @@ public class WeaponController extends Node {
   }
 
   /**
-   * Releases every carried weapon back into the world. Called on character death.
+   * Releases every droppable weapon back into the world. Called on character death.
    * Safe to invoke from a physics callback — actual reparenting is deferred to _process().
    * Each weapon spawns at hip height + 0.5 m extra and is thrown in a random radial
    * direction so weapons fan out rather than pile on one spot.
+   * Non-droppable weapons (fist) are skipped.
    */
   public void dropAllWeapons() {
     for (int i = 0; i < weapons.length; i++) {
       WeaponItem item = weapons[i];
-      if (item == null) continue;
+      if (item == null || !item.isDroppable) continue;
       weapons[i] = null;
       item.hide();
       pendingDrops.add(item);
@@ -304,10 +310,10 @@ public class WeaponController extends Node {
 
   @RegisterFunction
   public void onWeaponFire() {
-    if (fireTimer.getTimeLeft() > 0 || reloadTimer.getTimeLeft() > 0) return;
+    if (fireTimer.getTimeLeft() > 0 || reloadTimer.getTimeLeft() > 0 || isWeaponTransitioning()) return;
     WeaponItem w = getCurrentWeaponItem();
     if (w == null) return;
-    if (w.getMagazine() == 0) { onWeaponReload(); return; }
+    if (!w.isInfiniteAmmo && w.getMagazine() == 0) { onWeaponReload(); return; }
     if (!w.canUse()) return;
 
     fireTimer.setWaitTime(1.0 / w.getFireRate());
@@ -327,7 +333,7 @@ public class WeaponController extends Node {
   @RegisterFunction
   public void onWeaponReload() {
     WeaponItem w = getCurrentWeaponItem();
-    if (w == null || w.getReserve() == 0 || isWeaponReloading()) return;
+    if (w == null || w.isInfiniteAmmo || w.getReserve() == 0 || isWeaponReloading()) return;
     reloadTimer.setWaitTime(1.0 / w.getReloadSpeed());
     if (w.getReloadAudio() != null) {
       weaponAudio.setStream(w.getReloadAudio());
@@ -348,19 +354,8 @@ public class WeaponController extends Node {
   @RegisterFunction
   public void onSetWeapon(int slotIndex) {
     if (isWeaponTransitioning()) return;
-    if (slotIndex == -1) { unequipCurrent(); return; }
     if (slotIndex < 0 || slotIndex >= weapons.length) return;
     if (weapons[slotIndex] == null) return;
-
-    if (isUnarmed) {
-      // Re-equip from empty hands — skip put-down animation, just draw the new weapon.
-      isUnarmed = false;
-      pendingSlotIndex = slotIndex;
-      transitionTimer.setWaitTime(1.0 / weapons[pendingSlotIndex].getSwitchSpeed());
-      transitionTimer.start();
-      return;
-    }
-
     if (slotIndex == activeSlotIndex) { showWeapon(activeSlotIndex); return; }
 
     pendingSlotIndex = slotIndex;
@@ -369,15 +364,9 @@ public class WeaponController extends Node {
     transitionTimer.start();
   }
 
-  private void unequipCurrent() {
-    if (isUnarmed) return;
-    isUnarmed = true;
-    showWeapon(-1);
-    ammoChanged.emit(0, 0);
-  }
-
   @RegisterFunction
   public void onWeaponTransitionComplete() {
+    boolean wasArmed = isArmed();
     activeSlotIndex = pendingSlotIndex;
     showWeapon(activeSlotIndex);
     WeaponItem next = weapons[activeSlotIndex];
@@ -385,6 +374,7 @@ public class WeaponController extends Node {
       animationController.onWeaponEquip(next.weaponPoseIndex);
       ammoChanged.emit(next.getMagazine(), next.getReserve());
     }
+    if (wasArmed != isArmed()) emitArmedStateChanged(isArmed());
   }
 
   @RegisterFunction
@@ -402,14 +392,16 @@ public class WeaponController extends Node {
 
   // ── State queries ─────────────────────────────────────────────────────────
 
-  public int  getSlotCount()             { return slotTypes.length; }
+  public int     getSlotCount()             { return slotTypes.length; }
   public boolean isSlotFreeFor(WeaponSlotType type) { return findFreeSlot(type) >= 0; }
-  public boolean isWeaponReloading()     { return reloadTimer.getTimeLeft() > 0; }
-  public boolean isWeaponTransitioning() { return transitionTimer.getTimeLeft() > 0; }
+  public boolean isWeaponReloading()        { return reloadTimer.getTimeLeft() > 0; }
+  public boolean isWeaponTransitioning()    { return transitionTimer.getTimeLeft() > 0; }
 
   public boolean hasAmmoForWeapon(int slotIndex) {
     WeaponItem w = getWeaponItem(slotIndex);
-    return w != null && (w.getMagazine() > 0 || w.getReserve() > 0);
+    if (w == null) return false;
+    if (w.isInfiniteAmmo) return true;
+    return w.getMagazine() > 0 || w.getReserve() > 0;
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
@@ -430,6 +422,11 @@ public class WeaponController extends Node {
     return -1;
   }
 
+  private void emitArmedStateChanged(boolean armed) {
+    Node bus = getNodeOrNull("/root/EventBus");
+    if (bus instanceof EventBus eb) eb.armedStateChanged.emit(getOwner(), armed);
+  }
+
   /**
    * Replaces the AimRay used by the currently equipped weapon with {@code vehicleRay}.
    * Saves the original ray so {@link #restoreAimRay()} can undo the swap.
@@ -439,7 +436,6 @@ public class WeaponController extends Node {
   public void overrideAimRay(RayCast3D vehicleRay) {
     originalAimRay = aimRay;
     aimRay = vehicleRay;
-    // No re-injection needed: FirearmItem.getEffectiveAimRay() reads this field live.
   }
 
   /** Restores the character's original AimRay after exiting PASSENGER_WEAPON mode. */
@@ -447,14 +443,11 @@ public class WeaponController extends Node {
     if (originalAimRay == null) return;
     aimRay = originalAimRay;
     originalAimRay = null;
-    // No re-injection needed: FirearmItem.getEffectiveAimRay() reads this field live.
   }
 
   private void injectCharacterRefs(WeaponItem item) {
-    if (item instanceof FirearmItem fi) {
-      CharacterBody3D character = getOwner() instanceof CharacterBody3D c ? c : null;
-      fi.setup(this, character, weaponAudio);
-    }
+    CharacterBody3D character = getOwner() instanceof CharacterBody3D c ? c : null;
+    item.setup(this, character, weaponAudio);
   }
 
   private void showWeapon(int slotIndex) {
@@ -537,7 +530,7 @@ public class WeaponController extends Node {
    * frozen body, so onReturnedToWorld() unfreezes before we set position.
    */
   private void returnWeaponToWorld(WeaponItem item, Vector3 spawnPos, Vector3 impulse) {
-    if (item instanceof FirearmItem fi) fi.setup(null, null, null);
+    item.setup(null, null, null);
     item.show();
     item.reparent(getTree().getCurrentScene(), true);
     item.onReturnedToWorld();
@@ -549,14 +542,11 @@ public class WeaponController extends Node {
     item.applyCentralImpulse(impulse);
   }
 
+  // After a drop, fall back to fist (slot 0) which is always available.
   private void activateFirstAvailableSlot() {
     for (int i = 0; i < weapons.length; i++) {
-      if (weapons[i] != null) {
-        onSetWeapon(i);
-        return;
-      }
+      if (weapons[i] != null) { onSetWeapon(i); return; }
     }
-    // No weapons remain — clear HUD ammo display
     ammoChanged.emit(0, 0);
   }
 

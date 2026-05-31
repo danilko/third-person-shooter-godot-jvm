@@ -7,6 +7,8 @@ import godot.annotation.Export;
 import godot.annotation.RegisterProperty;
 import godot.core.*;
 import godot.global.GD;
+import java.util.HashMap;
+import java.util.Map;
 
 @RegisterClass(className = "AnimationController")
 public class AnimationController extends Node {
@@ -56,6 +58,9 @@ public class AnimationController extends Node {
   @RegisterProperty
   public boolean worldSpaceMovement = false;
 
+  // NodePath for the animation speed parameter never changes — build it once.
+  private static final NodePath ANIM_SPEED_PATH = new NodePath("parameters/MovementAnimSpeed/scale");
+
   private double camRotation = 0.0;
   private double onFloorBlend = 1.0;
   private double onFloorBlendTarget = 1.0;
@@ -66,6 +71,8 @@ public class AnimationController extends Node {
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
   private MovementState currentMovementState = null;
+  // Cached NodePaths for per-stance blend parameters — populated lazily (one allocation per stance).
+  private final Map<String, NodePath> blendPathCache = new HashMap<>();
 
 
   @RegisterFunction
@@ -104,6 +111,15 @@ public class AnimationController extends Node {
   public void onSetMovementState(MovementState movementState) {
     currentMovementState = movementState;
     updateAnimationBlend(movementState);
+  }
+
+  /**
+   * Story/cutscene hook: forces WeaponBlend to 0 (no weapon pose) or restores it to 1.
+   * Not called during normal slot switching — all weapons including fist use WeaponBlend = 1.
+   */
+  public void setHolster(boolean holster) {
+    if (animationTree == null) return;
+    animationTree.set("parameters/WeaponBlend/blend_position", holster ? 0 : 1);
   }
 
   public void onWeaponEquip(int animationWeaponIndex) {
@@ -202,10 +218,9 @@ public class AnimationController extends Node {
       animationDirection.setY(movementState.getId());
     }
 
-    String blendPath = "parameters/" + currentStanceName + "MovementBlend/blend_position";
-    tween.tweenProperty(animationTree, new NodePath(blendPath), animationDirection, animationBlendDuration);
-
-    String speedPath = "parameters/MovementAnimSpeed/scale";
-    tween.parallel().tweenProperty(animationTree, new NodePath(speedPath), movementState.animationSpeed, animationSpeedDuration);
+    NodePath blendPath = blendPathCache.computeIfAbsent(currentStanceName,
+        name -> new NodePath("parameters/" + name + "MovementBlend/blend_position"));
+    tween.tweenProperty(animationTree, blendPath, animationDirection, animationBlendDuration);
+    tween.parallel().tweenProperty(animationTree, ANIM_SPEED_PATH, movementState.animationSpeed, animationSpeedDuration);
   }
 }

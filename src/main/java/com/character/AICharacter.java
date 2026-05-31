@@ -326,19 +326,21 @@ public class AICharacter extends Character {
 
     // ── Weapon / ammo ─────────────────────────────────────────────────────────
 
+    // Prefer real weapons (slots 1+) by highest damage; fall back to fist (slot 0) as last resort.
     public int selectBestWeapon() {
-        if (weaponController == null) return -1;
+        if (weaponController == null) return 0;
         int bestIndex = -1;
         float bestDamage = -1f;
-        for (int i = 0; i < weaponController.getSlotCount(); i++) {
+        for (int i = 1; i < weaponController.getSlotCount(); i++) {
             if (!weaponController.hasAmmoForWeapon(i)) continue;
-            WeaponItem s = weaponController.getWeaponStats(i);
+            WeaponItem s = weaponController.getWeaponItem(i);
             if (s != null && s.damage > bestDamage) { bestDamage = s.damage; bestIndex = i; }
         }
-        return bestIndex;
+        return bestIndex >= 0 ? bestIndex : 0;
     }
 
-    public boolean hasAnyAmmo() { return selectBestWeapon() >= 0; }
+    // Fist is always available, so AI always has "ammo". Check slot 1+ for real weapons.
+    public boolean hasAnyAmmo() { return selectBestWeapon() > 0; }
 
     public boolean isAtAmmoRefill() {
         if (ammoRefill == null) return false;

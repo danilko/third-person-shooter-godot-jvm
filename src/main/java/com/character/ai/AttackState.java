@@ -122,8 +122,8 @@ public class AttackState implements AIState {
         ctrl.advanceAttackTimer(-delta);
         if (ctrl.isAttackReady()) {
             double fireRate = (body.weaponController != null
-                    && body.weaponController.getCurrentWeaponStats() != null)
-                    ? body.weaponController.getCurrentWeaponStats().getFireRate() : 0.0;
+                    && body.weaponController.getCurrentWeaponItem() != null)
+                    ? body.weaponController.getCurrentWeaponItem().getFireRate() : 0.0;
             ctrl.resetAttackTimer(fireRate > 0.0 ? 1.0 / fireRate : 1.5);
 
             Vector3 newTarget = hasLoS

@@ -108,12 +108,12 @@ public class WeaponSlotsUI extends PanelContainer {
     // ── Slot construction ─────────────────────────────────────────────────────
 
     private void resolveKeyTexts() {
-        // Slots 0–5 → weapon_slot_1 through weapon_slot_6 (keys 1–6)
-        for (int i = 0; i < SLOT_COUNT - 1; i++) {
-            keyTexts[i] = resolveKeyText("weapon_slot_" + (i + 1), String.valueOf(i + 1));
+        // Slot 0 (fist) → weapon_unequip binding
+        keyTexts[0] = resolveKeyText("weapon_unequip", "0");
+        // Slots 1–6 → weapon_slot_1 through weapon_slot_6 (keys 1–6)
+        for (int i = 1; i < SLOT_COUNT; i++) {
+            keyTexts[i] = resolveKeyText("weapon_slot_" + i, String.valueOf(i));
         }
-        // Slot 6 (OFFHAND) → weapon_unequip binding (key 0)
-        keyTexts[SLOT_COUNT - 1] = resolveKeyText("weapon_unequip", "0");
     }
 
     private String resolveKeyText(String action, String fallback) {

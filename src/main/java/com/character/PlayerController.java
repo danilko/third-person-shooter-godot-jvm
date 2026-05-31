@@ -33,6 +33,13 @@ public class PlayerController extends Controller {
 
     private static final int BUFFER_SIZE = 64;
 
+    // Pre-built action name strings to avoid per-frame string concatenation in the input hot-path.
+    // Slots 1–6 used on foot; slot 7 reserved for vehicle passenger mode.
+    private static final String[] WEAPON_SLOT_ACTIONS = {
+        "weapon_slot_1", "weapon_slot_2", "weapon_slot_3",
+        "weapon_slot_4", "weapon_slot_5", "weapon_slot_6", "weapon_slot_7"
+    };
+
     // ── Client-side prediction state ──────────────────────────────────────────
     private int              localSequence    = 0;
     private final UserCommand[] predictionBuffer = new UserCommand[BUFFER_SIZE];
@@ -155,14 +162,14 @@ public class PlayerController extends Controller {
         }
 
         // ── Weapon slot quick-switch ──────────────────────────────────────────
-        // Keys 1–6 → slots 0–5 (PRIMARY×2, SECONDARY, MELEE, THROWABLE, CONSUMABLE)
-        // Key 0    → slot 6 (OFFHAND) via weapon_unequip binding
+        // weapon_unequip → slot 0 (fist — always available)
+        // Keys 1–6       → slots 1–6 (PRIMARY×2, SECONDARY, MELEE, THROWABLE, CONSUMABLE)
         if (inp.isActionJustPressed("weapon_unequip", false)) {
-            cmd.desiredWeapon = 6;
+            cmd.desiredWeapon = 0;
         } else {
             for (int i = 0; i < 6; i++) {
-                if (inp.isActionJustPressed("weapon_slot_" + (i + 1), false)) {
-                    cmd.desiredWeapon = i;
+                if (inp.isActionJustPressed(WEAPON_SLOT_ACTIONS[i], false)) {
+                    cmd.desiredWeapon = i + 1;
                     break;
                 }
             }
@@ -209,11 +216,11 @@ public class PlayerController extends Controller {
 
         // Weapon slot switching — relayed to the occupant for PASSENGER_WEAPON mode.
         if (inp.isActionJustPressed("weapon_unequip", false)) {
-            cmd.desiredWeapon = 6;
+            cmd.desiredWeapon = 0;
         } else {
-            for (int i = 0; i < 6; i++) {
-                if (inp.isActionJustPressed("weapon_slot_" + (i + 1), false)) {
-                    cmd.desiredWeapon = i;
+            for (int i = 0; i < 7; i++) {
+                if (inp.isActionJustPressed(WEAPON_SLOT_ACTIONS[i], false)) {
+                    cmd.desiredWeapon = i + 1;
                     break;
                 }
             }

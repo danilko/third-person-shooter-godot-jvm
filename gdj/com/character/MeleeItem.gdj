@@ -1,11 +1,12 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = WeaponItem
-fqName = com.character.WeaponItem
+registeredName = MeleeItem
+fqName = com.character.MeleeItem
 baseType = RigidBody3D
 supertypes = [
-    com.environment.Pickup,
+    com.character.WeaponItem,
+	com.environment.Pickup,
 	godot.api.RigidBody3D,
 	godot.api.PhysicsBody3D,
 	godot.api.CollisionObject3D,
@@ -21,7 +22,10 @@ signals = [
     
 ]
 properties = [
-    weapon_id,
+    melee_range,
+	cone_angle_deg,
+	swing_duration,
+	weapon_id,
 	weapon_name,
 	slot_type,
 	is_droppable,
@@ -52,7 +56,10 @@ properties = [
 	pickup_cooldown_after_drop
 ]
 functions = [
-    _process,
+    _ready,
+	_physics_process,
+	on_hit_timer_timeout,
+	_process,
 	on_body_entered,
 	on_body_exited,
 	resume_from_pause

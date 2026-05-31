@@ -1,10 +1,13 @@
 package com.character;
 
+import com.environment.ImpactManager;
 import com.environment.Pickup;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterProperty;
+import godot.api.AudioStreamPlayer3D;
 import godot.api.AudioStreamWAV;
+import godot.api.CharacterBody3D;
 import godot.api.Node;
 import godot.api.Texture2D;
 import godot.core.PackedStringArray;
@@ -21,8 +24,14 @@ public class WeaponItem extends Pickup implements WeaponAction {
   // Human-readable display name: HUD, kill feed, inventory, interact prompt.
   @RegisterProperty @Export public String weaponName = "";
 
-  // WeaponSlotType ordinal: 0=PRIMARY 1=SECONDARY 2=MELEE 3=THROWABLE 4=OFFHAND
+  // WeaponSlotType ordinal: 0=PRIMARY 1=SECONDARY 2=MELEE 3=THROWABLE 4=CONSUMABLE 5=FIST
   @RegisterProperty @Export public int slotType = 0;
+
+  // When false the weapon cannot be dropped (e.g. FistItem). Guards dropCurrentWeapon/dropAllWeapons.
+  @RegisterProperty @Export public boolean isDroppable = true;
+
+  // When true magazine/reserve checks are bypassed — weapon has unlimited uses (e.g. FistItem).
+  @RegisterProperty @Export public boolean isInfiniteAmmo = false;
 
   // Index into the AnimationTree weapon blend nodes (WeaponAim, WeaponHold, WeaponChangeAnimation).
   // Decoupled from slot so the same animation pose is used regardless of which slot holds the weapon.
@@ -60,6 +69,42 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @RegisterProperty @Export public float damage = 25.0f;
   @RegisterProperty @Export public AudioStreamWAV fireAudio;
   @RegisterProperty @Export public AudioStreamWAV reloadAudio;
+
+  // ── Injected references (shared by all weapon subtypes) ─────────────────────
+  // Populated by WeaponController.injectCharacterRefs() after discovery/pickup.
+  // Cleared (set to null) when the weapon is returned to the world.
+  protected WeaponController       weaponController;
+  protected CharacterBody3D        owningCharacter;
+  protected AudioStreamPlayer3D    weaponAudio;
+  private   ImpactManager          impactManager;
+
+  /** Called by WeaponController after discovery or pickup. Pass nulls to clear on world return. */
+  public void setup(WeaponController controller, CharacterBody3D character, AudioStreamPlayer3D audio) {
+    this.weaponController = controller;
+    this.owningCharacter  = character;
+    this.weaponAudio      = audio;
+    this.impactManager    = null;
+  }
+
+  /** Lazily resolves and caches the world ImpactManager (single group lookup per weapon). */
+  protected ImpactManager getImpactManager() {
+    if (impactManager != null) return impactManager;
+    Node found = getTree().getFirstNodeInGroup("impact_manager");
+    if (found instanceof ImpactManager im) impactManager = im;
+    return impactManager;
+  }
+
+  /** Attacker display name for kill-feed and event-bus payloads. */
+  protected String resolveAttackerName() {
+    if (owningCharacter instanceof Character c && c.characterInfo != null) return c.characterInfo.displayName;
+    return owningCharacter != null ? owningCharacter.getName().toString() : "";
+  }
+
+  /** Attacker faction string for faction/friendly-fire checks. */
+  protected String resolveAttackerFaction() {
+    if (owningCharacter instanceof Character c && c.characterInfo != null) return c.characterInfo.faction;
+    return "";
+  }
 
   public WeaponSlotType getSlotType() {
     WeaponSlotType[] types = WeaponSlotType.values();

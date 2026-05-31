@@ -2,7 +2,6 @@ package com.character;
 
 import com.environment.BulletTracerManager;
 import com.environment.HitInfo;
-import com.environment.ImpactManager;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.*;
@@ -20,15 +19,10 @@ import godot.global.GD;
 @RegisterClass(className = "FirearmItem")
 public class FirearmItem extends WeaponItem {
 
-  // Injected by WeaponController after weapon discovery
-  private WeaponController weaponController;
-  private CharacterBody3D owningCharacter;
   private GPUParticles3D muzzleFlashFx;
   private AnimationPlayer muzzleFlashAnimPlayer;
-  private AudioStreamPlayer3D weaponAudio;
 
-  // Lazy-resolved world managers
-  private ImpactManager impactManager;
+  // Lazy-resolved world manager (ImpactManager is in WeaponItem base)
   private BulletTracerManager bulletTracerManager;
 
   private float currentBloom = 0f;
@@ -56,17 +50,6 @@ public class FirearmItem extends WeaponItem {
       muzzleFlashFx         = (GPUParticles3D)  vfx.getNodeOrNull("MuzzleFlash");
       muzzleFlashAnimPlayer = (AnimationPlayer) vfx.getNodeOrNull("AnimationPlayer");
     }
-  }
-
-  /**
-   * Called by WeaponController after weapon discovery or pickup.
-   * Every weapon is always owned by a WeaponController — character or vehicle.
-   * Pass nulls to clear refs when returning to a world pickup.
-   */
-  public void setup(WeaponController controller, CharacterBody3D character, AudioStreamPlayer3D audio) {
-    this.weaponController = controller;
-    this.owningCharacter  = character;
-    this.weaponAudio      = audio;
   }
 
   @RegisterFunction
@@ -173,19 +156,10 @@ public class FirearmItem extends WeaponItem {
         ray.getCollisionPoint().minus(ray.getGlobalTransform().getOrigin()).length() > 0.1) {
       Object collider = ray.getCollider();
       Node hitNode = (collider instanceof Node n) ? n : null;
-      ImpactManager im = getImpactManager();
+      var im = getImpactManager();
       if (im != null) {
-        HitInfo info = new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal());
-        String attackerName;
-        String attackerFaction;
-        if (owningCharacter instanceof Character c && c.characterInfo != null) {
-          attackerName    = c.characterInfo.displayName;
-          attackerFaction = c.characterInfo.faction;
-        } else {
-          attackerName    = owningCharacter != null ? owningCharacter.getName().toString() : "";
-          attackerFaction = "";
-        }
-        im.processHit(info, damage, getDisplayName(), weaponIcon, attackerName, attackerFaction);
+        im.processHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()),
+                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction());
       }
     }
 
@@ -226,13 +200,6 @@ public class FirearmItem extends WeaponItem {
 
   private Marker3D weaponMuzzle() {
     return (Marker3D) getNode("Muzzle");
-  }
-
-  private ImpactManager getImpactManager() {
-    if (impactManager != null) return impactManager;
-    Node found = getTree().getFirstNodeInGroup("impact_manager");
-    if (found instanceof ImpactManager im) impactManager = im;
-    return impactManager;
   }
 
   private BulletTracerManager getBulletTracerManager() {

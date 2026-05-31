@@ -417,8 +417,15 @@ public class Character extends CharacterBody3D implements Controllable {
         }
 
         // ── Combat state ───────────────────────────────────────────────────
-        if (input.wantCombat != combat) {
-            combat = input.wantCombat;
+        // Pressing fire with a melee weapon automatically enters combat stance so
+        // the character raises fists without requiring a separate aim button press.
+        boolean effectiveCombat = input.wantCombat;
+        if (input.fire && weaponController != null) {
+            WeaponItem w = weaponController.getCurrentWeaponItem();
+            if (w != null && w.getWeaponType() == WeaponType.MELEE) effectiveCombat = true;
+        }
+        if (effectiveCombat != combat) {
+            combat = effectiveCombat;
             setCombatState();
         }
 
@@ -493,7 +500,26 @@ public class Character extends CharacterBody3D implements Controllable {
 
     // ── Shared helpers ────────────────────────────────────────────────────────
     protected void setCombatState() {
-        changedCombatState.emit(combatStates.get(combat ? "Combat" : "NoCombat"));
+        changedCombatState.emit(combatStates.get(resolveCombatKey(null)));
+    }
+
+    /**
+     * Picks the combat-state dictionary key for the given weapon slot.
+     * Pass null to use the currently equipped weapon (for state refreshes).
+     * Pass a slot index to preview the camera state for a weapon being switched to.
+     *
+     * Returns "MeleeCombat" when the target weapon is MELEE type and that key exists,
+     * otherwise falls back to "Combat" / "NoCombat" as before.
+     */
+    private String resolveCombatKey(Integer targetSlot) {
+        if (!combat) return "NoCombat";
+        WeaponItem w = null;
+        if (weaponController != null) {
+            w = (targetSlot != null) ? weaponController.getWeaponItem(targetSlot)
+                                     : weaponController.getCurrentWeaponItem();
+        }
+        boolean isMelee = w != null && w.getWeaponType() == WeaponType.MELEE;
+        return (isMelee && combatStates.get("MeleeCombat") != null) ? "MeleeCombat" : "Combat";
     }
 
     @RegisterFunction
@@ -678,6 +704,12 @@ public class Character extends CharacterBody3D implements Controllable {
 
     public void setWeapon(int weapon) {
         changedWeapon.emit(weapon);
+        // Preview camera state for the target weapon type immediately so the camera
+        // starts lerping to melee/ranged position during the weapon-switch animation.
+        if (combat && weapon >= 0) {
+            CombatState state = combatStates.get(resolveCombatKey(weapon));
+            if (state != null) changedCombatState.emit(state);
+        }
     }
 
     // ── Controllable implementation ───────────────────────────────────────────
