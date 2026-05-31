@@ -48,6 +48,15 @@ public class AnimationController extends Node {
   @RegisterProperty
   public double floorBlendSpeed = 10.0;
 
+  /**
+   * When true the incoming movementDirection is world-space (AI). The blend rotates it
+   * into camera-local space so strafe animations play relative to the facing direction.
+   */
+  @Export
+  @RegisterProperty
+  public boolean worldSpaceMovement = false;
+
+  private double camRotation = 0.0;
   private double onFloorBlend = 1.0;
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
@@ -150,9 +159,25 @@ public class AnimationController extends Node {
   }
 
   @RegisterFunction
+  public void onSetCamRotation(double newCamRotation) {
+    camRotation = newCamRotation;
+  }
+
+  @RegisterFunction
   public void onSetMovementDirection(Vector3 movementDirection) {
-    this.movementDirection.setX(movementDirection.getX() == 0 ? 0 : movementDirection.getX() > 0 ? 1 : -1);
-    this.movementDirection.setY(movementDirection.getZ() == 0 ? 0 : movementDirection.getZ() > 0 ? 1 : -1);
+    double dx = movementDirection.getX();
+    double dz = movementDirection.getZ();
+    if (worldSpaceMovement && combat) {
+      // Rotate world-space direction into camera-local space so the strafe blend
+      // plays relative to the mesh facing direction rather than world axes.
+      double cos = Math.cos(-camRotation), sin = Math.sin(-camRotation);
+      double lx = dx * cos - dz * sin;
+      double lz = dx * sin + dz * cos;
+      dx = lx;
+      dz = lz;
+    }
+    this.movementDirection.setX(dx == 0 ? 0 : dx > 0 ? 1 : -1);
+    this.movementDirection.setY(dz == 0 ? 0 : dz > 0 ? 1 : -1);
 
     updateAnimationBlend(currentMovementState);
   }

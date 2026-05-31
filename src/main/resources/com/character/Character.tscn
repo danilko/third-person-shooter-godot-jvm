@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://1ckrskf53226" path="res://gdj/com/character/Character.gdj" id="1_gapvf"]
 [ext_resource type="PackedScene" uid="uid://dxb5mxkmawr80" path="res://src/main/resources/com/character/CharacterNameplate.tscn" id="1_nameplate"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/character/CharacterVisuals_GodotChan.tscn" id="1_rl0hp"]
+[ext_resource type="PackedScene" uid="uid://c1cbu0bo57ry6" path="res://src/main/resources/com/character/CharacterVisuals_GodotChan.tscn" id="1_rl0hp"]
 [ext_resource type="Script" uid="uid://dgjf58g3rfgvx" path="res://gdj/com/character/jumpstates/JumpState.gdj" id="2_3tgi5"]
 [ext_resource type="Resource" uid="uid://cemhpckfs3peb" path="res://src/main/resources/com/character/jumpstates/AirJump.tres" id="3_ttk2h"]
 [ext_resource type="Resource" uid="uid://i3rr4c4emq7j" path="res://src/main/resources/com/character/jumpstates/GroundJump.tres" id="4_6f0xc"]
@@ -32,7 +32,6 @@
 [sub_resource type="Resource" id="Resource_gapvf"]
 script = ExtResource("9_arx8k")
 metadata/_custom_type_script = "uid://cplrp8cx4gus0"
-
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_yfjlo"]
 radius = 0.35
@@ -65,12 +64,6 @@ properties/3/replication_mode = 2
 properties/4/path = NodePath("Health:sync_health")
 properties/4/spawn = true
 properties/4/replication_mode = 2
-
-[sub_resource type="BoxMesh" id="BoxMesh_gapvf"]
-size = Vector3(0.2, 0.2, 0.2)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gapvf"]
-albedo_color = Color(1, 0, 0.28627452, 1)
 
 [node name="Character" type="CharacterBody3D" unique_id=802038165 node_paths=PackedStringArray("weapon_controller")]
 collision_layer = 2
@@ -164,7 +157,6 @@ walk_state = ExtResource("22_arx8k")
 sprint_state = ExtResource("22_arx8k")
 spine_aim_max_angle = 0.0
 
-
 [node name="WeaponController" type="Node" parent="." unique_id=384125234 node_paths=PackedStringArray("animation_controller", "weapon_audio")]
 script = ExtResource("31_4afhp")
 animation_controller = NodePath("../AnimationController")
@@ -233,10 +225,6 @@ collision_mask = 9
 [node name="AimTarget" type="Marker3D" parent="ActiveCamera/AimRay" unique_id=1416140619]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.011982799, -5.461198)
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="ActiveCamera/AimRay/AimTarget" unique_id=1283815597]
-mesh = SubResource("BoxMesh_gapvf")
-surface_material_override/0 = SubResource("StandardMaterial3D_gapvf")
-
 [node name="CharacterNameplate" parent="." unique_id=1900000098 instance=ExtResource("1_nameplate")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5722028, 0)
 
@@ -280,3 +268,4 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 [connection signal="timeout" from="RollTimer" to="MovementController" method="completed_roll"]
 [connection signal="died" from="Health" to="." method="on_died"]
 [connection signal="set_cam_rotation" from="TPSCameraController" to="MovementController" method="on_set_cam_rotation"]
+[connection signal="set_cam_rotation" from="TPSCameraController" to="AnimationController" method="on_set_cam_rotation"]

@@ -122,8 +122,9 @@ public class MovementController extends Node {
     if (rolling && direction.lengthSquared() > 0.001) {
       // During roll: always face movement direction, even in combat
       targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
-    } else if (combat && !worldSpaceMovement) {
-      // Face camera direction (Player only; worldSpaceMovement=true prevents this for AI/Enemy)
+    } else if (combat) {
+      // Face camera direction in combat; camRotation is updated every frame via set_cam_rotation
+      // signal for both player (PlayerCameraController) and AI (AICameraController).
       targetRotation = camRotation;
     } else {
       // Face movement direction (only when actually moving)

@@ -52,7 +52,7 @@ public class AICameraController extends TPSCameraController {
       double  dz    = aimTarget.getZ() - myPos.getZ();
       double  hDist = Math.sqrt(dx * dx + dz * dz);
 
-      double targetYawDeg   = Math.toDegrees(Math.atan2(dx, dz));
+      double targetYawDeg   = Math.toDegrees(Math.atan2(-dx, -dz));
       double targetPitchDeg = (hDist > 0.01) ? -Math.toDegrees(Math.atan2(dy, hDist)) : 0.0;
 
       double deltaYaw   = GD.wrapf(targetYawDeg - controlRotation.yaw,  -180.0, 180.0);
