@@ -58,7 +58,7 @@ public class MeleeItem extends WeaponItem {
 
     private float     swingTimeLeft      = 0f;
     private boolean   swingHitRegistered = false;
-    // Computed once per attack in useWeapon(); reused across all physicsProcess frames of the swing.
+    // Built once in _ready() from the constant coneAngleDeg export; reused every swing.
     private float[][] swingOffsets;
 
     @RegisterFunction
@@ -66,6 +66,12 @@ public class MeleeItem extends WeaponItem {
     public void _ready() {
         Node ht = getNodeOrNull("HitTimer");
         if (ht instanceof Timer t) hitTimer = t;
+        buildSwingOffsets();
+    }
+
+    private void buildSwingOffsets() {
+        float a = coneAngleDeg;
+        swingOffsets = new float[][]{{0, 0}, {a, 0}, {-a, 0}, {0, a}, {0, -a}};
     }
 
     @RegisterFunction
@@ -91,9 +97,6 @@ public class MeleeItem extends WeaponItem {
             weaponAudio.setStream(fireAudio);
             weaponAudio.play();
         }
-        // Build cone offsets once per attack — reused across all physicsProcess frames of this swing.
-        float a = coneAngleDeg;
-        swingOffsets = new float[][]{{0, 0}, {a, 0}, {-a, 0}, {0, a}, {0, -a}};
         swingTimeLeft      = swingDuration;
         swingHitRegistered = false;
     }

@@ -26,8 +26,15 @@ public class BulletTracerManager extends Node3D {
     @RegisterProperty
     public int poolSize = 16;
 
-    private final List<MeshInstance3D> pool = new ArrayList<>();
-    private final List<Float> ages = new ArrayList<>();
+    private static class TracerEntry {
+        final MeshInstance3D mesh;
+        float age;
+        TracerEntry(MeshInstance3D m, float initialAge) { mesh = m; age = initialAge; }
+    }
+
+    private final List<TracerEntry> entries = new ArrayList<>();
+    // Circular scan index: successive acquires start where the last left off (O(1) amortised).
+    private int scanHead = 0;
 
     @RegisterFunction
     @Override
@@ -42,20 +49,17 @@ public class BulletTracerManager extends Node3D {
         for (int i = 0; i < poolSize; i++) {
             MeshInstance3D inst = (MeshInstance3D) template.duplicate();
             addChild(inst);
-            pool.add(inst);
-            ages.add(tracerLifetime); // starts expired = available
+            entries.add(new TracerEntry(inst, tracerLifetime)); // starts expired = available
         }
     }
 
     @RegisterFunction
     @Override
     public void _process(double delta) {
-        for (int i = 0; i < ages.size(); i++) {
-            float age = ages.get(i);
-            if (age >= tracerLifetime) continue;
-            age += (float) delta;
-            ages.set(i, age);
-            if (age >= tracerLifetime) pool.get(i).setVisible(false);
+        for (TracerEntry e : entries) {
+            if (e.age >= tracerLifetime) continue;
+            e.age += (float) delta;
+            if (e.age >= tracerLifetime) e.mesh.setVisible(false);
         }
     }
 
@@ -80,10 +84,14 @@ public class BulletTracerManager extends Node3D {
     }
 
     private MeshInstance3D acquire() {
-        for (int i = 0; i < pool.size(); i++) {
-            if (ages.get(i) >= tracerLifetime) {
-                ages.set(i, 0f);
-                return pool.get(i);
+        int size = entries.size();
+        for (int i = 0; i < size; i++) {
+            int idx = (scanHead + i) % size;
+            TracerEntry e = entries.get(idx);
+            if (e.age >= tracerLifetime) {
+                e.age = 0f;
+                scanHead = (idx + 1) % size;
+                return e.mesh;
             }
         }
         return null; // pool exhausted — skip this tracer

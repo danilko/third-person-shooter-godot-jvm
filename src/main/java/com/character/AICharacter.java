@@ -5,7 +5,9 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
+import godot.core.Callable;
 import godot.core.StringName;
+import godot.core.StringNames;
 import godot.core.Vector3;
 
 /**
@@ -22,10 +24,30 @@ import godot.core.Vector3;
 @RegisterClass(className = "AICharacter")
 public class AICharacter extends Character {
 
-    public static final float EYE_HEIGHT       = 1.4f;
+    public static final float EYE_HEIGHT        = 1.4f;
     public static final float TARGET_BODY_HEIGHT = 0.9f;
 
-    // ── Inspector-tunable body properties ─────────────────────────────────────
+    // ── Behaviour configuration ───────────────────────────────────────────────
+
+    /**
+     * Per-AI tuning resource.  When set, overrides all individual tuning fields
+     * below.  Swap different .tres presets (e.g. EnemySoldierBehavior.tres) in the
+     * inspector to change behaviour without touching code.
+     */
+    @Export @RegisterProperty public AIBehaviorConfig behaviorConfig;
+
+    // Default config — lazily created when behaviorConfig is null, so legacy scenes
+    // that set individual exports still work exactly as before.
+    private AIBehaviorConfig defaultConfig;
+
+    /** Returns the active config, falling back to legacy defaults if none is set. */
+    public AIBehaviorConfig getBehaviorConfig() {
+        if (behaviorConfig != null) return behaviorConfig;
+        if (defaultConfig  == null) defaultConfig = buildLegacyConfig();
+        return defaultConfig;
+    }
+
+    // ── Legacy per-field exports (kept for backwards compat with existing scenes) ──
     @Export @RegisterProperty public float  detectionRange       = 120.0f;
     @Export @RegisterProperty public float  aimPitchMin          = -55.0f;
     @Export @RegisterProperty public float  aimPitchMax          =  75.0f;
@@ -65,6 +87,25 @@ public class AICharacter extends Character {
      */
     @Export @RegisterProperty public boolean useCombatCrouch = true;
 
+    private AIBehaviorConfig buildLegacyConfig() {
+        AIBehaviorConfig c = new AIBehaviorConfig();
+        c.detectionRange      = detectionRange;
+        c.aimPitchMin         = aimPitchMin;
+        c.aimPitchMax         = aimPitchMax;
+        c.attackRange         = attackRange;
+        c.patrolRadius        = patrolRadius;
+        c.aimBodyPart         = aimBodyPart;
+        c.hitChance           = hitChance;
+        c.reactionTime        = reactionTime;
+        c.aimScatterRadius    = aimScatterRadius;
+        c.strafeChangeDuration = strafeChangeDuration;
+        c.suppressionDuration = suppressionDuration;
+        c.shootStillDuration  = shootStillDuration;
+        c.moveAccuracyPenalty = moveAccuracyPenalty;
+        c.useCombatCrouch     = useCombatCrouch;
+        return c;
+    }
+
     private static final float  AMMO_REFILL_ARRIVAL_THRESHOLD = 1.5f;
 
     // ── Sensor throttle constants ─────────────────────────────────────────────
@@ -94,6 +135,10 @@ public class AICharacter extends Character {
     private Node3D[]  cachedBoneNodes     = null;   // priority list: [preferred, fallback...]
     private Node3D    cachedVisibleBone   = null;   // first bone confirmed exposed in last check
 
+    // ── Best-weapon cache ─────────────────────────────────────────────────────
+    // -1 = invalid (recompute on next call). Invalidated by onAmmoChanged().
+    private int cachedBestWeapon = -1;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     @RegisterFunction
     @Override
@@ -110,6 +155,13 @@ public class AICharacter extends Character {
         // Stagger each AI's scan timers so every bot doesn't expire on the same frame.
         targetScanTimer = godot.global.GD.randfRange(0f, (float) TARGET_SCAN_INTERVAL);
         losCacheTimer   = godot.global.GD.randfRange(0f, (float) LOS_CACHE_INTERVAL);
+
+        // Invalidate best-weapon cache whenever ammo changes (shot fired, weapon picked up).
+        if (weaponController != null) {
+            weaponController.ammoChanged.connectUnsafe(
+                    Callable.createUnsafe(this, StringNames.toGodotName("onAmmoChanged")),
+                    godot.api.Object.ConnectFlags.DEFAULT);
+        }
 
         // Start the FSM now that all body hardware is ready.
         // AIController._ready() intentionally leaves currentState null so this
@@ -147,11 +199,10 @@ public class AICharacter extends Character {
     }
 
     /**
-     * Throttled target refresh — runs the full group scan at most once per
-     * TARGET_SCAN_INTERVAL seconds.  Clears the LoS and bone caches whenever
-     * the closest hostile changes so stale data is never used.
+     * Shared timer tick + target scan used by both refreshTarget() and canSeeTarget().
+     * Extracting to one method prevents double-decrement if ever called twice in a frame.
      */
-    public void refreshTarget(double delta) {
+    private void tickTargetScan(double delta) {
         targetScanTimer -= delta;
         if (targetScanTimer > 0) return;
         targetScanTimer = TARGET_SCAN_INTERVAL;
@@ -167,26 +218,22 @@ public class AICharacter extends Character {
     }
 
     /**
-     * Throttled visibility check for patrol detection.  Shares the same scan
-     * timer as refreshTarget so the two never double-scan on the same frame.
+     * Throttled target refresh — runs the full group scan at most once per
+     * TARGET_SCAN_INTERVAL seconds.  Clears the LoS and bone caches whenever
+     * the closest hostile changes so stale data is never used.
+     */
+    public void refreshTarget(double delta) {
+        tickTargetScan(delta);
+    }
+
+    /**
+     * Throttled visibility check for patrol detection.
      */
     public boolean canSeeTarget(double delta) {
-        targetScanTimer -= delta;
-        if (targetScanTimer <= 0) {
-            targetScanTimer = TARGET_SCAN_INTERVAL;
-            Character previous = currentTarget;
-            currentTarget = discoverTarget();
-            if (currentTarget != previous) {
-                cachedTargetForBone = null;
-                cachedBoneNodes     = null;
-                cachedVisibleBone   = null;
-                cachedLoS           = false;
-                losCacheTimer       = 0;
-            }
-        }
+        tickTargetScan(delta);
         if (currentTarget == null) return false;
         float dist = (float) getGlobalPosition().distanceTo(currentTarget.getGlobalPosition());
-        if (dist > detectionRange) return false;
+        if (dist > getBehaviorConfig().detectionRange) return false;
         return hasLineOfSight(delta);
     }
 
@@ -327,8 +374,10 @@ public class AICharacter extends Character {
     // ── Weapon / ammo ─────────────────────────────────────────────────────────
 
     // Prefer real weapons (slots 1+) by highest damage; fall back to fist (slot 0) as last resort.
+    // Result is cached; invalidated by onAmmoChanged() so this runs at most once per ammo event.
     public int selectBestWeapon() {
-        if (weaponController == null) return 0;
+        if (cachedBestWeapon >= 0) return cachedBestWeapon;
+        if (weaponController == null) { cachedBestWeapon = 0; return 0; }
         int bestIndex = -1;
         float bestDamage = -1f;
         for (int i = 1; i < weaponController.getSlotCount(); i++) {
@@ -336,11 +385,17 @@ public class AICharacter extends Character {
             WeaponItem s = weaponController.getWeaponItem(i);
             if (s != null && s.damage > bestDamage) { bestDamage = s.damage; bestIndex = i; }
         }
-        return bestIndex >= 0 ? bestIndex : 0;
+        cachedBestWeapon = bestIndex >= 0 ? bestIndex : 0;
+        return cachedBestWeapon;
     }
 
     // Fist is always available, so AI always has "ammo". Check slot 1+ for real weapons.
     public boolean hasAnyAmmo() { return selectBestWeapon() > 0; }
+
+    @RegisterFunction
+    public void onAmmoChanged(int magazine, int reserve) {
+        cachedBestWeapon = -1;
+    }
 
     public boolean isAtAmmoRefill() {
         if (ammoRefill == null) return false;

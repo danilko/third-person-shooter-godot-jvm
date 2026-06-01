@@ -57,6 +57,7 @@ public class DecalManager extends Node {
     /** All entries (pooled + active) — iterated each frame in _process. */
     private final List<DecalEntry> allEntries = new ArrayList<>();
     private ObjectPool<DecalEntry> pool;
+    private int activeCount = 0;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -100,11 +101,12 @@ public class DecalManager extends Node {
     @RegisterFunction
     @Override
     public void _process(double delta) {
-        if (pool == null) return;
+        if (pool == null || activeCount == 0) return;
         for (DecalEntry entry : allEntries) {
             if (!entry.decal.isVisible()) continue;
             entry.age += delta;
             if (entry.age >= decalLifetime) {
+                activeCount--;
                 pool.release(entry);
             }
         }
@@ -121,6 +123,7 @@ public class DecalManager extends Node {
 
         DecalEntry entry = pool.acquire();
         entry.age = 0.0;
+        activeCount++;
 
         entry.decal.setGlobalPosition(hitPoint.plus(hitNormal.normalized().times(0.005f)));
         orientToSurface(entry.decal, hitNormal.normalized());

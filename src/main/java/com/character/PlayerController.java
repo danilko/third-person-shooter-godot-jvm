@@ -35,9 +35,9 @@ public class PlayerController extends Controller {
 
     // Pre-built action name strings to avoid per-frame string concatenation in the input hot-path.
     // Slots 1–6 used on foot; slot 7 reserved for vehicle passenger mode.
-    private static final String[] WEAPON_SLOT_ACTIONS = {
-        "weapon_slot_1", "weapon_slot_2", "weapon_slot_3",
-        "weapon_slot_4", "weapon_slot_5", "weapon_slot_6", "weapon_slot_7"
+    private static final String[] WEAPON_SLOT_ACTIONS = {"weapon_slot_0",
+            "weapon_slot_1", "weapon_slot_2", "weapon_slot_3",
+        "weapon_slot_4", "weapon_slot_5", "weapon_slot_6"
     };
 
     // ── Client-side prediction state ──────────────────────────────────────────
@@ -162,16 +162,12 @@ public class PlayerController extends Controller {
         }
 
         // ── Weapon slot quick-switch ──────────────────────────────────────────
-        // weapon_unequip → slot 0 (fist — always available)
+        // Keys 0         → slot 0 (fist — always available)
         // Keys 1–6       → slots 1–6 (PRIMARY×2, SECONDARY, MELEE, THROWABLE, CONSUMABLE)
-        if (inp.isActionJustPressed("weapon_unequip", false)) {
-            cmd.desiredWeapon = 0;
-        } else {
-            for (int i = 0; i < 6; i++) {
-                if (inp.isActionJustPressed(WEAPON_SLOT_ACTIONS[i], false)) {
-                    cmd.desiredWeapon = i + 1;
-                    break;
-                }
+        for (int i = 0; i < 6; i++) {
+            if (inp.isActionJustPressed(WEAPON_SLOT_ACTIONS[i], false)) {
+                cmd.desiredWeapon = i;
+                break;
             }
         }
 
@@ -215,7 +211,7 @@ public class PlayerController extends Controller {
         cmd.resetVehicle = inp.isActionJustPressed("reload", false);
 
         // Weapon slot switching — relayed to the occupant for PASSENGER_WEAPON mode.
-        if (inp.isActionJustPressed("weapon_unequip", false)) {
+        if (inp.isActionJustPressed("weapon_slot_0", false)) {
             cmd.desiredWeapon = 0;
         } else {
             for (int i = 0; i < 7; i++) {
@@ -238,10 +234,22 @@ public class PlayerController extends Controller {
      * Discard prediction buffer entries confirmed by the server, then replay
      * any unacknowledged commands against the snapped server state.
      */
+    /**
+     * Server reconciliation entry point — PLAN.md Phase C3.
+     *
+     * Once the server acks a sequence number, discard confirmed entries from the
+     * prediction ring buffer.  The remainder are replayed against the snapped
+     * server state to re-converge the client.
+     *
+     * Implementation deferred to Phase C3:
+     *   1. Receive authoritative state from server (position, velocity, health).
+     *   2. Snap body to server state.
+     *   3. Replay all unacknowledged UserCommands in [serverAck+1 … localSequence].
+     *   4. This method already clears acknowledged entries so the buffer stays valid.
+     */
     public void reconcile(int serverAck) {
         for (int seq = serverAck; seq >= Math.max(0, serverAck - BUFFER_SIZE + 1); seq--) {
             predictionBuffer[seq % BUFFER_SIZE] = null;
         }
-        // Phase 4 TODO: snap body to server state, then replay unacknowledged commands.
     }
 }

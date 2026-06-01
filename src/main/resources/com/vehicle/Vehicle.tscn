@@ -59,6 +59,8 @@ points = PackedVector3Array(1, 0.24995148, 2, 1, -0.25, 2, 1, 0.24995148, -2, 0.
 albedo_color = Color(0.93040425, 0.083007835, 3.85046e-07, 1)
 
 [node name="Vehicle" type="RigidBody3D" unique_id=1625753015]
+collision_layer = 16
+collision_mask = 3
 mass = 1200.0
 physics_material_override = SubResource("PhysicsMaterial_x00le")
 linear_damp_mode = 1
@@ -87,7 +89,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, -0.15868372, -0.3)
 
 [node name="EntranceArea" type="Area3D" parent="." unique_id=1653067825]
 collision_layer = 0
-collision_mask = 3
+collision_mask = 2
 
 [node name="EntranceShape" type="CollisionShape3D" parent="EntranceArea" unique_id=1653067826]
 shape = SubResource("BoxShape3D_entrance")
@@ -134,7 +136,7 @@ fps_camera_mount_path = NodePath("../FPSCameraMount")
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 
 [node name="SpringArm" type="SpringArm3D" parent="CameraController/Yaw/Pitch/Pivot" unique_id=1379134570]
-collision_mask = 3
+collision_mask = 17
 spring_length = 9.0
 
 [node name="Proxy" type="Node3D" parent="CameraController/Yaw/Pitch/Pivot/SpringArm" unique_id=1379134571]
@@ -152,7 +154,7 @@ fov = 70.0
 
 [node name="AimRay" type="RayCast3D" parent="ActiveCamera" unique_id=1379134578]
 target_position = Vector3(0, 0, -200)
-collision_mask = 11
+collision_mask = 25
 
 [node name="VehicleWeaponMount" type="Marker3D" parent="." unique_id=1379134567]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -1.3520434)

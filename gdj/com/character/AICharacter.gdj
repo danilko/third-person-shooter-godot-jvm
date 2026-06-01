@@ -31,7 +31,8 @@ signals = [
 	drop_weapon
 ]
 properties = [
-    detection_range,
+    behavior_config,
+	detection_range,
 	aim_pitch_min,
 	aim_pitch_max,
 	attack_range,
@@ -67,6 +68,7 @@ properties = [
 ]
 functions = [
     _ready,
+	on_ammo_changed,
 	on_enemy_damaged,
 	on_died,
 	_physics_process,

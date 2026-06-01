@@ -138,7 +138,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
                     wheels.add(w);
                 }
             }
-            GD.print("[Vehicle] _ready: " + wheels.size() + " wheel(s) initialised");
         } else {
             GD.printErr("[Vehicle] Wheels node missing — hover disabled!");
         }
@@ -362,7 +361,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
         emitEnterPrompt(false);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this, c.characterInfo);
-        GD.print("[Vehicle] " + c.getName() + " entered");
     }
 
     public void tryExit() {

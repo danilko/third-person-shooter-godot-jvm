@@ -63,27 +63,27 @@ public class AIController extends Controller {
     // ── Memory / timers ───────────────────────────────────────────────────────
     // (moved from AICharacter — these are "what the AI remembers", not body capability)
 
-    private static final double LOST_TARGET_TIMEOUT = 3.0;
+    private static final double LOST_TARGET_TIMEOUT  = 3.0;
     private static final double UNDER_ATTACK_DURATION = 2.5;
 
-    double attackTimer      = 0.0;
-    double lostTargetTimer  = 0.0;
-    double reactionTimer    = 0.0;
-    double underAttackTimer = 0.0;
-    double strafeTimer      = 0.0;
-    double searchTimer      = 0.0;
-    double stillTimer       = 0.0;
+    private double attackTimer      = 0.0;
+    private double lostTargetTimer  = 0.0;
+    private double reactionTimer    = 0.0;
+    private double underAttackTimer = 0.0;
+    private double strafeTimer      = 0.0;
+    private double searchTimer      = 0.0;
+    private double stillTimer       = 0.0;
 
-    float   strafeX        = 0f;
-    float   strafeZ        = 0f;
-    float   strafeFlipSide = 1f;   // alternates ±1 each refresh — no random flips
+    private float   strafeX        = 0f;
+    private float   strafeZ        = 0f;
+    private float   strafeFlipSide = 1f;   // alternates ±1 each refresh — no random flips
 
-    double stanceHoldTimer = 0.0;  // minimum time to hold a stance before switching
+    private double stanceHoldTimer = 0.0;  // minimum time to hold a stance before switching
 
-    Vector3 lastKnownTargetPosition = null;
-    Vector3 currentAimTarget        = null;
+    private Vector3 lastKnownTargetPosition = null;
+    private Vector3 currentAimTarget        = null;
 
-    StanceName intendedAttackStance = StanceName.UPRIGHT;
+    private StanceName intendedAttackStance = StanceName.UPRIGHT;
 
     // ── Attack-timer helpers ──────────────────────────────────────────────────
     public void    resetAttackTimer()             { attackTimer = 0.0; }
@@ -166,12 +166,16 @@ public class AIController extends Controller {
     // ── Suppression fire ──────────────────────────────────────────────────────
     public Vector3 computeSuppressTarget(float hDist) {
         if (lastKnownTargetPosition == null) return null;
-        float maxOffset = getBody().aimScatterRadius * 2f * (hDist / 10f);
+        float maxOffset = getBody().getBehaviorConfig().aimScatterRadius * 2f * (hDist / 10f);
         float offset    = GD.randf() * maxOffset;
-        float angle     = GD.randf() * (float) (Math.PI * 2.0);
+        // Scatter in a full 3D sphere so suppression fire spreads in all directions,
+        // not just the XY world plane (which produced visible axis-aligned artefacts).
+        float azimuth   = GD.randf() * (float)(Math.PI * 2.0);
+        float elevation = (GD.randf() - 0.5f) * (float) Math.PI;
+        float cosEl     = (float) Math.cos(elevation);
         return lastKnownTargetPosition.plus(new Vector3(
-                offset * (float) Math.cos(angle),
-                offset * (float) Math.sin(angle),
-                0f));
+                offset * cosEl * (float) Math.cos(azimuth),
+                offset * (float) Math.sin(elevation),
+                offset * cosEl * (float) Math.sin(azimuth)));
     }
 }

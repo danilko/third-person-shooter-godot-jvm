@@ -47,88 +47,70 @@ public class ImpactManager extends Node {
     public void processHit(HitInfo info, float damage,
                            String weaponName, Texture2D weaponIcon,
                            String attackerName, String attackerFaction) {
-        spawnImpactParticles(info);
-        spawnDecal(info);
-        applyDamage(info, damage, weaponName, weaponIcon, attackerName, attackerFaction);
-        applyHitImpulse(info, damage);
-    }
+        // Walk the parent chain once to resolve surface type, health owner, and
+        // character — previously done by three independent traversals per hit.
+        HitContext ctx = resolveHitContext(info.hitNode);
 
-    // ── Private helpers (one per effect type) ────────────────────────────────
-
-    private void spawnImpactParticles(HitInfo info) {
         ParticleManager pm = getParticleManager();
-        if (pm == null) return;
-        pm.spawn(resolveSurfaceType(info.hitNode), info.hitPoint);
-    }
+        if (pm != null) pm.spawn(ctx.surface, info.hitPoint);
 
-    private void spawnDecal(HitInfo info) {
         DecalManager dm = getDecalManager();
-        if (dm == null || info.hitNormal == null) return;
-        dm.spawn(info.hitPoint, info.hitNormal);
+        if (dm != null && info.hitNormal != null) dm.spawn(info.hitPoint, info.hitNormal);
+
+        if (ctx.healthOwner != null) {
+            Health health = (Health) ctx.healthOwner.getNode(new NodePath("Health"));
+            health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction);
+        }
+
+        if (ctx.character != null && info.hitNormal != null) {
+            ctx.character.applyHitImpulse(info.hitNode, info.hitNormal.times(-1f), damage);
+        }
     }
 
-    private void applyDamage(HitInfo info, float damage,
-                             String weaponName, Texture2D weaponIcon,
-                             String attackerName, String attackerFaction) {
-        if (info.hitNode == null) return;
-        // Walk up the parent chain looking for a node that owns a Health child.
-        // getOwner() is not used here because CharacterVisuals is instantiated at
-        // runtime (addChild), so bones inside it report CharacterVisuals as owner,
-        // not the Character body that contains it.
-        Node healthOwner = walkToHealthOwner(info.hitNode);
-        if (healthOwner == null) return;
-        Health health = (Health) healthOwner.getNode(new NodePath("Health"));
-        health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction);
+    // ── Hit context resolution ────────────────────────────────────────────────
+
+    private static class HitContext {
+        final Character character;
+        final Node                    healthOwner;
+        final SurfaceType             surface;
+        HitContext(Character c, Node h, SurfaceType s) {
+            character = c; healthOwner = h; surface = s;
+        }
     }
 
     /**
-     * Surface type priority:
-     *   1. Character subclass        → FLESH  (automatic)
-     *   2. HittableBody script       → reads surfaceType property directly
-     *   3. Everything else           → DEFAULT
+     * Walks the parent chain once to collect surface type, health owner, and character.
+     * On a character hit all three resolve to the same ancestor — previously done by
+     * three independent traversals in resolveSurfaceType / walkToHealthOwner / applyHitImpulse.
      *
-     * Walks the parent chain instead of using getOwner() because CharacterVisuals
-     * is instantiated at runtime, making getOwner() point to CharacterVisuals root
-     * rather than the Character body.
+     * getOwner() is not used because CharacterVisuals is added at runtime (addChild),
+     * so bones inside it report CharacterVisuals as their owner, not the Character body.
      */
-    private SurfaceType resolveSurfaceType(Node hitNode) {
-        if (hitNode == null) return SurfaceType.DEFAULT;
+    private static HitContext resolveHitContext(Node hitNode) {
+        if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT);
+        Character character = null;
+        Node healthOwner = null;
+        SurfaceType surface = SurfaceType.DEFAULT;
+
         Node current = hitNode;
         while (current != null) {
-            if (current instanceof Character)       return SurfaceType.FLESH;
-            if (current instanceof HittableBody hb) return hb.getSurfaceType();
-            current = current.getParent();
-        }
-        return SurfaceType.DEFAULT;
-    }
-
-    /**
-     * Applies directional physics to the hit character.
-     * hitNormal points from the surface toward the shooter, so negating it gives the
-     * bullet travel direction — the direction the character should be pushed.
-     * applyDamage() is called first, so if this hit killed the character the ragdoll
-     * simulation is already running (died signal fires synchronously in takeDamage).
-     */
-    private void applyHitImpulse(HitInfo info, float damage) {
-        if (info.hitNode == null || info.hitNormal == null) return;
-        Node current = info.hitNode;
-        while (current != null) {
-            if (current instanceof Character character) {
-                character.applyHitImpulse(info.hitNode, info.hitNormal.times(-1f), damage);
-                return;
+            if (surface == SurfaceType.DEFAULT) {
+                if (current instanceof Character c) {
+                    surface = SurfaceType.FLESH;
+                    character = c;
+                } else if (current instanceof HittableBody hb) {
+                    surface = hb.getSurfaceType();
+                }
+            } else if (character == null && current instanceof Character c) {
+                character = c;
             }
+            if (healthOwner == null && current.hasNode(new NodePath("Health"))) {
+                healthOwner = current;
+            }
+            if (character != null && healthOwner != null && surface != SurfaceType.DEFAULT) break;
             current = current.getParent();
         }
-    }
-
-    // Walk up the parent chain looking for the first node that has a direct "Health" child.
-    private static Node walkToHealthOwner(Node start) {
-        Node current = start;
-        while (current != null) {
-            if (current.hasNode(new NodePath("Health"))) return current;
-            current = current.getParent();
-        }
-        return null;
+        return new HitContext(character, healthOwner, surface);
     }
 
     // ── Lazy singleton lookups ────────────────────────────────────────────────

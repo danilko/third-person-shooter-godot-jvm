@@ -52,7 +52,7 @@ public class WeaponController extends Node {
    * Slots 1–6 are the standard weapon inventory.
    */
   protected WeaponSlotType[] slotTypes = {
-      WeaponSlotType.FIST,        // slot 0 — permanent fist (key: weapon_unequip)
+      WeaponSlotType.FIST,        // slot 0 — permanent fist (key: key 0)
       WeaponSlotType.PRIMARY,     // slot 1 — first long weapon  (key 1)
       WeaponSlotType.PRIMARY,     // slot 2 — second long weapon (key 2)
       WeaponSlotType.SECONDARY,   // slot 3 — sidearm            (key 3)
@@ -78,6 +78,7 @@ public class WeaponController extends Node {
 
   private RayCast3D aimRay;
   private RayCast3D originalAimRay;
+  private EventBus eventBus;
 
   private Timer transitionTimer;
   private Timer fireTimer;
@@ -263,8 +264,8 @@ public class WeaponController extends Node {
                        active != null ? active.getReserve()  : 0);
     }
 
-    Node busNode = getNodeOrNull("/root/EventBus");
-    if (busNode instanceof EventBus bus) {
+    EventBus bus = getEventBus();
+    if (bus != null) {
       String characterId = (getOwner() instanceof Character c && c.characterInfo != null)
           ? c.characterInfo.characterId : "";
       bus.weaponPickedUp.emit(characterId, item.getDisplayName(), item.weaponIcon);
@@ -422,9 +423,17 @@ public class WeaponController extends Node {
     return -1;
   }
 
+  private EventBus getEventBus() {
+    if (eventBus == null) {
+      Node n = getNodeOrNull("/root/EventBus");
+      if (n instanceof EventBus eb) eventBus = eb;
+    }
+    return eventBus;
+  }
+
   private void emitArmedStateChanged(boolean armed) {
-    Node bus = getNodeOrNull("/root/EventBus");
-    if (bus instanceof EventBus eb) eb.armedStateChanged.emit(getOwner(), armed);
+    EventBus bus = getEventBus();
+    if (bus != null) bus.armedStateChanged.emit(getOwner(), armed);
   }
 
   /**

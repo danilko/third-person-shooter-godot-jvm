@@ -1,5 +1,6 @@
 package com.character;
 
+import com.util.CollisionLayers;
 import com.vehicle.VehicleWeaponMode;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
@@ -11,6 +12,8 @@ import godot.core.*;
 import godot.global.GD;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.UUID;
 
 @RegisterClass
@@ -51,6 +54,7 @@ public class Character extends CharacterBody3D implements Controllable {
     public final Signal0 dropWeapon = new Signal0(this, new StringName("drop_weapon"));
 
     // ── Exports ───────────────────────────────────────────────────────────────
+    @Export
     @RegisterProperty
     public int maxAirJump = 1;
 
@@ -174,6 +178,9 @@ public class Character extends CharacterBody3D implements Controllable {
     private double  ragdollFreezeCountdown = -1.0;
     private boolean ragdollFrozen          = false;
 
+    // ── Stance cache — populated once in _ready() to avoid repeated NodePath traversals ──
+    private final Map<StanceName, Stance> stanceCache = new EnumMap<>(StanceName.class);
+
     // ── Tick counter (stamped onto every UserCommand for network ordering) ─────
     protected long currentTick = 0;
 
@@ -246,6 +253,13 @@ public class Character extends CharacterBody3D implements Controllable {
 
         for (Node child : getChildren()) {
             if (child instanceof Controller c) { controller = c; break; }
+        }
+
+        for (StanceName sn : StanceName.values()) {
+            NodePath sp = stances.get(sn.getKey());
+            if (sp == null) continue;
+            Node sn2 = getNodeOrNull(sp);
+            if (sn2 instanceof Stance s) stanceCache.put(sn, s);
         }
 
         changedMovementDirection.emit(Vector3.Companion.getBACK());
@@ -534,17 +548,11 @@ public class Character extends CharacterBody3D implements Controllable {
             StanceName disabledStanceName = isRoll ? currentStanceName : StanceName.CROUCH;
             StanceName enabledStanceName  = isRoll ? StanceName.CROUCH  : currentStanceName;
 
-            NodePath disabledPath = stances.get(disabledStanceName.getKey());
-            if (disabledPath != null) {
-                Stance s = (Stance) getNode(disabledPath);
-                if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
-            }
+            Stance disabled = stanceCache.get(disabledStanceName);
+            if (disabled != null && disabled.getCollider() != null) disabled.getCollider().setDisabled(true);
 
-            NodePath enabledPath = stances.get(enabledStanceName.getKey());
-            if (enabledPath != null) {
-                Stance s = (Stance) getNode(enabledPath);
-                if (s != null && s.getCollider() != null) s.getCollider().setDisabled(false);
-            }
+            Stance enabled = stanceCache.get(enabledStanceName);
+            if (enabled != null && enabled.getCollider() != null) enabled.getCollider().setDisabled(false);
         }
 
         if (isRoll) {
@@ -556,9 +564,7 @@ public class Character extends CharacterBody3D implements Controllable {
     }
 
     public void setMovementState(MovementType type) {
-        NodePath path = stances.get(currentStanceName.getKey());
-        if (path == null) return;
-        Stance stanceNode = (Stance) getNode(path);
+        Stance stanceNode = stanceCache.get(currentStanceName);
         if (stanceNode == null) return;
         currentMovementType = type;
         changedMovementState.emit(stanceNode.getMovementState(type));
@@ -574,30 +580,22 @@ public class Character extends CharacterBody3D implements Controllable {
         StanceName next = (stanceName == currentStanceName) ? StanceName.UPRIGHT : stanceName;
         if (isStanceBlocked(next)) return;
 
-        NodePath currentPath = stances.get(currentStanceName.getKey());
-        if (currentPath != null) {
-            Stance s = (Stance) getNode(currentPath);
-            if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
-        }
+        Stance current = stanceCache.get(currentStanceName);
+        if (current != null && current.getCollider() != null) current.getCollider().setDisabled(true);
 
         currentStanceName = next;
         stanceOrdinal = currentStanceName.ordinal();
-        NodePath nextPath = stances.get(currentStanceName.getKey());
-        if (nextPath != null) {
-            Stance s = (Stance) getNode(nextPath);
-            if (s != null) {
-                if (s.getCollider() != null) s.getCollider().setDisabled(false);
-                changedStance.emit(s);
-            }
+        Stance nextStance = stanceCache.get(currentStanceName);
+        if (nextStance != null) {
+            if (nextStance.getCollider() != null) nextStance.getCollider().setDisabled(false);
+            changedStance.emit(nextStance);
         }
 
         setMovementState(currentMovementType);
     }
 
     protected boolean isStanceBlocked(StanceName stanceName) {
-        NodePath path = stances.get(stanceName.getKey());
-        if (path == null) return false;
-        Stance s = (Stance) getNode(path);
+        Stance s = stanceCache.get(stanceName);
         return (s != null) && s.isBlocked();
     }
 
@@ -607,20 +605,14 @@ public class Character extends CharacterBody3D implements Controllable {
      * happen the same frame regardless of how recently the last stance changed.
      */
     protected void forceSetStance(StanceName next) {
-        NodePath currentPath = stances.get(currentStanceName.getKey());
-        if (currentPath != null) {
-            Stance s = (Stance) getNode(currentPath);
-            if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
-        }
+        Stance current = stanceCache.get(currentStanceName);
+        if (current != null && current.getCollider() != null) current.getCollider().setDisabled(true);
         currentStanceName = next;
         stanceOrdinal     = next.ordinal();
-        NodePath nextPath = stances.get(next.getKey());
-        if (nextPath != null) {
-            Stance s = (Stance) getNode(nextPath);
-            if (s != null) {
-                if (s.getCollider() != null) s.getCollider().setDisabled(false);
-                changedStance.emit(s);
-            }
+        Stance nextStance = stanceCache.get(next);
+        if (nextStance != null) {
+            if (nextStance.getCollider() != null) nextStance.getCollider().setDisabled(false);
+            changedStance.emit(nextStance);
         }
     }
 
@@ -635,7 +627,7 @@ public class Character extends CharacterBody3D implements Controllable {
         preDriveCombat    = combat;
         preDriveRotation  = getGlobalRotation();
         vehicleWeaponMode = mode;
-        setCollisionLayer(0);
+        setCollisionLayer(0);  // remove from all layers while in vehicle
         forceSetStance(StanceName.DRIVE_CARRIER);
         // Reset the MeshRoot local rotation so the mesh aligns with the body.
         // MovementController normally controls this; since it is disabled the mesh
@@ -667,7 +659,7 @@ public class Character extends CharacterBody3D implements Controllable {
     public void exitDriveState() {
         // Restore body rotation so MovementController's playerInitRotation stays valid.
         setGlobalRotation(preDriveRotation);
-        setCollisionLayer(2);
+        setCollisionLayer(CollisionLayers.CHARACTER);
         setProcess(true);
         setPhysicsProcess(true);
         Node mc = getNodeOrNull("MovementController");
@@ -778,16 +770,12 @@ public class Character extends CharacterBody3D implements Controllable {
             for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
                 Node child = physicalBoneSimulator.getChild(i);
                 if (child instanceof PhysicalBone3D bone) {
-                    // Layer 4 (value 8) is the character-detection layer used by SightRay
-                    // and AimRay (both collision_mask = 9 = layers 1+4). Removing dead bones
-                    // from this layer makes the ragdoll transparent to raycasts from living
-                    // characters — fixes dead bodies blocking hasLineOfSight() and
-                    // performHitscan(), which caused the "not disappearing" and suppression-
-                    // fire-into-dead-body symptoms.
-                    bone.setCollisionLayerValue(4, false);
-                    // Layer 1 (world) in the MASK means the bone can detect the floor so
-                    // the ragdoll physically rests on world geometry.
-                    bone.setCollisionMaskValue(1, true);
+                    // Remove dead bones from the hitbox layer so living characters' AimRay
+                    // and LoS rays pass through corpses. Fixes dead bodies blocking
+                    // hasLineOfSight() and performHitscan().
+                    bone.setCollisionLayerValue(CollisionLayers.LAYER_HITBOX, false);
+                    // Add world to mask so ragdoll bones rest on floor geometry.
+                    bone.setCollisionMaskValue(CollisionLayers.LAYER_WORLD, true);
                 }
             }
             physicalBoneSimulator.physicalBonesStartSimulation();
@@ -894,7 +882,7 @@ public class Character extends CharacterBody3D implements Controllable {
     }
 
     public void setHeadVisible(boolean visible) {
-        for(Node3D headMesh : headMeshes) {headMesh.setVisible(visible);};
+        for (Node3D headMesh : headMeshes) headMesh.setVisible(visible);
     }
 
     /**
@@ -938,10 +926,7 @@ public class Character extends CharacterBody3D implements Controllable {
         enableRagdoll();
 
         // Disabled current stance to let ragdoll take over
-            NodePath enabledPath = stances.get(currentStanceName.getKey());
-            if (enabledPath != null) {
-                Stance s = (Stance) getNode(enabledPath);
-                if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
-            }
+        Stance s = stanceCache.get(currentStanceName);
+        if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
     }
 }

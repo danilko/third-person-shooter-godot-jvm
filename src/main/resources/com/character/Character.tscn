@@ -68,7 +68,7 @@ properties/4/replication_mode = 2
 
 [node name="Character" type="CharacterBody3D" unique_id=802038165 node_paths=PackedStringArray("weapon_controller")]
 collision_layer = 2
-collision_mask = 3
+collision_mask = 19
 script = ExtResource("1_gapvf")
 jump_states = Dictionary[String, ExtResource("2_3tgi5")]({
 "AirJump": ExtResource("3_ttk2h"),
@@ -222,7 +222,7 @@ far = 8192.0
 
 [node name="AimRay" type="RayCast3D" parent="ActiveCamera" unique_id=847198473]
 target_position = Vector3(0, 0, -2000)
-collision_mask = 9
+collision_mask = 25
 
 [node name="AimTarget" type="Marker3D" parent="ActiveCamera/AimRay" unique_id=1416140619]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.011982799, -5.461198)
@@ -251,7 +251,6 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 [connection signal="changed_movement_state" from="." to="MovementController" method="on_set_movement_state"]
 [connection signal="changed_movement_state" from="." to="AnimationController" method="on_set_movement_state"]
 [connection signal="changed_movement_state" from="." to="TPSCameraController" method="on_set_movement_state"]
-[connection signal="changed_stance" from="." to="MovementController" method="on_set_stance"]
 [connection signal="changed_stance" from="." to="AnimationController" method="on_set_stance"]
 [connection signal="changed_stance" from="." to="WeaponController" method="on_set_stance"]
 [connection signal="changed_stance" from="." to="TPSCameraController" method="on_set_stance"]

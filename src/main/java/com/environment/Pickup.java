@@ -65,6 +65,7 @@ public class Pickup extends RigidBody3D {
   /** True while held in a character's inventory; blocks body_entered re-triggering. */
   protected boolean equipped = false;
   private float pickupCooldown = 0f;
+  private EventBus eventBus;
 
   // ── Tick ─────────────────────────────────────────────────────────────────
 
@@ -197,10 +198,16 @@ public class Pickup extends RigidBody3D {
     return true;
   }
 
-  private void emitInteractPrompt(boolean inRange) {
-    Node busNode = getNodeOrNull("/root/EventBus");
-    if (busNode instanceof EventBus bus) {
-      bus.pickupInteractChanged.emit(inRange, inRange ? "Pick up: " + getInteractLabel() : "");
+  private EventBus getEventBus() {
+    if (eventBus == null) {
+      Node n = getNodeOrNull("/root/EventBus");
+      if (n instanceof EventBus eb) eventBus = eb;
     }
+    return eventBus;
+  }
+
+  private void emitInteractPrompt(boolean inRange) {
+    EventBus bus = getEventBus();
+    if (bus != null) bus.pickupInteractChanged.emit(inRange, inRange ? "Pick up: " + getInteractLabel() : "");
   }
 }

@@ -145,10 +145,6 @@ public class MovementController extends Node {
 
 
   @RegisterFunction
-  public void onSetStance(Stance stance) {
-  }
-
-  @RegisterFunction
   public void roll(RollState rollState) {
     rolling = true;
     rollSpeed = rollState.getRollSpeed();
