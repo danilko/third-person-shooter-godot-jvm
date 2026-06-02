@@ -146,12 +146,14 @@ public class Pickup extends RigidBody3D {
   // ── Equip / return lifecycle (used by WeaponItem) ─────────────────────────
 
   /** Called after this pickup is reparented into a character's inventory marker.
-   *  Freezes physics; sets the equipped flag so onBodyEntered ignores further
-   *  contacts without touching Area3D monitoring (which is blocked inside body signals). */
+   *  Hides immediately so the world pickup vanishes on collection, then freezes physics.
+   *  WeaponItem.moveWeaponToHand calls show() afterwards for weapons with a hold socket,
+   *  so the hide here is intentionally overridden for visually-held weapons. */
   public void onPickedUp() {
     equipped = true;
     overlappingBodies.clear();
     emitInteractPrompt(false);
+    hide();
     setFreezeEnabled(true);
   }
 

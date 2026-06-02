@@ -245,10 +245,26 @@ public class WeaponController extends Node {
     injectCharacterRefs(item);
     weapons[targetSlot] = item;
 
+    // Auto-equip a throwable when the player is unarmed (fist slot active) so they
+    // immediately see and can use the grenade without needing a manual slot switch.
+    if (!willBeActive
+            && item.getSlotType() == WeaponSlotType.THROWABLE
+            && activeSlotIndex == 0) {
+      willBeActive = true;
+      activeSlotIndex = targetSlot;
+    }
+
     if (willBeActive) {
       boolean wasArmed = isArmed();
       activeSlotIndex = targetSlot;
       moveWeaponToHand(item);
+      // Block accidental fire on pickup: the fire button may already be held from the
+      // previous weapon. Use the switch-speed delay (same as a manual slot switch) so the
+      // player must release and re-press fire before the newly equipped weapon can fire.
+      if (fireTimer.getTimeLeft() <= 0) {
+        fireTimer.setWaitTime(1.0 / item.getSwitchSpeed());
+        fireTimer.start();
+      }
       if (item.getReloadAudio() != null) {
         weaponAudio.setStream(item.getReloadAudio());
         weaponAudio.play();
@@ -271,7 +287,8 @@ public class WeaponController extends Node {
       bus.weaponPickedUp.emit(characterId, item.getDisplayName(), item.weaponIcon);
     }
 
-    if (displaced != null) returnWeaponToWorld(displaced);
+    if (displaced != null && displaced.shouldDropToWorld()) returnWeaponToWorld(displaced);
+    else if (displaced != null) displaced.setup(null, null, null);
   }
 
   /**
@@ -284,8 +301,13 @@ public class WeaponController extends Node {
     WeaponItem current = weapons[activeSlotIndex];
     if (current == null || !current.isDroppable) return;
     weapons[activeSlotIndex] = null;
-    current.hide();       // hide immediately — reparent is deferred to _process
-    pendingDrops.add(current);
+    current.hide();
+    // ThrowableItem with 0 carry count: clear refs but don't spawn a world pickup.
+    if (current.shouldDropToWorld()) {
+      pendingDrops.add(current);
+    } else {
+      current.setup(null, null, null);
+    }
     activateFirstAvailableSlot();
   }
 
@@ -323,6 +345,8 @@ public class WeaponController extends Node {
     w.useWeapon();
     weaponFired.emit(w.getFireRate() * 0.2f);
     ammoChanged.emit(w.getMagazine(), w.getReserve());
+    // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
+    if (!w.isInfiniteAmmo && w.getMagazine() == 0) w.onMagazineEmpty();
   }
 
   @RegisterFunction
@@ -395,6 +419,57 @@ public class WeaponController extends Node {
 
   public int     getSlotCount()             { return slotTypes.length; }
   public boolean isSlotFreeFor(WeaponSlotType type) { return findFreeSlot(type) >= 0; }
+
+  /**
+   * Returns the first weapon in the given slot type whose weaponId matches.
+   * Used by ThrowableItem to find an existing stack for carry-count merging.
+   */
+  public WeaponItem findWeaponByIdAndType(String weaponId, WeaponSlotType type) {
+    for (int i = 0; i < slotTypes.length; i++) {
+      if (slotTypes[i] == type && weapons[i] != null
+          && weapons[i].weaponId.equals(weaponId)) return weapons[i];
+    }
+    return null;
+  }
+
+  /**
+   * Emits ammoChanged for the given weapon if it is currently the active weapon.
+   * Called by ThrowableItem after a carry-count merge so the HUD updates immediately.
+   */
+  public void notifyAmmoChange(WeaponItem forItem) {
+    if (forItem != null && forItem == getCurrentWeaponItem()) {
+      ammoChanged.emit(forItem.getMagazine(), forItem.getReserve());
+    }
+  }
+
+  /**
+   * Starts the fire timer using the given item's switch speed if it isn't already running.
+   * Called by ThrowableItem after a merge pickup so rapid sequential pickups can't chain
+   * into an accidental throw when the player holds the fire button.
+   */
+  public void resetFireTimerForEquip(WeaponItem item) {
+    if (fireTimer.getTimeLeft() <= 0) {
+      fireTimer.setWaitTime(1.0 / item.getSwitchSpeed());
+      fireTimer.start();
+    }
+  }
+
+  /**
+   * Removes the active weapon from its slot without creating a world pickup, clears its
+   * character refs, and switches to the next available weapon.
+   * Called by ThrowableItem.onMagazineEmpty() after the last grenade is thrown so
+   * the THROWABLE slot becomes free for any other throwable type.
+   * The active slot is guaranteed to hold the item being emptied — no search needed.
+   */
+  public void clearActiveSlot() {
+    WeaponItem item = weapons[activeSlotIndex];
+    if (item == null) return;
+    weapons[activeSlotIndex] = null;
+    item.setup(null, null, null);
+    item.hide();
+    item.queueFree();
+    activateFirstAvailableSlot();
+  }
   public boolean isWeaponReloading()        { return reloadTimer.getTimeLeft() > 0; }
   public boolean isWeaponTransitioning()    { return transitionTimer.getTimeLeft() > 0; }
 
@@ -473,17 +548,23 @@ public class WeaponController extends Node {
   }
 
   /** Reparents {@code item} to its holdSocket Marker3D and shows it.
-   *  If holdSocket is empty or not registered, shows the weapon at its current position. */
+   *  Items with no holdSocket (e.g. throwables) stay in the world scene where Jolt already
+   *  registered their physics body; onPickedUp() already hid them, so just keep hidden. */
   private void moveWeaponToHand(WeaponItem item) {
     Node target = resolveSocket(item.holdSocket);
-    if (target != null) reparentWeapon(item, target);
-    item.show();
+    if (target != null) {
+      reparentWeapon(item, target);
+      item.show();
+    } else {
+      item.hide();
+    }
   }
 
   /** Reparents {@code item} to the first free socket in its holsterSockets list and shows it.
    *  A socket is considered free when it has no children or already holds this weapon.
-   *  Hides the weapon if the list is empty, none of the names are registered, or all
-   *  registered sockets are occupied by other weapons. */
+   *  Items with no holster sockets stay in the world scene (hidden); do NOT reparent them
+   *  to the owner — moving a frozen RigidBody3D confuses Jolt's body position and causes
+   *  the item to clip through the ground when it is returned to the world later. */
   private void moveWeaponToHolster(WeaponItem item) {
     for (String socketName : item.holsterSockets) {
       Node target = resolveSocket(socketName);
@@ -534,14 +615,20 @@ public class WeaponController extends Node {
    * Shared mechanics for both drop variants: clears character refs, re-enables physics,
    * places the weapon at spawnPos, and applies impulse.
    *
-   * keepGlobalTransform=true so the weapon stays at its hand position in world space
-   * after reparent. Jolt Physics does not reliably propagate setGlobalPosition on a
-   * frozen body, so onReturnedToWorld() unfreezes before we set position.
+   * Throwables (and any weapon without a socket) stay in the world scene while equipped
+   * (frozen, hidden), so reparent is a no-op for them — skipping it avoids the
+   * same-parent reparent edge-case. Socket-based weapons live under a Marker3D and need
+   * to be moved back.
+   * Jolt Physics does not reliably propagate setGlobalPosition on a frozen body, so
+   * onReturnedToWorld() unfreezes before we set position.
    */
   private void returnWeaponToWorld(WeaponItem item, Vector3 spawnPos, Vector3 impulse) {
     item.setup(null, null, null);
     item.show();
-    item.reparent(getTree().getCurrentScene(), true);
+    Node currentScene = getTree().getCurrentScene();
+    if (!currentScene.equals(item.getParent())) {
+      item.reparent(currentScene, true);
+    }
     item.onReturnedToWorld();
     item.setGlobalPosition(spawnPos);
     // Reset any residual velocity from the frozen/equipped state before applying

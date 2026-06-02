@@ -138,6 +138,8 @@ public class Character extends CharacterBody3D implements Controllable {
 
     // ── Vehicle / drive state ─────────────────────────────────────────────────
     public VehicleWeaponMode vehicleWeaponMode = VehicleWeaponMode.NONE;
+    /** The Vehicle RigidBody3D this character is currently riding, or null when on foot. */
+    public Node currentVehicleNode = null;
     private StanceName preDriveStance    = StanceName.UPRIGHT;
     private boolean    preDriveCombat    = false;
     private Vector3    preDriveRotation  = Vector3.Companion.getZERO();
@@ -622,11 +624,12 @@ public class Character extends CharacterBody3D implements Controllable {
      * and physics processing — Vehicle only needs to hot-swap the controller after
      * this returns.
      */
-    public void enterDriveState(VehicleWeaponMode mode) {
+    public void enterDriveState(VehicleWeaponMode mode, Node vehicleNode) {
         preDriveStance    = currentStanceName;
         preDriveCombat    = combat;
         preDriveRotation  = getGlobalRotation();
         vehicleWeaponMode = mode;
+        currentVehicleNode = vehicleNode;
         setCollisionLayer(0);  // remove from all layers while in vehicle
         forceSetStance(StanceName.DRIVE_CARRIER);
         // Reset the MeshRoot local rotation so the mesh aligns with the body.
@@ -657,6 +660,7 @@ public class Character extends CharacterBody3D implements Controllable {
      * Called by {@code Vehicle.tryExit} before the controller is returned.
      */
     public void exitDriveState() {
+        currentVehicleNode = null;
         // Restore body rotation so MovementController's playerInitRotation stays valid.
         setGlobalRotation(preDriveRotation);
         setCollisionLayer(CollisionLayers.CHARACTER);

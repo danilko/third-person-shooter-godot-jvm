@@ -6,9 +6,9 @@
 [ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="3_i1sta"]
 [ext_resource type="PackedScene" uid="uid://ds0yoqtkt2t1n" path="res://src/main/resources/com/vehicle/VehicleWheel.tscn" id="5_p3n1p"]
 [ext_resource type="Script" uid="uid://djm7aunxpr7f6" path="res://gdj/com/vehicle/VehicleCameraController.gdj" id="5_x00le"]
-[ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="7_wc"]
 [ext_resource type="Curve" uid="uid://cofnaffaigrhj" path="res://src/main/resources/com/vehicle/VehicleWheelFrontGrip.tres" id="6_i1sta"]
 [ext_resource type="Texture2D" uid="uid://ofwdiqxujlur" path="res://addons/kenney_prototype_textures/light/texture_01.png" id="6_jeqgg"]
+[ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="7_wc"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_x00le"]
 friction = 0.0
@@ -161,7 +161,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -1.3520434)
 
 [node name="WeaponController" type="Node" parent="." unique_id=1379134580]
 script = ExtResource("7_wc")
-aim_ray_path = NodePath("ActiveCamera/AimRay")
 weapon_attachment_path = NodePath("VehicleWeaponMount")
 
 [node name="TransitionTimer" type="Timer" parent="WeaponController" unique_id=1379134581]

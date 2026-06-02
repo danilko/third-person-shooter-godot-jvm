@@ -1,8 +1,8 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = Vehicle
-fqName = com.vehicle.Vehicle
+registeredName = T1Projectile
+fqName = com.character.T1Projectile
 baseType = RigidBody3D
 supertypes = [
     godot.api.RigidBody3D,
@@ -12,7 +12,7 @@ supertypes = [
 	godot.api.Node,
 	godot.api.Object,
 	godot.core.KtObject,
-	com.character.Controllable,
+	com.character.Detonatable,
 	godot.common.interop.NativeWrapper,
 	godot.common.interop.NativePointer
 ]
@@ -20,37 +20,13 @@ signals = [
     
 ]
 properties = [
-    character_info,
-	spring_strength,
-	spring_damping,
-	wheel_radius,
-	rest_distance,
-	over_extend,
-	z_traction,
-	z_brake_traction,
-	max_speed,
-	acceleration,
-	acceleration_curve,
-	tire_max_turn_speed,
-	tire_max_turn_degrees,
-	wheels_path,
-	driver_seat_path,
-	vehicle_cam_path,
-	weapon_mode_index,
-	vehicle_collision_min_speed,
-	vehicle_collision_damage_scale,
+    fuse_time,
 	explosion_radius,
 	explosion_max_damage,
-	explosion_push_force,
-	vehicle_icon,
-	wreck_scene,
-	wreck_duration
+	explosion_push_force
 ]
 functions = [
     _ready,
 	_physics_process,
-	_integrate_forces,
-	on_vehicle_destruction,
-	on_entrance_body_entered,
-	on_entrance_body_exited
+	detonate
 ]

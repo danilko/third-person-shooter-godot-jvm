@@ -5,6 +5,7 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
+import com.vehicle.Vehicle;
 import godot.core.Callable;
 import godot.core.StringName;
 import godot.core.StringNames;
@@ -139,6 +140,11 @@ public class AICharacter extends Character {
     // -1 = invalid (recompute on next call). Invalidated by onAmmoChanged().
     private int cachedBestWeapon = -1;
 
+    // ── Vehicle-target tracking ───────────────────────────────────────────────
+    // Last-known vehicle for the current target. When this changes the LoS cache
+    // is immediately invalidated so the new check (bones vs vehicle) fires next tick.
+    private Node cachedTargetVehicle = null;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     @RegisterFunction
     @Override
@@ -183,17 +189,47 @@ public class AICharacter extends Character {
 
     public NavigationAgent3D getNavAgent() { return navAgent; }
 
-    /** Full group scan for nearest live hostile. Called at most once per TARGET_SCAN_INTERVAL. */
+    /**
+     * Full group scan for nearest live hostile. Called at most once per TARGET_SCAN_INTERVAL.
+     *
+     * Scans both Character nodes (on-foot) and Vehicle nodes. When the nearest hostile is
+     * a vehicle occupant, the Character target is set so all existing faction / health /
+     * behaviour logic is unchanged — the vehicle redirect is handled transparently by
+     * hasLineOfSight() and getAimBonePosition() via currentTarget.currentVehicleNode.
+     */
     private Character discoverTarget() {
         String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
         float closestDist = Float.MAX_VALUE;
         Character closest = null;
+
         for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
-            if (!(node instanceof Character c) || c == this || !c.isAlive()) continue;
-            String tf = c.characterInfo != null ? c.characterInfo.faction : Faction.NEUTRAL;
-            if (!Faction.areHostile(myFaction, tf)) continue;
-            float dist = (float) getGlobalPosition().distanceTo(c.getGlobalPosition());
-            if (dist < closestDist) { closestDist = dist; closest = c; }
+            Character candidate = null;
+            float dist = Float.MAX_VALUE;
+
+            if (node instanceof Character c) {
+                if (c == this || !c.isAlive()) continue;
+                String tf = c.characterInfo != null ? c.characterInfo.faction : Faction.NEUTRAL;
+                if (!Faction.areHostile(myFaction, tf)) continue;
+                // Skip occupants found via character scan — the vehicle entry below
+                // will find them at the vehicle position (avoids double-counting).
+                if (c.currentVehicleNode != null) continue;
+                dist      = (float) getGlobalPosition().distanceTo(c.getGlobalPosition());
+                candidate = c;
+
+            } else if (node instanceof Vehicle v) {
+                Character occ = v.getOccupant();
+                if (occ == null || !occ.isAlive() || !v.isAlive()) continue;
+                String tf = occ.characterInfo != null ? occ.characterInfo.faction : Faction.NEUTRAL;
+                if (!Faction.areHostile(myFaction, tf)) continue;
+                // Distance to vehicle body so navigation targets the vehicle, not the old foot position.
+                dist      = (float) getGlobalPosition().distanceTo(v.getGlobalPosition());
+                candidate = occ;
+            }
+
+            if (candidate != null && dist < closestDist) {
+                closestDist = dist;
+                closest     = candidate;
+            }
         }
         return closest;
     }
@@ -209,11 +245,12 @@ public class AICharacter extends Character {
         Character previous = currentTarget;
         currentTarget = discoverTarget();
         if (currentTarget != previous) {
-            cachedTargetForBone = null;
-            cachedBoneNodes     = null;
-            cachedVisibleBone   = null;
-            cachedLoS           = false;
-            losCacheTimer       = 0;
+            cachedTargetForBone  = null;
+            cachedBoneNodes      = null;
+            cachedVisibleBone    = null;
+            cachedTargetVehicle  = null;
+            cachedLoS            = false;
+            losCacheTimer        = 0;
         }
     }
 
@@ -265,16 +302,51 @@ public class AICharacter extends Character {
 
     /**
      * LoS check with a short result cache (~3 frames at 60 Hz).
-     * Walks the priority bone list in order — stops at the first exposed bone
-     * and stores it in cachedVisibleBone so getAimBonePosition() can use it.
-     * At most 3 forceRaycastUpdate calls per LOS_CACHE_INTERVAL in the worst case
-     * (all bones behind cover); typically 1 call when the preferred bone is clear.
+     *
+     * When the target is on foot, walks the priority bone list and stops at the
+     * first exposed bone (see resolveTargetBones for priority order).
+     *
+     * When the target is inside a vehicle, bone-walking fails because bones are
+     * occluded by the vehicle mesh. Instead we cast directly to the vehicle's
+     * centre-of-mass: LoS is confirmed when the ray hits the vehicle body first
+     * or finds no obstruction. The AimRay mask includes the vehicle layer (25)
+     * so the vehicle body is always detectable.
+     *
+     * Vehicle-status changes are detected each tick so the cache never serves a
+     * stale result across a board/exit event.
      */
     public boolean hasLineOfSight(double delta) {
         if (currentTarget == null || aimRay == null) return false;
+
+        // Invalidate immediately when target's vehicle status changes (board / exit).
+        Node currentVehicle = currentTarget.currentVehicleNode;
+        if (currentVehicle != cachedTargetVehicle) {
+            cachedTargetVehicle = currentVehicle;
+            cachedVisibleBone   = null;
+            losCacheTimer       = 0;   // force a fresh raycast next branch
+        }
+
         losCacheTimer -= delta;
         if (losCacheTimer > 0) return cachedLoS;
         losCacheTimer = LOS_CACHE_INTERVAL;
+
+        // ── Target is inside a vehicle ─────────────────────────────────────
+        if (currentVehicle instanceof Node3D vehicleNode) {
+            // Aim at the vehicle cabin (centre + 0.5 m up — typical seat height).
+            Vector3 vehicleCenter = vehicleNode.getGlobalPosition().plus(new Vector3(0f, 0.5f, 0f));
+            aimRay.setTargetPosition(aimRay.toLocal(vehicleCenter));
+            aimRay.forceRaycastUpdate();
+            if (!aimRay.isColliding()) {
+                cachedLoS = true;   // clear path — vehicle is within ray reach
+            } else {
+                // LoS if the first thing hit is the vehicle body or one of its children.
+                cachedLoS = aimRay.getCollider() instanceof Node n
+                        && (n == vehicleNode || vehicleNode.isAncestorOf(n));
+            }
+            return cachedLoS;
+        }
+
+        // ── Target is on foot — original bone-walk logic ───────────────────
         if (currentTarget != cachedTargetForBone) resolveTargetBones();
         if (cachedBoneNodes == null) { cachedLoS = false; return false; }
         cachedVisibleBone = null;
@@ -324,11 +396,21 @@ public class AICharacter extends Character {
 
     /**
      * Returns the world position to aim at on the current target.
-     * Prefers the bone last confirmed exposed by hasLineOfSight() — no additional
-     * raycast needed since we already know it's clear.  Falls back to the first
-     * (preferred) bone in the priority list if the LoS result is stale.
+     *
+     * When the target is inside a vehicle, redirects to the vehicle cabin
+     * (centre + 0.5 m) — shooting at bone positions fails because they are
+     * occluded by the vehicle mesh. Hits land on the vehicle body, so Health
+     * damage goes to the vehicle, not the occupant directly.
+     *
+     * When on foot, prefers the bone last confirmed exposed by hasLineOfSight()
+     * so no extra raycast is needed. Falls back along the priority list.
      */
     public Vector3 getAimBonePosition() {
+        // Vehicle occupant: aim at vehicle cabin centre-mass.
+        if (currentTarget.currentVehicleNode instanceof Node3D vn) {
+            return vn.getGlobalPosition().plus(new Vector3(0f, 0.5f, 0f));
+        }
+        // On foot: prefer last confirmed visible bone (no extra raycast).
         if (cachedVisibleBone != null) return cachedVisibleBone.getGlobalPosition();
         if (cachedBoneNodes != null && cachedBoneNodes.length > 0 && cachedBoneNodes[0] != null)
             return cachedBoneNodes[0].getGlobalPosition();

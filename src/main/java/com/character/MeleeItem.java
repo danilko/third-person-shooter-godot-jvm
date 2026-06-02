@@ -155,6 +155,9 @@ public class MeleeItem extends WeaponItem {
     /** Checks one ray direction; processes the hit via ImpactManager and returns true if in range. */
     private boolean hitInRange(RayCast3D ray, Vector3 torso, com.environment.ImpactManager im) {
         if (!ray.isColliding()) return false;
+        // Reject floor/ground surfaces (normal pointing mostly upward) to prevent the
+        // TPS camera's natural downward tilt from registering ground hits.
+        if (ray.getCollisionNormal().getY() > 0.7f) return false;
         Vector3 hitPoint = ray.getCollisionPoint();
         if ((float) hitPoint.minus(torso).length() > meleeRange) return false;
         Object collider = ray.getCollider();

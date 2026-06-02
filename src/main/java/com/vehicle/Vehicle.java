@@ -2,6 +2,7 @@ package com.vehicle;
 
 import com.character.*;
 import com.character.Character;
+import com.environment.ExplosionManager;
 import com.game.EventBus;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
@@ -81,11 +82,27 @@ public class Vehicle extends RigidBody3D implements Controllable {
     /** Damage per m/s above vehicleCollisionMinSpeed on collision. */
     @RegisterProperty @Export public float vehicleCollisionDamageScale = 100.0f;
 
-    /** Damage dealt to the occupant when the vehicle is destroyed. */
-    @RegisterProperty @Export public float vehicleExplosionOccupantDamage = 50.0f;
+    /** Blast radius of the destruction explosion in metres (0 = no explosion). */
+    @RegisterProperty @Export public float explosionRadius = 6f;
 
-    /** Optional icon shown in the kill feed when this vehicle deals collision damage. */
+    /** Maximum damage at the blast centre; falls off quadratically to zero at radius. */
+    @RegisterProperty @Export public float explosionMaxDamage = 100f;
+
+    /** Physics push force applied to bodies caught in the blast. */
+    @RegisterProperty @Export public float explosionPushForce = 25f;
+
+    /** Optional icon shown in the kill feed for both collision damage and explosion kills. */
     @RegisterProperty @Export public Texture2D vehicleIcon;
+
+    /**
+     * Scene spawned at the vehicle's world transform when it is destroyed.
+     * Intended as a burnt-shell visual artifact; removed after wreckDuration seconds.
+     * Leave null to disable the wreck.
+     */
+    @RegisterProperty @Export public PackedScene wreckScene;
+
+    /** Seconds the wreck stays on the map before being removed. */
+    @RegisterProperty @Export public float wreckDuration = 15f;
 
     // ── Runtime state ─────────────────────────────────────────────────────────
 
@@ -339,7 +356,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
         VehicleWeaponMode mode = getWeaponMode();
 
         // Character handles collision, stance, combat state, and physics disabling.
-        c.enterDriveState(mode);
+        c.enterDriveState(mode, this);
         // Align character body to vehicle heading once — exitDriveState restores the pre-entry rotation.
         c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
 
@@ -397,31 +414,39 @@ public class Vehicle extends RigidBody3D implements Controllable {
     /**
      * Called when the vehicle's Health node reaches zero.
      *
-     * Ejects the occupant first (restoring their physics and stance) so that the
-     * exitDriveState / makeCameraActive chain runs on a live vehicle scene, then
-     * applies explosion damage to the ejected character, and finally removes the
-     * vehicle from the scene tree.
-     *
-     * Ordering matters: tryExit() must come before queueFree() so that reparenting
-     * the controller and querying global transforms still work on the intact vehicle.
-     * Damage is applied after ejection so that if the blast kills the character,
-     * enableRagdoll() fires on a fully-restored CharacterBody3D (not mid-drive-state).
+     * Order is critical:
+     *   1. tryExit() first — restores occupant physics/stance/camera on the intact scene.
+     *   2. triggerExplosion — the ejected occupant and any nearby characters/vehicles
+     *      are hit by the radial blast. The vehicle itself is excluded via excludeNode
+     *      so it doesn't receive impulse.
+     *   3. queueFree() — removes the vehicle after the explosion has been fired.
      */
     @RegisterFunction
     public void onVehicleDestruction() {
         if (occupant != null) {
-            Character ejected = occupant;
-            tryExit();
-            if (ejected.isAlive()) {
-                Node occHealth = ejected.getNodeOrNull("Health");
-                if (occHealth instanceof Health health) {
-                    String attackerName    = (characterInfo != null) ? characterInfo.displayName : getName().toString();
-                    String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
-                    health.takeDamage(null, vehicleExplosionOccupantDamage, "Vehicle Explosion",
-                            null, attackerName, attackerFaction);
-                }
+            tryExit();  // restore character before explosion so they can receive damage normally
+        }
+
+        if (explosionRadius > 0f) {
+            String attackerName    = (characterInfo != null) ? characterInfo.displayName : getName().toString();
+            String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
+            Node m = getTree().getFirstNodeInGroup("explosion_manager");
+            if (m instanceof ExplosionManager mgr) {
+                mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
+                                     explosionPushForce, attackerName, attackerFaction,
+                                     "Vehicle Explosion", vehicleIcon, this);
             }
         }
+
+        if (wreckScene != null) {
+            Node wreck = wreckScene.instantiate();
+            getTree().getCurrentScene().addChild(wreck);
+            if (wreck instanceof Node3D w) w.setGlobalTransform(getGlobalTransform());
+            SceneTreeTimer t = getTree().createTimer(wreckDuration, true, false, false);
+            t.connect(new StringName("timeout"),
+                    Callable.createUnsafe(wreck, new StringName("queue_free")));
+        }
+
         queueFree();
     }
 
@@ -472,6 +497,8 @@ public class Vehicle extends RigidBody3D implements Controllable {
     public boolean isAlive() {
         return healthNode == null || !healthNode.isDead();
     }
+
+    public Character getOccupant() { return occupant; }
 
     public boolean isSlipping()     { return slipping; }
     public void setSlipping(boolean slipping) { this.slipping = slipping; }

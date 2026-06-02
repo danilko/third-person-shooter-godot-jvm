@@ -12,8 +12,6 @@ import godot.global.GD;
 @RegisterClass(className = "WeaponRadialMenuItem")
 public class WeaponRadialMenuItem extends Control {
 
-    private static final int   SLOT_COUNT            = 5;
-
   @Export @RegisterProperty public int      index        = 0;
 
   /**
@@ -28,7 +26,7 @@ public class WeaponRadialMenuItem extends Control {
   @RegisterProperty @Export public NodePath reservePath    = new NodePath("Axis/Reserve");
   @RegisterProperty @Export public NodePath keyLabelPath    = new NodePath("Axis/KeyLabel");
 
-    private final String[]             keyTexts  = new String[SLOT_COUNT];
+    private String[] keyTexts = new String[0];
 
   private WeaponRadialMenu radialMenu;
 
@@ -84,11 +82,16 @@ public class WeaponRadialMenuItem extends Control {
     setNodeText(getNodeOrNull(weaponNamePath), weapon != null ? weapon.getDisplayName() : "");
     setNodeText(getNodeOrNull(magazinePath),   weapon != null ? String.valueOf(weapon.getMagazine()) : "--");
     setNodeText(getNodeOrNull(reservePath),    weapon != null ? String.valueOf(weapon.getReserve()) : "--");
-    setNodeText(getNodeOrNull(keyLabelPath), String.format("[%s]", weapon != null ? keyTexts[index] : "?"));
+    String keyText = (index < keyTexts.length) ? keyTexts[index] : String.valueOf(index + 1);
+    setNodeText(getNodeOrNull(keyLabelPath), String.format("[%s]", weapon != null ? keyText : "?"));
   }
 
     private void resolveKeyTexts() {
-        for (int i = 0; i < SLOT_COUNT; i++) {
+        WeaponRadialMenu rm = findRadialMenu();
+        int count = (rm != null && rm.getCharacter() != null && rm.getCharacter().weaponController != null)
+                ? rm.getCharacter().weaponController.getSlotCount() : 8;
+        keyTexts = new String[count];
+        for (int i = 0; i < count; i++) {
             keyTexts[i] = resolveKeyText("weapon_slot_" + (i + 1), String.valueOf(i + 1));
         }
     }

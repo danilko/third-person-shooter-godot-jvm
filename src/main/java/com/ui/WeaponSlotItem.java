@@ -60,7 +60,12 @@ public class WeaponSlotItem extends HBoxContainer {
 
         Node an = getNodeOrNull(ammoLabelPath);
         if (an instanceof Label l) {
-            l.setText(item != null ? item.getMagazine() + "/" + item.getReserve() : "--");
+            if (item == null) {
+                l.setText("--");
+            } else {
+                String ammo = item.getMagazine() + "/" + item.getReserve();
+                l.setText(item.weaponIcon == null ? item.getDisplayName() + "  " + ammo : ammo);
+            }
         }
 
         Color color = (item == null) ? COLOR_EMPTY

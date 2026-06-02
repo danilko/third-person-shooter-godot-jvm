@@ -1,6 +1,7 @@
 package com.environment;
 
 import com.character.Character;
+import com.character.Detonatable;
 import com.character.Health;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -65,16 +66,19 @@ public class ImpactManager extends Node {
         if (ctx.character != null && info.hitNormal != null) {
             ctx.character.applyHitImpulse(info.hitNode, info.hitNormal.times(-1f), damage);
         }
+
+        if (ctx.detonatable != null) ctx.detonatable.detonate();
     }
 
     // ── Hit context resolution ────────────────────────────────────────────────
 
     private static class HitContext {
-        final Character character;
-        final Node                    healthOwner;
-        final SurfaceType             surface;
-        HitContext(Character c, Node h, SurfaceType s) {
-            character = c; healthOwner = h; surface = s;
+        final Character   character;
+        final Node        healthOwner;
+        final SurfaceType surface;
+        final Detonatable detonatable;
+        HitContext(Character c, Node h, SurfaceType s, Detonatable d) {
+            character = c; healthOwner = h; surface = s; detonatable = d;
         }
     }
 
@@ -87,13 +91,15 @@ public class ImpactManager extends Node {
      * so bones inside it report CharacterVisuals as their owner, not the Character body.
      */
     private static HitContext resolveHitContext(Node hitNode) {
-        if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT);
+        if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT, null);
         Character character = null;
         Node healthOwner = null;
         SurfaceType surface = SurfaceType.DEFAULT;
+        Detonatable detonatable = null;
 
         Node current = hitNode;
         while (current != null) {
+            if (detonatable == null && current instanceof Detonatable d) detonatable = d;
             if (surface == SurfaceType.DEFAULT) {
                 if (current instanceof Character c) {
                     surface = SurfaceType.FLESH;
@@ -107,10 +113,11 @@ public class ImpactManager extends Node {
             if (healthOwner == null && current.hasNode(new NodePath("Health"))) {
                 healthOwner = current;
             }
-            if (character != null && healthOwner != null && surface != SurfaceType.DEFAULT) break;
+            if (character != null && healthOwner != null && surface != SurfaceType.DEFAULT
+                    && detonatable != null) break;
             current = current.getParent();
         }
-        return new HitContext(character, healthOwner, surface);
+        return new HitContext(character, healthOwner, surface, detonatable);
     }
 
     // ── Lazy singleton lookups ────────────────────────────────────────────────

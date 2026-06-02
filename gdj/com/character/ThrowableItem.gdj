@@ -1,18 +1,21 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = Vehicle
-fqName = com.vehicle.Vehicle
+registeredName = ThrowableItem
+fqName = com.character.ThrowableItem
 baseType = RigidBody3D
 supertypes = [
-    godot.api.RigidBody3D,
+    com.character.WeaponItem,
+	com.environment.Pickup,
+	godot.api.RigidBody3D,
 	godot.api.PhysicsBody3D,
 	godot.api.CollisionObject3D,
 	godot.api.Node3D,
 	godot.api.Node,
 	godot.api.Object,
 	godot.core.KtObject,
-	com.character.Controllable,
+	com.character.Detonatable,
+	com.character.WeaponAction,
 	godot.common.interop.NativeWrapper,
 	godot.common.interop.NativePointer
 ]
@@ -20,37 +23,45 @@ signals = [
     
 ]
 properties = [
-    character_info,
-	spring_strength,
-	spring_damping,
-	wheel_radius,
-	rest_distance,
-	over_extend,
-	z_traction,
-	z_brake_traction,
-	max_speed,
-	acceleration,
-	acceleration_curve,
-	tire_max_turn_speed,
-	tire_max_turn_degrees,
-	wheels_path,
-	driver_seat_path,
-	vehicle_cam_path,
-	weapon_mode_index,
-	vehicle_collision_min_speed,
-	vehicle_collision_damage_scale,
+    projectile_scene,
+	throw_speed,
+	arc_angle_deg,
 	explosion_radius,
 	explosion_max_damage,
 	explosion_push_force,
-	vehicle_icon,
-	wreck_scene,
-	wreck_duration
+	weapon_id,
+	weapon_name,
+	slot_type,
+	is_droppable,
+	is_infinite_ammo,
+	weapon_pose_index,
+	weapon_icon,
+	hold_socket,
+	holster_sockets,
+	spread,
+	bloom_per_shot,
+	bloom_decay_speed,
+	bloom_max,
+	reload_speed,
+	switch_speed,
+	fire_rate,
+	auto,
+	magazine,
+	magazine_size,
+	reserve,
+	reserve_max,
+	recoil,
+	damage,
+	fire_audio,
+	reload_audio,
+	remove_on_pickup,
+	pause_on_pickup,
+	require_interact,
+	pickup_cooldown_after_drop
 ]
 functions = [
-    _ready,
-	_physics_process,
-	_integrate_forces,
-	on_vehicle_destruction,
-	on_entrance_body_entered,
-	on_entrance_body_exited
+    _process,
+	on_body_entered,
+	on_body_exited,
+	resume_from_pause
 ]

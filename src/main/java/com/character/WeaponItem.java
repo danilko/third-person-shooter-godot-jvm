@@ -156,6 +156,19 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @Override public float getCurrentSpreadDeg() { return 0f; }
   @Override public void onSetStance(Stance stance) {}
 
+  /**
+   * Whether dropping this weapon should create a world pickup.
+   * Default: matches isDroppable. ThrowableItem overrides to block empty drops.
+   */
+  public boolean shouldDropToWorld() { return isDroppable; }
+
+  /**
+   * Called by WeaponController immediately after useWeapon() empties the magazine.
+   * Default is a no-op. ThrowableItem overrides to auto-clear the slot so any
+   * other throwable type can be picked up without needing an interact-to-swap.
+   */
+  public void onMagazineEmpty() {}
+
   public void decrementMagazine() {
     if (magazine > 0) magazine--;
   }
