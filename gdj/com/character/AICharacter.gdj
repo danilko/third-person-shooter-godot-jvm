@@ -33,6 +33,7 @@ signals = [
 properties = [
     behavior_config,
 	ammo_refill,
+	escort_target_path,
 	max_air_jump,
 	jump_states,
 	stances,
@@ -54,6 +55,7 @@ properties = [
 ]
 functions = [
     _ready,
+	on_escort_target_damaged,
 	_physics_process,
 	on_ammo_changed,
 	on_enemy_damaged,

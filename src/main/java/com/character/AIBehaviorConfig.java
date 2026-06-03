@@ -107,5 +107,24 @@ public class AIBehaviorConfig extends Resource {
      */
     @Export @RegisterProperty public float detectionFovDeg = 200.0f;
 
+    // ── Escort ────────────────────────────────────────────────────────────────
+
+    /**
+     * Desired follow distance (m) from the escort target in EscortState.
+     * AI moves toward the target when beyond this range, idles when within.
+     */
+    @Export @RegisterProperty public float followDistance = 3.0f;
+
+    // ── Flee ──────────────────────────────────────────────────────────────────
+
+    /** Distance (m) to run before returning to Patrol in FleeState. */
+    @Export @RegisterProperty public float fleeDistance = 20.0f;
+
+    /**
+     * When true, the AI transitions to FleeState instead of SearchState when hit
+     * and out of ammo. Use for civilians, wounded soldiers, or cowardly archetypes.
+     */
+    @Export @RegisterProperty public boolean useFleeOnAttack = false;
+
     public AIBehaviorConfig() { super(); }
 }

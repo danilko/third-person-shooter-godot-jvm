@@ -23,6 +23,9 @@ public class PatrolState implements AIState {
 
     @Override
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
+        // Escort target assigned → bodyguard mode takes priority over patrol.
+        if (body.escortTarget != null && body.escortTarget.isAlive()) return EscortState.INSTANCE;
+
         int bestWeapon = body.selectBestWeapon();
         if (bestWeapon >= 0 && body.weaponController != null
                 && bestWeapon != body.weaponController.getWeapon()
@@ -38,7 +41,11 @@ public class PatrolState implements AIState {
             return ChaseState.INSTANCE;
         }
 
-        if (ctrl.isUnderAttack() && ctrl.hasLastKnownPosition()) return SearchState.INSTANCE;
+        if (ctrl.isUnderAttack() && ctrl.hasLastKnownPosition()) {
+            // Flee instead of search when configured and out of ammo.
+            if (body.getBehaviorConfig().useFleeOnAttack && !body.hasAnyAmmo()) return FleeState.INSTANCE;
+            return SearchState.INSTANCE;
+        }
 
         cmd.wantCombat   = false;
         cmd.movementType = MovementType.WALK;

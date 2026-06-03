@@ -7,6 +7,7 @@ import godot.annotation.RegisterProperty;
 import godot.api.*;
 import com.vehicle.Vehicle;
 import godot.core.Callable;
+import godot.core.NodePath;
 import godot.core.StringName;
 import godot.core.StringNames;
 import godot.core.Vector3;
@@ -44,6 +45,18 @@ public class AICharacter extends Character {
      * Scene-specific node reference — lives here rather than in AIBehaviorConfig.
      */
     @Export @RegisterProperty public Area3D ammoRefill;
+
+    /**
+     * NodePath (from scene root) of the Character to escort in EscortState.
+     * Resolved to escortTarget in _ready(). Leave empty for non-escort AIs.
+     */
+    @Export @RegisterProperty public NodePath escortTargetPath = new NodePath();
+
+    /**
+     * Runtime escort target — populated from escortTargetPath in _ready() or set
+     * directly via setEscortTarget() from mission code (e.g. MissionDirector).
+     */
+    public Character escortTarget;
 
     // ── Sensor throttle constants ─────────────────────────────────────────────
     private static final StringName CHARACTERS_GROUP     = new StringName("characters");
@@ -122,7 +135,38 @@ public class AICharacter extends Character {
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
 
+        // Resolve escort target from NodePath if provided.
+        if (escortTargetPath != null && !escortTargetPath.getPath().isEmpty()) {
+            Node owner = getOwner();
+            if (owner != null) {
+                Node n = owner.getNodeOrNull(escortTargetPath.getPath());
+                if (n instanceof Character c) setEscortTarget(c);
+            }
+        }
+
         if (controller instanceof AIController aiCtrl) aiCtrl.start();
+    }
+
+    /**
+     * Assigns the escort target and connects to its Health.damaged signal so
+     * EscortState can react immediately when the target takes a hit.
+     * Safe to call at runtime from mission code.
+     */
+    public void setEscortTarget(Character target) {
+        escortTarget = target;
+        if (target == null) return;
+        Node h = target.getNodeOrNull("Health");
+        if (h instanceof Health health) {
+            health.damaged.connectUnsafe(
+                    Callable.createUnsafe(this, StringNames.toGodotName("onEscortTargetDamaged")),
+                    godot.api.Object.ConnectFlags.DEFAULT);
+        }
+    }
+
+    /** Called when the escort target's Health emits the damaged signal. */
+    @RegisterFunction
+    public void onEscortTargetDamaged(float amount) {
+        if (controller instanceof AIController aiCtrl) aiCtrl.setEscortTargetAttacked();
     }
 
     /**

@@ -174,6 +174,22 @@ public class AIController extends Controller {
     public void       startStanceHoldTimer(double d)        { stanceHoldTimer = d; }
     public void       tickStanceHoldTimer(double delta)     { if (stanceHoldTimer > 0) stanceHoldTimer = Math.max(0.0, stanceHoldTimer - delta); }
 
+    // ── Escort helpers ────────────────────────────────────────────────────────
+    // Set when the escort target's Health emits a damage signal. EscortState reads
+    // this flag to decide whether to break escort and engage the attacker.
+    private boolean escortTargetUnderAttack = false;
+
+    public void    setEscortTargetAttacked()  { escortTargetUnderAttack = true; }
+    public boolean isEscortTargetUnderAttack() { return escortTargetUnderAttack; }
+    public void    clearEscortTargetAttacked() { escortTargetUnderAttack = false; }
+
+    // ── Flee helpers ──────────────────────────────────────────────────────────
+    // FleeState records the position where fleeing started so it can check distance.
+    private Vector3 fleeStartPosition = null;
+
+    public void    setFleeStartPosition(Vector3 pos) { fleeStartPosition = pos; }
+    public Vector3 getFleeStartPosition()            { return fleeStartPosition; }
+
     // ── Suppression fire ──────────────────────────────────────────────────────
     public Vector3 computeSuppressTarget(float hDist) {
         if (lastKnownTargetPosition == null) return null;

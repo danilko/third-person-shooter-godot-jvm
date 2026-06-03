@@ -35,6 +35,10 @@ public class SearchState implements AIState {
         ctrl.advanceSearchTimer(delta);
         if (ctrl.isSearchTimedOut(SEARCH_TIMEOUT)) return PatrolState.INSTANCE;
 
+        // Out of ammo and still under attack → flee rather than continue searching.
+        if (body.getBehaviorConfig().useFleeOnAttack && !body.hasAnyAmmo()
+                && ctrl.isUnderAttack()) return FleeState.INSTANCE;
+
         cmd.wantCombat = true;
 
         boolean arrived = !ctrl.hasLastKnownPosition()
