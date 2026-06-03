@@ -97,7 +97,7 @@ public class MovementController extends Node {
     }
 
     // Apply movement using lerp
-    player.setVelocity( GD.lerp(player.getVelocity(), velocity, acceleration * delta));
+    player.setVelocity(GD.lerp(player.getVelocity(), velocity, Math.min(1.0, acceleration * delta)));
     float appliedVelocityY = (float) player.getVelocity().getY();
     player.moveAndSlide();
 

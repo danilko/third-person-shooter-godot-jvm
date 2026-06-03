@@ -79,15 +79,19 @@ public class AnimationController extends Node {
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || animationTree == null) return;
+    // Skip entirely for LOD-frozen AIs — they hold their last pose with zero JVM bridge cost.
+    if (player instanceof AICharacter ai && ai.isLodFrozen()) return;
 
-    // Calculate floor blend target
     onFloorBlendTarget = player.isOnFloor() ? 1.0 : 0.0;
-
-    // Smoothly interpolate the blend value
-    onFloorBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, floorBlendSpeed * delta);
-
-    // Access AnimationTree parameters using set() with a NodePath
-    animationTree.set("parameters/OnFloorBlend/blend_amount", onFloorBlend);
+    double newBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, floorBlendSpeed * delta);
+    // Only write to the AnimationTree when the value actually changes — eliminates
+    // ~1,920 unconditional JVM bridge calls/sec for 32 grounded AIs at 60 Hz.
+    if (Math.abs(newBlend - onFloorBlend) > 0.001) {
+      onFloorBlend = newBlend;
+      animationTree.set("parameters/OnFloorBlend/blend_amount", onFloorBlend);
+    } else {
+      onFloorBlend = newBlend;
+    }
   }
 
   @RegisterFunction

@@ -32,21 +32,7 @@ signals = [
 ]
 properties = [
     behavior_config,
-	detection_range,
-	aim_pitch_min,
-	aim_pitch_max,
-	attack_range,
-	patrol_radius,
 	ammo_refill,
-	aim_body_part,
-	hit_chance,
-	reaction_time,
-	aim_scatter_radius,
-	strafe_change_duration,
-	suppression_duration,
-	shoot_still_duration,
-	move_accuracy_penalty,
-	use_combat_crouch,
 	max_air_jump,
 	jump_states,
 	stances,
@@ -68,10 +54,10 @@ properties = [
 ]
 functions = [
     _ready,
+	_physics_process,
 	on_ammo_changed,
 	on_enemy_damaged,
 	on_died,
-	_physics_process,
 	_process,
 	completed_roll
 ]

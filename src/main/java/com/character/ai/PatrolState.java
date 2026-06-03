@@ -34,7 +34,7 @@ public class PatrolState implements AIState {
             cmd.wantCombat = true;
             float dist = (float) body.getGlobalPosition()
                                      .distanceTo(body.getTarget().getGlobalPosition());
-            if (dist <= body.attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
+            if (dist <= body.getBehaviorConfig().attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
             return ChaseState.INSTANCE;
         }
 

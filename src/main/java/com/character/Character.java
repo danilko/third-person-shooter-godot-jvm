@@ -419,7 +419,8 @@ public class Character extends CharacterBody3D implements Controllable {
     protected void applyInput(UserCommand input, double delta) {
 
         // ── Movement direction ─────────────────────────────────────────────
-        if (input.movementDirection.lengthSquared() > 0.001) {
+        if (input.movementDirection.lengthSquared() > 0.001
+                || movementDirection.lengthSquared() > 0.001) {
             movementDirection = input.movementDirection;
             changedMovementDirection.emit(movementDirection);
         }

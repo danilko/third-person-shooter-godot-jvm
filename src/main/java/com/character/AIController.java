@@ -95,11 +95,11 @@ public class AIController extends Controller {
     public void    resetLostTargetTimer()             { lostTargetTimer = 0.0; }
     public void    advanceLostTargetTimer(double d)   { lostTargetTimer += d; }
     public boolean isTargetLost()                     { return lostTargetTimer >= LOST_TARGET_TIMEOUT; }
-    public boolean isSuppressExpired()                { return lostTargetTimer >= getBody().suppressionDuration; }
+    public boolean isSuppressExpired()                { return lostTargetTimer >= getBody().getBehaviorConfig().suppressionDuration; }
 
     // ── Reaction-timer helpers ────────────────────────────────────────────────
     public void    advanceReactionTimer(double d) { reactionTimer += d; }
-    public boolean isReactionReady()              { return reactionTimer >= getBody().reactionTime; }
+    public boolean isReactionReady()              { return reactionTimer >= getBody().getBehaviorConfig().reactionTime; }
     public void    resetReactionTimer()           { reactionTimer = 0.0; }
 
     // ── Under-attack helpers ──────────────────────────────────────────────────
@@ -111,6 +111,17 @@ public class AIController extends Controller {
         if (attacker != null && lastKnownTargetPosition == null)
             lastKnownTargetPosition = new Vector3(attacker.getGlobalPosition());
     }
+
+    // ── Nav-target throttle (Perf 4) ─────────────────────────────────────────
+    // Prevents setTargetPosition() from being called 60×/s in ChaseState.
+    // Path recompute is only requested when the target moves > 1.5 m.
+    private Vector3 lastNavTarget = null;
+
+    public boolean shouldUpdateNav(Vector3 pos) {
+        return lastNavTarget == null || (float) lastNavTarget.distanceTo(pos) > 1.5f;
+    }
+    public void recordNavTarget(Vector3 pos) { lastNavTarget = pos; }
+    public void clearNavTarget()             { lastNavTarget = null; }
 
     // ── Strafe helpers ────────────────────────────────────────────────────────
     public boolean needsStrafeUpdate()           { return strafeTimer <= 0.0; }
@@ -126,14 +137,14 @@ public class AIController extends Controller {
             if (len > 0.1) {
                 strafeX = strafeFlipSide * (float) (toTarget.getZ() / len);
                 strafeZ = strafeFlipSide * (float) (-toTarget.getX() / len);
-                strafeTimer = getBody().strafeChangeDuration;
+                strafeTimer = getBody().getBehaviorConfig().strafeChangeDuration;
                 return;
             }
         }
         // Fallback: no known position yet — use current flip side along world X
         strafeX = strafeFlipSide;
         strafeZ = 0f;
-        strafeTimer = getBody().strafeChangeDuration;
+        strafeTimer = getBody().getBehaviorConfig().strafeChangeDuration;
     }
 
     // ── Still-phase helpers (stop-to-shoot) ──────────────────────────────────

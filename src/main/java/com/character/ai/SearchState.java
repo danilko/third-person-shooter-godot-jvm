@@ -28,7 +28,7 @@ public class SearchState implements AIState {
         if (body.canSeeTarget(delta)) {
             float dist = (float) body.getGlobalPosition()
                                      .distanceTo(body.getTarget().getGlobalPosition());
-            if (dist <= body.attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
+            if (dist <= body.getBehaviorConfig().attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
             return ChaseState.INSTANCE;
         }
 

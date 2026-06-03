@@ -14,6 +14,7 @@ public class ChaseState implements AIState {
     @Override
     public void enter(AICharacter body, AIController ctrl) {
         ctrl.resetLostTargetTimer();
+        ctrl.clearNavTarget();  // force a fresh nav update on the first chase frame
     }
 
     @Override
@@ -21,7 +22,6 @@ public class ChaseState implements AIState {
 
     @Override
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
-        // Re-evaluate nearest live hostile each frame so a closer threat is not ignored.
         body.refreshTarget(delta);
         if (body.getTarget() == null) {
             return PatrolState.INSTANCE;
@@ -31,10 +31,9 @@ public class ChaseState implements AIState {
                                  .distanceTo(body.getTarget().getGlobalPosition());
         cmd.wantCombat = true;
 
-        // Evaluate LoS once and reuse — avoids two forced raycasts per frame.
         boolean hasLoS = body.hasLineOfSight(delta);
 
-        if (dist <= body.attackRange && hasLoS) {
+        if (dist <= body.getBehaviorConfig().attackRange && hasLoS) {
             if (!body.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
             return AttackState.INSTANCE;
         }
@@ -45,8 +44,12 @@ public class ChaseState implements AIState {
             ctrl.resetLostTargetTimer();
             Vector3 targetPos = body.getTarget().getGlobalPosition();
             ctrl.setLastKnownTargetPosition(new Vector3(targetPos));
-            body.getNavAgent().setTargetPosition(targetPos);
-
+            // Only request a path recompute when the target has moved > 1.5 m — prevents
+            // 60 navAgent path-recomputes/sec while chasing a moving player.
+            if (ctrl.shouldUpdateNav(targetPos)) {
+                body.getNavAgent().setTargetPosition(targetPos);
+                ctrl.recordNavTarget(targetPos);
+            }
             Vector3 aimTarget = new Vector3(targetPos.getX(),
                     targetPos.getY() + AICharacter.TARGET_BODY_HEIGHT,
                     targetPos.getZ());
@@ -55,8 +58,13 @@ public class ChaseState implements AIState {
         } else {
             ctrl.advanceLostTargetTimer(delta);
             if (ctrl.isTargetLost()) return PatrolState.INSTANCE;
-            if (ctrl.hasLastKnownPosition())
-                body.getNavAgent().setTargetPosition(ctrl.getLastKnownTargetPosition());
+            if (ctrl.hasLastKnownPosition()) {
+                Vector3 lastKnown = ctrl.getLastKnownTargetPosition();
+                if (ctrl.shouldUpdateNav(lastKnown)) {
+                    body.getNavAgent().setTargetPosition(lastKnown);
+                    ctrl.recordNavTarget(lastKnown);
+                }
+            }
         }
 
         Vector3 dir = body.getNavAgent()

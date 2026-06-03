@@ -71,8 +71,13 @@ public class AIBehaviorConfig extends Resource {
     /** Seconds after losing LoS that the AI keeps firing at last known position. */
     @Export @RegisterProperty public float suppressionDuration = 1.5f;
 
-    /** Seconds the AI stops moving after each shot (stop-to-shoot pause). */
-    @Export @RegisterProperty public float shootStillDuration = 0.25f;
+    /**
+     * Seconds the AI stops moving after each shot (sniper/precision archetype only).
+     * Default 0 = fire while strafing (CS/GTA style — accuracy is handled by
+     * moveAccuracyPenalty instead). Set > 0 for archetypes that need a stop-to-aim
+     * pause, e.g. a sniper with shootStillDuration = 1.0.
+     */
+    @Export @RegisterProperty public float shootStillDuration = 0.0f;
 
     /** Seconds the AI holds a strafe direction before reversing. */
     @Export @RegisterProperty public float strafeChangeDuration = 1.0f;
@@ -80,10 +85,27 @@ public class AIBehaviorConfig extends Resource {
     // ── Stance ────────────────────────────────────────────────────────────────
 
     /**
-     * When true, the AI crouches once it has LoS and has completed its reaction
-     * delay.  Returns upright when repositioning or losing sight.
+     * When true, the AI may crouch during combat. Exact trigger depends on
+     * crouchOnSuppression: if true, only crouches while under attack (reactive
+     * cover); if false, crouches proactively once LoS + reaction are complete.
      */
-    @Export @RegisterProperty public boolean useCombatCrouch = true;
+    @Export @RegisterProperty public boolean useCombatCrouch = false;
+
+    /**
+     * When true (requires useCombatCrouch), the AI only crouches while actively
+     * under attack (took damage within the last 2.5 s). Matches CS/Battlefield
+     * reactive-cover behaviour. When false, crouches as soon as LoS + reaction
+     * are ready (proactive — the old behaviour).
+     */
+    @Export @RegisterProperty public boolean crouchOnSuppression = true;
+
+    /**
+     * Total patrol FOV cone in degrees. 360 disables the check (omnidirectional).
+     * Default 200° = ±100° from the movement-forward vector, blocking detection
+     * of enemies directly behind. Only applied in canSeeTarget() (patrol/search).
+     * Has no effect in AttackState where the AI is already locked on.
+     */
+    @Export @RegisterProperty public float detectionFovDeg = 200.0f;
 
     public AIBehaviorConfig() { super(); }
 }
