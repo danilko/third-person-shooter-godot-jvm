@@ -11,7 +11,6 @@
 [ext_resource type="Script" uid="uid://bor7f5iyg250q" path="res://gdj/com/character/stances/Stance.gdj" id="7_2iqcg"]
 [ext_resource type="Resource" uid="uid://7ik6f781r71n" path="res://src/main/resources/com/character/movementstates/crawl/CrawlIdle.tres" id="7_d7d1u"]
 [ext_resource type="Resource" uid="uid://c2wokahkmhfdd" path="res://src/main/resources/com/character/combatstates/NoCombat.tres" id="7_dnye5"]
-[ext_resource type="Resource" uid="uid://bm3le3c0mb4t1" path="res://src/main/resources/com/character/combatstates/MeleeCombat.tres" id="60_meleec"]
 [ext_resource type="Resource" uid="uid://dv4pugkv3xrms" path="res://src/main/resources/com/character/movementstates/crouch/CrouchIdle.tres" id="8_ttk2h"]
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="9_arx8k"]
 [ext_resource type="Resource" uid="uid://i6kix7q2sxsp" path="res://src/main/resources/com/character/movementstates/crouch/CrouchWalk.tres" id="9_gguhd"]
@@ -29,6 +28,7 @@
 [ext_resource type="Script" uid="uid://tssnb6upftda" path="res://gdj/com/character/FPSCameraController.gdj" id="27_gapvf"]
 [ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="31_4afhp"]
 [ext_resource type="Resource" uid="uid://drollstate01" path="res://src/main/resources/com/character/rollstates/Roll.tres" id="50_roll"]
+[ext_resource type="Resource" uid="uid://bm3le3c0mb4t1" path="res://src/main/resources/com/character/combatstates/MeleeCombat.tres" id="60_meleec"]
 
 [sub_resource type="Resource" id="Resource_gapvf"]
 script = ExtResource("9_arx8k")
@@ -82,8 +82,8 @@ stances = Dictionary[String, NodePath]({
 })
 combat_states = Dictionary[String, ExtResource("5_5k7ut")]({
 "Combat": ExtResource("6_j83q5"),
-"NoCombat": ExtResource("7_dnye5"),
-"MeleeCombat": ExtResource("60_meleec")
+"MeleeCombat": ExtResource("60_meleec"),
+"NoCombat": ExtResource("7_dnye5")
 })
 roll_state = ExtResource("50_roll")
 character_info = SubResource("Resource_gapvf")

@@ -1,0 +1,68 @@
+[gd_scene format=3 uid="uid://bf5k6xj310cia"]
+
+[ext_resource type="Script" uid="uid://cdfwvspmsemlo" path="res://gdj/com/character/ProjectileItem.gdj" id="1_pi"]
+[ext_resource type="PackedScene" uid="uid://dp3go447qhra3" path="res://src/main/resources/com/weapon/ATL4Projectile.tscn" id="2_proj"]
+[ext_resource type="PackedScene" uid="uid://xtgua1twvjqw" path="res://src/main/resources/com/weapon/MuzzleVFX.tscn" id="3_muzzle"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_atl4_body"]
+top_radius = 0.08
+bottom_radius = 0.08
+height = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_4b4ny"]
+top_radius = 0.12
+bottom_radius = 0.12
+height = 0.04
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_atl4_body"]
+size = Vector3(1, 0.2, 0.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_atl4_pickup"]
+size = Vector3(1.2, 0.4, 0.4)
+
+[node name="ATL4" type="RigidBody3D" unique_id=200200001]
+collision_layer = 4
+script = ExtResource("1_pi")
+projectile_scene = ExtResource("2_proj")
+weapon_id = "ATL4"
+weapon_name = "ATL-4"
+weapon_pose_index = 1
+hold_socket = "MarkerATL4"
+holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
+reload_speed = 2.5
+switch_speed = 1.5
+fire_rate = 1.0
+auto = false
+magazine = 1
+magazine_size = 1
+reserve = 3
+reserve_max = 3
+recoil = 3.0
+damage = 0.0
+require_interact = true
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=200200007]
+transform = Transform3D(0, 1, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0)
+mesh = SubResource("CylinderMesh_atl4_body")
+
+[node name="Body" type="MeshInstance3D" parent="Body" unique_id=310459934]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40678602, 0)
+mesh = SubResource("CylinderMesh_4b4ny")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=200200002]
+shape = SubResource("BoxShape3D_atl4_body")
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=200200003]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=200200004]
+shape = SubResource("BoxShape3D_atl4_pickup")
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=200200005]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0, 0)
+
+[node name="MuzzleVFX" parent="Muzzle" unique_id=200200006 instance=ExtResource("3_muzzle")]
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]
