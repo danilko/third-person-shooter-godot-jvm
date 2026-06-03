@@ -2,8 +2,10 @@ package com.character;
 
 import com.environment.BulletTracerManager;
 import com.environment.HitInfo;
+import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
+import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.api.Object;
 import godot.core.Vector3;
@@ -26,6 +28,10 @@ public class FirearmItem extends WeaponItem {
   private BulletTracerManager bulletTracerManager;
 
   private float currentBloom = 0f;
+  /** Pellets per shot. 1 = single bullet (default). Set > 1 for shotguns — each
+   *  pellet samples the spread cone independently; audio/bloom/recoil fire once. */
+  @Export @RegisterProperty public int pelletCount = 1;
+
   private boolean isWeaponFired = false;
   private StanceName currentStance = StanceName.UPRIGHT;
 
@@ -70,7 +76,7 @@ public class FirearmItem extends WeaponItem {
     triggerMuzzleFlash();
     applyRecoil();
     currentBloom = Math.min(currentBloom + bloomPerShot, bloomMax);
-    performHitscan();
+    for (int i = 0; i < pelletCount; i++) performHitscan();
   }
 
   @Override

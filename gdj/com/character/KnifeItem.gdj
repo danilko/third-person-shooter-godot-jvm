@@ -1,11 +1,12 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = FirearmItem
-fqName = com.character.FirearmItem
+registeredName = KnifeItem
+fqName = com.character.KnifeItem
 baseType = RigidBody3D
 supertypes = [
-    com.character.WeaponItem,
+    com.character.MeleeItem,
+	com.character.WeaponItem,
 	com.environment.Pickup,
 	godot.api.RigidBody3D,
 	godot.api.PhysicsBody3D,
@@ -22,7 +23,13 @@ signals = [
     
 ]
 properties = [
-    pellet_count,
+    charge_threshold,
+	heavy_damage,
+	heavy_melee_range,
+	heavy_cone_angle_deg,
+	melee_range,
+	cone_angle_deg,
+	swing_duration,
 	weapon_id,
 	weapon_name,
 	slot_type,
@@ -56,6 +63,7 @@ properties = [
 functions = [
     _ready,
 	_physics_process,
+	on_hit_timer_timeout,
 	_process,
 	on_body_entered,
 	on_body_exited,
