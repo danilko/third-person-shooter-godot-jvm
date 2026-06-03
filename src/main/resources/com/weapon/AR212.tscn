@@ -8,10 +8,10 @@
 [ext_resource type="PackedScene" uid="uid://xtgua1twvjqw" path="res://src/main/resources/com/weapon/MuzzleVFX.tscn" id="5_muzzle"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_l3rdl"]
-size = Vector3(0.215, 0.625, 0.105)
+size = Vector3(0.215, 0.105, 0.625)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_3xjif"]
-size = Vector3(0.215, 0.625, 0.105)
+size = Vector3(0.215, 0.105, 0.625)
 
 [node name="AR212" type="RigidBody3D" unique_id=1788483088]
 collision_layer = 4
@@ -51,12 +51,12 @@ transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0
 shape = SubResource("BoxShape3D_3xjif")
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=491564192]
-transform = Transform3D(1, 2.9802322e-08, 0, -2.9802322e-08, 0.9999999, 2.9802322e-08, 1.7881393e-07, -2.9802322e-08, 1, 0.28202188, 0.008987732, 0)
+transform = Transform3D(1, 2.9802322e-08, 0, -2.9802322e-08, 0.9999999, 2.9802322e-08, 1.7881393e-07, -2.9802322e-08, 1, 0, 0, -0.45294857)
 
 [node name="MuzzleVFX" parent="Muzzle" unique_id=1705398137 instance=ExtResource("5_muzzle")]
 
 [node name="AssaultRifle2_12" parent="." unique_id=491564191 instance=ExtResource("4_eti2j")]
-transform = Transform3D(0.1, 0, 0, 0, 0.1, 0, 0, 0, 0.1, -0.09636081, -0.054261185, 0)
+transform = Transform3D(-4.371139e-09, 0, 0.1, 0, 0.1, 0, -0.1, 0, -4.371139e-09, 0, -0.054, 0)
 
 [connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
 [connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

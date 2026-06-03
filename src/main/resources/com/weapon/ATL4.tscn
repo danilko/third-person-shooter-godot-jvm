@@ -15,10 +15,10 @@ bottom_radius = 0.12
 height = 0.04
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_atl4_body"]
-size = Vector3(1, 0.2, 0.2)
+size = Vector3(0.2, 0.2, 1)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_atl4_pickup"]
-size = Vector3(1.2, 0.4, 0.4)
+size = Vector3(0.4, 0.4, 1.2)
 
 [node name="ATL4" type="RigidBody3D" unique_id=200200001]
 collision_layer = 4
@@ -42,7 +42,7 @@ damage = 0.0
 require_interact = true
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=200200007]
-transform = Transform3D(0, 1, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0, 0)
 mesh = SubResource("CylinderMesh_atl4_body")
 
 [node name="Body" type="MeshInstance3D" parent="Body" unique_id=310459934]
@@ -60,7 +60,7 @@ collision_mask = 2
 shape = SubResource("BoxShape3D_atl4_pickup")
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=200200005]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.664365)
 
 [node name="MuzzleVFX" parent="Muzzle" unique_id=200200006 instance=ExtResource("3_muzzle")]
 
