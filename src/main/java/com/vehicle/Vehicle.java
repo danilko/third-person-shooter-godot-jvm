@@ -37,10 +37,8 @@ import java.util.Collection;
  * This is frame-rate independent and never produces the runaway 200 kN+ forces
  * from the old (-slip/dt)×mass×damp formula.
  *
- * Weapon modes (set weaponModeIndex in the inspector):
- *   0 = NONE            — no shooting while occupied
- *   1 = PASSENGER_WEAPON — occupant fires their own weapon via vehicle camera aim
- *   2 = VEHICLE_WEAPON  — vehicle's own FirearmItem fires; occupant weapon disabled
+ * All physics constants and combat/damage/wreck config live in VehicleConfig.
+ * Assign a .tres preset in the inspector; leave null to use built-in DEFAULTS.
  */
 @RegisterClass(className = "Vehicle")
 public class Vehicle extends RigidBody3D implements Controllable {
@@ -49,60 +47,25 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     @RegisterProperty @Export public CharacterInfo characterInfo;
 
-    @RegisterProperty @Export public float springStrength       = 10000f;
-    @RegisterProperty @Export public float springDamping        = 4500f;
-    @RegisterProperty @Export public float wheelRadius          = 0.4f;
-    @RegisterProperty @Export public float restDistance         = 0.5f;
-    @RegisterProperty @Export public float overExtend           = 0.3f;
-
-    @RegisterProperty @Export public float zTraction            = 0.05f;
-    @RegisterProperty @Export public float zBrakeTraction       = 0.25f;
-
-    @RegisterProperty @Export public float maxSpeed             = 20.0f;
-    @RegisterProperty @Export public float acceleration         = 9000.0f;
-    @RegisterProperty @Export public Curve accelerationCurve;
-    @RegisterProperty @Export public float tireMaxTurnSpeed     = 2.0f;
-    @RegisterProperty @Export public float tireMaxTurnDegrees   = 25.0f;
-
-    @RegisterProperty @Export public NodePath wheelsPath        = new NodePath("Wheels");
-    @RegisterProperty @Export public NodePath driverSeatPath    = new NodePath("DriverSeat");
-    @RegisterProperty @Export public NodePath vehicleCamPath    = new NodePath("ActiveCamera");
-
     /**
-     * Weapon mode: 0 = NONE, 1 = PASSENGER_WEAPON, 2 = VEHICLE_WEAPON.
-     * Set in the inspector for each vehicle type.  Default is PASSENGER_WEAPON (1)
-     * so a car/boat works immediately without inspector changes.
+     * Per-vehicle-type config (suspension, power, damage, wreck, etc.).
+     * Null = shared DEFAULTS singleton with the original hard-coded values.
+     * Swap a different .tres preset to change vehicle archetype with zero code changes.
      */
-    @RegisterProperty @Export public int weaponModeIndex = 1;
+    @RegisterProperty @Export public VehicleConfig vehicleConfig;
 
+    // Scene-structure paths — node positions are scene-specific, not config.
+    @RegisterProperty @Export public NodePath wheelsPath     = new NodePath("Wheels");
+    @RegisterProperty @Export public NodePath driverSeatPath = new NodePath("DriverSeat");
+    @RegisterProperty @Export public NodePath vehicleCamPath = new NodePath("ActiveCamera");
 
-    /** Minimum vehicle speed (m/s) needed to deal collision damage to characters. 0 disables it. */
-    @RegisterProperty @Export public float vehicleCollisionMinSpeed = 5.0f;
+    // ── Shared DEFAULTS (one instance, never mutated) ─────────────────────────
+    private static final VehicleConfig DEFAULTS = new VehicleConfig();
 
-    /** Damage per m/s above vehicleCollisionMinSpeed on collision. */
-    @RegisterProperty @Export public float vehicleCollisionDamageScale = 100.0f;
-
-    /** Blast radius of the destruction explosion in metres (0 = no explosion). */
-    @RegisterProperty @Export public float explosionRadius = 6f;
-
-    /** Maximum damage at the blast centre; falls off quadratically to zero at radius. */
-    @RegisterProperty @Export public float explosionMaxDamage = 100f;
-
-    /** Physics push force applied to bodies caught in the blast. */
-    @RegisterProperty @Export public float explosionPushForce = 25f;
-
-    /** Optional icon shown in the kill feed for both collision damage and explosion kills. */
-    @RegisterProperty @Export public Texture2D vehicleIcon;
-
-    /**
-     * Scene spawned at the vehicle's world transform when it is destroyed.
-     * Intended as a burnt-shell visual artifact; removed after wreckDuration seconds.
-     * Leave null to disable the wreck.
-     */
-    @RegisterProperty @Export public PackedScene wreckScene;
-
-    /** Seconds the wreck stays on the map before being removed. */
-    @RegisterProperty @Export public float wreckDuration = 15f;
+    /** Returns the active config, falling back to DEFAULTS when none is assigned. */
+    public VehicleConfig getConfig() {
+        return vehicleConfig != null ? vehicleConfig : DEFAULTS;
+    }
 
     // ── Runtime state ─────────────────────────────────────────────────────────
 
@@ -122,7 +85,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
     private boolean justEntered = false;
     private UserCommand cmd = new UserCommand();
 
-    // Characters currently touching the vehicle body — used to detect new contacts each frame.
     private final java.util.HashSet<Character> activeCollisions = new java.util.HashSet<>();
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -143,15 +105,12 @@ public class Vehicle extends RigidBody3D implements Controllable {
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
 
+        VehicleConfig cfg = getConfig();
         Node wheelsNode = getNodeOrNull("Wheels");
         if (wheelsNode != null) {
             for (Node child : wheelsNode.getChildren()) {
                 if (child instanceof VehicleWheel w) {
-                    w.springStrength = springStrength;
-                    w.springDamping  = springDamping;
-                    w.wheelRadius    = wheelRadius;
-                    w.restDistance   = restDistance;
-                    w.overExtend     = overExtend;
+                    w.setup(cfg);
                     wheels.add(w);
                 }
             }
@@ -165,13 +124,9 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Node cam = getNodeOrNull(vehicleCamPath.getPath());
         if (cam instanceof Camera3D c) vehicleCamera = c;
 
-        // "CameraController" is the VehicleCameraController node.
-        // "ActiveCamera" is a sibling Camera3D — these look up DIFFERENT nodes.
         Node camCtrl = getNodeOrNull("CameraController");
         if (camCtrl instanceof VehicleCameraController vcc) camController = vcc;
 
-        // Discover vehicle's own WeaponController (for VEHICLE_WEAPON mode).
-        // The WeaponController's _ready() handles AimRay wiring and weapon discovery automatically.
         Node wc = getNodeOrNull("WeaponController");
         if (wc instanceof WeaponController vwc) vehicleWeaponController = vwc;
 
@@ -197,15 +152,9 @@ public class Vehicle extends RigidBody3D implements Controllable {
         if (controller != null && controller.isAuthority()) {
             UserCommand currentCmd = controller.gatherInput(delta);
 
-            // R key: flip-right reset only when the occupant is NOT using it to reload.
             if (currentCmd.resetVehicle && getWeaponMode() != VehicleWeaponMode.PASSENGER_WEAPON) {
                 resetOrientation();
             }
-            // Guard: skip exit on the same frame tryEnter ran. isActionJustPressed
-            // stays true for the whole physics frame, so if Vehicle._physicsProcess
-            // runs after Player._physicsProcess in the same frame (possible with
-            // multiple characters in the scene), the interact press that triggered
-            // entry would immediately call tryExit without this flag.
             if (currentCmd.enterExit && !justEntered) {
                 tryExit();
             }
@@ -241,11 +190,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
             setCenterOfMass(Vector3.Companion.getDOWN().times(0.5f));
         }
 
-        // Keep occupant pinned to the driver seat each frame.
-        // Yaw is synced to vehicle heading so SpineAimModifier can reach aim targets that are
-        // in the vehicle's forward arc. Only Y is written; X/Z are untouched (no roll/pitch
-        // artefacts). preDriveRotation in Character saves the pre-entry rotation and restores
-        // it in exitDriveState, so this per-frame sync does not corrupt on-foot movement.
         if (occupant != null && driverSeatNode != null) {
             occupant.setGlobalPosition(driverSeatNode.getGlobalPosition());
             Vector3 occRot = occupant.getGlobalRotation();
@@ -253,7 +197,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
             occupant.setGlobalRotation(occRot);
         }
 
-        // Relay weapon commands to occupant based on weapon mode.
         if (occupant != null) {
             VehicleWeaponMode mode = getWeaponMode();
             if (mode == VehicleWeaponMode.PASSENGER_WEAPON) {
@@ -266,27 +209,20 @@ public class Vehicle extends RigidBody3D implements Controllable {
                 else          vehicleWeaponController.onWeaponNotFire();
             }
         }
-
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────
 
-    /**
-     * Detects new character contacts and applies one-time speed-proportional damage.
-     * PhysicsDirectBodyState3D.getContactColliderObject is the correct API for iterating
-     * contacts on a RigidBody3D — the equivalent getter does not exist on the body itself.
-     * Requires contact_monitor=true and max_contacts_reported>0 (set in _ready).
-     */
     @RegisterFunction
     @Override
     public void _integrateForces(PhysicsDirectBodyState3D state) {
-        if (vehicleCollisionMinSpeed <= 0) return;
+        VehicleConfig cfg = getConfig();
+        if (cfg.vehicleCollisionMinSpeed <= 0) return;
 
         int count = state.getContactCount();
         java.util.HashSet<Character> currentContacts = new java.util.HashSet<>();
 
         for (int i = 0; i < count; i++) {
-            // getContactColliderObject returns godot.api.Object; widened to java.lang.Object here.
             Object obj = state.getContactColliderObject(i);
             Character character = null;
             if (obj instanceof Character c) {
@@ -300,10 +236,10 @@ public class Vehicle extends RigidBody3D implements Controllable {
         }
 
         float speed = (float) GD.abs(getGlobalBasis().getZ().dot(getLinearVelocity()));
-        if (speed >= vehicleCollisionMinSpeed) {
+        if (speed >= cfg.vehicleCollisionMinSpeed) {
             for (Character character : currentContacts) {
                 if (!activeCollisions.contains(character)) {
-                    applyVehicleCollisionDamage(character, speed);
+                    applyVehicleCollisionDamage(character, speed, cfg);
                 }
             }
         }
@@ -312,24 +248,23 @@ public class Vehicle extends RigidBody3D implements Controllable {
         activeCollisions.addAll(currentContacts);
     }
 
-    private void applyVehicleCollisionDamage(Character character, float speed) {
-        float damage = (speed - vehicleCollisionMinSpeed) * vehicleCollisionDamageScale;
+    private void applyVehicleCollisionDamage(Character character, float speed, VehicleConfig cfg) {
+        float damage = (speed - cfg.vehicleCollisionMinSpeed) * cfg.vehicleCollisionDamageScale;
         Node healthNode = character.getNodeOrNull("Health");
         if (!(healthNode instanceof Health health)) return;
 
-        String attackerName    = (occupant != null) ? occupant.getCharacterInfo().displayName: "";
-        String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
-        health.takeDamage(null, damage, "Vehicle", vehicleIcon, attackerName, attackerFaction);
+        String attackerName    = (occupant != null) ? occupant.getCharacterInfo().displayName : "";
+        String attackerFaction = (characterInfo != null) ? characterInfo.faction : "";
+        health.takeDamage(null, damage, "Vehicle", cfg.vehicleIcon, attackerName, attackerFaction);
 
-        // Knockback in the direction the vehicle is travelling.
         Vector3 knockbackDir = getLinearVelocity().normalized();
         character.applyHitImpulse(null, knockbackDir, damage);
     }
 
-    /** Returns the typed weapon mode from the inspector int. */
+    /** Returns the typed weapon mode from the config int. */
     public VehicleWeaponMode getWeaponMode() {
         VehicleWeaponMode[] values = VehicleWeaponMode.values();
-        int idx = Math.max(0, Math.min(weaponModeIndex, values.length - 1));
+        int idx = Math.max(0, Math.min(getConfig().weaponModeIndex, values.length - 1));
         return values[idx];
     }
 
@@ -355,16 +290,12 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
         VehicleWeaponMode mode = getWeaponMode();
 
-        // Character handles collision, stance, combat state, and physics disabling.
         c.enterDriveState(mode, this);
-        // Align character body to vehicle heading once — exitDriveState restores the pre-entry rotation.
         c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
 
         Controller ctrl = c.detachController();
         if (ctrl != null) attachController(ctrl);
 
-        // For PASSENGER_WEAPON: swap the character's AimRay to the vehicle camera ray.
-        // The vehicle's WeaponController already resolved this ray in _ready().
         if (mode == VehicleWeaponMode.PASSENGER_WEAPON && vehicleWeaponController != null) {
             RayCast3D vRay = vehicleWeaponController.getAimRay();
             if (vRay != null) {
@@ -385,7 +316,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
         Character c = occupant;
         occupant = null;
 
-        // Restore AimRay before re-enabling character physics.
         if (getWeaponMode() == VehicleWeaponMode.PASSENGER_WEAPON) {
             Node wc = c.getNodeOrNull("WeaponController");
             if (wc instanceof WeaponController wcn) wcn.restoreAimRay();
@@ -396,7 +326,6 @@ public class Vehicle extends RigidBody3D implements Controllable {
                 .minus(right.times(1.5f)).plus(new Vector3(0f, 0.8f, 0f));
         c.setGlobalPosition(exitPos);
 
-        // exitDriveState restores the character body rotation saved on entry.
         c.exitDriveState();
 
         Controller ctrl = detachController();
@@ -404,45 +333,34 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
         if (camController != null) camController.setPassengerAimMode(false);
         c.makeCameraActive();
-        // Mark the exiting character as already-known so the next _integrateForces call does
-        // not treat them as a new contact and apply spurious collision damage on exit.
         activeCollisions.add(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
     }
 
-    /**
-     * Called when the vehicle's Health node reaches zero.
-     *
-     * Order is critical:
-     *   1. tryExit() first — restores occupant physics/stance/camera on the intact scene.
-     *   2. triggerExplosion — the ejected occupant and any nearby characters/vehicles
-     *      are hit by the radial blast. The vehicle itself is excluded via excludeNode
-     *      so it doesn't receive impulse.
-     *   3. queueFree() — removes the vehicle after the explosion has been fired.
-     */
     @RegisterFunction
     public void onVehicleDestruction() {
         if (occupant != null) {
-            tryExit();  // restore character before explosion so they can receive damage normally
+            tryExit();
         }
 
-        if (explosionRadius > 0f) {
+        VehicleConfig cfg = getConfig();
+        if (cfg.explosionRadius > 0f) {
             String attackerName    = (characterInfo != null) ? characterInfo.displayName : getName().toString();
             String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
             Node m = getTree().getFirstNodeInGroup("explosion_manager");
             if (m instanceof ExplosionManager mgr) {
-                mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
-                                     explosionPushForce, attackerName, attackerFaction,
-                                     "Vehicle Explosion", vehicleIcon, this);
+                mgr.triggerExplosion(getGlobalPosition(), cfg.explosionRadius, cfg.explosionMaxDamage,
+                                     cfg.explosionPushForce, attackerName, attackerFaction,
+                                     "Vehicle Explosion", cfg.vehicleIcon, this);
             }
         }
 
-        if (wreckScene != null) {
-            Node wreck = wreckScene.instantiate();
+        if (cfg.wreckScene != null) {
+            Node wreck = cfg.wreckScene.instantiate();
             getTree().getCurrentScene().addChild(wreck);
             if (wreck instanceof Node3D w) w.setGlobalTransform(getGlobalTransform());
-            SceneTreeTimer t = getTree().createTimer(wreckDuration, true, false, false);
+            SceneTreeTimer t = getTree().createTimer(cfg.wreckDuration, true, false, false);
             t.connect(new StringName("timeout"),
                     Callable.createUnsafe(wreck, new StringName("queue_free")));
         }
@@ -498,11 +416,11 @@ public class Vehicle extends RigidBody3D implements Controllable {
         return healthNode == null || !healthNode.isDead();
     }
 
-    public Character getOccupant() { return occupant; }
+    public Character getOccupant()   { return occupant; }
 
-    public boolean isSlipping()     { return slipping; }
-    public void setSlipping(boolean slipping) { this.slipping = slipping; }
+    public boolean isSlipping()      { return slipping; }
+    public void setSlipping(boolean s) { this.slipping = s; }
     public ArrayList<VehicleWheel> getWheels() { return wheels; }
-    public boolean isBraking()      { return braking; }
-    public boolean isHandbraking()  { return handBraking; }
+    public boolean isBraking()       { return braking; }
+    public boolean isHandbraking()   { return handBraking; }
 }
