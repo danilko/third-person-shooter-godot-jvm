@@ -19,7 +19,7 @@ This project is based on:
  - Johnny Rouddro's Third Person Controller tutorial ([YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) with several architectural changes and gameplay tweaks.
  - octodemy's Custom Raycast Vehicle Physics in Godot ([YouTube](https://www.youtube.com/@octodemy)) with several architectural changes and gameplay tweaks.
 
-* **Input-Driven Character Architecture:** `Character` (base) → `Player` / `Enemy`. All state transitions go through a `CharacterInput` snapshot, making human input, AI, and future network input interchangeable.
+* **Input-Driven Character Architecture:** `Character` (base) → `Player` / `AICharacter`. Each body delegates its "brain" to a `Controller` (`PlayerController` for keyboard/mouse, `AIController` for the FSM) via the `Controllable` interface. All state transitions go through a `UserCommand` snapshot, making human input, AI, and future network input interchangeable.
 * **Movement Mechanics:**
 	* Added **Double Jump** capability.
 	* **Crawl-to-Shoot** mechanics (Experimental/Beta animation).
@@ -28,10 +28,12 @@ This project is based on:
 	* Arcade-style shooting: recoil-only challenge by default; optional bloom accumulation and movement/stance spread modifiers for each weapon.
 	* Dynamic crosshair that tracks live spread from `WeaponController` via a configurable pixel-per-degree scale.
 	* Toggleable over-the-shoulder camera (Left/Right swap).
-* **Enemy AI (5-state FSM):**
-	* CS 1.6-inspired accuracy: configurable hit chance, reaction delay, aim scatter, and suppression fire.
+* **AI (7-state FSM):**
+	* Configurable hit chance, reaction delay, aim scatter, and suppression fire.
 	* Navigation via `NavigationAgent3D`; separate SightRay (LoS) and AimRay (fire direction).
 	* Ammo management with a dedicated `RefillAmmoState`.
+	* Faction-aware targeting (`AICharacter.discoverTarget()`) — same-faction AI ignore each other and neutral factions are never targeted, enabling friendly escorts and non-hostile NPCs.
+	* `EscortState` (follow + defend a designated character) and `FleeState` (sprint away from an attacker, then return to patrol).
 * **Drivable Vehicle:**
 	* Player able to enter and exit vehicle
 	* Arcade driving vehicle
@@ -49,30 +51,30 @@ This project is based on:
 ```
 Character._physicsProcess()
 	│
-	├── gatherInput(delta) → CharacterInput   ← overridden per subclass
-	│       Player   : polls Input singleton (keyboard/mouse)
-	│       Enemy    : AI FSM writes decisions into struct fields
-	│       (Network): future — inject a deserialized snapshot here
+	├── controller.gatherInput(delta) → UserCommand   ← per-body Controller
+	│       PlayerController : polls Input singleton (keyboard/mouse)
+	│       AIController     : runs the AI FSM, writes decisions into the snapshot
+	│       (Network)        : future — inject a deserialized snapshot here
 	│
-	└── applyInput(input, delta)              ← shared in base class
+	└── applyInput(command, delta)                    ← shared in base class
 			all signal emissions and state transitions live here
 ```
 
-`CharacterInput` carries a monotonically-increasing `tick` counter so inputs are totally ordered and can be replayed for client-side prediction in the future.
+`UserCommand` carries a monotonically-increasing `tick`/`sequenceNumber` so inputs are totally ordered and can be replayed for client-side prediction in the future.
 
 ### Scene Inheritance
 
 ```
 CharacterBody3D (Character.tscn)   ← shared ragdoll, health, weapon controller
-	├── Player.tscn                 ← HUD wiring, keyboard/mouse input
-	└── Enemy.tscn                  ← AI FSM, NavigationAgent3D, SightRay
+	├── Player.tscn                 ← PlayerController, HUD wiring, keyboard/mouse input
+	└── AICharacter.tscn            ← AIController (FSM), NavigationAgent3D, SightRay
 ```
 
 ---
 
-## 🤖 Enemy AI
+## 🤖 AI
 
-The enemy uses a **5-state singleton FSM**. States are stateless objects; all mutable data (timers, last-known position) lives on the `Enemy` node.
+AI characters run on a **7-state singleton FSM** owned by `AIController`. States are stateless objects; all mutable data (timers, last-known position, faction, escort/flee targets) lives on the `AICharacter` node.
 
 | State | Description |
 |:------|:------------|
@@ -81,15 +83,21 @@ The enemy uses a **5-state singleton FSM**. States are stateless objects; all mu
 | **AttackState** | Strafes laterally, waits for `reactionTime`, then fires per-shot accuracy rolls. Fires suppression shots at last known position for up to `suppressionDuration` after losing LoS. |
 | **SearchState** | Moves to last known position and strafes to peek cover. Re-engages on sight; gives up after 5 s and returns to Patrol. |
 | **RefillAmmoState** | Sprints to the `ammoRefill` Area3D. Fills all weapons on arrival, then returns to Patrol. |
+| **EscortState** | Follows a designated `Character` at a configurable distance; switches to Attack if the escort target is attacked. |
+| **FleeState** | Sprints away from an attacker for a configured distance, then returns to Patrol. |
+
+Targeting is faction-aware (`AICharacter.discoverTarget()`): same-faction AI never target each other and neutral factions are skipped entirely, which is what makes friendly escorts and non-hostile NPCs possible.
 
 ### State Transitions
 
 ```
-Patrol ──(sees player, in range)──► Attack ──(out of range)──► Chase
-	   ──(sees player, out of range)► Chase  ──(in range + LoS)► Attack
-	   ──(hit without LoS)─────────► Search  ──(sees player)──► Attack/Chase
-											 ──(timeout 5 s)──► Patrol
-Attack ──(no ammo)─────────────────► RefillAmmo ──────────────► Patrol
+Patrol ──(sees hostile, in range)──► Attack ──(out of range)──► Chase
+	   ──(sees hostile, out of range)► Chase  ──(in range + LoS)► Attack
+	   ──(hit without LoS)──────────► Search  ──(sees hostile)──► Attack/Chase
+											  ──(timeout 5 s)───► Patrol
+	   ──(assigned escort target)───► Escort  ──(target attacked)► Attack
+	   ──(low health / overwhelmed)─► Flee    ──(reached flee distance)► Patrol
+Attack ──(no ammo)──────────────────► RefillAmmo ───────────────────► Patrol
 ```
 
 ### Accuracy Knobs
@@ -211,12 +219,25 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 | **Crouch (Hold) / Crawl (Hold)**        | `Ctrl` / `Shift`             |
 | **Aim (Third Person) / Fire**           | `Mouse Right` / `Mouse Left` |
 | **Reload**                              | `R`                          |
-| **Switch Weapon**                       | `G`                          |
+| **Switch Weapon (cycle)**               | `G`                          |
+| **Select Weapon Slot (quick-switch)**   | `0` – `6` (see table below)  |
 | **Drop Weapon**                         | `F`                          |
 | **Equip/Use/Enter**                     | `E`                          |
 | **Swap Camera Shoulder (Third Person)** | `Q`                          |
 | **View Change to FPS/TPS**              | `Q`                          |
 | **Menu**                                | `Esc`                        |
+
+#### Weapon Slot Quick-Switch
+
+| Key | Slot | Type | Example |
+|:---:|:----:|:-----|:--------|
+| `0` | 0 | Fist (permanent, always available) | — |
+| `1` | 1 | Primary weapon A | Assault Rifle (AR4 / AR212) |
+| `2` | 2 | Primary weapon B | Shotgun (SG1) / Rocket Launcher (ATL4) |
+| `3` | 3 | Secondary (sidearm) | Pistol (PI52) |
+| `4` | 4 | Melee | Knife |
+| `5` | 5 | Throwable | Grenade (T1) |
+| `6` | 6 | Consumable | — |
 
 ### On Vehicle
 
@@ -228,7 +249,8 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 | **Ctrl**                                | `Break`                      |
 | **Aim (Hold to change angle) / Fire**   | `Mouse Right` / `Mouse Left` |
 | **Reload**                              | `R`                          |
-| **Switch Weapon**                       | `G`                          |
+| **Switch Weapon (cycle)**               | `G`                          |
+| **Select Weapon Slot (quick-switch)**   | `0` – `6` (passenger weapon mode — see table above) |
 | **Drop Weapon**                         | `F`                          |
 | **Exit**                                | `E`                          |
 | **Swap Camera Shoulder (Third Person)** | `Q`                          |
