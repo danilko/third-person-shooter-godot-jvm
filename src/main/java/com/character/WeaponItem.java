@@ -33,6 +33,13 @@ public class WeaponItem extends Pickup implements WeaponAction {
   // When true magazine/reserve checks are bypassed — weapon has unlimited uses (e.g. FistItem).
   @RegisterProperty @Export public boolean isInfiniteAmmo = false;
 
+  // When true, picking this up while the character is unarmed (fist active) makes it
+  // the active weapon immediately instead of stowing it in a holster slot — for
+  // consumables like throwables where instant access matters more than a deliberate
+  // weapon-switch choice. Default false: rifles/pistols/melee always require an
+  // explicit slot switch, matching how players expect ranged/melee pickups to behave.
+  @RegisterProperty @Export public boolean autoEquipOnPickup = false;
+
   // Index into the AnimationTree weapon blend nodes (WeaponAim, WeaponHold, WeaponChangeAnimation).
   // Decoupled from slot so the same animation pose is used regardless of which slot holds the weapon.
   @RegisterProperty @Export public int weaponPoseIndex = 0;
@@ -67,6 +74,12 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @RegisterProperty @Export public int reserveMax = 40;
   @RegisterProperty @Export public float recoil = 0.8f;
   @RegisterProperty @Export public float damage = 25.0f;
+
+  // Effective engagement distance in metres. AI uses this (via AICharacter.getEffectiveAttackRange)
+  // to cap how far it will try to fight with this weapon — e.g. a melee AI closes to arm's
+  // reach instead of standing at AIBehaviorConfig.attackRange and swinging at empty air.
+  // MeleeItem overrides getEffectiveRange() to return meleeRange so the two stay in sync.
+  @RegisterProperty @Export public float weaponRange = 50.0f;
   @RegisterProperty @Export public AudioStreamWAV fireAudio;
   @RegisterProperty @Export public AudioStreamWAV reloadAudio;
 
@@ -220,6 +233,9 @@ public class WeaponItem extends Pickup implements WeaponAction {
 
   public float getRecoil() { return recoil; }
   public void setRecoil(float recoil) { this.recoil = recoil; }
+
+  /** Effective engagement distance in metres — overridden by MeleeItem to mirror meleeRange. */
+  public float getEffectiveRange() { return weaponRange; }
 
   public AudioStreamWAV getFireAudio() { return fireAudio; }
   public void setFireAudio(AudioStreamWAV fireAudio) { this.fireAudio = fireAudio; }

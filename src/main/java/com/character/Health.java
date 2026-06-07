@@ -66,15 +66,17 @@ public class Health extends Node {
         currentHealth = Math.max(0.0f, currentHealth - damage);
         syncHealth = currentHealth;
         damaged.emit(damage);
+        emitCharacterHealthChanged();
         if (currentHealth <= 0) {
             Node busNode = getNodeOrNull("/root/EventBus");
             if (busNode instanceof EventBus bus) {
                 Node owner = getOwner();
                 String victimName;
                 String victimFaction;
-                if (owner instanceof Character c && c.characterInfo != null) {
-                    victimName    = c.characterInfo.displayName;
-                    victimFaction = c.characterInfo.faction;
+                CharacterInfo victimInfo = (owner instanceof Character c) ? c.characterInfo : null;
+                if (victimInfo != null) {
+                    victimName    = victimInfo.displayName;
+                    victimFaction = victimInfo.faction;
                 } else if (!displayName.isEmpty()) {
                     victimName    = displayName;
                     victimFaction = "";
@@ -85,15 +87,25 @@ public class Health extends Node {
                 bus.characterEliminated.emit(
                         attackerName, attackerFaction, victimName, victimFaction,
                         weaponName, weaponIcon, headshot);
+                if (victimInfo != null) bus.characterDied.emit(victimInfo);
             }
             died.emit();
         }
+    }
+
+    /** Relay current health to EventBus.characterHealthChanged for the owning character. */
+    private void emitCharacterHealthChanged() {
+        Node owner = getOwner();
+        if (!(owner instanceof Character c) || c.characterInfo == null) return;
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.characterHealthChanged.emit(c.characterInfo, currentHealth);
     }
 
     @RegisterFunction
     public void heal(float amount) {
         currentHealth = Math.min(maxHealth, currentHealth + amount);
         syncHealth = currentHealth;
+        emitCharacterHealthChanged();
     }
 
     public float getCurrentHealth() {

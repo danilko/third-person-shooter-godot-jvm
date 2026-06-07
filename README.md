@@ -257,6 +257,23 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 | **Menu**                                | `Esc`                        |
 ---
 
+## 🧪 Debug Harness (Temporary)
+
+`DebugHarness` (a node in `World.tscn`) wires a few function keys for exercising
+missions and AI population without the (not-yet-built) unlock-graph/console flow.
+It's a throwaway tool — slated for removal once the real debug console lands.
+
+| Key | Action |
+|:---:|:-------|
+| `F9`  | Starts a basic `ELIMINATE_ALL` debug mission targeting the `"enemy"` faction (spawns a few hostiles first if none are present). |
+| `F10` | Spawns 5 additional `"enemy"`-faction AI characters into the world (more enemies). |
+| `F11` | Spawns 1 additional `"player"`-faction AI ally into the world (more allies, e.g. for escort/squad testing). |
+
+Every AI spawned via `F10`/`F11` is auto-equipped with an AR4 rifle so it fights at
+range instead of relying on bare fists.
+
+---
+
 ## 📚 Credits & Assets
 
 ### Code & Logic

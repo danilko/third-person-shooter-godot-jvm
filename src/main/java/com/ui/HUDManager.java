@@ -16,14 +16,21 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.CanvasLayer;
 import godot.api.Control;
+import godot.api.Label;
 import godot.api.Node;
 import godot.api.Object;
 import godot.api.PackedScene;
 import godot.api.Texture2D;
+import godot.api.Timer;
 import godot.core.Callable;
+import godot.core.HorizontalAlignment;
 import godot.core.NodePath;
 import godot.core.StringNames;
+import godot.core.Vector2;
 import godot.global.GD;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * World-level HUD manager. Lives as a CanvasLayer in World.tscn so all HUD
@@ -67,6 +74,32 @@ public class HUDManager extends CanvasLayer {
   private Feed           feed;
   private WeaponSlotsUI  weaponSlotsUI;
 
+  /** Top-of-screen mission status banner — built at runtime, hidden until a mission event fires. */
+  private Label          missionBanner;
+  private Timer          missionBannerTimer;
+  private static final double MISSION_BANNER_DURATION = 4.0;
+
+  /**
+   * characterId → HUD widget registry (C2: multi-character HUD wiring).
+   * Lets any character — not just the local player — have a dedicated HUD widget
+   * (e.g. squad/escort overlays, future co-op split screens) that automatically
+   * receives that character's health/ammo/death events. Purely additive: the
+   * single-player FootHUD/playerCharacterId flow below is untouched.
+   */
+  private final Map<String, Node> characterHUDs = new HashMap<>();
+
+  /** Register a HUD widget to receive health/ammo/death events for the given character. */
+  public void registerCharacterHUD(String characterId, Node hudWidget) {
+	if (characterId == null || characterId.isEmpty() || hudWidget == null) return;
+	characterHUDs.put(characterId, hudWidget);
+  }
+
+  /** Stop routing events for the given character to its registered HUD widget. */
+  public void unregisterCharacterHUD(String characterId) {
+	if (characterId == null) return;
+	characterHUDs.remove(characterId);
+  }
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @RegisterFunction
@@ -94,7 +127,33 @@ public class HUDManager extends CanvasLayer {
 	  bus.characterEliminated.connectUnsafe(
 		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterEliminated")),
 		  Object.ConnectFlags.DEFAULT);
+
+	  // C2 — multi-character HUD wiring: route per-character events to whichever
+	  // widget (if any) is registered for that characterId via registerCharacterHUD().
+	  bus.characterHealthChanged.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterHealthChanged")),
+		  Object.ConnectFlags.DEFAULT);
+	  bus.characterAmmoChanged.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterAmmoChanged")),
+		  Object.ConnectFlags.DEFAULT);
+	  bus.characterDied.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterDiedHud")),
+		  Object.ConnectFlags.DEFAULT);
+
+	  // C1 — mission status banner: surfaces start/complete/fail events that were
+	  // previously only visible via GD.print in the console.
+	  bus.missionStarted.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onMissionStarted")),
+		  Object.ConnectFlags.DEFAULT);
+	  bus.missionCompleted.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onMissionCompletedHud")),
+		  Object.ConnectFlags.DEFAULT);
+	  bus.missionFailed.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onMissionFailedHud")),
+		  Object.ConnectFlags.DEFAULT);
 	}
+
+	buildMissionBanner();
 
 	// Cache the crosshair and weapon slot bar — siblings of FootHUD/VehicleHUD,
 	// persists across HUD context switches.
@@ -240,6 +299,54 @@ public class HUDManager extends CanvasLayer {
 	if (healthNode instanceof Health h) emitHealth(h.getCurrentHealth());
   }
 
+  // ── Mission status banner ─────────────────────────────────────────────────
+
+  /** Builds a centred top-of-screen Label + auto-hide Timer; no .tscn changes needed. */
+  private void buildMissionBanner() {
+	missionBanner = new Label();
+	missionBanner.setHorizontalAlignment(HorizontalAlignment.CENTER);
+	missionBanner.setAnchorsPreset(Control.LayoutPreset.PRESET_CENTER_TOP, false);
+	missionBanner.setPosition(new Vector2(-260f, 24f), false);
+	missionBanner.setSize(new Vector2(520f, 40f), false);
+	missionBanner.hide();
+	addChild(missionBanner);
+
+	missionBannerTimer = new Timer();
+	missionBannerTimer.setOneShot(true);
+	missionBannerTimer.setWaitTime(MISSION_BANNER_DURATION);
+	addChild(missionBannerTimer);
+	missionBannerTimer.getTimeout().connectUnsafe(
+		Callable.createUnsafe(this, StringNames.toGodotName("onMissionBannerTimeout")),
+		Object.ConnectFlags.DEFAULT);
+  }
+
+  private void showMissionBanner(String text) {
+	if (missionBanner == null) return;
+	missionBanner.setText(text);
+	missionBanner.show();
+	if (missionBannerTimer != null) missionBannerTimer.start();
+  }
+
+  @RegisterFunction
+  public void onMissionStarted(String missionId, String objectiveType) {
+	showMissionBanner("Mission started: " + missionId + " (" + objectiveType + ")");
+  }
+
+  @RegisterFunction
+  public void onMissionCompletedHud(String missionId, String winningFaction, String outcomeVariant) {
+	showMissionBanner("Mission complete — " + winningFaction + " wins (" + outcomeVariant + ")");
+  }
+
+  @RegisterFunction
+  public void onMissionFailedHud(String missionId, String reason) {
+	showMissionBanner("Mission failed — " + reason);
+  }
+
+  @RegisterFunction
+  public void onMissionBannerTimeout() {
+	if (missionBanner != null) missionBanner.hide();
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private void setActiveHUD(Control hud) {
@@ -266,6 +373,28 @@ public class HUDManager extends CanvasLayer {
 	entry.lifespan = feed.entryLifespan;
 	feed.push(entry);
 	entry.populate(attackerName, attackerFaction, victimName, victimFaction, weaponIcon, headshot);
+  }
+
+  // ── C2: per-character HUD routing ─────────────────────────────────────────
+
+  @RegisterFunction
+  public void onCharacterHealthChanged(CharacterInfo info, float currentHealth) {
+	if (info == null) return;
+	Node hud = characterHUDs.get(info.characterId);
+	if (hud instanceof CharacterHUD ch) ch.onHealthChanged(currentHealth);
+  }
+
+  @RegisterFunction
+  public void onCharacterAmmoChanged(CharacterInfo info, int magazine, int reserve) {
+	if (info == null) return;
+	Node hud = characterHUDs.get(info.characterId);
+	if (hud instanceof CharacterHUD ch) ch.onAmmoChanged(magazine, reserve);
+  }
+
+  @RegisterFunction
+  public void onCharacterDiedHud(CharacterInfo info) {
+	if (info == null) return;
+	unregisterCharacterHUD(info.characterId);
   }
 
   private PackedScene resolveDefeatedEntryScene() {

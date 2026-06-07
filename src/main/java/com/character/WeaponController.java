@@ -3,17 +3,21 @@ package com.character;
 import com.game.EventBus;
 import godot.annotation.*;
 import godot.api.*;
+import godot.core.Callable;
 import godot.core.NodePath;
 import godot.core.Signal1;
 import godot.core.Signal2;
 import godot.core.StringName;
+import godot.core.StringNames;
 import godot.core.VariantArray;
 import godot.core.Vector3;
 import godot.global.GD;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RegisterClass(className = "WeaponController")
 public class WeaponController extends Node {
@@ -68,6 +72,9 @@ public class WeaponController extends Node {
   // Weapons queued for equip/drop; processed in _process (idle) to avoid
   // reparenting a RigidBody3D (CollisionObject) during a physics callback.
   private final List<WeaponItem> pendingEquips = new ArrayList<>();
+  // Items already equipped during the current _process pass — see the race-guard
+  // comment in equipWeapon(). Cleared at the start of each pass that has work to do.
+  private final Set<WeaponItem> equippedThisPass = new HashSet<>();
   private final List<WeaponItem> pendingDrops  = new ArrayList<>();
   // True when pendingDrops was populated by dropAllWeapons() (death); false for a
   // manual single-weapon drop. Controls which physics parameters are used.
@@ -121,8 +128,10 @@ public class WeaponController extends Node {
   public void _process(double delta) {
     // Process equips first (deferred from Area3D body_entered signals)
     if (!pendingEquips.isEmpty()) {
+      equippedThisPass.clear();
       for (WeaponItem item : new ArrayList<>(pendingEquips)) equipWeapon(item);
       pendingEquips.clear();
+      equippedThisPass.clear();
     }
     // Then process any pending drops (single manual drop or full death-drop batch)
     if (!pendingDrops.isEmpty()) {
@@ -166,6 +175,21 @@ public class WeaponController extends Node {
     showWeapon(activeSlotIndex);
 
     emitInitialAmmoState();
+
+    // Self-relay: re-broadcast every ammoChanged emission to EventBus.characterAmmoChanged
+    // so multi-character HUD/game-state code (C2) can track any character's ammo, not
+    // just the local player's. Avoids touching every existing ammoChanged.emit() call site.
+    ammoChanged.connectUnsafe(
+        Callable.createUnsafe(this, StringNames.toGodotName("relayAmmoToEventBus")),
+        godot.api.Object.ConnectFlags.DEFAULT);
+  }
+
+  /** Receives our own ammoChanged signal and re-broadcasts it on EventBus, keyed by owner CharacterInfo. */
+  @RegisterFunction
+  public void relayAmmoToEventBus(int magazine, int reserve) {
+    if (!(getOwner() instanceof Character c) || c.characterInfo == null) return;
+    Node busNode = getNodeOrNull("/root/EventBus");
+    if (busNode instanceof EventBus bus) bus.characterAmmoChanged.emit(c.characterInfo, magazine, reserve);
   }
 
   /**
@@ -239,17 +263,32 @@ public class WeaponController extends Node {
     if (targetSlot < 0) return;
 
     WeaponItem displaced = weapons[targetSlot];
+
+    // Two nearby pickups of the same slot type can both pass shouldAutoPickup() in the
+    // same physics frame — the matching slot still reads as "free" to both because the
+    // actual equip is deferred to _process. Without this guard the second one would
+    // immediately displace-and-throw the first back into the world the instant it lands
+    // (e.g. "two throwables close together — one gets picked up and flung away again").
+    // Hand it back to the world instead: same outcome as walking up to a full slot
+    // (interact-prompt / re-trigger once settled), just consistent and non-jarring.
+    if (displaced != null && equippedThisPass.contains(displaced)) {
+      item.onReturnedToWorld();
+      return;
+    }
+
     boolean willBeActive = targetSlot == activeSlotIndex || weapons[activeSlotIndex] == null;
 
     item.onPickedUp();
     injectCharacterRefs(item);
     weapons[targetSlot] = item;
+    equippedThisPass.add(item);
 
-    // Auto-equip a throwable when the player is unarmed (fist slot active) so they
-    // immediately see and can use the grenade without needing a manual slot switch.
-    if (!willBeActive
-            && item.getSlotType() == WeaponSlotType.THROWABLE
-            && activeSlotIndex == 0) {
+    // Items that opt into autoEquipOnPickup (e.g. throwables) jump straight to the
+    // active slot when the character is unarmed (fist active), so they're immediately
+    // usable without a manual slot switch. Generalizes the old throwable-only special
+    // case so any weapon archetype can opt in via the exported flag — see
+    // WeaponItem.autoEquipOnPickup.
+    if (!willBeActive && item.autoEquipOnPickup && activeSlotIndex == 0) {
       willBeActive = true;
       activeSlotIndex = targetSlot;
     }
