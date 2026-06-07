@@ -31,6 +31,13 @@ public class Health extends Node {
     @RegisterProperty
     public float syncHealth = 100.0f;
 
+    /**
+     * Optional per-mesh bone multiplier table.  Set by Character._ready() from the
+     * CharacterVisuals scene's embedded MeshConfig.  When non-null and non-empty,
+     * overrides the built-in GodotChan bone-name table in getDamageMultiplier().
+     */
+    public MeshConfig meshConfig;
+
     private float currentHealth;
 
     @RegisterSignal
@@ -54,7 +61,7 @@ public class Health extends Node {
                            Texture2D weaponIcon, String attackerName, String attackerFaction) {
         if (currentHealth <= 0) return;
         boolean headshot = (hitNode instanceof PhysicalBone3D)
-                && "Physical Bone neck_01".equals(hitNode.getName().toString());
+                && "Physical Bone head_2".equals(hitNode.getName().toString());
         float damage = baseDamage * getDamageMultiplier(hitNode);
         currentHealth = Math.max(0.0f, currentHealth - damage);
         syncHealth = currentHealth;
@@ -99,12 +106,21 @@ public class Health extends Node {
 
     // ── Damage zone multipliers ───────────────────────────────────────────────
     // Node names come from the scene: "Physical Bone <bone_name>"
-    private static float getDamageMultiplier(Node hitNode) {
+    private float getDamageMultiplier(Node hitNode) {
         if (!(hitNode instanceof PhysicalBone3D)) return 1.0f;
         String nodeName = hitNode.getName().toString();
+        // MeshConfig table takes priority — allows per-skin customisation.
+        if (meshConfig != null && !meshConfig.boneHitMultipliers.isEmpty()) {
+            Object mult = meshConfig.boneHitMultipliers.get(nodeName);
+            return mult instanceof Float f ? f : 1.0f;
+        }
+        return getBuiltInMultiplier(nodeName);
+    }
+
+    private static float getBuiltInMultiplier(String nodeName) {
         switch (nodeName) {
-            // Head — neck_01 PhysicalBone3D covers both neck capsule and head sphere
-            case "Physical Bone neck_01":
+            // Head — head_2 PhysicalBone3D covers both neck capsule and head sphere
+            case "Physical Bone head_2":
                 return 4.0f;
             // Upper body
             case "Physical Bone spine_03":

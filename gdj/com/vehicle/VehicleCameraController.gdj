@@ -16,13 +16,19 @@ signals = [
     
 ]
 properties = [
-    min_distance,
-	max_distance,
+    pitch_min,
+	pitch_max,
 	height,
-	aim_recovery_speed,
-	camera_sensitivity,
-	min_pitch,
-	max_pitch
+	follow_pitch_deg,
+	yaw_sensitivity,
+	pitch_sensitivity,
+	tps_aim_sensitivity_mult,
+	yaw_recovery_speed,
+	pitch_recovery_speed,
+	slope_smooth_speed,
+	fps_pitch_follow_speed,
+	recoil_recovery_speed,
+	fps_camera_mount_path
 ]
 functions = [
     _ready,

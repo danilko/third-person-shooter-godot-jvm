@@ -63,21 +63,27 @@ public class AIController extends Controller {
     // ── Memory / timers ───────────────────────────────────────────────────────
     // (moved from AICharacter — these are "what the AI remembers", not body capability)
 
-    private static final double LOST_TARGET_TIMEOUT = 3.0;
+    private static final double LOST_TARGET_TIMEOUT  = 3.0;
     private static final double UNDER_ATTACK_DURATION = 2.5;
 
-    double attackTimer      = 0.0;
-    double lostTargetTimer  = 0.0;
-    double reactionTimer    = 0.0;
-    double underAttackTimer = 0.0;
-    double strafeTimer      = 0.0;
-    double searchTimer      = 0.0;
+    private double attackTimer      = 0.0;
+    private double lostTargetTimer  = 0.0;
+    private double reactionTimer    = 0.0;
+    private double underAttackTimer = 0.0;
+    private double strafeTimer      = 0.0;
+    private double searchTimer      = 0.0;
+    private double stillTimer       = 0.0;
 
-    float   strafeX = 0f;
-    float   strafeZ = 0f;
+    private float   strafeX        = 0f;
+    private float   strafeZ        = 0f;
+    private float   strafeFlipSide = 1f;   // alternates ±1 each refresh — no random flips
 
-    Vector3 lastKnownTargetPosition = null;
-    Vector3 currentAimTarget        = null;
+    private double stanceHoldTimer = 0.0;  // minimum time to hold a stance before switching
+
+    private Vector3 lastKnownTargetPosition = null;
+    private Vector3 currentAimTarget        = null;
+
+    private StanceName intendedAttackStance = StanceName.UPRIGHT;
 
     // ── Attack-timer helpers ──────────────────────────────────────────────────
     public void    resetAttackTimer()             { attackTimer = 0.0; }
@@ -89,11 +95,11 @@ public class AIController extends Controller {
     public void    resetLostTargetTimer()             { lostTargetTimer = 0.0; }
     public void    advanceLostTargetTimer(double d)   { lostTargetTimer += d; }
     public boolean isTargetLost()                     { return lostTargetTimer >= LOST_TARGET_TIMEOUT; }
-    public boolean isSuppressExpired()                { return lostTargetTimer >= getBody().suppressionDuration; }
+    public boolean isSuppressExpired()                { return lostTargetTimer >= getBody().getBehaviorConfig().suppressionDuration; }
 
     // ── Reaction-timer helpers ────────────────────────────────────────────────
     public void    advanceReactionTimer(double d) { reactionTimer += d; }
-    public boolean isReactionReady()              { return reactionTimer >= getBody().reactionTime; }
+    public boolean isReactionReady()              { return reactionTimer >= getBody().getBehaviorConfig().reactionTime; }
     public void    resetReactionTimer()           { reactionTimer = 0.0; }
 
     // ── Under-attack helpers ──────────────────────────────────────────────────
@@ -106,6 +112,17 @@ public class AIController extends Controller {
             lastKnownTargetPosition = new Vector3(attacker.getGlobalPosition());
     }
 
+    // ── Nav-target throttle (Perf 4) ─────────────────────────────────────────
+    // Prevents setTargetPosition() from being called 60×/s in ChaseState.
+    // Path recompute is only requested when the target moves > 1.5 m.
+    private Vector3 lastNavTarget = null;
+
+    public boolean shouldUpdateNav(Vector3 pos) {
+        return lastNavTarget == null || (float) lastNavTarget.distanceTo(pos) > 1.5f;
+    }
+    public void recordNavTarget(Vector3 pos) { lastNavTarget = pos; }
+    public void clearNavTarget()             { lastNavTarget = null; }
+
     // ── Strafe helpers ────────────────────────────────────────────────────────
     public boolean needsStrafeUpdate()           { return strafeTimer <= 0.0; }
     public void    tickStrafeTimer(double delta) { if (strafeTimer > 0) strafeTimer -= delta; }
@@ -113,22 +130,27 @@ public class AIController extends Controller {
     public float   getStrafeZ()                  { return strafeZ; }
 
     public void refreshStrafe() {
+        strafeFlipSide = -strafeFlipSide;  // alternate left / right — predictable, no random flips
         if (lastKnownTargetPosition != null) {
             Vector3 toTarget = lastKnownTargetPosition.minus(getBody().getGlobalPosition());
             double len = toTarget.length();
             if (len > 0.1) {
-                float side = GD.randf() > 0.5f ? 1f : -1f;
-                strafeX = side * (float) (toTarget.getZ() / len);
-                strafeZ = side * (float) (-toTarget.getX() / len);
-                strafeTimer = getBody().strafeChangeDuration;
+                strafeX = strafeFlipSide * (float) (toTarget.getZ() / len);
+                strafeZ = strafeFlipSide * (float) (-toTarget.getX() / len);
+                strafeTimer = getBody().getBehaviorConfig().strafeChangeDuration;
                 return;
             }
         }
-        float angle = GD.randf() * (float) (Math.PI * 2.0);
-        strafeX = (float) Math.cos(angle);
-        strafeZ = (float) Math.sin(angle);
-        strafeTimer = getBody().strafeChangeDuration;
+        // Fallback: no known position yet — use current flip side along world X
+        strafeX = strafeFlipSide;
+        strafeZ = 0f;
+        strafeTimer = getBody().getBehaviorConfig().strafeChangeDuration;
     }
+
+    // ── Still-phase helpers (stop-to-shoot) ──────────────────────────────────
+    public void    startStillPhase(double duration) { stillTimer = duration; }
+    public void    tickStillTimer(double delta)     { if (stillTimer > 0) stillTimer = Math.max(0.0, stillTimer - delta); }
+    public boolean isStillPhase()                   { return stillTimer > 0.0; }
 
     // ── Search-timer helpers ──────────────────────────────────────────────────
     public void    resetSearchTimer()               { searchTimer = 0.0; }
@@ -145,15 +167,42 @@ public class AIController extends Controller {
     public Vector3 getCurrentAimTarget()           { return currentAimTarget; }
     public void    setCurrentAimTarget(Vector3 t)  { currentAimTarget = t; }
 
+    // ── Combat-stance tracker + debounce ─────────────────────────────────────
+    public StanceName getIntendedAttackStance()             { return intendedAttackStance; }
+    public void       setIntendedAttackStance(StanceName s) { intendedAttackStance = s; }
+    public boolean    canChangeStance()                     { return stanceHoldTimer <= 0.0; }
+    public void       startStanceHoldTimer(double d)        { stanceHoldTimer = d; }
+    public void       tickStanceHoldTimer(double delta)     { if (stanceHoldTimer > 0) stanceHoldTimer = Math.max(0.0, stanceHoldTimer - delta); }
+
+    // ── Escort helpers ────────────────────────────────────────────────────────
+    // Set when the escort target's Health emits a damage signal. EscortState reads
+    // this flag to decide whether to break escort and engage the attacker.
+    private boolean escortTargetUnderAttack = false;
+
+    public void    setEscortTargetAttacked()  { escortTargetUnderAttack = true; }
+    public boolean isEscortTargetUnderAttack() { return escortTargetUnderAttack; }
+    public void    clearEscortTargetAttacked() { escortTargetUnderAttack = false; }
+
+    // ── Flee helpers ──────────────────────────────────────────────────────────
+    // FleeState records the position where fleeing started so it can check distance.
+    private Vector3 fleeStartPosition = null;
+
+    public void    setFleeStartPosition(Vector3 pos) { fleeStartPosition = pos; }
+    public Vector3 getFleeStartPosition()            { return fleeStartPosition; }
+
     // ── Suppression fire ──────────────────────────────────────────────────────
     public Vector3 computeSuppressTarget(float hDist) {
         if (lastKnownTargetPosition == null) return null;
-        float maxOffset = getBody().aimScatterRadius * 2f * (hDist / 10f);
+        float maxOffset = getBody().getBehaviorConfig().aimScatterRadius * 2f * (hDist / 10f);
         float offset    = GD.randf() * maxOffset;
-        float angle     = GD.randf() * (float) (Math.PI * 2.0);
+        // Scatter in a full 3D sphere so suppression fire spreads in all directions,
+        // not just the XY world plane (which produced visible axis-aligned artefacts).
+        float azimuth   = GD.randf() * (float)(Math.PI * 2.0);
+        float elevation = (GD.randf() - 0.5f) * (float) Math.PI;
+        float cosEl     = (float) Math.cos(elevation);
         return lastKnownTargetPosition.plus(new Vector3(
-                offset * (float) Math.cos(angle),
-                offset * (float) Math.sin(angle),
-                0f));
+                offset * cosEl * (float) Math.cos(azimuth),
+                offset * (float) Math.sin(elevation),
+                offset * cosEl * (float) Math.sin(azimuth)));
     }
 }

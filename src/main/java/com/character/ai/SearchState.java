@@ -25,15 +25,19 @@ public class SearchState implements AIState {
 
     @Override
     public AIState update(AICharacter body, AIController ctrl, UserCommand cmd, double delta) {
-        if (body.canSeeTarget()) {
+        if (body.canSeeTarget(delta)) {
             float dist = (float) body.getGlobalPosition()
                                      .distanceTo(body.getTarget().getGlobalPosition());
-            if (dist <= body.attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
+            if (dist <= body.getBehaviorConfig().attackRange && body.hasAnyAmmo()) return AttackState.INSTANCE;
             return ChaseState.INSTANCE;
         }
 
         ctrl.advanceSearchTimer(delta);
         if (ctrl.isSearchTimedOut(SEARCH_TIMEOUT)) return PatrolState.INSTANCE;
+
+        // Out of ammo and still under attack → flee rather than continue searching.
+        if (body.getBehaviorConfig().useFleeOnAttack && !body.hasAnyAmmo()
+                && ctrl.isUnderAttack()) return FleeState.INSTANCE;
 
         cmd.wantCombat = true;
 

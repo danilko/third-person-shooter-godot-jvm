@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://02yvfqf1pq5u"]
+
+[ext_resource type="Script" uid="uid://ball48fa3ke62" path="res://gdj/com/character/FistItem.gdj" id="1_fist"]
+
+[node name="Fist" type="RigidBody3D" unique_id=100001001]
+script = ExtResource("1_fist")
+melee_range = 1.5
+
+[node name="HitTimer" type="Timer" parent="." unique_id=100001004]
+wait_time = 2.0
+one_shot = true
+
+[connection signal="timeout" from="HitTimer" to="." method="on_hit_timer_timeout"]

@@ -70,8 +70,13 @@ public class WeaponRadialMenu extends Control {
 
   public void showRadialMenu() {
     if (character == null) return;
+    // Move to front so GUI input hits this menu before any sibling HUD Controls.
+    // FootHUD, WeaponSlotsUI etc. default to mouse_filter=STOP and sit in front
+    // of the radial menu in the original scene order, blocking all button events.
+    Node parent = getParent();
+    if (parent != null) parent.moveChild(this, parent.getChildCount() - 1);
     Input.setMouseMode(Input.MouseMode.VISIBLE);
-    character.setProcessInput(false);
+    character.inputBlocked = true;
     character.setMovementDirection(Vector3.Companion.getZERO());
     character.setMovementState(MovementType.IDLE);
     Node cam = getCamera();
@@ -84,8 +89,8 @@ public class WeaponRadialMenu extends Control {
   public void hideRadialMenu() {
     if (character == null) return;
     Input.setMouseMode(Input.MouseMode.CAPTURED);
+    character.inputBlocked = false;
     character.setMovementState(MovementType.IDLE);
-    character.setProcessInput(true);
     Node cam = getCamera();
     if (cam != null) cam.setProcessInput(true);
     hide();

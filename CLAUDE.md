@@ -261,7 +261,7 @@ All three world managers (`ImpactManager`, `ParticleManager`, `DecalManager`) li
 lazily cache references on first use to avoid `_ready()` ordering issues.
 
 Damage multipliers are resolved by bone name in `Health.getDamageMultiplier()`:
-- `Physical Bone neck_01` → 4.0× (headshot)
+- `Physical Bone head_2` → 4.0× (headshot)
 - Upper torso → 1.0×, mid torso / arms → 0.75×, legs → 0.5×
 
 On death, `Health` emits to `EventBus.characterEliminated(attacker, victim, weapon, headshot)`.
