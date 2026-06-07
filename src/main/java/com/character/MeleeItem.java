@@ -75,6 +75,11 @@ public class MeleeItem extends WeaponItem {
         return new float[][]{{0, 0}, {angleDeg, 0}, {-angleDeg, 0}, {0, angleDeg}, {0, -angleDeg}};
     }
 
+    /** Mirrors meleeRange so AI range checks (AICharacter.getEffectiveAttackRange) and
+     *  actual hit detection always agree — no separate "weaponRange" to keep in sync. */
+    @Override
+    public float getEffectiveRange() { return meleeRange; }
+
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {

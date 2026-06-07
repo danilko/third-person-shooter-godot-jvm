@@ -269,6 +269,18 @@ public class Character extends CharacterBody3D implements Controllable {
         setStance(currentStanceName);
         setCombatState();
         setWeapon(0);
+
+        // Deferred so all sibling _ready() calls (e.g. HUDManager, GameManager)
+        // finish connecting to characterSpawned before this fires. Fires for every
+        // character — player and AI — so multi-character systems (C2) can build
+        // characterId-keyed registries instead of assuming a single local player.
+        callDeferred(StringNames.toGodotName("emitCharacterSpawned"));
+    }
+
+    @RegisterFunction
+    public void emitCharacterSpawned() {
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof com.game.EventBus bus) bus.characterSpawned.emit(this, characterInfo);
     }
 
     /**

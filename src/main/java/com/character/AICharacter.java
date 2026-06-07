@@ -462,7 +462,38 @@ public class AICharacter extends Character {
         return cachedBestWeapon;
     }
 
-    public boolean hasAnyAmmo() { return selectBestWeapon() > 0; }
+    /**
+     * True when the selected weapon can actually be fired — including the permanent
+     * fist (slot 0, isInfiniteAmmo). selectBestWeapon() deliberately skips slot 0 when
+     * ranking *preferred* weapons (it's the fallback, not a pick), so checking
+     * `selectBestWeapon() > 0` here would wrongly mark a fist-only AI as "out of ammo"
+     * and route it to RefillAmmoState/FleeState forever instead of letting it brawl.
+     */
+    public boolean hasAnyAmmo() {
+        return weaponController != null && weaponController.hasAmmoForWeapon(selectBestWeapon());
+    }
+
+    /**
+     * Engagement range to use for Attack-state transitions: the smaller of the
+     * behaviour config's general attackRange and the selected weapon's effective
+     * range. Without this a melee AI (weaponRange ~1.5 m) would try to fight from
+     * AIBehaviorConfig.attackRange away — strafing and "shooting" at empty air
+     * instead of closing the distance to where its weapon can actually connect.
+     */
+    /** True when the AI's selected weapon is melee/fist — used to switch off ranged-style strafing. */
+    public boolean isMeleeEngagement() {
+        if (weaponController == null) return false;
+        WeaponItem weapon = weaponController.getWeaponItem(selectBestWeapon());
+        return weapon != null && weapon.getWeaponType() == WeaponType.MELEE;
+    }
+
+    public float getEffectiveAttackRange() {
+        float configRange = getBehaviorConfig().attackRange;
+        if (weaponController == null) return configRange;
+        WeaponItem weapon = weaponController.getWeaponItem(selectBestWeapon());
+        if (weapon == null) return configRange;
+        return Math.min(configRange, weapon.getEffectiveRange());
+    }
 
     @RegisterFunction
     public void onAmmoChanged(int magazine, int reserve) { cachedBestWeapon = -1; }

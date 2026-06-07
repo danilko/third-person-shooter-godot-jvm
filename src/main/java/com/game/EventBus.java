@@ -114,4 +114,63 @@ public class EventBus extends Node {
     public final Signal2<Node, Boolean> armedStateChanged =
             new Signal2<>(this, new StringName("armed_state_changed"));
 
+    /**
+     * Emitted by MissionManager.startMission().
+     * Payload: missionId, objectiveType — lets HUD show a "mission started" banner.
+     */
+    @RegisterSignal
+    public final Signal2<String, String> missionStarted =
+            new Signal2<>(this, new StringName("mission_started"));
+
+    /**
+     * Emitted by MissionManager.completeMission().
+     * Payload: missionId, winningFaction, outcomeVariant.
+     */
+    @RegisterSignal
+    public final Signal3<String, String, String> missionCompleted =
+            new Signal3<>(this, new StringName("mission_completed"));
+
+    /**
+     * Emitted by MissionManager.failMission().
+     * Payload: missionId, reason.
+     */
+    @RegisterSignal
+    public final Signal2<String, String> missionFailed =
+            new Signal2<>(this, new StringName("mission_failed"));
+
+    /**
+     * Emitted by Character once after _ready() completes (deferred, mirrors
+     * playerSpawned). Fires for every character — player and AI alike — so
+     * GameManager and HUDManager can build characterId-keyed registries instead
+     * of assuming a single local player.
+     * Payload: the spawned character node + its CharacterInfo.
+     */
+    @RegisterSignal
+    public final Signal2<Node, CharacterInfo> characterSpawned =
+            new Signal2<>(this, new StringName("character_spawned"));
+
+    /**
+     * Emitted by Health when its owning character dies (alongside characterEliminated).
+     * Payload: the victim's CharacterInfo — recipients filter by characterId.
+     */
+    @RegisterSignal
+    public final Signal1<CharacterInfo> characterDied =
+            new Signal1<>(this, new StringName("character_died"));
+
+    /**
+     * Emitted by Health.takeDamage()/heal() for any character (not just the player).
+     * Payload: CharacterInfo of the owner + the new current health.
+     */
+    @RegisterSignal
+    public final Signal2<CharacterInfo, Float> characterHealthChanged =
+            new Signal2<>(this, new StringName("character_health_changed"));
+
+    /**
+     * Emitted by WeaponController for any character (not just the player).
+     * Payload: CharacterInfo of the owner + magazine + reserve.
+     */
+    @RegisterSignal
+    public final Signal3<CharacterInfo, Integer, Integer> characterAmmoChanged =
+            new Signal3<>(this, new StringName("character_ammo_changed"));
+
 }
