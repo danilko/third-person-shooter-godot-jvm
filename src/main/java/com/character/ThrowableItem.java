@@ -46,6 +46,11 @@ import godot.core.Vector3;
 @RegisterClass(className = "ThrowableItem")
 public class ThrowableItem extends WeaponItem implements Detonatable {
 
+    public ThrowableItem() {
+        // All throwable by default should require manual throw
+        auto = false;
+    }
+
     /** Physics scene to instantiate on each throw (e.g. T1Projectile.tscn). */
     @Export @RegisterProperty public PackedScene projectileScene;
 

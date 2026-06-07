@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://cplrp8cx4gus0" path="res://gdj/com/character/CharacterInfo.gdj" id="3_fqupk"]
 [ext_resource type="Script" uid="uid://bd5tmrvs8w03p" path="res://gdj/com/character/AICameraController.gdj" id="4_x1vpt"]
 [ext_resource type="Script" uid="uid://d361a4re5s5lh" path="res://gdj/com/character/CharacterController.gdj" id="5_cctrl"]
+[ext_resource type="Script" path="res://gdj/com/character/AIBehaviorConfig.gdj" id="6_aibcf"]
 
 [sub_resource type="Resource" id="Resource_be1gi"]
 script = ExtResource("3_fqupk")
@@ -12,22 +13,26 @@ display_name = "test enemy"
 faction = "enemy"
 metadata/_custom_type_script = "uid://cplrp8cx4gus0"
 
-[node name="AICharacter" unique_id=1865541393 instance=ExtResource("1_base")]
-script = ExtResource("2_x1vpt")
+[sub_resource type="Resource" id="Resource_aibcf"]
+script = ExtResource("6_aibcf")
 detection_range = 100.0
-aim_pitch_min = -55.0
-aim_pitch_max = 75.0
 attack_range = 500.0
 patrol_radius = 200.0
+aim_pitch_min = -55.0
+aim_pitch_max = 75.0
 aim_body_part = "CHEST"
 hit_chance = 0.75
-reaction_time = 0.3
 aim_scatter_radius = 2.5
-strafe_change_duration = 1.2
+move_accuracy_penalty = 0.75
+reaction_time = 0.3
 suppression_duration = 1.5
 shoot_still_duration = 0.25
-move_accuracy_penalty = 0.75
+strafe_change_duration = 1.2
 use_combat_crouch = true
+
+[node name="AICharacter" unique_id=1865541393 instance=ExtResource("1_base")]
+script = ExtResource("2_x1vpt")
+behavior_config = SubResource("Resource_aibcf")
 character_info = SubResource("Resource_be1gi")
 
 [node name="MovementController" parent="." unique_id=349324944]
