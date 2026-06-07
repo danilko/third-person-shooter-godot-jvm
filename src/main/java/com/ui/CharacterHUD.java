@@ -22,14 +22,6 @@ public class CharacterHUD extends Control {
   @Export
   public NodePath healthLabelPath = new NodePath("Health/ColorRect/Health");
 
-  @RegisterProperty
-  @Export
-  public NodePath magazineLabelPath = new NodePath("Magazine/ColorRect/Magazine");
-
-  @RegisterProperty
-  @Export
-  public NodePath reserveLabelPath = new NodePath("Magazine/ColorRect/Reserve");
-
   @RegisterProperty @Export
   public NodePath notificationIconPath = new NodePath("Notification/WeaponIcon");
 
@@ -49,12 +41,7 @@ public class CharacterHUD extends Control {
     if (hasNode(healthLabelPath)) {
       healthLabel = (Label) getNode(healthLabelPath);
     }
-    if (hasNode(magazineLabelPath)) {
-      magazineLabel = (Label) getNode(magazineLabelPath);
-    }
-    if (hasNode(reserveLabelPath)) {
-      reserveLabel = (Label) getNode(reserveLabelPath);
-    }
+
     pickupNotificationLabel = (Label) getNode("Notification/EliminatedNotification");
     Node iconNode = getNodeOrNull(notificationIconPath);
     if (iconNode instanceof TextureRect tr) notificationIcon = tr;
@@ -63,17 +50,11 @@ public class CharacterHUD extends Control {
 
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) {
-      bus.playerAmmoChanged.connectUnsafe(
-          Callable.createUnsafe(this, StringNames.toGodotName("onAmmoChanged")),
-          godot.api.Object.ConnectFlags.DEFAULT);
       bus.playerHealthChanged.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onHealthChanged")),
           godot.api.Object.ConnectFlags.DEFAULT);
       bus.pickupInteractChanged.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onPickupInteractChanged")),
-          godot.api.Object.ConnectFlags.DEFAULT);
-      bus.weaponPickedUp.connectUnsafe(
-          Callable.createUnsafe(this, StringNames.toGodotName("onWeaponPickedUp")),
           godot.api.Object.ConnectFlags.DEFAULT);
     }
   }

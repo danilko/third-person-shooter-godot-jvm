@@ -1,7 +1,5 @@
 package com.character;
 
-import godot.annotation.RegisterClass;
-
 /**
  * Type-safe representation of the player stances.
  * The {@code key} matches both the Godot node name of the stance child node and

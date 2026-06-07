@@ -22,11 +22,16 @@ signals = [
     
 ]
 properties = [
-    weapon_id,
+    pellet_count,
+	weapon_id,
 	weapon_name,
 	slot_type,
+	is_droppable,
+	is_infinite_ammo,
 	weapon_pose_index,
 	weapon_icon,
+	hold_socket,
+	holster_sockets,
 	spread,
 	bloom_per_shot,
 	bloom_decay_speed,
@@ -49,7 +54,8 @@ properties = [
 	pickup_cooldown_after_drop
 ]
 functions = [
-    _physics_process,
+    _ready,
+	_physics_process,
 	_process,
 	on_body_entered,
 	on_body_exited,

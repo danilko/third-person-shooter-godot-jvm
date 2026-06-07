@@ -4,9 +4,9 @@
 [ext_resource type="Script" uid="uid://dgom5d5lml1qp" path="res://gdj/com/ui/WeaponRadialMenuItem.gdj" id="1_f7opg"]
 [ext_resource type="Texture2D" uid="uid://dowvrkhhp42bs" path="res://assets/ui/radial_menu_hover.png" id="2_qv767"]
 [ext_resource type="BitMap" uid="uid://di830knvfek2x" path="res://assets/ui/radial_menu_click_mask.bmp" id="3_f7opg"]
-[ext_resource type="Texture2D" uid="uid://dilbj38px75ln" path="res://assets/ui/rifle.png" id="5_f7opg"]
+[ext_resource type="Texture2D" uid="uid://dilbj38px75ln" path="res://assets/ui/AR212.png" id="5_f7opg"]
 
-[node name="RaidalMenuItem" type="Control" unique_id=703522310]
+[node name="WeaponRaidalMenuItem" type="Control" unique_id=703522310]
 layout_mode = 3
 anchors_preset = 8
 anchor_left = 0.5
@@ -89,6 +89,15 @@ offset_top = 41.0
 offset_right = 39.0
 offset_bottom = 69.0
 text = "123"
+
+[node name="KeyLabel" type="RichTextLabel" parent="Axis" unique_id=1074760005]
+layout_mode = 0
+offset_left = -18.0
+offset_top = 64.0
+offset_right = 18.0
+offset_bottom = 92.0
+text = "[ ? ]"
+horizontal_alignment = 1
 
 [connection signal="mouse_entered" from="Button" to="." method="on_hover"]
 [connection signal="pressed" from="Button" to="." method="on_clicked"]

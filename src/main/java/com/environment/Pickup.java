@@ -65,6 +65,7 @@ public class Pickup extends RigidBody3D {
   /** True while held in a character's inventory; blocks body_entered re-triggering. */
   protected boolean equipped = false;
   private float pickupCooldown = 0f;
+  private EventBus eventBus;
 
   // ── Tick ─────────────────────────────────────────────────────────────────
 
@@ -145,12 +146,14 @@ public class Pickup extends RigidBody3D {
   // ── Equip / return lifecycle (used by WeaponItem) ─────────────────────────
 
   /** Called after this pickup is reparented into a character's inventory marker.
-   *  Freezes physics; sets the equipped flag so onBodyEntered ignores further
-   *  contacts without touching Area3D monitoring (which is blocked inside body signals). */
+   *  Hides immediately so the world pickup vanishes on collection, then freezes physics.
+   *  WeaponItem.moveWeaponToHand calls show() afterwards for weapons with a hold socket,
+   *  so the hide here is intentionally overridden for visually-held weapons. */
   public void onPickedUp() {
     equipped = true;
     overlappingBodies.clear();
     emitInteractPrompt(false);
+    hide();
     setFreezeEnabled(true);
   }
 
@@ -197,10 +200,16 @@ public class Pickup extends RigidBody3D {
     return true;
   }
 
-  private void emitInteractPrompt(boolean inRange) {
-    Node busNode = getNodeOrNull("/root/EventBus");
-    if (busNode instanceof EventBus bus) {
-      bus.pickupInteractChanged.emit(inRange, inRange ? "Pick up: " + getInteractLabel() : "");
+  private EventBus getEventBus() {
+    if (eventBus == null) {
+      Node n = getNodeOrNull("/root/EventBus");
+      if (n instanceof EventBus eb) eventBus = eb;
     }
+    return eventBus;
+  }
+
+  private void emitInteractPrompt(boolean inRange) {
+    EventBus bus = getEventBus();
+    if (bus != null) bus.pickupInteractChanged.emit(inRange, inRange ? "Pick up: " + getInteractLabel() : "");
   }
 }

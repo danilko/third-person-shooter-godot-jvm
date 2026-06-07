@@ -1,12 +1,16 @@
 package com.character;
 
+import com.environment.ImpactManager;
 import com.environment.Pickup;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterProperty;
+import godot.api.AudioStreamPlayer3D;
 import godot.api.AudioStreamWAV;
+import godot.api.CharacterBody3D;
 import godot.api.Node;
 import godot.api.Texture2D;
+import godot.core.PackedStringArray;
 import godot.core.Vector3;
 
 import static godot.global.GD.min;
@@ -14,15 +18,20 @@ import static godot.global.GD.min;
 @RegisterClass(className = "WeaponItem")
 public class WeaponItem extends Pickup implements WeaponAction {
 
-  // Internal identifier: used for marker lookup ("Marker" + weaponId), event bus payloads,
-  // save keys. No spaces. If empty, falls back to weaponName for marker lookup.
+  // Internal identifier used for event bus payloads and save keys. No spaces.
   @RegisterProperty @Export public String weaponId = "";
 
   // Human-readable display name: HUD, kill feed, inventory, interact prompt.
   @RegisterProperty @Export public String weaponName = "";
 
-  // WeaponSlotType ordinal: 0=PRIMARY 1=SECONDARY 2=MELEE 3=THROWABLE 4=OFFHAND
+  // WeaponSlotType ordinal: 0=PRIMARY 1=SECONDARY 2=MELEE 3=THROWABLE 4=CONSUMABLE 5=FIST
   @RegisterProperty @Export public int slotType = 0;
+
+  // When false the weapon cannot be dropped (e.g. FistItem). Guards dropCurrentWeapon/dropAllWeapons.
+  @RegisterProperty @Export public boolean isDroppable = true;
+
+  // When true magazine/reserve checks are bypassed — weapon has unlimited uses (e.g. FistItem).
+  @RegisterProperty @Export public boolean isInfiniteAmmo = false;
 
   // Index into the AnimationTree weapon blend nodes (WeaponAim, WeaponHold, WeaponChangeAnimation).
   // Decoupled from slot so the same animation pose is used regardless of which slot holds the weapon.
@@ -30,6 +39,15 @@ public class WeaponItem extends Pickup implements WeaponAction {
 
   // Icon shown in the kill feed and radial menu. Set in the inspector per weapon scene.
   @RegisterProperty @Export public Texture2D weaponIcon = null;
+
+  // Name of the Marker3D socket to attach to when this weapon is the active (held) weapon.
+  // Must match a node name registered in WeaponController.socketPaths.
+  @RegisterProperty @Export public String holdSocket = "";
+
+  // Names of Marker3D sockets to try (in order) when parking this weapon in inventory.
+  // Each name must match a node registered in WeaponController.socketPaths.
+  // The first socket with no other weapon in it is used. Empty array = hide when inactive.
+  @RegisterProperty @Export public PackedStringArray holsterSockets = new PackedStringArray();
 
   @RegisterProperty @Export public float spread = 0.0f;
   // Inaccuracy added per shot; decays at bloomDecaySpeed when not firing.
@@ -51,6 +69,42 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @RegisterProperty @Export public float damage = 25.0f;
   @RegisterProperty @Export public AudioStreamWAV fireAudio;
   @RegisterProperty @Export public AudioStreamWAV reloadAudio;
+
+  // ── Injected references (shared by all weapon subtypes) ─────────────────────
+  // Populated by WeaponController.injectCharacterRefs() after discovery/pickup.
+  // Cleared (set to null) when the weapon is returned to the world.
+  protected WeaponController       weaponController;
+  protected CharacterBody3D        owningCharacter;
+  protected AudioStreamPlayer3D    weaponAudio;
+  private   ImpactManager          impactManager;
+
+  /** Called by WeaponController after discovery or pickup. Pass nulls to clear on world return. */
+  public void setup(WeaponController controller, CharacterBody3D character, AudioStreamPlayer3D audio) {
+    this.weaponController = controller;
+    this.owningCharacter  = character;
+    this.weaponAudio      = audio;
+    this.impactManager    = null;
+  }
+
+  /** Lazily resolves and caches the world ImpactManager (single group lookup per weapon). */
+  protected ImpactManager getImpactManager() {
+    if (impactManager != null) return impactManager;
+    Node found = getTree().getFirstNodeInGroup("impact_manager");
+    if (found instanceof ImpactManager im) impactManager = im;
+    return impactManager;
+  }
+
+  /** Attacker display name for kill-feed and event-bus payloads. */
+  protected String resolveAttackerName() {
+    if (owningCharacter instanceof Character c && c.characterInfo != null) return c.characterInfo.displayName;
+    return owningCharacter != null ? owningCharacter.getName().toString() : "";
+  }
+
+  /** Attacker faction string for faction/friendly-fire checks. */
+  protected String resolveAttackerFaction() {
+    if (owningCharacter instanceof Character c && c.characterInfo != null) return c.characterInfo.faction;
+    return "";
+  }
 
   public WeaponSlotType getSlotType() {
     WeaponSlotType[] types = WeaponSlotType.values();
@@ -101,6 +155,19 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @Override public WeaponType getWeaponType() { return WeaponType.RANGED; }
   @Override public float getCurrentSpreadDeg() { return 0f; }
   @Override public void onSetStance(Stance stance) {}
+
+  /**
+   * Whether dropping this weapon should create a world pickup.
+   * Default: matches isDroppable. ThrowableItem overrides to block empty drops.
+   */
+  public boolean shouldDropToWorld() { return isDroppable; }
+
+  /**
+   * Called by WeaponController immediately after useWeapon() empties the magazine.
+   * Default is a no-op. ThrowableItem overrides to auto-clear the slot so any
+   * other throwable type can be picked up without needing an interact-to-swap.
+   */
+  public void onMagazineEmpty() {}
 
   public void decrementMagazine() {
     if (magazine > 0) magazine--;

@@ -105,4 +105,13 @@ public class EventBus extends Node {
     public final Signal1<CharacterInfo> vehicleExited =
             new Signal1<>(this, new StringName("vehicle_exited"));
 
+    /**
+     * Emitted by WeaponController when the active slot crosses the fist/weapon boundary.
+     * Payload: the character node + true when a real weapon is now drawn, false when fist is active.
+     * Neutral NPCs listen to this to decide when to turn hostile.
+     */
+    @RegisterSignal
+    public final Signal2<Node, Boolean> armedStateChanged =
+            new Signal2<>(this, new StringName("armed_state_changed"));
+
 }

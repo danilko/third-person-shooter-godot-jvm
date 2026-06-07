@@ -7,6 +7,8 @@ import godot.annotation.Export;
 import godot.annotation.RegisterProperty;
 import godot.core.*;
 import godot.global.GD;
+import java.util.HashMap;
+import java.util.Map;
 
 @RegisterClass(className = "AnimationController")
 public class AnimationController extends Node {
@@ -48,10 +50,18 @@ public class AnimationController extends Node {
   @RegisterProperty
   public double floorBlendSpeed = 10.0;
 
-  private int weapon = 0;
-  private int pendingWeapon = -1;
-  private static final double WEAPON_SWAP_DELAY = 0.3;
+  /**
+   * When true the incoming movementDirection is world-space (AI). The blend rotates it
+   * into camera-local space so strafe animations play relative to the facing direction.
+   */
+  @Export
+  @RegisterProperty
+  public boolean worldSpaceMovement = false;
 
+  // NodePath for the animation speed parameter never changes — build it once.
+  private static final NodePath ANIM_SPEED_PATH = new NodePath("parameters/MovementAnimSpeed/scale");
+
+  private double camRotation = 0.0;
   private double onFloorBlend = 1.0;
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
@@ -61,21 +71,27 @@ public class AnimationController extends Node {
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
   private MovementState currentMovementState = null;
+  // Cached NodePaths for per-stance blend parameters — populated lazily (one allocation per stance).
+  private final Map<String, NodePath> blendPathCache = new HashMap<>();
 
 
   @RegisterFunction
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || animationTree == null) return;
+    // Skip entirely for LOD-frozen AIs — they hold their last pose with zero JVM bridge cost.
+    if (player instanceof AICharacter ai && ai.isLodFrozen()) return;
 
-    // Calculate floor blend target
     onFloorBlendTarget = player.isOnFloor() ? 1.0 : 0.0;
-
-    // Smoothly interpolate the blend value
-    onFloorBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, floorBlendSpeed * delta);
-
-    // Access AnimationTree parameters using set() with a NodePath
-    animationTree.set("parameters/OnFloorBlend/blend_amount", onFloorBlend);
+    double newBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, floorBlendSpeed * delta);
+    // Only write to the AnimationTree when the value actually changes — eliminates
+    // ~1,920 unconditional JVM bridge calls/sec for 32 grounded AIs at 60 Hz.
+    if (Math.abs(newBlend - onFloorBlend) > 0.001) {
+      onFloorBlend = newBlend;
+      animationTree.set("parameters/OnFloorBlend/blend_amount", onFloorBlend);
+    } else {
+      onFloorBlend = newBlend;
+    }
   }
 
   @RegisterFunction
@@ -101,26 +117,20 @@ public class AnimationController extends Node {
     updateAnimationBlend(movementState);
   }
 
-  public void onWeaponTransition(int animationWeaponIndex, boolean isEquipping) {
-    // If unequipping, we stay on the current weapon's pose.
-    if (!isEquipping) {
-      animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
-      animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
-    }
-    // 2. CONFIGURE: Tell the transition which weapon's specific animation to play
+  /**
+   * Story/cutscene hook: forces WeaponBlend to 0 (no weapon pose) or restores it to 1.
+   * Not called during normal slot switching — all weapons including fist use WeaponBlend = 1.
+   */
+  public void setHolster(boolean holster) {
+    if (animationTree == null) return;
+    animationTree.set("parameters/WeaponBlend/blend_position", holster ? 0 : 1);
+  }
+
+  public void onWeaponEquip(int animationWeaponIndex) {
+    animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
+    animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
     animationTree.set("parameters/WeaponChangeAnimation/blend_position", animationWeaponIndex);
-    // 3. DIRECTION: 1 for Equip (In), 0 or -1 for Unequip (Out)
-    int state = isEquipping ? 1 : -1;
-    animationTree.set("parameters/WeaponChangeScale/transition_request", state);
-
-    // 4. EXECUTE: Fire the actual movement
     animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
-
-    // If equipping, change to correct weapon pose
-    if (isEquipping) {
-      animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
-      animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
-    }
   }
 
   @RegisterFunction
@@ -136,19 +146,12 @@ public class AnimationController extends Node {
     this.currentStanceName = stance.getName().toString();
     this.currentStance = stance;
 
-    if (StanceName.DRIVE_CARRIER.getKey().equals(this.currentStanceName)) {
-      // Movement is disabled while driving; skip movement-blend update.
-      // Spine IK is suppressed by the DriveCarrier Stance's spineAimMaxAngle = 0.
-      // If the vehicle mode is PASSENGER_WEAPON, onSetCombatState("Combat") fires
-      // separately and will re-activate aimIk for the weapon hold pose.
-      updateAimModifiers();
-    } else {
-      updateAimModifiers();
-    }
+    updateAimModifiers();
   }
 
   @RegisterFunction
   public void onSetCombatState(CombatState combatState) {
+    if (animationTree == null) return;
     combat = combatState.isCombat();
     animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
     animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
@@ -168,9 +171,25 @@ public class AnimationController extends Node {
   }
 
   @RegisterFunction
+  public void onSetCamRotation(double newCamRotation) {
+    camRotation = newCamRotation;
+  }
+
+  @RegisterFunction
   public void onSetMovementDirection(Vector3 movementDirection) {
-    this.movementDirection.setX(movementDirection.getX() == 0 ? 0 : movementDirection.getX() > 0 ? 1 : -1);
-    this.movementDirection.setY(movementDirection.getZ() == 0 ? 0 : movementDirection.getZ() > 0 ? 1 : -1);
+    double dx = movementDirection.getX();
+    double dz = movementDirection.getZ();
+    if (worldSpaceMovement && combat) {
+      // Rotate world-space direction into camera-local space so the strafe blend
+      // plays relative to the mesh facing direction rather than world axes.
+      double cos = Math.cos(-camRotation), sin = Math.sin(-camRotation);
+      double lx = dx * cos - dz * sin;
+      double lz = dx * sin + dz * cos;
+      dx = lx;
+      dz = lz;
+    }
+    this.movementDirection.setX(dx == 0 ? 0 : dx > 0 ? 1 : -1);
+    this.movementDirection.setY(dz == 0 ? 0 : dz > 0 ? 1 : -1);
 
     updateAnimationBlend(currentMovementState);
   }
@@ -179,10 +198,7 @@ public class AnimationController extends Node {
   private void updateAnimationBlend(MovementState movementState) {
     if (animationTree == null || currentMovementState == null) return;
 
-    if (tween != null && tween.isValid()) {
-      tween.kill();
-    }
-
+    if (tween != null && tween.isValid()) tween.kill();
     tween = createTween();
 
     if (combat) {
@@ -195,10 +211,9 @@ public class AnimationController extends Node {
       animationDirection.setY(movementState.getId());
     }
 
-    String blendPath = "parameters/" + currentStanceName + "MovementBlend/blend_position";
-    tween.tweenProperty(animationTree, new NodePath(blendPath), animationDirection, animationBlendDuration);
-
-    String speedPath = "parameters/MovementAnimSpeed/scale";
-    tween.parallel().tweenProperty(animationTree, new NodePath(speedPath), movementState.animationSpeed, animationSpeedDuration);
+    NodePath blendPath = blendPathCache.computeIfAbsent(currentStanceName,
+        name -> new NodePath("parameters/" + name + "MovementBlend/blend_position"));
+    tween.tweenProperty(animationTree, blendPath, animationDirection, animationBlendDuration);
+    tween.parallel().tweenProperty(animationTree, ANIM_SPEED_PATH, movementState.animationSpeed, animationSpeedDuration);
   }
 }

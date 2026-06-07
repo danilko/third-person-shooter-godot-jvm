@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://bk5bkbssdlaa4"]
+
+[ext_resource type="Script" uid="uid://cblv3kj7lw3md" path="res://gdj/com/character/ThrowableItem.gdj" id="1_ti"]
+[ext_resource type="PackedScene" uid="uid://cts4wlnxcbmac" path="res://src/main/resources/com/weapon/T1Projectile.tscn" id="2_proj"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2wpi7"]
+size = Vector3(0.5, 0.5, 1.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_grenade"]
+size = Vector3(0.1, 0.1, 0.3)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ifxot"]
+size = Vector3(0.1, 0.1, 0.3)
+
+[node name="T1" type="RigidBody3D" unique_id=507572094]
+collision_layer = 4
+collision_mask = 1
+continuous_cd = true
+script = ExtResource("1_ti")
+projectile_scene = ExtResource("2_proj")
+explosion_radius = 10.0
+weapon_id = "T1"
+weapon_name = "T1 Grenade"
+slot_type = 3
+magazine = 1
+magazine_size = 6
+reserve = 0
+reserve_max = 0
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=1787117722]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=158100437]
+shape = SubResource("BoxShape3D_2wpi7")
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=851682241]
+mesh = SubResource("BoxMesh_grenade")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1793833142]
+shape = SubResource("BoxShape3D_ifxot")
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

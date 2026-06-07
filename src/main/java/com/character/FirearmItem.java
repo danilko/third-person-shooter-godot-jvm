@@ -2,9 +2,10 @@ package com.character;
 
 import com.environment.BulletTracerManager;
 import com.environment.HitInfo;
-import com.environment.ImpactManager;
+import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
+import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.api.Object;
 import godot.core.Vector3;
@@ -20,19 +21,17 @@ import godot.global.GD;
 @RegisterClass(className = "FirearmItem")
 public class FirearmItem extends WeaponItem {
 
-  // Injected by WeaponController after weapon discovery
-  private CharacterBody3D owningCharacter;
-  private RayCast3D aimRay3D;
-  private CameraController cameraController;
   private GPUParticles3D muzzleFlashFx;
   private AnimationPlayer muzzleFlashAnimPlayer;
-  private AudioStreamPlayer3D weaponAudio;
 
-  // Lazy-resolved world managers
-  private ImpactManager impactManager;
+  // Lazy-resolved world manager (ImpactManager is in WeaponItem base)
   private BulletTracerManager bulletTracerManager;
 
   private float currentBloom = 0f;
+  /** Pellets per shot. 1 = single bullet (default). Set > 1 for shotguns — each
+   *  pellet samples the spread cone independently; audio/bloom/recoil fire once. */
+  @Export @RegisterProperty public int pelletCount = 1;
+
   private boolean isWeaponFired = false;
   private StanceName currentStance = StanceName.UPRIGHT;
 
@@ -45,18 +44,18 @@ public class FirearmItem extends WeaponItem {
   private static final float JUMP_SPREAD_MULT   = 2.0f;
 
   /**
-   * Called by WeaponController after weapon discovery or pickup.
-   * Provides all character-level references that cannot be resolved from inside the
-   * weapon sub-scene. Pass null for all arguments to clear refs when returning to a pickup.
+   * Discovers weapon-local VFX nodes from the weapon scene. Called once on _ready();
+   * VFX live under Muzzle/MuzzleVFX and never change regardless of equip state.
    */
-  public void setup(CharacterBody3D character, RayCast3D aimRay, CameraController cam,
-                    BoneAttachment3D neckAttachment, AudioStreamPlayer3D audio) {
-    this.owningCharacter = character;
-    this.aimRay3D = aimRay;
-    this.cameraController = cam;
-    this.muzzleFlashFx = neckAttachment != null ? (GPUParticles3D) neckAttachment.getNode("MuzzleFlash") : null;
-    this.muzzleFlashAnimPlayer = neckAttachment != null ? (AnimationPlayer) neckAttachment.getNode("AnimationPlayer") : null;
-    this.weaponAudio = audio;
+  @RegisterFunction
+  @Override
+  public void _ready() {
+    Node muzzle = getNodeOrNull("Muzzle");
+    Node vfx    = (muzzle != null) ? muzzle.getNodeOrNull("MuzzleVFX") : null;
+    if (vfx != null) {
+      muzzleFlashFx         = (GPUParticles3D)  vfx.getNodeOrNull("MuzzleFlash");
+      muzzleFlashAnimPlayer = (AnimationPlayer) vfx.getNodeOrNull("AnimationPlayer");
+    }
   }
 
   @RegisterFunction
@@ -77,7 +76,7 @@ public class FirearmItem extends WeaponItem {
     triggerMuzzleFlash();
     applyRecoil();
     currentBloom = Math.min(currentBloom + bloomPerShot, bloomMax);
-    performHitscan();
+    for (int i = 0; i < pelletCount; i++) performHitscan();
   }
 
   @Override
@@ -126,27 +125,28 @@ public class FirearmItem extends WeaponItem {
 
   private void triggerMuzzleFlash() {
     if (muzzleFlashFx == null) return;
+    // VFX nodes are children of the weapon's Muzzle marker — position is automatic.
     muzzleFlashFx.setSpeedScale(fireRate);
-    muzzleFlashFx.setGlobalPosition(weaponMuzzle().getGlobalPosition());
     muzzleFlashAnimPlayer.setSpeedScale((float) GD.clamp(fireRate, 5, 10));
     muzzleFlashAnimPlayer.play("MuzzleFlash");
   }
 
   private void applyRecoil() {
-    if (cameraController == null) return;
+    if (!(owningCharacter instanceof Character c)) return;
     float horizRecoil = (float) GD.randfRange(-recoil * 0.3f, recoil * 0.3f);
-    cameraController.applyRecoil(recoil, horizRecoil);
+    c.applyRecoil(recoil, horizRecoil);
   }
 
   private void performHitscan() {
-    if (aimRay3D == null) return;
+    RayCast3D ray = getEffectiveAimRay();
+    if (ray == null) return;
 
     // Player: apply angular spread + force update. Enemy: snapAimRay already
     // positioned the ray (with scatter baked in) — rotating it again would override that.
     boolean applySpread = owningCharacter instanceof Character c && c.useWeaponSpread;
     Vector3 savedRot = null;
     if (applySpread && spread > 0f) {
-      savedRot = aimRay3D.getRotationDegrees();
+      savedRot = ray.getRotationDegrees();
       float halfSpread = getCurrentSpreadDeg() * 0.5f;
       // Circular cone: pick a random angle and a sqrt-distributed radius so
       // shots fill the disk uniformly (no diagonal bulge from a square pattern).
@@ -154,49 +154,45 @@ public class FirearmItem extends WeaponItem {
       double coneRadius = Math.sqrt(GD.randf()) * halfSpread;
       float pitchOff = (float)(Math.cos(coneAngle) * coneRadius);
       float yawOff   = (float)(Math.sin(coneAngle) * coneRadius);
-      aimRay3D.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
-      aimRay3D.forceRaycastUpdate();
+      ray.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
+      ray.forceRaycastUpdate();
     }
 
-    if (aimRay3D.isColliding() &&
-        aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin()).length() > 0.1) {
-      Object collider = aimRay3D.getCollider();
+    if (ray.isColliding() &&
+        ray.getCollisionPoint().minus(ray.getGlobalTransform().getOrigin()).length() > 0.1) {
+      Object collider = ray.getCollider();
       Node hitNode = (collider instanceof Node n) ? n : null;
-      ImpactManager im = getImpactManager();
+      var im = getImpactManager();
       if (im != null) {
-        HitInfo info = new HitInfo(hitNode, aimRay3D.getCollisionPoint(), aimRay3D.getCollisionNormal());
-        String attackerName;
-        String attackerFaction;
-        if (owningCharacter instanceof Character c && c.characterInfo != null) {
-          attackerName    = c.characterInfo.displayName;
-          attackerFaction = c.characterInfo.faction;
-        } else {
-          attackerName    = owningCharacter != null ? owningCharacter.getName().toString() : "";
-          attackerFaction = "";
-        }
-        im.processHit(info, damage, getDisplayName(), weaponIcon, attackerName, attackerFaction);
+        im.processHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()),
+                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction());
       }
     }
 
     if (savedRot != null) {
-      aimRay3D.setRotationDegrees(savedRot);
+      ray.setRotationDegrees(savedRot);
     }
 
-    spawnBulletTracer();
+    spawnBulletTracer(ray);
   }
 
-  private void spawnBulletTracer() {
+  private void spawnBulletTracer(RayCast3D ray) {
     Vector3 muzzlePos = weaponMuzzle().getGlobalPosition();
-    Vector3 tracerEnd;
-    if (aimRay3D.isColliding()) {
-      tracerEnd = aimRay3D.getCollisionPoint();
-    } else {
-      Vector3 rayDir = aimRay3D.toGlobal(aimRay3D.getTargetPosition())
-          .minus(aimRay3D.getGlobalPosition()).normalized();
-      tracerEnd = muzzlePos.plus(rayDir.times(200f));
-    }
+    Vector3 rayOrigin = ray.getGlobalPosition();
+    Vector3 rayDir    = ray.toGlobal(ray.getTargetPosition()).minus(rayOrigin).normalized();
+    Vector3 tracerEnd = ray.isColliding() ? ray.getCollisionPoint()
+                                          : rayOrigin.plus(rayDir.times(200f));
     BulletTracerManager tm = getBulletTracerManager();
     if (tm != null) tm.spawnTracer(muzzlePos, tracerEnd);
+  }
+
+  /**
+   * Every weapon belongs to a WeaponController (character or vehicle) that owns the
+   * authoritative AimRay. Reading it live means vehicle overrides, weapon switches,
+   * and enter/exit transitions are all automatically transparent.
+   */
+  private RayCast3D getEffectiveAimRay() {
+    return weaponController != null ? weaponController.getAimRay() : null;
   }
 
   private float stanceMultiplier(CharacterBody3D character) {
@@ -210,13 +206,6 @@ public class FirearmItem extends WeaponItem {
 
   private Marker3D weaponMuzzle() {
     return (Marker3D) getNode("Muzzle");
-  }
-
-  private ImpactManager getImpactManager() {
-    if (impactManager != null) return impactManager;
-    Node found = getTree().getFirstNodeInGroup("impact_manager");
-    if (found instanceof ImpactManager im) impactManager = im;
-    return impactManager;
   }
 
   private BulletTracerManager getBulletTracerManager() {

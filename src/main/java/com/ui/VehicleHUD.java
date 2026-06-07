@@ -53,9 +53,12 @@ public class VehicleHUD extends Control {
             var speed = -vehicle.getGlobalBasis().getZ().dot(vehicle.getLinearVelocity());
 
             // Car motor
-            var speedRatio = speed / vehicle.maxSpeed;
-            var accelerationRatio = vehicle.accelerationCurve.sampleBaked((float) speedRatio);
-            var accelerationForce = accelerationRatio * vehicle.acceleration;
+            var cfg = vehicle.getConfig();
+            var speedRatio = speed / cfg.maxSpeed;
+            var accelerationRatio = cfg.accelerationCurve != null
+                    ? cfg.accelerationCurve.sampleBaked((float) speedRatio)
+                    : Math.max(0.0, 1.0 - speedRatio);
+            var accelerationForce = accelerationRatio * cfg.acceleration;
 
             speedLabel.setText(String.format("Speed: %4.1f m/s | %4.1f km/h | %4.1f mph\nMotoRatio: %.0f\nAccelForce: %.0f", speed, speed*3.6, speed*2.237, speedRatio * 100, accelerationForce));
 

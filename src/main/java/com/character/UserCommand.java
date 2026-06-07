@@ -33,6 +33,7 @@ public class UserCommand {
     // ── State requests ────────────────────────────────────────────────────────
     public StanceName desiredStance;
     public int        desiredWeapon;
+    public boolean    wantUnequip;
 
     // ── Aim ───────────────────────────────────────────────────────────────────
     /**
@@ -82,6 +83,7 @@ public class UserCommand {
         roll              = false;
         desiredStance     = null;
         desiredWeapon     = -1;
+        wantUnequip       = false;
         aimTargetPosition = null;
         tick              = 0;
         sequenceNumber    = 0;
@@ -110,6 +112,7 @@ public class UserCommand {
         c.roll            = roll;
         c.desiredStance   = desiredStance;
         c.desiredWeapon   = desiredWeapon;
+        c.wantUnequip     = wantUnequip;
         c.aimTargetPosition = aimTargetPosition != null
                 ? new Vector3(aimTargetPosition.getX(),
                               aimTargetPosition.getY(),

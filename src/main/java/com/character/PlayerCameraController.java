@@ -8,7 +8,7 @@ import godot.api.InputEventMouseMotion;
 import godot.core.Vector2;
 
 @RegisterClass(className = "PlayerCameraController")
-public class PlayerCameraController extends CameraController {
+public class PlayerCameraController extends TPSCameraController {
 
   // Accumulated raw pixel deltas from all mouse-motion events since last physics step.
   // Using _input + getRelative() (the same pattern as VehicleCameraController) captures
@@ -22,13 +22,12 @@ public class PlayerCameraController extends CameraController {
   public void _ready() {
     super._ready();
     Input.setMouseMode(Input.MouseMode.CAPTURED);
-    camera.makeCurrent();
+    if (activeCamera != null) activeCamera.makeCurrent();
   }
 
   @RegisterFunction
   @Override
   public void _input(InputEvent event) {
-    if (!camera.isCurrent()) return;
     if (event instanceof InputEventMouseMotion mm) {
       pendingYaw   -= mm.getRelative().getX() * yawSensitivity;
       pendingPitch += mm.getRelative().getY() * pitchSensitivity;
@@ -37,13 +36,16 @@ public class PlayerCameraController extends CameraController {
 
   @Override
   protected Vector2 gatherLookInput(double delta) {
-    if (Input.isActionJustPressed("shoulder", false)) {
+    boolean isFps = player instanceof Character c && c.isFpsMode;
+
+    if (Input.isActionJustPressed("shoulder", false) && !isFps) {
       changeShoulderDirection();
     }
 
-    // Consume the accumulated raw pixel deltas and reset for next frame.
-    // No delta multiplication — getRelative() is already in pixels (not px/s),
-    // matching how VehicleCameraController handles mouse aim.
+    if (Input.isActionJustPressed("view", false)) {
+      if (player instanceof Character c) c.setCameraMode(!c.isFpsMode);
+    }
+
     double dy = pendingYaw;
     double dp = pendingPitch;
     pendingYaw   = 0;

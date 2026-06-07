@@ -78,7 +78,7 @@ public class ParticleManager extends Node {
      */
     public void spawn(SurfaceType type, Vector3 worldPosition) {
         ObjectPool<GPUParticles3D> pool = resolve(type);
-        if (pool == null) return;
+        if (pool == null || pool.available() == 0) return;
         GPUParticles3D p = pool.acquire();
         p.setGlobalPosition(worldPosition);
         p.setEmitting(true);

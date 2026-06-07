@@ -9,7 +9,7 @@ import godot.core.Vector3;
 import godot.global.GD;
 
 @RegisterClass(className = "AICameraController")
-public class AICameraController extends CameraController {
+public class AICameraController extends TPSCameraController {
 
   // World-space aim target; null = fall back to body-facing direction.
   private Vector3 aimTarget = null;
@@ -28,7 +28,7 @@ public class AICameraController extends CameraController {
   @Override
   public void _ready() {
     super._ready();
-    camera.clearCurrent(false);
+    if (activeCamera != null) activeCamera.clearCurrent(false);
   }
 
   public void setAimTarget(Vector3 worldTarget) { this.aimTarget = worldTarget; }
@@ -52,11 +52,11 @@ public class AICameraController extends CameraController {
       double  dz    = aimTarget.getZ() - myPos.getZ();
       double  hDist = Math.sqrt(dx * dx + dz * dz);
 
-      double targetYawDeg   = Math.toDegrees(Math.atan2(dx, dz));
+      double targetYawDeg   = Math.toDegrees(Math.atan2(-dx, -dz));
       double targetPitchDeg = (hDist > 0.01) ? -Math.toDegrees(Math.atan2(dy, hDist)) : 0.0;
 
-      double deltaYaw   = GD.wrapf(targetYawDeg - yaw,  -180.0, 180.0);
-      double deltaPitch = targetPitchDeg - pitch;
+      double deltaYaw   = GD.wrapf(targetYawDeg - controlRotation.yaw,  -180.0, 180.0);
+      double deltaPitch = targetPitchDeg - controlRotation.pitch;
 
       // Clamp rotation speed so the camera tracks at a finite rate rather than snapping.
       if (aimTrackingDegreesPerSec > 0f) {
@@ -71,7 +71,7 @@ public class AICameraController extends CameraController {
     // Default: track character body facing, pitch stays level.
     double characterYawDeg = Math.toDegrees(player.getRotation().getY());
     double targetYaw       = -characterYawDeg;
-    double deltaYaw        = GD.wrapf(targetYaw - yaw, -180.0, 180.0);
+    double deltaYaw        = GD.wrapf(targetYaw - controlRotation.yaw, -180.0, 180.0);
     return new Vector2((float) deltaYaw, 0f);
   }
 }
