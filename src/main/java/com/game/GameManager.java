@@ -1,6 +1,7 @@
 package com.game;
 
 import com.character.CharacterController;
+import com.character.CharacterInfo;
 import com.character.Player;
 import com.character.PlayerController;
 import godot.annotation.RegisterClass;
@@ -10,6 +11,9 @@ import godot.api.Node;
 import godot.core.Callable;
 import godot.core.StringNames;
 import godot.global.GD;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Central game state machine — registered as an AutoLoad singleton named "GameManager".
@@ -36,6 +40,14 @@ public class GameManager extends Node {
 
     private GameState currentState = GameState.PLAYING;
 
+    /**
+     * characterIds of every live, human-controlled (Player) character. GAME_OVER
+     * fires only once this set empties — generalises the old "the player died"
+     * single-character rule to co-op, where multiple Players can be present and
+     * the session must outlive any individual one of them.
+     */
+    private final Set<String> alivePlayerCharacterIds = new HashSet<>();
+
     @RegisterFunction
     @Override
     public void _ready() {
@@ -44,17 +56,33 @@ public class GameManager extends Node {
         Node eventBusNode = getNodeOrNull("/root/EventBus");
         if (eventBusNode instanceof EventBus) {
             EventBus bus = (EventBus) eventBusNode;
-            bus.playerDied.connectUnsafe(Callable.createUnsafe(this, StringNames.toGodotName("onPlayerDied")), godot.api.Object.ConnectFlags.DEFAULT);
+            bus.characterSpawned.connectUnsafe(Callable.createUnsafe(this, StringNames.toGodotName("onCharacterSpawned")), godot.api.Object.ConnectFlags.DEFAULT);
+            bus.characterDied.connectUnsafe(Callable.createUnsafe(this, StringNames.toGodotName("onCharacterDied")), godot.api.Object.ConnectFlags.DEFAULT);
+            // Note: playerDied is intentionally NOT connected here — MenuManager owns
+            // its own subscription for the pause + game-over UI. GAME_OVER state is
+            // now driven by the characterSpawned/characterDied "all dead" tracking below.
         }
     }
 
     // ── State transitions ─────────────────────────────────────────────────────
 
+    /** Track every spawned human-controlled (Player) character for the "all dead" check. */
     @RegisterFunction
-    public void onPlayerDied() {
-        if (currentState != GameState.PLAYING) return;
-        transitionTo(GameState.GAME_OVER);
-        // MenuManager.onPlayerDied() (same signal) owns the pause + game-over UI.
+    public void onCharacterSpawned(Node node, CharacterInfo info) {
+        if (node instanceof Player && info != null && !info.characterId.isEmpty()) {
+            alivePlayerCharacterIds.add(info.characterId);
+        }
+    }
+
+    /** GAME_OVER fires once every tracked Player character has died — not on the first. */
+    @RegisterFunction
+    public void onCharacterDied(CharacterInfo info) {
+        if (info == null) return;
+        if (alivePlayerCharacterIds.remove(info.characterId) && alivePlayerCharacterIds.isEmpty()) {
+            if (currentState != GameState.PLAYING) return;
+            transitionTo(GameState.GAME_OVER);
+            // MenuManager.onPlayerDied() (playerDied signal) owns the pause + game-over UI.
+        }
     }
 
     public void pauseGame() {

@@ -33,7 +33,7 @@ public class ChaseState implements AIState {
 
         boolean hasLoS = body.hasLineOfSight(delta);
 
-        if (dist <= body.getBehaviorConfig().attackRange && hasLoS) {
+        if (dist <= body.getEffectiveAttackRange() && hasLoS) {
             if (!body.hasAnyAmmo()) return RefillAmmoState.INSTANCE;
             return AttackState.INSTANCE;
         }

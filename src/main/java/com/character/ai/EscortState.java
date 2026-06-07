@@ -57,7 +57,7 @@ public class EscortState implements AIState {
                 float dist = (float) body.getGlobalPosition()
                         .distanceTo(hostile.getGlobalPosition());
                 ctrl.clearEscortTargetAttacked();
-                if (dist <= body.getBehaviorConfig().attackRange && body.hasAnyAmmo())
+                if (dist <= body.getEffectiveAttackRange() && body.hasAnyAmmo())
                     return AttackState.INSTANCE;
                 return ChaseState.INSTANCE;
             }

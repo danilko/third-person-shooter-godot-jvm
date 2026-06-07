@@ -13,6 +13,14 @@ public class AttackState implements AIState {
     public static final AttackState INSTANCE = new AttackState();
     private AttackState() {}
 
+    /**
+     * Melee range is only ~1-2 m, so the lateral strafe steps below would otherwise
+     * carry the AI back out of range almost every frame (chase ↔ attack flicker, no
+     * hits ever land). Breaking off to chase only once well outside the swing range
+     * absorbs that jitter; closing back in (rather than strafing) keeps it inside.
+     */
+    private static final float MELEE_CHASE_HYSTERESIS = 1.5f;
+
     @Override
     public void enter(AICharacter body, AIController ctrl) {
         ctrl.resetAttackTimer();
@@ -46,7 +54,10 @@ public class AttackState implements AIState {
         float hDist = (float) Math.sqrt(dx * dx + dz * dz);
         float dist  = (float) myPos.distanceTo(targetPos);
 
-        if (dist > body.getBehaviorConfig().attackRange) return ChaseState.INSTANCE;
+        boolean isMelee = body.isMeleeEngagement();
+        float attackRange = body.getEffectiveAttackRange();
+        float chaseBreakRange = isMelee ? attackRange * MELEE_CHASE_HYSTERESIS : attackRange;
+        if (dist > chaseBreakRange) return ChaseState.INSTANCE;
 
         cmd.wantCombat = true;
         ctrl.advanceReactionTimer(delta);
@@ -89,20 +100,30 @@ public class AttackState implements AIState {
         // ── Movement ──────────────────────────────────────────────────────────
         // Still phase: IDLE (speed = 0) so the AI fully stops; direction stays (0,0,0)
         // and the zero-direction emission in Character.applyInput clears MovementController.
-        // Moving phase: WALK with a valid strafe or reposition direction.
+        // Moving phase: WALK with a valid strafe/reposition/closing direction, or IDLE
+        // to hold a melee swing position (lateral strafing has no place at arm's reach).
+        boolean closeForMelee = isMelee && hDist > 0.01f && dist > attackRange * 0.85f;
         if (ctrl.isStillPhase()) {
+            cmd.movementType = MovementType.IDLE;
+        } else if (pitchOut && hDist > 0.01f) {
+            cmd.movementType = MovementType.WALK;
+            cmd.movementDirection.setX(-dx / hDist);
+            cmd.movementDirection.setZ(-dz / hDist);
+        } else if (closeForMelee) {
+            // Walk straight at the target — at melee distances it's the lateral strafe
+            // steps below that keep carrying the AI back out of its own swing range.
+            cmd.movementType = MovementType.WALK;
+            cmd.movementDirection.setX(dx / hDist);
+            cmd.movementDirection.setZ(dz / hDist);
+        } else if (isMelee) {
+            // Close enough to swing — hold position and let the attacks land.
             cmd.movementType = MovementType.IDLE;
         } else {
             cmd.movementType = MovementType.WALK;
-            if (pitchOut && hDist > 0.01f) {
-                cmd.movementDirection.setX(-dx / hDist);
-                cmd.movementDirection.setZ(-dz / hDist);
-            } else {
-                if (ctrl.needsStrafeUpdate()) ctrl.refreshStrafe();
-                ctrl.tickStrafeTimer(delta);
-                cmd.movementDirection.setX(ctrl.getStrafeX());
-                cmd.movementDirection.setZ(ctrl.getStrafeZ());
-            }
+            if (ctrl.needsStrafeUpdate()) ctrl.refreshStrafe();
+            ctrl.tickStrafeTimer(delta);
+            cmd.movementDirection.setX(ctrl.getStrafeX());
+            cmd.movementDirection.setZ(ctrl.getStrafeZ());
         }
 
         // ── Aim initialisation ────────────────────────────────────────────────

@@ -68,10 +68,21 @@ public class AICameraController extends TPSCameraController {
       return new Vector2((float) deltaYaw, (float) deltaPitch);
     }
 
-    // Default: track character body facing, pitch stays level.
+    // Default: track character body facing, pitch returns level.
+    // Both deltas are clamped exactly like the aim-target branch above — otherwise
+    // losing/clearing the aim target (combat → patrol, target killed, LoS lost)
+    // makes the camera snap instantly to the body's facing/level pitch in one frame.
     double characterYawDeg = Math.toDegrees(player.getRotation().getY());
     double targetYaw       = -characterYawDeg;
     double deltaYaw        = GD.wrapf(targetYaw - controlRotation.yaw, -180.0, 180.0);
-    return new Vector2((float) deltaYaw, 0f);
+    double deltaPitch      = -controlRotation.pitch;
+
+    if (aimTrackingDegreesPerSec > 0f) {
+      double cap = aimTrackingDegreesPerSec * delta;
+      deltaYaw   = GD.clamp(deltaYaw,   -cap, cap);
+      deltaPitch = GD.clamp(deltaPitch, -cap, cap);
+    }
+
+    return new Vector2((float) deltaYaw, (float) deltaPitch);
   }
 }
