@@ -1,5 +1,6 @@
 package com.character;
 
+import com.game.NetworkManager;
 import godot.annotation.RegisterClass;
 import godot.api.Node;
 
@@ -12,9 +13,12 @@ import godot.api.Node;
  * whether the source is a human, AI, or network peer.
  *
  * Single-player: isAuthority() always returns true.
- * Network (Phase 4): isAuthority() delegates to Godot's multiplayer authority
- *   system — true on the owning client (PlayerController) or server (AIController).
- *   Non-authority peers receive state via MultiplayerSynchronizer instead.
+ * Network: isAuthority() resolves CharacterInfo.ownerPeerId against
+ *   NetworkManager's localPeerId — true on the owning client (PlayerController)
+ *   or server (AIController). Non-authority peers run NetworkController instead —
+ *   it buffers and interpolates the MSG_SNAPSHOT frames NetworkManager decodes
+ *   off the wire, driving the body's transform/combat/stance/health/weapon-slot
+ *   directly (gatherInput/applyInput/physics never run for them).
  *
  * Hot-swap (Phase 5): call setTarget() before reparenting to a new body so
  * gatherInput() immediately generates the right command type.
@@ -31,12 +35,23 @@ public class Controller extends Node {
 
     /**
      * Whether this peer may run the simulation for the owned entity.
-     * Defaults to isMultiplayerAuthority() on the owner node, which is always
-     * true in single-player (every node is its own authority).
+     * Resolves CharacterInfo.ownerPeerId against NetworkManager.localPeerId —
+     * always true in single-player (no peer assigned, or no CharacterInfo to check).
      */
     public boolean isAuthority() {
-        Node owner = getOwner();
-        return owner == null || owner.isMultiplayerAuthority();
+        // getParent(), not getOwner(): owner is Godot's scene-serialization metadata,
+        // populated only for nodes that ship inside a .tscn — every controller
+        // attachController() ever attaches at runtime (NetworkController,
+        // ServerProxyController, bot-fill CharacterController) is a plain addChild()
+        // with no setOwner(), so getOwner() is null for them and this check would
+        // silently bypass to `true`. The driven Controllable is always the
+        // controller's direct parent (Character._ready()'s own getChildren() scan
+        // relies on exactly that), for both scene-defined and dynamic controllers.
+        Node owner = getParent();
+        if (!(owner instanceof Controllable c) || c.getCharacterInfo() == null) return true;
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (!(netNode instanceof NetworkManager net) || !net.isNetworked()) return true;
+        return net.isAuthorityFor(c.getCharacterInfo());
     }
 
     /**

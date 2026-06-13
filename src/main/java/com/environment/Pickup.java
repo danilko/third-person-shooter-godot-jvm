@@ -1,7 +1,9 @@
 package com.environment;
 
+import com.character.Controllable;
 import com.character.Health;
 import com.game.EventBus;
+import com.game.NetworkManager;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -61,11 +63,41 @@ public class Pickup extends RigidBody3D {
    */
   @RegisterProperty @Export public float pickupCooldownAfterDrop = 0.5f;
 
+  /**
+   * Stable replication identity, mirroring CharacterInfo.characterId. Scene-placed
+   * pickups derive it from their scene path in _ready() — identical on every peer
+   * because all peers load the same World.tscn. Runtime-spawned pickups (drops) get a
+   * UUID assigned by the originating peer's drop event before any peer references it.
+   */
+  @RegisterProperty @Export public String pickupId = "";
+
+  /** Group every pickup joins in _ready() — replication handlers resolve pickupId through it. */
+  public static final String PICKUPS_GROUP = "pickups";
+
   private final List<Node3D> overlappingBodies = new ArrayList<>();
   /** True while held in a character's inventory; blocks body_entered re-triggering. */
   protected boolean equipped = false;
   private float pickupCooldown = 0f;
   private EventBus eventBus;
+  /**
+   * Networked host only: a collector queued in a body_entered signal, resolved in _process
+   * (a safe, non-signal context) so the equip is SYNCHRONOUS and the host broadcasts the
+   * resolved outcome rather than a pre-equip guess. See {@link #collectBy}.
+   */
+  private Node pendingCollector;
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  /** Subclass overrides MUST call super._ready() or the pickup never registers for replication. */
+  @RegisterFunction
+  @Override
+  public void _ready() {
+    addToGroup(new StringName(PICKUPS_GROUP));
+    // NodePath.toString() returns "NodePath(<subnames>)" — empty for plain paths, so every
+    // pickup would share the literal id "NodePath()". getPath() (the path property) is the
+    // actual path string, identical on every peer for world-scene nodes.
+    if (pickupId.isEmpty()) pickupId = getPath().getPath();
+  }
 
   // ── Tick ─────────────────────────────────────────────────────────────────
 
@@ -73,6 +105,13 @@ public class Pickup extends RigidBody3D {
   @Override
   public void _process(double delta) {
     if (pickupCooldown > 0f) pickupCooldown -= (float) delta;
+
+    // Networked-host collect, resolved out of the body_entered signal (see collectBy).
+    if (pendingCollector != null) {
+      Node collector = pendingCollector;
+      pendingCollector = null;
+      resolveHostCollect(collector);
+    }
 
     if (requireInteract && !overlappingBodies.isEmpty()
         && Input.INSTANCE.isActionJustPressed("interact", false)) {
@@ -91,13 +130,12 @@ public class Pickup extends RigidBody3D {
 
   @RegisterFunction
   public void onBodyEntered(Node3D body) {
-    if (equipped || pickupCooldown > 0f) return;
+    if (equipped || pendingCollector != null || pickupCooldown > 0f) return;
     Node character = resolveCharacter(body);
-    if (character == null || !isAlive(character)) return;
+    if (character == null || !isAlive(character) || !isLocallyOwned(character)) return;
 
     if (shouldAutoPickup(character)) {
-      onCharacterEntered(character);
-      applyPostPickup();
+      collectBy(character);
     } else {
       overlappingBodies.add(body);
       emitInteractPrompt(true);
@@ -179,14 +217,113 @@ public class Pickup extends RigidBody3D {
   private void triggerInteract() {
     for (Node3D body : new ArrayList<>(overlappingBodies)) {
       Node character = resolveCharacter(body);
-      if (character != null && isAlive(character)) {
-        onCharacterEntered(character);
+      if (character != null && isAlive(character) && isLocallyOwned(character)) {
         overlappingBodies.clear();
         emitInteractPrompt(false);
-        applyPostPickup();
+        collectBy(character);
         return;
       }
     }
+  }
+
+  /**
+   * Single collection entry point — routes by network role (host-arbitrated pickups):
+   *   single-player / host-owned body → collect locally, then (if hosting) broadcast
+   *     MSG_PICKUP_TAKEN so every client mirrors the collect on its own copy;
+   *   client-owned body → send MSG_PICKUP_REQUEST only; the host validates and the
+   *     TAKEN echo performs the actual collect here (see applyReplicatedPickup).
+   * The owner-gate in onBodyEntered/triggerInteract guarantees the character passed
+   * here is locally owned, so "am I the host" fully determines the branch.
+   */
+  private void collectBy(Node character) {
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    if (netNode instanceof NetworkManager net && net.isNetworked()) {
+      String characterId = resolveCharacterId(character);
+      if (characterId.isEmpty()) return;   // unreplicatable collector — never collect silently in MP
+      if (!net.isServer()) {
+        net.requestPickup(pickupId, characterId);
+        return;
+      }
+      // Networked host: defer to _process so the equip resolves SYNCHRONOUSLY (out of this
+      // body_entered physics signal, where reparent is forbidden) and the broadcast carries
+      // the post-merge OUTCOME. Broadcasting before the equip could announce a pickup the
+      // slot-displacement guard then bounced back to the world — every client would delete an
+      // item the host still has. pendingCollector blocks re-trigger until _process resolves it.
+      pendingCollector = character;
+      return;
+    }
+    // Single-player: resolve inline (no broadcast, no cross-peer convergence concern).
+    onCharacterEntered(character);
+    applyPostPickup();
+  }
+
+  /**
+   * Networked host: resolve a queued collect synchronously, then broadcast MSG_PICKUP_TAKEN
+   * only for what was actually consumed (equipped or merged). Mirrors GameManager's grant path
+   * (applyReplicatedPickup → broadcast-if-taken) for the host's OWN collects, so a cluster of
+   * same-type pickups merges deterministically and clients are never told an item is taken that
+   * the host bounced back to the world. Runs in _process — safe context for reparent.
+   */
+  private void resolveHostCollect(Node character) {
+    if (character == null || !character.isInsideTree()) return;
+    // Capture state BEFORE collecting — a throwable merge consumes this node's magazine.
+    int magazine = getReplicatedMagazine();
+    int reserve = getReplicatedReserve();
+    applyReplicatedPickup(character, magazine, reserve);   // synchronous equip + applyPostPickup
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    if (isTaken() && netNode instanceof NetworkManager net && net.isNetworked() && net.isServer()) {
+      String characterId = resolveCharacterId(character);
+      if (!characterId.isEmpty()) net.broadcastPickupTaken(pickupId, characterId, magazine, reserve);
+    }
+  }
+
+  /**
+   * Executes a host-confirmed MSG_PICKUP_TAKEN on this peer — the same collect path a
+   * local pickup takes, with the item state stamped from the event first so every peer's
+   * copy of the item is identical. Idempotent: a duplicate event on an already-taken
+   * item is a no-op (equipped is set by onCharacterEntered/WeaponItem before any defer).
+   */
+  public void applyReplicatedPickup(Node character, int magazine, int reserve) {
+    if (equipped) return;
+    stampReplicatedAmmo(magazine, reserve);
+    // Resolve the equip SYNCHRONOUSLY (this runs in NetworkManager's _process packet drain,
+    // not a physics signal, so reparent is legal). Each granted/echoed pickup then fully
+    // lands before the next is processed, so a cluster of same-type items merges
+    // deterministically — identical on host and every client. See WeaponController.synchronousEquip.
+    Node wcNode = character.getNodeOrNull(WEAPON_CONTROLLER_PATH);
+    com.character.WeaponController wc =
+        wcNode instanceof com.character.WeaponController w ? w : null;
+    if (wc != null) wc.setSynchronousEquip(true);
+    try {
+      onCharacterEntered(character);
+    } finally {
+      if (wc != null) {
+        wc.setSynchronousEquip(false);
+        // Refresh the owner's HUD to the post-collect active-weapon count — a throwable
+        // merge that landed on the active slot must update the displayed count immediately,
+        // not stay stale until the next manual weapon switch.
+        wc.refreshActiveAmmoDisplay();
+      }
+    }
+    applyPostPickup();
+  }
+
+  /** True once collected into an inventory — the host's ALREADY_TAKEN arbitration check. */
+  public boolean isTaken() { return equipped; }
+
+  // Replication hooks — WeaponItem overrides to carry magazine/reserve; base pickups have no
+  // ammo. Getters are public so the host's grant path (GameManager.processPickupRequest) can
+  // sample the item state it puts on the wire.
+  public int getReplicatedMagazine() { return 0; }
+  public int getReplicatedReserve()  { return 0; }
+  protected void stampReplicatedAmmo(int magazine, int reserve) { }
+
+  /** The stable CharacterInfo.characterId of a collector, or "" when it has none. */
+  private String resolveCharacterId(Node character) {
+    if (character instanceof Controllable c && c.getCharacterInfo() != null) {
+      return c.getCharacterInfo().characterId;
+    }
+    return "";
   }
 
   private void applyPostPickup() {
@@ -198,6 +335,21 @@ public class Pickup extends RigidBody3D {
     Node healthNode = character.getNodeOrNull("Health");
     if (healthNode instanceof Health h) return !h.isDead();
     return true;
+  }
+
+  /**
+   * Only the peer that OWNS a character may process its pickup intent. Without this,
+   * a NetworkController puppet walking over a pickup would collect it into its local
+   * inventory — diverging inventories between peers (each peer's copy of the same
+   * character collecting different items). Single-player / non-networked: always true.
+   * Networked: resolves CharacterInfo.ownerPeerId against this peer's id; a body whose
+   * ownership can't be established is conservatively NOT collectable.
+   */
+  protected final boolean isLocallyOwned(Node character) {
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    if (!(netNode instanceof NetworkManager net) || !net.isNetworked()) return true;
+    if (!(character instanceof Controllable c) || c.getCharacterInfo() == null) return false;
+    return net.isAuthorityFor(c.getCharacterInfo());
   }
 
   private EventBus getEventBus() {

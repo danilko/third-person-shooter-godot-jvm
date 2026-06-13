@@ -46,6 +46,9 @@ public class RocketProjectile extends RigidBody3D implements Detonatable {
     public String    weaponDisplayName = "ATL-4";
     public Texture2D weaponIcon;
 
+    /** Cosmetic puppet-replay copy: VFX only, no damage (see WeaponController.playRemoteFireCue). */
+    public boolean cosmetic = false;
+
     private boolean detonated = false;
 
     // ── Physics ───────────────────────────────────────────────────────────────
@@ -76,9 +79,13 @@ public class RocketProjectile extends RigidBody3D implements Detonatable {
         detonated = true;
         Node m = getTree().getFirstNodeInGroup("explosion_manager");
         if (m instanceof ExplosionManager mgr) {
-            mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
-                                 explosionPushForce, attackerName, attackerFaction,
-                                 weaponDisplayName, weaponIcon, this);
+            if (cosmetic) {
+                mgr.spawnExplosion(getGlobalPosition());   // VFX only — damage is authority-side
+            } else {
+                mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
+                                     explosionPushForce, attackerName, attackerFaction,
+                                     weaponDisplayName, weaponIcon, this);
+            }
         }
         queueFree();
     }

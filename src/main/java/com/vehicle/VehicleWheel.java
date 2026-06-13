@@ -210,6 +210,48 @@ public class VehicleWheel extends RayCast3D {
         }
     }
 
+    /**
+     * Visual-only replay for replicated puppet vehicles (Round 11 N3) — no forces (puppets
+     * are frozen; the body transform comes from the interpolator), but every visible wheel
+     * behaviour mirrors the authority:
+     *
+     *   steer:      ease the wheel's Y rotation to the REPLICATED actual angle (not the
+     *               raw input — re-integrating an input rate would drift from the
+     *               authority's pose)
+     *   spin:       same mesh-spin math as applyWheelPhysics, from replicated speed
+     *   suspension: raycast still works on a frozen body — settle the mesh to the live
+     *               spring length so wheels hug the ground instead of floating at rest
+     *   skid marks: emit while the authority reports handbrake/slip and this wheel touches
+     */
+    public void applyPuppetVisuals(float delta, float steerAngle, float forwardSpeed, boolean skidding) {
+        if (wheelMesh == null || cfg == null) return;
+
+        if (isSteer) {
+            Vector3 rotation = getRotation();
+            float target = (float) GD.clamp(steerAngle, tireMaxTurnMinRad, tireMaxTurnMaxRad);
+            rotation.setY((float) GD.moveToward(rotation.getY(), target, cfg.tireMaxTurnSpeed * delta));
+            setRotation(rotation);
+        }
+
+        wheelMesh.rotateX((-forwardSpeed * delta) / cfg.wheelRadius);
+
+        forceRaycastUpdate();
+        if (isColliding()) {
+            double springLen = getGlobalPosition().distanceTo(getCollisionPoint()) - cfg.wheelRadius;
+            Vector3 wheelMeshPos = wheelMesh.getPosition();
+            wheelMeshPos.setY(GD.moveToward(wheelMeshPos.getY(), -springLen, 5 * delta));
+            wheelMesh.setPosition(wheelMeshPos);
+
+            if (skidMark != null) {
+                skidMark.setGlobalPosition(getCollisionPoint().plus(Vector3.Companion.getUP().times(0.01)));
+                skidMark.lookAt(skidMark.getGlobalPosition().plus(vehicle.getGlobalBasis().getZ()));
+                if (skidding != skidMark.isEmitting()) skidMark.setEmitting(skidding);
+            }
+        } else if (skidMark != null && skidMark.isEmitting()) {
+            skidMark.setEmitting(false);
+        }
+    }
+
     public void applyWheelSteering(float delta, float steering) {
         if (!isSteer) return;
         Vector3 rotation = getRotation();

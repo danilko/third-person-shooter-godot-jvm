@@ -123,7 +123,23 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     @Override
     public void useWeapon() {
         decrementMagazine();
-        spawnProjectile();
+        spawnProjectile(false);
+        playThrowAudio();
+    }
+
+    /**
+     * Puppet replay of a remote throw (Round 11 — WeaponController.playRemoteFireCue):
+     * throw audio + a COSMETIC projectile aimed at the replicated aim point, so every peer
+     * sees the grenade arc and explosion. No ammo decrement, no damage — both are
+     * authority-side (the thrower already spawned the real, damaging projectile).
+     */
+    @Override
+    public void playRemoteFireCue() {
+        playThrowAudio();
+        spawnProjectile(true);
+    }
+
+    private void playThrowAudio() {
         if (weaponAudio != null && fireAudio != null) {
             weaponAudio.stop();
             weaponAudio.setStream(fireAudio);
@@ -173,15 +189,15 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    private void spawnProjectile() {
-        if (projectileScene == null || weaponController == null || owningCharacter == null) return;
-        RayCast3D aimRay = weaponController.getAimRay();
-        if (aimRay == null) return;
+    /**
+     * Spawns the thrown projectile. {@code cosmetic} true is the puppet replay: aim comes from
+     * the replicated aim point (no aimRay on a puppet) and the projectile deals no damage.
+     */
+    private void spawnProjectile(boolean cosmetic) {
+        if (projectileScene == null || owningCharacter == null) return;
 
-        // Aim direction from ray start to far end
-        Vector3 rayOrigin = aimRay.getGlobalPosition();
-        Vector3 rayEnd    = aimRay.toGlobal(aimRay.getTargetPosition());
-        Vector3 aimDir    = rayEnd.minus(rayOrigin).normalized();
+        Vector3 aimDir = resolveAimDir(cosmetic);
+        if (aimDir == null) return;
 
         // Arc: rotate upward around the axis perpendicular to aim and world-up
         Vector3 right = aimDir.cross(Vector3.Companion.getUP()).normalized();
@@ -198,15 +214,37 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         // Inject attacker identity before the node enters the tree.
         // Explosion parameters are scene-configured inside the projectile scene itself.
         if (projectile instanceof T1Projectile gp) {
-            gp.attackerName      = resolveAttackerName();
-            gp.attackerFaction   = resolveAttackerFaction();
-            gp.weaponDisplayName = getDisplayName();
-            gp.weaponIcon        = weaponIcon;
+            gp.cosmetic = cosmetic;
+            if (!cosmetic) {
+                gp.attackerName      = resolveAttackerName();
+                gp.attackerFaction   = resolveAttackerFaction();
+                gp.weaponDisplayName = getDisplayName();
+                gp.weaponIcon        = weaponIcon;
+            }
         }
 
         getTree().getCurrentScene().addChild(projectile);
 
         if (projectile instanceof Node3D n3d) n3d.setGlobalPosition(spawnPos);
         if (projectile instanceof RigidBody3D rb) rb.setLinearVelocity(throwDir.times(throwSpeed));
+    }
+
+    /**
+     * Authority aim comes from the precise aimRay (crosshair); puppet aim from the replicated
+     * aim point (like FirearmItem.playRemoteFireCue), since a puppet has no active aimRay.
+     */
+    private Vector3 resolveAimDir(boolean cosmetic) {
+        if (cosmetic) {
+            if (!(owningCharacter instanceof Character c)) return null;
+            Vector3 from = owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.4f, 0f));
+            Vector3 dir = c.getAimTargetPosition().minus(from);
+            return dir.lengthSquared() < 1e-6f ? null : dir.normalized();
+        }
+        if (weaponController == null) return null;
+        RayCast3D aimRay = weaponController.getAimRay();
+        if (aimRay == null) return null;
+        Vector3 rayOrigin = aimRay.getGlobalPosition();
+        Vector3 rayEnd    = aimRay.toGlobal(aimRay.getTargetPosition());
+        return rayEnd.minus(rayOrigin).normalized();
     }
 }

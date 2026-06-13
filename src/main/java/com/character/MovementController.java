@@ -73,6 +73,21 @@ public class MovementController extends Node {
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || meshRoot == null) return;
+    // Non-authority bodies (NetworkController-driven remote peers/AI on a client) must
+    // be driven *only* by replicated MSG_SNAPSHOT data — Character._physicsProcess
+    // already early-returns for them (see its `!controller.isAuthority()` check), but
+    // this controller runs as an independent sibling Node with its own _physicsProcess
+    // and was never gated the same way. Left ungated, it called moveAndSlide() with a
+    // locally-derived (always-zero `direction`/stale `combat`/`camRotation`) velocity
+    // every physics tick — fighting applyReplicatedTransform's direct position writes
+    // — and continuously overwrote meshRoot's rotation toward its own locally-computed
+    // targetRotation, fighting applyReplicatedFacing's writes. That tug-of-war between
+    // local physics and replicated state is what produced "wrong position/direction"
+    // and the apparent multi-second catch-up lag (round 5 manual-test report).
+    if (player instanceof Character c) {
+      Controller ctrl = c.getController();
+      if (ctrl != null && !ctrl.isAuthority()) return;
+    }
 
     boolean wasOnFloor = player.isOnFloor();
 
@@ -123,8 +138,6 @@ public class MovementController extends Node {
       // During roll: always face movement direction, even in combat
       targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
     } else if (combat) {
-      // Face camera direction in combat; camRotation is updated every frame via set_cam_rotation
-      // signal for both player (PlayerCameraController) and AI (AICameraController).
       targetRotation = camRotation;
     } else {
       // Face movement direction (only when actually moving)
@@ -176,13 +189,9 @@ public class MovementController extends Node {
 
   @RegisterFunction
   public void onSetMovementDirection(Vector3 movementDirection) {
-    if (worldSpaceMovement) {
-      // Enemy/AI: direction is already world-space — use it directly
-      direction = movementDirection;
-    } else {
-      // Player: direction is camera-relative input space — rotate into world space
-      direction = movementDirection.rotated(Vector3.Companion.getUP(), camRotation + playerInitRotation);
-    }
+    // Direction is always world-space: AI provides it directly, PlayerController
+    // pre-rotates camera-relative WASD by the camera yaw before stamping the UserCommand.
+    direction = movementDirection;
   }
 
   @RegisterFunction

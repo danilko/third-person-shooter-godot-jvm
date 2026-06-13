@@ -70,6 +70,19 @@ public class ImpactManager extends Node {
         if (ctx.detonatable != null) ctx.detonatable.detonate();
     }
 
+    /**
+     * Cosmetic-only impact resolution — particles + decal, no damage/impulse/detonation. Used by a
+     * networked client to show its own predicted bullet impact (the shooter feels instant feedback)
+     * while the host owns the actual damage via the MSG_SHOT path (Round 8 — host-resolved bullets).
+     */
+    public void processVisualHit(HitInfo info) {
+        HitContext ctx = resolveHitContext(info.hitNode);
+        ParticleManager pm = getParticleManager();
+        if (pm != null) pm.spawn(ctx.surface, info.hitPoint);
+        DecalManager dm = getDecalManager();
+        if (dm != null && info.hitNormal != null) dm.spawn(info.hitPoint, info.hitNormal);
+    }
+
     // ── Hit context resolution ────────────────────────────────────────────────
 
     private static class HitContext {

@@ -144,7 +144,8 @@ public class Character extends CharacterBody3D implements Controllable {
     private boolean    preDriveCombat    = false;
     private Vector3    preDriveRotation  = Vector3.Companion.getZERO();
 
-    // ── Network-synced state (MultiplayerSynchronizer reads these) ────────────
+    // ── Combat/stance state (read by NetworkManager._physicsProcess for MSG_SNAPSHOT gather,
+    // applied on remote peers via applyReplicatedCombatAndStance — see NetworkController) ──
     @RegisterProperty
     @Export
     public boolean combat = false;
@@ -179,6 +180,10 @@ public class Character extends CharacterBody3D implements Controllable {
     // ── Ragdoll freeze state ──────────────────────────────────────────────────
     private double  ragdollFreezeCountdown = -1.0;
     private boolean ragdollFrozen          = false;
+    // Guards the death visuals (anim-tree off + ragdoll) so they run exactly once, whether the
+    // body died authoritatively (onDied) or via a replicated zero-health snapshot (applyReplicatedDeath).
+    // Protected: Player.applyReplicatedDeath keys its once-only playerDied emission off it.
+    protected boolean deathVisualsApplied  = false;
 
     // ── Stance cache — populated once in _ready() to avoid repeated NodePath traversals ──
     private final Map<StanceName, Stance> stanceCache = new EnumMap<>(StanceName.class);
@@ -227,6 +232,14 @@ public class Character extends CharacterBody3D implements Controllable {
         }
         if (activeCameraPath != null && !activeCameraPath.isEmpty() && hasNode(activeCameraPath)) {
             activeCamera = (Camera3D) getNode(activeCameraPath);
+            // Deferred: camera controllers' _ready() runs bottom-up — BEFORE this
+            // method assigns activeCamera (see TPSCameraController.setCameraFov's
+            // comment) — so any makeCurrent()/clearCurrent() ownership-gating done
+            // there sees a null activeCamera and is a silent no-op. Decide and act
+            // here instead, once activeCamera AND characterInfo are both resolved,
+            // deferred so every sibling _ready() (NetworkManager spawn wiring, etc.)
+            // has finished too — same pattern as emitCharacterSpawned below.
+            callDeferred(StringNames.toGodotName("activateCameraIfOwned"));
         }
 
         // ── Visuals instantiation (B2) ─────────────────────────────────────
@@ -390,13 +403,49 @@ public class Character extends CharacterBody3D implements Controllable {
 
     public boolean isCombat() { return combat; }
 
+    /** Current physics-tick counter — read by NetworkManager when gathering MSG_SNAPSHOT. */
+    public long getCurrentTick() { return currentTick; }
+
+    /** Current stance ordinal — read by NetworkManager when gathering MSG_SNAPSHOT (mirrors the exported `stanceOrdinal` field). */
+    public int getStanceOrdinal() { return stanceOrdinal; }
+
+    /**
+     * Visual facing — read by NetworkManager when gathering MSG_SNAPSHOT. Facing lives
+     * on MovementController.meshRoot's Y rotation (radians), NOT on this body's own
+     * transform: MovementController rotates the mesh independently of movement velocity
+     * (e.g. strafing keeps the mesh facing the aim target while the body slides
+     * sideways), so the body's rotation alone is never enough to reproduce "which way
+     * this character is visually facing" on a remote peer (Round 5 "wrong direction" bug).
+     */
+    public float getFacingYaw() {
+        Node mcNode = getNodeOrNull("MovementController");
+        if (mcNode instanceof MovementController mc && mc.meshRoot != null) {
+            return (float) (mc.meshRoot.getRotation().getY() + getRotation().getY());
+        }
+        return 0f;
+    }
+
+    /**
+     * World-space spine-IK look point — read by NetworkManager when gathering MSG_SNAPSHOT so a
+     * remote puppet can reproduce where this character is looking (drives its aimTarget node, which
+     * the LookAtModifier3D spine tracks). Falls back to the body origin if no aimTarget marker exists.
+     */
+    public Vector3 getAimTargetPosition() {
+        return aimTarget != null ? aimTarget.getGlobalPosition() : getGlobalPosition();
+    }
+
+    /** Current movement type ordinal (IDLE/WALK/SPRINT) — replicated in the snapshot flag bits so a puppet's locomotion blend matches exactly. */
+    public int getMovementTypeOrdinal() {
+        return currentMovementType != null ? currentMovementType.ordinal() : 0;
+    }
+
     // ── Physics loop: gather → apply ─────────────────────────────────────────
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
         UserCommand cmd;
         if (controller != null) {
-            if (!controller.isAuthority()) return; // non-authority: state via MultiplayerSynchronizer
+            if (!controller.isAuthority()) return; // non-authority: state arrives via MSG_SNAPSHOT — see NetworkController
             // inputBlocked is set by UI overlays (radial menu, pause) that own the mouse.
             // _physicsProcess still runs while blocked — we return an empty command so the
             // character stays still without interrupting physics (gravity, collision).
@@ -530,6 +579,87 @@ public class Character extends CharacterBody3D implements Controllable {
     // ── Shared helpers ────────────────────────────────────────────────────────
     protected void setCombatState() {
         changedCombatState.emit(combatStates.get(resolveCombatKey(null)));
+    }
+
+    // ── Replication apply (non-authority — driven by NetworkController from MSG_SNAPSHOT) ──
+    //
+    // Non-authority bodies never run gatherInput/applyInput/physics (see the early
+    // return in _physicsProcess above), so these are the only writes their transform/
+    // combat/stance state ever receive. Position/velocity are written every frame by
+    // the interpolator; combat/stance are discrete and applied once per snapshot.
+
+    /** Direct transform write — safe outside _physicsProcess because non-authority bodies never run move_and_slide. */
+    public void applyReplicatedTransform(Vector3 position, Vector3 velocity) {
+        setGlobalPosition(position);
+        setVelocity(velocity);
+    }
+
+    /**
+     * Direct mesh-facing write — counterpart to {@link #getFacingYaw()}. Sets only
+     * meshRoot's Y rotation, preserving whatever X/Z it already has (mirrors how
+     * MovementController itself only ever rewrites Y — see MovementController's
+     * `setRotation(new Vector3(currentRot.getX(), newY, currentRot.getZ()))`).
+     */
+    public void applyReplicatedFacing(float yaw) {
+        Node mcNode = getNodeOrNull("MovementController");
+        if (!(mcNode instanceof MovementController mc) || mc.meshRoot == null) return;
+        Vector3 rot = mc.meshRoot.getRotation();
+        float localY = yaw - (float) getRotation().getY();
+        mc.meshRoot.setRotation(new Vector3(rot.getX(), localY, rot.getZ()));
+    }
+
+    /** Direct spine-IK look write — moves the aimTarget marker the LookAtModifier3D tracks, so a puppet's upper body aims where the owner looks (counterpart to {@link #getAimTargetPosition()}). */
+    public void applyReplicatedAim(Vector3 aimPosition) {
+        if (aimTarget != null && aimPosition != null) aimTarget.setGlobalPosition(aimPosition);
+    }
+
+    /**
+     * Drives the locomotion blend on a non-authority body from replicated motion. applyInput never
+     * runs on a puppet, so {@code changed_movement_direction} / {@code set_cam_rotation} never fire
+     * for it — without this the AnimationController's walk/strafe blend stays frozen (the "AI
+     * animation not synced" bug). Movement direction is derived from the interpolated horizontal
+     * velocity (the same world-space convention the owner's own signal carries); facing yaw is pushed
+     * in as camRotation so the combat strafe blend rotates correctly. Movement *type* (walk vs sprint)
+     * is applied separately and discretely via {@link #applyReplicatedMovementType(int)}.
+     */
+    public void applyReplicatedLocomotion(Vector3 velocity, double yaw) {
+        Vector3 flat = new Vector3(velocity.getX(), 0, velocity.getZ());
+        if (flat.lengthSquared() > 0.01) {
+            movementDirection = flat.normalized();
+            changedMovementDirection.emit(movementDirection);
+        } else if (movementDirection.lengthSquared() > 0.0) {
+            // Velocity has settled to ~0: collapse the strafe direction to idle exactly once,
+            // instead of holding the last non-zero lean (the "stuck mid-stride" look after a
+            // remote body stops). The walk/idle blend itself is driven by the discrete
+            // movementType (applyReplicatedMovementType); this clears the combat strafe lean.
+            movementDirection = Vector3.Companion.getZERO();
+            changedMovementDirection.emit(movementDirection);
+        }
+        Node acNode = getNodeOrNull("AnimationController");
+        if (acNode instanceof AnimationController ac) ac.onSetCamRotation(yaw);
+    }
+
+    /** Applies a replicated movement type (IDLE/WALK/SPRINT) on a puppet — emits changed_movement_state so the blend speed/pose updates exactly like the local path. */
+    public void applyReplicatedMovementType(int ordinal) {
+        MovementType[] types = MovementType.values();
+        if (ordinal >= 0 && ordinal < types.length) setMovementState(types[ordinal]);
+    }
+
+    /**
+     * Replays the same change-detection + signal cascade applyInput uses for combat/
+     * stance (see the `effectiveCombat != combat` and `setStance` calls below) so the
+     * local-input and replication paths share one "transition into this state" routine
+     * rather than drifting apart over time.
+     */
+    public void applyReplicatedCombatAndStance(boolean combat, int stanceOrdinal) {
+        if (combat != this.combat) {
+            this.combat = combat;
+            setCombatState();
+        }
+        StanceName[] stances = StanceName.values();
+        if (stanceOrdinal >= 0 && stanceOrdinal < stances.length && stanceOrdinal != currentStanceName.ordinal()) {
+            setStance(stances[stanceOrdinal]);
+        }
     }
 
     /**
@@ -733,6 +863,11 @@ public class Character extends CharacterBody3D implements Controllable {
         return characterInfo;
     }
 
+    /** The controller currently driving this body — null only before _ready() resolves it. */
+    public Controller getController() {
+        return controller;
+    }
+
     /**
      * Remove the current Controller child and return it so the caller can
      * reparent it to a different Controllable (vehicle hot-swap).
@@ -894,6 +1029,48 @@ public class Character extends CharacterBody3D implements Controllable {
         if (activeCamera != null) activeCamera.makeCurrent();
     }
 
+    /**
+     * Claims the viewport for this body's camera if — and only if — this body is
+     * the one the local peer should be looking through: single-player (no
+     * NetworkManager, or not networked) always claims; networked, only the body
+     * this peer owns (isAuthorityFor) does. A ServerProxyController-driven body
+     * reports isAuthority()=true (the server simulates it) but is NOT locally
+     * owned, so gating on ownership — not on the attached controller — is what
+     * keeps the host's own view from being stolen by remote bodies it simulates.
+     * Deferred from _ready() (see the activeCamera resolution above) so this runs
+     * once activeCamera/characterInfo are populated and every other _ready() that
+     * might also touch the viewport (e.g. vehicle occupancy) has settled.
+     */
+    @RegisterFunction
+    public void activateCameraIfOwned() {
+        if (activeCamera == null) return;
+        // isAuthorityFor answers "do I simulate this body" — right for the physics
+        // gate, wrong for "is this MY viewpoint": AI characters default ownerPeerId
+        // to SERVER_PEER_ID, so on the host (localPeerId == SERVER_PEER_ID) every
+        // AI reports isAuthorityFor() == true and would otherwise steal the
+        // viewport the instant it spawns. Only a human-driven body (Player) is ever
+        // a valid local viewpoint — AICharacter is a sibling type, never a Player.
+        if (!(this instanceof Player)) return;
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        boolean isLocalView = characterInfo == null
+                || !(netNode instanceof com.game.NetworkManager net) || !net.isNetworked()
+                || net.isAuthorityFor(characterInfo);
+        if (isLocalView) {
+            activeCamera.makeCurrent();
+        } else if (netNode instanceof com.game.NetworkManager net && net.isNetworked()
+                   && controller instanceof PlayerController) {
+            // Ghost Player body: World.tscn's pre-placed Player on the client machine.
+            // removeLocalPrePlacedPlayer() queues it free on connect, but a physics frame
+            // can still run before queueFree resolves. Disable physics and collision here
+            // so the body cannot block the local player's movement or occupy physics space.
+            setPhysicsProcess(false);
+            Node mc = getNodeOrNull("MovementController");
+            if (mc != null) mc.setPhysicsProcess(false);
+            setCollisionLayer(0);
+            setCollisionMask(0);
+        }
+    }
+
     public boolean isAlive() {
         return healthNode == null || !healthNode.isDead();
     }
@@ -929,6 +1106,23 @@ public class Character extends CharacterBody3D implements Controllable {
     @RegisterFunction
     public void onDied() {
         GD.print(getName() + " died");
+        enableDeathVisuals();
+        // Authority-only side effect: the dropped weapons are the host's authoritative world
+        // state. A non-authority puppet (applyReplicatedDeath) must NOT drop, or it would spawn
+        // orphan, unsynced pickups on the client.
+        if (weaponController != null) weaponController.dropAllWeapons();
+    }
+
+    /**
+     * The visual half of death — disable the AnimationTree, start the ragdoll, and drop the
+     * active stance collider so the corpse settles. Shared by the authoritative {@link #onDied()}
+     * path and the non-authority {@link #applyReplicatedDeath()} path so a replicated corpse looks
+     * identical without re-running authority-only side effects. Idempotent via {@code deathVisualsApplied}.
+     */
+    protected void enableDeathVisuals() {
+        if (deathVisualsApplied) return;
+        deathVisualsApplied = true;
+
         // Disable animation tree — prefer meshConfig path, fall back to legacy position.
         AnimationTree animationTree = null;
         if (visualsInstance != null && meshConfig != null && !meshConfig.animationTreePath.isEmpty()) {
@@ -938,12 +1132,21 @@ public class Character extends CharacterBody3D implements Controllable {
         if (animationTree == null) animationTree = (AnimationTree) getNodeOrNull("AnimationTree");
         if (animationTree != null) animationTree.setActive(false);
 
-        if (weaponController != null) weaponController.dropAllWeapons();
-
         enableRagdoll();
 
         // Disabled current stance to let ragdoll take over
         Stance s = stanceCache.get(currentStanceName);
         if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
+    }
+
+    /**
+     * Non-authority death: a replicated {@code currentHealth} reached zero on a puppet
+     * (NetworkController-driven body). Plays the ragdoll visuals only — no weapon drops,
+     * no playerDied/game-over, no EventBus kill notification (all emitted once, on the
+     * authority, inside {@code Health.applyDamage}). NetworkController stops driving this
+     * body's transform after calling it, so the ragdoll isn't dragged by further snapshots.
+     */
+    public void applyReplicatedDeath() {
+        enableDeathVisuals();
     }
 }

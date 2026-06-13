@@ -28,7 +28,12 @@ public class AICameraController extends TPSCameraController {
   @Override
   public void _ready() {
     super._ready();
-    if (activeCamera != null) activeCamera.clearCurrent(false);
+    // No explicit clearCurrent() here: activeCamera is still null at this point
+    // (this _ready() runs bottom-up, before Character._ready() resolves it — see
+    // TPSCameraController.setCameraFov's comment), so the call was always a no-op.
+    // Character.activateCameraIfOwned() (deferred from Character._ready()) is the
+    // single place that claims the viewport — an AI body that's never local simply
+    // never calls makeCurrent() for itself, so it never needs to relinquish anything.
   }
 
   public void setAimTarget(Vector3 worldTarget) { this.aimTarget = worldTarget; }

@@ -4,23 +4,16 @@
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
 [ext_resource type="Script" uid="uid://bsd1d5cijxeiu" path="res://gdj/com/environment/AmmoRefill.gdj" id="3_m0gj3"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
-[ext_resource type="Script" uid="uid://ciyfqqv4fmm45" path="res://gdj/com/character/Controller.gdj" id="7_kfoa7"]
-[ext_resource type="Script" uid="uid://dbbua5exey73l" path="res://gdj/com/environment/ParticleManager.gdj" id="8_pctl"]
-[ext_resource type="Script" uid="uid://csrrl6d8m7lmj" path="res://gdj/com/environment/ImpactManager.gdj" id="9_imct"]
-[ext_resource type="Script" uid="uid://cr22di64fbwp1" path="res://gdj/com/environment/DecalManager.gdj" id="10_dcal"]
-[ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="10_m0gj3"]
-[ext_resource type="Script" uid="uid://fqq4oyin7clk" path="res://gdj/com/environment/BulletTracerManager.gdj" id="11_btrc"]
 [ext_resource type="PackedScene" uid="uid://bb60nshfmm7so" path="res://src/main/resources/com/weapon/PI52.tscn" id="12_ej8ck"]
-[ext_resource type="Script" uid="uid://bnxsv2psg1aoe" path="res://gdj/com/environment/ExplosionManager.gdj" id="12_evfx"]
 [ext_resource type="PackedScene" uid="uid://chmmjlji5vapb" path="res://src/main/resources/com/weapon/AR212.tscn" id="13_ijvcp"]
 [ext_resource type="PackedScene" uid="uid://bk5bkbssdlaa4" path="res://src/main/resources/com/weapon/T1.tscn" id="17_imhx0"]
-[ext_resource type="PackedScene" uid="uid://fg0ucxit12ax" path="res://src/main/resources/com/ui/HUDManager.tscn" id="17_nmpqt"]
 [ext_resource type="PackedScene" uid="uid://bf5k6xj310cia" path="res://src/main/resources/com/weapon/ATL4.tscn" id="18_eg1nj"]
-[ext_resource type="PackedScene" uid="uid://menumgr001" path="res://src/main/resources/com/ui/MenuManager.tscn" id="18_kfoa7"]
 [ext_resource type="PackedScene" uid="uid://c7aoav51c2882" path="res://src/main/resources/com/vehicle/Vehicle.tscn" id="19_imhx0"]
 [ext_resource type="PackedScene" uid="uid://biahtc64fjcgq" path="res://src/main/resources/com/weapon/SG1.tscn" id="19_scyio"]
 [ext_resource type="PackedScene" uid="uid://dmk1knife0001" path="res://src/main/resources/com/weapon/MW1.tscn" id="20_xp5wa"]
+[ext_resource type="PackedScene" uid="uid://dmk2axe000002" path="res://src/main/resources/com/weapon/MW2.tscn" id="23_mw2ax"]
 [ext_resource type="Script" uid="uid://cbn7l15n7dg2j" path="res://gdj/com/debug/DebugHarness.gdj" id="21_dbgh"]
+[ext_resource type="PackedScene" uid="uid://dvq2be1wcewoe" path="res://src/main/resources/com/world/WorldSystems.tscn" id="22_wsys"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
 vertices = PackedVector3Array(-49.688828, 0.81998825, -49.59558, -49.688828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.09558, -44.188828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.59558, -42.688828, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.09558, 47.811172, 0.81998825, -49.59558, -49.688828, 0.81998825, -47.59558, -49.688828, 0.81998825, 40.90442, -44.188828, 0.81998825, 40.90442, -44.188828, 0.81998825, -47.59558, -8.1888275, 0.81998825, -26.595581, -6.4388275, 0.81998825, -26.845581, -6.6888275, 0.81998825, -47.59558, -42.688828, 0.81998825, -47.59558, -42.688828, 0.81998825, -24.595581, -8.1888275, 0.81998825, -24.595581, 6.3111725, 0.81998825, -26.845581, 6.5611725, 0.81998825, -47.59558, 22.561172, 0.81998825, -9.595581, 23.811172, 0.81998825, -8.095581, 24.561172, 0.81998825, -8.095581, 8.0611725, 0.81998825, -26.595581, 8.0611725, 0.81998825, -16.095581, 25.311172, 0.81998825, -7.345581, 33.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, 4.404419, 47.811172, 0.81998825, -47.59558, -7.1888275, 3.5699883, -25.845581, -7.1888275, 3.5699883, -16.595581, 7.0611725, 3.5699883, -16.595581, 7.0611725, 3.5699883, -25.845581, -42.688828, 0.81998825, -17.845581, -8.1888275, 0.81998825, -17.845581, 0.8111725, 0.81998825, -7.845581, 1.5611725, 0.81998825, -8.095581, 1.5611725, 0.81998825, -15.595581, -7.9388275, 0.81998825, -15.595581, 10.3111725, 0.81998825, 40.90442, 10.3111725, 0.81998825, 5.154419, 9.5611725, 0.81998825, 4.904419, 1.0611725, 0.81998825, -6.345581, -42.688828, 0.81998825, 40.90442, 7.5611725, 0.81998825, -15.595581, 23.311172, 0.81998825, -7.845581, 23.561172, 0.81998825, -6.595581, 2.8111725, 0.81998825, -7.345581, 4.8111725, 0.81998825, -4.595581, 7.5611725, 0.81998825, -1.095581, 27.561172, 0.81998825, -1.345581, 11.3111725, 0.81998825, 4.154419, 29.811172, 0.81998825, 1.654419, 33.561172, 0.81998825, 5.154419, 47.811172, 0.81998825, 40.90442, 11.0611725, 0.81998825, 5.154419, 32.311172, 0.81998825, 5.154419, -49.688828, 0.81998825, 42.40442, -49.688828, 0.81998825, 49.65442, -44.188828, 0.81998825, 49.65442, -44.188828, 0.81998825, 42.40442, -42.688828, 0.81998825, 42.40442, -42.688828, 0.81998825, 49.65442, 47.811172, 0.81998825, 49.65442, 47.811172, 0.81998825, 42.40442)
@@ -75,98 +68,6 @@ size = Vector3(2, 0.1, 2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hbo2n"]
 size = Vector3(2, 0.1, 2)
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flesh"]
-direction = Vector3(0, 1, 0)
-initial_velocity_max = 4.0
-scale_min = 0.099999994
-scale_max = 0.29999998
-scale_over_velocity_max = 1.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flesh"]
-albedo_color = Color(1, 0, 0, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_flesh"]
-material = SubResource("StandardMaterial3D_flesh")
-size = Vector3(0.5, 0.5, 0.5)
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_hs4nr"]
-direction = Vector3(0, 1, 0)
-initial_velocity_max = 4.0
-scale_min = 0.099999994
-scale_max = 0.29999998
-scale_over_velocity_max = 1.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tracer"]
-shading_mode = 0
-albedo_color = Color(1.685791, 1.5852925, 1.0005594, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_kfoa7"]
-material = SubResource("StandardMaterial3D_tracer")
-size = Vector3(0.1, 0.5, 0.2)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kfoa7"]
-shading_mode = 0
-albedo_color = Color(1, 0.9882353, 0.8392157, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_hs4nr"]
-material = SubResource("StandardMaterial3D_kfoa7")
-size = Vector3(0.01, 0.01, 0.8)
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_expl_flash"]
-emission_shape = 1
-emission_sphere_radius = 0.5
-spread = 180.0
-initial_velocity_min = 5.0
-initial_velocity_max = 12.0
-gravity = Vector3(0, -5, 0)
-scale_min = 0.2
-scale_max = 0.5
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_expl_flash"]
-shading_mode = 0
-albedo_color = Color(1.5, 0.9, 0.2, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_expl_flash"]
-material = SubResource("StandardMaterial3D_expl_flash")
-size = Vector3(0.12, 0.12, 0.12)
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_expl_fireball"]
-emission_shape = 1
-emission_sphere_radius = 1.0
-spread = 120.0
-initial_velocity_min = 1.5
-initial_velocity_max = 5.0
-gravity = Vector3(0, 0.5, 0)
-scale_min = 0.8
-scale_max = 2.5
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_expl_fireball"]
-shading_mode = 0
-albedo_color = Color(1.2, 0.45, 0.05, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_expl_fireball"]
-material = SubResource("StandardMaterial3D_expl_fireball")
-size = Vector3(0.25, 0.25, 0.25)
-
-[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_expl_smoke"]
-emission_shape = 1
-emission_sphere_radius = 1.5
-direction = Vector3(0, 1, 0)
-spread = 40.0
-initial_velocity_min = 0.3
-initial_velocity_max = 1.5
-gravity = Vector3(0, -0.05, 0)
-scale_min = 1.5
-scale_max = 4.5
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_expl_smoke"]
-transparency = 1
-albedo_color = Color(0.28, 0.28, 0.28, 0.6)
-
-[sub_resource type="BoxMesh" id="BoxMesh_expl_smoke"]
-material = SubResource("StandardMaterial3D_expl_smoke")
-size = Vector3(0.5, 0.5, 0.5)
 
 [node name="World" type="Node3D" unique_id=822990337]
 
@@ -315,128 +216,50 @@ text = "AMMO REFILL"
 font = ExtResource("5_uecv0")
 font_size = 60
 
-[node name="ParticleManager" type="Node" parent="." unique_id=201400001]
-script = ExtResource("8_pctl")
-pool_size_per_type = 40
-
-[node name="FLESH" type="Node" parent="ParticleManager" unique_id=201400002]
-
-[node name="1" type="GPUParticles3D" parent="ParticleManager/FLESH" unique_id=201400010]
-emitting = false
-amount = 12
-one_shot = true
-speed_scale = 2.0
-explosiveness = 1.0
-process_material = SubResource("ParticleProcessMaterial_flesh")
-draw_pass_1 = SubResource("BoxMesh_flesh")
-
-[node name="DEFAULT" type="Node" parent="ParticleManager" unique_id=1074195676]
-script = ExtResource("7_kfoa7")
-metadata/_custom_type_script = "uid://ciyfqqv4fmm45"
-
-[node name="1" type="GPUParticles3D" parent="ParticleManager/DEFAULT" unique_id=536993378]
-emitting = false
-amount = 5
-one_shot = true
-speed_scale = 2.0
-explosiveness = 1.0
-process_material = SubResource("ParticleProcessMaterial_hs4nr")
-draw_pass_1 = SubResource("BoxMesh_kfoa7")
-
-[node name="ImpactManager" type="Node" parent="." unique_id=201500001]
-script = ExtResource("9_imct")
-
-[node name="DecalManager" type="Node" parent="." unique_id=201600001]
-script = ExtResource("10_dcal")
-pool_size = 40
-decal_lifetime = 5.0
-
-[node name="1" type="Decal" parent="DecalManager" unique_id=201600010]
-size = Vector3(0.1, 0.1, 0.1)
-texture_albedo = ExtResource("10_m0gj3")
-
-[node name="BulletTracerManager" type="Node3D" parent="." unique_id=201700001]
-script = ExtResource("11_btrc")
-
-[node name="1" type="MeshInstance3D" parent="BulletTracerManager" unique_id=201700002]
-mesh = SubResource("BoxMesh_hs4nr")
-
-[node name="ExplosionManager" type="Node" parent="." unique_id=201800001]
-script = ExtResource("12_evfx")
-
-[node name="FLASH" type="Node" parent="ExplosionManager" unique_id=201800002]
-
-[node name="1" type="GPUParticles3D" parent="ExplosionManager/FLASH" unique_id=201800003]
-emitting = false
-amount = 48
-one_shot = true
-speed_scale = 3.0
-explosiveness = 1.0
-process_material = SubResource("ParticleProcessMaterial_expl_flash")
-draw_pass_1 = SubResource("BoxMesh_expl_flash")
-
-[node name="FIREBALL" type="Node" parent="ExplosionManager" unique_id=201800004]
-
-[node name="1" type="GPUParticles3D" parent="ExplosionManager/FIREBALL" unique_id=201800005]
-emitting = false
-amount = 32
-one_shot = true
-explosiveness = 0.8
-process_material = SubResource("ParticleProcessMaterial_expl_fireball")
-draw_pass_1 = SubResource("BoxMesh_expl_fireball")
-
-[node name="SMOKE" type="Node" parent="ExplosionManager" unique_id=201800006]
-
-[node name="1" type="GPUParticles3D" parent="ExplosionManager/SMOKE" unique_id=201800007]
-emitting = false
-amount = 24
-one_shot = true
-speed_scale = 0.5
-explosiveness = 0.3
-process_material = SubResource("ParticleProcessMaterial_expl_smoke")
-draw_pass_1 = SubResource("BoxMesh_expl_smoke")
+[node name="WorldSystems" parent="." unique_id=201400001 instance=ExtResource("22_wsys")]
 
 [node name="Characters" type="Node" parent="." unique_id=1369023945]
 
 [node name="Player" parent="Characters" unique_id=131388266 instance=ExtResource("2_lj72b")]
-transform = Transform3D(-4.3711392e-08, 0, -1.0000001, 0, 1, 0, 1.0000001, 0, -4.3711392e-08, 0.010113716, 0.75241303, 3.8685875)
+transform = Transform3D(-4.3711392e-08, 0, -1.0000001, 0, 1, 0, 1.0000001, 0, -4.3711392e-08, -1.4326258, 1.0618466, 3.8685875)
 head_mesh_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/eyes"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_001"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_002"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_003"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/head"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/headphones")])
-
-[node name="Pistol" parent="Characters" unique_id=358619058 instance=ExtResource("12_ej8ck")]
-transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10, -4.3711214e-08, 1, -0.004708648, -0.9999888, -4.3711307e-08, 0.3874061, 0.59672034, 3.628375)
-
-[node name="Rifle" parent="Characters" unique_id=1788483088 instance=ExtResource("13_ijvcp")]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.012201309, 0.71774817, 3.423631)
-
-[node name="Pistol2" parent="Characters" unique_id=1577587948 instance=ExtResource("12_ej8ck")]
-transform = Transform3D(1, 0, 0, 0, -0.004537884, -0.9999897, 0, 0.99998957, -0.0045378846, 5.1328487, 0.8869443, -5.1316123)
-
-[node name="T1_2" parent="Characters" unique_id=100200001 instance=ExtResource("17_imhx0")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.925745, 1.4870585, 0)
-
-[node name="T1_3" parent="Characters" unique_id=669037550 instance=ExtResource("17_imhx0")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.8259232, 1.1179265, 0.3479452)
-
-[node name="T1" parent="Characters" unique_id=42787189 instance=ExtResource("17_imhx0")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.8638287, 0.74352926, 0)
-
-[node name="ATL4" parent="Characters" unique_id=200200001 instance=ExtResource("18_eg1nj")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.6034837, 0.74194765, 0)
-
-[node name="SG1" parent="Characters" unique_id=300100001 instance=ExtResource("19_scyio")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.050736, 1.0579798, 0)
-
-[node name="MW1" parent="Characters" unique_id=300200001 instance=ExtResource("20_xp5wa")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6147928, 0.88752294, 3.5717869)
-
-[node name="MenuManager" parent="." unique_id=349614519 instance=ExtResource("18_kfoa7")]
 
 [node name="VehicleRoot" parent="." unique_id=500123202 instance=ExtResource("19_imhx0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.3230138, 10.67893)
 
-[node name="HUDManager" parent="." unique_id=828289775 instance=ExtResource("17_nmpqt")]
-
 [node name="DebugHarness" type="Node" parent="." unique_id=210000001]
 script = ExtResource("21_dbgh")
+
+[node name="Pickups" type="Node" parent="." unique_id=1303406953]
+
+[node name="Pistol" parent="Pickups" unique_id=358619058 instance=ExtResource("12_ej8ck")]
+transform = Transform3D(0.9999889, -0.0047086477, -8.4334206e-11, -1.2148789e-10, -4.3711214e-08, 1, -0.004708648, -0.9999888, -4.3711307e-08, 0.3874061, 0.59672034, 3.628375)
+
+[node name="Rifle" parent="Pickups" unique_id=1788483088 instance=ExtResource("13_ijvcp")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0.012201309, 0.71774817, 3.423631)
+
+[node name="Pistol2" parent="Pickups" unique_id=1577587948 instance=ExtResource("12_ej8ck")]
+transform = Transform3D(1, 0, 0, 0, -0.004537884, -0.9999897, 0, 0.99998957, -0.0045378846, 5.1328487, 0.8869443, -5.1316123)
+
+[node name="T1_2" parent="Pickups" unique_id=100200001 instance=ExtResource("17_imhx0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.925745, 1.4870585, 0)
+
+[node name="T1_3" parent="Pickups" unique_id=669037550 instance=ExtResource("17_imhx0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.8259232, 1.1179265, 0.3479452)
+
+[node name="T1" parent="Pickups" unique_id=42787189 instance=ExtResource("17_imhx0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.8638287, 0.74352926, 0)
+
+[node name="ATL4" parent="Pickups" unique_id=200200001 instance=ExtResource("18_eg1nj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.6034837, 0.74194765, 0)
+
+[node name="SG1" parent="Pickups" unique_id=300100001 instance=ExtResource("19_scyio")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.050736, 1.0579798, 0)
+
+[node name="MW1" parent="Pickups" unique_id=300200001 instance=ExtResource("20_xp5wa")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6147928, 0.88752294, 3.5717869)
+
+[node name="MW2" parent="Pickups" unique_id=300400001 instance=ExtResource("23_mw2ax")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0.88752294, 3.5717869)
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

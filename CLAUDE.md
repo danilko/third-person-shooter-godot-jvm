@@ -345,3 +345,11 @@ Enemy input is world-space (set directly by AI FSM).
   fires before the weapon is attached.
 - `Pickup.pause()` calls `setFreezeEnabled(true)` (not `setFreeze`) — the Kotlin/JVM binding
   exposes the Godot 4 `freeze` property as `setFreezeEnabled / isFreezeEnabled`.
+- `ENetConnection.createHost/createHostBound` take `(… maxPeers, maxChannels, inBandwidth,
+  outBandwidth)` — all-int positional args. Putting the channel count one slot too far right
+  silently caps outgoing bandwidth at N bytes/s (ENet then throttle-drops unreliable packets
+  into multi-second bursts). `connectToHost` differs: its 3rd param IS `channel_count`.
+- `NodePath.toString()` returns `"NodePath(<subnames>)"` — the `:property` subname part only,
+  which is **empty for plain node paths** — NOT the path string. Use `nodePath.getPath()`
+  (the Kotlin `path` property) whenever a path string is needed, e.g. `getPath().getPath()`
+  on a Node. `StringName.toString()` is unaffected (it calls the native string operator).

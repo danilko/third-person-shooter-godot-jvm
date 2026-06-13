@@ -7,6 +7,7 @@ import com.character.Player;
 import com.character.WeaponController;
 import com.character.CharacterInfo;
 import com.game.EventBus;
+import com.game.NetworkManager;
 import com.vehicle.Vehicle;
 import com.vehicle.VehicleWeaponMode;
 import godot.api.Node3D;
@@ -169,6 +170,21 @@ public class HUDManager extends CanvasLayer {
 
   @RegisterFunction
   public void onPlayerSpawned(Node spawnedPlayer) {
+	// playerSpawned fires for *every* Player.tscn instance — including replicated
+	// remote bodies (spawnPlayerBody on the server, spawnReplicatedCharacter on the
+	// client both instantiate Player.tscn, and Player._ready emits unconditionally).
+	// Without an ownership check, wirePlayer rewires health/ammo/weapon-slot listeners
+	// to whichever body spawned most recently — "HUD never updates" once a remote
+	// body shows up. Same isAuthorityFor ownership gate as PlayerCameraController:
+	// pure ownerPeerId check, not controller.isAuthority() (a server-side
+	// ServerProxyController body is "authoritative" but isn't the locally-viewed one).
+	if (spawnedPlayer instanceof Character c && c.characterInfo != null) {
+	  Node netNode = getNodeOrNull("/root/NetworkManager");
+	  if (netNode instanceof NetworkManager net && net.isNetworked()
+			  && !net.isAuthorityFor(c.characterInfo)) {
+		return;
+	  }
+	}
 	wirePlayer(spawnedPlayer);
   }
 
@@ -235,7 +251,15 @@ public class HUDManager extends CanvasLayer {
 	CharacterInfo info = c.characterInfo;
 	if (info == null) return;
 	for (Node child : getChildren()) {
-	  if (child instanceof CharacterHUD hud) hud.setPlayerCharacterId(info.characterId);
+	  if (child instanceof CharacterHUD hud) {
+		hud.setPlayerCharacterId(info.characterId);
+		// C2 routing (onCharacterHealthChanged/onCharacterAmmoChanged) looks widgets
+		// up in characterHUDs by characterId — registerCharacterHUD existed but was
+		// never called from anywhere, so replicated health (applyReplicatedHealth
+		// emits characterHealthChanged, never `damaged`, specifically to route
+		// through here rather than onPlayerHealthDamaged) never reached the HUD.
+		registerCharacterHUD(info.characterId, hud);
+	  }
 	}
   }
 

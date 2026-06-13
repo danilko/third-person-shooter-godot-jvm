@@ -29,4 +29,14 @@ public class CharacterInfo extends Resource {
 
     /** Faction membership. Use Faction constants or a custom string for new factions. */
     @RegisterProperty @Export public String faction = Faction.NEUTRAL;
+
+    /**
+     * The peer that owns/drives this character — replaces Godot's
+     * {@code setMultiplayerAuthority} now that NetworkManager owns its own
+     * ENet transport instead of MultiplayerAPI. Defaults to
+     * {@code NetworkManager.SERVER_PEER_ID} (1), matching the convention that
+     * every node is its own authority in single-player (where localPeerId is
+     * also 1). The server stamps the real peer id at spawn time.
+     */
+    @RegisterProperty @Export public int ownerPeerId = 1;
 }

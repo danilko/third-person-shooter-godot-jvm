@@ -160,6 +160,22 @@ public class WeaponItem extends Pickup implements WeaponAction {
     return getDisplayName();
   }
 
+  // ── Replication hooks (Pickup base) ───────────────────────────────────────
+  // MSG_PICKUP_TAKEN carries the item's magazine/reserve at take time so every peer's
+  // copy of the weapon ends up byte-identical regardless of prior local drift.
+
+  @Override public int getReplicatedMagazine() { return magazine; }
+  @Override public int getReplicatedReserve()  { return reserve; }
+
+  @Override
+  protected void stampReplicatedAmmo(int replicatedMagazine, int replicatedReserve) {
+    magazine = replicatedMagazine;
+    reserve  = replicatedReserve;
+  }
+
+  /** Current holder (set by WeaponController.setup), or null while in the world — used for the late-join pickup baseline. */
+  public CharacterBody3D getOwningCharacter() { return owningCharacter; }
+
   // ── WeaponAction defaults — concrete subclasses override what they need ───
   @Override public void useWeapon() {}
   @Override public void stopUseWeapon() {}
@@ -181,6 +197,15 @@ public class WeaponItem extends Pickup implements WeaponAction {
    * other throwable type can be picked up without needing an interact-to-swap.
    */
   public void onMagazineEmpty() {}
+
+  /**
+   * Cosmetic remote replay on non-authority peers (puppets), invoked by
+   * WeaponController.playRemoteFireCue when the snapshot's fireSeq counter advances.
+   * Default no-op; FirearmItem replays muzzle/tracer, throwable/projectile weapons spawn a
+   * non-damaging projectile so every peer sees the shot/throw + explosion. Never consumes
+   * ammo or applies damage — those stay authority-side.
+   */
+  public void playRemoteFireCue() {}
 
   public void decrementMagazine() {
     if (magazine > 0) magazine--;

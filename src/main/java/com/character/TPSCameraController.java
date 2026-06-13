@@ -58,6 +58,12 @@ public class TPSCameraController extends Node3D {
   private Vector3 positionOffset = new Vector3(0, 0.8, 0);
   private Vector3 positionOffsetTarget = new Vector3(0, 0.8, 0);
 
+  // Camera height = stance height + combat offset. Tracked separately so onSetStance and
+  // onSetCombatState can each update their part without clobbering the other (both write
+  // positionOffsetTarget.Y via applyCameraHeight). Init to the default Y above.
+  private double stanceCameraHeight = 0.8;
+  private double combatHeightOffset = 0.0;
+
   private float springArmLengthTarget = 3;
 
   private double movementFov = 0.0;
@@ -102,6 +108,11 @@ public class TPSCameraController extends Node3D {
    */
   protected Vector2 gatherLookInput(double delta) {
     return Vector2.Companion.getZERO();
+  }
+
+  /** Camera yaw in radians — read by PlayerController to rotate WASD input to world-space each tick. */
+  public double getCurrentYaw() {
+    return yawNode != null ? yawNode.getRotation().getY() : 0.0;
   }
 
   public void changeShoulderDirection() {
@@ -165,6 +176,8 @@ public class TPSCameraController extends Node3D {
     cameraFov = combatState.cameraFov;
     positionOffsetTarget.setX(combatState.cameraShoulderOffset * shoulderDirection);
     springArmLengthTarget = (float) combatState.cameraDistance;
+    combatHeightOffset = combatState.cameraHeightOffset;
+    applyCameraHeight();
     setCameraFov();
   }
 
@@ -196,6 +209,12 @@ public class TPSCameraController extends Node3D {
 
   @RegisterFunction
   public void onSetStance(Stance stance) {
-    positionOffsetTarget.setY(stance.getCameraHeight());
+    stanceCameraHeight = stance.getCameraHeight();
+    applyCameraHeight();
+  }
+
+  /** Combine the stance base height with the combat-state offset into the camera's Y target. */
+  private void applyCameraHeight() {
+    positionOffsetTarget.setY(stanceCameraHeight + combatHeightOffset);
   }
 }

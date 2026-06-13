@@ -9,8 +9,9 @@ import godot.core.Vector3;
  * tick and consumed by Character.applyInput().
  *
  * All fields are primitives or copied value types: cheap to copy, diff, and
- * serialize over the network. The tick counter and sequence fields support
- * client-side prediction and server reconciliation (Phase 4).
+ * serialize over the network. Under ownership-based authority the command never
+ * crosses the wire — only the owner's resulting state does (MSG_SNAPSHOT) — so
+ * this stays a purely local intent struct; tick orders inputs for debugging/audit.
  */
 public class UserCommand {
 
@@ -47,21 +48,9 @@ public class UserCommand {
     // ── Network sequencing ────────────────────────────────────────────────────
     /**
      * Monotonically increasing tick number stamped by Character._physicsProcess.
-     * Totally orders inputs for replay during server reconciliation.
+     * Totally orders inputs (also stamped on outgoing snapshots for audit).
      */
     public long tick;
-
-    /**
-     * Client-side send sequence, incremented each time the owning client sends
-     * this command to the server. Used by the server to detect gaps.
-     */
-    public int sequenceNumber;
-
-    /**
-     * Last command sequence the server confirmed processing.
-     * Client discards prediction buffer entries at or below this value.
-     */
-    public int lastServerAck;
 
     // ── Vehicle fields (Phase 5) — ignored by Character.applyInput ────────────
     public float motor;
@@ -86,8 +75,6 @@ public class UserCommand {
         wantUnequip       = false;
         aimTargetPosition = null;
         tick              = 0;
-        sequenceNumber    = 0;
-        lastServerAck     = 0;
         motor = 0f;
         steering          = 0f;
         handbrake         = false;
@@ -96,7 +83,7 @@ public class UserCommand {
         resetVehicle      = false;
     }
 
-    /** Shallow copy for prediction rollback buffer. */
+    /** Shallow copy (defensive snapshot for buffering/debugging). */
     public UserCommand copy() {
         UserCommand c     = new UserCommand();
         c.movementDirection = new Vector3(
@@ -119,8 +106,6 @@ public class UserCommand {
                               aimTargetPosition.getZ())
                 : null;
         c.tick            = tick;
-        c.sequenceNumber  = sequenceNumber;
-        c.lastServerAck   = lastServerAck;
         c.motor = motor;
         c.steering        = steering;
         c.handbrake       = handbrake;

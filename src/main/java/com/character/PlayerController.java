@@ -1,11 +1,13 @@
 package com.character;
 
+import com.game.NetworkManager;
 import com.vehicle.Vehicle;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.Input;
+import godot.api.Node;
 import godot.api.Timer;
 import godot.core.Vector3;
 
@@ -22,16 +24,12 @@ import godot.core.Vector3;
  * Hot-swap (Phase 5): call setTarget(newBody) before reparenting so gatherInput()
  * immediately generates the correct command type for the incoming body.
  *
- * Network (Phase 4): on the owning client this runs locally for prediction;
- * the resulting UserCommand is stamped with a monotone sequenceNumber and stored
- * in the predictionBuffer ring buffer. When the server sends back a corrected
- * state, reconcile(serverAck) discards acknowledged entries and the caller
- * replays unacknowledged commands against the snapped server state.
+ * Network (ownership-based authority): the local human owns this body and simulates
+ * it fully locally; each tick the resulting state (not the command) is reported
+ * upstream via NetworkManager.sendOwnedState — see the field-group comment below.
  */
 @RegisterClass(className = "PlayerController")
 public class PlayerController extends Controller {
-
-    private static final int BUFFER_SIZE = 64;
 
     // Pre-built action name strings to avoid per-frame string concatenation in the input hot-path.
     // Slots 1–6 used on foot; slot 7 reserved for vehicle passenger mode.
@@ -40,14 +38,26 @@ public class PlayerController extends Controller {
         "weapon_slot_4", "weapon_slot_5", "weapon_slot_6"
     };
 
-    // ── Client-side prediction state ──────────────────────────────────────────
-    private int              localSequence    = 0;
-    private final UserCommand[] predictionBuffer = new UserCommand[BUFFER_SIZE];
+    // ── Ownership-based authority ─────────────────────────────────────────────
+    // The local human owns this body and simulates it locally (gatherInput → applyInput →
+    // move_and_slide, fully responsive). Each tick it reports its OWN resulting state upstream
+    // (NetworkManager.sendOwnedState); the host relays it to other peers, who interpolate. No
+    // client prediction/reconciliation against a host re-simulation — there is no host
+    // re-simulation of this body — which is what removed the dual-simulation teleporting.
 
     // ── Cached body references (re-resolved when body type changes) ───────────
     private Player     cachedPlayer;
     private Timer      cachedAimStayTimer;
     private Vehicle     cachedVehicle;
+
+    /**
+     * Minimum distance the spine-IK aim point may converge to. Aiming at a far target snaps the
+     * aim point onto the actual crosshair hit, so the visible gun (and replicated puppet gun)
+     * points where bullets land — closing the over-the-shoulder "gun isn't on me but I'm hit"
+     * mismatch. Clamping to this floor keeps the spine from yanking onto a wall right in front
+     * of the muzzle (the reason the aim point used to be a fixed far point instead).
+     */
+    private static final double MIN_AIM_CONVERGE_DISTANCE = 5.0;
 
     @RegisterFunction
     @Override
@@ -93,12 +103,26 @@ public class PlayerController extends Controller {
         boolean isFps = body.isFpsMode;
 
         // ── Movement ──────────────────────────────────────────────────────────
-        // Signs match Godot's -Z-forward convention: W → moveZ = -1 (world -Z = forward).
-        // Left/right: D (+X) = camera-right, A (-X) = camera-left.
+        // Direction is converted to world-space HERE (at the source) so the wire
+        // format always carries world-space intent.  MovementController no longer
+        // rotates by camRotation for player bodies — it uses the direction as-is.
         float moveX = inp.getActionStrength("right") - inp.getActionStrength("left");
         float moveZ = inp.getActionStrength("back")  - inp.getActionStrength("forward");
         cmd.movementDirection.setX(moveX);
         cmd.movementDirection.setZ(moveZ);
+
+        // Rotate to world-space at the source so the command always carries world-space
+        // intent. cam.getCurrentYaw() returns the previous tick's yaw — identical timing
+        // to the old MovementController rotation which also used the previous tick's
+        // camRotation.
+        Node camNode = body.getNodeOrNull("TPSCameraController");
+        if (camNode instanceof TPSCameraController cam) {
+            if (cmd.movementDirection.lengthSquared() > 0.001) {
+                cmd.movementDirection = cmd.movementDirection.rotated(
+                        Vector3.Companion.getUP(),
+                        (float) (cam.getCurrentYaw() + body.getRotation().getY()));
+            }
+        }
 
         if (cmd.movementDirection.lengthSquared() > 0.001) {
             cmd.movementType = inp.isActionPressed("walk", false)
@@ -122,17 +146,33 @@ public class PlayerController extends Controller {
             cmd.wantCombat = aimOrFire || (body.isCombat() && !aimStayTimer.isStopped());
         }
 
-        // ── Aim target (spine IK look direction — always far, never the hit point) ──
-        // AimTarget drives SpineAimModifier: it represents WHERE THE CAMERA LOOKS,
-        // not where the bullet lands. Placing it at the AimRay's far end (2000 m along
-        // camera forward) means the spine always tracks camera direction cleanly.
-        // Actual bullet impact is read from AimRay.isColliding() at fire time in
-        // FirearmItem.performHitscan() — AimTarget plays no part in hit detection.
-        // This prevents the spine from snapping upward when aiming near a wall.
+        // ── Aim target (spine IK look point — converges on the crosshair target) ──
+        // AimTarget drives SpineAimModifier (and is replicated as the puppet's look point).
+        // It is set to the ACTUAL world point the crosshair is on — the AimRay's collision
+        // point — so the visible gun, the replicated remote gun, and the bullet all converge
+        // on the same target. This closes the over-the-shoulder mismatch where the gun, aimed
+        // at a fixed far point parallel to the offset camera ray, appeared to point beside a
+        // victim who still got hit by the camera-origin bullet. Clamped to
+        // MIN_AIM_CONVERGE_DISTANCE so aiming near a wall doesn't snap the spine onto the close
+        // surface; falls back to the far point when nothing is hit. Hit detection itself is
+        // unchanged — still the camera AimRay in FirearmItem.performHitscan (no muzzle/animation
+        // coupling); this only aligns the visible aim with where bullets already go.
         if (cmd.wantCombat) {
             Vector3 rayDeg = body.aimRay.getRotationDegrees();
             body.aimRay.setRotationDegrees(new Vector3(rayDeg.getX(), 0.0f, 0.0f));
-            cmd.aimTargetPosition = body.aimRay.toGlobal(body.aimRay.getTargetPosition());
+            body.aimRay.forceRaycastUpdate();   // refresh collision for the reset orientation
+            Vector3 origin   = body.aimRay.getGlobalPosition();
+            Vector3 farPoint = body.aimRay.toGlobal(body.aimRay.getTargetPosition());
+            if (body.aimRay.isColliding()
+                    && body.aimRay.getCollisionPoint().minus(origin).length() >= MIN_AIM_CONVERGE_DISTANCE) {
+                cmd.aimTargetPosition = body.aimRay.getCollisionPoint();
+            } else if (body.aimRay.isColliding()) {
+                // Hit, but too close — clamp to the floor along the ray so the spine stays steady.
+                cmd.aimTargetPosition = origin.plus(
+                        farPoint.minus(origin).normalized().times((float) MIN_AIM_CONVERGE_DISTANCE));
+            } else {
+                cmd.aimTargetPosition = farPoint;
+            }
         }
 
         // ── Weapon / body actions ─────────────────────────────────────────────
@@ -175,11 +215,26 @@ public class PlayerController extends Controller {
         // Requires an "use" action in Project Settings → Input Map.
         cmd.enterExit = inp.isActionJustPressed("interact", false);
 
-        // ── Sequence stamp + prediction buffer (Phase 4) ──────────────────────
-        cmd.sequenceNumber = ++localSequence;
-        predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();
+        sendToNetwork(cmd);
 
         return cmd;
+    }
+
+    // ── Network transport (ownership-based) ───────────────────────────────────
+
+    /**
+     * Reports this body's OWN authoritative state upstream when networked as a non-host client.
+     * Single-player and the host stay untouched (NetworkManager.sendOwnedState no-ops on the
+     * host — its own body is broadcast directly). The {@code cmd} is unused for transport now:
+     * we send where the body actually is, not the input that got it there (ownership-based
+     * authority — see NETWORK_REWRITE_PLAN.md). Vehicle bodies aren't reported here yet
+     * (driver-authority migration is Step 3).
+     */
+    private void sendToNetwork(UserCommand cmd) {
+        if (cachedPlayer == null || cachedPlayer.characterInfo == null) return;
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (!(netNode instanceof NetworkManager net)) return;
+        net.sendOwnedState(cachedPlayer);
     }
 
     // ── Vehicle input ─────────────────────────────────────────────────────────
@@ -222,34 +277,17 @@ public class PlayerController extends Controller {
             }
         }
 
-        cmd.sequenceNumber = ++localSequence;
-        predictionBuffer[cmd.sequenceNumber % BUFFER_SIZE] = cmd.copy();
+        // Driver upstream (Round 11 N3): while driving, the on-foot sendToNetwork path never
+        // runs (the character's physics is off), so report BOTH owned bodies from here — the
+        // vehicle's locomotion, and the seated character's stream (aim/fireSeq/combat keep
+        // passenger weapons replicating; its transform is seat-pinned on every peer anyway).
+        // Per-entity throttling in NetworkManager keeps the two streams at ~30 Hz each.
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (netNode instanceof NetworkManager net && cachedVehicle != null) {
+            net.sendOwnedVehicleState(cachedVehicle);
+            if (cachedVehicle.getOccupant() != null) net.sendOwnedState(cachedVehicle.getOccupant());
+        }
 
         return cmd;
-    }
-
-    // ── Reconciliation (Phase 4) ──────────────────────────────────────────────
-
-    /**
-     * Discard prediction buffer entries confirmed by the server, then replay
-     * any unacknowledged commands against the snapped server state.
-     */
-    /**
-     * Server reconciliation entry point — PLAN.md Phase C3.
-     *
-     * Once the server acks a sequence number, discard confirmed entries from the
-     * prediction ring buffer.  The remainder are replayed against the snapped
-     * server state to re-converge the client.
-     *
-     * Implementation deferred to Phase C3:
-     *   1. Receive authoritative state from server (position, velocity, health).
-     *   2. Snap body to server state.
-     *   3. Replay all unacknowledged UserCommands in [serverAck+1 … localSequence].
-     *   4. This method already clears acknowledged entries so the buffer stays valid.
-     */
-    public void reconcile(int serverAck) {
-        for (int seq = serverAck; seq >= Math.max(0, serverAck - BUFFER_SIZE + 1); seq--) {
-            predictionBuffer[seq % BUFFER_SIZE] = null;
-        }
     }
 }
