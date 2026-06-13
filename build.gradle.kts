@@ -10,6 +10,21 @@ kotlin {
     jvmToolchain(17)
 }
 
+// ── Headless unit tests for the engine-free networking logic (com.game.net) ──
+// The Godot runtime can't instantiate native types (StreamPeerBuffer, CharacterBody3D),
+// so only the pure prediction/interpolation/queue algorithms are tested here — the parts
+// whose correctness (constant-speed playback, reconciliation convergence, in-order command
+// consumption) the F6/F7 manual pass can't measure. See NETWORK_REWRITE_PLAN.md Phase 8.
+dependencies {
+    testImplementation(platform("org.junit:junit-bom:5.10.2"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}
+
 godot {
     // ---------Setup-----------------
 

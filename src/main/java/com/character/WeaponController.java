@@ -1,6 +1,7 @@
 package com.character;
 
 import com.game.EventBus;
+import com.game.NetworkManager;
 import godot.annotation.*;
 import godot.api.*;
 import godot.core.Callable;
@@ -68,6 +69,9 @@ public class WeaponController extends Node {
   private WeaponItem[] weapons;
   private int activeSlotIndex  = 0;
   private int pendingSlotIndex = 0;
+  // Rolling shot counter (u8) replicated in each snapshot — remote peers play the fire cue when it
+  // changes (fire-as-state). On a puppet this is set from the wire via setReplicatedFireSeq.
+  private int fireSeq = 0;
 
   // Weapons queued for equip/drop; processed in _process (idle) to avoid
   // reparenting a RigidBody3D (CollisionObject) during a physics callback.
@@ -75,7 +79,24 @@ public class WeaponController extends Node {
   // Items already equipped during the current _process pass — see the race-guard
   // comment in equipWeapon(). Cleared at the start of each pass that has work to do.
   private final Set<WeaponItem> equippedThisPass = new HashSet<>();
-  private final List<WeaponItem> pendingDrops  = new ArrayList<>();
+  // Countdown (seconds) for a deferred throwable slot-clear; < 0 = idle. See clearActiveSlot
+  // for why the clear is held off (last-throw cue replication across a snapshot send).
+  private double pendingSlotClearCountdown = -1.0;
+  /** Hold the emptied throwable active this long so its throw fireSeq replicates (≥2 snapshot intervals at ~33 ms). */
+  private static final double SLOT_CLEAR_DELAY_SECONDS = 0.1;
+  // When true, requestEquip resolves the equip IMMEDIATELY instead of deferring to _process.
+  // Set by the network collect path (Pickup.applyReplicatedPickup), which runs in _process
+  // (NetworkManager's packet drain) — a safe, non-signal context where reparent is legal.
+  // Synchronous resolution is what makes a cluster of same-type pickups (e.g. 3 grenades)
+  // converge: each granted/echoed pickup fully equips before the next is processed, so the
+  // second sees the first in the slot and MERGES — identical outcome on host and every
+  // client, instead of the timing-dependent merge-vs-displace race that diverged inventories.
+  // The local body_entered collect path keeps deferring (it runs in a physics signal).
+  private boolean synchronousEquip = false;
+  // The slot is captured at queue time — it is nulled before _process drains the queue,
+  // and the replicated drop event (Phase E) is keyed by slot on the receiving peers.
+  private record PendingDrop(WeaponItem item, int slot) { }
+  private final List<PendingDrop> pendingDrops  = new ArrayList<>();
   // True when pendingDrops was populated by dropAllWeapons() (death); false for a
   // manual single-weapon drop. Controls which physics parameters are used.
   private boolean isDeathDrop = false;
@@ -100,6 +121,26 @@ public class WeaponController extends Node {
 
   public WeaponItem getCurrentWeaponItem() {
     return weapons[activeSlotIndex];
+  }
+
+  /** Active weapon's magazine (0 when fist/empty) — replicated per snapshot so puppets track ammo consumption. */
+  public int getActiveMagazine() {
+    WeaponItem w = getCurrentWeaponItem();
+    return w != null ? w.getMagazine() : 0;
+  }
+
+  /**
+   * Sets the active weapon's magazine from a replicated snapshot (puppet side only). Clears the
+   * slot if a consumable (throwable) emptied — mirrors the owner's onMagazineEmpty so a thrown-out
+   * grenade stack disappears on the puppet instead of lingering, and the host's manifest (built
+   * from this copy) stops listing phantom ammo. Never called on the owner's own body.
+   */
+  public void applyReplicatedActiveMagazine(int magazine) {
+    WeaponItem w = getCurrentWeaponItem();
+    if (w == null || w.isInfiniteAmmo || w.getMagazine() == magazine) return;
+    w.setMagazine(magazine);
+    notifyAmmoChange(w);
+    if (magazine == 0) w.onMagazineEmpty();
   }
 
   public int getWeaponCount() {
@@ -133,15 +174,20 @@ public class WeaponController extends Node {
       pendingEquips.clear();
       equippedThisPass.clear();
     }
+    // Deferred throwable slot-clear (held ~100 ms after the last throw — see clearActiveSlot).
+    if (pendingSlotClearCountdown >= 0.0) {
+      pendingSlotClearCountdown -= delta;
+      if (pendingSlotClearCountdown < 0.0) performActiveSlotClear();
+    }
     // Then process any pending drops (single manual drop or full death-drop batch)
     if (!pendingDrops.isEmpty()) {
-      List<WeaponItem> batch = new ArrayList<>(pendingDrops);
+      List<PendingDrop> batch = new ArrayList<>(pendingDrops);
       boolean death = isDeathDrop;
       pendingDrops.clear();
       isDeathDrop = false;
-      for (WeaponItem item : batch) {
-        if (death) returnWeaponToWorldOnDeath(item);
-        else       returnWeaponToWorld(item);
+      for (PendingDrop drop : batch) {
+        if (death) returnWeaponToWorldOnDeath(drop.item(), drop.slot());
+        else       returnWeaponToWorld(drop.item(), drop.slot());
       }
     }
   }
@@ -247,8 +293,21 @@ public class WeaponController extends Node {
    * body_entered signal (physics context) where reparent() is forbidden.
    */
   public void requestEquip(WeaponItem item) {
+    if (synchronousEquip) {
+      // Isolated single-item pass: equippedThisPass is cleared either side so the
+      // cross-item displacement guard in equipWeapon never fires here — sequential
+      // network grants resolve via merge (the second pickup sees the first), which is
+      // exactly the convergence we want.
+      equippedThisPass.clear();
+      equipWeapon(item);
+      equippedThisPass.clear();
+      return;
+    }
     if (!pendingEquips.contains(item)) pendingEquips.add(item);
   }
+
+  /** See {@link #synchronousEquip} — toggled by the network collect path around its equip. */
+  public void setSynchronousEquip(boolean on) { synchronousEquip = on; }
 
   /**
    * Equips {@code item} into the first free slot whose type matches the weapon's
@@ -326,7 +385,7 @@ public class WeaponController extends Node {
       bus.weaponPickedUp.emit(characterId, item.getDisplayName(), item.weaponIcon);
     }
 
-    if (displaced != null && displaced.shouldDropToWorld()) returnWeaponToWorld(displaced);
+    if (displaced != null && displaced.shouldDropToWorld()) returnWeaponToWorld(displaced, targetSlot);
     else if (displaced != null) displaced.setup(null, null, null);
   }
 
@@ -339,11 +398,12 @@ public class WeaponController extends Node {
   public void dropCurrentWeapon() {
     WeaponItem current = weapons[activeSlotIndex];
     if (current == null || !current.isDroppable) return;
-    weapons[activeSlotIndex] = null;
+    int slot = activeSlotIndex;
+    weapons[slot] = null;
     current.hide();
     // ThrowableItem with 0 carry count: clear refs but don't spawn a world pickup.
     if (current.shouldDropToWorld()) {
-      pendingDrops.add(current);
+      pendingDrops.add(new PendingDrop(current, slot));
     } else {
       current.setup(null, null, null);
     }
@@ -363,7 +423,7 @@ public class WeaponController extends Node {
       if (item == null || !item.isDroppable) continue;
       weapons[i] = null;
       item.hide();
-      pendingDrops.add(item);
+      pendingDrops.add(new PendingDrop(item, i));
     }
     isDeathDrop = true;
   }
@@ -384,8 +444,46 @@ public class WeaponController extends Node {
     w.useWeapon();
     weaponFired.emit(w.getFireRate() * 0.2f);
     ammoChanged.emit(w.getMagazine(), w.getReserve());
+    // Fire is replicated as STATE: bump the rolling shot counter that rides the snapshot stream.
+    // Remote peers play the muzzle/tracer cue when they see this change (NetworkController), so no
+    // separate (droppable) fire message is needed. u8 on the wire — only change-detection matters.
+    fireSeq = (fireSeq + 1) & 0xFF;
     // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
     if (!w.isInfiniteAmmo && w.getMagazine() == 0) w.onMagazineEmpty();
+  }
+
+  /** Rolling shot counter sampled into each snapshot (fire-as-state). */
+  public int getFireSeq() { return fireSeq; }
+
+  /** Mirrors the replicated counter onto a puppet so the host re-broadcasts the correct value. */
+  public void setReplicatedFireSeq(int seq) { fireSeq = seq & 0xFF; }
+
+  // One-shot guard for the cue-divergence diagnostic below — the cue fires per shot (up to
+  // ~10/s under sustained fire), so an unguarded print would flood the console.
+  private boolean loggedCueNoFirearm = false;
+
+  /** Network replay hook — plays the firing cosmetics (flash/audio + tracer) without consuming ammo or running hitscan. */
+  @RegisterFunction
+  public void playRemoteFireCue() {
+    WeaponItem w = getCurrentWeaponItem();
+    if (w != null && isArmed()) {
+      // Polymorphic cosmetic replay: firearms draw muzzle/tracer, throwable/projectile
+      // weapons spawn a non-damaging projectile so the grenade/rocket arc + explosion is
+      // seen on every peer (damage stays authority-side). Default no-op for the fist.
+      w.playRemoteFireCue();
+      return;
+    }
+    // The authority fired (its fireSeq advanced) but this puppet has no real active weapon to
+    // render it — the puppet's inventory/slot diverged from the owner's (the "host does not do
+    // any fire" symptom). Round 11 N1: count + log once so the divergence is visible; the
+    // MSG_INVENTORY sweep is what actually heals it.
+    com.game.net.NetStats.increment("cue_no_weapon");
+    if (!loggedCueNoFirearm) {
+      loggedCueNoFirearm = true;
+      GD.print("WeaponController: remote fire cue on '" + getOwner().getName()
+          + "' landed on empty/fist slot " + activeSlotIndex
+          + " — puppet inventory diverged (MSG_INVENTORY will reconcile)");
+    }
   }
 
   @RegisterFunction
@@ -435,6 +533,14 @@ public class WeaponController extends Node {
     showWeapon(activeSlotIndex);
     WeaponItem next = weapons[activeSlotIndex];
     if (next != null) {
+      // Lock firing through the draw-settle (mirrors the pickup-equip lockout in
+      // equipWeapon): the new weapon only becomes active here, and its equip animation
+      // raises it into the hand pose over the next frames. A held fire button could
+      // otherwise launch on the very first frame, while the muzzle is still mid-draw —
+      // a projectile/rocket spawned from that transient muzzle position can fire into the
+      // ground or the shooter's own body and detonate on self.
+      fireTimer.setWaitTime(1.0 / next.getSwitchSpeed());
+      fireTimer.start();
       animationController.onWeaponEquip(next.weaponPoseIndex);
       ammoChanged.emit(next.getMagazine(), next.getReserve());
     }
@@ -482,6 +588,19 @@ public class WeaponController extends Node {
   }
 
   /**
+   * Re-emits the active weapon's ammo so the owner's HUD reflects a networked pickup/merge
+   * that changed it. The throwable merge already calls notifyAmmoChange, but a replicated
+   * collect can update the active count through other paths (a fresh equip then a same-tick
+   * merge, or the slot becoming active mid-collect); this unconditional refresh after the
+   * collect resolves guarantees the HUD is never left on the pre-pickup count until the next
+   * manual weapon switch. No-op effect when the count didn't change (idempotent emit).
+   */
+  public void refreshActiveAmmoDisplay() {
+    WeaponItem w = getCurrentWeaponItem();
+    ammoChanged.emit(w != null ? w.getMagazine() : 0, w != null ? w.getReserve() : 0);
+  }
+
+  /**
    * Starts the fire timer using the given item's switch speed if it isn't already running.
    * Called by ThrowableItem after a merge pickup so rapid sequential pickups can't chain
    * into an accidental throw when the player holds the fire button.
@@ -501,6 +620,19 @@ public class WeaponController extends Node {
    * The active slot is guaranteed to hold the item being emptied — no search needed.
    */
   public void clearActiveSlot() {
+    // Hold the just-emptied throwable in the active slot briefly (resolved in _process) before
+    // freeing it and switching to fist. The throw's fireSeq is sampled into the snapshot AFTER
+    // this tick (gatherInput/sendOwnedState runs before applyInput/onWeaponFire in a tick, so
+    // the bumped counter first ships on the next throttled send ~33 ms later); if the slot
+    // cleared first, puppets would switch to fist before rendering the throw cue and the LAST
+    // grenade's cosmetic projectile would be lost (a single grenade would never show). The
+    // ~100 ms hold spans ≥2 snapshot intervals and is imperceptible — canUse() is already false
+    // at magazine 0, so it blocks no input. Re-arming via this same call refreshes the delay.
+    pendingSlotClearCountdown = SLOT_CLEAR_DELAY_SECONDS;
+  }
+
+  /** Performs the deferred {@link #clearActiveSlot} — frees the emptied item and activates the next slot. */
+  private void performActiveSlotClear() {
     WeaponItem item = weapons[activeSlotIndex];
     if (item == null) return;
     weapons[activeSlotIndex] = null;
@@ -627,7 +759,7 @@ public class WeaponController extends Node {
   }
 
   // Manual drop: throw forward at chest height (1.3 m gives clearance when crouching/crawling).
-  private void returnWeaponToWorld(WeaponItem item) {
+  private void returnWeaponToWorld(WeaponItem item, int slot) {
     CharacterBody3D character = (CharacterBody3D) getOwner();
     Vector3 spawnPos = character.getGlobalPosition().plus(new Vector3(0, 1.3f, 0));
     Vector3 forward  = character.getGlobalTransform().getBasis().getZ().times(-1f);
@@ -635,11 +767,12 @@ public class WeaponController extends Node {
         .plus(new Vector3(0, 4.0f, 0))
         .plus(character.getVelocity().times(0.3f));
     returnWeaponToWorld(item, spawnPos, impulse);
+    announceWeaponDropped(item, slot, spawnPos, impulse, false);
   }
 
   // Death drop: spawn higher (1.5 m) and scatter each weapon in a random direction
   // so multiple weapons fan out instead of piling on the same spot.
-  private void returnWeaponToWorldOnDeath(WeaponItem item) {
+  private void returnWeaponToWorldOnDeath(WeaponItem item, int slot) {
     CharacterBody3D character = (CharacterBody3D) getOwner();
     Vector3 spawnPos = character.getGlobalPosition().plus(new Vector3(0, 1.5f, 0));
     float   angle    = GD.randf() * (float) (Math.PI * 2.0);
@@ -648,6 +781,231 @@ public class WeaponController extends Node {
         .plus(new Vector3(0, (float) GD.randfRange(3.0f, 6.0f), 0))
         .plus(character.getVelocity().times(0.4f));
     returnWeaponToWorld(item, spawnPos, impulse);
+    announceWeaponDropped(item, slot, spawnPos, impulse, true);
+  }
+
+  /**
+   * Replicates a locally-originated drop (Phase E). Only two peers may ever announce:
+   * the character's OWNER for manual/displacement drops (the only peer whose input can
+   * trigger them), and the HOST for death drops (Character.onDied runs only where health
+   * is authoritative — including on the host's puppet of a dead client body, which the
+   * owning client itself never executes). A host displacing a weapon while applying a
+   * client's replicated equip announces nothing — the owner's own announcement converges
+   * everyone via the oldPickupId fallback (GameManager.applyReplicatedDrop).
+   *
+   * The originator rolls a fresh UUID and adopts it before sending, so after the event
+   * lands every peer agrees on the item's identity even if its previous path-derived id
+   * differed per peer (AI scene loadouts).
+   */
+  private void announceWeaponDropped(WeaponItem item, int slot, Vector3 spawnPos, Vector3 impulse, boolean deathDrop) {
+    if (!(getOwner() instanceof Character c) || c.characterInfo == null) return;
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    if (!(netNode instanceof NetworkManager net) || !net.isNetworked()) return;
+    boolean mayAnnounce = deathDrop ? net.isServer() : net.isAuthorityFor(c.characterInfo);
+    if (!mayAnnounce) return;
+    String oldPickupId = item.pickupId;
+    item.pickupId = java.util.UUID.randomUUID().toString();
+    net.sendWeaponDropped(c.characterInfo.characterId, slot, oldPickupId, item.pickupId,
+        spawnPos, impulse, item.getMagazine(), item.getReserve());
+  }
+
+  /**
+   * Executes a replicated MSG_WEAPON_DROPPED on this peer's copy of the character: removes
+   * the weapon from {@code slot} and returns it to the world at the originator's
+   * position/impulse (never re-rolled — death scatter is randomized at the source), adopting
+   * {@code newPickupId} and the carried ammo so the world item is identical everywhere.
+   * Returns false when the slot is already empty (the displacement race) so the caller can
+   * fall back to converging the already-dropped world item by its old id.
+   */
+  public boolean applyReplicatedDrop(int slot, String newPickupId, Vector3 spawnPos, Vector3 impulse,
+      int magazine, int reserve) {
+    WeaponItem item = getWeaponItem(slot);
+    if (item == null) return false;
+    boolean wasActive = slot == activeSlotIndex;
+    weapons[slot] = null;
+    item.hide();
+    returnWeaponToWorld(item, spawnPos, impulse);
+    item.pickupId = newPickupId;
+    item.setMagazine(magazine);
+    item.setReserve(reserve);
+    if (wasActive) activateFirstAvailableSlot();
+    return true;
+  }
+
+  // ── Inventory state reconciliation (Round 11 N2 — MSG_INVENTORY) ──────────
+  //
+  // The event-replicated inventory (MSG_PICKUP_TAKEN / MSG_WEAPON_DROPPED) can diverge
+  // permanently from a single missed/raced event, and some inventory was never
+  // event-replicated at all (AI rifles equipped at runtime via requestEquip). The host
+  // periodically broadcasts each character's authoritative slot manifest; this pair
+  // builds it (host side) and reconciles toward it (receiver side).
+
+  /** Maximum pickupId length the wire accepts (NetworkManager.MAX_STRING_LENGTH) — oversized path-derived loadout ids are sent as "" (receiver keeps its local id). */
+  private static final int MAX_WIRE_ID_LENGTH = 64;
+
+  /** Host side: snapshot of every occupied slot (slot 0/fist excluded — permanent scene furniture). */
+  public List<com.game.NetMessageCodec.InventorySlotEntry> buildInventoryEntries() {
+    List<com.game.NetMessageCodec.InventorySlotEntry> entries = new ArrayList<>();
+    for (int slot = 1; slot < weapons.length; slot++) {
+      WeaponItem w = weapons[slot];
+      if (w == null) continue;
+      String scenePath = w.getSceneFilePath();
+      String pickupId = (w.pickupId != null && !w.pickupId.isEmpty() && w.pickupId.length() <= MAX_WIRE_ID_LENGTH)
+          ? w.pickupId : "";
+      entries.add(new com.game.NetMessageCodec.InventorySlotEntry(slot,
+          w.weaponId != null ? w.weaponId : "",
+          scenePath != null ? scenePath : "",
+          pickupId, w.getMagazine(), w.getReserve()));
+    }
+    return entries;
+  }
+
+  /**
+   * Receiver side: reconcile this character's slots toward the host's manifest.
+   *
+   * <p>{@code addOnly} is true for the body this peer OWNS: its inventory is driven by its
+   * own input plus the reliable event echoes, and overwriting it from a (lag-stale) manifest
+   * would re-create the Round 10.2 echo feedback loop — so for owned bodies we only converge
+   * pickupId on a matching slot, never remove items, touch ammo, or resurrect a slot the owner
+   * emptied (the throwable-restock fix — see the loop body). Non-owned puppets reconcile fully:
+   * match per slot by
+   * weaponId, converge ammo + pickupId on match, equip from the manifest on mismatch
+   * (preferring the matching local world pickup over instantiating a duplicate), and discard
+   * local extras WITHOUT dropping them to the world (a reconcile drop would spawn orphan,
+   * unsynced pickups).
+   *
+   * <p>Skipped entirely while local equips/drops are still queued — the manifest was built
+   * before them and would fight their outcome; the next sweep (~300 ms) reconciles cleanly.
+   */
+  public void applyReplicatedInventory(List<com.game.NetMessageCodec.InventorySlotEntry> entries, boolean addOnly) {
+    if (!pendingEquips.isEmpty() || !pendingDrops.isEmpty()) {
+      com.game.net.NetStats.increment("inventory_apply_deferred");
+      return;
+    }
+    Map<Integer, com.game.NetMessageCodec.InventorySlotEntry> bySlot = new HashMap<>();
+    for (com.game.NetMessageCodec.InventorySlotEntry e : entries) bySlot.put(e.slot(), e);
+
+    for (int slot = 1; slot < weapons.length; slot++) {
+      com.game.NetMessageCodec.InventorySlotEntry entry = bySlot.get(slot);
+      WeaponItem local = weapons[slot];
+
+      if (entry == null) {
+        if (local != null && !addOnly) {
+          com.game.net.NetStats.increment("inventory_reconciled_remove");
+          discardSlotItem(slot);
+        }
+        continue;
+      }
+
+      if (local != null) {
+        if (manifestMatches(local, entry)) {
+          if (!addOnly) {
+            local.setMagazine(entry.magazine());
+            local.setReserve(entry.reserve());
+            notifyAmmoChange(local);
+          }
+          if (!entry.pickupId().isEmpty()) local.pickupId = entry.pickupId();
+          continue;
+        }
+        if (addOnly) continue;   // owned body: never displace what the owner is holding
+        com.game.net.NetStats.increment("inventory_reconciled_replace");
+        discardSlotItem(slot);
+      }
+
+      // Reached only when the slot is locally empty but the manifest lists an item.
+      // For an OWNED body, do NOT resurrect it: an owned body's slot presence is driven by
+      // its own input and the RELIABLE, ordered grant/drop events — never by a lag-stale
+      // manifest. This was the throwable-restock bug: a client throws its last grenade and
+      // clears the slot, but the host's copy hasn't caught the throw (consumption rides no
+      // reliable event, and the active-magazine snapshot can't carry the same-frame
+      // slot-clear), so its manifest still lists the stack and the next sweep re-instantiated
+      // it. The owner's inventory is restored on (re)join by baseline spawns + pickups, not by
+      // this path; AI inventory is non-owned (full reconcile), so its runtime rifle still heals.
+      if (addOnly) {
+        com.game.net.NetStats.increment("inventory_owned_no_resurrect");
+        continue;
+      }
+      equipReconciled(slot, entry);
+    }
+  }
+
+  /** Same item identity? weaponId is the designed key; scenePath is the fallback for items with no id set. */
+  private boolean manifestMatches(WeaponItem local, com.game.NetMessageCodec.InventorySlotEntry entry) {
+    String localId = local.weaponId != null ? local.weaponId : "";
+    if (!localId.isEmpty() || !entry.weaponId().isEmpty()) return localId.equals(entry.weaponId());
+    String localScene = local.getSceneFilePath();
+    return localScene != null && localScene.equals(entry.scenePath());
+  }
+
+  /**
+   * Removes a slot's item during reconciliation — clears refs and frees it, never returns
+   * it to the world (the manifest says the authority doesn't have it; a world drop here
+   * would create an orphan pickup no other peer knows about).
+   */
+  private void discardSlotItem(int slot) {
+    WeaponItem item = weapons[slot];
+    if (item == null) return;
+    boolean wasActive = slot == activeSlotIndex;
+    weapons[slot] = null;
+    item.setup(null, null, null);
+    item.hide();
+    item.queueFree();
+    if (wasActive) activateFirstAvailableSlot();
+  }
+
+  /**
+   * Materialises a manifest entry into {@code slot}: prefer adopting the matching local
+   * world pickup by the manifest's pickupId (kills the ghost-pickup case when healing a
+   * lost grant echo), else instantiate the validated weapon scene — the same
+   * add-to-tree-then-equip shape DebugHarness.equipDebugRifle uses. Runs at idle time
+   * (NetworkManager._process), so the RigidBody3D reparent is safe.
+   */
+  private void equipReconciled(int slot, com.game.NetMessageCodec.InventorySlotEntry entry) {
+    WeaponItem item = findWorldPickupById(entry.pickupId());
+    if (item == null) item = instantiateWeaponScene(entry.scenePath());
+    if (item == null) {
+      com.game.net.NetStats.increment("inventory_equip_failed");
+      GD.print("WeaponController: inventory reconcile could not materialise '" + entry.weaponId()
+          + "' (scene '" + entry.scenePath() + "') for slot " + slot + " on '" + getOwner().getName() + "'");
+      return;
+    }
+    if (!entry.pickupId().isEmpty()) item.pickupId = entry.pickupId();
+    item.setMagazine(entry.magazine());
+    item.setReserve(entry.reserve());
+    item.onPickedUp();
+    injectCharacterRefs(item);
+    weapons[slot] = item;
+    if (slot == activeSlotIndex) {
+      moveWeaponToHand(item);
+      if (animationController != null) animationController.onWeaponEquip(item.weaponPoseIndex);
+      ammoChanged.emit(item.getMagazine(), item.getReserve());
+    } else {
+      moveWeaponToHolster(item);
+    }
+    com.game.net.NetStats.increment("inventory_reconciled_equip");
+  }
+
+  /** Resolves a manifest pickupId to an un-taken WeaponItem in the world "pickups" group, or null. */
+  private WeaponItem findWorldPickupById(String pickupId) {
+    if (pickupId == null || pickupId.isEmpty() || getTree() == null) return null;
+    for (Node node : getTree().getNodesInGroup(new StringName(com.environment.Pickup.PICKUPS_GROUP))) {
+      if (node instanceof WeaponItem w && pickupId.equals(w.pickupId) && !w.isTaken()) return w;
+    }
+    return null;
+  }
+
+  /** Loads + instantiates a manifest weapon scene into the current scene tree (must be in-tree before socket reparenting). Path already validated by NetworkManager.isValidInventory. */
+  private WeaponItem instantiateWeaponScene(String scenePath) {
+    if (scenePath == null || scenePath.isEmpty()) return null;
+    java.lang.Object loaded = GD.load(scenePath);
+    if (!(loaded instanceof PackedScene scene)) return null;
+    Node instance = scene.instantiate();
+    if (!(instance instanceof WeaponItem item)) {
+      instance.queueFree();
+      return null;
+    }
+    getTree().getCurrentScene().addChild(item);
+    return item;
   }
 
   /**

@@ -49,23 +49,6 @@ radius = 0.7
 [sub_resource type="SphereShape3D" id="SphereShape3D_cam"]
 radius = 0.1
 
-[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_net01"]
-properties/0/path = NodePath(".:global_position")
-properties/0/spawn = true
-properties/0/replication_mode = 1
-properties/1/path = NodePath(".:velocity")
-properties/1/spawn = false
-properties/1/replication_mode = 1
-properties/2/path = NodePath(".:combat")
-properties/2/spawn = true
-properties/2/replication_mode = 2
-properties/3/path = NodePath(".:stance_ordinal")
-properties/3/spawn = true
-properties/3/replication_mode = 2
-properties/4/path = NodePath("Health:sync_health")
-properties/4/spawn = true
-properties/4/replication_mode = 2
-
 [node name="Character" type="CharacterBody3D" unique_id=802038165 node_paths=PackedStringArray("weapon_controller")]
 collision_layer = 2
 collision_mask = 19
@@ -210,9 +193,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 1.4210855e-14, 0, 1, 0, 0, 0)
 shape = SubResource("SphereShape3D_cam")
 
 [node name="Proxy" type="Node3D" parent="TPSCameraController/Yaw/Pitch/Pivot/SpringArm" unique_id=1900000201]
-
-[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1900000099]
-replication_config = SubResource("SceneReplicationConfig_net01")
 
 [node name="ActiveCamera" type="Camera3D" parent="." unique_id=1900000042]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3841858e-07, 0)

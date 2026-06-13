@@ -1,7 +1,10 @@
 package com.environment;
 
+import com.character.Controllable;
 import com.character.WeaponController;
 import com.game.EventBus;
+import com.game.GameManager;
+import com.game.NetworkManager;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Area3D;
@@ -24,8 +27,21 @@ public class AmmoRefill extends Area3D {
     Node character = resolveCharacter(body);
     if (character == null) return;
 
+    // Host-authoritative refill (Phase F): networked, only the HOST detects the overlap —
+    // for every body including client puppets (the station area is large, so the puppet's
+    // ~50-100 ms interp delay is immaterial) — applies it, and mirrors it to every peer
+    // via the WORLD_EVENT seam. Single-player: isServer() is true with no connection, so
+    // the local apply below runs unchanged and the broadcast no-ops.
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    NetworkManager net = netNode instanceof NetworkManager n ? n : null;
+    if (net != null && net.isNetworked() && !net.isServer()) return;
+
     WeaponController wc = (WeaponController) character.getNode(WEAPON_CONTROLLER_PATH);
     wc.fillWeaponAmmo();
+
+    if (net != null && character instanceof Controllable c && c.getCharacterInfo() != null) {
+      net.broadcastWorldEvent(GameManager.WORLD_EVENT_AMMO_REFILL, c.getCharacterInfo().characterId, 0f);
+    }
 
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) bus.ammoPickedUp.emit(0);
@@ -37,4 +53,5 @@ public class AmmoRefill extends Area3D {
     if (owner != null && owner.hasNode(WEAPON_CONTROLLER_PATH)) return owner;
     return null;
   }
+
 }

@@ -22,10 +22,12 @@ properties = [
     remove_on_pickup,
 	pause_on_pickup,
 	require_interact,
-	pickup_cooldown_after_drop
+	pickup_cooldown_after_drop,
+	pickup_id
 ]
 functions = [
-    _process,
+    _ready,
+	_process,
 	on_body_entered,
 	on_body_exited,
 	resume_from_pause

@@ -61,6 +61,7 @@ public class MeleeItem extends WeaponItem {
     @RegisterFunction
     @Override
     public void _ready() {
+        super._ready();  // Pickup._ready — group + pickupId registration for replication
         Node ht = getNodeOrNull("HitTimer");
         if (ht instanceof Timer t) hitTimer = t;
         swingOffsets = buildOffsets(coneAngleDeg);

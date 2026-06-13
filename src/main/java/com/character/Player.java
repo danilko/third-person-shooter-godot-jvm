@@ -19,8 +19,9 @@ import godot.core.StringNames;
  * nearbyVehicle is set/cleared by Vehicle.onEntranceBodyEntered/Exited when
  * the player walks into or out of a vehicle's entrance trigger zone. When the
  * player presses "use" (enterExit in the command) and nearbyVehicle is set,
- * applyInput delegates to Vehicle.tryEnter(this) rather than processing normal
- * character inputs.
+ * applyInput delegates to Vehicle.requestEnter(this) — direct seat in
+ * single-player, host-arbitrated grant when networked — rather than processing
+ * normal character inputs.
  */
 @RegisterClass
 public class Player extends Character {
@@ -47,8 +48,16 @@ public class Player extends Character {
     @Override
     protected void applyInput(UserCommand cmd, double delta) {
         if (cmd.enterExit && nearbyVehicle != null) {
-            nearbyVehicle.tryEnter(this);
-            return; // skip normal inputs this tick
+            // A destroyed vehicle is freed without firing its EntranceArea body_exited, so
+            // this reference can dangle — calling into a freed object throws (Round 11 N3).
+            if (!godot.global.GD.isInstanceValid(nearbyVehicle)) {
+                nearbyVehicle = null;
+            } else {
+                // Host-arbitrated when networked (the seat change lands on the grant echo);
+                // direct tryEnter in single-player — see Vehicle.requestEnter (Round 11 N3).
+                nearbyVehicle.requestEnter(this);
+                return; // skip normal inputs this tick
+            }
         }
         super.applyInput(cmd, delta);
     }
@@ -58,6 +67,23 @@ public class Player extends Character {
     public void onDied() {
         setProcessInput(false);
         super.onDied();
+        Node eventBusNode = getNodeOrNull("/root/EventBus");
+        if (eventBusNode instanceof EventBus bus) bus.playerDied.emit();
+    }
+
+    /**
+     * Network death for the locally-owned player (Round 11 N2 — MSG_ELIMINATION): the host
+     * owns our health, so our own death arrives over the wire instead of through
+     * Health.applyDamage → onDied. Plays the shared death visuals and the player-death UI
+     * signal, but NEVER drops weapons — death drops are host-announced (MSG_WEAPON_DROPPED)
+     * and local drops here would duplicate them as orphan pickups. Idempotent via the
+     * deathVisualsApplied guard.
+     */
+    @Override
+    public void applyReplicatedDeath() {
+        if (deathVisualsApplied) return;
+        setProcessInput(false);
+        super.applyReplicatedDeath();
         Node eventBusNode = getNodeOrNull("/root/EventBus");
         if (eventBusNode instanceof EventBus bus) bus.playerDied.emit();
     }

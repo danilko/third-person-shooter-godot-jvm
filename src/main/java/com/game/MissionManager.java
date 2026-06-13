@@ -40,6 +40,34 @@ public class MissionManager extends Node {
     private boolean active = false;
     private final Map<String, Integer> remainingByFaction = new HashMap<>();
 
+    /**
+     * Server-side join/rejoin registry (Part G — Step 5), keyed by peer id.
+     * Populated/depopulated by GameManager's peerConnected/peerDisconnected
+     * handlers (Step 6); NetworkManager resolves characterId → Character via
+     * the "characters" group, so this never needs to cache live Node references.
+     */
+    public final Map<Integer, PlayerSession> activeSessions = new HashMap<>();
+
+    public void registerSession(PlayerSession session) {
+        activeSessions.put(session.peerId, session);
+    }
+
+    public PlayerSession getSession(int peerId) {
+        return activeSessions.get(peerId);
+    }
+
+    public void removeSession(int peerId) {
+        activeSessions.remove(peerId);
+    }
+
+    /** Finds a disconnected session owning the given characterId — the rejoin lookup Step 6 needs. */
+    public PlayerSession findDisconnectedSessionByCharacterId(String characterId) {
+        for (PlayerSession session : activeSessions.values()) {
+            if (!session.isConnected && characterId.equals(session.characterId)) return session;
+        }
+        return null;
+    }
+
     @RegisterFunction
     @Override
     public void _ready() {

@@ -9,6 +9,7 @@ import com.character.WeaponItem;
 import com.game.MissionInfo;
 import com.game.MissionManager;
 import com.game.MissionObjectiveType;
+import com.game.NetworkManager;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.InputEvent;
@@ -38,6 +39,9 @@ import java.util.UUID;
  *       Characters container, for D1/D2-style population testing later.
  * F11 — spawnTestAI(1, PLAYER): drops one "player"-faction ally AICharacter, e.g.
  *       to test escort/squad behaviour against the F10 hostiles.
+ * F6  — NetworkManager.hostServer(DEBUG_PORT): starts an ENet server for LAN testing
+ *       (PLAN.md Part G). F7 — joinServer("127.0.0.1", DEBUG_PORT): connects as a
+ *       client to a host on the same machine. Edit DEBUG_HOST for a real LAN peer.
  * Every AI spawned by either binding is equipped with an AR4 rifle (see
  * equipDebugRifle) so it fights at range instead of relying on its bare fists.
  *
@@ -53,17 +57,64 @@ public class DebugHarness extends Node {
             "res://src/main/resources/com/weapon/AR4.tscn";
     private static final StringName CHARACTERS_GROUP = new StringName("characters");
 
+    private static final int DEBUG_PORT = 7777;
+    private static final String DEBUG_HOST = "127.0.0.1";
+
     @RegisterFunction
     @Override
     public void _input(InputEvent event) {
         if (!(event instanceof InputEventKey iek) || !iek.isPressed() || iek.isEcho()) return;
 
         if (iek.getKeycode() == Key.F9) {
-            startDebugMission();
+            if (canSpawnLocally()) startDebugMission();
         } else if (iek.getKeycode() == Key.F10) {
-            spawnTestAI(5, Faction.ENEMY, "Debug Spawn");
+            if (canSpawnLocally()) spawnTestAI(5, Faction.ENEMY, "Debug Spawn");
         } else if (iek.getKeycode() == Key.F11) {
-            spawnTestAI(1, Faction.PLAYER, "Debug Ally");
+            if (canSpawnLocally()) spawnTestAI(1, Faction.PLAYER, "Debug Ally");
+        } else if (iek.getKeycode() == Key.F6) {
+            hostDebugServer();
+        } else if (iek.getKeycode() == Key.F7) {
+            joinDebugServer();
+        }
+    }
+
+    /**
+     * F9/F10/F11 instantiate bodies directly into the local "characters" group —
+     * fine in single-player/host (where the server is the local process and
+     * announceSpawnIfHosting replicates them), but on a network client they would
+     * create local-only, non-replicated bodies the server never learns about:
+     * exactly the "AI moves on host only, spawn position differs" desync the
+     * "server is the sole spawn authority" principle (NETWORK_REWRITE_PLAN.md
+     * Phase 7 — handleSpawnMessage's isServer() guard) exists to prevent.
+     */
+    private boolean canSpawnLocally() {
+        Node managerNode = getNodeOrNull("/root/NetworkManager");
+        if (managerNode instanceof NetworkManager manager && manager.isNetworked() && !manager.isServer()) {
+            GD.print("DebugHarness: ignoring local spawn/mission key — only the host may author world population while networked");
+            return false;
+        }
+        return true;
+    }
+
+    private void hostDebugServer() {
+        Node managerNode = getNodeOrNull("/root/NetworkManager");
+        if (managerNode instanceof NetworkManager manager) {
+            manager.hostServer(DEBUG_PORT);
+        }
+    }
+
+    private void joinDebugServer() {
+        Node managerNode = getNodeOrNull("/root/NetworkManager");
+        if (managerNode instanceof NetworkManager manager) {
+            manager.joinServer(DEBUG_HOST, DEBUG_PORT);
+        }
+    }
+
+    /** F10/F11 spawn AI locally on whichever instance presses the key — when that instance is hosting, propagate the new body to connected clients via MSG_SPAWN (Phase 7's "live AI spawn propagates" verification). */
+    private void announceSpawnIfHosting(Character character) {
+        Node managerNode = getNodeOrNull("/root/NetworkManager");
+        if (managerNode instanceof NetworkManager manager && manager.isNetworked() && manager.isServer()) {
+            manager.announceSpawn(character);
         }
     }
 
@@ -133,6 +184,7 @@ public class DebugHarness extends Node {
                     GD.randfRange(-12.0f, 8.0f)));
 
             equipDebugRifle(ai, container);
+            announceSpawnIfHosting(ai);
         }
 
         GD.print("DebugHarness: spawned " + count + " '" + faction + "' test AI");

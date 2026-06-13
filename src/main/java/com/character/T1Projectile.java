@@ -35,6 +35,13 @@ public class T1Projectile extends RigidBody3D implements Detonatable {
     public String    weaponDisplayName = "Grenade";
     public Texture2D weaponIcon;
 
+    /**
+     * Cosmetic copy spawned on non-authority peers (puppet replay of a remote throw — see
+     * WeaponController.playRemoteFireCue): plays the explosion VFX but applies NO damage, so
+     * every peer sees the grenade + blast while damage stays single-sourced on the authority.
+     */
+    public boolean cosmetic = false;
+
     private float   fuseCountdown = 0f;
     private boolean detonated     = false;
 
@@ -59,9 +66,13 @@ public class T1Projectile extends RigidBody3D implements Detonatable {
         detonated = true;
         Node m = getTree().getFirstNodeInGroup("explosion_manager");
         if (m instanceof ExplosionManager mgr) {
-            mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
-                                 explosionPushForce, attackerName, attackerFaction,
-                                 weaponDisplayName, weaponIcon, null);
+            if (cosmetic) {
+                mgr.spawnExplosion(getGlobalPosition());   // VFX only — damage is authority-side
+            } else {
+                mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
+                                     explosionPushForce, attackerName, attackerFaction,
+                                     weaponDisplayName, weaponIcon, null);
+            }
         }
         queueFree();
     }

@@ -55,6 +55,7 @@ public class ProjectileItem extends WeaponItem {
     @RegisterFunction
     @Override
     public void _ready() {
+        super._ready();  // Pickup._ready — group + pickupId registration for replication
         Node muzzle = getNodeOrNull("Muzzle");
         Node vfx    = (muzzle != null) ? muzzle.getNodeOrNull("MuzzleVFX") : null;
         if (vfx != null) {
@@ -81,7 +82,20 @@ public class ProjectileItem extends WeaponItem {
         playFireAudio();
         triggerMuzzleFlash();
         applyRecoil();
-        spawnProjectile();
+        spawnProjectile(false);
+    }
+
+    /**
+     * Puppet replay of a remote launch (Round 11 — WeaponController.playRemoteFireCue):
+     * fire audio + muzzle flash + a COSMETIC rocket aimed at the replicated aim point, so
+     * every peer sees the rocket fly and explode. No ammo, no recoil, no damage — all
+     * authority-side.
+     */
+    @Override
+    public void playRemoteFireCue() {
+        playFireAudio();
+        triggerMuzzleFlash();
+        spawnProjectile(true);
     }
 
     @Override
@@ -116,10 +130,8 @@ public class ProjectileItem extends WeaponItem {
         c.applyRecoil(recoil, horizRecoil);
     }
 
-    private void spawnProjectile() {
-        if (projectileScene == null || weaponController == null || owningCharacter == null) return;
-        RayCast3D aimRay = weaponController.getAimRay();
-        if (aimRay == null) return;
+    private void spawnProjectile(boolean cosmetic) {
+        if (projectileScene == null || owningCharacter == null) return;
 
         // Spawn at Muzzle marker if present; fall back to character shoulder.
         Node muzzle = getNodeOrNull("Muzzle");
@@ -127,16 +139,25 @@ public class ProjectileItem extends WeaponItem {
                 ? m3d.getGlobalPosition()
                 : owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.0f, 0f));
 
-        // Aim direction: when the ray hits something, steer from muzzle → hit point so
-        // the rocket converges exactly on the crosshair target (corrects muzzle offset).
-        // When the ray misses (sky / max range), fall back to the raw ray direction.
+        // Authority: precise aimRay (steer to crosshair). Puppet replay: the replicated aim
+        // point (no active aimRay on a puppet — same source FirearmItem.playRemoteFireCue uses).
         Vector3 aimDir;
-        if (aimRay.isColliding()) {
-            aimDir = aimRay.getCollisionPoint().minus(spawnPos).normalized();
+        if (cosmetic) {
+            if (!(owningCharacter instanceof Character c)) return;
+            Vector3 dir = c.getAimTargetPosition().minus(spawnPos);
+            if (dir.lengthSquared() < 1e-6f) return;
+            aimDir = dir.normalized();
         } else {
-            Vector3 rayOrigin = aimRay.getGlobalPosition();
-            Vector3 rayEnd    = aimRay.toGlobal(aimRay.getTargetPosition());
-            aimDir = rayEnd.minus(rayOrigin).normalized();
+            if (weaponController == null) return;
+            RayCast3D aimRay = weaponController.getAimRay();
+            if (aimRay == null) return;
+            if (aimRay.isColliding()) {
+                aimDir = aimRay.getCollisionPoint().minus(spawnPos).normalized();
+            } else {
+                Vector3 rayOrigin = aimRay.getGlobalPosition();
+                Vector3 rayEnd    = aimRay.toGlobal(aimRay.getTargetPosition());
+                aimDir = rayEnd.minus(rayOrigin).normalized();
+            }
         }
 
         Node projectile = projectileScene.instantiate();
@@ -144,13 +165,16 @@ public class ProjectileItem extends WeaponItem {
         // Inject all parameters before the node enters the tree.
         if (projectile instanceof RocketProjectile rp) {
             rp.speed              = projectileSpeed;
+            rp.cosmetic           = cosmetic;
             rp.explosionRadius    = explosionRadius;
             rp.explosionMaxDamage = explosionMaxDamage;
             rp.explosionPushForce = explosionPushForce;
-            rp.attackerName       = resolveAttackerName();
-            rp.attackerFaction    = resolveAttackerFaction();
-            rp.weaponDisplayName  = getDisplayName();
-            rp.weaponIcon         = weaponIcon;
+            if (!cosmetic) {
+                rp.attackerName       = resolveAttackerName();
+                rp.attackerFaction    = resolveAttackerFaction();
+                rp.weaponDisplayName  = getDisplayName();
+                rp.weaponIcon         = weaponIcon;
+            }
         }
 
         getTree().getCurrentScene().addChild(projectile);

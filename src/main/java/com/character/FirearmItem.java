@@ -2,6 +2,7 @@ package com.character;
 
 import com.environment.BulletTracerManager;
 import com.environment.HitInfo;
+import com.game.NetworkManager;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -50,6 +51,7 @@ public class FirearmItem extends WeaponItem {
   @RegisterFunction
   @Override
   public void _ready() {
+    super._ready();  // Pickup._ready — group + pickupId registration for replication
     Node muzzle = getNodeOrNull("Muzzle");
     Node vfx    = (muzzle != null) ? muzzle.getNodeOrNull("MuzzleVFX") : null;
     if (vfx != null) {
@@ -72,11 +74,43 @@ public class FirearmItem extends WeaponItem {
   public void useWeapon() {
     isWeaponFired = true;
     decrementMagazine();
-    playFireAudio();
-    triggerMuzzleFlash();
+    playFireCue();
     applyRecoil();
     currentBloom = Math.min(currentBloom + bloomPerShot, bloomMax);
     for (int i = 0; i < pelletCount; i++) performHitscan();
+  }
+
+  /**
+   * Cosmetic fire feedback only — audio + muzzle flash, no ammo/hitscan side effects.
+   * Split out of {@link #useWeapon} so {@code WeaponController.playRemoteFireCue}
+   * can replay the same cue on non-authority peers via NetworkManager.broadcastWeaponFire
+   * without re-running hit detection (which stays local to the firing/authoritative peer).
+   */
+  public void playFireCue() {
+    playFireAudio();
+    triggerMuzzleFlash();
+  }
+
+  /** Visual length of a remote tracer when the peer has no local hit point — matches the no-collision fallback in {@link #spawnBulletTracer}. */
+  private static final float REMOTE_TRACER_LENGTH = 200f;
+
+  /**
+   * Remote cosmetic replay (non-authority peers): muzzle flash + fire audio + a tracer drawn from
+   * this puppet's own muzzle toward its replicated aim point. Triggered when the snapshot's fireSeq
+   * counter changes (fire is replicated as state — see DecodedSnapshot.fireSeq). Never consumes ammo
+   * or runs hitscan; damage is authority-only and resolved separately. Both the muzzle position and
+   * the aim point are already replicated onto this puppet, so no per-shot origin/direction is sent.
+   */
+  public void playRemoteFireCue() {
+    playFireCue();
+    if (!(owningCharacter instanceof Character c)) return;
+    Vector3 origin = weaponMuzzle().getGlobalPosition();
+    Vector3 dir = c.getAimTargetPosition().minus(origin);
+    if (dir.lengthSquared() < 1e-6f) return;
+    BulletTracerManager tm = getBulletTracerManager();
+    if (tm != null) {
+      tm.spawnTracer(origin, origin.plus(dir.normalized().times(REMOTE_TRACER_LENGTH)));
+    }
   }
 
   @Override
@@ -158,10 +192,23 @@ public class FirearmItem extends WeaponItem {
       ray.forceRaycastUpdate();
     }
 
-    if (ray.isColliding() &&
-        ray.getCollisionPoint().minus(ray.getGlobalTransform().getOrigin()).length() > 0.1) {
-      Object collider = ray.getCollider();
-      Node hitNode = (collider instanceof Node n) ? n : null;
+    boolean hit = ray.isColliding()
+        && ray.getCollisionPoint().minus(ray.getGlobalTransform().getOrigin()).length() > 0.1;
+    Node hitNode = (hit && ray.getCollider() instanceof Node n) ? n : null;
+
+    if (isNetworkedClient()) {
+      // Host-resolved bullets: predict the cosmetics here (muzzle/recoil/bloom/tracer already done),
+      // but DON'T apply damage — send the post-spread ray to the host, which raycasts it against
+      // authoritative positions and applies the damage. Show local impact VFX only (no Health touch).
+      Vector3 origin = ray.getGlobalPosition();
+      Vector3 dir = ray.toGlobal(ray.getTargetPosition()).minus(origin).normalized();
+      sendShotToHost(origin, dir);
+      if (hit) {
+        var im = getImpactManager();
+        if (im != null) im.processVisualHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()));
+      }
+    } else if (hit) {
+      // Server / single-player: resolve fully and locally (VFX + damage).
       var im = getImpactManager();
       if (im != null) {
         im.processHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()),
@@ -174,6 +221,57 @@ public class FirearmItem extends WeaponItem {
     }
 
     spawnBulletTracer(ray);
+  }
+
+  /**
+   * Host-side resolution of a client's MSG_SHOT (Round 8 — "client-predicted + host-resolved").
+   * Re-aims this weapon's AimRay along the client-reported world ray (post-spread already baked in,
+   * so no extra spread here) and resolves the hit authoritatively — damage, impact VFX, tracer — then
+   * restores the ray. Sign/rotation-agnostic: {@code toLocal} makes the cast land exactly on
+   * {@code origin + dir*range} regardless of the ray's resting orientation. The AimRay already
+   * excludes the shooter's own physical bones (Character._ready), so self-hits are impossible.
+   */
+  public void resolveServerShot(Vector3 origin, Vector3 direction) {
+    RayCast3D ray = getEffectiveAimRay();
+    if (ray == null || direction.lengthSquared() < 1e-6f) return;
+
+    Vector3 savedPos = ray.getGlobalPosition();
+    Vector3 savedTarget = ray.getTargetPosition();
+    float range = (float) Math.max(50.0, savedTarget.length());
+
+    ray.setGlobalPosition(origin);
+    ray.setTargetPosition(ray.toLocal(origin.plus(direction.normalized().times(range))));
+    ray.forceRaycastUpdate();
+
+    if (ray.isColliding() && ray.getCollisionPoint().minus(origin).length() > 0.1) {
+      Node hitNode = (ray.getCollider() instanceof Node n) ? n : null;
+      var im = getImpactManager();
+      if (im != null) {
+        im.processHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()),
+                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction());
+      }
+    }
+    // No tracer here: this runs on the host for a client's shot, and the host's (and every other
+    // viewer's) muzzle/tracer cue rides the shooter's snapshot fireSeq. Drawing one here too would
+    // double the tracer on the host. Damage/impact above is the host's only job for a relayed shot.
+
+    ray.setTargetPosition(savedTarget);
+    ray.setGlobalPosition(savedPos);
+  }
+
+  /** True on a networked non-host peer — its firearm shots are predicted locally but resolved by the host. */
+  private boolean isNetworkedClient() {
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    return netNode instanceof NetworkManager net && net.isNetworked() && !net.isServer();
+  }
+
+  /** Sends this shot's post-spread ray to the host for authoritative resolution. */
+  private void sendShotToHost(Vector3 origin, Vector3 direction) {
+    if (!(owningCharacter instanceof Character c) || c.characterInfo == null || weaponController == null) return;
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    if (netNode instanceof NetworkManager net) {
+      net.sendShot(c.characterInfo.characterId, origin, direction, weaponController.getWeapon());
+    }
   }
 
   private void spawnBulletTracer(RayCast3D ray) {
