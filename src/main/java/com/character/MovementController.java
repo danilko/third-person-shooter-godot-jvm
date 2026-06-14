@@ -48,8 +48,22 @@ public class MovementController extends Node {
   private boolean combat = false;
   private double combatSpeedFactor = 1.0;
   private double combatAccelerationFactor = 1.0;
-  private boolean rolling = false;
-  private double rollSpeed = 0.0;
+
+  // ── Air strafe (CS/Source-style) ────────────────────────────────────────────
+  /** Air acceleration constant — higher gives faster strafe speed-gain. */
+  @Export
+  @RegisterProperty
+  public double airAccelerate = 80.0;
+
+  /**
+   * Per-tick wish-speed cap that makes air-strafing gain speed: only the velocity
+   * component below this cap (projected onto the wish direction) can be added in air,
+   * so turning the mouse while strafing curves and accelerates momentum instead of
+   * snapping to {@code speed·dir}. Small by design (Quake's classic ~30 ups ≈ 0.8 m/s).
+   */
+  @Export
+  @RegisterProperty
+  public double airSpeedCap = 0.8;
 
   /** Downward speed (m/s) required before any fall damage is dealt. 0 disables fall damage. */
   @Export
@@ -89,31 +103,50 @@ public class MovementController extends Node {
       if (ctrl != null && !ctrl.isAuthority()) return;
     }
 
-    boolean wasOnFloor = player.isOnFloor();
+    boolean onFloor = player.isOnFloor();
+    boolean wasOnFloor = onFloor;
 
-    // Calculate horizontal velocity
     Vector3 normDir = direction.normalized();
+    Vector3 curVel  = player.getVelocity();
 
-    if (rolling) {
-      velocity.setX(rollSpeed * normDir.getX());
-      velocity.setZ(rollSpeed * normDir.getZ());
+    // ── Horizontal velocity ──────────────────────────────────────────────────
+    double newX, newZ;
+    if (onFloor) {
+      // Grounded: accelerate toward the target speed·dir with the usual smoothing.
+      double targetX = speed * normDir.getX();
+      double targetZ = speed * normDir.getZ();
+      double t = Math.min(1.0, acceleration * delta);
+      newX = GD.lerp(curVel.getX(), targetX, t);
+      newZ = GD.lerp(curVel.getZ(), targetZ, t);
     } else {
-      velocity.setX(speed * normDir.getX());
-      velocity.setZ(speed * normDir.getZ());
-    }
-
-    // Handle Gravity
-    if (!player.isOnFloor()) {
-      if (velocity.getY() >= 0) {
-        velocity.setY(velocity.getY() - (jumpGravity * delta));
-      } else {
-        velocity.setY(velocity.getY() - (fallGravity * delta));
+      // Airborne: Source-style air strafe. Preserve existing horizontal momentum and
+      // add only a capped amount along the wish direction — turning the mouse while
+      // holding a strafe key curves and gains speed (CS/Quake air control).
+      newX = curVel.getX();
+      newZ = curVel.getZ();
+      if (normDir.lengthSquared() > 0.0001) {
+        double curSpeedAlongWish = newX * normDir.getX() + newZ * normDir.getZ();
+        double addSpeed = airSpeedCap - curSpeedAlongWish;
+        if (addSpeed > 0) {
+          double accelSpeed = Math.min(airAccelerate * airSpeedCap * delta, addSpeed);
+          newX += accelSpeed * normDir.getX();
+          newZ += accelSpeed * normDir.getZ();
+        }
       }
     }
 
-    // Apply movement using lerp
-    player.setVelocity(GD.lerp(player.getVelocity(), velocity, Math.min(1.0, acceleration * delta)));
-    float appliedVelocityY = (float) player.getVelocity().getY();
+    // ── Vertical velocity (integrated on the internal Y, direct — no lerp) ─────
+    if (onFloor && velocity.getY() < 0) {
+      velocity.setY(0);
+    }
+    if (!onFloor) {
+      double g = velocity.getY() >= 0 ? jumpGravity : fallGravity;
+      velocity.setY(velocity.getY() - g * delta);
+    }
+    double newY = velocity.getY();
+
+    player.setVelocity(new Vector3(newX, newY, newZ));
+    float appliedVelocityY = (float) newY;
     player.moveAndSlide();
 
     // Fall damage: compare velocity just before landing to the configured threshold.
@@ -134,39 +167,23 @@ public class MovementController extends Node {
     // correct for a +Z-forward mesh; negating both components shifts it by π, which
     // is the rotation needed to flip from +Z to -Z facing convention.
     double targetRotation;
-    if (rolling && direction.lengthSquared() > 0.001) {
-      // During roll: always face movement direction, even in combat
-      targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
-    } else if (combat) {
+    if (combat) {
       targetRotation = camRotation;
-    } else {
+    } else if (direction.lengthSquared() > 0.001) {
       // Face movement direction (only when actually moving)
-      if (direction.lengthSquared() > 0.001) {
-        targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
-      } else {
-        targetRotation = meshRoot.getRotation().getY(); // hold current facing
-      }
+      targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
+    } else {
+      targetRotation = meshRoot.getRotation().getY(); // hold current facing
     }
 
     Vector3 currentRot = meshRoot.getRotation();
-    double newY = GD.lerpAngle(currentRot.getY(), targetRotation, rotationSpeed * delta);
+    double newMeshY = GD.lerpAngle(currentRot.getY(), targetRotation, rotationSpeed * delta);
 
     // Update only the Y axis
-    meshRoot.setRotation(new Vector3(currentRot.getX(), newY, currentRot.getZ()));
+    meshRoot.setRotation(new Vector3(currentRot.getX(), newMeshY, currentRot.getZ()));
 
   }
 
-
-  @RegisterFunction
-  public void roll(RollState rollState) {
-    rolling = true;
-    rollSpeed = rollState.getRollSpeed();
-  }
-
-  @RegisterFunction
-  public void completedRoll() {
-    rolling = false;
-  }
 
   @RegisterFunction
   public void jump(JumpState jumpState) {

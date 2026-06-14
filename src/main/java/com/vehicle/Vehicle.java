@@ -60,6 +60,13 @@ public class Vehicle extends RigidBody3D implements Controllable {
     @RegisterProperty @Export public NodePath driverSeatPath = new NodePath("DriverSeat");
     @RegisterProperty @Export public NodePath vehicleCamPath = new NodePath("ActiveCamera");
 
+    // Damage-source names stamped onto elimination events; also the IconRegistry keys
+    // each peer registers the vehicle icon under so a vehicle kill resolves its icon
+    // on remote peers (kept as shared constants so the damage site and registration
+    // can never drift apart).
+    public static final String DAMAGE_SOURCE_COLLISION = "Vehicle";
+    public static final String DAMAGE_SOURCE_EXPLOSION = "Vehicle Explosion";
+
     // ── Shared DEFAULTS (one instance, never mutated) ─────────────────────────
     private static final VehicleConfig DEFAULTS = new VehicleConfig();
 
@@ -119,6 +126,13 @@ public class Vehicle extends RigidBody3D implements Controllable {
         }
 
         VehicleConfig cfg = getConfig();
+        // Register the vehicle's kill-feed icon under the same damage-source keys it
+        // stamps onto eliminations, so a vehicle kill resolves its icon on every peer
+        // (the registry is local-only; textures never cross the wire — see IconRegistry).
+        if (cfg.vehicleIcon != null) {
+            com.character.IconRegistry.register(DAMAGE_SOURCE_COLLISION, cfg.vehicleIcon);
+            com.character.IconRegistry.register(DAMAGE_SOURCE_EXPLOSION, cfg.vehicleIcon);
+        }
         Node wheelsNode = getNodeOrNull("Wheels");
         if (wheelsNode != null) {
             for (Node child : wheelsNode.getChildren()) {
@@ -328,7 +342,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
         String attackerName    = (occupant != null) ? occupant.getCharacterInfo().displayName : "";
         String attackerFaction = (characterInfo != null) ? characterInfo.faction : "";
-        health.takeDamage(null, damage, "Vehicle", cfg.vehicleIcon, attackerName, attackerFaction);
+        health.takeDamage(null, damage, DAMAGE_SOURCE_COLLISION, cfg.vehicleIcon, attackerName, attackerFaction);
 
         Vector3 knockbackDir = getLinearVelocity().normalized();
         character.applyHitImpulse(null, knockbackDir, damage);
@@ -513,7 +527,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
             if (m instanceof ExplosionManager mgr) {
                 mgr.triggerExplosion(getGlobalPosition(), cfg.explosionRadius, cfg.explosionMaxDamage,
                                      cfg.explosionPushForce, attackerName, attackerFaction,
-                                     "Vehicle Explosion", cfg.vehicleIcon, this);
+                                     DAMAGE_SOURCE_EXPLOSION, cfg.vehicleIcon, this);
             }
         }
         spawnWreckScene(cfg);

@@ -680,10 +680,10 @@ public class GameManager extends Node {
      * snapshot) and re-emit the elimination on the local EventBus so the kill feed
      * (HUDManager), mission progress (MissionManager), and the all-players-dead GAME_OVER
      * tracking (onCharacterDied above) behave identically on every peer. The weaponIcon
-     * Texture2D never crosses the wire — it's resolved locally by weaponName from
-     * WeaponIconRegistry (every peer ships the same weapon scenes), so the client kill feed
-     * shows the same icon the host does. An unregistered weapon resolves to null, which the
-     * feed already tolerates.
+     * Texture2D never crosses the wire — it's resolved locally by the source name from
+     * IconRegistry (every peer ships the same weapon/vehicle scenes), so the client kill
+     * feed shows the same icon the host does. An unregistered source resolves to null,
+     * which the feed already tolerates.
      */
     public void applyReplicatedElimination(NetMessageCodec.DecodedElimination elim) {
         Character victim = findCharacterById(elim.victimCharacterId());
@@ -705,7 +705,7 @@ public class GameManager extends Node {
         }
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
-            godot.api.Texture2D weaponIcon = com.character.WeaponIconRegistry.get(elim.weaponName());
+            godot.api.Texture2D weaponIcon = com.character.IconRegistry.get(elim.weaponName());
             bus.characterEliminated.emit(elim.attackerName(), elim.attackerFaction(),
                     elim.victimName(), elim.victimFaction(), elim.weaponName(), weaponIcon, elim.headshot());
             if (victim != null && victim.characterInfo != null) bus.characterDied.emit(victim.characterInfo);

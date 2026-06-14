@@ -50,6 +50,20 @@ public class PlayerController extends Controller {
     private Timer      cachedAimStayTimer;
     private Vehicle     cachedVehicle;
 
+    // ── Stance / movement input mode (false = HOLD, true = TOGGLE) ────────────
+    // The hold-vs-toggle decision lives entirely here now; Character.setStance is a
+    // pure idempotent setter. Default movement is SPRINT (run); holding/toggling the
+    // stealth key (Shift, the "sprint" action) drops to the slower WALK tier — the
+    // quiet "stealth walk" the future reduced-audio/awareness system keys off (the
+    // WALK MovementState carries the low noiseLevel).
+    @Export @RegisterProperty public boolean stanceToggleMode  = false;
+    @Export @RegisterProperty public boolean stealthToggleMode = false;
+
+    private final ModalInput crouchInput  = new ModalInput("crouch");
+    private final ModalInput crawlInput   = new ModalInput("crawl");
+    private final ModalInput stealthInput = new ModalInput("sprint");
+    private StanceName lastDesiredStance  = StanceName.UPRIGHT;
+
     /**
      * Minimum distance the spine-IK aim point may converge to. Aiming at a far target snaps the
      * aim point onto the actual crosshair hit, so the visible gun (and replicated puppet gun)
@@ -125,7 +139,9 @@ public class PlayerController extends Controller {
         }
 
         if (cmd.movementDirection.lengthSquared() > 0.001) {
-            cmd.movementType = inp.isActionPressed("walk", false)
+            // Default movement is SPRINT (run); holding/toggling the stealth key drops
+            // to the slower, quieter WALK tier (CS-style "walk to stay quiet").
+            cmd.movementType = stealthInput.poll(inp, stealthToggleMode)
                     ? MovementType.WALK : MovementType.SPRINT;
         }
 
@@ -180,25 +196,20 @@ public class PlayerController extends Controller {
         cmd.reload  = inp.isActionJustPressed("reload", false);
         cmd.drop    = inp.isActionJustPressed("drop", false);
         cmd.jump    = inp.isActionJustPressed("jump", false);
-        cmd.roll    = !isFps && inp.isActionJustPressed("roll", false);
 
-        // Hold-to-hold crouch/crawl.
-        // setStance() has a built-in toggle (same == current → UPRIGHT), so we must only
-        // call it on the key-press and key-release edges — not every frame while held.
-        // justPressed  → enter the stance (fires once per press, toggle goes standing→crouched)
-        // justReleased → request UPRIGHT (fires once on release, toggle goes crouched→standing)
-        // neither      → desiredStance stays null, applyInput skips the setStance call
-        for (String stanceKey : body.stances.keys()) {
-            if (StanceName.DRIVE_CARRIER.getKey().equals(stanceKey)) continue;
-            String key = stanceKey.toLowerCase();
-            if (inp.isActionJustPressed(key, false)) {
-                cmd.desiredStance = StanceName.fromKey(stanceKey);
-                break;
-            }
-            if (inp.isActionJustReleased(key, false)) {
-                cmd.desiredStance = StanceName.UPRIGHT;
-                break;
-            }
+        // ── Stance (hold or toggle, configurable via stanceToggleMode) ────────
+        // Resolve the desired stance from the modal crouch/crawl inputs; crawl (prone)
+        // wins over crouch when both are active. Emit only on change so a held stance
+        // doesn't re-issue every tick (preserves jump-to-stand). Character.setStance is
+        // idempotent, so a repeat would be harmless regardless.
+        boolean wantCrouch = crouchInput.poll(inp, stanceToggleMode);
+        boolean wantCrawl  = crawlInput.poll(inp, stanceToggleMode);
+        StanceName desired = wantCrawl  ? StanceName.CRAWL
+                           : wantCrouch ? StanceName.CROUCH
+                           : StanceName.UPRIGHT;
+        if (desired != lastDesiredStance) {
+            cmd.desiredStance = desired;
+            lastDesiredStance = desired;
         }
 
         // ── Weapon slot quick-switch ──────────────────────────────────────────

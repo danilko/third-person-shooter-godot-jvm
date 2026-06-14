@@ -104,14 +104,6 @@ public class AnimationController extends Node {
   }
 
   @RegisterFunction
-  public void roll(RollState rollState) {
-    if (animationTree == null) return;
-    // Same reasoning as jump: the roll OneShot is independent of movement blending.
-    String path = "parameters/" + rollState.getAnimationName() + "/request";
-    animationTree.set(path, AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
-  }
-
-  @RegisterFunction
   public void onSetMovementState(MovementState movementState) {
     currentMovementState = movementState;
     updateAnimationBlend(movementState);

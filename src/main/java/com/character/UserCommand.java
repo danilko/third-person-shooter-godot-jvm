@@ -29,7 +29,6 @@ public class UserCommand {
 
     // ── Body actions ──────────────────────────────────────────────────────────
     public boolean jump;
-    public boolean roll;
 
     // ── State requests ────────────────────────────────────────────────────────
     public StanceName desiredStance;
@@ -69,7 +68,6 @@ public class UserCommand {
         reload            = false;
         drop              = false;
         jump              = false;
-        roll              = false;
         desiredStance     = null;
         desiredWeapon     = -1;
         wantUnequip       = false;
@@ -96,7 +94,6 @@ public class UserCommand {
         c.reload          = reload;
         c.drop            = drop;
         c.jump            = jump;
-        c.roll            = roll;
         c.desiredStance   = desiredStance;
         c.desiredWeapon   = desiredWeapon;
         c.wantUnequip     = wantUnequip;

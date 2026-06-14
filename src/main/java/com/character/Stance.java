@@ -67,10 +67,16 @@ public class Stance extends Node {
    * ceiling, neither Crouch nor Upright can be entered until the ceiling clears.
    *
    * Inspector: assign the sibling Stance nodes that are blocked by this stance's ceiling raycast.
+   *
+   * Typed to {@code Node} (not {@code Stance}) deliberately: a typed {@code Array[Stance]}
+   * export hint holds a strong reference to the {@code Stance.gdj} GdjScript that is never
+   * released, leaving it "in use at exit" (the long-standing shutdown leak). {@code Node} is a
+   * built-in class (no script resource), so the hint references nothing to leak — and Stance
+   * IS a Node, so assigning sibling stances still works. {@link #isBlocked} narrows back.
    */
   @Export
   @RegisterProperty
-  public VariantArray<Stance> higherStances = new VariantArray<>(Stance.class);
+  public VariantArray<Node> higherStances = new VariantArray<>(Node.class);
 
   /**
    * Returns true if this stance's space is obstructed (ceiling too low).
@@ -80,8 +86,8 @@ public class Stance extends Node {
   @RegisterFunction
   public boolean isBlocked() {
     if (colRaycast != null && colRaycast.isColliding()) return true;
-    for (Stance taller : higherStances) {
-      if (taller != null && taller.isBlocked()) return true;
+    for (Node taller : higherStances) {
+      if (taller instanceof Stance s && s.isBlocked()) return true;
     }
     return false;
   }
@@ -136,11 +142,11 @@ public class Stance extends Node {
     this.colRaycast = colRaycast;
   }
 
-  public VariantArray<Stance> getHigherStances() {
+  public VariantArray<Node> getHigherStances() {
     return higherStances;
   }
 
-  public void setHigherStances(VariantArray<Stance> higherStances) {
+  public void setHigherStances(VariantArray<Node> higherStances) {
     this.higherStances = higherStances;
   }
 

@@ -24,9 +24,6 @@ public class Character extends CharacterBody3D implements Controllable {
     public final Signal1<JumpState> pressedJump = new Signal1<>(this, new StringName("pressed_jump"));
 
     @RegisterSignal
-    public final Signal1<RollState> pressedRoll = new Signal1<>(this, new StringName("pressed_roll"));
-
-    @RegisterSignal
     public final Signal1<Stance> changedStance = new Signal1<>(this, new StringName("changed_stance"));
 
     @RegisterSignal
@@ -56,10 +53,6 @@ public class Character extends CharacterBody3D implements Controllable {
     // ── Exports ───────────────────────────────────────────────────────────────
     @Export
     @RegisterProperty
-    public int maxAirJump = 1;
-
-    @Export
-    @RegisterProperty
     public Dictionary<String, JumpState> jumpStates = new Dictionary<>(String.class, JumpState.class);
 
     @Export
@@ -69,10 +62,6 @@ public class Character extends CharacterBody3D implements Controllable {
     @Export
     @RegisterProperty
     public Dictionary<String, CombatState> combatStates = new Dictionary<>(String.class, CombatState.class);
-
-    @Export
-    @RegisterProperty
-    public RollState rollState = null;
 
     @RegisterProperty
     @Export
@@ -127,11 +116,9 @@ public class Character extends CharacterBody3D implements Controllable {
     public PackedScene characterVisuals;
 
     // ── Protected state ───────────────────────────────────────────────────────
-    protected int airJumpCounter = 0;
     protected Vector3 movementDirection = new Vector3();
     protected StanceName currentStanceName = StanceName.UPRIGHT;
     protected MovementType currentMovementType = MovementType.IDLE;
-    protected boolean isRolling = false;
 
     // False for AI-controlled characters whose accuracy is managed by their own system.
     protected boolean useWeaponSpread = true;
@@ -160,8 +147,6 @@ public class Character extends CharacterBody3D implements Controllable {
 
     protected ArrayList<Node3D> headMeshes = new ArrayList<>();
 
-    protected Timer stanceAntispamTimer;
-    protected Timer rollTimer;
     protected Health healthNode;
     protected Marker3D aimTarget;
     protected RayCast3D aimRay;
@@ -201,15 +186,6 @@ public class Character extends CharacterBody3D implements Controllable {
     @RegisterFunction
     @Override
     public void _ready() {
-        if (hasNode("StanceAntispamTimer")) {
-            stanceAntispamTimer = (Timer) getNode("StanceAntispamTimer");
-        }
-        if (hasNode("RollTimer")) {
-            rollTimer = (Timer) getNode("RollTimer");
-            if (rollTimer != null && rollState != null) {
-                rollTimer.setWaitTime(rollState.getRollDuration());
-            }
-        }
         healthNode = (Health) getNode("Health");
         if (characterInfo == null) characterInfo = new CharacterInfo();
         if (characterInfo.characterId.isEmpty())
@@ -279,7 +255,10 @@ public class Character extends CharacterBody3D implements Controllable {
 
         changedMovementDirection.emit(Vector3.Companion.getBACK());
         setMovementState(MovementType.IDLE);
-        setStance(currentStanceName);
+        // Init: force-emit the starting stance. setStance is now idempotent (no-ops on
+        // same stance), so the initial wiring of colliders/animation goes through
+        // forceSetStance which always emits changed_stance.
+        forceSetStance(currentStanceName);
         setCombatState();
         setWeapon(0);
 
@@ -487,13 +466,6 @@ public class Character extends CharacterBody3D implements Controllable {
         }
         setMovementState(input.movementType);
 
-        // ── Floor / jump counter ───────────────────────────────────────────
-        if (isOnFloor()) {
-            airJumpCounter = 0;
-        } else if (airJumpCounter == 0) {
-            airJumpCounter = 1;
-        }
-
         // ── Combat state ───────────────────────────────────────────────────
         // Pressing fire with a melee weapon automatically enters combat stance so
         // the character raises fists without requiring a separate aim button press.
@@ -517,12 +489,8 @@ public class Character extends CharacterBody3D implements Controllable {
         }
         
         // ── Fire / not-fire ────────────────────────────────────────────────
-        if (!isRolling) {
-            if (input.fire) {
-                fireWeapon.emit();
-            } else {
-                notFireWeapon.emit();
-            }
+        if (input.fire) {
+            fireWeapon.emit();
         } else {
             notFireWeapon.emit();
         }
@@ -537,34 +505,23 @@ public class Character extends CharacterBody3D implements Controllable {
             dropWeapon.emit();
         }
 
-        // ── Jump ───────────────────────────────────────────────────────────
-        if (input.jump && !isRolling && airJumpCounter <= maxAirJump) {
+        // ── Jump (single ground jump only) ─────────────────────────────────
+        // First stand up if crouched/crawling, otherwise launch a ground jump.
+        if (input.jump && isOnFloor()) {
             if (!isStanceBlocked(StanceName.UPRIGHT)) {
                 if (currentStanceName != StanceName.UPRIGHT) {
                     setStance(StanceName.UPRIGHT);
                 } else {
-                    String jumpName = (airJumpCounter > 0) ? "AirJump" : "GroundJump";
-                    JumpState js = jumpStates.get(jumpName);
+                    JumpState js = jumpStates.get("GroundJump");
                     if (js != null) {
                         pressedJump.emit(js);
                     }
-                    airJumpCounter++;
                 }
             }
         }
 
-        // ── Roll ───────────────────────────────────────────────────────────
-        if (input.roll && !isRolling && isOnFloor() &&
-                movementDirection.lengthSquared() > 0.001 &&
-                (weaponController == null || !weaponController.isWeaponReloading())) {
-            if (rollTimer == null || rollTimer.getTimeLeft() <= 0) {
-                roll(true);
-            }
-        }
-
         // ── Stance ─────────────────────────────────────────────────────────
-        if (input.desiredStance != null && isOnFloor() &&
-                (rollTimer == null || rollTimer.getTimeLeft() <= 0)) {
+        if (input.desiredStance != null && isOnFloor()) {
             setStance(input.desiredStance);
         }
 
@@ -681,32 +638,6 @@ public class Character extends CharacterBody3D implements Controllable {
         return (isMelee && combatStates.get("MeleeCombat") != null) ? "MeleeCombat" : "Combat";
     }
 
-    @RegisterFunction
-    public void completedRoll() {
-        roll(false);
-    }
-
-    protected void roll(boolean isRoll) {
-        isRolling = isRoll;
-
-        if (currentStanceName != StanceName.CROUCH) {
-            StanceName disabledStanceName = isRoll ? currentStanceName : StanceName.CROUCH;
-            StanceName enabledStanceName  = isRoll ? StanceName.CROUCH  : currentStanceName;
-
-            Stance disabled = stanceCache.get(disabledStanceName);
-            if (disabled != null && disabled.getCollider() != null) disabled.getCollider().setDisabled(true);
-
-            Stance enabled = stanceCache.get(enabledStanceName);
-            if (enabled != null && enabled.getCollider() != null) enabled.getCollider().setDisabled(false);
-        }
-
-        if (isRoll) {
-            if (rollTimer != null) {
-                rollTimer.start();
-            }
-            pressedRoll.emit(rollState);
-        }
-    }
 
     public void setMovementState(MovementType type) {
         Stance stanceNode = stanceCache.get(currentStanceName);
@@ -715,20 +646,20 @@ public class Character extends CharacterBody3D implements Controllable {
         changedMovementState.emit(stanceNode.getMovementState(type));
     }
 
+    /**
+     * Pure idempotent stance setter — sets the character to exactly {@code stanceName}.
+     * No toggle, no anti-spam timer: the hold-vs-toggle decision lives in the input
+     * layer ({@link ModalInput} in {@link PlayerController}) and AI uses its own hold
+     * timer. This is also the replication apply path, so it must be idempotent.
+     */
     protected void setStance(StanceName stanceName) {
-        if (stanceAntispamTimer != null && stanceAntispamTimer.getTimeLeft() > 0) return;
-
-        if (stanceAntispamTimer != null && getTree() != null) {
-            stanceAntispamTimer.start();
-        }
-
-        StanceName next = (stanceName == currentStanceName) ? StanceName.UPRIGHT : stanceName;
-        if (isStanceBlocked(next)) return;
+        if (stanceName == currentStanceName) return;
+        if (isStanceBlocked(stanceName)) return;
 
         Stance current = stanceCache.get(currentStanceName);
         if (current != null && current.getCollider() != null) current.getCollider().setDisabled(true);
 
-        currentStanceName = next;
+        currentStanceName = stanceName;
         stanceOrdinal = currentStanceName.ordinal();
         Stance nextStance = stanceCache.get(currentStanceName);
         if (nextStance != null) {
