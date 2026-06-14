@@ -107,6 +107,11 @@ public class GameManager extends Node {
         if (getTree() != null) getTree().setPause(false);
         Input.INSTANCE.setMouseMode(Input.MouseMode.CAPTURED);
         transitionTo(GameState.PLAYING);
+        // End any live network session before reloading: NetworkManager is an AutoLoad and
+        // survives reloadCurrentScene, so without this a "restart" would carry a stale ENet
+        // connection into the fresh scene. After leaveSession the reload comes up single-player.
+        NetworkManager net = getNetworkManager();
+        if (net != null) net.leaveSession();
         if (getTree() != null) getTree().reloadCurrentScene();
     }
 
@@ -674,8 +679,11 @@ public class GameManager extends Node {
      * victim dead immediately (reliable path — no waiting on an unreliable health==0
      * snapshot) and re-emit the elimination on the local EventBus so the kill feed
      * (HUDManager), mission progress (MissionManager), and the all-players-dead GAME_OVER
-     * tracking (onCharacterDied above) behave identically on every peer. weaponIcon is
-     * HUD-local and never crosses the wire — null here, which the feed already tolerates.
+     * tracking (onCharacterDied above) behave identically on every peer. The weaponIcon
+     * Texture2D never crosses the wire — it's resolved locally by weaponName from
+     * WeaponIconRegistry (every peer ships the same weapon scenes), so the client kill feed
+     * shows the same icon the host does. An unregistered weapon resolves to null, which the
+     * feed already tolerates.
      */
     public void applyReplicatedElimination(NetMessageCodec.DecodedElimination elim) {
         Character victim = findCharacterById(elim.victimCharacterId());
@@ -697,8 +705,9 @@ public class GameManager extends Node {
         }
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
+            godot.api.Texture2D weaponIcon = com.character.WeaponIconRegistry.get(elim.weaponName());
             bus.characterEliminated.emit(elim.attackerName(), elim.attackerFaction(),
-                    elim.victimName(), elim.victimFaction(), elim.weaponName(), null, elim.headshot());
+                    elim.victimName(), elim.victimFaction(), elim.weaponName(), weaponIcon, elim.headshot());
             if (victim != null && victim.characterInfo != null) bus.characterDied.emit(victim.characterInfo);
         }
     }
@@ -738,15 +747,51 @@ public class GameManager extends Node {
     /** A vehicle (key = vehicleId) was destroyed — every peer plays the same wreck cosmetics (Round 11 N3); the despawn follows on the same ordered channel. */
     public static final int WORLD_EVENT_VEHICLE_WRECK = 2;
 
+    /** Mission started — key = missionId, args = [objectiveType]. Host MissionManager broadcasts; clients re-emit EventBus.missionStarted for the HUD banner. */
+    public static final int WORLD_EVENT_MISSION_STARTED = 3;
+
+    /** Mission completed — key = missionId, args = [winningFaction, outcomeVariant]. */
+    public static final int WORLD_EVENT_MISSION_COMPLETED = 4;
+
+    /** Mission failed — key = missionId, args = [reason]. */
+    public static final int WORLD_EVENT_MISSION_FAILED = 5;
+
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
-    public void onWorldEvent(int eventType, String key, float value) {
+    public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         switch (eventType) {
             case WORLD_EVENT_AMMO_REFILL -> applyAmmoRefill(key);
             case WORLD_EVENT_VEHICLE_WRECK -> applyVehicleWreck(key);
+            case WORLD_EVENT_MISSION_STARTED -> applyMissionStarted(key, args);
+            case WORLD_EVENT_MISSION_COMPLETED -> applyMissionCompleted(key, args);
+            case WORLD_EVENT_MISSION_FAILED -> applyMissionFailed(key, args);
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
-            // case WORLD_EVENT_MISSION -> missionManager.applyNetworkedBeat(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }
+    }
+
+    /** Safe positional read from a world-event args list — empty string for a missing index (a client must never index past a short/garbage frame). */
+    private static String arg(java.util.List<String> args, int index) {
+        return args != null && index < args.size() && args.get(index) != null ? args.get(index) : "";
+    }
+
+    // Mission lifecycle is host-authoritative (MissionManager runs/tracks only there). On clients we
+    // re-emit the matching EventBus signal so the HUD banner and any listener behave identically to
+    // the host — but we never re-run host-only tracking (countHostilesByFaction); clients are pure
+    // mirrors of mission state.
+
+    private void applyMissionStarted(String missionId, java.util.List<String> args) {
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.missionStarted.emit(missionId, arg(args, 0));
+    }
+
+    private void applyMissionCompleted(String missionId, java.util.List<String> args) {
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.missionCompleted.emit(missionId, arg(args, 0), arg(args, 1));
+    }
+
+    private void applyMissionFailed(String missionId, java.util.List<String> args) {
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.missionFailed.emit(missionId, arg(args, 0));
     }
 
     /**
@@ -766,6 +811,19 @@ public class GameManager extends Node {
         if (character == null) return;
         Node wcNode = character.getNodeOrNull("WeaponController");
         if (wcNode instanceof com.character.WeaponController wc) wc.fillWeaponAmmo();
+    }
+
+    /**
+     * Client-side: the host vanished (NetworkManager.onHostLost already tore the dead session
+     * down — isNetworked() is false here). Surface a recovery prompt so the player can restart
+     * into single-player rather than sitting frozen against stale puppets. The restart path
+     * (MenuManager.restart → restartLevel) reloads the scene into a fresh single-player world.
+     */
+    public void onHostLost(String reason) {
+        GD.print("GameManager: host lost — " + reason);
+        if (currentState == GameState.PLAYING) transitionTo(GameState.GAME_OVER);
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.connectionLost.emit(reason);
     }
 
     private void transitionTo(GameState next) {

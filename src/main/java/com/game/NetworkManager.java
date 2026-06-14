@@ -222,12 +222,15 @@ public class NetworkManager extends Node {
             String dump = com.game.net.NetStats.consumeDumpLine();
             if (!dump.isEmpty()) GD.print(dump);
         }
-        while (true) {
+        // Loop guards on `connection != null`, not `true`: dispatchEnetEvent may tear the
+        // transport down mid-drain (a client's host-loss DISCONNECT → onHostLost → leaveSession
+        // nulls `connection`), and the next service(0) would NPE on it.
+        while (connection != null) {
             VariantArray<Object> event = connection.service(0);
             ENetConnection.EventType type = ENetConnection.EventType.Companion.from(asLong(event.get(0)));
             // service() always returns a 4-element array — [type, peer, data, channel] — even
             // when nothing happened, so EventType (not array size) is the real "drained" signal.
-            if (type == ENetConnection.EventType.NONE) return;
+            if (type == ENetConnection.EventType.NONE) break;
             if (type == ENetConnection.EventType.ERROR) {
                 GD.print("NetworkManager: ENet service error — resetting transport");
                 resetTransport();
@@ -235,6 +238,36 @@ public class NetworkManager extends Node {
             }
             dispatchEnetEvent(type, event);
         }
+        // Host-loss watchdog (client only): ENet's own DISCONNECT can lag, so an app-level
+        // staleness check declares the host gone when no packet has arrived for HOST_TIMEOUT_MS —
+        // see onHostLost. Skipped on the host and once already handled this session.
+        if (connection != null && !amServer && !hostLossHandled
+                && now - lastServerPacketMs > HOST_TIMEOUT_MS) {
+            onHostLost("timeout (" + HOST_TIMEOUT_MS + "ms with no packet)");
+        }
+    }
+
+    // ── Host-loss detection (client only) ─────────────────────────────────────
+    //
+    // A client whose host vanishes must not sit frozen: it detects loss two ways — the ENet
+    // DISCONNECT event (handlePeerDisconnected) and a no-packet-for-N-seconds watchdog (above) —
+    // then tears the dead session down and hands control to GameManager to surface a recovery
+    // prompt. hostLossHandled makes the two paths idempotent; resetTransport clears it.
+
+    /** No server packet for this long ⇒ declare the host lost. 5 s: long enough to ride out a stall, short enough not to leave the player guessing. */
+    private static final int HOST_TIMEOUT_MS = 5000;
+    private int lastServerPacketMs;           // client: wall-clock of the last packet from the server
+    private boolean hostLossHandled;          // guards the event + watchdog paths against double-firing
+
+    /** Tears down a dead client session and notifies GameManager. No-op on the host / single-player / when already handled. */
+    private void onHostLost(String reason) {
+        if (amServer || hostLossHandled || connection == null) return;
+        hostLossHandled = true;
+        GD.print("NetworkManager: host lost — " + reason + " — leaving session");
+        Node managerNode = getNodeOrNull("/root/GameManager");
+        // Tear the transport down first so isNetworked() reads false when the recovery UI runs.
+        leaveSession();
+        if (managerNode instanceof GameManager manager) manager.onHostLost(reason);
     }
 
     // Broadcast every Nth physics tick instead of every tick — at the default 60 Hz
@@ -525,6 +558,9 @@ public class NetworkManager extends Node {
         Node managerNode = getNodeOrNull("/root/GameManager");
         if (amServer && managerNode instanceof GameManager manager) {
             manager.onPeerDisconnected(id);
+        } else if (!amServer) {
+            // A client only ever has the server as a peer — its disconnect is host loss.
+            onHostLost("transport disconnect");
         }
     }
 
@@ -543,6 +579,9 @@ public class NetworkManager extends Node {
 
     private void onPacketReceived(int senderPeerId, PackedByteArray data) {
         try {
+            // Any byte from the server proves it's alive — stamp liveness before validation so
+            // even a malformed/rate-limited packet defers the host-loss watchdog (see onHostLost).
+            if (!amServer) lastServerPacketMs = nowMs();
             if (data.getSize() == 0 || data.getSize() > MAX_PACKET_BYTES) {
                 com.game.net.NetStats.increment("drop_packet_size");
                 GD.print("NetworkManager: dropping packet from " + senderPeerId
@@ -1032,7 +1071,7 @@ public class NetworkManager extends Node {
         }
         if (isServer()) return;   // host owns world state; never accepts an inbound world event
         Node managerNode = getNodeOrNull("/root/GameManager");
-        if (managerNode instanceof GameManager manager) manager.onWorldEvent(event.eventType(), event.key(), event.value());
+        if (managerNode instanceof GameManager manager) manager.onWorldEvent(event.eventType(), event.key(), event.value(), event.args());
     }
 
     /**
@@ -1403,8 +1442,15 @@ public class NetworkManager extends Node {
     }
 
     private boolean isValidWorldEvent(NetMessageCodec.DecodedWorldEvent event) {
-        return event.key() != null && event.key().length() <= MAX_STRING_LENGTH
-                && event.eventType() >= 0 && isFiniteDouble(event.value());
+        if (event.key() == null || event.key().length() > MAX_STRING_LENGTH
+                || event.eventType() < 0 || !isFiniteDouble(event.value())
+                || event.args() == null || event.args().size() > NetMessageCodec.MAX_WORLD_EVENT_ARGS) {
+            return false;
+        }
+        for (String arg : event.args()) {
+            if (arg == null || arg.length() > MAX_STRING_LENGTH) return false;
+        }
+        return true;
     }
 
     private boolean isValidSpawn(NetMessageCodec.DecodedSpawn spawn) {
@@ -1506,6 +1552,12 @@ public class NetworkManager extends Node {
         connection = host;
         serverPeer = peer;
         amServer = false;
+        // Tighten ENet's own drop timeout so a vanished host surfaces a transport DISCONNECT in a
+        // few seconds rather than ENet's ~30 s default — the app-level watchdog (HOST_TIMEOUT_MS)
+        // is the binding-independent backstop, this just makes the fast path fast.
+        peer.setTimeout(0, 3000, HOST_TIMEOUT_MS);
+        // Seed liveness so the watchdog doesn't fire before the first packet has had a chance to land.
+        lastServerPacketMs = nowMs();
         GD.print("NetworkManager: connecting to " + address + ":" + port);
         return true;
     }
@@ -1526,9 +1578,24 @@ public class NetworkManager extends Node {
         idsByPeer.clear();
         rateLimiters.clear();
         nextPeerId = 2;
+        localPeerId = SERVER_PEER_ID;   // back to the single-player assumption until the next host/join
+        hostLossHandled = false;        // a fresh session may legitimately detect host loss again
         loggedOnceKeys.clear();   // a fresh session may legitimately re-hit one-shot diagnostics
         lastAcceptedUpstream.clear();
         lastOwnedStateSendMsById.clear();
+    }
+
+    /**
+     * Public teardown: drop the live session and return to single-player. Distinct from the private
+     * {@link #resetTransport} (an internal swap-out step) — this is the entry point UI/lifecycle code
+     * calls before a scene reload so a "restart" actually ends the network session instead of carrying
+     * a stale ENet connection across the reload (NetworkManager is an AutoLoad — it outlives the
+     * scene). After it, {@link #isNetworked()} is false and every single-player path works again.
+     */
+    public void leaveSession() {
+        if (connection == null) return;
+        GD.print("NetworkManager: leaving session");
+        resetTransport();
     }
 
     /** AutoLoad singletons outlive every scene — release the ENet host on shutdown, not just on rehost/rejoin. */
@@ -1638,8 +1705,13 @@ public class NetworkManager extends Node {
      * (doors, mission/story, pickups, spawn director) sends through — see {@link #handleWorldEventMessage}.
      */
     public void broadcastWorldEvent(int eventType, String key, float value) {
+        broadcastWorldEvent(eventType, key, value, java.util.List.of());
+    }
+
+    /** Args overload — the trailing string list carries any textual payload an event needs (e.g. a mission's objectiveType/winningFaction/variant/reason). See {@link NetMessageCodec#encodeWorldEvent}. */
+    public void broadcastWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         if (!isServer() || !isNetworked()) return;
-        broadcastMessage(NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT, eventType, key, value), null);
+        broadcastMessage(NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT, eventType, key, value, args), null);
     }
 
     // ── Spawn/despawn replication (Phase 7 — folds in G3) ─────────────────────

@@ -2,6 +2,7 @@ package com.ui;
 
 import com.game.EventBus;
 import com.game.GameManager;
+import com.game.NetworkManager;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.CanvasLayer;
@@ -45,6 +46,9 @@ public class MenuManager extends CanvasLayer {
             bus.playerDied.connectUnsafe(
                     Callable.createUnsafe(this, StringNames.toGodotName("onPlayerDied")),
                     godot.api.Object.ConnectFlags.DEFAULT);
+            bus.connectionLost.connectUnsafe(
+                    Callable.createUnsafe(this, StringNames.toGodotName("onConnectionLost")),
+                    godot.api.Object.ConnectFlags.DEFAULT);
         }
     }
 
@@ -64,6 +68,18 @@ public class MenuManager extends CanvasLayer {
 
     @RegisterFunction
     public void onPlayerDied() {
+        showGameOver();
+    }
+
+    /**
+     * Client-side host-loss recovery (EventBus.connectionLost). Reuses the game-over overlay —
+     * its Restart button reloads into a fresh single-player world and Quit exits — which is the
+     * "notify and let the player restart the whole session" behaviour. The session is already
+     * torn down by the time this fires (NetworkManager.onHostLost → leaveSession).
+     */
+    @RegisterFunction
+    public void onConnectionLost(String reason) {
+        if (gameOverMenu != null) gameOverMenu.setBanner("Connection lost — " + reason);
         showGameOver();
     }
 
@@ -92,6 +108,10 @@ public class MenuManager extends CanvasLayer {
         } else {
             getTree().setPause(false);
             Input.INSTANCE.setMouseMode(Input.MouseMode.CAPTURED);
+            // Mirror restartLevel's session teardown for the no-GameManager fallback — otherwise
+            // a restart here would reload the scene on top of a live ENet session (AutoLoad survives).
+            Node netNode = getNodeOrNull("/root/NetworkManager");
+            if (netNode instanceof NetworkManager net) net.leaveSession();
             getTree().reloadCurrentScene();
         }
     }

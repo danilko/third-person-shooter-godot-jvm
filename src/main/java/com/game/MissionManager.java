@@ -102,6 +102,8 @@ public class MissionManager extends Node {
         if (busNode instanceof EventBus bus) {
             bus.missionStarted.emit(info.missionId, info.objectiveType);
         }
+        broadcastWorldEvent(GameManager.WORLD_EVENT_MISSION_STARTED, info.missionId,
+                java.util.List.of(info.objectiveType == null ? "" : info.objectiveType));
     }
 
     /** Marks the active mission complete and emits EventBus.missionCompleted. */
@@ -115,6 +117,9 @@ public class MissionManager extends Node {
         if (busNode instanceof EventBus bus) {
             bus.missionCompleted.emit(missionId, winningFaction, outcomeVariant);
         }
+        broadcastWorldEvent(GameManager.WORLD_EVENT_MISSION_COMPLETED, missionId,
+                java.util.List.of(winningFaction == null ? "" : winningFaction,
+                        outcomeVariant == null ? "" : outcomeVariant));
     }
 
     /** Marks the active mission failed and emits EventBus.missionFailed. */
@@ -127,6 +132,14 @@ public class MissionManager extends Node {
         if (busNode instanceof EventBus bus) {
             bus.missionFailed.emit(missionId, reason);
         }
+        broadcastWorldEvent(GameManager.WORLD_EVENT_MISSION_FAILED, missionId,
+                java.util.List.of(reason == null ? "" : reason));
+    }
+
+    /** Host → all: mirror a mission lifecycle change to clients via the world-event seam. No-op off the host / single-player. */
+    private void broadcastWorldEvent(int eventType, String missionId, java.util.List<String> args) {
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (netNode instanceof NetworkManager net) net.broadcastWorldEvent(eventType, missionId, 0f, args);
     }
 
     public MissionInfo getActiveMission() { return activeMission; }

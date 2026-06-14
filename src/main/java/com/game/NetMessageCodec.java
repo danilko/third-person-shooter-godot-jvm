@@ -305,21 +305,29 @@ public final class NetMessageCodec {
 
     // ── MSG_WORLD_EVENT (host → all, reliable world-state seam) ───────────────
     //
-    // [tag u8][eventType u8][key utf8][value float]
+    // [tag u8][eventType u8][key utf8][value float][argCount u8][arg utf8]...
     //
     // The host-authoritative seam for discrete, reliable world state the snapshot stream isn't
     // suited to — doors opening, mission/story beats, pickup spawns/consumption, the spawn director.
     // Generic on purpose: {@code eventType} selects the meaning, {@code key} names the target (a door
-    // id, mission id, pickup id…), {@code value} carries an optional scalar (a state, an amount). The
-    // host owns the truth and broadcasts; clients apply. Specific events are added by GameManager as
-    // features need them — this is the scaffold (Round 7/8 Step 4: "central logic to build upon").
+    // id, mission id, pickup id…), {@code value} carries an optional scalar (a state, an amount), and
+    // the trailing {@code args} string list carries any extra textual payload an event needs (e.g. a
+    // mission's objectiveType / winningFaction / outcomeVariant / fail reason) without minting a new
+    // message type per feature. The host owns the truth and broadcasts; clients apply. Specific events
+    // are added by GameManager as features need them — the scaffold (Round 7/8 Step 4).
 
-    public static PackedByteArray encodeWorldEvent(int msgType, int eventType, String key, float value) {
+    /** Hard cap on the args string list — bounds isValidWorldEvent against a hostile/garbage frame. */
+    public static final int MAX_WORLD_EVENT_ARGS = 8;
+
+    public static PackedByteArray encodeWorldEvent(int msgType, int eventType, String key, float value,
+            java.util.List<String> args) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.put8(eventType);
         buf.putUtf8String(key);
         buf.putFloat(value);
+        buf.put8(args.size());
+        for (String a : args) buf.putUtf8String(a == null ? "" : a);
         return buf.getDataArray();
     }
 
@@ -328,11 +336,14 @@ public final class NetMessageCodec {
         int eventType = buf.getU8();
         String key = buf.getUtf8String();
         float value = buf.getFloat();
-        return new DecodedWorldEvent(eventType, key, value);
+        int count = buf.getU8();
+        java.util.List<String> args = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) args.add(buf.getUtf8String());
+        return new DecodedWorldEvent(eventType, key, value, args);
     }
 
     /** Carrier for a decoded MSG_WORLD_EVENT body — the generic host-authoritative world-state event. */
-    public record DecodedWorldEvent(int eventType, String key, float value) { }
+    public record DecodedWorldEvent(int eventType, String key, float value, java.util.List<String> args) { }
 
     // ── MSG_SPAWN ─────────────────────────────────────────────────────────────
     //
