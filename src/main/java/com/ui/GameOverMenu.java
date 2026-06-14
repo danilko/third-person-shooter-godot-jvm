@@ -3,6 +3,8 @@ package com.ui;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Control;
+import godot.api.Label;
+import godot.api.Node;
 
 /**
  * Game-over overlay — display only.
@@ -18,6 +20,16 @@ public class GameOverMenu extends Control {
     @Override
     public void _ready() {
         hide();
+    }
+
+    /**
+     * Sets the overlay's headline text — used to distinguish a host-loss recovery prompt from a
+     * normal death. No-op when the scene has no "Title" Label child, so it never depends on a
+     * specific .tscn layout (the default "Game Over" text simply stays).
+     */
+    public void setBanner(String text) {
+        Node titleNode = getNodeOrNull("Title");
+        if (titleNode instanceof Label label) label.setText(text);
     }
 
     @RegisterFunction

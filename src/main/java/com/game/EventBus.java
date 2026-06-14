@@ -173,4 +173,14 @@ public class EventBus extends Node {
     public final Signal3<CharacterInfo, Integer, Integer> characterAmmoChanged =
             new Signal3<>(this, new StringName("character_ammo_changed"));
 
+    /**
+     * Emitted by GameManager.onHostLost() on a client whose host vanished
+     * (NetworkManager detected it via DISCONNECT or the no-packet watchdog).
+     * Payload: a short human-readable reason. MenuManager surfaces the recovery
+     * prompt (restart / quit) — the session has already been torn down by then.
+     */
+    @RegisterSignal
+    public final Signal1<String> connectionLost =
+            new Signal1<>(this, new StringName("connection_lost"));
+
 }

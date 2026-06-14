@@ -4,6 +4,7 @@ import com.environment.ImpactManager;
 import com.environment.Pickup;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
+import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.AudioStreamPlayer3D;
 import godot.api.AudioStreamWAV;
@@ -131,6 +132,19 @@ public class WeaponItem extends Pickup implements WeaponAction {
   }
 
   // ── Pickup callbacks ──────────────────────────────────────────────────────
+
+  /**
+   * Registers this weapon's kill-feed icon under its weaponName so the networked
+   * kill feed can resolve it locally (textures never cross the wire — see
+   * {@link WeaponIconRegistry}). MUST call super._ready() or the Pickup base never
+   * registers for replication.
+   */
+  @RegisterFunction
+  @Override
+  public void _ready() {
+    super._ready();
+    WeaponIconRegistry.register(weaponName, weaponIcon);
+  }
 
   /**
    * Auto-pickup when the character's matching slot is free; otherwise show the
