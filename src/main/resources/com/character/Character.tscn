@@ -27,7 +27,6 @@
 [ext_resource type="Script" uid="uid://oymron85jta" path="res://gdj/com/character/Health.gdj" id="26_gapvf"]
 [ext_resource type="Script" uid="uid://tssnb6upftda" path="res://gdj/com/character/FPSCameraController.gdj" id="27_gapvf"]
 [ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="31_4afhp"]
-[ext_resource type="Resource" uid="uid://drollstate01" path="res://src/main/resources/com/character/rollstates/Roll.tres" id="50_roll"]
 [ext_resource type="Resource" uid="uid://bm3le3c0mb4t1" path="res://src/main/resources/com/character/combatstates/MeleeCombat.tres" id="60_meleec"]
 
 [sub_resource type="Resource" id="Resource_gapvf"]
@@ -68,7 +67,6 @@ combat_states = Dictionary[String, ExtResource("5_5k7ut")]({
 "MeleeCombat": ExtResource("60_meleec"),
 "NoCombat": ExtResource("7_dnye5")
 })
-roll_state = ExtResource("50_roll")
 character_info = SubResource("Resource_gapvf")
 weapon_controller = NodePath("WeaponController")
 character_visuals = ExtResource("1_rl0hp")
@@ -161,15 +159,6 @@ one_shot = true
 process_callback = 0
 one_shot = true
 
-[node name="RollTimer" type="Timer" parent="." unique_id=832343372]
-process_callback = 0
-one_shot = true
-
-[node name="StanceAntispamTimer" type="Timer" parent="." unique_id=37994442]
-process_callback = 0
-wait_time = 0.25
-one_shot = true
-
 [node name="WeaponAudio" type="AudioStreamPlayer3D" parent="." unique_id=2081946510]
 
 [node name="Health" type="Node" parent="." unique_id=1822801054]
@@ -240,13 +229,9 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 [connection signal="not_fire_weapon" from="." to="WeaponController" method="on_weapon_not_fire"]
 [connection signal="pressed_jump" from="." to="MovementController" method="jump"]
 [connection signal="pressed_jump" from="." to="AnimationController" method="jump"]
-[connection signal="pressed_roll" from="." to="MovementController" method="roll"]
-[connection signal="pressed_roll" from="." to="AnimationController" method="roll"]
 [connection signal="reload_weapon" from="." to="WeaponController" method="on_weapon_reload"]
 [connection signal="timeout" from="WeaponController/TransitionTimer" to="WeaponController" method="on_weapon_transition_complete"]
 [connection signal="timeout" from="WeaponController/ReloadTimer" to="WeaponController" method="on_weapon_reload_complete"]
-[connection signal="timeout" from="RollTimer" to="." method="completed_roll"]
-[connection signal="timeout" from="RollTimer" to="MovementController" method="completed_roll"]
 [connection signal="died" from="Health" to="." method="on_died"]
 [connection signal="set_cam_rotation" from="TPSCameraController" to="MovementController" method="on_set_cam_rotation"]
 [connection signal="set_cam_rotation" from="TPSCameraController" to="AnimationController" method="on_set_cam_rotation"]

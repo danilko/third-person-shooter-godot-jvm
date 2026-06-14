@@ -9,11 +9,13 @@ import godot.api.*;
 import godot.core.Callable;
 import godot.core.NodePath;
 import godot.core.StringNames;
+
 /**
- * Per-character HUD: health bar, ammo counters, pickup notification, interact prompt.
+ * Per-character HUD: health label and interact prompt.
  *
- * Global feed entries (kill feed) are owned by HUDManager so they remain
- * visible across HUD context switches (foot ↔ vehicle).
+ * Transient toasts (weapon pickups, mission events) and the kill feed are owned by
+ * {@link HUDManager} and rendered through the shared {@link Feed} components, so this
+ * widget stays a thin per-character status panel that survives HUD context switches.
  */
 @RegisterClass(className = "CharacterHUD")
 public class CharacterHUD extends Control {
@@ -22,18 +24,9 @@ public class CharacterHUD extends Control {
   @Export
   public NodePath healthLabelPath = new NodePath("Health/ColorRect/Health");
 
-  @RegisterProperty @Export
-  public NodePath notificationIconPath = new NodePath("Notification/WeaponIcon");
-
   private Label healthLabel;
-  private Label magazineLabel;
-  private Label reserveLabel;
-  private Label pickupNotificationLabel;
-  private TextureRect notificationIcon;
   private Label interactPromptLabel;
   private String playerCharacterId = "";
-  private double pickupTimer = 0.0;
-  private static final double PICKUP_NOTIFICATION_DURATION = 3.0;
 
   @RegisterFunction
   @Override
@@ -42,9 +35,6 @@ public class CharacterHUD extends Control {
       healthLabel = (Label) getNode(healthLabelPath);
     }
 
-    pickupNotificationLabel = (Label) getNode("Notification/EliminatedNotification");
-    Node iconNode = getNodeOrNull(notificationIconPath);
-    if (iconNode instanceof TextureRect tr) notificationIcon = tr;
     Node promptNode = getNodeOrNull("InteractPrompt");
     if (promptNode instanceof Label l) interactPromptLabel = l;
 
@@ -59,27 +49,13 @@ public class CharacterHUD extends Control {
     }
   }
 
-  @RegisterFunction
-  @Override
-  public void _process(double delta) {
-    if (pickupTimer > 0) {
-      pickupTimer -= delta;
-      if (pickupTimer <= 0) {
-        if (pickupNotificationLabel != null) pickupNotificationLabel.setVisible(false);
-        if (notificationIcon != null) notificationIcon.setVisible(false);
-      }
-    }
-  }
-
-  /** Receive WeaponController.ammoChanged signal. */
+  /**
+   * Receive WeaponController.ammoChanged (routed per-character by HUDManager's C2 path).
+   * No-op today — ammo is displayed by WeaponSlotsUI / the radial menu; kept as the
+   * per-character hook for a future dedicated ammo widget (e.g. co-op squad overlays).
+   */
   @RegisterFunction
   public void onAmmoChanged(int magazine, int reserve) {
-    if (magazineLabel != null) {
-      magazineLabel.setText(String.valueOf(magazine));
-    }
-    if (reserveLabel != null) {
-      reserveLabel.setText(String.valueOf(reserve));
-    }
   }
 
   /** Receive Health.damaged signal (pass currentHealth from the character). */
@@ -90,7 +66,7 @@ public class CharacterHUD extends Control {
     }
   }
 
-  /** Receive EventBus.pickupInteractChanged — show/hide the "Press F to pick up" prompt. */
+  /** Receive EventBus.pickupInteractChanged — show/hide the "Press E to pick up" prompt. */
   @RegisterFunction
   public void onPickupInteractChanged(boolean inRange, String label) {
     if (interactPromptLabel == null) return;
@@ -105,25 +81,5 @@ public class CharacterHUD extends Control {
   /** Called by HUDManager.wirePlayer() to bind this HUD to a specific character. */
   public void setPlayerCharacterId(String id) {
     playerCharacterId = id != null ? id : "";
-  }
-
-  /** Receive EventBus.weaponPickedUp — brief HUD notification of the item name and icon. */
-  @RegisterFunction
-  public void onWeaponPickedUp(String characterId, String weaponName, Texture2D weaponIcon) {
-    if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(characterId)) return;
-    showNotification("Picked up " + weaponName, weaponIcon);
-  }
-
-  /** Show a transient pickup notification (weapon icon + item name). */
-  private void showNotification(String text, Texture2D icon) {
-    if (pickupNotificationLabel != null) {
-      pickupNotificationLabel.setText(text);
-      pickupNotificationLabel.setVisible(true);
-    }
-    if (notificationIcon != null) {
-      notificationIcon.setTexture(icon);
-      notificationIcon.setVisible(icon != null);
-    }
-    pickupTimer = PICKUP_NOTIFICATION_DURATION;
   }
 }

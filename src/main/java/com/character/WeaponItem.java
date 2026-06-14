@@ -136,14 +136,14 @@ public class WeaponItem extends Pickup implements WeaponAction {
   /**
    * Registers this weapon's kill-feed icon under its weaponName so the networked
    * kill feed can resolve it locally (textures never cross the wire — see
-   * {@link WeaponIconRegistry}). MUST call super._ready() or the Pickup base never
+   * {@link IconRegistry}). MUST call super._ready() or the Pickup base never
    * registers for replication.
    */
   @RegisterFunction
   @Override
   public void _ready() {
     super._ready();
-    WeaponIconRegistry.register(weaponName, weaponIcon);
+    IconRegistry.register(weaponName, weaponIcon);
   }
 
   /**

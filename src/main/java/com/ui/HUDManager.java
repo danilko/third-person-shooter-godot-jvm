@@ -68,17 +68,19 @@ public class HUDManager extends CanvasLayer {
   private static final String DEFEATED_ENTRY_SCENE_PATH =
 		  "res://src/main/resources/com/ui/DefeatedFeedEntry.tscn";
 
+  /** Which set of HUD widgets is shown. One declarative transition per context. */
+  private enum HudContext { ON_FOOT, IN_VEHICLE }
+
   private Control        activeHUD;
   private Node           player;
   private String         playerCharacterId = "";
   private Crosshair      crosshair;
-  private Feed           feed;
+  private Feed           feed;          // bottom-right kill feed
+  private Feed           statusFeed;    // top-center transient toasts (pickups, mission events)
   private WeaponSlotsUI  weaponSlotsUI;
 
-  /** Top-of-screen mission status banner — built at runtime, hidden until a mission event fires. */
-  private Label          missionBanner;
-  private Timer          missionBannerTimer;
-  private static final double MISSION_BANNER_DURATION = 4.0;
+  private HudContext     currentContext  = HudContext.ON_FOOT;
+  private Vehicle        currentVehicle;  // non-null only while IN_VEHICLE
 
   /**
    * characterId → HUD widget registry (C2: multi-character HUD wiring).
@@ -106,10 +108,18 @@ public class HUDManager extends CanvasLayer {
   @RegisterFunction
   @Override
   public void _ready() {
-	// Scan children for the Feed — must be a direct child of HUDManager so it
-	// stays visible across HUD context switches (FootHUD ↔ VehicleHUD).
-	for (Node child : getChildren()) {
-	  if (child instanceof Feed f) { feed = f; break; }
+	// Feeds are direct children of HUDManager so they stay visible across HUD
+	// context switches (FootHUD ↔ VehicleHUD).
+	Node feedNode = getNodeOrNull("Feed");
+	if (feedNode instanceof Feed f) feed = f;
+	Node statusFeedNode = getNodeOrNull("StatusFeed");
+	if (statusFeedNode instanceof Feed sf) {
+	  statusFeed = sf;
+	  // StatusFeed instances the same Feed scene as the bottom-right kill feed, so move
+	  // its row container to the top-center here (avoids a fragile per-instance .tscn
+	  // override of an instanced sub-scene's child).
+	  Node vbox = statusFeed.getNodeOrNull("VBoxContainer");
+	  if (vbox instanceof Control vb) vb.setPosition(new Vector2(460f, 24f), false);
 	}
 
 	Node busNode = getNodeOrNull("/root/EventBus");
@@ -152,9 +162,13 @@ public class HUDManager extends CanvasLayer {
 	  bus.missionFailed.connectUnsafe(
 		  Callable.createUnsafe(this, StringNames.toGodotName("onMissionFailedHud")),
 		  Object.ConnectFlags.DEFAULT);
-	}
 
-	buildMissionBanner();
+	  // Pickup toasts route through the same status feed as mission events
+	  // (was previously a dead connection — nothing connected weaponPickedUp).
+	  bus.weaponPickedUp.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onWeaponPickedUp")),
+		  Object.ConnectFlags.DEFAULT);
+	}
 
 	// Cache the crosshair and weapon slot bar — siblings of FootHUD/VehicleHUD,
 	// persists across HUD context switches.
@@ -190,7 +204,45 @@ public class HUDManager extends CanvasLayer {
 
   @RegisterFunction
   public void onPlayerCombatStateChanged(CombatState state) {
-	if (crosshair != null) crosshair.setShowCrosshair(state.isCombat());
+	refreshCrosshair();
+  }
+
+  // ── HUD context machine ───────────────────────────────────────────────────
+
+  /**
+   * Single declarative transition between HUD contexts. Each context fully defines
+   * which widgets are visible — replacing the old scattered per-widget show/hide deltas
+   * that had to remember to undo each other. Add a context here, not another enter/exit
+   * mutation pair.
+   */
+  private void applyContext(HudContext ctx) {
+	currentContext = ctx;
+	activateHUD(ctx == HudContext.IN_VEHICLE ? "VehicleHUD" : "FootHUD");
+	if (weaponSlotsUI != null) {
+	  if (ctx == HudContext.IN_VEHICLE) weaponSlotsUI.hide(); else weaponSlotsUI.show();
+	}
+	refreshCrosshair();
+  }
+
+  /**
+   * The single place crosshair visibility is decided (was previously driven from three
+   * separate sites). On foot it follows the player's combat state and the player's weapon
+   * controller; in a vehicle it shows only for a VEHICLE_WEAPON vehicle, with no weapon
+   * controller (fixed spread).
+   */
+  private void refreshCrosshair() {
+	if (crosshair == null) return;
+	if (currentContext == HudContext.IN_VEHICLE) {
+	  boolean vehWeapon = currentVehicle != null
+			  && currentVehicle.getWeaponMode() == VehicleWeaponMode.VEHICLE_WEAPON;
+	  crosshair.weaponController = null;
+	  crosshair.setShowCrosshair(vehWeapon);
+	} else {
+	  Node wcNode = player != null ? player.getNodeOrNull("WeaponController") : null;
+	  crosshair.weaponController = wcNode instanceof WeaponController wc ? wc : null;
+	  boolean inCombat = player instanceof Character c && c.combat;
+	  crosshair.setShowCrosshair(inCombat);
+	}
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -281,15 +333,8 @@ public class HUDManager extends CanvasLayer {
 	if (vhudNode instanceof VehicleHUD hud && vehicle instanceof Node3D v) {
 	  hud.setVehicle(v);
 	}
-	activateHUD("VehicleHUD");
-	if (weaponSlotsUI != null) weaponSlotsUI.hide();
-	// VEHICLE_WEAPON: combat state is not forced on (no character weapon), but the
-	// vehicle fires its own gun — show crosshair with fixed spread (null weapon controller).
-	if (crosshair != null && vehicle instanceof Vehicle v
-			&& v.getWeaponMode() == VehicleWeaponMode.VEHICLE_WEAPON) {
-	  crosshair.weaponController = null;
-	  crosshair.setShowCrosshair(true);
-	}
+	currentVehicle = vehicle instanceof Vehicle v ? v : null;
+	applyContext(HudContext.IN_VEHICLE);
   }
 
   @RegisterFunction
@@ -297,15 +342,8 @@ public class HUDManager extends CanvasLayer {
 	if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
 	Node vhudNode = getNodeOrNull("VehicleHUD");
 	if (vhudNode instanceof VehicleHUD hud) hud.setVehicle(null);
-	activateHUD("FootHUD");
-	if (weaponSlotsUI != null) weaponSlotsUI.show();
-	// Restore crosshair weapon controller and visibility from the player's state.
-	if (crosshair != null) {
-	  Node wcNode = player != null ? player.getNodeOrNull("WeaponController") : null;
-	  crosshair.weaponController = wcNode instanceof WeaponController wc ? wc : null;
-	  boolean inCombat = player instanceof Character c && c.combat;
-	  crosshair.setShowCrosshair(inCombat);
-	}
+	currentVehicle = null;
+	applyContext(HudContext.ON_FOOT);
   }
 
   // ── Signal relays — player → EventBus ─────────────────────────────────────
@@ -323,52 +361,36 @@ public class HUDManager extends CanvasLayer {
 	if (healthNode instanceof Health h) emitHealth(h.getCurrentHealth());
   }
 
-  // ── Mission status banner ─────────────────────────────────────────────────
+  // ── Status feed (mission + pickup toasts) ─────────────────────────────────
 
-  /** Builds a centred top-of-screen Label + auto-hide Timer; no .tscn changes needed. */
-  private void buildMissionBanner() {
-	missionBanner = new Label();
-	missionBanner.setHorizontalAlignment(HorizontalAlignment.CENTER);
-	missionBanner.setAnchorsPreset(Control.LayoutPreset.PRESET_CENTER_TOP, false);
-	missionBanner.setPosition(new Vector2(-260f, 24f), false);
-	missionBanner.setSize(new Vector2(520f, 40f), false);
-	missionBanner.hide();
-	addChild(missionBanner);
-
-	missionBannerTimer = new Timer();
-	missionBannerTimer.setOneShot(true);
-	missionBannerTimer.setWaitTime(MISSION_BANNER_DURATION);
-	addChild(missionBannerTimer);
-	missionBannerTimer.getTimeout().connectUnsafe(
-		Callable.createUnsafe(this, StringNames.toGodotName("onMissionBannerTimeout")),
-		Object.ConnectFlags.DEFAULT);
+  /** Push a transient text (+ optional icon) row to the top-center status feed. */
+  private void pushStatus(String text, Texture2D icon) {
+	if (statusFeed == null) return;
+	StatusFeedEntry entry = new StatusFeedEntry();
+	entry.lifespan = statusFeed.entryLifespan;
+	entry.setContent(text, icon);
+	statusFeed.push(entry);
   }
 
-  private void showMissionBanner(String text) {
-	if (missionBanner == null) return;
-	missionBanner.setText(text);
-	missionBanner.show();
-	if (missionBannerTimer != null) missionBannerTimer.start();
+  @RegisterFunction
+  public void onWeaponPickedUp(String characterId, String weaponName, Texture2D weaponIcon) {
+	if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(characterId)) return;
+	pushStatus("Picked up " + weaponName, weaponIcon);
   }
 
   @RegisterFunction
   public void onMissionStarted(String missionId, String objectiveType) {
-	showMissionBanner("Mission started: " + missionId + " (" + objectiveType + ")");
+	pushStatus("Mission started: " + missionId + " (" + objectiveType + ")", null);
   }
 
   @RegisterFunction
   public void onMissionCompletedHud(String missionId, String winningFaction, String outcomeVariant) {
-	showMissionBanner("Mission complete — " + winningFaction + " wins (" + outcomeVariant + ")");
+	pushStatus("Mission complete — " + winningFaction + " wins (" + outcomeVariant + ")", null);
   }
 
   @RegisterFunction
   public void onMissionFailedHud(String missionId, String reason) {
-	showMissionBanner("Mission failed — " + reason);
-  }
-
-  @RegisterFunction
-  public void onMissionBannerTimeout() {
-	if (missionBanner != null) missionBanner.hide();
+	pushStatus("Mission failed — " + reason, null);
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
