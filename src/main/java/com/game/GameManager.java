@@ -64,9 +64,9 @@ public class GameManager extends Node {
             EventBus bus = (EventBus) eventBusNode;
             bus.characterSpawned.connectUnsafe(Callable.createUnsafe(this, StringNames.toGodotName("onCharacterSpawned")), godot.api.Object.ConnectFlags.DEFAULT);
             bus.characterDied.connectUnsafe(Callable.createUnsafe(this, StringNames.toGodotName("onCharacterDied")), godot.api.Object.ConnectFlags.DEFAULT);
-            // Note: playerDied is intentionally NOT connected here — MenuManager owns
-            // its own subscription for the pause + game-over UI. GAME_OVER state is
-            // now driven by the characterSpawned/characterDied "all dead" tracking below.
+            // Note: playerDied is intentionally NOT connected here — it fires per dead
+            // body. GAME_OVER is driven by the characterSpawned/characterDied "all dead"
+            // tracking below, which emits EventBus.allPlayersDied for MenuManager's UI.
         }
     }
 
@@ -87,7 +87,12 @@ public class GameManager extends Node {
         if (alivePlayerCharacterIds.remove(info.characterId) && alivePlayerCharacterIds.isEmpty()) {
             if (currentState != GameState.PLAYING) return;
             transitionTo(GameState.GAME_OVER);
-            // MenuManager.onPlayerDied() (playerDied signal) owns the pause + game-over UI.
+            // Surface the session-ending game-over screen ONLY now that every player is down.
+            // MenuManager listens to allPlayersDied (not the per-body playerDied) so a single
+            // co-op teammate's death no longer kicks the whole session — including the host,
+            // which holds a Player puppet for the client — to the restart menu.
+            Node busNode = getNodeOrNull("/root/EventBus");
+            if (busNode instanceof EventBus bus) bus.allPlayersDied.emit();
         }
     }
 

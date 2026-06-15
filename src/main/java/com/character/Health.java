@@ -36,8 +36,26 @@ public class Health extends Node {
 
     private float currentHealth;
 
+    /**
+     * Discrete "took a hit" event carrying the damage amount. Fires ONLY on authority-side
+     * {@code applyDamage} and is re-broadcast to non-authority peers as a reliable hit cue
+     * ({@code NetworkManager.handleDamageBroadcastMessage}). Drives momentary reactions —
+     * AI aggro, escort alerts, hit feedback — NOT health-bar display. Kept deliberately
+     * separate from {@link #healthChanged}: re-deriving a discrete event from the
+     * continuously-replicated health value would double-fire it on clients.
+     */
     @RegisterSignal
-    public final Signal1<Float> damaged = new Signal1<>(this, new StringName("damaged"));
+    public final Signal1<Float> hit = new Signal1<>(this, new StringName("hit"));
+
+    /**
+     * Fires whenever {@code currentHealth} changes from ANY source — local damage/heal
+     * AND replicated updates ({@link #applyReplicatedHealth}). This is THE signal for
+     * health-value display (HUD bar, nameplate); listen here, never to {@link #hit},
+     * for anything that shows current health — otherwise it won't track on non-authority
+     * peers (where damage arrives via replication, not local {@code takeDamage}).
+     */
+    @RegisterSignal
+    public final Signal1<Float> healthChanged = new Signal1<>(this, new StringName("health_changed"));
 
     @RegisterSignal
     public final Signal0 died = new Signal0(this, new StringName("died"));
@@ -103,7 +121,7 @@ public class Health extends Node {
     private void applyDamage(float damage, boolean headshot, String weaponName, Texture2D weaponIcon,
                              String attackerName, String attackerFaction) {
         currentHealth = Math.max(0.0f, currentHealth - damage);
-        damaged.emit(damage);
+        hit.emit(damage);
         emitCharacterHealthChanged();
         if (currentHealth <= 0) {
             Node busNode = getNodeOrNull("/root/EventBus");
@@ -144,6 +162,10 @@ public class Health extends Node {
 
     /** Relay current health to EventBus.characterHealthChanged for the owning character. */
     private void emitCharacterHealthChanged() {
+        // Local signal first — fires on every health change (local or replicated) so the
+        // sibling nameplate updates on non-authority peers too. Independent of the
+        // EventBus/characterInfo eligibility below.
+        healthChanged.emit(currentHealth);
         Node owner = getOwner();
         if (!(owner instanceof Character c) || c.characterInfo == null) return;
         Node busNode = getNodeOrNull("/root/EventBus");

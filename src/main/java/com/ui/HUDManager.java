@@ -38,7 +38,7 @@ import java.util.Map;
  * scenes render on top of the game world regardless of camera.
  *
  * Responsibilities:
- *  1. Relay active player's local signals (ammoChanged, Health.damaged) to
+ *  1. Relay active player's local signals (ammoChanged, Health.healthChanged) to
  *     EventBus so HUDs remain completely decoupled from the player node.
  *  2. Switch between HUD contexts (foot, vehicle, ...) by showing/hiding
  *     named child Control nodes.
@@ -284,8 +284,10 @@ public class HUDManager extends CanvasLayer {
 
 	Node healthNode = player.getNodeOrNull("Health");
 	if (healthNode instanceof Health h) {
-	  h.damaged.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onPlayerHealthDamaged")),
+	  // healthChanged (not the discrete hit event) so the HUD bar tracks every health
+	  // change — local damage/heal and replicated updates — uniformly.
+	  h.healthChanged.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onPlayerHealthChanged")),
 		  Object.ConnectFlags.DEFAULT);
 	  emitHealth(h.getCurrentHealth());
 	}
@@ -308,8 +310,7 @@ public class HUDManager extends CanvasLayer {
 		// C2 routing (onCharacterHealthChanged/onCharacterAmmoChanged) looks widgets
 		// up in characterHUDs by characterId — registerCharacterHUD existed but was
 		// never called from anywhere, so replicated health (applyReplicatedHealth
-		// emits characterHealthChanged, never `damaged`, specifically to route
-		// through here rather than onPlayerHealthDamaged) never reached the HUD.
+		// emits characterHealthChanged) never reached the HUD.
 		registerCharacterHUD(info.characterId, hud);
 	  }
 	}
@@ -355,10 +356,8 @@ public class HUDManager extends CanvasLayer {
   }
 
   @RegisterFunction
-  public void onPlayerHealthDamaged(float damage) {
-	if (player == null) return;
-	Node healthNode = player.getNodeOrNull("Health");
-	if (healthNode instanceof Health h) emitHealth(h.getCurrentHealth());
+  public void onPlayerHealthChanged(float currentHealth) {
+	emitHealth(currentHealth);
   }
 
   // ── Status feed (mission + pickup toasts) ─────────────────────────────────

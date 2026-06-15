@@ -22,7 +22,8 @@ import godot.core.StringNames;
  *
  * Responsibilities:
  *   - Toggle PauseMenu on Esc (when not in GAME_OVER state)
- *   - Show GameOverMenu on EventBus.playerDied
+ *   - Show GameOverMenu on EventBus.allPlayersDied (the co-op "all players down"
+ *     condition — NOT the per-body playerDied, which fires on any single teammate's death)
  *   - Own mouse-mode + SceneTree pause transitions
  *   - Expose restart() and quit() for child menus to call
  *
@@ -43,8 +44,8 @@ public class MenuManager extends CanvasLayer {
 
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
-            bus.playerDied.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onPlayerDied")),
+            bus.allPlayersDied.connectUnsafe(
+                    Callable.createUnsafe(this, StringNames.toGodotName("onAllPlayersDied")),
                     godot.api.Object.ConnectFlags.DEFAULT);
             bus.connectionLost.connectUnsafe(
                     Callable.createUnsafe(this, StringNames.toGodotName("onConnectionLost")),
@@ -67,7 +68,7 @@ public class MenuManager extends CanvasLayer {
     // ── EventBus listener ─────────────────────────────────────────────────────
 
     @RegisterFunction
-    public void onPlayerDied() {
+    public void onAllPlayersDied() {
         showGameOver();
     }
 
