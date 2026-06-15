@@ -29,9 +29,25 @@ import godot.core.StringName;
 @RegisterClass(className = "EventBus")
 public class EventBus extends Node {
 
-    /** Emitted by Player.onDied(). Payload: none — the player is a singleton. */
+    /**
+     * Emitted by Player.onDied() for EVERY Player death — including a co-op teammate's
+     * (each peer holds a Player puppet for every human, so this fires once per body that
+     * dies on every peer). It is therefore NOT a session-ending signal: use it only for
+     * per-player effects (death cam, future respawn/spectate). The session-ending
+     * game-over screen is driven by {@link #allPlayersDied} instead.
+     */
     @RegisterSignal
     public final Signal0 playerDied = new Signal0(this, new StringName("player_died"));
+
+    /**
+     * Emitted by GameManager once EVERY tracked Player character has died (the co-op
+     * "all players down" condition — see GameManager.onCharacterDied). This — not the
+     * per-body {@link #playerDied} — is what surfaces the session-ending game-over screen,
+     * so a single teammate's death no longer kicks the whole session (including the host)
+     * to the restart menu.
+     */
+    @RegisterSignal
+    public final Signal0 allPlayersDied = new Signal0(this, new StringName("all_players_died"));
 
     /**
      * Emitted by Player once after _ready() completes (deferred so all sibling

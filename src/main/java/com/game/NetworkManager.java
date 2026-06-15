@@ -981,7 +981,7 @@ public class NetworkManager extends Node {
         if (!(victim instanceof Node victimNode) || isAuthorityFor(victim.getCharacterInfo())) return;
 
         Health health = findHealth(victimNode);
-        if (health != null) health.damaged.emit(cast.damage());
+        if (health != null) health.hit.emit(cast.damage());
     }
 
     /**

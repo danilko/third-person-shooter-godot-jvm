@@ -70,8 +70,9 @@ public class CharacterNameplate extends Node3D {
         if (healthNode instanceof Health health) {
             maxHealth = health.maxHealth;
             updateBar(health.getCurrentHealth());
-            health.damaged.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onDamaged")),
+            // healthChanged (not damaged) so the bar tracks replicated health on clients too.
+            health.healthChanged.connectUnsafe(
+                    Callable.createUnsafe(this, StringNames.toGodotName("onHealthChanged")),
                     godot.api.Object.ConnectFlags.DEFAULT);
             health.died.connectUnsafe(
                     Callable.createUnsafe(this, StringNames.toGodotName("onDied")),
@@ -79,11 +80,10 @@ public class CharacterNameplate extends Node3D {
         }
     }
 
-    /** Connected to Health.damaged signal. */
+    /** Connected to Health.healthChanged signal (fires on local damage/heal and replication). */
     @RegisterFunction
-    public void onDamaged(float amount) {
-        Node healthNode = getNodeOrNull(healthNodePath);
-        if (healthNode instanceof Health health) updateBar(health.getCurrentHealth());
+    public void onHealthChanged(float currentHealth) {
+        updateBar(currentHealth);
     }
 
     /** Connected to Health.died signal. */

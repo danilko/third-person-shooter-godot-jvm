@@ -148,7 +148,7 @@ public class AICharacter extends Character {
     }
 
     /**
-     * Assigns the escort target and connects to its Health.damaged signal so
+     * Assigns the escort target and connects to its Health.hit signal so
      * EscortState can react immediately when the target takes a hit.
      * Safe to call at runtime from mission code.
      */
@@ -157,13 +157,13 @@ public class AICharacter extends Character {
         if (target == null) return;
         Node h = target.getNodeOrNull("Health");
         if (h instanceof Health health) {
-            health.damaged.connectUnsafe(
+            health.hit.connectUnsafe(
                     Callable.createUnsafe(this, StringNames.toGodotName("onEscortTargetDamaged")),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
     }
 
-    /** Called when the escort target's Health emits the damaged signal. */
+    /** Called when the escort target's Health emits the hit signal. */
     @RegisterFunction
     public void onEscortTargetDamaged(float amount) {
         if (controller instanceof AIController aiCtrl) aiCtrl.setEscortTargetAttacked();

@@ -58,7 +58,7 @@ public class CharacterHUD extends Control {
   public void onAmmoChanged(int magazine, int reserve) {
   }
 
-  /** Receive Health.damaged signal (pass currentHealth from the character). */
+  /** Receive EventBus.playerHealthChanged (current health for the active player). */
   @RegisterFunction
   public void onHealthChanged(float currentHealth) {
     if (healthLabel != null) {

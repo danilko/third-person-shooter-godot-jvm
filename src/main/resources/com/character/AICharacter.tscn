@@ -68,4 +68,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7752043, 0)
 [node name="FPSCameraController" parent="." unique_id=704008049]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
-[connection signal="damaged" from="Health" to="." method="on_enemy_damaged"]
+[connection signal="hit" from="Health" to="." method="on_enemy_damaged"]

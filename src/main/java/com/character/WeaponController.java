@@ -318,7 +318,16 @@ public class WeaponController extends Node {
   public void equipWeapon(WeaponItem item) {
     WeaponSlotType type = item.getSlotType();
     int targetSlot = findFreeSlot(type);
-    if (targetSlot < 0) targetSlot = findFirstSlot(type);
+    if (targetSlot < 0) {
+      // No free slot of this type — replace the weapon currently HELD if it's this type
+      // (drop what you're holding for the new one), otherwise fall back to the first slot
+      // of this type. Previously this always displaced the first slot, so picking up a
+      // primary while holding the second primary wrongly threw away the first one.
+      targetSlot = (activeSlotIndex >= 0 && activeSlotIndex < slotTypes.length
+                    && slotTypes[activeSlotIndex] == type)
+          ? activeSlotIndex
+          : findFirstSlot(type);
+    }
     if (targetSlot < 0) return;
 
     WeaponItem displaced = weapons[targetSlot];
