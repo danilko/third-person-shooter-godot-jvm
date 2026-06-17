@@ -363,7 +363,7 @@ public class NetworkManager extends Node {
             entries.add(new NetMessageCodec.DecodedSnapshot(c.characterInfo.characterId, c.getCurrentTick(),
                     c.getGlobalPosition(), c.getVelocity(), c.getAimTargetPosition(), c.isCombat(),
                     c.getStanceOrdinal(), wc.getWeapon(), c.getMovementTypeOrdinal(), c.getFacingYaw(),
-                    health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine()));
+                    health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(), wc.getReloadSeq()));
         }
         broadcastSnapshotBatchChunked(entries);
         broadcastVehicleSnapshots();
@@ -465,8 +465,8 @@ public class NetworkManager extends Node {
      */
     private static final int MAX_BATCH_PAYLOAD_BYTES = 1100;
 
-    /** Fixed bytes per snapshot entry beyond the characterId text: u32 len + i64 tick + 9 floats + flags u8 + yaw/health/time + fireSeq u8 + activeMagazine u16 — see NetMessageCodec.putSnapshotEntry. */
-    private static final int SNAPSHOT_ENTRY_FIXED_BYTES = 64;
+    /** Fixed bytes per snapshot entry beyond the characterId text: u32 len + i64 tick + 9 floats + flags u8 + yaw/health/time + fireSeq u8 + activeMagazine u16 + reloadSeq u8 — see NetMessageCodec.putSnapshotEntry. */
+    private static final int SNAPSHOT_ENTRY_FIXED_BYTES = 65;
 
     /** Splits the gathered entries into as many ≤{@link #MAX_BATCH_PAYLOAD_BYTES} frames as needed and broadcasts each. */
     private void broadcastSnapshotBatchChunked(List<NetMessageCodec.DecodedSnapshot> entries) {
@@ -745,7 +745,7 @@ public class NetworkManager extends Node {
             snap = new NetMessageCodec.DecodedSnapshot(snap.characterId(), snap.tick(), pos, snap.velocity(),
                     snap.aimTarget(), snap.combat(), snap.stanceOrdinal(), snap.activeSlotIndex(),
                     snap.movementTypeOrdinal(), snap.yaw(), snap.currentHealth(), snap.senderTimeMs(), snap.fireSeq(),
-                    snap.activeMagazine());
+                    snap.activeMagazine(), snap.reloadSeq());
         }
         return snap;
     }
@@ -1682,7 +1682,8 @@ public class NetworkManager extends Node {
         sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeSnapshot(MSG_SNAPSHOT, body.characterInfo.characterId,
                 body.getCurrentTick(), body.getGlobalPosition(), body.getVelocity(), body.getAimTargetPosition(),
                 body.isCombat(), body.getStanceOrdinal(), wc.getWeapon(), body.getMovementTypeOrdinal(),
-                body.getFacingYaw(), health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine()));
+                body.getFacingYaw(), health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(),
+                wc.getReloadSeq()));
     }
 
     /**

@@ -54,6 +54,11 @@ public class NetworkController extends Controller {
     // haveFireSeq suppresses a spurious cue on the very first snapshot (no prior value to diff).
     private boolean haveFireSeq = false;
     private int     lastFireSeq = 0;
+    // Reload-as-state: play the reload animation/audio cue when the snapshot's rolling reload
+    // counter changes, so a reloading enemy is visibly telegraphed (a tactical tell that they
+    // can't return fire mid-reload). haveReloadSeq suppresses a spurious cue on the first snapshot.
+    private boolean haveReloadSeq = false;
+    private int     lastReloadSeq = 0;
 
     @Override
     public boolean isAuthority() { return false; }
@@ -165,7 +170,10 @@ public class NetworkController extends Controller {
             // current slot instead is self-healing: the next snapshot after the pickup
             // event lands switches cleanly.
             int slot = snapshot.activeSlotIndex();
-            if (wc.getWeapon() != slot && wc.getWeaponItem(slot) != null) wc.onSetWeapon(slot);
+            // applyReplicatedWeaponSlot (not onSetWeapon): snap the puppet's slot + play the draw
+            // as cosmetic only, so the switch shows up as promptly as position/stance and a fire
+            // cue never lands mid-draw. See WeaponController.applyReplicatedWeaponSlot.
+            if (wc.getWeapon() != slot && wc.getWeaponItem(slot) != null) wc.applyReplicatedWeaponSlot(slot);
             // Track the owner's active-weapon ammo so consumption that rides no other message
             // (a thrown grenade) is reflected on the puppet — and, on the host, in the manifest
             // this copy feeds. Puppet-only: the owner's own echo never reaches here (it goes
@@ -178,6 +186,13 @@ public class NetworkController extends Controller {
             wc.setReplicatedFireSeq(snapshot.fireSeq());
             lastFireSeq = snapshot.fireSeq();
             haveFireSeq = true;
+            // Reload replicated as state, same change-detection model as fire: a changed reload
+            // counter means the authority started a reload since the last snapshot → play the
+            // reload cue here. Mirror the value so a re-broadcasting host carries it onward.
+            if (haveReloadSeq && snapshot.reloadSeq() != lastReloadSeq) wc.playRemoteReloadCue();
+            wc.setReplicatedReloadSeq(snapshot.reloadSeq());
+            lastReloadSeq = snapshot.reloadSeq();
+            haveReloadSeq = true;
         }
     }
 }

@@ -130,21 +130,27 @@ public class ProjectileItem extends WeaponItem {
     private void spawnProjectile(boolean cosmetic) {
         if (projectileScene == null || owningCharacter == null) return;
 
-        // Spawn at Muzzle marker if present; fall back to character shoulder.
-        Node muzzle = getNodeOrNull("Muzzle");
-        Vector3 spawnPos = (muzzle instanceof Node3D m3d)
-                ? m3d.getGlobalPosition()
-                : owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.0f, 0f));
-
-        // Authority: precise aimRay (steer to crosshair). Puppet replay: the replicated aim
-        // point (no active aimRay on a puppet — same source FirearmItem.playRemoteFireCue uses).
+        Vector3 spawnPos;
         Vector3 aimDir;
         if (cosmetic) {
+            // Puppet replay: derive everything from the replicated aim point and a STABLE
+            // chest-relative origin — NOT the transient Muzzle marker, which on a remote peer
+            // may be mid-draw (down at the hip) and would launch the cosmetic rocket into the
+            // ground or the shooter's own body. Cosmetics follow replicated logical state, never
+            // the animating pose. (Matches ThrowableItem.spawnProjectile's puppet path.)
             if (!(owningCharacter instanceof Character c)) return;
-            Vector3 dir = c.getAimTargetPosition().minus(spawnPos);
+            Vector3 from = owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.4f, 0f));
+            Vector3 dir = c.getAimTargetPosition().minus(from);
             if (dir.lengthSquared() < 1e-6f) return;
             aimDir = dir.normalized();
+            spawnPos = from.plus(aimDir.times(0.4f));
         } else {
+            // Authority: spawn at the Muzzle marker (falls back to chest) and steer to the
+            // precise aimRay / crosshair.
+            Node muzzle = getNodeOrNull("Muzzle");
+            spawnPos = (muzzle instanceof Node3D m3d)
+                    ? m3d.getGlobalPosition()
+                    : owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.0f, 0f));
             if (weaponController == null) return;
             RayCast3D aimRay = weaponController.getAimRay();
             if (aimRay == null) return;
