@@ -312,6 +312,25 @@ identically to the authority:**
   weapon never collides with / detonates on its own shooter (the rocket's `collision_mask` includes
   the character layer); it is not the consistency fix, the unified muzzle+`aimTarget` spawn is.
 
+**Weapon switch — ordered equip event (so a remote switch is neither late nor early, and fire can't
+render before draw):** the owner's switch is two-phase — `onSetWeapon` starts `transitionTimer`
+(holster, old weapon still shown) and only `onWeaponTransitionComplete` raises the new weapon
+(`onWeaponEquip`) — so the new weapon comes up at `switchStart + transitionTime`. Both `onSetWeapon`
+and the puppet path share `beginWeaponTransition(slot)`, so **a puppet runs the same transition and
+raises the weapon at the same offset from switch-start** — timing-identical, off only by latency.
+This requires delivering the switch at switch-*start*: `onSetWeapon` emits a reliable, ordered
+`MSG_WEAPON_SWITCH(charId, targetSlot)` the instant the owner begins (gated on `isAuthorityFor`; host
+validates owner + re-broadcasts excluding the originator), and the per-tick snapshot replicates
+`getReplicatedActiveSlot()` (the **target** during a transition, not the post-animation
+`activeSlotIndex`) as the drop-heal backstop. (Pitfall: an earlier version *snapped* the puppet's
+weapon up instantly — fine while delivery was *late* via the post-transition slot, but once delivery
+became prompt it drew a full `transitionTime` too early.) The puppet gates its cue with the **same**
+condition as the owner's `onWeaponFire` — `isWeaponTransitioning() || fireTimer.getTimeLeft() > 0`
+(`fireTimer` = draw-settle started by `onWeaponTransitionComplete`) — dropping any cue inside the
+draw window (`fire_cue_predraw_suppressed`). The replicated path only ever runs on puppets (the owner
+uses `onWeaponFire`/`onSetWeapon`), so these timers never carry two meanings on one body. Host-side
+fire-timing *validation* is deferred (H3).
+
 ### Ragdoll on death (Character.enableRagdoll)
 
 1. `setPhysicsProcess(false)` on both `Character` and `MovementController`.

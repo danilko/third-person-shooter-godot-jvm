@@ -132,6 +132,15 @@ public class WeaponController extends Node {
 
   public int getWeapon() { return activeSlotIndex; }
 
+  /**
+   * The slot to replicate (G4-1): the switch TARGET while a transition is in flight, otherwise the
+   * active slot. Replicating the target the instant the owner commits to a switch — not the
+   * post-animation outcome — lets puppets begin their draw promptly (and keeps the per-tick snapshot
+   * agreeing with the reliable MSG_WEAPON_SWITCH event so the two never fight). Owner-only state: a
+   * puppet never transitions, so this just returns its snapped activeSlotIndex.
+   */
+  public int getReplicatedActiveSlot() { return isWeaponTransitioning() ? pendingSlotIndex : activeSlotIndex; }
+
   /** True when a real weapon (slot > 0) is active. False when fist is active. */
   public boolean isArmed() { return activeSlotIndex > 0; }
 
@@ -511,6 +520,15 @@ public class WeaponController extends Node {
   /** Network replay hook — plays the firing cosmetics (flash/audio + tracer) without consuming ammo or running hitscan. */
   @RegisterFunction
   public void playRemoteFireCue() {
+    // G4-2 (puppet fire-gate): never render a shot before the weapon is up. Mirror the owner's own
+    // onWeaponFire gate — suppress while the holster→draw transition runs OR through the draw-settle
+    // fireTimer that onWeaponTransitionComplete starts. A cue inside that window is the
+    // fire-precedes-draw race (rare once G4-1 aligns the switch). The owner self-gates its real fire
+    // on the same condition, so nothing authoritative is lost.
+    if (isWeaponTransitioning() || fireTimer.getTimeLeft() > 0) {
+      NetStats.increment("fire_cue_predraw_suppressed");
+      return;
+    }
     WeaponItem w = getCurrentWeaponItem();
     if (w != null && isArmed()) {
       // Polymorphic cosmetic replay: firearms draw muzzle/tracer, throwable/projectile
@@ -565,15 +583,45 @@ public class WeaponController extends Node {
 
   @RegisterFunction
   public void onSetWeapon(int slotIndex) {
-    if (isWeaponTransitioning()) return;
-    if (slotIndex < 0 || slotIndex >= weapons.length) return;
-    if (weapons[slotIndex] == null) return;
-    if (slotIndex == activeSlotIndex) { showWeapon(activeSlotIndex); return; }
+    if (!beginWeaponTransition(slotIndex)) return;
+    // G4-1: announce the equip START now (reliable, ordered), so puppets begin the SAME transition
+    // at the same logical moment. The per-tick snapshot (getReplicatedActiveSlot, the target during
+    // this transition) is the drop-heal backstop.
+    announceWeaponSwitch(pendingSlotIndex);
+  }
+
+  /**
+   * Starts the holster→draw transition toward {@code slotIndex} — the shared timing used by both the
+   * owner's input ({@link #onSetWeapon}) and a puppet's replicated switch
+   * ({@link #applyReplicatedWeaponSlot}). The new weapon is only raised at
+   * {@link #onWeaponTransitionComplete} (after {@code transitionTimer}), so every peer draws the new
+   * weapon at the same offset from switch-start — owner and puppet stay timing-identical. Returns
+   * true when a transition actually started (false on a no-op: mid-transition, invalid/empty slot, or
+   * re-selecting the active slot).
+   */
+  private boolean beginWeaponTransition(int slotIndex) {
+    if (isWeaponTransitioning()) return false;
+    if (slotIndex < 0 || slotIndex >= weapons.length) return false;
+    if (weapons[slotIndex] == null) return false;
+    if (slotIndex == activeSlotIndex) { showWeapon(activeSlotIndex); return false; }
 
     pendingSlotIndex = slotIndex;
-    showWeapon(activeSlotIndex);
+    showWeapon(activeSlotIndex);   // keep the OLD weapon up through the holster phase
     transitionTimer.setWaitTime(1.0 / weapons[pendingSlotIndex].getSwitchSpeed());
     transitionTimer.start();
+    return true;
+  }
+
+  /**
+   * Owner/host → network: announce the start of a weapon switch (G4-1). Gated on local authority
+   * for this body (mirrors announceWeaponDropped) — a puppet's own cosmetic switch never re-announces.
+   */
+  private void announceWeaponSwitch(int targetSlot) {
+    if (!(getOwner() instanceof Character c) || c.characterInfo == null) return;
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    if (!(netNode instanceof NetworkManager net) || !net.isNetworked()) return;
+    if (!net.isAuthorityFor(c.characterInfo)) return;
+    net.sendWeaponSwitch(c.characterInfo.characterId, targetSlot);
   }
 
   @RegisterFunction
@@ -598,33 +646,27 @@ public class WeaponController extends Node {
   }
 
   /**
-   * Puppet-side weapon switch (non-authority peers, driven by the replicated active-slot state).
+   * Puppet-side weapon switch (non-authority peers, driven by the replicated switch — the ordered
+   * MSG_WEAPON_SWITCH event, with the per-tick {@code getReplicatedActiveSlot} slot as the drop-heal
+   * backstop).
    *
-   * <p>Snaps the active slot to the replicated value and plays the draw as a <b>cosmetic</b>
-   * animation only — no {@code transitionTimer} / {@code fireTimer} gating, because a puppet never
-   * fires locally (its shots arrive as the {@code fireSeq} cue). This is the deliberate split from
-   * the input-driven {@link #onSetWeapon}: routing replication through that re-ran the full animated
-   * transition on every peer, so a remote weapon switch lagged the owner by an extra draw-animation
-   * (on top of the owner's own draw + network latency) while position/stance applied instantly — and
-   * a fire cue could land while the puppet was still mid-draw, spawning a projectile from a
-   * half-raised muzzle in a strange direction.
+   * <p>Runs the SAME holster→draw {@code transitionTimer} the owner runs (via
+   * {@link #beginWeaponTransition}), so the new weapon is raised at the same offset from switch-start
+   * on every peer — owner and puppet stay timing-identical. This relies on the switch being delivered
+   * at switch-<i>start</i> (the G4-1 event), not the post-animation slot: an earlier version snapped
+   * the weapon up instantly to compensate for late (post-transition) delivery, which — once delivery
+   * became prompt — made the puppet draw a full {@code transitionTime} <i>before</i> the owner. The
+   * shared {@link #onWeaponTransitionComplete} starts {@code fireTimer} (the draw-settle), so a puppet
+   * never fires before its weapon is up (the {@link #playRemoteFireCue} gate keys on
+   * {@code isWeaponTransitioning() || fireTimer}, mirroring the owner's own {@code onWeaponFire} gate).
    *
-   * <p>Foundation for scale: remote weapon visuals derive from replicated <i>logical</i> state, not
-   * the transient animation pose — the invariant that lets future LOD / interest-management coarsen
-   * or drop puppet animation without breaking shot consistency. No-op when the slot is unchanged or
-   * empty (the caller already guards the empty case to avoid the fist↔weapon thrash loop).
+   * <p>Foundation for scale: remote weapon visuals derive from replicated <i>logical</i> state (the
+   * switch event + slot), not the transient animation pose — the invariant that lets future LOD /
+   * interest-management coarsen or drop puppet animation without breaking shot consistency. No-op when
+   * the slot is unchanged, empty, or a transition is already in flight (handled in beginWeaponTransition).
    */
   public void applyReplicatedWeaponSlot(int slotIndex) {
-    if (slotIndex < 0 || slotIndex >= weapons.length || weapons[slotIndex] == null) return;
-    if (slotIndex == activeSlotIndex) return;
-    boolean wasArmed = isArmed();
-    activeSlotIndex = slotIndex;
-    pendingSlotIndex = slotIndex;
-    showWeapon(activeSlotIndex);
-    WeaponItem next = weapons[activeSlotIndex];
-    if (animationController != null) animationController.onWeaponEquip(next.weaponPoseIndex);
-    ammoChanged.emit(next.getMagazine(), next.getReserve());
-    if (wasArmed != isArmed()) emitArmedStateChanged(isArmed());
+    beginWeaponTransition(slotIndex);
   }
 
   @RegisterFunction
