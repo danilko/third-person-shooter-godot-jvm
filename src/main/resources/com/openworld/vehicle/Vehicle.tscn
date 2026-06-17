@@ -1,0 +1,183 @@
+[gd_scene format=4 uid="uid://c7aoav51c2882"]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/vehicle/Vehicle.java" id="1_v"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/Health.java" id="2_h"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/CharacterInfo.java" id="3_ci"]
+[ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="3_i1sta"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/vehicle/VehicleWheel.tscn" id="5_p3n1p"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="5_x00le"]
+[ext_resource type="Curve" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="6_i1sta"]
+[ext_resource type="Texture2D" uid="uid://ofwdiqxujlur" path="res://addons/kenney_prototype_textures/light/texture_01.png" id="6_jeqgg"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="7_wc"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_x00le"]
+friction = 0.0
+
+[sub_resource type="Resource" id="Resource_x00le"]
+script = ExtResource("3_ci")
+display_name = "Vehicle"
+metadata/_custom_type_script = "uid://cplrp8cx4gus0"
+
+[sub_resource type="Curve" id="Curve_yyb6n"]
+_data = [Vector2(0, 0.3), 0.0, 0.0, 0, 0, Vector2(0.3, 0.9), 0.0, 0.0, 0, 0, Vector2(0.3, 0), 0.0, 0.0, 0, 0, Vector2(0.6, 0.8), 0.0, 0.0, 0, 0, Vector2(1, 0.1), 0.0, 0.0, 0, 0]
+point_count = 5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i1sta"]
+albedo_texture = ExtResource("6_jeqgg")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jeqgg"]
+albedo_texture = ExtResource("6_jeqgg")
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_p3n1p"]
+_surfaces = [{
+"aabb": AABB(-1, -0.25, -2, 2, 0.5, 4),
+"attribute_data": PackedByteArray("AAAAAAAAgD8AAAAAAAAAP6uqqj4AAAA/AACAPwAAAD+rqio/AAAAPwAAgD8AAAAAAAAAAAAAgD+rqqo+AAAAP6uqqj4AAIA/q6oqPwAAgD+rqio/AAAAPwAAgD8AAAA/AAAAAAAAAD8AAAAAAAAAAKuqqj4AAAAAq6oqPwAAgD/D9RA/M/ZSP6uqKj8AAAA/q6oqPwAAgD97FN4+M/ZSP8P1ED8z9lI/q6oqPwAAAD/D9RA/M/ZSP8P1ED9mKQY/q6oqPwAAAD/D9RA/ZikGP6uqqj4AAAA/q6oqPwAAgD8AAIA/AAAAPwAAgD8AAIA/AACAPwAAAACrqio/AAAAP6uqKj8AAAAAq6oqPwAAAD+rqqo+AAAAP6uqKj8AAAAAAAAAAAAAAD+rqqo+AAAAAKuqqj4AAAA/q6qqPgAAAD+rqqo+AAAAAKuqKj8AAAAAq6oqPwAAgD+rqqo+AACAP3sU3j4z9lI/q6qqPgAAgD+rqqo+AAAAP3sU3j4z9lI/q6qqPgAAAD/D9RA/ZikGP3sU3j5mKQY/q6qqPgAAAD97FN4+ZikGP3sU3j4z9lI/"),
+"format": 34359738391,
+"material": SubResource("StandardMaterial3D_i1sta"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 54,
+"vertex_data": PackedByteArray("AACAvwAAgL4AAADAAACAvwAAgD4AAADAAACAvwAAgD4AAABAAACAvwAAgL4AAADAAACAPwAAgL4AAADAAACAvwAAgD4AAADAAACAvwAAgL4AAADAAACAvwAAgD4AAABAAACAvwAAgL4AAABAAACAvwAAgL4AAADAAACAvwAAgL4AAABAAACAPwAAgL4AAABAAACAvwAAgL4AAABAAACAvwAAgD4AAABAAACAPwAAgD4AAABAAACAvwAAgD4AAADAH4XLvgAAgD6YsRe/AACAvwAAgD4AAABAAACAvwAAgD4AAADAH4XLPgAAgD6YsRe/H4XLvgAAgD6YsRe/AACAvwAAgD4AAABAH4XLvgAAgD6YsRe/H4XLvgAAgD5oWuc/AACAvwAAgD4AAABAH4XLvgAAgD5oWuc/AACAPwAAgD4AAABAAACAvwAAgL4AAADAAACAPwAAgL4AAABAAACAPwAAgL4AAADAAACAvwAAgD4AAADAAACAPwAAgL4AAADAAACAPwAAgD4AAADAAACAPwAAgL4AAADAAACAPwAAgL4AAABAAACAPwAAgD4AAADAAACAvwAAgL4AAABAAACAPwAAgD4AAABAAACAPwAAgL4AAABAAACAPwAAgL4AAABAAACAPwAAgD4AAABAAACAPwAAgD4AAADAAACAvwAAgD4AAADAAACAPwAAgD4AAADAH4XLPgAAgD6YsRe/AACAPwAAgD4AAADAAACAPwAAgD4AAABAH4XLPgAAgD6YsRe/AACAPwAAgD4AAABAH4XLvgAAgD5oWuc/H4XLPgAAgD5oWuc/AACAPwAAgD4AAABAH4XLPgAAgD5oWuc/H4XLPgAAgD6YsRe/AAD/f/9//78AAP9//3//vwAA/3//f/+//////wAA/7//////AAD/v/////8AAP+/AAD/f/9//78AAP9//3//vwAA/3//f/+//38AAP///7//fwAA////v/9/AAD///+//3//f////7//f/9/////v/9//3////+//3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/7//f///AAD/v/9///8AAP+//38AAP///7//fwAA////v/9/AAD///+//////wAA/7//////AAD/v/////8AAP+/////f/////////9//////////3///////3//f////7//f/9/////v/9//3////+/////f/////////9//////////3///////3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/7//f///AAD/v/9///8AAP+//3///wAA/7//f///AAD/v/9///8AAP+/")
+}, {
+"aabb": AABB(-0.3975, 0.25, -0.5925536, 0.795, 0.4651369, 2.4),
+"attribute_data": PackedByteArray("AACAPwAAgD8AAIA/6v8dPgAAAADq/x0+AAAAAAAAgD8GgFg/AACAPwaAWD8AAAAAAAAAAAAAAAAAAAAAAACAPwaAWD8AAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8GgFg/AACAPwAAgD8AAAAAAAAAAAAAAAAAAIA/AACAPwAAgD8AAAAA6v8dPgAAAAAAAIA/AAAAAAAAgD8GgFg/AACAPwaAWD8AAAAAAAAAAAAAAAAAAAAABoBYPwAAgD8GgFg/AACAPwAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8GgFg/AAAAAAAAAAAAAAAA"),
+"format": 34359738391,
+"material": SubResource("StandardMaterial3D_jeqgg"),
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 30,
+"vertex_data": PackedByteArray("H4XLvjYTNz+YsRe/H4XLvgAAgD6YsRe/H4XLPgAAgD6YsRe/H4XLvjYTNz9oWuc/H4XLvgAAgD5oWuc/H4XLvgAAgD6YsRe/H4XLvjYTNz+YsRe/H4XLvjYTNz9oWuc/H4XLvgAAgD6YsRe/H4XLvjYTNz9oWuc/H4XLPjYTNz9oWuc/H4XLvgAAgD5oWuc/H4XLvjYTNz+YsRe/H4XLPjYTNz9oWuc/H4XLvjYTNz9oWuc/H4XLvjYTNz+YsRe/H4XLPgAAgD6YsRe/H4XLPjYTNz+YsRe/H4XLPjYTNz+YsRe/H4XLPgAAgD6YsRe/H4XLPgAAgD5oWuc/H4XLPjYTNz9oWuc/H4XLPgAAgD5oWuc/H4XLvgAAgD5oWuc/H4XLvjYTNz+YsRe/H4XLPjYTNz+YsRe/H4XLPjYTNz9oWuc/H4XLPjYTNz+YsRe/H4XLPgAAgD5oWuc/H4XLPjYTNz9oWuc//////wAA/z//////AAD/P/////8AAP8/AAD/f/9//n8AAP9//3/+fwAA/3//f/5/AAD/f/9//n8AAP9//3/+fwAA/3//f/5//3//fwAA/z//f/9/AAD/P/9//38AAP8//3//////AAD/f/////8AAP9//////wAA/////wAA/z//////AAD/P/////8AAP8/////f/9//n////9//3/+f////3//f/5//3//fwAA/z//f/9/AAD/P/9//38AAP8//3//////AAD/f/////8AAP9//////wAA////f/9//n////9//3/+f////3//f/5/")
+}]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_entrance"]
+size = Vector3(4, 2.5, 7)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_x00le"]
+points = PackedVector3Array(1, 0.24995148, 2, 1, -0.25, 2, 1, 0.24995148, -2, 0.39741588, 0.7151369, 1.8073611, -1, 0.24995148, 2, -1, -0.25, 2, 1, -0.25, -2, -1, 0.24995148, -2, 0.39741588, 0.7151369, -0.5927956, -0.39761162, 0.7151369, 1.8073611, -1, -0.25, -2, -0.39761162, 0.7151369, -0.5927956)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sut32"]
+albedo_color = Color(0.93040425, 0.083007835, 3.85046e-07, 1)
+
+[node name="Vehicle" type="RigidBody3D" unique_id=1625753015]
+collision_layer = 16
+collision_mask = 3
+mass = 1200.0
+physics_material_override = SubResource("PhysicsMaterial_x00le")
+linear_damp_mode = 1
+script = ExtResource("1_v")
+character_info = SubResource("Resource_x00le")
+spring_strength = 12000.0
+wheel_radius = 0.33
+max_speed = 180.0
+acceleration = 16000.0
+acceleration_curve = SubResource("Curve_yyb6n")
+tire_max_turn_degrees = 12.0
+vehicle_icon = ExtResource("3_i1sta")
+
+[node name="Health" type="Node" parent="." unique_id=450985]
+script = ExtResource("2_h")
+max_health = 500.0
+
+[node name="BodyMesh" type="Node3D" parent="." unique_id=2000000001]
+
+[node name="CSGBakedMeshInstance3D" type="MeshInstance3D" parent="BodyMesh" unique_id=1581182864]
+transform = Transform3D(1, 0, 0, 0, 0.45200956, 0, 0, 0, 1, 0, 0, 0)
+mesh = SubResource("ArrayMesh_p3n1p")
+
+[node name="DriverSeat" type="Marker3D" parent="." unique_id=1653067824]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, -0.15868372, -0.3)
+
+[node name="EntranceArea" type="Area3D" parent="." unique_id=1653067825]
+collision_layer = 0
+collision_mask = 2
+
+[node name="EntranceShape" type="CollisionShape3D" parent="EntranceArea" unique_id=1653067826]
+shape = SubResource("BoxShape3D_entrance")
+
+[node name="Wheels" type="Marker3D" parent="." unique_id=1952437078]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1920929e-07, 0)
+
+[node name="RR" parent="Wheels" unique_id=602057335 instance=ExtResource("5_p3n1p")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, -0.16, 1.3)
+is_motor = true
+
+[node name="RL" parent="Wheels" unique_id=1918960343 instance=ExtResource("5_p3n1p")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, -0.16, 1.3)
+is_motor = true
+
+[node name="FR" parent="Wheels" unique_id=1837445748 instance=ExtResource("5_p3n1p")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, -0.16, -1.3)
+is_steer = true
+grip_curve = ExtResource("6_i1sta")
+
+[node name="FL" parent="Wheels" unique_id=1956086151 instance=ExtResource("5_p3n1p")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, -0.16, -1.3)
+wheel_radius = 0.33
+is_steer = true
+grip_curve = ExtResource("6_i1sta")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=763271005]
+shape = SubResource("ConvexPolygonShape3D_x00le")
+
+[node name="CameraController" type="Node3D" parent="." unique_id=1698678202]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+script = ExtResource("5_x00le")
+height = 2.0
+follow_pitch_deg = 10.0
+yaw_sensitivity = 0.02
+pitch_sensitivity = 0.03
+fps_camera_mount_path = NodePath("../FPSCameraMount")
+
+[node name="Yaw" type="Node3D" parent="CameraController" unique_id=1786511247]
+
+[node name="Pitch" type="Node3D" parent="CameraController/Yaw" unique_id=1379134568]
+
+[node name="Pivot" type="Node3D" parent="CameraController/Yaw/Pitch" unique_id=1379134569]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="SpringArm" type="SpringArm3D" parent="CameraController/Yaw/Pitch/Pivot" unique_id=1379134570]
+collision_mask = 17
+spring_length = 9.0
+
+[node name="Proxy" type="Node3D" parent="CameraController/Yaw/Pitch/Pivot/SpringArm" unique_id=1379134571]
+transform = Transform3D(1, 0, 0, 0, 0.98480767, 0.17364816, 0, -0.17364816, 0.98480767, 0, 0, 0)
+
+[node name="FPSCameraMount" type="Marker3D" parent="." unique_id=1379134576]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.33772087, -0.7964479)
+
+[node name="CSGBox3D" type="CSGBox3D" parent="FPSCameraMount" unique_id=1432086839]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+material_override = SubResource("StandardMaterial3D_sut32")
+
+[node name="ActiveCamera" type="Camera3D" parent="." unique_id=1379134577]
+fov = 70.0
+
+[node name="AimRay" type="RayCast3D" parent="ActiveCamera" unique_id=1379134578]
+target_position = Vector3(0, 0, -200)
+collision_mask = 25
+
+[node name="VehicleWeaponMount" type="Marker3D" parent="." unique_id=1379134567]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -1.3520434)
+
+[node name="WeaponController" type="Node" parent="." unique_id=1379134580]
+script = ExtResource("7_wc")
+weapon_attachment_path = NodePath("VehicleWeaponMount")
+
+[node name="TransitionTimer" type="Timer" parent="WeaponController" unique_id=1379134581]
+process_callback = 0
+wait_time = 0.1
+one_shot = true
+
+[node name="FireTimer" type="Timer" parent="WeaponController" unique_id=1379134582]
+process_callback = 0
+wait_time = 0.15
+one_shot = true
+
+[node name="ReloadTimer" type="Timer" parent="WeaponController" unique_id=1379134583]
+process_callback = 0
+one_shot = true
+
+[connection signal="body_entered" from="EntranceArea" to="." method="on_entrance_body_entered"]
+[connection signal="body_exited" from="EntranceArea" to="." method="on_entrance_body_exited"]
+[connection signal="timeout" from="WeaponController/TransitionTimer" to="WeaponController" method="on_weapon_transition_complete"]
+[connection signal="timeout" from="WeaponController/ReloadTimer" to="WeaponController" method="on_weapon_reload_complete"]

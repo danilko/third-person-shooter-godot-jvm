@@ -1,0 +1,237 @@
+[gd_scene format=3 uid="uid://dhp225d838mq7"]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/Character.java" id="1_gapvf"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/CharacterNameplate.tscn" id="1_nameplate"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/CharacterVisuals_GodotChan.tscn" id="1_rl0hp"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/movement/character/JumpState.java" id="2_3tgi5"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/jumpstates/AirJump.tres" id="3_ttk2h"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/jumpstates/GroundJump.tres" id="4_6f0xc"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/movement/character/CombatState.java" id="5_5k7ut"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/combatstates/Combat.tres" id="6_j83q5"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/movement/character/Stance.java" id="7_2iqcg"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/crawl/CrawlIdle.tres" id="7_d7d1u"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/combatstates/NoCombat.tres" id="7_dnye5"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/crouch/CrouchIdle.tres" id="8_ttk2h"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/CharacterInfo.java" id="9_arx8k"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/crouch/CrouchWalk.tres" id="9_gguhd"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/movement/character/MovementController.java" id="9_ie7o8"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/crouch/CrouchSprint.tres" id="10_gguhd"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/upright/UprightIdle.tres" id="11_kuqdj"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/upright/UprightWalk.tres" id="12_agpyf"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/AnimationController.java" id="13_4afhp"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/upright/UprightSprint.tres" id="13_jwg7l"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/crawl/CrawlSprint.tres" id="15_bgnjm"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/crawl/CrawlWalk.tres" id="16_u0j3k"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/movementstates/drivecarrier/DriveCarrierIdle.tres" id="22_arx8k"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/camera/TPSCameraController.java" id="25_gapvf"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/Health.java" id="26_gapvf"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/camera/FPSCameraController.java" id="27_gapvf"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="31_4afhp"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/combatstates/MeleeCombat.tres" id="60_meleec"]
+
+[sub_resource type="Resource" id="Resource_gapvf"]
+script = ExtResource("9_arx8k")
+metadata/_custom_type_script = "uid://cplrp8cx4gus0"
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_yfjlo"]
+radius = 0.35
+height = 1.5
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gguhd"]
+radius = 0.35
+height = 0.94
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_gguhd"]
+height = 0.48
+radius = 0.7
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_cam"]
+radius = 0.1
+
+[node name="Character" type="CharacterBody3D" unique_id=802038165 node_paths=PackedStringArray("weapon_controller")]
+collision_layer = 2
+collision_mask = 19
+script = ExtResource("1_gapvf")
+jump_states = Dictionary[String, ExtResource("2_3tgi5")]({
+"AirJump": ExtResource("3_ttk2h"),
+"GroundJump": ExtResource("4_6f0xc")
+})
+stances = Dictionary[String, NodePath]({
+"Crawl": NodePath("Stances/Crawl"),
+"Crouch": NodePath("Stances/Crouch"),
+"DriveCarrier": NodePath("Stances/DriveCarrier"),
+"Upright": NodePath("Stances/Upright")
+})
+combat_states = Dictionary[String, ExtResource("5_5k7ut")]({
+"Combat": ExtResource("6_j83q5"),
+"MeleeCombat": ExtResource("60_meleec"),
+"NoCombat": ExtResource("7_dnye5")
+})
+character_info = SubResource("Resource_gapvf")
+weapon_controller = NodePath("WeaponController")
+character_visuals = ExtResource("1_rl0hp")
+
+[node name="VisualsMount" type="Marker3D" parent="." unique_id=1900002001]
+
+[node name="UprightCollision" type="CollisionShape3D" parent="." unique_id=1192960009]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+shape = SubResource("CapsuleShape3D_yfjlo")
+
+[node name="RayCast3D" type="RayCast3D" parent="UprightCollision" unique_id=150935415]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.27, 0)
+target_position = Vector3(0, 1.02, 0)
+
+[node name="CrouchCollision" type="CollisionShape3D" parent="." unique_id=521225264]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.47, 0)
+shape = SubResource("CapsuleShape3D_gguhd")
+disabled = true
+
+[node name="RayCast3D" type="RayCast3D" parent="CrouchCollision" unique_id=892151405]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
+target_position = Vector3(0, 0.46, 0)
+
+[node name="CrawlCollision" type="CollisionShape3D" parent="." unique_id=1080545347]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, 0)
+shape = SubResource("CylinderShape3D_gguhd")
+disabled = true
+
+[node name="MovementController" type="Node" parent="." unique_id=349324944 node_paths=PackedStringArray("player")]
+script = ExtResource("9_ie7o8")
+player = NodePath("..")
+
+[node name="AnimationController" type="Node" parent="." unique_id=1235095298 node_paths=PackedStringArray("player")]
+script = ExtResource("13_4afhp")
+player = NodePath("..")
+
+[node name="Stances" type="Node" parent="." unique_id=1821526874]
+
+[node name="Crouch" type="Node" parent="Stances" unique_id=1942246071 node_paths=PackedStringArray("collider", "col_raycast")]
+script = ExtResource("7_2iqcg")
+idle_state = ExtResource("8_ttk2h")
+walk_state = ExtResource("9_gguhd")
+sprint_state = ExtResource("10_gguhd")
+camera_height = 0.85
+spine_aim_max_angle = 0.0
+collider = NodePath("../../CrouchCollision")
+col_raycast = NodePath("../../CrouchCollision/RayCast3D")
+
+[node name="Upright" type="Node" parent="Stances" unique_id=963536893 node_paths=PackedStringArray("collider", "col_raycast")]
+script = ExtResource("7_2iqcg")
+idle_state = ExtResource("11_kuqdj")
+walk_state = ExtResource("12_agpyf")
+sprint_state = ExtResource("13_jwg7l")
+camera_height = 1.2
+collider = NodePath("../../UprightCollision")
+col_raycast = NodePath("../../UprightCollision/RayCast3D")
+
+[node name="Crawl" type="Node" parent="Stances" unique_id=1531972803 node_paths=PackedStringArray("collider")]
+script = ExtResource("7_2iqcg")
+idle_state = ExtResource("7_d7d1u")
+walk_state = ExtResource("15_bgnjm")
+sprint_state = ExtResource("16_u0j3k")
+camera_height = 0.7
+spine_aim_max_angle = 0.0
+collider = NodePath("../../CrawlCollision")
+
+[node name="DriveCarrier" type="Node" parent="Stances" unique_id=838124124]
+script = ExtResource("7_2iqcg")
+idle_state = ExtResource("22_arx8k")
+walk_state = ExtResource("22_arx8k")
+sprint_state = ExtResource("22_arx8k")
+spine_aim_max_angle = 0.0
+
+[node name="WeaponController" type="Node" parent="." unique_id=384125234 node_paths=PackedStringArray("animation_controller", "weapon_audio")]
+script = ExtResource("31_4afhp")
+animation_controller = NodePath("../AnimationController")
+weapon_audio = NodePath("../WeaponAudio")
+
+[node name="TransitionTimer" type="Timer" parent="WeaponController" unique_id=402280787]
+process_callback = 0
+wait_time = 0.1
+one_shot = true
+
+[node name="FireTimer" type="Timer" parent="WeaponController" unique_id=250728270]
+process_callback = 0
+wait_time = 0.15
+one_shot = true
+
+[node name="ReloadTimer" type="Timer" parent="WeaponController" unique_id=333238122]
+process_callback = 0
+one_shot = true
+
+[node name="WeaponAudio" type="AudioStreamPlayer3D" parent="." unique_id=2081946510]
+
+[node name="Health" type="Node" parent="." unique_id=1822801054]
+script = ExtResource("26_gapvf")
+
+[node name="TPSCameraController" type="Node3D" parent="." unique_id=1945688108 node_paths=PackedStringArray("player")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 1.7, 0)
+script = ExtResource("25_gapvf")
+player = NodePath("..")
+
+[node name="Yaw" type="Node3D" parent="TPSCameraController" unique_id=1671558584]
+
+[node name="Pitch" type="Node3D" parent="TPSCameraController/Yaw" unique_id=643544584]
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
+
+[node name="Pivot" type="Node3D" parent="TPSCameraController/Yaw/Pitch" unique_id=1611848527]
+transform = Transform3D(-1, 0, 1.509958e-07, 0, 0.9999995, 0, -1.509957e-07, 0, -0.9999995, 0, 0.4, 0)
+
+[node name="SpringArm" type="SpringArm3D" parent="TPSCameraController/Yaw/Pitch/Pivot" unique_id=588223935]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 1.4210855e-14, 0, 1, 0, 0, 0)
+shape = SubResource("SphereShape3D_cam")
+
+[node name="Proxy" type="Node3D" parent="TPSCameraController/Yaw/Pitch/Pivot/SpringArm" unique_id=1900000201]
+
+[node name="ActiveCamera" type="Camera3D" parent="." unique_id=1900000042]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3841858e-07, 0)
+doppler_tracking = 1
+fov = 65.0
+far = 8192.0
+
+[node name="AimRay" type="RayCast3D" parent="ActiveCamera" unique_id=847198473]
+target_position = Vector3(0, 0, -2000)
+collision_mask = 29
+
+[node name="AimTarget" type="Marker3D" parent="ActiveCamera/AimRay" unique_id=1416140619]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.011982799, -5.461198)
+
+[node name="CharacterNameplate" parent="." unique_id=1900000098 instance=ExtResource("1_nameplate")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5722028, 0)
+
+[node name="FPSCameraController" type="Node3D" parent="." unique_id=704008049]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+script = ExtResource("27_gapvf")
+metadata/_custom_type_script = "uid://tssnb6upftda"
+
+[node name="Yaw" type="Node3D" parent="FPSCameraController" unique_id=366885886]
+
+[node name="Pitch" type="Node3D" parent="FPSCameraController/Yaw" unique_id=622567120]
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
+
+[node name="Pivot" type="Node3D" parent="FPSCameraController/Yaw/Pitch" unique_id=1900000301]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
+[connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]
+[connection signal="changed_combat_state" from="." to="TPSCameraController" method="on_set_combat_state"]
+[connection signal="changed_movement_direction" from="." to="MovementController" method="on_set_movement_direction"]
+[connection signal="changed_movement_direction" from="." to="AnimationController" method="on_set_movement_direction"]
+[connection signal="changed_movement_state" from="." to="MovementController" method="on_set_movement_state"]
+[connection signal="changed_movement_state" from="." to="AnimationController" method="on_set_movement_state"]
+[connection signal="changed_movement_state" from="." to="TPSCameraController" method="on_set_movement_state"]
+[connection signal="changed_stance" from="." to="AnimationController" method="on_set_stance"]
+[connection signal="changed_stance" from="." to="WeaponController" method="on_set_stance"]
+[connection signal="changed_stance" from="." to="TPSCameraController" method="on_set_stance"]
+[connection signal="changed_weapon" from="." to="WeaponController" method="on_set_weapon"]
+[connection signal="drop_weapon" from="." to="WeaponController" method="drop_current_weapon"]
+[connection signal="fire_weapon" from="." to="WeaponController" method="on_weapon_fire"]
+[connection signal="not_fire_weapon" from="." to="WeaponController" method="on_weapon_not_fire"]
+[connection signal="pressed_jump" from="." to="MovementController" method="jump"]
+[connection signal="pressed_jump" from="." to="AnimationController" method="jump"]
+[connection signal="reload_weapon" from="." to="WeaponController" method="on_weapon_reload"]
+[connection signal="timeout" from="WeaponController/TransitionTimer" to="WeaponController" method="on_weapon_transition_complete"]
+[connection signal="timeout" from="WeaponController/ReloadTimer" to="WeaponController" method="on_weapon_reload_complete"]
+[connection signal="died" from="Health" to="." method="on_died"]
+[connection signal="set_cam_rotation" from="TPSCameraController" to="MovementController" method="on_set_cam_rotation"]
+[connection signal="set_cam_rotation" from="TPSCameraController" to="AnimationController" method="on_set_cam_rotation"]

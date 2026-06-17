@@ -1,0 +1,190 @@
+[gd_scene format=3 uid="uid://worldsystems0001"]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/ParticleManager.java" id="1_pctl"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/control/Controller.java" id="2_kfoa7"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/ImpactManager.java" id="3_imct"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/DecalManager.java" id="4_dcal"]
+[ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="5_m0gj3"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/BulletTracerManager.java" id="6_btrc"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/ExplosionManager.java" id="7_evfx"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/MenuManager.tscn" id="8_kfoa7"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/HUDManager.tscn" id="9_nmpqt"]
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flesh"]
+direction = Vector3(0, 1, 0)
+initial_velocity_max = 4.0
+scale_min = 0.099999994
+scale_max = 0.29999998
+scale_over_velocity_max = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flesh"]
+albedo_color = Color(1, 0, 0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_flesh"]
+material = SubResource("StandardMaterial3D_flesh")
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_hs4nr"]
+direction = Vector3(0, 1, 0)
+initial_velocity_max = 4.0
+scale_min = 0.099999994
+scale_max = 0.29999998
+scale_over_velocity_max = 1.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tracer"]
+shading_mode = 0
+albedo_color = Color(1.685791, 1.5852925, 1.0005594, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_kfoa7"]
+material = SubResource("StandardMaterial3D_tracer")
+size = Vector3(0.1, 0.5, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kfoa7"]
+shading_mode = 0
+albedo_color = Color(1, 0.9882353, 0.8392157, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_hs4nr"]
+material = SubResource("StandardMaterial3D_kfoa7")
+size = Vector3(0.01, 0.01, 0.8)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_expl_flash"]
+emission_shape = 1
+emission_sphere_radius = 0.5
+spread = 180.0
+initial_velocity_min = 5.0
+initial_velocity_max = 12.0
+gravity = Vector3(0, -5, 0)
+scale_min = 0.2
+scale_max = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_expl_flash"]
+shading_mode = 0
+albedo_color = Color(1.5, 0.9, 0.2, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_expl_flash"]
+material = SubResource("StandardMaterial3D_expl_flash")
+size = Vector3(0.12, 0.12, 0.12)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_expl_fireball"]
+emission_shape = 1
+emission_sphere_radius = 1.0
+spread = 120.0
+initial_velocity_min = 1.5
+initial_velocity_max = 5.0
+gravity = Vector3(0, 0.5, 0)
+scale_min = 0.8
+scale_max = 2.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_expl_fireball"]
+shading_mode = 0
+albedo_color = Color(1.2, 0.45, 0.05, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_expl_fireball"]
+material = SubResource("StandardMaterial3D_expl_fireball")
+size = Vector3(0.25, 0.25, 0.25)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_expl_smoke"]
+emission_shape = 1
+emission_sphere_radius = 1.5
+direction = Vector3(0, 1, 0)
+spread = 40.0
+initial_velocity_min = 0.3
+initial_velocity_max = 1.5
+gravity = Vector3(0, -0.05, 0)
+scale_min = 1.5
+scale_max = 4.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_expl_smoke"]
+transparency = 1
+albedo_color = Color(0.28, 0.28, 0.28, 0.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_expl_smoke"]
+material = SubResource("StandardMaterial3D_expl_smoke")
+size = Vector3(0.5, 0.5, 0.5)
+
+[node name="WorldSystems" type="Node"]
+
+[node name="ParticleManager" type="Node" parent="."]
+script = ExtResource("1_pctl")
+pool_size_per_type = 40
+
+[node name="FLESH" type="Node" parent="ParticleManager"]
+
+[node name="1" type="GPUParticles3D" parent="ParticleManager/FLESH"]
+emitting = false
+amount = 12
+one_shot = true
+speed_scale = 2.0
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_flesh")
+draw_pass_1 = SubResource("BoxMesh_flesh")
+
+[node name="DEFAULT" type="Node" parent="ParticleManager"]
+script = ExtResource("2_kfoa7")
+metadata/_custom_type_script = "uid://ciyfqqv4fmm45"
+
+[node name="1" type="GPUParticles3D" parent="ParticleManager/DEFAULT"]
+emitting = false
+amount = 5
+one_shot = true
+speed_scale = 2.0
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_hs4nr")
+draw_pass_1 = SubResource("BoxMesh_kfoa7")
+
+[node name="ImpactManager" type="Node" parent="."]
+script = ExtResource("3_imct")
+
+[node name="DecalManager" type="Node" parent="."]
+script = ExtResource("4_dcal")
+pool_size = 40
+decal_lifetime = 5.0
+
+[node name="1" type="Decal" parent="DecalManager"]
+size = Vector3(0.1, 0.1, 0.1)
+texture_albedo = ExtResource("5_m0gj3")
+
+[node name="BulletTracerManager" type="Node3D" parent="."]
+script = ExtResource("6_btrc")
+
+[node name="1" type="MeshInstance3D" parent="BulletTracerManager"]
+mesh = SubResource("BoxMesh_hs4nr")
+
+[node name="ExplosionManager" type="Node" parent="."]
+script = ExtResource("7_evfx")
+
+[node name="FLASH" type="Node" parent="ExplosionManager"]
+
+[node name="1" type="GPUParticles3D" parent="ExplosionManager/FLASH"]
+emitting = false
+amount = 48
+one_shot = true
+speed_scale = 3.0
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_expl_flash")
+draw_pass_1 = SubResource("BoxMesh_expl_flash")
+
+[node name="FIREBALL" type="Node" parent="ExplosionManager"]
+
+[node name="1" type="GPUParticles3D" parent="ExplosionManager/FIREBALL"]
+emitting = false
+amount = 32
+one_shot = true
+explosiveness = 0.8
+process_material = SubResource("ParticleProcessMaterial_expl_fireball")
+draw_pass_1 = SubResource("BoxMesh_expl_fireball")
+
+[node name="SMOKE" type="Node" parent="ExplosionManager"]
+
+[node name="1" type="GPUParticles3D" parent="ExplosionManager/SMOKE"]
+emitting = false
+amount = 24
+one_shot = true
+speed_scale = 0.5
+explosiveness = 0.3
+process_material = SubResource("ParticleProcessMaterial_expl_smoke")
+draw_pass_1 = SubResource("BoxMesh_expl_smoke")
+
+[node name="MenuManager" parent="." instance=ExtResource("8_kfoa7")]
+
+[node name="HUDManager" parent="." instance=ExtResource("9_nmpqt")]
