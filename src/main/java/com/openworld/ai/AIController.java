@@ -56,9 +56,18 @@ public class AIController extends Controller {
     @Override
     public UserCommand gatherInput(double delta) {
         UserCommand cmd = new UserCommand();
-        if (getBody().isDead()) return cmd;
+        AICharacter body = getBody();
+        if (body.isDead()) return cmd;
+        // PASSIVE LOD tier (PLAN.md Part D / D2): mid-range AIs skip the FSM entirely — no
+        // NavAgent pathfinding, no state transitions, no aim/target work — and just hold their
+        // last heading. AnimationController separately skips its AnimationTree writes at this tier.
+        if (body.getLodLevel() == AILodLevel.PASSIVE) {
+            cmd.movementDirection = body.getMovementDirection();
+            cmd.movementType      = body.getCurrentMovementType();
+            return cmd;
+        }
         if (underAttackTimer > 0) underAttackTimer = Math.max(0.0, underAttackTimer - delta);
-        AIState next = currentState.update(getBody(), this, cmd, delta);
+        AIState next = currentState.update(body, this, cmd, delta);
         if (next != currentState) transitionTo(next);
         return cmd;
     }
