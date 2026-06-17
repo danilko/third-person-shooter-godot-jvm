@@ -1,4 +1,4 @@
-# Godot Kotlin/JVM Third Person Experiment
+# Godot Kotlin/JVM Shooter
 
 A technical exploration of 3D game mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. This project adapts and refactors traditional GDScript-based third-person controllers into a Java/Kotlin-compatible architecture.
 
@@ -19,15 +19,17 @@ This project is based on:
  - Johnny Rouddro's Third Person Controller tutorial ([YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) with several architectural changes and gameplay tweaks.
  - octodemy's Custom Raycast Vehicle Physics in Godot ([YouTube](https://www.youtube.com/@octodemy)) with several architectural changes and gameplay tweaks.
 
-* **Input-Driven Character Architecture:** `Character` (base) → `Player` / `AICharacter`. Each body delegates its "brain" to a `Controller` (`PlayerController` for keyboard/mouse, `AIController` for the FSM) via the `Controllable` interface. All state transitions go through a `UserCommand` snapshot, making human input, AI, and future network input interchangeable.
+* **Input-Driven Character Architecture:** `Character` (base) → `Player` / `AICharacter`. Each body delegates its "brain" to a `Controller` (`PlayerController` for keyboard/mouse, `AIController` for the FSM) via the `Controllable` interface. All state transitions go through a `UserCommand` snapshot, making human input, AI, and network input (`NetworkController`) interchangeable.
 * **Movement Mechanics:**
-	* Added **Double Jump** capability.
-	* **Crawl-to-Shoot** mechanics (Experimental/Beta animation).
-	* Dynamic **Physics Body transformation** during dodge rolls.
+	* **Run by default**; hold (or toggle) **Shift** to *walk* — slower and quieter ("walk to stay quiet"), scaffolding for a future stealth/awareness system (the WALK state carries a low `noiseLevel`).
+	* Single **ground jump** plus CS/Source-style **air strafe** (mid-air acceleration / speed cap) — replicates cleanly under ownership-based network authority.
+	* **Crouch / Crawl** stances, each with its own speed, camera height, and accuracy modifier; **Crawl-to-Shoot** supported (experimental animation).
 * **Combat & Ballistics:**
 	* Arcade-style shooting: recoil-only challenge by default; optional bloom accumulation and movement/stance spread modifiers for each weapon.
 	* Dynamic crosshair that tracks live spread from `WeaponController` via a configurable pixel-per-degree scale.
-	* Toggleable over-the-shoulder camera (Left/Right swap).
+	* Per-weapon **full-auto vs. semi-auto** firing: the "one use per trigger pull" lock lives in the base `WeaponItem` (`auto` flag + `isSemiAutoReady()`), shared by firearms, projectile launchers, and throwables — so a held trigger throws exactly one grenade.
+	* Weapon variety: firearms, melee (knife/axe/fist), throwables (grenade), and projectile launchers (rocket).
+	* Toggleable over-the-shoulder camera (Left/Right swap) and FPS/TPS view toggle.
 * **AI (7-state FSM):**
 	* Configurable hit chance, reaction delay, aim scatter, and suppression fire.
 	* Navigation via `NavigationAgent3D`; separate SightRay (LoS) and AimRay (fire direction).
@@ -37,10 +39,13 @@ This project is based on:
 * **Drivable Vehicle:**
 	* Player able to enter and exit vehicle
 	* Arcade driving vehicle
+* **LAN Multiplayer (experimental):**
+	* Host-authoritative networking over ENet (`NetworkManager` AutoLoad): batched character/vehicle state snapshots with near-time interpolation, reliable elimination + inventory reconciliation, and client→host request/grant for pickups and vehicle seats.
+	* Non-authority bodies are driven by a `NetworkController` (the same `Controller` slot the player/AI use), so locomotion, firing, and ragdoll replicate without bespoke per-feature sync.
 * **Game Systems:**
-	* `EventBus` AutoLoad singleton for decoupled kill/death events.
+	* `EventBus` AutoLoad singleton for decoupled kill/death/HUD events.
 	* `GameManager` AutoLoad singleton (PLAYING / PAUSED / GAME_OVER).
-	* `AmmoRefill` environment trigger that replenishes all weapons on contact.
+	* `AmmoRefill` station that replenishes all weapons on contact.
 
 ---
 
@@ -211,21 +216,21 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 
 ### On Foot
 
-| Action                                  | Input                        |
-|:----------------------------------------|:-----------------------------|
-| **Move**                                | `W` `A` `S` `D`              |
-| **Jump / Double Jump**                  | `Space`                      |
-| **Roll (Third Person)**                 | `C` + Direction              |
-| **Crouch (Hold) / Crawl (Hold)**        | `Ctrl` / `Shift`             |
-| **Aim (Third Person) / Fire**           | `Mouse Right` / `Mouse Left` |
-| **Reload**                              | `R`                          |
-| **Switch Weapon (cycle)**               | `G`                          |
-| **Select Weapon Slot (quick-switch)**   | `0` – `6` (see table below)  |
-| **Drop Weapon**                         | `F`                          |
-| **Equip/Use/Enter**                     | `E`                          |
-| **Swap Camera Shoulder (Third Person)** | `Q`                          |
-| **View Change to FPS/TPS**              | `Q`                          |
-| **Menu**                                | `Esc`                        |
+| Action                                         | Input                        |
+|:-----------------------------------------------|:-----------------------------|
+| **Move**                                       | `W` `A` `S` `D`              |
+| **Jump** (also stands up if crouched/crawling) | `Space`                      |
+| **Walk (hold/toggle — run is the default)**    | `Shift`                      |
+| **Crouch (hold/toggle) / Crawl (hold/toggle)** | `Ctrl` / `Alt`               |
+| **Aim (Third Person) / Fire**                  | `Mouse Right` / `Mouse Left` |
+| **Reload**                                     | `R`                          |
+| **Switch Weapon (cycle)**                      | `G`                          |
+| **Select Weapon Slot (quick-switch)**          | `0` – `6` (see table below)  |
+| **Drop Weapon**                                | `F`                          |
+| **Equip/Use/Enter**                            | `E`                          |
+| **Swap Camera Shoulder (Third Person)**        | `Q`                          |
+| **View Change to FPS/TPS**                      | `V`                          |
+| **Menu**                                       | `Esc`                        |
 
 #### Weapon Slot Quick-Switch
 
