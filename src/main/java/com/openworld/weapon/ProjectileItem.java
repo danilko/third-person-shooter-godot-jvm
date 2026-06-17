@@ -130,37 +130,27 @@ public class ProjectileItem extends WeaponItem {
     private void spawnProjectile(boolean cosmetic) {
         if (projectileScene == null || owningCharacter == null) return;
 
-        Vector3 spawnPos;
+        // Spawn geometry is derived IDENTICALLY on every peer — authority and puppet alike — so the
+        // rocket leaves the barrel along the same line for the shooter and every observer. Origin is
+        // the weapon's own Muzzle marker; direction is the replicated aim point (getAimTargetPosition,
+        // the same value that drives spine IK and rides in every snapshot). This matches
+        // FirearmItem.playRemoteFireCue's convention. Only damage differs by `cosmetic`, never the
+        // trajectory — previously authority used Muzzle+aimRay while the puppet used chest+aimTarget,
+        // and that divergence (not the collision layer) is what made the sync-side rocket misbehave.
+        Node muzzle = getNodeOrNull("Muzzle");
+        Vector3 spawnPos = (muzzle instanceof Node3D m3d)
+                ? m3d.getGlobalPosition()
+                : owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.4f, 0f));
+
         Vector3 aimDir;
-        if (cosmetic) {
-            // Puppet replay: derive everything from the replicated aim point and a STABLE
-            // chest-relative origin — NOT the transient Muzzle marker, which on a remote peer
-            // may be mid-draw (down at the hip) and would launch the cosmetic rocket into the
-            // ground or the shooter's own body. Cosmetics follow replicated logical state, never
-            // the animating pose. (Matches ThrowableItem.spawnProjectile's puppet path.)
-            if (!(owningCharacter instanceof Character c)) return;
-            Vector3 from = owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.4f, 0f));
-            Vector3 dir = c.getAimTargetPosition().minus(from);
+        if (owningCharacter instanceof Character c) {
+            Vector3 dir = c.getAimTargetPosition().minus(spawnPos);
             if (dir.lengthSquared() < 1e-6f) return;
             aimDir = dir.normalized();
-            spawnPos = from.plus(aimDir.times(0.4f));
+        } else if (muzzle instanceof Node3D m3d) {
+            aimDir = m3d.getGlobalBasis().getZ().times(-1f).normalized();  // muzzle forward (-Z)
         } else {
-            // Authority: spawn at the Muzzle marker (falls back to chest) and steer to the
-            // precise aimRay / crosshair.
-            Node muzzle = getNodeOrNull("Muzzle");
-            spawnPos = (muzzle instanceof Node3D m3d)
-                    ? m3d.getGlobalPosition()
-                    : owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.0f, 0f));
-            if (weaponController == null) return;
-            RayCast3D aimRay = weaponController.getAimRay();
-            if (aimRay == null) return;
-            if (aimRay.isColliding()) {
-                aimDir = aimRay.getCollisionPoint().minus(spawnPos).normalized();
-            } else {
-                Vector3 rayOrigin = aimRay.getGlobalPosition();
-                Vector3 rayEnd    = aimRay.toGlobal(aimRay.getTargetPosition());
-                aimDir = rayEnd.minus(rayOrigin).normalized();
-            }
+            return;
         }
 
         Node projectile = projectileScene.instantiate();
@@ -191,6 +181,10 @@ public class ProjectileItem extends WeaponItem {
         // Initial velocity to start moving immediately before first _physicsProcess tick.
         if (projectile instanceof RigidBody3D rb) {
             rb.setLinearVelocity(aimDir.times(projectileSpeed));
+            // Correctness guard (secondary to the unified spawn above): a weapon never collides
+            // with / detonates on its own shooter. The rocket's mask includes the character layer,
+            // so this covers point-blank / against-a-wall edges where the muzzle sits near the body.
+            if (owningCharacter != null) rb.addCollisionExceptionWith(owningCharacter);
         }
     }
 }

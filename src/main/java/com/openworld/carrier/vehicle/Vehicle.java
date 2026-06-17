@@ -622,8 +622,17 @@ public class Vehicle extends RigidBody3D implements Controllable {
         return c;
     }
 
+    /**
+     * Replace the vehicle's controller, freeing the outgoing one (it has no other referent).
+     * Callers retaining the old controller use {@link #detachController()} instead. Mirrors
+     * Character.attachController — without the free a swapped-out controller leaks at exit.
+     */
     public void attachController(Controller ctrl) {
-        if (controller != null) removeChild(controller);
+        if (controller != null && controller != ctrl) {
+            Controller old = controller;
+            removeChild(old);
+            old.queueFree();
+        }
         controller = ctrl;
         addChild(ctrl);
     }

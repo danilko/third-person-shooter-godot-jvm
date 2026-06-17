@@ -744,11 +744,20 @@ public class Character extends CharacterBody3D implements Controllable {
     }
 
     /**
-     * Add ctrl as a child controller, replacing any existing one.
-     * The outgoing controller is freed unless the caller retains a reference.
+     * Add ctrl as a child controller, replacing any existing one. The outgoing controller is
+     * removed from the tree AND freed — a swapped-out controller is owned here and has no other
+     * referent. A caller that wants to keep the old controller (vehicle enter/exit hot-swap) must
+     * use {@link #detachController()} instead, which removes without freeing and returns it.
+     * Without the free, every swap (puppet spawn → NetworkController, player-leaves → bot
+     * AIController, scene PlayerController → NetworkController) orphaned a parentless, unfreed
+     * node — the "removed with remove_child() but not freed" leak reported at exit.
      */
     public void attachController(Controller ctrl) {
-        if (controller != null) removeChild(controller);
+        if (controller != null && controller != ctrl) {
+            Controller old = controller;
+            removeChild(old);
+            old.queueFree();
+        }
         controller = ctrl;
         addChild(ctrl);
     }

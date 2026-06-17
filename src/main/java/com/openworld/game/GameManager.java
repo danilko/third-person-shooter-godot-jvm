@@ -90,6 +90,19 @@ public class GameManager extends Node {
         }
     }
 
+    /**
+     * Release process-global Godot references on shutdown. {@link IconRegistry} caches feed
+     * icons (Texture2D) in a static map for the whole JVM lifetime; clearing it here, as the
+     * AutoLoad leaves the tree at engine teardown, drops those references before Godot tears
+     * down its resource table — otherwise the still-referenced texture is reported as
+     * "1 resource still in use at exit" (leaked ObjectDB instance).
+     */
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        IconRegistry.clear();
+    }
+
     // ── State transitions ─────────────────────────────────────────────────────
 
     /** Track every spawned human-controlled (Player) character for the "all dead" check. */
