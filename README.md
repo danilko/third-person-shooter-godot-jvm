@@ -1,4 +1,4 @@
-# Godot Kotlin/JVM Third Person Experiment
+# Godot Kotlin/JVM Shooter
 
 A technical exploration of 3D game mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. This project adapts and refactors traditional GDScript-based third-person controllers into a Java/Kotlin-compatible architecture.
 
@@ -19,15 +19,17 @@ This project is based on:
  - Johnny Rouddro's Third Person Controller tutorial ([YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) with several architectural changes and gameplay tweaks.
  - octodemy's Custom Raycast Vehicle Physics in Godot ([YouTube](https://www.youtube.com/@octodemy)) with several architectural changes and gameplay tweaks.
 
-* **Input-Driven Character Architecture:** `Character` (base) → `Player` / `AICharacter`. Each body delegates its "brain" to a `Controller` (`PlayerController` for keyboard/mouse, `AIController` for the FSM) via the `Controllable` interface. All state transitions go through a `UserCommand` snapshot, making human input, AI, and future network input interchangeable.
+* **Input-Driven Character Architecture:** `Character` (base) → `Player` / `AICharacter`. Each body delegates its "brain" to a `Controller` (`PlayerController` for keyboard/mouse, `AIController` for the FSM) via the `Controllable` interface. All state transitions go through a `UserCommand` snapshot, making human input, AI, and network input (`NetworkController`) interchangeable.
 * **Movement Mechanics:**
-	* Added **Double Jump** capability.
-	* **Crawl-to-Shoot** mechanics (Experimental/Beta animation).
-	* Dynamic **Physics Body transformation** during dodge rolls.
+	* **Run by default**; hold (or toggle) **Shift** to *walk* — slower and quieter ("walk to stay quiet"), scaffolding for a future stealth/awareness system (the WALK state carries a low `noiseLevel`).
+	* Single **ground jump** plus CS/Source-style **air strafe** (mid-air acceleration / speed cap) — replicates cleanly under ownership-based network authority.
+	* **Crouch / Crawl** stances, each with its own speed, camera height, and accuracy modifier; **Crawl-to-Shoot** supported (experimental animation).
 * **Combat & Ballistics:**
 	* Arcade-style shooting: recoil-only challenge by default; optional bloom accumulation and movement/stance spread modifiers for each weapon.
 	* Dynamic crosshair that tracks live spread from `WeaponController` via a configurable pixel-per-degree scale.
-	* Toggleable over-the-shoulder camera (Left/Right swap).
+	* Per-weapon **full-auto vs. semi-auto** firing: the "one use per trigger pull" lock lives in the base `WeaponItem` (`auto` flag + `isSemiAutoReady()`), shared by firearms, projectile launchers, and throwables — so a held trigger throws exactly one grenade.
+	* Weapon variety: firearms, melee (knife/axe/fist), throwables (grenade), and projectile launchers (rocket).
+	* Toggleable over-the-shoulder camera (Left/Right swap) and FPS/TPS view toggle.
 * **AI (7-state FSM):**
 	* Configurable hit chance, reaction delay, aim scatter, and suppression fire.
 	* Navigation via `NavigationAgent3D`; separate SightRay (LoS) and AimRay (fire direction).
@@ -37,10 +39,13 @@ This project is based on:
 * **Drivable Vehicle:**
 	* Player able to enter and exit vehicle
 	* Arcade driving vehicle
+* **LAN Multiplayer (experimental):**
+	* Host-authoritative networking over ENet (`NetworkManager` AutoLoad): batched character/vehicle state snapshots with near-time interpolation, reliable elimination + inventory reconciliation, and client→host request/grant for pickups and vehicle seats.
+	* Non-authority bodies are driven by a `NetworkController` (the same `Controller` slot the player/AI use), so locomotion, firing, and ragdoll replicate without bespoke per-feature sync.
 * **Game Systems:**
-	* `EventBus` AutoLoad singleton for decoupled kill/death events.
+	* `EventBus` AutoLoad singleton for decoupled kill/death/HUD events.
 	* `GameManager` AutoLoad singleton (PLAYING / PAUSED / GAME_OVER).
-	* `AmmoRefill` environment trigger that replenishes all weapons on contact.
+	* `AmmoRefill` station that replenishes all weapons on contact.
 
 ---
 
@@ -52,9 +57,9 @@ This project is based on:
 Character._physicsProcess()
 	│
 	├── controller.gatherInput(delta) → UserCommand   ← per-body Controller
-	│       PlayerController : polls Input singleton (keyboard/mouse)
-	│       AIController     : runs the AI FSM, writes decisions into the snapshot
-	│       (Network)        : future — inject a deserialized snapshot here
+	│       PlayerController  : polls Input singleton (keyboard/mouse)
+	│       AIController      : runs the AI FSM, writes decisions into the snapshot
+	│       NetworkController : applies the host-broadcast snapshot on non-authority peers
 	│
 	└── applyInput(command, delta)                    ← shared in base class
 			all signal emissions and state transitions live here
@@ -118,6 +123,34 @@ LoS is detected via a dedicated **SightRay** that is completely independent of t
 
 ## 🎯 Combat System
 
+### Shooting Pipeline
+
+A shot flows through one path for every weapon, gated and then delegated:
+
+```
+fire held → WeaponController.onWeaponFire()
+    ├─ gate: fireTimer (1 / fireRate), not reloading, not switching
+    ├─ semi-auto lock: WeaponItem.isSemiAutoReady()  (!isWeaponFired || auto)
+    ├─ weapon.useWeapon()
+    │     FirearmItem  → performHitscan() ×pelletCount  (hitscan ray, cone spread)
+    │     ProjectileItem / ThrowableItem → spawn a physics projectile (rocket / grenade)
+    │     MeleeItem    → swing window + hitbox overlap
+    └─ on a hitscan hit → HitInfo(node, point, normal)
+           → ImpactManager.processHit(info, damage, weapon, attacker)
+                 ├─ spawnImpactParticles()  (ParticleManager, per SurfaceType)
+                 ├─ spawnDecal()            (DecalManager)
+                 └─ applyDamage()           (Health.takeDamage → bone multiplier / headshot)
+```
+
+- **Hitscan** firearms raycast from the camera's `AimRay`; the hit is bundled into an immutable
+  `HitInfo` and handed to `ImpactManager` — the single place that resolves surface VFX, decals,
+  and damage, so new hit effects never touch `WeaponController`.
+- **Networking:** firing is replicated as *state*, not an event. `WeaponController` bumps a rolling
+  `fireSeq` counter that rides the snapshot stream; remote peers replay the muzzle/tracer/throw
+  cosmetics when they see it change. Damage is resolved host-authoritatively (`Health.takeDamage`).
+- **AI** skips spread entirely (`useWeaponSpread = false`) — its accuracy is the `hitChance` /
+  `aimScatterRadius` model above, not the cone below.
+
 ### Weapon Ballistics (Spread & Bloom)
 
 `FirearmItem` computes a live spread value each frame:
@@ -135,12 +168,23 @@ The stance multiplier scales the **entire** expression — crouching and crawlin
 | Crawl | 0.5× |
 | Airborne | 2.0× |
 
-**Bloom** (`currentBloom`) accumulates per shot and decays continuously. The key tuning relationship: if `bloomDecaySpeed < bloomPerShot × fireRate` bloom builds during sustained fire (full-auto); if greater, each shot clears before the next (semi-auto tap-fire).
+**Bloom logic** (`currentBloom`) is the dynamic, fire-driven part of spread:
+
+- Each shot adds `bloomPerShot`, clamped to `bloomMax`: `currentBloom = min(currentBloom + bloomPerShot, bloomMax)`.
+- Every physics frame it decays toward 0 at `bloomDecaySpeed` (deg/s) while not firing.
+- The key tuning relationship: if `bloomDecaySpeed < bloomPerShot × fireRate` bloom **builds** during sustained fire (full-auto spray opens up); if greater, each shot **clears before the next** (semi-auto tap-fire stays tight).
+
+Spread is then applied as a **circular cone** in `performHitscan`: a random angle plus a
+`sqrt(rand) × halfSpread` radius gives a uniform disk of bullet deviation (no diagonal bulge from
+sampling pitch/yaw independently). When `spread == 0` the cone math is skipped entirely.
 
 | Weapon | Base spread | Bloom/shot | Bloom decay | Bloom cap | Recoil/shot |
 |:-------|:-----------:|:----------:|:-----------:|:---------:|:-----------:|
 | Rifle  | 0.01°       | 0.05°      | 0.3°/s      | 0.25°     | 1.0°        |
 | Pistol | 0.05°       | 0.05°      | 2.0°/s      | 0.2°      | 0.5°        |
+
+- **Rifle:** near-laser first shot (0.01° ≈ 1 cm at 50 m); bloom builds to ~0.26° over ~1.25 s of full-auto spray.
+- **Pistol:** looser first shot (0.05°) but high decay clears bloom between taps, so semi-auto fire stays near base spread.
 
 **Crosshair** (`Crosshair.java`) reads `getCurrentSpreadDeg() × spreadPixelsPerDeg` (default **100 px/deg**) every frame and lerps the four reticle arms: instant snap outward on each shot, fast contract during recovery. At scale 100 the pistol's 0.05° base spread produces a 5 px arm gap from the moment it is drawn — giving an immediate visual "this is less precise than the rifle" signal without any shots fired.
 
@@ -211,21 +255,21 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 
 ### On Foot
 
-| Action                                  | Input                        |
-|:----------------------------------------|:-----------------------------|
-| **Move**                                | `W` `A` `S` `D`              |
-| **Jump / Double Jump**                  | `Space`                      |
-| **Roll (Third Person)**                 | `C` + Direction              |
-| **Crouch (Hold) / Crawl (Hold)**        | `Ctrl` / `Shift`             |
-| **Aim (Third Person) / Fire**           | `Mouse Right` / `Mouse Left` |
-| **Reload**                              | `R`                          |
-| **Switch Weapon (cycle)**               | `G`                          |
-| **Select Weapon Slot (quick-switch)**   | `0` – `6` (see table below)  |
-| **Drop Weapon**                         | `F`                          |
-| **Equip/Use/Enter**                     | `E`                          |
-| **Swap Camera Shoulder (Third Person)** | `Q`                          |
-| **View Change to FPS/TPS**              | `Q`                          |
-| **Menu**                                | `Esc`                        |
+| Action                                         | Input                        |
+|:-----------------------------------------------|:-----------------------------|
+| **Move**                                       | `W` `A` `S` `D`              |
+| **Jump** (also stands up if crouched/crawling) | `Space`                      |
+| **Walk (hold/toggle — run is the default)**    | `Shift`                      |
+| **Crouch (hold/toggle) / Crawl (hold/toggle)** | `Ctrl` / `Alt`               |
+| **Aim (Third Person) / Fire**                  | `Mouse Right` / `Mouse Left` |
+| **Reload**                                     | `R`                          |
+| **Switch Weapon (cycle)**                      | `G`                          |
+| **Select Weapon Slot (quick-switch)**          | `0` – `6` (see table below)  |
+| **Drop Weapon**                                | `F`                          |
+| **Equip/Use/Enter**                            | `E`                          |
+| **Swap Camera Shoulder (Third Person)**        | `Q`                          |
+| **View Change to FPS/TPS**                      | `V`                          |
+| **Menu**                                       | `Esc`                        |
 
 #### Weapon Slot Quick-Switch
 
@@ -243,10 +287,10 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 
 | Action                                  | Input                        |
 |:----------------------------------------|:-----------------------------|
-| **Accelerate/Back**                     | `W` `S`                      |
+| **Accelerate / Reverse**                | `W` `S`                      |
 | **Steer**                               | `A` `D`                      |
-| **Handbreak**                           | `Space`                      |
-| **Ctrl**                                | `Break`                      |
+| **Handbrake**                           | `Space`                      |
+| **Brake**                               | `Shift`                      |
 | **Aim (Hold to change angle) / Fire**   | `Mouse Right` / `Mouse Left` |
 | **Reload**                              | `R`                          |
 | **Switch Weapon (cycle)**               | `G`                          |
