@@ -57,9 +57,9 @@ This project is based on:
 Character._physicsProcess()
 	│
 	├── controller.gatherInput(delta) → UserCommand   ← per-body Controller
-	│       PlayerController : polls Input singleton (keyboard/mouse)
-	│       AIController     : runs the AI FSM, writes decisions into the snapshot
-	│       (Network)        : future — inject a deserialized snapshot here
+	│       PlayerController  : polls Input singleton (keyboard/mouse)
+	│       AIController      : runs the AI FSM, writes decisions into the snapshot
+	│       NetworkController : applies the host-broadcast snapshot on non-authority peers
 	│
 	└── applyInput(command, delta)                    ← shared in base class
 			all signal emissions and state transitions live here
@@ -123,6 +123,34 @@ LoS is detected via a dedicated **SightRay** that is completely independent of t
 
 ## 🎯 Combat System
 
+### Shooting Pipeline
+
+A shot flows through one path for every weapon, gated and then delegated:
+
+```
+fire held → WeaponController.onWeaponFire()
+    ├─ gate: fireTimer (1 / fireRate), not reloading, not switching
+    ├─ semi-auto lock: WeaponItem.isSemiAutoReady()  (!isWeaponFired || auto)
+    ├─ weapon.useWeapon()
+    │     FirearmItem  → performHitscan() ×pelletCount  (hitscan ray, cone spread)
+    │     ProjectileItem / ThrowableItem → spawn a physics projectile (rocket / grenade)
+    │     MeleeItem    → swing window + hitbox overlap
+    └─ on a hitscan hit → HitInfo(node, point, normal)
+           → ImpactManager.processHit(info, damage, weapon, attacker)
+                 ├─ spawnImpactParticles()  (ParticleManager, per SurfaceType)
+                 ├─ spawnDecal()            (DecalManager)
+                 └─ applyDamage()           (Health.takeDamage → bone multiplier / headshot)
+```
+
+- **Hitscan** firearms raycast from the camera's `AimRay`; the hit is bundled into an immutable
+  `HitInfo` and handed to `ImpactManager` — the single place that resolves surface VFX, decals,
+  and damage, so new hit effects never touch `WeaponController`.
+- **Networking:** firing is replicated as *state*, not an event. `WeaponController` bumps a rolling
+  `fireSeq` counter that rides the snapshot stream; remote peers replay the muzzle/tracer/throw
+  cosmetics when they see it change. Damage is resolved host-authoritatively (`Health.takeDamage`).
+- **AI** skips spread entirely (`useWeaponSpread = false`) — its accuracy is the `hitChance` /
+  `aimScatterRadius` model above, not the cone below.
+
 ### Weapon Ballistics (Spread & Bloom)
 
 `FirearmItem` computes a live spread value each frame:
@@ -140,12 +168,23 @@ The stance multiplier scales the **entire** expression — crouching and crawlin
 | Crawl | 0.5× |
 | Airborne | 2.0× |
 
-**Bloom** (`currentBloom`) accumulates per shot and decays continuously. The key tuning relationship: if `bloomDecaySpeed < bloomPerShot × fireRate` bloom builds during sustained fire (full-auto); if greater, each shot clears before the next (semi-auto tap-fire).
+**Bloom logic** (`currentBloom`) is the dynamic, fire-driven part of spread:
+
+- Each shot adds `bloomPerShot`, clamped to `bloomMax`: `currentBloom = min(currentBloom + bloomPerShot, bloomMax)`.
+- Every physics frame it decays toward 0 at `bloomDecaySpeed` (deg/s) while not firing.
+- The key tuning relationship: if `bloomDecaySpeed < bloomPerShot × fireRate` bloom **builds** during sustained fire (full-auto spray opens up); if greater, each shot **clears before the next** (semi-auto tap-fire stays tight).
+
+Spread is then applied as a **circular cone** in `performHitscan`: a random angle plus a
+`sqrt(rand) × halfSpread` radius gives a uniform disk of bullet deviation (no diagonal bulge from
+sampling pitch/yaw independently). When `spread == 0` the cone math is skipped entirely.
 
 | Weapon | Base spread | Bloom/shot | Bloom decay | Bloom cap | Recoil/shot |
 |:-------|:-----------:|:----------:|:-----------:|:---------:|:-----------:|
 | Rifle  | 0.01°       | 0.05°      | 0.3°/s      | 0.25°     | 1.0°        |
 | Pistol | 0.05°       | 0.05°      | 2.0°/s      | 0.2°      | 0.5°        |
+
+- **Rifle:** near-laser first shot (0.01° ≈ 1 cm at 50 m); bloom builds to ~0.26° over ~1.25 s of full-auto spray.
+- **Pistol:** looser first shot (0.05°) but high decay clears bloom between taps, so semi-auto fire stays near base spread.
 
 **Crosshair** (`Crosshair.java`) reads `getCurrentSpreadDeg() × spreadPixelsPerDeg` (default **100 px/deg**) every frame and lerps the four reticle arms: instant snap outward on each shot, fast contract during recovery. At scale 100 the pistol's 0.05° base spread produces a 5 px arm gap from the moment it is drawn — giving an immediate visual "this is less precise than the rifle" signal without any shots fired.
 
@@ -248,10 +287,10 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 
 | Action                                  | Input                        |
 |:----------------------------------------|:-----------------------------|
-| **Accelerate/Back**                     | `W` `S`                      |
+| **Accelerate / Reverse**                | `W` `S`                      |
 | **Steer**                               | `A` `D`                      |
-| **Handbreak**                           | `Space`                      |
-| **Ctrl**                                | `Break`                      |
+| **Handbrake**                           | `Space`                      |
+| **Brake**                               | `Shift`                      |
 | **Aim (Hold to change angle) / Fire**   | `Mouse Right` / `Mouse Left` |
 | **Reload**                              | `R`                          |
 | **Switch Weapon (cycle)**               | `G`                          |
