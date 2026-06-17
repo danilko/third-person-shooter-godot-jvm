@@ -10,7 +10,7 @@ kotlin {
     jvmToolchain(17)
 }
 
-// ── Headless unit tests for the engine-free networking logic (com.game.net) ──
+// ── Headless unit tests for the engine-free networking logic (com.openworld.game.net) ──
 // The Godot runtime can't instantiate native types (StreamPeerBuffer, CharacterBody3D),
 // so only the pure prediction/interpolation/queue algorithms are tested here — the parts
 // whose correctness (constant-speed playback, reconciliation convergence, in-order command

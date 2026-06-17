@@ -1,0 +1,63 @@
+[gd_scene format=3 uid="uid://bb60nshfmm7so"]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FirearmItem.java" id="1_wa52e"]
+[ext_resource type="Texture2D" uid="uid://km3ugbyo5fy8" path="res://assets/ui/PI52.png" id="2_4tcni"]
+[ext_resource type="AudioStream" uid="uid://c0v8ncowcuy0l" path="res://assets/audio/Pistol_fire.wav" id="3_t6cmh"]
+[ext_resource type="AudioStream" uid="uid://b11jauobcpulr" path="res://assets/audio/Pistol_reload.wav" id="4_l5qg7"]
+[ext_resource type="PackedScene" uid="uid://b813tvx5x2wet" path="res://assets/Pistol_5.glb" id="5_28o6u"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="6_muzzle"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(0.064, 0.161, 0.211)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_area"]
+size = Vector3(0.064, 0.161, 0.211)
+
+[node name="PI52" type="RigidBody3D" unique_id=358619058]
+transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
+collision_layer = 4
+script = ExtResource("1_wa52e")
+weapon_id = "PI52"
+weapon_name = "PI-52"
+slot_type = 1
+weapon_icon = ExtResource("2_4tcni")
+hold_socket = "MarkerPI52"
+holster_sockets = PackedStringArray("ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2", "ShortWeaponHolsterMaker3", "ShortWeaponHolsterMaker4")
+spread = 0.05
+bloom_per_shot = 0.05
+bloom_decay_speed = 2.0
+bloom_max = 0.2
+reload_speed = 0.5
+switch_speed = 1.5
+fire_rate = 6.0
+auto = false
+magazine = 15
+magazine_size = 15
+reserve = 30
+reserve_max = 30
+recoil = 0.5
+damage = 10.0
+fire_audio = ExtResource("3_t6cmh")
+reload_audio = ExtResource("4_l5qg7")
+require_interact = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=100000002]
+shape = SubResource("BoxShape3D_body")
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=100000003]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=1413815655]
+shape = SubResource("BoxShape3D_area")
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=1222425939]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.6028354e-09, 0.009999997, -0.16118813)
+
+[node name="MuzzleVFX" parent="Muzzle" unique_id=1454172846 instance=ExtResource("6_muzzle")]
+
+[node name="Pistol_52" parent="." unique_id=509308939 instance=ExtResource("5_28o6u")]
+transform = Transform3D(-4.371139e-09, 0, 0.1, 0, 0.10000003, 0, -0.1, 0, -4.371139e-09, 1.2429424e-09, -0.044, 0.055608302)
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

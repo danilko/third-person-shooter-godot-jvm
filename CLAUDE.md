@@ -21,61 +21,50 @@ Source of truth is always `src/main/java/` — never edit generated files.
 
 ## Source Layout
 
-```
-src/main/java/
-  com/character/          # all character logic
-    ai/                   # enemy FSM states (5 files)
-    Character.java        # base CharacterBody3D — gatherInput / applyInput loop
-    Player.java           # samples keyboard/mouse → CharacterInput
-    Enemy.java            # AI FSM owner — all mutable AI state lives here
-    CharacterInput.java   # per-tick input snapshot (shared by player, AI, network)
-    Health.java           # damage, bone multipliers, headshot, death signal
-    WeaponController.java # slot-based inventory: equip/drop, rate-limit, reload, switch timing
-    WeaponAction.java     # interface: useWeapon / stopUseWeapon / canUse / onReloadComplete
-    WeaponItem.java       # Node3D base for all equippable items: stats, ammo, audio exports
-    FirearmItem.java      # hitscan firearm: bloom, spread, recoil, muzzle flash, bullet tracer
-    WeaponSlot.java       # enum: PRIMARY / SECONDARY / UTILITY / MELEE
-    WeaponType.java       # enum: RANGED / THROWN / MELEE
-    AnimationController.java  # AnimationTree parameter writes
-    MovementController.java   # physics: velocity, gravity, mesh rotation, crosshair
-    CameraController.java     # base camera: recoil, shoulder swap, FoV tween
-    PlayerCameraController.java  # mouse input → CameraController
-    EnemyCameraController.java   # AI aim target → CameraController
-    MovementState.java    # Resource: speed, acceleration, FoV, animation speed
-    MovementType.java     # enum: IDLE / WALK / SPRINT
-    StanceName.java       # enum: UPRIGHT / CROUCH / CRAWL
-    Stance.java           # Resource: collider ref, movement states, camera height
-    CombatState.java      # Resource: speed factor, FoV, shoulder offset, distance
-    JumpState.java        # Resource: jump height, apex duration, animation name
-    RollState.java        # Resource: roll speed, duration, animation name
-  com/environment/
-    Pickup.java           # RigidBody3D base for all world pickups: physics body + PickupArea (Area3D)
-                          #   removeOnPickup / pauseOnPickup / respawnTime countdown
-    WeaponPickup.java     # Pickup: finds WeaponItem child and equips it via WeaponController
-    AmmoRefill.java       # Area3D (static station, no physics): fills all weapons on entry
-    SurfaceType.java      # enum: FLESH / METAL / STONE / WOOD / DEFAULT
-    HittableBody.java     # StaticBody3D subclass: attach to world geometry needing non-default particles
-    HitInfo.java          # immutable hit snapshot (node, point, normal) — network-serializable
-    ParticleManager.java  # world-level pool — fire-and-forget GPUParticles3D per SurfaceType
-    DecalManager.java     # world-level pool — held Decal nodes recycled after decalLifetime seconds
-    ImpactManager.java    # world-level singleton: resolves every HitInfo → particles + decal + damage
-  com/game/
-    EventBus.java         # AutoLoad singleton — global signals
-    GameManager.java      # AutoLoad singleton — PLAYING / PAUSED / GAME_OVER FSM
-  com/ui/
-    CharacterHUD.java     # health label, ammo label, kill notification (3 s)
-    Crosshair.java        # reticle arms track live spread from WeaponController
-    PauseMenu.java
-    RadialMenu.java / RadialMenuItem.java
-  com/util/
-    ObjectPool.java       # generic fixed-size pool (used for splatter particles)
+All code lives under the **`com.openworld`** root, organized **by domain/concern** (not layer-first).
+Scripts are referenced from scenes by `.java` path (`res://src/main/java/com/openworld/.../X.java`),
+not via generated `.gdj`. The two reorg scripts (`tools/reorg_stage1.py`, `tools/reorg_stage2.py`)
+and `tools/REORG_PROGRESS.md` document the move; reuse their pattern for future moves.
 
-src/main/resources/com/  # .tscn scene files mirroring the Java package structure
-  character/Character.tscn, Player.tscn, Enemy.tscn
-  weapon/pistol.tscn, rifile.tscn
-  world/World.tscn
-  ui/PauseMenu.tscn
 ```
+src/main/java/com/openworld/
+  character/      # character bodies + visuals + data: Character (gatherInput/applyInput loop),
+                  #   Player, AICharacter, Health, AnimationController, CharacterInfo,
+                  #   CharacterVisuals, CharacterNameplate, MeshConfig, CharacterRagdoll,
+                  #   CharacterDriveState, CharacterReplication, Faction
+  ai/             # AI brain + FSM: AIController, AIState (base), AIBehaviorConfig
+    character/    #   7 behaviour states: Patrol/Chase/Attack/Search/RefillAmmo/Escort/Flee
+    vehicle/      #   VehicleAIController (reserved for future vehicle AI states)
+  control/        # controller framework + input: Controllable, Controller, CharacterController,
+                  #   PlayerController, UserCommand (per-tick input snapshot), ModalInput
+  camera/         # AI/Player/FPS/TPS/Vehicle CameraControllers, CameraMode, ControlRotation
+  movement/character/  # MovementController, MovementState, MovementType, Stance, StanceName,
+                  #   CombatState, JumpState, RollState
+  weapon/         # WeaponController (slot inventory), WeaponItem (extends item.Pickup),
+                  #   WeaponAction, WeaponType, WeaponSlotType, FirearmItem, Melee/Knife/Axe/Fist,
+                  #   ThrowableItem, ProjectileItem, RocketProjectile, T1Projectile, Detonatable,
+                  #   IconRegistry
+  world/          # world types: HitInfo, HittableBody, SurfaceType
+    manager/      #   world-level singleton systems: Impact/Particle/Decal/Explosion/BulletTracer
+  item/           # Pickup (RigidBody3D base for world pickups), AmmoRefill station
+  carrier/vehicle/ # Vehicle, VehicleWheel, VehicleConfig, VehicleWeaponMode
+  game/           # EventBus (AutoLoad signals), GameManager (PLAYING/PAUSED/GAME_OVER FSM)
+    mission/      #   MissionInfo, MissionManager, MissionObjectiveType
+  net/            # NetworkManager (AutoLoad RPC), NetMessageCodec, NetworkController,
+                  #   VehicleNetworkController, snapshot interpolators, policies, NetStats, Vec3/Quat
+    session/      #   PlayerSession, PersistentPlayerId
+  ui/             # CharacterHUD, Crosshair, HUDManager, PauseMenu, RadialMenu, Feed, …
+  util/           # ObjectPool, generic helpers
+  debug/          # DebugHarness (temporary test-spawn harness)
+
+src/main/resources/com/openworld/  # .tscn/.tres (internal layout NOT yet remapped to new java pkgs)
+  character/Character.tscn, Player.tscn, AICharacter.tscn
+  weapon/AR4.tscn, PI52.tscn, …    world/World.tscn, WorldSystems.tscn    ui/…
+src/test/java/com/openworld/net/   # headless unit tests for the engine-free net logic
+```
+
+> AutoLoads (`project.godot`): `EventBus`, `GameManager` (`game`), `MissionManager`
+> (`game.mission`), `NetworkManager` (`net`).
 
 ---
 
