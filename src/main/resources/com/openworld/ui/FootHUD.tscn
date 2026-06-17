@@ -1,0 +1,100 @@
+[gd_scene format=3 uid="uid://dtlryojg3n01y"]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/CharacterHUD.java" id="1_2lu2a"]
+[ext_resource type="FontFile" uid="uid://btgb34w8m7xgt" path="res://assets/ui/DSEG7ClassicMini-Bold.ttf" id="4_f5mbb"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_large"]
+font = ExtResource("4_f5mbb")
+font_size = 30
+outline_size = 8
+outline_color = Color(0.023529412, 0.46666667, 1, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_small"]
+font = ExtResource("4_f5mbb")
+font_size = 20
+outline_size = 3
+outline_color = Color(0.023529412, 0.46666667, 1, 1)
+
+[node name="FootHUD" type="Control" unique_id=1962846644]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_2lu2a")
+
+[node name="Health" type="Control" parent="." unique_id=974714568]
+layout_mode = 1
+anchor_left = 0.034722224
+anchor_top = -0.061728396
+anchor_right = 0.15625
+anchor_bottom = 0.061728396
+offset_left = -10.0
+offset_top = 560.0
+offset_right = 29.99968
+offset_bottom = 560.0
+
+[node name="ColorRect" type="ColorRect" parent="Health" unique_id=1412301142]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0.35235986, 0.64161503, 0.28235295)
+
+[node name="Health" type="Label" parent="Health/ColorRect" unique_id=536381731]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 10.0
+offset_top = -11.5
+offset_right = 50.0
+offset_bottom = 11.5
+grow_vertical = 2
+text = "100"
+label_settings = SubResource("LabelSettings_large")
+
+[node name="Slash" type="Label" parent="Health/ColorRect" unique_id=425496442]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 89.0
+offset_top = -19.0
+offset_right = 129.0
+offset_bottom = 19.0
+grow_vertical = 2
+text = "/"
+label_settings = SubResource("LabelSettings_large")
+clip_text = true
+
+[node name="Total" type="Label" parent="Health/ColorRect" unique_id=959130993]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 120.0
+offset_top = -5.0
+offset_right = 180.0
+offset_bottom = 25.0
+grow_vertical = 2
+text = "100"
+label_settings = SubResource("LabelSettings_small")
+
+[node name="InteractPrompt" type="Label" parent="." unique_id=500797350]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -199.0
+offset_right = 200.0
+offset_bottom = -169.0
+grow_horizontal = 2
+grow_vertical = 0
+horizontal_alignment = 1

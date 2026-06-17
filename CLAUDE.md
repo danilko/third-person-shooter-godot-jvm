@@ -8,98 +8,93 @@ All game logic is written in **Java** (a few stubs in Kotlin). GDScript is not u
 ## Build & Run
 
 ```bash
-./gradlew build          # compile + generate .gdj registration files into gdj/
+./gradlew build          # compile + regenerate .gdj registration files into gdj/
 ```
 
 Open `project.godot` with the **Godot Kotlin/JVM editor** (not the standard editor).
 Plugin version: `0.15.0-4.6`. JVM toolchain: **JDK 17**.
 
-Generated `.gdj` files land in `gdj/` and are what Godot actually loads.
-Source of truth is always `src/main/java/` — never edit generated files.
+Scenes/resources now reference scripts by their **source `.java` path**
+(`res://src/main/java/com/openworld/.../X.java`), not the generated `.gdj` — see the
+`.gdj`→`.java` migration in PLAN.md. `.gdj` generation into `gdj/` is still ON as a
+safety net but is no longer what scenes load. Source of truth is always `src/main/java/`
+— never edit generated files.
 
 ---
 
 ## Source Layout
 
-```
-src/main/java/
-  com/character/          # all character logic
-    ai/                   # enemy FSM states (5 files)
-    Character.java        # base CharacterBody3D — gatherInput / applyInput loop
-    Player.java           # samples keyboard/mouse → CharacterInput
-    Enemy.java            # AI FSM owner — all mutable AI state lives here
-    CharacterInput.java   # per-tick input snapshot (shared by player, AI, network)
-    Health.java           # damage, bone multipliers, headshot, death signal
-    WeaponController.java # slot-based inventory: equip/drop, rate-limit, reload, switch timing
-    WeaponAction.java     # interface: useWeapon / stopUseWeapon / canUse / onReloadComplete
-    WeaponItem.java       # Node3D base for all equippable items: stats, ammo, audio exports
-    FirearmItem.java      # hitscan firearm: bloom, spread, recoil, muzzle flash, bullet tracer
-    WeaponSlot.java       # enum: PRIMARY / SECONDARY / UTILITY / MELEE
-    WeaponType.java       # enum: RANGED / THROWN / MELEE
-    AnimationController.java  # AnimationTree parameter writes
-    MovementController.java   # physics: velocity, gravity, mesh rotation, crosshair
-    CameraController.java     # base camera: recoil, shoulder swap, FoV tween
-    PlayerCameraController.java  # mouse input → CameraController
-    EnemyCameraController.java   # AI aim target → CameraController
-    MovementState.java    # Resource: speed, acceleration, FoV, animation speed
-    MovementType.java     # enum: IDLE / WALK / SPRINT
-    StanceName.java       # enum: UPRIGHT / CROUCH / CRAWL
-    Stance.java           # Resource: collider ref, movement states, camera height
-    CombatState.java      # Resource: speed factor, FoV, shoulder offset, distance
-    JumpState.java        # Resource: jump height, apex duration, animation name
-    RollState.java        # Resource: roll speed, duration, animation name
-  com/environment/
-    Pickup.java           # RigidBody3D base for all world pickups: physics body + PickupArea (Area3D)
-                          #   removeOnPickup / pauseOnPickup / respawnTime countdown
-    WeaponPickup.java     # Pickup: finds WeaponItem child and equips it via WeaponController
-    AmmoRefill.java       # Area3D (static station, no physics): fills all weapons on entry
-    SurfaceType.java      # enum: FLESH / METAL / STONE / WOOD / DEFAULT
-    HittableBody.java     # StaticBody3D subclass: attach to world geometry needing non-default particles
-    HitInfo.java          # immutable hit snapshot (node, point, normal) — network-serializable
-    ParticleManager.java  # world-level pool — fire-and-forget GPUParticles3D per SurfaceType
-    DecalManager.java     # world-level pool — held Decal nodes recycled after decalLifetime seconds
-    ImpactManager.java    # world-level singleton: resolves every HitInfo → particles + decal + damage
-  com/game/
-    EventBus.java         # AutoLoad singleton — global signals
-    GameManager.java      # AutoLoad singleton — PLAYING / PAUSED / GAME_OVER FSM
-  com/ui/
-    CharacterHUD.java     # health label, ammo label, kill notification (3 s)
-    Crosshair.java        # reticle arms track live spread from WeaponController
-    PauseMenu.java
-    RadialMenu.java / RadialMenuItem.java
-  com/util/
-    ObjectPool.java       # generic fixed-size pool (used for splatter particles)
+All code lives under the **`com.openworld`** root, organized **by domain/concern** (not layer-first).
+Scripts are referenced from scenes by `.java` path (`res://src/main/java/com/openworld/.../X.java`),
+not via generated `.gdj`. The two reorg scripts (`tools/reorg_stage1.py`, `tools/reorg_stage2.py`)
+and `tools/REORG_PROGRESS.md` document the move; reuse their pattern for future moves.
 
-src/main/resources/com/  # .tscn scene files mirroring the Java package structure
-  character/Character.tscn, Player.tscn, Enemy.tscn
-  weapon/pistol.tscn, rifile.tscn
-  world/World.tscn
-  ui/PauseMenu.tscn
 ```
+src/main/java/com/openworld/
+  character/      # character bodies + visuals + data: Character (gatherInput/applyInput loop),
+                  #   Player, AICharacter, Health, AnimationController, CharacterInfo,
+                  #   CharacterVisuals, CharacterNameplate, MeshConfig, CharacterRagdoll,
+                  #   CharacterDriveState, CharacterReplication, Faction
+  ai/             # AI brain + FSM: AIController, AIState (base), AIBehaviorConfig
+    character/    #   7 behaviour states: Patrol/Chase/Attack/Search/RefillAmmo/Escort/Flee
+    vehicle/      #   VehicleAIController (reserved for future vehicle AI states)
+  control/        # controller framework + input: Controllable, Controller, CharacterController,
+                  #   PlayerController, UserCommand (per-tick input snapshot), ModalInput
+  camera/         # AI/Player/FPS/TPS/Vehicle CameraControllers, CameraMode, ControlRotation
+  movement/character/  # MovementController, MovementState, MovementType, Stance, StanceName,
+                  #   CombatState, JumpState, RollState
+  weapon/         # WeaponController (slot inventory), WeaponItem (extends item.Pickup),
+                  #   WeaponAction, WeaponType, WeaponSlotType, FirearmItem, Melee/Knife/Axe/Fist,
+                  #   ThrowableItem, ProjectileItem, RocketProjectile, T1Projectile, Detonatable,
+                  #   IconRegistry
+  world/          # world types: HitInfo, HittableBody, SurfaceType
+    manager/      #   world-level singleton systems: Impact/Particle/Decal/Explosion/BulletTracer
+  item/           # Pickup (RigidBody3D base for world pickups), AmmoRefill station
+  carrier/vehicle/ # Vehicle, VehicleWheel, VehicleConfig, VehicleWeaponMode
+  game/           # EventBus (AutoLoad signals), GameManager (PLAYING/PAUSED/GAME_OVER FSM)
+    mission/      #   MissionInfo, MissionManager, MissionObjectiveType
+  net/            # NetworkManager (AutoLoad RPC), NetMessageCodec, NetworkController,
+                  #   VehicleNetworkController, snapshot interpolators, policies, NetStats, Vec3/Quat
+    session/      #   PlayerSession, PersistentPlayerId
+  ui/             # CharacterHUD, Crosshair, HUDManager, PauseMenu, RadialMenu, Feed, …
+  util/           # ObjectPool, generic helpers
+  debug/          # DebugHarness (temporary test-spawn harness)
+
+src/main/resources/com/openworld/  # .tscn/.tres (internal layout NOT yet remapped to new java pkgs)
+  character/Character.tscn, Player.tscn, AICharacter.tscn
+  weapon/AR4.tscn, PI52.tscn, …    world/World.tscn, WorldSystems.tscn    ui/…
+src/test/java/com/openworld/net/   # headless unit tests for the engine-free net logic
+```
+
+> AutoLoads (`project.godot`): `EventBus`, `GameManager` (`game`), `MissionManager`
+> (`game.mission`), `NetworkManager` (`net`).
 
 ---
 
 ## Core Architecture Pattern
 
-### CharacterInput loop
+### UserCommand loop
 
-Every character (player or enemy) runs the same two-step cycle each physics frame:
+Every character (player or AI) runs the same two-step cycle each physics frame. The "brain"
+is a separate `Controller` (`com.openworld.control`) attached to the body via the `Controllable`
+interface — not a `Character` subclass override:
 
 ```
 Character._physicsProcess(delta)
-    1. input = gatherInput(delta)     ← subclass provides the source
-    2. applyInput(input, delta)       ← base class applies to shared state
+    1. command = controller.gatherInput(delta)   ← per-body Controller provides the source
+    2. applyInput(command, delta)                ← base class applies to shared state
 ```
 
-`CharacterInput` is a plain struct holding all per-tick intent:
+`UserCommand` (`com.openworld.control`) is a plain struct holding all per-tick intent:
 `movementDirection`, `movementType`, `wantCombat`, `fire`, `reload`, `jump`,
-`roll`, `desiredStance`, `desiredWeapon`, `aimTargetPosition`, `tick`.
+`desiredStance`, `desiredWeapon`, `aimTargetPosition`, `tick`/`sequenceNumber`.
 
-- **Player** overrides `gatherInput`: polls `Input` singleton (keyboard/mouse).
-- **Enemy** overrides `gatherInput`: runs AI FSM, writes decisions into the struct.
-- **Network** (future): inject a deserialized snapshot — no other code changes needed.
+- **`PlayerController`** polls the `Input` singleton (keyboard/mouse).
+- **`AIController`** runs the AI FSM and writes decisions into the command.
+- **`NetworkController`** (`com.openworld.net`) injects the host-broadcast snapshot on
+  non-authority peers — the interchangeable third source the pattern was built for.
 
-The `tick` counter makes inputs totally ordered for future replay/reconciliation.
+The `tick`/`sequenceNumber` counter makes commands totally ordered for replay/reconciliation.
 
 ### Scene Inheritance
 
@@ -107,8 +102,8 @@ The `tick` counter makes inputs totally ordered for future replay/reconciliation
 CharacterBody3D (Character.tscn)
     shared subtree: Health, WeaponController, AnimationController,
                     MovementController, ragdoll skeleton, stances
-    ├── Player.tscn  — adds: PlayerCameraController, CharacterHUD, AimStayTimer
-    └── Enemy.tscn   — adds: EnemyCameraController, NavigationAgent3D, SightRay
+    ├── Player.tscn       — adds: PlayerController, camera, HUD wiring, AimStayTimer
+    └── AICharacter.tscn  — adds: AIController, AICameraController, NavigationAgent3D, SightRay
 ```
 
 ### Camera Hierarchy (both characters)
@@ -121,14 +116,16 @@ CameraController (Node3D, top-level)
                     └── SpringArm3D
                           └── Camera3D
                                 ├── AimRay (RayCast3D)   ← fire direction
-                                └── SightRay (RayCast3D) ← LoS only (Enemy)
+                                └── SightRay (RayCast3D) ← LoS only (AICharacter)
 ```
 
 `PlayerCameraController._input` accumulates `InputEventMouseMotion.getRelative()` deltas into
 `pendingYaw / pendingPitch` on every mouse event; `gatherLookInput` consumes and resets them
 each physics tick. This captures every mouse event between physics steps rather than sampling
 only the last velocity (`getLastMouseVelocity`), which dropped intermediate events.
-`EnemyCameraController.gatherLookInput` → derives yaw/pitch delta from `aimTarget` world position.
+`AICameraController.gatherLookInput` → derives yaw/pitch delta from `aimTarget` world position.
+(`PlayerCameraController` is the on-foot TPS/FPS controller; `TPSCameraController` /
+`FPSCameraController` are its view sub-types. All live in `com.openworld.camera`.)
 
 Recoil is stored as `recoilPitch / recoilYaw` on `CameraController` and decays via
 `GD.lerp(…, 0, recoilRecoverySpeed * delta)` each frame — fully separate from the
@@ -139,20 +136,27 @@ builds a learnable upward drift (~1.7° at full spray) rather than a persistent 
 
 ---
 
-## Enemy AI (5-state singleton FSM)
+## AI (7-state singleton FSM)
 
-States are **stateless** singleton objects. All mutable data lives on `Enemy`.
-`EnemyAIState.update()` returns the next state; a different reference triggers transition.
+The AI body is `AICharacter`; its brain is `AIController` (`com.openworld.ai`), which runs the
+FSM in `gatherInput`. States are **stateless** singleton objects under `com.openworld.ai.character`.
+All mutable data lives on `AICharacter`. `AIState.update()` returns the next state; a different
+reference triggers a transition.
 
 | State | Key behaviour |
 |:------|:--------------|
 | `PatrolState` | NavAgent random walk within `patrolRadius` of spawn. → Chase/Attack on sight. → Search on hit. |
-| `ChaseState` | Sprint to player (or last known pos). → Attack when in range + LoS. → Patrol after `LOST_PLAYER_TIMEOUT` (3 s). |
+| `ChaseState` | Sprint to target (or last known pos). → Attack when in range + LoS. → Patrol after `LOST_PLAYER_TIMEOUT` (3 s). |
 | `AttackState` | Strafe laterally. Reaction delay before first shot. Per-shot `hitChance` roll. Suppression fire for `suppressionDuration` after losing LoS. → Search when suppression expires. → RefillAmmo when dry. |
 | `SearchState` | Sprint to last known position, strafe to peek. Re-engage on sight. → Patrol after 5 s. |
 | `RefillAmmoState` | Sprint to `ammoRefill` Area3D. Fill all weapons on arrival. → Patrol. |
+| `EscortState` | Follow + defend a designated `Character`. → Attack if the escort target is attacked. |
+| `FleeState` | Sprint away from an attacker for a set distance. → Patrol on arrival. |
 
-### Key Enemy fields (timers all on Enemy, not states)
+Targeting is faction-aware (`AICharacter.discoverTarget()`): same-faction AI ignore each other
+and neutral factions are never targeted (friendly escorts / non-hostile NPCs).
+
+### Key AICharacter fields (timers all on AICharacter, not states)
 
 ```java
 double attackTimer         // counts down per-shot cooldown
@@ -168,13 +172,27 @@ Vector3 currentAimTarget   // where AimRay is tracking this frame
 ### SightRay vs AimRay separation
 
 - **SightRay**: pure LoS check — `hasLineOfSight()`. Never moves the camera.
-- **AimRay**: fire direction — `Enemy.snapAimRay(target)` forces it to point at the
-  computed aim target just before `input.fire = true`.
+- **AimRay**: fire direction — `AICharacter.snapAimRay(target)` forces it to point at the
+  computed aim target just before `command.fire = true`.
 - These are independent so accurate LoS never implies accurate aim.
 
 ---
 
 ## Combat / Weapon System
+
+All weapon classes live in `com.openworld.weapon`; `WeaponItem extends item.Pickup`
+(weapon items *are* the world pickup nodes).
+
+### Semi-auto / full-auto lock (WeaponItem)
+
+The "one use per trigger pull" lock lives in the base `WeaponItem`, not per-subclass:
+`isWeaponFired` is set in `useWeapon()` and cleared in `stopUseWeapon()` (trigger release);
+`isSemiAutoReady()` returns `!isWeaponFired || auto`. Every weapon gates `canUse()` on it, so a
+non-`auto` weapon fires exactly once per pull regardless of `fireRate`. `FirearmItem`,
+`ProjectileItem`, and `ThrowableItem` all share this — previously the lock was copy-pasted into
+the firearm/projectile only and **missing from `ThrowableItem`**, which let a held throw key
+spawn multiple grenades back-to-back (the double-throw bug). `MeleeItem` keeps its own
+timer-based model (overrides `stopUseWeapon()` to a no-op).
 
 ### Spread formula (FirearmItem)
 
@@ -205,7 +223,7 @@ Spread is applied as a **circular cone** in `performHitscan`: random angle + `sq
 halfSpread` radius → uniform disk distribution (no diagonal bulge from independent pitch/yaw
 sampling). The block is skipped entirely when `spread == 0` (no wasted raycast work).
 
-Enemy bypasses spread entirely (`useWeaponSpread = false`); accuracy is controlled
+AI bypasses spread entirely (`useWeaponSpread = false` on the AICharacter); accuracy is controlled
 by `hitChance` + `aimScatterRadius` in `AttackState`.
 
 ### Crosshair
@@ -266,6 +284,53 @@ Damage multipliers are resolved by bone name in `Health.getDamageMultiplier()`:
 
 On death, `Health` emits to `EventBus.characterEliminated(attacker, victim, weapon, headshot)`.
 
+### Networked combat cosmetics — fire / reload / melee replay (puppets)
+
+Combat is replicated as **state, not events**: `WeaponController` carries two rolling u8 counters
+sampled into every snapshot — `fireSeq` (bumped in `onWeaponFire`, all weapon types) and `reloadSeq`
+(bumped at the end of `onWeaponReload`). `NetworkController.applyDiscreteState` change-detects each:
+when a counter differs from the last seen value it calls `wc.playRemoteFireCue()` /
+`wc.playRemoteReloadCue()` and mirrors the value forward (so a re-broadcasting host carries the right
+counter to other clients). No separate droppable fire/reload message exists. `SNAPSHOT_ENTRY_FIXED_BYTES`
+in `NetworkManager` must equal the per-entry byte count in `NetMessageCodec.putSnapshotEntry`
+(currently 65 = …+ fireSeq u8 + activeMagazine u16 + reloadSeq u8) or MTU chunking mis-sizes frames.
+
+**The core rule — a puppet replays cosmetics only, never re-derives damage, and derives the shot
+identically to the authority:**
+- Every weapon's `playRemoteFireCue()` reconstructs the shot from the **replicated logical state**
+  shared by all peers: the weapon's **own `Muzzle` marker** for the origin and the replicated
+  **`getAimTargetPosition()`** point (which also drives spine IK and rides in every snapshot) for the
+  direction — *never* the local `aimRay`/crosshair (puppets have none) and *never* the animating pose.
+  Authority and puppet run the **same** origin/direction derivation; only damage differs.
+- Damage is **authority-only**, gated by the `cosmetic` flag: `RocketProjectile`/`T1Projectile` spawned
+  with `cosmetic = true` play VFX (`ExplosionManager.spawnExplosion`) but skip
+  `triggerExplosion`/attacker injection; `FirearmItem` puppet draws a tracer but runs no hitscan;
+  `MeleeItem.playRemoteFireCue` plays swing audio only and must **not** call `startSwing()` (its hit
+  window applies damage). `WeaponItem.playRemoteFireCue()` is an empty default — every concrete weapon
+  type that can fire must override it or it is silent/invisible on other peers (this was the melee bug).
+- Spawned projectiles add `addCollisionExceptionWith(owningCharacter)` — a secondary guard so a
+  weapon never collides with / detonates on its own shooter (the rocket's `collision_mask` includes
+  the character layer); it is not the consistency fix, the unified muzzle+`aimTarget` spawn is.
+
+**Weapon switch — ordered equip event (so a remote switch is neither late nor early, and fire can't
+render before draw):** the owner's switch is two-phase — `onSetWeapon` starts `transitionTimer`
+(holster, old weapon still shown) and only `onWeaponTransitionComplete` raises the new weapon
+(`onWeaponEquip`) — so the new weapon comes up at `switchStart + transitionTime`. Both `onSetWeapon`
+and the puppet path share `beginWeaponTransition(slot)`, so **a puppet runs the same transition and
+raises the weapon at the same offset from switch-start** — timing-identical, off only by latency.
+This requires delivering the switch at switch-*start*: `onSetWeapon` emits a reliable, ordered
+`MSG_WEAPON_SWITCH(charId, targetSlot)` the instant the owner begins (gated on `isAuthorityFor`; host
+validates owner + re-broadcasts excluding the originator), and the per-tick snapshot replicates
+`getReplicatedActiveSlot()` (the **target** during a transition, not the post-animation
+`activeSlotIndex`) as the drop-heal backstop. (Pitfall: an earlier version *snapped* the puppet's
+weapon up instantly — fine while delivery was *late* via the post-transition slot, but once delivery
+became prompt it drew a full `transitionTime` too early.) The puppet gates its cue with the **same**
+condition as the owner's `onWeaponFire` — `isWeaponTransitioning() || fireTimer.getTimeLeft() > 0`
+(`fireTimer` = draw-settle started by `onWeaponTransitionComplete`) — dropping any cue inside the
+draw window (`fire_cue_predraw_suppressed`). The replicated path only ever runs on puppets (the owner
+uses `onWeaponFire`/`onSetWeapon`), so these timers never carry two meanings on one body. Host-side
+fire-timing *validation* is deferred (H3).
+
 ### Ragdoll on death (Character.enableRagdoll)
 
 1. `setPhysicsProcess(false)` on both `Character` and `MovementController`.
@@ -280,28 +345,32 @@ On death, `Health` emits to `EventBus.characterEliminated(attacker, victim, weap
 `EventBus` is a global `Node` registered as AutoLoad. Any node reaches it via
 `getNodeOrNull("/root/EventBus")`.
 
+Key signals (not exhaustive — see `EventBus.java` for the full set, which also includes
+`all_players_died`, `player_spawned`, `pickup_interact_changed`, `player_ammo_changed`,
+`weapon_picked_up`, and the multi-character spawn/health/ammo signals used by `HUDManager`):
+
 | Signal | Emitter | Payload |
 |:-------|:--------|:--------|
 | `player_died` | `Player.onDied()` | — |
 | `enemy_killed` | (future use) | score: `int` |
 | `player_health_changed` | (future use) | currentHealth: `float` |
 | `ammo_picked_up` | (future use) | weapon index: `int` |
-| `character_eliminated` | `Health.takeDamage()` | attacker, victim, weapon, headshot |
+| `character_eliminated` | `Health.takeDamage()` | `Signal7`: victimId, victimName, victimFaction, attackerName, attackerFaction, icon, headshot |
 
 `GameManager` connects `playerDied → onPlayerDied()` in `_ready()`.
-`CharacterHUD` connects `characterEliminated → onCharacterEliminated()` in `_ready()`.
+The HUD (`HUDManager`/`CharacterHUD`) connects `characterEliminated` for the kill feed.
 
 ---
 
-## MovementController flags (Player vs Enemy)
+## MovementController flags (Player vs AICharacter)
 
-| Export flag | Player | Enemy |
-|:------------|:------:|:-----:|
+| Export flag | Player | AICharacter |
+|:------------|:------:|:-----------:|
 | `worldSpaceMovement` | `false` | `true` |
 | `faceCameraInCombat` | `true` | `false` |
 
 Player input is camera-relative (rotated by `camRotation`).
-Enemy input is world-space (set directly by AI FSM).
+AI input is world-space (set directly by the AI FSM).
 
 ---
 
@@ -309,10 +378,11 @@ Enemy input is world-space (set directly by AI FSM).
 
 - Every class exposed to Godot needs `@RegisterClass`, methods need `@RegisterFunction`,
   properties need `@RegisterProperty` + `@Export`.
-- Signal declarations: `Signal0 / Signal1<T> / Signal2<T,U> / Signal4<A,B,C,D>` declared as
-  `public final` fields.
-- Scene nodes not in `.tscn` but loaded via `.gdj` registration files in `gdj/` —
-  always run `./gradlew build` before opening the editor.
+- Signal declarations: `Signal0 / Signal1<T> / … / Signal7<…>` declared as `public final` fields.
+- Class registration is byte-compatible across package moves: `@RegisterClass(className=…)` is
+  an explicit string (and the default is the simple class name), both package-independent — so the
+  `com.openworld.*` reorg did not change any registered type name.
+- Always run `./gradlew build` before opening the editor so registration is up to date.
 - `GD.lerp`, `GD.lerpAngle`, `GD.clamp`, `GD.randf`, `GD.randfRange` are the GDScript global equivalents.
 - `StringName` is used for signal names and node lookups; `NodePath` for node paths.
 
@@ -320,14 +390,14 @@ Enemy input is world-space (set directly by AI FSM).
 
 ## Known Quirks / Gotchas
 
-- Enemy `onDied()` must set `isDead = true` **before** calling `super.onDied()` (which stops
+- `AICharacter.onDied()` must set `isDead = true` **before** calling `super.onDied()` (which stops
   physics processing). If `isDead` is not set first, `gatherInput` can still run on the
   same frame via a pending physics callback.
-- `AimStayTimer` in `Player.gatherInput`: uses `isActionJustReleased` (not `isActionPressed`)
+- `AimStayTimer` in `PlayerController.gatherInput`: uses `isActionJustReleased` (not `isActionPressed`)
   to start the timer so it starts exactly once and doesn't restart every frame after it ends.
 - `WeaponController.onWeaponFire` saves and restores `aimRay3D` rotation when applying spread;
-  Enemy's `snapAimRay` pre-positions the ray before firing so the spread rotation must be
-  skipped for enemies (`useWeaponSpread = false`).
+  `AICharacter.snapAimRay` pre-positions the ray before firing so the spread rotation must be
+  skipped for AI (`useWeaponSpread = false`).
 - `ParticleManager` pool containers must be named exactly after the `SurfaceType` constant
   (e.g. node named `"FLESH"`, not `"Flesh"`). A missing container is silently skipped in `_ready()`.
 - To add a new surface type: (1) add constant to `SurfaceType.java`, (2) add a child container
@@ -336,7 +406,22 @@ Enemy input is world-space (set directly by AI FSM).
 - `ImpactManager.processHit()` is the single place to add new hit effects (decals, sounds,
   physics impulse). `WeaponController` does not need to change for any of those additions.
 - `PhysicalBoneSimulator3D` children must be added to `aimRay.addException()` in both
-  `Character._ready()` and `Enemy._ready()` (for SightRay) to prevent self-hits.
+  `Character._ready()` and `AICharacter._ready()` (for SightRay) to prevent self-hits.
+- Process-global static state that holds Godot **resources** (e.g. `IconRegistry.ICONS`, a static
+  `Map<String,Texture2D>`) outlives the engine and surfaces as `1 resource still in use at exit` /
+  `ObjectDB instances leaked at exit`. Clear such caches on shutdown: `IconRegistry.clear()` is
+  called from `GameManager._exitTree()` (the AutoLoad leaving the tree at engine teardown). Add the
+  same release for any future static Godot-object cache. (`Color`/`Vector3`/`Quat` statics are value
+  types — they don't leak.)
+- **Swapping a node must free the outgoing one.** `Character.attachController` /
+  `Vehicle.attachController` replace the controller with `removeChild(old); old.queueFree();` — a
+  `removeChild` *without* the free leaves a parentless, never-freed node (Godot reports it at exit as
+  `Leaked instance: Node … - removed with remove_child() but not freed`, and any resource it holds —
+  e.g. its `.java` script — as `resources still in use`). This bites every controller swap: puppet
+  spawn (→ `NetworkController`), player-disconnect (→ bot `CharacterController`), scene
+  `PlayerController` → `NetworkController`. The retain-and-reuse path is the separate
+  `detachController()` (removes, returns, does **not** free — used by vehicle enter/exit hot-swap).
+  Same rule for any other `removeChild` that isn't handing the node to a new parent.
 - Weapon scenes are discovered dynamically: `WeaponController` iterates children of
   `WeaponAttachment` at `_ready()` — add a new weapon by adding a `Marker3D` wrapper with a
   `WeaponItem` subclass scene (e.g. `FirearmItem`) as its only child.
@@ -345,3 +430,11 @@ Enemy input is world-space (set directly by AI FSM).
   fires before the weapon is attached.
 - `Pickup.pause()` calls `setFreezeEnabled(true)` (not `setFreeze`) — the Kotlin/JVM binding
   exposes the Godot 4 `freeze` property as `setFreezeEnabled / isFreezeEnabled`.
+- `ENetConnection.createHost/createHostBound` take `(… maxPeers, maxChannels, inBandwidth,
+  outBandwidth)` — all-int positional args. Putting the channel count one slot too far right
+  silently caps outgoing bandwidth at N bytes/s (ENet then throttle-drops unreliable packets
+  into multi-second bursts). `connectToHost` differs: its 3rd param IS `channel_count`.
+- `NodePath.toString()` returns `"NodePath(<subnames>)"` — the `:property` subname part only,
+  which is **empty for plain node paths** — NOT the path string. Use `nodePath.getPath()`
+  (the Kotlin `path` property) whenever a path string is needed, e.g. `getPath().getPath()`
+  on a Node. `StringName.toString()` is unaffected (it calls the native string operator).

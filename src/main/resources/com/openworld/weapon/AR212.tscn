@@ -1,0 +1,62 @@
+[gd_scene format=3 uid="uid://chmmjlji5vapb"]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FirearmItem.java" id="1_baof6"]
+[ext_resource type="Texture2D" uid="uid://dilbj38px75ln" path="res://assets/ui/AR212.png" id="2_0umnc"]
+[ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="2_o1kqx"]
+[ext_resource type="AudioStream" uid="uid://c333cb6cupk6h" path="res://assets/audio/Rifle_reload.wav" id="3_jkr78"]
+[ext_resource type="PackedScene" uid="uid://cgkct1784t5mt" path="res://assets/AssaultRifle2_1.glb" id="4_eti2j"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="5_muzzle"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_l3rdl"]
+size = Vector3(0.215, 0.105, 0.625)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3xjif"]
+size = Vector3(0.215, 0.105, 0.625)
+
+[node name="AR212" type="RigidBody3D" unique_id=1788483088]
+collision_layer = 4
+script = ExtResource("1_baof6")
+weapon_id = "AR212"
+weapon_name = "AR-212"
+weapon_pose_index = 1
+weapon_icon = ExtResource("2_0umnc")
+hold_socket = "MarkerAR212"
+holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
+spread = 0.01
+bloom_per_shot = 0.05
+bloom_decay_speed = 0.3
+reload_speed = 0.4
+switch_speed = 1.5
+fire_rate = 10.0
+magazine = 30
+magazine_size = 30
+reserve = 60
+reserve_max = 60
+recoil = 1.0
+damage = 20.0
+fire_audio = ExtResource("2_o1kqx")
+reload_audio = ExtResource("3_jkr78")
+require_interact = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=100000002]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+shape = SubResource("BoxShape3D_l3rdl")
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=100000003]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=1413815656]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+shape = SubResource("BoxShape3D_3xjif")
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=491564192]
+transform = Transform3D(1, 2.9802322e-08, 0, -2.9802322e-08, 0.9999999, 2.9802322e-08, 1.7881393e-07, -2.9802322e-08, 1, 0, 0, -0.45294857)
+
+[node name="MuzzleVFX" parent="Muzzle" unique_id=1705398137 instance=ExtResource("5_muzzle")]
+
+[node name="AssaultRifle2_12" parent="." unique_id=491564191 instance=ExtResource("4_eti2j")]
+transform = Transform3D(-4.371139e-09, 0, 0.1, 0, 0.1, 0, -0.1, 0, -4.371139e-09, 0, -0.054, 0)
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

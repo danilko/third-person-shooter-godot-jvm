@@ -1,0 +1,47 @@
+[gd_scene format=3 uid="uid://by30wrak6f7gk"]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/DefeatedFeedEntry.java" id="1_gb4lt"]
+[ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="2_u7ww0"]
+[ext_resource type="Texture2D" uid="uid://dilbj38px75ln" path="res://assets/ui/AR212.png" id="3_aqwaa"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_kf"]
+font_size = 14
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.85)
+
+[node name="DefeatedFeedEntry" type="HBoxContainer" unique_id=708373032]
+clip_contents = true
+custom_minimum_size = Vector2(0, 26)
+layout_direction = 2
+theme_override_constants/separation = 6
+script = ExtResource("1_gb4lt")
+headshot_icon = ExtResource("2_u7ww0")
+
+[node name="AttackerName" type="Label" parent="." unique_id=602513230]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Attacker"
+label_settings = SubResource("LabelSettings_kf")
+horizontal_alignment = 2
+clip_text = true
+
+[node name="WeaponIcon" type="TextureRect" parent="." unique_id=926103712]
+layout_mode = 2
+texture = ExtResource("3_aqwaa")
+expand_mode = 3
+stretch_mode = 4
+
+[node name="HeadshotIndicator" type="TextureRect" parent="." unique_id=26380404]
+layout_mode = 2
+texture = ExtResource("2_u7ww0")
+expand_mode = 3
+stretch_mode = 4
+
+[node name="VictimName" type="Label" parent="." unique_id=2002710970]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Victim"
+label_settings = SubResource("LabelSettings_kf")
+clip_text = true
