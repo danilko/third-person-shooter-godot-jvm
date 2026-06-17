@@ -284,6 +284,34 @@ Damage multipliers are resolved by bone name in `Health.getDamageMultiplier()`:
 
 On death, `Health` emits to `EventBus.characterEliminated(attacker, victim, weapon, headshot)`.
 
+### Networked combat cosmetics — fire / reload / melee replay (puppets)
+
+Combat is replicated as **state, not events**: `WeaponController` carries two rolling u8 counters
+sampled into every snapshot — `fireSeq` (bumped in `onWeaponFire`, all weapon types) and `reloadSeq`
+(bumped at the end of `onWeaponReload`). `NetworkController.applyDiscreteState` change-detects each:
+when a counter differs from the last seen value it calls `wc.playRemoteFireCue()` /
+`wc.playRemoteReloadCue()` and mirrors the value forward (so a re-broadcasting host carries the right
+counter to other clients). No separate droppable fire/reload message exists. `SNAPSHOT_ENTRY_FIXED_BYTES`
+in `NetworkManager` must equal the per-entry byte count in `NetMessageCodec.putSnapshotEntry`
+(currently 65 = …+ fireSeq u8 + activeMagazine u16 + reloadSeq u8) or MTU chunking mis-sizes frames.
+
+**The core rule — a puppet replays cosmetics only, never re-derives damage, and derives the shot
+identically to the authority:**
+- Every weapon's `playRemoteFireCue()` reconstructs the shot from the **replicated logical state**
+  shared by all peers: the weapon's **own `Muzzle` marker** for the origin and the replicated
+  **`getAimTargetPosition()`** point (which also drives spine IK and rides in every snapshot) for the
+  direction — *never* the local `aimRay`/crosshair (puppets have none) and *never* the animating pose.
+  Authority and puppet run the **same** origin/direction derivation; only damage differs.
+- Damage is **authority-only**, gated by the `cosmetic` flag: `RocketProjectile`/`T1Projectile` spawned
+  with `cosmetic = true` play VFX (`ExplosionManager.spawnExplosion`) but skip
+  `triggerExplosion`/attacker injection; `FirearmItem` puppet draws a tracer but runs no hitscan;
+  `MeleeItem.playRemoteFireCue` plays swing audio only and must **not** call `startSwing()` (its hit
+  window applies damage). `WeaponItem.playRemoteFireCue()` is an empty default — every concrete weapon
+  type that can fire must override it or it is silent/invisible on other peers (this was the melee bug).
+- Spawned projectiles add `addCollisionExceptionWith(owningCharacter)` — a secondary guard so a
+  weapon never collides with / detonates on its own shooter (the rocket's `collision_mask` includes
+  the character layer); it is not the consistency fix, the unified muzzle+`aimTarget` spawn is.
+
 ### Ragdoll on death (Character.enableRagdoll)
 
 1. `setPhysicsProcess(false)` on both `Character` and `MovementController`.
@@ -360,6 +388,21 @@ AI input is world-space (set directly by the AI FSM).
   physics impulse). `WeaponController` does not need to change for any of those additions.
 - `PhysicalBoneSimulator3D` children must be added to `aimRay.addException()` in both
   `Character._ready()` and `AICharacter._ready()` (for SightRay) to prevent self-hits.
+- Process-global static state that holds Godot **resources** (e.g. `IconRegistry.ICONS`, a static
+  `Map<String,Texture2D>`) outlives the engine and surfaces as `1 resource still in use at exit` /
+  `ObjectDB instances leaked at exit`. Clear such caches on shutdown: `IconRegistry.clear()` is
+  called from `GameManager._exitTree()` (the AutoLoad leaving the tree at engine teardown). Add the
+  same release for any future static Godot-object cache. (`Color`/`Vector3`/`Quat` statics are value
+  types — they don't leak.)
+- **Swapping a node must free the outgoing one.** `Character.attachController` /
+  `Vehicle.attachController` replace the controller with `removeChild(old); old.queueFree();` — a
+  `removeChild` *without* the free leaves a parentless, never-freed node (Godot reports it at exit as
+  `Leaked instance: Node … - removed with remove_child() but not freed`, and any resource it holds —
+  e.g. its `.java` script — as `resources still in use`). This bites every controller swap: puppet
+  spawn (→ `NetworkController`), player-disconnect (→ bot `CharacterController`), scene
+  `PlayerController` → `NetworkController`. The retain-and-reuse path is the separate
+  `detachController()` (removes, returns, does **not** free — used by vehicle enter/exit hot-swap).
+  Same rule for any other `removeChild` that isn't handing the node to a new parent.
 - Weapon scenes are discovered dynamically: `WeaponController` iterates children of
   `WeaponAttachment` at `_ready()` — add a new weapon by adding a `Marker3D` wrapper with a
   `WeaponItem` subclass scene (e.g. `FirearmItem`) as its only child.

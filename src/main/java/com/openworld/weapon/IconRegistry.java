@@ -39,4 +39,13 @@ public final class IconRegistry {
     public static Texture2D get(String key) {
         return key == null ? null : ICONS.get(key);
     }
+
+    /**
+     * Drop all cached icon references. Called on engine shutdown (GameManager._exitTree) so the
+     * static map doesn't keep Godot Texture2D resources alive past the engine's resource teardown
+     * (which would surface as "resource still in use at exit" / leaked ObjectDB instances).
+     */
+    public static void clear() {
+        ICONS.clear();
+    }
 }

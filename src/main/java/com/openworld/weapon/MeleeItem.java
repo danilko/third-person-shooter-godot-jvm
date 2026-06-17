@@ -111,6 +111,22 @@ public class MeleeItem extends WeaponItem {
         return hitTimer == null || hitTimer.getTimeLeft() <= 0;
     }
 
+    /**
+     * Puppet replay of a remote swing (fired when the snapshot's fireSeq advances — see
+     * WeaponController.playRemoteFireCue). Plays the swing audio only, so observers hear a remote
+     * melee. Deliberately does NOT call startSwing(): the hit window runs performMeleeHit()/
+     * processHit() which applies damage, and damage is authority-only. (Without this override
+     * melee was the one weapon type with no cosmetic cue on other peers.)
+     */
+    @Override
+    public void playRemoteFireCue() {
+        if (weaponAudio != null && fireAudio != null) {
+            weaponAudio.stop();
+            weaponAudio.setStream(fireAudio);
+            weaponAudio.play();
+        }
+    }
+
     @Override public void stopUseWeapon() {}
     @Override public WeaponType getWeaponType() { return WeaponType.MELEE; }
 
