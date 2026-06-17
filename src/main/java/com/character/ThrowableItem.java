@@ -118,10 +118,14 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
 
     @Override public WeaponType getWeaponType()   { return WeaponType.THROWN; }
     @Override public WeaponSlotType getSlotType() { return WeaponSlotType.THROWABLE; }
-    @Override public boolean canUse()             { return magazine > 0; }
+    // Semi-auto by default (auto = false): one grenade per trigger pull. Without the
+    // isSemiAutoReady() gate a held throw key spawned multiple grenades back-to-back
+    // (capped only by fireRate) both locally and across LAN — the double-throw bug.
+    @Override public boolean canUse()             { return magazine > 0 && isSemiAutoReady(); }
 
     @Override
     public void useWeapon() {
+        isWeaponFired = true;
         decrementMagazine();
         spawnProjectile(false);
         playThrowAudio();

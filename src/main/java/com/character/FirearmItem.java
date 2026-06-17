@@ -33,7 +33,6 @@ public class FirearmItem extends WeaponItem {
    *  pellet samples the spread cone independently; audio/bloom/recoil fire once. */
   @Export @RegisterProperty public int pelletCount = 1;
 
-  private boolean isWeaponFired = false;
   private StanceName currentStance = StanceName.UPRIGHT;
 
   // Added to spread per m/s of horizontal+vertical speed before the stance multiplier,
@@ -113,10 +112,7 @@ public class FirearmItem extends WeaponItem {
     }
   }
 
-  @Override
-  public void stopUseWeapon() {
-    isWeaponFired = false;
-  }
+  // stopUseWeapon() (clears the semi-auto lock) is inherited from WeaponItem.
 
   @Override
   public void onReloadComplete() {
@@ -126,7 +122,7 @@ public class FirearmItem extends WeaponItem {
   /** True when the trigger can produce another shot (semi-auto lock check only). */
   @Override
   public boolean canUse() {
-    return !isWeaponFired || auto;
+    return isSemiAutoReady();
   }
 
   @Override
