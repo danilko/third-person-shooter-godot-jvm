@@ -47,9 +47,6 @@ public class ProjectileItem extends WeaponItem {
     private GPUParticles3D muzzleFlashFx;
     private AnimationPlayer muzzleFlashAnimPlayer;
 
-    // Semi-auto lock: true while the trigger is held, cleared on stopUseWeapon.
-    private boolean isWeaponFired = false;
-
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     @RegisterFunction
@@ -72,7 +69,7 @@ public class ProjectileItem extends WeaponItem {
     /** Semi-auto lock: one shot per trigger pull. */
     @Override
     public boolean canUse() {
-        return !isWeaponFired || auto;
+        return isSemiAutoReady();
     }
 
     @Override
@@ -98,10 +95,7 @@ public class ProjectileItem extends WeaponItem {
         spawnProjectile(true);
     }
 
-    @Override
-    public void stopUseWeapon() {
-        isWeaponFired = false;
-    }
+    // stopUseWeapon() (clears the semi-auto lock) is inherited from WeaponItem.
 
     @Override
     public void onReloadComplete() {

@@ -191,8 +191,20 @@ public class WeaponItem extends Pickup implements WeaponAction {
   public CharacterBody3D getOwningCharacter() { return owningCharacter; }
 
   // ── WeaponAction defaults — concrete subclasses override what they need ───
+  // Semi-auto lock: set true in useWeapon() after a shot, cleared on stopUseWeapon()
+  // (i.e. on trigger release). Subclasses gate canUse() on isSemiAutoReady() so that a
+  // non-auto weapon produces exactly one use per trigger pull regardless of fireRate.
+  protected boolean isWeaponFired = false;
+
+  /**
+   * True when the trigger may produce another use: full-auto weapons (auto) always,
+   * semi-auto weapons only after the trigger was released since the last shot.
+   */
+  protected boolean isSemiAutoReady() { return !isWeaponFired || auto; }
+
   @Override public void useWeapon() {}
-  @Override public void stopUseWeapon() {}
+  // Trigger released — clear the semi-auto lock so the next pull can fire.
+  @Override public void stopUseWeapon() { isWeaponFired = false; }
   @Override public void onReloadComplete() {}
   @Override public boolean canUse() { return false; }
   @Override public WeaponType getWeaponType() { return WeaponType.RANGED; }
