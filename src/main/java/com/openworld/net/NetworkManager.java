@@ -97,6 +97,7 @@ public class NetworkManager extends Node {
     private static final int MSG_VEHICLE_SNAPSHOT_BATCH = 20; // Round 11 N3 — host→all: every replicated vehicle's state per broadcast tick
     private static final int MSG_VEHICLE_SEAT_REQUEST   = 21; // Round 11 N3 — client→host: ask to (un)seat a character (host-arbitrated)
     private static final int MSG_VEHICLE_OCCUPANCY      = 22; // Round 11 N3 — host→all: authoritative seat state + locomotion owner (atomic)
+    private static final int MSG_WEAPON_SWITCH          = 23; // G4-1 — owner→host→all: ordered equip-start event (puppet draws promptly, fire can't precede draw)
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -149,7 +150,7 @@ public class NetworkManager extends Node {
             case MSG_IDENTIFY, MSG_DAMAGE_REQUEST, MSG_DAMAGE_BROADCAST, MSG_SPAWN, MSG_DESPAWN, MSG_SHOT,
                     MSG_WORLD_EVENT, MSG_OWNERSHIP, MSG_PICKUP_REQUEST, MSG_PICKUP_TAKEN,
                     MSG_WEAPON_DROPPED, MSG_ELIMINATION, MSG_INVENTORY,
-                    MSG_VEHICLE_SEAT_REQUEST, MSG_VEHICLE_OCCUPANCY ->
+                    MSG_VEHICLE_SEAT_REQUEST, MSG_VEHICLE_OCCUPANCY, MSG_WEAPON_SWITCH ->
                     new ChannelSpec(0, ENetPacketPeer.FLAG_RELIABLE);
             case MSG_SNAPSHOT, MSG_SNAPSHOT_BATCH, MSG_VEHICLE_SNAPSHOT, MSG_VEHICLE_SNAPSHOT_BATCH ->
                     new ChannelSpec(2, 0L);
@@ -362,7 +363,7 @@ public class NetworkManager extends Node {
             // at send — the receiver's interpolation timeline.
             entries.add(new NetMessageCodec.DecodedSnapshot(c.characterInfo.characterId, c.getCurrentTick(),
                     c.getGlobalPosition(), c.getVelocity(), c.getAimTargetPosition(), c.isCombat(),
-                    c.getStanceOrdinal(), wc.getWeapon(), c.getMovementTypeOrdinal(), c.getFacingYaw(),
+                    c.getStanceOrdinal(), wc.getReplicatedActiveSlot(), c.getMovementTypeOrdinal(), c.getFacingYaw(),
                     health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(), wc.getReloadSeq()));
         }
         broadcastSnapshotBatchChunked(entries);
@@ -653,6 +654,7 @@ public class NetworkManager extends Node {
                 }
                 case MSG_VEHICLE_SEAT_REQUEST -> handleVehicleSeatRequestMessage(senderPeerId, buf);
                 case MSG_VEHICLE_OCCUPANCY -> handleVehicleOccupancyMessage(senderPeerId, buf);
+                case MSG_WEAPON_SWITCH -> handleWeaponSwitchMessage(senderPeerId, buf);
                 default -> GD.print("NetworkManager: dropping packet from " + senderPeerId
                         + " — unknown message tag " + msgType);
             }
@@ -1312,6 +1314,42 @@ public class NetworkManager extends Node {
         else sendMessage(SERVER_PEER_ID, frame);
     }
 
+    /**
+     * Owner/host → network: announce the START of a weapon switch (G4-1 — called by
+     * WeaponController.onSetWeapon, which already gated on local authority for this body).
+     * Host: broadcast to every client. Client: report to the host, which validates and fans out.
+     * Puppets snap the slot + start an aligned cosmetic draw immediately, so a remote switch lands
+     * as promptly as the owner's instead of a full draw-animation late.
+     */
+    public void sendWeaponSwitch(String characterId, int targetSlot) {
+        if (!isNetworked()) return;
+        PackedByteArray frame = NetMessageCodec.encodeWeaponSwitch(MSG_WEAPON_SWITCH, characterId, targetSlot);
+        if (isServer()) broadcastMessage(frame, null);
+        else sendMessage(SERVER_PEER_ID, frame);
+    }
+
+    /** MSG_WEAPON_SWITCH (owner → host → all): apply the equip-start on this peer's copy; host validates owner + fans out. */
+    private void handleWeaponSwitchMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedWeaponSwitch sw = NetMessageCodec.decodeWeaponSwitch(buf);
+        if (!isValidIdentifier(sw.characterId()) || sw.targetSlot() < 0 || sw.targetSlot() >= WEAPON_SLOT_COUNT) {
+            dropInvalid("weapon_switch", "MSG_WEAPON_SWITCH", senderPeerId);
+            return;
+        }
+        Character character = findCharacterById(sw.characterId());
+        if (isServer()) {
+            if (character == null || character.characterInfo == null
+                    || character.characterInfo.ownerPeerId != senderPeerId) {
+                GD.print("NetworkManager: rejecting MSG_WEAPON_SWITCH from non-owner peer " + senderPeerId);
+                return;
+            }
+            broadcastMessage(NetMessageCodec.encodeWeaponSwitch(MSG_WEAPON_SWITCH, sw.characterId(),
+                    sw.targetSlot()), senderPeerId);
+        }
+        if (character == null) return;
+        WeaponController wc = findWeaponController(character);
+        if (wc != null) wc.applyReplicatedWeaponSlot(sw.targetSlot());
+    }
+
     // ── Reliable elimination + inventory reconciliation (Round 11 N2) ─────────
     //
     // MSG_ELIMINATION: death was previously visible to non-authority peers only as an
@@ -1681,7 +1719,7 @@ public class NetworkManager extends Node {
         if (health == null || wc == null) return;
         sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeSnapshot(MSG_SNAPSHOT, body.characterInfo.characterId,
                 body.getCurrentTick(), body.getGlobalPosition(), body.getVelocity(), body.getAimTargetPosition(),
-                body.isCombat(), body.getStanceOrdinal(), wc.getWeapon(), body.getMovementTypeOrdinal(),
+                body.isCombat(), body.getStanceOrdinal(), wc.getReplicatedActiveSlot(), body.getMovementTypeOrdinal(),
                 body.getFacingYaw(), health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(),
                 wc.getReloadSeq()));
     }

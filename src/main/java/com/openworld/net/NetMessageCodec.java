@@ -460,6 +460,35 @@ public final class NetMessageCodec {
     /** Carrier for a decoded MSG_PICKUP_TAKEN body — the host-confirmed pickup every peer applies. */
     public record DecodedPickupTaken(String pickupId, String characterId, int magazine, int reserve) { }
 
+    // ── MSG_WEAPON_SWITCH (owner → host → all) ────────────────────────────────
+    //
+    // [tag u8][characterId utf8][targetSlot u8]
+    //
+    // The ordered equip event (G4-1): emitted the instant the owner *begins* a weapon switch,
+    // not the post-animation slot value. Puppets snap to targetSlot and time-align their cosmetic
+    // draw immediately, so a remote switch lands as promptly as the owner's — no extra draw-animation
+    // of lag. Reliable channel 0; the per-tick snapshot slot (now the *target* during a transition)
+    // is the drop-heal backstop. No fire timing rides here — the puppet gates its own fire cue on the
+    // local draw window (see WeaponController.applyReplicatedWeaponSlot / playRemoteFireCue).
+
+    public static PackedByteArray encodeWeaponSwitch(int msgType, String characterId, int targetSlot) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(characterId);
+        buf.put8(targetSlot & 0xFF);
+        return buf.getDataArray();
+    }
+
+    /** Decodes the body following the tag byte. Caller must have already consumed it. */
+    public static DecodedWeaponSwitch decodeWeaponSwitch(StreamPeerBuffer buf) {
+        String characterId = buf.getUtf8String();
+        int targetSlot = buf.getU8();
+        return new DecodedWeaponSwitch(characterId, targetSlot);
+    }
+
+    /** Carrier for a decoded MSG_WEAPON_SWITCH body — the ordered equip-start event every peer applies. */
+    public record DecodedWeaponSwitch(String characterId, int targetSlot) { }
+
     // ── MSG_WEAPON_DROPPED (owner → host → all) ───────────────────────────────
     //
     // [tag u8][characterId utf8][slot u8][oldPickupId utf8][newPickupId utf8]
