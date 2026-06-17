@@ -145,6 +145,11 @@ public class GameManager extends Node {
         if (getTree() != null) getTree().setPause(false);
         Input.INSTANCE.setMouseMode(Input.MouseMode.CAPTURED);
         transitionTo(GameState.PLAYING);
+        // Faction relationships live on the FactionManager AutoLoad, which survives the scene
+        // reload below — so a mid-game betrayal would carry into the restarted game. Reset to the
+        // shipped DefaultFactions.tres so a restart is a clean slate.
+        com.openworld.character.FactionManager factions = getFactionManager();
+        if (factions != null) factions.reset();
         // End any live network session before reloading: NetworkManager is an AutoLoad and
         // survives reloadCurrentScene, so without this a "restart" would carry a stale ENet
         // connection into the fresh scene. After leaveSession the reload comes up single-player.
@@ -269,6 +274,8 @@ public class GameManager extends Node {
                 net.sendBaselineInventories(peerId);
                 // Occupied vehicles after spawns — the seated body must exist first (N3).
                 net.sendBaselineVehicleOccupancy(peerId);
+                // Runtime faction-relationship flips (per-character factions ride sendBaselineSpawns).
+                net.sendBaselineFactionRelationships(peerId);
             }
             return;
         }
@@ -283,6 +290,7 @@ public class GameManager extends Node {
             net.sendBaselinePickups(peerId);
             net.sendBaselineInventories(peerId);   // after spawns + pickups — see rejoin branch
             net.sendBaselineVehicleOccupancy(peerId);   // occupied vehicles after spawns (N3)
+            net.sendBaselineFactionRelationships(peerId);   // runtime relationship flips (D3)
         }
         spawnPlayerBody(peerId, persistentPlayerId);
     }
@@ -297,6 +305,11 @@ public class GameManager extends Node {
     private NetworkManager getNetworkManager() {
         Node node = getNodeOrNull("/root/NetworkManager");
         return node instanceof NetworkManager net ? net : null;
+    }
+
+    private com.openworld.character.FactionManager getFactionManager() {
+        Node node = getNodeOrNull("/root/FactionManager");
+        return node instanceof com.openworld.character.FactionManager fm ? fm : null;
     }
 
     private Node resolveCharactersContainer() {
@@ -794,6 +807,12 @@ public class GameManager extends Node {
     /** Mission failed — key = missionId, args = [reason]. */
     public static final int WORLD_EVENT_MISSION_FAILED = 5;
 
+    /** Runtime faction-relationship flip (D3) — key = factionA, args = [factionB, relationship]. Host FactionManager.setRelationship broadcasts; clients re-apply. */
+    public static final int WORLD_EVENT_FACTION_RELATIONSHIP = 6;
+
+    /** Runtime per-character faction swap (D3) — key = characterId, args = [faction]. Host Character.setFaction broadcasts; clients re-apply. */
+    public static final int WORLD_EVENT_FACTION_SWAP = 7;
+
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         switch (eventType) {
@@ -802,6 +821,8 @@ public class GameManager extends Node {
             case WORLD_EVENT_MISSION_STARTED -> applyMissionStarted(key, args);
             case WORLD_EVENT_MISSION_COMPLETED -> applyMissionCompleted(key, args);
             case WORLD_EVENT_MISSION_FAILED -> applyMissionFailed(key, args);
+            case WORLD_EVENT_FACTION_RELATIONSHIP -> applyFactionRelationship(key, args);
+            case WORLD_EVENT_FACTION_SWAP -> applyCharacterFaction(key, args);
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }
@@ -830,6 +851,20 @@ public class GameManager extends Node {
     private void applyMissionFailed(String missionId, java.util.List<String> args) {
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.missionFailed.emit(missionId, arg(args, 0));
+    }
+
+    /** Client-side: mirror a host faction-relationship flip onto this peer's FactionManager (D3). */
+    private void applyFactionRelationship(String factionA, java.util.List<String> args) {
+        com.openworld.character.FactionManager factions = getFactionManager();
+        // No re-broadcast: FactionManager.setRelationship gates its broadcast on isServer().
+        if (factions != null) factions.setRelationship(factionA, arg(args, 0), arg(args, 1));
+    }
+
+    /** Client-side: mirror a host per-character faction swap (D3). Re-targeting follows on the next AI scan. */
+    private void applyCharacterFaction(String characterId, java.util.List<String> args) {
+        Character character = findCharacterById(characterId);
+        // No re-broadcast: Character.setFaction gates its broadcast on isServer().
+        if (character != null) character.setFaction(arg(args, 0));
     }
 
     /**

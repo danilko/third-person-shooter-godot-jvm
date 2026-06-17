@@ -34,8 +34,9 @@ src/main/java/com/openworld/
   character/      # character bodies + visuals + data: Character (gatherInput/applyInput loop),
                   #   Player, AICharacter, Health, AnimationController, CharacterInfo,
                   #   CharacterVisuals, CharacterNameplate, MeshConfig, CharacterRagdoll,
-                  #   CharacterDriveState, CharacterReplication, Faction
-  ai/             # AI brain + FSM: AIController, AIState (base), AIBehaviorConfig
+                  #   CharacterDriveState, CharacterReplication, Faction, FactionManager (AutoLoad),
+                  #   FactionTable (relationship matrix Resource)
+  ai/             # AI brain + FSM: AIController, AIState (base), AIBehaviorConfig, AILodLevel
     character/    #   7 behaviour states: Patrol/Chase/Attack/Search/RefillAmmo/Escort/Flee
     vehicle/      #   VehicleAIController (reserved for future vehicle AI states)
   control/        # controller framework + input: Controllable, Controller, CharacterController,
@@ -47,11 +48,12 @@ src/main/java/com/openworld/
                   #   WeaponAction, WeaponType, WeaponSlotType, FirearmItem, Melee/Knife/Axe/Fist,
                   #   ThrowableItem, ProjectileItem, RocketProjectile, T1Projectile, Detonatable,
                   #   IconRegistry
-  world/          # world types: HitInfo, HittableBody, SurfaceType
+  world/          # world types: HitInfo, HittableBody, SurfaceType, SpatialEntityGrid (AutoLoad)
     manager/      #   world-level singleton systems: Impact/Particle/Decal/Explosion/BulletTracer
   item/           # Pickup (RigidBody3D base for world pickups), AmmoRefill station
   carrier/vehicle/ # Vehicle, VehicleWheel, VehicleConfig, VehicleWeaponMode
-  game/           # EventBus (AutoLoad signals), GameManager (PLAYING/PAUSED/GAME_OVER FSM)
+  game/           # EventBus (AutoLoad signals), GameManager (PLAYING/PAUSED/GAME_OVER FSM),
+                  #   PlayerRegistry (AutoLoad — live Player list for AI LOD)
     mission/      #   MissionInfo, MissionManager, MissionObjectiveType
   net/            # NetworkManager (AutoLoad RPC), NetMessageCodec, NetworkController,
                   #   VehicleNetworkController, snapshot interpolators, policies, NetStats, Vec3/Quat
@@ -67,7 +69,8 @@ src/test/java/com/openworld/net/   # headless unit tests for the engine-free net
 ```
 
 > AutoLoads (`project.godot`): `EventBus`, `GameManager` (`game`), `MissionManager`
-> (`game.mission`), `NetworkManager` (`net`).
+> (`game.mission`), `NetworkManager` (`net`), `PlayerRegistry` (`game`), `SpatialEntityGrid`
+> (`world`), `FactionManager` (`character`).
 
 ---
 
@@ -133,6 +136,69 @@ mouse-intent `pitch/yaw` so recovery never fights aim. `recoilPitch` is **subtra
 (`recoilPitch -= pitchKick`) because negative pitch = look up in Godot's convention.
 `recoilRecoverySpeed = 8.0` gives a snappy per-shot kick that clears in ~0.3 s; sustained fire
 builds a learnable upward drift (~1.7° at full spray) rather than a persistent offset.
+
+---
+
+## Performance Foundation (Part D)
+
+Drop-in accelerators that change nothing visually. Each degrades gracefully if its AutoLoad is
+absent (test scenes), so they are safe to rely on but never required for correctness.
+
+### Spatial partitioning — SpatialEntityGrid (`com.openworld.world`, AutoLoad, D1)
+
+Uniform XZ spatial hash (`cellSize` exported, 50 m). `Character` and `Vehicle` (both in the
+"characters" group) `register()` in `_ready()`, re-bucket via a throttled `updateSpatialCell()`
+(0.25 s) called at the **top of `_physicsProcess`, before the non-authority early return** — so
+puppet bodies (e.g. remote players on the host) keep their cell current too — and `unregister()`
+in `_exitTree()`. `AICharacter.discoverTarget()` calls `queryRadius(pos, detectionRange)` instead of
+`getNodesInGroup("characters")`, falling back to the group scan when `SpatialEntityGrid.get()` is
+null. Reached via a JVM-static `get()`; all maps + the static are cleared in `_exitTree()`
+(leak discipline).
+
+### AI level-of-detail — AILodLevel (`com.openworld.ai`, D2)
+
+`AICharacter` carries an `AILodLevel { ACTIVE, PASSIVE, FROZEN }` set every 2 s from
+`nearestPlayerDist()` (which now iterates `PlayerRegistry`, not the group): `< 80 m ACTIVE`,
+`80–200 m PASSIVE`, `> 200 m FROZEN`.
+- **FROZEN** — `AICharacter._physicsProcess` returns before `super` (whole FSM + animation tick
+  skipped). MovementController, a separate node, still decelerates the body to rest.
+- **PASSIVE** — `AIController.gatherInput` returns a hold-heading command (no NavAgent / FSM /
+  aim), and `AnimationController._physicsProcess` skips **all AnimationTree writes** when
+  `getLodLevel() != ACTIVE` — those JVM-bridge calls are the dominant per-AI cost, so this is the
+  real mid-range win.
+- Returning to ACTIVE from any non-ACTIVE tier clears stale nav/search state.
+`isLodFrozen()` is kept as a back-compat shorthand for `lodLevel == FROZEN`.
+
+### Faction relationships — FactionManager / FactionTable (`com.openworld.character`, D3)
+
+`Faction.areHostile()` is a **thin delegate** to the `FactionManager` AutoLoad (registered via
+`Faction.setRegistry`), so **all call-sites stay unchanged** and there is no duplicated rule.
+`FactionManager.areHostile()` is the single owner of the logic: NEUTRAL is never hostile → an
+explicit `FactionTable` entry wins (`HOSTILE/DESPISE` → hostile) → otherwise the inherent default
+(same faction allied, different factions hostile). The table (`DefaultFactions.tres`, a flat
+`Dictionary<String,String>` keyed `"a>b"`) only needs **overrides** of that default — it ships just
+the editable `player↔enemy = HOSTILE` rows. `setRelationship(a,b,rel)` flips a relationship at
+runtime (mission betrayals; required before Part F). With no registry loaded (engine-free tests)
+`Faction.areHostile()` returns false.
+
+#### Multi-faction & runtime changes (high-level — details will firm up with Part F mission state)
+
+Factions are arbitrary strings on `CharacterInfo.faction`, resolved fresh every target scan, so any
+number of parties works with **no code change** — author a `FactionTable` (`.tres`) with only the
+pairs that *differ* from the default (different faction ⇒ hostile, same ⇒ allied, `"neutral"` ⇒
+never fights). Two runtime levers, both **host-authoritative and replicated** over the world-event
+seam (`WORLD_EVENT_FACTION_*`):
+- `FactionManager.setRelationship(a, b, rel)` — flip a whole party relationship (the betrayal beat).
+- `Character.setFaction(s)` — swap one character's allegiance (e.g. a cornered NPC turning hostile).
+
+Use these setters, **not** a raw `characterInfo.faction = …` write, so the change syncs to clients
+(and rides the late-join baseline). **Lifetime:** the live table is a `duplicate()` of the shipped
+`.tres`, and `FactionManager` is an AutoLoad, so a flip persists across scenes/missions until
+`FactionManager.reset()` restores defaults (already called on full restart in
+`GameManager.restartLevel`; call it at mission end for per-mission scope — auto-scoping belongs with
+Part F). Behaviours that *react* to factions (a bystander fleeing when a fight erupts, corner
+detection that triggers a swap) are AI-perception features not built yet — they'll land with Part E2
+`StimulusManager` / the AI FSM.
 
 ---
 
@@ -393,6 +459,12 @@ AI input is world-space (set directly by the AI FSM).
 - `AICharacter.onDied()` must set `isDead = true` **before** calling `super.onDied()` (which stops
   physics processing). If `isDead` is not set first, `gatherInput` can still run on the
   same frame via a pending physics callback.
+- **Do not export a nested/raw generic `Dictionary` from a `@RegisterClass`** (e.g.
+  `@Export Dictionary<String, Dictionary>`). The godot-kotlin-jvm `classGraphSymbolsProcess`
+  registration scanner chokes on the raw nested type parameter and dies with `Java heap space` /
+  `Requested array size exceeds VM limit` (NOT a real memory shortage — bumping `org.gradle.jvmargs`
+  does not help). Use a flat `Dictionary<String, String>` (compose keys, e.g. `"a>b"`) — the shape
+  the codebase already uses (`MeshConfig.boneHitMultipliers`). This bit `FactionTable` (D3).
 - `AimStayTimer` in `PlayerController.gatherInput`: uses `isActionJustReleased` (not `isActionPressed`)
   to start the timer so it starts exactly once and doesn't restart every frame after it ends.
 - `WeaponController.onWeaponFire` saves and restores `aimRay3D` rotation when applying spread;

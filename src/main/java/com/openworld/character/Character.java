@@ -39,6 +39,7 @@ import com.openworld.ui.HUDManager;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 import com.openworld.weapon.WeaponType;
+import com.openworld.world.SpatialEntityGrid;
 import com.openworld.world.manager.ExplosionManager;
 import com.openworld.world.manager.ImpactManager;
 
@@ -223,6 +224,12 @@ public class Character extends CharacterBody3D implements Controllable {
         if (characterInfo.characterId.isEmpty())
             characterInfo.characterId = UUID.randomUUID().toString();
         addToGroup(new StringName("characters"), false);
+        // Register in the spatial grid so AI target discovery can query neighbours in O(k)
+        // instead of scanning the whole "characters" group (PLAN.md Part D / D1). Stagger the
+        // first re-bucket so bodies spawned together don't all update on the same frame.
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.register(this, getGlobalPosition());
+        gridUpdateTimer = GD.randfRange(0f, (float) GRID_UPDATE_INTERVAL);
         if (hasNode(aimTargetPath)) {
             aimTarget = (Marker3D) getNode(aimTargetPath);
         }
@@ -450,10 +457,35 @@ public class Character extends CharacterBody3D implements Controllable {
         return currentMovementType != null ? currentMovementType.ordinal() : 0;
     }
 
+    /** Current movement direction — read by AIController to build a PASSIVE-tier hold-heading command. */
+    public Vector3 getMovementDirection() { return movementDirection; }
+
+    /** Current movement type — read by AIController to build a PASSIVE-tier hold-heading command. */
+    public MovementType getCurrentMovementType() { return currentMovementType; }
+
+    // ── Spatial grid bookkeeping (PLAN.md Part D / D1) ───────────────────────
+    private static final double GRID_UPDATE_INTERVAL = 0.25;
+    private double gridUpdateTimer = 0.0;
+
+    /**
+     * Throttled spatial-grid re-bucket. Cheap (a map lookup) while the body stays in its cell;
+     * only an actual cell crossing re-hashes. Called from {@link #_physicsProcess} BEFORE the
+     * non-authority early return so puppet bodies (NetworkController, e.g. remote players on the
+     * host) keep their grid cell current too — host AI must be able to find them.
+     */
+    protected void updateSpatialCell(double delta) {
+        gridUpdateTimer -= delta;
+        if (gridUpdateTimer > 0.0) return;
+        gridUpdateTimer = GRID_UPDATE_INTERVAL;
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.move(this, getGlobalPosition());
+    }
+
     // ── Physics loop: gather → apply ─────────────────────────────────────────
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
+        updateSpatialCell(delta);
         UserCommand cmd;
         if (controller != null) {
             if (!controller.isAuthority()) return; // non-authority: state arrives via MSG_SNAPSHOT — see NetworkController
@@ -473,6 +505,14 @@ public class Character extends CharacterBody3D implements Controllable {
     @Override
     public void _process(double delta) {
         ragdoll.tickFreeze(delta);
+    }
+
+    /** Drop out of the spatial grid when this body leaves the tree (death/despawn). */
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.unregister(this);
     }
 
     /** Fallback input path when no Controller child is present. Returns empty command. */
@@ -723,6 +763,24 @@ public class Character extends CharacterBody3D implements Controllable {
     @Override
     public CharacterInfo getCharacterInfo() {
         return characterInfo;
+    }
+
+    /**
+     * Host-authoritative runtime faction change (D3). Updates this body's faction and, on a
+     * networked host, replicates it so every client re-targets identically — target discovery reads
+     * {@code characterInfo.faction} fresh each scan, so the change takes effect on the next scan.
+     * A client applying an inbound swap (GameManager.applyCharacterFaction) calls this too, but the
+     * {@code isServer()} gate stops it echoing back. (Nameplate tint is set at spawn and is not
+     * re-applied here — cosmetic, out of scope.)
+     */
+    public void setFaction(String faction) {
+        if (characterInfo == null || faction == null) return;
+        characterInfo.faction = faction;
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (netNode instanceof com.openworld.net.NetworkManager net && net.isNetworked() && net.isServer()) {
+            net.broadcastWorldEvent(com.openworld.game.GameManager.WORLD_EVENT_FACTION_SWAP,
+                    characterInfo.characterId, 0f, java.util.List.of(faction));
+        }
     }
 
     /** The controller currently driving this body — null only before _ready() resolves it. */

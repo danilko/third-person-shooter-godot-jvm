@@ -2,6 +2,7 @@ package com.openworld.carrier.vehicle;
 
 import com.openworld.character.*;
 import com.openworld.character.Character;
+import com.openworld.world.SpatialEntityGrid;
 import com.openworld.world.manager.ExplosionManager;
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
@@ -127,6 +128,11 @@ public class Vehicle extends RigidBody3D implements Controllable {
             }
         }
         addToGroup(new StringName("characters"), false);
+        // Register in the spatial grid so AI target discovery finds vehicle occupants in O(k)
+        // (PLAN.md Part D / D1). Stagger the first re-bucket like Character does.
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.register(this, getGlobalPosition());
+        gridUpdateTimer = GD.randfRange(0f, (float) GRID_UPDATE_INTERVAL);
         setContactMonitor(true);
         setMaxContactsReported(8);
 
@@ -225,9 +231,31 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     // ── Physics ───────────────────────────────────────────────────────────────
 
+    // ── Spatial grid bookkeeping (PLAN.md Part D / D1) ───────────────────────
+    private static final double GRID_UPDATE_INTERVAL = 0.25;
+    private double gridUpdateTimer = 0.0;
+
+    /** Throttled spatial-grid re-bucket — mirrors {@code Character.updateSpatialCell}. */
+    private void updateSpatialCell(double delta) {
+        gridUpdateTimer -= delta;
+        if (gridUpdateTimer > 0.0) return;
+        gridUpdateTimer = GRID_UPDATE_INTERVAL;
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.move(this, getGlobalPosition());
+    }
+
+    /** Drop out of the spatial grid when the vehicle leaves the tree (destroyed/despawned). */
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.unregister(this);
+    }
+
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
+        updateSpatialCell(delta);
         boolean isGrounded = false;
 
         cmd.motor     = 0;

@@ -13,6 +13,7 @@ import godot.core.StringNames;
 import godot.core.Vector3;
 import com.openworld.ai.AIBehaviorConfig;
 import com.openworld.ai.AIController;
+import com.openworld.ai.AILodLevel;
 import com.openworld.ai.character.AttackState;
 import com.openworld.ai.character.EscortState;
 import com.openworld.ai.character.FleeState;
@@ -21,11 +22,13 @@ import com.openworld.camera.AICameraController;
 import com.openworld.control.CharacterController;
 import com.openworld.control.Controller;
 import com.openworld.control.UserCommand;
+import com.openworld.game.PlayerRegistry;
 import com.openworld.movement.character.MovementController;
 import com.openworld.movement.character.MovementType;
 import com.openworld.movement.character.StanceName;
 import com.openworld.weapon.WeaponItem;
 import com.openworld.weapon.WeaponType;
+import com.openworld.world.SpatialEntityGrid;
 
 /**
  * AI-controlled character body — hardware and sensing only.
@@ -78,15 +81,30 @@ public class AICharacter extends Character {
     private static final double     TARGET_SCAN_INTERVAL = 0.4;
     private static final double     LOS_CACHE_INTERVAL   = 0.05;
 
-    // ── Lightweight LOD ───────────────────────────────────────────────────────
-    // AIs beyond LOD_FREEZE_DIST from all players skip their entire FSM + animation
-    // tick (Character._physicsProcess is not called). MovementController still runs
-    // as a separate node, decelerating the AI to rest and holding its last pose.
+    // ── Distance-based LOD (PLAN.md Part D / D2) ──────────────────────────────
+    // Re-evaluated on the ~2 s lodTimer from nearestPlayerDist():
+    //   ACTIVE  (< 80 m)   full FSM + NavAgent + AnimationTree.
+    //   PASSIVE (80–200 m) simplified tick: no pathfinding / no FSM transitions (AIController
+    //                      returns a hold-heading command) and no AnimationTree writes
+    //                      (AnimationController holds the last pose).
+    //   FROZEN  (> 200 m)  Character._physicsProcess is skipped entirely. MovementController
+    //                      still runs as a separate node, decelerating the AI to rest.
+    private static final float LOD_ACTIVE_DIST = 80.0f;
     private static final float LOD_FREEZE_DIST = 200.0f;
-    private double  lodTimer  = 0.0;
-    private boolean lodFrozen = false;
+    private double      lodTimer = 0.0;
+    private AILodLevel  lodLevel = AILodLevel.ACTIVE;
 
-    public boolean isLodFrozen() { return lodFrozen; }
+    /** Current LOD tier — read by AIController (FSM gating) and AnimationController (pose gating). */
+    public AILodLevel getLodLevel() { return lodLevel; }
+
+    /** Back-compat shorthand: kept so existing FROZEN-only callers keep working. */
+    public boolean isLodFrozen() { return lodLevel == AILodLevel.FROZEN; }
+
+    private AILodLevel classifyLod(float nearestPlayer) {
+        if (nearestPlayer > LOD_FREEZE_DIST) return AILodLevel.FROZEN;
+        if (nearestPlayer > LOD_ACTIVE_DIST) return AILodLevel.PASSIVE;
+        return AILodLevel.ACTIVE;
+    }
 
     // ── Movement-state dedup (Perf 3) ─────────────────────────────────────────
     // Prevents Character.setMovementState emitting changedMovementState every frame
@@ -197,27 +215,35 @@ public class AICharacter extends Character {
         lodTimer -= delta;
         if (lodTimer <= 0.0) {
             lodTimer = 2.0;
-            boolean shouldFreeze = nearestPlayerDist() > LOD_FREEZE_DIST;
-            if (shouldFreeze != lodFrozen) {
-                lodFrozen = shouldFreeze;
-                if (!lodFrozen && controller instanceof AIController ai) {
-                    // Unfreeze: clear stale nav/search state so AI doesn't resume mid-lunge.
+            AILodLevel next = classifyLod(nearestPlayerDist());
+            if (next != lodLevel) {
+                AILodLevel prev = lodLevel;
+                lodLevel = next;
+                // Returning to ACTIVE from a tier that didn't run the FSM (FROZEN skips it, PASSIVE
+                // holds heading without it): clear stale nav/search state so the AI re-plans from
+                // its current position instead of resuming a mid-lunge nav target.
+                if (next == AILodLevel.ACTIVE && prev != AILodLevel.ACTIVE
+                        && controller instanceof AIController ai) {
                     ai.clearNavTarget();
                     ai.resetSearchTimer();
                 }
             }
         }
-        if (lodFrozen) return;  // skip entire FSM + animation tick
+        if (lodLevel == AILodLevel.FROZEN) return;  // skip entire FSM + animation tick
+        // PASSIVE: super still runs, but AIController.gatherInput returns a hold-heading command
+        // (no NavAgent / FSM) and AnimationController skips its AnimationTree writes.
         super._physicsProcess(delta);
     }
 
     private float nearestPlayerDist() {
         float min = Float.MAX_VALUE;
-        for (Node n : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
-            if (n instanceof Player p) {
-                float d = (float) getGlobalPosition().distanceTo(p.getGlobalPosition());
-                if (d < min) min = d;
-            }
+        Vector3 myPos = getGlobalPosition();
+        // O(playerCount) via PlayerRegistry instead of an O(characterCount) group scan +
+        // instanceof filter (PLAN.md Part D pre-D1 quick win).
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (!godot.global.GD.isInstanceValid(p)) continue;  // defensive: list holds in-tree bodies
+            float d = (float) myPos.distanceTo(p.getGlobalPosition());
+            if (d < min) min = d;
         }
         return min;  // Float.MAX_VALUE if no players in scene → freeze
     }
@@ -242,41 +268,68 @@ public class AICharacter extends Character {
      * Null-faction characters (characterInfo == null or faction == null) are treated
      * as opponents so AI always attacks unknown combatants.
      */
+    // Scratch list reused across discoverTarget() scans so a grid query allocates nothing per call.
+    private final java.util.List<Node> targetQueryScratch = new java.util.ArrayList<>();
+    // Set by evaluateCandidate() as an out-param alongside its return value (single-threaded).
+    private float candidateDist;
+
     private Character discoverTarget() {
         String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
         float closestDist = Float.MAX_VALUE;
         Character closest = null;
+        Vector3 myPos = getGlobalPosition();
 
-        for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
-            Character candidate = null;
-            float dist = Float.MAX_VALUE;
-
-            if (node instanceof Character c) {
-                if (c == this || !c.isAlive()) continue;
-                // Unknown faction → treated as opponent (empty string is hostile to all named factions).
-                String tf = (c.characterInfo != null && c.characterInfo.faction != null)
-                        ? c.characterInfo.faction : "";
-                if (!Faction.areHostile(myFaction, tf)) continue;
-                if (c.currentVehicleNode != null) continue;   // vehicle entry handles this
-                dist      = (float) getGlobalPosition().distanceTo(c.getGlobalPosition());
-                candidate = c;
-
-            } else if (node instanceof Vehicle v) {
-                Character occ = v.getOccupant();
-                if (occ == null || !occ.isAlive() || !v.isAlive()) continue;
-                String tf = (occ.characterInfo != null && occ.characterInfo.faction != null)
-                        ? occ.characterInfo.faction : "";
-                if (!Faction.areHostile(myFaction, tf)) continue;
-                dist      = (float) getGlobalPosition().distanceTo(v.getGlobalPosition());
-                candidate = occ;
+        // D1: query only the cells overlapping the detection circle instead of the whole
+        // "characters" group. Falls back to the group scan when the grid AutoLoad is absent
+        // (e.g. minimal test scenes) so behaviour is identical, just slower, without it.
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) {
+            grid.queryRadius(myPos, getBehaviorConfig().detectionRange, targetQueryScratch);
+            for (Node node : targetQueryScratch) {
+                Character candidate = evaluateCandidate(node, myFaction, myPos);
+                if (candidate != null && candidateDist < closestDist) {
+                    closestDist = candidateDist;
+                    closest     = candidate;
+                }
             }
-
-            if (candidate != null && dist < closestDist) {
-                closestDist = dist;
-                closest     = candidate;
+        } else {
+            for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
+                Character candidate = evaluateCandidate(node, myFaction, myPos);
+                if (candidate != null && candidateDist < closestDist) {
+                    closestDist = candidateDist;
+                    closest     = candidate;
+                }
             }
         }
         return closest;
+    }
+
+    /**
+     * Returns the targetable Character for a candidate node — the node itself for an on-foot
+     * Character, or the occupant for a Vehicle — when it is a live hostile, else null. On a hit,
+     * {@link #candidateDist} is set to the distance used for nearest-selection (vehicle distance is
+     * measured to the vehicle, matching the prior behaviour).
+     */
+    private Character evaluateCandidate(Node node, String myFaction, Vector3 myPos) {
+        if (node instanceof Character c) {
+            if (c == this || !c.isAlive()) return null;
+            // Unknown faction → treated as opponent (empty string is hostile to all named factions).
+            String tf = (c.characterInfo != null && c.characterInfo.faction != null)
+                    ? c.characterInfo.faction : "";
+            if (!Faction.areHostile(myFaction, tf)) return null;
+            if (c.currentVehicleNode != null) return null;   // vehicle entry handles this
+            candidateDist = (float) myPos.distanceTo(c.getGlobalPosition());
+            return c;
+        } else if (node instanceof Vehicle v) {
+            Character occ = v.getOccupant();
+            if (occ == null || !occ.isAlive() || !v.isAlive()) return null;
+            String tf = (occ.characterInfo != null && occ.characterInfo.faction != null)
+                    ? occ.characterInfo.faction : "";
+            if (!Faction.areHostile(myFaction, tf)) return null;
+            candidateDist = (float) myPos.distanceTo(v.getGlobalPosition());
+            return occ;
+        }
+        return null;
     }
 
     /**
