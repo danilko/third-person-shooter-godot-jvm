@@ -124,12 +124,12 @@ public class Character extends CharacterBody3D implements Controllable {
     protected boolean useWeaponSpread = true;
 
     // ── Vehicle / drive state ─────────────────────────────────────────────────
+    // The outward-visible flags stay here (NetworkController/NetworkManager read them); the
+    // transition logic + pre-drive snapshot live in CharacterDriveState (WS5 god-class split).
     public VehicleWeaponMode vehicleWeaponMode = VehicleWeaponMode.NONE;
     /** The Vehicle RigidBody3D this character is currently riding, or null when on foot. */
     public Node currentVehicleNode = null;
-    private StanceName preDriveStance    = StanceName.UPRIGHT;
-    private boolean    preDriveCombat    = false;
-    private Vector3    preDriveRotation  = Vector3.Companion.getZERO();
+    final CharacterDriveState driveState = new CharacterDriveState(this);
 
     // ── Combat/stance state (read by NetworkManager._physicsProcess for MSG_SNAPSHOT gather,
     // applied on remote peers via applyReplicatedCombatAndStance — see NetworkController) ──
@@ -162,22 +162,27 @@ public class Character extends CharacterBody3D implements Controllable {
     protected CharacterVisuals visualsInstance;
     protected MeshConfig meshConfig;
 
-    // ── Ragdoll freeze state ──────────────────────────────────────────────────
-    private double  ragdollFreezeCountdown = -1.0;
-    private boolean ragdollFrozen          = false;
+    // ── Ragdoll + death visuals (extracted to CharacterRagdoll — WS5 god-class split) ──
+    // The settle-timer state lives in the collaborator; _process pumps it via tickFreeze.
+    final CharacterRagdoll ragdoll = new CharacterRagdoll(this);
     // Guards the death visuals (anim-tree off + ragdoll) so they run exactly once, whether the
     // body died authoritatively (onDied) or via a replicated zero-health snapshot (applyReplicatedDeath).
-    // Protected: Player.applyReplicatedDeath keys its once-only playerDied emission off it.
+    // Protected: Player.applyReplicatedDeath keys its once-only playerDied emission off it;
+    // CharacterRagdoll (same package) reads/sets it from enableDeathVisuals.
     protected boolean deathVisualsApplied  = false;
 
     // ── Stance cache — populated once in _ready() to avoid repeated NodePath traversals ──
-    private final Map<StanceName, Stance> stanceCache = new EnumMap<>(StanceName.class);
+    // Package-private: CharacterRagdoll reads it to drop the active stance collider on death.
+    final Map<StanceName, Stance> stanceCache = new EnumMap<>(StanceName.class);
 
     // ── Tick counter (stamped onto every UserCommand for network ordering) ─────
     protected long currentTick = 0;
 
     // ── Controller (generates UserCommand each tick) ──────────────────────────
     protected Controller controller;
+
+    // ── Non-authority replication writes (extracted to CharacterReplication — WS5 god-class split) ──
+    final CharacterReplication replication = new CharacterReplication(this);
 
     // ── UI input lock (set by radial menu / pause / any overlay that must own the mouse) ──
     public boolean inputBlocked = false;
@@ -440,9 +445,7 @@ public class Character extends CharacterBody3D implements Controllable {
     @RegisterFunction
     @Override
     public void _process(double delta) {
-        if (ragdollFreezeCountdown <= 0) return;
-        ragdollFreezeCountdown -= delta;
-        if (ragdollFreezeCountdown <= 0) freezeRagdoll();
+        ragdoll.tickFreeze(delta);
     }
 
     /** Fallback input path when no Controller child is present. Returns empty command. */
@@ -538,85 +541,42 @@ public class Character extends CharacterBody3D implements Controllable {
         changedCombatState.emit(combatStates.get(resolveCombatKey(null)));
     }
 
-    // ── Replication apply (non-authority — driven by NetworkController from MSG_SNAPSHOT) ──
+    // ── Replication apply (bodies extracted to CharacterReplication — WS5 god-class split) ──
     //
-    // Non-authority bodies never run gatherInput/applyInput/physics (see the early
-    // return in _physicsProcess above), so these are the only writes their transform/
-    // combat/stance state ever receive. Position/velocity are written every frame by
-    // the interpolator; combat/stance are discrete and applied once per snapshot.
+    // Non-authority bodies never run gatherInput/applyInput/physics (see the early return in
+    // _physicsProcess above), so these are the only writes their transform/combat/stance state
+    // ever receive. NetworkController calls these each frame; the implementations live in
+    // CharacterReplication. Position/velocity are written every frame by the interpolator;
+    // combat/stance are discrete and applied once per snapshot.
 
     /** Direct transform write — safe outside _physicsProcess because non-authority bodies never run move_and_slide. */
     public void applyReplicatedTransform(Vector3 position, Vector3 velocity) {
-        setGlobalPosition(position);
-        setVelocity(velocity);
+        replication.applyTransform(position, velocity);
     }
 
-    /**
-     * Direct mesh-facing write — counterpart to {@link #getFacingYaw()}. Sets only
-     * meshRoot's Y rotation, preserving whatever X/Z it already has (mirrors how
-     * MovementController itself only ever rewrites Y — see MovementController's
-     * `setRotation(new Vector3(currentRot.getX(), newY, currentRot.getZ()))`).
-     */
+    /** Direct mesh-facing write — counterpart to {@link #getFacingYaw()}. */
     public void applyReplicatedFacing(float yaw) {
-        Node mcNode = getNodeOrNull("MovementController");
-        if (!(mcNode instanceof MovementController mc) || mc.meshRoot == null) return;
-        Vector3 rot = mc.meshRoot.getRotation();
-        float localY = yaw - (float) getRotation().getY();
-        mc.meshRoot.setRotation(new Vector3(rot.getX(), localY, rot.getZ()));
+        replication.applyFacing(yaw);
     }
 
-    /** Direct spine-IK look write — moves the aimTarget marker the LookAtModifier3D tracks, so a puppet's upper body aims where the owner looks (counterpart to {@link #getAimTargetPosition()}). */
+    /** Direct spine-IK look write — counterpart to {@link #getAimTargetPosition()}. */
     public void applyReplicatedAim(Vector3 aimPosition) {
-        if (aimTarget != null && aimPosition != null) aimTarget.setGlobalPosition(aimPosition);
+        replication.applyAim(aimPosition);
     }
 
-    /**
-     * Drives the locomotion blend on a non-authority body from replicated motion. applyInput never
-     * runs on a puppet, so {@code changed_movement_direction} / {@code set_cam_rotation} never fire
-     * for it — without this the AnimationController's walk/strafe blend stays frozen (the "AI
-     * animation not synced" bug). Movement direction is derived from the interpolated horizontal
-     * velocity (the same world-space convention the owner's own signal carries); facing yaw is pushed
-     * in as camRotation so the combat strafe blend rotates correctly. Movement *type* (walk vs sprint)
-     * is applied separately and discretely via {@link #applyReplicatedMovementType(int)}.
-     */
+    /** Drives the locomotion blend on a non-authority body from replicated motion. */
     public void applyReplicatedLocomotion(Vector3 velocity, double yaw) {
-        Vector3 flat = new Vector3(velocity.getX(), 0, velocity.getZ());
-        if (flat.lengthSquared() > 0.01) {
-            movementDirection = flat.normalized();
-            changedMovementDirection.emit(movementDirection);
-        } else if (movementDirection.lengthSquared() > 0.0) {
-            // Velocity has settled to ~0: collapse the strafe direction to idle exactly once,
-            // instead of holding the last non-zero lean (the "stuck mid-stride" look after a
-            // remote body stops). The walk/idle blend itself is driven by the discrete
-            // movementType (applyReplicatedMovementType); this clears the combat strafe lean.
-            movementDirection = Vector3.Companion.getZERO();
-            changedMovementDirection.emit(movementDirection);
-        }
-        Node acNode = getNodeOrNull("AnimationController");
-        if (acNode instanceof AnimationController ac) ac.onSetCamRotation(yaw);
+        replication.applyLocomotion(velocity, yaw);
     }
 
-    /** Applies a replicated movement type (IDLE/WALK/SPRINT) on a puppet — emits changed_movement_state so the blend speed/pose updates exactly like the local path. */
+    /** Applies a replicated movement type (IDLE/WALK/SPRINT) on a puppet. */
     public void applyReplicatedMovementType(int ordinal) {
-        MovementType[] types = MovementType.values();
-        if (ordinal >= 0 && ordinal < types.length) setMovementState(types[ordinal]);
+        replication.applyMovementType(ordinal);
     }
 
-    /**
-     * Replays the same change-detection + signal cascade applyInput uses for combat/
-     * stance (see the `effectiveCombat != combat` and `setStance` calls below) so the
-     * local-input and replication paths share one "transition into this state" routine
-     * rather than drifting apart over time.
-     */
+    /** Replays the local applyInput combat/stance transition cascade from a replicated snapshot. */
     public void applyReplicatedCombatAndStance(boolean combat, int stanceOrdinal) {
-        if (combat != this.combat) {
-            this.combat = combat;
-            setCombatState();
-        }
-        StanceName[] stances = StanceName.values();
-        if (stanceOrdinal >= 0 && stanceOrdinal < stances.length && stanceOrdinal != currentStanceName.ordinal()) {
-            setStance(stances[stanceOrdinal]);
-        }
+        replication.applyCombatAndStance(combat, stanceOrdinal);
     }
 
     /**
@@ -692,80 +652,24 @@ public class Character extends CharacterBody3D implements Controllable {
         }
     }
 
-    /**
-     * Puts the character into the DRIVE_CARRIER state for the given weapon mode.
-     * Called by {@code Vehicle.tryEnter}.  Handles collision, stance, combat state,
-     * and physics processing — Vehicle only needs to hot-swap the controller after
-     * this returns.
-     */
+    // ── Vehicle drive state (bodies extracted to CharacterDriveState — WS5 god-class split) ──
+
+    /** Puts the character into the DRIVE_CARRIER state for the given weapon mode. Called by {@code Vehicle.tryEnter}. */
     public void enterDriveState(VehicleWeaponMode mode, Node vehicleNode) {
-        preDriveStance    = currentStanceName;
-        preDriveCombat    = combat;
-        preDriveRotation  = getGlobalRotation();
-        vehicleWeaponMode = mode;
-        currentVehicleNode = vehicleNode;
-        setCollisionLayer(0);  // remove from all layers while in vehicle
-        forceSetStance(StanceName.DRIVE_CARRIER);
-        // Reset the MeshRoot local rotation so the mesh aligns with the body.
-        // MovementController normally controls this; since it is disabled the mesh
-        // would otherwise stay at whatever facing angle it had when the player stopped.
-        Node meshRoot = null;
-        if (visualsInstance != null && meshConfig != null && !meshConfig.meshRootPath.isEmpty()) {
-            meshRoot = visualsInstance.getNodeOrNull(meshConfig.meshRootPath);
-        }
-        if (meshRoot == null) meshRoot = getNodeOrNull("MeshRoot");
-        if (meshRoot instanceof Node3D mr) mr.setRotation(Vector3.Companion.getZERO());
-        // Show character weapon for any mode where the vehicle has no weapon of its own.
-        // PASSENGER_WEAPON: character fires their weapon via vehicle camera → must be in combat.
-        // NONE: vehicle has no weapon; character still holds their weapon visually while riding.
-        // VEHICLE_WEAPON: vehicle fires its own weapon; leave the character's combat state as-is.
-        if (mode != VehicleWeaponMode.VEHICLE_WEAPON) {
-            combat = true;
-            setCombatState();
-        }
-        setProcess(false);
-        setPhysicsProcess(false);
-        Node mc = getNodeOrNull("MovementController");
-        if (mc != null) mc.setPhysicsProcess(false);
+        driveState.enter(mode, vehicleNode);
     }
 
-    /**
-     * Restores the character's pre-drive state.
-     * Called by {@code Vehicle.tryExit} before the controller is returned.
-     */
+    /** Restores the character's pre-drive state. Called by {@code Vehicle.tryExit} before the controller is returned. */
     public void exitDriveState() {
-        currentVehicleNode = null;
-        // Restore body rotation so MovementController's playerInitRotation stays valid.
-        setGlobalRotation(preDriveRotation);
-        setCollisionLayer(CollisionLayers.CHARACTER);
-        setProcess(true);
-        setPhysicsProcess(true);
-        Node mc = getNodeOrNull("MovementController");
-        if (mc != null) mc.setPhysicsProcess(true);
-        forceSetStance(preDriveStance);
-        combat = preDriveCombat;
-        setCombatState();
-        vehicleWeaponMode = VehicleWeaponMode.NONE;
+        driveState.exit();
     }
 
     /**
-     * Relays fire/reload commands from the vehicle controller to this character's
-     * weapon system each physics frame.  Only called when
-     * {@code vehicleWeaponMode == PASSENGER_WEAPON}.
-     *
-     * @param fire      true while the fire button is held
-     * @param reload    true on the frame the reload button is just-pressed
-     * @param aimTarget world-space point the vehicle camera is aimed at (unused here;
-     *                  the vehicle already injected its AimRay into WeaponController)
+     * Relays fire/reload commands from the vehicle controller to this character's weapon system
+     * each physics frame. Only called when {@code vehicleWeaponMode == PASSENGER_WEAPON}.
      */
     public void applyPassengerWeaponInput(boolean fire, boolean reload, int desiredWeapon, Vector3 aimTargetPos) {
-        if (aimTargetPos != null && aimTarget != null) {
-            aimTarget.setGlobalPosition(aimTargetPos);
-        }
-        if (fire) fireWeapon.emit();
-        else      notFireWeapon.emit();
-        if (reload) reloadWeapon.emit();
-        if (desiredWeapon >= 0) setWeapon(desiredWeapon);
+        driveState.applyPassengerWeaponInput(fire, reload, desiredWeapon, aimTargetPos);
     }
 
     public void setMovementDirection(Vector3 movementDirection) {
@@ -822,132 +726,20 @@ public class Character extends CharacterBody3D implements Controllable {
         addChild(ctrl);
     }
 
-    // ── Ragdoll ───────────────────────────────────────────────────────────────
-    protected void enableRagdoll() {
-        // Stop Character's own input/apply cycle
-        setPhysicsProcess(false);
-
-        // Stop MovementController — it is a separate Node with its own
-        // _physicsProcess that applies gravity and calls moveAndSlide().
-        // Without this, the CharacterBody3D keeps falling even after death.
-        if (hasNode("MovementController")) {
-            getNode("MovementController").setPhysicsProcess(false);
-        }
-
-        // Disable all CharacterBody3D stance capsules so the frozen corpse
-        // shell doesn't block navigation or other characters.
-        for (int i = 0; i < getChildCount(); i++) {
-            Node child = getChild(i);
-            if (child instanceof CollisionShape3D shape) {
-                shape.setDisabled(true);
-            }
-        }
-
-        if (physicalBoneSimulator == null) {
-            ragdollFrozen = true; // nothing to freeze later
-            return;
-        }
-
-        if (ragdollDuration > 0) {
-            // Simulate ragdoll briefly so the body tumbles naturally, then freeze.
-            for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
-                Node child = physicalBoneSimulator.getChild(i);
-                if (child instanceof PhysicalBone3D bone) {
-                    // Remove dead bones from the hitbox layer so living characters' AimRay
-                    // and LoS rays pass through corpses. Fixes dead bodies blocking
-                    // hasLineOfSight() and performHitscan().
-                    bone.setCollisionLayerValue(CollisionLayers.LAYER_HITBOX, false);
-                    // Add world to mask so ragdoll bones rest on floor geometry.
-                    bone.setCollisionMaskValue(CollisionLayers.LAYER_WORLD, true);
-                }
-            }
-            physicalBoneSimulator.physicalBonesStartSimulation();
-            ragdollFreezeCountdown = ragdollDuration;
-        } else {
-            // ragdollDuration == 0: skip simulation, freeze at animation pose immediately.
-            freezeRagdoll();
-        }
-    }
+    // ── Ragdoll (bodies extracted to CharacterRagdoll — WS5 god-class split) ────
 
     /**
-     * Freezes all ragdoll physics and stops the bone simulator.
-     *
-     * Called automatically after ragdollDuration seconds (via _process), or
-     * immediately when ragdollDuration <= 0. After this:
-     *   - PhysicalBone3D rigid bodies are frozen in place (no gravity, no collision)
-     *   - PhysicalBoneSimulator3D modifier is deactivated
-     *   - Skeleton retains the last bone transforms → mesh stays at the frozen pose
-     *   - No ongoing physics or modifier processing cost
-     */
-    private void freezeRagdoll() {
-        if (ragdollFrozen) return;
-        ragdollFrozen = true;
-        setProcess(false);
-
-        if (physicalBoneSimulator == null) return;
-
-        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
-            Node child = physicalBoneSimulator.getChild(i);
-            if (child instanceof PhysicalBone3D bone) {
-                // Switch from DYNAMIC → STATIC in the physics server.
-                // STATIC bodies are not simulated (no gravity, no velocity integration)
-                // but stay exactly at their current world transform and remain solid
-                // so the corpse rests on the floor rather than falling through it.
-                // This is the same technique used by CS-style engines for settled ragdolls.
-                PhysicsServer3D.bodySetMode(bone.getRid(), PhysicsServer3D.BodyMode.STATIC);
-                // Static bodies don't move so they don't need a collision mask
-                // (they never query what they're touching). Keep the layer so
-                // bullets and characters can still physically interact with the corpse.
-                bone.setCollisionMask(0);
-            }
-        }
-        // Leave the simulator active — it copies the now-static bone world transforms
-        // to the skeleton each frame, keeping the mesh at the frozen ragdoll pose.
-        // Cost is a handful of matrix copies, not physics simulation.
-    }
-
-    // Velocity change per damage point applied to an alive character (m/s per dmg).
-    private static final float ALIVE_HIT_VELOCITY_SCALE = 0.05f;
-    // Impulse magnitude per damage point applied to the hit ragdoll bone (N·s per dmg).
-    private static final float DEATH_BONE_IMPULSE_SCALE = 0.3f;
-
-    /**
-     * Applies a physics response to a bullet hit.
-     *
-     * While alive: adds a small velocity kick in the bullet direction — simulates the
-     * stagger seen in CS/L4D where shots push the target back from the shooter.
-     *
-     * On death: pushes the specific PhysicalBone3D that was struck so the ragdoll
-     * falls away from the shooter. Requires the ragdoll to already be started —
-     * ImpactManager calls this after applyDamage(), by which point the synchronous
-     * died-signal chain has already called enableRagdoll().
-     *
-     * @param hitNode    the node returned by AimRay (typically a PhysicalBone3D)
-     * @param bulletDir  world-space bullet travel direction (hitNormal negated)
-     * @param damage     base damage value used to scale the impulse magnitude
+     * Applies a physics response to a bullet hit — a stagger velocity kick while alive, or a
+     * bone impulse on a started ragdoll. Public surface unchanged for ImpactManager /
+     * ExplosionManager / Vehicle; delegates to {@link CharacterRagdoll}.
      */
     public void applyHitImpulse(Node hitNode, Vector3 bulletDir, float damage) {
-        Vector3 dir = bulletDir.normalized();
-        if (isAlive()) {
-            setVelocity(getVelocity().plus(dir.times(damage * ALIVE_HIT_VELOCITY_SCALE)));
-        } else if (hitNode instanceof PhysicalBone3D bone) {
-            bone.applyCentralImpulse(dir.times(damage * DEATH_BONE_IMPULSE_SCALE));
-        }
+        ragdoll.applyHitImpulse(hitNode, bulletDir, damage);
     }
 
-    /**
-     * Apply a physics impulse to a named bone during ragdoll.
-     * Only has effect when the ragdoll is active (call after enableRagdoll or on death).
-     */
+    /** Apply a physics impulse to a named bone during ragdoll. Delegates to {@link CharacterRagdoll}. */
     public void applyBoneImpulse(String boneName, Vector3 impulse) {
-        if (physicalBoneSimulator == null) return;
-        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
-            Node child = physicalBoneSimulator.getChild(i);
-            if (child instanceof PhysicalBone3D bone && boneName.equalsIgnoreCase(String.valueOf(bone.getName()))) {
-                bone.applyCentralImpulse(impulse);
-                return;
-            }
-        }
+        ragdoll.applyBoneImpulse(boneName, impulse);
     }
 
     public Node3D getCameraRoot() { return cameraRoot; }
@@ -1037,37 +829,11 @@ public class Character extends CharacterBody3D implements Controllable {
     @RegisterFunction
     public void onDied() {
         GD.print(getName() + " died");
-        enableDeathVisuals();
+        ragdoll.enableDeathVisuals();
         // Authority-only side effect: the dropped weapons are the host's authoritative world
         // state. A non-authority puppet (applyReplicatedDeath) must NOT drop, or it would spawn
         // orphan, unsynced pickups on the client.
         if (weaponController != null) weaponController.dropAllWeapons();
-    }
-
-    /**
-     * The visual half of death — disable the AnimationTree, start the ragdoll, and drop the
-     * active stance collider so the corpse settles. Shared by the authoritative {@link #onDied()}
-     * path and the non-authority {@link #applyReplicatedDeath()} path so a replicated corpse looks
-     * identical without re-running authority-only side effects. Idempotent via {@code deathVisualsApplied}.
-     */
-    protected void enableDeathVisuals() {
-        if (deathVisualsApplied) return;
-        deathVisualsApplied = true;
-
-        // Disable animation tree — prefer meshConfig path, fall back to legacy position.
-        AnimationTree animationTree = null;
-        if (visualsInstance != null && meshConfig != null && !meshConfig.animationTreePath.isEmpty()) {
-            Node atNode = visualsInstance.getNodeOrNull(meshConfig.animationTreePath);
-            if (atNode instanceof AnimationTree at) animationTree = at;
-        }
-        if (animationTree == null) animationTree = (AnimationTree) getNodeOrNull("AnimationTree");
-        if (animationTree != null) animationTree.setActive(false);
-
-        enableRagdoll();
-
-        // Disabled current stance to let ragdoll take over
-        Stance s = stanceCache.get(currentStanceName);
-        if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
     }
 
     /**
@@ -1078,6 +844,6 @@ public class Character extends CharacterBody3D implements Controllable {
      * body's transform after calling it, so the ragdoll isn't dragged by further snapshots.
      */
     public void applyReplicatedDeath() {
-        enableDeathVisuals();
+        ragdoll.enableDeathVisuals();
     }
 }
