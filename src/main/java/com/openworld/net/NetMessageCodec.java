@@ -73,11 +73,12 @@ public final class NetMessageCodec {
     public static PackedByteArray encodeSnapshot(int msgType, String characterId, long tick, Vector3 position,
             Vector3 velocity, Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine) {
+            int activeMagazine, int reloadSeq) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         putSnapshotEntry(buf, characterId, tick, position, velocity, aimTarget, combat, stanceOrdinal,
-                activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine);
+                activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine,
+                reloadSeq);
         return buf.getDataArray();
     }
 
@@ -98,12 +99,15 @@ public final class NetMessageCodec {
      * <p>{@code fireSeq} is a rolling per-character shot counter (u8 on the wire). Fire is replicated
      * as STATE, not a separate cosmetic message: a receiver plays the muzzle/tracer cue whenever the
      * counter changes between snapshots. This rides the reliable-cadence snapshot stream instead of a
-     * droppable one-shot MSG_WEAPON_FIRE, so remote shots stay visible.
+     * droppable one-shot MSG_WEAPON_FIRE, so remote shots stay visible. {@code reloadSeq} is the
+     * identical pattern for reloads — a u8 rolling counter so every peer plays the reload animation
+     * (a visible "this character is reloading and can't fire yet" tell), drop-resilient because the
+     * new value persists across snapshots until the next reload.
      */
     public record DecodedSnapshot(String characterId, long tick, Vector3 position, Vector3 velocity,
             Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine) { }
+            int activeMagazine, int reloadSeq) { }
 
     /** One tick's worth of every replicated character's state, sent as a single broadcast frame. */
     public static PackedByteArray encodeSnapshotBatch(int msgType, java.util.List<DecodedSnapshot> entries) {
@@ -113,7 +117,7 @@ public final class NetMessageCodec {
         for (DecodedSnapshot e : entries) {
             putSnapshotEntry(buf, e.characterId(), e.tick(), e.position(), e.velocity(), e.aimTarget(),
                     e.combat(), e.stanceOrdinal(), e.activeSlotIndex(), e.movementTypeOrdinal(),
-                    e.yaw(), e.currentHealth(), e.senderTimeMs(), e.fireSeq(), e.activeMagazine());
+                    e.yaw(), e.currentHealth(), e.senderTimeMs(), e.fireSeq(), e.activeMagazine(), e.reloadSeq());
         }
         return buf.getDataArray();
     }
@@ -129,7 +133,7 @@ public final class NetMessageCodec {
     private static void putSnapshotEntry(StreamPeerBuffer buf, String characterId, long tick, Vector3 position,
             Vector3 velocity, Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine) {
+            int activeMagazine, int reloadSeq) {
         buf.putUtf8String(characterId);
         buf.put64(tick);
         putVector3(buf, position);
@@ -149,6 +153,7 @@ public final class NetMessageCodec {
         // neither a hitscan (MSG_SHOT) nor a pickup/drop event. Applied only to puppets
         // (NetworkController), never the owner's own echo, so the owner stays authoritative.
         buf.put16(Math.max(0, Math.min(0xFFFF, activeMagazine)));
+        buf.put8(reloadSeq & 0xFF);   // rolling reload counter — puppets play the reload anim on change
     }
 
     private static DecodedSnapshot getSnapshotEntry(StreamPeerBuffer buf) {
@@ -167,8 +172,10 @@ public final class NetMessageCodec {
         int senderTimeMs = buf.get32();
         int fireSeq = buf.getU8();
         int activeMagazine = buf.getU16();
+        int reloadSeq = buf.getU8();
         return new DecodedSnapshot(characterId, tick, position, velocity, aimTarget, combat, stanceOrdinal,
-                activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine);
+                activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine,
+                reloadSeq);
     }
 
     // ── MSG_IDENTIFY ──────────────────────────────────────────────────────────

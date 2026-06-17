@@ -85,6 +85,9 @@ public class WeaponController extends Node {
   // Rolling shot counter (u8) replicated in each snapshot — remote peers play the fire cue when it
   // changes (fire-as-state). On a puppet this is set from the wire via setReplicatedFireSeq.
   private int fireSeq = 0;
+  // Rolling reload counter (u8), same pattern as fireSeq — remote peers play the reload animation
+  // when it changes, so a reloading character is visibly reloading on every screen (a tactical tell).
+  private int reloadSeq = 0;
 
   // Weapons queued for equip/drop; processed in _process (idle) to avoid
   // reparenting a RigidBody3D (CollisionObject) during a physics callback.
@@ -480,6 +483,27 @@ public class WeaponController extends Node {
   /** Mirrors the replicated counter onto a puppet so the host re-broadcasts the correct value. */
   public void setReplicatedFireSeq(int seq) { fireSeq = seq & 0xFF; }
 
+  /** Rolling reload counter sampled into each snapshot (reload-as-state). */
+  public int getReloadSeq() { return reloadSeq; }
+
+  /** Mirrors the replicated reload counter onto a puppet so the host re-broadcasts the correct value. */
+  public void setReplicatedReloadSeq(int seq) { reloadSeq = seq & 0xFF; }
+
+  /**
+   * Network replay hook — plays the reload cosmetics (animation + audio) without running the reload
+   * timer or refilling the magazine (ammo arrives via the replicated activeMagazine). Lets every
+   * peer see a character is reloading. No-op when there's no active weapon (e.g. fist/diverged slot).
+   */
+  public void playRemoteReloadCue() {
+    WeaponItem w = getCurrentWeaponItem();
+    if (w == null || !isArmed()) return;
+    if (w.getReloadAudio() != null) {
+      weaponAudio.setStream(w.getReloadAudio());
+      weaponAudio.play();
+    }
+    if (animationController != null) animationController.onWeaponReload();
+  }
+
   // One-shot guard for the cue-divergence diagnostic below — the cue fires per shot (up to
   // ~10/s under sustained fire), so an unguarded print would flood the console.
   private boolean loggedCueNoFirearm = false;
@@ -525,6 +549,10 @@ public class WeaponController extends Node {
     }
     reloadTimer.start();
     if (animationController != null) animationController.onWeaponReload();
+    // Reload-as-state: bump the rolling counter that rides the snapshot stream so every remote peer
+    // replays the reload animation (a visible "reloading, can't fire yet" tell). u8 — only change
+    // detection matters, and the new value persists across snapshots so a dropped frame is harmless.
+    reloadSeq = (reloadSeq + 1) & 0xFF;
   }
 
   @RegisterFunction
@@ -566,6 +594,36 @@ public class WeaponController extends Node {
       animationController.onWeaponEquip(next.weaponPoseIndex);
       ammoChanged.emit(next.getMagazine(), next.getReserve());
     }
+    if (wasArmed != isArmed()) emitArmedStateChanged(isArmed());
+  }
+
+  /**
+   * Puppet-side weapon switch (non-authority peers, driven by the replicated active-slot state).
+   *
+   * <p>Snaps the active slot to the replicated value and plays the draw as a <b>cosmetic</b>
+   * animation only — no {@code transitionTimer} / {@code fireTimer} gating, because a puppet never
+   * fires locally (its shots arrive as the {@code fireSeq} cue). This is the deliberate split from
+   * the input-driven {@link #onSetWeapon}: routing replication through that re-ran the full animated
+   * transition on every peer, so a remote weapon switch lagged the owner by an extra draw-animation
+   * (on top of the owner's own draw + network latency) while position/stance applied instantly — and
+   * a fire cue could land while the puppet was still mid-draw, spawning a projectile from a
+   * half-raised muzzle in a strange direction.
+   *
+   * <p>Foundation for scale: remote weapon visuals derive from replicated <i>logical</i> state, not
+   * the transient animation pose — the invariant that lets future LOD / interest-management coarsen
+   * or drop puppet animation without breaking shot consistency. No-op when the slot is unchanged or
+   * empty (the caller already guards the empty case to avoid the fist↔weapon thrash loop).
+   */
+  public void applyReplicatedWeaponSlot(int slotIndex) {
+    if (slotIndex < 0 || slotIndex >= weapons.length || weapons[slotIndex] == null) return;
+    if (slotIndex == activeSlotIndex) return;
+    boolean wasArmed = isArmed();
+    activeSlotIndex = slotIndex;
+    pendingSlotIndex = slotIndex;
+    showWeapon(activeSlotIndex);
+    WeaponItem next = weapons[activeSlotIndex];
+    if (animationController != null) animationController.onWeaponEquip(next.weaponPoseIndex);
+    ammoChanged.emit(next.getMagazine(), next.getReserve());
     if (wasArmed != isArmed()) emitArmedStateChanged(isArmed());
   }
 
