@@ -58,6 +58,9 @@ public class SpawnPool {
     /** True if the most recent {@link #acquire} returned a recycled (already-armed) body. */
     public boolean wasLastAcquireRecycled() { return lastRecycled; }
 
+    /** Number of detached bodies currently held for reuse (debug/logging aid). */
+    public int idleCount() { return idle.size(); }
+
     /**
      * Detach a healthy body from the tree and keep it for reuse (up to capacity; beyond that it is
      * freed). The body's controller and equipped weapon ride along with the detached subtree.
