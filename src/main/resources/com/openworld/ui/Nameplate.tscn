@@ -1,19 +1,22 @@
 [gd_scene format=3 uid="uid://dxb5mxkmawr80"]
 
-[ext_resource type="Script" path="res://src/main/java/com/openworld/character/CharacterNameplate.java" id="1_cnp"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/Nameplate.java" id="1_cnp"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/CharacterHealthUI.tscn" id="2_rec58"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/CharacterWeaponUI.tscn" id="3_wpnui"]
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_np"]
 viewport_path = NodePath("SubViewport")
 
-[node name="CharacterNameplate" type="Node3D" unique_id=174704409]
+[node name="Nameplate" type="Node3D" unique_id=174704409]
 script = ExtResource("1_cnp")
 
 [node name="SubViewport" type="SubViewport" parent="." unique_id=676065440]
 transparent_bg = true
-size = Vector2i(400, 50)
+size = Vector2i(400, 72)
 
 [node name="HealthUI" parent="SubViewport" unique_id=1291570458 instance=ExtResource("2_rec58")]
+
+[node name="WeaponUI" parent="SubViewport" unique_id=1291570459 instance=ExtResource("3_wpnui")]
 
 [node name="NameplateSprite" type="Sprite3D" parent="." unique_id=1900003006]
 pixel_size = 0.004

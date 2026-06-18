@@ -594,4 +594,42 @@ public class AICharacter extends Character {
         isDead = true;
         super.onDied();
     }
+
+    /**
+     * Re-initialise this body for a (re)spawn — PLAN.md Part E / E1. Called by WorldZoneManager
+     * after the body is (re)added to the tree: repositions it, re-anchors the patrol center to the
+     * new position, full-heals, clears all sensor caches + FSM memory, and re-registers in the
+     * spatial grid. Safe on a fresh instance too (a harmless re-init over what {@code _ready} did).
+     *
+     * <p>A pooled body's {@code _ready()} does NOT run again on tree re-entry, so the work
+     * {@code _ready} normally does for spawn placement (capturing {@code spawnPosition}) and the
+     * grid registration must be redone here explicitly.
+     */
+    public void activateForSpawn(Vector3 worldPos) {
+        setGlobalPosition(worldPos);
+        spawnPosition = new Vector3(getGlobalPosition());
+        isDead = false;
+
+        currentTarget       = null;
+        cachedTargetForBone = null;
+        cachedBoneNodes     = null;
+        cachedVisibleBone   = null;
+        cachedTargetVehicle = null;
+        cachedLoS           = false;
+        cachedBestWeapon    = -1;
+        lastEmittedMoveType   = null;
+        lastEmittedMoveStance = null;
+
+        lodLevel        = AILodLevel.ACTIVE;
+        lodTimer        = godot.global.GD.randfRange(0f, 2.0f);
+        targetScanTimer = godot.global.GD.randfRange(0f, (float) TARGET_SCAN_INTERVAL);
+        losCacheTimer   = godot.global.GD.randfRange(0f, (float) LOS_CACHE_INTERVAL);
+
+        if (healthNode != null) healthNode.resetFull();
+
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.register(this, getGlobalPosition());
+
+        if (controller instanceof AIController aiCtrl) aiCtrl.resetState();
+    }
 }

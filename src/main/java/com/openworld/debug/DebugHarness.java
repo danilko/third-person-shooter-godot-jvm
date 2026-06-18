@@ -10,6 +10,10 @@ import com.openworld.game.mission.MissionInfo;
 import com.openworld.game.mission.MissionManager;
 import com.openworld.game.mission.MissionObjectiveType;
 import com.openworld.net.NetworkManager;
+import com.openworld.game.PlayerRegistry;
+import com.openworld.world.SpawnConfig;
+import com.openworld.world.WorldZone;
+import com.openworld.world.WorldZoneMarker;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.InputEvent;
@@ -76,6 +80,8 @@ public class DebugHarness extends Node {
             hostDebugServer();
         } else if (iek.getKeycode() == Key.F7) {
             joinDebugServer();
+        } else if (iek.getKeycode() == Key.F12) {
+            spawnDebugZone();
         }
     }
 
@@ -220,6 +226,45 @@ public class DebugHarness extends Node {
         container.addChild(rifle);
         rifle.setGlobalPosition(ai.getGlobalPosition());
         wc.requestEquip(rifle);
+    }
+
+    /**
+     * F12 — drops a placeholder {@link WorldZoneMarker} ~60 m in front of the player (PLAN.md
+     * Part E / E1). Its zone (built in code so no .tres is needed) streams in five "enemy" AIs
+     * when a player walks within loadRadius (40 m) and streams them back out beyond unloadRadius
+     * (70 m). Walk toward the marker to load, away to unload — the E1 verify step.
+     */
+    private void spawnDebugZone() {
+        if (getTree() == null) return;
+        Node scene = getTree().getCurrentScene();
+        if (scene == null) { GD.print("DebugHarness: no current scene for debug zone"); return; }
+
+        Vector3 anchor = new Vector3(0f, 0.9f, 0f);
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p)) {
+                Vector3 pp = p.getGlobalPosition();
+                anchor = new Vector3((float) pp.getX(), (float) pp.getY(), (float) pp.getZ() - 60f);
+                break;
+            }
+        }
+
+        SpawnConfig cfg = new SpawnConfig();
+        cfg.faction = Faction.ENEMY;
+        cfg.count = 5;
+
+        WorldZone zone = new WorldZone();
+        zone.zoneId = "debug_zone";
+        zone.loadRadius = 40f;
+        zone.unloadRadius = 70f;
+        zone.size = new Vector3(20f, 4f, 20f);
+        zone.spawnConfigs.add(cfg);
+
+        WorldZoneMarker marker = new WorldZoneMarker();
+        marker.zone = zone;
+        scene.addChild(marker);
+        marker.setGlobalPosition(anchor);
+        GD.print("DebugHarness: placed debug WorldZoneMarker at " + anchor
+                + " (walk within 40 m to stream AI in, beyond 70 m to stream out)");
     }
 
     /** Counts living "characters"-group members whose CharacterInfo.faction matches. */

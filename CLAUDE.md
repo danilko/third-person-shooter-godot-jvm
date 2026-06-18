@@ -33,7 +33,7 @@ and `tools/REORG_PROGRESS.md` document the move; reuse their pattern for future 
 src/main/java/com/openworld/
   character/      # character bodies + visuals + data: Character (gatherInput/applyInput loop),
                   #   Player, AICharacter, Health, AnimationController, CharacterInfo,
-                  #   CharacterVisuals, CharacterNameplate, MeshConfig, CharacterRagdoll,
+                  #   CharacterVisuals, MeshConfig, CharacterRagdoll, NameplateTarget (interface),
                   #   CharacterDriveState, CharacterReplication, Faction, FactionManager (AutoLoad),
                   #   FactionTable (relationship matrix Resource)
   ai/             # AI brain + FSM: AIController, AIState (base), AIBehaviorConfig, AILodLevel
@@ -58,7 +58,8 @@ src/main/java/com/openworld/
   net/            # NetworkManager (AutoLoad RPC), NetMessageCodec, NetworkController,
                   #   VehicleNetworkController, snapshot interpolators, policies, NetStats, Vec3/Quat
     session/      #   PlayerSession, PersistentPlayerId
-  ui/             # CharacterHUD, Crosshair, HUDManager, PauseMenu, RadialMenu, Feed, …
+  ui/             # CharacterHUD, Crosshair, HUDManager, PauseMenu, RadialMenu, Feed,
+                  #   Nameplate (generic billboard, any NameplateTarget), WeaponSlotsUI/Item, …
   util/           # ObjectPool, generic helpers
   debug/          # DebugHarness (temporary test-spawn harness)
 
@@ -404,6 +405,66 @@ fire-timing *validation* is deferred (H3).
 3. Set `collisionMask` layer 1 on each `PhysicalBone3D` so bones rest on the floor.
 4. `physicalBoneSimulator.physicalBonesStartSimulation()`.
 
+### Nameplate (`ui.Nameplate`) — generic, reusable across entity types
+
+`ui.Nameplate` (scene `ui/Nameplate.tscn`) is a **generic** floating plate: a single `SubViewport`
+rendered to a billboard `Sprite3D`, holding two UI sub-scenes — `CharacterHealthUI.tscn` (`HealthUI`,
+name + health, top) and `CharacterWeaponUI.tscn` (`WeaponUI`, active weapon + `mag/reserve`, bottom
+strip). The weapon row is for cross-network debugging (shown for all factions now; gameplay
+faction-visibility filtering is later).
+
+**It carries no entity-specific logic** — it binds to its parent purely through the
+`character.NameplateTarget` interface (`getNameplateText()`, `getNameplateColor()`,
+`getNameplateChangedSignal()`) plus two conventionally-named sibling nodes it discovers itself
+(`Health`, `WeaponController` — same names on `Character` and `Vehicle`). So **any type reuses the same
+scene/script** by implementing `NameplateTarget` and supplying its own rules. `NameplateTarget` lives
+in the `character` package (not `ui`) only to avoid a package cycle — `ui` already depends on
+`character`. It's instanced in **`Character.tscn`** (base, node still named `CharacterNameplate`), so
+AI *and* every networked player gets one.
+
+`Character implements NameplateTarget`: colour = own faction. `Vehicle implements NameplateTarget`:
+colour = its *driver's* faction (neutral when empty/defeated), health + weapon = the *carrier's* own
+(found via the shared sibling-node lookup) — see "Carrier nameplate".
+
+**Visibility is decided at runtime by ownership, not per scene and not by the camera:** the plate
+defaults visible, and `Character.applyNameplateVisibility` (deferred from `_ready`) hides it **only on
+the body we locally own** — `isLocallyOwnedPlayer()` = single-player, or networked + `isAuthorityFor`,
+gated to `Player` so AI is never affected. Ownership is the real signal (the camera being current is a
+consequence of it); keying on it also stays correct while spectating / viewing another camera. This
+replaced both the old `visible = false` override on `Player.tscn` (which also hid *remote* players'
+plates) and a camera-coupled hide inside `activateCameraIfOwned`. AI and other peers' players keep the
+default, so networked peers see each other's.
+
+**It reflects replicated state with no extra net message** by reacting to signals that already fire on
+the puppet apply paths:
+- weapon/ammo ← `WeaponController.ammoChanged` (emitted in `applyReplicated*` on puppets).
+- name/colour/weapon ← `NameplateTarget.getNameplateChangedSignal()`. For `Character` that's the
+  registered `nameplateChanged` (Signal0), emitted in `setFaction` (so a replicated
+  `WORLD_EVENT_FACTION_SWAP` recolours on every peer, not just at spawn) and alongside `changedWeapon`.
+  A carrier would emit it on driver enter/exit (replicated for free via `MSG_VEHICLE_OCCUPANCY`).
+
+#### Carrier nameplate (implemented)
+
+`Vehicle` reuses `ui/Nameplate.tscn` unchanged (instanced as a `Nameplate` node in `Vehicle.tscn`) and
+implements `NameplateTarget`:
+- `getNameplateColor()` = driver present & alive ? `Faction.color(driver.faction)` : `NEUTRAL` — the
+  **driver seat occupant determines the colour; neutral when not ridden or driver exits/defeated**.
+- health + weapon/ammo are the **carrier's own** `Health` / `WeaponController` — no code change in
+  `Nameplate`; its `../Health` + `../WeaponController` sibling lookup resolves to the vehicle's nodes
+  (same node names as on `Character`).
+- emits `nameplateChanged` in `tryEnter`/`tryExit`; both run on **every peer** (host-arbitrated seat
+  change), so the tint re-derives everywhere with no new message — occupancy already replicates.
+- **Auto-exit when the seated occupant is defeated** ("shot through the open vehicle") is still a
+  separate *Vehicle gameplay* concern, not nameplate (not built): on the occupant's `Health.died` the
+  host would run `Vehicle.tryExit()` + broadcast occupancy; the plate then goes neutral *because* the
+  seat emptied — `tryExit` already emits `nameplateChanged`. Damage reaching a seated occupant is
+  hit/collision routing on the occupant's `Health`.
+
+> A base `Carrier` class above `Vehicle` was considered and **deferred**: reuse is achieved through
+> the `NameplateTarget` / `Controllable` interfaces (the codebase idiom), so a class hierarchy buys
+> nothing while `Vehicle` is the only concrete carrier. Extract `Carrier` when a second carrier type
+> (boat/aircraft/mount) actually exists and shows what is genuinely shared.
+
 ---
 
 ## Event System (EventBus AutoLoad)
@@ -494,6 +555,16 @@ AI input is world-space (set directly by the AI FSM).
   `PlayerController` → `NetworkController`. The retain-and-reuse path is the separate
   `detachController()` (removes, returns, does **not** free — used by vehicle enter/exit hot-swap).
   Same rule for any other `removeChild` that isn't handing the node to a new parent.
+- **A 3D audio playback still running when its node is freed mid-session leaks at exit.** Freeing an
+  `AudioStreamPlayer3D` while it is playing leaves the `AudioStreamPlaybackWAV` + its stream held by
+  the audio server (`Leaked instance: AudioStreamPlaybackWAV` / `Resource still in use:
+  Rifle_reload.wav`). This is **networked-only** in practice: the client frees its pre-placed `Player`
+  on connect (`NetworkManager.removeLocalPrePlacedPlayer` → `queueFree`) while the spawn-time
+  equip/reload SFX (`WeaponController` plays `getReloadAudio()` on equip) is still sounding — in
+  single-player no body is freed mid-session, so the cue always finishes. Fix: `WeaponController._exitTree`
+  calls `weaponAudio.stop()` (guarded by `GD.isInstanceValid`), releasing the playback on every
+  teardown path. Apply the same `stop()`-on-`_exitTree` rule to any other node that plays audio and can
+  be freed while playing.
 - Weapon scenes are discovered dynamically: `WeaponController` iterates children of
   `WeaponAttachment` at `_ready()` — add a new weapon by adding a `Marker3D` wrapper with a
   `WeaponItem` subclass scene (e.g. `FirearmItem`) as its only child.

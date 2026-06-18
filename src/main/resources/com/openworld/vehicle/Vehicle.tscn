@@ -9,6 +9,7 @@
 [ext_resource type="Curve" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="6_i1sta"]
 [ext_resource type="Texture2D" uid="uid://ofwdiqxujlur" path="res://addons/kenney_prototype_textures/light/texture_01.png" id="6_jeqgg"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="7_wc"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/Nameplate.tscn" id="8_np"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_x00le"]
 friction = 0.0
@@ -158,6 +159,9 @@ collision_mask = 25
 
 [node name="VehicleWeaponMount" type="Marker3D" parent="." unique_id=1379134567]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -1.3520434)
+
+[node name="Nameplate" parent="." unique_id=1379134590 instance=ExtResource("8_np")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
 
 [node name="WeaponController" type="Node" parent="." unique_id=1379134580]
 script = ExtResource("7_wc")
