@@ -71,7 +71,8 @@ src/test/java/com/openworld/net/   # headless unit tests for the engine-free net
 
 > AutoLoads (`project.godot`): `EventBus`, `GameManager` (`game`), `MissionManager`
 > (`game.mission`), `NetworkManager` (`net`), `PlayerRegistry` (`game`), `SpatialEntityGrid`
-> (`world`), `FactionManager` (`character`).
+> (`world`), `FactionManager` (`character`), `WorldZoneManager` (`world`),
+> `StimulusManager` (`world`).
 
 ---
 
@@ -200,6 +201,164 @@ Use these setters, **not** a raw `characterInfo.faction = …` write, so the cha
 Part F). Behaviours that *react* to factions (a bystander fleeing when a fight erupts, corner
 detection that triggers a swap) are AI-perception features not built yet — they'll land with Part E2
 `StimulusManager` / the AI FSM.
+
+---
+
+## Open World Simulation (Part E)
+
+### Zone streaming — WorldZoneManager / WorldZone / SpawnPool (`com.openworld.world`, E1)
+
+As a player walks toward a populated area an AI group streams in; walking away streams it back
+out — no scene stutter, no O(n) tree scans, host-authoritative + replicated spawns. Five pieces:
+
+- **`WorldZone`** (`@RegisterClass extends Resource`) — placeholder-AABB zone data: `zoneId`,
+  `size` (full XZ extents of the spawn box; *center is the marker's world position*),
+  `loadRadius`/`unloadRadius` (hysteresis — unload **>** load avoids boundary flicker), nullable
+  `geometry` (PackedScene, cosmetic), and two collections built with class tokens —
+  `VariantArray<SpawnConfig> spawnConfigs` (ambient groups) and
+  `VariantArray<NamedCharacterConfig> namedCharacters` (story AI with stable ids for Part F).
+- **`SpawnConfig`** — `faction`, nullable `behaviorConfig` (else AICharacter `DEFAULTS`), `count`,
+  `weaponScenePath` (AR4 default). Ambient AI share the `AICharacter.tscn` archetype.
+- **`NamedCharacterConfig`** — stable `characterId`, `displayName`, `faction`, nullable `scene`
+  (else AICharacter.tscn), `behaviorConfig`, `weaponScenePath`, `offset` (relative to marker).
+- **`WorldZoneMarker`** (`@RegisterClass extends Node3D`) — the inspector-friendly in-scene anchor
+  (a `Resource` AutoLoad can't take an inspector-assigned `.tres`, and a marker is positioned by
+  dragging). Holds `@Export WorldZone zone`; **its global position is the zone center**. Registers
+  with the manager in `_ready()`, deregisters in `_exitTree()` (the same register-with-AutoLoad
+  idiom `Character` uses with `SpatialEntityGrid`).
+- **`SpawnPool`** — plain Java helper (not an AutoLoad, not `util/ObjectPool` which throws on
+  exhaustion and isn't tree-aware), owned by the manager. `acquire()` polls a `Deque<AICharacter>`
+  (recycling a detached body, validated by `isInstanceValid`) or instantiates fresh;
+  `wasLastAcquireRecycled()` lets load skip re-equipping an already-armed recycled body;
+  `release(ai)` removes from tree + enqueues up to `poolCapacity`, else `queueFree`. **Only healthy
+  bodies are pooled** — dead AI follow the normal death/ragdoll→free flow, so a recycled body never
+  needs un-ragdolling.
+- **`WorldZoneManager`** (`@RegisterClass extends Node`, AutoLoad) — mirrors `SpatialEntityGrid`'s
+  shape (JVM-static `instance`/`get()`, `_exitTree()` frees geometry + clears maps + `pool.clear()`
+  for leak discipline). Throttled tick (`evalInterval`, 0.5 s) over registered markers computes
+  nearest-player XZ distance via `PlayerRegistry.getPlayers()` (O(playerCount)); `< loadRadius` →
+  `load`, `> unloadRadius` → `unload`.
+
+**Authority:** AI spawn/despawn is host-only — `load()` instances cosmetic geometry on every peer
+but returns early on a non-server client (`net.isNetworked() && !net.isServer()`); clients receive
+the bodies through the existing `announceSpawn → MSG_SPAWN → GameManager.spawnReplicatedCharacter`
+path, and late-joiners via `sendBaselineSpawns`. `unload()` calls `announceDespawn(characterId)`
+before pooling/freeing.
+
+**What streams vs. what's static (a common confusion):** only two things are added on load and
+removed on unload — the **AI bodies** and the zone's **`geometry` PackedScene** (instanced as a
+marker child, `queueFree`d on unload). Anything authored directly into the `WorldZoneMarker` *scene*
+(the debug box from `showDebugVolume`, or any mesh you drop under the marker node) is **static scene
+content — it never streams**; it is the persistent zone *footprint/outline*. To make a mesh stream
+in/out, assign it to the WorldZone's **`geometry`** field, not as a marker child
+(`zones/DebugZoneGeometry.tscn` is an example to drop into that slot). Zones also do **not** carry
+their own navigation — AI use the level's `NavigationRegion3D`; nav is a parent/world concern.
+
+**Body recycling is OFF by default (`recycleBodies`, EXPERIMENTAL).** Reusing a full character body
+subtree (detach via `removeChild`, re-attach via `addChild`) is **unsafe** in godot-kotlin-jvm: the
+body carries a `top_level` camera (`TPSCameraController.setAsTopLevel`), a muzzle-flash
+`GPUParticles3D`, and a nameplate `SubViewport`, and re-attaching that subtree leaves them
+half-initialised — `get_global_transform "not inside tree"` / `particles is null` errors, then a
+native use-after-free **segfault on zone enter** (no AI death required). So `unload()` frees and
+`load()` instantiates fresh; correct and stutter-tolerable. Spreading spawns across frames is the
+proper perf answer (TODO), not body reuse. The `SpawnPool` + `activateForSpawn` reset path is kept
+behind the flag for future hardening only. When recycling *is* on, only `isAlive() && !isDead()`
+bodies are pooled (a dead body is ragdolled and `activateForSpawn` does not un-ragdoll it).
+
+**The manager is an AutoLoad, so it survives `reloadCurrentScene()`/restart** — and pooled bodies are
+parentless (held only by the deque, not in the scene tree), so a scene reload does **not** free them.
+`detectSceneReload()` (top of `_physicsProcess`, compares the current-scene instance id) drops
+`loaded` + frees the pool on any scene swap, so a restart never resurrects a body from the old scene
+into the new one (this was a reproducible restart crash).
+
+**Despawn safety — dangling references:** streaming despawns bodies that other systems may still
+reference between target scans. `AICharacter.validateCurrentTarget()` (run every active frame, before
+`super._physicsProcess`) drops `currentTarget` + its bone caches the moment the target is freed or
+pulled out of the tree — without it, the FSM dereferences an out-of-tree node (`get_global_transform`
+/ `look_at` "Node not inside tree") and segfaults once it is freed. `activateForSpawn` also clears the
+recycled body's carried-over camera aim target and escort reference for the same reason.
+
+**Pooled-reuse reset constraint (critical):** a pooled body's `_ready()` does **not** re-run on
+tree re-entry, so reuse must re-initialize explicitly. `load()` calls
+`AICharacter.activateForSpawn(worldPos)` **after `addChild`**, which sets global position,
+**re-captures `spawnPosition`** (the patrol anchor, otherwise only set in `_ready()`), clears
+`isDead` + all sensor caches, resets LOD + staggered timers, `Health.resetFull()`, re-registers the
+`SpatialEntityGrid`, and calls `AIController.resetState()` (FSM back to `initialState()`, all timers
++ last-known targets cleared). Without the re-anchor a recycled AI would patrol around its *previous*
+spawn point.
+
+**Debug visualization + walk-test setup:** `WorldZoneManager.debugLog` (exported, on) prints each
+load/unload decision, an approach-distance line while a player is near, and per-load recycled-vs-fresh
++ pool-idle counts. `WorldZoneMarker.showDebugVolume` (exported, on) builds at runtime a translucent
+box (the spawn volume, `zone.size`) plus flat rings at `loadRadius`/`unloadRadius`; the box tints
+**green while streamed in, cyan while idle** (driven by `setLoadedVisual` from the manager) — so you
+can see a zone and walk into it. Both are pure debug aids, off via their export flags for shipping.
+`resources/com/openworld/world/zones/DebugZone.tscn` is a reusable **zone scene** (a `WorldZoneMarker`
+with `DebugZone.tres` assigned) — the authoring template / "what a zone looks like" demo (duplicate it
+and swap the `.tres` for a real zone; a Blender-exported zone-chunk mesh becomes the optional
+`geometry`). One instance is placed in `World.tscn` (`DebugZone` node, ~20 m left of spawn) for an
+in-editor walk-test. The `DebugHarness` **F12** key also drops a code-built zone in front of the
+nearest player if you want one without editing the scene.
+
+### AI spatial perception — StimulusManager (`com.openworld.world`, AutoLoad, E2)
+
+Poll-based, spatial channel for AI-perceptible world events — the AI counterpart to `SpatialEntityGrid`
+(events instead of bodies). **Not EventBus:** EventBus fans every signal to every listener (right for
+UI, wrong for AI at open-world scale); a stimulus is instead *dropped at a world position with an
+audible `radius`*, and AI **poll** their own neighbourhood. EventBus is unchanged and keeps all UI
+signals — only AI-perception events live here.
+
+- **`StimulusManager`** mirrors the AutoLoad shape (JVM-static `get()`, `_exitTree()` clears). Holds a
+  `List<Stimulus>` aged out after `stimulusLifetime` (5 s) in `_process`. `post(type, origin, radius,
+  source, sourceFaction)` drops one; `getStimuli()` exposes the live list read-only (same backing-list
+  convention as `PlayerRegistry`). `Stimulus` is an immutable plain object; `Type` =
+  `GUNSHOT, EXPLOSION, VEHICLE_CRASH, DEAD_BODY, PLAYER_SPOTTED` (last two reserved for later).
+- **Emit (authority side-effect paths only**, so the host that simulates the AI sees them):
+  `FirearmItem.useWeapon` → `GUNSHOT` at the muzzle (`gunshotHearingRadius`, exported, 150 m — *not* the
+  puppet `playRemoteFireCue`); `ExplosionManager.triggerExplosion` → `EXPLOSION` at the blast center
+  (heard past the blast); `Vehicle._integrateForces` → `VEHICLE_CRASH` on a fast impact (throttled
+  ~1×/s).
+- **Poll:** `AICharacter.hearAlarm()` returns the nearest investigate-worthy origin within
+  `behaviorConfig.hearingRadius` (capped by each stimulus's own radius), ignoring its own events and
+  *allied* gunfire (`Faction.areHostile` for `GUNSHOT`; explosions/crashes alert everyone).
+  `PatrolState` calls it after the visual-target check and, on a hit, sets the controller's
+  last-known-position and transitions to `SearchState` (which already navigates there). `DebugHarness`
+  **F8** drops a synthetic enemy `GUNSHOT` at the player for a vision-free walk-test.
+
+**Networked propagation:** stimuli are a local per-peer list (puppet AI don't think). A remote
+*client's* gunshot is delivered to host AI **for free via the existing fire replication** — when the
+client's `fireSeq` bumps, the host runs `FirearmItem.playRemoteFireCue` on that puppet and (gated to
+`isServerPeer()`) posts the same GUNSHOT stimulus there, where the AI poll. No new network message;
+other clients run the cue but don't post (their AI are puppets). Non-gunshot stimuli
+(explosion/crash) still post only where their authoritative side-effect runs.
+
+### Squad awareness — AISquad (`com.openworld.character`, E3)
+
+Shared group targeting so shooting one AI turns the whole nearby band toward the shooter within a
+frame, instead of each AI waking on its own ~0.4 s scan.
+
+- **`AISquad`** is a `Node` (editor-placed, or one created per `SpawnConfig` by `WorldZoneManager`).
+  Members `register`/`unregister`; it holds a `sharedTarget` + `sharedLastKnownPosition`.
+  `getSharedTarget()` self-clears a dead/freed/out-of-tree target (the "lose track" path);
+  `clearThreat()` drops a still-alive one.
+- **Spot → broadcast:** `broadcastSpotted(spotter, target, pos)` records the target and pushes it to
+  every member within `alertBroadcastRadius` (60 m of the spotter) via `AICharacter.adoptSquadTarget`
+  — which sets `currentTarget` + last-known immediately (skipping the scan interval). Triggers:
+  `AttackState` on confirmed LoS, and `AICharacter.onEnemyDamaged` (being shot is a sighting too — uses
+  `currentTarget`, the believed attacker). Squad-mates are one faction and the spotter already verified
+  hostility, so adopters skip a redundant faction check.
+- **Converge:** `AICharacter.discoverTarget()` consults `getSharedTarget()` **before** its own scan, so
+  a mate keeps the shared target across rescans; `PatrolState` chases a squad-adopted target even
+  without personal LoS yet. `AICharacter` holds the squad via `activeSquad()` (nulls a stale ref to a
+  freed squad node — pooling/reuse safe); `setSquad` moves registration; `WorldZoneManager` frees each
+  per-group squad on unload.
+
+`AISquad._process` also implements **lose-track**: if no member has spotted the shared target for
+`forgetDuration` (8 s) it `clearThreat()`s and members fall back to their own scans (death is handled
+sooner by `getSharedTarget`'s self-clear).
+
+> **Part E (E1–E3) complete.** Only deferred item left: body-recycling (E1, off by default — subtree
+> reuse unsafe; frame-spread spawning is the real perf fix, TODO).
 
 ---
 
@@ -563,8 +722,17 @@ AI input is world-space (set directly by the AI FSM).
   equip/reload SFX (`WeaponController` plays `getReloadAudio()` on equip) is still sounding — in
   single-player no body is freed mid-session, so the cue always finishes. Fix: `WeaponController._exitTree`
   calls `weaponAudio.stop()` (guarded by `GD.isInstanceValid`), releasing the playback on every
-  teardown path. Apply the same `stop()`-on-`_exitTree` rule to any other node that plays audio and can
-  be freed while playing.
+  teardown path. **But `stop()` from a *different* node's `_exitTree` is unreliable when a whole body
+  subtree is freed at once** (E1 zone-unload frees armed AI mid-session; the player's gun audio leaked
+  the same way at app exit — fire SFX `Rifle_fire.wav`): the sibling `WeaponAudio` `AudioStreamPlayer3D`
+  can exit the tree *before* `WeaponController._exitTree` runs, orphaning its in-flight playback first.
+  **Primary, universal fix: the audio node stops *itself* on its own `tree_exiting`** — `WeaponController._ready`
+  connects `weaponAudio`'s `tree_exiting` → `weaponAudio.stop`; that signal fires while the node is still
+  valid and in-tree, so the playback is released no matter who frees the body or in what order (covers app
+  exit too). Belt-and-suspenders: `WeaponController.silenceAudio()` (public) is also called by
+  `WorldZoneManager.unload` before it frees/recycles a body (stop a touch earlier, while fully in-tree).
+  For any other node that plays audio and can be freed while playing, prefer the **self-stop on
+  `tree_exiting`** pattern over a parent/sibling `_exitTree` stop.
 - Weapon scenes are discovered dynamically: `WeaponController` iterates children of
   `WeaponAttachment` at `_ready()` — add a new weapon by adding a `Marker3D` wrapper with a
   `WeaponItem` subclass scene (e.g. `FirearmItem`) as its only child.

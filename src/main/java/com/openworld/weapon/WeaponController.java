@@ -231,6 +231,18 @@ public class WeaponController extends Node {
   @RegisterFunction
   @Override
   public void _exitTree() {
+    silenceAudio();
+  }
+
+  /**
+   * Stop any in-progress weapon SFX. Call this <b>before</b> the body is removed/freed (while it is
+   * still in the tree) so the AudioServer releases the AudioStreamPlaybackWAV — relying on
+   * {@code _exitTree} alone is unreliable when the whole body subtree is freed at once, because the
+   * sibling {@code WeaponAudio} node can exit the tree before this {@code _exitTree} runs, leaking the
+   * playback (see CLAUDE.md audio-leak quirk). E1 zone-unload now frees armed AI mid-session, so the
+   * remover (WorldZoneManager) calls this first.
+   */
+  public void silenceAudio() {
     if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) weaponAudio.stop();
   }
 
@@ -270,6 +282,15 @@ public class WeaponController extends Node {
     ammoChanged.connectUnsafe(
         Callable.createUnsafe(this, StringNames.toGodotName("relayAmmoToEventBus")),
         godot.api.Object.ConnectFlags.DEFAULT);
+
+    // Have WeaponAudio stop ITSELF the instant it leaves the tree. _exitTree here is too late when a
+    // whole body subtree is freed at once (incl. app exit): the sibling WeaponAudio can exit first,
+    // orphaning its in-flight AudioStreamPlaybackWAV before our stop() runs (CLAUDE.md audio-leak
+    // quirk). tree_exiting fires while the node is still valid, so a self-stop reliably releases it.
+    if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) {
+      weaponAudio.connect(new StringName("tree_exiting"),
+          Callable.createUnsafe(weaponAudio, new StringName("stop")));
+    }
   }
 
   /** Receives our own ammoChanged signal and re-broadcasts it on EventBus, keyed by owner CharacterInfo. */

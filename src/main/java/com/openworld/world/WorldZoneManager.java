@@ -11,6 +11,7 @@ import godot.core.Vector3;
 import godot.global.GD;
 
 import com.openworld.character.AICharacter;
+import com.openworld.character.AISquad;
 import com.openworld.character.Character;
 import com.openworld.character.CharacterInfo;
 import com.openworld.character.Player;
@@ -58,6 +59,21 @@ public class WorldZoneManager extends Node {
     /** Max recycled AI bodies the pool retains. */
     @Export @RegisterProperty public int poolCapacity = 64;
 
+    /** Print per-zone load/unload decisions + pool stats to the Output log (E1 walk-test aid). */
+    @Export @RegisterProperty public boolean debugLog = true;
+
+    /**
+     * Recycle AI bodies through the {@link SpawnPool} across load/unload. <b>Default off / EXPERIMENTAL:</b>
+     * reusing a full character body subtree (detach via {@code removeChild}, re-attach via {@code addChild})
+     * is unsafe in godot-kotlin-jvm — the body carries a {@code top_level} camera, a muzzle-flash
+     * {@code GPUParticles3D}, and a nameplate {@code SubViewport}, and re-attaching that subtree
+     * dereferences transforms/particles in a half-initialised state ({@code get_global_transform "not
+     * inside tree"} / {@code particles is null}) → native use-after-free crash. With it off, unload frees
+     * and load instantiates fresh — correct and stutter-tolerable; spreading spawns across frames is the
+     * proper perf answer (TODO) rather than body reuse. Leave off unless you are actively hardening reuse.
+     */
+    @Export @RegisterProperty public boolean recycleBodies = false;
+
     private static final String AI_SCENE_PATH =
             "res://src/main/resources/com/openworld/character/AICharacter.tscn";
 
@@ -65,11 +81,14 @@ public class WorldZoneManager extends Node {
     private final Map<WorldZoneMarker, LoadedZone> loaded = new HashMap<>();
     private SpawnPool pool;
     private double evalTimer = 0.0;
+    /** Instance id of the scene root last seen, to detect a scene reload/restart (this AutoLoad survives it). */
+    private long lastSceneInstanceId = 0;
 
     /** Per-loaded-zone bookkeeping so unload returns exactly what load created. */
     private static final class LoadedZone {
         final List<AICharacter> pooled = new ArrayList<>();   // SpawnConfig AI → returned to pool
         final List<Character>   named  = new ArrayList<>();   // NamedCharacterConfig AI → freed
+        final List<AISquad>     squads = new ArrayList<>();   // one per SpawnConfig group (E3) → freed
         Node geometryInstance;                                // cosmetic, freed on unload
     }
 
@@ -109,6 +128,8 @@ public class WorldZoneManager extends Node {
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
+        detectSceneReload();
+
         evalTimer -= delta;
         if (evalTimer > 0.0) return;
         evalTimer = evalInterval;
@@ -121,8 +142,33 @@ public class WorldZoneManager extends Node {
                 load(marker);
             } else if (isLoaded && dist > marker.zone.unloadRadius) {
                 unload(marker);
+            } else if (debugLog && dist < marker.zone.unloadRadius * 1.2f) {
+                // Approach feedback (only for zones the player is near, so far zones stay quiet).
+                GD.print("WorldZoneManager: zone '" + marker.zone.zoneId + "' nearestPlayer="
+                        + String.format("%.1f", dist) + "m  [load<" + marker.zone.loadRadius
+                        + " unload>" + marker.zone.unloadRadius + "]  "
+                        + (isLoaded ? "LOADED" : "idle"));
             }
         }
+    }
+
+    /**
+     * This is an AutoLoad, so it survives {@code reloadCurrentScene()}/{@code changeSceneToFile()}
+     * (restart, level change). Pooled bodies are parentless — held only by the {@link SpawnPool}
+     * deque, NOT in the scene tree — so a scene reload does <b>not</b> free them; re-acquiring one
+     * into the new scene resurrects a body that references freed nodes → crash. Detect the scene
+     * swap and drop all carried-over state so the new scene starts clean. ({@code loaded} entries key
+     * off the old scene's now-freed markers; those bodies were children of the freed scene and are
+     * gone with it — only the pool needs explicit freeing.)
+     */
+    private void detectSceneReload() {
+        if (getTree() == null) return;
+        Node scene = getTree().getCurrentScene();
+        long id = scene != null ? scene.getInstanceId() : 0;
+        if (id == lastSceneInstanceId) return;
+        lastSceneInstanceId = id;
+        loaded.clear();
+        if (pool != null) { pool.clear(); pool = null; }
     }
 
     /** Horizontal (XZ) distance to the nearest live player, or MAX_VALUE if none. */
@@ -145,6 +191,7 @@ public class WorldZoneManager extends Node {
         WorldZone zone = marker.zone;
         LoadedZone lz = new LoadedZone();
         loaded.put(marker, lz);
+        marker.setLoadedVisual(true);
 
         // Cosmetic geometry — instanced locally on every peer.
         if (zone.geometry != null) {
@@ -165,13 +212,20 @@ public class WorldZoneManager extends Node {
 
         Vector3 center = marker.getGlobalPosition();
         SpawnPool sp = pool();
+        int recycledCount = 0;
+        int freshCount = 0;
 
         for (SpawnConfig cfg : zone.spawnConfigs) {
             if (cfg == null) continue;
+            // One squad per SpawnConfig group so the band shares awareness (PLAN.md E3).
+            AISquad squad = new AISquad();
+            container.addChild(squad);
+            lz.squads.add(squad);
             for (int i = 0; i < cfg.count; i++) {
                 AICharacter ai = sp.acquire();
                 if (ai == null) continue;
                 boolean recycled = sp.wasLastAcquireRecycled();
+                if (recycled) recycledCount++; else freshCount++;
 
                 CharacterInfo info = new CharacterInfo();
                 info.characterId = UUID.randomUUID().toString();
@@ -182,7 +236,10 @@ public class WorldZoneManager extends Node {
 
                 container.addChild(ai);
                 ai.activateForSpawn(randomPointInBox(center, zone.size));
-                if (!recycled) equipWeapon(ai, cfg.weaponScenePath, container);
+                ai.setSquad(squad);
+                // A recycled body keeps its weapon, so skip the equip — unless it somehow came back
+                // unarmed (defensive: never leave a streamed AI with only fists).
+                if (!recycled || !isArmed(ai)) equipWeapon(ai, cfg.weaponScenePath, container);
 
                 lz.pooled.add(ai);
                 if (net != null) net.announceSpawn(ai);
@@ -209,30 +266,55 @@ public class WorldZoneManager extends Node {
             if (net != null) net.announceSpawn(ai);
         }
 
-        GD.print("WorldZoneManager: loaded zone '" + zone.zoneId + "' ("
-                + lz.pooled.size() + " ambient, " + lz.named.size() + " named)");
+        if (debugLog) {
+            GD.print("WorldZoneManager: LOADED zone '" + zone.zoneId + "' — "
+                    + lz.pooled.size() + " ambient (" + recycledCount + " recycled, " + freshCount
+                    + " fresh), " + lz.named.size() + " named; pool idle now " + sp.idleCount());
+        }
     }
 
     private void unload(WorldZoneMarker marker) {
         LoadedZone lz = loaded.remove(marker);
         if (lz == null) return;
+        if (GD.isInstanceValid(marker)) marker.setLoadedVisual(false);
 
         NetworkManager net = networkManager();
+        int recycled = 0;
+        int freed = 0;
         for (AICharacter ai : lz.pooled) {
             if (!GD.isInstanceValid(ai)) continue;
             if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
-            pool().release(ai);
+            silenceWeaponAudio(ai);  // stop in-flight SFX while still in-tree (audio-leak quirk)
+            // Only HEALTHY bodies are recycled (and only when recycleBodies is on). A body that died
+            // while the zone was loaded is ragdolled (physics off, collision shapes disabled, weapons
+            // dropped) — activateForSpawn does not undo that, so resurrecting it crashes. Dead bodies
+            // (and everything when recycling is off) follow the normal free flow.
+            if (recycleBodies && ai.isAlive() && !ai.isDead()) {
+                pool().release(ai);
+                recycled++;
+            } else {
+                ai.queueFree();
+                freed++;
+            }
         }
         for (Character ai : lz.named) {
             if (!GD.isInstanceValid(ai)) continue;
             if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
+            silenceWeaponAudio(ai);
             ai.queueFree();
+        }
+        for (AISquad squad : lz.squads) {
+            if (GD.isInstanceValid(squad)) squad.queueFree();
         }
         if (lz.geometryInstance != null && GD.isInstanceValid(lz.geometryInstance))
             lz.geometryInstance.queueFree();
 
-        GD.print("WorldZoneManager: unloaded zone '"
-                + (marker.zone != null ? marker.zone.zoneId : "?") + "'");
+        if (debugLog) {
+            GD.print("WorldZoneManager: UNLOADED zone '"
+                    + (marker.zone != null ? marker.zone.zoneId : "?")
+                    + "' — " + recycled + " recycled, " + freed + " dead freed; pool idle now "
+                    + (pool != null ? pool.idleCount() : 0));
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -273,6 +355,17 @@ public class WorldZoneManager extends Node {
      * Loads + equips a weapon onto the AI — same deferred path DebugHarness/WeaponPickup use
      * (the WeaponItem must be inside the tree before WeaponController reparents it onto the body).
      */
+    private boolean isArmed(AICharacter ai) {
+        Node wcNode = ai.getNodeOrNull(new NodePath("WeaponController"));
+        return wcNode instanceof WeaponController wc && wc.isArmed();
+    }
+
+    /** Stop a body's weapon SFX while it is still in-tree, before freeing it (audio-leak quirk). */
+    private void silenceWeaponAudio(Character ai) {
+        Node wcNode = ai.getNodeOrNull(new NodePath("WeaponController"));
+        if (wcNode instanceof WeaponController wc) wc.silenceAudio();
+    }
+
     private void equipWeapon(AICharacter ai, String weaponScenePath, Node container) {
         Node wcNode = ai.getNodeOrNull(new NodePath("WeaponController"));
         if (!(wcNode instanceof WeaponController wc)) return;

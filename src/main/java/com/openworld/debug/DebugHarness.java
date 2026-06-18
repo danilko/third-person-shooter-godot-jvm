@@ -44,6 +44,8 @@ import com.openworld.character.Player;
  *       Characters container, for D1/D2-style population testing later.
  * F11 — spawnTestAI(1, PLAYER): drops one "player"-faction ally AICharacter, e.g.
  *       to test escort/squad behaviour against the F10 hostiles.
+ * F8  — postDebugGunshot(): drops a "player"-faction GUNSHOT stimulus ~35 m in front of the
+ *       player so the zone's "enemy" AI investigate the noise (PLAN.md E2 perception test).
  * F6  — NetworkManager.hostServer(DEBUG_PORT): starts an ENet server for LAN testing
  *       (PLAN.md Part G). F7 — joinServer("127.0.0.1", DEBUG_PORT): connects as a
  *       client to a host on the same machine. Edit DEBUG_HOST for a real LAN peer.
@@ -82,6 +84,8 @@ public class DebugHarness extends Node {
             joinDebugServer();
         } else if (iek.getKeycode() == Key.F12) {
             spawnDebugZone();
+        } else if (iek.getKeycode() == Key.F8) {
+            postDebugGunshot();
         }
     }
 
@@ -265,6 +269,29 @@ public class DebugHarness extends Node {
         marker.setGlobalPosition(anchor);
         GD.print("DebugHarness: placed debug WorldZoneMarker at " + anchor
                 + " (walk within 40 m to stream AI in, beyond 70 m to stream out)");
+    }
+
+    /**
+     * F8 — drops a synthetic "player"-faction GUNSHOT stimulus ~35 m in front of the player (PLAN.md
+     * E2), so the zone's "enemy" AI (hostile to "player") investigate a spot away from you — making the
+     * "walk toward the noise" behaviour obvious rather than blending into them chasing you. Walk-test:
+     * enter the debug zone to spawn enemies, break their line of sight, press F8 — they should path to
+     * the noise 35 m off. (Live shots post the same stimulus via FirearmItem.useWeapon; AI that already
+     * see you engage by vision regardless.)
+     */
+    private void postDebugGunshot() {
+        com.openworld.world.StimulusManager sm = com.openworld.world.StimulusManager.get();
+        if (sm == null) { GD.print("DebugHarness: StimulusManager autoload not found"); return; }
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p)) {
+                Vector3 fwd = p.getGlobalTransform().getBasis().getColumn(2); // player's +Z (back)
+                Vector3 origin = p.getGlobalPosition().minus(fwd.times(35f)); // 35 m in front (-Z)
+                sm.post(com.openworld.world.StimulusManager.Type.GUNSHOT, origin, 200f, null, Faction.PLAYER);
+                GD.print("DebugHarness: posted debug GUNSHOT (faction player) at " + origin);
+                return;
+            }
+        }
+        GD.print("DebugHarness: no player found for debug gunshot");
     }
 
     /** Counts living "characters"-group members whose CharacterInfo.faction matches. */

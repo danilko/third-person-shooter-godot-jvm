@@ -3,6 +3,7 @@ package com.openworld.world.manager;
 import com.openworld.character.Character;
 import com.openworld.character.Health;
 import com.openworld.util.ObjectPool;
+import com.openworld.world.StimulusManager;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -91,7 +92,19 @@ public class ExplosionManager extends Node {
             }
         }
         spawnExplosion(center);
+
+        // EXPLOSION stimulus so nearby AI investigate the blast (PLAN.md E2). triggerExplosion is the
+        // authority blast path, so this fires once on the simulating peer. Audible well past the blast
+        // radius; faction "" means hostile-to-all (everyone reacts to an explosion).
+        StimulusManager sm = StimulusManager.get();
+        if (sm != null) {
+            sm.post(StimulusManager.Type.EXPLOSION, center,
+                    Math.max(radius * 3f, EXPLOSION_HEARING_RADIUS), excludeNode, attackerFaction);
+        }
     }
+
+    /** Default audible range of an explosion to AI (m) when 3× the blast radius is smaller. */
+    private static final float EXPLOSION_HEARING_RADIUS = 300f;
 
     /** Spawn all three VFX layers at the given world position. */
     public void spawnExplosion(Vector3 center) {

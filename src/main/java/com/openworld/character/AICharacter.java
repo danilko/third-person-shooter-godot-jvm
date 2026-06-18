@@ -29,6 +29,7 @@ import com.openworld.movement.character.StanceName;
 import com.openworld.weapon.WeaponItem;
 import com.openworld.weapon.WeaponType;
 import com.openworld.world.SpatialEntityGrid;
+import com.openworld.world.StimulusManager;
 
 /**
  * AI-controlled character body — hardware and sensing only.
@@ -69,6 +70,16 @@ public class AICharacter extends Character {
      * Resolved to escortTarget in _ready(). Leave empty for non-escort AIs.
      */
     @Export @RegisterProperty public NodePath escortTargetPath = new NodePath();
+
+    /**
+     * NodePath to this AI's {@link AISquad} for editor-placed squads (PLAN.md E3). Resolved in
+     * {@code _ready()}. Zone-spawned AI are assigned a squad programmatically via {@link #setSquad}
+     * instead. Leave empty for a solo AI.
+     */
+    @Export @RegisterProperty public NodePath squadPath = new NodePath();
+
+    /** Runtime squad — shared group awareness (E3). Null = solo. Accessed via {@link #activeSquad()}. */
+    private AISquad squad;
 
     /**
      * Runtime escort target — populated from escortTargetPath in _ready() or set
@@ -177,7 +188,63 @@ public class AICharacter extends Character {
             }
         }
 
+        // Resolve squad from NodePath (editor-placed squads); zone-spawned AI use setSquad() instead.
+        if (squadPath != null && !squadPath.getPath().isEmpty()) {
+            Node n = getNodeOrNull(squadPath);
+            if (n instanceof AISquad s) setSquad(s);
+        }
+
         if (controller instanceof AIController aiCtrl) aiCtrl.start();
+    }
+
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        if (squad != null && godot.global.GD.isInstanceValid(squad)) squad.unregister(this);
+        super._exitTree();
+    }
+
+    // ── Squad (E3) ──────────────────────────────────────────────────────────────
+
+    /** The squad if still valid, else null (also nulls a stale ref to a freed squad node). */
+    private AISquad activeSquad() {
+        if (squad != null && !godot.global.GD.isInstanceValid(squad)) squad = null;
+        return squad;
+    }
+
+    public AISquad getSquad() { return activeSquad(); }
+
+    /** Assign (or clear) this AI's squad, moving its registration. Safe across recycled reuse. */
+    public void setSquad(AISquad s) {
+        if (squad == s) return;
+        if (squad != null && godot.global.GD.isInstanceValid(squad)) squad.unregister(this);
+        squad = s;
+        if (squad != null) squad.register(this);
+    }
+
+    /**
+     * Adopt a target pushed by a squad-mate (PLAN.md E3) without waiting for the next scan: set it as
+     * the current target, drop stale bone caches, and seed last-known so the FSM converges even before
+     * personal LoS. Faction was already verified by the spotter.
+     */
+    public void adoptSquadTarget(Character target, Vector3 pos) {
+        if (target == null || isDead()) return;
+        if (currentTarget != target) {
+            currentTarget       = target;
+            cachedTargetForBone = null;
+            cachedBoneNodes     = null;
+            cachedVisibleBone   = null;
+            cachedTargetVehicle = null;
+            cachedLoS           = false;
+            losCacheTimer       = 0;
+        }
+        if (controller instanceof AIController ai && pos != null) ai.setLastKnownTargetPosition(pos);
+    }
+
+    /** Tell squad-mates within alert range about this AI's confirmed target (LoS or being shot). */
+    public void broadcastToSquad(Character target, Vector3 pos) {
+        AISquad s = activeSquad();
+        if (s != null && target != null) s.broadcastSpotted(this, target, pos);
     }
 
     /**
@@ -230,9 +297,31 @@ public class AICharacter extends Character {
             }
         }
         if (lodLevel == AILodLevel.FROZEN) return;  // skip entire FSM + animation tick
+        // Drop any target/bone references that have been freed or pulled out of the tree (e.g. a
+        // zone-streamed body despawned by WorldZoneManager.unload). Dereferencing such a node's
+        // global transform logs "Node not inside tree" and, once it is freed, segfaults — so the
+        // FSM must never see a dangling target.
+        validateCurrentTarget();
         // PASSIVE: super still runs, but AIController.gatherInput returns a hold-heading command
         // (no NavAgent / FSM) and AnimationController skips its AnimationTree writes.
         super._physicsProcess(delta);
+    }
+
+    /**
+     * Clears {@link #currentTarget} and all its derived bone caches if the target has been freed or
+     * removed from the scene tree. Cheap (a validity + in-tree check) and runs every active frame;
+     * the guard is what makes streamed/despawned bodies safe to reference between target scans.
+     */
+    private void validateCurrentTarget() {
+        if (currentTarget == null) return;
+        if (!godot.global.GD.isInstanceValid(currentTarget) || !currentTarget.isInsideTree()) {
+            currentTarget       = null;
+            cachedTargetForBone = null;
+            cachedBoneNodes     = null;
+            cachedVisibleBone   = null;
+            cachedTargetVehicle = null;
+            cachedLoS           = false;
+        }
     }
 
     private float nearestPlayerDist() {
@@ -275,6 +364,20 @@ public class AICharacter extends Character {
 
     private Character discoverTarget() {
         String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
+
+        // Squad-shared target (E3) takes priority over a personal scan, so a mate keeps converging on
+        // a threat a squad-mate spotted even before it can see the threat itself. getSharedTarget()
+        // self-clears a dead/freed target, falling back to the scan below.
+        AISquad s = activeSquad();
+        if (s != null) {
+            Character shared = s.getSharedTarget();
+            if (shared != null && shared != this && shared.currentVehicleNode == null) {
+                String tf = (shared.characterInfo != null && shared.characterInfo.faction != null)
+                        ? shared.characterInfo.faction : "";
+                if (Faction.areHostile(myFaction, tf)) return shared;
+            }
+        }
+
         float closestDist = Float.MAX_VALUE;
         Character closest = null;
         Vector3 myPos = getGlobalPosition();
@@ -330,6 +433,36 @@ public class AICharacter extends Character {
             return occ;
         }
         return null;
+    }
+
+    /**
+     * Nearest world position worth investigating that this AI can currently hear (PLAN.md E2): a
+     * GUNSHOT from a hostile/unknown faction, or any EXPLOSION / VEHICLE_CRASH, within
+     * {@code hearingRadius} (capped by each stimulus's own audible radius). Ignores its own events and
+     * allied gunfire. Returns null when nothing relevant is audible — PatrolState uses it to wake into
+     * SearchState toward the sound. No-op (null) without the StimulusManager AutoLoad (test scenes).
+     */
+    public Vector3 hearAlarm() {
+        StimulusManager sm = StimulusManager.get();
+        if (sm == null) return null;
+        float radius = getBehaviorConfig().hearingRadius;
+        Vector3 myPos = getGlobalPosition();
+        String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
+        Vector3 best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (StimulusManager.Stimulus s : sm.getStimuli()) {
+            if (s.source == this) continue;
+            boolean investigate = switch (s.type) {
+                case GUNSHOT                  -> Faction.areHostile(myFaction, s.sourceFaction);
+                case EXPLOSION, VEHICLE_CRASH -> true;
+                default                       -> false;
+            };
+            if (!investigate) continue;
+            float heardWithin = Math.min(radius, s.radius);
+            float d = (float) myPos.distanceTo(s.origin);
+            if (d <= heardWithin && d < bestDist) { bestDist = d; best = s.origin; }
+        }
+        return best;
     }
 
     /**
@@ -586,6 +719,10 @@ public class AICharacter extends Character {
     public void onEnemyDamaged(float amount) {
         CharacterController ctrl = getCharacterController();
         if (ctrl != null) ctrl.onDamagedByAttacker(currentTarget);
+        // Being shot is a confirmed sighting too (E3): rally the squad onto the attacker. The damage
+        // signal only carries the amount, so we use currentTarget (the AI's believed attacker) — set
+        // when it already sees the shooter, which is the common "shoot one, the squad turns" case.
+        if (currentTarget != null) broadcastToSquad(currentTarget, currentTarget.getGlobalPosition());
     }
 
     @RegisterFunction
@@ -624,6 +761,11 @@ public class AICharacter extends Character {
         lodTimer        = godot.global.GD.randfRange(0f, 2.0f);
         targetScanTimer = godot.global.GD.randfRange(0f, (float) TARGET_SCAN_INTERVAL);
         losCacheTimer   = godot.global.GD.randfRange(0f, (float) LOS_CACHE_INTERVAL);
+
+        // Drop references carried over from the previous life so a recycled body never points at a
+        // freed node: the camera's aim target and any escort target (and its Health.hit connection).
+        clearCameraAimTarget();
+        if (escortTarget != null) setEscortTarget(null);
 
         if (healthNode != null) healthNode.resetFull();
 

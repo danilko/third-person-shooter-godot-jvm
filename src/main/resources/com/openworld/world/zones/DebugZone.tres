@@ -1,19 +1,18 @@
-[gd_resource type="Resource" script_class="WorldZone" format=3 uid="uid://bdbgzone0e1aa"]
+[gd_resource type="Resource" format=3 uid="uid://bdbg0one0e1aa"]
 
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/WorldZone.java" id="1_wz"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/SpawnConfig.java" id="2_sc"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/zones/DebugZoneGeometry.tscn" id="1_cmp8a"]
+[ext_resource type="Script" uid="uid://cbbpelnr1c44f" path="res://src/main/java/com/openworld/world/WorldZone.java" id="1_wz"]
+[ext_resource type="Script" uid="uid://giovrewvxhap" path="res://gdj/com/openworld/world/SpawnConfig.gdj" id="3_cmp8a"]
 
-[sub_resource type="Resource" id="SpawnConfig_dbg"]
-script = ExtResource("2_sc")
-faction = "enemy"
-count = 5
-weapon_scene_path = "res://src/main/resources/com/openworld/weapon/AR4.tscn"
+[sub_resource type="Resource" id="Resource_vt165"]
+script = ExtResource("3_cmp8a")
+metadata/_custom_type_script = "uid://giovrewvxhap"
 
 [resource]
 script = ExtResource("1_wz")
 zone_id = "debug_zone"
-size = Vector3(20, 4, 20)
-load_radius = 40.0
-unload_radius = 70.0
-spawn_configs = Array[Resource]([SubResource("SpawnConfig_dbg")])
-named_characters = Array[Resource]([])
+size = Vector3(50, 4, 50)
+load_radius = 30.0
+unload_radius = 50.0
+geometry = ExtResource("1_cmp8a")
+spawn_configs = Array[Object]([SubResource("Resource_vt165")])

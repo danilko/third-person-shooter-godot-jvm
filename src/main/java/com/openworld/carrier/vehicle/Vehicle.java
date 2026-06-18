@@ -3,6 +3,7 @@ package com.openworld.carrier.vehicle;
 import com.openworld.character.*;
 import com.openworld.character.Character;
 import com.openworld.world.SpatialEntityGrid;
+import com.openworld.world.StimulusManager;
 import com.openworld.world.manager.ExplosionManager;
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
@@ -109,6 +110,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     private UserCommand cmd = new UserCommand();
 
     private final java.util.HashSet<Character> activeCollisions = new java.util.HashSet<>();
+    /** Counts down between VEHICLE_CRASH stimulus posts so a sustained scrape alerts AI at most ~1×/s (E2). */
+    private double crashStimulusCooldown = 0.0;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -373,9 +376,27 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
         }
 
+        // VEHICLE_CRASH stimulus (PLAN.md E2): a fast impact against anything (wall or body) alerts
+        // nearby AI. Throttled so a sustained scrape posts ~1×/s rather than every physics frame.
+        crashStimulusCooldown = Math.max(0.0, crashStimulusCooldown - state.getStep());
+        if (count > 0 && speed >= cfg.vehicleCollisionMinSpeed && crashStimulusCooldown <= 0.0) {
+            StimulusManager sm = StimulusManager.get();
+            if (sm != null) {
+                String faction = (occupant != null && occupant.getCharacterInfo() != null)
+                        ? occupant.getCharacterInfo().faction : "";
+                sm.post(StimulusManager.Type.VEHICLE_CRASH, getGlobalPosition(),
+                        CRASH_HEARING_RADIUS, this, faction);
+                crashStimulusCooldown = CRASH_STIMULUS_INTERVAL;
+            }
+        }
+
         activeCollisions.clear();
         activeCollisions.addAll(currentContacts);
     }
+
+    /** Audible range (m) of a vehicle crash to AI, and the min seconds between crash stimulus posts (E2). */
+    private static final float  CRASH_HEARING_RADIUS    = 200f;
+    private static final double CRASH_STIMULUS_INTERVAL = 0.75;
 
     private void applyVehicleCollisionDamage(Character character, float speed, VehicleConfig cfg) {
         float damage = (speed - cfg.vehicleCollisionMinSpeed) * cfg.vehicleCollisionDamageScale;
