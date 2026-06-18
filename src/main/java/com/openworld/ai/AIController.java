@@ -78,6 +78,29 @@ public class AIController extends Controller {
         currentState.enter(getBody(), this);
     }
 
+    /**
+     * Wipe all FSM memory and return to the initial state. Called when a pooled body is recycled
+     * into a fresh spawn (PLAN.md Part E / E1 SpawnPool) so a reused AI does not resume a stale
+     * chase/search/flee from its previous life.
+     */
+    public void resetState() {
+        attackTimer = 0.0;
+        lostTargetTimer = 0.0;
+        reactionTimer = 0.0;
+        underAttackTimer = 0.0;
+        strafeTimer = 0.0;
+        searchTimer = 0.0;
+        stillTimer = 0.0;
+        stanceHoldTimer = 0.0;
+        lastKnownTargetPosition = null;
+        currentAimTarget = null;
+        lastNavTarget = null;
+        escortTargetUnderAttack = false;
+        fleeStartPosition = null;
+        intendedAttackStance = StanceName.UPRIGHT;
+        transitionTo(initialState());
+    }
+
     // ── Memory / timers ───────────────────────────────────────────────────────
     // (moved from AICharacter — these are "what the AI remembers", not body capability)
 

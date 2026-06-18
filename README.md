@@ -1,4 +1,4 @@
-# Godot Kotlin/JVM Shooter
+# Godot Kotlin/JVM Open World Shooter
 
 A technical exploration of 3D game mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. This project adapts and refactors traditional GDScript-based third-person controllers into a Java/Kotlin-compatible architecture.
 
@@ -129,17 +129,17 @@ A shot flows through one path for every weapon, gated and then delegated:
 
 ```
 fire held → WeaponController.onWeaponFire()
-    ├─ gate: fireTimer (1 / fireRate), not reloading, not switching
-    ├─ semi-auto lock: WeaponItem.isSemiAutoReady()  (!isWeaponFired || auto)
-    ├─ weapon.useWeapon()
-    │     FirearmItem  → performHitscan() ×pelletCount  (hitscan ray, cone spread)
-    │     ProjectileItem / ThrowableItem → spawn a physics projectile (rocket / grenade)
-    │     MeleeItem    → swing window + hitbox overlap
-    └─ on a hitscan hit → HitInfo(node, point, normal)
-           → ImpactManager.processHit(info, damage, weapon, attacker)
-                 ├─ spawnImpactParticles()  (ParticleManager, per SurfaceType)
-                 ├─ spawnDecal()            (DecalManager)
-                 └─ applyDamage()           (Health.takeDamage → bone multiplier / headshot)
+	├─ gate: fireTimer (1 / fireRate), not reloading, not switching
+	├─ semi-auto lock: WeaponItem.isSemiAutoReady()  (!isWeaponFired || auto)
+	├─ weapon.useWeapon()
+	│     FirearmItem  → performHitscan() ×pelletCount  (hitscan ray, cone spread)
+	│     ProjectileItem / ThrowableItem → spawn a physics projectile (rocket / grenade)
+	│     MeleeItem    → swing window + hitbox overlap
+	└─ on a hitscan hit → HitInfo(node, point, normal)
+		   → ImpactManager.processHit(info, damage, weapon, attacker)
+				 ├─ spawnImpactParticles()  (ParticleManager, per SurfaceType)
+				 ├─ spawnDecal()            (DecalManager)
+				 └─ applyDamage()           (Health.takeDamage → bone multiplier / headshot)
 ```
 
 - **Hitscan** firearms raycast from the camera's `AimRay`; the hit is bundled into an immutable

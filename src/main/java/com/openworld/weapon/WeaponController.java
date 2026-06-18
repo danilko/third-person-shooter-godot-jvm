@@ -175,7 +175,9 @@ public class WeaponController extends Node {
   }
 
   public WeaponItem getWeaponItem(int slotIndex) {
-    if (slotIndex < 0 || slotIndex >= weapons.length) return null;
+    // weapons is allocated in _ready(); a reader can hit this before then (e.g. a sibling
+    // Nameplate whose _ready runs first) — treat "not yet built" as empty.
+    if (weapons == null || slotIndex < 0 || slotIndex >= weapons.length) return null;
     return weapons[slotIndex];
   }
 
@@ -215,6 +217,21 @@ public class WeaponController extends Node {
         else       returnWeaponToWorld(drop.item(), drop.slot());
       }
     }
+  }
+
+  /**
+   * Stop any in-flight weapon SFX before this controller leaves the tree. A 3D playback still
+   * running when its node is freed mid-session leaks the playback and its stream at exit
+   * ("Leaked instance: AudioStreamPlaybackWAV … Resource still in use: Rifle_reload.wav"). The
+   * networked symptom: the client frees its pre-placed Player on connect ({@code
+   * NetworkManager.removeLocalPrePlacedPlayer}) while the spawn-time equip SFX is still playing —
+   * single-player never frees a body mid-session, so the cue always finishes naturally. Stopping
+   * here releases the playback on every teardown path (despawn, disconnect, engine shutdown).
+   */
+  @RegisterFunction
+  @Override
+  public void _exitTree() {
+    if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) weaponAudio.stop();
   }
 
   @RegisterFunction

@@ -10,6 +10,7 @@ import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
+import godot.annotation.RegisterSignal;
 import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
@@ -56,7 +57,7 @@ import com.openworld.weapon.WeaponController;
  * Assign a .tres preset in the inspector; leave null to use built-in DEFAULTS.
  */
 @RegisterClass(className = "Vehicle")
-public class Vehicle extends RigidBody3D implements Controllable {
+public class Vehicle extends RigidBody3D implements Controllable, NameplateTarget {
 
     // ── Inspector exports ─────────────────────────────────────────────────────
 
@@ -409,6 +410,34 @@ public class Vehicle extends RigidBody3D implements Controllable {
     @Override public void applyCommand(UserCommand cmd, double delta) { }
     @Override public CharacterInfo getCharacterInfo()                 { return characterInfo; }
 
+    // ── NameplateTarget ─────────────────────────────────────────────────────────
+    // The carrier reuses ui/Nameplate.tscn unchanged: the plate finds its sibling "Health" and
+    // "WeaponController" nodes itself, so health + weapon/ammo are the CARRIER's. Only the colour
+    // is carrier-specific — it follows the DRIVER's faction, neutral when not ridden or the driver
+    // is down. tryEnter/tryExit (run on every peer via the host-arbitrated seat change) emit
+    // nameplateChanged, so the tint re-derives on every peer with no extra net message.
+
+    @RegisterSignal
+    public final Signal0 nameplateChanged = new Signal0(this, new StringName("nameplate_changed"));
+
+    @Override
+    public String getNameplateText() {
+        if (characterInfo != null && !characterInfo.displayName.isEmpty()) return characterInfo.displayName;
+        return getName().toString();
+    }
+
+    @Override
+    public Color getNameplateColor() {
+        // Driver seat occupant determines the colour; neutral when empty or the driver is defeated.
+        if (occupant != null && occupant.isAlive() && occupant.characterInfo != null) {
+            return Faction.color(occupant.characterInfo.faction);
+        }
+        return Faction.color(Faction.NEUTRAL);
+    }
+
+    @Override
+    public Signal0 getNameplateChangedSignal() { return nameplateChanged; }
+
     // ── Enter / Exit ──────────────────────────────────────────────────────────
     //
     // Round 11 N3: networked enter/exit is HOST-ARBITRATED. requestEnter/requestExit are
@@ -502,6 +531,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
         }
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this, c.characterInfo);
+        nameplateChanged.emit();   // re-tint the carrier plate to the new driver's faction
     }
 
     /** Executes the unseat locally — same puppet awareness as {@link #tryEnter}. */
@@ -538,6 +568,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
         activeCollisions.add(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
+        nameplateChanged.emit();   // seat now empty → carrier plate falls back to neutral
     }
 
     /**
