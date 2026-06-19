@@ -30,6 +30,10 @@ public class AIBehaviorConfig extends Resource {
     /** Distance (m) at which this AI can detect a hostile target. */
     @Export @RegisterProperty public float detectionRange = 120.0f;
 
+    /** Distance (m) at which this AI perceives world stimuli (gunshots, explosions — PLAN.md E2).
+     *  Capped against each stimulus's own audible radius, so a quiet event is heard only up close. */
+    @Export @RegisterProperty public float hearingRadius = 150.0f;
+
     /** Distance (m) at which this AI transitions from Chase to Attack. */
     @Export @RegisterProperty public float attackRange = 150.0f;
 

@@ -39,11 +39,12 @@ import com.openworld.ui.HUDManager;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 import com.openworld.weapon.WeaponType;
+import com.openworld.world.SpatialEntityGrid;
 import com.openworld.world.manager.ExplosionManager;
 import com.openworld.world.manager.ImpactManager;
 
 @RegisterClass
-public class Character extends CharacterBody3D implements Controllable {
+public class Character extends CharacterBody3D implements Controllable, NameplateTarget {
 
     // ── Signals ──────────────────────────────────────────────────────────────
     @RegisterSignal
@@ -75,6 +76,14 @@ public class Character extends CharacterBody3D implements Controllable {
 
     @RegisterSignal
     public final Signal0 dropWeapon = new Signal0(this, new StringName("drop_weapon"));
+
+    /**
+     * Generic {@link NameplateTarget} refresh: emitted whenever name, faction colour, or active
+     * weapon changes (faction swap, weapon switch). The nameplate re-reads the getters; health/ammo
+     * refresh via the Health/WeaponController node signals.
+     */
+    @RegisterSignal
+    public final Signal0 nameplateChanged = new Signal0(this, new StringName("nameplate_changed"));
 
     // ── Exports ───────────────────────────────────────────────────────────────
     @Export
@@ -223,11 +232,23 @@ public class Character extends CharacterBody3D implements Controllable {
         if (characterInfo.characterId.isEmpty())
             characterInfo.characterId = UUID.randomUUID().toString();
         addToGroup(new StringName("characters"), false);
+        // Register in the spatial grid so AI target discovery can query neighbours in O(k)
+        // instead of scanning the whole "characters" group (PLAN.md Part D / D1). Stagger the
+        // first re-bucket so bodies spawned together don't all update on the same frame.
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.register(this, getGlobalPosition());
+        gridUpdateTimer = GD.randfRange(0f, (float) GRID_UPDATE_INTERVAL);
         if (hasNode(aimTargetPath)) {
             aimTarget = (Marker3D) getNode(aimTargetPath);
         }
         if (hasNode(aimRayPath)) {
             aimRay = (RayCast3D) getNode(aimRayPath);
+            // Exclude our own body from the AimRay. The bone exceptions (addPhysicalBoneExceptions)
+            // only cover the ragdoll PhysicalBone3D nodes, not the live stance capsule. Firearms
+            // never hit self (spread < 0.5deg), but MeleeItem casts this ray through a +/-25deg cone
+            // that can tilt onto the character's own capsule and deal self-damage. Excepting the body
+            // here is rotation-independent, so it covers every cone ray (and hardens firearm hitscan).
+            aimRay.addException(this);
         }
         if (hasNode(cameraRootPath)) {
             cameraRoot = (Node3D) getNode(cameraRootPath);
@@ -299,6 +320,10 @@ public class Character extends CharacterBody3D implements Controllable {
         // character — player and AI — so multi-character systems (C2) can build
         // characterId-keyed registries instead of assuming a single local player.
         callDeferred(StringNames.toGodotName("emitCharacterSpawned"));
+
+        // Decide our own-nameplate hide by ownership, not the camera — deferred so ownerPeerId is
+        // resolved. No-ops for AI and other peers' bodies (they keep their visible nameplate).
+        callDeferred(StringNames.toGodotName("applyNameplateVisibility"));
     }
 
     @RegisterFunction
@@ -450,10 +475,35 @@ public class Character extends CharacterBody3D implements Controllable {
         return currentMovementType != null ? currentMovementType.ordinal() : 0;
     }
 
+    /** Current movement direction — read by AIController to build a PASSIVE-tier hold-heading command. */
+    public Vector3 getMovementDirection() { return movementDirection; }
+
+    /** Current movement type — read by AIController to build a PASSIVE-tier hold-heading command. */
+    public MovementType getCurrentMovementType() { return currentMovementType; }
+
+    // ── Spatial grid bookkeeping (PLAN.md Part D / D1) ───────────────────────
+    private static final double GRID_UPDATE_INTERVAL = 0.25;
+    private double gridUpdateTimer = 0.0;
+
+    /**
+     * Throttled spatial-grid re-bucket. Cheap (a map lookup) while the body stays in its cell;
+     * only an actual cell crossing re-hashes. Called from {@link #_physicsProcess} BEFORE the
+     * non-authority early return so puppet bodies (NetworkController, e.g. remote players on the
+     * host) keep their grid cell current too — host AI must be able to find them.
+     */
+    protected void updateSpatialCell(double delta) {
+        gridUpdateTimer -= delta;
+        if (gridUpdateTimer > 0.0) return;
+        gridUpdateTimer = GRID_UPDATE_INTERVAL;
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.move(this, getGlobalPosition());
+    }
+
     // ── Physics loop: gather → apply ─────────────────────────────────────────
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
+        updateSpatialCell(delta);
         UserCommand cmd;
         if (controller != null) {
             if (!controller.isAuthority()) return; // non-authority: state arrives via MSG_SNAPSHOT — see NetworkController
@@ -473,6 +523,14 @@ public class Character extends CharacterBody3D implements Controllable {
     @Override
     public void _process(double delta) {
         ragdoll.tickFreeze(delta);
+    }
+
+    /** Drop out of the spatial grid when this body leaves the tree (death/despawn). */
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.unregister(this);
     }
 
     /** Fallback input path when no Controller child is present. Returns empty command. */
@@ -705,6 +763,7 @@ public class Character extends CharacterBody3D implements Controllable {
 
     public void setWeapon(int weapon) {
         changedWeapon.emit(weapon);
+        nameplateChanged.emit();
         // Preview camera state for the target weapon type immediately so the camera
         // starts lerping to melee/ranged position during the weapon-switch animation.
         if (combat && weapon >= 0) {
@@ -723,6 +782,41 @@ public class Character extends CharacterBody3D implements Controllable {
     @Override
     public CharacterInfo getCharacterInfo() {
         return characterInfo;
+    }
+
+    // ── NameplateTarget ─────────────────────────────────────────────────────────
+    @Override
+    public String getNameplateText() {
+        return characterInfo != null ? characterInfo.displayName : "";
+    }
+
+    @Override
+    public Color getNameplateColor() {
+        return Faction.color(characterInfo != null ? characterInfo.faction : null);
+    }
+
+    @Override
+    public Signal0 getNameplateChangedSignal() {
+        return nameplateChanged;
+    }
+
+    /**
+     * Host-authoritative runtime faction change (D3). Updates this body's faction and, on a
+     * networked host, replicates it so every client re-targets identically — target discovery reads
+     * {@code characterInfo.faction} fresh each scan, so the change takes effect on the next scan.
+     * A client applying an inbound swap (GameManager.applyCharacterFaction) calls this too, but the
+     * {@code isServer()} gate stops it echoing back. Emits {@link #nameplateChanged} so cosmetics that
+     * key off faction (e.g. the nameplate tint) re-apply on every peer, host and client alike.
+     */
+    public void setFaction(String faction) {
+        if (characterInfo == null || faction == null) return;
+        characterInfo.faction = faction;
+        nameplateChanged.emit();
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (netNode instanceof com.openworld.net.NetworkManager net && net.isNetworked() && net.isServer()) {
+            net.broadcastWorldEvent(com.openworld.game.GameManager.WORLD_EVENT_FACTION_SWAP,
+                    characterInfo.characterId, 0f, java.util.List.of(faction));
+        }
     }
 
     /** The controller currently driving this body — null only before _ready() resolves it. */
@@ -811,10 +905,7 @@ public class Character extends CharacterBody3D implements Controllable {
         // a valid local viewpoint — AICharacter is a sibling type, never a Player.
         if (!(this instanceof Player)) return;
         Node netNode = getNodeOrNull("/root/NetworkManager");
-        boolean isLocalView = characterInfo == null
-                || !(netNode instanceof com.openworld.net.NetworkManager net) || !net.isNetworked()
-                || net.isAuthorityFor(characterInfo);
-        if (isLocalView) {
+        if (isLocallyOwnedPlayer()) {
             activeCamera.makeCurrent();
         } else if (netNode instanceof com.openworld.net.NetworkManager net && net.isNetworked()
                    && controller instanceof PlayerController) {
@@ -828,6 +919,35 @@ public class Character extends CharacterBody3D implements Controllable {
             setCollisionLayer(0);
             setCollisionMask(0);
         }
+    }
+
+    /**
+     * True when this body is the local peer's own player — the one we drive: single-player always,
+     * or, when networked, the body this peer is authoritative for ({@code ownerPeerId == localPeerId}).
+     * Gated to {@link Player} so it is never true for AI (on the host the AI's ownerPeerId is
+     * SERVER_PEER_ID, so it would otherwise report as "ours"). This is the ownership signal — the
+     * camera being current is a consequence of it, not the source of truth.
+     */
+    private boolean isLocallyOwnedPlayer() {
+        if (!(this instanceof Player)) return false;
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (!(netNode instanceof com.openworld.net.NetworkManager net) || !net.isNetworked()) return true;
+        return net.isAuthorityFor(characterInfo);
+    }
+
+    /**
+     * Hide this body's own nameplate — you never see your own. Decided purely by ownership (not by
+     * the camera): a Player we locally own hides it; AI and other peers' players keep the
+     * Character.tscn default (visible), so networked peers still see each other's plates. Deferred
+     * from _ready (like activateCameraIfOwned) so ownerPeerId/characterInfo are resolved first.
+     * Replaces the old per-scene `visible = false` override on Player.tscn (which also hid remote
+     * players') and the camera-coupled hide inside activateCameraIfOwned.
+     */
+    @RegisterFunction
+    public void applyNameplateVisibility() {
+        if (!isLocallyOwnedPlayer()) return;
+        Node nameplate = getNodeOrNull("CharacterNameplate");
+        if (nameplate instanceof Node3D np) np.setVisible(false);
     }
 
     public boolean isAlive() {

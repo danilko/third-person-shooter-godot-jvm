@@ -9,6 +9,7 @@ import godot.core.*;
 import godot.global.GD;
 import java.util.HashMap;
 import java.util.Map;
+import com.openworld.ai.AILodLevel;
 import com.openworld.movement.character.CombatState;
 import com.openworld.movement.character.JumpState;
 import com.openworld.movement.character.MovementState;
@@ -83,8 +84,10 @@ public class AnimationController extends Node {
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || animationTree == null) return;
-    // Skip entirely for LOD-frozen AIs — they hold their last pose with zero JVM bridge cost.
-    if (player instanceof AICharacter ai && ai.isLodFrozen()) return;
+    // Skip for any non-ACTIVE LOD tier (PASSIVE or FROZEN): the AnimationTree JVM-bridge writes
+    // are the most expensive per-AI work, so mid-range and distant AIs hold their last pose at
+    // zero bridge cost (PLAN.md Part D / D2). Player/non-AI bodies are always ACTIVE.
+    if (player instanceof AICharacter ai && ai.getLodLevel() != AILodLevel.ACTIVE) return;
 
     onFloorBlendTarget = player.isOnFloor() ? 1.0 : 0.0;
     double newBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, floorBlendSpeed * delta);

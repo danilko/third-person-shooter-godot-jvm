@@ -2,6 +2,8 @@ package com.openworld.carrier.vehicle;
 
 import com.openworld.character.*;
 import com.openworld.character.Character;
+import com.openworld.world.SpatialEntityGrid;
+import com.openworld.world.StimulusManager;
 import com.openworld.world.manager.ExplosionManager;
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
@@ -9,6 +11,7 @@ import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
+import godot.annotation.RegisterSignal;
 import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
@@ -55,7 +58,7 @@ import com.openworld.weapon.WeaponController;
  * Assign a .tres preset in the inspector; leave null to use built-in DEFAULTS.
  */
 @RegisterClass(className = "Vehicle")
-public class Vehicle extends RigidBody3D implements Controllable {
+public class Vehicle extends RigidBody3D implements Controllable, NameplateTarget {
 
     // ── Inspector exports ─────────────────────────────────────────────────────
 
@@ -107,6 +110,8 @@ public class Vehicle extends RigidBody3D implements Controllable {
     private UserCommand cmd = new UserCommand();
 
     private final java.util.HashSet<Character> activeCollisions = new java.util.HashSet<>();
+    /** Counts down between VEHICLE_CRASH stimulus posts so a sustained scrape alerts AI at most ~1×/s (E2). */
+    private double crashStimulusCooldown = 0.0;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -127,6 +132,11 @@ public class Vehicle extends RigidBody3D implements Controllable {
             }
         }
         addToGroup(new StringName("characters"), false);
+        // Register in the spatial grid so AI target discovery finds vehicle occupants in O(k)
+        // (PLAN.md Part D / D1). Stagger the first re-bucket like Character does.
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.register(this, getGlobalPosition());
+        gridUpdateTimer = GD.randfRange(0f, (float) GRID_UPDATE_INTERVAL);
         setContactMonitor(true);
         setMaxContactsReported(8);
 
@@ -225,9 +235,31 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     // ── Physics ───────────────────────────────────────────────────────────────
 
+    // ── Spatial grid bookkeeping (PLAN.md Part D / D1) ───────────────────────
+    private static final double GRID_UPDATE_INTERVAL = 0.25;
+    private double gridUpdateTimer = 0.0;
+
+    /** Throttled spatial-grid re-bucket — mirrors {@code Character.updateSpatialCell}. */
+    private void updateSpatialCell(double delta) {
+        gridUpdateTimer -= delta;
+        if (gridUpdateTimer > 0.0) return;
+        gridUpdateTimer = GRID_UPDATE_INTERVAL;
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.move(this, getGlobalPosition());
+    }
+
+    /** Drop out of the spatial grid when the vehicle leaves the tree (destroyed/despawned). */
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.unregister(this);
+    }
+
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
+        updateSpatialCell(delta);
         boolean isGrounded = false;
 
         cmd.motor     = 0;
@@ -272,7 +304,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
                 w.applyWheelPhysics((float) delta, (float) getPhysicsProcessDeltaTime(), cmd);
                 w.applyWheelSteering((float) delta, cmd.steering);
                 w.applySkidMark();
-                if (w.isColliding()) isGrounded = true;
+                if (w.grounded()) isGrounded = true;
             }
 
             setCenterOfMassMode(CenterOfMassMode.CUSTOM);
@@ -344,9 +376,27 @@ public class Vehicle extends RigidBody3D implements Controllable {
             }
         }
 
+        // VEHICLE_CRASH stimulus (PLAN.md E2): a fast impact against anything (wall or body) alerts
+        // nearby AI. Throttled so a sustained scrape posts ~1×/s rather than every physics frame.
+        crashStimulusCooldown = Math.max(0.0, crashStimulusCooldown - state.getStep());
+        if (count > 0 && speed >= cfg.vehicleCollisionMinSpeed && crashStimulusCooldown <= 0.0) {
+            StimulusManager sm = StimulusManager.get();
+            if (sm != null) {
+                String faction = (occupant != null && occupant.getCharacterInfo() != null)
+                        ? occupant.getCharacterInfo().faction : "";
+                sm.post(StimulusManager.Type.VEHICLE_CRASH, getGlobalPosition(),
+                        CRASH_HEARING_RADIUS, this, faction);
+                crashStimulusCooldown = CRASH_STIMULUS_INTERVAL;
+            }
+        }
+
         activeCollisions.clear();
         activeCollisions.addAll(currentContacts);
     }
+
+    /** Audible range (m) of a vehicle crash to AI, and the min seconds between crash stimulus posts (E2). */
+    private static final float  CRASH_HEARING_RADIUS    = 200f;
+    private static final double CRASH_STIMULUS_INTERVAL = 0.75;
 
     private void applyVehicleCollisionDamage(Character character, float speed, VehicleConfig cfg) {
         float damage = (speed - cfg.vehicleCollisionMinSpeed) * cfg.vehicleCollisionDamageScale;
@@ -380,6 +430,34 @@ public class Vehicle extends RigidBody3D implements Controllable {
 
     @Override public void applyCommand(UserCommand cmd, double delta) { }
     @Override public CharacterInfo getCharacterInfo()                 { return characterInfo; }
+
+    // ── NameplateTarget ─────────────────────────────────────────────────────────
+    // The carrier reuses ui/Nameplate.tscn unchanged: the plate finds its sibling "Health" and
+    // "WeaponController" nodes itself, so health + weapon/ammo are the CARRIER's. Only the colour
+    // is carrier-specific — it follows the DRIVER's faction, neutral when not ridden or the driver
+    // is down. tryEnter/tryExit (run on every peer via the host-arbitrated seat change) emit
+    // nameplateChanged, so the tint re-derives on every peer with no extra net message.
+
+    @RegisterSignal
+    public final Signal0 nameplateChanged = new Signal0(this, new StringName("nameplate_changed"));
+
+    @Override
+    public String getNameplateText() {
+        if (characterInfo != null && !characterInfo.displayName.isEmpty()) return characterInfo.displayName;
+        return getName().toString();
+    }
+
+    @Override
+    public Color getNameplateColor() {
+        // Driver seat occupant determines the colour; neutral when empty or the driver is defeated.
+        if (occupant != null && occupant.isAlive() && occupant.characterInfo != null) {
+            return Faction.color(occupant.characterInfo.faction);
+        }
+        return Faction.color(Faction.NEUTRAL);
+    }
+
+    @Override
+    public Signal0 getNameplateChangedSignal() { return nameplateChanged; }
 
     // ── Enter / Exit ──────────────────────────────────────────────────────────
     //
@@ -474,6 +552,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
         }
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this, c.characterInfo);
+        nameplateChanged.emit();   // re-tint the carrier plate to the new driver's faction
     }
 
     /** Executes the unseat locally — same puppet awareness as {@link #tryEnter}. */
@@ -510,6 +589,7 @@ public class Vehicle extends RigidBody3D implements Controllable {
         activeCollisions.add(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
+        nameplateChanged.emit();   // seat now empty → carrier plate falls back to neutral
     }
 
     /**

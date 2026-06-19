@@ -18,6 +18,7 @@ import com.openworld.item.Pickup;
 import com.openworld.movement.character.Stance;
 import com.openworld.movement.character.StanceName;
 import com.openworld.world.manager.ImpactManager;
+import com.openworld.world.StimulusManager;
 
 /**
  * Hitscan firearm. Owns: spread calculation, recoil, muzzle flash, fire audio,
@@ -31,6 +32,9 @@ public class FirearmItem extends WeaponItem {
 
   private GPUParticles3D muzzleFlashFx;
   private AnimationPlayer muzzleFlashAnimPlayer;
+
+  /** How far this shot is audible to AI (PLAN.md E2 — ~150 m urban, raise toward ~400 m for open terrain). */
+  @Export @RegisterProperty public float gunshotHearingRadius = 150f;
 
   // Lazy-resolved world manager (ImpactManager is in WeaponItem base)
   private BulletTracerManager bulletTracerManager;
@@ -84,6 +88,21 @@ public class FirearmItem extends WeaponItem {
     applyRecoil();
     currentBloom = Math.min(currentBloom + bloomPerShot, bloomMax);
     for (int i = 0; i < pelletCount; i++) performHitscan();
+    postGunshotStimulus();
+  }
+
+  /**
+   * Drop a GUNSHOT stimulus at the muzzle so nearby patrolling AI investigate (PLAN.md E2). Runs only
+   * on the authority fire path ({@link #useWeapon}, not the puppet {@code playRemoteFireCue}), so the
+   * host — which simulates the AI — sees the event. No-op without the StimulusManager AutoLoad.
+   */
+  private void postGunshotStimulus() {
+    StimulusManager sm = StimulusManager.get();
+    if (sm == null) return;
+    String faction = (owningCharacter instanceof Character c && c.characterInfo != null)
+        ? c.characterInfo.faction : "";
+    sm.post(StimulusManager.Type.GUNSHOT, weaponMuzzle().getGlobalPosition(),
+        gunshotHearingRadius, owningCharacter, faction);
   }
 
   /**
@@ -109,6 +128,12 @@ public class FirearmItem extends WeaponItem {
    */
   public void playRemoteFireCue() {
     playFireCue();
+    // E2 networked perception: this runs on every non-authority peer when a puppet's replicated
+    // fireSeq bumps. On the HOST (which simulates the AI) a puppet is a remote *client's* character —
+    // turn its shot into a GUNSHOT stimulus so host AI hear client gunfire too (the gap E2 left).
+    // Other clients also run this but don't post (their AI are puppets that never poll). Reuses the
+    // existing fire replication — no new network message.
+    if (isServerPeer()) postGunshotStimulus();
     if (!(owningCharacter instanceof Character c)) return;
     Vector3 origin = weaponMuzzle().getGlobalPosition();
     Vector3 dir = c.getAimTargetPosition().minus(origin);
@@ -266,6 +291,13 @@ public class FirearmItem extends WeaponItem {
   private boolean isNetworkedClient() {
     Node netNode = getNodeOrNull("/root/NetworkManager");
     return netNode instanceof NetworkManager net && net.isNetworked() && !net.isServer();
+  }
+
+  /** True on the host of a networked session (the peer that simulates the AI, so the one whose
+   *  StimulusManager AI poll). Used to turn a *remote* player's replicated shot into a host stimulus. */
+  private boolean isServerPeer() {
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    return netNode instanceof NetworkManager net && net.isNetworked() && net.isServer();
   }
 
   /** Sends this shot's post-spread ray to the host for authoritative resolution. */

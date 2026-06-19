@@ -56,6 +56,18 @@ public class VehicleWheel extends RayCast3D {
     private float tireMaxTurnMaxRad;
     private float gripFactor;
 
+    /**
+     * Extra fore/aft suspension probes (cfg.suspensionSamples - 1 of them). The wheel node
+     * itself is always the centre probe; these sample the rest of the contact patch so the
+     * wheel rides over edges/cracks smoothly. Empty when suspensionSamples <= 1.
+     */
+    private final java.util.ArrayList<RayCast3D> extraProbes = new java.util.ArrayList<>();
+
+    /** Aggregated ground contact for the current frame, populated by {@link #sampleGround()}. */
+    private boolean groundHit;
+    private Vector3 groundPoint;
+    private Vector3 groundNormal;
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     @RegisterFunction
@@ -75,7 +87,74 @@ public class VehicleWheel extends RayCast3D {
         Vector3 targetPosition = getTargetPosition();
         targetPosition.setY(-(cfg.restDistance + cfg.wheelRadius + cfg.overExtend));
         setTargetPosition(targetPosition);
+
+        buildExtraProbes();
     }
+
+    /**
+     * Spawns the additional contact-patch probe rays (cfg.suspensionSamples - 1). They are
+     * RayCast3D children of this wheel — so they inherit its steer rotation and stay fore/aft
+     * of the rolling direction — offset along local Z, with the same mask/exceptions as the
+     * centre ray. The vehicle body is excepted so a probe never self-hits.
+     */
+    private void buildExtraProbes() {
+        int samples = Math.max(1, cfg.suspensionSamples);
+        if (samples <= 1) return;
+
+        float spread = cfg.suspensionSampleSpread;
+        Vector3 target = getTargetPosition();
+        for (int i = 0; i < samples; i++) {
+            // Even fore/aft distribution across [-spread, +spread]; the centre (offset 0,
+            // index nearest the middle) is already covered by the wheel node itself.
+            float off = (samples == 1) ? spread
+                    : (-spread + 2f * spread * i / (samples - 1));
+            if (Math.abs(off) < 1e-4f) continue;   // centre = the wheel node's own ray
+
+            RayCast3D probe = new RayCast3D();
+            probe.setName(new godot.core.StringName("SuspensionProbe" + i));
+            probe.setEnabled(true);
+            probe.setCollisionMask(getCollisionMask());
+            probe.setCollideWithAreas(isCollideWithAreasEnabled());
+            probe.setCollideWithBodies(isCollideWithBodiesEnabled());
+            addChild(probe);
+            probe.setPosition(new Vector3(0f, 0f, off));   // local +Z = backward, -Z = forward
+            probe.setTargetPosition(target);
+            if (vehicle != null) probe.addException(vehicle);
+            extraProbes.add(probe);
+        }
+    }
+
+    /**
+     * Aggregates the centre ray + extra probes into a single ground contact for this frame.
+     * Uses the HIGHEST contact (closest to the wheel → least sink, so the wheel rests on the
+     * highest point and never drops into a crack one ray happened to straddle) and the AVERAGED
+     * normal across all hits (steadier suspension/grip over bumps). Falls back to the single
+     * centre ray when suspensionSamples <= 1.
+     */
+    private void sampleGround() {
+        Vector3 origin = getGlobalPosition();
+        groundHit = isColliding();
+        groundPoint = groundHit ? getCollisionPoint() : null;
+        Vector3 normalSum = groundHit ? getCollisionNormal() : null;
+        double bestDist = groundHit ? origin.distanceTo(groundPoint) : Double.MAX_VALUE;
+        int normalCount = groundHit ? 1 : 0;
+
+        for (RayCast3D probe : extraProbes) {
+            probe.forceRaycastUpdate();
+            if (!probe.isColliding()) continue;
+            Vector3 p = probe.getCollisionPoint();
+            double d = origin.distanceTo(p);
+            if (!groundHit || d < bestDist) { bestDist = d; groundPoint = p; }
+            normalSum = (normalCount == 0) ? probe.getCollisionNormal()
+                                           : normalSum.plus(probe.getCollisionNormal());
+            normalCount++;
+            groundHit = true;
+        }
+        groundNormal = (normalCount > 0) ? normalSum.normalized() : null;
+    }
+
+    /** True when any of this wheel's probes touched the ground this frame. */
+    public boolean grounded() { return groundHit; }
 
     private Vector3 getPointVelocity(Vector3 point) {
         return vehicle.getLinearVelocity().plus(
@@ -93,38 +172,46 @@ public class VehicleWheel extends RayCast3D {
         double speed = forwardDir.dot(vehicle.getLinearVelocity());
         wheelMesh.rotateX((float)((-speed * physDelta) / cfg.wheelRadius));
 
-        if (!isColliding()) return;
+        // Aggregate the centre ray + any extra contact-patch probes into one contact.
+        sampleGround();
+        if (!groundHit) return;
 
-        Vector3 contact     = getCollisionPoint();
-        double  springLen   = getGlobalPosition().distanceTo(contact) - cfg.wheelRadius;
+        double  springLen   = getGlobalPosition().distanceTo(groundPoint) - cfg.wheelRadius;
         double  compression = cfg.restDistance - springLen;
 
         Vector3 wheelMeshPos = wheelMesh.getPosition();
         wheelMeshPos.setY(GD.moveToward(wheelMeshPos.getY(), -springLen, 5 * getPhysicsProcessDeltaTime()));
         wheelMesh.setPosition(wheelMeshPos);
 
-        contact = wheelMesh.getGlobalPosition();
+        Vector3 contact  = wheelMesh.getGlobalPosition();
         Vector3 forcePos = contact.minus(vehicle.getGlobalPosition());
 
         // Spring suspension force
         double springForceMag = cfg.springStrength * compression;
         Vector3 tireVelocity  = getPointVelocity(contact);
         double  dampForceMag  = cfg.springDamping * getGlobalBasis().getY().dot(tireVelocity);
-        Vector3 yForce        = getCollisionNormal().times(springForceMag - dampForceMag);
+        Vector3 yForce        = groundNormal.times(springForceMag - dampForceMag);
 
-        // Motor force
+        // Motor force. speedRatio is measured in the COMMANDED direction (speed * sign(motor)),
+        // so reverse tapers at maxSpeed exactly like forward. Previously a negative ratio made
+        // accelRatio = 1 - ratio grow PAST 1 in reverse — reverse was uncapped and stronger than
+        // forward (the "forward is much slower than backward" bug). Clamp the curve input too.
         if (isMotor && cmd.motor != 0) {
-            double speedRatio  = speed / cfg.maxSpeed;
+            double dirSpeed    = speed * Math.signum(cmd.motor);
+            double speedRatio  = dirSpeed / cfg.maxSpeed;
             double accelRatio  = cfg.accelerationCurve != null
-                    ? cfg.accelerationCurve.sampleBaked((float) speedRatio)
+                    ? cfg.accelerationCurve.sampleBaked((float) GD.clamp(speedRatio, 0.0, 1.0))
                     : Math.max(0.0, 1.0 - speedRatio);
             Vector3 accelForce = forwardDir.times(cfg.acceleration * cmd.motor * accelRatio);
             vehicle.applyForce(accelForce, forcePos);
         }
 
-        // Lateral (X) traction
+        // Lateral (X) traction. Guard the slip ratio against a zero-length tire velocity — at
+        // rest (e.g. the frame you enter a stationary vehicle) the division is 0/0 = NaN, and
+        // gripCurve.sampleBaked(NaN) throws the "Curve point not finite" error.
         float  steeringXSpeed = (float) getGlobalBasis().getX().dot(tireVelocity);
-        gripFactor = (float) GD.abs(steeringXSpeed / tireVelocity.length());
+        float  tireSpeed      = (float) tireVelocity.length();
+        gripFactor = tireSpeed > 1e-3f ? (float) GD.abs(steeringXSpeed / tireSpeed) : 0f;
         double xTraction = gripCurve != null ? gripCurve.sampleBaked(gripFactor) : 1.0;
 
         if (cmd.handbrake && gripFactor < 0.2f) vehicle.setSlipping(false);
@@ -153,7 +240,11 @@ public class VehicleWheel extends RayCast3D {
     }
 
     public void applySkidMark() {
-        skidMark.setGlobalPosition(getCollisionPoint().plus(Vector3.Companion.getUP().times(0.01)));
+        if (!groundHit || groundPoint == null) {
+            if (skidMark.isEmitting()) skidMark.setEmitting(false);   // airborne — no marks
+            return;
+        }
+        skidMark.setGlobalPosition(groundPoint.plus(Vector3.Companion.getUP().times(0.01)));
         skidMark.lookAt(skidMark.getGlobalPosition().plus(vehicle.getGlobalBasis().getZ()));
 
         if (!vehicle.isHandbraking() && gripFactor < 0.2f) {

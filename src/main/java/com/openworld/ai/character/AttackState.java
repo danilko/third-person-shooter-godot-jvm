@@ -69,6 +69,9 @@ public class AttackState implements AIState {
         if (hasLoS) {
             ctrl.setLastKnownTargetPosition(new Vector3(targetPos));
             ctrl.resetLostTargetTimer();
+            // Confirmed sighting → rally squad-mates onto this target so they engage without waiting
+            // for their own scan (PLAN.md E3). No-op for a solo AI.
+            body.broadcastToSquad(body.getTarget(), targetPos);
         } else {
             ctrl.advanceLostTargetTimer(delta);
             if (!ctrl.hasLastKnownPosition() || ctrl.isSuppressExpired()) return SearchState.INSTANCE;

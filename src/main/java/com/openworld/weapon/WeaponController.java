@@ -175,7 +175,9 @@ public class WeaponController extends Node {
   }
 
   public WeaponItem getWeaponItem(int slotIndex) {
-    if (slotIndex < 0 || slotIndex >= weapons.length) return null;
+    // weapons is allocated in _ready(); a reader can hit this before then (e.g. a sibling
+    // Nameplate whose _ready runs first) — treat "not yet built" as empty.
+    if (weapons == null || slotIndex < 0 || slotIndex >= weapons.length) return null;
     return weapons[slotIndex];
   }
 
@@ -217,6 +219,33 @@ public class WeaponController extends Node {
     }
   }
 
+  /**
+   * Stop any in-flight weapon SFX before this controller leaves the tree. A 3D playback still
+   * running when its node is freed mid-session leaks the playback and its stream at exit
+   * ("Leaked instance: AudioStreamPlaybackWAV … Resource still in use: Rifle_reload.wav"). The
+   * networked symptom: the client frees its pre-placed Player on connect ({@code
+   * NetworkManager.removeLocalPrePlacedPlayer}) while the spawn-time equip SFX is still playing —
+   * single-player never frees a body mid-session, so the cue always finishes naturally. Stopping
+   * here releases the playback on every teardown path (despawn, disconnect, engine shutdown).
+   */
+  @RegisterFunction
+  @Override
+  public void _exitTree() {
+    silenceAudio();
+  }
+
+  /**
+   * Stop any in-progress weapon SFX. Call this <b>before</b> the body is removed/freed (while it is
+   * still in the tree) so the AudioServer releases the AudioStreamPlaybackWAV — relying on
+   * {@code _exitTree} alone is unreliable when the whole body subtree is freed at once, because the
+   * sibling {@code WeaponAudio} node can exit the tree before this {@code _exitTree} runs, leaking the
+   * playback (see CLAUDE.md audio-leak quirk). E1 zone-unload now frees armed AI mid-session, so the
+   * remover (WorldZoneManager) calls this first.
+   */
+  public void silenceAudio() {
+    if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) weaponAudio.stop();
+  }
+
   @RegisterFunction
   @Override
   public void _ready() {
@@ -253,6 +282,15 @@ public class WeaponController extends Node {
     ammoChanged.connectUnsafe(
         Callable.createUnsafe(this, StringNames.toGodotName("relayAmmoToEventBus")),
         godot.api.Object.ConnectFlags.DEFAULT);
+
+    // Have WeaponAudio stop ITSELF the instant it leaves the tree. _exitTree here is too late when a
+    // whole body subtree is freed at once (incl. app exit): the sibling WeaponAudio can exit first,
+    // orphaning its in-flight AudioStreamPlaybackWAV before our stop() runs (CLAUDE.md audio-leak
+    // quirk). tree_exiting fires while the node is still valid, so a self-stop reliably releases it.
+    if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) {
+      weaponAudio.connect(new StringName("tree_exiting"),
+          Callable.createUnsafe(weaponAudio, new StringName("stop")));
+    }
   }
 
   /** Receives our own ammoChanged signal and re-broadcasts it on EventBus, keyed by owner CharacterInfo. */
@@ -365,6 +403,27 @@ public class WeaponController extends Node {
     // Hand it back to the world instead: same outcome as walking up to a full slot
     // (interact-prompt / re-trigger once settled), just consistent and non-jarring.
     if (displaced != null && equippedThisPass.contains(displaced)) {
+      // Same-type throwable stacking: when two or more grenade pickups are grabbed in the SAME
+      // frame they all pass the (deferred-slot) free/merge check against a still-empty slot and
+      // queue a free-slot equip; only the first lands and the rest reach this guard. Merge their
+      // carry counts into the stack already equipped this pass instead of bouncing the extras back
+      // to the world — otherwise the stack under-counts (only the first unit lands) and re-collecting
+      // the bounced pickups one-by-one produces inconsistent totals (the over/under-count bug).
+      if (item instanceof ThrowableItem incoming && displaced instanceof ThrowableItem stack
+          && !incoming.weaponId.isEmpty() && incoming.weaponId.equals(stack.weaponId)) {
+        int room = stack.magazineSize - stack.magazine;
+        if (room > 0) {
+          int moved = Math.min(room, incoming.magazine);
+          stack.magazine += moved;
+          incoming.magazine -= moved;
+          notifyAmmoChange(stack);
+        }
+        // Anything that didn't fit (stack hit magazineSize) goes back to the world; a fully
+        // absorbed pickup is consumed.
+        if (incoming.magazine > 0) incoming.onReturnedToWorld();
+        else incoming.queueFree();
+        return;
+      }
       item.onReturnedToWorld();
       return;
     }
@@ -757,6 +816,14 @@ public class WeaponController extends Node {
   private void performActiveSlotClear() {
     WeaponItem item = weapons[activeSlotIndex];
     if (item == null) return;
+    // Cancel the clear if a pickup merged more units into this stack during the ~100 ms hold window
+    // (clearActiveSlot is only requested when the magazine hits 0 on the last throw; a same-tick
+    // merge can refill it). Freeing it here regardless would silently drop the just-collected
+    // grenades. Re-emit so the HUD reflects the refilled count.
+    if (!item.isInfiniteAmmo && item.getMagazine() > 0) {
+      ammoChanged.emit(item.getMagazine(), item.getReserve());
+      return;
+    }
     weapons[activeSlotIndex] = null;
     item.setup(null, null, null);
     item.hide();

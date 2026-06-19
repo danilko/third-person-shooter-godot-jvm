@@ -1,6 +1,7 @@
 package com.openworld.character;
 
 import com.openworld.game.EventBus;
+import com.openworld.game.PlayerRegistry;
 import com.openworld.carrier.vehicle.Vehicle;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -37,9 +38,25 @@ public class Player extends Character {
     public void _ready() {
         super._ready();
         aimRay.addException(this);
+        // Register with the player registry so AI LOD can find the nearest player in
+        // O(playerCount) instead of scanning the whole "characters" group (PLAN.md Part D).
+        PlayerRegistry.register(this);
         // Deferred so all sibling _ready() calls (e.g. HUDManager) finish
         // connecting to playerSpawned before this fires.
         callDeferred(StringNames.toGodotName("emitPlayerSpawned"));
+    }
+
+    /**
+     * Deregister on leaving the tree (free/despawn). Deliberately NOT in onDied: the group
+     * scan this replaces counted dead-but-still-present bodies too (it filtered on
+     * {@code instanceof Player}, not liveness), so a downed player's ragdoll keeps holding
+     * AIs near it ACTIVE until the body is actually freed — preserving prior LOD behaviour.
+     */
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        PlayerRegistry.deregister(this);
+        super._exitTree();
     }
 
     @RegisterFunction
