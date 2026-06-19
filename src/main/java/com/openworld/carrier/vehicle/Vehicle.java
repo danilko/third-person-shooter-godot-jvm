@@ -304,7 +304,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 w.applyWheelPhysics((float) delta, (float) getPhysicsProcessDeltaTime(), cmd);
                 w.applyWheelSteering((float) delta, cmd.steering);
                 w.applySkidMark();
-                if (w.isColliding()) isGrounded = true;
+                if (w.grounded()) isGrounded = true;
             }
 
             setCenterOfMassMode(CenterOfMassMode.CUSTOM);
