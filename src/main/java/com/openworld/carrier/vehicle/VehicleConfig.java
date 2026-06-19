@@ -40,6 +40,18 @@ public class VehicleConfig extends Resource {
     /** How far the wheel can extend below rest position before the ray stops. */
     @Export @RegisterProperty public float overExtend       = 0.3f;
 
+    /**
+     * Number of suspension probe rays per wheel along the rolling (fore/aft) axis.
+     * 1 = original single centre ray. Extra probes sample the contact patch so the wheel
+     * rides over cracks, kerbs and edges smoothly instead of snagging or dropping when the
+     * single ray falls into a gap — the suspension uses the HIGHEST contact found and the
+     * AVERAGED ground normal, which also steadies skid/grip. 3 is a good value.
+     */
+    @Export @RegisterProperty public int suspensionSamples = 1;
+
+    /** Fore/aft half-spread (m) of the multi-sample probes along the wheel's rolling axis. */
+    @Export @RegisterProperty public float suspensionSampleSpread = 0.15f;
+
     // ── Traction ──────────────────────────────────────────────────────────
 
     /** Longitudinal rolling-friction coefficient (no throttle or brake). */
