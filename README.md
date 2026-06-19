@@ -1,4 +1,4 @@
-# Godot Kotlin/JVM Shooter
+# Godot Kotlin/JVM Open World Shooter
 
 A technical exploration of 3D game mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. This project adapts and refactors traditional GDScript-based third-person controllers into a Java/Kotlin-compatible architecture.
 
@@ -75,6 +75,26 @@ CharacterBody3D (Character.tscn)   ← shared ragdoll, health, weapon controller
 	└── AICharacter.tscn            ← AIController (FSM), NavigationAgent3D, SightRay
 ```
 
+### Open-World Zones (E1)
+
+`WorldZoneManager` streams an AI population (and optional cosmetic `geometry`) in and out as
+players move. A zone is a `WorldZoneMarker` placed in the level with a `WorldZone` `.tres`:
+
+- **Marker position = zone center.** `WorldZone.size` is the spawn box (AI spawn at random XZ
+  points inside it).
+- **`loadRadius` / `unloadRadius` are center-relative hysteresis triggers**, measured from the
+  marker and **independent of `size`**. A zone loads when a player is within `loadRadius` of the
+  center and only unloads when *all* players are beyond `unloadRadius` — so the unload trigger
+  is deliberately *larger* than the box (default box half-extent 30 m, `loadRadius` 200 m,
+  `unloadRadius` 350 m). Stepping just outside the box does **not** unload it.
+- **Sizing rule:** `unloadRadius > loadRadius > size/2`
+  (e.g. `loadRadius ≈ size/2 + ~150 m` pre-spawn lead, `unloadRadius ≈ loadRadius + ~150 m`).
+  A debug warning fires if a `.tres` violates this.
+- **Navigation:** AI path on the level's `NavigationRegion3D`. Streamed geometry chunks carry
+  their own baked navmesh — see `BLENDER_CONVENTIONS.md` ("Zone chunking" / "Navigation per chunk").
+
+See `CLAUDE.md` ("Open World Simulation (Part E)") for the full streaming/authority details.
+
 ---
 
 ## 🤖 AI
@@ -129,17 +149,17 @@ A shot flows through one path for every weapon, gated and then delegated:
 
 ```
 fire held → WeaponController.onWeaponFire()
-    ├─ gate: fireTimer (1 / fireRate), not reloading, not switching
-    ├─ semi-auto lock: WeaponItem.isSemiAutoReady()  (!isWeaponFired || auto)
-    ├─ weapon.useWeapon()
-    │     FirearmItem  → performHitscan() ×pelletCount  (hitscan ray, cone spread)
-    │     ProjectileItem / ThrowableItem → spawn a physics projectile (rocket / grenade)
-    │     MeleeItem    → swing window + hitbox overlap
-    └─ on a hitscan hit → HitInfo(node, point, normal)
-           → ImpactManager.processHit(info, damage, weapon, attacker)
-                 ├─ spawnImpactParticles()  (ParticleManager, per SurfaceType)
-                 ├─ spawnDecal()            (DecalManager)
-                 └─ applyDamage()           (Health.takeDamage → bone multiplier / headshot)
+	├─ gate: fireTimer (1 / fireRate), not reloading, not switching
+	├─ semi-auto lock: WeaponItem.isSemiAutoReady()  (!isWeaponFired || auto)
+	├─ weapon.useWeapon()
+	│     FirearmItem  → performHitscan() ×pelletCount  (hitscan ray, cone spread)
+	│     ProjectileItem / ThrowableItem → spawn a physics projectile (rocket / grenade)
+	│     MeleeItem    → swing window + hitbox overlap
+	└─ on a hitscan hit → HitInfo(node, point, normal)
+		   → ImpactManager.processHit(info, damage, weapon, attacker)
+				 ├─ spawnImpactParticles()  (ParticleManager, per SurfaceType)
+				 ├─ spawnDecal()            (DecalManager)
+				 └─ applyDamage()           (Health.takeDamage → bone multiplier / headshot)
 ```
 
 - **Hitscan** firearms raycast from the camera's `AimRay`; the hit is bundled into an immutable

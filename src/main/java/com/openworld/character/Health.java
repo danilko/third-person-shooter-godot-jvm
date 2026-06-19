@@ -180,6 +180,17 @@ public class Health extends Node {
     }
 
     /**
+     * Restore to full and clear the dead state. Used when a pooled body is recycled into a new
+     * spawn (PLAN.md Part E / E1 SpawnPool) — a recycled AICharacter's {@code _ready()} does not
+     * run again, so health must be reset explicitly. Emits healthChanged so the nameplate/HUD
+     * re-read the restored value.
+     */
+    public void resetFull() {
+        currentHealth = maxHealth;
+        emitCharacterHealthChanged();
+    }
+
+    /**
      * Applies the authoritative health value carried by MSG_SNAPSHOT on non-authority
      * peers — direct replacement for the old syncHealth mirror, except this writes the
      * field every HUD/nameplate reader actually reads (getCurrentHealth/currentHealth),

@@ -1,14 +1,16 @@
 [gd_scene format=4 uid="uid://c7aoav51c2882"]
 
-[ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/vehicle/Vehicle.java" id="1_v"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/character/Health.java" id="2_h"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/character/CharacterInfo.java" id="3_ci"]
-[ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="3_i1sta"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/vehicle/VehicleWheel.tscn" id="5_p3n1p"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="5_x00le"]
-[ext_resource type="Curve" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="6_i1sta"]
+[ext_resource type="Script" uid="uid://ctsrfvmvohi6x" path="res://src/main/java/com/openworld/carrier/vehicle/Vehicle.java" id="1_v"]
+[ext_resource type="Script" uid="uid://bteuhlfvgdp3o" path="res://src/main/java/com/openworld/character/Health.java" id="2_h"]
+[ext_resource type="Script" uid="uid://cuac11don07ow" path="res://gdj/com/openworld/carrier/vehicle/VehicleConfig.gdj" id="3_37ea8"]
+[ext_resource type="Script" uid="uid://df0ckptq6t15r" path="res://src/main/java/com/openworld/character/CharacterInfo.java" id="3_ci"]
+[ext_resource type="PackedScene" uid="uid://cvhwreck1a1b" path="res://src/main/resources/com/openworld/vehicle/VehicleWreck.tscn" id="4_rx71e"]
+[ext_resource type="PackedScene" uid="uid://ds0yoqtkt2t1n" path="res://src/main/resources/com/openworld/vehicle/VehicleWheel.tscn" id="5_p3n1p"]
+[ext_resource type="Script" uid="uid://d2o3rhv6eos0d" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="5_x00le"]
+[ext_resource type="Curve" uid="uid://cofnaffaigrhj" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="6_i1sta"]
 [ext_resource type="Texture2D" uid="uid://ofwdiqxujlur" path="res://addons/kenney_prototype_textures/light/texture_01.png" id="6_jeqgg"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="7_wc"]
+[ext_resource type="Script" uid="uid://dqhs0yfdyku6r" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="7_wc"]
+[ext_resource type="PackedScene" uid="uid://dxb5mxkmawr80" path="res://src/main/resources/com/openworld/ui/Nameplate.tscn" id="8_np"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_x00le"]
 friction = 0.0
@@ -18,9 +20,12 @@ script = ExtResource("3_ci")
 display_name = "Vehicle"
 metadata/_custom_type_script = "uid://cplrp8cx4gus0"
 
-[sub_resource type="Curve" id="Curve_yyb6n"]
-_data = [Vector2(0, 0.3), 0.0, 0.0, 0, 0, Vector2(0.3, 0.9), 0.0, 0.0, 0, 0, Vector2(0.3, 0), 0.0, 0.0, 0, 0, Vector2(0.6, 0.8), 0.0, 0.0, 0, 0, Vector2(1, 0.1), 0.0, 0.0, 0, 0]
-point_count = 5
+[sub_resource type="Resource" id="Resource_37ea8"]
+script = ExtResource("3_37ea8")
+suspension_samples = 3
+acceleration_curve = ExtResource("6_i1sta")
+wreck_scene = ExtResource("4_rx71e")
+metadata/_custom_type_script = "uid://cuac11don07ow"
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i1sta"]
 albedo_texture = ExtResource("6_jeqgg")
@@ -66,13 +71,7 @@ physics_material_override = SubResource("PhysicsMaterial_x00le")
 linear_damp_mode = 1
 script = ExtResource("1_v")
 character_info = SubResource("Resource_x00le")
-spring_strength = 12000.0
-wheel_radius = 0.33
-max_speed = 180.0
-acceleration = 16000.0
-acceleration_curve = SubResource("Curve_yyb6n")
-tire_max_turn_degrees = 12.0
-vehicle_icon = ExtResource("3_i1sta")
+vehicle_config = SubResource("Resource_37ea8")
 
 [node name="Health" type="Node" parent="." unique_id=450985]
 script = ExtResource("2_h")
@@ -112,7 +111,6 @@ grip_curve = ExtResource("6_i1sta")
 
 [node name="FL" parent="Wheels" unique_id=1956086151 instance=ExtResource("5_p3n1p")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, -0.16, -1.3)
-wheel_radius = 0.33
 is_steer = true
 grip_curve = ExtResource("6_i1sta")
 
@@ -158,6 +156,9 @@ collision_mask = 25
 
 [node name="VehicleWeaponMount" type="Marker3D" parent="." unique_id=1379134567]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -1.3520434)
+
+[node name="Nameplate" parent="." unique_id=1379134590 instance=ExtResource("8_np")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
 
 [node name="WeaponController" type="Node" parent="." unique_id=1379134580]
 script = ExtResource("7_wc")

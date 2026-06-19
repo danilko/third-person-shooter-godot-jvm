@@ -1806,6 +1806,23 @@ public class NetworkManager extends Node {
         }
     }
 
+    /**
+     * Server → one peer: late-join baseline of runtime faction-relationship flips (D3). Per-character
+     * faction swaps already ride {@link #sendBaselineSpawns} (encodeSpawnFor reads the live faction),
+     * so only the global relationship table needs catching up here. Sent as the same MSG_WORLD_EVENT
+     * a live flip uses, so the receiver path is identical.
+     */
+    public void sendBaselineFactionRelationships(int targetPeerId) {
+        if (!isServer()) return;
+        Node fmNode = getNodeOrNull("/root/FactionManager");
+        if (!(fmNode instanceof com.openworld.character.FactionManager fm)) return;
+        for (String[] rel : fm.getActiveRelationships()) {
+            sendMessage(targetPeerId, NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT,
+                    com.openworld.game.GameManager.WORLD_EVENT_FACTION_RELATIONSHIP, rel[0], 0f,
+                    java.util.List.of(rel[1], rel[2])));
+        }
+    }
+
     /** Server → all: announce a character's removal (queueFree on receipt). */
     public void announceDespawn(String characterId) {
         if (!isServer()) return;

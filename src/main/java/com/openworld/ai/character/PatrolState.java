@@ -42,6 +42,21 @@ public class PatrolState implements AIState {
             return ChaseState.INSTANCE;
         }
 
+        // Squad-mate spotted a target this AI can't see yet (PLAN.md E3) — canSeeTarget's scan adopts
+        // the shared target, so close in on it rather than keep patrolling.
+        if (body.getTarget() != null) {
+            cmd.wantCombat = true;
+            ctrl.setLastKnownTargetPosition(body.getTarget().getGlobalPosition());
+            return ChaseState.INSTANCE;
+        }
+
+        // Heard hostile gunfire / an explosion / a crash nearby (PLAN.md E2) → investigate the source.
+        Vector3 alarm = body.hearAlarm();
+        if (alarm != null) {
+            ctrl.setLastKnownTargetPosition(alarm);
+            return SearchState.INSTANCE;
+        }
+
         if (ctrl.isUnderAttack() && ctrl.hasLastKnownPosition()) {
             // Flee instead of search when configured and out of ammo.
             if (body.getBehaviorConfig().useFleeOnAttack && !body.hasAnyAmmo()) return FleeState.INSTANCE;

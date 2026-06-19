@@ -13,6 +13,7 @@ import godot.core.StringNames;
 import godot.core.Vector3;
 import com.openworld.ai.AIBehaviorConfig;
 import com.openworld.ai.AIController;
+import com.openworld.ai.AILodLevel;
 import com.openworld.ai.character.AttackState;
 import com.openworld.ai.character.EscortState;
 import com.openworld.ai.character.FleeState;
@@ -21,11 +22,14 @@ import com.openworld.camera.AICameraController;
 import com.openworld.control.CharacterController;
 import com.openworld.control.Controller;
 import com.openworld.control.UserCommand;
+import com.openworld.game.PlayerRegistry;
 import com.openworld.movement.character.MovementController;
 import com.openworld.movement.character.MovementType;
 import com.openworld.movement.character.StanceName;
 import com.openworld.weapon.WeaponItem;
 import com.openworld.weapon.WeaponType;
+import com.openworld.world.SpatialEntityGrid;
+import com.openworld.world.StimulusManager;
 
 /**
  * AI-controlled character body — hardware and sensing only.
@@ -68,6 +72,16 @@ public class AICharacter extends Character {
     @Export @RegisterProperty public NodePath escortTargetPath = new NodePath();
 
     /**
+     * NodePath to this AI's {@link AISquad} for editor-placed squads (PLAN.md E3). Resolved in
+     * {@code _ready()}. Zone-spawned AI are assigned a squad programmatically via {@link #setSquad}
+     * instead. Leave empty for a solo AI.
+     */
+    @Export @RegisterProperty public NodePath squadPath = new NodePath();
+
+    /** Runtime squad — shared group awareness (E3). Null = solo. Accessed via {@link #activeSquad()}. */
+    private AISquad squad;
+
+    /**
      * Runtime escort target — populated from escortTargetPath in _ready() or set
      * directly via setEscortTarget() from mission code (e.g. MissionDirector).
      */
@@ -78,15 +92,30 @@ public class AICharacter extends Character {
     private static final double     TARGET_SCAN_INTERVAL = 0.4;
     private static final double     LOS_CACHE_INTERVAL   = 0.05;
 
-    // ── Lightweight LOD ───────────────────────────────────────────────────────
-    // AIs beyond LOD_FREEZE_DIST from all players skip their entire FSM + animation
-    // tick (Character._physicsProcess is not called). MovementController still runs
-    // as a separate node, decelerating the AI to rest and holding its last pose.
+    // ── Distance-based LOD (PLAN.md Part D / D2) ──────────────────────────────
+    // Re-evaluated on the ~2 s lodTimer from nearestPlayerDist():
+    //   ACTIVE  (< 80 m)   full FSM + NavAgent + AnimationTree.
+    //   PASSIVE (80–200 m) simplified tick: no pathfinding / no FSM transitions (AIController
+    //                      returns a hold-heading command) and no AnimationTree writes
+    //                      (AnimationController holds the last pose).
+    //   FROZEN  (> 200 m)  Character._physicsProcess is skipped entirely. MovementController
+    //                      still runs as a separate node, decelerating the AI to rest.
+    private static final float LOD_ACTIVE_DIST = 80.0f;
     private static final float LOD_FREEZE_DIST = 200.0f;
-    private double  lodTimer  = 0.0;
-    private boolean lodFrozen = false;
+    private double      lodTimer = 0.0;
+    private AILodLevel  lodLevel = AILodLevel.ACTIVE;
 
-    public boolean isLodFrozen() { return lodFrozen; }
+    /** Current LOD tier — read by AIController (FSM gating) and AnimationController (pose gating). */
+    public AILodLevel getLodLevel() { return lodLevel; }
+
+    /** Back-compat shorthand: kept so existing FROZEN-only callers keep working. */
+    public boolean isLodFrozen() { return lodLevel == AILodLevel.FROZEN; }
+
+    private AILodLevel classifyLod(float nearestPlayer) {
+        if (nearestPlayer > LOD_FREEZE_DIST) return AILodLevel.FROZEN;
+        if (nearestPlayer > LOD_ACTIVE_DIST) return AILodLevel.PASSIVE;
+        return AILodLevel.ACTIVE;
+    }
 
     // ── Movement-state dedup (Perf 3) ─────────────────────────────────────────
     // Prevents Character.setMovementState emitting changedMovementState every frame
@@ -159,7 +188,63 @@ public class AICharacter extends Character {
             }
         }
 
+        // Resolve squad from NodePath (editor-placed squads); zone-spawned AI use setSquad() instead.
+        if (squadPath != null && !squadPath.getPath().isEmpty()) {
+            Node n = getNodeOrNull(squadPath);
+            if (n instanceof AISquad s) setSquad(s);
+        }
+
         if (controller instanceof AIController aiCtrl) aiCtrl.start();
+    }
+
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        if (squad != null && godot.global.GD.isInstanceValid(squad)) squad.unregister(this);
+        super._exitTree();
+    }
+
+    // ── Squad (E3) ──────────────────────────────────────────────────────────────
+
+    /** The squad if still valid, else null (also nulls a stale ref to a freed squad node). */
+    private AISquad activeSquad() {
+        if (squad != null && !godot.global.GD.isInstanceValid(squad)) squad = null;
+        return squad;
+    }
+
+    public AISquad getSquad() { return activeSquad(); }
+
+    /** Assign (or clear) this AI's squad, moving its registration. Safe across recycled reuse. */
+    public void setSquad(AISquad s) {
+        if (squad == s) return;
+        if (squad != null && godot.global.GD.isInstanceValid(squad)) squad.unregister(this);
+        squad = s;
+        if (squad != null) squad.register(this);
+    }
+
+    /**
+     * Adopt a target pushed by a squad-mate (PLAN.md E3) without waiting for the next scan: set it as
+     * the current target, drop stale bone caches, and seed last-known so the FSM converges even before
+     * personal LoS. Faction was already verified by the spotter.
+     */
+    public void adoptSquadTarget(Character target, Vector3 pos) {
+        if (target == null || isDead()) return;
+        if (currentTarget != target) {
+            currentTarget       = target;
+            cachedTargetForBone = null;
+            cachedBoneNodes     = null;
+            cachedVisibleBone   = null;
+            cachedTargetVehicle = null;
+            cachedLoS           = false;
+            losCacheTimer       = 0;
+        }
+        if (controller instanceof AIController ai && pos != null) ai.setLastKnownTargetPosition(pos);
+    }
+
+    /** Tell squad-mates within alert range about this AI's confirmed target (LoS or being shot). */
+    public void broadcastToSquad(Character target, Vector3 pos) {
+        AISquad s = activeSquad();
+        if (s != null && target != null) s.broadcastSpotted(this, target, pos);
     }
 
     /**
@@ -197,27 +282,57 @@ public class AICharacter extends Character {
         lodTimer -= delta;
         if (lodTimer <= 0.0) {
             lodTimer = 2.0;
-            boolean shouldFreeze = nearestPlayerDist() > LOD_FREEZE_DIST;
-            if (shouldFreeze != lodFrozen) {
-                lodFrozen = shouldFreeze;
-                if (!lodFrozen && controller instanceof AIController ai) {
-                    // Unfreeze: clear stale nav/search state so AI doesn't resume mid-lunge.
+            AILodLevel next = classifyLod(nearestPlayerDist());
+            if (next != lodLevel) {
+                AILodLevel prev = lodLevel;
+                lodLevel = next;
+                // Returning to ACTIVE from a tier that didn't run the FSM (FROZEN skips it, PASSIVE
+                // holds heading without it): clear stale nav/search state so the AI re-plans from
+                // its current position instead of resuming a mid-lunge nav target.
+                if (next == AILodLevel.ACTIVE && prev != AILodLevel.ACTIVE
+                        && controller instanceof AIController ai) {
                     ai.clearNavTarget();
                     ai.resetSearchTimer();
                 }
             }
         }
-        if (lodFrozen) return;  // skip entire FSM + animation tick
+        if (lodLevel == AILodLevel.FROZEN) return;  // skip entire FSM + animation tick
+        // Drop any target/bone references that have been freed or pulled out of the tree (e.g. a
+        // zone-streamed body despawned by WorldZoneManager.unload). Dereferencing such a node's
+        // global transform logs "Node not inside tree" and, once it is freed, segfaults — so the
+        // FSM must never see a dangling target.
+        validateCurrentTarget();
+        // PASSIVE: super still runs, but AIController.gatherInput returns a hold-heading command
+        // (no NavAgent / FSM) and AnimationController skips its AnimationTree writes.
         super._physicsProcess(delta);
+    }
+
+    /**
+     * Clears {@link #currentTarget} and all its derived bone caches if the target has been freed or
+     * removed from the scene tree. Cheap (a validity + in-tree check) and runs every active frame;
+     * the guard is what makes streamed/despawned bodies safe to reference between target scans.
+     */
+    private void validateCurrentTarget() {
+        if (currentTarget == null) return;
+        if (!godot.global.GD.isInstanceValid(currentTarget) || !currentTarget.isInsideTree()) {
+            currentTarget       = null;
+            cachedTargetForBone = null;
+            cachedBoneNodes     = null;
+            cachedVisibleBone   = null;
+            cachedTargetVehicle = null;
+            cachedLoS           = false;
+        }
     }
 
     private float nearestPlayerDist() {
         float min = Float.MAX_VALUE;
-        for (Node n : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
-            if (n instanceof Player p) {
-                float d = (float) getGlobalPosition().distanceTo(p.getGlobalPosition());
-                if (d < min) min = d;
-            }
+        Vector3 myPos = getGlobalPosition();
+        // O(playerCount) via PlayerRegistry instead of an O(characterCount) group scan +
+        // instanceof filter (PLAN.md Part D pre-D1 quick win).
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (!godot.global.GD.isInstanceValid(p)) continue;  // defensive: list holds in-tree bodies
+            float d = (float) myPos.distanceTo(p.getGlobalPosition());
+            if (d < min) min = d;
         }
         return min;  // Float.MAX_VALUE if no players in scene → freeze
     }
@@ -242,41 +357,112 @@ public class AICharacter extends Character {
      * Null-faction characters (characterInfo == null or faction == null) are treated
      * as opponents so AI always attacks unknown combatants.
      */
+    // Scratch list reused across discoverTarget() scans so a grid query allocates nothing per call.
+    private final java.util.List<Node> targetQueryScratch = new java.util.ArrayList<>();
+    // Set by evaluateCandidate() as an out-param alongside its return value (single-threaded).
+    private float candidateDist;
+
     private Character discoverTarget() {
         String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
+
+        // Squad-shared target (E3) takes priority over a personal scan, so a mate keeps converging on
+        // a threat a squad-mate spotted even before it can see the threat itself. getSharedTarget()
+        // self-clears a dead/freed target, falling back to the scan below.
+        AISquad s = activeSquad();
+        if (s != null) {
+            Character shared = s.getSharedTarget();
+            if (shared != null && shared != this && shared.currentVehicleNode == null) {
+                String tf = (shared.characterInfo != null && shared.characterInfo.faction != null)
+                        ? shared.characterInfo.faction : "";
+                if (Faction.areHostile(myFaction, tf)) return shared;
+            }
+        }
+
         float closestDist = Float.MAX_VALUE;
         Character closest = null;
+        Vector3 myPos = getGlobalPosition();
 
-        for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
-            Character candidate = null;
-            float dist = Float.MAX_VALUE;
-
-            if (node instanceof Character c) {
-                if (c == this || !c.isAlive()) continue;
-                // Unknown faction → treated as opponent (empty string is hostile to all named factions).
-                String tf = (c.characterInfo != null && c.characterInfo.faction != null)
-                        ? c.characterInfo.faction : "";
-                if (!Faction.areHostile(myFaction, tf)) continue;
-                if (c.currentVehicleNode != null) continue;   // vehicle entry handles this
-                dist      = (float) getGlobalPosition().distanceTo(c.getGlobalPosition());
-                candidate = c;
-
-            } else if (node instanceof Vehicle v) {
-                Character occ = v.getOccupant();
-                if (occ == null || !occ.isAlive() || !v.isAlive()) continue;
-                String tf = (occ.characterInfo != null && occ.characterInfo.faction != null)
-                        ? occ.characterInfo.faction : "";
-                if (!Faction.areHostile(myFaction, tf)) continue;
-                dist      = (float) getGlobalPosition().distanceTo(v.getGlobalPosition());
-                candidate = occ;
+        // D1: query only the cells overlapping the detection circle instead of the whole
+        // "characters" group. Falls back to the group scan when the grid AutoLoad is absent
+        // (e.g. minimal test scenes) so behaviour is identical, just slower, without it.
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) {
+            grid.queryRadius(myPos, getBehaviorConfig().detectionRange, targetQueryScratch);
+            for (Node node : targetQueryScratch) {
+                Character candidate = evaluateCandidate(node, myFaction, myPos);
+                if (candidate != null && candidateDist < closestDist) {
+                    closestDist = candidateDist;
+                    closest     = candidate;
+                }
             }
-
-            if (candidate != null && dist < closestDist) {
-                closestDist = dist;
-                closest     = candidate;
+        } else {
+            for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
+                Character candidate = evaluateCandidate(node, myFaction, myPos);
+                if (candidate != null && candidateDist < closestDist) {
+                    closestDist = candidateDist;
+                    closest     = candidate;
+                }
             }
         }
         return closest;
+    }
+
+    /**
+     * Returns the targetable Character for a candidate node — the node itself for an on-foot
+     * Character, or the occupant for a Vehicle — when it is a live hostile, else null. On a hit,
+     * {@link #candidateDist} is set to the distance used for nearest-selection (vehicle distance is
+     * measured to the vehicle, matching the prior behaviour).
+     */
+    private Character evaluateCandidate(Node node, String myFaction, Vector3 myPos) {
+        if (node instanceof Character c) {
+            if (c == this || !c.isAlive()) return null;
+            // Unknown faction → treated as opponent (empty string is hostile to all named factions).
+            String tf = (c.characterInfo != null && c.characterInfo.faction != null)
+                    ? c.characterInfo.faction : "";
+            if (!Faction.areHostile(myFaction, tf)) return null;
+            if (c.currentVehicleNode != null) return null;   // vehicle entry handles this
+            candidateDist = (float) myPos.distanceTo(c.getGlobalPosition());
+            return c;
+        } else if (node instanceof Vehicle v) {
+            Character occ = v.getOccupant();
+            if (occ == null || !occ.isAlive() || !v.isAlive()) return null;
+            String tf = (occ.characterInfo != null && occ.characterInfo.faction != null)
+                    ? occ.characterInfo.faction : "";
+            if (!Faction.areHostile(myFaction, tf)) return null;
+            candidateDist = (float) myPos.distanceTo(v.getGlobalPosition());
+            return occ;
+        }
+        return null;
+    }
+
+    /**
+     * Nearest world position worth investigating that this AI can currently hear (PLAN.md E2): a
+     * GUNSHOT from a hostile/unknown faction, or any EXPLOSION / VEHICLE_CRASH, within
+     * {@code hearingRadius} (capped by each stimulus's own audible radius). Ignores its own events and
+     * allied gunfire. Returns null when nothing relevant is audible — PatrolState uses it to wake into
+     * SearchState toward the sound. No-op (null) without the StimulusManager AutoLoad (test scenes).
+     */
+    public Vector3 hearAlarm() {
+        StimulusManager sm = StimulusManager.get();
+        if (sm == null) return null;
+        float radius = getBehaviorConfig().hearingRadius;
+        Vector3 myPos = getGlobalPosition();
+        String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
+        Vector3 best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (StimulusManager.Stimulus s : sm.getStimuli()) {
+            if (s.source == this) continue;
+            boolean investigate = switch (s.type) {
+                case GUNSHOT                  -> Faction.areHostile(myFaction, s.sourceFaction);
+                case EXPLOSION, VEHICLE_CRASH -> true;
+                default                       -> false;
+            };
+            if (!investigate) continue;
+            float heardWithin = Math.min(radius, s.radius);
+            float d = (float) myPos.distanceTo(s.origin);
+            if (d <= heardWithin && d < bestDist) { bestDist = d; best = s.origin; }
+        }
+        return best;
     }
 
     /**
@@ -533,6 +719,10 @@ public class AICharacter extends Character {
     public void onEnemyDamaged(float amount) {
         CharacterController ctrl = getCharacterController();
         if (ctrl != null) ctrl.onDamagedByAttacker(currentTarget);
+        // Being shot is a confirmed sighting too (E3): rally the squad onto the attacker. The damage
+        // signal only carries the amount, so we use currentTarget (the AI's believed attacker) — set
+        // when it already sees the shooter, which is the common "shoot one, the squad turns" case.
+        if (currentTarget != null) broadcastToSquad(currentTarget, currentTarget.getGlobalPosition());
     }
 
     @RegisterFunction
@@ -540,5 +730,48 @@ public class AICharacter extends Character {
     public void onDied() {
         isDead = true;
         super.onDied();
+    }
+
+    /**
+     * Re-initialise this body for a (re)spawn — PLAN.md Part E / E1. Called by WorldZoneManager
+     * after the body is (re)added to the tree: repositions it, re-anchors the patrol center to the
+     * new position, full-heals, clears all sensor caches + FSM memory, and re-registers in the
+     * spatial grid. Safe on a fresh instance too (a harmless re-init over what {@code _ready} did).
+     *
+     * <p>A pooled body's {@code _ready()} does NOT run again on tree re-entry, so the work
+     * {@code _ready} normally does for spawn placement (capturing {@code spawnPosition}) and the
+     * grid registration must be redone here explicitly.
+     */
+    public void activateForSpawn(Vector3 worldPos) {
+        setGlobalPosition(worldPos);
+        spawnPosition = new Vector3(getGlobalPosition());
+        isDead = false;
+
+        currentTarget       = null;
+        cachedTargetForBone = null;
+        cachedBoneNodes     = null;
+        cachedVisibleBone   = null;
+        cachedTargetVehicle = null;
+        cachedLoS           = false;
+        cachedBestWeapon    = -1;
+        lastEmittedMoveType   = null;
+        lastEmittedMoveStance = null;
+
+        lodLevel        = AILodLevel.ACTIVE;
+        lodTimer        = godot.global.GD.randfRange(0f, 2.0f);
+        targetScanTimer = godot.global.GD.randfRange(0f, (float) TARGET_SCAN_INTERVAL);
+        losCacheTimer   = godot.global.GD.randfRange(0f, (float) LOS_CACHE_INTERVAL);
+
+        // Drop references carried over from the previous life so a recycled body never points at a
+        // freed node: the camera's aim target and any escort target (and its Health.hit connection).
+        clearCameraAimTarget();
+        if (escortTarget != null) setEscortTarget(null);
+
+        if (healthNode != null) healthNode.resetFull();
+
+        SpatialEntityGrid grid = SpatialEntityGrid.get();
+        if (grid != null) grid.register(this, getGlobalPosition());
+
+        if (controller instanceof AIController aiCtrl) aiCtrl.resetState();
     }
 }

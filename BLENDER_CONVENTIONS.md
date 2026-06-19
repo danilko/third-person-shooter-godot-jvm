@@ -14,6 +14,7 @@ as the team agrees on it, and update the section with the actual decision.
 - [ ] Collision-proxy authoring workflow
 - [ ] Naming conventions for collision / navigation / gameplay markers
 - [ ] Zone-chunking size (must match `WorldZone` grid — see PLAN.md E1)
+- [x] Per-chunk navigation + chunk adjacency (abut, don't overlap) — see "Zone chunking" below
 - [ ] LOD / poly budget per region tier
 - [ ] Terrain strategy (heightmap vs. hand-modeled mesh)
 - [ ] Import / version pipeline
@@ -65,11 +66,58 @@ this document exists to avoid — lock the prefix scheme down first.
 ## Zone chunking
 
 - `WorldZoneManager` (PLAN.md E1) streams geometry per `WorldZone` based on
-  `loadRadius` (200 m) / `unloadRadius` (350 m, hysteresis). Author and export
-  geometry in chunks matching the chosen zone-grid size — **not** as one
-  monolithic scene — or E1 has nothing to stream in/out.
+  `loadRadius` / `unloadRadius` (hysteresis). Author and export geometry in chunks
+  matching the chosen zone-grid size — **not** as one monolithic scene — or E1 has
+  nothing to stream in/out. The chunk is assigned to the `WorldZone.geometry`
+  PackedScene field (it instances on **every peer**, host and client — geometry is
+  cosmetic/local, only AI bodies are host-authoritative). A mesh placed as a child
+  of the `WorldZoneMarker` is static scene furniture and does **not** stream.
 - Decide the zone-grid size *before* any real geometry is modeled; it constrains
   border layout, road continuity (I3), and region-transition placement (I4).
+
+### Setting up a zone (recipe) — E1
+
+1. **Pick a zone-grid cell size** (e.g. 60–120 m square) and model/export each
+   geometry chunk to those exact extents so chunks **abut** (see below). This is
+   the value `WorldZone.size` (X/Z) should match — the spawn box is meant to cover
+   the authored chunk footprint; Y is the vertical spawn band (~10 m is plenty for
+   ground AI).
+2. **Place a `WorldZoneMarker`** (duplicate `resources/.../world/zones/DebugZone.tscn`)
+   at the chunk **center** — the marker's world position *is* the zone center — and
+   assign a `WorldZone` `.tres` with `size` = the chunk extents.
+3. **Set the trigger radii** (both measured from the center, independent of `size`):
+   `loadRadius ≈ size/2 + pre-spawn lead (~150 m)` so AI stream in *before* the player
+   reaches the box, and `unloadRadius ≈ loadRadius + hysteresis margin (~150 m)`. The
+   invariant `unloadRadius > loadRadius > max(size.x,size.z)/2` must hold or the zone
+   flickers / unloads while the player is still on it (`WorldZoneManager.warnIfMisSized`
+   logs a debug warning otherwise). Neighbour zones' `loadRadius` should reach past the
+   `unloadRadius` you're leaving so there's no dead frame with nothing loaded.
+4. **Assign the chunk mesh to `WorldZone.geometry`** (the PackedScene field) so it streams
+   with the zone. A mesh dropped as a *child of the marker* is static furniture and never
+   streams. Populate `spawnConfigs` (ambient AI) and `namedCharacters` (story AI).
+
+### Navigation per chunk — DECIDED (E1)
+
+- Each streamed zone-geometry chunk **carries its own baked `NavigationRegion3D`**
+  inside its `geometry` PackedScene (baked offline against that chunk's collision).
+  Streaming the chunk in adds its navmesh to the navigation map; streaming out
+  removes it. The current single world-baked `NavigationRegion3D` is a placeholder —
+  AI path *through* any building you stream in until that building's chunk owns nav.
+- Multiple `NavigationRegion3D`s feed one navigation map; Godot stitches them where
+  their navmesh **edges fall within the map's `edge_connection_margin` (~0.25 m)**.
+
+### Chunk adjacency: abut, don't overlap — DECIDED (E1)
+
+- **Geometry + navmesh chunks must be edge-adjacent (abutting), never overlapping.**
+  Overlapping navmeshes create ambiguous/duplicate regions and seams; only abutting
+  edges (within `edge_connection_margin`) stitch cleanly.
+- The **load/unload *trigger* radii are the part that overlaps** — `loadRadius` of a
+  neighbour reaches past the `unloadRadius` of the one you're leaving, so a player
+  crossing a border is inside the next zone's `loadRadius` before leaving the
+  current zone's `unloadRadius` (no dead frame with nothing loaded). Distinct from
+  the geometry chunks, which abut. There is **no** cross-zone connection/portal graph
+  in E1 — zones are independent and AI roam freely between them (the zone box is a
+  spawn + load/unload trigger, not a movement fence).
 
 ## LOD / poly budget (Steam Deck target)
 
