@@ -114,7 +114,30 @@ public class WorldZoneManager extends Node {
     // ── Marker registry ───────────────────────────────────────────────────────
 
     public void registerMarker(WorldZoneMarker marker) {
-        if (marker != null && !markers.contains(marker)) markers.add(marker);
+        if (marker != null && !markers.contains(marker)) {
+            markers.add(marker);
+            warnIfMisSized(marker);
+        }
+    }
+
+    /**
+     * Debug-gated sanity check on a zone's trigger radii. Both {@code loadRadius} and
+     * {@code unloadRadius} are measured from the marker (zone <b>center</b>), independent of
+     * {@code size}, so for sane streaming they must satisfy
+     * {@code unloadRadius > loadRadius > halfExtent} — otherwise the zone unloads while the player is
+     * still inside/near the spawn box (flicker, or "everything unloads the moment I step out").
+     * Logs once at registration; no behavior change. See CLAUDE.md "Sizing a zone".
+     */
+    private void warnIfMisSized(WorldZoneMarker marker) {
+        if (!debugLog || marker.zone == null) return;
+        WorldZone z = marker.zone;
+        float halfExtent = (float) Math.max(z.size.getX(), z.size.getZ()) * 0.5f;
+        if (z.unloadRadius <= z.loadRadius || z.loadRadius < halfExtent) {
+            GD.print("WorldZoneManager: zone '" + z.zoneId + "' has mis-sized radii (load="
+                    + z.loadRadius + " unload=" + z.unloadRadius + " halfExtent="
+                    + String.format("%.1f", halfExtent) + "m). Expected unloadRadius > loadRadius > "
+                    + "halfExtent (radii are center-relative — see CLAUDE.md 'Sizing a zone').");
+        }
     }
 
     public void unregisterMarker(WorldZoneMarker marker) {

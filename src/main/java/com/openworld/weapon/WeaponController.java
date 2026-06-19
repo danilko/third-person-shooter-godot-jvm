@@ -403,6 +403,27 @@ public class WeaponController extends Node {
     // Hand it back to the world instead: same outcome as walking up to a full slot
     // (interact-prompt / re-trigger once settled), just consistent and non-jarring.
     if (displaced != null && equippedThisPass.contains(displaced)) {
+      // Same-type throwable stacking: when two or more grenade pickups are grabbed in the SAME
+      // frame they all pass the (deferred-slot) free/merge check against a still-empty slot and
+      // queue a free-slot equip; only the first lands and the rest reach this guard. Merge their
+      // carry counts into the stack already equipped this pass instead of bouncing the extras back
+      // to the world — otherwise the stack under-counts (only the first unit lands) and re-collecting
+      // the bounced pickups one-by-one produces inconsistent totals (the over/under-count bug).
+      if (item instanceof ThrowableItem incoming && displaced instanceof ThrowableItem stack
+          && !incoming.weaponId.isEmpty() && incoming.weaponId.equals(stack.weaponId)) {
+        int room = stack.magazineSize - stack.magazine;
+        if (room > 0) {
+          int moved = Math.min(room, incoming.magazine);
+          stack.magazine += moved;
+          incoming.magazine -= moved;
+          notifyAmmoChange(stack);
+        }
+        // Anything that didn't fit (stack hit magazineSize) goes back to the world; a fully
+        // absorbed pickup is consumed.
+        if (incoming.magazine > 0) incoming.onReturnedToWorld();
+        else incoming.queueFree();
+        return;
+      }
       item.onReturnedToWorld();
       return;
     }
@@ -795,6 +816,14 @@ public class WeaponController extends Node {
   private void performActiveSlotClear() {
     WeaponItem item = weapons[activeSlotIndex];
     if (item == null) return;
+    // Cancel the clear if a pickup merged more units into this stack during the ~100 ms hold window
+    // (clearActiveSlot is only requested when the magazine hits 0 on the last throw; a same-tick
+    // merge can refill it). Freeing it here regardless would silently drop the just-collected
+    // grenades. Re-emit so the HUD reflects the refilled count.
+    if (!item.isInfiniteAmmo && item.getMagazine() > 0) {
+      ammoChanged.emit(item.getMagazine(), item.getReserve());
+      return;
+    }
     weapons[activeSlotIndex] = null;
     item.setup(null, null, null);
     item.hide();

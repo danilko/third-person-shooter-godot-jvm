@@ -168,6 +168,19 @@ public class MeleeItem extends WeaponItem {
      * Explicit parameters let subclasses (KnifeItem) call this with light-attack or
      * heavy-attack stats without touching instance fields.
      */
+    /**
+     * True when {@code hitNode} is the attacker's own body — the CharacterBody3D itself or any
+     * descendant of it (e.g. a PhysicalBone3D). Belt-and-suspenders against the cone ray landing
+     * on the swinger; the AimRay exception in Character._ready is the primary guard.
+     */
+    private boolean isOwnBody(Node hitNode) {
+        if (hitNode == null || owningCharacter == null) return false;
+        for (Node n = hitNode; n != null; n = n.getParent()) {
+            if (n.equals(owningCharacter)) return true;
+        }
+        return false;
+    }
+
     protected boolean performMeleeHitWith(float hitDamage, float range, float[][] offsets) {
         if (weaponController == null || owningCharacter == null || offsets == null) return false;
         RayCast3D ray = weaponController.getAimRay();
@@ -189,6 +202,10 @@ public class MeleeItem extends WeaponItem {
                 Vector3 hitPoint = ray.getCollisionPoint();
                 if ((float) hitPoint.minus(torso).length() > range) continue;
                 Node hitNode = (ray.getCollider() instanceof Node n) ? n : null;
+                // Never melee our own body. The AimRay already excepts the owning CharacterBody3D
+                // (Character._ready), but a cone ray that resolves to ourselves (own capsule or a
+                // bone whose owner is us) is skipped here too as a backstop — see the self-hit fix.
+                if (isOwnBody(hitNode)) continue;
                 im.processHit(new HitInfo(hitNode, hitPoint, ray.getCollisionNormal()),
                         hitDamage, getDisplayName(), weaponIcon,
                         resolveAttackerName(), resolveAttackerFaction());

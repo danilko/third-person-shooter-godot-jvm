@@ -239,6 +239,18 @@ out — no scene stutter, no O(n) tree scans, host-authoritative + replicated sp
   nearest-player XZ distance via `PlayerRegistry.getPlayers()` (O(playerCount)); `< loadRadius` →
   `load`, `> unloadRadius` → `unload`.
 
+**Sizing a zone (radii are center-relative, NOT edge-relative).** Both `loadRadius` and
+`unloadRadius` are measured from the **marker (zone center)** and are **fully independent of
+`size`** (the spawn box). So the unload trigger can and *should* be much larger than the box — a
+player stepping a few metres past the box edge does **not** unload (you'd have to reach
+`unloadRadius` from the center). Defaults: `size = (60,10,60)` (30 m half-extent),
+`loadRadius = 200`, `unloadRadius = 350` — unload only fires 350 m from center. Recommended
+relationship (`halfExtent = max(size.x, size.z)/2`):
+`unloadRadius > loadRadius > halfExtent`, e.g. `loadRadius ≈ halfExtent + pre-spawn lead (~150 m)`
+and `unloadRadius ≈ loadRadius + hysteresis margin (~150 m)`. `WorldZoneManager.warnIfMisSized`
+(debug-gated) logs once at registration when a `.tres` violates this (the cause of "everything
+unloads the moment I step out" — a too-small `unloadRadius`).
+
 **Authority:** AI spawn/despawn is host-only — `load()` instances cosmetic geometry on every peer
 but returns early on a non-server client (`net.isNetworked() && !net.isServer()`); clients receive
 the bodies through the existing `announceSpawn → MSG_SPAWN → GameManager.spawnReplicatedCharacter`

@@ -243,6 +243,12 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         }
         if (hasNode(aimRayPath)) {
             aimRay = (RayCast3D) getNode(aimRayPath);
+            // Exclude our own body from the AimRay. The bone exceptions (addPhysicalBoneExceptions)
+            // only cover the ragdoll PhysicalBone3D nodes, not the live stance capsule. Firearms
+            // never hit self (spread < 0.5deg), but MeleeItem casts this ray through a +/-25deg cone
+            // that can tilt onto the character's own capsule and deal self-damage. Excepting the body
+            // here is rotation-independent, so it covers every cone ray (and hardens firearm hitscan).
+            aimRay.addException(this);
         }
         if (hasNode(cameraRootPath)) {
             cameraRoot = (Node3D) getNode(cameraRootPath);
