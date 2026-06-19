@@ -75,6 +75,27 @@ this document exists to avoid — lock the prefix scheme down first.
 - Decide the zone-grid size *before* any real geometry is modeled; it constrains
   border layout, road continuity (I3), and region-transition placement (I4).
 
+### Setting up a zone (recipe) — E1
+
+1. **Pick a zone-grid cell size** (e.g. 60–120 m square) and model/export each
+   geometry chunk to those exact extents so chunks **abut** (see below). This is
+   the value `WorldZone.size` (X/Z) should match — the spawn box is meant to cover
+   the authored chunk footprint; Y is the vertical spawn band (~10 m is plenty for
+   ground AI).
+2. **Place a `WorldZoneMarker`** (duplicate `resources/.../world/zones/DebugZone.tscn`)
+   at the chunk **center** — the marker's world position *is* the zone center — and
+   assign a `WorldZone` `.tres` with `size` = the chunk extents.
+3. **Set the trigger radii** (both measured from the center, independent of `size`):
+   `loadRadius ≈ size/2 + pre-spawn lead (~150 m)` so AI stream in *before* the player
+   reaches the box, and `unloadRadius ≈ loadRadius + hysteresis margin (~150 m)`. The
+   invariant `unloadRadius > loadRadius > max(size.x,size.z)/2` must hold or the zone
+   flickers / unloads while the player is still on it (`WorldZoneManager.warnIfMisSized`
+   logs a debug warning otherwise). Neighbour zones' `loadRadius` should reach past the
+   `unloadRadius` you're leaving so there's no dead frame with nothing loaded.
+4. **Assign the chunk mesh to `WorldZone.geometry`** (the PackedScene field) so it streams
+   with the zone. A mesh dropped as a *child of the marker* is static furniture and never
+   streams. Populate `spawnConfigs` (ambient AI) and `namedCharacters` (story AI).
+
 ### Navigation per chunk — DECIDED (E1)
 
 - Each streamed zone-geometry chunk **carries its own baked `NavigationRegion3D`**
