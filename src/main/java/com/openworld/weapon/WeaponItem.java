@@ -70,7 +70,10 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @RegisterProperty @Export public float bloomDecaySpeed = 1.0f;
   @RegisterProperty @Export public float bloomMax        = 0.25f;
   @RegisterProperty @Export public float reloadSpeed = 0.8f;
-  @RegisterProperty @Export public float switchSpeed = 1.2f;
+  // switchSpeed is a rate: deploy time = 1/switchSpeed. 2.2 ⇒ ~0.45 s deploy (CS/PUBG-snappy); the
+  // post-deploy fire lockout is a small fixed constant (WeaponController.DRAW_SETTLE_SECONDS), not a
+  // second full 1/switchSpeed, so total switch ≈ deploy time.
+  @RegisterProperty @Export public float switchSpeed = 2.2f;
   @RegisterProperty @Export public float fireRate = 8.0f;
   @RegisterProperty @Export public boolean auto = true;
   @RegisterProperty @Export public int magazine = 40;
@@ -122,6 +125,11 @@ public class WeaponItem extends Pickup implements WeaponAction {
   protected String resolveAttackerFaction() {
     if (owningCharacter instanceof Character c && c.characterInfo != null) return c.characterInfo.faction;
     return "";
+  }
+
+  /** World position of the shooter, for the HUD damage-direction indicator. Null when unknown. */
+  protected godot.core.Vector3 resolveAttackerPosition() {
+    return owningCharacter != null ? owningCharacter.getGlobalPosition() : null;
   }
 
   public WeaponSlotType getSlotType() {

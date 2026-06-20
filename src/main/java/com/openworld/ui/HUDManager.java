@@ -28,6 +28,7 @@ import godot.core.HorizontalAlignment;
 import godot.core.NodePath;
 import godot.core.StringNames;
 import godot.core.Vector2;
+import godot.core.Vector3;
 import godot.global.GD;
 
 import java.util.HashMap;
@@ -42,22 +43,19 @@ import com.openworld.item.Pickup;
  * Responsibilities:
  *  1. Relay active player's local signals (ammoChanged, Health.healthChanged) to
  *     EventBus so HUDs remain completely decoupled from the player node.
- *  2. Switch between HUD contexts (foot, vehicle, ...) by showing/hiding
- *     named child Control nodes.
+ *  2. Show/hide HUD widgets per {@link Situation} via a declarative table ({@link #BASE_LAYOUT})
+ *     plus a runtime override layer ({@link #setWidgetEnabled}). The situation is on-foot, or — while
+ *     in a carrier — derived from the carrier's weapon mode, so the right weapon UI shows and player
+ *     health stays visible while riding.
+ *  3. Drive the damage-direction indicator for the local player (EventBus.characterDamagedFrom).
  *
- * Scene setup:
- *   HUDManager (CanvasLayer, script = HUDManager.gdj)
- *     FootHUD  (CharacterHUD scene)
- *     VehicleHUD (future)
- *
- * To switch HUD context at runtime call activateHUD("VehicleHUD").
+ * Scene setup (HUDManager.tscn, a CanvasLayer): table-managed widget children are discovered by node
+ * name (FootHUD, VehicleHUD, WeaponSlotsUI, DamageIndicator, future Minimap); Feed/StatusFeed/Crosshair
+ * and the WeaponRadialMenu are not table-managed. Add a widget = drop the node + list its name in
+ * BASE_LAYOUT.
  */
 @RegisterClass(className = "HUDManager")
 public class HUDManager extends CanvasLayer {
-
-  /** Name of the HUD child to show on startup. */
-  @RegisterProperty @Export
-  public String initialHUD = "FootHUD";
 
   /** Path to the WeaponRadialMenu child (relative to this node). Set empty to skip wiring. */
   @RegisterProperty @Export
@@ -70,19 +68,57 @@ public class HUDManager extends CanvasLayer {
   private static final String DEFEATED_ENTRY_SCENE_PATH =
 		  "res://src/main/resources/com/openworld/ui/DefeatedFeedEntry.tscn";
 
-  /** Which set of HUD widgets is shown. One declarative transition per context. */
-  private enum HudContext { ON_FOOT, IN_VEHICLE }
+  /**
+   * HUD situations — richer than on-foot/in-vehicle: the in-vehicle case splits by the carrier's
+   * weapon mode so the right weapon UI shows. Derived in {@link #situationForVehicle}. Each maps to a
+   * declarative set of visible widgets in {@link #BASE_LAYOUT}.
+   */
+  private enum Situation { ON_FOOT, VEHICLE_DRIVE, VEHICLE_PASSENGER_WEAPON, VEHICLE_MOUNTED_WEAPON }
 
-  private Control        activeHUD;
-  private Node           player;
-  private String         playerCharacterId = "";
-  private Crosshair      crosshair;
-  private Feed           feed;          // bottom-right kill feed
-  private Feed           statusFeed;    // top-center transient toasts (pickups, mission events)
-  private WeaponSlotsUI  weaponSlotsUI;
+  // Widget node-name ids — must match the child node names in HUDManager.tscn.
+  private static final String W_FOOT_HUD     = "FootHUD";       // player health + interact prompt
+  private static final String W_VEHICLE_HUD  = "VehicleHUD";    // speed + vehicle health
+  private static final String W_WEAPON_SLOTS = "WeaponSlotsUI"; // on-foot weapon inventory bar
+  private static final String W_DAMAGE_IND   = "DamageIndicator";
 
-  private HudContext     currentContext  = HudContext.ON_FOOT;
-  private Vehicle        currentVehicle;  // non-null only while IN_VEHICLE
+  /**
+   * Declarative source of truth: which registry widgets are visible per situation. Edit this table to
+   * change the HUD layout; adding a widget = drop its node in HUDManager.tscn + list its name here.
+   * Kept as a code table (not an exported nested Dictionary, which crashes the godot-kotlin-jvm
+   * registration scanner — see CLAUDE.md). Player health ({@code FootHUD}) is listed in every vehicle
+   * situation so it stays visible while riding (the occupant's body is exposed). The Crosshair and the
+   * WeaponRadialMenu are intentionally NOT table-managed: the crosshair has finer combat/weapon-mode
+   * gating in {@link #refreshCrosshair}, and the radial menu is a self-managed input overlay.
+   */
+  private static final java.util.EnumMap<Situation, java.util.Set<String>> BASE_LAYOUT =
+      new java.util.EnumMap<>(Situation.class);
+  static {
+    BASE_LAYOUT.put(Situation.ON_FOOT,
+        java.util.Set.of(W_FOOT_HUD, W_WEAPON_SLOTS, W_DAMAGE_IND));
+    BASE_LAYOUT.put(Situation.VEHICLE_DRIVE,
+        java.util.Set.of(W_FOOT_HUD, W_VEHICLE_HUD, W_DAMAGE_IND));
+    BASE_LAYOUT.put(Situation.VEHICLE_PASSENGER_WEAPON,
+        java.util.Set.of(W_FOOT_HUD, W_VEHICLE_HUD, W_WEAPON_SLOTS, W_DAMAGE_IND));
+    BASE_LAYOUT.put(Situation.VEHICLE_MOUNTED_WEAPON,
+        java.util.Set.of(W_FOOT_HUD, W_VEHICLE_HUD, W_DAMAGE_IND));
+  }
+
+  /** Table-managed widget nodes by name, discovered from children in _ready. */
+  private final Map<String, Control> widgets = new HashMap<>();
+  /** Runtime per-widget visibility overrides (id → forced visible/hidden) — wins over BASE_LAYOUT. */
+  private final Map<String, Boolean> widgetOverrides = new HashMap<>();
+
+  private Node            player;
+  private String          playerCharacterId = "";
+  private Crosshair       crosshair;
+  private Feed            feed;          // bottom-right kill feed
+  private Feed            statusFeed;    // top-center transient toasts (pickups, mission events)
+  private WeaponSlotsUI   weaponSlotsUI;
+  private DamageIndicator damageIndicator;
+  private WeaponProgress  weaponProgress;
+
+  private Situation      currentSituation = Situation.ON_FOOT;
+  private Vehicle        currentVehicle;  // non-null only while in a vehicle situation
 
   /**
    * characterId → HUD widget registry (C2: multi-character HUD wiring).
@@ -170,6 +206,11 @@ public class HUDManager extends CanvasLayer {
 	  bus.weaponPickedUp.connectUnsafe(
 		  Callable.createUnsafe(this, StringNames.toGodotName("onWeaponPickedUp")),
 		  Object.ConnectFlags.DEFAULT);
+
+	  // Damage-direction indicator: routed per-character, filtered to the local player below.
+	  bus.characterDamagedFrom.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterDamagedFrom")),
+		  Object.ConnectFlags.DEFAULT);
 	}
 
 	// Cache the crosshair and weapon slot bar — siblings of FootHUD/VehicleHUD,
@@ -177,11 +218,24 @@ public class HUDManager extends CanvasLayer {
 	Node ch = getNodeOrNull("Crosshair");
 	if (ch instanceof Crosshair c) crosshair = c;
 
+	// Build the situational widget registry: every direct Control child EXCEPT the always-on feeds,
+	// the self-gated crosshair, and the input-overlay radial menu. Adding a widget = drop its node +
+	// list its name in BASE_LAYOUT — no new show/hide code here.
 	for (Node child : getChildren()) {
-	  if (child instanceof WeaponSlotsUI ui) { weaponSlotsUI = ui; break; }
+	  if (!(child instanceof Control c)) continue;
+	  String name = child.getName().toString();
+	  if (name.equals("Feed") || name.equals("StatusFeed") || name.equals("Crosshair")
+		  || name.equals("WeaponRadialMenu") || name.equals("WeaponProgress")) continue;
+	  widgets.put(name, c);
+	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
+	  if (c instanceof DamageIndicator di) damageIndicator = di;
 	}
+	// WeaponProgress self-hides when idle (polls the controller each frame), so it is not
+	// table-managed — cache it directly to wire its controller.
+	Node wp = getNodeOrNull("WeaponProgress");
+	if (wp instanceof WeaponProgress w) weaponProgress = w;
 
-	if (!initialHUD.isEmpty()) activateHUD(initialHUD);
+	applyContext(Situation.ON_FOOT);
   }
 
   @RegisterFunction
@@ -212,51 +266,85 @@ public class HUDManager extends CanvasLayer {
   // ── HUD context machine ───────────────────────────────────────────────────
 
   /**
-   * Single declarative transition between HUD contexts. Each context fully defines
-   * which widgets are visible — replacing the old scattered per-widget show/hide deltas
-   * that had to remember to undo each other. Add a context here, not another enter/exit
-   * mutation pair.
+   * Apply a situation: set every table-managed widget's visibility from BASE_LAYOUT (with any runtime
+   * override applied), then refresh the crosshair. The single declarative transition — no scattered
+   * per-widget show/hide deltas.
    */
-  private void applyContext(HudContext ctx) {
-	currentContext = ctx;
-	activateHUD(ctx == HudContext.IN_VEHICLE ? "VehicleHUD" : "FootHUD");
-	if (weaponSlotsUI != null) {
-	  if (ctx == HudContext.IN_VEHICLE) weaponSlotsUI.hide(); else weaponSlotsUI.show();
+  private void applyContext(Situation situation) {
+	currentSituation = situation;
+	for (Map.Entry<String, Control> e : widgets.entrySet()) {
+	  e.getValue().setVisible(resolveWidgetVisible(e.getKey(), situation));
 	}
 	refreshCrosshair();
   }
 
+  /** A widget is visible if a runtime override forces it; otherwise per the situation's BASE_LAYOUT set. */
+  private boolean resolveWidgetVisible(String id, Situation situation) {
+	Boolean override = widgetOverrides.get(id);
+	if (override != null) return override;
+	java.util.Set<String> set = BASE_LAYOUT.get(situation);
+	return set != null && set.contains(id);
+  }
+
+  /** Maps a vehicle's weapon mode to the HUD situation (null vehicle ⇒ plain drive). */
+  private Situation situationForVehicle(Vehicle v) {
+	if (v == null) return Situation.VEHICLE_DRIVE;
+	return switch (v.getWeaponMode()) {
+	  case PASSENGER_WEAPON -> Situation.VEHICLE_PASSENGER_WEAPON;
+	  case VEHICLE_WEAPON   -> Situation.VEHICLE_MOUNTED_WEAPON;
+	  default               -> Situation.VEHICLE_DRIVE;
+	};
+  }
+
   /**
-   * The single place crosshair visibility is decided (was previously driven from three
-   * separate sites). On foot it follows the player's combat state and the player's weapon
-   * controller; in a vehicle it shows only for a VEHICLE_WEAPON vehicle, with no weapon
-   * controller (fixed spread).
+   * Runtime override: force a HUD widget visible/hidden regardless of the current situation's table
+   * entry — for per-carrier or gameplay tweaks (e.g. a turret carrier hiding the minimap). The id is
+   * the widget's node name (e.g. {@code "WeaponSlotsUI"}, {@code "DamageIndicator"}).
+   */
+  @RegisterFunction
+  public void setWidgetEnabled(String id, boolean enabled) {
+	widgetOverrides.put(id, enabled);
+	applyContext(currentSituation);
+  }
+
+  /** Drop a runtime override so the widget follows the situation table again. */
+  @RegisterFunction
+  public void clearWidgetOverride(String id) {
+	widgetOverrides.remove(id);
+	applyContext(currentSituation);
+  }
+
+  /**
+   * The single place crosshair visibility is decided. On foot it follows the player's combat state and
+   * weapon controller; for a mounted vehicle weapon it shows with fixed spread (no weapon controller);
+   * for a passenger weapon it shows with the player's own weapon spread; while plain driving it hides.
    */
   private void refreshCrosshair() {
 	if (crosshair == null) return;
-	if (currentContext == HudContext.IN_VEHICLE) {
-	  boolean vehWeapon = currentVehicle != null
-			  && currentVehicle.getWeaponMode() == VehicleWeaponMode.VEHICLE_WEAPON;
-	  crosshair.weaponController = null;
-	  crosshair.setShowCrosshair(vehWeapon);
-	} else {
-	  Node wcNode = player != null ? player.getNodeOrNull("WeaponController") : null;
-	  crosshair.weaponController = wcNode instanceof WeaponController wc ? wc : null;
-	  boolean inCombat = player instanceof Character c && c.combat;
-	  crosshair.setShowCrosshair(inCombat);
+	switch (currentSituation) {
+	  case VEHICLE_MOUNTED_WEAPON -> {
+		crosshair.weaponController = null;
+		crosshair.setShowCrosshair(true);
+	  }
+	  case VEHICLE_PASSENGER_WEAPON -> {
+		Node wcNode = player != null ? player.getNodeOrNull("WeaponController") : null;
+		crosshair.weaponController = wcNode instanceof WeaponController wc ? wc : null;
+		crosshair.setShowCrosshair(true);
+	  }
+	  case VEHICLE_DRIVE -> {
+		crosshair.weaponController = null;
+		crosshair.setShowCrosshair(false);
+	  }
+	  default -> {
+		Node wcNode = player != null ? player.getNodeOrNull("WeaponController") : null;
+		crosshair.weaponController = wcNode instanceof WeaponController wc ? wc : null;
+		boolean inCombat = player instanceof Character c && c.combat;
+		crosshair.setShowCrosshair(inCombat);
+	  }
 	}
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
-
-  /**
-   * Switch to the named HUD child (e.g. "FootHUD", "VehicleHUD").
-   * Hides the current HUD and shows the new one.
-   */
-  public void activateHUD(String name) {
-	Node child = getNodeOrNull(new NodePath(name));
-	if (child instanceof Control c) setActiveHUD(c);
-  }
 
   /**
    * Wire a new player node's signals to the EventBus relay and configure all
@@ -300,6 +388,24 @@ public class HUDManager extends CanvasLayer {
 	if (weaponSlotsUI != null && newPlayer instanceof Character c) {
 	  weaponSlotsUI.wireCharacter(c);
 	}
+	if (damageIndicator != null && newPlayer instanceof Character c) {
+	  damageIndicator.setPlayer(c);
+	}
+	if (weaponProgress != null && newPlayer instanceof Character c) {
+	  weaponProgress.wireCharacter(c);
+	}
+  }
+
+  /**
+   * EventBus.characterDamagedFrom → drive the damage-direction indicator for the LOCAL player only
+   * (filtered by characterId, same as the other per-character HUD routing). The attacker world
+   * position came from the authority (single-player/host) or the replicated damage broadcast.
+   */
+  @RegisterFunction
+  public void onCharacterDamagedFrom(CharacterInfo info, Vector3 source) {
+	if (info == null || damageIndicator == null) return;
+	if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(info.characterId)) return;
+	damageIndicator.onDamagedFrom(source);
   }
 
   private void wireCharacterHUD(Node newPlayer) {
@@ -325,19 +431,17 @@ public class HUDManager extends CanvasLayer {
 	if (newPlayer instanceof Character c) rm.wireCharacter(c);
   }
 
-  public Control getActiveHUD() { return activeHUD; }
-
   // ── Vehicle HUD switching ─────────────────────────────────────────────────
 
   @RegisterFunction
   public void onVehicleEntered(Node vehicle, CharacterInfo occupantInfo) {
 	if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
+	currentVehicle = vehicle instanceof Vehicle v ? v : null;
 	Node vhudNode = getNodeOrNull("VehicleHUD");
 	if (vhudNode instanceof VehicleHUD hud && vehicle instanceof Node3D v) {
 	  hud.setVehicle(v);
 	}
-	currentVehicle = vehicle instanceof Vehicle v ? v : null;
-	applyContext(HudContext.IN_VEHICLE);
+	applyContext(situationForVehicle(currentVehicle));
   }
 
   @RegisterFunction
@@ -346,7 +450,7 @@ public class HUDManager extends CanvasLayer {
 	Node vhudNode = getNodeOrNull("VehicleHUD");
 	if (vhudNode instanceof VehicleHUD hud) hud.setVehicle(null);
 	currentVehicle = null;
-	applyContext(HudContext.ON_FOOT);
+	applyContext(Situation.ON_FOOT);
   }
 
   // ── Signal relays — player → EventBus ─────────────────────────────────────
@@ -395,12 +499,6 @@ public class HUDManager extends CanvasLayer {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
-
-  private void setActiveHUD(Control hud) {
-	if (activeHUD != null) activeHUD.hide();
-	activeHUD = hud;
-	if (activeHUD != null) activeHUD.show();
-  }
 
   private void emitHealth(float currentHealth) {
 	Node busNode = getNodeOrNull("/root/EventBus");

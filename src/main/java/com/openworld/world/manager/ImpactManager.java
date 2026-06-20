@@ -53,6 +53,17 @@ public class ImpactManager extends Node {
     public void processHit(HitInfo info, float damage,
                            String weaponName, Texture2D weaponIcon,
                            String attackerName, String attackerFaction) {
+        processHit(info, damage, weaponName, weaponIcon, attackerName, attackerFaction, null);
+    }
+
+    /**
+     * @param attackerPos world position of the shooter, threaded to {@link Health#takeDamage} so the
+     *                    HUD can show a damage-direction indicator. Null when unknown.
+     */
+    public void processHit(HitInfo info, float damage,
+                           String weaponName, Texture2D weaponIcon,
+                           String attackerName, String attackerFaction,
+                           godot.core.Vector3 attackerPos) {
         // Walk the parent chain once to resolve surface type, health owner, and
         // character — previously done by three independent traversals per hit.
         HitContext ctx = resolveHitContext(info.hitNode);
@@ -65,7 +76,7 @@ public class ImpactManager extends Node {
 
         if (ctx.healthOwner != null) {
             Health health = (Health) ctx.healthOwner.getNode(new NodePath("Health"));
-            health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction);
+            health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos);
         }
 
         if (ctx.character != null && info.hitNormal != null) {

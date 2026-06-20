@@ -240,7 +240,8 @@ public class FirearmItem extends WeaponItem {
       var im = getImpactManager();
       if (im != null) {
         im.processHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()),
-                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction());
+                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
+                      resolveAttackerPosition());
       }
     }
 
@@ -276,7 +277,8 @@ public class FirearmItem extends WeaponItem {
       var im = getImpactManager();
       if (im != null) {
         im.processHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()),
-                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction());
+                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
+                      resolveAttackerPosition());
       }
     }
     // No tracer here: this runs on the host for a client's shot, and the host's (and every other

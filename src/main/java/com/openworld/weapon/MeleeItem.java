@@ -208,7 +208,7 @@ public class MeleeItem extends WeaponItem {
                 if (isOwnBody(hitNode)) continue;
                 im.processHit(new HitInfo(hitNode, hitPoint, ray.getCollisionNormal()),
                         hitDamage, getDisplayName(), weaponIcon,
-                        resolveAttackerName(), resolveAttackerFaction());
+                        resolveAttackerName(), resolveAttackerFaction(), resolveAttackerPosition());
                 return true;
             }
             return false;

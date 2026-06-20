@@ -13,6 +13,7 @@ import godot.api.Texture2D;
 import godot.core.Signal0;
 import godot.core.Signal1;
 import godot.core.StringName;
+import godot.core.Vector3;
 import godot.global.GD;
 import com.openworld.control.Controllable;
 
@@ -68,11 +69,22 @@ public class Health extends Node {
     }
 
     public void takeDamage(Node hitNode, float baseDamage, String weaponName) {
-        takeDamage(hitNode, baseDamage, weaponName, null, "", "");
+        takeDamage(hitNode, baseDamage, weaponName, null, "", "", null);
     }
 
     public void takeDamage(Node hitNode, float baseDamage, String weaponName,
                            Texture2D weaponIcon, String attackerName, String attackerFaction) {
+        takeDamage(hitNode, baseDamage, weaponName, weaponIcon, attackerName, attackerFaction, null);
+    }
+
+    /**
+     * @param attackerPos world position of the damage source (shooter / blast center), or null when
+     *                    the damage has no meaningful direction (fall, etc.). Drives the HUD
+     *                    damage-direction indicator via {@link EventBus#characterDamagedFrom}.
+     */
+    public void takeDamage(Node hitNode, float baseDamage, String weaponName,
+                           Texture2D weaponIcon, String attackerName, String attackerFaction,
+                           Vector3 attackerPos) {
         if (currentHealth <= 0) return;
 
         boolean headshot = (hitNode instanceof PhysicalBone3D)
@@ -97,7 +109,7 @@ public class Health extends Node {
             }
         }
 
-        applyDamage(damage, headshot, weaponName, weaponIcon, attackerName, attackerFaction);
+        applyDamage(damage, headshot, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos);
     }
 
     private void relayDamageToAuthority(Controllable c, float finalDamage, boolean headshot,
@@ -114,16 +126,20 @@ public class Health extends Node {
      * (HUD-local concern; never crosses the wire).
      */
     public void applyNetworkDamage(float finalDamage, boolean headshot, String weaponName,
-            String attackerName, String attackerFaction) {
+            String attackerName, String attackerFaction, Vector3 attackerPos) {
         if (currentHealth <= 0) return;
-        applyDamage(finalDamage, headshot, weaponName, null, attackerName, attackerFaction);
+        applyDamage(finalDamage, headshot, weaponName, null, attackerName, attackerFaction, attackerPos);
     }
 
     private void applyDamage(float damage, boolean headshot, String weaponName, Texture2D weaponIcon,
-                             String attackerName, String attackerFaction) {
+                             String attackerName, String attackerFaction, Vector3 attackerPos) {
         currentHealth = Math.max(0.0f, currentHealth - damage);
         hit.emit(damage);
         emitCharacterHealthChanged();
+        emitDamagedFrom(attackerPos);
+        // Server is the single site that broadcasts the per-hit cue + attacker source to clients
+        // (covers host-originated AND client-relayed damage; the relay path flows through here too).
+        maybeBroadcastDamageCue(damage, attackerPos);
         if (currentHealth <= 0) {
             Node busNode = getNodeOrNull("/root/EventBus");
             if (busNode instanceof EventBus bus) {
@@ -159,6 +175,35 @@ public class Health extends Node {
             }
             died.emit();
         }
+    }
+
+    /**
+     * Server-only: re-broadcast the per-hit cue (and attacker source for the HUD direction indicator)
+     * to clients. The victim may be a Character or a Vehicle — both are Controllable with CharacterInfo.
+     * Non-networked / client peers no-op (clients receive the cue via handleDamageBroadcastMessage).
+     */
+    private void maybeBroadcastDamageCue(float damage, Vector3 attackerPos) {
+        Node owner = getOwner();
+        if (!(owner instanceof Controllable ctrl) || ctrl.getCharacterInfo() == null) return;
+        String id = ctrl.getCharacterInfo().characterId;
+        if (id == null || id.isEmpty()) return;
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (netNode instanceof NetworkManager net && net.isNetworked() && net.isServer()) {
+            net.broadcastDamage(id, damage, attackerPos != null, attackerPos);
+        }
+    }
+
+    /**
+     * Emit EventBus.characterDamagedFrom for the HUD damage-direction indicator. No-op when the source
+     * is unknown (null — fall/world damage carry no direction) or the owner has no CharacterInfo
+     * (vehicles, scenery). HUDManager filters this to the local player.
+     */
+    private void emitDamagedFrom(Vector3 attackerPos) {
+        if (attackerPos == null) return;
+        Node owner = getOwner();
+        if (!(owner instanceof Character c) || c.characterInfo == null) return;
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.characterDamagedFrom.emit(c.characterInfo, attackerPos);
     }
 
     /** Relay current health to EventBus.characterHealthChanged for the owning character. */
