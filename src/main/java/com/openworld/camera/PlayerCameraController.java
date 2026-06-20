@@ -69,6 +69,17 @@ public class PlayerCameraController extends TPSCameraController {
   protected Vector2 gatherLookInput(double delta) {
     if (!isLocallyControlled()) return Vector2.Companion.getZERO();
 
+    // While on-foot input is blocked by a UI overlay that owns the mouse (the radial weapon menu,
+    // pause menu — they set Character.inputBlocked AND mouse mode VISIBLE), do NOT re-capture the
+    // mouse or apply look. This runs in _physicsProcess, which setProcessInput(false) does not stop,
+    // so without this guard the per-frame CAPTURED re-grab below immediately hides/locks the cursor
+    // the overlay just made visible — making the radial menu impossible to navigate with the mouse.
+    if (player instanceof Character c && c.inputBlocked) {
+      pendingYaw   = 0;
+      pendingPitch = 0;
+      return Vector2.Companion.getZERO();
+    }
+
     // Deferred from _ready() (see comment there) — idempotent, cheap to repeat.
     Input.setMouseMode(Input.MouseMode.CAPTURED);
 

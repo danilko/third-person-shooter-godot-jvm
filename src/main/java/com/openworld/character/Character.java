@@ -946,7 +946,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     @RegisterFunction
     public void applyNameplateVisibility() {
         if (!isLocallyOwnedPlayer()) return;
-        Node nameplate = getNodeOrNull("CharacterNameplate");
+        Node nameplate = getNodeOrNull("Nameplate");
         if (nameplate instanceof Node3D np) np.setVisible(false);
     }
 

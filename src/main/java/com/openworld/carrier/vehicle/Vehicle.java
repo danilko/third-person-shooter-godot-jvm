@@ -268,6 +268,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         cmd.brake     = false;
         cmd.fire      = false;
         cmd.reload    = false;
+        cmd.desiredWeapon = -1;
 
         if (controller != null && controller.isAuthority()) {
             UserCommand currentCmd = controller.gatherInput(delta);
@@ -286,6 +287,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             cmd.brake     = currentCmd.brake;
             cmd.fire      = currentCmd.fire;
             cmd.reload    = currentCmd.reload;
+            // Relay the passenger-weapon slot switch (PASSENGER_WEAPON mode): without this the
+            // stale persistent cmd.desiredWeapon (-1) was forwarded every frame and number keys
+            // never reached the seated occupant's WeaponController.
+            cmd.desiredWeapon = currentCmd.desiredWeapon;
         }
 
         if (cmd.handbrake) {
