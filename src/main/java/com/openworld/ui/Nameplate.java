@@ -143,16 +143,26 @@ public class Nameplate extends Node3D {
         }
     }
 
+    /**
+     * Lists every carried weapon (one slot per line) for cross-network debugging — the active slot is
+     * marked with a leading ">". Iterates all slots via the WeaponController accessors rather than
+     * showing only the active weapon, so a glance at any plate reveals the full inventory.
+     */
     private void refreshWeapon() {
         if (weaponLabel == null) return;
         if (weaponController == null) { weaponLabel.setText("--"); return; }
 
-        WeaponItem item = weaponController.getWeaponItem(weaponController.getWeapon());
-        if (item == null) {
-            weaponLabel.setText("--");
-        } else {
-            weaponLabel.setText(item.getDisplayName() + "  " + item.getMagazine() + "/" + item.getReserve());
+        int active = weaponController.getWeapon();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < weaponController.getSlotCount(); i++) {
+            WeaponItem item = weaponController.getWeaponItem(i);
+            if (item == null) continue;
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(i == active ? "> " : "  ")
+              .append(i).append(' ').append(item.getDisplayName())
+              .append(' ').append(item.getMagazine()).append('/').append(item.getReserve());
         }
+        weaponLabel.setText(sb.length() == 0 ? "--" : sb.toString());
     }
 
     private void updateBar(float current) {

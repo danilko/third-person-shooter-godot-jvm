@@ -7,7 +7,6 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.core.NodePath;
-import godot.global.GD;
 
 @RegisterClass(className = "WeaponRadialMenuItem")
 public class WeaponRadialMenuItem extends Control {
@@ -113,27 +112,22 @@ public class WeaponRadialMenuItem extends Control {
   @RegisterFunction
   public void onClicked() {
     WeaponRadialMenu rm = getRadialMenu();
-    GD.print("Click menu item " + this.getName());
     if (rm == null || rm.getCharacter() == null) return;
-
-      GD.print("Click menu item " + this.getName() + " set weapon " + index);
-
     rm.getCharacter().setWeapon(index);
     rm.hideRadialMenu();
   }
 
+  /**
+   * Hovering switches to this slot's weapon live (preview) but does NOT close the menu — the menu
+   * stays open until the player clicks ({@link #onClicked}) or releases the radial-menu key
+   * (handled in {@link WeaponRadialMenu#_input}). The Button's {@code texture_hover} provides the
+   * visual highlight.
+   */
   @RegisterFunction
   public void onHover() {
-
-      WeaponRadialMenu rm = getRadialMenu();
-    // visual highlight is handled by Button's texture_hover — switching on hover
-      GD.print("hover menu item " + this.getName());
-      if (rm == null || rm.getCharacter() == null) return;
-
-      GD.print("hover menu item " + this.getName() + " set weapon " + index);
-
-      rm.getCharacter().setWeapon(index);
-      rm.hideRadialMenu();
+    WeaponRadialMenu rm = getRadialMenu();
+    if (rm == null || rm.getCharacter() == null) return;
+    rm.getCharacter().setWeapon(index);
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

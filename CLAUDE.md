@@ -580,8 +580,10 @@ fire-timing *validation* is deferred (H3).
 
 `ui.Nameplate` (scene `ui/Nameplate.tscn`) is a **generic** floating plate: a single `SubViewport`
 rendered to a billboard `Sprite3D`, holding two UI sub-scenes — `CharacterHealthUI.tscn` (`HealthUI`,
-name + health, top) and `CharacterWeaponUI.tscn` (`WeaponUI`, active weapon + `mag/reserve`, bottom
-strip). The weapon row is for cross-network debugging (shown for all factions now; gameplay
+name + health, top) and `CharacterWeaponUI.tscn` (`WeaponUI`, bottom strip). `Nameplate.refreshWeapon`
+lists **every** carried weapon (one line per occupied slot, `<slot> <name> <mag>/<reserve>`, active slot
+marked with a leading `>`) — a full-inventory readout for cross-network debugging, not just the active
+weapon. The weapon block is for cross-network debugging (shown for all factions now; gameplay
 faction-visibility filtering is later).
 
 **It carries no entity-specific logic** — it binds to its parent purely through the
@@ -590,8 +592,10 @@ faction-visibility filtering is later).
 (`Health`, `WeaponController` — same names on `Character` and `Vehicle`). So **any type reuses the same
 scene/script** by implementing `NameplateTarget` and supplying its own rules. `NameplateTarget` lives
 in the `character` package (not `ui`) only to avoid a package cycle — `ui` already depends on
-`character`. It's instanced in **`Character.tscn`** (base, node still named `CharacterNameplate`), so
-AI *and* every networked player gets one.
+`character`. It's instanced in **`Character.tscn`** (base, node named `Nameplate`), so
+AI *and* every networked player gets one. `Character.applyNameplateVisibility` looks this node up by
+that exact name (`getNodeOrNull("Nameplate")`) to hide the locally-owned body's own plate — keep the
+node name and the lookup string in sync.
 
 `Character implements NameplateTarget`: colour = own faction. `Vehicle implements NameplateTarget`:
 colour = its *driver's* faction (neutral when empty/defeated), health + weapon = the *carrier's* own

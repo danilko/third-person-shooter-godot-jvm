@@ -416,7 +416,9 @@ public class WeaponController extends Node {
           int moved = Math.min(room, incoming.magazine);
           stack.magazine += moved;
           incoming.magazine -= moved;
-          notifyAmmoChange(stack);
+          // Unconditional re-emit (see ThrowableItem merge): refresh the slot UI / nameplate even
+          // when the merged stack is not the active weapon — notifyAmmoChange would no-op there.
+          refreshActiveAmmoDisplay();
         }
         // Anything that didn't fit (stack hit magazineSize) goes back to the world; a fully
         // absorbed pickup is consumed.

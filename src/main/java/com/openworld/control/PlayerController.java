@@ -224,7 +224,7 @@ public class PlayerController extends Controller {
         // ── Weapon slot quick-switch ──────────────────────────────────────────
         // Keys 0         → slot 0 (fist — always available)
         // Keys 1–6       → slots 1–6 (PRIMARY×2, SECONDARY, MELEE, THROWABLE, CONSUMABLE)
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < WEAPON_SLOT_ACTIONS.length; i++) {
             if (inp.isActionJustPressed(WEAPON_SLOT_ACTIONS[i], false)) {
                 cmd.desiredWeapon = i;
                 break;
@@ -286,14 +286,12 @@ public class PlayerController extends Controller {
         cmd.resetVehicle = inp.isActionJustPressed("reload", false);
 
         // Weapon slot switching — relayed to the occupant for PASSENGER_WEAPON mode.
-        if (inp.isActionJustPressed("weapon_slot_0", false)) {
-            cmd.desiredWeapon = 0;
-        } else {
-            for (int i = 0; i < 7; i++) {
-                if (inp.isActionJustPressed(WEAPON_SLOT_ACTIONS[i], false)) {
-                    cmd.desiredWeapon = i + 1;
-                    break;
-                }
+        // WEAPON_SLOT_ACTIONS[i] maps directly to slot i (same as the on-foot path); the previous
+        // i+1 mapping switched one slot too high and could request the invalid slot 7.
+        for (int i = 0; i < WEAPON_SLOT_ACTIONS.length; i++) {
+            if (inp.isActionJustPressed(WEAPON_SLOT_ACTIONS[i], false)) {
+                cmd.desiredWeapon = i;
+                break;
             }
         }
 

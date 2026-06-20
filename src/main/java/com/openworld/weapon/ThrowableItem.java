@@ -104,7 +104,11 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
             WeaponItem existing = wc.findWeaponByIdAndType(weaponId, getSlotType());
             if (existing instanceof ThrowableItem ti && ti.magazine < ti.magazineSize) {
                 ti.magazine += Math.min(ti.magazineSize - ti.magazine, magazine);
-                wc.notifyAmmoChange(ti);
+                // Emit unconditionally so the slot UI / nameplate (which re-scan every slot on
+                // ammoChanged) refresh the merged count immediately — even when the throwable is
+                // NOT the active weapon. notifyAmmoChange(ti) no-ops on an inactive stack, which is
+                // why the count previously only updated after a later fire/weapon-switch.
+                wc.refreshActiveAmmoDisplay();
                 wc.resetFireTimerForEquip(ti);
                 equipped = true;
                 queueFree();
