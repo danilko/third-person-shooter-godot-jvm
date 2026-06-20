@@ -100,6 +100,14 @@ public class WeaponController extends Node {
   private double pendingSlotClearCountdown = -1.0;
   /** Hold the emptied throwable active this long so its throw fireSeq replicates (≥2 snapshot intervals at ~33 ms). */
   private static final double SLOT_CLEAR_DELAY_SECONDS = 0.1;
+  /**
+   * Draw-settle fire lockout after a weapon switch completes (s). A small fixed value just long enough
+   * to stop a held fire button launching on the very first mid-draw frame (a projectile spawned from
+   * the transient muzzle could fire into the ground/self). Previously this was a full
+   * {@code 1/switchSpeed} — doubling the perceived switch time; the deploy time alone is the switch
+   * cost (CS/PUBG-style), so the settle is now a brief constant.
+   */
+  private static final double DRAW_SETTLE_SECONDS = 0.08;
   // When true, requestEquip resolves the equip IMMEDIATELY instead of deferring to _process.
   // Set by the network collect path (Pickup.applyReplicatedPickup), which runs in _process
   // (NetworkManager's packet drain) — a safe, non-signal context where reparent is legal.
@@ -697,8 +705,9 @@ public class WeaponController extends Node {
       // raises it into the hand pose over the next frames. A held fire button could
       // otherwise launch on the very first frame, while the muzzle is still mid-draw —
       // a projectile/rocket spawned from that transient muzzle position can fire into the
-      // ground or the shooter's own body and detonate on self.
-      fireTimer.setWaitTime(1.0 / next.getSwitchSpeed());
+      // ground or the shooter's own body and detonate on self. Fixed brief settle (not a full
+      // 1/switchSpeed) so the switch feels snappy — the deploy (transitionTimer) is the switch cost.
+      fireTimer.setWaitTime(DRAW_SETTLE_SECONDS);
       fireTimer.start();
       animationController.onWeaponEquip(next.weaponPoseIndex);
       ammoChanged.emit(next.getMagazine(), next.getReserve());
@@ -834,6 +843,19 @@ public class WeaponController extends Node {
   }
   public boolean isWeaponReloading()        { return reloadTimer.getTimeLeft() > 0; }
   public boolean isWeaponTransitioning()    { return transitionTimer.getTimeLeft() > 0; }
+
+  /** 0..1 progress of an in-flight weapon switch (deploy phase), or -1 when not switching. For the HUD progress ring. */
+  public double getSwitchProgress()  { return timerProgress(transitionTimer); }
+  /** 0..1 progress of an in-flight reload, or -1 when not reloading. For the HUD progress ring. */
+  public double getReloadProgress()  { return timerProgress(reloadTimer); }
+
+  private static double timerProgress(Timer timer) {
+    if (timer == null) return -1.0;
+    double left = timer.getTimeLeft();
+    if (left <= 0.0) return -1.0;
+    double total = timer.getWaitTime();
+    return total > 0.0 ? 1.0 - (left / total) : -1.0;
+  }
 
   public boolean hasAmmoForWeapon(int slotIndex) {
     WeaponItem w = getWeaponItem(slotIndex);

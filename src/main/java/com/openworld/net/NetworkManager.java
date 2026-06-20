@@ -993,10 +993,12 @@ public class NetworkManager extends Node {
 
         Health health = findHealth(victimNode);
         if (health == null) return;
+        // attackerPos is null on this relay path (the client sent only the attacker's name, not a
+        // position). The common firearm path resolves on the host via MSG_SHOT, where the shooter's
+        // host-side position is known. The broadcast (incl. the direction cue) now happens inside
+        // applyDamage on the server — covering host-originated damage too — so no explicit broadcast here.
         health.applyNetworkDamage(req.finalDamage(), req.headshot(), req.weaponName(),
-                req.attackerName(), req.attackerFaction());
-
-        broadcastDamage(req.victimCharacterId(), req.finalDamage());
+                req.attackerName(), req.attackerFaction(), null);
     }
 
     /** Authority → all: momentary hit-reaction cue — broadcastDamage's old body, isMultiplayerAuthority() swapped for isAuthorityFor(). Non-authority peers only; the authority already played it locally via applyDamage. */
@@ -1011,6 +1013,16 @@ public class NetworkManager extends Node {
 
         Health health = findHealth(victimNode);
         if (health != null) health.hit.emit(cast.damage());
+
+        // Drive this peer's HUD damage-direction indicator: emit characterDamagedFrom with the attacker
+        // world position the host included. HUDManager filters to the local player, so this is only
+        // meaningful for a client's own body (host-originated or another client's host-resolved shot).
+        if (cast.hasSource() && victim.getCharacterInfo() != null) {
+            Node busNode = getNodeOrNull("/root/EventBus");
+            if (busNode instanceof com.openworld.game.EventBus bus) {
+                bus.characterDamagedFrom.emit(victim.getCharacterInfo(), cast.source());
+            }
+        }
     }
 
     /**
@@ -1756,9 +1768,17 @@ public class NetworkManager extends Node {
                 victimCharacterId, finalDamage, headshot, weaponName, attackerName, attackerFaction));
     }
 
-    /** Authority → all: encodes + broadcasts the momentary hit-reaction cue. */
-    private void broadcastDamage(String victimCharacterId, float damage) {
-        broadcastMessage(NetMessageCodec.encodeDamageBroadcast(MSG_DAMAGE_BROADCAST, victimCharacterId, damage), null);
+    /**
+     * Authority → all: encodes + broadcasts the momentary hit-reaction cue, plus the attacker's world
+     * position ({@code hasSource}/{@code source}) so the victim's peer can drive the HUD
+     * damage-direction indicator. Called from {@code Health.applyDamage} on the server for every
+     * networked victim (host-originated and client-relayed damage alike), so this is now the single
+     * broadcast site.
+     */
+    public void broadcastDamage(String victimCharacterId, float damage, boolean hasSource,
+            godot.core.Vector3 source) {
+        broadcastMessage(NetMessageCodec.encodeDamageBroadcast(MSG_DAMAGE_BROADCAST, victimCharacterId,
+                damage, hasSource, source), null);
     }
 
 

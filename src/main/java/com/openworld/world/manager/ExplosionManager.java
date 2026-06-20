@@ -124,7 +124,8 @@ public class ExplosionManager extends Node {
         float damage = maxDamage * t * t;
         Node h = c.getNodeOrNull(new NodePath("Health"));
         if (h instanceof Health health && !health.isDead()) {
-            health.takeDamage(c, damage, weaponDisplayName, weaponIcon, attackerName, attackerFaction);
+            // Blast center is the damage source for the HUD direction indicator.
+            health.takeDamage(c, damage, weaponDisplayName, weaponIcon, attackerName, attackerFaction, center);
         }
         if (c.isAlive()) {
             Vector3 pushDir = c.getGlobalPosition().minus(center).normalized();

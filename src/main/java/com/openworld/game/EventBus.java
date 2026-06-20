@@ -12,6 +12,7 @@ import godot.core.Signal3;
 import godot.core.Signal4;
 import godot.core.Signal7;
 import godot.core.StringName;
+import godot.core.Vector3;
 import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.character.Character;
 import com.openworld.character.Health;
@@ -209,5 +210,17 @@ public class EventBus extends Node {
     @RegisterSignal
     public final Signal1<String> connectionLost =
             new Signal1<>(this, new StringName("connection_lost"));
+
+    /**
+     * Emitted when a character takes damage that has a known world-space source — drives the HUD
+     * damage-direction indicator. Payload: victim CharacterInfo + the attacker's world position.
+     * Emitted authority/single-player side from {@code Health.applyDamage}, and on a networked
+     * client from {@code NetworkManager.handleDamageBroadcastMessage} (attacker resolved by id).
+     * HUDManager filters to the local player and forwards the bearing to {@code DamageIndicator}.
+     * Not emitted for sourceless damage (fall, world hazards) — those carry no direction.
+     */
+    @RegisterSignal
+    public final Signal2<CharacterInfo, Vector3> characterDamagedFrom =
+            new Signal2<>(this, new StringName("character_damaged_from"));
 
 }

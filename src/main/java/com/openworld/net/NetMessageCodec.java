@@ -239,13 +239,20 @@ public final class NetMessageCodec {
 
     // ── MSG_DAMAGE_BROADCAST ──────────────────────────────────────────────────
     //
-    // [tag u8][victimCharacterId utf8][damage float]
+    // [tag u8][victimCharacterId utf8][damage float][hasSource u8][source 3×float]
+    //
+    // source = the attacker's world position (shooter / blast center), so the victim's peer can drive
+    // the HUD damage-direction indicator. hasSource = 0 for sourceless damage (fall/world); the three
+    // floats are still present (zero) to keep the layout fixed.
 
-    public static PackedByteArray encodeDamageBroadcast(int msgType, String victimCharacterId, float damage) {
+    public static PackedByteArray encodeDamageBroadcast(int msgType, String victimCharacterId, float damage,
+            boolean hasSource, Vector3 source) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(victimCharacterId);
         buf.putFloat(damage);
+        buf.put8(hasSource ? 1 : 0);
+        putVector3(buf, hasSource && source != null ? source : Vector3.Companion.getZERO());
         return buf.getDataArray();
     }
 
@@ -253,11 +260,13 @@ public final class NetMessageCodec {
     public static DecodedDamageBroadcast decodeDamageBroadcast(StreamPeerBuffer buf) {
         String victimCharacterId = buf.getUtf8String();
         float damage = buf.getFloat();
-        return new DecodedDamageBroadcast(victimCharacterId, damage);
+        boolean hasSource = buf.getU8() != 0;
+        Vector3 source = getVector3(buf);
+        return new DecodedDamageBroadcast(victimCharacterId, damage, hasSource, source);
     }
 
-    /** Carrier for a decoded MSG_DAMAGE_BROADCAST body — the cosmetic "you got hit" cue for non-authority peers. */
-    public record DecodedDamageBroadcast(String victimCharacterId, float damage) { }
+    /** Carrier for a decoded MSG_DAMAGE_BROADCAST body — the cosmetic "you got hit" cue (+ attacker source) for non-authority peers. */
+    public record DecodedDamageBroadcast(String victimCharacterId, float damage, boolean hasSource, Vector3 source) { }
 
     // ── MSG_SHOT (client → host, host-resolved bullets) ───────────────────────
     //

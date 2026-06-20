@@ -550,6 +550,14 @@ identically to the authority:**
   weapon never collides with / detonates on its own shooter (the rocket's `collision_mask` includes
   the character layer); it is not the consistency fix, the unified muzzle+`aimTarget` spawn is.
 
+**Switch timing (CS/PUBG-snappy):** the deploy is `transitionTimer = 1/switchSpeed` (~0.45 s at
+`switchSpeed = 2.2`); the post-deploy fire lockout `onWeaponTransitionComplete` starts is a small fixed
+`WeaponController.DRAW_SETTLE_SECONDS` (0.08 s), **not** a second full `1/switchSpeed`. So total
+switch ≈ deploy time (was ~2/switchSpeed — the old double-duration that felt sluggish). The
+draw-settle still exists only to stop a held fire button launching on the first mid-draw frame; its
+duration is intentionally tiny. (The `WeaponProgress` HUD ring reads `getSwitchProgress` /
+`getReloadProgress` off these timers — see HUD system.)
+
 **Weapon switch — ordered equip event (so a remote switch is neither late nor early, and fire can't
 render before draw):** the owner's switch is two-phase — `onSetWeapon` starts `transitionTimer`
 (holster, old weapon still shown) and only `onWeaponTransitionComplete` raises the new weapon
@@ -661,6 +669,59 @@ Key signals (not exhaustive — see `EventBus.java` for the full set, which also
 
 `GameManager` connects `playerDied → onPlayerDied()` in `_ready()`.
 The HUD (`HUDManager`/`CharacterHUD`) connects `characterEliminated` for the kill feed.
+
+---
+
+## HUD system (`com.openworld.ui`)
+
+`HUDManager` (CanvasLayer in `HUDManager.tscn`) owns the on-screen HUD. Two pieces worth knowing:
+
+### Situational widget visibility (declarative table + runtime overrides)
+
+Instead of scattered `show()/hide()`, visibility is driven by a `Situation` enum — `ON_FOOT`,
+`VEHICLE_DRIVE`, `VEHICLE_PASSENGER_WEAPON`, `VEHICLE_MOUNTED_WEAPON` (the in-vehicle case is derived
+from `Vehicle.getWeaponMode()` in `situationForVehicle`). A code table `BASE_LAYOUT`
+(`EnumMap<Situation, Set<String>>`) lists which **table-managed widgets** are visible per situation.
+Widgets are direct `Control` children discovered by **node name** in `_ready` (`FootHUD`, `VehicleHUD`,
+`WeaponSlotsUI`, `DamageIndicator`, future `Minimap`); `Feed`/`StatusFeed`/`Crosshair`/`WeaponRadialMenu`
+are intentionally excluded (feeds are always-on; the crosshair self-gates in `refreshCrosshair`; the
+radial menu is a self-managed input overlay). **Player health (`FootHUD`) is in every vehicle situation**
+so it stays visible while riding (the seated occupant is exposed). Add a widget = drop the node in
+`HUDManager.tscn` + add its name to the relevant `BASE_LAYOUT` sets — no new code.
+Runtime flexibility: `setWidgetEnabled(id, bool)` / `clearWidgetOverride(id)` (a `widgetOverrides` map
+that wins over the table) force a widget on/off regardless of situation (per-carrier/gameplay tweaks).
+The table is **code, not an exported `Dictionary`** — a nested generic `Dictionary` export crashes the
+godot-kotlin-jvm registration scanner (see Known Quirks).
+
+### Weapon switch/reload progress ring (`WeaponProgress`)
+
+`WeaponProgress` (`ui/WeaponProgress.tscn`, a radial `TextureProgressBar` centered on the crosshair —
+renamed from the old unused `WeaponReloadProgression`) polls the active player's `WeaponController` each
+frame: it shows + fills 0→100% during a weapon switch (`getSwitchProgress`) or reload
+(`getReloadProgress`), hidden otherwise (switch tints cyan, reload amber). The ring texture is generated
+procedurally in `_ready` (a transparent annulus), so no ring asset is needed. Not table-managed (it
+self-hides); wired in `HUDManager.wirePlayer` like `WeaponSlotsUI`. The progress getters return -1 when
+their timer is idle.
+
+### Damage-direction indicator (`DamageIndicator`)
+
+Industry-standard directional hit cue: on local-player damage a red arc appears around the crosshair
+**rotated to the attacker's bearing** (top=front, sides=left/right, bottom=behind), fading over
+`fadeSeconds`; repeated hits from one bearing stack opacity up to `maxAlpha` (a small pooled set of arcs
+handles multi-source hits). Bearing is computed relative to the player camera's facing, so it stays
+correct as the camera turns.
+
+**Data path:** `EventBus.characterDamagedFrom(CharacterInfo victim, Vector3 sourceWorldPos)` — emitted in
+`Health.applyDamage` (single-player/host, attacker world pos threaded through
+`ImpactManager.processHit` → `Health.takeDamage`; weapons supply it via `WeaponItem.resolveAttackerPosition`,
+explosions via the blast center). `HUDManager.onCharacterDamagedFrom` filters to the local player and
+calls `DamageIndicator.onDamagedFrom`. **Networked:** the host is the single broadcast site —
+`Health.applyDamage` calls `NetworkManager.broadcastDamage(victimId, damage, hasSource, source)` for every
+server-applied hit (host-originated AND client-relayed), and `MSG_DAMAGE_BROADCAST` now carries the
+attacker world position (`hasSource` u8 + Vec3 — cheaper than a UUID and exact); the victim's client
+re-emits `characterDamagedFrom` in `handleDamageBroadcastMessage`. The per-hit broadcast moved **out** of
+`handleDamageRequestMessage` into `applyDamage` (the relay path flows through `applyDamage` on the host
+anyway), so it is now the one place the hit cue + direction are sent.
 
 ---
 
