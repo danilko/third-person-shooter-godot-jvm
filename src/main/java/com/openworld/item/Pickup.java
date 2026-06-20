@@ -258,6 +258,13 @@ public class Pickup extends RigidBody3D {
       return;
     }
     // Single-player: resolve inline (no broadcast, no cross-peer convergence concern).
+    // Claim the pickup BEFORE onCharacterEntered: a throwable's free-slot equip is deferred to
+    // _process, and during that window a second body_entered for the SAME pickup (the player's held
+    // weapon body follows the capsule into the area, or split-frame timing) could collect it again —
+    // the "picked up 6 instead of 3" double-count. Setting equipped here makes the onBodyEntered guard
+    // reject any re-trigger immediately. Safe: collectBy is only reached when the pickup will be
+    // consumed (shouldAutoPickup), and the equip/merge paths set equipped anyway.
+    equipped = true;
     onCharacterEntered(character);
     applyPostPickup();
   }

@@ -12,6 +12,7 @@ import godot.annotation.RegisterFunction;
 import godot.api.Input;
 import godot.api.Node;
 import godot.api.PackedScene;
+import godot.api.Window;
 import godot.core.Callable;
 import godot.core.StringName;
 import godot.core.StringNames;
@@ -88,6 +89,45 @@ public class GameManager extends Node {
             // body. GAME_OVER is driven by the characterSpawned/characterDied "all dead"
             // tracking below, which emits EventBus.allPlayersDied for MenuManager's UI.
         }
+
+        // Stop all in-flight weapon SFX the instant the OS requests a window close, while every
+        // node and the JVM are still alive. At the real quit the godot-kotlin-jvm runtime is torn
+        // down BEFORE the final SceneTree node teardown, so a WeaponController's
+        // tree_exiting → weaponAudio.stop self-stop never runs for bodies still alive at quit —
+        // their in-flight reload/fire AudioStreamPlaybackWAV leaks ("Resource still in use:
+        // Rifle_reload.wav" / leaked ObjectDB instances). The root Window's close_requested fires
+        // first, while everything is valid, so it is the one reliable place to silence them.
+        Window root = (getTree() != null) ? getTree().getRoot() : null;
+        if (root != null) {
+            root.getCloseRequested().connectUnsafe(
+                Callable.createUnsafe(this, StringNames.toGodotName("onCloseRequested")),
+                godot.api.Object.ConnectFlags.DEFAULT);
+        }
+    }
+
+    /**
+     * Window close handler (see _ready). Stops EVERY audio player in the tree before the quit tears
+     * it down. At app exit the godot-kotlin-jvm runtime is cleaned before the final node teardown, so
+     * a JVM-registered tree_exiting/_exitTree stop never releases an in-flight playback — any
+     * AudioStreamPlayer{,2D,3D} still playing at quit leaks its AudioStreamPlaybackWAV ("Resource
+     * still in use" / leaked ObjectDB). This is a single generic sweep on purpose: it is NOT
+     * weapon-specific, so future audio (footsteps, engines, ambient, UI) is covered with no per-entity
+     * wiring. (Mid-session frees — zone unload, despawn — are a separate concern handled by each audio
+     * node self-stopping on its own tree_exiting; see WeaponController and the CLAUDE.md audio quirk.)
+     */
+    @RegisterFunction
+    public void onCloseRequested() {
+        if (getTree() == null) return;
+        stopAllAudio(getTree().getRoot());
+    }
+
+    /** Depth-first stop() on every AudioStreamPlayer/2D/3D under {@code node} (inclusive). */
+    private void stopAllAudio(Node node) {
+        if (node == null) return;
+        if (node instanceof godot.api.AudioStreamPlayer p) p.stop();
+        else if (node instanceof godot.api.AudioStreamPlayer2D p) p.stop();
+        else if (node instanceof godot.api.AudioStreamPlayer3D p) p.stop();
+        for (Node child : node.getChildren()) stopAllAudio(child);
     }
 
     /**

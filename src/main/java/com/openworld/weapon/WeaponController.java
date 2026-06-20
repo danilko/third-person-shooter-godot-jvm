@@ -194,6 +194,12 @@ public class WeaponController extends Node {
     return w != null ? w.getCurrentSpreadDeg() : 0f;
   }
 
+  /** Current weapon's crosshair openness (0..1, weapon-normalized) for the HUD reticle. 0 when unarmed. */
+  public float getCrosshairSpreadFraction() {
+    WeaponItem w = getCurrentWeaponItem();
+    return w != null ? w.getCrosshairFraction() : 0f;
+  }
+
   /** The active AimRay for all character-owned weapons. May be the vehicle ray when overridden. */
   public RayCast3D getAimRay() { return aimRay; }
 
