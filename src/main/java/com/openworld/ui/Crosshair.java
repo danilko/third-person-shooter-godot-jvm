@@ -51,11 +51,18 @@ public class Crosshair extends Control {
     @Export @RegisterProperty public boolean showCrosshair = true;
 
     /**
-     * Pixels per degree of spread. Increase for small spread values (e.g. 0.015°)
-     * so the arms move a visible distance. At 100 px/deg: 0.015° → 1.5 px at rest,
-     * 0.265° at max bloom → 26.5 px open.
+     * Arm offset (px) at the tightest accuracy (crosshair fraction 0). The minimum gap so the reticle
+     * never fully closes.
      */
-    @Export @RegisterProperty public float spreadPixelsPerDeg = 100f;
+    @Export @RegisterProperty public float minSpreadPixels = 3f;
+
+    /**
+     * Arm offset (px) at the widest accuracy (crosshair fraction 1). Caps how far the arms open so the
+     * reticle never runs off-screen even for a wide-cone weapon (e.g. a shotgun) — the off-screen bug.
+     * The fraction is weapon-normalized (WeaponController.getCrosshairSpreadFraction), so this same
+     * range serves every weapon with no per-weapon crosshair tuning.
+     */
+    @Export @RegisterProperty public float maxSpreadPixels = 90f;
 
     private VariantArray<Node> lines;
     private float positionX = 0f;
@@ -84,9 +91,13 @@ public class Crosshair extends Control {
     @RegisterFunction
     @Override
     public void _process(double delta) {
-        // Self-managed spread: read live from weapon controller when available.
+        // Self-managed spread: map the weapon-normalized accuracy fraction (0..1) to a fixed pixel
+        // range. Normalizing per weapon keeps one reticle scale for every gun (no per-weapon tuning),
+        // caps the maximum opening (no off-screen), and still reflects movement/bloom/stance within
+        // the range — so the reticle reliably shows current accuracy regardless of weapon.
         if (weaponController != null) {
-            positionX = weaponController.getCurrentSpreadDeg() * spreadPixelsPerDeg;
+            float frac = weaponController.getCrosshairSpreadFraction();
+            positionX = minSpreadPixels + frac * (maxSpreadPixels - minSpreadPixels);
         }
 
         // Target: 0 when hidden (arms collapse to centre), positionX when shown.

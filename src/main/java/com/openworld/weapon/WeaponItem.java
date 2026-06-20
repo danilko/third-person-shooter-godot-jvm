@@ -221,6 +221,17 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @Override public boolean canUse() { return false; }
   @Override public WeaponType getWeaponType() { return WeaponType.RANGED; }
   @Override public float getCurrentSpreadDeg() { return 0f; }
+
+  /**
+   * Crosshair openness for the CURRENT accuracy state, as a 0..1 fraction of this weapon's own
+   * worst-case spread envelope — a purely cosmetic, weapon-normalized signal for the HUD reticle
+   * (the real bullet cone is {@link #getCurrentSpreadDeg()}). Normalizing per weapon means the
+   * crosshair uses the same fixed pixel range for every gun (no per-weapon crosshair tuning, never
+   * runs off-screen), while still reflecting movement/bloom/stance changes within that range.
+   * Default 0 (weapons with no spread keep a tight reticle).
+   */
+  public float getCrosshairFraction() { return 0f; }
+
   @Override public void onSetStance(Stance stance) {}
 
   /**

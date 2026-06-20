@@ -169,6 +169,22 @@ public class FirearmItem extends WeaponItem {
     return (spread + currentBloom + speed * MOVEMENT_SPREAD_PER_MPS) * stanceMultiplier(owningCharacter);
   }
 
+  /** Reference movement speed (m/s ≈ sprint) defining the top of the crosshair spread envelope. */
+  private static final float CROSSHAIR_REF_SPEED = 6.0f;
+
+  @Override
+  public float getCrosshairFraction() {
+    // Worst realistic on-ground spread for THIS weapon: full bloom + reference movement, upright. The
+    // current spread is shown as a fraction of this, so every weapon shares one fixed crosshair pixel
+    // range (no per-weapon tuning) and a wide-cone weapon (shotgun) caps at the top instead of running
+    // off-screen — while movement/bloom still move the reticle visibly across the range. Airborne /
+    // jumping spread exceeds this envelope and simply clamps to 1 (max openness — you're least accurate).
+    float worst = spread + bloomMax + CROSSHAIR_REF_SPEED * MOVEMENT_SPREAD_PER_MPS;
+    if (worst <= 0f) return 0f;
+    float frac = getCurrentSpreadDeg() / worst;
+    return frac < 0f ? 0f : (frac > 1f ? 1f : frac);
+  }
+
   @Override
   public void onSetStance(Stance stance) {
     currentStance = StanceName.fromKey(String.valueOf(stance.getName()));
