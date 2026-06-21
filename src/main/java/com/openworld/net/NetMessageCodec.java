@@ -37,11 +37,12 @@ public final class NetMessageCodec {
     // MSG_SNAPSHOT:       [tag u8][entry]
     // MSG_SNAPSHOT_BATCH: [tag u8][count u16][entry]*
     //
-    // The flags byte packs the four small enums that used to be replicated as
-    // separate MultiplayerSynchronizer properties — bit0 = combat, bits1-2 =
-    // stanceOrdinal (0-2, fits StanceName's 3 values), bits3-5 = activeSlotIndex
-    // (0-6, fits WeaponController's 7 slots), bits6-7 = movementTypeOrdinal (0-2,
-    // fits MovementType's IDLE/WALK/SPRINT).
+    // The flags field (u16) packs the four small enums that used to be replicated as
+    // separate MultiplayerSynchronizer properties — bit0 = combat, bits1-3 =
+    // stanceOrdinal (3 bits, 0-7 — fits StanceName's 5 values incl. SWIM), bits4-6 =
+    // activeSlotIndex (0-6, fits WeaponController's 7 slots), bits7-8 = movementTypeOrdinal
+    // (0-2, fits MovementType's IDLE/WALK/SPRINT). Widened from a u8 to a u16 when SWIM was
+    // added (5 stances no longer fit the old 2-bit field) — see SNAPSHOT_ENTRY_FIXED_BYTES.
     //
     // aimTarget is the world-space spine-IK look point (a far point along the owner's
     // aim direction). Without it a remote puppet's aimTarget node never moves, so its
@@ -62,12 +63,12 @@ public final class NetMessageCodec {
 
     private static final int SNAPSHOT_FLAG_COMBAT       = 1;
     private static final int SNAPSHOT_STANCE_SHIFT      = 1;
-    private static final int SNAPSHOT_STANCE_MASK       = 0b11;
-    private static final int SNAPSHOT_WEAPON_SLOT_SHIFT = 3;
+    private static final int SNAPSHOT_STANCE_MASK       = 0b111;
+    private static final int SNAPSHOT_WEAPON_SLOT_SHIFT = 4;
     private static final int SNAPSHOT_WEAPON_SLOT_MASK  = 0b111;
-    // MovementType (IDLE/WALK/SPRINT — 3 values) packs into the 2 previously-unused high bits of the
-    // flags byte, so the puppet's locomotion blend gets the exact movement state with no wire growth.
-    private static final int SNAPSHOT_MOVE_TYPE_SHIFT   = 6;
+    // MovementType (IDLE/WALK/SPRINT — 3 values) packs into bits 7-8 of the u16 flags field,
+    // so the puppet's locomotion blend gets the exact movement state.
+    private static final int SNAPSHOT_MOVE_TYPE_SHIFT   = 7;
     private static final int SNAPSHOT_MOVE_TYPE_MASK    = 0b11;
 
     public static PackedByteArray encodeSnapshot(int msgType, String characterId, long tick, Vector3 position,
@@ -143,7 +144,7 @@ public final class NetMessageCodec {
                 | ((stanceOrdinal & SNAPSHOT_STANCE_MASK) << SNAPSHOT_STANCE_SHIFT)
                 | ((activeSlotIndex & SNAPSHOT_WEAPON_SLOT_MASK) << SNAPSHOT_WEAPON_SLOT_SHIFT)
                 | ((movementTypeOrdinal & SNAPSHOT_MOVE_TYPE_MASK) << SNAPSHOT_MOVE_TYPE_SHIFT);
-        buf.put8(flags);
+        buf.put16(flags);
         buf.putFloat(yaw);
         buf.putFloat(currentHealth);
         buf.put32(senderTimeMs);
@@ -162,7 +163,7 @@ public final class NetMessageCodec {
         Vector3 position = getVector3(buf);
         Vector3 velocity = getVector3(buf);
         Vector3 aimTarget = getVector3(buf);
-        int flags = buf.getU8();
+        int flags = buf.getU16();
         boolean combat = (flags & SNAPSHOT_FLAG_COMBAT) != 0;
         int stanceOrdinal = (flags >> SNAPSHOT_STANCE_SHIFT) & SNAPSHOT_STANCE_MASK;
         int activeSlotIndex = (flags >> SNAPSHOT_WEAPON_SLOT_SHIFT) & SNAPSHOT_WEAPON_SLOT_MASK;

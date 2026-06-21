@@ -36,6 +36,9 @@ public class UserCommand {
     // ── Body actions ──────────────────────────────────────────────────────────
     public boolean jump;
 
+    /** Vertical swim intent while in the SWIM stance: +1 surface/ascend, -1 dive, 0 hold. */
+    public double swimVertical;
+
     // ── State requests ────────────────────────────────────────────────────────
     public StanceName desiredStance;
     public int        desiredWeapon;
@@ -74,6 +77,7 @@ public class UserCommand {
         reload            = false;
         drop              = false;
         jump              = false;
+        swimVertical      = 0.0;
         desiredStance     = null;
         desiredWeapon     = -1;
         wantUnequip       = false;
@@ -100,6 +104,7 @@ public class UserCommand {
         c.reload          = reload;
         c.drop            = drop;
         c.jump            = jump;
+        c.swimVertical    = swimVertical;
         c.desiredStance   = desiredStance;
         c.desiredWeapon   = desiredWeapon;
         c.wantUnequip     = wantUnequip;

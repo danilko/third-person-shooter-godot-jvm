@@ -56,6 +56,15 @@ public class AnimationController extends Node {
   public double floorBlendSpeed = 10.0;
 
   /**
+   * Faster floor-blend rate used the instant the body lands (going back to the grounded pose), so
+   * locomotion shows promptly instead of lingering in the airborne pose. Higher than
+   * {@link #floorBlendSpeed} (which governs the slower lift-off into the air).
+   */
+  @Export
+  @RegisterProperty
+  public double landBlendSpeed = 22.0;
+
+  /**
    * When true the incoming movementDirection is world-space (AI). The blend rotates it
    * into camera-local space so strafe animations play relative to the facing direction.
    */
@@ -69,9 +78,13 @@ public class AnimationController extends Node {
   private double camRotation = 0.0;
   private double onFloorBlend = 1.0;
   private double onFloorBlendTarget = 1.0;
+  private boolean wasOnFloor = true;
   private Tween tween;
   private String currentStanceName = "Upright";
   private Stance currentStance = null;
+  // True while in the SWIM stance — keeps the locomotion blend grounded so the (placeholder Crawl)
+  // swim pose plays fully instead of blending to the airborne/falling pose while floating off-floor.
+  private boolean swimming = false;
   private boolean combat = false;
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
@@ -89,8 +102,24 @@ public class AnimationController extends Node {
     // zero bridge cost (PLAN.md Part D / D2). Player/non-AI bodies are always ACTIVE.
     if (player instanceof AICharacter ai && ai.getLodLevel() != AILodLevel.ACTIVE) return;
 
-    onFloorBlendTarget = player.isOnFloor() ? 1.0 : 0.0;
-    double newBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, floorBlendSpeed * delta);
+    // Landing edge: a jump/fall OneShot plays its FULL clip once fired, so after touchdown the
+    // multi-second jump/falling pose keeps blending on top of locomotion — the "still airborne while
+    // already running" lag. Fade those OneShots out the moment we regain the floor so walk/run shows.
+    boolean onFloor = player.isOnFloor();
+    if (onFloor && !wasOnFloor) {
+      long fadeOut = AnimationNodeOneShot.OneShotRequest.FADE_OUT.getValue();
+      animationTree.set("parameters/GroundJump/request", fadeOut);
+      animationTree.set("parameters/AirJump/request", fadeOut);
+    }
+    wasOnFloor = onFloor;
+
+    // Treat swimming as grounded for the floor blend — a floating swimmer is off-floor, but the
+    // placeholder swim pose should not blend toward the falling animation.
+    onFloorBlendTarget = (swimming || onFloor) ? 1.0 : 0.0;
+    // Snap to the grounded pose quickly on landing (landBlendSpeed), but lift off into the air at the
+    // gentler floorBlendSpeed — asymmetric so touchdown reads as "grounded" without a slow fade.
+    double blendRate = (onFloorBlendTarget > onFloorBlend) ? landBlendSpeed : floorBlendSpeed;
+    double newBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, blendRate * delta);
     // Only write to the AnimationTree when the value actually changes — eliminates
     // ~1,920 unconditional JVM bridge calls/sec for 32 grounded AIs at 60 Hz.
     if (Math.abs(newBlend - onFloorBlend) > 0.001) {
@@ -141,8 +170,14 @@ public class AnimationController extends Node {
   public void onSetStance(Stance stance) {
     if (animationTree == null) return;
 
-    animationTree.set("parameters/StanceTransition/transition_request", stance.getName().toString());
-    this.currentStanceName = stance.getName().toString();
+    // Use the stance's animation-key override when set (e.g. SWIM → "Crawl" placeholder, I1);
+    // otherwise the stance's node name drives the AnimationTree transition + movement blend.
+    swimming = "Swim".equals(stance.getName().toString());
+    String key = stance.getAnimationStanceKey();
+    if (key == null || key.isEmpty()) key = stance.getName().toString();
+
+    animationTree.set("parameters/StanceTransition/transition_request", key);
+    this.currentStanceName = key;
     this.currentStance = stance;
 
     updateAimModifiers();

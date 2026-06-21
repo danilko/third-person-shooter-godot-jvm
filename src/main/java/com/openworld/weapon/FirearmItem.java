@@ -53,6 +53,9 @@ public class FirearmItem extends WeaponItem {
   private static final float CROUCH_SPREAD_MULT = 0.7f;
   private static final float CRAWL_SPREAD_MULT  = 0.5f;
   private static final float JUMP_SPREAD_MULT   = 2.0f;
+  // Treading water is unstable — surface shooting is deliberately less accurate than on land
+  // (GTA/PUBG). Explicit so it no longer relies on the incidental !isOnFloor() airborne branch.
+  private static final float SWIM_SPREAD_MULT   = 1.8f;
 
   /**
    * Discovers weapon-local VFX nodes from the weapon scene. Called once on _ready();
@@ -347,6 +350,9 @@ public class FirearmItem extends WeaponItem {
   }
 
   private float stanceMultiplier(CharacterBody3D character) {
+    // SWIM is checked before the airborne branch: a swimmer floats off the floor, so the
+    // !isOnFloor() check would otherwise mislabel it as airborne. Treading water has its own value.
+    if (currentStance == StanceName.SWIM) return SWIM_SPREAD_MULT;
     if (!character.isOnFloor()) return JUMP_SPREAD_MULT;
     return switch (currentStance) {
       case CROUCH -> CROUCH_SPREAD_MULT;

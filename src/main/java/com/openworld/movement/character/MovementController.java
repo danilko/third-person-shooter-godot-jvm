@@ -81,6 +81,30 @@ public class MovementController extends Node {
   @RegisterProperty
   public float fallDamageScale = 5.0f;
 
+  /** Swim tunables (buoyancy / reduced gravity / vertical clamp) — used while {@link #swimming}. */
+  @Export
+  @RegisterProperty
+  public SwimState swimState = null;
+
+  /** True while the body is in a water volume (set by Character.setInWater → setSwimming). */
+  private boolean swimming = false;
+  /** World-space Y of the water surface the body floats toward while swimming. */
+  private double waterSurfaceY = 0.0;
+  /** Per-tick vertical swim intent: +1 ascend, -1 dive, 0 hold (let buoyancy settle to surface). */
+  private double swimVertical = 0.0;
+
+  @RegisterFunction
+  public void setSwimming(boolean value, double surfaceY) {
+    swimming = value;
+    if (value) waterSurfaceY = surfaceY;
+    else swimVertical = 0.0;
+  }
+
+  @RegisterFunction
+  public void setSwimVertical(double value) {
+    swimVertical = value;
+  }
+
   @RegisterFunction
   @Override
   public void _ready() {
@@ -116,8 +140,10 @@ public class MovementController extends Node {
     Vector3 curVel  = player.getVelocity();
 
     // ── Horizontal velocity ──────────────────────────────────────────────────
+    // Swimming uses the grounded smoothing branch even in deep water (isOnFloor()==false)
+    // so the swimmer still accelerates toward its (capped) target speed.
     double newX, newZ;
-    if (onFloor) {
+    if (onFloor || swimming) {
       // Grounded: accelerate toward the target speed·dir with the usual smoothing.
       double targetX = speed * normDir.getX();
       double targetZ = speed * normDir.getZ();
@@ -142,12 +168,42 @@ public class MovementController extends Node {
     }
 
     // ── Vertical velocity (integrated on the internal Y, direct — no lerp) ─────
-    if (onFloor && velocity.getY() < 0) {
-      velocity.setY(0);
-    }
-    if (!onFloor) {
-      double g = velocity.getY() >= 0 ? jumpGravity : fallGravity;
-      velocity.setY(velocity.getY() - g * delta);
+    if (swimming && swimState != null) {
+      // Vertical swim model. With no input a buoyancy spring drives the body toward the settle line
+      // (surface − settleDepth) and holds it there, so it settles AT the water line instead of
+      // popping out the top (the surface-bob flicker). Manual ascend/dive use their own (faster)
+      // speeds — held jump rises at swimAscendSpeed (clearly faster than the gentle passive cap),
+      // easing in near the surface so it never breaches; held crouch/crawl dives at swimDiveSpeed.
+      // The stance reverts (in Character.applyInput) only when the swimmer rests on shallow ground.
+      boolean combat = (player instanceof Character c) && c.isCombat();
+      double settleDepth = combat ? swimState.getAimSubmersionDepth() : swimState.getSubmersionDepth();
+      double targetY = waterSurfaceY - settleDepth;
+      double bodyY = player.getGlobalPosition().getY();
+      double passiveCap = swimState.getMaxVerticalSpeed();   // gentle auto-settle only
+      double vy;
+      if (swimVertical > 0.0) {
+        // Held jump → ascend FAST, but ease into the settle line near the surface (don't breach).
+        if (bodyY >= targetY) {
+          vy = GD.clamp((targetY - bodyY) * swimState.getBuoyancy(), -passiveCap, passiveCap);
+        } else {
+          vy = swimState.getSwimAscendSpeed();
+        }
+      } else if (swimVertical < 0.0) {
+        vy = -swimState.getSwimDiveSpeed();                  // held crouch/crawl → dive
+      } else {
+        double diff = targetY - bodyY;                       // no input → passive buoyancy settle
+        vy = GD.clamp(diff * swimState.getBuoyancy(), -passiveCap, passiveCap);
+        if (Math.abs(diff) < 0.05) vy = 0.0;   // deadzone — avoid micro-jitter once settled
+      }
+      velocity.setY(vy);
+    } else {
+      if (onFloor && velocity.getY() < 0) {
+        velocity.setY(0);
+      }
+      if (!onFloor) {
+        double g = velocity.getY() >= 0 ? jumpGravity : fallGravity;
+        velocity.setY(velocity.getY() - g * delta);
+      }
     }
     double newY = velocity.getY();
 
@@ -156,7 +212,8 @@ public class MovementController extends Node {
     player.moveAndSlide();
 
     // Fall damage: compare velocity just before landing to the configured threshold.
-    if (fallDamageThreshold > 0 && !wasOnFloor && player.isOnFloor()
+    // Skipped while swimming — water cushions the entry/landing.
+    if (!swimming && fallDamageThreshold > 0 && !wasOnFloor && player.isOnFloor()
             && appliedVelocityY < -fallDamageThreshold) {
       float fallSpeed = -appliedVelocityY;
       float damage = (fallSpeed - fallDamageThreshold) * fallDamageScale;

@@ -221,6 +221,13 @@ public class PlayerController extends Controller {
             lastDesiredStance = desired;
         }
 
+        // ── Vertical swim intent (only consumed while in the SWIM stance) ─────────
+        // Held jump = surface/ascend, held crouch or crawl = dive. Uses the held action
+        // state (not the edge-triggered cmd.jump) so the player can hold to keep diving.
+        boolean swimUp   = inp.isActionPressed("jump", false);
+        boolean swimDown = wantCrouch || wantCrawl;
+        cmd.swimVertical = (swimUp ? 1.0 : 0.0) - (swimDown ? 1.0 : 0.0);
+
         // ── Weapon slot quick-switch ──────────────────────────────────────────
         // Keys 0         → slot 0 (fist — always available)
         // Keys 1–6       → slots 1–6 (PRIMARY×2, SECONDARY, MELEE, THROWABLE, CONSUMABLE)

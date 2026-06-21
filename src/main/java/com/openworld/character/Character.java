@@ -33,6 +33,7 @@ import com.openworld.movement.character.MovementState;
 import com.openworld.movement.character.MovementType;
 import com.openworld.movement.character.Stance;
 import com.openworld.movement.character.StanceName;
+import com.openworld.movement.character.SwimState;
 import com.openworld.net.NetworkController;
 import com.openworld.net.NetworkManager;
 import com.openworld.ui.HUDManager;
@@ -154,6 +155,23 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     protected Vector3 movementDirection = new Vector3();
     protected StanceName currentStanceName = StanceName.UPRIGHT;
     protected MovementType currentMovementType = MovementType.IDLE;
+
+    /** True while overlapping a {@code WaterVolume} (PLAN.md I1) — gates the depth-based swim decision. */
+    protected boolean inWater = false;
+    /** World-space Y of the overlapped water surface; the swim decision compares feet depth against it. */
+    protected double waterSurfaceY = 0.0;
+    // Floor-probe throttle: the down-ray is re-cast at most every WATER_PROBE_INTERVAL while in water
+    // (it never runs out of water) and the depth is cached between casts — swim transitions don't need
+    // per-frame precision, so this cuts the raycast rate ~6× while wading. Reset to 0 on water exit so
+    // re-entry (and dive-in) probes immediately.
+    private static final double WATER_PROBE_INTERVAL = 0.1;
+    private double cachedWaterDepth = 0.0;
+    private double waterProbeCooldown = 0.0;
+    /** Debug aid (PLAN.md I1): when set, the local player shows an on-screen swim/water-depth readout. */
+    @Export
+    @RegisterProperty
+    public boolean debugSwim = false;
+    private Label swimDebugLabel = null;
 
     // False for AI-controlled characters whose accuracy is managed by their own system.
     // public (not protected): read cross-package by weapon/movement/control collaborators.
@@ -595,7 +613,8 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
         // ── Jump (single ground jump only) ─────────────────────────────────
         // First stand up if crouched/crawling, otherwise launch a ground jump.
-        if (input.jump && isOnFloor()) {
+        // No jumping while swimming.
+        if (input.jump && isOnFloor() && currentStanceName != StanceName.SWIM) {
             if (!isStanceBlocked(StanceName.UPRIGHT)) {
                 if (currentStanceName != StanceName.UPRIGHT) {
                     setStance(StanceName.UPRIGHT);
@@ -609,9 +628,48 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         }
 
         // ── Stance ─────────────────────────────────────────────────────────
-        if (input.desiredStance != null && isOnFloor()) {
+        // Swimming is a continuous function of the TRUE water depth below the body (surface − floor,
+        // from a downward physics probe), not of volume overlap or grounding (GTA/PUBG model). Using
+        // the floor depth — rather than how submerged the body currently is — is what makes every case
+        // work with one rule:
+        //  • Dive/jump in from above → floor is deep → swim immediately (no sink-to-floor-then-rise).
+        //  • Wade in on a slope → floor shallow → walk; deepens past chest → swim.
+        //  • Puddle / shallow harbor shelf → floor shallow → never swims (walk).
+        //  • Swim toward a rising shore → depth drops below exit → stand up automatically.
+        //  • High dock wall over deep water → floor stays deep → keep floating at the surface (never
+        //    falls out), since the decision no longer needs the body to touch the bottom.
+        // enter > exit gives hysteresis (no SWIM⇄UPRIGHT flicker at the boundary).
+        MovementController mc = movementController();
+        SwimState sw = (mc != null) ? mc.swimState : null;
+        boolean swimming = (currentStanceName == StanceName.SWIM);
+        double waterDepth = 0.0;
+        if (inWater && sw != null) {
+            waterProbeCooldown -= delta;                   // throttled floor probe (see field doc)
+            if (waterProbeCooldown <= 0.0) {
+                cachedWaterDepth = waterDepthBelowBody(sw);
+                waterProbeCooldown = WATER_PROBE_INTERVAL;
+            }
+            waterDepth = cachedWaterDepth;                 // surface − floor directly below
+            if (!swimming) {
+                if (waterDepth >= sw.getSwimEnterDepth()) swimming = true;
+            } else {
+                if (waterDepth <= sw.getSwimExitDepth()) swimming = false;
+            }
+        } else {
+            swimming = false;
+            waterProbeCooldown = 0.0;                       // probe immediately on next water entry
+        }
+
+        if (swimming) {
+            if (currentStanceName != StanceName.SWIM) setStance(StanceName.SWIM);
+            if (mc != null) mc.setSwimVertical(input.swimVertical);
+        } else if (currentStanceName == StanceName.SWIM) {
+            setStance(StanceName.UPRIGHT);
+        } else if (input.desiredStance != null && isOnFloor()) {
             setStance(input.desiredStance);
         }
+        if (mc != null) mc.setSwimming(swimming, waterSurfaceY);
+        if (debugSwim) updateSwimDebug(sw, waterDepth, swimming);
 
         // ── Weapon switch / unequip ────────────────────────────────────────
         if (input.wantUnequip) {
@@ -718,6 +776,87 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     protected boolean isStanceBlocked(StanceName stanceName) {
         Stance s = stanceCache.get(stanceName);
         return (s != null) && s.isBlocked();
+    }
+
+    /**
+     * Water enter/exit hook (PLAN.md I1) — called by {@code WaterVolume} on every peer. Toggles
+     * the swim flag and the MovementController's swim physics; the actual SWIM ⇄ UPRIGHT stance
+     * switch happens on the authority body in {@link #applyInput} (and replicates from there).
+     */
+    public void setInWater(boolean value, double surfaceY) {
+        inWater = value;
+        if (value) {
+            waterSurfaceY = surfaceY;
+        } else {
+            // Left the volume entirely — stop swim physics. The per-frame decision in applyInput
+            // owns the SWIM stance while inside (it may be UPRIGHT in shallow water).
+            MovementController mc = movementController();
+            if (mc != null) mc.setSwimming(false, 0.0);
+        }
+    }
+
+    /**
+     * True water depth (water surface − floor) directly below the body, from a downward physics
+     * raycast. Drives the depth-based swim decision so it works whether the body is grounded, wading,
+     * or airborne (diving in) — unlike {@code isOnFloor()}, which a floating swimmer never satisfies
+     * over deep water. Returns a large value (the full probe length) when no floor is found, i.e.
+     * very deep water. Bodies (layer-masked) are hit; the water {@code Area3D} is ignored by the ray.
+     */
+    private double waterDepthBelowBody(SwimState sw) {
+        World3D world = getWorld3d();
+        if (world == null) return 0.0;
+        PhysicsDirectSpaceState3D space = world.getDirectSpaceState();
+        if (space == null) return 0.0;
+        Vector3 origin = getGlobalPosition();
+        double probe = sw.getFloorProbeLength();
+        Vector3 from = new Vector3(origin.getX(), origin.getY() + 0.2, origin.getZ());
+        Vector3 to   = new Vector3(origin.getX(), origin.getY() - probe, origin.getZ());
+        VariantArray<RID> exclude = new VariantArray<>(RID.class);
+        exclude.add(getRid());
+        PhysicsRayQueryParameters3D q =
+            PhysicsRayQueryParameters3D.Companion.create(from, to, sw.getFloorProbeMask(), exclude);
+        Dictionary<java.lang.Object, java.lang.Object> hit = space.intersectRay(q);
+        if (hit.isEmpty()) return waterSurfaceY - to.getY();   // no floor within probe → deep
+        java.lang.Object pos = hit.get("position");
+        return (pos instanceof Vector3 p) ? (waterSurfaceY - p.getY()) : (waterSurfaceY - to.getY());
+    }
+
+    /**
+     * On-screen swim/water-depth readout for the local player (gated by {@link #debugSwim}). Lazily
+     * builds a tiny CanvasLayer+Label as a child of the body, so it renders to screen and frees with
+     * the body. Shows in-water, measured depth, enter/exit thresholds, grounded, and the swim decision
+     * — enough to diagnose "why am I (not) swimming here" during a walk-test without the editor.
+     */
+    private void updateSwimDebug(SwimState sw, double waterDepth, boolean swimming) {
+        if (!isLocallyOwnedPlayer()) return;
+        if (swimDebugLabel == null) {
+            CanvasLayer layer = new CanvasLayer();
+            addChild(layer);
+            swimDebugLabel = new Label();
+            swimDebugLabel.setPosition(new Vector2(16f, 120f));
+            layer.addChild(swimDebugLabel);
+        }
+        String enter = sw != null ? String.format("%.2f", sw.getSwimEnterDepth()) : "-";
+        String exit  = sw != null ? String.format("%.2f", sw.getSwimExitDepth()) : "-";
+        swimDebugLabel.setText(String.format(
+            "SWIM DEBUG\ninWater: %s\nwaterDepth: %s\nenter/exit: %s / %s\nonFloor: %s\nstance: %s%s",
+            inWater,
+            inWater ? String.format("%.2f m", waterDepth) : "-",
+            enter, exit,
+            isOnFloor(),
+            currentStanceName,
+            swimming ? "  [SWIMMING]" : ""));
+    }
+
+    private MovementController movementControllerRef;
+
+    /** Lazily-cached MovementController sibling (never freed/swapped during the body's life). */
+    private MovementController movementController() {
+        if (movementControllerRef == null) {
+            Node n = getNodeOrNull("MovementController");
+            if (n instanceof MovementController mc) movementControllerRef = mc;
+        }
+        return movementControllerRef;
     }
 
     /**
