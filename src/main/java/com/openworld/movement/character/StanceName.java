@@ -12,7 +12,8 @@ public enum StanceName {
     UPRIGHT("Upright"),
     CROUCH("Crouch"),
     CRAWL("Crawl"),
-    DRIVE_CARRIER("DriveCarrier");
+    DRIVE_CARRIER("DriveCarrier"),
+    SWIM("Swim");
 
     private final String key;
 

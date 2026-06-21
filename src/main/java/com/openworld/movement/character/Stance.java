@@ -32,6 +32,18 @@ public class Stance extends Node {
   @RegisterProperty
   public double cameraHeight = 1.3;
 
+  // --- Animation ---
+
+  /**
+   * Optional override for the AnimationTree stance key. When empty (default) the stance's
+   * Godot node name drives the {@code StanceTransition} request and {@code …MovementBlend}
+   * path. Set this to reuse another stance's animation states — e.g. the SWIM stance sets
+   * {@code "Crawl"} as a placeholder until a dedicated swim AnimationTree state exists (I1).
+   */
+  @Export
+  @RegisterProperty
+  public String animationStanceKey = "";
+
   // --- Aim / IK ---
 
   /** Local offset added to WeaponIKTarget's base position for this stance. */
@@ -116,6 +128,9 @@ public class Stance extends Node {
   public void setSprintState(MovementState sprintState) {
     this.sprintState = sprintState;
   }
+
+  public String getAnimationStanceKey() { return animationStanceKey; }
+  public void setAnimationStanceKey(String v) { this.animationStanceKey = v; }
 
   public double getCameraHeight() { return cameraHeight; }
   public void setCameraHeight(double v) { this.cameraHeight = v; }

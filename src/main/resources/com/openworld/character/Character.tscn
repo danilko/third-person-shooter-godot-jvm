@@ -28,6 +28,7 @@
 [ext_resource type="Script" uid="uid://behuglp4g7ric" path="res://src/main/java/com/openworld/camera/FPSCameraController.java" id="27_gapvf"]
 [ext_resource type="Script" uid="uid://dqhs0yfdyku6r" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="31_4afhp"]
 [ext_resource type="Resource" uid="uid://bm3le3c0mb4t1" path="res://src/main/resources/com/openworld/character/combatstates/MeleeCombat.tres" id="60_meleec"]
+[ext_resource type="Resource" uid="uid://bswmst8swim01i1" path="res://src/main/resources/com/openworld/character/movementstates/swim/DefaultSwim.tres" id="70_swim"]
 
 [sub_resource type="Resource" id="Resource_gapvf"]
 script = ExtResource("9_arx8k")
@@ -60,6 +61,7 @@ stances = Dictionary[String, NodePath]({
 "Crawl": NodePath("Stances/Crawl"),
 "Crouch": NodePath("Stances/Crouch"),
 "DriveCarrier": NodePath("Stances/DriveCarrier"),
+"Swim": NodePath("Stances/Swim"),
 "Upright": NodePath("Stances/Upright")
 })
 combat_states = Dictionary[String, ExtResource("5_pw55h")]({
@@ -98,6 +100,7 @@ disabled = true
 [node name="MovementController" type="Node" parent="." unique_id=349324944 node_paths=PackedStringArray("player")]
 script = ExtResource("9_ie7o8")
 player = NodePath("..")
+swim_state = ExtResource("70_swim")
 
 [node name="AnimationController" type="Node" parent="." unique_id=1235095298 node_paths=PackedStringArray("player")]
 script = ExtResource("13_4afhp")
@@ -139,6 +142,16 @@ idle_state = ExtResource("22_arx8k")
 walk_state = ExtResource("22_arx8k")
 sprint_state = ExtResource("22_arx8k")
 spine_aim_max_angle = 0.0
+
+[node name="Swim" type="Node" parent="Stances" unique_id=838124999 node_paths=PackedStringArray("collider")]
+script = ExtResource("7_2iqcg")
+idle_state = ExtResource("7_d7d1u")
+walk_state = ExtResource("16_u0j3k")
+sprint_state = ExtResource("15_bgnjm")
+camera_height = 0.7
+animation_stance_key = "Crawl"
+spine_aim_max_angle = 0.0
+collider = NodePath("../../CrawlCollision")
 
 [node name="WeaponController" type="Node" parent="." unique_id=384125234 node_paths=PackedStringArray("animation_controller", "weapon_audio")]
 script = ExtResource("31_4afhp")

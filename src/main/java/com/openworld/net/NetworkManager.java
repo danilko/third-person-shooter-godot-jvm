@@ -466,8 +466,8 @@ public class NetworkManager extends Node {
      */
     private static final int MAX_BATCH_PAYLOAD_BYTES = 1100;
 
-    /** Fixed bytes per snapshot entry beyond the characterId text: u32 len + i64 tick + 9 floats + flags u8 + yaw/health/time + fireSeq u8 + activeMagazine u16 + reloadSeq u8 — see NetMessageCodec.putSnapshotEntry. */
-    private static final int SNAPSHOT_ENTRY_FIXED_BYTES = 65;
+    /** Fixed bytes per snapshot entry beyond the characterId text: u32 len + i64 tick + 9 floats + flags u16 + yaw/health/time + fireSeq u8 + activeMagazine u16 + reloadSeq u8 — see NetMessageCodec.putSnapshotEntry. */
+    private static final int SNAPSHOT_ENTRY_FIXED_BYTES = 66;
 
     /** Splits the gathered entries into as many ≤{@link #MAX_BATCH_PAYLOAD_BYTES} frames as needed and broadcasts each. */
     private void broadcastSnapshotBatchChunked(List<NetMessageCodec.DecodedSnapshot> entries) {
