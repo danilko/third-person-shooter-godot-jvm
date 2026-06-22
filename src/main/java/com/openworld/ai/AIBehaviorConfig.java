@@ -137,5 +137,18 @@ public class AIBehaviorConfig extends Resource {
      */
     @Export @RegisterProperty public boolean useFleeOnAttack = false;
 
+    // ── Breaching ───────────────────────────────────────────────────────────────
+
+    /**
+     * When the AI has a target in weapon range but its line of sight is blocked by geometry (a wall,
+     * a building) for {@code suppressionDuration}, <b>true</b> = pursue/approach to regain a clean shot
+     * (paths around cover or through a doorway into a building, re-engaging once it sees the target
+     * again) — an aggressive breacher that clears rooms; <b>false</b> = hold-and-shoot (sweep the last
+     * known spot via SearchState then return to post) — snipers, static guards, defenders that engage
+     * only from where they stand. This is the lever between "AI follows you into the building" and
+     * "AI camps outside and fires through the window".
+     */
+    @Export @RegisterProperty public boolean breachWhenBlocked = true;
+
     public AIBehaviorConfig() { super(); }
 }
