@@ -1843,6 +1843,23 @@ public class NetworkManager extends Node {
         }
     }
 
+    /**
+     * Server → one peer: late-join baseline of already-broken destructibles (I2). Sent as the same
+     * MSG_WORLD_EVENT a live break uses, so the receiver path ({@code GameManager.applyBreakableState})
+     * is identical. Only broken pieces need sending — a freshly-joined client's geometry starts intact.
+     */
+    public void sendBaselineBreakables(int targetPeerId) {
+        if (!isServer() || getTree() == null) return;
+        for (Node node : getTree().getNodesInGroup(
+                new StringName(com.openworld.world.Breakable.BREAKABLE_GROUP))) {
+            if (node instanceof com.openworld.world.Breakable b && b.isBroken()) {
+                sendMessage(targetPeerId, NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT,
+                        com.openworld.game.GameManager.WORLD_EVENT_BREAKABLE, b.breakableId, 1f,
+                        java.util.List.of()));
+            }
+        }
+    }
+
     /** Server → all: announce a character's removal (queueFree on receipt). */
     public void announceDespawn(String characterId) {
         if (!isServer()) return;
