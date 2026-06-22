@@ -10,6 +10,7 @@ import godot.api.Texture2D;
 import godot.core.NodePath;
 import com.openworld.character.CharacterVisuals;
 import com.openworld.weapon.WeaponController;
+import com.openworld.world.Breakable;
 import com.openworld.world.HitInfo;
 import com.openworld.world.HittableBody;
 import com.openworld.world.SurfaceType;
@@ -84,6 +85,10 @@ public class ImpactManager extends Node {
         }
 
         if (ctx.detonatable != null) ctx.detonatable.detonate();
+
+        // Destructible world geometry (breakable glass/wall — PLAN.md I2). Host-authoritative:
+        // Breakable.applyDamage ignores the hit on a non-server peer and replicates the break itself.
+        if (ctx.breakable != null) ctx.breakable.applyDamage(damage, attackerPos);
     }
 
     /**
@@ -106,8 +111,9 @@ public class ImpactManager extends Node {
         final Node        healthOwner;
         final SurfaceType surface;
         final Detonatable detonatable;
-        HitContext(Character c, Node h, SurfaceType s, Detonatable d) {
-            character = c; healthOwner = h; surface = s; detonatable = d;
+        final Breakable   breakable;
+        HitContext(Character c, Node h, SurfaceType s, Detonatable d, Breakable b) {
+            character = c; healthOwner = h; surface = s; detonatable = d; breakable = b;
         }
     }
 
@@ -120,15 +126,17 @@ public class ImpactManager extends Node {
      * so bones inside it report CharacterVisuals as their owner, not the Character body.
      */
     private static HitContext resolveHitContext(Node hitNode) {
-        if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT, null);
+        if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT, null, null);
         Character character = null;
         Node healthOwner = null;
         SurfaceType surface = SurfaceType.DEFAULT;
         Detonatable detonatable = null;
+        Breakable breakable = null;
 
         Node current = hitNode;
         while (current != null) {
             if (detonatable == null && current instanceof Detonatable d) detonatable = d;
+            if (breakable == null && current instanceof Breakable b) breakable = b;
             if (surface == SurfaceType.DEFAULT) {
                 if (current instanceof Character c) {
                     surface = SurfaceType.FLESH;
@@ -143,10 +151,10 @@ public class ImpactManager extends Node {
                 healthOwner = current;
             }
             if (character != null && healthOwner != null && surface != SurfaceType.DEFAULT
-                    && detonatable != null) break;
+                    && detonatable != null && breakable != null) break;
             current = current.getParent();
         }
-        return new HitContext(character, healthOwner, surface, detonatable);
+        return new HitContext(character, healthOwner, surface, detonatable, breakable);
     }
 
     // ── Lazy singleton lookups ────────────────────────────────────────────────

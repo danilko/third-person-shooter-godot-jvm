@@ -316,6 +316,7 @@ public class GameManager extends Node {
                 net.sendBaselineVehicleOccupancy(peerId);
                 // Runtime faction-relationship flips (per-character factions ride sendBaselineSpawns).
                 net.sendBaselineFactionRelationships(peerId);
+                net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
             }
             return;
         }
@@ -331,6 +332,7 @@ public class GameManager extends Node {
             net.sendBaselineInventories(peerId);   // after spawns + pickups — see rejoin branch
             net.sendBaselineVehicleOccupancy(peerId);   // occupied vehicles after spawns (N3)
             net.sendBaselineFactionRelationships(peerId);   // runtime relationship flips (D3)
+            net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
         }
         spawnPlayerBody(peerId, persistentPlayerId);
     }
@@ -853,6 +855,9 @@ public class GameManager extends Node {
     /** Runtime per-character faction swap (D3) — key = characterId, args = [faction]. Host Character.setFaction broadcasts; clients re-apply. */
     public static final int WORLD_EVENT_FACTION_SWAP = 7;
 
+    /** Destructible state change (I2) — key = breakableId, value = 1 broken / 0 intact. Host Breakable broadcasts; clients re-apply cosmetically. */
+    public static final int WORLD_EVENT_BREAKABLE = 8;
+
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         switch (eventType) {
@@ -863,6 +868,7 @@ public class GameManager extends Node {
             case WORLD_EVENT_MISSION_FAILED -> applyMissionFailed(key, args);
             case WORLD_EVENT_FACTION_RELATIONSHIP -> applyFactionRelationship(key, args);
             case WORLD_EVENT_FACTION_SWAP -> applyCharacterFaction(key, args);
+            case WORLD_EVENT_BREAKABLE -> applyBreakableState(key, value);
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }
@@ -916,6 +922,29 @@ public class GameManager extends Node {
     private void applyVehicleWreck(String vehicleId) {
         com.openworld.carrier.vehicle.Vehicle vehicle = findVehicleById(vehicleId);
         if (vehicle != null) vehicle.playWreckCosmetics();
+    }
+
+    /**
+     * Client-side: mirror a host-confirmed destructible state change (I2). value=1 → break, 0 → restore.
+     * Cosmetic only (no re-broadcast): {@code Breakable.breakNow/restore} are called with broadcast=false
+     * so a re-broadcasting host doesn't echo. Also used by {@code NetworkManager.sendBaselineBreakables}
+     * to bring a late-joiner up to date on already-broken pieces.
+     */
+    private void applyBreakableState(String breakableId, float value) {
+        com.openworld.world.Breakable b = findBreakableById(breakableId);
+        if (b == null) return;
+        if (value >= 0.5f) b.breakNow(false); else b.restore(false);
+    }
+
+    private com.openworld.world.Breakable findBreakableById(String breakableId) {
+        if (getTree() == null || breakableId == null) return null;
+        for (Node node : getTree().getNodesInGroup(
+                new StringName(com.openworld.world.Breakable.BREAKABLE_GROUP))) {
+            if (node instanceof com.openworld.world.Breakable b && breakableId.equals(b.breakableId)) {
+                return b;
+            }
+        }
+        return null;
     }
 
     /** Mirrors a host-confirmed ammo refill onto this peer's copy of the character. */

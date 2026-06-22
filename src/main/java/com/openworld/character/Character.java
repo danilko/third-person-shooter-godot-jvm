@@ -177,6 +177,10 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     public boolean debugSwim = false;
     private Label swimDebugLabel = null;
 
+    /** Full-screen blue tint shown to the local player while the camera is submerged (PLAN.md I2 follow-up). */
+    private CanvasLayer underwaterLayer = null;
+    private ColorRect underwaterTint = null;
+
     // False for AI-controlled characters whose accuracy is managed by their own system.
     // public (not protected): read cross-package by weapon/movement/control collaborators.
     public boolean useWeaponSpread = true;
@@ -685,6 +689,10 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         }
         if (mc != null) mc.setSwimming(swimming, waterSurfaceY);
         updateOxygen(sw, swimming, delta);
+        // Screen tint when the head (camera) drops below the water line — the water mesh is single-sided,
+        // so once you're under the surface there is no blue in the world to signal it; the overlay does.
+        updateUnderwaterOverlay(inWater && activeCamera != null
+                && activeCamera.getGlobalPosition().getY() < waterSurfaceY);
         if (debugSwim) updateSwimDebug(sw, waterDepth, swimming);
 
         // ── Weapon switch / unequip ────────────────────────────────────────
@@ -910,6 +918,26 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
             swimming ? "  [SWIMMING]" : ""));
     }
 
+    /**
+     * Shows/hides a full-screen blue tint while the local player is submerged. Lazily builds a
+     * CanvasLayer + full-rect ColorRect as a child of the body (same pattern as {@link #updateSwimDebug},
+     * so it renders to screen and frees with the body). No-op for AI / remote bodies.
+     */
+    private void updateUnderwaterOverlay(boolean submerged) {
+        if (!isLocallyOwnedPlayer()) return;
+        if (underwaterTint == null) {
+            if (!submerged) return; // don't build the overlay until it is first needed
+            underwaterLayer = new CanvasLayer();
+            addChild(underwaterLayer);
+            underwaterTint = new ColorRect();
+            underwaterTint.setColor(new Color(0.05, 0.32, 0.55, 0.45));
+            underwaterTint.setMouseFilter(Control.MouseFilter.IGNORE);
+            underwaterTint.setAnchorsPreset(Control.LayoutPreset.PRESET_FULL_RECT, false);
+            underwaterLayer.addChild(underwaterTint);
+        }
+        underwaterTint.setVisible(submerged);
+    }
+
     private MovementController movementControllerRef;
 
     /** Lazily-cached MovementController sibling (never freed/swapped during the body's life). */
@@ -1129,6 +1157,9 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * SERVER_PEER_ID, so it would otherwise report as "ours"). This is the ownership signal — the
      * camera being current is a consequence of it, not the source of truth.
      */
+    /** Public ownership check — for world volumes (e.g. {@code InteriorVolume}) that affect only the local player's experience. */
+    public boolean isLocalOwnedPlayer() { return isLocallyOwnedPlayer(); }
+
     private boolean isLocallyOwnedPlayer() {
         if (!(this instanceof Player)) return false;
         Node netNode = getNodeOrNull("/root/NetworkManager");
