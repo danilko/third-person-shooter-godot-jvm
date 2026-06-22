@@ -74,7 +74,15 @@ public class AttackState implements AIState {
             body.broadcastToSquad(body.getTarget(), targetPos);
         } else {
             ctrl.advanceLostTargetTimer(delta);
-            if (!ctrl.hasLastKnownPosition() || ctrl.isSuppressExpired()) return SearchState.INSTANCE;
+            if (!ctrl.hasLastKnownPosition() || ctrl.isSuppressExpired()) {
+                // Lost the shot for good (no last-known, or suppression window elapsed). A breacher
+                // pursues toward the target — ChaseState paths around the wall / through the doorway
+                // (using the doorway NavigationLink) and re-enters AttackState once it regains a line,
+                // so it follows you inside instead of camping. A hold-and-shoot AI sweeps the last spot.
+                return (body.getBehaviorConfig().breachWhenBlocked && ctrl.hasLastKnownPosition())
+                        ? ChaseState.INSTANCE
+                        : SearchState.INSTANCE;
+            }
         }
 
         // ── Still-phase tick (stop-to-shoot) ─────────────────────────────────
