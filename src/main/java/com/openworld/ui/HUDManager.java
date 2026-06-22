@@ -185,6 +185,9 @@ public class HUDManager extends CanvasLayer {
 	  bus.characterAmmoChanged.connectUnsafe(
 		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterAmmoChanged")),
 		  Object.ConnectFlags.DEFAULT);
+	  bus.characterOxygenChanged.connectUnsafe(
+		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterOxygenChanged")),
+		  Object.ConnectFlags.DEFAULT);
 	  bus.characterDied.connectUnsafe(
 		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterDiedHud")),
 		  Object.ConnectFlags.DEFAULT);
@@ -534,6 +537,15 @@ public class HUDManager extends CanvasLayer {
 	if (info == null) return;
 	Node hud = characterHUDs.get(info.characterId);
 	if (hud instanceof CharacterHUD ch) ch.onAmmoChanged(magazine, reserve);
+  }
+
+  /** Relay the active player's swim oxygen to the FootHUD breath meter (filtered like pickups). */
+  @RegisterFunction
+  public void onCharacterOxygenChanged(CharacterInfo info, float current, float max) {
+	if (info == null) return;
+	if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(info.characterId)) return;
+	Node busNode = getNodeOrNull("/root/EventBus");
+	if (busNode instanceof EventBus bus) bus.playerOxygenChanged.emit(current, max);
   }
 
   @RegisterFunction

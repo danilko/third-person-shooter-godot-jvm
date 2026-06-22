@@ -202,6 +202,23 @@ public class EventBus extends Node {
             new Signal3<>(this, new StringName("character_ammo_changed"));
 
     /**
+     * Emitted by Character while swimming (PLAN.md I1 — breath/oxygen) for any character.
+     * Payload: CharacterInfo of the owner + current oxygen (s) + max oxygen (s). HUDManager
+     * filters to the active player and re-emits {@link #playerOxygenChanged}.
+     */
+    @RegisterSignal
+    public final Signal3<CharacterInfo, Float, Float> characterOxygenChanged =
+            new Signal3<>(this, new StringName("character_oxygen_changed"));
+
+    /**
+     * Active-player oxygen, relayed by HUDManager (the swim breath meter). Payload: current
+     * oxygen (s) + max oxygen (s). CharacterHUD shows the meter while submerged, hides it at full.
+     */
+    @RegisterSignal
+    public final Signal2<Float, Float> playerOxygenChanged =
+            new Signal2<>(this, new StringName("player_oxygen_changed"));
+
+    /**
      * Emitted by GameManager.onHostLost() on a client whose host vanished
      * (NetworkManager detected it via DISCONNECT or the no-packet watchdog).
      * Payload: a short human-readable reason. MenuManager surfaces the recovery

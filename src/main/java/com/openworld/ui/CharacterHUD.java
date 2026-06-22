@@ -28,6 +28,9 @@ public class CharacterHUD extends Control {
 
   private Label healthLabel;
   private Label interactPromptLabel;
+  /** Swim breath meter root (shown only while submerged) + its fill bar. Optional in the scene. */
+  private Control oxygenRoot;
+  private ProgressBar oxygenBar;
   private String playerCharacterId = "";
 
   @RegisterFunction
@@ -40,6 +43,14 @@ public class CharacterHUD extends Control {
     Node promptNode = getNodeOrNull("InteractPrompt");
     if (promptNode instanceof Label l) interactPromptLabel = l;
 
+    Node oxNode = getNodeOrNull("Oxygen");
+    if (oxNode instanceof Control c) {
+      oxygenRoot = c;
+      oxygenRoot.setVisible(false);   // hidden until the swimmer submerges
+      Node bar = oxNode.getNodeOrNull("Bar");
+      if (bar instanceof ProgressBar pb) oxygenBar = pb;
+    }
+
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) {
       bus.playerHealthChanged.connectUnsafe(
@@ -48,7 +59,21 @@ public class CharacterHUD extends Control {
       bus.pickupInteractChanged.connectUnsafe(
           Callable.createUnsafe(this, StringNames.toGodotName("onPickupInteractChanged")),
           godot.api.Object.ConnectFlags.DEFAULT);
+      bus.playerOxygenChanged.connectUnsafe(
+          Callable.createUnsafe(this, StringNames.toGodotName("onOxygenChanged")),
+          godot.api.Object.ConnectFlags.DEFAULT);
     }
+  }
+
+  /**
+   * Receive EventBus.playerOxygenChanged — fill the swim breath meter and show it only while air is
+   * below full (i.e. the swimmer is/was submerged); a full tank hides the widget.
+   */
+  @RegisterFunction
+  public void onOxygenChanged(float current, float max) {
+    if (oxygenRoot == null) return;
+    oxygenRoot.setVisible(current < max);
+    if (oxygenBar != null && max > 0f) oxygenBar.setValue((current / max) * 100.0);
   }
 
   /**
