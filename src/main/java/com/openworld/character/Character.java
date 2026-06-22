@@ -167,6 +167,10 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     private static final double WATER_PROBE_INTERVAL = 0.1;
     private double cachedWaterDepth = 0.0;
     private double waterProbeCooldown = 0.0;
+    /** Remaining lung air (s) — drains while fully submerged, recovers at the surface (PLAN.md I1). */
+    private double currentOxygen = -1.0;   // <0 = uninitialised; lazily set to SwimState.maxOxygen
+    /** Accumulates real time once oxygen is empty; deals a drowning tick every drowningInterval. */
+    private double drownTimer = 0.0;
     /** Debug aid (PLAN.md I1): when set, the local player shows an on-screen swim/water-depth readout. */
     @Export
     @RegisterProperty
@@ -653,7 +657,14 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
             if (!swimming) {
                 if (waterDepth >= sw.getSwimEnterDepth()) swimming = true;
             } else {
-                if (waterDepth <= sw.getSwimExitDepth()) swimming = false;
+                // Only stand up when the body can ACTUALLY rest on ground — a shallow depth reading
+                // alone is not enough. Near a harbor the down-probe hits the dock's underwater wall
+                // and reads shallow while the body floats over genuinely deep water beside it; exiting
+                // SWIM there dropped the (ungrounded) body to the seabed under gravity, then buoyancy
+                // refloated it — the airborne drop/refloat oscillation. Requiring isOnFloor() means we
+                // revert only when buoyancy has actually settled the body onto a shallow bottom
+                // (wading out), never beside a deep wall.
+                if (waterDepth <= sw.getSwimExitDepth() && isOnFloor()) swimming = false;
             }
         } else {
             swimming = false;
@@ -662,13 +673,18 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
         if (swimming) {
             if (currentStanceName != StanceName.SWIM) setStance(StanceName.SWIM);
-            if (mc != null) mc.setSwimVertical(input.swimVertical);
+            if (mc != null) {
+                mc.setSwimVertical(input.swimVertical);
+                // Tap jump → breach hop toward a low ledge/harbor (a tall dock can't be cleared).
+                if (input.jump) mc.swimJump();
+            }
         } else if (currentStanceName == StanceName.SWIM) {
             setStance(StanceName.UPRIGHT);
         } else if (input.desiredStance != null && isOnFloor()) {
             setStance(input.desiredStance);
         }
         if (mc != null) mc.setSwimming(swimming, waterSurfaceY);
+        updateOxygen(sw, swimming, delta);
         if (debugSwim) updateSwimDebug(sw, waterDepth, swimming);
 
         // ── Weapon switch / unequip ────────────────────────────────────────
@@ -819,6 +835,52 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         if (hit.isEmpty()) return waterSurfaceY - to.getY();   // no floor within probe → deep
         java.lang.Object pos = hit.get("position");
         return (pos instanceof Vector3 p) ? (waterSurfaceY - p.getY()) : (waterSurfaceY - to.getY());
+    }
+
+    /**
+     * Breath/oxygen tick (PLAN.md I1). Swimming at the surface is free; once the body is fully
+     * submerged (head deeper than {@code submergeDepth} below the surface) the lungs drain, and when
+     * empty the swimmer takes periodic drowning damage — so a dive has a time budget and the player
+     * must surface (tactical play; also covers a future murky-water shader). Air recovers above water
+     * and on land. Runs only on the authority body (applyInput), like the rest of the swim decision.
+     */
+    private void updateOxygen(SwimState sw, boolean swimming, double delta) {
+        if (sw == null) return;
+        double max = sw.getMaxOxygen();
+        if (currentOxygen < 0.0) currentOxygen = max;   // lazy init to full
+
+        double prevOxygen = currentOxygen;
+        boolean submerged = swimming && (waterSurfaceY - getGlobalPosition().getY()) > sw.getSubmergeDepth();
+        if (submerged) {
+            currentOxygen = Math.max(0.0, currentOxygen - delta);   // 1 s of air per real second
+            if (currentOxygen <= 0.0) {
+                drownTimer += delta;
+                double interval = Math.max(0.1, sw.getDrowningInterval());
+                while (drownTimer >= interval) {
+                    drownTimer -= interval;
+                    if (healthNode != null) {
+                        String attackerName    = (characterInfo != null) ? characterInfo.displayName : "";
+                        String attackerFaction = (characterInfo != null) ? characterInfo.faction     : "";
+                        healthNode.takeDamage(null, (float) sw.getDrowningDamage(), "Drowning",
+                                              null, attackerName, attackerFaction);
+                    }
+                }
+            } else {
+                drownTimer = 0.0;
+            }
+        } else {
+            currentOxygen = Math.min(max, currentOxygen + sw.getOxygenRecoverRate() * delta);
+            drownTimer = 0.0;
+        }
+
+        // Emit on change, plus the frame it returns to full (so the HUD meter hides). Skip otherwise.
+        boolean reachedFull = (currentOxygen >= max && prevOxygen < max);
+        if (currentOxygen != prevOxygen || reachedFull) {
+            Node busNode = getNodeOrNull("/root/EventBus");
+            if (busNode instanceof EventBus bus && characterInfo != null) {
+                bus.characterOxygenChanged.emit(characterInfo, (float) currentOxygen, (float) max);
+            }
+        }
     }
 
     /**

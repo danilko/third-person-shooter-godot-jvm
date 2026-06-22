@@ -88,6 +88,58 @@ public class SwimState extends Resource {
   public double swimDiveSpeed = 3.0;
 
   /**
+   * Upward impulse (m/s) of a swim-jump "breach" — a tap of jump near the surface launches the
+   * swimmer up and (with forward momentum) onto a low ledge/harbor at or just above the waterline
+   * (PLAN.md I1; the GTA/PUBG "hop out of water onto a low edge"). Only fires near the surface, not
+   * from the depths. A tall dock above this reach still can't be cleared (mantle climb is future work).
+   */
+  @Export
+  @RegisterProperty
+  public double swimJumpSpeed = 4.5;
+
+  /**
+   * How long (s) the breach stays ballistic before buoyancy resumes. During this window the body
+   * arcs up under {@link #swimGravity} (instead of the surface spring) so it can clear the lip; once
+   * it expires the passive buoyancy gently settles it back to the surface if it fell short.
+   */
+  @Export
+  @RegisterProperty
+  public double swimJumpDuration = 0.45;
+
+  // ── Breath / oxygen (PLAN.md I1) ────────────────────────────────────────────
+  // Swimming at the surface is safe; diving fully under starts an oxygen countdown that, when it
+  // hits zero, deals drowning damage — forcing the player to periodically surface (tactical play,
+  // and a hedge for a future murky-underwater water shader).
+
+  /** Lung capacity in seconds — how long a fully-submerged swimmer lasts before drowning starts. */
+  @Export
+  @RegisterProperty
+  public double maxOxygen = 12.0;
+
+  /**
+   * Depth below the water surface (m) at which the head is considered underwater and oxygen begins
+   * to drain. Must be deeper than {@link #submersionDepth} so ordinary surface swimming never drains.
+   */
+  @Export
+  @RegisterProperty
+  public double submergeDepth = 1.2;
+
+  /** Oxygen recovery rate (s of air per real second) once the head is back above water. */
+  @Export
+  @RegisterProperty
+  public double oxygenRecoverRate = 4.0;
+
+  /** Drowning damage applied per {@link #drowningInterval} once oxygen is depleted. */
+  @Export
+  @RegisterProperty
+  public double drowningDamage = 8.0;
+
+  /** Seconds between drowning damage ticks while oxygen is empty. */
+  @Export
+  @RegisterProperty
+  public double drowningInterval = 1.0;
+
+  /**
    * Lateral swim speed cap (m/s). The effective horizontal speed is driven by the SWIM
    * stance's {@link MovementState} resources; this value documents/serves as the intended
    * cap and is available for future explicit clamping.
@@ -107,6 +159,13 @@ public class SwimState extends Resource {
   public double getMaxVerticalSpeed() { return maxVerticalSpeed; }
   public double getSwimAscendSpeed() { return swimAscendSpeed; }
   public double getSwimDiveSpeed() { return swimDiveSpeed; }
+  public double getSwimJumpSpeed() { return swimJumpSpeed; }
+  public double getSwimJumpDuration() { return swimJumpDuration; }
+  public double getMaxOxygen() { return maxOxygen; }
+  public double getSubmergeDepth() { return submergeDepth; }
+  public double getOxygenRecoverRate() { return oxygenRecoverRate; }
+  public double getDrowningDamage() { return drowningDamage; }
+  public double getDrowningInterval() { return drowningInterval; }
   public double getSwimSpeed() { return swimSpeed; }
 
   // Default constructor is required for Godot to instantiate the Resource

@@ -92,17 +92,35 @@ public class MovementController extends Node {
   private double waterSurfaceY = 0.0;
   /** Per-tick vertical swim intent: +1 ascend, -1 dive, 0 hold (let buoyancy settle to surface). */
   private double swimVertical = 0.0;
+  /** Remaining ballistic-breach window (s) after a swim-jump; >0 suspends the buoyancy spring. */
+  private double swimJumpTimer = 0.0;
 
   @RegisterFunction
   public void setSwimming(boolean value, double surfaceY) {
     swimming = value;
     if (value) waterSurfaceY = surfaceY;
-    else swimVertical = 0.0;
+    else { swimVertical = 0.0; swimJumpTimer = 0.0; }
   }
 
   @RegisterFunction
   public void setSwimVertical(double value) {
     swimVertical = value;
+  }
+
+  /**
+   * Swim-jump "breach": a tap of jump near the water surface launches the swimmer up so forward
+   * momentum can carry it onto a low ledge/harbor. Ignored unless currently swimming AND near the
+   * surface — you can't launch off the seabed. Starts a {@link SwimState#swimJumpDuration} ballistic
+   * window; if the lip isn't cleared, buoyancy settles the body back at the surface afterward.
+   */
+  @RegisterFunction
+  public void swimJump() {
+    if (!swimming || swimState == null || player == null) return;
+    double bodyY = player.getGlobalPosition().getY();
+    double surfaceTarget = waterSurfaceY - swimState.getSubmersionDepth();
+    if (bodyY < surfaceTarget - 0.5) return;   // too deep — must be near the surface to breach
+    velocity.setY(swimState.getSwimJumpSpeed());
+    swimJumpTimer = swimState.getSwimJumpDuration();
   }
 
   @RegisterFunction
@@ -181,7 +199,12 @@ public class MovementController extends Node {
       double bodyY = player.getGlobalPosition().getY();
       double passiveCap = swimState.getMaxVerticalSpeed();   // gentle auto-settle only
       double vy;
-      if (swimVertical > 0.0) {
+      if (swimJumpTimer > 0.0) {
+        // Breaching: arc up under the (gentle) swim gravity instead of the surface spring, so the
+        // hop can clear a low lip; buoyancy resumes (and re-settles us) once the window expires.
+        swimJumpTimer -= delta;
+        vy = velocity.getY() - swimState.getSwimGravity() * delta;
+      } else if (swimVertical > 0.0) {
         // Held jump → ascend FAST, but ease into the settle line near the surface (don't breach).
         if (bodyY >= targetY) {
           vy = GD.clamp((targetY - bodyY) * swimState.getBuoyancy(), -passiveCap, passiveCap);
