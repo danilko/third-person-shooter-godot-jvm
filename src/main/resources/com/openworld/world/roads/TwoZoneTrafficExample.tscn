@@ -1,0 +1,151 @@
+[gd_scene format=3 uid="uid://c8vq8ho7ukxto"]
+
+; Two-zone traffic corridor (PLAN.md I3b/I3c). A straight ~98 m road runs along -Z between two
+; WorldZoneMarkers (ZoneA south at z=0, ZoneB north at z=-98). Each zone streams in AI-driven cars on a
+; one-way lane (CorridorAB drives north, CorridorBA drives south); a car drives to the far end, DESPAWNs
+; (VehicleRoute.end_behavior), and the zone tops the population back up at the lane entry — continuous
+; GTA-style traffic. Host-authoritative; clients receive the cars + seated drivers via MSG_VEHICLE_SPAWN
+; + occupancy. Instanced once in World.tscn. Carjack any car with Enter (PLAN.md I3c).
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/roads/Road2LaneStraight.tscn" id="1_str"]
+[ext_resource type="Script" uid="uid://bcmnw5s2701hq" path="res://src/main/java/com/openworld/world/VehicleRoute.java" id="2_rt"]
+[ext_resource type="Script" uid="uid://ckgs0tjrki0c4" path="res://src/main/java/com/openworld/world/WorldZoneMarker.java" id="3_mk"]
+[ext_resource type="Resource" uid="uid://b2zonea0traf1" path="res://src/main/resources/com/openworld/world/zones/ZoneA.tres" id="4_za"]
+[ext_resource type="Resource" uid="uid://b2zoneb0traf1" path="res://src/main/resources/com/openworld/world/zones/ZoneB.tres" id="5_zb"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_ground"]
+albedo_color = Color(0.16, 0.18, 0.14, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_ground"]
+size = Vector3(24, 0.4, 116)
+
+[sub_resource type="BoxShape3D" id="Box_ground"]
+size = Vector3(24, 0.4, 116)
+
+[node name="TwoZoneTrafficExample" type="Node3D"]
+
+[node name="Ground" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.3, -49)
+collision_mask = 0
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground"]
+material_override = SubResource("Mat_ground")
+mesh = SubResource("Mesh_ground")
+
+[node name="Col" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("Box_ground")
+
+[node name="Tile0" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="Tile1" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -7)
+
+[node name="Tile2" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -14)
+
+[node name="Tile3" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -21)
+
+[node name="Tile4" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -28)
+
+[node name="Tile5" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -35)
+
+[node name="Tile6" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -42)
+
+[node name="Tile7" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -49)
+
+[node name="Tile8" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -56)
+
+[node name="Tile9" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -63)
+
+[node name="Tile10" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -70)
+
+[node name="Tile11" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -77)
+
+[node name="Tile12" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -84)
+
+[node name="Tile13" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -91)
+
+[node name="Tile14" parent="." instance=ExtResource("1_str")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -98)
+
+[node name="CorridorAB" type="Node3D" parent="."]
+script = ExtResource("2_rt")
+loop = false
+lane_offset = 1.75
+end_behavior = "DESPAWN"
+
+[node name="m0" type="Marker3D" parent="CorridorAB"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+
+[node name="m1" type="Marker3D" parent="CorridorAB"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -14)
+
+[node name="m2" type="Marker3D" parent="CorridorAB"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -28)
+
+[node name="m3" type="Marker3D" parent="CorridorAB"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -42)
+
+[node name="m4" type="Marker3D" parent="CorridorAB"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -56)
+
+[node name="m5" type="Marker3D" parent="CorridorAB"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -70)
+
+[node name="m6" type="Marker3D" parent="CorridorAB"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -84)
+
+[node name="m7" type="Marker3D" parent="CorridorAB"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -98)
+
+[node name="CorridorBA" type="Node3D" parent="."]
+script = ExtResource("2_rt")
+loop = false
+lane_offset = 1.75
+end_behavior = "DESPAWN"
+
+[node name="m0" type="Marker3D" parent="CorridorBA"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -98)
+
+[node name="m1" type="Marker3D" parent="CorridorBA"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -84)
+
+[node name="m2" type="Marker3D" parent="CorridorBA"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -70)
+
+[node name="m3" type="Marker3D" parent="CorridorBA"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -56)
+
+[node name="m4" type="Marker3D" parent="CorridorBA"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -42)
+
+[node name="m5" type="Marker3D" parent="CorridorBA"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -28)
+
+[node name="m6" type="Marker3D" parent="CorridorBA"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -14)
+
+[node name="m7" type="Marker3D" parent="CorridorBA"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+
+[node name="ZoneA" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("3_mk")
+zone = ExtResource("4_za")
+
+[node name="ZoneB" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -98)
+script = ExtResource("3_mk")
+zone = ExtResource("5_zb")

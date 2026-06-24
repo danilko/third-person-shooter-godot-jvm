@@ -72,6 +72,11 @@ public class Player extends Character {
             // this reference can dangle — calling into a freed object throws (Round 11 N3).
             if (!godot.global.GD.isInstanceValid(nearbyVehicle)) {
                 nearbyVehicle = null;
+            } else if (nearbyVehicle.isAiOccupied()) {
+                // An AI-driven traffic car → carjack: host evicts the AI driver, then seats us
+                // (PLAN.md I3c). Same Enter key as a normal entry.
+                nearbyVehicle.requestCarjack(this);
+                return; // skip normal inputs this tick
             } else {
                 // Host-arbitrated when networked (the seat change lands on the grant echo);
                 // direct tryEnter in single-player — see Vehicle.requestEnter (Round 11 N3).
@@ -106,5 +111,41 @@ public class Player extends Character {
         super.applyReplicatedDeath();
         Node eventBusNode = getNodeOrNull("/root/EventBus");
         if (eventBusNode instanceof EventBus bus) bus.playerDied.emit();
+    }
+
+    // ── GPS waypoint (I5) ──────────────────────────────────────────────────────
+
+    /** This player's network id, or "" before _ready stamps it. Used to key its WaypointStore entry. */
+    private String waypointKey() {
+        return characterInfo != null ? characterInfo.characterId : "";
+    }
+
+    /**
+     * Set this player's GPS waypoint (from a full-map click): record it locally in the
+     * {@link com.openworld.game.WaypointStore} and, when networked, broadcast it so teammates see the
+     * marker in this player's faction colour. The minimap / full map / world-space arrow read the store.
+     */
+    public void setWaypoint(godot.core.Vector3 worldPos) {
+        String id = waypointKey();
+        if (id.isEmpty() || worldPos == null) return;
+        com.openworld.game.WaypointStore.set(id, worldPos);
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (netNode instanceof com.openworld.net.NetworkManager net)
+            net.broadcastWaypoint(id, true, worldPos);
+    }
+
+    /** Clear this player's GPS waypoint (and tell teammates). */
+    public void clearWaypoint() {
+        String id = waypointKey();
+        if (id.isEmpty()) return;
+        com.openworld.game.WaypointStore.clear(id);
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (netNode instanceof com.openworld.net.NetworkManager net)
+            net.broadcastWaypoint(id, false, godot.core.Vector3.Companion.getZERO());
+    }
+
+    /** This player's current waypoint, or null if none. */
+    public godot.core.Vector3 getWaypoint() {
+        return com.openworld.game.WaypointStore.get(waypointKey());
     }
 }

@@ -150,5 +150,18 @@ public class AIBehaviorConfig extends Resource {
      */
     @Export @RegisterProperty public boolean breachWhenBlocked = true;
 
+    // ── Carjack reaction (PLAN.md I3c) ───────────────────────────────────────────
+
+    /**
+     * How an ambient-traffic driver reacts when the player carjacks its vehicle (PLAN.md I3c).
+     * String (not an enum — the godot-kotlin-jvm registration scanner chokes on raw enum exports):
+     * <ul>
+     *   <li>{@code "FLEE"} (default) — a civilian panics and runs from the carjacker (FleeState).
+     *   <li>{@code "FIGHT"} — a gang/hostile driver turns aggressive (host-authoritative faction flip,
+     *       replicated) and attacks the carjacker (AttackState).
+     * </ul>
+     */
+    @Export @RegisterProperty public String reactToCarjack = "FLEE";
+
     public AIBehaviorConfig() { super(); }
 }

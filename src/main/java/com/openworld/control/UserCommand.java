@@ -63,6 +63,11 @@ public class UserCommand {
     // ── Vehicle fields (Phase 5) — ignored by Character.applyInput ────────────
     public float motor;
     public float   steering;
+    /** False (player): {@code steering} is a turn <b>rate</b> the wheel integrates (hold-to-turn).
+     *  True (AI): {@code steering} is the desired <b>normalized wheel angle</b> [-1,1] the wheel
+     *  converges to — see VehicleWheel.applyWheelSteering. Lets AI hold a stable steer angle instead
+     *  of winding the rate integrator (the cornering-wobble fix, I3b). */
+    public boolean steerToTarget;
     public boolean handbrake;
     public boolean brake;
     public boolean enterExit;
@@ -85,6 +90,7 @@ public class UserCommand {
         tick              = 0;
         motor = 0f;
         steering          = 0f;
+        steerToTarget     = false;
         handbrake         = false;
         brake             = false;
         enterExit         = false;
@@ -116,6 +122,7 @@ public class UserCommand {
         c.tick            = tick;
         c.motor = motor;
         c.steering        = steering;
+        c.steerToTarget   = steerToTarget;
         c.handbrake       = handbrake;
         c.brake           = brake;
         c.enterExit       = enterExit;

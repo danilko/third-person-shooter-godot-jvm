@@ -11,7 +11,10 @@ import com.openworld.game.mission.MissionManager;
 import com.openworld.game.mission.MissionObjectiveType;
 import com.openworld.net.NetworkManager;
 import com.openworld.game.PlayerRegistry;
+import com.openworld.ai.vehicle.VehicleAIController;
+import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.world.SpawnConfig;
+import com.openworld.world.VehicleRoute;
 import com.openworld.world.WorldZone;
 import com.openworld.world.WorldZoneMarker;
 import godot.annotation.RegisterClass;
@@ -46,6 +49,8 @@ import com.openworld.character.Player;
  *       to test escort/squad behaviour against the F10 hostiles.
  * F8  — postDebugGunshot(): drops a "player"-faction GUNSHOT stimulus ~35 m in front of the
  *       player so the zone's "enemy" AI investigate the noise (PLAN.md E2 perception test).
+ * F4  — spawnOnAllRoutes(): drops one AI vehicle on every VehicleRoute in the scene (PLAN.md I3) —
+ *       the one-keypress test for an authored road layout (e.g. RoadKitExample's lanes).
  * F6  — NetworkManager.hostServer(DEBUG_PORT): starts an ENet server for LAN testing
  *       (PLAN.md Part G). F7 — joinServer("127.0.0.1", DEBUG_PORT): connects as a
  *       client to a host on the same machine. Edit DEBUG_HOST for a real LAN peer.
@@ -62,6 +67,8 @@ public class DebugHarness extends Node {
             "res://src/main/resources/com/openworld/character/AICharacter.tscn";
     private static final String RIFLE_SCENE_PATH =
             "res://src/main/resources/com/openworld/weapon/AR4.tscn";
+    private static final String VEHICLE_SCENE_PATH =
+            "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn";
     private static final StringName CHARACTERS_GROUP = new StringName("characters");
 
     private static final int DEBUG_PORT = 7777;
@@ -86,6 +93,8 @@ public class DebugHarness extends Node {
             spawnDebugZone();
         } else if (iek.getKeycode() == Key.F8) {
             postDebugGunshot();
+        } else if (iek.getKeycode() == Key.F4) {
+            if (canSpawnLocally()) spawnOnAllRoutes();
         }
     }
 
@@ -292,6 +301,95 @@ public class DebugHarness extends Node {
             }
         }
         GD.print("DebugHarness: no player found for debug gunshot");
+    }
+
+    /**
+     * F4 — drops one AI vehicle on every {@link VehicleRoute} in the scene. The fastest way to test an
+     * authored road layout (e.g. RoadKitExample): each lane/route gets a car driving its direction.
+     */
+    private void spawnOnAllRoutes() {
+        if (getTree() == null) return;
+        Node scene = getTree().getCurrentScene();
+        if (scene == null) { GD.print("DebugHarness: no current scene for traffic"); return; }
+
+        java.util.List<VehicleRoute> routes = new java.util.ArrayList<>();
+        collectRoutes(scene, routes);
+        if (routes.isEmpty()) { GD.print("DebugHarness: no VehicleRoute nodes found (F4)"); return; }
+
+        Object loaded = GD.load(VEHICLE_SCENE_PATH);
+        if (!(loaded instanceof PackedScene vehicleScene)) {
+            GD.print("DebugHarness: failed to load " + VEHICLE_SCENE_PATH);
+            return;
+        }
+
+        // Track placed spawn points so two routes sharing a start (e.g. a through lane + a turn lane)
+        // don't drop cars on top of each other — overlapping rigid bodies shove apart sideways.
+        java.util.List<Vector3> placed = new java.util.ArrayList<>();
+        int spawned = 0;
+        for (VehicleRoute route : routes) {
+            if (spawnVehicleOnRoute(vehicleScene, scene, route, spawned, placed)) spawned++;
+        }
+        GD.print("DebugHarness: spawned " + spawned + " AI vehicles across "
+                + routes.size() + " routes (F4)");
+    }
+
+    private void collectRoutes(Node node, java.util.List<VehicleRoute> out) {
+        if (node instanceof VehicleRoute r) out.add(r);
+        for (Node child : node.getChildren()) collectRoutes(child, out);
+    }
+
+    /** Spawns one AI vehicle near the route's first waypoint, facing the second, bound to that route.
+     *  If the spot is occupied (a shared lane start), it is nudged back along the lane so cars queue
+     *  instead of overlapping. */
+    private boolean spawnVehicleOnRoute(PackedScene vehicleScene, Node scene, VehicleRoute route,
+                                        int idx, java.util.List<Vector3> placed) {
+        java.util.List<Vector3> pts = route.waypoints();
+        if (pts.size() < 2) return false;
+
+        Vector3 a = pts.get(0);
+        Vector3 b = pts.get(1);
+        // Unit direction of travel (XZ) and its reverse for back-offsetting.
+        double dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1e-3) return false;
+        double ux = dx / len, uz = dz / len;
+
+        // Start at the first marker; back off 7 m at a time until clear of already-placed cars.
+        double sx = a.getX(), sz = a.getZ();
+        for (int guard = 0; guard < 8 && tooClose(placed, sx, sz, 5.0); guard++) {
+            sx -= ux * 7.0; sz -= uz * 7.0;
+        }
+        Vector3 spawnPos = new Vector3((float) sx, (float) a.getY() + 0.6f, (float) sz);
+        placed.add(spawnPos);
+
+        Node inst = vehicleScene.instantiate();
+        if (!(inst instanceof Vehicle v)) { if (inst != null) inst.queueFree(); return false; }
+
+        CharacterInfo info = new CharacterInfo();
+        info.characterId = UUID.randomUUID().toString();
+        info.displayName = "Traffic " + (idx + 1);
+        info.faction = Faction.NEUTRAL;
+        v.characterInfo = info;
+
+        scene.addChild(v);
+        v.setGlobalPosition(spawnPos);
+        // Face along the lane so it does not start driving backwards (Node3D.lookAt aims local -Z).
+        v.lookAt(new Vector3((float) (sx + ux), (float) spawnPos.getY(), (float) (sz + uz)),
+                 Vector3.Companion.getUP());
+
+        VehicleAIController ctrl = new VehicleAIController();
+        v.attachController(ctrl);
+        ctrl.setRoute(route);
+        return true;
+    }
+
+    private boolean tooClose(java.util.List<Vector3> placed, double x, double z, double minDist) {
+        double m2 = minDist * minDist;
+        for (Vector3 p : placed) {
+            double dx = p.getX() - x, dz = p.getZ() - z;
+            if (dx * dx + dz * dz < m2) return true;
+        }
+        return false;
     }
 
     /** Counts living "characters"-group members whose CharacterInfo.faction matches. */

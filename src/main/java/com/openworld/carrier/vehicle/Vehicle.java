@@ -19,6 +19,8 @@ import godot.global.GD;
 import java.lang.Object;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.UUID;
+import com.openworld.ai.vehicle.VehicleAIController;
 import com.openworld.camera.VehicleCameraController;
 import com.openworld.control.Controllable;
 import com.openworld.control.Controller;
@@ -59,6 +61,11 @@ import com.openworld.weapon.WeaponController;
  */
 @RegisterClass(className = "Vehicle")
 public class Vehicle extends RigidBody3D implements Controllable, NameplateTarget {
+
+    /** Group tag for vehicles spawned at runtime by {@code WorldZoneManager} (ambient traffic, I3b) —
+     *  as opposed to scene-authored vehicles that already exist on every peer. Only members of this
+     *  group are announced over {@code MSG_VEHICLE_SPAWN} and replayed in the late-join baseline. */
+    public static final String STREAMED_GROUP = "streamed_vehicle";
 
     // ── Inspector exports ─────────────────────────────────────────────────────
 
@@ -119,17 +126,26 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override
     public void _ready() {
         if (characterInfo == null) characterInfo = new CharacterInfo();
-        // Scene-path-derived id (the Pickup.pickupId pattern): peer-identical for
-        // scene-placed vehicles, so every peer resolves the same vehicle without any
-        // spawn replication. Runtime-spawned vehicles must have a host-stamped UUID
-        // set BEFORE addChild. Round 11 N3 — this is what makes ownership migration,
-        // snapshots, and damage requests resolvable for vehicles at all.
+        // Privatize a scene-embedded (shared) CharacterInfo before stamping our id. The sub-resource
+        // in Vehicle.tscn is shared by every instantiation unless copied; an empty characterId means
+        // "scene-supplied" (code-spawned bodies stamp a UUID before addChild), so copy it into a fresh
+        // instance so the stamp below can't rewrite a sibling vehicle's identity (the traffic aliasing
+        // bug). Done in code rather than resource_local_to_scene, which threw a JVM Shared Buffer Error.
+        else if (characterInfo.characterId == null || characterInfo.characterId.isEmpty()) {
+            characterInfo = CharacterInfo.copyOf(characterInfo);
+        }
+        // ONE vehicle identity model (mirrors Character._ready): a host-stamped UUID, never a
+        // node path. Scene-placed vehicles used to derive their id from getPath() on the theory
+        // it was peer-identical — but that broke across ownership migration / per-peer tree
+        // differences (a client's exit request carried '/root/World/VehicleRoot', which the host
+        // could not resolve → NO_VEHICLE). Now scene vehicles replicate exactly like the
+        // pre-placed Player: the client frees its local copy on connect
+        // (NetworkManager.removeLocalPrePlacedVehicles) and the host re-supplies it with THIS
+        // UUID via the late-join baseline, so every peer keys off the same id. Runtime-spawned
+        // vehicles still set their id BEFORE addChild, so this fallback only fires for the host's
+        // (or single-player's) own scene/spawn body.
         if (characterInfo.characterId == null || characterInfo.characterId.isEmpty()) {
-            characterInfo.characterId = getPath().getPath();
-            if (characterInfo.characterId.length() > 64) {
-                GD.printErr("[Vehicle] characterId '" + characterInfo.characterId
-                        + "' exceeds the 64-char wire cap — this vehicle cannot replicate");
-            }
+            characterInfo.characterId = UUID.randomUUID().toString();
         }
         addToGroup(new StringName("characters"), false);
         // Register in the spatial grid so AI target discovery finds vehicle occupants in O(k)
@@ -264,6 +280,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
         cmd.motor     = 0;
         cmd.steering  = 0;
+        cmd.steerToTarget = false;
         cmd.handbrake = false;
         cmd.brake     = false;
         cmd.fire      = false;
@@ -283,6 +300,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
             cmd.motor     = currentCmd.motor;
             cmd.steering  = currentCmd.steering;
+            cmd.steerToTarget = currentCmd.steerToTarget;
             cmd.handbrake = currentCmd.handbrake;
             cmd.brake     = currentCmd.brake;
             cmd.fire      = currentCmd.fire;
@@ -307,7 +325,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (isLocallySimulated()) {
             for (VehicleWheel w : wheels) {
                 w.applyWheelPhysics((float) delta, (float) getPhysicsProcessDeltaTime(), cmd);
-                w.applyWheelSteering((float) delta, cmd.steering);
+                w.applyWheelSteering((float) delta, cmd.steering, cmd.steerToTarget);
                 w.applySkidMark();
                 if (w.grounded()) isGrounded = true;
             }
@@ -320,6 +338,14 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
         }
 
+        // Drop a stale occupant pin BEFORE dereferencing it: under streamed traffic (PLAN.md I3c) a
+        // seated AI driver can be freed/removed out from under us by a despawn race, and reading its
+        // transform then throws `get_global_transform "!is_inside_tree"` → native use-after-free segfault.
+        // isInstanceValid is checked first (short-circuit) so isInsideTree is never called on a freed node.
+        if (occupant != null && (!GD.isInstanceValid(occupant) || !occupant.isInsideTree())) {
+            occupant = null;
+            nameplateChanged.emit();
+        }
         if (occupant != null && driverSeatNode != null) {
             occupant.setGlobalPosition(driverSeatNode.getGlobalPosition());
             Vector3 occRot = occupant.getGlobalRotation();
@@ -455,7 +481,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override
     public Color getNameplateColor() {
         // Driver seat occupant determines the colour; neutral when empty or the driver is defeated.
-        if (occupant != null && occupant.isAlive() && occupant.characterInfo != null) {
+        // isInstanceValid guards against a freed occupant (streamed-traffic despawn race, PLAN.md I3c).
+        if (occupant != null && GD.isInstanceValid(occupant) && occupant.isAlive() && occupant.characterInfo != null) {
             return Faction.color(occupant.characterInfo.faction);
         }
         return Faction.color(Faction.NEUTRAL);
@@ -530,7 +557,12 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         c.enterDriveState(mode, this);
         c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
 
-        if (!(c.getController() instanceof NetworkController)) {
+        // PLAN.md I3c: an AI-driven traffic car already has its lane-follow brain
+        // (VehicleAIController) on the vehicle, and the seated AI is a non-driving visible occupant —
+        // so do NOT steal the occupant's controller (it keeps its own AIController, suppressed by the
+        // drive-state physics-off, ready to resume on eviction). The hot-swap is only for the normal
+        // case (player or AI taking the wheel of a car with no AI driver of its own).
+        if (!(c.getController() instanceof NetworkController) && !(controller instanceof VehicleAIController)) {
             // A leftover puppet controller would be silently orphaned by attachController's
             // removeChild — applyAuthorityState normally clears it first (with velocity
             // seeding); this is the belt-and-braces for any other path.
@@ -580,9 +612,12 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
         c.exitDriveState();
 
-        // Only hand back what tryEnter hot-swapped in: a VehicleNetworkController stays —
-        // it belongs to the vehicle's replication, not the character.
-        if (!(controller instanceof VehicleNetworkController)) {
+        // Only hand back what tryEnter hot-swapped in. A VehicleNetworkController stays (it belongs to
+        // the vehicle's replication). A VehicleAIController also stays — it is the car's OWN lane-follow
+        // brain (PLAN.md I3c Design B), never brought by the occupant; the occupant kept its own
+        // controller while seated, so moving the driving brain onto it here would be wrong (and would
+        // break the evicted driver's carjack reaction, which needs its AIController intact).
+        if (!(controller instanceof VehicleNetworkController) && !(controller instanceof VehicleAIController)) {
             Controller ctrl = detachController();
             if (ctrl != null) c.attachController(ctrl);
         }
@@ -674,7 +709,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @RegisterFunction
     public void onEntranceBodyEntered(Node3D body) {
         Character c = resolveCharacter(body);
-        if (c == null || occupant != null) return;
+        if (c == null) return;
+        // Empty car → "Enter"; AI-driven car → "Carjack". A car occupied by another player offers
+        // no prompt (you can't carjack a player).
+        if (occupant != null && !isAiOccupied()) return;
         if (c instanceof Player p) { p.nearbyVehicle = this; emitEnterPrompt(true); }
     }
 
@@ -693,8 +731,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     private void emitEnterPrompt(boolean inRange) {
         Node busNode = getNodeOrNull("/root/EventBus");
-        if (busNode instanceof EventBus bus)
-            bus.pickupInteractChanged.emit(inRange, inRange ? "Enter vehicle" : "");
+        if (busNode instanceof EventBus bus) {
+            String text = !inRange ? "" : (isAiOccupied() ? "Carjack" : "Enter vehicle");
+            bus.pickupInteractChanged.emit(inRange, text);
+        }
     }
 
     // ── Controller hot-swap ───────────────────────────────────────────────────
@@ -729,6 +769,60 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public Controller getController() { return controller; }
 
     public Character getOccupant()   { return occupant; }
+
+    // ── Carjacking (PLAN.md I3c) ──────────────────────────────────────────────
+
+    /** True when an AI (not a player) is in the driver seat — i.e. this car is a carjack target. */
+    public boolean isAiOccupied() {
+        return occupant != null && !(occupant instanceof Player);
+    }
+
+    /**
+     * Player intent to carjack an AI-driven car (PLAN.md I3c). Host-arbitrated like {@link #requestEnter}
+     * (the car is host-owned in the synced model): single-player evicts + seats locally; a networked host
+     * runs the carjack through the {@link GameManager} seat path (it detects an AI-occupied seat and evicts
+     * first, replicating both the eviction and the player's enter over occupancy); a client forwards the
+     * seat request and the host carries it out.
+     */
+    public void requestCarjack(Character player) {
+        if (!isAiOccupied() || player == null) return;
+        Node netNode = getNodeOrNull("/root/NetworkManager");
+        if (!(netNode instanceof NetworkManager net) || !net.isNetworked()) {
+            doLocalCarjack(player);   // single-player — no policy, mirrors requestEnter's SP path
+            return;
+        }
+        String playerId = player.characterInfo != null ? player.characterInfo.characterId : "";
+        if (net.isServer()) {
+            if (getNodeOrNull("/root/GameManager") instanceof GameManager gm) {
+                gm.processVehicleSeatRequest(NetworkManager.SERVER_PEER_ID,
+                        characterInfo.characterId, playerId, true);   // carjack detected host-side
+            }
+        } else {
+            net.requestVehicleSeat(characterInfo.characterId, playerId, true);
+        }
+    }
+
+    /** Local (single-player) carjack: eject the AI driver, react it, drop the lane brain, seat the player. */
+    private void doLocalCarjack(Character player) {
+        Character ejected = occupant;
+        tryExit();
+        removeAiDriverBrain();
+        if (ejected instanceof AICharacter ai) ai.reactToCarjack(player);
+        tryEnter(player);
+    }
+
+    /**
+     * Drop the lane-follow brain so a player can take the wheel of a carjacked traffic car. Design B
+     * keeps the {@link VehicleAIController} on the <i>vehicle</i> (the seated AI never held it), so on a
+     * carjack it must be freed here — otherwise {@link #tryEnter}'s guard would refuse to hot-swap the
+     * player's controller in and the player couldn't drive.
+     */
+    public void removeAiDriverBrain() {
+        if (controller instanceof VehicleAIController) {
+            Controller old = detachController();
+            if (old != null) old.queueFree();
+        }
+    }
 
     public boolean isSlipping()      { return slipping; }
     public void setSlipping(boolean s) { this.slipping = s; }

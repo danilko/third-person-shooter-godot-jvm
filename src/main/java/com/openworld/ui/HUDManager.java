@@ -116,6 +116,9 @@ public class HUDManager extends CanvasLayer {
   private WeaponSlotsUI   weaponSlotsUI;
   private DamageIndicator damageIndicator;
   private WeaponProgress  weaponProgress;
+  private MinimapController minimap;     // I5 — always-on radar
+  private WorldMapManager   worldMap;    // I5 — toggled full map
+  private GpsArrow          gpsArrow;    // I5 — world-space waypoint arrow
 
   private Situation      currentSituation = Situation.ON_FOOT;
   private Vehicle        currentVehicle;  // non-null only while in a vehicle situation
@@ -228,7 +231,8 @@ public class HUDManager extends CanvasLayer {
 	  if (!(child instanceof Control c)) continue;
 	  String name = child.getName().toString();
 	  if (name.equals("Feed") || name.equals("StatusFeed") || name.equals("Crosshair")
-		  || name.equals("WeaponRadialMenu") || name.equals("WeaponProgress")) continue;
+		  || name.equals("WeaponRadialMenu") || name.equals("WeaponProgress")
+		  || name.equals("Minimap") || name.equals("WorldMap") || name.equals("GpsArrow")) continue;
 	  widgets.put(name, c);
 	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
 	  if (c instanceof DamageIndicator di) damageIndicator = di;
@@ -237,6 +241,13 @@ public class HUDManager extends CanvasLayer {
 	// table-managed — cache it directly to wire its controller.
 	Node wp = getNodeOrNull("WeaponProgress");
 	if (wp instanceof WeaponProgress w) weaponProgress = w;
+	// I5 navigation widgets — always-on / self-toggled, not table-managed (like WeaponProgress).
+	Node mm = getNodeOrNull("Minimap");
+	if (mm instanceof MinimapController m) minimap = m;
+	Node wmap = getNodeOrNull("WorldMap");
+	if (wmap instanceof WorldMapManager w) worldMap = w;
+	Node ga = getNodeOrNull("GpsArrow");
+	if (ga instanceof GpsArrow a) gpsArrow = a;
 
 	applyContext(Situation.ON_FOOT);
   }
@@ -396,6 +407,12 @@ public class HUDManager extends CanvasLayer {
 	}
 	if (weaponProgress != null && newPlayer instanceof Character c) {
 	  weaponProgress.wireCharacter(c);
+	}
+	// I5 navigation widgets follow the local player.
+	if (newPlayer instanceof Player p) {
+	  if (minimap != null)  minimap.wirePlayer(p);
+	  if (worldMap != null) worldMap.wirePlayer(p);
+	  if (gpsArrow != null) gpsArrow.wirePlayer(p);
 	}
   }
 

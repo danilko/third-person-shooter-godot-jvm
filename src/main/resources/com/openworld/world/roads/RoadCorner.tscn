@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3]
+
+[sub_resource type="BoxShape3D" id="Box_road"]
+size = Vector3(7, 0.2, 7)
+
+[sub_resource type="BoxMesh" id="Mesh_road"]
+size = Vector3(7, 0.2, 7)
+
+[sub_resource type="StandardMaterial3D" id="Mat_asphalt"]
+albedo_color = Color(0.1, 0.1, 0.11, 1)
+
+[node name="RoadCorner" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Col" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("Box_road")
+
+[node name="Asphalt" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("Mesh_road")
+material_override = SubResource("Mat_asphalt")

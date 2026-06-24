@@ -67,6 +67,17 @@ public class NetworkManager extends Node {
 
     private static final int DEFAULT_MAX_CLIENTS = 32;
     private static final StringName CHARACTERS_GROUP = new StringName("characters");
+    private static final StringName STREAMED_VEHICLE_GROUP =
+            new StringName(com.openworld.carrier.vehicle.Vehicle.STREAMED_GROUP);
+
+    // Client-side ghost reconcile (PLAN.md I3c): streamed ambient traffic churns fast, so a late-join
+    // baseline spawn can race a despawn and leave a "ghost" the host no longer simulates (no snapshots →
+    // stuck at its spawn point in the ground). Every VEHICLE_RECONCILE_INTERVAL_MS the client frees any
+    // STREAMED_GROUP vehicle it has not received a snapshot for in STREAMED_VEHICLE_GHOST_TIMEOUT_MS.
+    private static final int STREAMED_VEHICLE_GHOST_TIMEOUT_MS = 2500;
+    private static final int VEHICLE_RECONCILE_INTERVAL_MS = 1000;
+    private final Map<String, Integer> vehicleLastSnapshotMs = new HashMap<>();
+    private int lastVehicleReconcileMs = 0;
 
     private static final int CHANNEL_COUNT = 4;   // Phase 3 assigns per-message reliability per channel
 
@@ -98,6 +109,8 @@ public class NetworkManager extends Node {
     private static final int MSG_VEHICLE_SEAT_REQUEST   = 21; // Round 11 N3 — client→host: ask to (un)seat a character (host-arbitrated)
     private static final int MSG_VEHICLE_OCCUPANCY      = 22; // Round 11 N3 — host→all: authoritative seat state + locomotion owner (atomic)
     private static final int MSG_WEAPON_SWITCH          = 23; // G4-1 — owner→host→all: ordered equip-start event (puppet draws promptly, fire can't precede draw)
+    private static final int MSG_VEHICLE_SPAWN          = 24; // I3b — host→all: streamed ambient-traffic vehicle spawn (counterpart of MSG_SPAWN)
+    private static final int MSG_WAYPOINT               = 25; // I5  — owner→host→all: GPS waypoint set/clear (faction-coloured teammate marker)
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -150,7 +163,8 @@ public class NetworkManager extends Node {
             case MSG_IDENTIFY, MSG_DAMAGE_REQUEST, MSG_DAMAGE_BROADCAST, MSG_SPAWN, MSG_DESPAWN, MSG_SHOT,
                     MSG_WORLD_EVENT, MSG_OWNERSHIP, MSG_PICKUP_REQUEST, MSG_PICKUP_TAKEN,
                     MSG_WEAPON_DROPPED, MSG_ELIMINATION, MSG_INVENTORY,
-                    MSG_VEHICLE_SEAT_REQUEST, MSG_VEHICLE_OCCUPANCY, MSG_WEAPON_SWITCH ->
+                    MSG_VEHICLE_SEAT_REQUEST, MSG_VEHICLE_OCCUPANCY, MSG_WEAPON_SWITCH,
+                    MSG_VEHICLE_SPAWN, MSG_WAYPOINT ->
                     new ChannelSpec(0, ENetPacketPeer.FLAG_RELIABLE);
             case MSG_SNAPSHOT, MSG_SNAPSHOT_BATCH, MSG_VEHICLE_SNAPSHOT, MSG_VEHICLE_SNAPSHOT_BATCH ->
                     new ChannelSpec(2, 0L);
@@ -256,6 +270,104 @@ public class NetworkManager extends Node {
                 && now - lastServerPacketMs > HOST_TIMEOUT_MS) {
             onHostLost("timeout (" + HOST_TIMEOUT_MS + "ms with no packet)");
         }
+        // Client-side ghost-vehicle reconcile (PLAN.md I3c) — only a client has puppet streamed cars.
+        if (connection != null && !amServer && now - lastVehicleReconcileMs >= VEHICLE_RECONCILE_INTERVAL_MS) {
+            lastVehicleReconcileMs = now;
+            reconcileStreamedVehicles(now);
+        }
+        // Per-peer vehicle/character inventory dump (temporary diagnostic — set NET_DEBUG_VEHICLES=false
+        // to silence). Both peers log every ~2 s so a side-by-side compare shows exactly where a vehicle,
+        // its owner/freeze state, its driver, or its snapshot feed diverges between host and client.
+        if (NET_DEBUG_VEHICLES && connection != null && now - lastVehicleDiagMs >= VEHICLE_DIAG_INTERVAL_MS) {
+            lastVehicleDiagMs = now;
+            dumpVehicleDiagnostics();
+        }
+    }
+
+    // ── Temporary networked-vehicle diagnostics ───────────────────────────────
+    public static boolean NET_DEBUG_VEHICLES = false;      // flip to true to dump per-vehicle/character net state
+    private static final int VEHICLE_DIAG_INTERVAL_MS = 2000;
+    private int lastVehicleDiagMs;
+    // Vehicle snapshot entries received per id since the last dump (cleared each dump).
+    private final java.util.Map<String, Integer> vehicleSnapCount = new java.util.HashMap<>();
+
+    private static String shortId(String id) {
+        if (id == null || id.isEmpty()) return "?";
+        return id.length() <= 8 ? id : id.substring(0, 8);
+    }
+
+    /** Logs this peer's full vehicle inventory + seated-occupant + snapshot-feed state for cross-peer compare. */
+    private void dumpVehicleDiagnostics() {
+        if (getTree() == null) return;
+        String role = amServer ? "HOST" : "CLI";
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== NETDIAG ").append(role).append(" peer=").append(localPeerId).append(" ===\n");
+        int vehicleCount = 0;
+        for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
+            if (!(node instanceof com.openworld.carrier.vehicle.Vehicle v) || v.getCharacterInfo() == null) continue;
+            vehicleCount++;
+            CharacterInfo info = v.getCharacterInfo();
+            String ctrl = v.getController() == null ? "none"
+                    : v.getController().getClass().getSimpleName();
+            com.openworld.character.Character occ = v.getOccupant();
+            String occStr = occ == null ? "-"
+                    : shortId(occ.characterInfo != null ? occ.characterInfo.characterId : "?")
+                      + "/" + occ.getClass().getSimpleName() + (occ.isVisible() ? "" : ",HIDDEN");
+            Vector3 p = v.getGlobalPosition();
+            Integer snaps = vehicleSnapCount.getOrDefault(info.characterId, 0);
+            sb.append(String.format(
+                    "  VEH %s own=%d auth=%b sim=%b frozen=%b vis=%b grp=%s ctrl=%-24s occ=%s snaps2s=%d pos=(%.1f,%.1f,%.1f)\n",
+                    shortId(info.characterId), info.ownerPeerId, isAuthorityFor(info), v.isLocallySimulated(),
+                    v.isFreezeEnabled(), v.isVisible(),
+                    v.isInGroup(STREAMED_VEHICLE_GROUP) ? "STREAM" : "SCENE", ctrl, occStr, snaps,
+                    p.getX(), p.getY(), p.getZ()));
+        }
+        // Players/characters (the "can't see the other player" symptom).
+        for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
+            if (!(node instanceof com.openworld.character.Character c) || c.characterInfo == null) continue;
+            if (node instanceof com.openworld.carrier.vehicle.Vehicle) continue;
+            String ctrl = c.getController() == null ? "none" : c.getController().getClass().getSimpleName();
+            String seat = c.currentVehicleNode instanceof com.openworld.carrier.vehicle.Vehicle sv
+                    && sv.getCharacterInfo() != null ? shortId(sv.getCharacterInfo().characterId) : "-";
+            Vector3 p = c.getGlobalPosition();
+            sb.append(String.format("  CHR %s own=%d auth=%b vis=%b ctrl=%-18s seat=%s pos=(%.1f,%.1f,%.1f)\n",
+                    shortId(c.characterInfo.characterId), c.characterInfo.ownerPeerId,
+                    isAuthorityFor(c.characterInfo), c.isVisible(), ctrl, seat, p.getX(), p.getY(), p.getZ()));
+        }
+        sb.append("  totals: vehicles=").append(vehicleCount);
+        GD.print(sb.toString());
+        vehicleSnapCount.clear();
+    }
+
+    /**
+     * Client-side ghost reconcile (PLAN.md I3c). Streamed ambient traffic spawns/despawns constantly, so a
+     * late-join baseline spawn can land after the host already despawned that car (or a despawn is missed),
+     * leaving a puppet the host no longer simulates — it gets no snapshots and sits frozen at its spawn
+     * point (often sunk into the ground). The host broadcasts a snapshot for every live streamed car ~30×/s,
+     * so "no snapshot for {@link #STREAMED_VEHICLE_GHOST_TIMEOUT_MS}" reliably means the car is gone on the
+     * host. Free those; a car never yet seen (just spawned, snapshot not arrived) is seeded with a grace
+     * window instead of freed.
+     */
+    private void reconcileStreamedVehicles(int now) {
+        if (getTree() == null) return;
+        for (Node node : getTree().getNodesInGroup(STREAMED_VEHICLE_GROUP)) {
+            if (!(node instanceof com.openworld.carrier.vehicle.Vehicle v) || v.getCharacterInfo() == null
+                    || v.getCharacterInfo().characterId.isEmpty() || v.isQueuedForDeletion()) continue;
+            // A car the local player is driving (carjacked/entered) is ours — never reconcile it away.
+            if (isAuthorityFor(v.getCharacterInfo())) continue;
+            String id = v.getCharacterInfo().characterId;
+            Integer last = vehicleLastSnapshotMs.get(id);
+            if (last == null) { vehicleLastSnapshotMs.put(id, now); continue; }   // first sighting → grace
+            if (now - last > STREAMED_VEHICLE_GHOST_TIMEOUT_MS) {
+                vehicleLastSnapshotMs.remove(id);
+                GameManager gm = gameManager();
+                if (gm != null) gm.despawnReplicatedCharacter(id);
+                else v.queueFree();
+            }
+        }
+        // Drop bookkeeping for vehicles that no longer exist locally (freed elsewhere), so the map
+        // doesn't grow unbounded across the session's churn.
+        vehicleLastSnapshotMs.keySet().removeIf(id -> findControllableById(id) == null);
     }
 
     // ── Host-loss detection (client only) ─────────────────────────────────────
@@ -550,6 +662,10 @@ public class NetworkManager extends Node {
             // remove it now, before any spawn traffic can arrive, to avoid ending up
             // with two "self" bodies (one frozen by the authority check, one driven).
             removeLocalPrePlacedPlayer();
+            // Same rationale for scene-authored vehicles (PLAN.md netcode WS3): the host owns and
+            // re-supplies them via sendBaselineVehicleSpawns with the host's UUID, so drop our local
+            // copies (whose ids would diverge) before any spawn traffic arrives.
+            removeLocalPrePlacedVehicles();
             // CONNECT-event handshake trigger — replaces the MultiplayerAPI onConnectedToServer
             // signal that no longer fires (Phase 1 stopped assigning a MultiplayerPeer).
             // Reports our stable identity and (via the server's MSG_IDENTIFY reply) learns
@@ -575,6 +691,30 @@ public class NetworkManager extends Node {
                 player.queueFree();
                 return;
             }
+        }
+    }
+
+    /**
+     * Frees World.tscn's scene-authored vehicles on the connecting client (PLAN.md netcode WS3).
+     * Vehicle identity is now a host-stamped UUID; a client's locally-instanced scene car would carry
+     * a divergent UUID, so its enter/exit/snapshot/damage requests could not be resolved on the host
+     * (the NO_VEHICLE exit bug). The host re-supplies every vehicle through sendBaselineVehicleSpawns
+     * with the authoritative UUID, exactly as it does the pre-placed Player. Exit any occupant first so
+     * the vehicle's camera/occupant state tears down cleanly. Snapshot the group up front — queueFree
+     * mutates the live group during iteration.
+     */
+    private void removeLocalPrePlacedVehicles() {
+        if (getTree() == null) return;
+        java.util.List<com.openworld.carrier.vehicle.Vehicle> scene = new java.util.ArrayList<>();
+        for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
+            if (node instanceof com.openworld.carrier.vehicle.Vehicle v) scene.add(v);
+        }
+        for (com.openworld.carrier.vehicle.Vehicle v : scene) {
+            if (!GD.isInstanceValid(v)) continue;
+            if (v.getOccupant() != null) v.tryExit();
+            GD.print("NetworkManager: removing locally pre-placed Vehicle " + v.getName()
+                    + " — the host will re-supply it with its authoritative id");
+            v.queueFree();
         }
     }
 
@@ -654,7 +794,9 @@ public class NetworkManager extends Node {
                 }
                 case MSG_VEHICLE_SEAT_REQUEST -> handleVehicleSeatRequestMessage(senderPeerId, buf);
                 case MSG_VEHICLE_OCCUPANCY -> handleVehicleOccupancyMessage(senderPeerId, buf);
+                case MSG_VEHICLE_SPAWN -> handleVehicleSpawnMessage(senderPeerId, buf);
                 case MSG_WEAPON_SWITCH -> handleWeaponSwitchMessage(senderPeerId, buf);
+                case MSG_WAYPOINT -> handleWaypointMessage(senderPeerId, buf);
                 default -> GD.print("NetworkManager: dropping packet from " + senderPeerId
                         + " — unknown message tag " + msgType);
             }
@@ -800,12 +942,36 @@ public class NetworkManager extends Node {
             dropInvalid("vehicle_snapshot", "vehicle snapshot", senderPeerId);
             return;
         }
-        if (!(findControllableById(snap.vehicleId()) instanceof com.openworld.carrier.vehicle.Vehicle vehicle)) {
+        if (NET_DEBUG_VEHICLES)   // diagnostic: count received entries per id (incl. unknown), reset each dump
+            vehicleSnapCount.merge(snap.vehicleId(), 1, Integer::sum);
+        com.openworld.carrier.vehicle.Vehicle vehicle =
+                findControllableById(snap.vehicleId()) instanceof com.openworld.carrier.vehicle.Vehicle found
+                        ? found : null;
+        if (vehicle == null) {
             com.openworld.net.NetStats.increment("vehicle_snapshot_unknown");
-            logOnce("vsnap-unknown:" + snap.vehicleId(),
-                    "NetworkManager: receiving snapshots for unknown vehicle " + snap.vehicleId()
-                            + " — scene mismatch between peers?");
-            return;
+            // The snapshot stream is the source of truth for streamed vehicles (PLAN.md netcode WS1).
+            // A snapshot routinely outruns its reliable MSG_VEHICLE_SPAWN (spawn rides ENet channel 0,
+            // snapshots channel 2 — no cross-channel ordering) or arrives ahead of the late-join
+            // baseline. Rather than drop it (the old "unknown vehicle" flood), a CLIENT lazy-spawns the
+            // puppet here from the snapshot, so the car is born at a live transform and never sits sunk.
+            // Idempotent with the reliable spawn — spawnReplicatedVehicle guards duplicate ids; the
+            // puppet is born hidden (Vehicle.applyAuthorityState) until its first placement reveals it.
+            // yaw = 0: the body is invisible until the first interpolated snapshot supplies its full
+            // orientation, so the initial spawn yaw is never seen. The host never lazy-spawns (it owns
+            // the authoritative bodies); an unknown snapshot there is a genuine anomaly, so it still drops.
+            if (isServer()) return;
+            GameManager gm = gameManager();
+            if (gm != null) {
+                // ephemeral=true: only streamed traffic races its spawn this way. A persistent vehicle
+                // arrives via the reliable baseline (ephemeral=false), which then UPGRADES this body out
+                // of STREAMED_GROUP in spawnReplicatedVehicle — so a persistent car is never left
+                // reconcile-eligible just because its snapshot beat its baseline.
+                gm.spawnReplicatedVehicle(new NetMessageCodec.DecodedVehicleSpawn(
+                        snap.vehicleId(), "neutral", snap.position(), 0f, SERVER_PEER_ID, true));
+                vehicle = findControllableById(snap.vehicleId()) instanceof com.openworld.carrier.vehicle.Vehicle lazy
+                        ? lazy : null;
+            }
+            if (vehicle == null) return;   // container not ready — the next snapshot retries
         }
         // A despawned (wrecked) vehicle lingers in the tree until end of frame — don't
         // attach controllers to or place a node that is already being freed.
@@ -839,6 +1005,8 @@ public class NetworkManager extends Node {
         vehicle.applyAuthorityState();
         if (vehicle.getController() instanceof com.openworld.net.VehicleNetworkController vnc) {
             vnc.receiveSnapshot(snap, !isServer());
+            // Client: stamp the last-snapshot time so the ghost reconcile (above) keeps a live car alive.
+            if (!isServer()) vehicleLastSnapshotMs.put(snap.vehicleId(), nowMs());
         }
     }
 
@@ -1362,6 +1530,40 @@ public class NetworkManager extends Node {
         if (wc != null) wc.applyReplicatedWeaponSlot(sw.targetSlot());
     }
 
+    /**
+     * Owner → network: set/clear a player's GPS waypoint (I5). Mirrors {@link #sendWeaponSwitch} —
+     * host broadcasts to every client; a client reports to the host, which validates the owner and
+     * fans out. Low-frequency (on map click), so reliable. {@code pos} is ignored when
+     * {@code hasWaypoint} is false (a clear).
+     */
+    public void broadcastWaypoint(String characterId, boolean hasWaypoint, godot.core.Vector3 pos) {
+        if (!isNetworked()) return;
+        PackedByteArray frame = NetMessageCodec.encodeWaypoint(MSG_WAYPOINT, characterId, hasWaypoint, pos);
+        if (isServer()) broadcastMessage(frame, null);
+        else sendMessage(SERVER_PEER_ID, frame);
+    }
+
+    /** MSG_WAYPOINT (owner → host → all): update the WaypointStore on this peer; host validates owner + fans out. */
+    private void handleWaypointMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedWaypoint wp = NetMessageCodec.decodeWaypoint(buf);
+        if (!isValidIdentifier(wp.characterId())) {
+            dropInvalid("waypoint", "MSG_WAYPOINT", senderPeerId);
+            return;
+        }
+        if (isServer()) {
+            Character character = findCharacterById(wp.characterId());
+            if (character == null || character.characterInfo == null
+                    || character.characterInfo.ownerPeerId != senderPeerId) {
+                GD.print("NetworkManager: rejecting MSG_WAYPOINT from non-owner peer " + senderPeerId);
+                return;
+            }
+            broadcastMessage(NetMessageCodec.encodeWaypoint(MSG_WAYPOINT, wp.characterId(),
+                    wp.hasWaypoint(), wp.position()), senderPeerId);
+        }
+        if (wp.hasWaypoint()) com.openworld.game.WaypointStore.set(wp.characterId(), wp.position());
+        else com.openworld.game.WaypointStore.clear(wp.characterId());
+    }
+
     // ── Reliable elimination + inventory reconciliation (Round 11 N2) ─────────
     //
     // MSG_ELIMINATION: death was previously visible to non-authority peers only as an
@@ -1864,6 +2066,54 @@ public class NetworkManager extends Node {
     public void announceDespawn(String characterId) {
         if (!isServer()) return;
         broadcastMessage(NetMessageCodec.encodeDespawn(MSG_DESPAWN, characterId), null);
+    }
+
+    /**
+     * Server → all: announce a runtime-streamed ambient-traffic vehicle (I3b) so every client
+     * reconstructs it. The vehicle counterpart of {@link #announceSpawn} — used by
+     * {@code WorldZoneManager} when a zone streams traffic in. Despawn rides the generic
+     * {@link #announceDespawn} (vehicles share the "characters" id space).
+     */
+    public void announceVehicleSpawn(com.openworld.carrier.vehicle.Vehicle vehicle) {
+        if (!isServer() || vehicle == null || vehicle.getCharacterInfo() == null) return;
+        broadcastMessage(encodeVehicleSpawnFor(vehicle), null);
+    }
+
+    /** Server → one peer: late-join baseline of EVERY host vehicle — the vehicle counterpart of
+     *  {@link #sendBaselineSpawns}. Both runtime-streamed traffic AND scene-authored vehicles are sent:
+     *  a connecting client frees its local scene vehicles ({@link #removeLocalPrePlacedVehicles}, like the
+     *  pre-placed Player) so the host re-supplies them here carrying the host's UUID. That gives one shared
+     *  id per vehicle on every peer — without it a scene car's id diverged and exit requests hit NO_VEHICLE
+     *  (PLAN.md netcode WS3). Iterating the "characters" group covers both kinds in one pass. */
+    public void sendBaselineVehicleSpawns(int targetPeerId) {
+        if (!isServer() || getTree() == null) return;
+        for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
+            if (node instanceof com.openworld.carrier.vehicle.Vehicle v && v.getCharacterInfo() != null)
+                sendMessage(targetPeerId, encodeVehicleSpawnFor(v));
+        }
+    }
+
+    /** Client-side receiver for MSG_VEHICLE_SPAWN — host-only source (a client can't populate traffic),
+     *  mirrors {@link #handleSpawnMessage}. Delegates reconstruction to GameManager. */
+    private void handleVehicleSpawnMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedVehicleSpawn spawn = NetMessageCodec.decodeVehicleSpawn(buf);
+        if (!isValidIdentifier(spawn.vehicleId()) || !isFiniteVector3(spawn.position())) {
+            dropInvalid("vehicle_spawn", "MSG_VEHICLE_SPAWN", senderPeerId);
+            return;
+        }
+        if (isServer()) return;
+        GameManager manager = gameManager();
+        if (manager != null) manager.spawnReplicatedVehicle(spawn);
+    }
+
+    private PackedByteArray encodeVehicleSpawnFor(com.openworld.carrier.vehicle.Vehicle vehicle) {
+        CharacterInfo info = vehicle.getCharacterInfo();
+        // ephemeral = runtime-streamed ambient traffic (in STREAMED_GROUP on the host). Scene-placed /
+        // player-driven vehicles are persistent → not reconcile-eligible on the client (WS3 fix).
+        boolean ephemeral = vehicle.isInGroup(STREAMED_VEHICLE_GROUP);
+        return NetMessageCodec.encodeVehicleSpawn(MSG_VEHICLE_SPAWN, info.characterId, info.faction,
+                vehicle.getGlobalPosition(), (float) vehicle.getGlobalRotation().getY(), info.ownerPeerId,
+                ephemeral);
     }
 
     private PackedByteArray encodeSpawnFor(Character character) {

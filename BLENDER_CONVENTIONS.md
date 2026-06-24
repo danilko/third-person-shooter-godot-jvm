@@ -15,6 +15,7 @@ as the team agrees on it, and update the section with the actual decision.
 - [ ] Naming conventions for collision / navigation / gameplay markers
 - [ ] Zone-chunking size (must match `WorldZone` grid — see PLAN.md E1)
 - [x] Per-chunk navigation + chunk adjacency (abut, don't overlap) — see "Zone chunking" below
+- [x] Road / traffic-lane authoring (3.5 m lane modules + `VehicleRoute` lanes) — see "Roads & AI traffic" below
 - [ ] LOD / poly budget per region tier
 - [ ] Terrain strategy (heightmap vs. hand-modeled mesh)
 - [ ] Import / version pipeline
@@ -54,7 +55,7 @@ scenes afterward. Proposed scheme — confirm before the first real zone is buil
 | Empty named `spawn_<faction>_<n>` | `Marker3D` + `SpawnConfig` entry | E1 `WorldZone` |
 | Empty named `portal_<zoneA>_<zoneB>` | `PortalTrigger` (`Area3D`) | I2 `InteriorZone` |
 | Empty named `water_<id>` (bounding box) | `Area3D` in group `"water"` | I1 `SwimState` |
-| Empty named `waypoint_<route>_<n>` | NavAgent waypoint | I3 `VehicleAIController` |
+| Empty named `lane_<route>_<n>` | `Marker3D` child of a `VehicleRoute` | I3 traffic lane (pure pursuit, **not** navmesh) |
 | Empty named `zonetrigger_<beatId>` | `ZoneTrigger` (`Area3D`) | F3 |
 | Mesh suffixed `-col` | `CollisionShape3D` | all world geometry |
 
@@ -118,6 +119,94 @@ this document exists to avoid — lock the prefix scheme down first.
   the geometry chunks, which abut. There is **no** cross-zone connection/portal graph
   in E1 — zones are independent and AI roam freely between them (the zone box is a
   spawn + load/unload trigger, not a movement fence).
+
+## Roads & AI traffic lanes — DECIDED (I3)
+
+**Core rule: a navmesh does not drive cars.** A navmesh is a 2-D walkable polygon with no concept of
+lanes or direction, so it can keep a *pedestrian* on a surface but cannot make a car hold a lane or go
+one way. AI traffic (PLAN.md I3) therefore follows an explicit **directional lane path** — a
+`VehicleRoute` node whose ordered `Marker3D` children are the lane centerline, in travel order. The car
+uses **pure pursuit** (aims a fixed look-ahead ahead *along* the polyline), which keeps it in-lane and
+damps steering oscillation. The vehicle navmesh layer was removed; do **not** bake nav for roads.
+
+So a road has **two independent halves**, authored separately:
+
+### 1. Road mesh (Blender) — visuals + collision, on a grid
+- **Lane width = 3.5 m** (matches `SingleRoadMesh.tscn`, the placeholder block: 3.5 m wide × 1 m
+  forward). A 2-way street = two lanes = **7 m** wide.
+- **Block set — modular kit on a 7 m grid, +Z = forward, tiles centered on origin so they abut
+  (never overlap, same rule as zone chunks above).** Placeholder kit (replace each with a Blender
+  mesh of the same footprint): `resources/.../world/roads/`
+  - **`Road2LaneStraight.tscn`** — 7 m × 7 m 2-lane straight (center + edge lane lines). A 7 m
+    2-lane tile is the convention (easier than two single-lane rows, matches lane-marking textures);
+    `SingleRoadMesh` (a single 3.5 m lane) is kept only as the raw dimension reference.
+  - **`Road4Way.tscn`** — 7×7 cross intersection. **Carries an `IntersectionZone`** (right-of-way,
+    below) so dropping a 4-way tile brings its own traffic control.
+  - **`RoadCorner.tscn`** — 7×7 corner (for ring roads / 90° turns; the lane route defines the curve).
+  - *(Model a 3-way `T` tile the same way when needed.)*
+  - Each tile carries its **own collision** (StaticBody3D, layer 1) — the imported Blender mesh
+    replaces both the visual and that collision. Build a layout by placing tiles on the grid
+    (rotate straights 90° for the cross axis); see `RoadKitExample.tscn`.
+
+- **Junction right-of-way (I3b):** the `Road4Way` tile's `IntersectionZone` (an `Area3D`, `collision_mask`
+  = vehicle layer) arbitrates crossing — first AI vehicle to arrive holds the junction, others yield
+  until it clears (deadlock-free single-occupancy). Place a junction tile and the zone comes with it;
+  no per-junction wiring. (Concurrent non-conflicting movements + signals = the fuller lane-graph, still
+  future work.)
+
+### 2. Lane paths (`VehicleRoute`) — the directional graph
+- **One `VehicleRoute` per lane/direction.** Markers run along the lane centerline, **offset ±1.75 m**
+  from the road center, spaced ~5–15 m (denser on curves). Marker order = travel direction.
+- **Drive side = a content choice (tunable), not a code flag** — it's purely which side of the road
+  centerline each direction's lane markers sit on. To flip it, mirror the lane-offset sign on every
+  route; if a route generator lands later (I3b lane-graph), drive-side becomes one parameter there.
+- **Project default: drive on the LEFT** (the map targets a Japan-like setting — Japan is left-hand).
+  With +Z = north, +X = east, keep-left means: northbound uses the **west** lane (X = −1.75),
+  southbound the east lane (X = +1.75), eastbound the **north** lane (Z = +1.75), westbound the south
+  lane (Z = −1.75). The near-side (easy, no-oncoming-cross) turn is a **left** turn. `RoadKitExample`
+  is authored this way (`RouteTurnNB_WB` is the example left turn). For right-hand traffic, negate all
+  those offsets.
+- **2-way street** = two routes, opposite directions, one per lane.
+- **4-way junction** = one route per movement you actually want (through + each turn). Cars on different
+  routes cross at the center and brake for each other via a forward obstacle ray; **true right-of-way /
+  signals is the deferred lane-graph (PLAN.md I3b)** — until then, expect bumping at busy junctions.
+- `VehicleRoute.loop`: `true` = ring road (cars circulate); `false` = one-way through lane (car drives
+  to the last marker and stops — junction-to-junction chaining is I3b).
+- **Authoring source of truth = Blender empties** named `lane_<route>_<n>` (see the table above); an
+  `EditorScenePostImport` step groups them into `VehicleRoute` nodes. `RoadKitExample.tscn` is the
+  hand-built reference layout (4-way + 2-way ring); press **F4** in-game (DebugHarness) to drop one AI
+  car on every route to test a layout.
+
+> **Future (I3b):** a connected lane-graph (junction connectivity + right-of-way/signals), an optional
+> generator that builds `VehicleRoute`s from Blender curves/empties, and networked spawn replication of
+> streamed traffic.
+
+## Blender-authored world & thin Godot loader — DIRECTION (I6)
+
+**Goal: Blender is the source of truth for geometry *and* gameplay markers; Godot just imports +
+runs a thin post-import loader.** No hand-placement of roads/lanes/zones in `.tscn`.
+
+- **One conversion mechanism — `EditorScenePostImport`** (already referenced in "Naming conventions"):
+  a script on the imported scene walks it once and turns **named** Blender objects into the gameplay
+  nodes (the naming table above). Model + name in Blender → Godot auto-builds the node tree.
+- **Roads (mesh) via Geometry Nodes:** draw road **centerline curves**; a GN setup sweeps the tile
+  profile along them (surface, curbs, lane-line UVs). GN output exports fine — glTF/.blend export the
+  *evaluated* mesh. Godot imports baked mesh + bakes collision from `-col` proxies.
+- **Lanes via curves, not hundreds of markers (the scale win):** author **one centerline curve per
+  road**; a GN/Python step offsets ±1.75 m per lane and reverses the opposite direction — so
+  **drive-side is the offset sign, generated** (the tunable knob, see "Roads & AI traffic"). Bridge to
+  Godot: glTF doesn't round-trip curves, so bake each lane to **named empties** (`lane_<route>_<n>`,
+  exported as nodes) or a **JSON sidecar** of points; post-import builds a `VehicleRoute` per route.
+  *(Recommended code follow-up: let `VehicleRoute` optionally hold a baked `Curve3D` so one Blender
+  curve = one lane node — pure pursuit samples the curve. Do this with I6.)*
+- **Junctions / zones / spawns / water = named empties** → post-import creates the Area3D/marker nodes
+  (`intersection_<id>` → `Road4Way`'s `IntersectionZone`, `spawn_*`, `water_*`, `zone_*`, …).
+- **Stays Godot-side (don't move to Blender):** pedestrian `NavigationRegion3D` bake (scriptable on
+  import, but Godot's bake; lanes need none), all networking/gameplay logic (Java), final `.tscn`
+  assembly + AutoLoads, `WorldZone` streaming wiring (chunks exported per grid cell per "Zone chunking").
+- **Caveats:** glTF triangulates curves (use the empties/JSON bridge); GN can emit geometry for export
+  but not real empties (use a Python script for marker/curve data); the whole pipeline hinges on the
+  **stable naming scheme** — lock names before volume grows (the retrofit cost this doc exists to avoid).
 
 ## LOD / poly budget (Steam Deck target)
 

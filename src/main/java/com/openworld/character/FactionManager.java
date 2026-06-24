@@ -66,6 +66,18 @@ public class FactionManager extends Node {
         loadDefaultTable();
     }
 
+    /**
+     * Install a region's faction relationships (PLAN.md I4 {@code RegionConfig.factionTable}). Like
+     * {@link #loadDefaultTable}, the table is <b>duplicated</b> so runtime flips (betrayals) never write
+     * back into the authored {@code .tres}. A null argument restores the shipped defaults (a region with
+     * no custom rules), so leaving / entering a plain region cleanly reverts to baseline. Local per-peer
+     * (the same zone loads on every peer); runtime {@link #setRelationship} flips still replicate as before.
+     */
+    public void applyTable(FactionTable region) {
+        if (region != null) table = (FactionTable) region.duplicate(true);
+        else loadDefaultTable();
+    }
+
     @RegisterFunction
     @Override
     public void _exitTree() {

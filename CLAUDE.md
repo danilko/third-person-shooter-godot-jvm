@@ -774,6 +774,20 @@ AI input is world-space (set directly by the AI FSM).
   `Requested array size exceeds VM limit` (NOT a real memory shortage — bumping `org.gradle.jvmargs`
   does not help). Use a flat `Dictionary<String, String>` (compose keys, e.g. `"a>b"`) — the shape
   the codebase already uses (`MeshConfig.boneHitMultipliers`). This bit `FactionTable` (D3).
+- **A `.tscn`-embedded sub-resource is SHARED across every instantiation of that scene** (Godot
+  reference semantics), so an *identity/mutable* Resource embedded in a scene (e.g. the
+  `CharacterInfo` on `Character.tscn`/`AICharacter.tscn`/`Player.tscn`/`Vehicle.tscn`) is the **same
+  object** on every instance — mutating one (stamping a per-instance `characterId`) rewrites them all.
+  This collapsed all streamed traffic onto one id (stuck/can't-exit/ownership-migrates — I3b). **Own
+  identity in code, not the scene:** spawn code builds a fresh `new CharacterInfo()` before `addChild`,
+  and `Character._ready`/`Vehicle._ready` **privatize** a scene-supplied (empty-`characterId`) one via
+  `CharacterInfo.copyOf` before stamping the UUID. **Do NOT use `resource_local_to_scene = true` on a
+  JVM-scripted Resource** to force per-instance copies — its instantiate-time `duplicate()` reenters the
+  godot-kotlin-jvm `TransferContext` shared buffer and throws `Shared Buffer Error: JVM expected a LONG
+  but received a BOOL` (the int `ownerPeerId` read colliding with the bool `resource_local_to_scene`
+  write). Copy fields in plain Java instead. Read-only shared configs (`VehicleConfig`,
+  `AIBehaviorConfig`) are fine embedded/shared — never mutated per-instance, so leave them as-is (and
+  do not add `resource_local_to_scene` to them either).
 - `AimStayTimer` in `PlayerController.gatherInput`: uses `isActionJustReleased` (not `isActionPressed`)
   to start the timer so it starts exactly once and doesn't restart every frame after it ends.
 - `WeaponController.onWeaponFire` saves and restores `aimRay3D` rotation when applying spread;

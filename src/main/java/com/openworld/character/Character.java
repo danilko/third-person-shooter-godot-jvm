@@ -255,6 +255,13 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     public void _ready() {
         healthNode = (Health) getNode("Health");
         if (characterInfo == null) characterInfo = new CharacterInfo();
+        // Privatize a scene-embedded (shared) CharacterInfo before stamping our id — a .tscn
+        // sub-resource is shared across every instantiation of that scene unless copied, so
+        // stamping a per-instance UUID onto the shared object would rewrite every sibling's
+        // identity. An empty characterId means "scene-supplied" (code-spawned bodies stamp a
+        // UUID before addChild); copy it into a fresh instance first. See CharacterInfo.copyOf.
+        else if (characterInfo.characterId.isEmpty())
+            characterInfo = CharacterInfo.copyOf(characterInfo);
         if (characterInfo.characterId.isEmpty())
             characterInfo.characterId = UUID.randomUUID().toString();
         addToGroup(new StringName("characters"), false);

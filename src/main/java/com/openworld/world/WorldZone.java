@@ -49,5 +49,17 @@ public class WorldZone extends Resource {
     public VariantArray<NamedCharacterConfig> namedCharacters =
             new VariantArray<>(NamedCharacterConfig.class);
 
+    /** Ambient vehicle traffic groups streamed in on load (PLAN.md I3). */
+    @Export @RegisterProperty
+    public VariantArray<VehicleSpawnConfig> vehicleSpawnConfigs =
+            new VariantArray<>(VehicleSpawnConfig.class);
+
+    /**
+     * Optional region tuning (PLAN.md I4): faction rules, AI/vehicle density, LOD range, lighting/fog.
+     * Null = a plain zone that changes no ambience. {@code WorldZoneManager} scales this zone's spawn
+     * counts by the densities on load, and applies the global ambience when this becomes the active region.
+     */
+    @Export @RegisterProperty public RegionConfig regionConfig = null;
+
     public WorldZone() { super(); }
 }

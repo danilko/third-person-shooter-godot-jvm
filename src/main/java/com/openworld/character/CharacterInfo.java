@@ -40,4 +40,25 @@ public class CharacterInfo extends Resource {
      * also 1). The server stamps the real peer id at spawn time.
      */
     @RegisterProperty @Export public int ownerPeerId = 1;
+
+    /**
+     * A fresh instance carrying the same field values — used to <b>privatize</b> a
+     * scene-embedded CharacterInfo in {@code _ready()}. A Godot sub-resource embedded in a
+     * {@code .tscn} is <b>shared</b> across every instantiation of that scene unless
+     * {@code resource_local_to_scene = true}; stamping a per-instance id onto that shared
+     * object rewrites the identity of every sibling instance (the traffic-vehicle aliasing
+     * bug). We privatize by copying fields into a brand-new instance rather than relying on
+     * {@code resource_local_to_scene} (whose instantiate-time {@code duplicate()} reenters the
+     * godot-kotlin-jvm TransferContext and throws a {@code Shared Buffer Error}).
+     */
+    public static CharacterInfo copyOf(CharacterInfo src) {
+        CharacterInfo c = new CharacterInfo();
+        if (src != null) {
+            c.characterId = src.characterId;
+            c.displayName = src.displayName;
+            c.faction = src.faction;
+            c.ownerPeerId = src.ownerPeerId;
+        }
+        return c;
+    }
 }

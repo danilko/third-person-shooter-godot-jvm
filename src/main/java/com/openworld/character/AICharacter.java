@@ -102,8 +102,20 @@ public class AICharacter extends Character {
     //                      still runs as a separate node, decelerating the AI to rest.
     private static final float LOD_ACTIVE_DIST = 80.0f;
     private static final float LOD_FREEZE_DIST = 200.0f;
+    /**
+     * Process-global multiplier on the LOD distances, set by the active region (PLAN.md I4
+     * {@code RegionConfig.aiLodBias}): a rural region pushes it {@code > 1} (AI stay active farther
+     * out), a dense city {@code < 1} (tighter budget). 1.0 = the built-in defaults. Static because
+     * the active region is a world-wide property, not per-AI.
+     */
+    private static float lodDistanceBias = 1.0f;
     private double      lodTimer = 0.0;
     private AILodLevel  lodLevel = AILodLevel.ACTIVE;
+
+    /** Set the world-wide LOD-distance multiplier (WorldZoneManager.applyRegion). Clamped to a sane floor. */
+    public static void setLodDistanceBias(float bias) {
+        lodDistanceBias = bias > 0.1f ? bias : 0.1f;
+    }
 
     /** Current LOD tier — read by AIController (FSM gating) and AnimationController (pose gating). */
     public AILodLevel getLodLevel() { return lodLevel; }
@@ -112,8 +124,8 @@ public class AICharacter extends Character {
     public boolean isLodFrozen() { return lodLevel == AILodLevel.FROZEN; }
 
     private AILodLevel classifyLod(float nearestPlayer) {
-        if (nearestPlayer > LOD_FREEZE_DIST) return AILodLevel.FROZEN;
-        if (nearestPlayer > LOD_ACTIVE_DIST) return AILodLevel.PASSIVE;
+        if (nearestPlayer > LOD_FREEZE_DIST * lodDistanceBias) return AILodLevel.FROZEN;
+        if (nearestPlayer > LOD_ACTIVE_DIST * lodDistanceBias) return AILodLevel.PASSIVE;
         return AILodLevel.ACTIVE;
     }
 
@@ -723,6 +735,26 @@ public class AICharacter extends Character {
         // signal only carries the amount, so we use currentTarget (the AI's believed attacker) — set
         // when it already sees the shooter, which is the common "shoot one, the squad turns" case.
         if (currentTarget != null) broadcastToSquad(currentTarget, currentTarget.getGlobalPosition());
+    }
+
+    /**
+     * React to being carjacked (PLAN.md I3c) — called host-side on the ejected driver right after it is
+     * unseated and back on foot. {@code AIBehaviorConfig.reactToCarjack} decides the response:
+     * <ul>
+     *   <li>{@code FLEE} (default, civilian) — panic and run from the carjacker ({@link FleeState}).
+     *   <li>{@code FIGHT} (gang/hostile) — flip this body's allegiance to {@code ENEMY} (a targeted,
+     *       host-authoritative faction swap replicated over {@code WORLD_EVENT_FACTION_SWAP}) and engage
+     *       the carjacker via the normal Attack/Chase path; squad mates can join for free.
+     * </ul>
+     */
+    public void reactToCarjack(Character carjacker) {
+        if (carjacker == null || !(controller instanceof AIController ai)) return;
+        if ("FIGHT".equalsIgnoreCase(getBehaviorConfig().reactToCarjack)) {
+            setFaction(Faction.ENEMY);
+            adoptSquadTarget(carjacker, carjacker.getGlobalPosition());
+        } else {
+            ai.forceFlee(carjacker.getGlobalPosition());
+        }
     }
 
     @RegisterFunction
