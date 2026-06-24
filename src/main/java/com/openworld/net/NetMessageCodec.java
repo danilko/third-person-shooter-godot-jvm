@@ -331,6 +331,27 @@ public final class NetMessageCodec {
     /** Carrier for a decoded MSG_OWNERSHIP body — the entity whose authority is migrating + its new owner peer. */
     public record DecodedOwnership(String characterId, int newOwnerPeerId) { }
 
+    // ── MSG_WAYPOINT (I5 — owner→host→all reliable GPS waypoint set/clear) ────────────────────────
+    public static PackedByteArray encodeWaypoint(int msgType, String characterId, boolean hasWaypoint,
+            Vector3 pos) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(characterId);
+        buf.put8(hasWaypoint ? 1 : 0);
+        putVector3(buf, hasWaypoint && pos != null ? pos : Vector3.Companion.getZERO());
+        return buf.getDataArray();
+    }
+
+    public static DecodedWaypoint decodeWaypoint(StreamPeerBuffer buf) {
+        String characterId = buf.getUtf8String();
+        boolean hasWaypoint = buf.getU8() != 0;
+        Vector3 pos = getVector3(buf);
+        return new DecodedWaypoint(characterId, hasWaypoint, pos);
+    }
+
+    /** Carrier for a decoded MSG_WAYPOINT body — whose waypoint, whether it's set, and where. */
+    public record DecodedWaypoint(String characterId, boolean hasWaypoint, Vector3 position) { }
+
     // ── MSG_WORLD_EVENT (host → all, reliable world-state seam) ───────────────
     //
     // [tag u8][eventType u8][key utf8][value float][argCount u8][arg utf8]...
@@ -824,6 +845,51 @@ public final class NetMessageCodec {
     /** Carrier for a decoded MSG_VEHICLE_OCCUPANCY — the host's authoritative seat state (occupant empty = vacant). */
     public record DecodedVehicleOccupancy(String vehicleId, String occupantCharacterId,
             int ownerPeerId, boolean entering) { }
+
+    // ── MSG_VEHICLE_SPAWN (host → all, reliable — streamed ambient traffic, I3b) ──
+    //
+    // [tag u8][vehicleId utf8][faction utf8][position 3×float][yaw float][ownerPeerId i32][ephemeral u8]
+    //
+    // The counterpart of MSG_SPAWN for replicated vehicles. ownerPeerId is the host (for ambient
+    // traffic and idle scene cars), so a client resolves isAuthorityFor=false and attaches a
+    // VehicleNetworkController; the existing MSG_VEHICLE_SNAPSHOT_BATCH then drives it. yaw is the
+    // initial facing (the snapshot corrects orientation within a tick).
+    //
+    // `ephemeral` is the persistent/ephemeral split (PLAN.md netcode WS3 fix): true ONLY for
+    // runtime-streamed ambient traffic (WorldZoneManager), which the client tags into STREAMED_GROUP
+    // so the ghost-reconcile may free it on a snapshot-timeout (missed despawn cleanup). Scene-placed
+    // / player-driven vehicles re-supplied via the late-join baseline are ephemeral=false: they are
+    // NEVER reconcile-eligible, so a momentary snapshot gap (e.g. traffic-volume pressure) can never
+    // despawn a persistent car out from under a non-driving peer. The scene is the single bounded
+    // Vehicle.tscn (no wire path, same anti-arbitrary-resource rationale as MSG_SPAWN's sceneSelector).
+
+    public static PackedByteArray encodeVehicleSpawn(int msgType, String vehicleId, String faction,
+            Vector3 position, float yaw, int ownerPeerId, boolean ephemeral) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(vehicleId);
+        buf.putUtf8String(faction);
+        putVector3(buf, position);
+        buf.putFloat(yaw);
+        buf.put32(ownerPeerId);
+        buf.put8(ephemeral ? 1 : 0);
+        return buf.getDataArray();
+    }
+
+    /** Decodes the body following the tag byte. Caller must have already consumed it. */
+    public static DecodedVehicleSpawn decodeVehicleSpawn(StreamPeerBuffer buf) {
+        String vehicleId = buf.getUtf8String();
+        String faction = buf.getUtf8String();
+        Vector3 position = getVector3(buf);
+        float yaw = buf.getFloat();
+        int ownerPeerId = buf.get32();
+        boolean ephemeral = buf.get8() != 0;
+        return new DecodedVehicleSpawn(vehicleId, faction, position, yaw, ownerPeerId, ephemeral);
+    }
+
+    /** Carrier for a decoded MSG_VEHICLE_SPAWN — matches GameManager.spawnReplicatedVehicle's reconstruction shape. */
+    public record DecodedVehicleSpawn(String vehicleId, String faction, Vector3 position,
+            float yaw, int ownerPeerId, boolean ephemeral) { }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

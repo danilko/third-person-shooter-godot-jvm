@@ -101,6 +101,16 @@ public class AIController extends Controller {
         transitionTo(initialState());
     }
 
+    /**
+     * Force the FSM straight into {@link FleeState}, running from a threat at {@code threatPos}
+     * (PLAN.md I3c — an evicted civilian driver panicking away from the carjacker). FleeState reads
+     * the last-known position for its flee direction, so we seed it here.
+     */
+    public void forceFlee(Vector3 threatPos) {
+        if (threatPos != null) lastKnownTargetPosition = new Vector3(threatPos);
+        transitionTo(FleeState.INSTANCE);
+    }
+
     // ── Memory / timers ───────────────────────────────────────────────────────
     // (moved from AICharacter — these are "what the AI remembers", not body capability)
 

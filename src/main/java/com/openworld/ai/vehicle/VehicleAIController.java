@@ -1,79 +1,203 @@
 package com.openworld.ai.vehicle;
 
+import com.openworld.control.Controllable;
 import com.openworld.control.Controller;
 import com.openworld.control.UserCommand;
+import com.openworld.carrier.vehicle.Vehicle;
+import com.openworld.world.IntersectionZone;
+import com.openworld.world.LaneGraph;
+import com.openworld.world.VehicleRoute;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
-import godot.api.NavigationAgent3D;
 import godot.api.Node;
+import godot.api.RayCast3D;
 import godot.core.Vector3;
-import com.openworld.ai.AIController;
-import com.openworld.carrier.vehicle.Vehicle;
-import com.openworld.control.CharacterController;
+import godot.global.GD;
+
+import java.util.List;
 
 /**
- * AI controller for VehicleBody — navigates toward waypoints set at runtime.
+ * AI brain for an ambient-traffic {@link Vehicle} (PLAN.md I3 / I3b).
  *
- * Design: stateless waypoint follower using NavigationAgent3D.
- * External systems (spawner, game objective) set the navigation target via
- * setNavigationTarget(Vector3) and the controller steers toward it.
+ * <p>Runs a minimal FSM ({@link CruiseState} ⇄ {@link BrakeState}) in {@link #gatherInput}, mirroring
+ * the on-foot {@link com.openworld.ai.AIController}. The controller holds all mutable memory (state +
+ * current lane + progress along it); the singleton states are stateless.
  *
- * Steering: proportional — project the vector-to-next-point onto the vehicle's
- * right axis. Positive dot → target is to the right → steer right (positive).
+ * <p><b>Lane following.</b> The car follows its assigned {@link VehicleRoute} (a directional lane) over
+ * that lane's <i>smoothed, lane-offset</i> path, tracked by <b>arc length</b> (monotonic progress, not a
+ * global nearest-point search — that snapped at corners). Pure pursuit aims a speed-proportional
+ * look-ahead ahead along the path. Steering is emitted as a <b>target wheel angle</b>
+ * ({@code UserCommand.steerToTarget}) so the wheel converges and holds it instead of winding the rate
+ * integrator — the cornering-wobble fix.
  *
- * Future: replace with a multi-state FSM (patrol, chase, retreat) analogous
- * to the on-foot CharacterController / AIController hierarchy.
+ * <p><b>Junctions / recycling.</b> At a lane's end the car continues via the geometry-derived
+ * {@link LaneGraph} (or the lane's explicit {@code nextRoutes}); with no successor it follows the lane's
+ * {@code endBehavior} — U-turn (drive back) or despawn (the zone respawns one elsewhere).
  */
 @RegisterClass(className = "VehicleAIController")
 public class VehicleAIController extends Controller {
 
-    /** Throttle fraction applied when driving toward the target (0–1). */
-    @RegisterProperty @Export public float cruiseThrottle = 0.6f;
+    /** Throttle fraction applied while cruising along the lane (0–1). */
+    @RegisterProperty @Export public float cruiseThrottle = 0.4f;
 
-    /** Distance from waypoint considered "arrived" — NavigationAgent3D stops. */
-    @RegisterProperty @Export public float arrivalThreshold = 3.0f;
+    /** Speed-proportional look-ahead: {@code clamp(lookaheadMin + speed·lookaheadSpeedGain, …, lookaheadMax)}. */
+    @RegisterProperty @Export public float lookaheadMin = 4.0f;
+    @RegisterProperty @Export public float lookaheadSpeedGain = 0.5f;
+    @RegisterProperty @Export public float lookaheadMax = 14.0f;
 
-    private Vehicle        vehicleBody;
-    private NavigationAgent3D navAgent;
+    /** How far beyond the steer look-ahead to probe the lane for an upcoming bend (m) — corner anticipation. */
+    @RegisterProperty @Export public float curvatureProbe = 5.0f;
 
-    @RegisterFunction
-    @Override
-    public void _ready() {
-        Node owner = getOwner();
-        if (owner instanceof Vehicle v) {
-            vehicleBody = v;
-        }
-        if (vehicleBody != null) {
-            Node nav = vehicleBody.getNodeOrNull("NavigationAgent3D");
-            if (nav instanceof NavigationAgent3D n) navAgent = n;
-        }
+    /** Heading-error → steer-angle gain. The car commands a target wheel angle ∝ steerGain·sin(error),
+     *  saturating to full lock; higher = sharper turn-in. */
+    @RegisterProperty @Export public float steerGain = 2.5f;
+
+    /** How much to cut throttle in turns (0 = never, 1 = stop in a hard turn). */
+    @RegisterProperty @Export public float turnSlowdown = 0.7f;
+
+    private static final double END_THRESHOLD = 3.0;   // m from the lane end = "arrived"
+
+    private Vehicle   vehicleBody;
+    private RayCast3D obstacleRay;
+    private boolean   resolved = false;
+
+    private VehicleAIState currentState;
+    private VehicleRoute   route;
+    private IntersectionZone currentIntersection;   // junction we're inside, if any (I3b right-of-way)
+    private boolean finished = false;               // reached a dead-end lane → zone despawns this car
+
+    private double  routeProgress = 0.0;            // arc length along the current lane (monotonic)
+    private boolean progressInit  = false;
+
+    // ── Configuration (set by the spawner before the first tick) ───────────────
+
+    /** Assign the lane this vehicle follows (resets progress + finished). */
+    public void setRoute(VehicleRoute route) {
+        this.route = route;
+        finished = false;
+        progressInit = false;
+        routeProgress = 0.0;
     }
 
-    /** Point the vehicle toward this world-space position. */
-    public void setNavigationTarget(Vector3 target) {
-        if (navAgent != null) navAgent.setTargetPosition(target);
+    public VehicleRoute getRoute() { return route; }
+
+    /**
+     * At a lane end, continue onto a connected lane (geometry {@link LaneGraph}, or the lane's explicit
+     * {@code nextRoutes}); with no successor, apply the lane's {@code endBehavior} — U-turn back, or mark
+     * {@link #isFinished()} (despawn). Returns true if a new lane was adopted (keep driving).
+     */
+    public boolean advanceToNextRoute() {
+        if (finished || route == null) return false;
+
+        VehicleRoute next = route.pickNextRoute();   // explicit override first
+        if (next == null) {
+            List<VehicleRoute> succ = LaneGraph.successorsOf(route);
+            if (!succ.isEmpty())
+                next = succ.get(Math.min((int) Math.floor(GD.randf() * succ.size()), succ.size() - 1));
+        }
+        if (next != null) { setRoute(next); return true; }
+
+        if (VehicleRoute.END_UTURN.equals(route.endBehavior)) {
+            VehicleRoute back = route.resolveRoute(route.returnRoute);
+            if (back == null) back = LaneGraph.reverseOf(route);
+            if (back != null) { setRoute(back); return true; }
+        }
+        finished = true;   // END_DESPAWN, or no reverse lane authored
+        return false;
     }
+
+    /** True once this car reached a dead-end lane with no continuation — the zone reclaims it. */
+    public boolean isFinished() { return finished; }
+
+    // ── FSM tick ───────────────────────────────────────────────────────────────
 
     @Override
     public UserCommand gatherInput(double delta) {
         UserCommand cmd = new UserCommand();
+        resolveBody();
+        if (vehicleBody == null) return cmd;
 
-        if (vehicleBody == null || navAgent == null) return cmd;
-        if (navAgent.isNavigationFinished()) return cmd;
+        if (currentState == null) transitionTo(CruiseState.INSTANCE);
 
-        Vector3 nextPos = navAgent.getNextPathPosition();
-        Vector3 toNext  = nextPos.minus(vehicleBody.getGlobalPosition());
-
-        // Steering: dot of toNext direction against vehicle right axis.
-        // Right axis = column 0 of the basis (local +X in Godot's convention).
-        Vector3 right   = vehicleBody.getGlobalTransform().getBasis().getColumn(0);
-        float steerDot  = (float) toNext.normalized().dot(right);
-
-        cmd.motor = cruiseThrottle;
-        cmd.steering = Math.max(-1f, Math.min(1f, steerDot));
-
+        VehicleAIState next = currentState.update(vehicleBody, this, cmd, delta);
+        if (next != currentState) transitionTo(next);
         return cmd;
+    }
+
+    private void transitionTo(VehicleAIState next) {
+        if (currentState != null) currentState.exit(vehicleBody, this);
+        currentState = next;
+        currentState.enter(vehicleBody, this);
+    }
+
+    // ── Arc-length lane following ────────────────────────────────────────────────
+
+    /** Advance the monotonic progress by re-projecting the body locally onto the lane (no global snap). */
+    public void updateProgress(Vector3 pos) {
+        if (route == null) return;
+        double window = steeringLookahead() + 8.0;
+        routeProgress = route.lengthAtNearest(pos, progressInit ? routeProgress : -1.0, window);
+        progressInit = true;
+    }
+
+    /** Pure-pursuit steer target: a point one look-ahead ahead of current progress along the lane. */
+    public Vector3 lookaheadPoint() {
+        return route == null ? null : route.pointAtLength(routeProgress + steeringLookahead());
+    }
+
+    /** A point farther still along the lane — used to anticipate an upcoming corner. */
+    public Vector3 curvaturePoint() {
+        return route == null ? null : route.pointAtLength(routeProgress + steeringLookahead() + curvatureProbe);
+    }
+
+    /** True when this is a one-way lane and progress has reached its end. */
+    public boolean atRouteEnd() {
+        return route != null && !route.isLoop() && routeProgress >= route.total() - END_THRESHOLD;
+    }
+
+    /** Horizontal (XZ) speed of the body in m/s — drives the speed-proportional look-ahead. */
+    public float currentSpeed() {
+        if (vehicleBody == null) return 0f;
+        Vector3 v = vehicleBody.getLinearVelocity();
+        return (float) Math.sqrt(v.getX() * v.getX() + v.getZ() * v.getZ());
+    }
+
+    /** The current speed-proportional steering look-ahead distance (m), clamped to the configured range. */
+    public float steeringLookahead() {
+        float look = lookaheadMin + currentSpeed() * lookaheadSpeedGain;
+        return Math.max(lookaheadMin, Math.min(lookaheadMax, look));
+    }
+
+    // ── Sensing ─────────────────────────────────────────────────────────────────
+
+    /** True when the forward obstacle ray is hitting something within its look-ahead length. */
+    public boolean isPathBlocked() {
+        return obstacleRay != null && obstacleRay.isColliding();
+    }
+
+    // ── Junction right-of-way (I3b) ──────────────────────────────────────────────
+
+    public void enterIntersection(IntersectionZone z) { currentIntersection = z; }
+    public void exitIntersection(IntersectionZone z) { if (currentIntersection == z) currentIntersection = null; }
+
+    /** True when we are in a junction another vehicle currently holds — yield (brake) until clear. */
+    public boolean shouldYield() {
+        return currentIntersection != null && vehicleBody != null && currentIntersection.blocks(vehicleBody);
+    }
+
+    // ── Body / hardware resolution ───────────────────────────────────────────────
+
+    private void resolveBody() {
+        if (resolved) return;
+        // getControllable() (parent-based), NOT getOwner(): runtime-attached controllers have no
+        // scene owner (see Controller.isAuthority comment), so getOwner() would be null here.
+        Controllable c = getControllable();
+        if (c instanceof Vehicle v) {
+            vehicleBody = v;
+            Node ray = v.getNodeOrNull("ObstacleRay");
+            if (ray instanceof RayCast3D r) obstacleRay = r;
+            resolved = true;
+        }
     }
 }

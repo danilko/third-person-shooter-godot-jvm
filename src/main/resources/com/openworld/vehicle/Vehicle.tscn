@@ -66,7 +66,7 @@ albedo_color = Color(0.93040425, 0.083007835, 3.85046e-07, 1)
 
 [node name="Vehicle" type="RigidBody3D" unique_id=1625753015]
 collision_layer = 16
-collision_mask = 3
+collision_mask = 19
 mass = 1200.0
 physics_material_override = SubResource("PhysicsMaterial_x00le")
 linear_damp_mode = 1
@@ -157,6 +157,11 @@ collision_mask = 25
 
 [node name="VehicleWeaponMount" type="Marker3D" parent="." unique_id=1379134567]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -1.3520434)
+
+[node name="ObstacleRay" type="RayCast3D" parent="." unique_id=1379134596]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -1.6)
+target_position = Vector3(0, 0, -7)
+collision_mask = 18
 
 [node name="Nameplate" parent="." unique_id=1379134590 instance=ExtResource("8_np")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)

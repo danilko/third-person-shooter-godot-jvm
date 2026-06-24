@@ -343,10 +343,17 @@ public class VehicleWheel extends RayCast3D {
         }
     }
 
-    public void applyWheelSteering(float delta, float steering) {
+    public void applyWheelSteering(float delta, float steering, boolean steerToTarget) {
         if (!isSteer) return;
         Vector3 rotation = getRotation();
-        if (steering != 0) {
+        if (steerToTarget) {
+            // AI: `steering` is a normalized TARGET angle [-1,1]; converge the wheel to it (and hold
+            // it) at the steer rate. Unlike the rate model below, this settles at any intermediate
+            // angle instead of winding to full lock — the cornering-wobble fix (I3b).
+            float target = (float) GD.clamp(steering, -1f, 1f) * tireMaxTurnMaxRad;  // min == -max
+            rotation.setY((float) GD.moveToward(rotation.getY(), target, cfg.tireMaxTurnSpeed * delta));
+        } else if (steering != 0) {
+            // Player: `steering` is a turn rate the wheel integrates (hold-to-turn).
             float rotY = (float) GD.clamp(rotation.getY() + steering * delta,
                                           tireMaxTurnMinRad, tireMaxTurnMaxRad);
             rotation.setY(rotY);

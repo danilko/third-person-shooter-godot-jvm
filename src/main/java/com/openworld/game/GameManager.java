@@ -141,6 +141,7 @@ public class GameManager extends Node {
     @Override
     public void _exitTree() {
         IconRegistry.clear();
+        WaypointStore.clearAll();   // I5 — hygiene + clean restart (Vector3 values, but clear anyway)
     }
 
     // ── State transitions ─────────────────────────────────────────────────────
@@ -257,6 +258,7 @@ public class GameManager extends Node {
 
     private static final String PLAYER_SCENE_PATH = "res://src/main/resources/com/openworld/character/Player.tscn";
     private static final String AI_SCENE_PATH = "res://src/main/resources/com/openworld/character/AICharacter.tscn";
+    private static final String VEHICLE_SCENE_PATH = "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn";
     private static final StringName CHARACTERS_GROUP = new StringName("characters");
 
     /** Server-side: a peer connected at the transport level. Real handling waits for identifyPeer. */
@@ -308,6 +310,7 @@ public class GameManager extends Node {
             // Pickups after spawns: the holder bodies must exist before their pickup events.
             if (net != null) {
                 net.sendBaselineSpawns(peerId);
+                net.sendBaselineVehicleSpawns(peerId);   // streamed traffic bodies before their occupancy (I3b)
                 net.sendBaselinePickups(peerId);
                 // Inventories last: bodies exist and pickup events have applied, so the
                 // manifests only have to cover what events never carried (Round 11 N2).
@@ -328,6 +331,7 @@ public class GameManager extends Node {
         // spawns: the holder bodies must exist on the joiner before their pickup events.
         if (net != null) {
             net.sendBaselineSpawns(peerId);
+            net.sendBaselineVehicleSpawns(peerId);   // streamed traffic bodies before their occupancy (I3b)
             net.sendBaselinePickups(peerId);
             net.sendBaselineInventories(peerId);   // after spawns + pickups — see rejoin branch
             net.sendBaselineVehicleOccupancy(peerId);   // occupied vehicles after spawns (N3)
@@ -483,6 +487,15 @@ public class GameManager extends Node {
 
     // ── Host-arbitrated vehicle seats (Round 11 N3) ───────────────────────────
 
+    // Deferred vehicle occupancy (PLAN.md netcode WS2): a MSG_VEHICLE_OCCUPANCY can arrive before the
+    // vehicle and/or occupant body has spawned on this peer (cross-ordering with the spawn/baseline
+    // stream — worse now that streamed cars lazy-spawn from snapshots). The latest desired seat per
+    // vehicle is parked here and re-applied the instant both bodies exist (flushed from
+    // spawnReplicatedVehicle / spawnReplicatedCharacter), so a driver never lingers pinned-but-unseated
+    // in a standing pose waiting on the ~1 Hz occupancy sweep.
+    private final java.util.Map<String, PendingSeat> pendingSeats = new java.util.HashMap<>();
+    private record PendingSeat(String occupantCharacterId, int ownerPeerId, boolean entering) {}
+
     /** Resolves a vehicleId to its live Vehicle via the "characters" group — mirrors findCharacterById. */
     private com.openworld.carrier.vehicle.Vehicle findVehicleById(String vehicleId) {
         if (getTree() == null) return null;
@@ -508,6 +521,17 @@ public class GameManager extends Node {
         Character character = findCharacterById(characterId);
         boolean senderOwns = character != null && character.characterInfo != null
                 && character.characterInfo.ownerPeerId == senderPeerId;
+
+        // PLAN.md I3c — carjack: a player asking to enter a car driven by an AI evicts that AI driver
+        // first (host-authoritative), reacts it (flee/fight), and drops the lane-follow brain so the
+        // seat is now empty and player-drivable; the normal enter policy below then grants it.
+        if (entering && vehicle != null && vehicle.isAiOccupied()
+                && character instanceof Player && senderOwns) {
+            Character ejected = vehicle.getOccupant();
+            forceVehicleExit(vehicle);
+            vehicle.removeAiDriverBrain();
+            if (ejected instanceof AICharacter ai) ai.reactToCarjack(character);
+        }
 
         com.openworld.net.VehicleSeatPolicy.Verdict verdict;
         if (entering) {
@@ -576,6 +600,25 @@ public class GameManager extends Node {
     }
 
     /**
+     * Host/SP: seat a freshly-spawned AI driver into a streamed traffic car (PLAN.md I3c). The car
+     * keeps its own {@link com.openworld.ai.vehicle.VehicleAIController} (Design B) — {@code tryEnter}'s
+     * guard leaves it driving and seats the AI as a visible, inert (drive-state physics-off) passenger.
+     * The seat replicates to clients via the ~1 Hz occupancy sweep + late-join baseline; we also fire one
+     * immediate occupancy broadcast so the driver appears promptly. Streamed traffic is host-owned, so
+     * the vehicle's {@code ownerPeerId} is already the server.
+     */
+    public void seatTrafficDriver(Vehicle vehicle, AICharacter driver) {
+        if (vehicle == null || driver == null || vehicle.getOccupant() != null) return;
+        vehicle.tryEnter(driver);
+        NetworkManager net = getNetworkManager();
+        if (net != null && net.isNetworked() && net.isServer()
+                && vehicle.getCharacterInfo() != null && driver.characterInfo != null) {
+            net.broadcastVehicleOccupancy(vehicle.getCharacterInfo().characterId,
+                    driver.characterInfo.characterId, vehicle.getCharacterInfo().ownerPeerId, true);
+        }
+    }
+
+    /**
      * Client-side MSG_VEHICLE_OCCUPANCY apply — every peer (including the requester) runs the
      * seat change locally from the host's authoritative event. Idempotent on purpose: the ~1 Hz
      * occupancy sweep re-sends current state as a self-heal backstop, so re-applying what this
@@ -583,20 +626,27 @@ public class GameManager extends Node {
      */
     public void applyVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId, boolean entering) {
         com.openworld.carrier.vehicle.Vehicle vehicle = findVehicleById(vehicleId);
-        if (vehicle == null || vehicle.getCharacterInfo() == null) {
-            GD.print("GameManager: VEHICLE_OCCUPANCY apply failed — no vehicle '" + vehicleId + "'");
+        Character character = entering ? findCharacterById(occupantCharacterId) : null;
+
+        // Defer until BOTH bodies exist on this peer (WS2). Park the latest desired seat and re-apply
+        // from spawnReplicatedVehicle / spawnReplicatedCharacter — deterministic, not the ~1 Hz sweep.
+        // Converge ownership eagerly if the vehicle is already present so its authority/freeze is right
+        // even before the occupant arrives.
+        if (vehicle == null || vehicle.getCharacterInfo() == null || (entering && character == null)) {
+            if (vehicle != null && vehicle.getCharacterInfo() != null) {
+                vehicle.getCharacterInfo().ownerPeerId = ownerPeerId;
+                vehicle.applyAuthorityState();
+            }
+            pendingSeats.put(vehicleId, new PendingSeat(occupantCharacterId, ownerPeerId, entering));
+            GD.print("GameManager: VEHICLE_OCCUPANCY deferred for '" + vehicleId + "' — waiting on "
+                    + (vehicle == null ? "vehicle" : "occupant " + occupantCharacterId) + " spawn");
             return;
         }
+        pendingSeats.remove(vehicleId);   // a resolved apply supersedes any parked request
+
         vehicle.getCharacterInfo().ownerPeerId = ownerPeerId;
         if (entering) {
-            Character character = findCharacterById(occupantCharacterId);
-            if (character == null) {
-                // Body not spawned here yet (cross-ordering with a spawn we haven't applied) —
-                // ownership still converged above; the occupancy sweep retries within ~1 s.
-                GD.print("GameManager: VEHICLE_OCCUPANCY enter for unknown character "
-                        + occupantCharacterId + " — waiting for spawn (sweep will retry)");
-                vehicle.applyAuthorityState();
-            } else if (vehicle.getOccupant() != character) {
+            if (vehicle.getOccupant() != character) {
                 if (vehicle.getOccupant() != null) vehicle.tryExit();   // diverged seat — self-heal
                 // Authority first (see processVehicleSeatRequest): on the requester this frees
                 // the puppet controller — seeding coast velocities — before the live hot-swap.
@@ -608,6 +658,20 @@ public class GameManager extends Node {
         } else {
             if (vehicle.getOccupant() != null) vehicle.tryExit();
             vehicle.applyAuthorityState();
+        }
+    }
+
+    /**
+     * Re-apply parked occupancy whose bodies have now spawned (WS2). Called after any replicated
+     * vehicle/character spawn. Iterates a copy — applyVehicleOccupancy mutates pendingSeats (removes on
+     * a resolved apply, re-parks while still unresolved).
+     */
+    private void retryPendingSeats() {
+        if (pendingSeats.isEmpty()) return;
+        for (java.util.Map.Entry<String, PendingSeat> e :
+                new java.util.ArrayList<>(pendingSeats.entrySet())) {
+            PendingSeat seat = e.getValue();
+            applyVehicleOccupancy(e.getKey(), seat.occupantCharacterId(), seat.ownerPeerId(), seat.entering());
         }
     }
 
@@ -722,11 +786,70 @@ public class GameManager extends Node {
         }
         GD.print("GameManager: spawned replicated character " + spawn.characterId()
                 + " (scene selector " + spawn.sceneSelector() + ")");
+        retryPendingSeats();   // this body may be a driver a deferred occupancy was waiting on (WS2)
+    }
+
+    /**
+     * Client-side: instantiate a host-announced streamed traffic vehicle (I3b) — MSG_VEHICLE_SPAWN's
+     * receiving side. Mirrors {@link #spawnReplicatedCharacter}: the scene is the single bounded
+     * Vehicle.tscn (no wire path). We are never authority for it (ownerPeerId = host), so
+     * {@code Vehicle.applyAuthorityState} attaches a {@code VehicleNetworkController} and freezes the
+     * body; the existing MSG_VEHICLE_SNAPSHOT_BATCH then drives it. Tagged into {@code STREAMED_GROUP}
+     * so a later late-join baseline / despawn treats it like the host's.
+     */
+    public void spawnReplicatedVehicle(NetMessageCodec.DecodedVehicleSpawn spawn) {
+        if (getTree() == null) return;
+        StringName streamedGroup = new StringName(Vehicle.STREAMED_GROUP);
+        for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {   // already present? idempotent
+            if (node instanceof Controllable c && c.getCharacterInfo() != null
+                    && spawn.vehicleId().equals(c.getCharacterInfo().characterId)) {
+                // Idempotent — but reconcile the persistent/ephemeral flag (WS3 fix): a snapshot can
+                // lazy-spawn a body as ephemeral before its reliable baseline (ephemeral=false) lands.
+                // When the authoritative baseline says persistent, UPGRADE it out of STREAMED_GROUP so it
+                // is no longer reconcile-eligible. (We never downgrade persistent → ephemeral.)
+                if (!spawn.ephemeral() && node instanceof Vehicle existing && existing.isInGroup(streamedGroup)) {
+                    existing.removeFromGroup(streamedGroup);
+                }
+                return;
+            }
+        }
+        Node container = resolveCharactersContainer();
+        if (container == null) {
+            GD.print("GameManager: Characters container not found — cannot spawn replicated vehicle " + spawn.vehicleId());
+            return;
+        }
+        Object loaded = GD.load(VEHICLE_SCENE_PATH);
+        if (!(loaded instanceof PackedScene scene)) {
+            GD.print("GameManager: failed to load " + VEHICLE_SCENE_PATH);
+            return;
+        }
+        Node instance = scene.instantiate();
+        if (!(instance instanceof Vehicle vehicle)) {
+            if (instance != null) instance.queueFree();
+            return;
+        }
+        CharacterInfo info = new CharacterInfo();
+        info.characterId = spawn.vehicleId();
+        info.faction = spawn.faction();
+        info.ownerPeerId = spawn.ownerPeerId();
+        vehicle.characterInfo = info;
+
+        container.addChild(vehicle);   // Vehicle._ready fires here (populates id/group/authority)
+        // Only ephemeral streamed traffic is reconcile-eligible (WS3 fix). A persistent vehicle
+        // (scene-placed / player-driven, re-supplied via the baseline) is NOT tagged, so the client
+        // ghost-reconcile never frees it during a snapshot gap.
+        if (spawn.ephemeral()) vehicle.addToGroup(streamedGroup);
+        vehicle.setGlobalPosition(spawn.position());
+        vehicle.setGlobalRotation(new Vector3(0f, spawn.yaw(), 0f));
+        vehicle.applyAuthorityState();   // attach VehicleNetworkController + freeze now (don't fall pre-snapshot)
+        GD.print("GameManager: spawned replicated vehicle " + spawn.vehicleId());
+        retryPendingSeats();   // a deferred occupancy may have been waiting on this vehicle (WS2)
     }
 
     /** Client-side: remove a server-despawned entity (Character or Vehicle) — MSG_DESPAWN's receiving side (NetworkManager.handleDespawnMessage). */
     public void despawnReplicatedCharacter(String characterId) {
         if (getTree() == null) return;
+        pendingSeats.remove(characterId);   // drop any parked occupancy for a vehicle that's now gone (WS2)
         for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
             if (node instanceof com.openworld.control.Controllable c && c.getCharacterInfo() != null
                     && characterId.equals(c.getCharacterInfo().characterId)) {
@@ -734,10 +857,28 @@ public class GameManager extends Node {
                 // missed/raced, the seated character's controller is a CHILD of this node and
                 // would be freed with it — a permanently stuck (and crash-prone) body. tryExit
                 // recovers the controller and drive state first; harmless if already vacant.
+                Character despawnedVehicleDriver = null;
                 if (node instanceof com.openworld.carrier.vehicle.Vehicle vehicle && vehicle.getOccupant() != null) {
+                    Character occ = vehicle.getOccupant();
+                    // An ephemeral traffic car's AI driver is paired with it — free it too, so a lost
+                    // driver-despawn never strands the driver on foot ("character but no vehicle").
+                    // A carjacked car holds a Player → never freed; a persistent car keeps its occupant.
+                    if (occ instanceof AICharacter && vehicle.isInGroup(new StringName(Vehicle.STREAMED_GROUP))) {
+                        despawnedVehicleDriver = occ;
+                    }
                     vehicle.tryExit();
                 }
+                // Mirror of the above for the OTHER ordering (PLAN.md I3c streamed traffic): freeing a
+                // SEATED character (e.g. a despawned AI driver whose despawn arrives before its car's)
+                // must unseat it first, or the vehicle's `occupant` dangles → Vehicle._physicsProcess
+                // dereferences a freed node (`get_global_transform "!is_inside_tree"` → use-after-free).
+                if (node instanceof Character ch && ch.currentVehicleNode instanceof Vehicle seat
+                        && seat.getOccupant() == ch) {
+                    seat.tryExit();
+                }
                 node.queueFree();
+                if (despawnedVehicleDriver != null && GD.isInstanceValid(despawnedVehicleDriver))
+                    despawnedVehicleDriver.queueFree();   // its own MSG_DESPAWN is idempotent if it also lands
                 return;
             }
         }

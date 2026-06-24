@@ -9,6 +9,9 @@
 [ext_resource type="PackedScene" uid="uid://b85prgrblwads" path="res://src/main/resources/com/openworld/ui/WeaponSlotsUI.tscn" id="6_wsbar"]
 [ext_resource type="PackedScene" uid="uid://bdmgind0000a1" path="res://src/main/resources/com/openworld/ui/DamageIndicator.tscn" id="7_dmgind"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/WeaponProgress.tscn" id="8_wprog"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/MinimapController.java" id="9_mini"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/WorldMapManager.java" id="10_wmap"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/GpsArrow.java" id="11_gps"]
 
 [node name="HUDManager" type="CanvasLayer" unique_id=828289775]
 script = ExtResource("1_fuvei")
@@ -37,3 +40,26 @@ offset_bottom = -148.0
 metadata/_edit_use_anchors_ = true
 
 [node name="DamageIndicator" parent="." unique_id=730000001 instance=ExtResource("7_dmgind")]
+
+[node name="Minimap" type="Control" parent="." unique_id=850000001]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -212.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = 212.0
+mouse_filter = 2
+clip_contents = true
+script = ExtResource("9_mini")
+
+[node name="WorldMap" type="Control" parent="." unique_id=850000002]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+script = ExtResource("10_wmap")
+
+[node name="GpsArrow" type="Control" parent="." unique_id=850000003]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("11_gps")
