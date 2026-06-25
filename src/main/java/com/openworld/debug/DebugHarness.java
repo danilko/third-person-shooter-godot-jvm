@@ -95,7 +95,20 @@ public class DebugHarness extends Node {
             postDebugGunshot();
         } else if (iek.getKeycode() == Key.F4) {
             if (canSpawnLocally()) spawnOnAllRoutes();
+        } else if (iek.getKeycode() == Key.F5) {
+            bakeWorld();
         }
+    }
+
+    /**
+     * F5 — bake the Blender-authored world source into a native {@code .tscn} (PLAN.md I6a). Converts
+     * named empties (lane_/spawn_/zone_/water_/intersection_) into gameplay nodes and saves. Swap the
+     * source path for the imported {@code .blend} once authored; {@code WorldSource.tscn} is the test stand-in.
+     */
+    private void bakeWorld() {
+        com.openworld.world.WorldBaker.bake(this,
+                "res://src/main/resources/com/openworld/world/WorldSource.tscn",
+                "res://src/main/resources/com/openworld/world/World_baked.tscn");
     }
 
     /**
