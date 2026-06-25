@@ -1,0 +1,36 @@
+[gd_scene format=3 uid="uid://b6worldsource01"]
+
+; Hand-built stand-in for a Blender-imported world (PLAN.md I6a). A Blender empty imports as exactly
+; this kind of named Node3D, so WorldBaker converts this identically to a real .blend import. Bake it
+; (DebugHarness F5, or a BakeWorld scene) → World_baked.tscn. Replace this with the imported .blend.
+
+[node name="WorldSource" type="Node3D"]
+
+[node name="zone_test" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+metadata/size = Vector3(60, 10, 60)
+
+[node name="spawn_enemy_0" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0, 4)
+metadata/count = 2
+
+[node name="lane_loopA_0" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.2, 10)
+metadata/loop = true
+metadata/lane_offset = 1.75
+
+[node name="lane_loopA_1" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.2, -10)
+
+[node name="lane_loopA_2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, -10)
+
+[node name="lane_loopA_3" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, 10)
+
+[node name="water_pond" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, 0)
+metadata/size = Vector3(8, 3, 8)
+
+[node name="intersection_main" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 18)

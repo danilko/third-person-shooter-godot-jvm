@@ -181,14 +181,79 @@ So a road has **two independent halves**, authored separately:
 > generator that builds `VehicleRoute`s from Blender curves/empties, and networked spawn replication of
 > streamed traffic.
 
-## Blender-authored world & thin Godot loader — DIRECTION (I6)
+## Blender-authored world & Java baker — DECIDED MECHANISM (I6a)
 
-**Goal: Blender is the source of truth for geometry *and* gameplay markers; Godot just imports +
-runs a thin post-import loader.** No hand-placement of roads/lanes/zones in `.tscn`.
+**Goal: Blender is the source of truth for geometry *and* gameplay markers; a Java baker converts the
+imported scene into a native `.tscn`.** No hand-placement of roads/lanes/zones in `.tscn`.
 
-- **One conversion mechanism — `EditorScenePostImport`** (already referenced in "Naming conventions"):
-  a script on the imported scene walks it once and turns **named** Blender objects into the gameplay
-  nodes (the naming table above). Model + name in Blender → Godot auto-builds the node tree.
+- **Conversion mechanism — a Java `WorldBaker` that bakes to a native `.tscn`** (NOT
+  `EditorScenePostImport`). **Verified:** godot-kotlin-jvm `0.15.0-4.6` exposes **no editor API**
+  (`EditorScenePostImport`/`EditorPlugin` are absent from every dependency jar), so a Java post-import
+  script is impossible, and a GDScript one breaks the no-GDScript rule + can't reuse the Java converters.
+  Instead `world/WorldBaker.java` loads the imported `.blend`/`.glb` scene, walks it, converts **named**
+  objects → gameplay nodes (reusing `VehicleRoute`, `WorldZone`, etc.), sets `owner` on every node, and
+  `PackedScene.pack` + `ResourceSaver.save`s a native `.tscn`. Re-bake when the `.blend` changes (manual,
+  not auto-on-reimport — the one trade-off vs. a post-import hook, accepted to stay all-Java).
+- **Three ways to trigger the bake** (all bake `source_scene_path` → `output_scene_path`):
+  - **Headless CLI — the scriptable one-shot (`BakeWorld.tscn`, `bake_on_ready` + `quit_when_done`):**
+    ```
+    <godot-jvm-binary> --headless --path <project-root> \
+      res://src/main/resources/com/openworld/world/BakeWorld.tscn
+    ```
+    Passing the scene path as the positional arg runs it as the main scene; `_ready` bakes, prints a
+    per-type summary, and `getTree().quit()` exits the process — no interactive editor. *(Depends on
+    godot-kotlin-jvm bootstrapping the JVM under `--headless`; if that fails on your build, use one of the
+    two fallbacks below — neither quits the running instance.)*
+  - **Editor:** open `BakeWorld.tscn`, **F6** ("Run Current Scene").
+  - **In-game:** `DebugHarness` **F5**.
+  Only the `bake_on_ready` auto-path quits (gated by `quit_when_done`); the `bake()` method never does.
+- **The prefix decides the type; Blender custom properties → Godot node metadata carry the parameters**
+  (faction, count, loop, lane offset, zone radii, region tuning) — read via `Node.getMeta` with defaults.
+  **glTF `extras` typing:** numbers/bools/strings import as scalar metadata directly; a **JSON array
+  imports as a Godot `Array`, not a `Vector3`** — so `size: [x,y,z]` is read by the baker's array-aware
+  `metaVec3`, and all `RegionConfig` tuning is **scalar** (`light_temperature`, `fog_density`,
+  `ambient_ai_density`, `vehicle_density`, `ai_lod_bias`, `region_name`, `faction_table` path) for a clean
+  round-trip. (Fallback if the importer drops custom props: encode params in the name, e.g.
+  `spawn_enemy_3`.)
+- **`pack()` gotcha:** every node to be saved must have `owner` set to the pack root or it's silently
+  dropped — the baker sets owner recursively before packing.
+
+**Authoring naming (I6a foundation — model + name in Blender, the baker builds the node):**
+
+| Blender object | Name / form | Becomes (Godot) |
+|:---------------|:------------|:----------------|
+| Lane centerline empties | `lane_<route>_<n>` (ordered) | one `VehicleRoute` per `<route>` + ordered `Marker3D` children |
+| Ambient spawn | `spawn_<faction>_<n>` (+ `count` meta) | `SpawnConfig` on the nearest `zone_` |
+| Zone / region anchor | `zone_<id>` / `region_<id>` (+ size/radii meta) | `WorldZoneMarker` + `WorldZone` (+ `RegionConfig`) |
+| Water volume | `water_<id>` | `Area3D` (+ `CollisionShape3D`) in group `"water"` (I1) |
+| Junction | `intersection_<id>` | `IntersectionZone` (`Area3D`, I3b) |
+| Collision proxy | mesh suffix `-col` | `CollisionShape3D` (Godot importer, on import) |
+
+> Earlier this section proposed `EditorScenePostImport`; superseded by the Java baker above after
+> verifying the editor API is unavailable in the JVM binding.
+
+### Authoring a source + running the baker (recipe — I6a)
+
+Two ready-made demo sources live beside the baker — start from either:
+- **`WorldExample.gltf`** — a real importable asset (text glTF, **empties only**, no buffers). Open it in
+  **Blender** (*File ▸ Import ▸ glTF 2.0*): the named empties appear (`region_downtown`, `lane_loopA_*`,
+  `spawn_enemy_0`, `water_pond`, `intersection_main`) with their params on each object's **Custom
+  Properties** panel. This is the "import to Blender, add geometry" path.
+- **`WorldSource.tscn`** — the same layout hand-built as native Godot nodes (no Blender needed), proving
+  the baker path in isolation.
+
+1. **Author in Blender.** Model real geometry around/under the empties — Geometry Nodes road sweep along
+   the `lane_*` centerline empties, building meshes, terrain. Keep the marker **names** and add params as
+   **Custom Properties** (numbers/bools/strings; a `size` as a 3-number array). Add `-col` collision
+   proxies for meshes that need them.
+2. **Export into `res://`** as glTF (or save the `.blend`) so Godot imports it. Custom properties ride
+   along as glTF `extras` → Godot node metadata.
+3. **Point the baker at it:** set `BakeWorld.tscn`'s `source_scene_path` to your imported asset (e.g.
+   `res://…/WorldExample.gltf`), leave `output_scene_path` at `World_baked.tscn`.
+4. **Bake** via the headless CLI (or F6 / F5 — see "Three ways to trigger" above). The baker writes
+   `World_baked.tscn`.
+5. **The game loads `World_baked.tscn`** — the bake scene is a **dev/tool scene, separate from
+   `World.tscn`**; re-run the baker whenever the source changes.
 - **Roads (mesh) via Geometry Nodes:** draw road **centerline curves**; a GN setup sweeps the tile
   profile along them (surface, curbs, lane-line UVs). GN output exports fine — glTF/.blend export the
   *evaluated* mesh. Godot imports baked mesh + bakes collision from `-col` proxies.

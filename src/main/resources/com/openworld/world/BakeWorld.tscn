@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://b6bakeworld001"]
+
+; Standalone bake tool (PLAN.md I6a). Two ways to run it — both bake `source_scene_path` →
+; `output_scene_path`, print a per-type summary, then quit the process (quit_when_done):
+;   • Headless CLI (no editor session):
+;       <godot-jvm-binary> --headless --path <project-root> \
+;         res://src/main/resources/com/openworld/world/BakeWorld.tscn
+;   • Editor: open this scene, "Run Current Scene" / F6.
+; Not part of the game — it only produces World_baked.tscn, which World.tscn then uses. Point
+; `source_scene_path` at your imported .blend/.gltf (or the WorldSource stand-in / WorldExample.gltf demo).
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/WorldBaker.java" id="1_baker"]
+
+[node name="BakeWorld" type="Node" unique_id=900000001]
+script = ExtResource("1_baker")
+source_scene_path = "res://src/main/resources/com/openworld/world/WorldSource.tscn"
+output_scene_path = "res://src/main/resources/com/openworld/world/World_baked.tscn"
+bake_on_ready = true
+quit_when_done = true

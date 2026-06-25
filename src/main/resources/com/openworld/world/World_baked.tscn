@@ -1,0 +1,107 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://gdj/com/openworld/world/WorldZoneMarker.gdj" id="1_yl1ba"]
+[ext_resource type="Script" path="res://gdj/com/openworld/world/NamedCharacterConfig.gdj" id="2_2icm3"]
+[ext_resource type="Script" path="res://gdj/com/openworld/world/WorldZone.gdj" id="3_pemn8"]
+[ext_resource type="Script" path="res://gdj/com/openworld/world/SpawnConfig.gdj" id="4_dsxmi"]
+[ext_resource type="Script" path="res://gdj/com/openworld/world/VehicleSpawnConfig.gdj" id="5_f7egt"]
+[ext_resource type="Script" path="res://gdj/com/openworld/world/VehicleRoute.gdj" id="6_16cls"]
+[ext_resource type="Script" path="res://gdj/com/openworld/world/IntersectionZone.gdj" id="7_qnqnr"]
+
+[sub_resource type="Resource" id="Resource_kp4eo"]
+script = ExtResource("4_dsxmi")
+count = 2
+
+[sub_resource type="Resource" id="Resource_g8keo"]
+script = ExtResource("3_pemn8")
+zone_id = "test"
+load_radius = 180.0
+unload_radius = 330.0
+spawn_configs = Array[ExtResource("4_dsxmi")]([SubResource("Resource_kp4eo")])
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lsx0u"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(0, 0.7, 1, 0.12)
+
+[sub_resource type="BoxMesh" id="BoxMesh_6v40x"]
+size = Vector3(60, 10, 60)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8rf5p"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(1, 0.85, 0, 0.1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_0aj5k"]
+top_radius = 180.0
+bottom_radius = 180.0
+height = 0.1
+radial_segments = 48
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_80hmy"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(1, 0.25, 0.2, 0.07)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_nekkv"]
+top_radius = 330.0
+bottom_radius = 330.0
+height = 0.1
+radial_segments = 48
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_brs58"]
+size = Vector3(8, 3, 8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mij7f"]
+size = Vector3(7, 4, 7)
+
+[node name="WorldSource" type="Node3D" unique_id=1982373537]
+
+[node name="ZoneMarker_test" type="Node3D" parent="." unique_id=1101278851]
+script = ExtResource("1_yl1ba")
+zone = SubResource("Resource_g8keo")
+
+[node name="@MeshInstance3D@269" type="MeshInstance3D" parent="ZoneMarker_test" unique_id=1809449320]
+material_override = SubResource("StandardMaterial3D_lsx0u")
+mesh = SubResource("BoxMesh_6v40x")
+
+[node name="@MeshInstance3D@270" type="MeshInstance3D" parent="ZoneMarker_test" unique_id=2012636215]
+material_override = SubResource("StandardMaterial3D_8rf5p")
+mesh = SubResource("CylinderMesh_0aj5k")
+
+[node name="@MeshInstance3D@271" type="MeshInstance3D" parent="ZoneMarker_test" unique_id=1476780686]
+material_override = SubResource("StandardMaterial3D_80hmy")
+mesh = SubResource("CylinderMesh_nekkv")
+
+[node name="loopA" type="Node3D" parent="." unique_id=207444798]
+script = ExtResource("6_16cls")
+lane_offset = 1.75
+end_behavior = "DESPAWN"
+
+[node name="@Marker3D@272" type="Marker3D" parent="loopA" unique_id=1294154354]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.2, 10)
+
+[node name="@Marker3D@273" type="Marker3D" parent="loopA" unique_id=2044764823]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.2, -10)
+
+[node name="@Marker3D@274" type="Marker3D" parent="loopA" unique_id=74952690]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, -10)
+
+[node name="@Marker3D@275" type="Marker3D" parent="loopA" unique_id=696736372]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, 10)
+
+[node name="Water_pond" type="Area3D" parent="." unique_id=394387641 groups=["water"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, 0)
+
+[node name="@CollisionShape3D@276" type="CollisionShape3D" parent="Water_pond" unique_id=208855214]
+shape = SubResource("BoxShape3D_brs58")
+
+[node name="Intersection_main" type="Area3D" parent="." unique_id=1714285477]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 18)
+script = ExtResource("7_qnqnr")
+
+[node name="@CollisionShape3D@277" type="CollisionShape3D" parent="Intersection_main" unique_id=1264319702]
+shape = SubResource("BoxShape3D_mij7f")
