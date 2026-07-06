@@ -1,0 +1,42 @@
+[gd_scene format=3 uid="uid://0epl5wy5aru3"]
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/master/World_master.tscn" id="master"]
+[ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
+[ext_resource type="PackedScene" uid="uid://c7aoav51c2882" path="res://src/main/resources/com/openworld/vehicle/Vehicle.tscn" id="vehicle"]
+[ext_resource type="PackedScene" uid="uid://dvq2be1wcewoe" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
+
+[sub_resource type="ProceduralSkyMaterial" id="skymat"]
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("skymat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+tonemap_mode = 2
+glow_enabled = true
+
+[node name="WorldMaster" type="Node3D" unique_id=625140160]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=229620193]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=315887235]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.5, 0.75, -0.43301266, 0, 40, 0)
+shadow_enabled = true
+
+[node name="Master" parent="." unique_id=746527671 instance=ExtResource("master")]
+
+[node name="WorldSystems" parent="." unique_id=650725803 instance=ExtResource("wsys")]
+
+[node name="PlayerSpawn" type="Marker3D" parent="." unique_id=1090837462]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -689.0247, 14, 756)
+
+[node name="Characters" type="Node" parent="." unique_id=320776545]
+
+[node name="Player" parent="Characters" unique_id=1831409965 instance=ExtResource("player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -689.0247, 14, 756)
+
+[node name="VehicleRoot" parent="." unique_id=1342995585 instance=ExtResource("vehicle")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -663.9771, 14, 759)

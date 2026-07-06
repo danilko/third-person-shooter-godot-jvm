@@ -11,6 +11,7 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Input;
 import godot.api.Node;
+import godot.api.Node3D;
 import godot.api.PackedScene;
 import godot.api.Window;
 import godot.core.Callable;
@@ -364,6 +365,40 @@ public class GameManager extends Node {
         return scene != null ? scene.getNodeOrNull("Characters") : null;
     }
 
+    /**
+     * Looks up an optional {@code PlayerSpawn} {@link Node3D} at the scene root — the convention a
+     * host scene (e.g. {@code WorldMaster.tscn}) uses to mark where its populated area actually is.
+     * Returns null when absent (legacy test scenes like {@code World.tscn}/{@code SoloPiece.tscn}
+     * carry no such node), so callers must have an origin-relative fallback.
+     */
+    private Node3D resolveSpawnAnchor() {
+        if (getTree() == null) return null;
+        Node scene = getTree().getCurrentScene();
+        Node marker = scene != null ? scene.getNodeOrNull("PlayerSpawn") : null;
+        return marker instanceof Node3D anchor ? anchor : null;
+    }
+
+    /**
+     * A joining/rejoining player's spawn position: jittered around the scene's {@code PlayerSpawn}
+     * marker when present, else the legacy origin-relative box (mirrors
+     * {@code DebugHarness.spawnTestAI}'s exact range) so scenes without the marker convention
+     * (world-scale test scenes predating it) keep behaving exactly as before.
+     */
+    private Vector3 jitteredSpawnPosition() {
+        Node3D anchor = resolveSpawnAnchor();
+        if (anchor != null) {
+            Vector3 pos = anchor.getGlobalPosition();
+            return new Vector3(
+                    (float) pos.getX() + GD.randfRange(-4.0f, 4.0f),
+                    (float) pos.getY(),
+                    (float) pos.getZ() + GD.randfRange(-4.0f, 4.0f));
+        }
+        return new Vector3(
+                GD.randfRange(-12.0f, 18.0f),
+                0.9f,
+                GD.randfRange(-12.0f, 8.0f));
+    }
+
     private Character findCharacterById(String characterId) {
         if (getTree() == null) return null;
         for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
@@ -711,16 +746,13 @@ public class GameManager extends Node {
         // applyHealth gate). The owning client itself gets a live PlayerController via
         // spawnReplicatedCharacter's isAuthorityFor branch.
         player.attachController(new NetworkController());
-        // Player.tscn carries no transform of its own (defaults to the scene origin) —
-        // the same point World.tscn's pre-placed Player sits at. Spawning there stacks
-        // the two CharacterBody3Ds, and physics shoves the new one to an arbitrary
-        // overlap-resolution position (observed: airborne / inside the vehicle).
-        // Randomize within the populated area, mirroring DebugHarness.spawnTestAI's
-        // exact range, so joining players land somewhere sensible and distinct.
-        player.setGlobalPosition(new Vector3(
-                GD.randfRange(-12.0f, 18.0f),
-                0.9f,
-                GD.randfRange(-12.0f, 8.0f)));
+        // Player.tscn carries no transform of its own (defaults to the scene origin), and
+        // spawning exactly on top of another body there stacks the two CharacterBody3Ds —
+        // physics shoves the new one to an arbitrary overlap-resolution position (observed:
+        // airborne / inside the vehicle). Jitter around a real anchor so joining players land
+        // somewhere sensible and distinct instead of on top of each other.
+        Vector3 jitteredSpawn = jitteredSpawnPosition();
+        player.setGlobalPosition(jitteredSpawn);
         GD.print("GameManager: spawned new body for peer " + peerId + " (characterId=" + characterId + ")");
 
         NetworkManager net = getNetworkManager();

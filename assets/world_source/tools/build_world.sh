@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# build_world.sh — the ONE-COMMAND master-world iteration loop (mirrors build_piece.sh's shape,
+# but for the full 4 km layout instead of one district piece). Builds world_master.blend, exports
+# it to res:// as glTF, and bakes it to a native .tscn via the checked-in BakeWorldMaster.tscn host
+# (its source_scene_path/output_scene_path are fixed — unlike a district piece, there's only one
+# master, so no per-run throwaway bake scene needs synthesizing).
+#
+#   tools/build_world.sh
+#   then: <godot-jvm> --path <repo> res://src/main/resources/com/openworld/world/hosts/WorldMaster.tscn
+#
+# Per-district detail is untouched by this script — build_piece.sh handles each district
+# separately; WorldMaster.tscn's zones resolve District_<Name>.tscn lazily at stream time.
+set -euo pipefail
+
+# Registered here so an interrupted/failed run still cleans up on exit (same convention as
+# build_piece.sh) instead of leaving a stray export log behind.
+CLEANUP_FILES=()
+trap 'rm -f "${CLEANUP_FILES[@]}" 2>/dev/null || true' EXIT
+
+BP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"           # assets/world_source
+REPO="$(cd "$BP/../.." && pwd)"                                 # repo root
+BLENDER="${BLENDER:-blender}"
+GODOT="${GODOT:-/data/danilko/bin/godot.linuxbsd.editor.x86_64.jvm.0.15.0}"
+RES_DIR="src/main/resources/com/openworld/world/master"        # relative to res://
+ABS_DIR="$REPO/$RES_DIR"
+mkdir -p "$ABS_DIR"
+
+echo "── 1/3 build world_master.blend"
+BUILD_LOG="$($BLENDER --background --python "$BP/towns/build_world.py" 2>&1)"
+echo "$BUILD_LOG" | grep -iE "^WORLD:" || true
+BLEND="$BP/world_master.blend"
+[ -f "$BLEND" ] || { echo "ERROR: build_world.py did not produce $BLEND"; exit 1; }
+
+echo "── 2/3 export -> res://$RES_DIR/World_master.gltf"
+EXPORT_LOG="/tmp/export_world_$$.log"
+CLEANUP_FILES+=("$EXPORT_LOG")
+if ! $BLENDER --background "$BLEND" --python "$BP/tools/export_world.py" -- "$ABS_DIR/World_master.gltf" >"$EXPORT_LOG" 2>&1; then
+  cat "$EXPORT_LOG"; exit 1
+fi
+$GODOT --headless --path "$REPO" --import >/dev/null 2>&1 || true
+
+echo "── 3/3 bake -> res://$RES_DIR/World_master.tscn"
+# NOT --headless: WorldBaker's MultiMesh step needs a real RenderingServer (set_instance_transform
+# routes through it; the headless dummy RS drops the transform buffer) — see build_piece.sh. The
+# master rarely carries mmesh_ markers today, but stay consistent with the district bake path.
+run=("$GODOT")
+command -v xvfb-run >/dev/null 2>&1 && run=(xvfb-run -a "$GODOT")
+"${run[@]}" --path "$REPO" res://src/main/resources/com/openworld/world/hosts/BakeWorldMaster.tscn 2>&1 \
+    | grep -iE "WorldBaker: baked" | grep -viE "OCIO" || true
+
+echo
+echo "DONE. Walk-test it:"
+echo "  $GODOT --path \"$REPO\" res://src/main/resources/com/openworld/world/hosts/WorldMaster.tscn"

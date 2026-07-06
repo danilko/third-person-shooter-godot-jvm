@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://b6bakeworldmaster1"]
+
+; Bake the 4 km Tokyo-like MASTER world-layout (assets/world_source/towns/build_world.py ->
+; world_master.blend -> tools/export_world.py -> World_master.gltf) into a native .tscn.
+; Same tool as BakeWorld.tscn, just pre-pointed at the master glTF. Runs on `_ready`,
+; prints a per-type summary, and quits (quit_when_done):
+;   • Headless CLI: <godot-jvm-binary> --headless --path <root> \
+;       res://src/main/resources/com/openworld/world/BakeWorldMaster.tscn
+;   • Editor: open this scene, F6 ("Run Current Scene").
+; Prereq: open World_master.gltf once in the editor so Godot imports it (generates its
+; .import), then bake. Re-export + re-bake whenever build_world.py changes.
+; The emitted World_master_baked.tscn is what the game/streaming layer then loads.
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/WorldBaker.java" id="1_baker"]
+
+[node name="BakeWorldMaster" type="Node" unique_id=900000002]
+script = ExtResource("1_baker")
+source_scene_path = "res://src/main/resources/com/openworld/world/master/World_master.gltf"
+output_scene_path = "res://src/main/resources/com/openworld/world/master/World_master.tscn"
+bake_on_ready = true
+quit_when_done = true

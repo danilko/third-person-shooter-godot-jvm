@@ -31,7 +31,7 @@ public class SwimState extends Resource {
   /** How far below the water surface the body origin settles (m) — small so the head pokes out. */
   @Export
   @RegisterProperty
-  public double submersionDepth = 0.6;
+  public double submersionDepth = 0.7;
 
   /**
    * A shallower settle line (m) used while the swimmer is aiming/in combat, so the body lifts and
@@ -39,7 +39,7 @@ public class SwimState extends Resource {
    */
   @Export
   @RegisterProperty
-  public double aimSubmersionDepth = 0.45;
+  public double aimSubmersionDepth = 0.53;
 
   /**
    * Water depth at the feet (while grounded) required to START swimming (m) — represents chest
@@ -49,7 +49,7 @@ public class SwimState extends Resource {
    */
   @Export
   @RegisterProperty
-  public double swimEnterDepth = 1.2;
+  public double swimEnterDepth = 1.4;
 
   /**
    * Water depth (surface − floor, from the downward floor probe) at or below which a swimmer stands
@@ -57,7 +57,7 @@ public class SwimState extends Resource {
    */
   @Export
   @RegisterProperty
-  public double swimExitDepth = 0.8;
+  public double swimExitDepth = 0.93;
 
   /** How far down (m) the floor probe casts to find the bottom; beyond this is treated as deep water. */
   @Export
@@ -122,7 +122,7 @@ public class SwimState extends Resource {
    */
   @Export
   @RegisterProperty
-  public double submergeDepth = 1.2;
+  public double submergeDepth = 1.4;
 
   /** Oxygen recovery rate (s of air per real second) once the head is back above water. */
   @Export

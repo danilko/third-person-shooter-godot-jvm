@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""
+export_world.py — export the master world-layout .blend into res:// as glTF for the baker.
+
+Unlike export_kit.py (per-leaf .glb library), this exports the WHOLE open scene — every
+district plate, arterial ribbon, harbor blockout, and (crucially) every named marker empty
+with its Custom Properties as glTF `extras` — so the Java WorldBaker can turn region_/lane_/
+intersection_/water_/slot_ nodes into gameplay nodes (BLENDER_CONVENTIONS.md I6a).
+
+The one flag that matters vs. the kit export: `export_extras=True` (marker params ride along)
+and empties are kept as nodes. Cameras/lights are dropped (preview-only).
+
+RUN (with the master .blend open):
+  blender --background world_master.blend --python tools/export_world.py
+Then bake it: point BakeWorldMaster.tscn (or BakeWorld.tscn) at the emitted glTF and run it
+(headless CLI / editor F6 / DebugHarness F5) — see BLENDER_CONVENTIONS "Three ways to trigger".
+
+Also reused by tools/build_piece.sh for a per-district PIECE export (not just the master) —
+optionally scoped to ONE top-level content collection via `--only <CollName>`, e.g.
+`--only STREET_LOD_LOW` exports JUST the low-detail placeholder tier (see lib/lod_low.py) as
+its own standalone glTF/`.tscn`, dropping STREET/MARKERS/MANUAL entirely so the two LOD tiers
+bake to two independent scenes a runtime LOD switch can pick between
+(WorldZoneMarker.instantiateLodLow/removeLodLow) instead of one merged scene:
+  blender --background District_X.blend --python tools/export_world.py -- --only STREET_LOD_LOW out.gltf
+"""
+import bpy, sys, os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)                       # assets/world_source
+# res:// world dir the baker reads from.
+PROJECT = os.path.dirname(os.path.dirname(ROOT))   # repo root (…/third-person-shooter)
+OUT_DIR = os.path.join(PROJECT, "src", "main", "resources", "com", "openworld", "world")
+OUT = os.path.join(OUT_DIR, "master", "World_master.gltf")
+
+argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+only_coll = None
+if argv and argv[0] == "--only":
+    only_coll = argv[1]
+    argv = argv[2:]
+if argv:
+    OUT = argv[0]
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
+
+# Scoped export: keep ONLY `only_coll`'s objects among the piece's content collections (kit
+# SOURCE collections are untouched here — the existing drop-sources pass below removes them
+# regardless of scope). Runs on a throwaway load, same as the rest of this script.
+if only_coll:
+    _dropped_scope = 0
+    for cname in ("STREET", "STREET_LOD_LOW", "MARKERS", "MANUAL"):
+        if cname == only_coll:
+            continue
+        c = bpy.data.collections.get(cname)
+        if not c:
+            continue
+        for o in list(c.objects):
+            bpy.data.objects.remove(o, do_unlink=True)
+            _dropped_scope += 1
+    print("--only %s: dropped %d objects from other content collections" % (only_coll, _dropped_scope))
+    kept = bpy.data.collections.get(only_coll)
+    if not kept or not kept.objects:
+        print("--only %s: collection missing or empty -- nothing to export" % only_coll)
+        sys.exit(3)
+
+# Realize Geometry-Nodes instances into real mesh BEFORE export. Blender's glTF exporter does NOT
+# export bare GN 'Instance on Points' instances — they collapse to the source at origin — so every
+# kc.instancer / kc.Batch layer (fill_frontage streetwall, road/sidewalk tiling, trees, poles) would
+# pile up at center. Converting each GN-modified object to mesh bakes the placement into real,
+# positioned geometry. (Runs on a throwaway load — the .blend keeps its GN; only the export is baked.)
+_gn = [o for o in bpy.context.scene.objects
+       if o.type == 'MESH' and any(m.type == 'NODES' for m in o.modifiers)]
+if _gn:
+    for o in bpy.context.view_layer.objects:
+        o.select_set(False)
+    for o in _gn:
+        o.hide_set(False)
+        o.hide_viewport = False
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = _gn[0]
+    bpy.ops.object.convert(target='MESH')     # applies GN + realizes instances into real mesh
+    print("realized %d GN-instanced layers into mesh for export" % len(_gn))
+
+# Drop kit SOURCE objects before export. load_kits appends every kit piece (SM_*, Road_*, Deco_*, +
+# their -colonly proxies) at ORIGIN; hide_sources only hides them from RENDER, but the exporter takes
+# the whole scene regardless — so they baked as a redundant geometry+collision PILE at the district
+# centre that blocks movement. They're not needed in the export: mmesh visuals load from the res://
+# kit glbs and towers are already realized above. Remove them from this throwaway load (the .blend is
+# untouched). NOTE: this runs AFTER the GN realize so tower geometry (which referenced these sources)
+# is already baked to mesh. LANDMARK_PREVIEW (tools/link_landmark_preview.py) is dropped for the same
+# reason — a real district's STREET content linked in purely so opening world_master.blend shows it
+# beside the harbor/ring; it must never reach the baked master (that district already streams in on
+# its own via the normal region_ zone mechanism — this would double it up). LAYOUT (build_world.py's
+# theme-coloured Plate_* boxes) and HARBOR (its harbor/Haneda/bridge blockout boxes) are the master's
+# own preview-base geometry, by the same design doc's own words: "replaced by each district piece's
+# own geometry" once it streams in — every gameplay marker they build alongside (region_/lane_/
+# intersection_/slot_) already lands in MARKERS/LANDMARKS instead, so dropping these two collections
+# loses no gameplay data. Left in, they baked hundreds of raw MeshInstance3D/StaticBody3D/
+# ConcavePolygonShape3D nodes straight into World_master.tscn (never collapsed to MultiMesh — that
+# only applies to `mmesh_`-tagged markers) — real geometry with no runtime purpose, heavy enough to
+# make the Godot editor slow to open/render the baked master scene.
+_dropped = 0
+for cname in ("ROADS", "WALLS", "PROPS", "EXTRAS", "HIGHRISE", "INFRA", "LANDMARK_PREVIEW",
+              "LAYOUT", "HARBOR"):
+    c = bpy.data.collections.get(cname)
+    if c:
+        for o in list(c.objects):
+            bpy.data.objects.remove(o, do_unlink=True)
+            _dropped += 1
+if _dropped:
+    print("dropped %d kit source objects (kept out of the export)" % _dropped)
+
+for o in bpy.data.objects:
+    o.select_set(False)
+
+bpy.ops.export_scene.gltf(
+    filepath=OUT,
+    export_format='GLTF_SEPARATE',   # text .gltf + .bin (inspectable; matches WorldExample.gltf)
+    use_selection=False,             # whole scene
+    export_apply=True,
+    export_extras=True,              # Custom Properties -> glTF extras -> node metadata (the marker params)
+    export_cameras=False,
+    export_lights=False,
+    export_yup=True,                 # Blender Z-up -> glTF Y-up (Godot importer expects this)
+)
+print("EXPORTED world master ->", OUT)

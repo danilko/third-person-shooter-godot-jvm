@@ -262,9 +262,10 @@ removed on unload — the **AI bodies** and the zone's **`geometry` PackedScene*
 marker child, `queueFree`d on unload). Anything authored directly into the `WorldZoneMarker` *scene*
 (the debug box from `showDebugVolume`, or any mesh you drop under the marker node) is **static scene
 content — it never streams**; it is the persistent zone *footprint/outline*. To make a mesh stream
-in/out, assign it to the WorldZone's **`geometry`** field, not as a marker child
-(`zones/DebugZoneGeometry.tscn` is an example to drop into that slot). Zones also do **not** carry
-their own navigation — AI use the level's `NavigationRegion3D`; nav is a parent/world concern.
+in/out, assign it to the WorldZone's **`geometry`** field, not as a marker child (a Blender-exported
+zone-chunk `.tscn`, same convention every district piece's `geometry_path` already uses). Zones also
+do **not** carry their own navigation — AI use the level's `NavigationRegion3D`; nav is a
+parent/world concern.
 
 **Body recycling is OFF by default (`recycleBodies`, EXPERIMENTAL).** Reusing a full character body
 subtree (detach via `removeChild`, re-attach via `addChild`) is **unsafe** in godot-kotlin-jvm: the
@@ -305,12 +306,11 @@ load/unload decision, an approach-distance line while a player is near, and per-
 box (the spawn volume, `zone.size`) plus flat rings at `loadRadius`/`unloadRadius`; the box tints
 **green while streamed in, cyan while idle** (driven by `setLoadedVisual` from the manager) — so you
 can see a zone and walk into it. Both are pure debug aids, off via their export flags for shipping.
-`resources/com/openworld/world/zones/DebugZone.tscn` is a reusable **zone scene** (a `WorldZoneMarker`
-with `DebugZone.tres` assigned) — the authoring template / "what a zone looks like" demo (duplicate it
-and swap the `.tres` for a real zone; a Blender-exported zone-chunk mesh becomes the optional
-`geometry`). One instance is placed in `World.tscn` (`DebugZone` node, ~20 m left of spawn) for an
-in-editor walk-test. The `DebugHarness` **F12** key also drops a code-built zone in front of the
-nearest player if you want one without editing the scene.
+The `DebugHarness` **F12** key drops a code-built `WorldZone`/`WorldZoneMarker` in front of the
+nearest player (`spawnDebugZone()`, no `.tscn`/`.tres` needed) if you want a quick zone to walk-test
+without editing a scene — the standalone example zone scene this used to point at (`zones/DebugZone
+.tscn`/`.tres`, `zones/DebugZoneGeometry.tscn`) was retired once the real 36-district open world
+(`assets/world_source/`, `hosts/WorldMaster.tscn`) existed to walk-test against instead.
 
 ### AI spatial perception — StimulusManager (`com.openworld.world`, AutoLoad, E2)
 

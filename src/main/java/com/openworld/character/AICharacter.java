@@ -44,8 +44,8 @@ import com.openworld.world.StimulusManager;
 @RegisterClass(className = "AICharacter")
 public class AICharacter extends Character {
 
-    public static final float EYE_HEIGHT        = 1.4f;
-    public static final float TARGET_BODY_HEIGHT = 0.9f;
+    public static final float EYE_HEIGHT        = 1.63f;
+    public static final float TARGET_BODY_HEIGHT = 1.05f;
 
     // ── Behaviour configuration ───────────────────────────────────────────────
 

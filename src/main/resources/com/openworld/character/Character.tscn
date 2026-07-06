@@ -36,14 +36,14 @@ metadata/_custom_type_script = "uid://cplrp8cx4gus0"
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_yfjlo"]
 radius = 0.35
-height = 1.5
+height = 1.75
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gguhd"]
 radius = 0.35
-height = 0.94
+height = 1.1
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_gguhd"]
-height = 0.48
+height = 0.56
 radius = 0.7
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_cam"]
@@ -76,24 +76,24 @@ character_visuals = ExtResource("1_rl0hp")
 [node name="VisualsMount" type="Marker3D" parent="." unique_id=1900002001]
 
 [node name="UprightCollision" type="CollisionShape3D" parent="." unique_id=1192960009]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.875, 0)
 shape = SubResource("CapsuleShape3D_yfjlo")
 
 [node name="RayCast3D" type="RayCast3D" parent="UprightCollision" unique_id=150935415]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.27, 0)
-target_position = Vector3(0, 1.02, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.315, 0)
+target_position = Vector3(0, 1.19, 0)
 
 [node name="CrouchCollision" type="CollisionShape3D" parent="." unique_id=521225264]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.47, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
 shape = SubResource("CapsuleShape3D_gguhd")
 disabled = true
 
 [node name="RayCast3D" type="RayCast3D" parent="CrouchCollision" unique_id=892151405]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, 0)
-target_position = Vector3(0, 0.46, 0)
+target_position = Vector3(0, 0.54, 0)
 
 [node name="CrawlCollision" type="CollisionShape3D" parent="." unique_id=1080545347]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.24, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.28, 0)
 shape = SubResource("CylinderShape3D_gguhd")
 disabled = true
 
@@ -113,7 +113,7 @@ script = ExtResource("7_2iqcg")
 idle_state = ExtResource("8_ttk2h")
 walk_state = ExtResource("9_gguhd")
 sprint_state = ExtResource("10_gguhd")
-camera_height = 0.85
+camera_height = 0.99
 spine_aim_max_angle = 0.0
 collider = NodePath("../../CrouchCollision")
 col_raycast = NodePath("../../CrouchCollision/RayCast3D")
@@ -123,7 +123,7 @@ script = ExtResource("7_2iqcg")
 idle_state = ExtResource("11_kuqdj")
 walk_state = ExtResource("12_agpyf")
 sprint_state = ExtResource("13_jwg7l")
-camera_height = 1.2
+camera_height = 1.4
 collider = NodePath("../../UprightCollision")
 col_raycast = NodePath("../../UprightCollision/RayCast3D")
 
@@ -132,7 +132,7 @@ script = ExtResource("7_2iqcg")
 idle_state = ExtResource("7_d7d1u")
 walk_state = ExtResource("15_bgnjm")
 sprint_state = ExtResource("16_u0j3k")
-camera_height = 0.7
+camera_height = 0.82
 spine_aim_max_angle = 0.0
 collider = NodePath("../../CrawlCollision")
 
@@ -148,7 +148,7 @@ script = ExtResource("7_2iqcg")
 idle_state = ExtResource("7_d7d1u")
 walk_state = ExtResource("16_u0j3k")
 sprint_state = ExtResource("15_bgnjm")
-camera_height = 0.7
+camera_height = 0.82
 animation_stance_key = "Crawl"
 spine_aim_max_angle = 0.0
 collider = NodePath("../../CrawlCollision")

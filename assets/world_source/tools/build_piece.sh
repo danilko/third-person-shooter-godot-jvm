@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# build_piece.sh <name> — the ONE-COMMAND district-piece iteration loop (see BLENDER_CONVENTIONS
+# "district piece"). Builds the piece .blend, exports it to res:// as glTF, bakes it to a native
+# .tscn via WorldBaker, and points SoloPiece.tscn at it so you can immediately walk-test it.
+#
+#   tools/build_piece.sh shibuya
+#   then: <godot-jvm> --path <repo> res://src/main/resources/com/openworld/world/hosts/SoloPiece.tscn
+#
+# The master never needs re-baking: its zones' geometry_path already point at these predictable
+# res://…/world/districts/District_<Name>.tscn files (resolved lazily at stream time).
+#
+# Procedural pieces (not PLATEAU precincts) ALSO get a second, independent bake of their
+# STREET_LOD_LOW collection (lib/lod_low.py) -> District_<Name>_LOD_LOW.tscn, wired at the same
+# predictable path world_grid.lod_low_piece_path() computes — WorldZoneMarker streams it in
+# whenever the full-detail piece is unloaded (see WorldZoneManager load()/unload()). Detected by
+# grepping step 1's own stdout for the "lod_low[" stat it only prints on that branch — PLATEAU
+# precincts never build that collection, so the second export/bake is skipped for them.
+set -euo pipefail
+
+# Every throwaway bake-host .tscn/.import (and export log) bake_one() creates gets registered
+# here, so an interrupted or failed run (Ctrl-C, a Blender/Godot crash) still cleans up on exit
+# instead of leaving a stray _bake_*.tscn behind in districts/ — the per-call `rm -f` below only
+# covers the success path.
+CLEANUP_FILES=()
+trap 'rm -f "${CLEANUP_FILES[@]}" 2>/dev/null || true' EXIT
+
+NAME="${1:?usage: build_piece.sh <name>   (e.g. shibuya)}"
+BP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"           # assets/world_source
+REPO="$(cd "$BP/../.." && pwd)"                                 # repo root
+BLENDER="${BLENDER:-blender}"
+GODOT="${GODOT:-/data/danilko/bin/godot.linuxbsd.editor.x86_64.jvm.0.15.0}"
+RES_DIR="src/main/resources/com/openworld/world/districts"     # relative to res://
+ABS_DIR="$REPO/$RES_DIR"
+mkdir -p "$ABS_DIR"
+
+echo "── 1/4 build piece .blend ($NAME)"
+BUILD_LOG="$($BLENDER --background --python "$BP/towns/districts/build_district.py" -- "$NAME" 2>&1)"
+echo "$BUILD_LOG" | grep -iE "DISTRICT |PIECE=" || true
+STEM="$(echo "$BUILD_LOG" | grep -oE 'PIECE=[A-Za-z0-9_]+' | head -1 | cut -d= -f2)"
+[ -n "$STEM" ] || { echo "ERROR: build_district.py did not report PIECE=<stem>"; exit 1; }
+BLEND="$BP/districts/$STEM.blend"
+echo "   -> $STEM  ($BLEND)"
+HAS_LOD_LOW=false
+echo "$BUILD_LOG" | grep -q "lod_low\[" && HAS_LOD_LOW=true
+
+# bake_one <gltf-export-args...> <gltf-relpath> <tscn-relpath> — export (with the given extra
+# export_world.py args) then bake via a throwaway WorldBaker host scene.
+bake_one() {
+  local gltf_rel="$1" tscn_rel="$2"; shift 2
+  echo "   export -> res://$gltf_rel"
+  local export_log="/tmp/export_$$.log"
+  CLEANUP_FILES+=("$export_log")
+  if ! $BLENDER --background "$BLEND" --python "$BP/tools/export_world.py" -- "$@" "$ABS_DIR/$(basename "$gltf_rel")" >"$export_log" 2>&1; then
+    if grep -q "nothing to export" "$export_log"; then
+      echo "   (skipped — collection missing/empty)"; return 1
+    fi
+    cat "$export_log"; return 1
+  fi
+  $GODOT --headless --path "$REPO" --import >/dev/null 2>&1 || true
+  local bake_tscn="$REPO/$RES_DIR/_bake_$$_${RANDOM}.tscn"
+  CLEANUP_FILES+=("$bake_tscn" "$bake_tscn.import")
+  cat > "$bake_tscn" <<EOF
+[gd_scene format=3 uid="uid://bpiecebake${RANDOM}"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/WorldBaker.java" id="1"]
+[node name="BakePiece" type="Node" unique_id=900000${RANDOM}]
+script = ExtResource("1")
+source_scene_path = "res://$gltf_rel"
+output_scene_path = "res://$tscn_rel"
+bake_on_ready = true
+quit_when_done = true
+EOF
+  # NOT --headless: MultiMesh.set_instance_transform routes through the RenderingServer, and the
+  # headless dummy RS drops the transform buffer (instances collapse to origin).
+  local run=("$GODOT")
+  command -v xvfb-run >/dev/null 2>&1 && run=(xvfb-run -a "$GODOT")
+  "${run[@]}" --path "$REPO" "res://$RES_DIR/$(basename "$bake_tscn")" 2>&1 \
+      | grep -iE "WorldBaker: baked" | grep -viE "OCIO" || true
+  rm -f "$bake_tscn" "$bake_tscn.import" 2>/dev/null || true
+}
+
+# bake_nav <tscn-relpath> — bake a NavigationRegion3D into an already-baked district .tscn (from
+# ITS OWN collision geometry) via a throwaway NavBaker host scene, same shape as bake_one() above.
+# STATIC_COLLIDERS parsing only reads PhysicsServer3D data (see NavBaker.java), so unlike
+# bake_one()'s MultiMesh step this runs --headless — no xvfb dependency, no RenderingServer needed.
+bake_nav() {
+  local tscn_rel="$1"
+  echo "   navmesh -> res://$tscn_rel"
+  local nav_tscn="$REPO/$RES_DIR/_navbake_$$_${RANDOM}.tscn"
+  CLEANUP_FILES+=("$nav_tscn" "$nav_tscn.import")
+  cat > "$nav_tscn" <<EOF
+[gd_scene format=3 uid="uid://bnavbake${RANDOM}"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/NavBaker.java" id="1"]
+[node name="BakeNav" type="Node" unique_id=900001${RANDOM}]
+script = ExtResource("1")
+scene_path = "res://$tscn_rel"
+bake_on_ready = true
+quit_when_done = true
+EOF
+  $GODOT --headless --path "$REPO" "res://$RES_DIR/$(basename "$nav_tscn")" 2>&1 \
+      | grep -iE "NavBaker: baked" || true
+  rm -f "$nav_tscn" "$nav_tscn.import" 2>/dev/null || true
+}
+
+echo "── 2-3/5 export + bake full detail -> $STEM.tscn"
+bake_one "$RES_DIR/$STEM.gltf" "$RES_DIR/$STEM.tscn"
+
+echo "── 4/5 bake navmesh into $STEM.tscn"
+bake_nav "$RES_DIR/$STEM.tscn"
+
+if $HAS_LOD_LOW; then
+  echo "── (LOD_LOW) export + bake -> ${STEM}_LOD_LOW.tscn"
+  bake_one "$RES_DIR/${STEM}_LOD_LOW.gltf" "$RES_DIR/${STEM}_LOD_LOW.tscn" --only STREET_LOD_LOW || \
+      echo "   (no STREET_LOD_LOW content — leaving ${STEM}_LOD_LOW.tscn unbaked)"
+else
+  echo "── (no STREET_LOD_LOW collection for this piece — PLATEAU precinct, skipping LOD_LOW bake)"
+fi
+
+echo "── 5/5 point SoloPiece.tscn at $STEM.tscn"
+SOLO="$REPO/src/main/resources/com/openworld/world/hosts/SoloPiece.tscn"
+python3 - "$SOLO" "res://$RES_DIR/$STEM.tscn" <<'PY'
+import re, sys
+p, path = sys.argv[1], sys.argv[2]
+s = open(p).read()
+s = re.sub(r'(\[ext_resource type="PackedScene" path=")[^"]*(" id="piece"\])',
+           lambda m: m.group(1) + path + m.group(2), s)
+open(p, 'w').write(s)
+PY
+
+echo
+echo "DONE. Walk-test it:"
+echo "  $GODOT --path \"$REPO\" res://src/main/resources/com/openworld/world/hosts/SoloPiece.tscn"
