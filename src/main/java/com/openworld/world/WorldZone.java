@@ -40,6 +40,27 @@ public class WorldZone extends Resource {
     /** Optional zone geometry instanced on load (null for placeholder zones). */
     @Export @RegisterProperty public PackedScene geometry;
 
+    /**
+     * Optional {@code res://} path to this zone's geometry piece, resolved lazily on first stream
+     * (and cached into {@link #geometry}). This is the incremental-authoring seam: the master wires
+     * a <b>predictable</b> path here for every zone up front, so a district piece authored/baked
+     * <i>after</i> the master went live is picked up on the next run with <b>no master re-bake</b>.
+     * Empty = none. {@code geometry} (a directly-assigned scene) still wins if set.
+     */
+    @Export @RegisterProperty public String geometryPath = "";
+
+    /**
+     * Optional {@code res://} path to a LOW-DETAIL PLACEHOLDER tier for this zone's geometry (a
+     * synthesized "PLATEAU-style" simple-box version — see {@code lib/lod_low.py} — for procedural
+     * districts too cheap in object count to bother streaming). Unlike {@link #geometryPath} (lazily
+     * streamed in/out with the zone), this tier is instanced by {@link WorldZoneMarker} EAGERLY at
+     * {@code _ready()} — cheap enough to stay resident always — and is only removed for the moment
+     * the full-detail {@link #geometry} is actually loaded (then re-instanced the moment it unloads),
+     * so a distant/not-yet-streamed district still reads as a real place instead of empty ground.
+     * Empty = no placeholder tier was baked for this zone (e.g. a real-data PLATEAU precinct).
+     */
+    @Export @RegisterProperty public String lodLowGeometryPath = "";
+
     /** Ambient AI spawn groups streamed in on load. */
     @Export @RegisterProperty
     public VariantArray<SpawnConfig> spawnConfigs = new VariantArray<>(SpawnConfig.class);

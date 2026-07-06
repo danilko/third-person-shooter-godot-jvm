@@ -8,6 +8,7 @@ import godot.api.DirectionalLight3D;
 import godot.api.Environment;
 import godot.api.Node;
 import godot.api.PackedScene;
+import godot.api.ResourceLoader;
 import godot.api.WorldEnvironment;
 import godot.core.Color;
 import godot.core.NodePath;
@@ -65,6 +66,19 @@ public class WorldZoneManager extends Node {
 
     /** Seconds between load/unload evaluations. */
     @Export @RegisterProperty public float evalInterval = 0.5f;
+
+    /**
+     * Max new zone {@code load()}s performed in a single eval tick. Each load synchronously
+     * instantiates a whole district {@code PackedScene} — now real PLATEAU/kit geometry plus a
+     * baked {@code NavigationRegion3D}, not placeholder boxes — so if several districts enter
+     * range in the same tick (common right after a teleport, or at spawn: district centers are
+     * ~504m apart and the default {@code loadRadius} is 402m, so immediate neighbours routinely
+     * qualify together), loading them all in one frame is a visible freeze. Extra qualifying
+     * zones are simply picked up on the next tick(s) instead — a few hundred ms of the world
+     * "catching up" reads far better than a multi-district stutter. Unloads are NOT throttled
+     * (freeing is cheap relative to instantiating).
+     */
+    @Export @RegisterProperty public int maxLoadsPerTick = 1;
 
     /** Max recycled AI bodies the pool retains. */
     @Export @RegisterProperty public int poolCapacity = 64;
@@ -143,6 +157,24 @@ public class WorldZoneManager extends Node {
     /** Read-only view of the registered zone markers (I5 map/minimap region outlines). */
     public List<WorldZoneMarker> getMarkers() { return markers; }
 
+    /** The nearest loaded zone carrying a RegionConfig (see {@link #updateActiveRegion}), or null
+     * if the local player isn't currently near any loaded region — e.g. a debug HUD readout. */
+    public WorldZoneMarker getActiveRegionMarker() { return activeRegionMarker; }
+
+    /** Nearest REGISTERED zone marker to the local player, loaded or not (unlike
+     * {@link #getActiveRegionMarker}, which only considers already-loaded zones) — e.g. a debug
+     * "which district am I over" readout that should work even before anything streams in. */
+    public WorldZoneMarker getNearestMarker() {
+        WorldZoneMarker best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (WorldZoneMarker m : markers) {
+            if (!GD.isInstanceValid(m) || m.zone == null) continue;
+            float d = localPlayerDistXZ(m.getGlobalPosition());
+            if (d < bestDist) { bestDist = d; best = m; }
+        }
+        return best;
+    }
+
     /**
      * Debug-gated sanity check on a zone's trigger radii. Both {@code loadRadius} and
      * {@code unloadRadius} are measured from the marker (zone <b>center</b>), independent of
@@ -181,12 +213,15 @@ public class WorldZoneManager extends Node {
         if (evalTimer > 0.0) return;
         evalTimer = evalInterval;
 
+        int loadsThisTick = 0;
         for (WorldZoneMarker marker : new ArrayList<>(markers)) {
             if (!GD.isInstanceValid(marker) || marker.zone == null) continue;
             float dist = nearestPlayerDistXZ(marker.getGlobalPosition());
             boolean isLoaded = loaded.containsKey(marker);
             if (!isLoaded && dist < marker.zone.loadRadius) {
+                if (loadsThisTick >= maxLoadsPerTick) continue;   // next tick(s) pick up the rest
                 load(marker);
+                loadsThisTick++;
             } else if (isLoaded && dist > marker.zone.unloadRadius) {
                 unload(marker);
             } else if (debugLog && dist < marker.zone.unloadRadius * 1.2f) {
@@ -468,6 +503,16 @@ public class WorldZoneManager extends Node {
         LoadedZone lz = new LoadedZone();
         loaded.put(marker, lz);
         marker.setLoadedVisual(true);
+        marker.removeLodLow();   // full detail is taking over — drop the always-resident placeholder
+
+        // Lazily resolve a path-wired geometry piece (incremental authoring: a piece baked after the
+        // master went live is picked up here with no master re-bake). `exists` guards against error
+        // spam for a zone whose piece is not authored yet; the resolved scene is cached on the resource.
+        if (zone.geometry == null && zone.geometryPath != null && !zone.geometryPath.isEmpty()
+                && ResourceLoader.INSTANCE.exists(zone.geometryPath, "")) {
+            Object o = GD.load(zone.geometryPath);
+            if (o instanceof PackedScene ps) zone.geometry = ps;
+        }
 
         // Cosmetic geometry — instanced locally on every peer.
         if (zone.geometry != null) {
@@ -567,7 +612,10 @@ public class WorldZoneManager extends Node {
     private void unload(WorldZoneMarker marker) {
         LoadedZone lz = loaded.remove(marker);
         if (lz == null) return;
-        if (GD.isInstanceValid(marker)) marker.setLoadedVisual(false);
+        if (GD.isInstanceValid(marker)) {
+            marker.setLoadedVisual(false);
+            marker.instantiateLodLow();   // full detail is gone — bring the placeholder back
+        }
 
         NetworkManager net = networkManager();
         int recycled = 0;

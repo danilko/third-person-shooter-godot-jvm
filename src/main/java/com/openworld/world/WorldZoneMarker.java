@@ -8,10 +8,17 @@ import godot.api.BaseMaterial3D;
 import godot.api.BoxMesh;
 import godot.api.CylinderMesh;
 import godot.api.MeshInstance3D;
+import godot.api.Node;
 import godot.api.Node3D;
+import godot.api.PackedScene;
+import godot.api.ResourceLoader;
 import godot.api.StandardMaterial3D;
 import godot.core.Color;
 import godot.core.Vector3;
+import godot.global.GD;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * In-scene anchor for a {@link WorldZone} (PLAN.md Part E / E1).
@@ -44,6 +51,11 @@ public class WorldZoneMarker extends Node3D {
     private static final Color UNLOAD_RING  = new Color(1.0, 0.25, 0.2, 0.07); // red ring  (unload)
 
     private StandardMaterial3D volumeMat;  // box material, recoloured on load/unload
+    private final List<Node> debugVisualNodes = new ArrayList<>();
+
+    /** The eagerly-resident low-detail placeholder tier (see {@link WorldZone#lodLowGeometryPath}),
+     * or null if this zone never baked one, or it is currently removed (full detail is loaded). */
+    private Node lodLowInstance;
 
     @RegisterFunction
     @Override
@@ -51,6 +63,7 @@ public class WorldZoneMarker extends Node3D {
         WorldZoneManager mgr = WorldZoneManager.get();
         if (mgr != null) mgr.registerMarker(this);
         if (showDebugVolume && zone != null) buildDebugVisuals();
+        instantiateLodLow();   // zone starts "unloaded" — show the placeholder immediately, if any
     }
 
     @RegisterFunction
@@ -65,6 +78,60 @@ public class WorldZoneMarker extends Node3D {
         if (volumeMat != null) volumeMat.setAlbedo(loaded ? LOADED_COLOR : IDLE_COLOR);
     }
 
+    // ── Low-detail placeholder tier (always resident unless the full-detail geometry is loaded) ──
+
+    /**
+     * Instance {@link WorldZone#lodLowGeometryPath} as a child, if not already present. A no-op
+     * when the zone has no such path (PLATEAU precincts, most hand-authored pieces) or the file
+     * hasn't been baked yet — {@code exists()} guards against error-log spam either way.
+     */
+    public void instantiateLodLow() {
+        if (lodLowInstance != null && GD.isInstanceValid(lodLowInstance)) return;
+        if (zone == null || zone.lodLowGeometryPath == null || zone.lodLowGeometryPath.isEmpty()) return;
+        if (!ResourceLoader.INSTANCE.exists(zone.lodLowGeometryPath, "")) return;
+        Object o = GD.load(zone.lodLowGeometryPath);
+        if (!(o instanceof PackedScene ps)) return;
+        Node n = ps.instantiate();
+        if (n == null) return;
+        addChild(n);
+        lodLowInstance = n;
+    }
+
+    /**
+     * Free the placeholder tier the instant the real full-detail geometry takes its place.
+     * {@code removeChild} first (synchronous) rather than relying on {@code queueFree()} alone —
+     * {@code queueFree()} only defers to the end of the current idle frame, so a caller that packs
+     * the scene in the same call (e.g. {@code WorldBaker}'s bake-time strip) would otherwise still
+     * see this node as a live child and serialize it anyway.
+     */
+    public void removeLodLow() {
+        if (lodLowInstance != null && GD.isInstanceValid(lodLowInstance)) {
+            removeChild(lodLowInstance);
+            lodLowInstance.queueFree();
+        }
+        lodLowInstance = null;
+    }
+
+    /**
+     * Free the debug spawn-volume box + load/unload rings (see {@link #buildDebugVisuals}).
+     * These are a single-zone dev aid ("so you can see a zone and walk into it") — baking
+     * dozens of them (one per district) into a master-world scene means large overlapping
+     * transparent rings permanently embedded across the whole map, for no runtime benefit.
+     * Same immediate-{@code removeChild}-before-{@code queueFree} reasoning as
+     * {@link #removeLodLow}: a bake-time caller packs the scene in the same call, before a
+     * deferred free would have taken effect.
+     */
+    public void removeDebugVisuals() {
+        for (Node n : debugVisualNodes) {
+            if (GD.isInstanceValid(n)) {
+                removeChild(n);
+                n.queueFree();
+            }
+        }
+        debugVisualNodes.clear();
+        volumeMat = null;
+    }
+
     // ── Debug mesh construction ───────────────────────────────────────────────
 
     private void buildDebugVisuals() {
@@ -75,6 +142,7 @@ public class WorldZoneMarker extends Node3D {
         boxInst.setMesh(box);
         boxInst.setMaterialOverride(volumeMat);
         addChild(boxInst);
+        debugVisualNodes.add(boxInst);
 
         addRing(zone.loadRadius, LOAD_RING);
         addRing(zone.unloadRadius, UNLOAD_RING);
@@ -90,6 +158,7 @@ public class WorldZoneMarker extends Node3D {
         inst.setMesh(disc);
         inst.setMaterialOverride(makeMaterial(color));
         addChild(inst);
+        debugVisualNodes.add(inst);
     }
 
     private StandardMaterial3D makeMaterial(Color color) {

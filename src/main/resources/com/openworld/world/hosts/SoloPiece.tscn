@@ -1,0 +1,41 @@
+[gd_scene load_steps=7 format=3 uid="uid://bsolopiece00001"]
+
+; Fast INNER-LOOP test host for a single district piece (BLENDER_CONVENTIONS "district piece").
+; Instances ONE piece at origin + a Player + environment — no 4 km streaming — so you can walk the
+; zone you're editing immediately. `tools/build_piece.sh <name>` rebuilds the piece AND rewrites the
+; "piece" ext_resource path below to point at it, so this scene always targets the last-built piece.
+; Run: open in editor + F6, or:  <godot-jvm> --path <root> res://…/world/SoloPiece.tscn
+; (The whole streamed world is the separate WorldMaster host, run less often.)
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/districts/District_mtn_0_4.tscn" id="piece"]
+
+[sub_resource type="ProceduralSkyMaterial" id="skymat"]
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("skymat")
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+tonemap_mode = 2
+glow_enabled = true
+
+[node name="SoloPiece" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.5, 0.75, -0.43301266, 0, 40, 0)
+light_energy = 1.0
+shadow_enabled = true
+
+[node name="Piece" parent="." instance=ExtResource("piece")]
+
+[node name="WorldSystems" parent="." instance=ExtResource("wsys")]
+
+[node name="Characters" type="Node" parent="."]
+
+[node name="Player" parent="Characters" instance=ExtResource("player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 40)

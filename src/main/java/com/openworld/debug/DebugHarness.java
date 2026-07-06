@@ -16,12 +16,14 @@ import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.world.SpawnConfig;
 import com.openworld.world.VehicleRoute;
 import com.openworld.world.WorldZone;
+import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.InputEvent;
 import godot.api.InputEventKey;
 import godot.api.Node;
+import godot.api.Node3D;
 import godot.api.PackedScene;
 import godot.core.Key;
 import godot.core.NodePath;
@@ -50,10 +52,15 @@ import com.openworld.character.Player;
  * F8  — postDebugGunshot(): drops a "player"-faction GUNSHOT stimulus ~35 m in front of the
  *       player so the zone's "enemy" AI investigate the noise (PLAN.md E2 perception test).
  * F4  — spawnOnAllRoutes(): drops one AI vehicle on every VehicleRoute in the scene (PLAN.md I3) —
- *       the one-keypress test for an authored road layout (e.g. RoadKitExample's lanes).
+ *       the one-keypress test for an authored road layout (e.g. a district piece's seam routes).
  * F6  — NetworkManager.hostServer(DEBUG_PORT): starts an ENet server for LAN testing
  *       (PLAN.md Part G). F7 — joinServer("127.0.0.1", DEBUG_PORT): connects as a
  *       client to a host on the same machine. Edit DEBUG_HOST for a real LAN peer.
+ * F1  — teleportToNextZone(): jumps the local player to the next registered
+ *       WorldZoneMarker (cycles through every district at world scale), so testing
+ *       across districts doesn't require walking/driving the whole map.
+ * F2  — dropWeaponHere(): spawns an AR4 pickup at the player's feet — the companion to F1
+ *       for testing weapon pickup flow in whichever district you've just teleported to.
  * Every AI spawned by either binding is equipped with an AR4 rifle (see
  * equipDebugRifle) so it fights at range instead of relying on its bare fists.
  *
@@ -73,6 +80,9 @@ public class DebugHarness extends Node {
 
     private static final int DEBUG_PORT = 7777;
     private static final String DEBUG_HOST = "127.0.0.1";
+
+    /** F1 teleport-cycle position in the sorted zoneId list — persists across presses, wraps around. */
+    private int teleportZoneIndex = -1;
 
     @RegisterFunction
     @Override
@@ -97,6 +107,10 @@ public class DebugHarness extends Node {
             if (canSpawnLocally()) spawnOnAllRoutes();
         } else if (iek.getKeycode() == Key.F5) {
             bakeWorld();
+        } else if (iek.getKeycode() == Key.F1) {
+            teleportToNextZone();
+        } else if (iek.getKeycode() == Key.F2) {
+            dropWeaponHere();
         }
     }
 
@@ -211,10 +225,7 @@ public class DebugHarness extends Node {
             ai.characterInfo = info;
 
             container.addChild(ai);
-            ai.setGlobalPosition(new Vector3(
-                    GD.randfRange(-12.0f, 18.0f),
-                    0.9f,
-                    GD.randfRange(-12.0f, 8.0f)));
+            ai.setGlobalPosition(jitteredSpawnPosition());
 
             equipDebugRifle(ai, container);
             announceSpawnIfHosting(ai);
@@ -317,8 +328,72 @@ public class DebugHarness extends Node {
     }
 
     /**
+     * F1 — teleports the local player to the next registered {@link WorldZoneMarker}, cycling
+     * through every district at world scale (sorted by {@code zoneId} for a stable, predictable
+     * order — {@link WorldZoneManager#getMarkers()} is registration order, which isn't). The same
+     * registry the I5 minimap already reads, so no new bookkeeping — every district's marker is
+     * permanently registered (part of the always-loaded master), regardless of whether that
+     * district's own geometry is currently streamed in. A few metres above the marker so the
+     * player doesn't spawn inside the ground; physics settles the rest on landing.
+     */
+    private void teleportToNextZone() {
+        WorldZoneManager mgr = WorldZoneManager.get();
+        if (mgr == null) { GD.print("DebugHarness: WorldZoneManager autoload not found"); return; }
+
+        java.util.List<WorldZoneMarker> markers = new java.util.ArrayList<>(mgr.getMarkers());
+        if (markers.isEmpty()) { GD.print("DebugHarness: no registered zone markers to teleport to"); return; }
+        markers.sort(java.util.Comparator.comparing(m -> m.zone != null ? m.zone.zoneId : ""));
+
+        Player player = null;
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p)) { player = p; break; }
+        }
+        if (player == null) { GD.print("DebugHarness: no player found to teleport (F1)"); return; }
+
+        teleportZoneIndex = (teleportZoneIndex + 1) % markers.size();
+        WorldZoneMarker target = markers.get(teleportZoneIndex);
+        Vector3 pos = target.getGlobalPosition();
+        player.setGlobalPosition(new Vector3((float) pos.getX(), (float) pos.getY() + 3f, (float) pos.getZ()));
+        GD.print("DebugHarness: teleported to zone '" + (target.zone != null ? target.zone.zoneId : "?")
+                + "' (" + (teleportZoneIndex + 1) + "/" + markers.size() + ")");
+    }
+
+    /**
+     * F2 — drops an AR4 pickup at the local player's feet: the companion to F1's teleport for
+     * testing weapon pickup flow in whichever district you've just jumped to. Same instantiate
+     * pattern as {@link #equipDebugRifle} but left as a free-standing world pickup (no
+     * {@code requestEquip} call) rather than equipped onto a character.
+     */
+    private void dropWeaponHere() {
+        Player player = null;
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p)) { player = p; break; }
+        }
+        if (player == null) { GD.print("DebugHarness: no player found to drop a weapon near (F2)"); return; }
+
+        Node container = getNodeOrNull(new NodePath("../Characters"));
+        if (container == null) { GD.print("DebugHarness: Characters container not found"); return; }
+
+        Object loadedRifle = GD.load(RIFLE_SCENE_PATH);
+        if (!(loadedRifle instanceof PackedScene rifleScene)) {
+            GD.print("DebugHarness: failed to load " + RIFLE_SCENE_PATH);
+            return;
+        }
+        Node instance = rifleScene.instantiate();
+        if (!(instance instanceof WeaponItem rifle)) {
+            instance.queueFree();
+            return;
+        }
+
+        container.addChild(rifle);
+        rifle.setGlobalPosition(player.getGlobalPosition());
+        GD.print("DebugHarness: dropped AR4 pickup at " + player.getGlobalPosition());
+    }
+
+    /**
      * F4 — drops one AI vehicle on every {@link VehicleRoute} in the scene. The fastest way to test an
-     * authored road layout (e.g. RoadKitExample): each lane/route gets a car driving its direction.
+     * authored road layout (any baked district piece or the full world): each lane/route gets a car
+     * driving its direction.
      */
     private void spawnOnAllRoutes() {
         if (getTree() == null) return;
@@ -403,6 +478,28 @@ public class DebugHarness extends Node {
             if (dx * dx + dz * dz < m2) return true;
         }
         return false;
+    }
+
+    /**
+     * F10/F11's spawn position: jittered around the scene's {@code PlayerSpawn} marker when
+     * present (the same convention {@code GameManager.spawnPlayerBody} uses), else the legacy
+     * origin-relative box — so scenes without the marker (predating it) keep behaving exactly
+     * as before.
+     */
+    private Vector3 jitteredSpawnPosition() {
+        Node scene = getTree() != null ? getTree().getCurrentScene() : null;
+        Node marker = scene != null ? scene.getNodeOrNull("PlayerSpawn") : null;
+        if (marker instanceof Node3D anchor) {
+            Vector3 pos = anchor.getGlobalPosition();
+            return new Vector3(
+                    (float) pos.getX() + GD.randfRange(-4.0f, 4.0f),
+                    (float) pos.getY(),
+                    (float) pos.getZ() + GD.randfRange(-4.0f, 4.0f));
+        }
+        return new Vector3(
+                GD.randfRange(-12.0f, 18.0f),
+                0.9f,
+                GD.randfRange(-12.0f, 8.0f));
     }
 
     /** Counts living "characters"-group members whose CharacterInfo.faction matches. */
