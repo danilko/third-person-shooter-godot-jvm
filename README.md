@@ -1,6 +1,6 @@
-# Godot Kotlin/JVM Open World Shooter
+# Godot Kotlin/JVM Open World First/Third Person Network Multiplayer Shooter
 
-A technical exploration of 3D game mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. This project adapts and refactors traditional GDScript-based third-person controllers into a Java/Kotlin-compatible architecture.
+A technical exploration of 3D game first/third person network multiplayer shooter mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. 
 
 ## 🎮 Play the Game
 A prebuilt binary is available on **itch.io**: [third-person-shooter-godot-jvm](https://danil-ko.itch.io/third-person-shooter-godot-jvm)
@@ -39,9 +39,29 @@ This project is based on:
 * **Drivable Vehicle:**
 	* Player able to enter and exit vehicle
 	* Arcade driving vehicle
-* **LAN Multiplayer (experimental):**
+* **Ambient Vehicle Traffic:**
+	* AI-driven traffic follows a lane graph derived from route geometry (pure-pursuit steering, Catmull-Rom smoothing, per-lane offset) — cars hold their lane, take random turns at junctions, and yield at intersections by first-come right-of-way.
+	* Vehicles physically collide (queue/bump rather than clip through each other) and recycle at dead ends (U-turn or despawn/respawn elsewhere).
+	* **Carjacking:** ambient traffic vehicles carry a visible AI driver; walking up and pressing `E` evicts the AI (which flees or turns hostile, faction-dependent) and seats the player.
+* **Performance Foundation (large AI counts):**
+	* Spatial hashing (`SpatialEntityGrid`) replaces group-scans for nearby-entity queries.
+	* Three-tier AI LOD (ACTIVE / PASSIVE / FROZEN by distance) skips pathfinding and animation-tree updates for AI far from every player.
+	* Data-driven faction relationship matrix (`FactionManager`/`FactionTable`), with runtime relationship flips (e.g. a betrayal turning an ally hostile) that replicate to all peers.
+* **Open-World Simulation:**
+	* Zones (`WorldZoneManager`) stream AI population, geometry, and ambient traffic in/out as players move, host-authoritative and replicated.
+	* AI spatial perception (`StimulusManager`) — gunshots/explosions/crashes post an audible event AI poll for, so out-of-sight enemies investigate noise instead of only reacting to line-of-sight.
+	* Squad awareness (`AISquad`) — one AI spotting a target alerts nearby squadmates instantly instead of each AI waking on its own scan.
+	* Per-region ambience (`RegionConfig`) — density, AI/vehicle population multipliers, lighting colour temperature, and fog shift as players cross into a different named region.
+* **Swimming & Enterable Buildings:**
+	* A dedicated swim stance (buoyancy, dive/surface) for water volumes.
+	* Breakable glass/walls and openable (auto or interact) doors placed as ordinary streamed world geometry — no loading-screen "interior cells," so shooting and AI pathing continue seamlessly in and out.
+* **Navigation UI:** always-on minimap, a full-screen toggleable map (click to set a GPS waypoint), and a crosshair-arrow GPS indicator — waypoints replicate so co-op teammates see each other's marker in their faction colour.
+* **LAN Multiplayer:**
 	* Host-authoritative networking over ENet (`NetworkManager` AutoLoad): batched character/vehicle state snapshots with near-time interpolation, reliable elimination + inventory reconciliation, and client→host request/grant for pickups and vehicle seats.
 	* Non-authority bodies are driven by a `NetworkController` (the same `Controller` slot the player/AI use), so locomotion, firing, and ragdoll replicate without bespoke per-feature sync.
+	* **Join / rejoin:** `PlayerSession` tracks peer/character/faction/connection state — disconnecting mid-session swaps the player to an AI-controlled bot, reconnecting reattaches control to the same body.
+	* **Weapon-switch/fire ordering fixed for remote peers:** a reliable switch event plus a shared holster→draw timeline means a puppet's weapon change and fire cosmetics never render ahead of (or desynced from) the actual draw animation; reload replicates the same way.
+	* Net observability (drop/backpressure counters), reliable elimination + inventory reconciliation, and full vehicle replication (driver authority, host-owned health/ammo, occupancy sync) round out the sync layer.
 * **Game Systems:**
 	* `EventBus` AutoLoad singleton for decoupled kill/death/HUD events.
 	* `GameManager` AutoLoad singleton (PLAYING / PAUSED / GAME_OVER).
@@ -92,6 +112,11 @@ players move. A zone is a `WorldZoneMarker` placed in the level with a `WorldZon
   A debug warning fires if a `.tres` violates this.
 - **Navigation:** AI path on the level's `NavigationRegion3D`. Streamed geometry chunks carry
   their own baked navmesh — see `BLENDER_CONVENTIONS.md` ("Zone chunking" / "Navigation per chunk").
+- **Perception + squads on top of streaming:** `StimulusManager` gives AI a poll-based "hearing"
+  channel (gunshots/explosions/crashes) independent of line-of-sight, and `AISquad` shares one
+  spotted target across a nearby group so the whole squad reacts within a frame, not one scan cycle
+  at a time. `RegionConfig` (optional, per zone) scales ambient AI/vehicle density and swaps
+  lighting/fog/faction rules as players cross into a differently-themed area.
 
 See `CLAUDE.md` ("Open World Simulation (Part E)") for the full streaming/authority details.
 
@@ -138,6 +163,24 @@ Attack ──(no ammo)──────────────────► 
 | `attackRange` | 150 | Max range to stay in AttackState |
 
 LoS is detected via a dedicated **SightRay** that is completely independent of the AimRay. This means accurate LoS detection never implies accurate aim — the two systems are decoupled.
+
+---
+
+## 🗾 Open World
+
+A ~3 km × 3 km, 36-district open world assembled from a Blender-authored layout (an arterial road
+backbone + individually-built district pieces) and baked into native Godot scenes by a custom Java
+bake pipeline — the godot-kotlin-jvm plugin build used here ships no editor scripting API, so the
+"turn named Blender markers into gameplay nodes" step runs as ordinary game code instead of an
+editor plugin.
+
+Every district's building/road footprint is **real extracted geospatial data** from
+[Project PLATEAU](https://www.mlit.go.jp/plateau/) (Japan's MLIT open 3D city model program) — real
+Tokyo Bay waterfront, real residential wards, a real mountain village's road network, and several
+well-known real precincts — composited into one condensed map rather than a literal geographic
+reconstruction (see **Credits & Assets** below for the required data attribution). District pieces
+stream in/out as players approach (zone-based, host-authoritative and replicated), each with its own
+baked pedestrian navmesh so AI can path through the real building layouts.
 
 ---
 
@@ -323,15 +366,25 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
 
 ## 🧪 Debug Harness (Temporary)
 
-`DebugHarness` (a node in `World.tscn`) wires a few function keys for exercising
-missions and AI population without the (not-yet-built) unlock-graph/console flow.
-It's a throwaway tool — slated for removal once the real debug console lands.
+`DebugHarness` wires a set of function keys for exercising missions, AI population, traffic, and
+world-scale testing without the (not-yet-built) unlock-graph/console flow. It's a throwaway tool —
+slated for removal once the real debug console lands. `hosts/WorldMasterDebug.tscn` is the
+full-open-world host scene with this harness attached (`hosts/WorldMaster.tscn` is the same world
+without it, for a "clean" run).
 
 | Key | Action |
 |:---:|:-------|
+| `F1`  | Teleport-cycles the player through every registered district in the open world — quick way to jump around the map without walking/driving. |
+| `F2`  | Drops a weapon pickup at the player's feet (for testing pickup flow in whichever district `F1` landed on). |
+| `F4`  | Spawns one AI vehicle on every authored traffic route in the current scene. |
+| `F5`  | Re-bakes the Blender-authored world source into a native scene (world-build iteration tool). |
+| `F6`  | Hosts a debug LAN server. |
+| `F7`  | Joins a debug LAN server on localhost. |
+| `F8`  | Posts a synthetic gunshot noise event near the player, so nearby AI investigate it. |
 | `F9`  | Starts a basic `ELIMINATE_ALL` debug mission targeting the `"enemy"` faction (spawns a few hostiles first if none are present). |
 | `F10` | Spawns 5 additional `"enemy"`-faction AI characters into the world (more enemies). |
 | `F11` | Spawns 1 additional `"player"`-faction AI ally into the world (more allies, e.g. for escort/squad testing). |
+| `F12` | Places a debug world zone near the player that streams in a small enemy group on approach (zone-streaming walk-test). |
 
 Every AI spawned via `F10`/`F11` is auto-equipped with an AR4 rifle so it fights at
 range instead of relying on bare fists.
