@@ -1,13 +1,16 @@
-[gd_scene load_steps=3 format=3 uid="uid://cworldmasterdebug1"]
+[gd_scene format=3 uid="uid://8l7lsc2x7hfi"]
 
 [ext_resource type="PackedScene" uid="uid://0epl5wy5aru3" path="res://src/main/resources/com/openworld/world/hosts/WorldMaster.tscn" id="1_wmbase"]
 [ext_resource type="Script" uid="uid://dj0ch24xgin8d" path="res://src/main/java/com/openworld/debug/DebugHarness.java" id="2_dbgh"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/debug/ZoneDebugOverlay.java" id="3_zdbg"]
+[ext_resource type="Script" uid="uid://dvpasfn7wwa0b" path="res://src/main/java/com/openworld/debug/ZoneDebugOverlay.java" id="3_zdbg"]
 
-[node name="WorldMaster" instance=ExtResource("1_wmbase")]
+[node name="WorldMaster" unique_id=1311395931 instance=ExtResource("1_wmbase")]
 
-[node name="DebugHarness" type="Node" parent="." unique_id=210000002]
+[node name="VehicleRoot" parent="." index="6" unique_id=1342995585]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -660.922, 30, 759)
+
+[node name="DebugHarness" type="Node" parent="." index="7" unique_id=210000002]
 script = ExtResource("2_dbgh")
 
-[node name="ZoneDebugOverlay" type="CanvasLayer" parent="." unique_id=210000003]
+[node name="ZoneDebugOverlay" type="CanvasLayer" parent="." index="8" unique_id=210000003]
 script = ExtResource("3_zdbg")
