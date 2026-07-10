@@ -16,6 +16,9 @@ assets/world_source/plateau/data/*.json filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/districts/*.gltf filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/districts/*.bin filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/districts/*.tscn filter=lfs diff=lfs merge=lfs -text
+# .scn = binary resave of the district .tscn (DistrictBinaryConverter — faster stream-in parse).
+# Derived + regenerable, but LFS-committed so a fresh checkout streams fast without a converter run.
+src/main/resources/com/openworld/world/districts/*.scn filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/master/*.gltf filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/master/*.bin filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/master/*.tscn filter=lfs diff=lfs merge=lfs -text
