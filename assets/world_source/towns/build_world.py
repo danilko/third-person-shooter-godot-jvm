@@ -210,8 +210,15 @@ def build():
             kc.box(f"Plate_{key}_{gx}_{gy}", to_world(x0), to_world(x1), to_world(y0), to_world(y1),
                    elev - 0.6, elev - 0.1, layout, t["col"])
 
-            # region_ marker -> WorldZoneMarker + RegionConfig.
-            r = bpy.data.objects.new(f"region_{key}_{gx}_{gy}", None)
+            # region_ marker -> WorldZoneMarker + RegionConfig. Named after the ACTUAL piece stem
+            # (District_<theme>_<gx>_<gy> or a hero name like District_Shibuya via HERO_PIECE) --
+            # not the generic theme/grid key -- so WorldBaker's idOf() derives a zoneId that is
+            # EXACTLY the piece's .blend/.tscn filename stem. That zoneId is what ZoneDebugOverlay
+            # prints ("District: <zoneId>") and WorldZoneManager logs on load/unload, so a hero
+            # district's debug id now reads "District_Shibuya" (not "city_1_1"), traceable straight
+            # to districts/District_Shibuya.blend with no lookup table.
+            piece_stem = HERO_PIECE.get((gx, gy), f"District_{key}_{gx}_{gy}.tscn").removesuffix(".tscn")
+            r = bpy.data.objects.new(f"region_{piece_stem}", None)
             r.empty_display_type = 'CUBE'; r.empty_display_size = DISTRICT / 2.0
             r.location = (cx, cy, elev)
             r["size"] = [DISTRICT, 40.0, DISTRICT]; r["bounds"] = [DISTRICT, 40.0, DISTRICT]

@@ -264,6 +264,28 @@ def colonly(visual, coll=None, inset=0.0):
     return p
 
 
+def colonly_mesh(visual, coll=None):
+    """Author a `<Name>-colonly` proxy that COPIES the visual's own mesh geometry instead of its
+    bounding box. Same Godot import contract as colonly() (the `-colonly` suffix drops the visual
+    half on import and builds a CollisionShape3D from this mesh) -- but for an irregular real-world
+    footprint (a PLATEAU building/bridge) a box proxy blocks empty space the visual never occupied
+    (an L-shaped or angled building reads as a solid rectangle to collision), which shows up as an
+    invisible wall in an area that looks walkable. Use this instead of colonly() wherever the
+    visual mesh is already low-poly enough to serve directly as its own (concave) collider -- real
+    PLATEAU buildings/bridges/landmarks, not modular kit pieces (those keep the box proxy).
+    Deliberately NOT a convex-hull option: a bridge or archway's real open span under/through it
+    would become solid under a convex hull (found on Rainbow Bridge during walk-testing), which is
+    worse than the box proxy this replaces -- concave is the only shape that keeps real holes."""
+    c = coll or (visual.users_collection[0] if visual.users_collection else get_coll("ENV"))
+    me = visual.data.copy()
+    p = bpy.data.objects.new(visual.name + "-colonly", me)
+    c.objects.link(p)
+    p.data.materials.clear()
+    p.data.materials.append(mat("col"))
+    p["proxy_for"] = visual.name
+    return p
+
+
 def export_gltf(objs, filepath):
     """Export the given objects (+ their data) to a .glb at filepath."""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)

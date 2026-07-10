@@ -173,9 +173,27 @@ def import_components(coll, components, ox, oy, ground_ref, world_z, tag, rot_de
         name = f"{tag}_{i:03d}_h{c['height']:.0f}m"
         obj = _mesh_object(name, coll, c["verts"], c["faces"], ox, oy, oz, rot_deg=rot_deg)
         if colonly:
-            kc.colonly(obj, coll=coll)
+            kc.colonly_mesh(obj, coll=coll)
         tv += len(c["verts"]); tf += len(c["faces"])
     return len(components) - skipped, tv, tf, skipped
+
+
+def _join_all(objs, name):
+    """Join every object in `objs` into ONE mesh object named `name` (single-object case just
+    renames -- no join needed). Same select/active/join idiom as build_infra_elevated.py's
+    `_weld()`. Used to collapse a district's many per-polygon road slabs into one mesh."""
+    if not objs:
+        return None
+    if len(objs) == 1:
+        objs[0].name = name
+        return objs[0]
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    objs[0].name = name
+    return objs[0]
 
 
 def _crosses_edge_margin(verts, half, margin):
@@ -218,7 +236,7 @@ def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=Non
         tag_kind = "Landmark" if i < 3 else "Bldg"
         name = f"{tag}_{tag_kind}_{i:03d}_h{b['height']:.0f}m"
         obj = _mesh_object(name, coll, b["verts"], b["faces"], offset_x, offset_y, ground_z)
-        kc.colonly(obj, coll=coll)
+        kc.colonly_mesh(obj, coll=coll)
         b_verts += len(b["verts"]); b_faces += len(b["faces"])
 
     br_verts = br_faces = 0
@@ -229,7 +247,7 @@ def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=Non
             continue
         name = f"{tag}_Bridge_{i:03d}_h{br['height']:.0f}m"
         obj = _mesh_object(name, coll, br["verts"], br["faces"], offset_x, offset_y, ground_z)
-        kc.colonly(obj, coll=coll)
+        kc.colonly_mesh(obj, coll=coll)
         br_verts += len(br["verts"]); br_faces += len(br["faces"])
 
     terrain_tris = data.get("terrain") or []
@@ -239,6 +257,7 @@ def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=Non
         terrain_obj = import_terrain(coll, terrain_tris, offset_x, offset_y, ground_z, tag=f"{tag}_Terrain")
 
     r_count = 0
+    road_objs = []
     for i, r in enumerate(data["roads"]):
         ring = r["rings"][0]
         xy = [(p[0], p[1]) for p in ring[:-1]] if ring[0] == ring[-1] else [(p[0], p[1]) for p in ring]
@@ -247,7 +266,13 @@ def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=Non
                                top_zs=top_zs)
         if obj:
             obj.data.materials.append(kc.mat("asphalt"))
+            road_objs.append(obj)
             r_count += 1
+
+    # Combine every per-polygon road slab into ONE mesh -- one object/node per district instead
+    # of (often) dozens, all sharing the same "asphalt" material and carrying no per-object
+    # collision of their own (the district's flat GroundSafety box is what's actually walkable).
+    _join_all(road_objs, f"{tag}_Road")
 
     return {
         "buildings": len(data["buildings"]) - b_skipped, "buildings_total": data.get("buildings_total_in_tiles", 0),
