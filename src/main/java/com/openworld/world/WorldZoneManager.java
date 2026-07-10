@@ -6,11 +6,13 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.DirectionalLight3D;
 import godot.api.Environment;
+import godot.api.NavigationRegion3D;
 import godot.api.Node;
 import godot.api.PackedScene;
 import godot.api.ResourceLoader;
 import godot.api.WorldEnvironment;
 import godot.core.Color;
+import godot.core.Error;
 import godot.core.NodePath;
 import godot.core.StringName;
 import godot.core.Vector3;
@@ -30,9 +32,11 @@ import com.openworld.net.NetworkManager;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -68,17 +72,26 @@ public class WorldZoneManager extends Node {
     @Export @RegisterProperty public float evalInterval = 0.5f;
 
     /**
-     * Max new zone {@code load()}s performed in a single eval tick. Each load synchronously
-     * instantiates a whole district {@code PackedScene} — now real PLATEAU/kit geometry plus a
-     * baked {@code NavigationRegion3D}, not placeholder boxes — so if several districts enter
-     * range in the same tick (common right after a teleport, or at spawn: district centers are
-     * ~504m apart and the default {@code loadRadius} is 402m, so immediate neighbours routinely
-     * qualify together), loading them all in one frame is a visible freeze. Extra qualifying
-     * zones are simply picked up on the next tick(s) instead — a few hundred ms of the world
-     * "catching up" reads far better than a multi-district stutter. Unloads are NOT throttled
-     * (freeing is cheap relative to instantiating).
+     * Max new zone stream-in pipelines <b>started</b> in a single eval tick. Starting a pipeline is
+     * cheap now (it only issues a threaded {@code ResourceLoader} request — parse happens on engine
+     * worker threads), so this no longer guards a freeze; it only caps how many multi-MB district
+     * parses run concurrently (memory/IO pressure right after a teleport or at spawn, when several
+     * neighbours qualify together — district centers are ~504m apart vs. the default 402m
+     * {@code loadRadius}). Main-thread work (instantiate / tree entry / spawning) is serialized to
+     * one zone at a time and time-sliced by {@link #streamBudgetMs} regardless of this value.
+     * Unloads are not capped (they are batched under the same budget).
      */
-    @Export @RegisterProperty public int maxLoadsPerTick = 1;
+    @Export @RegisterProperty public int maxLoadsPerTick = 2;
+
+    /**
+     * Per-frame main-thread time budget (milliseconds) for streaming work: entering district
+     * geometry children into the tree, spawning streamed AI/vehicles, and batched unload frees.
+     * The pipeline always makes at least one step of progress per frame even when a single step
+     * (e.g. instancing one heavy building) blows the budget, so a task can never stall. ~4ms
+     * leaves headroom inside a 60Hz physics tick; lower it on Steam Deck if streaming visibly
+     * dents the frame rate, raise it to stream faster.
+     */
+    @Export @RegisterProperty public float streamBudgetMs = 4.0f;
 
     /** Max recycled AI bodies the pool retains. */
     @Export @RegisterProperty public int poolCapacity = 64;
@@ -126,6 +139,46 @@ public class WorldZoneManager extends Node {
         Node geometryInstance;                                // cosmetic, freed on unload
     }
 
+    // ── Incremental streaming pipeline (the anti-freeze rework) ────────────────
+    //
+    // A zone crossing used to be one synchronous load(): GD.load-parse a 7–19MB district .tscn on
+    // the main thread, instantiate ~1600 nodes, enter 500+ static bodies + a NavigationRegion3D
+    // into the tree, then spawn every AI/vehicle — all inside a single physics frame (the district
+    // -border freeze). Streaming is now a per-marker task state machine:
+    //
+    //   GEO_REQUEST → GEO_WAIT (engine worker threads parse the PackedScene; main thread polls)
+    //     → GEO_INSTANTIATE (one frame: instantiate off-tree, strip children for batched entry)
+    //     → GEO_ENTER (children re-enter the tree a budget-slice per frame; a NavigationRegion3D
+    //        gets a frame alone — its nav-map sync is a one-off spike)
+    //     → SPAWN (AI/named/vehicle spawns drained as work items under the same budget)
+    //   and for unload: FREE_BODIES → FREE_GEO (batched queueFree instead of one 1600-node drop).
+    //
+    // While a task is in flight the marker is neither in `loaded` nor eligible for a second task;
+    // the LOD-low placeholder stays up until the full-detail children are all in (no visual hole).
+    // A load task whose player retreats past unloadRadius is cancelled (teardown of whatever made
+    // it in so far). Synchronous teardown paths (marker exiting the tree, scene reload, AutoLoad
+    // exit) still exist — see unloadImmediate/teardownZone.
+
+    private enum Phase { GEO_REQUEST, GEO_WAIT, GEO_INSTANTIATE, GEO_ENTER, SPAWN, FREE_BODIES, FREE_GEO }
+
+    private static final class StreamTask {
+        final WorldZoneMarker marker;
+        final boolean isLoad;          // false = batched unload
+        final LoadedZone lz;
+        Phase phase;
+        String threadedPath = "";      // res:// path handed to loadThreadedRequest ("" = none)
+        Node geoRoot;                  // instanced district root (in tree, children re-entering)
+        final ArrayDeque<Node> pendingChildren = new ArrayDeque<>();  // OFF-tree until entered
+        final ArrayDeque<Runnable> spawnWork = new ArrayDeque<>();
+        int recycled = 0, freed = 0;   // unload stats (debug log)
+        StreamTask(WorldZoneMarker marker, boolean isLoad, LoadedZone lz, Phase phase) {
+            this.marker = marker; this.isLoad = isLoad; this.lz = lz; this.phase = phase;
+        }
+    }
+
+    /** In-flight stream-in/out tasks, insertion-ordered (first task gets the frame budget). */
+    private final Map<WorldZoneMarker, StreamTask> tasks = new LinkedHashMap<>();
+
     @RegisterFunction
     @Override
     public void _ready() {
@@ -136,6 +189,10 @@ public class WorldZoneManager extends Node {
     @Override
     public void _exitTree() {
         if (instance == this) instance = null;
+        // In-flight tasks: only the OFF-tree staged children need explicit freeing (everything
+        // in-tree — geometry roots, spawned AI — goes down with the SceneTree at engine teardown).
+        for (StreamTask t : tasks.values()) freePendingChildren(t);
+        tasks.clear();
         for (LoadedZone lz : loaded.values()) {
             if (lz.geometryInstance != null && GD.isInstanceValid(lz.geometryInstance))
                 lz.geometryInstance.queueFree();
@@ -197,7 +254,15 @@ public class WorldZoneManager extends Node {
 
     public void unregisterMarker(WorldZoneMarker marker) {
         if (marker == null) return;
-        if (loaded.containsKey(marker)) unload(marker);
+        StreamTask task = tasks.remove(marker);
+        if (task != null) {
+            // Mid-stream marker removal: free the OFF-tree staged children (they'd leak — nothing
+            // owns them) and tear down whatever the task already put in the world (AI live under
+            // the Characters container, not the marker, so they do NOT die with it).
+            freePendingChildren(task);
+            teardownZone(marker, task.lz);
+        }
+        if (loaded.containsKey(marker)) unloadImmediate(marker);
         markers.remove(marker);
     }
 
@@ -208,6 +273,7 @@ public class WorldZoneManager extends Node {
     public void _physicsProcess(double delta) {
         detectSceneReload();
         cullFinishedVehicles();   // every frame (anti-jam) — a DESPAWN car must not idle at the lane end
+        processStreamTasks();     // every frame — the time-sliced streaming pipeline
 
         evalTimer -= delta;
         if (evalTimer > 0.0) return;
@@ -217,13 +283,22 @@ public class WorldZoneManager extends Node {
         for (WorldZoneMarker marker : new ArrayList<>(markers)) {
             if (!GD.isInstanceValid(marker) || marker.zone == null) continue;
             float dist = nearestPlayerDistXZ(marker.getGlobalPosition());
+            StreamTask task = tasks.get(marker);
+            if (task != null) {
+                // In flight — leave the pipeline to it. One exception: a player who turned around
+                // mid-stream. Once they're past unloadRadius (same hysteresis as a loaded zone),
+                // abandon the load — otherwise sprinting past a district forces a full load
+                // immediately followed by a full unload.
+                if (task.isLoad && dist > marker.zone.unloadRadius) cancelLoad(task);
+                continue;
+            }
             boolean isLoaded = loaded.containsKey(marker);
             if (!isLoaded && dist < marker.zone.loadRadius) {
                 if (loadsThisTick >= maxLoadsPerTick) continue;   // next tick(s) pick up the rest
-                load(marker);
+                beginLoad(marker);
                 loadsThisTick++;
             } else if (isLoaded && dist > marker.zone.unloadRadius) {
-                unload(marker);
+                beginUnload(marker);
             } else if (debugLog && dist < marker.zone.unloadRadius * 1.2f) {
                 // Approach feedback (only for zones the player is near, so far zones stay quiet).
                 GD.print("WorldZoneManager: zone '" + marker.zone.zoneId + "' nearestPlayer="
@@ -457,6 +532,10 @@ public class WorldZoneManager extends Node {
         if (id == lastSceneInstanceId) return;
         lastSceneInstanceId = id;
         loaded.clear();
+        // In-flight tasks referenced the old scene (markers, containers) — all of that died with it.
+        // Only the OFF-tree staged children survive a scene swap; free them or they leak.
+        for (StreamTask t : tasks.values()) freePendingChildren(t);
+        tasks.clear();
         if (pool != null) { pool.clear(); pool = null; }
     }
 
@@ -496,155 +575,439 @@ public class WorldZoneManager extends Node {
         return min;
     }
 
-    // ── Load / unload ───────────────────────────────────────────────────────────
+    // ── Load / unload (task creation) ───────────────────────────────────────────
 
-    private void load(WorldZoneMarker marker) {
-        WorldZone zone = marker.zone;
-        LoadedZone lz = new LoadedZone();
-        loaded.put(marker, lz);
-        marker.setLoadedVisual(true);
-        marker.removeLodLow();   // full detail is taking over — drop the always-resident placeholder
+    private void beginLoad(WorldZoneMarker marker) {
+        // NOTE: the marker is NOT in `loaded` and its LOD-low placeholder stays up until the
+        // pipeline finishes — completeLoad() flips both.
+        tasks.put(marker, new StreamTask(marker, true, new LoadedZone(), Phase.GEO_REQUEST));
+        if (debugLog) GD.print("WorldZoneManager: streaming IN zone '" + marker.zone.zoneId + "'…");
+    }
 
-        // Lazily resolve a path-wired geometry piece (incremental authoring: a piece baked after the
-        // master went live is picked up here with no master re-bake). `exists` guards against error
-        // spam for a zone whose piece is not authored yet; the resolved scene is cached on the resource.
-        if (zone.geometry == null && zone.geometryPath != null && !zone.geometryPath.isEmpty()
-                && ResourceLoader.INSTANCE.exists(zone.geometryPath, "")) {
-            Object o = GD.load(zone.geometryPath);
-            if (o instanceof PackedScene ps) zone.geometry = ps;
+    private void beginUnload(WorldZoneMarker marker) {
+        LoadedZone lz = loaded.remove(marker);
+        if (lz == null) return;
+        marker.setLoadedVisual(false);
+        tasks.put(marker, new StreamTask(marker, false, lz, Phase.FREE_BODIES));
+        if (debugLog) GD.print("WorldZoneManager: streaming OUT zone '" + marker.zone.zoneId + "'…");
+    }
+
+    // ── Streaming pipeline ──────────────────────────────────────────────────────
+
+    private void processStreamTasks() {
+        if (tasks.isEmpty()) return;
+        long budgetNanos = (long) (streamBudgetMs * 1_000_000L);
+        long start = System.nanoTime();
+        boolean workerTaken = false;   // one budgeted task per frame keeps the budget honest
+        for (StreamTask t : new ArrayList<>(tasks.values())) {
+            if (!GD.isInstanceValid(t.marker) || t.marker.zone == null) { discardTask(t); continue; }
+            // Threaded-load polling is near-free — poll every waiting task every frame so a parse
+            // finishing on a worker thread is picked up promptly even while another zone streams.
+            if (t.phase == Phase.GEO_WAIT) {
+                pollThreadedLoad(t);
+                if (t.phase == Phase.GEO_WAIT) continue;   // still parsing on the worker
+            }
+            if (workerTaken) continue;
+            workerTaken = true;
+            stepTask(t, start, budgetNanos);
         }
+    }
 
-        // Cosmetic geometry — instanced locally on every peer.
-        if (zone.geometry != null) {
-            Node geo = zone.geometry.instantiate();
-            if (geo != null) { marker.addChild(geo); lz.geometryInstance = geo; }
+    /** Advance one task until it completes, yields the frame, or the budget runs out. */
+    private void stepTask(StreamTask t, long start, long budgetNanos) {
+        boolean cont = true;
+        while (cont && tasks.get(t.marker) == t && (System.nanoTime() - start) < budgetNanos) {
+            cont = switch (t.phase) {
+                case GEO_REQUEST     -> beginGeometry(t);
+                case GEO_WAIT        -> false;                 // worker thread owns it; poll next frame
+                case GEO_INSTANTIATE -> { instantiateGeometry(t); yield true; }
+                case GEO_ENTER       -> enterGeometryBatch(t, start, budgetNanos);
+                case SPAWN           -> spawnBatch(t, start, budgetNanos);
+                case FREE_BODIES     -> freeBodiesBatch(t, start, budgetNanos);
+                case FREE_GEO        -> freeGeometryBatch(t, start, budgetNanos);
+            };
         }
+    }
 
-        // Everything below is host-authoritative (PLAN.md I3c synced model): clients reconstruct the AI
-        // via MSG_SPAWN and the traffic via MSG_VEHICLE_SPAWN, then drive both from snapshots.
+    /**
+     * Resolve the zone's geometry piece to the path actually loaded: a sibling binary {@code .scn}
+     * wins over the baked text {@code .tscn} when it exists (see {@code DistrictBinaryConverter} —
+     * binary skips the multi-MB text/base64 parse), else the wired path, else "" (not authored yet).
+     * `exists` guards against error spam either way (incremental authoring, no master re-bake).
+     */
+    private String resolveGeometryPath(WorldZone zone) {
+        String p = zone.geometryPath;
+        if (p == null || p.isEmpty()) return "";
+        if (p.endsWith(".tscn")) {
+            String bin = p.substring(0, p.length() - ".tscn".length()) + ".scn";
+            if (ResourceLoader.INSTANCE.exists(bin, "")) return bin;
+        }
+        return ResourceLoader.INSTANCE.exists(p, "") ? p : "";
+    }
+
+    /** GEO_REQUEST: kick the threaded parse (or skip straight ahead). Returns false when now waiting. */
+    private boolean beginGeometry(StreamTask t) {
+        WorldZone zone = t.marker.zone;
+        if (zone.geometry != null) { t.phase = Phase.GEO_INSTANTIATE; return true; }   // already cached
+        String path = resolveGeometryPath(zone);
+        if (path.isEmpty()) { beginSpawnPhase(t); return true; }   // geometry-less zone (AI only)
+        Error err = ResourceLoader.loadThreadedRequest(path);
+        if (err != Error.OK) {
+            GD.printErr("WorldZoneManager: loadThreadedRequest failed for '" + path + "': " + err);
+            beginSpawnPhase(t);
+            return true;
+        }
+        t.threadedPath = path;
+        t.phase = Phase.GEO_WAIT;
+        return false;
+    }
+
+    /** GEO_WAIT: check on the worker-thread parse; cache + advance when it lands. */
+    private void pollThreadedLoad(StreamTask t) {
+        ResourceLoader.ThreadLoadStatus st = ResourceLoader.loadThreadedGetStatus(t.threadedPath);
+        if (st == ResourceLoader.ThreadLoadStatus.IN_PROGRESS) return;
+        if (st == ResourceLoader.ThreadLoadStatus.LOADED
+                && ResourceLoader.loadThreadedGet(t.threadedPath) instanceof PackedScene ps) {
+            t.marker.zone.geometry = ps;   // cached on the resource, same as the old sync path
+            t.phase = Phase.GEO_INSTANTIATE;
+            return;
+        }
+        GD.printErr("WorldZoneManager: threaded load of '" + t.threadedPath + "' failed (" + st + ")");
+        beginSpawnPhase(t);
+    }
+
+    /**
+     * GEO_INSTANTIATE: instantiate the district off-tree — node construction only, no physics/render
+     * registration yet — then strip its children so GEO_ENTER can re-enter them a slice per frame
+     * (tree entry is where the 500+ static-body/collider/render registrations actually happen).
+     * The bare root enters the tree here (near-free: one Node3D). This is the single largest
+     * remaining per-frame step (~1600 node constructions); if it ever reads as a hitch on Steam
+     * Deck, the next lever is baking districts as sub-chunk scenes, not shrinking the budget.
+     */
+    private void instantiateGeometry(StreamTask t) {
+        Node geo = t.marker.zone.geometry.instantiate();
+        if (geo == null) { beginSpawnPhase(t); return; }
+        for (Node child : new ArrayList<>(geo.getChildren())) {
+            child.setOwner(null);   // removeChild keeps pack-time owner; re-adding then warns per node
+            geo.removeChild(child);
+            t.pendingChildren.add(child);
+        }
+        t.marker.addChild(geo);
+        t.geoRoot = geo;
+        t.lz.geometryInstance = geo;
+        t.phase = Phase.GEO_ENTER;
+    }
+
+    /**
+     * GEO_ENTER: re-enter stripped children under the budget (children keep their local transforms,
+     * so batched re-parenting is layout-identical). Always at least one per frame (guaranteed
+     * progress). A {@link NavigationRegion3D} yields the rest of the frame — entering it triggers
+     * the NavigationServer map sync, a one-off spike that shouldn't share a frame with anything.
+     */
+    private boolean enterGeometryBatch(StreamTask t, long start, long budgetNanos) {
+        boolean first = true;
+        while (!t.pendingChildren.isEmpty() && (first || (System.nanoTime() - start) < budgetNanos)) {
+            first = false;
+            Node child = t.pendingChildren.poll();
+            boolean navRegion = child instanceof NavigationRegion3D;
+            t.geoRoot.addChild(child);
+            if (navRegion) return false;
+        }
+        if (!t.pendingChildren.isEmpty()) return false;   // budget spent — resume next frame
+        // Full detail is genuinely all in — only now swap the placeholder out (no visual hole).
+        t.marker.setLoadedVisual(true);
+        t.marker.removeLodLow();
+        beginSpawnPhase(t);
+        return true;
+    }
+
+    /** Enter SPAWN with the zone's population queued as work items; empty queue completes at once. */
+    private void beginSpawnPhase(StreamTask t) {
+        t.phase = Phase.SPAWN;
+        buildSpawnWork(t);
+        if (t.spawnWork.isEmpty()) completeLoad(t);
+    }
+
+    /** SPAWN: drain spawn work items under the budget, at least one per frame. */
+    private boolean spawnBatch(StreamTask t, long start, long budgetNanos) {
+        boolean first = true;
+        while (!t.spawnWork.isEmpty() && (first || (System.nanoTime() - start) < budgetNanos)) {
+            first = false;
+            t.spawnWork.poll().run();
+        }
+        if (t.spawnWork.isEmpty()) completeLoad(t);
+        return true;
+    }
+
+    private void completeLoad(StreamTask t) {
+        tasks.remove(t.marker);
+        loaded.put(t.marker, t.lz);
+        if (debugLog) {
+            GD.print("WorldZoneManager: LOADED zone '" + t.marker.zone.zoneId + "' — "
+                    + t.lz.pooled.size() + " ambient, " + t.lz.named.size() + " named, "
+                    + t.lz.vehicles.size() + " vehicles; pool idle now "
+                    + (pool != null ? pool.idleCount() : 0));
+        }
+    }
+
+    /**
+     * Queue the zone's population as one-per-frame-amortizable work items (PLAN.md E1's deferred
+     * "frame-spread spawning"): squad creation, each ambient AI, each named AI, each traffic car.
+     * Host/SP-only, mirroring the old synchronous load — clients reconstruct via MSG_SPAWN /
+     * MSG_VEHICLE_SPAWN. Captured references (container, center) are per-load; a scene reload
+     * mid-task drops the whole task in detectSceneReload, so no stale-capture risk.
+     */
+    private void buildSpawnWork(StreamTask t) {
         NetworkManager net = networkManager();
         if (net != null && net.isNetworked() && !net.isServer()) return;
-
+        WorldZone zone = t.marker.zone;
         Node container = charactersContainer();
         if (container == null) {
             GD.print("WorldZoneManager: Characters container not found — cannot stream zone '"
                     + zone.zoneId + "'");
             return;
         }
-        Vector3 center = marker.getGlobalPosition();
-        SpawnPool sp = pool();
-        int recycledCount = 0;
-        int freshCount = 0;
+        Vector3 center = t.marker.getGlobalPosition();
         // Region density scales this zone's own spawn counts (PLAN.md I4). 1.0 / no region = unchanged.
         float aiDensity  = zone.regionConfig != null ? zone.regionConfig.ambientAiDensity : 1.0f;
         float vehDensity = zone.regionConfig != null ? zone.regionConfig.vehicleDensity  : 1.0f;
 
         for (SpawnConfig cfg : zone.spawnConfigs) {
             if (cfg == null) continue;
-            // One squad per SpawnConfig group so the band shares awareness (PLAN.md E3).
-            AISquad squad = new AISquad();
-            container.addChild(squad);
-            lz.squads.add(squad);
-            for (int i = 0; i < scaledCount(cfg.count, aiDensity); i++) {
-                AICharacter ai = sp.acquire();
-                if (ai == null) continue;
-                boolean recycled = sp.wasLastAcquireRecycled();
-                if (recycled) recycledCount++; else freshCount++;
-
-                CharacterInfo info = new CharacterInfo();
-                info.characterId = UUID.randomUUID().toString();
-                info.displayName = cfg.faction + " " + (i + 1);
-                info.faction = cfg.faction;
-                ai.characterInfo = info;
-                if (cfg.behaviorConfig != null) ai.behaviorConfig = cfg.behaviorConfig;
-
-                container.addChild(ai);
-                ai.activateForSpawn(randomPointInBox(center, zone.size));
-                ai.setSquad(squad);
-                // A recycled body keeps its weapon, so skip the equip — unless it somehow came back
-                // unarmed (defensive: never leave a streamed AI with only fists).
-                if (!recycled || !isArmed(ai)) equipWeapon(ai, cfg.weaponScenePath, container);
-
-                lz.pooled.add(ai);
-                if (net != null) net.announceSpawn(ai);
+            // One squad per SpawnConfig group so the band shares awareness (PLAN.md E3). The squad
+            // node is created by the first work item of the group; members read it via the holder.
+            final AISquad[] squadRef = new AISquad[1];
+            t.spawnWork.add(() -> {
+                AISquad squad = new AISquad();
+                container.addChild(squad);
+                t.lz.squads.add(squad);
+                squadRef[0] = squad;
+            });
+            int n = scaledCount(cfg.count, aiDensity);
+            for (int i = 0; i < n; i++) {
+                final int idx = i;
+                t.spawnWork.add(() -> spawnAmbient(t.lz, cfg, squadRef[0], idx, center, zone, container));
             }
         }
-
         for (NamedCharacterConfig nc : zone.namedCharacters) {
             if (nc == null) continue;
-            AICharacter ai = instantiateNamed(nc);
-            if (ai == null) continue;
-
-            CharacterInfo info = new CharacterInfo();
-            info.characterId = nc.characterId.isEmpty() ? UUID.randomUUID().toString() : nc.characterId;
-            info.displayName = nc.displayName;
-            info.faction = nc.faction;
-            ai.characterInfo = info;
-            if (nc.behaviorConfig != null) ai.behaviorConfig = nc.behaviorConfig;
-
-            container.addChild(ai);
-            ai.activateForSpawn(center.plus(nc.offset));
-            equipWeapon(ai, nc.weaponScenePath, container);
-
-            lz.named.add(ai);
-            if (net != null) net.announceSpawn(ai);
+            t.spawnWork.add(() -> spawnNamed(t.lz, nc, center, container));
         }
-
-        // Ambient vehicle traffic (PLAN.md I3c) — host-owned + replicated (synced model). spawnVehicle
-        // announces each car (MSG_VEHICLE_SPAWN) and its AI driver (MSG_SPAWN + occupancy).
         for (VehicleSpawnConfig vc : zone.vehicleSpawnConfigs) {
             if (vc == null) continue;
-            VehicleRoute vroute = findRoute(vc.routeName);
-            for (int i = 0; i < scaledCount(vc.count, vehDensity); i++) {
-                Vehicle v = spawnVehicle(vc, center, container, vroute, i, lz);
-                if (v != null) lz.vehicles.add(v);
+            int n = scaledCount(vc.count, vehDensity);
+            for (int i = 0; i < n; i++) {
+                final int idx = i;
+                t.spawnWork.add(() -> {
+                    Vehicle v = spawnVehicle(vc, center, container, findRoute(vc.routeName), idx, t.lz);
+                    if (v != null) t.lz.vehicles.add(v);
+                });
             }
-        }
-
-        if (debugLog) {
-            GD.print("WorldZoneManager: LOADED zone '" + zone.zoneId + "' — "
-                    + lz.pooled.size() + " ambient (" + recycledCount + " recycled, " + freshCount
-                    + " fresh), " + lz.named.size() + " named, " + lz.vehicles.size()
-                    + " vehicles; pool idle now " + sp.idleCount());
         }
     }
 
-    private void unload(WorldZoneMarker marker) {
+    /** One ambient SpawnConfig AI (extracted from the old synchronous load loop, one work item). */
+    private void spawnAmbient(LoadedZone lz, SpawnConfig cfg, AISquad squad, int index,
+                              Vector3 center, WorldZone zone, Node container) {
+        if (!GD.isInstanceValid(container)) return;
+        SpawnPool sp = pool();
+        AICharacter ai = sp.acquire();
+        if (ai == null) return;
+        boolean recycled = sp.wasLastAcquireRecycled();
+
+        CharacterInfo info = new CharacterInfo();
+        info.characterId = UUID.randomUUID().toString();
+        info.displayName = cfg.faction + " " + (index + 1);
+        info.faction = cfg.faction;
+        ai.characterInfo = info;
+        if (cfg.behaviorConfig != null) ai.behaviorConfig = cfg.behaviorConfig;
+
+        container.addChild(ai);
+        ai.activateForSpawn(randomPointInBox(center, zone.size));
+        if (squad != null && GD.isInstanceValid(squad)) ai.setSquad(squad);
+        // A recycled body keeps its weapon, so skip the equip — unless it somehow came back
+        // unarmed (defensive: never leave a streamed AI with only fists).
+        if (!recycled || !isArmed(ai)) equipWeapon(ai, cfg.weaponScenePath, container);
+
+        lz.pooled.add(ai);
+        NetworkManager net = networkManager();
+        if (net != null) net.announceSpawn(ai);
+    }
+
+    /** One named story AI (extracted from the old synchronous load loop, one work item). */
+    private void spawnNamed(LoadedZone lz, NamedCharacterConfig nc, Vector3 center, Node container) {
+        if (!GD.isInstanceValid(container)) return;
+        AICharacter ai = instantiateNamed(nc);
+        if (ai == null) return;
+
+        CharacterInfo info = new CharacterInfo();
+        info.characterId = nc.characterId.isEmpty() ? UUID.randomUUID().toString() : nc.characterId;
+        info.displayName = nc.displayName;
+        info.faction = nc.faction;
+        ai.characterInfo = info;
+        if (nc.behaviorConfig != null) ai.behaviorConfig = nc.behaviorConfig;
+
+        container.addChild(ai);
+        ai.activateForSpawn(center.plus(nc.offset));
+        equipWeapon(ai, nc.weaponScenePath, container);
+
+        lz.named.add(ai);
+        NetworkManager net = networkManager();
+        if (net != null) net.announceSpawn(ai);
+    }
+
+    /**
+     * FREE_BODIES: batched teardown of the zone's population, one body per step under the budget.
+     * Freeing an AI body (skeleton + nameplate SubViewport + camera) is the expensive unit here;
+     * squads (plain Nodes) are freed all at once when the bodies are done.
+     */
+    private boolean freeBodiesBatch(StreamTask t, long start, long budgetNanos) {
+        NetworkManager net = networkManager();
+        LoadedZone lz = t.lz;
+        boolean first = true;
+        while (first || (System.nanoTime() - start) < budgetNanos) {
+            first = false;
+            if (!lz.pooled.isEmpty()) {
+                freeAmbient(t, lz.pooled.remove(lz.pooled.size() - 1), net);
+            } else if (!lz.named.isEmpty()) {
+                Character ai = lz.named.remove(lz.named.size() - 1);
+                if (!GD.isInstanceValid(ai)) continue;
+                if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
+                silenceWeaponAudio(ai);
+                ai.queueFree();
+            } else if (!lz.vehicles.isEmpty()) {
+                Vehicle v = lz.vehicles.remove(lz.vehicles.size() - 1);
+                freeTrafficCar(lz, v, net);
+            } else {
+                break;
+            }
+        }
+        if (lz.pooled.isEmpty() && lz.named.isEmpty() && lz.vehicles.isEmpty()) {
+            for (AISquad squad : lz.squads) if (GD.isInstanceValid(squad)) squad.queueFree();
+            lz.squads.clear();
+            lz.driverOf.clear();
+            t.phase = Phase.FREE_GEO;
+        }
+        return true;
+    }
+
+    /** One pooled ambient body: despawn-announce, silence audio, recycle-or-free (see recycleBodies). */
+    private void freeAmbient(StreamTask t, AICharacter ai, NetworkManager net) {
+        if (!GD.isInstanceValid(ai)) return;
+        if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
+        silenceWeaponAudio(ai);  // stop in-flight SFX while still in-tree (audio-leak quirk)
+        // Only HEALTHY bodies are recycled (and only when recycleBodies is on). A body that died
+        // while the zone was loaded is ragdolled (physics off, collision shapes disabled, weapons
+        // dropped) — activateForSpawn does not undo that, so resurrecting it crashes. Dead bodies
+        // (and everything when recycling is off) follow the normal free flow.
+        if (recycleBodies && ai.isAlive() && !ai.isDead()) {
+            pool().release(ai);
+            t.recycled++;
+        } else {
+            ai.queueFree();
+            t.freed++;
+        }
+    }
+
+    /**
+     * FREE_GEO: dismantle the district a budget-slice per frame instead of queueFree-ing a
+     * ~1600-node subtree in one go (all of it would be destructed at the same frame's end —
+     * the unload-side hitch). Children are detached (tree exit = physics/render dereg) and
+     * individually queueFree'd; the bare root goes last, then the placeholder tier returns.
+     */
+    private boolean freeGeometryBatch(StreamTask t, long start, long budgetNanos) {
+        Node geo = t.lz.geometryInstance;
+        if (geo == null || !GD.isInstanceValid(geo)) { completeUnload(t); return true; }
+        List<Node> kids = new ArrayList<>(geo.getChildren());
+        int i = kids.size() - 1;
+        boolean first = true;
+        while (i >= 0 && (first || (System.nanoTime() - start) < budgetNanos)) {
+            first = false;
+            Node child = kids.get(i--);
+            if (!GD.isInstanceValid(child)) continue;
+            geo.removeChild(child);
+            child.queueFree();
+        }
+        if (i < 0) {
+            geo.queueFree();
+            completeUnload(t);
+        }
+        return true;
+    }
+
+    private void completeUnload(StreamTask t) {
+        tasks.remove(t.marker);
+        t.marker.instantiateLodLow();   // full detail is gone — bring the placeholder back
+        if (debugLog) {
+            GD.print("WorldZoneManager: UNLOADED zone '"
+                    + (t.marker.zone != null ? t.marker.zone.zoneId : "?")
+                    + "' — " + t.recycled + " recycled, " + t.freed + " freed; pool idle now "
+                    + (pool != null ? pool.idleCount() : 0));
+        }
+    }
+
+    // ── Task cancellation / synchronous teardown ────────────────────────────────
+
+    /** Abandon an in-flight LOAD (player retreated). Whatever made it in tears down synchronously. */
+    private void cancelLoad(StreamTask t) {
+        tasks.remove(t.marker);
+        freePendingChildren(t);
+        teardownZone(t.marker, t.lz);
+        if (GD.isInstanceValid(t.marker)) {
+            t.marker.setLoadedVisual(false);
+            t.marker.instantiateLodLow();
+        }
+        if (debugLog && t.marker.zone != null) {
+            GD.print("WorldZoneManager: load of zone '" + t.marker.zone.zoneId
+                    + "' cancelled (player left mid-stream)");
+        }
+        // A still-running threaded parse can't be cancelled; it completes into the resource cache
+        // and makes the next approach near-instant. Harmless.
+    }
+
+    /** Free a task's OFF-tree staged children — nobody owns them, so they'd otherwise leak. */
+    private void freePendingChildren(StreamTask t) {
+        for (Node n : t.pendingChildren) if (GD.isInstanceValid(n)) n.queueFree();
+        t.pendingChildren.clear();
+    }
+
+    /** Drop a task whose marker died (its in-tree nodes die with the marker/scene). */
+    private void discardTask(StreamTask t) {
+        tasks.remove(t.marker);
+        freePendingChildren(t);
+    }
+
+    /** Synchronous unload — marker leaving the tree / AutoLoad teardown (never the streaming tick). */
+    private void unloadImmediate(WorldZoneMarker marker) {
         LoadedZone lz = loaded.remove(marker);
         if (lz == null) return;
         if (GD.isInstanceValid(marker)) {
             marker.setLoadedVisual(false);
             marker.instantiateLodLow();   // full detail is gone — bring the placeholder back
         }
-
-        NetworkManager net = networkManager();
-        int recycled = 0;
-        int freed = 0;
-        for (AICharacter ai : lz.pooled) {
-            if (!GD.isInstanceValid(ai)) continue;
-            if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
-            silenceWeaponAudio(ai);  // stop in-flight SFX while still in-tree (audio-leak quirk)
-            // Only HEALTHY bodies are recycled (and only when recycleBodies is on). A body that died
-            // while the zone was loaded is ragdolled (physics off, collision shapes disabled, weapons
-            // dropped) — activateForSpawn does not undo that, so resurrecting it crashes. Dead bodies
-            // (and everything when recycling is off) follow the normal free flow.
-            if (recycleBodies && ai.isAlive() && !ai.isDead()) {
-                pool().release(ai);
-                recycled++;
-            } else {
-                ai.queueFree();
-                freed++;
-            }
+        teardownZone(marker, lz);
+        if (debugLog) {
+            GD.print("WorldZoneManager: UNLOADED zone '"
+                    + (marker.zone != null ? marker.zone.zoneId : "?")
+                    + "' (immediate); pool idle now " + (pool != null ? pool.idleCount() : 0));
         }
+    }
+
+    /** Free everything a LoadedZone tracks, in one go (cancel / unregister / exit paths). */
+    private void teardownZone(WorldZoneMarker marker, LoadedZone lz) {
+        NetworkManager net = networkManager();
+        StreamTask stats = new StreamTask(marker, false, lz, Phase.FREE_BODIES);   // recycle/free counters only
+        for (AICharacter ai : lz.pooled) freeAmbient(stats, ai, net);
+        lz.pooled.clear();
         for (Character ai : lz.named) {
             if (!GD.isInstanceValid(ai)) continue;
             if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
             silenceWeaponAudio(ai);
             ai.queueFree();
         }
-        for (AISquad squad : lz.squads) {
-            if (GD.isInstanceValid(squad)) squad.queueFree();
-        }
+        lz.named.clear();
+        for (AISquad squad : lz.squads) if (GD.isInstanceValid(squad)) squad.queueFree();
+        lz.squads.clear();
         // Ambient vehicles (I3) + their AI drivers (I3c) — freed together, not pooled (full vehicle
         // subtree reuse is unsafe, same reason recycleBodies is off for characters; the body owns a
         // top_level camera + viewport). A player-carjacked car is released, not freed (see freeTrafficCar).
@@ -653,13 +1016,6 @@ public class WorldZoneManager extends Node {
         lz.driverOf.clear();
         if (lz.geometryInstance != null && GD.isInstanceValid(lz.geometryInstance))
             lz.geometryInstance.queueFree();
-
-        if (debugLog) {
-            GD.print("WorldZoneManager: UNLOADED zone '"
-                    + (marker.zone != null ? marker.zone.zoneId : "?")
-                    + "' — " + recycled + " recycled, " + freed + " dead freed; pool idle now "
-                    + (pool != null ? pool.idleCount() : 0));
-        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

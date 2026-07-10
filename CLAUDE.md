@@ -251,11 +251,44 @@ and `unloadRadius ≈ loadRadius + hysteresis margin (~150 m)`. `WorldZoneManage
 (debug-gated) logs once at registration when a `.tres` violates this (the cause of "everything
 unloads the moment I step out" — a too-small `unloadRadius`).
 
-**Authority:** AI spawn/despawn is host-only — `load()` instances cosmetic geometry on every peer
-but returns early on a non-server client (`net.isNetworked() && !net.isServer()`); clients receive
+**Authority:** AI spawn/despawn is host-only — geometry is instanced on every peer but the spawn
+work is skipped on a non-server client (`net.isNetworked() && !net.isServer()`); clients receive
 the bodies through the existing `announceSpawn → MSG_SPAWN → GameManager.spawnReplicatedCharacter`
-path, and late-joiners via `sendBaselineSpawns`. `unload()` calls `announceDespawn(characterId)`
+path, and late-joiners via `sendBaselineSpawns`. Unload calls `announceDespawn(characterId)`
 before pooling/freeing.
+
+**Incremental streaming pipeline (the district-border anti-freeze rework):** a zone crossing used
+to be one synchronous `load()` — `GD.load`-parse a 7–19 MB district `.tscn` on the main thread,
+instantiate ~1600 nodes, tree-enter 500+ static bodies + a `NavigationRegion3D`, then spawn every
+AI/vehicle, all in a single physics frame. Streaming is now a per-marker **task state machine**
+(`StreamTask` in `WorldZoneManager`), processed every physics frame under a time budget
+(`streamBudgetMs`, exported, 4 ms, ≥1 step of progress per frame so tasks can't stall):
+`GEO_REQUEST → GEO_WAIT` (PackedScene parsed on **engine worker threads** via
+`ResourceLoader.loadThreadedRequest`; main thread only polls) `→ GEO_INSTANTIATE` (one frame:
+instantiate off-tree — node construction only — then strip children) `→ GEO_ENTER` (children
+re-enter the tree a budget-slice per frame — tree entry is where physics/render registration
+happens; a `NavigationRegion3D` gets a frame alone for its nav-map sync spike) `→ SPAWN`
+(AI/named/vehicle spawns drained as work items — the formerly-deferred "frame-spread spawning",
+now done). Unload is likewise batched: `FREE_BODIES → FREE_GEO` (per-child detach+free instead of
+one ~1600-node `queueFree`). Rules that fall out of this: a marker with an in-flight task is in
+neither `loaded` nor eligible for a second task; the LOD-low placeholder stays up until full
+detail is **completely** entered (no visual hole) and returns only when the last child is freed;
+a load whose player retreats past `unloadRadius` mid-stream is **cancelled** (partial content
+torn down synchronously; off-tree staged children are explicitly freed — they'd leak otherwise,
+same in `detectSceneReload`/`_exitTree`). Synchronous teardown still exists for marker-exit /
+scene-reload / AutoLoad-exit (`unloadImmediate`/`teardownZone`). `maxLoadsPerTick` (now 2) only
+caps how many *threaded parses* start per eval tick — main-thread work is always serialized to
+one zone per frame. The remaining single-frame cost is `instantiate()` of the whole district
+(~1600 node constructions, no registration); if that ever reads as a hitch on Steam Deck the next
+lever is baking districts as sub-chunk scenes, not shrinking the budget.
+
+**Binary district scenes:** `resolveGeometryPath` prefers a sibling `.scn` over the wired
+`geometry_path` `.tscn` when it exists — the baked districts are multi-MB *text* scenes whose
+parse dominates stream-in time even on a worker thread. `DistrictBinaryConverter`
+(`hosts/ConvertDistricts.tscn`, one-shot batch job in the `WorldBaker` idiom, mtime-skips
+unchanged files) resaves them all; re-run it after any district re-bake. `.scn` files are derived
+artifacts (delete-and-regenerate safe); the `.tscn` stays the source of truth. No master re-bake
+or `geometry_path` edit is needed for the preference to kick in.
 
 **What streams vs. what's static (a common confusion):** only two things are added on load and
 removed on unload — the **AI bodies** and the zone's **`geometry` PackedScene** (instanced as a
@@ -272,9 +305,10 @@ subtree (detach via `removeChild`, re-attach via `addChild`) is **unsafe** in go
 body carries a `top_level` camera (`TPSCameraController.setAsTopLevel`), a muzzle-flash
 `GPUParticles3D`, and a nameplate `SubViewport`, and re-attaching that subtree leaves them
 half-initialised — `get_global_transform "not inside tree"` / `particles is null` errors, then a
-native use-after-free **segfault on zone enter** (no AI death required). So `unload()` frees and
-`load()` instantiates fresh; correct and stutter-tolerable. Spreading spawns across frames is the
-proper perf answer (TODO), not body reuse. The `SpawnPool` + `activateForSpawn` reset path is kept
+native use-after-free **segfault on zone enter** (no AI death required). So unload frees and
+load instantiates fresh — correct, and no longer a stutter concern: spawns are frame-spread by the
+streaming pipeline's SPAWN phase (see above), which was always the proper perf answer, not body
+reuse. The `SpawnPool` + `activateForSpawn` reset path is kept
 behind the flag for future hardening only. When recycling *is* on, only `isAlive() && !isDead()`
 bodies are pooled (a dead body is ragdolled and `activateForSpawn` does not un-ragdoll it).
 
