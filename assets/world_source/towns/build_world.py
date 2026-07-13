@@ -50,8 +50,8 @@ import road_network as rn
 import assemble as asm
 from world_grid import (
     CELL, DISTRICT, DCELLS, GRID_N, LANE_OFF, LANE_STRIDE, THEMES, MAP, LANDMARKS,
-    PIECE_DIR, HERO_PIECE, WORLD, ORIGIN,
-    piece_path, lod_low_piece_path, theme_at, elev_at, district_center, to_world,
+    PIECE_DIR, WORLD, ORIGIN,
+    piece_path, piece_stem, lod_low_piece_path, theme_at, elev_at, district_center, to_world,
     flank_z as _flank_z, sampled as _sampled,
 )
 
@@ -94,50 +94,86 @@ def make_grid():
     return g
 
 
-def backbone_lanes(coll):
-    """One VehicleRoute pair (both directions, keep-left) per arterial line, sampled
-    sparsely — lane_art_<line>_<dir>_<n> for the WorldBaker. Sparse by design: straights
-    need few points; junction weaving is per-district. z tracks the seam elevation.
-    Grid-space math throughout; to_world() applied only at the final marker placement (so
-    _flank_z, which expects true world coordinates, still gets them right)."""
+# Arterial half-footprint: the paved junction block is 3 cells (21 m) wide, so lane stop
+# lines sit at its edge (10.5 m) + 1 m margin — NOT at the lane-count-derived radius
+# road_graph would compute (8 m, inside the pavement).
+ART_LANES = 2                                 # lanes per direction on the backbone
+ART_STOP_RADIUS = (3 * CELL) / 2.0 + 1.0
+
+
+def backbone_deck(coll):
+    """Always-resident collision-only deck (21 m wide) under every arterial line — the master
+    OWNS the boundary roads, and this is their physical surface. Without it, anything on an
+    arterial outside the streamed districts stands over void: districts only bring ground
+    while streamed in and PLATEAU precincts ship no always-resident LOD_LOW tier, so ambient
+    traffic spawned along the backbone simply fell into the void (0-moving traffic, headless
+    smoke). Swept with the SAME _flank_z the lane markers use, so cars drop the marker's
+    0.6 m onto the deck; V/H strips overlap at crossings (junction surface for free)."""
+    half = (3 * CELL) / 2.0
+    lines = [k * DCELLS * CELL for k in range(GRID_N + 1)]
+    span = int(lines[-1])
+    step = int(4 * CELL)
     n = 0
-    for k in range(GRID_N + 1):
-        c = k * DCELLS                       # arterial cell col/row
-        base = c * CELL                      # grid-space coord of the centreline
-        ys = _sampled(0, SPAN, LANE_STRIDE)
-        # vertical arterial at x=base: NB (west lane, +y order), SB (east lane, -y order)
-        nb = [(base - LANE_OFF, y * CELL) for y in ys]
-        sb = [(base + LANE_OFF, y * CELL) for y in reversed(ys)]
-        # horizontal arterial at y=base: EB (north lane, +x order), WB (south lane, -x order)
-        eb = [(x * CELL, base + LANE_OFF) for x in ys]
-        wb = [(x * CELL, base - LANE_OFF) for x in reversed(ys)]
-        for route, pts in ((f"art_v{k}_N", nb), (f"art_v{k}_S", sb),
-                           (f"art_h{k}_E", eb), (f"art_h{k}_W", wb)):
-            for i, (gx, gy) in enumerate(pts):
-                wx, wy = to_world(gx), to_world(gy)
-                e = bpy.data.objects.new(f"lane_{route}_{i}", None)
-                e.empty_display_size = 1.0
-                e.location = (wx, wy, _flank_z(wx, wy) + 0.6)
-                coll.objects.link(e)
-                n += 1
+    for i, c in enumerate(lines):
+        cw = to_world(c)
+        vpts = [(cw, to_world(y), _flank_z(cw, to_world(y))) for y in range(0, span + 1, step)]
+        kc.colonly_swept(f"ArtDeckV_{i}", vpts, half, coll, z0=-0.5, z1=0.0)
+        hpts = [(to_world(x), cw, _flank_z(to_world(x), cw)) for x in range(0, span + 1, step)]
+        kc.colonly_swept(f"ArtDeckH_{i}", hpts, half, coll, z0=-0.5, z1=0.0)
+        n += 2
     return n
 
 
-def backbone_intersections(g, coll):
-    """intersection_<cx>_<cy> at every major junction the SOLVER finds on the arterial
-    backbone (g.arterial_intersections()) -> IntersectionZone (traffic right-of-way) in the
-    bake. Solver-driven, so hand-editing the arterials keeps the junctions correct; local
-    junctions are per-district. z tracks the seam it sits on."""
-    n = 0
-    for (cx, cy, _opens) in g.arterial_intersections():
-        wx, wy = to_world(cx * CELL), to_world(cy * CELL)
-        e = bpy.data.objects.new(f"intersection_{cx}_{cy}", None)
-        e.empty_display_type = 'PLAIN_AXES'; e.empty_display_size = 10.5
-        e.location = (wx, wy, _flank_z(wx, wy) + 0.6)
-        e["size"] = [21.0, 6.0, 21.0]        # 3x3-cell arterial junction footprint
-        coll.objects.link(e)
-        n += 1
-    return n
+def safety_floor(coll):
+    """World-spanning collision-only safety slab (a `-colonly` box, so the Godot importer builds a
+    CollisionShape3D and drops the visual). Districts bring ground only while streamed in, the
+    arterial deck covers only the 21 m backbone strips, and the LAYOUT plates / HARBOR blockout are
+    dropped at export — so anything that strays off both (a car overshooting a junction, a body
+    knocked off a road) free-falls into the void forever. This slab guarantees a floor everywhere.
+    Top at Z = -2.5: just BELOW every real surface (bay floor -2, deck ramps >= -1) so it never
+    pokes above drivable geometry — a top at exactly 0 would stand proud of the low deck ramps.
+    Authored here (not runtime Java) so it is inspectable/tunable in world_master.blend."""
+    margin = 100.0
+    x0, x1 = to_world(0.0) - margin, to_world(WORLD) + margin
+    y0, y1 = to_world(BAY_Y0) - margin, to_world(WORLD) + margin   # include the bay/island band
+    b = kc.box("SafetyFloor-colonly", x0, x1, y0, y1, -7.5, -2.5, coll, "col")
+    b["proxy_for"] = "SafetyFloor"
+    return b
+
+
+def backbone_graph():
+    """Junction-split arterial RoadGraph (lib/road_graph.py): nodes at every gridline
+    crossing, one edge per inter-crossing segment, ART_LANES per direction. Replaces the
+    old whole-line backbone_lanes pairs — lanes now END at each junction and continue via
+    generated turn connectors (data-wired next_routes), so backbone traffic turns at
+    junctions instead of sailing through and despawning at map edges only.
+
+    Edge points are sampled every 4 cells so the emitted marker z (via _flank_z) tracks the
+    seam elevation; road_graph.simplify_polyline then thins the straights back out."""
+    import road_graph as rgm
+    rg = rgm.RoadGraph()
+    lines = [k * DCELLS * CELL for k in range(GRID_N + 1)]   # grid-space coords of arterials
+    step = 4 * CELL
+
+    def samples(a, b):
+        out = list(range(int(a), int(b), int(step)))
+        return out + [int(b)]
+
+    span = SPAN * CELL
+    for i, c in enumerate(lines):
+        for j in range(GRID_N):
+            y0, y1 = lines[j], lines[j + 1]
+            pts = [(to_world(c), to_world(y), 0.0) for y in samples(y0, y1)]
+            rg.add_edge(f"art_v{i}_{j}", pts, lanes_f=ART_LANES, lanes_r=ART_LANES,
+                        cls='arterial', eps=1.0)
+    for j, c in enumerate(lines):
+        for i in range(GRID_N):
+            x0, x1 = lines[i], lines[i + 1]
+            pts = [(to_world(x), to_world(c), 0.0) for x in samples(x0, x1)]
+            rg.add_edge(f"art_h{j}_{i}", pts, lanes_f=ART_LANES, lanes_r=ART_LANES,
+                        cls='arterial', eps=1.0)
+    assert span == lines[-1], "arterial span drifted off the district grid"
+    return rg
 
 
 def build_harbor(coll, mk, land):
@@ -194,8 +230,6 @@ def build():
     land = kc.get_coll("LANDMARKS")
     harbor = kc.get_coll("HARBOR")
 
-    g = make_grid()
-
     counts = {k: 0 for k in THEMES}
     for gy in range(GRID_N):
         for gx in range(GRID_N):
@@ -211,14 +245,14 @@ def build():
                    elev - 0.6, elev - 0.1, layout, t["col"])
 
             # region_ marker -> WorldZoneMarker + RegionConfig. Named after the ACTUAL piece stem
-            # (District_<theme>_<gx>_<gy> or a hero name like District_Shibuya via HERO_PIECE) --
-            # not the generic theme/grid key -- so WorldBaker's idOf() derives a zoneId that is
-            # EXACTLY the piece's .blend/.tscn filename stem. That zoneId is what ZoneDebugOverlay
-            # prints ("District: <zoneId>") and WorldZoneManager logs on load/unload, so a hero
-            # district's debug id now reads "District_Shibuya" (not "city_1_1"), traceable straight
-            # to districts/District_Shibuya.blend with no lookup table.
-            piece_stem = HERO_PIECE.get((gx, gy), f"District_{key}_{gx}_{gy}.tscn").removesuffix(".tscn")
-            r = bpy.data.objects.new(f"region_{piece_stem}", None)
+            # (District_<theme>_<gx>_<gy> — coordinate-named for EVERY district, heroes included;
+            # the hero identity lives in world_grid.LANDMARKS / build_district.py's plateau_json,
+            # not the filename) so WorldBaker's idOf() derives a zoneId that is EXACTLY the
+            # piece's .blend/.tscn filename stem. That zoneId is what ZoneDebugOverlay prints
+            # ("District: <zoneId>") and WorldZoneManager logs on load/unload — traceable straight
+            # to districts/<stem>.blend with no lookup table.
+            stem = piece_stem(gx, gy, key)
+            r = bpy.data.objects.new(f"region_{stem}", None)
             r.empty_display_type = 'CUBE'; r.empty_display_size = DISTRICT / 2.0
             r.location = (cx, cy, elev)
             r["size"] = [DISTRICT, 40.0, DISTRICT]; r["bounds"] = [DISTRICT, 40.0, DISTRICT]
@@ -230,15 +264,30 @@ def build():
             # detail geometry above is streamed out — resolved the same lazy way; a district that
             # never built one (PLATEAU precincts) just has nothing to show, no error.
             r["geometry_lod_low"] = lod_low_piece_path(gx, gy, key)
+            # Ambient-traffic recipe → VehicleSpawnConfig at bake time (WorldBaker.buildZone).
+            # traffic_route is a route-name PREFIX: WorldZoneManager.findRoute collects the
+            # matching lanes near the zone and distributes spawns round-robin. Districts with
+            # a hand-authored roads sidecar (districts/<piece>.roads.json → save_roads.py)
+            # use their own internal lanes ("<piece_stem>__"); the rest fall back to the
+            # master arterial lanes crossing the district ("art_"). Re-run this master build
+            # after adding a sidecar so the meta flips. Count is further scaled by the
+            # theme's vehicle_density at load.
+            r["traffic_count"] = 6
+            has_roads = os.path.exists(os.path.join(ROOT, "districts", stem + ".roads.json"))
+            r["traffic_route"] = f"{stem}__" if has_roads else "art_"
             mk.objects.link(r)
 
-    # arterial backbone: lane routes + major-junction IntersectionZones (the functional AI/traffic
-    # graph). The cosmetic Art_V/H preview ribbons and the grid-locked C1 Loop ring were removed --
-    # both were tied to the district-boundary grid lines and didn't route like a real expressway
-    # (see the highway/district redesign follow-up); ring_network.py itself is kept for that redesign,
+    # arterial backbone: junction-split multi-lane routes + turn connectors + IntersectionZones
+    # (the functional AI/traffic graph), all generated from one RoadGraph. The cosmetic Art_V/H
+    # preview ribbons and the grid-locked C1 Loop ring were removed -- both were tied to the
+    # district-boundary grid lines and didn't route like a real expressway (see the
+    # highway/district redesign follow-up); ring_network.py itself is kept for that redesign,
     # just not invoked here for now.
-    n_lane = backbone_lanes(mk)
-    n_ix = backbone_intersections(g, mk)
+    n_lane, n_conn, n_ix = asm.lay_road_graph(
+        backbone_graph(), z_fn=_flank_z, z_off=0.6,
+        radius_fn=lambda _rg, _node: ART_STOP_RADIUS)
+    n_deck = backbone_deck(kc.get_coll("ARTDECK"))
+    safety_floor(kc.get_coll("ARTDECK"))   # always-resident catch-all floor (ships with the deck)
 
     # harbor: Tokyo Bay + Haneda airport island + connecting road/rail bridge.
     build_harbor(harbor, mk, land)
@@ -257,8 +306,8 @@ def build():
                        cam_loc=(to_world(WORLD / 2), to_world(-WORLD * 0.4), WORLD * 0.75), lens=28)
 
     summary = "  ".join(f"{k}={v}" for k, v in counts.items())
-    print("WORLD: %.0fx%.0f m  districts=%d (%dx%d, %.0f m)  lanes=%d  junctions=%d  landmarks=%d  %s"
-          % (WORLD, WORLD, GRID_N * GRID_N, GRID_N, GRID_N, DISTRICT, n_lane, n_ix, len(LANDMARKS), summary))
+    print("WORLD: %.0fx%.0f m  districts=%d (%dx%d, %.0f m)  lanes=%d  connectors=%d  junctions=%d  decks=%d  landmarks=%d  %s"
+          % (WORLD, WORLD, GRID_N * GRID_N, GRID_N, GRID_N, DISTRICT, n_lane, n_conn, n_ix, n_deck, len(LANDMARKS), summary))
 
 
 def main():

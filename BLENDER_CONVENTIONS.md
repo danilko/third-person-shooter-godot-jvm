@@ -154,8 +154,8 @@ The "instance, never copy" rule is now produced by the baker. Two levels of reus
 PLATEAU_TokyoTower.blend`/`PLATEAU_ShibuyaScramble.blend` (hand-modeled landmark placeholders,
 placed via `build_district.place_landmark()`) and `buildings/RecycledBuildingKit.blend` (55 real
 PLATEAU buildings recycled from already-extracted precinct data, one top-level collection per
-placeable asset — see `AUTHORING_GUIDE.md` §9) are the pattern to copy/extend by hand for any new
-hand-crafted building (see `AUTHORING_GUIDE.md`'s manual-edit-boundary table). A marker-based
+placeable asset — see `AUTHORING_GUIDE.md` §10) are the pattern to copy/extend by hand for any new
+hand-crafted building (see `AUTHORING_GUIDE.md` §2's edit-channels table). A marker-based
 building assembled from staged kit leaves (`kit_common.instance_marker`, one `asset_path` marker per
 leaf, baked to `ext_resource`+`instance=` node references with zero inlined mesh data) is the same
 mechanism at building scale — `world/buildings/Door.tscn` is a real baked single-asset example of
@@ -174,9 +174,9 @@ what one placed leaf looks like on the Godot side.
 > `MultiMeshInstance3D` per asset (GPU instancing — one draw call for thousands of identical wall
 > panels/road tiles, at the cost of no per-instance collision, which is why streetwall solidity comes
 > from separate
-> `buildings._building_collision` convex-box proxies, see `AUTHORING_GUIDE.md` §1); towers/hero
+> `buildings._building_collision` convex-box proxies, see `AUTHORING_GUIDE.md` §10); towers/hero
 > buildings are realized as unique geometry instead. Confirmed in the committed
-> `districts/District_Shibuya.tscn`: zero `instance=` references, all `MultiMeshInstance3D` +
+> `districts/District_city_1_1.tscn` (Shibuya): zero `instance=` references, all `MultiMeshInstance3D` +
 > realized meshes. Both strategies are legitimate and both ship — `instance=` for scenes that need
 > their own collision/script/children as a unit, `MultiMesh` for dumb high-count visual repeats — but
 > don't expect editing a kit leaf to propagate via `instance=` for city-scale content; it propagates
@@ -299,14 +299,14 @@ pieces, not placeholder boxes:
 2. **Building** — `assets/world_source/buildings/PLATEAU_TokyoTower.blend`/`RecycledBuildingKit.blend`
    (real geometry, individually hand-editable, placed via `build_district.place_landmark()`/
    `lib/recycled_buildings.py`) — the working building-tier template, see this file's "Nested
-   instancing" section above and `AUTHORING_GUIDE.md` §9.
-3. **Zone** — real district pieces (`District_Shibuya`, `District_city_2_1`, `District_resid_1_2`)
+   instancing" section above and `AUTHORING_GUIDE.md` §10.
+3. **Zone** — real district pieces (`District_city_1_1`/Shibuya, `District_city_2_1`, `District_resid_1_2`)
    with working `-colonly` ground, real `WorldZone` streaming.
 4. **Region** — `RegionConfig` per theme (`city`/`resid`/`rural`/`mtn`/`snow`/`harbor`), assigned via
    `world_grid.THEMES`.
 5. **City/World abutting chunks** — Shibuya/`city_2_1`/`resid_1_2` are real ADJACENT districts (not
    just a same-side-by-side test pair) with verified-touching seams (`tools/check_seams.py` PASS) —
-   see `AUTHORING_GUIDE.md` §6.
+   see `AUTHORING_GUIDE.md` §4.
 
 That validates kit → building → zone → region → world with a handful of boxes, before any real art.
 

@@ -17,7 +17,7 @@ Usage:
 
 Example (the Shibuya / city_2_1 / resid_1_2 cluster):
   blender --background --python tools/render_cluster.py -- _preview_cluster \\
-      districts/District_Shibuya.blend:1:1 \\
+      districts/District_city_1_1.blend:1:1 \\
       districts/District_city_2_1.blend:2:1 \\
       districts/District_resid_1_2.blend:1:2
 """

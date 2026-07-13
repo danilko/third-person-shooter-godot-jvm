@@ -4,6 +4,7 @@ import com.openworld.control.Controllable;
 import com.openworld.control.Controller;
 import com.openworld.control.UserCommand;
 import com.openworld.carrier.vehicle.Vehicle;
+import com.openworld.util.WeightedPick;
 import com.openworld.world.IntersectionZone;
 import com.openworld.world.LaneGraph;
 import com.openworld.world.VehicleRoute;
@@ -56,6 +57,15 @@ public class VehicleAIController extends Controller {
     /** How much to cut throttle in turns (0 = never, 1 = stop in a hard turn). */
     @RegisterProperty @Export public float turnSlowdown = 0.7f;
 
+    /** Distance (m) before a chained lane end at which the car eases off for the junction. The
+     *  curvature probe can't see past the current route, so an upcoming 90° turn connector is
+     *  invisible until adopted — without this cars enter junctions at full cruise speed and fly
+     *  off the turn (roads-v2 Phase 1). */
+    @RegisterProperty @Export public float junctionSlowdown = 18.0f;
+
+    /** Throttle multiplier while approaching a junction or riding a non-straight turn connector. */
+    @RegisterProperty @Export public float junctionThrottleScale = 0.45f;
+
     private static final double END_THRESHOLD = 3.0;   // m from the lane end = "arrived"
 
     private Vehicle   vehicleBody;
@@ -83,9 +93,11 @@ public class VehicleAIController extends Controller {
     public VehicleRoute getRoute() { return route; }
 
     /**
-     * At a lane end, continue onto a connected lane (geometry {@link LaneGraph}, or the lane's explicit
-     * {@code nextRoutes}); with no successor, apply the lane's {@code endBehavior} — U-turn back, or mark
-     * {@link #isFinished()} (despawn). Returns true if a new lane was adopted (keep driving).
+     * At a lane end, continue onto a connected lane (the lane's explicit weighted {@code nextRoutes}
+     * first, then the geometry {@link LaneGraph} fallback — straightness-biased, so legacy unwired
+     * lanes still mostly flow through a junction instead of turning uniformly at random); with no
+     * successor, apply the lane's {@code endBehavior} — U-turn back, or mark {@link #isFinished()}
+     * (despawn). Returns true if a new lane was adopted (keep driving).
      */
     public boolean advanceToNextRoute() {
         if (finished || route == null) return false;
@@ -93,8 +105,18 @@ public class VehicleAIController extends Controller {
         VehicleRoute next = route.pickNextRoute();   // explicit override first
         if (next == null) {
             List<VehicleRoute> succ = LaneGraph.successorsOf(route);
-            if (!succ.isEmpty())
-                next = succ.get(Math.min((int) Math.floor(GD.randf() * succ.size()), succ.size() - 1));
+            if (!succ.isEmpty()) {
+                double[] out = route.endTangentXZ();
+                float[] w = new float[succ.size()];
+                for (int i = 0; i < succ.size(); i++) {
+                    double[] in = succ.get(i).startTangentXZ();
+                    // dot 1 (straight) → ~1.05, right angle → ~0.3, near-reverse → 0.05.
+                    double dot = (out != null && in != null) ? out[0] * in[0] + out[1] * in[1] : 1.0;
+                    double half = (dot + 1.0) / 2.0;
+                    w[i] = (float) (half * half + 0.05);
+                }
+                next = succ.get(WeightedPick.pick(succ.size(), w, GD.randf()));
+            }
         }
         if (next != null) { setRoute(next); return true; }
 
@@ -154,6 +176,20 @@ public class VehicleAIController extends Controller {
     /** True when this is a one-way lane and progress has reached its end. */
     public boolean atRouteEnd() {
         return route != null && !route.isLoop() && routeProgress >= route.total() - END_THRESHOLD;
+    }
+
+    /** True while riding a generated turn connector that actually bends (turn L/R, not S). */
+    public boolean onTurnConnector() {
+        return route != null && route.turn != null && !route.turn.isEmpty() && !"S".equals(route.turn);
+    }
+
+    /** True within {@link #junctionSlowdown} of the end of a chained lane (a junction is ahead —
+     *  the successor may be a hard turn the curvature probe cannot see yet). */
+    public boolean approachingJunction() {
+        return route != null && !route.isLoop()
+                && VehicleRoute.END_CHAIN.equals(route.endBehavior)
+                && (route.turn == null || route.turn.isEmpty())
+                && routeProgress >= route.total() - junctionSlowdown;
     }
 
     /** Horizontal (XZ) speed of the body in m/s — drives the speed-proportional look-ahead. */

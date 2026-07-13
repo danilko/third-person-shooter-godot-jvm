@@ -22,8 +22,15 @@ def wipe_scene():
             bpy.data.meshes.remove(me)
 
 
+def _local_coll_get(name):
+    """Local (non-library) collection lookup — same-named collections can also arrive via
+    library links (tools/link_neighbors.py links neighbour districts' STREET collections)."""
+    return next((c for c in bpy.data.collections
+                 if c.name == name and c.library is None), None)
+
+
 def _clear_coll(name):
-    c = bpy.data.collections.get(name)
+    c = _local_coll_get(name)
     if c:
         for o in list(c.objects):
             bpy.data.objects.remove(o, do_unlink=True)
@@ -31,11 +38,64 @@ def _clear_coll(name):
 
 
 def _named_coll(name):
-    c = bpy.data.collections.get(name)
+    c = _local_coll_get(name)
     if c is None:
         c = bpy.data.collections.new(name)
         bpy.context.scene.collection.children.link(c)
     return c
+
+
+# ── Lane-route emission (single funnel for every lane_ empty) ──────────────────────────
+#
+# ROUTE_PREFIX namespaces every district-local route name (lane_<piece>__<route>_<n>) so
+# recycled districts that emit identical local names (h12_0_E …) stay unique once several
+# stream in together — VehicleRoute.findRoute/pickNextRoute search the LIVE scene by name
+# and would otherwise resolve into the wrong district. Seam routes bypass the prefix (their
+# names are the cross-district contract and already carry the grid coords). The master
+# build leaves the prefix unset.
+#
+# The `_0` empty of every route ALWAYS carries explicit route metas (WorldBaker reads only
+# the first empty). `lane_offset=0.0` is load-bearing: emitters bake the keep-left offset
+# into marker POSITIONS, but WorldBaker's default is 1.75 — without the explicit 0.0 the
+# runtime shifted every lane a second time, collapsing both directions back onto the road
+# centreline (the head-on-traffic bug).
+
+ROUTE_PREFIX = ""
+
+
+def set_route_prefix(stem):
+    """Set (or clear, stem=None/"") the per-piece route namespace, e.g. the district piece
+    stem. Call once at the top of a district build, after wipe_scene."""
+    global ROUTE_PREFIX
+    ROUTE_PREFIX = f"{stem}__" if stem else ""
+
+
+def route_name(route):
+    """The namespaced route name (what VehicleRoute nodes will be called after the bake)."""
+    return f"{ROUTE_PREFIX}{route}"
+
+
+def lane_empty(mk, route, n, loc, size=0.5, **props):
+    """Create one lane_<prefixed route>_<n> empty. On the _0 empty, stamp the explicit
+    route metas (defaults: positions-are-truth offset 0, one-way, despawn at end) merged
+    with any overrides in **props (end_behavior, next_routes, next_weights, turn, …)."""
+    name = f"lane_{ROUTE_PREFIX}{route}_{n}"
+    # Blender truncates object names at 63 chars and .001-renames collisions — either would
+    # silently corrupt WorldBaker's name-based route grouping, so fail the build instead.
+    if len(name) > 63:
+        raise ValueError(f"lane marker name exceeds Blender's 63-char cap: {name}")
+    if name in bpy.data.objects:
+        raise ValueError(f"duplicate lane marker name (route emitted twice?): {name}")
+    e = bpy.data.objects.new(name, None)
+    e.empty_display_size = size
+    e.location = loc
+    if n == 0:
+        meta = {"lane_offset": 0.0, "loop": False, "end_behavior": "DESPAWN"}
+        meta.update(props)
+        for k, v in meta.items():
+            e[k] = v
+    mk.objects.link(e)
+    return e
 
 
 def setup(here, reopen=None):
@@ -120,10 +180,7 @@ def _arterial_routes(coll, nm, cells, axis):
         seq = cells if side in ('E', 'N') else list(reversed(cells))
         for n, (cx, cy) in enumerate(seq):
             wx, wy = _lateral(axis, cx, cy, off)
-            e = bpy.data.objects.new(f"lane_{nm}{side}_{n}", None)
-            e.empty_display_size = 0.5
-            e.location = (wx, wy, 0.1)
-            mk.objects.link(e)
+            lane_empty(mk, f"{nm}{side}", n, (wx, wy, 0.1))
 
 
 ARTERIAL_HALF = 8.5      # m from the arterial centreline to its kerb/sidewalk (=sw_off)
@@ -322,14 +379,51 @@ def place_corridor_signs(corridor, coll, every=6):
 # edge barriers are SEPARATE instanced pieces that OPEN at the merge, and the lane markers
 # follow the curve so the network connects as a graph.
 
-def _route_polyline_markers(coll, route, poly, z_off=0.2):
-    """Emit ordered lane_<route>_<n> empties along a 3D polyline (the WorldBaker route)."""
+def _route_polyline_markers(coll, route, poly, z_off=0.2, **props):
+    """Emit ordered lane_<route>_<n> empties along a 3D polyline (the WorldBaker route).
+    **props are stamped on the _0 empty (end_behavior, next_routes, …)."""
     mk = _named_coll("MARKERS")
     for n, (wx, wy, wz) in enumerate(poly):
-        e = bpy.data.objects.new(f"lane_{route}_{n}", None)
-        e.empty_display_size = 0.5
-        e.location = (wx, wy, wz + z_off)
+        lane_empty(mk, route, n, (wx, wy, wz + z_off), **props)
+
+
+def lay_road_graph(rg, z_fn=None, z_off=0.3, simplify=True, radius_fn=None):
+    """Emit the FULL traffic layer for a road_graph.RoadGraph: per generated lane/turn-connector
+    a lane_<route>_<n> empty chain (route metas on the _0 empty; next_routes/next_weights wire
+    junction turning as explicit data — never runtime endpoint clustering), plus one
+    intersection_<node> empty per junction (size meta → IntersectionZone). All route names get
+    the current ROUTE_PREFIX, so a district's graph stays namespaced while the wiring keeps
+    pointing inside itself. Marker z = point z (+ z_fn(x, y) if given) + z_off.
+    Returns (n_lanes, n_connectors, n_junctions)."""
+    import road_graph as rgm
+    mk = _named_coll("MARKERS")
+    lanes, junctions = rgm.generate(rg, radius_fn=radius_fn)
+    n_conn = 0
+    for r in lanes:
+        pts = rgm.simplify_polyline(r.pts) if (simplify and not r.turn) else r.pts
+        props = {}
+        if r.end_behavior != 'DESPAWN':
+            props["end_behavior"] = r.end_behavior
+        if r.next_routes:
+            props["next_routes"] = ",".join(route_name(x) for x in r.next_routes)
+        if r.next_weights:
+            props["next_weights"] = ",".join(f"{w:.3f}" for w in r.next_weights)
+        if r.turn:
+            props["turn"] = r.turn
+            props["approach"] = r.approach
+            n_conn += 1
+        for n, (x, y, z) in enumerate(pts):
+            wz = z + (z_fn(x, y) if z_fn else 0.0) + z_off
+            lane_empty(mk, r.name, n, (x, y, wz), **props)
+    for j in junctions:
+        e = bpy.data.objects.new(f"intersection_{ROUTE_PREFIX}{j.name}", None)
+        e.empty_display_type = 'PLAIN_AXES'
+        e.empty_display_size = j.size_x / 2.0
+        jz = j.z + (z_fn(j.x, j.y) if z_fn else 0.0) + z_off
+        e.location = (j.x, j.y, jz)
+        e["size"] = [j.size_x, 6.0, j.size_y]
         mk.objects.link(e)
+    return (len(lanes) - n_conn, n_conn, len(junctions))
 
 
 def _edge_polyline(pts, sgn, extra=0.0):
@@ -533,14 +627,12 @@ def lay_sidewalks(grid, coll):
 
 
 def lay_lane_markers(grid, coll):
-    """One empty per lane sample, named lane_<route>_<n> for the Java WorldBaker."""
+    """One empty per lane sample, named lane_<route>_<n> for the Java WorldBaker.
+    Positions already carry the keep-left offset; lane_empty stamps lane_offset=0."""
     mk = _named_coll("MARKERS")
     for route, pts in grid.lane_routes().items():
         for n, (wx, wy) in enumerate(pts):
-            e = bpy.data.objects.new(f"lane_{route}_{n}", None)
-            e.empty_display_size = 0.5
-            e.location = (wx, wy, 0.1)
-            mk.objects.link(e)
+            lane_empty(mk, route, n, (wx, wy, 0.1))
 
 
 def add_zone_markers(grid, coll=None):
@@ -847,10 +939,7 @@ def lay_arterial(coll, axis, cross, start, end, lanes=4, name="Arterial"):
     for side, off in (("L", -LANE), ("R", LANE)):
         for n, s in enumerate(steps):
             wx, wy = world(s * CELL, off)
-            e = bpy.data.objects.new(f"lane_{name}{side}_{n}", None)
-            e.empty_display_size = 0.5
-            e.location = (wx, wy, 0.1)
-            mk.objects.link(e)
+            lane_empty(mk, f"{name}{side}", n, (wx, wy, 0.1))
     return lane_pts
 
 

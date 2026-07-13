@@ -70,17 +70,20 @@ MAP = [
 ]
 
 # Tokyo hero districts: (slot name, piece .tscn, district gx, gy, footprint cells).
+# Pieces are COORDINATE-NAMED like every other district (District_<theme>_<gx>_<gy>) — the hero
+# identity lives in the slot name / this table / build_district.py's plateau_json, not the
+# filename (the old District_Shibuya-style hero filenames were renamed for one consistent scheme).
 LANDMARKS = [
-    ("shibuya",     "District_Shibuya.tscn",     1, 1, 5),   # scramble core, SW of centre
-    ("tokyostation","District_TokyoStation.tscn",2, 2, 6),   # rail hub, central
-    ("akihabara",   "District_Akihabara.tscn",   3, 3, 4),   # electric town, NE
-    ("imperialpalace","District_ImperialPalace.tscn", 2, 3, 6),  # real PLATEAU data, low-rise palace grounds
-    ("tokyotower",  "District_TokyoTower.tscn", 3, 2, 6),  # real surrounding blocks; Tokyo Tower itself
+    ("shibuya",     "District_city_1_1.tscn",   1, 1, 5),   # scramble core, SW of centre
+    ("tokyostation","District_city_2_2.tscn",   2, 2, 6),   # rail hub, central
+    ("akihabara",   "District_city_3_3.tscn",   3, 3, 4),   # electric town, NE
+    ("imperialpalace","District_city_2_3.tscn", 2, 3, 6),   # real PLATEAU data, low-rise palace grounds
+    ("tokyotower",  "District_city_3_2.tscn",   3, 2, 6),  # real surrounding blocks; Tokyo Tower itself
                                                             # NOT in the PLATEAU extraction (lattice tower,
                                                             # no solid footprint) -- needs hand-modeling as
                                                             # a building-tier asset using the real anchor
                                                             # point (139.7454E, 35.6586N) as reference.
-    ("dotonbori",   "District_Dotonbori.tscn", 3, 0, 6),   # Ebisu Bridge/Dotonbori -- Osaka, not Tokyo
+    ("dotonbori",   "District_harbor_3_0.tscn", 3, 0, 6),  # Ebisu Bridge/Dotonbori -- Osaka, not Tokyo
                                                             # (real anchor 135.501361E, 34.669056N, EPSG:6674
                                                             # not 6677); part of the "greatest hits" collage,
                                                             # not literal Tokyo geography. harbor theme.
@@ -90,11 +93,15 @@ LANDMARKS = [
 # Every zone is wired (up front) to a PREDICTABLE piece path so a district piece authored/baked
 # later goes live with no master re-bake (WorldZone.geometryPath, resolved lazily at stream time).
 PIECE_DIR  = "res://src/main/resources/com/openworld/world/districts/"
-HERO_PIECE = {(gx, gy): piece for (_n, piece, gx, gy, _fc) in LANDMARKS}
+
+
+def piece_stem(gx, gy, key):
+    """Canonical district piece filename stem — purely coordinate-derived, heroes included."""
+    return f"District_{key}_{gx}_{gy}"
 
 
 def piece_path(gx, gy, key):
-    return PIECE_DIR + HERO_PIECE.get((gx, gy), f"District_{key}_{gx}_{gy}.tscn")
+    return PIECE_DIR + piece_stem(gx, gy, key) + ".tscn"
 
 
 def lod_low_piece_path(gx, gy, key):

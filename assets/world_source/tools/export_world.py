@@ -32,6 +32,14 @@ PROJECT = os.path.dirname(os.path.dirname(ROOT))   # repo root (…/third-person
 OUT_DIR = os.path.join(PROJECT, "src", "main", "resources", "com", "openworld", "world")
 OUT = os.path.join(OUT_DIR, "master", "World_master.gltf")
 
+def _local_coll(name):
+    """Local (non-library) collection by name — a district .blend with neighbours linked in
+    (tools/link_neighbors.py) holds several same-named linked STREET collections, and a bare
+    bpy.data.collections.get() may return one of those instead of the piece's own."""
+    return next((c for c in bpy.data.collections
+                 if c.name == name and c.library is None), None)
+
+
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 only_coll = None
 if argv and argv[0] == "--only":
@@ -49,14 +57,14 @@ if only_coll:
     for cname in ("STREET", "STREET_LOD_LOW", "MARKERS", "MANUAL"):
         if cname == only_coll:
             continue
-        c = bpy.data.collections.get(cname)
+        c = _local_coll(cname)
         if not c:
             continue
         for o in list(c.objects):
             bpy.data.objects.remove(o, do_unlink=True)
             _dropped_scope += 1
     print("--only %s: dropped %d objects from other content collections" % (only_coll, _dropped_scope))
-    kept = bpy.data.collections.get(only_coll)
+    kept = _local_coll(only_coll)
     if not kept or not kept.objects:
         print("--only %s: collection missing or empty -- nothing to export" % only_coll)
         sys.exit(3)
@@ -98,9 +106,13 @@ if _gn:
 # only applies to `mmesh_`-tagged markers) — real geometry with no runtime purpose, heavy enough to
 # make the Godot editor slow to open/render the baked master scene.
 _dropped = 0
+# NEIGHBOR_REF = tools/link_neighbors.py's linked neighbour-district/master references (the
+# in-context seam-editing aid) — read-only Blender-side context that must never reach the game
+# (each neighbour already streams in on its own; exporting it would double the geometry), same
+# rationale as LANDMARK_PREVIEW on the master.
 for cname in ("ROADS", "WALLS", "PROPS", "EXTRAS", "HIGHRISE", "INFRA", "LANDMARK_PREVIEW",
-              "LAYOUT", "HARBOR"):
-    c = bpy.data.collections.get(cname)
+              "LAYOUT", "HARBOR", "ROADS_SRC", "NEIGHBOR_REF"):
+    c = _local_coll(cname)
     if c:
         for o in list(c.objects):
             bpy.data.objects.remove(o, do_unlink=True)
@@ -108,7 +120,9 @@ for cname in ("ROADS", "WALLS", "PROPS", "EXTRAS", "HIGHRISE", "INFRA", "LANDMAR
 if _dropped:
     print("dropped %d kit source objects (kept out of the export)" % _dropped)
 
-for o in bpy.data.objects:
+# view-layer objects only: bpy.data.objects also holds library-linked datablocks (neighbour
+# refs), and select_set raises on an object that is not in the view layer.
+for o in bpy.context.view_layer.objects:
     o.select_set(False)
 
 bpy.ops.export_scene.gltf(

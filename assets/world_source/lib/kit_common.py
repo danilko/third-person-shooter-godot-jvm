@@ -60,7 +60,11 @@ def setup_units():
 
 
 def get_coll(name):
-    coll = bpy.data.collections.get(name)
+    # local-only lookup: with neighbour districts library-linked in (tools/link_neighbors.py),
+    # several libraries can each contribute a same-named collection (e.g. STREET) — a bare
+    # bpy.data.collections.get() may return a read-only linked one instead of ours.
+    coll = next((c for c in bpy.data.collections
+                 if c.name == name and c.library is None), None)
     if coll is None:
         coll = bpy.data.collections.new(name)
         bpy.context.scene.collection.children.link(coll)

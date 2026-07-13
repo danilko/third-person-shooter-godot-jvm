@@ -21,7 +21,7 @@ RUN one district (edits world_master.blend in place):
 
 Example (Dotonbori beside the harbor, gx=3 gy=0):
   blender --background world_master.blend --python tools/link_landmark_preview.py -- \\
-      districts/District_Dotonbori.blend 3 0 Dotonbori
+      districts/District_harbor_3_0.blend 3 0 Dotonbori
 
 RUN all built districts (every build_district.CONFIG entry with an existing .blend on disk):
   blender --background world_master.blend --python tools/link_landmark_preview.py -- --all

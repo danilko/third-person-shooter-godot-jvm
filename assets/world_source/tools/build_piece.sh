@@ -24,24 +24,46 @@ set -euo pipefail
 CLEANUP_FILES=()
 trap 'rm -f "${CLEANUP_FILES[@]}" 2>/dev/null || true' EXIT
 
-NAME="${1:?usage: build_piece.sh <name>   (e.g. shibuya)}"
+# Two forms:
+#   build_piece.sh <name>                      config-name form (e.g. shibuya, city_2_1):
+#                                              REGENERATES the .blend first, then exports/bakes.
+#   build_piece.sh District_<theme>_<gx>_<gy>  stem form (BAKE-ONLY): skips the regen and
+#                                              exports/bakes the EXISTING .blend as-is — use this
+#                                              after hand-editing a district .blend so your edits
+#                                              go straight to the game without being regenerated
+#                                              over (regen preserves only MANUAL/NEIGHBOR_REF).
+NAME="${1:?usage: build_piece.sh <name>|District_<theme>_<gx>_<gy>   (e.g. shibuya, or District_city_1_1 to bake an existing .blend without regenerating)}"
 BP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"           # assets/world_source
 REPO="$(cd "$BP/../.." && pwd)"                                 # repo root
 BLENDER="${BLENDER:-blender}"
 GODOT="${GODOT:-/data/danilko/bin/godot.linuxbsd.editor.x86_64.jvm.0.15.0}"
+# NOT --headless for bake/convert runs: MultiMesh data routes through the RenderingServer, and
+# the headless dummy RS drops the transform buffers (instances collapse to origin).
+RUN=("$GODOT")
+command -v xvfb-run >/dev/null 2>&1 && RUN=(xvfb-run -a "$GODOT")
 RES_DIR="src/main/resources/com/openworld/world/districts"     # relative to res://
 ABS_DIR="$REPO/$RES_DIR"
 mkdir -p "$ABS_DIR"
 
-echo "── 1/4 build piece .blend ($NAME)"
-BUILD_LOG="$($BLENDER --background --python "$BP/towns/districts/build_district.py" -- "$NAME" 2>&1)"
-echo "$BUILD_LOG" | grep -iE "DISTRICT |PIECE=" || true
-STEM="$(echo "$BUILD_LOG" | grep -oE 'PIECE=[A-Za-z0-9_]+' | head -1 | cut -d= -f2)"
-[ -n "$STEM" ] || { echo "ERROR: build_district.py did not report PIECE=<stem>"; exit 1; }
-BLEND="$BP/districts/$STEM.blend"
-echo "   -> $STEM  ($BLEND)"
-HAS_LOD_LOW=false
-echo "$BUILD_LOG" | grep -q "lod_low\[" && HAS_LOD_LOW=true
+if [[ "$NAME" == District_* ]]; then
+  STEM="$NAME"
+  BLEND="$BP/districts/$STEM.blend"
+  [ -f "$BLEND" ] || { echo "ERROR: $BLEND does not exist (stem form bakes an existing .blend)"; exit 1; }
+  echo "── 1/4 SKIP regen (bake-only, stem form) — using existing $BLEND"
+  # attempt the LOD_LOW bake and let export_world.py's "nothing to export" skip it cleanly
+  # when this piece has no STREET_LOD_LOW collection (PLATEAU precincts).
+  HAS_LOD_LOW=true
+else
+  echo "── 1/4 build piece .blend ($NAME)"
+  BUILD_LOG="$($BLENDER --background --python "$BP/towns/districts/build_district.py" -- "$NAME" 2>&1)"
+  echo "$BUILD_LOG" | grep -iE "DISTRICT |PIECE=" || true
+  STEM="$(echo "$BUILD_LOG" | grep -oE 'PIECE=[A-Za-z0-9_]+' | head -1 | cut -d= -f2)"
+  [ -n "$STEM" ] || { echo "ERROR: build_district.py did not report PIECE=<stem>"; exit 1; }
+  BLEND="$BP/districts/$STEM.blend"
+  echo "   -> $STEM  ($BLEND)"
+  HAS_LOD_LOW=false
+  echo "$BUILD_LOG" | grep -q "lod_low\[" && HAS_LOD_LOW=true
+fi
 
 # bake_one <gltf-export-args...> <gltf-relpath> <tscn-relpath> — export (with the given extra
 # export_world.py args) then bake via a throwaway WorldBaker host scene.
@@ -69,11 +91,7 @@ output_scene_path = "res://$tscn_rel"
 bake_on_ready = true
 quit_when_done = true
 EOF
-  # NOT --headless: MultiMesh.set_instance_transform routes through the RenderingServer, and the
-  # headless dummy RS drops the transform buffer (instances collapse to origin).
-  local run=("$GODOT")
-  command -v xvfb-run >/dev/null 2>&1 && run=(xvfb-run -a "$GODOT")
-  "${run[@]}" --path "$REPO" "res://$RES_DIR/$(basename "$bake_tscn")" 2>&1 \
+  "${RUN[@]}" --path "$REPO" "res://$RES_DIR/$(basename "$bake_tscn")" 2>&1 \
       | grep -iE "WorldBaker: baked" | grep -viE "OCIO" || true
   rm -f "$bake_tscn" "$bake_tscn.import" 2>/dev/null || true
 }
@@ -115,7 +133,15 @@ else
   echo "── (no STREET_LOD_LOW collection for this piece — PLATEAU precinct, skipping LOD_LOW bake)"
 fi
 
-echo "── 5/5 point SoloPiece.tscn at $STEM.tscn"
+echo "── 5/6 refresh binary district scenes (.tscn -> .scn)"
+# The runtime prefers a sibling .scn over the .tscn (WorldZoneManager.resolveGeometryPath) — a
+# stale .scn from a previous bake would silently shadow the scene just baked. ConvertDistricts
+# mtime-skips unchanged districts, so this only reconverts what this run touched. Same
+# non-headless/xvfb pattern as bake_one(): MultiMesh data doesn't survive the headless dummy RS.
+"${RUN[@]}" --path "$REPO" res://src/main/resources/com/openworld/world/hosts/ConvertDistricts.tscn 2>&1 \
+    | grep -iE "DistrictBinaryConverter: done" || true
+
+echo "── 6/6 point SoloPiece.tscn at $STEM.tscn"
 SOLO="$REPO/src/main/resources/com/openworld/world/hosts/SoloPiece.tscn"
 python3 - "$SOLO" "res://$RES_DIR/$STEM.tscn" <<'PY'
 import re, sys

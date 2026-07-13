@@ -327,6 +327,11 @@ public class WorldBaker extends Node {
         vr.laneOffset  = metaFloat(empties.get(0), "lane_offset", 1.75f);
         vr.endBehavior = metaString(empties.get(0), "end_behavior", VehicleRoute.END_DESPAWN);
         vr.nextRoutes  = metaString(empties.get(0), "next_routes", "");
+        vr.nextWeights = metaString(empties.get(0), "next_weights", "");
+        vr.turn        = metaString(empties.get(0), "turn", "");
+        vr.approach    = metaString(empties.get(0), "approach", "");
+        vr.laneWidth   = metaFloat(empties.get(0), "lane_width", 3.5f);
+        vr.returnRoute = metaString(empties.get(0), "return_route", "");
         root.addChild(vr);
         for (Node3D e : empties) {
             Marker3D m = new Marker3D();
@@ -346,6 +351,18 @@ public class WorldBaker extends Node {
         zone.geometryPath = metaString(empty, "geometry", "");   // resolved lazily at stream time
         zone.lodLowGeometryPath = metaString(empty, "geometry_lod_low", "");   // eager, always-resident tier
         zone.regionConfig = buildRegion(empty);
+        // Ambient-traffic recipe (roads-v2 Phase 1): traffic_count cars on the lanes whose route
+        // name starts with traffic_route (a PREFIX — WorldZoneManager.findRoute distributes spawns
+        // across the matching lanes near the zone). No meta = no traffic for this zone.
+        int trafficCount = (int) metaFloat(empty, "traffic_count", 0f);
+        String trafficRoute = metaString(empty, "traffic_route", "");
+        if (trafficCount > 0 && !trafficRoute.isEmpty()) {
+            VehicleSpawnConfig vc = new VehicleSpawnConfig();
+            vc.count = trafficCount;
+            vc.routeName = trafficRoute;
+            vc.cruiseThrottle = metaFloat(empty, "traffic_throttle", vc.cruiseThrottle);
+            zone.vehicleSpawnConfigs.add(vc);
+        }
         WorldZoneMarker marker = new WorldZoneMarker();
         marker.setName(new StringName("ZoneMarker_" + id));
         marker.zone = zone;

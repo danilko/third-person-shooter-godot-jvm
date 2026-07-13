@@ -18,7 +18,7 @@ Checks, for the shared edge between two districts:
      name — the thing that makes VehicleRoute.nextRoutes chaining resolve at runtime
      (see world_grid.py's seam_route_name docstring).
 
-RUN: python3 tools/check_seams.py districts/District_Shibuya.seam.json districts/District_city_2_1.seam.json
+RUN: python3 tools/check_seams.py districts/District_city_1_1.seam.json districts/District_city_2_1.seam.json
      (or any two adjacent pieces' .seam.json files, in either order)
 Exit code 0 = all checks passed, 1 = a mismatch was found (details printed).
 """
