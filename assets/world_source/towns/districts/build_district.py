@@ -52,24 +52,28 @@ import world_grid as wg
 # `landmark` (tokyotower only) overlays a hand-modeled building-tier asset the real extraction
 # can't produce (Tokyo Tower is a lattice structure with no solid footprint).
 CONFIG = {
-    "shibuya":        dict(piece="District_Shibuya", cells=72, source="plateau",
+    # Hero precincts are coordinate-named like every other piece (District_<theme>_<gx>_<gy>);
+    # the hero identity lives in the CONFIG key + plateau_json, not the filename — the old
+    # District_Shibuya-style hero filenames were renamed for one consistent naming scheme
+    # (see world_grid.piece_stem / LANDMARKS).
+    "shibuya":        dict(piece="District_city_1_1", cells=72, source="plateau",
                             plateau_json=os.path.join(ROOT, "plateau", "data", "shibuya.json"),
                             gx=1, gy=1, theme="city"),
-    "tokyostation":   dict(piece="District_TokyoStation", cells=72, source="plateau",
+    "tokyostation":   dict(piece="District_city_2_2", cells=72, source="plateau",
                             plateau_json=os.path.join(ROOT, "plateau", "data", "tokyostation.json"),
                             gx=2, gy=2, theme="city"),
-    "akihabara":      dict(piece="District_Akihabara", cells=72, source="plateau",
+    "akihabara":      dict(piece="District_city_3_3", cells=72, source="plateau",
                             plateau_json=os.path.join(ROOT, "plateau", "data", "akihabara.json"),
                             gx=3, gy=3, theme="city"),
-    "imperialpalace": dict(piece="District_ImperialPalace", cells=72, source="plateau",
+    "imperialpalace": dict(piece="District_city_2_3", cells=72, source="plateau",
                             plateau_json=os.path.join(ROOT, "plateau", "data", "imperialpalace.json"),
                             gx=2, gy=3, theme="city"),
-    "tokyotower":     dict(piece="District_TokyoTower", cells=72, source="plateau",
+    "tokyotower":     dict(piece="District_city_3_2", cells=72, source="plateau",
                             plateau_json=os.path.join(ROOT, "plateau", "data", "tokyotower_full.json"),
                             gx=3, gy=2, theme="city",
                             landmark=dict(blend=os.path.join(ROOT, "buildings", "PLATEAU_TokyoTower.blend"),
                                           collection="TokyoTower")),
-    "dotonbori":      dict(piece="District_Dotonbori", cells=72, source="plateau",
+    "dotonbori":      dict(piece="District_harbor_3_0", cells=72, source="plateau",
                             plateau_json=os.path.join(ROOT, "plateau", "data", "dotonbori.json"),
                             gx=3, gy=0, theme="harbor"),
     "city_2_1":       dict(piece="District_city_2_1", cells=72, source="plateau",
@@ -329,14 +333,74 @@ def add_ground_safety_plane(cfg, coll):
     (extract_plateau.py's `--dem` wasn't used, so no real terrain was extracted), or an
     under-detailed recycled outskirts area — the player lands on this instead of falling through
     into the void. Collision-only (kc.colonly's "-colonly" suffix convention: Godot's import drops
-    the visual, keeps a CollisionShape3D) — deliberately invisible, a pure stopgap; hand-adjust
-    real per-district terrain/ground afterward and this never shows."""
+    the visual, keeps a CollisionShape3D) — deliberately invisible, a pure stopgap.
+
+    SKIPPED for a PLATEAU precinct whose real DEM terrain fully covers the district square
+    (stats["terrain_covers_square"], see extract_plateau.py --augment / import_precinct) — there
+    the real terrain mesh IS the ground (visual + collision), and this flat slab at elev-1.0
+    would poke above it as an invisible hovering floor wherever the real ground dips lower.
+    A partial-coverage terrain (e.g. a legacy extraction whose DEM radius stops short of the
+    square's corners) still gets the plane, exactly as before."""
     half = DISTRICT / 2.0
     elev = elev_at(cfg["gx"], cfg["gy"])
     visual = kc.box(f"{cfg['piece']}_GroundSafety", -half, half, -half, half,
                      elev - 1.0, elev - 0.8, coll, "concrete")
     kc.colonly(visual, coll=coll)
     bpy.data.objects.remove(visual, do_unlink=True)
+
+
+# ── Hand-authored road spines (districts/<piece>.roads.json sidecar) ────────────────────
+#
+# PLATEAU districts have no solver grid and their road meshes are raw polygon slabs with no
+# centerlines — so internal traffic comes from HAND-AUTHORED centerline curves drawn over
+# the road meshes in Blender (road_<name> poly/bezier curves + lanes/oneway/class custom
+# props). Because this build REGENERATES the .blend (wipe_scene), the curves persist in a
+# git-diffable JSON sidecar, not the blend: edit curves → tools/save_roads.py exports the
+# sidecar → this build re-imports them into a ROADS_SRC collection (round-trip editing,
+# excluded from the glTF export) and generates the full traffic layer from them
+# (lib/road_graph.from_curves → junction-split lanes + turn connectors + intersection
+# markers, all namespaced lane_<piece>__…). No sidecar = arterials-only district, no error.
+
+def load_roads_sidecar(cfg):
+    path = os.path.join(ROOT, "districts", cfg["piece"] + ".roads.json")
+    if not os.path.exists(path):
+        return None
+    import json
+    with open(path) as f:
+        return json.load(f)
+
+
+def import_roads_src(data):
+    """Rebuild the sidecar's road_* curves as editable POLY curve objects in ROADS_SRC."""
+    src = kc.get_coll("ROADS_SRC")
+    for c in data.get("curves", []):
+        cu = bpy.data.curves.new(c["name"], 'CURVE')
+        cu.dimensions = '3D'
+        sp = cu.splines.new('POLY')
+        pts = c["points"]
+        sp.points.add(len(pts) - 1)
+        for i, (x, y, z) in enumerate(pts):
+            sp.points[i].co = (x, y, z, 1.0)
+        ob = bpy.data.objects.new(c["name"], cu)
+        ob["lanes"] = int(c.get("lanes", 1))
+        ob["oneway"] = bool(c.get("oneway", False))
+        ob["class"] = c.get("class", "local")
+        src.objects.link(ob)
+    return len(data.get("curves", []))
+
+
+def emit_authored_roads(data):
+    """Sidecar curves → RoadGraph → traffic markers. Route stems drop the road_ prefix to
+    stay inside Blender's 63-char object-name cap once the piece prefix is added."""
+    import road_graph as rgm
+    curves = []
+    for c in data.get("curves", []):
+        stem = c["name"]
+        stem = stem[len("road_"):] if stem.startswith("road_") else stem
+        curves.append((stem, [tuple(p) for p in c["points"]],
+                       {"lanes": c.get("lanes", 1), "oneway": c.get("oneway", False),
+                        "class": c.get("class", "local")}))
+    return asm.lay_road_graph(rgm.from_curves(curves), z_off=0.3)
 
 
 # ── Seams (cross-district route continuity — see world_grid.seam_route_name) ────────────
@@ -368,15 +432,33 @@ def emit_seam_routes(cfg, mk_coll):
         entry_route = seam_route_name(gx, gy, nx, ny, 0, "entry_lo" if (gx, gy) <= (nx, ny) else "entry_hi")
         expects_next = seam_route_name(gx, gy, nx, ny, 0, "entry_hi" if (gx, gy) <= (nx, ny) else "entry_lo")
 
-        # exit_route: heading OUT toward the edge (0.65 -> 0.85, ends near the boundary).
-        # entry_route: starting AT the edge, heading back IN (0.85 -> 0.65) — the two
-        # directions of travel this district owns on its own side of the seam.
-        for route, fracs in ((exit_route, (0.65, 0.85)), (entry_route, (0.85, 0.65))):
+        # exit_route: heading OUT toward the edge (0.90 -> 1.00, ENDS ON the boundary).
+        # entry_route: starting AT the edge (1.00 -> 0.90), heading back IN — the two
+        # directions of travel this district owns on its own side of the seam. Fracs reach
+        # 1.00 so this exit's end coincides with the neighbour's entry start (both districts
+        # abut on the seam line) — the old 0.65–0.85 stubs left a ~75 m dead gap a chained
+        # car had to teleport across. The exit stub carries the actual runtime chain:
+        # next_routes = the NEIGHBOUR's entry route name (resolves once both stream in;
+        # unresolved = harmless despawn-at-end, same as a map edge). lane_offset=-1.75 is
+        # deliberate here (unlike solver lanes, whose positions are truth): stubs sit on the
+        # road CENTRELINE and rely on the runtime shift. VehicleRoute offsets along the RIGHT
+        # normal of travel, so keep-left (northbound rides the west lane, matching
+        # backbone_lanes) needs the NEGATIVE sign — the old implicit baker default (+1.75)
+        # had seam traffic on the wrong (right-hand-drive) side.
+        for route, fracs, props in (
+            (exit_route, (0.90, 1.00),
+             dict(lane_offset=-1.75, end_behavior="CHAIN", next_routes=expects_next)),
+            (entry_route, (1.00, 0.90),
+             dict(lane_offset=-1.75)),
+        ):
             for i, frac in enumerate(fracs):
                 e = bpy.data.objects.new(f"lane_{route}_{i}", None)
                 e.empty_display_size = 1.0
                 e.location = (ex * frac if side in ("E", "W") else ex,
                               ey * frac if side in ("N", "S") else ey, elev + 0.6)
+                if i == 0:
+                    for k, v in props.items():
+                        e[k] = v
                 mk_coll.objects.link(e)
             n += 1
 
@@ -391,8 +473,30 @@ def emit_seam_routes(cfg, mk_coll):
 
 def build(name):
     cfg = CONFIG[name]
-    asm.wipe_scene()
+    # Regenerate IN PLACE when the piece .blend already exists: open it and clear only the
+    # PROCEDURAL collections, so hand-authored content survives a rebuild — the MANUAL
+    # collection (your own meshes/markers; exported + baked like any generated content) and
+    # NEIGHBOR_REF (tools/link_neighbors.py's linked seam-editing context; export-dropped).
+    # Same preserve idiom as assemble.setup(reopen=...) in the towns generator.
+    existing = os.path.join(ROOT, "districts", cfg["piece"] + ".blend")
+    if os.path.exists(existing):
+        bpy.ops.wm.open_mainfile(filepath=existing)
+        for cn in ("STREET", "MARKERS", "STREET_LOD_LOW", "ROADS_SRC"):
+            asm._clear_coll(cn)
+        # purge data orphaned by the clear (freshly regenerated below); local blocks only —
+        # library-linked data belongs to the NEIGHBOR_REF references.
+        for data in (bpy.data.meshes, bpy.data.curves, bpy.data.materials, bpy.data.images):
+            for blk in list(data):
+                if blk.users == 0 and blk.library is None:
+                    data.remove(blk)
+    else:
+        asm.wipe_scene()
     kc.setup_units()
+    # Namespace every district-local route name (lane_<piece>__<route>_<n>): recycled
+    # districts emit identical local names, and VehicleRoute.findRoute/pickNextRoute search
+    # the LIVE scene tree by name — two streamed districts would cross-resolve otherwise.
+    # Seam routes bypass the prefix (their names are the cross-district contract).
+    asm.set_route_prefix(cfg["piece"])
     # Marker mode: instancer()/kit placement emit instance_<piece>/mmesh_<piece> EMPTIES
     # (asset_path = kc.MARKER_KIT_DIR + <piece>.glb) instead of GN-instancing a Blender-loaded
     # kit source — the Java WorldBaker resolves those against res://.../world/kit/ at bake time.
@@ -404,11 +508,14 @@ def build(name):
 
     stats = ""
     has_lod_low = False
+    terrain_is_ground = False
     if cfg["source"] == "plateau":
         pstats, landmark_name = build_plateau(cfg, coll)
+        terrain_is_ground = pstats.get("terrain_covers_square", False)
         stats = (f"[PLATEAU: {pstats.get('buildings', 0)}/{pstats.get('buildings_total', 0)} buildings, "
                   f"{pstats.get('bridges', 0)} bridges, {pstats.get('roads', 0)}/"
-                  f"{pstats.get('roads_total', 0)} roads, terrain={pstats.get('terrain_triangles', 0)} tris, "
+                  f"{pstats.get('roads_total', 0)} roads, terrain={pstats.get('terrain_triangles', 0)} tris"
+                  f"{' (GROUND)' if terrain_is_ground else ''}, "
                   f"edge_clipped={pstats.get('edge_clipped', 0)}]")
     else:
         g, tblocks, n_front, n_tow, n_out = build_recycled(cfg, coll, mk_coll)
@@ -419,17 +526,26 @@ def build(name):
         stats += f" lod_low[roads={n_roads} buildings={n_bldg} towers={n_tow_lod}]"
         has_lod_low = True
 
-    add_ground_safety_plane(cfg, coll)
+    if not terrain_is_ground:
+        add_ground_safety_plane(cfg, coll)
 
     n_seam, manifest = emit_seam_routes(cfg, mk_coll)
     stats += f" seam_routes={n_seam}"
+
+    roads = load_roads_sidecar(cfg)
+    if roads:
+        import_roads_src(roads)
+        n_rd, n_cn, n_jn = emit_authored_roads(roads)
+        stats += f" roads[lanes={n_rd} connectors={n_cn} junctions={n_jn}]"
     if cfg["source"] == "plateau" and landmark_name:
         stats += f" landmark={landmark_name}"
 
     print("DISTRICT %s: %.0fm cells=%d %s"
           % (name, cfg["cells"] * CELL, cfg["cells"], stats))
 
-    for o in bpy.data.objects:
+    # view-layer objects only: with NEIGHBOR_REF present, bpy.data.objects also holds
+    # library-linked datablocks, and select_set raises on objects not in the view layer.
+    for o in bpy.context.view_layer.objects:
         o.select_set(False)
     kc.save_blend(os.path.join(ROOT, "districts"), cfg["piece"] + ".blend")
     with open(os.path.join(ROOT, "districts", cfg["piece"] + ".seam.json"), "w") as f:

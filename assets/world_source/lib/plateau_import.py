@@ -113,13 +113,25 @@ class TerrainSampler:
         return min(self.centroids, key=lambda c: (c[0] - x) ** 2 + (c[1] - y) ** 2)[2]
 
 
-def import_terrain(coll, triangles, ox, oy, ground_ref, tag="Terrain"):
+def import_terrain(coll, triangles, ox, oy, ground_ref, tag="Terrain", edge_half=None):
     """Build ONE real terrain mesh (visual + collision, `-col` suffix per BLENDER_CONVENTIONS --
     the visual IS the collision proxy here, no separate box) from real DEM triangles, translated by
     (ox, oy) and by -ground_ref in Z (so it lands in the same locally-zeroed ground frame every
-    other object in the precinct already uses). Returns the object, or None if no triangles."""
+    other object in the precinct already uses). Returns the object, or None if no triangles.
+
+    `edge_half`: if given, triangles whose centroid falls outside the +/-edge_half district square
+    are dropped -- the DEM clip is RADIAL (extract_plateau.py), so a radius big enough to cover the
+    square's corners (356+ m) also overhangs its edge midpoints (252 m) by ~100 m; unclipped, that
+    overhang pokes into the NEIGHBOURING district's footprint at this district's own ground datum
+    (wrong elevation there -- seam z-fighting, bumps under the boundary arterial deck)."""
     if not triangles:
         return None
+    if edge_half is not None:
+        triangles = [tri for tri in triangles
+                     if abs(sum(p[0] for p in tri) / 3.0) <= edge_half
+                     and abs(sum(p[1] for p in tri) / 3.0) <= edge_half]
+        if not triangles:
+            return None
     verts, faces = [], []
     for tri in triangles:
         base = len(verts)
@@ -254,7 +266,10 @@ def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=Non
     sampler = TerrainSampler(terrain_tris) if terrain_tris else None
     terrain_obj = None
     if sampler:
-        terrain_obj = import_terrain(coll, terrain_tris, offset_x, offset_y, ground_z, tag=f"{tag}_Terrain")
+        # NB: the sampler above keeps the FULL (unclipped) triangle set so road draping still has
+        # height data right up to the district edge; only the built mesh is clipped to the square.
+        terrain_obj = import_terrain(coll, terrain_tris, offset_x, offset_y, ground_z,
+                                     tag=f"{tag}_Terrain", edge_half=edge_half)
 
     r_count = 0
     road_objs = []
@@ -271,8 +286,17 @@ def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=Non
 
     # Combine every per-polygon road slab into ONE mesh -- one object/node per district instead
     # of (often) dozens, all sharing the same "asphalt" material and carrying no per-object
-    # collision of their own (the district's flat GroundSafety box is what's actually walkable).
+    # collision of their own (what's walkable is the real terrain mesh when DEM was extracted,
+    # else the district's flat GroundSafety box).
     _join_all(road_objs, f"{tag}_Road")
+
+    # Does the (radial) DEM clip cover the whole district square, corners included? If so the
+    # terrain mesh IS the district ground and the caller can skip the flat GroundSafety plane
+    # (which would otherwise poke above real terrain anywhere the ground dips below its own
+    # elev-1.0 slab level -- an invisible floor hovering over every real valley).
+    terrain_radius = data.get("terrain_radius_m", data.get("radius_m", 0.0)) if terrain_tris else 0.0
+    covers = terrain_obj is not None and edge_half is not None and \
+        terrain_radius >= math.hypot(edge_half, edge_half) - 1e-6
 
     return {
         "buildings": len(data["buildings"]) - b_skipped, "buildings_total": data.get("buildings_total_in_tiles", 0),
@@ -280,6 +304,7 @@ def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=Non
         "roads_total": data.get("roads_total_in_tiles", 0),
         "building_verts": b_verts, "building_faces": b_faces,
         "terrain_triangles": len(terrain_tris), "has_terrain": terrain_obj is not None,
+        "terrain_covers_square": covers,
         "edge_clipped": b_skipped + br_skipped,
     }
 

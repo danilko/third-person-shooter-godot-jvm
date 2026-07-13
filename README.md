@@ -182,6 +182,14 @@ reconstruction (see **Credits & Assets** below for the required data attribution
 stream in/out as players approach (zone-based, host-authoritative and replicated), each with its own
 baked pedestrian navmesh so AI can path through the real building layouts.
 
+**Modifying the world:** each district is a Blender file under `assets/world_source/districts/`;
+one command (`assets/world_source/tools/build_piece.sh`) rebuilds/exports/bakes a district into the
+game, and `tools/link_neighbors.py` links the adjacent districts into the file you're editing so
+borders can be fixed in context. The full artist workflow — what survives a regeneration, the
+bake-only loop for hand edits, cross-district border editing — is documented in
+[`assets/world_source/AUTHORING_GUIDE.md`](assets/world_source/AUTHORING_GUIDE.md); naming and
+structural conventions live in [`BLENDER_CONVENTIONS.md`](BLENDER_CONVENTIONS.md).
+
 ---
 
 ## 🎯 Combat System

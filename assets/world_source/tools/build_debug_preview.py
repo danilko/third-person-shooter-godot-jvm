@@ -32,7 +32,7 @@ Usage:
 Examples:
   # the resid_0_1 <-> Shibuya edge (the connector-stub obstacle investigation):
   blender --background --python tools/build_debug_preview.py -- _debug_edge \\
-      districts/District_Shibuya.blend:1:1 districts/District_resid_0_1.blend:0:1
+      districts/District_city_1_1.blend:1:1 districts/District_resid_0_1.blend:0:1
 
   # the harbor:
   blender --background --python tools/build_debug_preview.py -- _debug_harbor --harbor

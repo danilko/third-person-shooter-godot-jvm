@@ -2,12 +2,14 @@ package com.openworld.world;
 
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
+import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.Marker3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.core.Vector3;
 import godot.global.GD;
+import com.openworld.util.WeightedPick;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +49,18 @@ public class VehicleRoute extends Node3D {
      *  {@link LaneGraph} connectivity when set. */
     @Export @RegisterProperty public String nextRoutes = "";
 
+    /** Optional comma-separated weights parallel to {@link #nextRoutes} (baked straight-biased,
+     *  e.g. "0.6,0.2,0.2"). Empty/malformed = uniform pick. */
+    @Export @RegisterProperty public String nextWeights = "";
+
+    /** Turn movement this route makes through a junction — "L"/"S"/"R" on a generated turn
+     *  connector, "" on a plain lane. Read by the junction right-of-way logic (Phase 2). */
+    @Export @RegisterProperty public String turn = "";
+
+    /** Compass arm ("N"/"E"/"S"/"W") a car on this connector arrives from — the junction
+     *  conflict-table key (Phase 2). "" on a plain lane. */
+    @Export @RegisterProperty public String approach = "";
+
     /** Right-side lane offset (m) applied to the followed path — keeps cars in their lane rather than
      *  riding the marker centerline. Author opposing one-way lanes, or one centerline + ± offset. */
     @Export @RegisterProperty public float laneOffset = 0f;
@@ -70,6 +84,23 @@ public class VehicleRoute extends Node3D {
 
     public VehicleRoute() { super(); }
 
+    // Registered with the WorldZoneManager route registry (register-with-AutoLoad idiom, like
+    // Character ↔ SpatialEntityGrid) so every lane lookup is a map read, not a scene-tree walk.
+    @RegisterFunction
+    @Override
+    public void _ready() {
+        WorldZoneManager mgr = WorldZoneManager.get();
+        if (mgr != null) mgr.registerRoute(this);
+    }
+
+    @RegisterFunction
+    @Override
+    public void _exitTree() {
+        cachedEntry = null;   // global positions are per scene-instance
+        WorldZoneManager mgr = WorldZoneManager.get();
+        if (mgr != null) mgr.unregisterRoute(this);
+    }
+
     /** Raw centerline marker positions in scene order (no smoothing / offset). */
     public List<Vector3> waypoints() {
         List<Vector3> pts = new ArrayList<>();
@@ -90,6 +121,31 @@ public class VehicleRoute extends Node3D {
      *  cluster junctions. Null when the lane has no markers. */
     public Vector3 startPoint() { List<Vector3> p = waypoints(); return p.isEmpty() ? null : p.get(0); }
     public Vector3 endPoint()   { List<Vector3> p = waypoints(); return p.isEmpty() ? null : p.get(p.size() - 1); }
+
+    private Vector3 cachedEntry;
+
+    /** {@link #startPoint()} cached for the lifetime of this tree entry — the spawn-time prefix
+     *  query ({@code WorldZoneManager.findRoute}) distance-filters every registered lane, so it must
+     *  not re-walk marker children (JVM-bridge calls) per candidate. Lanes are static content. */
+    public Vector3 entryPoint() {
+        if (cachedEntry == null) cachedEntry = startPoint();
+        return cachedEntry;
+    }
+
+    /** Unit XZ travel direction leaving the first / arriving at the last marker — {@code {x, z}},
+     *  or null when under 2 markers. Drives the straightness-biased {@link LaneGraph} fallback. */
+    public double[] startTangentXZ() { return tangentXZ(true); }
+    public double[] endTangentXZ()   { return tangentXZ(false); }
+
+    private double[] tangentXZ(boolean atStart) {
+        List<Vector3> p = waypoints();
+        if (p.size() < 2) return null;
+        Vector3 a = atStart ? p.get(0) : p.get(p.size() - 2);
+        Vector3 b = atStart ? p.get(1) : p.get(p.size() - 1);
+        double dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        return len < 1e-9 ? null : new double[]{dx / len, dz / len};
+    }
 
     public boolean isLoop() { return loop; }
 
@@ -185,27 +241,44 @@ public class VehicleRoute extends Node3D {
 
     // ── Explicit-successor override (geometry-derived connectivity lives in LaneGraph) ──
 
-    /** A random explicit successor from {@link #nextRoutes}, or null when none is set/resolves. */
+    /**
+     * A weighted-random explicit successor from {@link #nextRoutes} / {@link #nextWeights}, or
+     * null when none is set/resolves. Weights stay parallel through resolution: an unresolved
+     * name (its district not streamed in yet) drops its weight with it, so the remaining
+     * candidates keep their relative bias.
+     */
     public VehicleRoute pickNextRoute() {
-        if (loop || nextRoutes == null || nextRoutes.isBlank() || getTree() == null) return null;
-        Node scene = getTree().getCurrentScene();
-        if (scene == null) return null;
+        if (loop || nextRoutes == null || nextRoutes.isBlank()) return null;
+        float[] baked = WeightedPick.parseWeights(nextWeights);
+        String[] names = nextRoutes.split(",");
         List<VehicleRoute> candidates = new ArrayList<>();
-        for (String raw : nextRoutes.split(",")) {
-            String nm = raw.trim();
+        List<Float> kept = new ArrayList<>();
+        for (int i = 0; i < names.length; i++) {
+            String nm = names[i].trim();
             if (nm.isEmpty()) continue;
-            VehicleRoute r = findRoute(scene, nm);
-            if (r != null && r != this) candidates.add(r);
+            VehicleRoute r = resolveRoute(nm);
+            if (r == null || r == this) continue;
+            candidates.add(r);
+            kept.add(baked != null && baked.length == names.length ? baked[i] : 1f);
         }
         if (candidates.isEmpty()) return null;
-        return candidates.get(Math.min((int) Math.floor(GD.randf() * candidates.size()), candidates.size() - 1));
+        float[] w = new float[kept.size()];
+        for (int i = 0; i < w.length; i++) w[i] = kept.get(i);
+        return candidates.get(WeightedPick.pick(candidates.size(), w, GD.randf()));
     }
 
-    /** Resolve a sibling lane by node name anywhere in the active scene (used by {@link #returnRoute}). */
+    /**
+     * Resolve a sibling lane by node name (used by {@link #nextRoutes} / {@link #returnRoute}) — a
+     * {@code WorldZoneManager} registry read; falls back to a scene-tree scan only when the AutoLoad
+     * is absent (test scenes).
+     */
     public VehicleRoute resolveRoute(String name) {
-        if (name == null || name.isBlank() || getTree() == null) return null;
-        Node scene = getTree().getCurrentScene();
-        return scene != null ? findRoute(scene, name.trim()) : null;
+        if (name == null || name.isBlank()) return null;
+        String nm = name.trim();
+        WorldZoneManager mgr = WorldZoneManager.get();
+        if (mgr != null) return mgr.routeByName(nm);
+        Node scene = getTree() != null ? getTree().getCurrentScene() : null;
+        return scene != null ? findRoute(scene, nm) : null;
     }
 
     private static VehicleRoute findRoute(Node node, String name) {

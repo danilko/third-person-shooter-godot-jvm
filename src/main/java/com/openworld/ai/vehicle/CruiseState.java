@@ -73,6 +73,11 @@ public class CruiseState implements VehicleAIState {
         cmd.steerToTarget = true;
         cmd.steering = steer;
         cmd.motor    = ctrl.cruiseThrottle * (1f - ctrl.turnSlowdown * turnFactor);
+        // Junction discipline: the probe above only sees the CURRENT route, so a hard turn
+        // connector right after this lane's end is invisible until adopted — ease off ahead of
+        // any chained lane end, and stay slow while the connector actually bends (L/R).
+        if (ctrl.approachingJunction() || ctrl.onTurnConnector())
+            cmd.motor = Math.min(cmd.motor, ctrl.cruiseThrottle * ctrl.junctionThrottleScale);
         return this;
     }
 }

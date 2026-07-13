@@ -286,9 +286,20 @@ lever is baking districts as sub-chunk scenes, not shrinking the budget.
 `geometry_path` `.tscn` when it exists — the baked districts are multi-MB *text* scenes whose
 parse dominates stream-in time even on a worker thread. `DistrictBinaryConverter`
 (`hosts/ConvertDistricts.tscn`, one-shot batch job in the `WorldBaker` idiom, mtime-skips
-unchanged files) resaves them all; re-run it after any district re-bake. `.scn` files are derived
-artifacts (delete-and-regenerate safe); the `.tscn` stays the source of truth. No master re-bake
-or `geometry_path` edit is needed for the preference to kick in.
+unchanged files) resaves them all; `tools/build_piece.sh` runs it automatically as its final step
+(so a fresh bake is never shadowed by a stale `.scn`) — re-run it manually only after baking a
+district by hand. `.scn` files are derived artifacts (delete-and-regenerate safe); the `.tscn`
+stays the source of truth. No master re-bake or `geometry_path` edit is needed for the preference
+to kick in.
+
+**District authoring seam (see `assets/world_source/AUTHORING_GUIDE.md`):** a district rebuild
+regenerates the `.blend` **in place** — only the procedural collections (`STREET`, `MARKERS`,
+`STREET_LOD_LOW`, `ROADS_SRC`) are wiped; `MANUAL` (hand-authored content, exported + baked) and
+`NEIGHBOR_REF` (read-only library-linked neighbour/master context from `tools/link_neighbors.py`,
+dropped by every export) survive. `build_piece.sh District_<theme>_<gx>_<gy>` (stem form) is the
+bake-only loop for hand-edited blends — it skips the regen entirely. Because linked libraries can
+carry same-named collections (several linked `STREET`s), every collection lookup in the Blender
+pipeline is local-only (`library is None`) — keep new lookups that way.
 
 **What streams vs. what's static (a common confusion):** only two things are added on load and
 removed on unload — the **AI bodies** and the zone's **`geometry` PackedScene** (instanced as a
@@ -345,6 +356,71 @@ nearest player (`spawnDebugZone()`, no `.tscn`/`.tres` needed) if you want a qui
 without editing a scene — the standalone example zone scene this used to point at (`zones/DebugZone
 .tscn`/`.tres`, `zones/DebugZoneGeometry.tscn`) was retired once the real 36-district open world
 (`assets/world_source/`, `hosts/WorldMaster.tscn`) existed to walk-test against instead.
+
+### Ambient traffic & the road graph (roads-v2)
+
+**Generated data, not runtime inference.** `assets/world_source/lib/road_graph.py` (pure Python,
+`python3 lib/road_graph.py` self-tests) turns an abstract centerline graph — junction nodes +
+polyline edges with `lanes`/`oneway`/`class` — into everything the runtime consumes: per-direction
+per-lane offset routes (`<edge>_<F|R><lane>`, keep-left, trimmed at junction stop lines), bezier
+**turn connectors** (`c<node>_<in>_<turn>`, short names — Blender's 63-char object-name cap) carrying
+`turn` (L/S/R) + `approach` (N/E/S/W) metas, and `intersection_` markers. Turning is a **data
+lookup**: each chained lane's `_0` empty stamps `next_routes` (its connectors) + straight-biased
+`next_weights` (0.6/0.2/0.2); `LaneGraph` endpoint clustering is only the legacy fallback (now
+straightness-biased via `VehicleRoute.start/endTangentXZ`). Weighted choice = `util/WeightedPick`
+(engine-free, unit-tested; malformed weights degrade to uniform, never throw). Keep-left legality:
+1-lane approach → L/S/R; ≥2 lanes → curb lane (idx 0) L+S, median (n−1) R+S, middle S only; target
+lane clamps by index — that clamp is the whole mixed-lane-count answer. `assemble.lay_road_graph()`
+emits it all (raises on any name collision/overflow — Blender auto-rename would corrupt the baker's
+name grouping).
+
+**Graph sources:** master backbone — `build_world.backbone_graph()` (junction-split, 2 lanes per
+direction, 336 lanes + 568 connectors + 49 junctions; `radius_fn` forces stop lines to the 21 m
+paved footprint) + `backbone_deck()`, an always-resident **collision-only deck** under every
+arterial (without it, cars outside streamed districts fall into the void — PLATEAU districts have
+no always-resident ground) + `safety_floor()`, a world-spanning `-colonly` slab (top **Z = −2.5**,
+just below the bay floor −2 / deck ramps ≥ −1 so it never pokes above drivable geometry) in the
+same exported `ARTDECK` collection — the catch-all guaranteeing nothing free-falls out of the
+world no matter what ground a district ships. Authored in the master blend (debuggable there),
+NOT runtime Java. The *accurate* per-district ground is PLATEAU terrain: `extract_plateau.py
+--dem` (CityGML `dem:TINRelief`) → `plateau_import.import_terrain` builds a real sloped ground
+mesh (visual + collision) and drapes roads onto it — districts extracted without `--dem` have no
+continuous ground and rely on the floor. District internals — hand-authored curves in a git-diffable sidecar
+`districts/<piece>.roads.json`: draw `road_<name>` curves over the PLATEAU road meshes, set
+`lanes`/`oneway`/`class` props, run `tools/save_roads.py`; the rebuild re-imports them into
+`ROADS_SRC` (excluded from export) and generates the namespaced (`<piece>__…`) traffic layer. No
+sidecar = arterials-only district.
+
+**Spawning:** region markers carry `traffic_count`/`traffic_route` → `WorldBaker.buildZone` builds a
+`VehicleSpawnConfig`. `traffic_route` is a route-name **prefix** (`"art_"`, or `"<piece>__"` once a
+sidecar exists — the master build flips the meta by checking for the sidecar, so re-run it after
+authoring): `WorldZoneManager.findRoute(name, center, maxDist, index)` matches exact first, else
+prefix-collects plain lanes (never turn connectors) whose entry is within `unloadRadius`,
+round-robin by spawn index in name order — that spread IS the multi-lane spawn distribution.
+**All lane lookups are registry reads, never scene-tree walks:** `VehicleRoute._ready/_exitTree`
+register/deregister with a `TreeMap` on `WorldZoneManager` (the Character↔SpatialEntityGrid
+idiom; sorted names make the prefix query ordered for free), and `entryPoint()` caches the first
+marker position per tree entry. The old recursive whole-tree scans (two per spawn, tens of
+thousands of JVM-bridge calls with a district streamed in) ran inside the 0.5 s `maintainTraffic`
+tick and were the "periodic hitch in all movement" regression; `VehicleRoute.resolveRoute`/
+`pickNextRoute` (every lane end) go through the same registry.
+`maintainTraffic` reclaims: dead / route-finished / **fell-out** (Y < −30 — an off-road car
+free-falls with unchanged XZ, so the range check alone never catches it) / out-of-range, then tops
+back up (GTA disposable traffic). `debugLog` prints spawn/reclaim/status lines — "N cars, M moving,
+K routed" is the headless-smoke signal (routed-but-0-moving = falling through missing ground;
+route-finished churn = broken junction wiring).
+
+**Junction discipline:** `CruiseState`'s curvature probe cannot see past the current route, so
+`VehicleAIController` clamps throttle (`junctionThrottleScale`, 0.45) within `junctionSlowdown`
+(18 m) of any chained lane end and while riding an L/R connector — without this cars enter 90°
+turns at full cruise speed and fly off. Phase 2 (JunctionArbiter FCFS grant sets + timed signals
+keyed on the baked `approach`/`turn`) and Phase 3 (highway ring + ramps + `speedLimit`) are next —
+see PLAN.md "Roads & Traffic v2".
+
+**Known noise:** instancing `Vehicle.tscn` from code logs a `CharacterInfo` ClassCastException
+(the scene-embedded sub-resource's JVM script binds late, so the setter receives a plain
+`Resource`) — harmless: every spawn path immediately overwrites `characterInfo` with a fresh
+instance per the shared-sub-resource identity rule.
 
 ### AI spatial perception — StimulusManager (`com.openworld.world`, AutoLoad, E2)
 

@@ -39,6 +39,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -199,7 +200,36 @@ public class WorldZoneManager extends Node {
         }
         loaded.clear();
         markers.clear();
+        routes.clear();
         if (pool != null) pool.clear();
+    }
+
+    // ── Route registry ──────────────────────────────────────────────────────────
+    //
+    // Name → live lane node, maintained by VehicleRoute._ready/_exitTree (the same
+    // register-with-AutoLoad idiom Character uses with SpatialEntityGrid). Lookups that used to
+    // recursively walk the ENTIRE scene tree per spawn (tens of thousands of JVM-bridge calls with
+    // a district streamed in — the periodic maintainTraffic hitch) are now a map read. A TreeMap
+    // keeps names sorted, so a prefix query iterates its matches in name order for free — the same
+    // deterministic order the old collect-and-sort produced for the round-robin spawn spread.
+
+    private final TreeMap<String, VehicleRoute> routes = new TreeMap<>();
+
+    public void registerRoute(VehicleRoute route) {
+        if (route != null) routes.put(route.getName().toString(), route);
+    }
+
+    public void unregisterRoute(VehicleRoute route) {
+        if (route == null) return;
+        String name = route.getName().toString();
+        if (routes.get(name) == route) routes.remove(name);
+    }
+
+    /** Live lane by exact node name (O(log n)), or null when absent/freed. */
+    public VehicleRoute routeByName(String name) {
+        if (name == null || name.isEmpty()) return null;
+        VehicleRoute r = routes.get(name);
+        return r != null && GD.isInstanceValid(r) ? r : null;
     }
 
     // ── Marker registry ───────────────────────────────────────────────────────
@@ -469,12 +499,17 @@ public class WorldZoneManager extends Node {
      * <p>Host/SP-only (PLAN.md I3c synced model) — the host owns the traffic population; clients mirror
      * each spawn/despawn over MSG_VEHICLE_SPAWN / MSG_DESPAWN and free ghosts via the client reconcile.
      */
+    /** Eval ticks between periodic traffic-status debug lines (~10 s at evalInterval 0.5). */
+    private static final int TRAFFIC_LOG_EVERY = 20;
+    private int trafficLogTick = 0;
+
     private void maintainTraffic() {
         if (loaded.isEmpty()) return;
         NetworkManager net = networkManager();
         if (net != null && net.isNetworked() && !net.isServer()) return;
         Node container = charactersContainer();
         if (container == null) return;
+        boolean logStatus = debugLog && ++trafficLogTick % TRAFFIC_LOG_EVERY == 0;
 
         for (Map.Entry<WorldZoneMarker, LoadedZone> e : loaded.entrySet()) {
             WorldZoneMarker marker = e.getKey();
@@ -491,13 +526,41 @@ public class WorldZoneManager extends Node {
             while (it.hasNext()) {
                 Vehicle v = it.next();
                 boolean dead = !GD.isInstanceValid(v);
-                boolean reclaim = dead
-                        || (v.getController() instanceof VehicleAIController c && c.isFinished())
-                        || nearestPlayerDistXZ(v.getGlobalPosition()) > marker.zone.unloadRadius;
-                if (reclaim) {
+                boolean fin = !dead && v.getController() instanceof VehicleAIController c && c.isFinished();
+                // A car that left the road (junction overshoot, deck edge) free-falls forever —
+                // its XZ stays inside the zone so the range check never reclaims it.
+                boolean fell = !dead && v.getGlobalPosition().getY() < FELL_OUT_Y;
+                boolean far = !dead && !fin && !fell
+                        && nearestPlayerDistXZ(v.getGlobalPosition()) > marker.zone.unloadRadius;
+                if (dead || fin || fell || far) {
+                    // "finished" reclaims should be ~0 away from map edges once lanes chain through
+                    // junctions (roads-v2 Phase 1) — a steady stream of them means broken wiring.
+                    if (debugLog) GD.print("WorldZoneManager: traffic reclaim in '" + marker.zone.zoneId
+                            + "' (" + (dead ? "dead" : fin ? "route-finished"
+                                     : fell ? "fell-out" : "out-of-range") + ")");
                     freeTrafficCar(lz, v, net);
                     it.remove();
                 }
+            }
+
+            // Periodic health line: cars moving + on-lane counts are the headless-smoke signal that
+            // traffic actually flows and junction chaining works (roads-v2 Phase 1) — a fleet that is
+            // routed but 0-moving, or moving but unrouted, is each its own distinct failure.
+            if (logStatus && !lz.vehicles.isEmpty()) {
+                int moving = 0, routed = 0;
+                Vehicle sample = null;
+                for (Vehicle v : lz.vehicles) {
+                    if (!GD.isInstanceValid(v)) continue;
+                    if (sample == null) sample = v;
+                    Vector3 vel = v.getLinearVelocity();
+                    double sp = Math.sqrt(vel.getX() * vel.getX() + vel.getZ() * vel.getZ());
+                    if (sp > 2.0) moving++;
+                    if (v.getController() instanceof VehicleAIController c && c.getRoute() != null) routed++;
+                }
+                GD.print("WorldZoneManager: traffic status '" + marker.zone.zoneId + "': "
+                        + lz.vehicles.size() + " cars, " + moving + " moving, " + routed + " routed"
+                        + (sample != null ? "  sample pos=" + sample.getGlobalPosition()
+                            + " vel=" + sample.getLinearVelocity() : ""));
             }
 
             // (2) Top each zone back up to its configured vehicle count (region-density scaled to match
@@ -510,8 +573,28 @@ public class WorldZoneManager extends Node {
             int spawnIdx = lz.vehicles.size();
             for (int k = lz.vehicles.size(); k < target && !configs.isEmpty(); k++) {
                 VehicleSpawnConfig vc = configs.get(k % configs.size());
-                Vehicle v = spawnVehicle(vc, center, container, findRoute(vc.routeName), spawnIdx++, lz);
-                if (v != null) lz.vehicles.add(v);
+                VehicleRoute route = findRoute(vc.routeName, center, marker.zone.unloadRadius, spawnIdx);
+                // Spawn-gate by PLAYER distance, not just zone distance: the cull above reclaims any
+                // car farther than unloadRadius from every player, but findRoute only checks the lane
+                // entry against the ZONE CENTER — on a 504 m district a far-side entry can sit beyond
+                // unloadRadius from the player, so the car would be reclaimed next tick and respawned
+                // forever (a 4-cars-per-tick reclaim/spawn loop in the log). Skip that lane for now
+                // (spawnIdx still advances, so the round-robin tries other lanes); 0.9 leaves
+                // hysteresis between the spawn gate and the reclaim radius.
+                if (route != null) {
+                    Vector3 entry = route.entryPoint();
+                    if (entry != null
+                            && nearestPlayerDistXZ(entry) > marker.zone.unloadRadius * 0.9f) {
+                        spawnIdx++;
+                        continue;
+                    }
+                }
+                Vehicle v = spawnVehicle(vc, center, container, route, spawnIdx++, lz);
+                if (v != null) {
+                    lz.vehicles.add(v);
+                    if (debugLog) GD.print("WorldZoneManager: traffic spawn in '" + marker.zone.zoneId
+                            + "' lane=" + (route != null ? route.getName().toString() : "<none>"));
+                }
             }
         }
     }
@@ -799,7 +882,8 @@ public class WorldZoneManager extends Node {
             for (int i = 0; i < n; i++) {
                 final int idx = i;
                 t.spawnWork.add(() -> {
-                    Vehicle v = spawnVehicle(vc, center, container, findRoute(vc.routeName), idx, t.lz);
+                    VehicleRoute route = findRoute(vc.routeName, center, zone.unloadRadius, idx);
+                    Vehicle v = spawnVehicle(vc, center, container, route, idx, t.lz);
                     if (v != null) t.lz.vehicles.add(v);
                 });
             }
@@ -1180,6 +1264,10 @@ public class WorldZoneManager extends Node {
     /** Metres between successive cars queued at a one-way lane's entry (≈ one car length). */
     private static final float VEHICLE_QUEUE_SPACING = 6.0f;
 
+    /** World-Y below every drivable surface (bay floor is -2, decks ramp ≥ -1) — a traffic car
+     *  under this has fallen out of the world and is reclaimed. */
+    private static final float FELL_OUT_Y = -30.0f;
+
     /**
      * Start position for a streamed vehicle.
      *
@@ -1207,20 +1295,39 @@ public class WorldZoneManager extends Node {
         return new Vector3(entry.getX() + dx / len * step, entry.getY(), entry.getZ() + dz / len * step);
     }
 
-    /** Finds a {@link VehicleRoute} node by name anywhere under the active scene (null if absent). */
-    private VehicleRoute findRoute(String routeName) {
-        if (routeName == null || routeName.isEmpty() || getTree() == null) return null;
-        Node scene = getTree().getCurrentScene();
-        return scene != null ? findRouteRecursive(scene, routeName) : null;
-    }
-
-    private VehicleRoute findRouteRecursive(Node node, String routeName) {
-        if (node instanceof VehicleRoute r && node.getName().toString().equals(routeName)) return r;
-        for (Node child : node.getChildren()) {
-            VehicleRoute found = findRouteRecursive(child, routeName);
-            if (found != null) return found;
+    /**
+     * Resolve a {@link VehicleRoute} for spawn <b>index</b> of a zone at <b>center</b>. Exact node-name
+     * match first; otherwise {@code routeName} is a <b>prefix</b> (roads-v2 Phase 1 — e.g. {@code "art_"}
+     * = the master arterial lanes, {@code "District_X__"} = that district's authored lanes): collect the
+     * matching plain lanes (never a turn connector — spawning mid-junction would drop a car inside the
+     * box) whose entry lies within {@code maxDist} of the zone (a map-wide prefix must not spawn a car
+     * kilometres away), and pick round-robin by spawn index in name order — that spread IS the
+     * multi-lane spawn distribution. Null when nothing matches (car spawns unrouted at the center).
+     *
+     * <p>All lookups go through the {@link #routes} registry (never a scene-tree walk); the prefix
+     * pass reads only plain-Java state per candidate ({@code turn}, the cached
+     * {@link VehicleRoute#entryPoint()}), so it stays cheap at hundreds of lanes.
+     */
+    private VehicleRoute findRoute(String routeName, Vector3 center, float maxDist, int index) {
+        if (routeName == null || routeName.isEmpty()) return null;
+        VehicleRoute exact = routeByName(routeName);
+        if (exact != null) return exact;
+        List<VehicleRoute> matches = new ArrayList<>();
+        for (Map.Entry<String, VehicleRoute> e : routes.tailMap(routeName).entrySet()) {
+            if (!e.getKey().startsWith(routeName)) break;   // sorted map — past the prefix block
+            VehicleRoute r = e.getValue();
+            if (!GD.isInstanceValid(r)) continue;
+            if (r.turn != null && !r.turn.isEmpty()) continue;   // never spawn mid-junction
+            Vector3 sp = r.entryPoint();
+            if (sp == null) continue;
+            if (center != null && maxDist > 0) {
+                double dx = sp.getX() - center.getX(), dz = sp.getZ() - center.getZ();
+                if (dx * dx + dz * dz > (double) maxDist * maxDist) continue;
+            }
+            matches.add(r);
         }
-        return null;
+        if (matches.isEmpty()) return null;
+        return matches.get(Math.floorMod(index, matches.size()));
     }
 
     private Vector3 randomPointInBox(Vector3 center, Vector3 size) {
