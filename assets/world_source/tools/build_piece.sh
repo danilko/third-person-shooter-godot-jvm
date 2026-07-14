@@ -55,7 +55,8 @@ if [[ "$NAME" == District_* ]]; then
   HAS_LOD_LOW=true
 else
   echo "── 1/4 build piece .blend ($NAME)"
-  BUILD_LOG="$($BLENDER --background --python "$BP/towns/districts/build_district.py" -- "$NAME" 2>&1)"
+  BUILD_LOG="$($BLENDER --background --python-exit-code 1 --python "$BP/towns/districts/build_district.py" -- "$NAME" 2>&1)" \
+      || { echo "$BUILD_LOG" | tail -30; echo "ERROR: build_district.py failed for '$NAME'"; exit 1; }
   echo "$BUILD_LOG" | grep -iE "DISTRICT |PIECE=" || true
   STEM="$(echo "$BUILD_LOG" | grep -oE 'PIECE=[A-Za-z0-9_]+' | head -1 | cut -d= -f2)"
   [ -n "$STEM" ] || { echo "ERROR: build_district.py did not report PIECE=<stem>"; exit 1; }
@@ -72,7 +73,9 @@ bake_one() {
   echo "   export -> res://$gltf_rel"
   local export_log="/tmp/export_$$.log"
   CLEANUP_FILES+=("$export_log")
-  if ! $BLENDER --background "$BLEND" --python "$BP/tools/export_world.py" -- "$@" "$ABS_DIR/$(basename "$gltf_rel")" >"$export_log" 2>&1; then
+  # --python-exit-code 1: without it Blender exits 0 even when the export script dies on an
+  # unhandled exception, and the bake below silently rebakes a STALE .gltf from the previous run.
+  if ! $BLENDER --background "$BLEND" --python-exit-code 1 --python "$BP/tools/export_world.py" -- "$@" "$ABS_DIR/$(basename "$gltf_rel")" >"$export_log" 2>&1; then
     if grep -q "nothing to export" "$export_log"; then
       echo "   (skipped — collection missing/empty)"; return 1
     fi

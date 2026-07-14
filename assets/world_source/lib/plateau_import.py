@@ -113,29 +113,90 @@ class TerrainSampler:
         return min(self.centroids, key=lambda c: (c[0] - x) ** 2 + (c[1] - y) ** 2)[2]
 
 
-def import_terrain(coll, triangles, ox, oy, ground_ref, tag="Terrain", edge_half=None):
+# Width of the border band over which DEM ground blends to the master's seam elevation.
+# Kept EQUAL to import_precinct's edge_margin (the building/bridge-free border strip) so the
+# taper never moves ground under an imported building -- only the empty strip ramps.
+SEAM_TAPER_MARGIN = 20.0
+
+
+def seam_taper(x, y, z, half, targets, margin=SEAM_TAPER_MARGIN):
+    """Blend a final (re-based, local-frame) ground height toward the master's seam elevation
+    near each district border, so adjacent districts -- each re-based to its OWN theme datum
+    (markers carry elev: harbor 0 / city 2 / resid 4 / rural 10 / mtn 40 / snow 90) -- meet at
+    the same world height instead of ending in an up-to-~10 m cliff at the seam (the "gap in
+    the ground, fall through to the lower mesh" bug; the arterial deck already uses this same
+    seam elevation via world_grid.flank_z, so tapered ground meets the deck too).
+
+    `targets`: {'+x','-x','+y','-y'} -> LOCAL-frame border height (world flank elevation minus
+    this district's own elev), from build_district.build_plateau. Smoothstep weight, applied
+    per-axis sequentially (corners blend both); pure function, self-tested by stubbing bpy."""
+    if not targets:
+        return z
+    for axis_val, key in ((x, "+x"), (-x, "-x"), (y, "+y"), (-y, "-y")):
+        d = half - axis_val          # distance to that border; only taper inside the margin
+        if d < margin:
+            t = 1.0 - max(d, 0.0) / margin
+            w = t * t * (3.0 - 2.0 * t)
+            z = z * (1.0 - w) + targets[key] * w
+    return z
+
+
+def _clip_tri_to_square(tri, half):
+    """Sutherland-Hodgman clip of ONE 3D triangle to the axis-aligned square |x| <= half,
+    |y| <= half (Z interpolated along each cut edge). Returns a list of triangles (a fan over
+    the clipped polygon): the original triangle when fully inside, [] when fully outside.
+    Pure function, no bpy -- unit-tested by this module's __main__ self-test."""
+    poly = list(tri)
+    for axis, sign in ((0, 1.0), (0, -1.0), (1, 1.0), (1, -1.0)):
+        if not poly:
+            return []
+        out = []
+        for i, cur in enumerate(poly):
+            prev = poly[i - 1]
+            cur_d = half - sign * cur[axis]     # >= 0 -> inside this half-plane
+            prev_d = half - sign * prev[axis]
+            if (cur_d >= 0) != (prev_d >= 0):
+                t = prev_d / (prev_d - cur_d)
+                out.append(tuple(p + t * (c - p) for p, c in zip(prev, cur)))
+            if cur_d >= 0:
+                out.append(tuple(cur))
+        poly = out
+    if len(poly) < 3:
+        return []
+    return [(poly[0], poly[i], poly[i + 1]) for i in range(1, len(poly) - 1)]
+
+
+def import_terrain(coll, triangles, ox, oy, ground_ref, tag="Terrain", edge_half=None,
+                   seam_targets=None):
     """Build ONE real terrain mesh (visual + collision, `-col` suffix per BLENDER_CONVENTIONS --
     the visual IS the collision proxy here, no separate box) from real DEM triangles, translated by
     (ox, oy) and by -ground_ref in Z (so it lands in the same locally-zeroed ground frame every
     other object in the precinct already uses). Returns the object, or None if no triangles.
 
-    `edge_half`: if given, triangles whose centroid falls outside the +/-edge_half district square
-    are dropped -- the DEM clip is RADIAL (extract_plateau.py), so a radius big enough to cover the
-    square's corners (356+ m) also overhangs its edge midpoints (252 m) by ~100 m; unclipped, that
-    overhang pokes into the NEIGHBOURING district's footprint at this district's own ground datum
-    (wrong elevation there -- seam z-fighting, bumps under the boundary arterial deck)."""
+    `edge_half`: if given, triangles are clipped EXACTLY to the +/-edge_half district square
+    (`_clip_tri_to_square`) -- the DEM clip is RADIAL (extract_plateau.py), so a radius big enough
+    to cover the square's corners (356+ m) also overhangs its edge midpoints (252 m) by ~100 m;
+    unclipped, that overhang pokes into the NEIGHBOURING district's footprint at this district's
+    own ground datum (wrong elevation there -- seam z-fighting, bumps under the boundary arterial
+    deck). Exact clipping, not the earlier centroid-based triangle drop: coarse TIN triangles with
+    an in-square centroid still reached 10-20 m past the border, and each district's own ground
+    datum (`ground_ref`) differs from its neighbour's by metres -- so the spill was a second
+    ground collision+visual layer up to ~10 m above/below the neighbour's true terrain, and
+    vehicles near seams visibly sank into (or climbed onto) it."""
     if not triangles:
         return None
     if edge_half is not None:
-        triangles = [tri for tri in triangles
-                     if abs(sum(p[0] for p in tri) / 3.0) <= edge_half
-                     and abs(sum(p[1] for p in tri) / 3.0) <= edge_half]
+        triangles = [ct for tri in triangles for ct in _clip_tri_to_square(tri, edge_half)]
         if not triangles:
             return None
     verts, faces = [], []
     for tri in triangles:
         base = len(verts)
-        verts.extend((x + ox, y + oy, z - ground_ref) for (x, y, z) in tri)
+        for (x, y, z) in tri:
+            zf = z - ground_ref
+            if seam_targets is not None and edge_half is not None:
+                zf = seam_taper(x, y, zf, edge_half, seam_targets)
+            verts.append((x + ox, y + oy, zf))
         faces.append((base, base + 1, base + 2))
     me = bpy.data.meshes.new(f"{tag}-col")
     me.from_pydata(verts, [], faces)
@@ -225,7 +286,8 @@ def _crosses_edge_margin(verts, half, margin):
     return False
 
 
-def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=None, edge_margin=20.0):
+def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=None, edge_margin=20.0,
+                    seam_targets=None):
     """Build every building/bridge/road object from a loaded extract_plateau.py JSON into `coll`,
     shifted by (offset_x, offset_y) -- the piece's own pre-recenter half-extent, so the real-world
     anchor point lands at local (offset_x, offset_y) and recenter() brings it to true origin exactly
@@ -269,14 +331,23 @@ def import_precinct(coll, data, offset_x, offset_y, tag="PLATEAU", edge_half=Non
         # NB: the sampler above keeps the FULL (unclipped) triangle set so road draping still has
         # height data right up to the district edge; only the built mesh is clipped to the square.
         terrain_obj = import_terrain(coll, terrain_tris, offset_x, offset_y, ground_z,
-                                     tag=f"{tag}_Terrain", edge_half=edge_half)
+                                     tag=f"{tag}_Terrain", edge_half=edge_half,
+                                     seam_targets=seam_targets)
 
     r_count = 0
     road_objs = []
     for i, r in enumerate(data["roads"]):
         ring = r["rings"][0]
         xy = [(p[0], p[1]) for p in ring[:-1]] if ring[0] == ring[-1] else [(p[0], p[1]) for p in ring]
-        top_zs = [sampler.height_at(x, y) - ground_z for x, y in xy] if sampler else None
+        # roads drape onto the SAME tapered heights as the terrain mesh, or they'd float above
+        # (or dig into) the seam-blended ground inside the border band.
+        if sampler:
+            top_zs = [seam_taper(x, y, sampler.height_at(x, y) - ground_z, edge_half, seam_targets)
+                      if seam_targets is not None and edge_half is not None
+                      else sampler.height_at(x, y) - ground_z
+                      for x, y in xy]
+        else:
+            top_zs = None
         obj = _extrude_polygon(f"{tag}_Road_{i:03d}", coll, xy, -ROAD_THICKNESS, 0.0, offset_x, offset_y,
                                top_zs=top_zs)
         if obj:

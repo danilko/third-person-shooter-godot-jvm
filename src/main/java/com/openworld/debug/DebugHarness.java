@@ -33,6 +33,7 @@ import godot.global.GD;
 
 import java.util.UUID;
 import com.openworld.character.Player;
+import godot.api.OS;
 
 /**
  * Throwaway Pre-C1 debug/test harness (PLAN.md "Pre-C1 — Debug/test harness").
@@ -356,6 +357,78 @@ public class DebugHarness extends Node {
         player.setGlobalPosition(new Vector3((float) pos.getX(), (float) pos.getY() + 3f, (float) pos.getZ()));
         GD.print("DebugHarness: teleported to zone '" + (target.zone != null ? target.zone.zoneId : "?")
                 + "' (" + (teleportZoneIndex + 1) + "/" + markers.size() + ")");
+    }
+
+    // ── Headless auto-walk (run with `-- --auto-walk` cmdline user args) ─────────────────────
+
+    /** Metres per second the auto-walk drags the player (highway pace — crosses a 504 m
+     *  district in ~20 s, so a several-minute headless smoke exercises multiple zone
+     *  stream-in/stream-out cycles plus the traffic maintenance around each). */
+    private static final float AUTO_WALK_SPEED = 25f;
+    /** XZ arrival slack before advancing to the next marker. */
+    private static final float AUTO_WALK_ARRIVE = 25f;
+    /** Tour altitude above each marker — high enough to clear every building, because the player's
+     *  own MovementController still runs move_and_slide each frame: at street level a wall collision
+     *  cancels the drag and the tour jams against the first facade it meets. Streaming, traffic
+     *  upkeep, and AI LOD all measure XZ distance only, so altitude doesn't distort the test. */
+    private static final float AUTO_WALK_ALTITUDE = 50f;
+
+    private boolean autoWalk = false;
+    private int autoWalkIndex = 0;
+
+    /**
+     * Headless walk-test driver: launched with {@code -- --auto-walk} (Godot user args), drags the
+     * local player through every registered {@link WorldZoneMarker} in {@code zoneId} order at
+     * {@link #AUTO_WALK_SPEED}. This makes a {@code --headless} smoke actually exercise streaming —
+     * without it the input-less player stands still forever and only its spawn district ever loads,
+     * so streaming/traffic regressions (which show up on zone crossings) never reproduce in CI-style
+     * runs. Same marker registry + sort as F1's {@link #teleportToNextZone}, but continuous movement
+     * instead of a jump — crossings, hysteresis, and mid-stream cancels all get hit.
+     */
+    @RegisterFunction
+    @Override
+    public void _ready() {
+        for (String arg : OS.getCmdlineUserArgs()) {
+            if ("--auto-walk".equals(arg)) { autoWalk = true; break; }
+        }
+        setPhysicsProcess(autoWalk);
+        if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order");
+    }
+
+    @RegisterFunction
+    @Override
+    public void _physicsProcess(double delta) {
+        if (!autoWalk) return;
+        WorldZoneManager mgr = WorldZoneManager.get();
+        if (mgr == null) return;
+        java.util.List<WorldZoneMarker> markers = new java.util.ArrayList<>(mgr.getMarkers());
+        if (markers.isEmpty()) return;
+        markers.sort(java.util.Comparator.comparing(m -> m.zone != null ? m.zone.zoneId : ""));
+
+        Player player = null;
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p)) { player = p; break; }
+        }
+        if (player == null) return;
+
+        autoWalkIndex %= markers.size();
+        WorldZoneMarker target = markers.get(autoWalkIndex);
+        Vector3 tp = target.getGlobalPosition();
+        Vector3 pp = player.getGlobalPosition();
+        double dx = tp.getX() - pp.getX(), dz = tp.getZ() - pp.getZ();
+        double dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < AUTO_WALK_ARRIVE) {
+            GD.print("DebugHarness: auto-walk reached '" + (target.zone != null ? target.zone.zoneId : "?")
+                    + "' (" + (autoWalkIndex + 1) + "/" + markers.size() + ")");
+            autoWalkIndex = (autoWalkIndex + 1) % markers.size();
+            return;
+        }
+        double step = Math.min(AUTO_WALK_SPEED * delta, dist);
+        // Drag the transform directly (not synthesized input) — streaming and traffic upkeep only
+        // read the player's XZ position. Y is re-pinned every tick (gravity pulls between sets).
+        float y = (float) (tp.getY() + AUTO_WALK_ALTITUDE);
+        player.setGlobalPosition(new Vector3((float) (pp.getX() + dx / dist * step), y,
+                (float) (pp.getZ() + dz / dist * step)));
     }
 
     /**

@@ -313,7 +313,19 @@ def build_recycled_lod_low(cfg, coll, g):
 def build_plateau(cfg, coll):
     data = pi.load(cfg["plateau_json"])
     edge_half = DISTRICT / 2.0
-    stats = pi.import_precinct(coll, data, 0.0, 0.0, tag=cfg["piece"], edge_half=edge_half)
+    # Seam elevation targets (LOCAL frame = world flank elevation minus this district's own
+    # theme elev): the same per-seam height world_grid.flank_z gives the master's arterials,
+    # so DEM ground tapers to meet BOTH the neighbouring district's ground and the deck.
+    # theme_at clamps off-grid, so a map-edge border simply tapers to the district's own datum.
+    gx, gy, own = cfg["gx"], cfg["gy"], wg.elev_at(cfg["gx"], cfg["gy"])
+    seam_targets = {
+        "+x": (own + wg.elev_at(gx + 1, gy)) / 2.0 - own,
+        "-x": (own + wg.elev_at(gx - 1, gy)) / 2.0 - own,
+        "+y": (own + wg.elev_at(gx, gy + 1)) / 2.0 - own,
+        "-y": (own + wg.elev_at(gx, gy - 1)) / 2.0 - own,
+    }
+    stats = pi.import_precinct(coll, data, 0.0, 0.0, tag=cfg["piece"], edge_half=edge_half,
+                               seam_targets=seam_targets)
 
     landmark = cfg.get("landmark")
     landmark_name = None
@@ -545,8 +557,12 @@ def build(name):
 
     # view-layer objects only: with NEIGHBOR_REF present, bpy.data.objects also holds
     # library-linked datablocks, and select_set raises on objects not in the view layer.
-    for o in bpy.context.view_layer.objects:
-        o.select_set(False)
+    # Snapshot + skip None: object removals during the regen leave stale None slots in
+    # view_layer.objects until the next depsgraph update (Blender 5.x) — same guard as
+    # export_world.py's deselect loop.
+    for o in list(bpy.context.view_layer.objects):
+        if o is not None:
+            o.select_set(False)
     kc.save_blend(os.path.join(ROOT, "districts"), cfg["piece"] + ".blend")
     with open(os.path.join(ROOT, "districts", cfg["piece"] + ".seam.json"), "w") as f:
         import json
