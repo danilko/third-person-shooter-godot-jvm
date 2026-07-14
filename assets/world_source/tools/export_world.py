@@ -121,9 +121,12 @@ if _dropped:
     print("dropped %d kit source objects (kept out of the export)" % _dropped)
 
 # view-layer objects only: bpy.data.objects also holds library-linked datablocks (neighbour
-# refs), and select_set raises on an object that is not in the view layer.
-for o in bpy.context.view_layer.objects:
-    o.select_set(False)
+# refs), and select_set raises on an object that is not in the view layer. Snapshot the list and
+# skip None entries: the removals above leave stale None slots in view_layer.objects until the
+# next depsgraph update (Blender 5.x), and select_set on that None crashed the whole export.
+for o in list(bpy.context.view_layer.objects):
+    if o is not None:
+        o.select_set(False)
 
 bpy.ops.export_scene.gltf(
     filepath=OUT,

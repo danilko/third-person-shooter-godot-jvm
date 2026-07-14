@@ -59,6 +59,37 @@ public class NavBaker extends Node {
     private static final float AGENT_MAX_CLIMB = 0.5f;
     private static final float AGENT_MAX_SLOPE_DEG = 46f;
 
+    /**
+     * Rasterization voxel size (engine default is 0.25/0.25). Coarsened for the DEM-terrain
+     * districts: the real PLATEAU TIN is dense and irregular, and at the default resolution the
+     * polygonizer emits a handful of duplicate free edges where TIN detail and building collision
+     * proxies interleave — Godot then logs "Navigation region synchronization had N edge error(s)"
+     * on every region sync at runtime. Halving the resolution re-polygonizes those spots away and
+     * shrinks the mesh; centimetre-precision walkability is meaningless on 504 m district chunks.
+     */
+    private static final float CELL_SIZE = 0.5f;
+    private static final float CELL_HEIGHT = 0.5f;
+
+    /**
+     * Clip the bake to the district's own 504 m grid cell ({@code world_grid.DISTRICT}, content
+     * centered at local origin). The PLATEAU TIN + border-building colliders spill 10–25 m past the
+     * cell edge, so an unclipped bake overlaps its neighbours' — and two loaded neighbours then
+     * rasterize the same map cells at the seam, which is Godot's "More than 2 edges tried to occupy
+     * the same map rasterization space" edge error.
+     *
+     * <p>{@code NAV_CLIP_INSET}: the clip is pulled a further 0.5 m INSIDE the cell on every side.
+     * Regions that abut <i>exactly</i> still share border rasterization cells, and wherever a third
+     * edge lands in one of those cells (notably 4-district corners) the same ">2 edges" warning
+     * fires. The inset leaves a deliberate 1 m gap between neighbouring navmeshes so they never
+     * share a cell; the map's edge-connection pass (see {@code navigation/3d/
+     * default_edge_connection_margin = 1.5} in project.godot, raised from the 0.25 default to
+     * bridge this gap) still connects the two free edges, so cross-district pathing is unaffected.
+     */
+    private static final float DISTRICT_HALF_EXTENT = 252f;
+    private static final float NAV_CLIP_INSET = 0.5f;
+    private static final float CLIP_Y_MIN = -100f;
+    private static final float CLIP_Y_MAX = 1000f;
+
     @RegisterFunction
     @Override
     public void _ready() {
@@ -85,12 +116,24 @@ public class NavBaker extends Node {
         if (root == null) { GD.printErr("NavBaker: source instantiate failed"); return; }
         host.addChild(root);
 
+        // Idempotence: drop any BakedNav a previous run left behind BEFORE parsing source geometry —
+        // re-baking must replace the region, not stack a second identical navmesh on top of it
+        // (overlapping duplicates are exactly what trips the runtime "edge error(s)" warning).
+        Node stale = root.getNodeOrNull(new godot.core.NodePath("BakedNav"));
+        if (stale != null) { root.removeChild(stale); stale.queueFree(); }
+
         NavigationMesh navMesh = new NavigationMesh();
         navMesh.setParsedGeometryType(NavigationMesh.ParsedGeometryType.STATIC_COLLIDERS);
         navMesh.setAgentHeight(AGENT_HEIGHT);
         navMesh.setAgentRadius(AGENT_RADIUS);
         navMesh.setAgentMaxClimb(AGENT_MAX_CLIMB);
         navMesh.setAgentMaxSlope(AGENT_MAX_SLOPE_DEG);
+        navMesh.setCellSize(CELL_SIZE);
+        navMesh.setCellHeight(CELL_HEIGHT);
+        float clipHalf = DISTRICT_HALF_EXTENT - NAV_CLIP_INSET;
+        navMesh.setFilterBakingAabb(new godot.core.AABB(
+                new godot.core.Vector3(-clipHalf, CLIP_Y_MIN, -clipHalf),
+                new godot.core.Vector3(2 * clipHalf, CLIP_Y_MAX - CLIP_Y_MIN, 2 * clipHalf)));
 
         // Two explicit steps (see class doc for why, not NavigationMeshGenerator.bake()): scan
         // root's whole subtree for STATIC_COLLIDERS geometry, then bake polygons from it.
