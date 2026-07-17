@@ -67,6 +67,15 @@ public class Player extends Character {
 
     @Override
     protected void applyInput(UserCommand cmd, double delta) {
+        // Seated passenger exit (multi-seat): the driver's exit runs through the vehicle's own
+        // _physicsProcess, but a passenger's controller stays on this character — handle the
+        // interact key here. Host-arbitrated like every other seat change.
+        if (cmd.enterExit && isSeatedPassenger()
+                && currentVehicleNode instanceof com.openworld.carrier.vehicle.Vehicle v
+                && godot.global.GD.isInstanceValid(v)) {
+            v.requestExitOccupant(this);
+            return;
+        }
         if (cmd.enterExit && nearbyVehicle != null) {
             // A destroyed vehicle is freed without firing its EntranceArea body_exited, so
             // this reference can dangle — calling into a freed object throws (Round 11 N3).

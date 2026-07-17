@@ -5,11 +5,60 @@ albedo_color = Color(0.08, 0.07, 0.06, 1)
 roughness = 1.0
 metallic = 0.2
 
-[sub_resource type="BoxMesh" id="BoxMesh_wreck"]
+[sub_resource type="BoxMesh" id="BoxMesh_wreckbody"]
 material = SubResource("StandardMaterial3D_wreck")
-size = Vector3(2, 0.45, 4)
+size = Vector3(2, 0.4, 4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wreckcabin"]
+material = SubResource("StandardMaterial3D_wreck")
+size = Vector3(1.6, 0.22, 2.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wreck"]
+size = Vector3(2, 0.55, 4)
+
+[sub_resource type="Gradient" id="Gradient_wrecksmoke"]
+colors = PackedColorArray(0.12, 0.12, 0.12, 0.85, 0.35, 0.35, 0.35, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_wrecksmoke"]
+gradient = SubResource("Gradient_wrecksmoke")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_wrecksmoke"]
+direction = Vector3(0, 1, 0)
+spread = 14.0
+initial_velocity_min = 1.0
+initial_velocity_max = 2.0
+gravity = Vector3(0, 0.7, 0)
+scale_min = 0.7
+scale_max = 1.6
+color_ramp = SubResource("GradientTexture1D_wrecksmoke")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wreckpuff"]
+transparency = 1
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+
+[sub_resource type="QuadMesh" id="QuadMesh_wreckpuff"]
+material = SubResource("StandardMaterial3D_wreckpuff")
+size = Vector2(0.8, 0.8)
 
 [node name="VehicleWreck" type="Node3D"]
 
-[node name="Mesh" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_wreck")
+[node name="Shell" type="StaticBody3D" parent="."]
+
+[node name="Body" type="MeshInstance3D" parent="Shell"]
+mesh = SubResource("BoxMesh_wreckbody")
+
+[node name="Cabin" type="MeshInstance3D" parent="Shell"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0.3)
+mesh = SubResource("BoxMesh_wreckcabin")
+
+[node name="Collision" type="CollisionShape3D" parent="Shell"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+shape = SubResource("BoxShape3D_wreck")
+
+[node name="Smoke" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, -1)
+amount = 32
+lifetime = 2.2
+process_material = SubResource("ParticleProcessMaterial_wrecksmoke")
+draw_pass_1 = SubResource("QuadMesh_wreckpuff")

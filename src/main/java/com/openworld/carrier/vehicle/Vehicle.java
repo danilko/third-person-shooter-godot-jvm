@@ -102,7 +102,14 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     protected Controller             controller;
     protected Health                 healthNode;
+    /** Driver (seat 0) — kept as a field alias of seatOccupants[0] so the many driver-centric
+     *  call sites (nameplate colour, carjack, weapon routing, AI eviction) stay unchanged. */
     protected Character              occupant;
+
+    // ── Multi-seat (driver = seat 0, passengers = 1..n) ───────────────────────
+    /** Seat anchors from the scene's `Seats` children; falls back to the legacy single DriverSeat. */
+    private final ArrayList<Node3D>  seatNodes = new ArrayList<>();
+    private Character[]              seatOccupants = new Character[1];
 
     private Node3D                   driverSeatNode;
     private Camera3D                 vehicleCamera;
@@ -114,11 +121,26 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     private boolean braking     = false;
     private boolean handBraking = false;
     private boolean justEntered = false;
-    private UserCommand cmd = new UserCommand();
+    /** The tick's gathered command — readable by carrier subclasses' applyLocomotion overrides. */
+    protected UserCommand cmd = new UserCommand();
 
     private final java.util.HashSet<Character> activeCollisions = new java.util.HashSet<>();
     /** Counts down between VEHICLE_CRASH stimulus posts so a sustained scrape alerts AI at most ~1×/s (E2). */
     private double crashStimulusCooldown = 0.0;
+
+    // ── Parked/idle stability (anti character-push + slope-creep) ─────────────
+    // The body has a zero-friction physics material and wheel forces every frame, so it
+    // never sleeps on its own — a CharacterBody3D depenetrating against it slides it, and
+    // the parking *friction* coefficient can only slow slope-creep, never stop it. Parked
+    // uses RigidBody SLEEPING, never freeze: freeze is the puppet mechanism, and the ~1 Hz
+    // occupancy self-heal sweep re-runs applyAuthorityState → setFreezeEnabled(false) on
+    // every locally simulated vehicle, which would silently un-park a freeze-based park.
+    /** Continuous low-speed idle dwell (s) accumulated toward the parked transition. */
+    private double parkTimer = 0.0;
+    /** True while parked: wheel-force loop skipped, RigidBody asleep. */
+    private boolean parked = false;
+    /** Ground state from the last simulated wheel loop — read by the _integrateForces lock. */
+    private boolean lastGrounded = false;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -162,6 +184,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             healthNode.died.connectUnsafe(
                     Callable.createUnsafe(this, StringNames.toGodotName("onVehicleDestruction")),
                     godot.api.Object.ConnectFlags.DEFAULT);
+            // Damage wakes a parked (sleeping) body so it reacts to what follows the hit.
+            healthNode.hit.connectUnsafe(
+                    Callable.createUnsafe(this, StringNames.toGodotName("onVehicleDamaged")),
+                    godot.api.Object.ConnectFlags.DEFAULT);
         }
 
         VehicleConfig cfg = getConfig();
@@ -180,18 +206,39 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                     wheels.add(w);
                 }
             }
-        } else {
+        } else if (requiresWheels()) {
             GD.printErr("[Vehicle] Wheels node missing — hover disabled!");
         }
 
         Node seat = getNodeOrNull(driverSeatPath.getPath());
         if (seat instanceof Node3D n) driverSeatNode = n;
 
+        // Multi-seat: a `Seats` node's Node3D children are the seat anchors in index order
+        // (Seat0 = driver). Legacy scenes without one keep working as single-seat via
+        // DriverSeat. Seat0, when present, supersedes driverSeatPath as the driver anchor.
+        Node seatsRoot = getNodeOrNull("Seats");
+        if (seatsRoot != null) {
+            for (Node child : seatsRoot.getChildren()) {
+                if (child instanceof Node3D sn) seatNodes.add(sn);
+            }
+        }
+        if (seatNodes.isEmpty() && driverSeatNode != null) seatNodes.add(driverSeatNode);
+        if (!seatNodes.isEmpty()) driverSeatNode = seatNodes.get(0);
+        seatOccupants = new Character[Math.max(1, seatNodes.size())];
+
         Node cam = getNodeOrNull(vehicleCamPath.getPath());
         if (cam instanceof Camera3D c) vehicleCamera = c;
 
         Node camCtrl = getNodeOrNull("CameraController");
         if (camCtrl instanceof VehicleCameraController vcc) camController = vcc;
+
+        // Optional damage-tier emitters (DamageVfx/Smoke + DamageVfx/Fire) — degrade
+        // gracefully when a vehicle scene ships without them.
+        Node dv = getNodeOrNull("DamageVfx");
+        if (dv != null) {
+            if (dv.getNodeOrNull("Smoke") instanceof GPUParticles3D s) damageSmoke = s;
+            if (dv.getNodeOrNull("Fire")  instanceof GPUParticles3D f) damageFire  = f;
+        }
 
         Node wc = getNodeOrNull("WeaponController");
         if (wc instanceof WeaponController vwc) vehicleWeaponController = vwc;
@@ -245,6 +292,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 GD.printErr("[Vehicle] " + characterInfo.characterId
                         + " lost authority while holding a live controller — freezing under it");
             }
+            // Freeze (puppet) and parked-sleep are distinct mechanisms — never hold both, so
+            // an authority handback always resumes from a clean (awake, unparked) slate.
+            if (parked) unpark();
+            parkTimer = 0.0;
             setFreezeEnabled(true);
         }
     }
@@ -276,13 +327,13 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override
     public void _physicsProcess(double delta) {
         updateSpatialCell(delta);
-        boolean isGrounded = false;
 
         cmd.motor     = 0;
         cmd.steering  = 0;
         cmd.steerToTarget = false;
         cmd.handbrake = false;
         cmd.brake     = false;
+        cmd.boost     = false;
         cmd.fire      = false;
         cmd.reload    = false;
         cmd.desiredWeapon = -1;
@@ -303,6 +354,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             cmd.steerToTarget = currentCmd.steerToTarget;
             cmd.handbrake = currentCmd.handbrake;
             cmd.brake     = currentCmd.brake;
+            cmd.boost     = currentCmd.boost;
             cmd.fire      = currentCmd.fire;
             cmd.reload    = currentCmd.reload;
             // Relay the passenger-weapon slot switch (PASSENGER_WEAPON mode): without this the
@@ -323,18 +375,39 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // puppets are frozen and placed kinematically by VehicleNetworkController, which
         // also drives their wheel visuals from the replicated steering/speed.
         if (isLocallySimulated()) {
-            for (VehicleWheel w : wheels) {
-                w.applyWheelPhysics((float) delta, (float) getPhysicsProcessDeltaTime(), cmd);
-                w.applyWheelSteering((float) delta, cmd.steering, cmd.steerToTarget);
-                w.applySkidMark();
-                if (w.grounded()) isGrounded = true;
+            VehicleConfig cfg = getConfig();
+            float speed = (float) getLinearVelocity().length();
+            boolean idle = isIdleInput();
+
+            // A hard shove (ram, big blast impulse) crossed the threshold, or the driver
+            // gave input — resume physics this frame.
+            if (parked && (!idle || speed >= cfg.parkSpeedThreshold)) {
+                unpark();
             }
 
-            setCenterOfMassMode(CenterOfMassMode.CUSTOM);
-            if (isGrounded) {
-                setCenterOfMass(new Vector3(0f, -0.3f, 0f));
+            if (parked) {
+                // An external nudge (small blast push, a body settling against us) can wake
+                // the engine without crossing the speed threshold — re-assert sleep so the
+                // zero-friction body never accumulates depenetration drift from a character
+                // leaning on it.
+                if (!isSleeping()) setSleeping(true);
             } else {
-                setCenterOfMass(Vector3.Companion.getDOWN().times(0.5f));
+                boolean supported = applyLocomotion(cfg, delta);
+                lastGrounded = supported;
+
+                // Park evaluation: idle + supported + slow, held for parkDelaySeconds
+                // (the dwell prevents sleep/wake flap at the threshold). AI traffic never
+                // parks mid-drive — CruiseState always emits motor ≠ 0 and a junction hold
+                // (BrakeState) emits brake = true, both of which fail isIdleInput().
+                if (idle && supported && speed < cfg.parkSpeedThreshold) {
+                    parkTimer += delta;
+                    if (parkTimer >= cfg.parkDelaySeconds) {
+                        parked = true;
+                        setSleeping(true);
+                    }
+                } else {
+                    parkTimer = 0.0;
+                }
             }
         }
 
@@ -342,15 +415,22 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // seated AI driver can be freed/removed out from under us by a despawn race, and reading its
         // transform then throws `get_global_transform "!is_inside_tree"` → native use-after-free segfault.
         // isInstanceValid is checked first (short-circuit) so isInsideTree is never called on a freed node.
-        if (occupant != null && (!GD.isInstanceValid(occupant) || !occupant.isInsideTree())) {
-            occupant = null;
-            nameplateChanged.emit();
-        }
-        if (occupant != null && driverSeatNode != null) {
-            occupant.setGlobalPosition(driverSeatNode.getGlobalPosition());
-            Vector3 occRot = occupant.getGlobalRotation();
+        // Every seat is validated + pinned (runs on every peer — puppets pin their riders too).
+        for (int seat = 0; seat < seatOccupants.length; seat++) {
+            Character rider = seatOccupants[seat];
+            if (rider == null) continue;
+            if (!GD.isInstanceValid(rider) || !rider.isInsideTree()) {
+                seatOccupants[seat] = null;
+                if (seat == 0) occupant = null;
+                nameplateChanged.emit();
+                continue;
+            }
+            Node3D anchor = seat < seatNodes.size() ? seatNodes.get(seat) : driverSeatNode;
+            if (anchor == null) continue;
+            rider.setGlobalPosition(anchor.getGlobalPosition());
+            Vector3 occRot = rider.getGlobalRotation();
             occRot.setY((float) getGlobalRotation().getY());
-            occupant.setGlobalRotation(occRot);
+            rider.setGlobalRotation(occRot);
         }
 
         // Weapon routing is authority-only (N3): on a puppet, the occupant's fire cues and
@@ -370,6 +450,312 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
     }
 
+    // ── Locomotion hook (carrier-type seam) ───────────────────────────────────
+
+    /**
+     * One simulated physics tick of locomotion — never called while parked or on puppets.
+     * Base implementation = the raycast-wheel car. Carrier stubs ({@code Motorcycle},
+     * {@code Boat}, {@code Airplane}) override or extend this one method; everything else
+     * on this class (seats/occupancy, authority + puppet handling, Health/destruction/wreck,
+     * snapshot replication, parked sleep, boost meter, damage tiers) is carrier-generic and
+     * inherited unchanged. (A full {@code Carrier} base-class extraction — pure code motion —
+     * stays open as a follow-up; this hook is the behavioural seam it would move along.)
+     *
+     * @return true when the body is supported (grounded / afloat) — feeds the parked
+     *         evaluation and the _integrateForces static lock.
+     */
+    protected boolean applyLocomotion(VehicleConfig cfg, double delta) {
+        boolean isGrounded = false;
+        float speed = (float) getLinearVelocity().length();
+        updateBoost(cfg, delta);
+        // Arcade gearbox (GTA/NFS standard): throttle AGAINST the rolling direction is a
+        // brake until near-stopped — S at speed slows the car with brake force instead of
+        // full reverse motor thrust (the old sharp stop that flowed straight into reverse),
+        // and W while backing up brakes before driving off forward.
+        float fwdSpeed = (float) getGlobalBasis().getZ().times(-1).dot(getLinearVelocity());
+        if ((cmd.motor < 0f && fwdSpeed > 1.0f) || (cmd.motor > 0f && fwdSpeed < -1.0f)) {
+            cmd.brake = true;
+            cmd.motor = 0f;
+        }
+        for (VehicleWheel w : wheels) {
+            w.applyWheelPhysics((float) delta, (float) getPhysicsProcessDeltaTime(), cmd);
+            w.applyWheelSteering((float) delta, cmd.steering, cmd.steerToTarget);
+            w.applySkidMark();
+            if (w.grounded()) isGrounded = true;
+        }
+
+        setCenterOfMassMode(CenterOfMassMode.CUSTOM);
+        if (isGrounded) {
+            setCenterOfMass(new Vector3(0f, -0.3f, 0f));
+        } else {
+            setCenterOfMass(Vector3.Companion.getDOWN().times(0.5f));
+        }
+
+        applyStabilityAssists(cfg, isGrounded, speed);
+        // Quadratic aero drag (grounded or airborne) — the real high-speed limiter now
+        // that rolling friction saturates; without it saturation would remove any ceiling.
+        if (cfg.aeroDragCoefficient > 0f && speed > 1f) {
+            applyCentralForce(getLinearVelocity().times(-cfg.aeroDragCoefficient * speed));
+        }
+        if (isGrounded) {
+            applyFlatTirePull(cfg, speed);
+            applyMomentumAlignment(cfg, delta);
+            // Drift rotation (NFS-Carbon style): while the handbrake is held, steering
+            // applies a direct yaw torque — full donuts and burnout spins under player
+            // control, instead of the grip model's self-stalling equilibrium angle.
+            // Authority needs motion OR throttle (a parked, brakeless car doesn't spin).
+            if (cmd.handbrake && cfg.driftYawTorque > 0f && Math.abs(cmd.steering) > 0.01f) {
+                double authority = GD.clamp(speed / 8.0 + Math.abs(cmd.motor), 0.0, 1.0);
+                applyTorque(getGlobalBasis().getY()
+                        .times(cmd.steering * cfg.driftYawTorque * authority));
+            }
+        }
+        return isGrounded;
+    }
+
+    /**
+     * Arcade corner-speed retention (the NFS/GTA "rail" turn): rotate the horizontal
+     * velocity direction toward the body heading, preserving |v| — a gripping steered turn
+     * redirects momentum instead of scrubbing it off through tire friction (without this a
+     * full-speed corner bleeds ~25% speed; measured by the DriveTest harness). Skipped for
+     * handbrake/slip so drift keeps its physics; flats weaken it (grip is what redirects).
+     */
+    private void applyMomentumAlignment(VehicleConfig cfg, double delta) {
+        if (cfg.momentumAlignRate <= 0f || cmd.handbrake || isSlipping()) return;
+        Vector3 vel   = getLinearVelocity();
+        Vector3 horiz = new Vector3(vel.getX(), 0.0, vel.getZ());
+        double  hs    = horiz.length();
+        if (hs < 2.0) return;                       // parking/creep untouched
+        Vector3 fwd = getGlobalBasis().getZ().times(-1);
+        Vector3 fh  = new Vector3(fwd.getX(), 0.0, fwd.getZ());
+        if (fh.length() < 1e-3) return;             // pointing straight up/down
+        fh = fh.normalized();
+        double dir = Math.signum(fh.dot(horiz));
+        if (dir == 0.0) return;                     // pure sideways slide — nothing to align to
+
+        double rate = cfg.momentumAlignRate;
+        for (VehicleWheel w : wheels) {
+            if (w.isFlat()) { rate *= cfg.flatGripScale; break; }
+        }
+        double w = Math.min(1.0, rate * delta);
+        // Friction-circle budget: redirecting v at angular rate ω costs lateral accel v·ω,
+        // so cap the per-tick rotation at maxLateralG — the assist must not corner harder
+        // than the tires themselves are allowed to (same cap as the wheel lateral force).
+        if (cfg.maxLateralG > 0f) {
+            double angleGap = horiz.normalized().angleTo(fh.times(dir));
+            double maxStep  = (cfg.maxLateralG * 9.81 / hs) * delta;   // ω_max·dt
+            if (angleGap > 1e-4 && angleGap * w > maxStep) w = maxStep / angleGap;
+        }
+        Vector3 newDir = horiz.normalized().lerp(fh.times(dir), w).normalized();
+        Vector3 newHoriz = newDir.times(hs);
+        setLinearVelocity(new Vector3(newHoriz.getX(), vel.getY(), newHoriz.getZ()));
+    }
+
+    /** Wheel-less carrier subclasses (Boat/Airplane) suppress the missing-Wheels error. */
+    protected boolean requiresWheels() { return true; }
+
+    // ── High-speed stability assists (GTA-style anti-flip) ────────────────────
+
+    /** Last angular-damp ground state applied, so the property is only written on change. */
+    private Boolean lastDampGrounded = null;
+
+    /**
+     * Body-level stability, simulating peer only, after the wheel-force loop:
+     * anti-roll bar (per-axle compression transfer), speed² downforce along −bodyUp
+     * (banked roads press the car into their surface), grounded angular damping, and a
+     * soft keep-upright torque. Airborne keeps low damping and no assists — jumps tumble
+     * naturally, GTA-style. All tunables live in {@link VehicleConfig}.
+     */
+    protected void applyStabilityAssists(VehicleConfig cfg, boolean grounded, float speed) {
+        if (lastDampGrounded == null || lastDampGrounded != grounded) {
+            lastDampGrounded = grounded;
+            setAngularDamp(grounded ? cfg.groundedAngularDamp : cfg.airborneAngularDamp);
+        }
+        if (cfg.antiRollStiffness > 0f) applyAntiRoll(cfg);
+        if (!grounded) return;
+
+        Vector3 bodyUp = getGlobalBasis().getY();
+        if (cfg.downforceCoefficient > 0f) {
+            float weight = (float) (getMass() * -getGravity().getY());
+            float df = Math.min(cfg.downforceCoefficient * speed * speed, weight);
+            applyCentralForce(bodyUp.times(-df));
+        }
+        if (cfg.uprightTorque > 0f) {
+            Vector3 targetUp = desiredUpAxis();
+            // Axis bodyUp × targetUp rotates bodyUp toward targetUp; magnitude sin(tilt)
+            // scales the correction naturally (soft assist, not a hard constraint).
+            if (bodyUp.dot(targetUp) < 0.995) {
+                applyTorque(bodyUp.cross(targetUp).times(cfg.uprightTorque));
+            }
+        }
+    }
+
+    /**
+     * The up axis the keep-upright assist pulls toward. World-up for cars; {@code Motorcycle}
+     * tilts it into the turn so one assist both holds the bike up and banks it.
+     */
+    protected Vector3 desiredUpAxis() { return Vector3.Companion.getUP(); }
+
+    /**
+     * Anti-roll bar: per axle (wheels paired by local-Z proximity), transfer
+     * antiRollStiffness × (compression difference) between the two sides — pushes the
+     * compressed side up and pulls the extended side down, resisting body roll without
+     * touching yaw. Default stiffness is 0 (off); an escalation lever beyond the
+     * CoM-height lateral-force blend.
+     */
+    private void applyAntiRoll(VehicleConfig cfg) {
+        for (int i = 0; i < wheels.size(); i++) {
+            VehicleWheel a = wheels.get(i);
+            for (int j = i + 1; j < wheels.size(); j++) {
+                VehicleWheel b = wheels.get(j);
+                // Same axle = opposite X sides at similar Z.
+                if (Math.signum(a.getPosition().getX()) == Math.signum(b.getPosition().getX())) continue;
+                if (Math.abs(a.getPosition().getZ() - b.getPosition().getZ()) > 0.5f) continue;
+                float diff = a.getLastCompression() - b.getLastCompression();
+                if (diff == 0f) continue;
+                Vector3 bodyUp = getGlobalBasis().getY();
+                Vector3 transfer = bodyUp.times(diff * cfg.antiRollStiffness);
+                applyForce(transfer.times(-1), a.getGlobalPosition().minus(getGlobalPosition()));
+                applyForce(transfer, b.getGlobalPosition().minus(getGlobalPosition()));
+            }
+        }
+    }
+
+    // ── Damage-tier VFX (smoke → fire, GTA-style) ─────────────────────────────
+    // Runs on EVERY peer in _process, polled from the Health fraction — puppets receive
+    // health in every snapshot (applyReplicatedHealth), so the tiers replicate with no
+    // new message and no death-signal coupling (puppets never fire died).
+
+    private static final double DAMAGE_VFX_INTERVAL = 0.25;
+    private double damageVfxTimer = 0.0;
+    private GPUParticles3D damageSmoke;
+    private GPUParticles3D damageFire;
+
+    @RegisterFunction
+    @Override
+    public void _process(double delta) {
+        damageVfxTimer -= delta;
+        if (damageVfxTimer > 0.0) return;
+        damageVfxTimer = DAMAGE_VFX_INTERVAL;
+        refreshDamageTier();
+    }
+
+    private void refreshDamageTier() {
+        if (healthNode == null || (damageSmoke == null && damageFire == null)) return;
+        VehicleConfig cfg = getConfig();
+        float frac = healthNode.maxHealth > 0f
+                ? healthNode.getCurrentHealth() / healthNode.maxHealth : 1f;
+        boolean smoke = frac > 0f && frac < cfg.damageSmokeFraction;
+        boolean fire  = frac > 0f && frac < cfg.damageFireFraction;
+        if (damageSmoke != null && damageSmoke.isEmitting() != smoke) damageSmoke.setEmitting(smoke);
+        if (damageFire  != null && damageFire.isEmitting()  != fire)  damageFire.setEmitting(fire);
+    }
+
+    // ── NOS / booster ─────────────────────────────────────────────────────────
+    // Authority-only physics multiplier (sprint key while driving): the wheels read the
+    // accel/max-speed scale; puppets need nothing — the snapshot velocity carries the
+    // result, and the speed-feel camera (FOV kick, speed lines, blur) reacts to real
+    // speed automatically. Meter exposed via getBoostFraction() for a future HUD gauge.
+
+    private double  boostMeter  = Double.NaN;   // lazily seeded from config (full tank)
+    private boolean boostActive = false;
+
+    protected void updateBoost(VehicleConfig cfg, double delta) {
+        if (Double.isNaN(boostMeter)) boostMeter = cfg.boostCapacitySeconds;
+        boostActive = cmd.boost && cmd.motor > 0.01f && boostMeter > 0.0
+                && cfg.boostAccelMultiplier > 1f;
+        if (boostActive) {
+            boostMeter = Math.max(0.0, boostMeter - delta);
+        } else {
+            boostMeter = Math.min(cfg.boostCapacitySeconds,
+                    boostMeter + cfg.boostRechargeRate * delta);
+        }
+    }
+
+    public boolean isBoosting() { return boostActive; }
+
+    /** 0..1 remaining boost — HUD gauge hook. */
+    public float getBoostFraction() {
+        float cap = getConfig().boostCapacitySeconds;
+        return cap <= 0f || Double.isNaN(boostMeter) ? 0f : (float) (boostMeter / cap);
+    }
+
+    /** Motor-force multiplier the wheels apply this tick. */
+    public float getBoostAccelScale() { return boostActive ? getConfig().boostAccelMultiplier : 1f; }
+
+    /** Effective top speed this tick — boost raises the accel-curve ceiling. */
+    public float getBoostMaxSpeed() {
+        VehicleConfig cfg = getConfig();
+        return cfg.maxSpeed * (boostActive ? cfg.boostMaxSpeedMultiplier : 1f);
+    }
+
+    // ── Damageable tires (flat state + replication accessors) ────────────────
+
+    /**
+     * Asymmetric flats yaw-pull the car toward the flat side, scaled by speed — the
+     * player counter-steers against it (the classic shot-out-tire feel). Symmetric flats
+     * (both sides) cancel; the grip/sag penalties still apply per wheel.
+     */
+    private void applyFlatTirePull(VehicleConfig cfg, float speed) {
+        if (cfg.flatPullTorque <= 0f) return;
+        int bias = 0;
+        for (VehicleWheel w : wheels) {
+            if (w.isFlat()) bias += (w.getPosition().getX() > 0f) ? 1 : -1;
+        }
+        if (bias == 0) return;
+        float speedRatio = (float) GD.clamp(speed / Math.max(1e-3f, cfg.maxSpeed), 0.0, 1.0);
+        // Positive yaw (about +Y) turns the nose toward −X, so a +X-side flat needs −yaw.
+        applyTorque(getGlobalBasis().getY().times(-bias * cfg.flatPullTorque * speedRatio));
+    }
+
+    /** Bit i = wheel i (scene child order, peer-identical) is flat — rides the snapshot flags u8, bits 3–6. */
+    public int getFlatMask() {
+        int mask = 0;
+        for (int i = 0; i < wheels.size() && i < 4; i++) {
+            if (wheels.get(i).isFlat()) mask |= 1 << i;
+        }
+        return mask;
+    }
+
+    /** Puppet apply path — mirrors the authority's flat state (visual squash + sag), idempotent. */
+    public void applyReplicatedFlatMask(int mask) {
+        for (int i = 0; i < wheels.size() && i < 4; i++) {
+            wheels.get(i).setFlat((mask & (1 << i)) != 0);
+        }
+    }
+
+    // ── Parked helpers ────────────────────────────────────────────────────────
+
+    /** True when the current command applies no drive intent — nothing pushes the car this tick.
+     *  Epsilon comparisons, not == 0: analog stick drift must not hold the car awake forever. */
+    private boolean isIdleInput() {
+        return Math.abs(cmd.motor) < 0.01f && !cmd.brake && !cmd.handbrake
+                && Math.abs(cmd.steering) < 0.05f;
+    }
+
+    /** Leave the parked state and resume wheel physics next frame. */
+    private void unpark() {
+        parked = false;
+        parkTimer = 0.0;
+        setSleeping(false);
+    }
+
+    /**
+     * External wake: seat enter and weapon damage clear the parked sleep immediately.
+     * (An explosion's applyCentralImpulse wakes the physics engine on its own; the parked
+     * branch then unparks if the push crossed parkSpeedThreshold, else re-sleeps.)
+     */
+    public void wakeUp() {
+        if (parked) unpark();
+        else parkTimer = 0.0;
+    }
+
+    /** Damage wake (Health.hit): a shot parked car resumes physics (reacts to later pushes/sag). */
+    @RegisterFunction
+    public void onVehicleDamaged(float damage) {
+        wakeUp();
+    }
+
     // ── Utilities ─────────────────────────────────────────────────────────────
 
     @RegisterFunction
@@ -380,6 +766,28 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // a client-side hit relays via Health.takeDamage from the simulating peer instead.
         if (!isLocallySimulated()) return;
         VehicleConfig cfg = getConfig();
+
+        // Static parking / low-speed brake lock. A friction coefficient can only slow
+        // slope-creep, never stop it — below a small speed epsilon the car is held by
+        // zeroing velocity outright (frame-rate independent, cannot oscillate, invisible
+        // at these speeds). Handbrake keeps its drift meaning: at speed it still only
+        // kills lateral grip, the lock engages below parkingLockSpeed (GTA behaviour).
+        // The park-candidate lock also holds an unoccupied car on a slope during the
+        // parkDelaySeconds dwell, before sleep takes over.
+        if (lastGrounded) {
+            float lockSpeed = (float) state.getLinearVelocity().length();
+            // Throttle overrides the parking lock: handbrake + gas at a standstill is a
+            // burnout donut (drift yaw torque spins the car in place), not a parked car.
+            boolean brakeLock = lockSpeed < cfg.parkingLockSpeed
+                    && Math.abs(cmd.motor) < 0.01f && (cmd.handbrake || cmd.brake);
+            boolean parkLock = lockSpeed < cfg.parkSpeedThreshold
+                    && (parked || parkTimer > 0.0);
+            if (brakeLock || parkLock) {
+                state.setLinearVelocity(Vector3.Companion.getZERO());
+                state.setAngularVelocity(Vector3.Companion.getZERO());
+            }
+        }
+
         if (cfg.vehicleCollisionMinSpeed <= 0) return;
 
         int count = state.getContactCount();
@@ -501,41 +909,78 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     // the same event (no client-originated MSG_OWNERSHIP anymore). Single-player routes
     // requestEnter/requestExit straight to tryEnter/tryExit — zero behavioural diff.
 
-    /** Ask to seat {@code c}: direct in single-player, host-arbitrated when networked. */
+    // ── Seat accessors (multi-seat) ───────────────────────────────────────────
+
+    public int getSeatCount() { return seatOccupants.length; }
+
+    public Character getSeatOccupant(int seat) {
+        return (seat >= 0 && seat < seatOccupants.length) ? seatOccupants[seat] : null;
+    }
+
+    /** Occupancy snapshot for {@link VehicleSeatPolicy#pickSeat} (host-side seat selection). */
+    public boolean[] buildSeatOccupancy() {
+        boolean[] occupied = new boolean[seatOccupants.length];
+        for (int i = 0; i < seatOccupants.length; i++) occupied[i] = seatOccupants[i] != null;
+        return occupied;
+    }
+
+    /** Seat index this character occupies, or -1. */
+    public int findSeatOf(Character c) {
+        if (c == null) return -1;
+        for (int i = 0; i < seatOccupants.length; i++) {
+            if (seatOccupants[i] == c) return i;
+        }
+        return -1;
+    }
+
+    public boolean hasFreeSeat() {
+        for (Character rider : seatOccupants) {
+            if (rider == null) return true;
+        }
+        return false;
+    }
+
+    /** Ask to seat {@code c} (host picks the seat — driver first): direct in single-player, host-arbitrated when networked. */
     public void requestEnter(Character c) {
-        if (occupant != null || c == null) return;
+        if (c == null || !hasFreeSeat()) return;
         Node netNode = getNodeOrNull("/root/NetworkManager");
         if (!(netNode instanceof NetworkManager net) || !net.isNetworked()) {
-            tryEnter(c);
+            int seat = VehicleSeatPolicy.pickSeat(buildSeatOccupancy(), VehicleSeatPolicy.SEAT_AUTO);
+            if (seat >= 0) tryEnter(c, seat);
             return;
         }
         String occupantId = c.characterInfo != null ? c.characterInfo.characterId : "";
         if (net.isServer()) {
             if (getNodeOrNull("/root/GameManager") instanceof com.openworld.game.GameManager gm) {
                 gm.processVehicleSeatRequest(NetworkManager.SERVER_PEER_ID,
-                        characterInfo.characterId, occupantId, true);
+                        characterInfo.characterId, occupantId, true, VehicleSeatPolicy.SEAT_AUTO);
             }
         } else {
-            net.requestVehicleSeat(characterInfo.characterId, occupantId, true);
+            net.requestVehicleSeat(characterInfo.characterId, occupantId, true, VehicleSeatPolicy.SEAT_AUTO);
         }
     }
 
-    /** Ask to unseat the current occupant: direct in single-player, host-arbitrated when networked. */
+    /** Ask to unseat the driver: direct in single-player, host-arbitrated when networked. */
     public void requestExit() {
-        if (occupant == null) return;
+        requestExitOccupant(occupant);
+    }
+
+    /** Ask to unseat any specific rider (driver or passenger) — the host resolves the seat by characterId. */
+    public void requestExitOccupant(Character c) {
+        if (c == null || findSeatOf(c) < 0) return;
         Node netNode = getNodeOrNull("/root/NetworkManager");
         if (!(netNode instanceof NetworkManager net) || !net.isNetworked()) {
-            tryExit();
+            tryExit(findSeatOf(c));
             return;
         }
-        String occupantId = occupant.characterInfo != null ? occupant.characterInfo.characterId : "";
+        String occupantId = c.characterInfo != null ? c.characterInfo.characterId : "";
         if (net.isServer()) {
             if (getNodeOrNull("/root/GameManager") instanceof com.openworld.game.GameManager gm) {
                 gm.processVehicleSeatRequest(NetworkManager.SERVER_PEER_ID,
-                        characterInfo.characterId, occupantId, false);
+                        characterInfo.characterId, occupantId, false, VehicleSeatPolicy.SEAT_AUTO);
             }
         } else {
-            net.requestVehicleSeat(characterInfo.characterId, occupantId, false);
+            net.requestVehicleSeat(characterInfo.characterId, occupantId, false, VehicleSeatPolicy.SEAT_AUTO);
         }
     }
 
@@ -546,10 +991,20 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      * (it still replicates aim/health/fire) and the vehicle keeps its VehicleNetworkController;
      * the camera only follows the LOCAL player's enter.
      */
-    public void tryEnter(Character c) {
-        if (occupant != null) return;
+    public void tryEnter(Character c) { tryEnter(c, 0); }
+
+    /** Seat-aware enter — seat 0 is the driver (full hot-swap path below); higher seats are passengers. */
+    public void tryEnter(Character c, int seatIndex) {
+        if (c == null || seatIndex < 0 || seatIndex >= seatOccupants.length) return;
+        if (seatOccupants[seatIndex] != null) return;
+        if (seatIndex != 0) {
+            enterPassenger(c, seatIndex);
+            return;
+        }
         occupant    = c;
+        seatOccupants[0] = c;
         justEntered = true;
+        wakeUp();   // a parked (sleeping) car resumes physics the moment someone takes the seat
 
         VehicleWeaponMode mode = getWeaponMode();
         boolean localDriver = c.getController() instanceof PlayerController;
@@ -592,11 +1047,38 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         nameplateChanged.emit();   // re-tint the carrier plate to the new driver's faction
     }
 
+    /**
+     * Passenger enter (seat 1..n): no controller hot-swap, no camera switch, no ownership —
+     * the rider keeps their own controller and camera, is pinned to the seat each tick, and
+     * (config-gated) fires their own weapon from the window, GTA drive-by style. Their input
+     * keeps flowing because {@code enterDriveState(…, isDriver=false)} leaves the character's
+     * processing on; {@code Character.applyInput} reduces it to weapon-use while seated.
+     */
+    private void enterPassenger(Character c, int seatIndex) {
+        seatOccupants[seatIndex] = c;
+        VehicleWeaponMode mode = getConfig().passengerSeatsCanShoot
+                ? VehicleWeaponMode.PASSENGER_WEAPON : VehicleWeaponMode.NONE;
+        c.enterDriveState(mode, this, false);
+        c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this, c.characterInfo);
+        nameplateChanged.emit();
+    }
+
     /** Executes the unseat locally — same puppet awareness as {@link #tryEnter}. */
-    public void tryExit() {
-        if (occupant == null) return;
+    public void tryExit() { tryExit(0); }
+
+    /** Seat-aware exit — placement mirrors the seat's side; passengers skip the driver-only teardown. */
+    public void tryExit(int seatIndex) {
+        if (seatIndex < 0 || seatIndex >= seatOccupants.length) return;
+        if (seatOccupants[seatIndex] == null) return;
+        if (seatIndex != 0) {
+            exitPassenger(seatIndex);
+            return;
+        }
         Character c = occupant;
         occupant = null;
+        seatOccupants[0] = null;
 
         boolean localDriver = controller instanceof PlayerController;
 
@@ -605,10 +1087,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             if (wc instanceof WeaponController wcn) wcn.restoreAimRay();
         }
 
-        Vector3 right   = getGlobalTransform().getBasis().getColumn(0);
-        Vector3 exitPos = getGlobalPosition()
-                .minus(right.times(1.5f)).plus(new Vector3(0f, 0.8f, 0f));
-        c.setGlobalPosition(exitPos);
+        c.setGlobalPosition(seatExitPosition(seatIndex));
 
         c.exitDriveState();
 
@@ -632,6 +1111,27 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         nameplateChanged.emit();   // seat now empty → carrier plate falls back to neutral
     }
 
+    /** Passenger unseat — restore + place; no controller/camera/ownership teardown to undo. */
+    private void exitPassenger(int seatIndex) {
+        Character c = seatOccupants[seatIndex];
+        seatOccupants[seatIndex] = null;
+        c.setGlobalPosition(seatExitPosition(seatIndex));
+        c.exitDriveState();
+        activeCollisions.add(c);
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.vehicleExited.emit(c.characterInfo);
+        nameplateChanged.emit();
+    }
+
+    /** Exit placement mirrored to the seat's side (left seats step out left, right seats right). */
+    private Vector3 seatExitPosition(int seatIndex) {
+        Vector3 right = getGlobalTransform().getBasis().getColumn(0);
+        Node3D anchor = seatIndex < seatNodes.size() ? seatNodes.get(seatIndex) : driverSeatNode;
+        float side = (anchor != null && anchor.getPosition().getX() > 0f) ? 1f : -1f;
+        Vector3 base = anchor != null ? anchor.getGlobalPosition() : getGlobalPosition();
+        return base.plus(right.times(1.5f * side)).plus(new Vector3(0f, 0.8f, 0f));
+    }
+
     /**
      * Authority-side destruction (Health.died only ever fires where damage is applied —
      * applyReplicatedHealth never emits it, so a puppet can't reach this from a snapshot).
@@ -640,16 +1140,18 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      */
     @RegisterFunction
     public void onVehicleDestruction() {
-        if (occupant != null) {
+        if (!isEmptyOfRiders()) {
             // FORCED unseat, never requestExit: the seat policy denies a host-initiated exit
             // for a client driver (NOT_OWNER), which would skip the occupancy broadcast and
             // free the driving client's controller inside the despawned vehicle. The forced
             // path bypasses the policy and broadcasts, so every peer unseats BEFORE the
-            // wreck/despawn arrive on the same ordered channel.
+            // wreck/despawn arrive on the same ordered channel. All seats are evicted.
             if (getNodeOrNull("/root/GameManager") instanceof com.openworld.game.GameManager gm) {
                 gm.forceVehicleExit(this);
             }
-            if (occupant != null) tryExit();   // no GameManager (tests/odd scenes) — at least free locally
+            for (int seat = seatOccupants.length - 1; seat >= 0; seat--) {
+                if (seatOccupants[seat] != null) tryExit(seat);   // no GameManager — at least free locally
+            }
         }
 
         VehicleConfig cfg = getConfig();
@@ -706,13 +1208,22 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     // ── EntranceArea signals ──────────────────────────────────────────────────
 
+    private boolean isEmptyOfRiders() {
+        for (Character rider : seatOccupants) {
+            if (rider != null) return false;
+        }
+        return true;
+    }
+
     @RegisterFunction
     public void onEntranceBodyEntered(Node3D body) {
         Character c = resolveCharacter(body);
         if (c == null) return;
-        // Empty car → "Enter"; AI-driven car → "Carjack". A car occupied by another player offers
+        // AI-driven car → "Carjack"; any free seat (empty car OR player-driven with room) →
+        // "Enter" (multi-seat: passengers join a driven car). A full player-driven car offers
         // no prompt (you can't carjack a player).
-        if (occupant != null && !isAiOccupied()) return;
+        if (!isAiOccupied() && !hasFreeSeat()) return;
+        if (occupant instanceof Player && !hasFreeSeat()) return;
         if (c instanceof Player p) { p.nearbyVehicle = this; emitEnterPrompt(true); }
     }
 
@@ -732,7 +1243,9 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     private void emitEnterPrompt(boolean inRange) {
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
-            String text = !inRange ? "" : (isAiOccupied() ? "Carjack" : "Enter vehicle");
+            // Carries its own key hint: vehicles use "use_carrier" (F), while the HUD's
+            // default "[ E ]" prefix is the pickup "interact" action.
+            String text = !inRange ? "" : (isAiOccupied() ? "[ F ]  Carjack" : "[ F ]  Enter vehicle");
             bus.pickupInteractChanged.emit(inRange, text);
         }
     }
@@ -795,10 +1308,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (net.isServer()) {
             if (getNodeOrNull("/root/GameManager") instanceof GameManager gm) {
                 gm.processVehicleSeatRequest(NetworkManager.SERVER_PEER_ID,
-                        characterInfo.characterId, playerId, true);   // carjack detected host-side
+                        characterInfo.characterId, playerId, true, 0);   // carjack targets the wheel
             }
         } else {
-            net.requestVehicleSeat(characterInfo.characterId, playerId, true);
+            net.requestVehicleSeat(characterInfo.characterId, playerId, true, 0);
         }
     }
 

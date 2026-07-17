@@ -1,0 +1,121 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/aircraft/Airplane.java" id="1_plane"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/Health.java" id="2_h"]
+[ext_resource type="Script" path="res://gdj/com/openworld/carrier/vehicle/VehicleConfig.gdj" id="3_cfg"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/CharacterInfo.java" id="4_ci"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/vehicle/VehicleWreck.tscn" id="5_wreck"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="7_cam"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_plane"]
+friction = 0.3
+
+[sub_resource type="Resource" id="Resource_plane_ci"]
+script = ExtResource("4_ci")
+display_name = "Airplane"
+
+[sub_resource type="Resource" id="Resource_plane_cfg"]
+script = ExtResource("3_cfg")
+max_speed = 80.0
+acceleration = 30000.0
+downforce_coefficient = 0.0
+upright_torque = 4000.0
+grounded_angular_damp = 1.5
+airborne_angular_damp = 1.2
+lift_coefficient = 8.0
+pitch_torque = 12000.0
+roll_torque = 9000.0
+wreck_scene = ExtResource("5_wreck")
+
+[sub_resource type="BoxMesh" id="BoxMesh_fuselage"]
+size = Vector3(1, 0.8, 5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wing"]
+size = Vector3(7, 0.12, 1.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_plane"]
+size = Vector3(1, 0.8, 5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_plane_entrance"]
+size = Vector3(5, 3, 7)
+
+[node name="Airplane" type="RigidBody3D"]
+collision_layer = 16
+collision_mask = 19
+mass = 1200.0
+physics_material_override = SubResource("PhysicsMaterial_plane")
+linear_damp_mode = 1
+script = ExtResource("1_plane")
+character_info = SubResource("Resource_plane_ci")
+vehicle_config = SubResource("Resource_plane_cfg")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_h")
+max_health = 350.0
+
+[node name="BodyMesh" type="Node3D" parent="."]
+
+[node name="Fuselage" type="MeshInstance3D" parent="BodyMesh"]
+mesh = SubResource("BoxMesh_fuselage")
+
+[node name="Wing" type="MeshInstance3D" parent="BodyMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -0.3)
+mesh = SubResource("BoxMesh_wing")
+
+[node name="Tail" type="MeshInstance3D" parent="BodyMesh"]
+transform = Transform3D(0.4, 0, 0, 0, 1, 0, 0, 0, 0.6, 0, 0.35, 2.2)
+mesh = SubResource("BoxMesh_wing")
+
+[node name="Seats" type="Marker3D" parent="."]
+
+[node name="Seat0" type="Marker3D" parent="Seats"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 0.45, -1.2)
+
+[node name="Seat1" type="Marker3D" parent="Seats"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0.45, -1.2)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_plane")
+
+[node name="EntranceArea" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="EntranceShape" type="CollisionShape3D" parent="EntranceArea"]
+shape = SubResource("BoxShape3D_plane_entrance")
+
+[node name="CameraController" type="Node3D" parent="."]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+script = ExtResource("7_cam")
+height = 3.0
+follow_pitch_deg = 12.0
+yaw_sensitivity = 0.02
+pitch_sensitivity = 0.03
+fps_camera_mount_path = NodePath("../FPSCameraMount")
+
+[node name="Yaw" type="Node3D" parent="CameraController"]
+
+[node name="Pitch" type="Node3D" parent="CameraController/Yaw"]
+
+[node name="Pivot" type="Node3D" parent="CameraController/Yaw/Pitch"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="SpringArm" type="SpringArm3D" parent="CameraController/Yaw/Pitch/Pivot"]
+collision_mask = 17
+spring_length = 12.0
+
+[node name="Proxy" type="Node3D" parent="CameraController/Yaw/Pitch/Pivot/SpringArm"]
+transform = Transform3D(1, 0, 0, 0, 0.98480767, 0.17364816, 0, -0.17364816, 0.98480767, 0, 0, 0)
+
+[node name="FPSCameraMount" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -1.6)
+
+[node name="ActiveCamera" type="Camera3D" parent="."]
+fov = 70.0
+
+[node name="AimRay" type="RayCast3D" parent="ActiveCamera"]
+target_position = Vector3(0, 0, -200)
+collision_mask = 25
+
+[connection signal="body_entered" from="EntranceArea" to="." method="on_entrance_body_entered"]
+[connection signal="body_exited" from="EntranceArea" to="." method="on_entrance_body_exited"]

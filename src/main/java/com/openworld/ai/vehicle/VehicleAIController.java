@@ -42,6 +42,12 @@ public class VehicleAIController extends Controller {
     /** Throttle fraction applied while cruising along the lane (0–1). */
     @RegisterProperty @Export public float cruiseThrottle = 0.4f;
 
+    /** Target cruising speed (m/s) — throttle eases to zero above it (city pace ≈ 11 ≈ 40 km/h). */
+    @RegisterProperty @Export public float cruiseSpeed = 11f;
+
+    /** Speed band (m/s) over which throttle fades from full to zero above cruiseSpeed. */
+    @RegisterProperty @Export public float cruiseSpeedFalloff = 3f;
+
     /** Speed-proportional look-ahead: {@code clamp(lookaheadMin + speed·lookaheadSpeedGain, …, lookaheadMax)}. */
     @RegisterProperty @Export public float lookaheadMin = 4.0f;
     @RegisterProperty @Export public float lookaheadSpeedGain = 0.5f;

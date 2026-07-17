@@ -238,9 +238,9 @@ public class PlayerController extends Controller {
             }
         }
 
-        // ── Vehicle enter (press "use" near a vehicle) ────────────────────────
-        // Requires an "use" action in Project Settings → Input Map.
-        cmd.enterExit = inp.isActionJustPressed("interact", false);
+        // ── Vehicle enter (press F near a vehicle) ────────────────────────────
+        // Dedicated "use_carrier" action — "interact" (E) stays for pickups only.
+        cmd.enterExit = inp.isActionJustPressed("use_carrier", false);
 
         sendToNetwork(cmd);
 
@@ -285,7 +285,9 @@ public class PlayerController extends Controller {
         cmd.steering     = -(inp.getActionStrength("right") - inp.getActionStrength("left"));
         cmd.handbrake    = inp.isActionPressed("handbrake", false);
         cmd.brake        = inp.isActionPressed("brake", false);
-        cmd.enterExit    = inp.isActionJustPressed("interact", false);
+        // Sprint doubles as the NOS/booster while driving (no extra input mapping needed).
+        cmd.boost        = inp.isActionPressed("sprint", false);
+        cmd.enterExit    = inp.isActionJustPressed("use_carrier", false);
         // Weapon inputs: relayed to the occupant by Vehicle when weaponMode != NONE.
         cmd.fire         = inp.isActionPressed("fire", false);
         cmd.reload       = inp.isActionJustPressed("reload", false);

@@ -98,7 +98,9 @@ public class CharacterHUD extends Control {
   public void onPickupInteractChanged(boolean inRange, String label) {
     if (interactPromptLabel == null) return;
     if (inRange) {
-      interactPromptLabel.setText("[ E ]  " + label);
+      // Labels may carry their own key hint (vehicles send "[ F ]  Enter vehicle" for the
+      // use_carrier action); only default to the pickup "interact" key when they don't.
+      interactPromptLabel.setText(label.startsWith("[") ? label : "[ E ]  " + label);
       interactPromptLabel.setVisible(true);
     } else {
       interactPromptLabel.setVisible(false);

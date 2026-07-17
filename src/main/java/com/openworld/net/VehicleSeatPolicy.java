@@ -25,7 +25,30 @@ public final class VehicleSeatPolicy {
     /** Matches the EntranceArea's reach with slack for interpolation staleness. */
     public static final double ENTER_TOLERANCE_METERS = 6.0;
 
+    /** Wire value (u8) for "no specific seat — host picks" in MSG_VEHICLE_SEAT_REQUEST. */
+    public static final int SEAT_AUTO = 255;
+
     private VehicleSeatPolicy() { }
+
+    /**
+     * Pure seat selection for an enter request (multi-seat). A concrete requested index is
+     * granted only if free; {@link #SEAT_AUTO} scans from seat 0 (driver first — entering an
+     * empty car takes the wheel, a car with a driver fills passenger seats in order).
+     *
+     * @return the seat index to grant, or -1 when nothing is available (requested seat taken
+     *         or vehicle full) — the caller maps -1 to a {@link Verdict#SEAT_TAKEN} denial.
+     */
+    public static int pickSeat(boolean[] occupied, int requestedSeat) {
+        if (occupied == null || occupied.length == 0) return -1;
+        if (requestedSeat != SEAT_AUTO) {
+            return (requestedSeat >= 0 && requestedSeat < occupied.length && !occupied[requestedSeat])
+                    ? requestedSeat : -1;
+        }
+        for (int i = 0; i < occupied.length; i++) {
+            if (!occupied[i]) return i;
+        }
+        return -1;
+    }
 
     public static Verdict evaluateEnter(boolean vehicleFound, boolean vehicleAlive, boolean seatOccupied,
             boolean characterFound, boolean characterAlive, boolean senderOwnsCharacter,

@@ -8,12 +8,63 @@
 [ext_resource type="PackedScene" uid="uid://ds0yoqtkt2t1n" path="res://src/main/resources/com/openworld/vehicle/VehicleWheel.tscn" id="5_p3n1p"]
 [ext_resource type="Script" uid="uid://d2o3rhv6eos0d" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="5_x00le"]
 [ext_resource type="Curve" uid="uid://cofnaffaigrhj" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="6_i1sta"]
+[ext_resource type="Curve" uid="uid://cvaccel240crv" path="res://src/main/resources/com/openworld/vehicle/VehicleAccelCurve.tres" id="6_accel"]
 [ext_resource type="Texture2D" uid="uid://ofwdiqxujlur" path="res://addons/kenney_prototype_textures/light/texture_01.png" id="6_jeqgg"]
 [ext_resource type="Script" uid="uid://dqhs0yfdyku6r" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="7_wc"]
 [ext_resource type="PackedScene" uid="uid://dxb5mxkmawr80" path="res://src/main/resources/com/openworld/ui/Nameplate.tscn" id="8_np"]
+[ext_resource type="Shader" path="res://src/main/resources/com/openworld/vehicle/SpeedLines.gdshader" id="9_sfx"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_x00le"]
 friction = 0.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sfx"]
+shader = ExtResource("9_sfx")
+shader_parameter/intensity = 0.0
+
+[sub_resource type="Gradient" id="Gradient_dmgsmoke"]
+colors = PackedColorArray(0.25, 0.25, 0.25, 0.8, 0.45, 0.45, 0.45, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_dmgsmoke"]
+gradient = SubResource("Gradient_dmgsmoke")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_dmgsmoke"]
+direction = Vector3(0, 1, 0)
+spread = 12.0
+initial_velocity_min = 1.2
+initial_velocity_max = 2.2
+gravity = Vector3(0, 0.6, 0)
+scale_min = 0.5
+scale_max = 1.3
+color_ramp = SubResource("GradientTexture1D_dmgsmoke")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dmgpuff"]
+transparency = 1
+vertex_color_use_as_albedo = true
+billboard_mode = 3
+
+[sub_resource type="QuadMesh" id="QuadMesh_dmgpuff"]
+material = SubResource("StandardMaterial3D_dmgpuff")
+size = Vector2(0.6, 0.6)
+
+[sub_resource type="Gradient" id="Gradient_dmgfire"]
+colors = PackedColorArray(1, 0.75, 0.1, 0.9, 0.9, 0.2, 0, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_dmgfire"]
+gradient = SubResource("Gradient_dmgfire")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_dmgfire"]
+direction = Vector3(0, 1, 0)
+spread = 8.0
+initial_velocity_min = 0.8
+initial_velocity_max = 1.6
+gravity = Vector3(0, 1.2, 0)
+scale_min = 0.25
+scale_max = 0.6
+color_ramp = SubResource("GradientTexture1D_dmgfire")
+
+[sub_resource type="QuadMesh" id="QuadMesh_dmgfire"]
+material = SubResource("StandardMaterial3D_dmgpuff")
+size = Vector2(0.35, 0.35)
 
 [sub_resource type="Resource" id="Resource_x00le"]
 script = ExtResource("3_ci")
@@ -23,8 +74,10 @@ metadata/_custom_type_script = "uid://cplrp8cx4gus0"
 [sub_resource type="Resource" id="Resource_37ea8"]
 script = ExtResource("3_37ea8")
 suspension_samples = 3
-max_speed = 120.0
-acceleration_curve = ExtResource("6_i1sta")
+max_speed = 67.0
+acceleration = 10000.0
+z_traction = 0.02
+acceleration_curve = ExtResource("6_accel")
 wreck_scene = ExtResource("4_rx71e")
 metadata/_custom_type_script = "uid://cuac11don07ow"
 
@@ -86,6 +139,20 @@ mesh = SubResource("ArrayMesh_p3n1p")
 
 [node name="DriverSeat" type="Marker3D" parent="." unique_id=1653067824]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, -0.15868372, -0.3)
+
+[node name="Seats" type="Marker3D" parent="." unique_id=1653067830]
+
+[node name="Seat0" type="Marker3D" parent="Seats" unique_id=1653067831]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, -0.15868372, -0.3)
+
+[node name="Seat1" type="Marker3D" parent="Seats" unique_id=1653067832]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, -0.15868372, -0.3)
+
+[node name="Seat2" type="Marker3D" parent="Seats" unique_id=1653067833]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, -0.15868372, 0.9)
+
+[node name="Seat3" type="Marker3D" parent="Seats" unique_id=1653067834]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, -0.15868372, 0.9)
 
 [node name="EntranceArea" type="Area3D" parent="." unique_id=1653067825]
 collision_layer = 0
@@ -183,6 +250,36 @@ one_shot = true
 [node name="ReloadTimer" type="Timer" parent="WeaponController" unique_id=1379134583]
 process_callback = 0
 one_shot = true
+
+[node name="DamageVfx" type="Node3D" parent="." unique_id=1379134610]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, -1.2)
+
+[node name="Smoke" type="GPUParticles3D" parent="DamageVfx" unique_id=1379134611]
+emitting = false
+amount = 24
+lifetime = 1.6
+process_material = SubResource("ParticleProcessMaterial_dmgsmoke")
+draw_pass_1 = SubResource("QuadMesh_dmgpuff")
+
+[node name="Fire" type="GPUParticles3D" parent="DamageVfx" unique_id=1379134612]
+emitting = false
+amount = 32
+lifetime = 0.5
+process_material = SubResource("ParticleProcessMaterial_dmgfire")
+draw_pass_1 = SubResource("QuadMesh_dmgfire")
+
+[node name="SpeedFX" type="CanvasLayer" parent="." unique_id=1379134600]
+layer = 5
+visible = false
+
+[node name="SpeedLines" type="ColorRect" parent="SpeedFX" unique_id=1379134601]
+material = SubResource("ShaderMaterial_sfx")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [connection signal="body_entered" from="EntranceArea" to="." method="on_entrance_body_entered"]
 [connection signal="body_exited" from="EntranceArea" to="." method="on_entrance_body_exited"]

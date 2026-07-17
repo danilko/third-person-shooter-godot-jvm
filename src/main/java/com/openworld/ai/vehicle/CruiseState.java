@@ -73,6 +73,14 @@ public class CruiseState implements VehicleAIState {
         cmd.steerToTarget = true;
         cmd.steering = steer;
         cmd.motor    = ctrl.cruiseThrottle * (1f - ctrl.turnSlowdown * turnFactor);
+        // Cruise speed governor: cruiseThrottle is open-loop, so traffic pace used to be an
+        // accident of the motor-vs-drag balance — with highway-capable car configs (240 km/h
+        // retune) that balance lands far above city pace. Ease throttle to zero across the
+        // falloff band above cruiseSpeed so traffic keeps its authored speed regardless of
+        // how powerful the vehicle archetype is.
+        float over = ((float) body.getLinearVelocity().length() - ctrl.cruiseSpeed)
+                / Math.max(0.1f, ctrl.cruiseSpeedFalloff);
+        if (over > 0f) cmd.motor *= Math.max(0f, 1f - over);
         // Junction discipline: the probe above only sees the CURRENT route, so a hard turn
         // connector right after this lane's end is invisible until adopted — ease off ahead of
         // any chained lane end, and stay slow while the connector actually bends (L/R).
