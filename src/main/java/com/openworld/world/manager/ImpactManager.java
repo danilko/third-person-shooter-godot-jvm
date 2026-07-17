@@ -76,8 +76,14 @@ public class ImpactManager extends Node {
         if (dm != null && info.hitNormal != null) dm.spawn(info.hitPoint, info.hitNormal);
 
         if (ctx.healthOwner != null) {
+            float bodyDamage = damage;
+            // Tire hit (the TireHit collider under a VehicleWheel): the wheel takes the
+            // damage — flats on the simulating peer, replicated via the snapshot flatMask —
+            // and only a reduced passthrough continues to the vehicle body Health. The
+            // vehicle counterpart of the character bone-multiplier model.
+            if (ctx.wheel != null) bodyDamage = ctx.wheel.applyTireDamage(damage);
             Health health = (Health) ctx.healthOwner.getNode(new NodePath("Health"));
-            health.takeDamage(info.hitNode, damage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos);
+            health.takeDamage(info.hitNode, bodyDamage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos);
         }
 
         if (ctx.character != null && info.hitNormal != null) {
@@ -112,8 +118,10 @@ public class ImpactManager extends Node {
         final SurfaceType surface;
         final Detonatable detonatable;
         final Breakable   breakable;
-        HitContext(Character c, Node h, SurfaceType s, Detonatable d, Breakable b) {
-            character = c; healthOwner = h; surface = s; detonatable = d; breakable = b;
+        final com.openworld.carrier.vehicle.VehicleWheel wheel;
+        HitContext(Character c, Node h, SurfaceType s, Detonatable d, Breakable b,
+                   com.openworld.carrier.vehicle.VehicleWheel w) {
+            character = c; healthOwner = h; surface = s; detonatable = d; breakable = b; wheel = w;
         }
     }
 
@@ -126,17 +134,21 @@ public class ImpactManager extends Node {
      * so bones inside it report CharacterVisuals as their owner, not the Character body.
      */
     private static HitContext resolveHitContext(Node hitNode) {
-        if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT, null, null);
+        if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT, null, null, null);
         Character character = null;
         Node healthOwner = null;
         SurfaceType surface = SurfaceType.DEFAULT;
         Detonatable detonatable = null;
         Breakable breakable = null;
+        com.openworld.carrier.vehicle.VehicleWheel wheel = null;
 
         Node current = hitNode;
         while (current != null) {
             if (detonatable == null && current instanceof Detonatable d) detonatable = d;
             if (breakable == null && current instanceof Breakable b) breakable = b;
+            // A TireHit collider's parent chain passes through its VehicleWheel before
+            // reaching the Vehicle (which owns the Health) — capture it for tire damage.
+            if (wheel == null && current instanceof com.openworld.carrier.vehicle.VehicleWheel vw) wheel = vw;
             if (surface == SurfaceType.DEFAULT) {
                 if (current instanceof Character c) {
                     surface = SurfaceType.FLESH;
@@ -154,7 +166,7 @@ public class ImpactManager extends Node {
                     && detonatable != null && breakable != null) break;
             current = current.getParent();
         }
-        return new HitContext(character, healthOwner, surface, detonatable, breakable);
+        return new HitContext(character, healthOwner, surface, detonatable, breakable, wheel);
     }
 
     // ── Lazy singleton lookups ────────────────────────────────────────────────

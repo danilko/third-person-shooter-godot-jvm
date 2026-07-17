@@ -690,7 +690,7 @@ public final class NetMessageCodec {
     //
     // Entry: [vehicleId utf8][senderTimeMs i32][pos 3f][orientation quat 4f]
     //        [linVel 3f][angVel 3f][steerAngle f][throttle f]
-    //        [flags u8: bit0 handbrake, bit1 brake, bit2 slipping][health f][fireSeq u8]
+    //        [flags u8: bit0 handbrake, bit1 brake, bit2 slipping, bits3-6 flatMask][health f][fireSeq u8]
     //
     // A parallel entry shape to the character snapshot rather than a kind-byte inside it:
     // vehicles need the FULL orientation (they roll and pitch — the character entry's one
@@ -710,6 +710,10 @@ public final class NetMessageCodec {
     private static final int VEHICLE_FLAG_HANDBRAKE = 1;
     private static final int VEHICLE_FLAG_BRAKE     = 2;
     private static final int VEHICLE_FLAG_SLIPPING  = 4;
+    // Bits 3–6: per-wheel flat-tire mask (wheel index = scene child order, peer-identical).
+    // Spare bits in the existing flags u8 — the entry byte count is unchanged.
+    private static final int VEHICLE_FLAG_FLAT_SHIFT = 3;
+    private static final int VEHICLE_FLAG_FLAT_MASK  = 0xF;
 
     /** Fixed bytes per vehicle entry beyond the vehicleId text: u32 string length + i32 time + 13 floats + flags u8 + health float + fireSeq u8 — see putVehicleSnapshotEntry. */
     public static final int VEHICLE_SNAPSHOT_ENTRY_FIXED_BYTES = 4 + 4 + 13 * 4 + 1 + 4 + 1;
@@ -757,7 +761,8 @@ public final class NetMessageCodec {
         buf.putFloat(e.throttle());
         buf.put8((e.handbrake() ? VEHICLE_FLAG_HANDBRAKE : 0)
                 | (e.brake() ? VEHICLE_FLAG_BRAKE : 0)
-                | (e.slipping() ? VEHICLE_FLAG_SLIPPING : 0));
+                | (e.slipping() ? VEHICLE_FLAG_SLIPPING : 0)
+                | ((e.flatMask() & VEHICLE_FLAG_FLAT_MASK) << VEHICLE_FLAG_FLAT_SHIFT));
         buf.putFloat(e.health());
         buf.put8(e.fireSeq() & 0xFF);
     }
@@ -780,19 +785,24 @@ public final class NetMessageCodec {
         return new DecodedVehicleSnapshot(vehicleId, senderTimeMs, position,
                 new Quaternion(qx, qy, qz, qw), linearVelocity, angularVelocity, steerAngle, throttle,
                 (flags & VEHICLE_FLAG_HANDBRAKE) != 0, (flags & VEHICLE_FLAG_BRAKE) != 0,
-                (flags & VEHICLE_FLAG_SLIPPING) != 0, health, fireSeq);
+                (flags & VEHICLE_FLAG_SLIPPING) != 0,
+                (flags >> VEHICLE_FLAG_FLAT_SHIFT) & VEHICLE_FLAG_FLAT_MASK, health, fireSeq);
     }
 
     /** Carrier for one vehicle's replicated state — see the wire-layout comment above. */
     public record DecodedVehicleSnapshot(String vehicleId, int senderTimeMs, Vector3 position,
             Quaternion orientation, Vector3 linearVelocity, Vector3 angularVelocity,
             float steerAngle, float throttle, boolean handbrake, boolean brake, boolean slipping,
-            float health, int fireSeq) { }
+            int flatMask, float health, int fireSeq) { }
 
     // ── MSG_VEHICLE_SEAT_REQUEST / MSG_VEHICLE_OCCUPANCY (Round 11 N3) ────────
     //
-    // Request:   [tag u8][vehicleId utf8][characterId utf8][entering u8]      client → host
-    // Occupancy: [tag u8][vehicleId utf8][occupantCharacterId utf8][ownerPeerId i32][entering u8]   host → all
+    // Request:   [tag u8][vehicleId utf8][characterId utf8][entering u8][seatIndex u8]   client → host
+    // Occupancy: [tag u8][vehicleId utf8][occupantCharacterId utf8][ownerPeerId i32][entering u8][seatIndex u8]   host → all
+    //
+    // seatIndex (multi-seat): 255 = SEAT_AUTO on a request ("host picks" — the one enter key);
+    // occupancy always carries the host-resolved concrete seat. One seat per message — the
+    // ~1 Hz sweep and the late-join baseline iterate every seat.
     //
     // Host-arbitrated enter/exit, mirroring the pickup grant: the client only REQUESTS;
     // the host validates (VehicleSeatPolicy) and broadcasts the authoritative occupancy,
@@ -802,12 +812,13 @@ public final class NetMessageCodec {
     // occupantCharacterId is empty on an exit broadcast (seat now vacant).
 
     public static PackedByteArray encodeVehicleSeatRequest(int msgType, String vehicleId,
-            String characterId, boolean entering) {
+            String characterId, boolean entering, int seatIndex) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(vehicleId);
         buf.putUtf8String(characterId);
         buf.put8(entering ? 1 : 0);
+        buf.put8(seatIndex & 0xFF);   // 255 = SEAT_AUTO (host picks); exit resolves by characterId
         return buf.getDataArray();
     }
 
@@ -816,20 +827,23 @@ public final class NetMessageCodec {
         String vehicleId = buf.getUtf8String();
         String characterId = buf.getUtf8String();
         boolean entering = buf.getU8() != 0;
-        return new DecodedVehicleSeatRequest(vehicleId, characterId, entering);
+        int seatIndex = buf.getU8();
+        return new DecodedVehicleSeatRequest(vehicleId, characterId, entering, seatIndex);
     }
 
     /** Carrier for a decoded MSG_VEHICLE_SEAT_REQUEST — a client asking to (un)seat its character. */
-    public record DecodedVehicleSeatRequest(String vehicleId, String characterId, boolean entering) { }
+    public record DecodedVehicleSeatRequest(String vehicleId, String characterId, boolean entering,
+            int seatIndex) { }
 
     public static PackedByteArray encodeVehicleOccupancy(int msgType, String vehicleId,
-            String occupantCharacterId, int ownerPeerId, boolean entering) {
+            String occupantCharacterId, int ownerPeerId, boolean entering, int seatIndex) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(vehicleId);
         buf.putUtf8String(occupantCharacterId);
         buf.put32(ownerPeerId);
         buf.put8(entering ? 1 : 0);
+        buf.put8(seatIndex & 0xFF);   // concrete seat (host-resolved), one seat per message
         return buf.getDataArray();
     }
 
@@ -839,12 +853,13 @@ public final class NetMessageCodec {
         String occupantCharacterId = buf.getUtf8String();
         int ownerPeerId = buf.get32();
         boolean entering = buf.getU8() != 0;
-        return new DecodedVehicleOccupancy(vehicleId, occupantCharacterId, ownerPeerId, entering);
+        int seatIndex = buf.getU8();
+        return new DecodedVehicleOccupancy(vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex);
     }
 
     /** Carrier for a decoded MSG_VEHICLE_OCCUPANCY — the host's authoritative seat state (occupant empty = vacant). */
     public record DecodedVehicleOccupancy(String vehicleId, String occupantCharacterId,
-            int ownerPeerId, boolean entering) { }
+            int ownerPeerId, boolean entering, int seatIndex) { }
 
     // ── MSG_VEHICLE_SPAWN (host → all, reliable — streamed ambient traffic, I3b) ──
     //

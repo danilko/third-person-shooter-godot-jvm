@@ -189,6 +189,9 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     // The outward-visible flags stay here (NetworkController/NetworkManager read them); the
     // transition logic + pre-drive snapshot live in CharacterDriveState (WS5 god-class split).
     public VehicleWeaponMode vehicleWeaponMode = VehicleWeaponMode.NONE;
+
+    /** True while seated as the DRIVER (seat 0) of {@link #currentVehicleNode}; false as a passenger. */
+    public boolean vehicleDriver = false;
     /** The Vehicle RigidBody3D this character is currently riding, or null when on foot. */
     public Node currentVehicleNode = null;
     final CharacterDriveState driveState = new CharacterDriveState(this);
@@ -578,6 +581,15 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * input source (local, AI, network) produces identical results.
      */
     protected void applyInput(UserCommand input, double delta) {
+
+        // ── Seated passenger (multi-seat) ──────────────────────────────────
+        // The body is pinned to its seat by the vehicle each tick; movement/jump/stance/swim
+        // are meaningless, so the input reduces to weapon use + aim (GTA drive-by model).
+        // Exit intent is handled by Player.applyInput before this runs.
+        if (isSeatedPassenger()) {
+            applySeatedPassengerInput(input);
+            return;
+        }
 
         // ── Movement direction ─────────────────────────────────────────────
         if (input.movementDirection.lengthSquared() > 0.001
@@ -975,9 +987,31 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     // ── Vehicle drive state (bodies extracted to CharacterDriveState — WS5 god-class split) ──
 
-    /** Puts the character into the DRIVE_CARRIER state for the given weapon mode. Called by {@code Vehicle.tryEnter}. */
+    /** True while riding a carrier as a non-driving passenger — input reduces to weapon use. */
+    public boolean isSeatedPassenger() {
+        return currentVehicleNode != null && !vehicleDriver;
+    }
+
+    /** Reduced input path while riding as a passenger — weapon use + aim only. */
+    protected void applySeatedPassengerInput(UserCommand input) {
+        if (input.aimTargetPosition != null && aimTarget != null) {
+            aimTarget.setGlobalPosition(input.aimTargetPosition);
+        }
+        if (vehicleWeaponMode != VehicleWeaponMode.PASSENGER_WEAPON) return;   // seat can't shoot
+        if (input.fire) fireWeapon.emit();
+        else            notFireWeapon.emit();
+        if (input.reload) reloadWeapon.emit();
+        if (input.desiredWeapon >= 0) setWeapon(input.desiredWeapon);
+    }
+
+    /** Puts the character into the DRIVER (seat 0) DRIVE_CARRIER state. Called by {@code Vehicle.tryEnter}. */
     public void enterDriveState(VehicleWeaponMode mode, Node vehicleNode) {
-        driveState.enter(mode, vehicleNode);
+        driveState.enter(mode, vehicleNode, true);
+    }
+
+    /** Seat-aware drive state — passengers keep their own controller/input (see CharacterDriveState). */
+    public void enterDriveState(VehicleWeaponMode mode, Node vehicleNode, boolean isDriver) {
+        driveState.enter(mode, vehicleNode, isDriver);
     }
 
     /** Restores the character's pre-drive state. Called by {@code Vehicle.tryExit} before the controller is returned. */

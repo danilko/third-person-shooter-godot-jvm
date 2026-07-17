@@ -29,6 +29,19 @@ ORIGIN     = WORLD / 2.0              # centre-origin shift: the world spans [-O
 LANE_OFF   = rn.LANE_OFF              # keep-left lane offset (Japan) — matches VehicleRoute default
 LANE_STRIDE = 36                      # sample a backbone route every 36 cells (252 m)
 
+# ---- Tokyo Bay + Haneda airport island + the connecting bridge (GRID-SPACE coords, m —
+# to_world() applied at each use site). Shared here (not build_world.py-local) so the harbor
+# blockout, the slot_ landmark anchors, AND the overlay generators (overlays/build_*_overlay.py,
+# e.g. the Rainbow Bridge overlay) all compute the same seat from one source. Island moved out
+# to sea (was Y0/Y1 = -450/-187.5) to make room for the real Rainbow Bridge span (~750 m raw
+# extraction); the gap is now ~800 m. Placeholder-quality sizing — hand-tune positions later.
+BAY_Y0, BAY_Y1 = -1108.0, 0.0                # sea band south of the map (Tokyo Bay)
+ISL_X0, ISL_X1 = 1134.0, 2268.0              # airport island footprint (SE, near harbor cells)
+ISL_Y0, ISL_Y1 = -1058.0, -795.5
+BR_X = 1701.0                                # bridge centreline x (~ island centre)
+BR_DECK_Z = 11.0                             # LAYER_EXPS — road deck top (engine Z, size-independent)
+BR_RAIL_Z = 8.0                              # LAYER_RAIL — rail deck top (engine Z, size-independent)
+
 
 def to_world(local):
     """Convert a grid-space coordinate (0..WORLD, corner-origin — what k*DISTRICT / gx*DISTRICT

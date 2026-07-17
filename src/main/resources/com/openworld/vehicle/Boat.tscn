@@ -1,0 +1,114 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/carrier/boat/Boat.java" id="1_boat"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/Health.java" id="2_h"]
+[ext_resource type="Script" path="res://gdj/com/openworld/carrier/vehicle/VehicleConfig.gdj" id="3_cfg"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/CharacterInfo.java" id="4_ci"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/vehicle/VehicleWreck.tscn" id="5_wreck"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="7_cam"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_boat"]
+friction = 0.0
+
+[sub_resource type="Resource" id="Resource_boat_ci"]
+script = ExtResource("4_ci")
+display_name = "Boat"
+
+[sub_resource type="Resource" id="Resource_boat_cfg"]
+script = ExtResource("3_cfg")
+max_speed = 22.0
+acceleration = 24000.0
+downforce_coefficient = 0.0
+upright_torque = 9000.0
+grounded_angular_damp = 2.5
+hull_half_width = 1.0
+hull_half_length = 2.0
+wreck_scene = ExtResource("5_wreck")
+
+[sub_resource type="BoxMesh" id="BoxMesh_boat"]
+size = Vector3(2.2, 0.8, 4.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_boat"]
+size = Vector3(2.2, 0.8, 4.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_boat_entrance"]
+size = Vector3(4.5, 3, 6.5)
+
+[node name="Boat" type="RigidBody3D"]
+collision_layer = 16
+collision_mask = 19
+mass = 1600.0
+physics_material_override = SubResource("PhysicsMaterial_boat")
+linear_damp_mode = 1
+script = ExtResource("1_boat")
+character_info = SubResource("Resource_boat_ci")
+vehicle_config = SubResource("Resource_boat_cfg")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_h")
+max_health = 400.0
+
+[node name="BodyMesh" type="Node3D" parent="."]
+
+[node name="Hull" type="MeshInstance3D" parent="BodyMesh"]
+mesh = SubResource("BoxMesh_boat")
+
+[node name="Seats" type="Marker3D" parent="."]
+
+[node name="Seat0" type="Marker3D" parent="Seats"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.45, -0.8)
+
+[node name="Seat1" type="Marker3D" parent="Seats"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.45, -0.8)
+
+[node name="Seat2" type="Marker3D" parent="Seats"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 0.45, 0.7)
+
+[node name="Seat3" type="Marker3D" parent="Seats"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0.45, 0.7)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_boat")
+
+[node name="EntranceArea" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="EntranceShape" type="CollisionShape3D" parent="EntranceArea"]
+shape = SubResource("BoxShape3D_boat_entrance")
+
+[node name="CameraController" type="Node3D" parent="."]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 0)
+script = ExtResource("7_cam")
+height = 2.5
+follow_pitch_deg = 12.0
+yaw_sensitivity = 0.02
+pitch_sensitivity = 0.03
+fps_camera_mount_path = NodePath("../FPSCameraMount")
+
+[node name="Yaw" type="Node3D" parent="CameraController"]
+
+[node name="Pitch" type="Node3D" parent="CameraController/Yaw"]
+
+[node name="Pivot" type="Node3D" parent="CameraController/Yaw/Pitch"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="SpringArm" type="SpringArm3D" parent="CameraController/Yaw/Pitch/Pivot"]
+collision_mask = 17
+spring_length = 10.0
+
+[node name="Proxy" type="Node3D" parent="CameraController/Yaw/Pitch/Pivot/SpringArm"]
+transform = Transform3D(1, 0, 0, 0, 0.98480767, 0.17364816, 0, -0.17364816, 0.98480767, 0, 0, 0)
+
+[node name="FPSCameraMount" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, -1.2)
+
+[node name="ActiveCamera" type="Camera3D" parent="."]
+fov = 70.0
+
+[node name="AimRay" type="RayCast3D" parent="ActiveCamera"]
+target_position = Vector3(0, 0, -200)
+collision_mask = 25
+
+[connection signal="body_entered" from="EntranceArea" to="." method="on_entrance_body_entered"]
+[connection signal="body_exited" from="EntranceArea" to="." method="on_entrance_body_exited"]

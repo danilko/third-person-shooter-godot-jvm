@@ -72,6 +72,8 @@ public class UserCommand {
     public boolean brake;
     public boolean enterExit;
     public boolean resetVehicle;
+    /** NOS/booster held (vehicle only) — sprint action while driving. */
+    public boolean boost;
 
     // ── Construction ──────────────────────────────────────────────────────────
     public UserCommand() {
@@ -95,6 +97,7 @@ public class UserCommand {
         brake             = false;
         enterExit         = false;
         resetVehicle      = false;
+        boost             = false;
     }
 
     /** Shallow copy (defensive snapshot for buffering/debugging). */
@@ -127,6 +130,7 @@ public class UserCommand {
         c.brake           = brake;
         c.enterExit       = enterExit;
         c.resetVehicle    = resetVehicle;
+        c.boost           = boost;
         return c;
     }
 }

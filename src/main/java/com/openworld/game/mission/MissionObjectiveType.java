@@ -16,6 +16,8 @@ public final class MissionObjectiveType {
     public static final String HOLD_POINT    = "HOLD_POINT";
     public static final String ESCORT        = "ESCORT";
     public static final String DELIVER       = "DELIVER";
+    /** Checkpoint race (GTA SA/VC-style street race) — schema only; see PLAN.md "Race missions (groundwork)". */
+    public static final String RACE          = "RACE";
 
     private MissionObjectiveType() {}
 }

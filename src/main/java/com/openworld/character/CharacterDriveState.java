@@ -41,11 +41,23 @@ final class CharacterDriveState {
      * to hot-swap the controller after this returns.
      */
     void enter(VehicleWeaponMode mode, Node vehicleNode) {
+        enter(mode, vehicleNode, true);
+    }
+
+    /**
+     * @param isDriver seat 0 = true: processing is turned OFF (input flows through the
+     *        vehicle's hot-swapped controller). Passengers keep their processing ON so their
+     *        own controller still gathers input — {@code Character.applyInput} reduces it to
+     *        weapon-use while seated (the GTA drive-by model); movement is dead anyway
+     *        (MovementController off, body pinned to the seat by the vehicle each tick).
+     */
+    void enter(VehicleWeaponMode mode, Node vehicleNode, boolean isDriver) {
         preDriveStance    = owner.currentStanceName;
         preDriveCombat    = owner.combat;
         preDriveRotation  = owner.getGlobalRotation();
         owner.vehicleWeaponMode = mode;
         owner.currentVehicleNode = vehicleNode;
+        owner.vehicleDriver = isDriver;
         owner.setCollisionLayer(0);  // remove from all layers while in vehicle
         owner.forceSetStance(StanceName.DRIVE_CARRIER);
         // Reset the MeshRoot local rotation so the mesh aligns with the body.
@@ -65,8 +77,10 @@ final class CharacterDriveState {
             owner.combat = true;
             owner.setCombatState();
         }
-        owner.setProcess(false);
-        owner.setPhysicsProcess(false);
+        if (isDriver) {
+            owner.setProcess(false);
+            owner.setPhysicsProcess(false);
+        }
         Node mc = owner.getNodeOrNull("MovementController");
         if (mc != null) mc.setPhysicsProcess(false);
     }
@@ -74,6 +88,7 @@ final class CharacterDriveState {
     /** Restores the character's pre-drive state. Called by {@code Vehicle.tryExit} before the controller is returned. */
     void exit() {
         owner.currentVehicleNode = null;
+        owner.vehicleDriver = false;
         // Restore body rotation so MovementController's playerInitRotation stays valid.
         owner.setGlobalRotation(preDriveRotation);
         owner.setCollisionLayer(CollisionLayers.CHARACTER);

@@ -56,6 +56,60 @@ public class VehicleWheel extends RayCast3D {
     private float tireMaxTurnMaxRad;
     private float gripFactor;
 
+    /** Suspension compression (m) from the last simulated frame; 0 when airborne. Read by the anti-roll bar. */
+    private float lastCompression = 0f;
+
+    public float getLastCompression() { return lastCompression; }
+
+    // ── Damageable tire (shoot the TireHit collider → flat) ──────────────────
+    // Per-wheel state lives HERE, never on the shared VehicleConfig resource — effective
+    // radius/rest are computed, cfg is read-only.
+
+    private float   tireHealth = Float.MAX_VALUE;
+    private boolean flat       = false;
+
+    public boolean isFlat() { return flat; }
+
+    /** Effective rolling radius — a flat rides on the rim. */
+    private float effRadius() { return flat ? cfg.wheelRadius * cfg.flatRadiusScale : cfg.wheelRadius; }
+
+    /** Effective suspension rest distance — a flat corner sags. */
+    private float effRest()   { return flat ? cfg.restDistance * cfg.flatRestScale : cfg.restDistance; }
+
+    /**
+     * Authority-side tire hit ({@code ImpactManager} routes a TireHit collider hit here
+     * before the body Health). Only the simulating peer mutates flat state — a client's
+     * cosmetic-only hit resolution never flattens a puppet's tire (the replicated
+     * flatMask is the single source of truth and heals any drift).
+     *
+     * @return the reduced damage that should continue on to the vehicle body Health.
+     */
+    public float applyTireDamage(float damage) {
+        if (cfg == null) return damage;
+        if (vehicle != null && vehicle.isLocallySimulated() && !flat) {
+            tireHealth -= damage;
+            if (tireHealth <= 0f) setFlat(true);
+        }
+        return damage * cfg.tireDamagePassthrough;
+    }
+
+    /**
+     * Idempotent flat application — also the puppet replication path (snapshot flatMask).
+     * Visual: the wheel mesh's radius plane (its local X/Z — local Y is the cylinder's
+     * width axis) squashes by flatRadiusScale; rotationally symmetric about the spin axis,
+     * so the constantly-spinning mesh never shears.
+     */
+    public void setFlat(boolean value) {
+        if (flat == value) return;
+        flat = value;
+        if (cfg != null && !value) tireHealth = cfg.tireMaxHealth;   // re-inflate (fresh spawn)
+        if (wheelMesh != null && cfg != null) {
+            float s = value ? cfg.flatRadiusScale : 1f;
+            wheelMesh.setScale(new Vector3(s, 1f, s));
+        }
+        if (vehicle != null) vehicle.wakeUp();   // a parked car sags awake when shot flat
+    }
+
     /**
      * Extra fore/aft suspension probes (cfg.suspensionSamples - 1 of them). The wheel node
      * itself is always the centre probe; these sample the rest of the contact patch so the
@@ -80,6 +134,7 @@ public class VehicleWheel extends RayCast3D {
         // cfg is injected by Vehicle._ready() via setup() BEFORE VehicleWheel._ready()
         // fires (parent _ready runs after children). Guard against unset cfg at startup.
         if (cfg == null) cfg = vehicle.getConfig();
+        tireHealth = cfg.tireMaxHealth;
 
         tireMaxTurnMinRad = (float) GD.degToRad(-cfg.tireMaxTurnDegrees);
         tireMaxTurnMaxRad = (float) GD.degToRad(cfg.tireMaxTurnDegrees);
@@ -164,20 +219,21 @@ public class VehicleWheel extends RayCast3D {
     public void applyWheelPhysics(float delta, float physDelta, UserCommand cmd) {
         forceRaycastUpdate();
         Vector3 targetPosition = getTargetPosition();
-        targetPosition.setY(-(cfg.restDistance + cfg.wheelRadius + cfg.overExtend));
+        targetPosition.setY(-(effRest() + effRadius() + cfg.overExtend));
         setTargetPosition(targetPosition);
 
         // Rotate wheel visuals
         Vector3 forwardDir = getGlobalBasis().getZ().times(-1);
         double speed = forwardDir.dot(vehicle.getLinearVelocity());
-        wheelMesh.rotateX((float)((-speed * physDelta) / cfg.wheelRadius));
+        wheelMesh.rotateX((float)((-speed * physDelta) / effRadius()));
 
         // Aggregate the centre ray + any extra contact-patch probes into one contact.
         sampleGround();
-        if (!groundHit) return;
+        if (!groundHit) { lastCompression = 0f; return; }
 
-        double  springLen   = getGlobalPosition().distanceTo(groundPoint) - cfg.wheelRadius;
-        double  compression = cfg.restDistance - springLen;
+        double  springLen   = getGlobalPosition().distanceTo(groundPoint) - effRadius();
+        double  compression = effRest() - springLen;
+        lastCompression = (float) compression;
 
         Vector3 wheelMeshPos = wheelMesh.getPosition();
         wheelMeshPos.setY(GD.moveToward(wheelMeshPos.getY(), -springLen, 5 * getPhysicsProcessDeltaTime()));
@@ -196,13 +252,31 @@ public class VehicleWheel extends RayCast3D {
         // so reverse tapers at maxSpeed exactly like forward. Previously a negative ratio made
         // accelRatio = 1 - ratio grow PAST 1 in reverse — reverse was uncapped and stronger than
         // forward (the "forward is much slower than backward" bug). Clamp the curve input too.
-        if (isMotor && cmd.motor != 0) {
+        // Explicit governor: maxSpeed (boost ceiling while boosting) is a hard top-speed
+        // cap, not merely where the curve happens to run out — so a plateau-shaped curve
+        // can keep enough force to actually REACH maxSpeed without overshooting it.
+        // Reverse gets its own much lower ceiling (arcade: cars back up slowly).
+        double ceiling = vehicle.getBoostMaxSpeed()
+                * (cmd.motor < 0f ? cfg.reverseSpeedFraction : 1f);
+        if (isMotor && cmd.motor != 0 && speed * Math.signum(cmd.motor) < ceiling) {
             double dirSpeed    = speed * Math.signum(cmd.motor);
-            double speedRatio  = dirSpeed / cfg.maxSpeed;
+            // Boost raises the curve ceiling (higher effective maxSpeed) AND the force —
+            // NOS pushes past the normal top speed instead of just reaching it faster.
+            double speedRatio  = dirSpeed / ceiling;
             double accelRatio  = cfg.accelerationCurve != null
                     ? cfg.accelerationCurve.sampleBaked((float) GD.clamp(speedRatio, 0.0, 1.0))
                     : Math.max(0.0, 1.0 - speedRatio);
-            Vector3 accelForce = forwardDir.times(cfg.acceleration * cmd.motor * accelRatio);
+            double motorScale = (flat ? cfg.flatMotorScale : 1.0) * vehicle.getBoostAccelScale();
+            // Launch punch: FORWARD only (signed speed clamps to ratio 0 in reverse, which
+            // used to keep the boost active for the whole reverse run), fading out by
+            // launchBoostEndRatio of base maxSpeed (not the boost ceiling — NOS shouldn't
+            // re-arm the launch kick).
+            if (cmd.motor > 0f && cfg.launchBoost > 1f && cfg.launchBoostEndRatio > 1e-3f) {
+                double baseRatio = GD.clamp(speed / Math.max(1e-3f, cfg.maxSpeed), 0.0, 1.0);
+                motorScale *= 1.0 + (cfg.launchBoost - 1.0)
+                        * Math.max(0.0, 1.0 - baseRatio / cfg.launchBoostEndRatio);
+            }
+            Vector3 accelForce = forwardDir.times(cfg.acceleration * cmd.motor * accelRatio * motorScale);
             vehicle.applyForce(accelForce, forcePos);
         }
 
@@ -215,12 +289,41 @@ public class VehicleWheel extends RayCast3D {
         double xTraction = gripCurve != null ? gripCurve.sampleBaked(gripFactor) : 1.0;
 
         if (cmd.handbrake && gripFactor < 0.2f) vehicle.setSlipping(false);
-        if (cmd.handbrake)          xTraction = 0.01;
-        else if (vehicle.isSlipping()) xTraction = 0.1;
+        // Drift: uniform low grip — the car slides on all four; rotation authority comes
+        // from Vehicle's steering-controlled driftYawTorque, not grip asymmetry (front
+        // bite self-stalls at an equilibrium angle — it aligns against further rotation).
+        if (cmd.handbrake) {
+            xTraction = cfg.driftGrip;
+        } else if (vehicle.isSlipping()) xTraction = 0.1;
+        if (flat) xTraction *= cfg.flatGripScale;   // a flat corner slides — the handling destabilizer
 
         double gravity = -vehicle.getGravity().getY();
+        // Friction circle: each wheel's lateral force is capped at its share of
+        // maxLateralG — slip-proportional force otherwise exceeds 2 g in a hard turn
+        // (10 m circles at 70 km/h), where real/arcade cars widen the arc instead.
+        double latAccel = Math.abs(steeringXSpeed) * xTraction * gravity;  // demanded, m/s²
+        if (cfg.maxLateralG > 0f) latAccel = Math.min(latAccel, cfg.maxLateralG * gravity);
         Vector3 xForce = getGlobalBasis().getX().times(
-                -steeringXSpeed * xTraction * (vehicle.getMass() * gravity / 4.0));
+                -Math.signum(steeringXSpeed) * latAccel * (vehicle.getMass() / 4.0));
+
+        // Anti-flip (GTA-style): lateral grip applied AT THE CONTACT has a roll lever arm
+        // about the CoM — at speed that torque is what flips the car in a hard swerve. Lift
+        // the application point toward CoM HEIGHT as speed rises (same force, no roll
+        // moment), leaving parking-speed feel untouched. Spring + zForce stay at the true
+        // contact. The CoM is retuned per-tick (grounded/airborne) — read it live.
+        Vector3 xForcePos = forcePos;
+        if (cfg.lateralForceHeightBlend > 0f) {
+            float speedRatio = (float) GD.clamp(
+                    vehicle.getLinearVelocity().length() / Math.max(1e-3f, cfg.maxSpeed), 0.0, 1.0);
+            // Full blend by lateralBlendFullRatio, not maxSpeed — peak cornering force (and
+            // its roll moment) occurs at mid speeds where steering still allows big angles.
+            float blend = cfg.lateralForceHeightBlend
+                    * Math.min(1f, speedRatio / Math.max(1e-3f, cfg.lateralBlendFullRatio));
+            Vector3 bodyUp    = vehicle.getGlobalBasis().getY();
+            Vector3 comOffset = vehicle.getGlobalBasis().xform(vehicle.getCenterOfMass());
+            double  heightGap = bodyUp.dot(comOffset.minus(forcePos));
+            xForcePos = forcePos.plus(bodyUp.times(heightGap * blend));
+        }
 
         // Longitudinal (Z) friction
         double forwardSpeed = forwardDir.dot(tireVelocity);
@@ -231,10 +334,16 @@ public class VehicleWheel extends RayCast3D {
             zFriction = cfg.zBrakeTraction;  // parking friction on slopes
         }
 
+        // Saturate the speed factor: rolling resistance is ~constant and brakes deliver a
+        // fixed ~1.5 g in reality — ∝v forever made braking absurd at speed and capped top
+        // speed at ~74 km/h no matter the motor. Low-speed behaviour (< saturation speed,
+        // incl. parking friction) is unchanged; aero drag is the high-speed limiter now.
+        double sat = Math.max(0.5f, cfg.longFrictionSaturationSpeed);
+        double effForwardSpeed = GD.clamp(forwardSpeed, -sat, sat);
         Vector3 zForce = vehicle.getGlobalBasis().getZ().times(
-                forwardSpeed * zFriction * (vehicle.getMass() * gravity / vehicle.getWheels().size()));
+                effForwardSpeed * zFriction * (vehicle.getMass() * gravity / vehicle.getWheels().size()));
 
-        vehicle.applyForce(xForce, forcePos);
+        vehicle.applyForce(xForce, xForcePos);
         vehicle.applyForce(yForce, forcePos);
         vehicle.applyForce(zForce, forcePos);
     }
@@ -247,11 +356,14 @@ public class VehicleWheel extends RayCast3D {
         skidMark.setGlobalPosition(groundPoint.plus(Vector3.Companion.getUP().times(0.01)));
         skidMark.lookAt(skidMark.getGlobalPosition().plus(vehicle.getGlobalBasis().getZ()));
 
-        if (!vehicle.isHandbraking() && gripFactor < 0.2f) {
+        // Hard braking at speed lays rubber too, not just the handbrake — the arcade
+        // "tires locked" readout (marks stop below ~4 m/s as the car comes to rest).
+        boolean brakeSkid = vehicle.isBraking() && vehicle.getLinearVelocity().length() > 4.0;
+        if (!vehicle.isHandbraking() && !brakeSkid && gripFactor < 0.2f) {
             vehicle.setSlipping(false);
             skidMark.setEmitting(false);
         }
-        if (vehicle.isHandbraking() && !skidMark.isEmitting()) {
+        if ((vehicle.isHandbraking() || brakeSkid) && !skidMark.isEmitting()) {
             skidMark.setEmitting(true);
         }
     }
@@ -281,26 +393,6 @@ public class VehicleWheel extends RayCast3D {
         vehicle.applyForce(springForce, contact.minus(vehicle.getGlobalPosition()));
     }
 
-    public void applyWheelAcceleration(float physDelta, float motor) {
-        Vector3 forwardDir = getGlobalBasis().getZ().times(-1);
-        double velocity    = forwardDir.dot(vehicle.getLinearVelocity());
-        wheelMesh.rotateX((float)((-velocity * physDelta) / cfg.wheelRadius));
-
-        if (!isColliding()) return;
-
-        Vector3 contact   = getCollisionPoint();
-        Vector3 forcePos  = contact.minus(vehicle.getGlobalPosition());
-
-        if (isMotor && motor != 0) {
-            double speedRatio = velocity / cfg.maxSpeed;
-            double accelRatio = cfg.accelerationCurve != null
-                    ? cfg.accelerationCurve.sampleBaked((float) speedRatio)
-                    : Math.max(0.0, 1.0 - speedRatio);
-            Vector3 forceVec = forwardDir.times(cfg.acceleration * motor * accelRatio);
-            vehicle.applyForce(forceVec, forcePos);
-        }
-    }
-
     /**
      * Visual-only replay for replicated puppet vehicles (Round 11 N3) — no forces (puppets
      * are frozen; the body transform comes from the interpolator), but every visible wheel
@@ -324,11 +416,11 @@ public class VehicleWheel extends RayCast3D {
             setRotation(rotation);
         }
 
-        wheelMesh.rotateX((-forwardSpeed * delta) / cfg.wheelRadius);
+        wheelMesh.rotateX((-forwardSpeed * delta) / effRadius());
 
         forceRaycastUpdate();
         if (isColliding()) {
-            double springLen = getGlobalPosition().distanceTo(getCollisionPoint()) - cfg.wheelRadius;
+            double springLen = getGlobalPosition().distanceTo(getCollisionPoint()) - effRadius();
             Vector3 wheelMeshPos = wheelMesh.getPosition();
             wheelMeshPos.setY(GD.moveToward(wheelMeshPos.getY(), -springLen, 5 * delta));
             wheelMesh.setPosition(wheelMeshPos);
@@ -343,19 +435,36 @@ public class VehicleWheel extends RayCast3D {
         }
     }
 
+    /**
+     * Max steer angle available RIGHT NOW — shrinks with speed (GTA-style stability).
+     * Full lock below steeringLimitStartRatio of maxSpeed, easing down to
+     * steeringHighSpeedFraction of full lock at maxSpeed. Puppet visual replay keeps the
+     * static limits (the replicated angle was already limited at its source).
+     */
+    private float effectiveMaxTurnRad() {
+        float frac = cfg.steeringHighSpeedFraction;
+        if (frac >= 1f) return tireMaxTurnMaxRad;
+        float ratio = (float) (vehicle.getLinearVelocity().length() / Math.max(1e-3f, cfg.maxSpeed));
+        float start = cfg.steeringLimitStartRatio;
+        float t = (float) GD.clamp((ratio - start) / Math.max(1e-3f, 1f - start), 0.0, 1.0);
+        return tireMaxTurnMaxRad * (float) GD.lerp(1f, frac, t);
+    }
+
     public void applyWheelSteering(float delta, float steering, boolean steerToTarget) {
         if (!isSteer) return;
+        float effMaxRad = effectiveMaxTurnRad();
         Vector3 rotation = getRotation();
         if (steerToTarget) {
             // AI: `steering` is a normalized TARGET angle [-1,1]; converge the wheel to it (and hold
             // it) at the steer rate. Unlike the rate model below, this settles at any intermediate
-            // angle instead of winding to full lock — the cornering-wobble fix (I3b).
-            float target = (float) GD.clamp(steering, -1f, 1f) * tireMaxTurnMaxRad;  // min == -max
+            // angle instead of winding to full lock — the cornering-wobble fix (I3b). The normalized
+            // target scales by the speed-limited angle, so AI authority shrinks at speed too
+            // (junctionThrottleScale already keeps AI slow where full lock matters).
+            float target = (float) GD.clamp(steering, -1f, 1f) * effMaxRad;
             rotation.setY((float) GD.moveToward(rotation.getY(), target, cfg.tireMaxTurnSpeed * delta));
         } else if (steering != 0) {
             // Player: `steering` is a turn rate the wheel integrates (hold-to-turn).
-            float rotY = (float) GD.clamp(rotation.getY() + steering * delta,
-                                          tireMaxTurnMinRad, tireMaxTurnMaxRad);
+            float rotY = (float) GD.clamp(rotation.getY() + steering * delta, -effMaxRad, effMaxRad);
             rotation.setY(rotY);
         } else {
             rotation.setY((float) GD.moveToward(rotation.getY(), 0, cfg.tireMaxTurnSpeed * delta));

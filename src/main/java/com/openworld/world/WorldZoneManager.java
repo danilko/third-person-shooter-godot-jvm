@@ -6,6 +6,7 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.DirectionalLight3D;
 import godot.api.Environment;
+import godot.api.FileAccess;
 import godot.api.NavigationRegion3D;
 import godot.api.Node;
 import godot.api.PackedScene;
@@ -35,10 +36,12 @@ import com.openworld.weapon.WeaponItem;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -180,6 +183,11 @@ public class WorldZoneManager extends Node {
     /** In-flight stream-in/out tasks, insertion-ordered (first task gets the frame budget). */
     private final Map<WorldZoneMarker, StreamTask> tasks = new LinkedHashMap<>();
 
+    /** Markers whose next GEO_REQUEST must bypass the engine resource cache — set by
+     * {@link #reloadZone} (debug hot-reload after an external rebake), consumed in
+     * {@code beginGeometry}. */
+    private final Set<WorldZoneMarker> replaceOnNextLoad = new HashSet<>();
+
     @RegisterFunction
     @Override
     public void _ready() {
@@ -194,6 +202,7 @@ public class WorldZoneManager extends Node {
         // in-tree — geometry roots, spawned AI — goes down with the SceneTree at engine teardown).
         for (StreamTask t : tasks.values()) freePendingChildren(t);
         tasks.clear();
+        replaceOnNextLoad.clear();
         for (LoadedZone lz : loaded.values()) {
             if (lz.geometryInstance != null && GD.isInstanceValid(lz.geometryInstance))
                 lz.geometryInstance.queueFree();
@@ -223,6 +232,18 @@ public class WorldZoneManager extends Node {
         if (route == null) return;
         String name = route.getName().toString();
         if (routes.get(name) == route) routes.remove(name);
+    }
+
+    /** One-line streaming/traffic summary for the perf HUD ({@code PerfDebugOverlay}) — the
+     * counters that actually move when the open world hitches. Debug-only consumer. */
+    public String debugStatsLine() {
+        return "zones=" + loaded.size() + " tasks=" + tasks.size()
+                + " routes=" + routes.size() + " poolIdle=" + (pool != null ? pool.idleCount() : 0);
+    }
+
+    /** Read-only, name-sorted view of the live lane registry (debug overlay / diagnostics). */
+    public java.util.SortedMap<String, VehicleRoute> getRoutes() {
+        return java.util.Collections.unmodifiableSortedMap(routes);
     }
 
     /** Live lane by exact node name (O(log n)), or null when absent/freed. */
@@ -260,6 +281,48 @@ public class WorldZoneManager extends Node {
             if (d < bestDist) { bestDist = d; best = m; }
         }
         return best;
+    }
+
+    /**
+     * Debug-only: drop this zone's cached {@link WorldZone#geometry} and re-stream it from disk,
+     * bypassing the engine resource cache — picks up an external rebake
+     * ({@code tools/build_piece.sh}) without restarting the game. Refuses while a stream task is
+     * in flight (the pipeline owns the marker then — retry once it settles). The zone is only
+     * unloaded here; the normal eval tick streams it back in because the player is still inside
+     * {@code loadRadius}, so the "marker with an in-flight task is in neither set" invariant holds.
+     */
+    public boolean reloadZone(WorldZoneMarker marker) {
+        if (marker == null || marker.zone == null) return false;
+        if (tasks.containsKey(marker)) {
+            GD.print("WorldZoneManager: reload of '" + marker.zone.zoneId
+                    + "' refused — stream task in flight, retry");
+            return false;
+        }
+        marker.zone.geometry = null;   // kill the parsed-scene short-circuit in beginGeometry
+        replaceOnNextLoad.add(marker);
+        warnIfStaleBinary(marker.zone);
+        if (loaded.containsKey(marker)) beginUnload(marker);
+        if (debugLog) GD.print("WorldZoneManager: hot-reload queued for zone '"
+                + marker.zone.zoneId + "'");
+        return true;
+    }
+
+    /**
+     * {@link #resolveGeometryPath} prefers a sibling {@code .scn} over the baked {@code .tscn};
+     * {@code build_piece.sh} refreshes the binary as its final step, but a by-hand rebake that
+     * only rewrote the {@code .tscn} would be silently shadowed by the stale binary. Debug-gated
+     * log only, no behavior change.
+     */
+    private void warnIfStaleBinary(WorldZone zone) {
+        if (!debugLog) return;
+        String p = zone.geometryPath;
+        if (p == null || !p.endsWith(".tscn")) return;
+        String bin = p.substring(0, p.length() - ".tscn".length()) + ".scn";
+        if (!ResourceLoader.INSTANCE.exists(bin, "") || !ResourceLoader.INSTANCE.exists(p, "")) return;
+        if (FileAccess.getModifiedTime(p) > FileAccess.getModifiedTime(bin)) {
+            GD.print("WorldZoneManager: zone '" + zone.zoneId + "' — stale .scn shadows a fresh .tscn"
+                    + " (reload will use the OLD binary; run ConvertDistricts to refresh it)");
+        }
     }
 
     /**
@@ -619,6 +682,7 @@ public class WorldZoneManager extends Node {
         // Only the OFF-tree staged children survive a scene swap; free them or they leak.
         for (StreamTask t : tasks.values()) freePendingChildren(t);
         tasks.clear();
+        replaceOnNextLoad.clear();
         if (pool != null) { pool.clear(); pool = null; }
     }
 
@@ -734,7 +798,12 @@ public class WorldZoneManager extends Node {
         if (zone.geometry != null) { t.phase = Phase.GEO_INSTANTIATE; return true; }   // already cached
         String path = resolveGeometryPath(zone);
         if (path.isEmpty()) { beginSpawnPhase(t); return true; }   // geometry-less zone (AI only)
-        Error err = ResourceLoader.loadThreadedRequest(path);
+        // Hot-reload (reloadZone): REPLACE re-reads the file from disk AND refreshes the engine
+        // cache in place — plain REUSE would hand back the stale parse, IGNORE would leave the
+        // stale entry cached for the next plain load.
+        Error err = replaceOnNextLoad.remove(t.marker)
+                ? ResourceLoader.loadThreadedRequest(path, "", false, ResourceLoader.CacheMode.REPLACE)
+                : ResourceLoader.loadThreadedRequest(path);
         if (err != Error.OK) {
             GD.printErr("WorldZoneManager: loadThreadedRequest failed for '" + path + "': " + err);
             beginSpawnPhase(t);

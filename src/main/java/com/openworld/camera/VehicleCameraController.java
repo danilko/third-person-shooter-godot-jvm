@@ -79,6 +79,43 @@ public class VehicleCameraController extends Node3D {
 
     @RegisterProperty @Export public NodePath fpsCameraMountPath = new NodePath("FPSCameraMount");
 
+    // ── Speed feel (racing-game sense of speed) ───────────────────────────────
+    // Perceived speed in racing games is mostly camera FOV widening with speed (the
+    // single biggest trick), reinforced by a peripheral speed-line overlay. Both are
+    // driven here, from the vehicle's real velocity, and only while this camera is
+    // current — 60–80 km/h reads "fast" because the world stretches, not because the
+    // car actually moves faster.
+
+    /** Extra FOV (degrees) added at fovReferenceSpeed. 0 disables the FOV kick. */
+    @RegisterProperty @Export public double fovSpeedBoost     = 18.0;
+
+    /** Speed (m/s) at which the full FOV boost and full speed-line intensity are reached. */
+    @RegisterProperty @Export public double fovReferenceSpeed = 30.0;
+
+    /** Lerp speed for FOV changes (also eases back down when slowing/exiting). */
+    @RegisterProperty @Export public double fovLerpSpeed      = 4.0;
+
+    /** Fraction of fovReferenceSpeed where the speed-line overlay starts fading in. */
+    @RegisterProperty @Export public double speedLinesStartRatio = 0.35;
+
+    /**
+     * Extra FOV (degrees) at full forward acceleration — the launch/overtake "surge" every
+     * arcade racer plays on throttle. Decays as acceleration flattens, independent of speed.
+     */
+    @RegisterProperty @Export public double fovAccelBoost     = 5.0;
+
+    /** Forward acceleration (m/s²) at which the full fovAccelBoost is reached. */
+    @RegisterProperty @Export public double accelReference    = 7.0;
+
+    /** Extra FOV (degrees) while NOS is active (on top of the speed/accel terms). */
+    @RegisterProperty @Export public double fovNosBoost       = 6.0;
+
+    /**
+     * Metres the TPS spring arm extends at fovReferenceSpeed — the car shrinks in frame and
+     * the world flows past faster (the GTA/Horizon speed pull-back). 0 disables.
+     */
+    @RegisterProperty @Export public double armSpeedExtend    = 2.0;
+
     // ── Node refs ─────────────────────────────────────────────────────────────
 
     private Node3D      target;
@@ -91,6 +128,16 @@ public class VehicleCameraController extends Node3D {
     private Node3D      pivotNode;
     private SpringArm3D tpsSpringArm;
     private Node3D      tpsProxyNode;
+
+    /** Rest FOV captured at _ready — the speed kick always eases back to this. */
+    private float          baseFov = 70f;
+    /** Rest spring-arm length captured at _ready — armSpeedExtend adds on top of this. */
+    private double         baseSpringLength = 0.0;
+    private double         lastSpeed        = 0.0;
+    private double         smoothedAccel    = 0.0;
+    private CanvasLayer    speedFxLayer;
+    private ShaderMaterial speedLinesMaterial;
+    private static final godot.core.StringName SPEED_LINES_INTENSITY = new godot.core.StringName("intensity");
 
     // ── State ─────────────────────────────────────────────────────────────────
 
@@ -128,6 +175,19 @@ public class VehicleCameraController extends Node3D {
 
         Node m = getNodeOrNull(fpsCameraMountPath);
         if (m instanceof Node3D n) fpsCameraMount = n;
+
+        if (activeCamera != null) baseFov = activeCamera.getFov();
+        if (tpsSpringArm != null) baseSpringLength = tpsSpringArm.getLength();
+        // Optional sibling speed-line overlay (SpeedFX CanvasLayer > SpeedLines ColorRect
+        // with the SpeedLines.gdshader material) — degrade gracefully when absent.
+        Node fx = getParent().getNodeOrNull("SpeedFX");
+        if (fx instanceof CanvasLayer layer) {
+            speedFxLayer = layer;
+            Node rect = layer.getNodeOrNull("SpeedLines");
+            if (rect instanceof ColorRect cr && cr.getMaterial() instanceof ShaderMaterial sm) {
+                speedLinesMaterial = sm;
+            }
+        }
 
         if (target instanceof CollisionObject3D co) {
             if (tpsSpringArm != null) tpsSpringArm.addExcludedObject(co.getRid());
@@ -267,6 +327,59 @@ public class VehicleCameraController extends Node3D {
 
         pendingYaw   = 0.0;
         pendingPitch = 0.0;
+
+        applySpeedFeel(delta);
+    }
+
+    /**
+     * Speed-scaled FOV kick + acceleration surge + NOS kick + spring-arm pull-back +
+     * peripheral speed-line overlay. FOV uses a smoothstep ease so the effect is already
+     * felt at city speeds (the old quadratic was nearly flat in the 40–90 km/h band —
+     * exactly where "same km/h feels slower than GTA/NFS" lived); the acceleration surge
+     * plays the launch shove independent of absolute speed. The overlay layer is hidden
+     * outright whenever this camera is not current, so per-vehicle overlays cost nothing
+     * and never draw for puppet/AI cars.
+     */
+    private void applySpeedFeel(double delta) {
+        if (activeCamera == null) return;
+        boolean current = activeCamera.isCurrent();
+        double speed = (target instanceof RigidBody3D rb) ? rb.getLinearVelocity().length() : 0.0;
+        double t = GD.clamp(speed / Math.max(1e-3, fovReferenceSpeed), 0.0, 1.0);
+        double ease = t * t * (3.0 - 2.0 * t);   // smoothstep — responds through the mid band
+
+        // Forward-acceleration surge. Raw per-tick dv/dt is noisy (suspension, kerbs), so
+        // low-pass it; only positive acceleration surges (braking is handled by ease-down).
+        double rawAccel = (speed - lastSpeed) / Math.max(1e-4, delta);
+        lastSpeed = speed;
+        smoothedAccel = GD.lerp(smoothedAccel, GD.clamp(rawAccel, 0.0, accelReference),
+                Math.min(1.0, 3.0 * delta));
+        double surge = fovAccelBoost * (smoothedAccel / Math.max(1e-3, accelReference));
+
+        double nos = (target instanceof Vehicle v && v.isBoosting()) ? fovNosBoost : 0.0;
+
+        double targetFov = current ? baseFov + fovSpeedBoost * ease + surge + nos : baseFov;
+        activeCamera.setFov((float) GD.lerp((double) activeCamera.getFov(),
+                Math.min(targetFov, baseFov + 32.0),
+                Math.min(1.0, fovLerpSpeed * delta)));
+
+        // Speed pull-back: the arm extends with speed so the car shrinks in frame and the
+        // world flows past faster. Arm is only consumed in TPS; writing it in FPS is inert.
+        if (tpsSpringArm != null && armSpeedExtend > 0.0) {
+            double targetLen = current ? baseSpringLength + armSpeedExtend * ease : baseSpringLength;
+            tpsSpringArm.setLength((float) GD.lerp(
+                    (double) tpsSpringArm.getLength(), targetLen,
+                    Math.min(1.0, fovLerpSpeed * delta)));
+        }
+
+        if (speedFxLayer == null) return;
+        double start = GD.clamp(speedLinesStartRatio, 0.0, 0.95);
+        double intensity = current
+                ? GD.clamp((t - start) / Math.max(1e-3, 1.0 - start), 0.0, 1.0) : 0.0;
+        boolean show = intensity > 0.01;
+        if (speedFxLayer.isVisible() != show) speedFxLayer.setVisible(show);
+        if (show && speedLinesMaterial != null) {
+            speedLinesMaterial.setShaderParameter(SPEED_LINES_INTENSITY, intensity);
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

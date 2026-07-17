@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
 [ext_resource type="PackedScene" uid="uid://c7aoav51c2882" path="res://src/main/resources/com/openworld/vehicle/Vehicle.tscn" id="vehicle"]
 [ext_resource type="PackedScene" uid="uid://dvq2be1wcewoe" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/overlays/Overlay_RainbowBridge.tscn" id="ovl_rainbowbridge"]
 
 [sub_resource type="ProceduralSkyMaterial" id="skymat"]
 
@@ -27,6 +28,8 @@ transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545
 shadow_enabled = true
 
 [node name="Master" parent="." unique_id=746527671 instance=ExtResource("master")]
+
+[node name="OverlayRainbowBridge" parent="." unique_id=1090837463 instance=ExtResource("ovl_rainbowbridge")]
 
 [node name="WorldSystems" parent="." unique_id=650725803 instance=ExtResource("wsys")]
 

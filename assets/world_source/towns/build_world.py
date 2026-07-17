@@ -51,6 +51,7 @@ import assemble as asm
 from world_grid import (
     CELL, DISTRICT, DCELLS, GRID_N, LANE_OFF, LANE_STRIDE, THEMES, MAP, LANDMARKS,
     PIECE_DIR, WORLD, ORIGIN,
+    BAY_Y0, BAY_Y1, ISL_X0, ISL_X1, ISL_Y0, ISL_Y1, BR_X, BR_DECK_Z, BR_RAIL_Z,
     piece_path, piece_stem, lod_low_piece_path, theme_at, elev_at, district_center, to_world,
     flank_z as _flank_z, sampled as _sampled,
 )
@@ -63,20 +64,9 @@ from world_grid import (
 SPAN     = DCELLS * GRID_N            # 432 cells = 3024 m ~ 3 km
 SEAM     = 4.0                        # visual gap between plates so pieces read apart
 
-# ---- Tokyo Bay + Haneda airport island + the connecting bridge (GRID-SPACE coords, m —
-# to_world() applied at each use site, same convention as the rest of this file) ----
-# Island moved further out to sea (was Y0/Y1 = -450/-187.5, a 192m bridge gap) to make room for
-# the real Rainbow Bridge landmark overlay (buildings/PLATEAU_RainbowBridge.blend): the raw PLATEAU
-# extraction spans ~750m (a single-anchor, 260m-radius extraction that only reaches one tower, not
-# a clean symmetric span), which massively overhung the old 192m gap into the island. The gap is
-# now ~800m -- comfortable room for that real span without overlap. Placeholder-quality sizing,
-# not a final harbor layout -- expect to hand-tune island/bridge/coast positions further later.
-BAY_Y0, BAY_Y1 = -1108.0, 0.0                # sea band south of the map (Tokyo Bay)
-ISL_X0, ISL_X1 = 1134.0, 2268.0              # airport island footprint (SE, near harbor cells)
-ISL_Y0, ISL_Y1 = -1058.0, -795.5
-BR_X = 1701.0                                # bridge centreline x (~ island centre)
-BR_DECK_Z = 11.0                             # LAYER_EXPS — road deck top (engine Z, size-independent)
-BR_RAIL_Z = 8.0                              # LAYER_RAIL — rail deck top (engine Z, size-independent)
+# Tokyo Bay / Haneda island / bridge constants (BAY_*, ISL_*, BR_*) moved to lib/world_grid.py —
+# shared with the overlay generators (overlays/build_rainbow_bridge_overlay.py) so the harbor
+# blockout, slot_ anchors, and the overlay geometry all seat from one source.
 
 
 def make_grid():
@@ -177,29 +167,16 @@ def backbone_graph():
 
 
 def build_harbor(coll, mk, land):
-    """Tokyo Bay + Haneda airport island + connecting road/rail bridge. Lightweight blockout
-    (a dozen boxes + markers); the real Haneda terminal / Rainbow Bridge landmark overlays
-    (buildings/PLATEAU_HanedaTerminal.blend, buildings/PLATEAU_RainbowBridge.blend) sit on top
-    of this footprint via their own slot_ hooks, same contract as the district LANDMARKS."""
+    """Tokyo Bay + Haneda airport island blockout + markers. The Rainbow Bridge road/rail is NO
+    LONGER blocked out here — it lives in its own overlay blend
+    (overlays/build_rainbow_bridge_overlay.py, AUTHORING_GUIDE §5), which actually ships
+    (this HARBOR collection is dropped at export, preview-only) — keeping a blockout here too
+    would just diverge from the real overlay geometry. The slot_rainbowbridge anchor stays as
+    the coordinate record; the shared seat constants are in world_grid.py (BR_*, ISL_*)."""
     bay = kc.box("Bay", to_world(0.0), to_world(WORLD), to_world(BAY_Y0), to_world(BAY_Y1),
                  -2.0, -0.2, coll, "metal")
     island = kc.box("HanedaIsland", to_world(ISL_X0), to_world(ISL_X1),
                      to_world(ISL_Y0), to_world(ISL_Y1), -0.5, 0.5, coll, "roof")
-
-    deck = kc.box("RainbowBridgeDeck", to_world(BR_X - 15.0), to_world(BR_X + 15.0),
-                  to_world(ISL_Y0 - 260.0), to_world(ISL_Y0), BR_DECK_Z - 0.6, BR_DECK_Z,
-                  coll, "metal")
-    rail = kc.box("RainbowBridgeRail", to_world(BR_X - 6.0), to_world(BR_X + 6.0),
-                  to_world(ISL_Y0 - 260.0), to_world(ISL_Y0), BR_RAIL_Z - 0.4, BR_RAIL_Z,
-                  coll, "metal")
-
-    n_pier = 0
-    y = ISL_Y0 - 20.0
-    while y > ISL_Y0 - 260.0:
-        p = kc.cyl(f"BridgePier_{n_pier}", 4.0, -2.0, BR_DECK_Z - 0.6, coll, "metal")
-        p.location = (to_world(BR_X), to_world(y), 0.0)
-        n_pier += 1
-        y -= 40.0
 
     s = bpy.data.objects.new("slot_haneda", None)
     s.empty_display_type = 'ARROWS'; s.empty_display_size = 60.0
@@ -219,7 +196,7 @@ def build_harbor(coll, mk, land):
     e["size"] = [WORLD, 4.0, BAY_Y1 - BAY_Y0]
     mk.objects.link(e)
 
-    return 8  # box/pier count, matches the "harbor=8" preview-build summary stat
+    return 2  # blockout box count (Bay + island; the bridge moved to its overlay blend)
 
 
 def build():

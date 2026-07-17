@@ -528,8 +528,10 @@ public class GameManager extends Node {
     // vehicle is parked here and re-applied the instant both bodies exist (flushed from
     // spawnReplicatedVehicle / spawnReplicatedCharacter), so a driver never lingers pinned-but-unseated
     // in a standing pose waiting on the ~1 Hz occupancy sweep.
+    /** Keyed "vehicleId#seatIndex" — one deferred entry per seat, so a car can wait on several occupants. */
     private final java.util.Map<String, PendingSeat> pendingSeats = new java.util.HashMap<>();
-    private record PendingSeat(String occupantCharacterId, int ownerPeerId, boolean entering) {}
+    private record PendingSeat(String vehicleId, String occupantCharacterId, int ownerPeerId,
+            boolean entering, int seatIndex) {}
 
     /** Resolves a vehicleId to its live Vehicle via the "characters" group — mirrors findCharacterById. */
     private com.openworld.carrier.vehicle.Vehicle findVehicleById(String vehicleId) {
@@ -551,7 +553,8 @@ public class GameManager extends Node {
      * including the requester, whose own enter/exit happens only on that echo (mirrors the
      * pickup grant: no optimistic local enter to roll back).
      */
-    public void processVehicleSeatRequest(int senderPeerId, String vehicleId, String characterId, boolean entering) {
+    public void processVehicleSeatRequest(int senderPeerId, String vehicleId, String characterId,
+            boolean entering, int requestedSeat) {
         com.openworld.carrier.vehicle.Vehicle vehicle = findVehicleById(vehicleId);
         Character character = findCharacterById(characterId);
         boolean senderOwns = character != null && character.characterInfo != null
@@ -563,25 +566,31 @@ public class GameManager extends Node {
         if (entering && vehicle != null && vehicle.isAiOccupied()
                 && character instanceof Player && senderOwns) {
             Character ejected = vehicle.getOccupant();
-            forceVehicleExit(vehicle);
+            forceVehicleExitSeat(vehicle, 0);
             vehicle.removeAiDriverBrain();
             if (ejected instanceof AICharacter ai) ai.reactToCarjack(character);
         }
 
+        // Multi-seat: resolve the concrete seat host-side. Enter picks via the pure policy
+        // (SEAT_AUTO scans driver-first); exit resolves whichever seat the character holds.
+        int seat;
         com.openworld.net.VehicleSeatPolicy.Verdict verdict;
         if (entering) {
+            seat = vehicle != null
+                    ? com.openworld.net.VehicleSeatPolicy.pickSeat(vehicle.buildSeatOccupancy(), requestedSeat)
+                    : -1;
             double distance = (vehicle != null && character != null)
                     ? vehicle.getGlobalPosition().distanceTo(character.getGlobalPosition())
                     : Double.NaN;
             verdict = com.openworld.net.VehicleSeatPolicy.evaluateEnter(
                     vehicle != null, vehicle != null && vehicle.isAlive(),
-                    vehicle != null && vehicle.getOccupant() != null,
+                    vehicle != null && seat < 0,
                     character != null, character != null && character.isAlive(), senderOwns,
                     distance, com.openworld.net.VehicleSeatPolicy.ENTER_TOLERANCE_METERS);
         } else {
+            seat = (vehicle != null && character != null) ? vehicle.findSeatOf(character) : -1;
             verdict = com.openworld.net.VehicleSeatPolicy.evaluateExit(
-                    vehicle != null, vehicle != null && character != null && vehicle.getOccupant() == character,
-                    senderOwns);
+                    vehicle != null, seat >= 0, senderOwns);
         }
         if (verdict != com.openworld.net.VehicleSeatPolicy.Verdict.GRANT) {
             GD.print("GameManager: denied vehicle " + (entering ? "enter" : "exit") + " request from peer "
@@ -589,28 +598,30 @@ public class GameManager extends Node {
             return;
         }
         GD.print("GameManager: granted vehicle " + (entering ? "enter" : "exit") + " '" + vehicleId
-                + "' ↔ " + characterId + " (peer " + senderPeerId + ")");
+                + "' ↔ " + characterId + " seat " + seat + " (peer " + senderPeerId + ")");
 
-        // Ownership BEFORE the seat change, so the hot-swapped controller's isAuthority()
-        // reads the new owner the moment it lands on the vehicle. Exit hands locomotion
-        // back to the host. The atomic occupancy broadcast carries the same owner.
+        // Ownership migrates ONLY with the driver seat (seat 0) — passengers never own the
+        // vehicle's locomotion. Ordering unchanged: ownership BEFORE the seat change, so the
+        // hot-swapped controller's isAuthority() reads the new owner the moment it lands.
         // applyAuthorityState ordering: BEFORE tryEnter (clear the puppet controller —
         // seeding velocities — ahead of the live hot-swap) but AFTER tryExit (the live
         // controller must leave the vehicle before a puppet controller can take over).
         CharacterInfo info = vehicle.getCharacterInfo();
-        info.ownerPeerId = entering ? senderPeerId : NetworkManager.SERVER_PEER_ID;
+        if (seat == 0) {
+            info.ownerPeerId = entering ? senderPeerId : NetworkManager.SERVER_PEER_ID;
+        }
         if (entering) {
-            vehicle.applyAuthorityState();
-            vehicle.tryEnter(character);
+            if (seat == 0) vehicle.applyAuthorityState();
+            vehicle.tryEnter(character, seat);
         } else {
-            vehicle.tryExit();
-            vehicle.applyAuthorityState();
+            vehicle.tryExit(seat);
+            if (seat == 0) vehicle.applyAuthorityState();
         }
 
         NetworkManager net = getNetworkManager();
         if (net != null && net.isNetworked()) {
             net.broadcastVehicleOccupancy(info.characterId,
-                    entering ? characterId : "", info.ownerPeerId, entering);
+                    entering ? characterId : "", info.ownerPeerId, entering, seat);
         }
     }
 
@@ -623,14 +634,22 @@ public class GameManager extends Node {
      * client's controller was freed inside the despawned vehicle (stuck body, then crash).
      */
     public void forceVehicleExit(com.openworld.carrier.vehicle.Vehicle vehicle) {
-        if (vehicle == null || vehicle.getOccupant() == null || vehicle.getCharacterInfo() == null) return;
+        if (vehicle == null || vehicle.getCharacterInfo() == null) return;
+        for (int seat = vehicle.getSeatCount() - 1; seat >= 0; seat--) {   // passengers first, driver last
+            if (vehicle.getSeatOccupant(seat) != null) forceVehicleExitSeat(vehicle, seat);
+        }
+    }
+
+    /** Single-seat forced unseat — see {@link #forceVehicleExit}; ownership resets only with seat 0. */
+    private void forceVehicleExitSeat(com.openworld.carrier.vehicle.Vehicle vehicle, int seat) {
+        if (vehicle == null || vehicle.getSeatOccupant(seat) == null || vehicle.getCharacterInfo() == null) return;
         CharacterInfo info = vehicle.getCharacterInfo();
-        info.ownerPeerId = NetworkManager.SERVER_PEER_ID;
-        vehicle.tryExit();
-        vehicle.applyAuthorityState();
+        if (seat == 0) info.ownerPeerId = NetworkManager.SERVER_PEER_ID;
+        vehicle.tryExit(seat);
+        if (seat == 0) vehicle.applyAuthorityState();
         NetworkManager net = getNetworkManager();
         if (net != null && net.isNetworked() && net.isServer()) {
-            net.broadcastVehicleOccupancy(info.characterId, "", info.ownerPeerId, false);
+            net.broadcastVehicleOccupancy(info.characterId, "", info.ownerPeerId, false, seat);
         }
     }
 
@@ -649,7 +668,7 @@ public class GameManager extends Node {
         if (net != null && net.isNetworked() && net.isServer()
                 && vehicle.getCharacterInfo() != null && driver.characterInfo != null) {
             net.broadcastVehicleOccupancy(vehicle.getCharacterInfo().characterId,
-                    driver.characterInfo.characterId, vehicle.getCharacterInfo().ownerPeerId, true);
+                    driver.characterInfo.characterId, vehicle.getCharacterInfo().ownerPeerId, true, 0);
         }
     }
 
@@ -659,40 +678,44 @@ public class GameManager extends Node {
      * occupancy sweep re-sends current state as a self-heal backstop, so re-applying what this
      * peer already shows must be a no-op (plus ownership convergence, which is just a field write).
      */
-    public void applyVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId, boolean entering) {
+    public void applyVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId,
+            boolean entering, int seatIndex) {
         com.openworld.carrier.vehicle.Vehicle vehicle = findVehicleById(vehicleId);
         Character character = entering ? findCharacterById(occupantCharacterId) : null;
 
         // Defer until BOTH bodies exist on this peer (WS2). Park the latest desired seat and re-apply
         // from spawnReplicatedVehicle / spawnReplicatedCharacter — deterministic, not the ~1 Hz sweep.
         // Converge ownership eagerly if the vehicle is already present so its authority/freeze is right
-        // even before the occupant arrives.
+        // even before the occupant arrives. Keyed per seat — a car can wait on several occupants.
         if (vehicle == null || vehicle.getCharacterInfo() == null || (entering && character == null)) {
             if (vehicle != null && vehicle.getCharacterInfo() != null) {
                 vehicle.getCharacterInfo().ownerPeerId = ownerPeerId;
                 vehicle.applyAuthorityState();
             }
-            pendingSeats.put(vehicleId, new PendingSeat(occupantCharacterId, ownerPeerId, entering));
-            GD.print("GameManager: VEHICLE_OCCUPANCY deferred for '" + vehicleId + "' — waiting on "
-                    + (vehicle == null ? "vehicle" : "occupant " + occupantCharacterId) + " spawn");
+            pendingSeats.put(vehicleId + "#" + seatIndex,
+                    new PendingSeat(vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex));
+            GD.print("GameManager: VEHICLE_OCCUPANCY deferred for '" + vehicleId + "' seat " + seatIndex
+                    + " — waiting on " + (vehicle == null ? "vehicle" : "occupant " + occupantCharacterId)
+                    + " spawn");
             return;
         }
-        pendingSeats.remove(vehicleId);   // a resolved apply supersedes any parked request
+        pendingSeats.remove(vehicleId + "#" + seatIndex);   // a resolved apply supersedes any parked request
 
+        int seat = Math.min(Math.max(seatIndex, 0), Math.max(0, vehicle.getSeatCount() - 1));
         vehicle.getCharacterInfo().ownerPeerId = ownerPeerId;
         if (entering) {
-            if (vehicle.getOccupant() != character) {
-                if (vehicle.getOccupant() != null) vehicle.tryExit();   // diverged seat — self-heal
+            if (vehicle.getSeatOccupant(seat) != character) {
+                if (vehicle.getSeatOccupant(seat) != null) vehicle.tryExit(seat);   // diverged seat — self-heal
                 // Authority first (see processVehicleSeatRequest): on the requester this frees
                 // the puppet controller — seeding coast velocities — before the live hot-swap.
-                vehicle.applyAuthorityState();
-                vehicle.tryEnter(character);
-            } else {
+                if (seat == 0) vehicle.applyAuthorityState();
+                vehicle.tryEnter(character, seat);
+            } else if (seat == 0) {
                 vehicle.applyAuthorityState();   // already seated — ownership converge only
             }
         } else {
-            if (vehicle.getOccupant() != null) vehicle.tryExit();
-            vehicle.applyAuthorityState();
+            if (vehicle.getSeatOccupant(seat) != null) vehicle.tryExit(seat);
+            if (seat == 0) vehicle.applyAuthorityState();
         }
     }
 
@@ -706,7 +729,8 @@ public class GameManager extends Node {
         for (java.util.Map.Entry<String, PendingSeat> e :
                 new java.util.ArrayList<>(pendingSeats.entrySet())) {
             PendingSeat seat = e.getValue();
-            applyVehicleOccupancy(e.getKey(), seat.occupantCharacterId(), seat.ownerPeerId(), seat.entering());
+            applyVehicleOccupancy(seat.vehicleId(), seat.occupantCharacterId(), seat.ownerPeerId(),
+                    seat.entering(), seat.seatIndex());
         }
     }
 

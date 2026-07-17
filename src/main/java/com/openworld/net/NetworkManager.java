@@ -490,34 +490,38 @@ public class NetworkManager extends Node {
     private static final int OCCUPANCY_SWEEP_INTERVAL_MS = 1000;
     private int lastOccupancySweepMs = 0;
 
-    /** Host: every OCCUPANCY_SWEEP_INTERVAL_MS, re-broadcast each vehicle's authoritative seat + owner. */
+    /** Host: every OCCUPANCY_SWEEP_INTERVAL_MS, re-broadcast each vehicle's authoritative seats + owner (all seats — a missed passenger exit self-heals too). */
     private void sweepVehicleOccupancyBroadcast(int now) {
         if (now - lastOccupancySweepMs < OCCUPANCY_SWEEP_INTERVAL_MS) return;
         lastOccupancySweepMs = now;
         for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
             if (!(node instanceof com.openworld.carrier.vehicle.Vehicle v) || v.getCharacterInfo() == null
                     || v.getCharacterInfo().characterId.isEmpty() || v.isQueuedForDeletion()) continue;
-            Character occupant = v.getOccupant();
-            String occupantId = occupant != null && occupant.characterInfo != null
-                    ? occupant.characterInfo.characterId : "";
-            broadcastVehicleOccupancy(v.getCharacterInfo().characterId, occupantId,
-                    v.getCharacterInfo().ownerPeerId, !occupantId.isEmpty());
+            for (int seat = 0; seat < v.getSeatCount(); seat++) {
+                Character occupant = v.getSeatOccupant(seat);
+                String occupantId = occupant != null && occupant.characterInfo != null
+                        ? occupant.characterInfo.characterId : "";
+                broadcastVehicleOccupancy(v.getCharacterInfo().characterId, occupantId,
+                        v.getCharacterInfo().ownerPeerId, !occupantId.isEmpty(), seat);
+            }
         }
     }
 
     /**
      * Host → one peer: late-join occupancy baseline — one MSG_VEHICLE_OCCUPANCY per OCCUPIED
-     * vehicle (vacant is the scene default, nothing to converge). Sent AFTER the spawn baseline
+     * seat (vacant is the scene default, nothing to converge). Sent AFTER the spawn baseline
      * on the same reliable channel so the occupant body exists on the joiner before it seats.
      */
     public void sendBaselineVehicleOccupancy(int targetPeerId) {
         if (!isServer() || getTree() == null) return;
         for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
             if (!(node instanceof com.openworld.carrier.vehicle.Vehicle v) || v.getCharacterInfo() == null) continue;
-            Character occupant = v.getOccupant();
-            if (occupant == null || occupant.characterInfo == null) continue;
-            sendVehicleOccupancy(targetPeerId, v.getCharacterInfo().characterId,
-                    occupant.characterInfo.characterId, v.getCharacterInfo().ownerPeerId, true);
+            for (int seat = 0; seat < v.getSeatCount(); seat++) {
+                Character occupant = v.getSeatOccupant(seat);
+                if (occupant == null || occupant.characterInfo == null) continue;
+                sendVehicleOccupancy(targetPeerId, v.getCharacterInfo().characterId,
+                        occupant.characterInfo.characterId, v.getCharacterInfo().ownerPeerId, true, seat);
+            }
         }
     }
 
@@ -542,23 +546,26 @@ public class NetworkManager extends Node {
 
             float steerAngle, throttle;
             boolean handbrake, brake, slipping;
+            int flatMask;
             if (v.getController() instanceof com.openworld.net.VehicleNetworkController vnc) {
                 steerAngle = vnc.getLastSteerAngle();
                 throttle = vnc.getLastThrottle();
                 handbrake = vnc.getLastHandbrake();
                 brake = vnc.getLastBrake();
                 slipping = vnc.getLastSlipping();
+                flatMask = vnc.getLastFlatMask();
             } else {
                 steerAngle = v.getCurrentSteerAngle();
                 throttle = v.getCurrentThrottle();
                 handbrake = v.isHandbraking();
                 brake = v.isBraking();
                 slipping = v.isSlipping();
+                flatMask = v.getFlatMask();
             }
             entries.add(new NetMessageCodec.DecodedVehicleSnapshot(v.getCharacterInfo().characterId,
                     nowMs(), v.getGlobalPosition(), v.getGlobalBasis().getRotationQuaternion(),
                     v.getLinearVelocity(), v.getAngularVelocity(), steerAngle, throttle,
-                    handbrake, brake, slipping, health.getCurrentHealth(), fireSeq));
+                    handbrake, brake, slipping, flatMask, health.getCurrentHealth(), fireSeq));
         }
         broadcastVehicleBatchChunked(entries);
     }
@@ -997,7 +1004,7 @@ public class NetworkManager extends Node {
                 snap = new NetMessageCodec.DecodedVehicleSnapshot(snap.vehicleId(), snap.senderTimeMs(), pos,
                         snap.orientation(), snap.linearVelocity(), snap.angularVelocity(), snap.steerAngle(),
                         snap.throttle(), snap.handbrake(), snap.brake(), snap.slipping(),
-                        snap.health(), snap.fireSeq());
+                        snap.flatMask(), snap.health(), snap.fireSeq());
             }
         }
         // Lazy puppet attach: scene-placed vehicles on a client have no join hook, so the
@@ -1045,29 +1052,30 @@ public class NetworkManager extends Node {
                         vehicle.getLinearVelocity(), vehicle.getAngularVelocity(),
                         vehicle.getCurrentSteerAngle(), vehicle.getCurrentThrottle(),
                         vehicle.isHandbraking(), vehicle.isBraking(), vehicle.isSlipping(),
-                        healthValue, fireSeq)));
+                        vehicle.getFlatMask(), healthValue, fireSeq)));
     }
 
     /** Client → host: ask the host to (un)seat a character (host-arbitrated enter/exit). No-op on host/single-player — they arbitrate directly. */
-    public void requestVehicleSeat(String vehicleId, String characterId, boolean entering) {
+    public void requestVehicleSeat(String vehicleId, String characterId, boolean entering, int seatIndex) {
         if (!isNetworked() || isServer()) return;
         sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeVehicleSeatRequest(MSG_VEHICLE_SEAT_REQUEST,
-                vehicleId, characterId, entering));
+                vehicleId, characterId, entering, seatIndex));
     }
 
-    /** Host → all: the authoritative seat state + locomotion owner for one vehicle. */
-    public void broadcastVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId, boolean entering) {
+    /** Host → all: the authoritative seat state + locomotion owner for one vehicle seat. */
+    public void broadcastVehicleOccupancy(String vehicleId, String occupantCharacterId, int ownerPeerId,
+            boolean entering, int seatIndex) {
         if (!isNetworked() || !isServer()) return;
         broadcastMessage(NetMessageCodec.encodeVehicleOccupancy(MSG_VEHICLE_OCCUPANCY,
-                vehicleId, occupantCharacterId, ownerPeerId, entering), null);
+                vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex), null);
     }
 
-    /** Host → one peer: late-join occupancy baseline entry for a single occupied vehicle. */
+    /** Host → one peer: late-join occupancy baseline entry for a single occupied seat. */
     public void sendVehicleOccupancy(int targetPeerId, String vehicleId, String occupantCharacterId,
-            int ownerPeerId, boolean entering) {
+            int ownerPeerId, boolean entering, int seatIndex) {
         if (!isNetworked() || !isServer()) return;
         sendMessage(targetPeerId, NetMessageCodec.encodeVehicleOccupancy(MSG_VEHICLE_OCCUPANCY,
-                vehicleId, occupantCharacterId, ownerPeerId, entering));
+                vehicleId, occupantCharacterId, ownerPeerId, entering, seatIndex));
     }
 
     /** Host-side seat arbitration entry — decode/validate here, grant logic in GameManager (the established split). */
@@ -1080,7 +1088,8 @@ public class NetworkManager extends Node {
         if (!isServer()) return;
         GameManager manager = gameManager();
         if (manager != null) {
-            manager.processVehicleSeatRequest(senderPeerId, req.vehicleId(), req.characterId(), req.entering());
+            manager.processVehicleSeatRequest(senderPeerId, req.vehicleId(), req.characterId(),
+                    req.entering(), req.seatIndex());
         }
     }
 
@@ -1095,7 +1104,8 @@ public class NetworkManager extends Node {
         if (isServer()) return;
         GameManager manager = gameManager();
         if (manager != null) {
-            manager.applyVehicleOccupancy(occ.vehicleId(), occ.occupantCharacterId(), occ.ownerPeerId(), occ.entering());
+            manager.applyVehicleOccupancy(occ.vehicleId(), occ.occupantCharacterId(), occ.ownerPeerId(),
+                    occ.entering(), occ.seatIndex());
         }
     }
 

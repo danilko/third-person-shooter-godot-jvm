@@ -4,6 +4,7 @@ import com.openworld.character.AICharacter;
 import com.openworld.character.Character;
 import com.openworld.character.CharacterInfo;
 import com.openworld.character.Faction;
+import com.openworld.character.Health;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 import com.openworld.game.mission.MissionInfo;
@@ -54,6 +55,13 @@ import godot.api.OS;
  *       player so the zone's "enemy" AI investigate the noise (PLAN.md E2 perception test).
  * F4  — spawnOnAllRoutes(): drops one AI vehicle on every VehicleRoute in the scene (PLAN.md I3) —
  *       the one-keypress test for an authored road layout (e.g. a district piece's seam routes).
+ * Shift+F5 — reloadNearestZone(): hot-reloads the district the player is standing in, bypassing
+ *       the resource cache — rebake with tools/build_piece.sh, press, see the change in place
+ *       (plain F5 stays bakeWorld).
+ * Shift+F3 — togglePerfOverlay(): engine perf-monitor HUD (FPS/draw calls/primitives/memory/
+ *       orphans + streaming counters) — see PerfDebugOverlay.
+ * F3  — toggleRouteOverlay(): 3D line-draw of every registered VehicleRoute (driven path, colored
+ *       turn connectors, DESPAWN crosses) + IntersectionZone boxes — see RouteDebugOverlay.
  * F6  — NetworkManager.hostServer(DEBUG_PORT): starts an ENet server for LAN testing
  *       (PLAN.md Part G). F7 — joinServer("127.0.0.1", DEBUG_PORT): connects as a
  *       client to a host on the same machine. Edit DEBUG_HOST for a real LAN peer.
@@ -85,6 +93,12 @@ public class DebugHarness extends Node {
     /** F1 teleport-cycle position in the sorted zoneId list — persists across presses, wraps around. */
     private int teleportZoneIndex = -1;
 
+    /** Shift+F3 perf HUD — lazily constructed as a child of this harness, toggled by visibility. */
+    private PerfDebugOverlay perfOverlay;
+
+    /** F3 route/junction 3D debug-draw — lazily constructed, toggled by visibility. */
+    private RouteDebugOverlay routeOverlay;
+
     @RegisterFunction
     @Override
     public void _input(InputEvent event) {
@@ -93,21 +107,32 @@ public class DebugHarness extends Node {
         if (iek.getKeycode() == Key.F9) {
             if (canSpawnLocally()) startDebugMission();
         } else if (iek.getKeycode() == Key.F10) {
-            if (canSpawnLocally()) spawnTestAI(5, Faction.ENEMY, "Debug Spawn");
+            // Shift+F10 = motorcycle stub walk-test; plain F10 = enemy AI spawn.
+            if (iek.isShiftPressed()) spawnDebugCarrier(
+                    "res://src/main/resources/com/openworld/vehicle/Motorcycle.tscn", "Motorcycle");
+            else if (canSpawnLocally()) spawnTestAI(5, Faction.ENEMY, "Debug Spawn");
         } else if (iek.getKeycode() == Key.F11) {
-            if (canSpawnLocally()) spawnTestAI(1, Faction.PLAYER, "Debug Ally");
+            // Shift+F11 = boat stub walk-test (drop it near water); plain F11 = ally AI.
+            if (iek.isShiftPressed()) spawnDebugCarrier(
+                    "res://src/main/resources/com/openworld/vehicle/Boat.tscn", "Boat");
+            else if (canSpawnLocally()) spawnTestAI(1, Faction.PLAYER, "Debug Ally");
         } else if (iek.getKeycode() == Key.F6) {
             hostDebugServer();
         } else if (iek.getKeycode() == Key.F7) {
             joinDebugServer();
         } else if (iek.getKeycode() == Key.F12) {
-            spawnDebugZone();
+            // Shift+F12 = airplane stub walk-test; plain F12 = debug streaming zone.
+            if (iek.isShiftPressed()) spawnDebugCarrier(
+                    "res://src/main/resources/com/openworld/vehicle/Airplane.tscn", "Airplane");
+            else spawnDebugZone();
         } else if (iek.getKeycode() == Key.F8) {
             postDebugGunshot();
         } else if (iek.getKeycode() == Key.F4) {
             if (canSpawnLocally()) spawnOnAllRoutes();
         } else if (iek.getKeycode() == Key.F5) {
-            bakeWorld();
+            if (iek.isShiftPressed()) reloadNearestZone(); else bakeWorld();
+        } else if (iek.getKeycode() == Key.F3) {
+            if (iek.isShiftPressed()) togglePerfOverlay(); else toggleRouteOverlay();
         } else if (iek.getKeycode() == Key.F1) {
             teleportToNextZone();
         } else if (iek.getKeycode() == Key.F2) {
@@ -124,6 +149,47 @@ public class DebugHarness extends Node {
         com.openworld.world.WorldBaker.bake(this,
                 "res://src/main/resources/com/openworld/world/WorldSource.tscn",
                 "res://src/main/resources/com/openworld/world/World_baked.tscn");
+    }
+
+    /**
+     * Shift+F5 — hot-reload the district the player is standing in: after an external
+     * {@code tools/build_piece.sh} rebake, re-streams the zone from disk (cache-bypassing) so the
+     * change shows up without restarting the game. See {@link WorldZoneManager#reloadZone}.
+     */
+    /** Shift+F3 — toggle the engine perf-monitor HUD. Lazily built (CanvasLayer renders from
+     * anywhere in the tree, so no scene wiring is needed — available in every DebugHarness scene). */
+    private void togglePerfOverlay() {
+        if (perfOverlay == null || !GD.isInstanceValid(perfOverlay)) {
+            perfOverlay = new PerfDebugOverlay();
+            addChild(perfOverlay);
+            GD.print("DebugHarness: perf overlay ON");
+            return;
+        }
+        perfOverlay.setVisible(!perfOverlay.isVisible());
+        GD.print("DebugHarness: perf overlay " + (perfOverlay.isVisible() ? "ON" : "OFF"));
+    }
+
+    /** F3 — toggle the route/junction 3D debug-draw. Parented to this harness (a plain Node, so
+     * the overlay's identity transform stays world-space — route points are global coords). */
+    private void toggleRouteOverlay() {
+        if (routeOverlay == null || !GD.isInstanceValid(routeOverlay)) {
+            routeOverlay = new RouteDebugOverlay();
+            addChild(routeOverlay);
+            GD.print("DebugHarness: route overlay ON");
+            return;
+        }
+        routeOverlay.setVisible(!routeOverlay.isVisible());
+        GD.print("DebugHarness: route overlay " + (routeOverlay.isVisible() ? "ON" : "OFF"));
+    }
+
+    private void reloadNearestZone() {
+        WorldZoneManager mgr = WorldZoneManager.get();
+        if (mgr == null) { GD.print("DebugHarness: no WorldZoneManager — nothing to reload"); return; }
+        WorldZoneMarker marker = mgr.getNearestMarker();
+        if (marker == null) { GD.print("DebugHarness: no registered zone markers — nothing to reload"); return; }
+        if (mgr.reloadZone(marker)) {
+            GD.print("DebugHarness: hot-reloading zone '" + marker.zone.zoneId + "'");
+        }
     }
 
     /**
@@ -306,6 +372,46 @@ public class DebugHarness extends Node {
     }
 
     /**
+     * Shift+F10/F11/F12 — drops a carrier stub (Motorcycle/Boat/Airplane) ~8 m in front of the
+     * nearest player for a walk-test. Identity is stamped BEFORE addChild (fresh CharacterInfo —
+     * the shared-sub-resource rule), same as every runtime vehicle spawn path.
+     */
+    private void spawnDebugCarrier(String scenePath, String label) {
+        if (!canSpawnLocally() || getTree() == null) return;
+        Node scene = getTree().getCurrentScene();
+        if (scene == null) return;
+
+        Vector3 anchor = new Vector3(0f, 2f, -8f);
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p)) {
+                Vector3 fwd = p.getGlobalBasis().getZ().times(-1);
+                anchor = p.getGlobalPosition().plus(fwd.times(8f)).plus(new Vector3(0f, 1.5f, 0f));
+                break;
+            }
+        }
+
+        godot.api.Resource res = godot.api.ResourceLoader.INSTANCE.load(scenePath, "",
+                godot.api.ResourceLoader.CacheMode.REUSE);
+        if (!(res instanceof godot.api.PackedScene packed)) {
+            GD.printErr("DebugHarness: cannot load carrier scene " + scenePath);
+            return;
+        }
+        Node node = packed.instantiate();
+        if (!(node instanceof com.openworld.carrier.vehicle.Vehicle v)) {
+            GD.printErr("DebugHarness: " + scenePath + " is not a Vehicle scene");
+            if (node != null) node.queueFree();
+            return;
+        }
+        CharacterInfo info = new CharacterInfo();
+        info.characterId = java.util.UUID.randomUUID().toString();
+        info.displayName = label;
+        v.characterInfo = info;
+        scene.addChild(v);
+        v.setGlobalPosition(anchor);
+        GD.print("DebugHarness: spawned debug " + label + " at " + anchor);
+    }
+
+    /**
      * F8 — drops a synthetic "player"-faction GUNSHOT stimulus ~35 m in front of the player (PLAN.md
      * E2), so the zone's "enemy" AI (hostile to "player") investigate a spot away from you — making the
      * "walk toward the noise" behaviour obvious rather than blending into them chasing you. Walk-test:
@@ -369,12 +475,20 @@ public class DebugHarness extends Node {
     private static final float AUTO_WALK_ARRIVE = 25f;
     /** Tour altitude above each marker — high enough to clear every building, because the player's
      *  own MovementController still runs move_and_slide each frame: at street level a wall collision
-     *  cancels the drag and the tour jams against the first facade it meets. Streaming, traffic
-     *  upkeep, and AI LOD all measure XZ distance only, so altitude doesn't distort the test. */
-    private static final float AUTO_WALK_ALTITUDE = 50f;
+     *  cancels the drag and the tour jams against the first facade it meets. Also high enough that
+     *  ground AI stay in the PASSIVE LOD band (3D distance > {@code LOD_ACTIVE_DIST} 80 m — the old
+     *  50 m altitude put the flyover inside it, and city AI shot the tour player down; a dead body
+     *  ignores the drag, silently stalling the rest of the run). Zone streaming measures XZ only,
+     *  so altitude doesn't distort the test. */
+    private static final float AUTO_WALK_ALTITUDE = 120f;
 
     private boolean autoWalk = false;
     private int autoWalkIndex = 0;
+    /** Accumulator for the 5 s auto-walk progress heartbeat (headless log breadcrumb). */
+    private double autoWalkLogTimer = 0.0;
+    /** Optional zoneId substring from {@code --auto-walk=<filter>} — the tour starts at the first
+     * matching marker (targeted headless verification of one district) instead of index 0. */
+    private String autoWalkStartFilter = null;
 
     /**
      * Headless walk-test driver: launched with {@code -- --auto-walk} (Godot user args), drags the
@@ -390,9 +504,15 @@ public class DebugHarness extends Node {
     public void _ready() {
         for (String arg : OS.getCmdlineUserArgs()) {
             if ("--auto-walk".equals(arg)) { autoWalk = true; break; }
+            if (arg.startsWith("--auto-walk=")) {
+                autoWalk = true;
+                autoWalkStartFilter = arg.substring("--auto-walk=".length());
+                break;
+            }
         }
         setPhysicsProcess(autoWalk);
-        if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order");
+        if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order"
+                + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
 
     @RegisterFunction
@@ -411,17 +531,36 @@ public class DebugHarness extends Node {
         }
         if (player == null) return;
 
+        if (autoWalkStartFilter != null) {
+            for (int i = 0; i < markers.size(); i++) {
+                WorldZoneMarker m = markers.get(i);
+                if (m.zone != null && m.zone.zoneId.contains(autoWalkStartFilter)) { autoWalkIndex = i; break; }
+            }
+            autoWalkStartFilter = null;
+        }
         autoWalkIndex %= markers.size();
         WorldZoneMarker target = markers.get(autoWalkIndex);
         Vector3 tp = target.getGlobalPosition();
         Vector3 pp = player.getGlobalPosition();
         double dx = tp.getX() - pp.getX(), dz = tp.getZ() - pp.getZ();
         double dist = Math.sqrt(dx * dx + dz * dz);
+        autoWalkLogTimer += delta;
+        if (autoWalkLogTimer >= 5.0) {
+            autoWalkLogTimer = 0.0;
+            GD.print(String.format("DebugHarness: auto-walk at (%.0f, %.0f, %.0f) -> '%s' dist %.0f m",
+                    pp.getX(), pp.getY(), pp.getZ(),
+                    target.zone != null ? target.zone.zoneId : "?", dist));
+        }
         if (dist < AUTO_WALK_ARRIVE) {
             GD.print("DebugHarness: auto-walk reached '" + (target.zone != null ? target.zone.zoneId : "?")
                     + "' (" + (autoWalkIndex + 1) + "/" + markers.size() + ")");
             autoWalkIndex = (autoWalkIndex + 1) % markers.size();
             return;
+        }
+        // Keep the tour driver unkillable: the altitude keeps AI passive, but stray damage
+        // (explosions, vehicle hits) would otherwise kill the player and stall the whole run.
+        if (player.getNodeOrNull(new NodePath("Health")) instanceof Health h && !h.isDead()) {
+            h.resetFull();
         }
         double step = Math.min(AUTO_WALK_SPEED * delta, dist);
         // Drag the transform directly (not synthesized input) — streaming and traffic upkeep only

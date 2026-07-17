@@ -53,6 +53,7 @@ public class VehicleNetworkController extends Controller {
     private boolean lastHandbrake  = false;
     private boolean lastBrake      = false;
     private boolean lastSlipping   = false;
+    private int     lastFlatMask   = 0;
 
     // Discrete-state forward gate (same shape as NetworkController.latestDiscreteTimeMs).
     private long latestDiscreteTimeMs = Long.MIN_VALUE;
@@ -73,6 +74,7 @@ public class VehicleNetworkController extends Controller {
     public boolean getLastHandbrake()  { return lastHandbrake; }
     public boolean getLastBrake()      { return lastBrake; }
     public boolean getLastSlipping()   { return lastSlipping; }
+    public int     getLastFlatMask()   { return lastFlatMask; }
     public int     getLastFireSeq()    { return lastFireSeq; }
 
     /**
@@ -109,8 +111,13 @@ public class VehicleNetworkController extends Controller {
         lastHandbrake  = snap.handbrake();
         lastBrake      = snap.brake();
         lastSlipping   = snap.slipping();
+        lastFlatMask   = snap.flatMask();
 
         if (!(getParent() instanceof Vehicle vehicle)) return;
+
+        // Flat tires mirror the authority (visual squash + sag on the frozen puppet);
+        // rides every snapshot, so late-join and drop-heal come for free.
+        vehicle.applyReplicatedFlatMask(snap.flatMask());
 
         if (applyHealth) {
             Node healthNode = vehicle.getNodeOrNull(new godot.core.NodePath("Health"));
