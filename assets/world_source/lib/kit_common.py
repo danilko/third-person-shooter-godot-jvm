@@ -52,11 +52,29 @@ def reset_scene(coll_names):
             bpy.data.meshes.remove(me)
 
 
+# Default far clip baked into every generated .blend (viewports + script-made cameras): the
+# 3 km world vanishes past Blender's 1 km viewport default the moment you zoom out to frame it.
+VIEW_CLIP_END = 100000.0
+
+
+def setup_view_clip(end=VIEW_CLIP_END):
+    """Set the far clip on every 3D viewport of every screen/workspace stored in the file, so
+    the saved .blend opens showing the whole world. Works headless too — bpy.data.screens is
+    the file's saved UI data, no window needed."""
+    for scr in bpy.data.screens:
+        for area in scr.areas:
+            if area.type == 'VIEW_3D':
+                for sp in area.spaces:
+                    if sp.type == 'VIEW_3D':
+                        sp.clip_end = end
+
+
 def setup_units():
     sc = bpy.context.scene
     sc.unit_settings.system = 'METRIC'
     sc.unit_settings.scale_length = 1.0
     sc.unit_settings.length_unit = 'METERS'
+    setup_view_clip()
 
 
 def get_coll(name):
@@ -69,6 +87,27 @@ def get_coll(name):
         coll = bpy.data.collections.new(name)
         bpy.context.scene.collection.children.link(coll)
     return coll
+
+
+def link_collections(abspath, names):
+    """TRUE library-link (link=True) the named collections from `abspath` in ONE library load;
+    returns those found. Linked data is a live, read-only reference to the source .blend —
+    edit + save the source, reload the linking file, the edit is there; nothing is copied and
+    the linking file can never corrupt the source. Shared mechanism of tools/link_world.py,
+    tools/link_neighbors.py and the master's linked-district layer (towns/build_world.py)."""
+    with bpy.data.libraries.load(abspath, link=True) as (src, dst):
+        dst.collections = [c for c in src.collections if c in names]
+    return [c for c in dst.collections if c is not None]
+
+
+def instance_collection(dest, name, coll, loc):
+    """Collection-Instance empty placing (linked) collection `coll` at world `loc`."""
+    inst = bpy.data.objects.new(name, None)
+    inst.instance_type = 'COLLECTION'
+    inst.instance_collection = coll
+    inst.location = loc
+    dest.objects.link(inst)
+    return inst
 
 
 # ----------------------------------------------------------------- materials
@@ -288,6 +327,208 @@ def colonly_mesh(visual, coll=None):
     p.data.materials.append(mat("col"))
     p["proxy_for"] = visual.name
     return p
+
+
+# ------------------------------------------------------------- lane centerlines
+def centerlines_from_vertex_group(obj, group_name="lanedata"):
+    """Extract ordered, directional lane polylines from `group_name` on mesh `obj`. Reused by the
+    interactive `RKA_OT_centerline_from_vertex_group` operator (road_kit_authoring addon) so kit
+    pieces get their lane data from hand-tagged mesh topology instead of a guessed bbox midline.
+
+    Each edge-connected component of tagged vertices is treated as ONE lane -- this is what lets
+    a single 'lanedata' group carry several distinct lane paths in one mesh (e.g. every turn
+    movement through an intersection piece), disambiguated purely by mesh connectivity, no extra
+    grouping convention needed. A component must be a simple path (both ends degree <=1) or a
+    closed loop (every vertex degree 2); anything branchier is a tagging mistake, not a lane.
+
+    Direction: a non-loop lane's point order (index 0 = tail, index -1 = head) follows the tagged
+    verts' GROUP WEIGHT when the two path endpoints differ (lower weight = tail) -- tag weight 0.0
+    at a lane's start and 1.0 at its end (Blender's Vertex Weights panel) to make direction
+    explicit. This is what lets ONE lane-tile mesh serve both directions of a 2-way street: place
+    it normally for one direction, rotate it 180 degrees for the other -- the weight travels with
+    the vertex data, so which physical end is "head" survives the rotation even though the
+    topological walk alone (arbitrary tie-break) would not. Equal/default weights (e.g. both ends
+    at the vertex-group default of 1.0) fall back to the topological walk order -- no behavior
+    change for data tagged before this convention existed.
+
+    Returns (lanes, warnings): `lanes` is a list of {"points": [world-space Vector, ...],
+    "loop": bool}; `warnings` is a list of human-readable strings (isolated tagged verts with no
+    edge partner -- skipped, not an error, since a piece may be tagged incrementally)."""
+    vg = obj.vertex_groups.get(group_name)
+    if vg is None:
+        return [], []
+    gi = vg.index
+    me = obj.data
+    tagged = {}
+    for v in me.vertices:
+        for g in v.groups:
+            if g.group == gi:
+                tagged[v.index] = g.weight
+    if not tagged:
+        return [], []
+
+    adjacency = {vi: set() for vi in tagged}
+    for e in me.edges:
+        a, b = e.vertices[0], e.vertices[1]
+        if a in tagged and b in tagged:
+            adjacency[a].add(b)
+            adjacency[b].add(a)
+
+    mw = obj.matrix_world
+    lanes, warnings = [], []
+    visited = set()
+    for start in sorted(tagged):
+        if start in visited:
+            continue
+        component, stack = set(), [start]
+        while stack:
+            v = stack.pop()
+            if v in component:
+                continue
+            component.add(v)
+            stack.extend(adjacency[v] - component)
+        visited |= component
+
+        if len(component) == 1:
+            warnings.append("%s: isolated tagged vertex %d has no edge partner -- skipped"
+                             % (obj.name, start))
+            continue
+
+        degrees = {v: len(adjacency[v]) for v in component}
+        branchy = [v for v, d in degrees.items() if d > 2]
+        if branchy:
+            raise ValueError(
+                "%s: vertex %d in '%s' has %d tagged neighbours -- a lane centerline must be a "
+                "simple path or loop, not a branch" % (obj.name, branchy[0], group_name, degrees[branchy[0]]))
+
+        endpoints = [v for v, d in degrees.items() if d <= 1]
+        is_loop = not endpoints
+        start_v = endpoints[0] if endpoints else next(iter(component))
+
+        ordered = [start_v]
+        prev, cur = None, start_v
+        while True:
+            nxt = [n for n in adjacency[cur] if n != prev]
+            if not nxt or nxt[0] == ordered[0]:
+                break
+            cur, prev = nxt[0], cur
+            ordered.append(cur)
+
+        if not is_loop and tagged[ordered[0]] > tagged[ordered[-1]]:
+            ordered.reverse()
+
+        lanes.append({"points": [mw @ me.vertices[vi].co for vi in ordered], "loop": is_loop})
+    return lanes, warnings
+
+
+def lane_marking_strip(name, x_center, y0, y1, z, width, matkey, coll):
+    """Thin flat lane-boundary marking, centered on local `x_center`, spanning `y0..y1`, sitting
+    on the road surface at height `z`. `matkey` is 'line_w' (same-direction divider) or 'line_y'
+    (opposite-direction divider) from `MATS`. Used by `RKA_OT_combine_lanes` to mark the seam
+    between two adjacent lane tiles -- kept as its own small object (not joined into the lane
+    mesh) so it can later be swapped for a dashed/textured decal without touching lane geometry."""
+    return box(name, x_center - width / 2.0, x_center + width / 2.0, y0, y1, z, z + 0.01, coll, matkey)
+
+
+def poly_curve(name, pts, coll, loop=False, lane_width=None, oneway=True, end_behavior='CHAIN'):
+    """A plain POLY-spline Curve object through pts=[(x,y,z), ...] EXACTLY (no NURBS smoothing/
+    approximation -- every point is a real control point on a straight-segment spline). Same
+    `lanecl_*`-shape object `RKA_OT_centerline_from_vertex_group` builds by hand from tagged mesh
+    topology (see ops_centerline.py) -- this is the computed-geometry counterpart, used by
+    `RKA_OT_build_intersection` for corner/turn centerlines generated from `lib/intersection_kit.py`.
+    Sets `curve.rka_curve` (lane_width/oneway/loop/end_behavior) when `lane_width` is given."""
+    cu = bpy.data.curves.new(name, 'CURVE')
+    cu.dimensions = '3D'
+    sp = cu.splines.new('POLY')
+    sp.points.add(len(pts) - 1)
+    for i, (x, y, z) in enumerate(pts):
+        sp.points[i].co = (x, y, z, 1.0)
+    sp.use_cyclic_u = loop
+    if lane_width is not None:
+        cu.rka_curve.lane_width = lane_width
+        cu.rka_curve.oneway = oneway
+        cu.rka_curve.loop = loop
+        cu.rka_curve.end_behavior = end_behavior
+    obj = bpy.data.objects.new(name, cu)
+    coll.objects.link(obj)
+    return obj
+
+
+def flat_ribbon(name, pts, half_width, coll, matkey="asphalt"):
+    """A flat, constant-`half_width` quad-strip mesh following the 3D polyline pts=[(x,y,z), ...]
+    EXACTLY (same tangent-offset technique as `swept_wall`, just horizontal instead of vertical) --
+    the visual driving surface under a computed lane centerline (see `poly_curve` /
+    `lib/intersection_kit.py`), so a generated turn reads as an actual road, not a bare line."""
+    n = len(pts)
+    if n < 2:
+        return None
+    verts, faces = [], []
+    for i, (x, y, z) in enumerate(pts):
+        a = pts[max(0, i - 1)]
+        b = pts[min(n - 1, i + 1)]
+        tx, ty = b[0] - a[0], b[1] - a[1]
+        L = math.hypot(tx, ty) or 1.0
+        nx, ny = -ty / L * half_width, tx / L * half_width
+        verts += [(x - nx, y - ny, z), (x + nx, y + ny, z)]
+    for i in range(n - 1):
+        a, b = i * 2, (i + 1) * 2
+        faces.append((a, a + 1, b + 1, b))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    recalc_normals(me)
+    obj = bpy.data.objects.new(name, me)
+    coll.objects.link(obj)
+    obj.data.materials.append(mat(matkey))
+    return obj
+
+
+def swept_profile(name, pts, profile_2d, coll, matkey="concrete"):
+    """A solid mesh sweeping an arbitrary 2D cross-section (`profile_2d`, an ordered list of
+    `(lateral_offset, height)` pairs) along the 3D polyline `pts=[(x,y,z), ...]` EXACTLY -- the
+    same tangent/right-normal-offset technique as `swept_wall`/`flat_ribbon`, generalized from a
+    fixed rectangle/ribbon to any cross-section (e.g. a curb-and-gutter L-shape, see
+    `gutter_curb_profile`). `lateral_offset` is signed distance from the path (right-hand normal,
+    same sign convention as `swept_wall`'s `thickness`); `height` is added to each point's Z.
+    Produces the walls between consecutive profile points only (no end caps or a top/bottom
+    closing face) -- fine for a curb/gutter that abuts other geometry on its unseen sides; add
+    caps yourself if the profile is meant to be a free-standing closed solid."""
+    n = len(pts)
+    m = len(profile_2d)
+    if n < 2 or m < 2:
+        return None
+    verts, faces = [], []
+    for i, (x, y, z) in enumerate(pts):
+        a = pts[max(0, i - 1)]
+        b = pts[min(n - 1, i + 1)]
+        tx, ty = b[0] - a[0], b[1] - a[1]
+        L = math.hypot(tx, ty) or 1.0
+        nx, ny = -ty / L, tx / L   # unit right-normal
+        for off, h in profile_2d:
+            verts.append((x + nx * off, y + ny * off, z + h))
+    for i in range(n - 1):
+        for j in range(m - 1):
+            a, b = i * m + j, (i + 1) * m + j
+            faces.append((a, a + 1, b + 1, b))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    recalc_normals(me)
+    obj = bpy.data.objects.new(name, me)
+    coll.objects.link(obj)
+    obj.data.materials.append(mat(matkey))
+    return obj
+
+
+def gutter_curb_profile(width, height):
+    """A simple 'city gutter' curb cross-section -- flush road-facing apron stepping up to a
+    flat-topped curb face -- matching the overall SILHOUETTE of the hand-modeled
+    `kit_side_straight_city_gutter_curb_w0p6m_l5m` piece (`kit/lane_kit.blend`, inspected
+    read-only, never modified) reduced to just its width/height (per the author's own
+    instruction -- not a literal geometry extraction, which that piece's actual topology doesn't
+    trivially reduce to for an arbitrary-length swept curve). Points ordered by increasing
+    lateral offset: road edge (flush, height 0) -> apron edge (flush) -> curb base -> curb top."""
+    return [(0.0, 0.0), (width * 0.4, 0.0), (width * 0.4, height), (width, height)]
 
 
 def export_gltf(objs, filepath):

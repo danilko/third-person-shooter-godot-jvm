@@ -1,0 +1,245 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://gdj/com/openworld/world/PathLaneRoute.gdj" id="1_ua6uu"]
+
+[sub_resource type="Curve3D" id="Curve3D_uyjkk"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 12, 0.15, 2.5, 0, 0, 0, 0, 0, 0, 9, 0.15, 2.5, 0, 0, 0, 0, 0, 0, 6.756461, 0.15, 2.2790308, 0, 0, 0, 0, 0, 0, 4.5991406, 0.15, 1.6246146, 0, 0, 0, 0, 0, 0, 2.6109424, 0.15, 0.56190056, 0, 0, 0, 0, 0, 0, 0.868272, 0.15, -0.868272, 0, 0, 0, 0, 0, 0, -0.56190056, 0.15, -2.6109424, 0, 0, 0, 0, 0, 0, -1.6246146, 0.15, -4.5991406, 0, 0, 0, 0, 0, 0, -2.2790308, 0.15, -6.756461, 0, 0, 0, 0, 0, 0, -2.5, 0.15, -9, 0, 0, 0, 0, 0, 0, -2.5, 0.15, -12),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 11
+
+[sub_resource type="Curve3D" id="Curve3D_m65sh"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 12, 0.15, 2.5, 0, 0, 0, 0, 0, 0, -12, 0.15, 2.5),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_30ok5"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 15, 0.15, 2.5, 0, 0, 0, 0, 0, 0, 14, 0.15, 2.5, 0, 0, 0, 0, 0, 0, 11.756461, 0.15, 2.7209692, 0, 0, 0, 0, 0, 0, 9.59914, 0.15, 3.3753853, 0, 0, 0, 0, 0, 0, 7.6109424, 0.15, 4.4380994, 0, 0, 0, 0, 0, 0, 5.868272, 0.15, 5.868272, 0, 0, 0, 0, 0, 0, 4.4380994, 0.15, 7.6109424, 0, 0, 0, 0, 0, 0, 3.3753853, 0.15, 9.59914, 0, 0, 0, 0, 0, 0, 2.7209692, 0.15, 11.756461, 0, 0, 0, 0, 0, 0, 2.5, 0.15, 14, 0, 0, 0, 0, 0, 0, 2.5, 0.15, 15),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 11
+
+[sub_resource type="Curve3D" id="Curve3D_cx2ra"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 2.5, 0.15, -15, 0, 0, 0, 0, 0, 0, 2.5, 0.15, -14, 0, 0, 0, 0, 0, 0, 2.7209692, 0.15, -11.756461, 0, 0, 0, 0, 0, 0, 3.3753853, 0.15, -9.59914, 0, 0, 0, 0, 0, 0, 4.4380994, 0.15, -7.6109424, 0, 0, 0, 0, 0, 0, 5.868272, 0.15, -5.868272, 0, 0, 0, 0, 0, 0, 7.6109424, 0.15, -4.4380994, 0, 0, 0, 0, 0, 0, 9.59914, 0.15, -3.3753853, 0, 0, 0, 0, 0, 0, 11.756461, 0.15, -2.7209692, 0, 0, 0, 0, 0, 0, 14, 0.15, -2.5, 0, 0, 0, 0, 0, 0, 15, 0.15, -2.5),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 11
+
+[sub_resource type="Curve3D" id="Curve3D_tsvpx"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 2.5, 0.15, -12, 0, 0, 0, 0, 0, 0, 2.5, 0.15, -9, 0, 0, 0, 0, 0, 0, 2.2790308, 0.15, -6.756461, 0, 0, 0, 0, 0, 0, 1.6246146, 0.15, -4.5991406, 0, 0, 0, 0, 0, 0, 0.56190056, 0.15, -2.6109424, 0, 0, 0, 0, 0, 0, -0.868272, 0.15, -0.868272, 0, 0, 0, 0, 0, 0, -2.6109424, 0.15, 0.56190056, 0, 0, 0, 0, 0, 0, -4.5991406, 0.15, 1.6246146, 0, 0, 0, 0, 0, 0, -6.756461, 0.15, 2.2790308, 0, 0, 0, 0, 0, 0, -9, 0.15, 2.5, 0, 0, 0, 0, 0, 0, -12, 0.15, 2.5),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 11
+
+[sub_resource type="Curve3D" id="Curve3D_tkum4"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 2.5, 0.15, -12, 0, 0, 0, 0, 0, 0, 2.5, 0.15, 12),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_vdk5a"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -12, 0.15, -2.5, 0, 0, 0, 0, 0, 0, 12, 0.15, -2.5),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_is4ph"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -15, 0.15, -2.5, 0, 0, 0, 0, 0, 0, -14, 0.15, -2.5, 0, 0, 0, 0, 0, 0, -11.756461, 0.15, -2.7209692, 0, 0, 0, 0, 0, 0, -9.59914, 0.15, -3.3753853, 0, 0, 0, 0, 0, 0, -7.6109424, 0.15, -4.4380994, 0, 0, 0, 0, 0, 0, -5.868272, 0.15, -5.868272, 0, 0, 0, 0, 0, 0, -4.4380994, 0.15, -7.6109424, 0, 0, 0, 0, 0, 0, -3.3753853, 0.15, -9.59914, 0, 0, 0, 0, 0, 0, -2.7209692, 0.15, -11.756461, 0, 0, 0, 0, 0, 0, -2.5, 0.15, -14, 0, 0, 0, 0, 0, 0, -2.5, 0.15, -15),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 11
+
+[sub_resource type="Curve3D" id="Curve3D_5wjl3"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -12, 0.15, -2.5, 0, 0, 0, 0, 0, 0, -9, 0.15, -2.5, 0, 0, 0, 0, 0, 0, -6.756461, 0.15, -2.2790308, 0, 0, 0, 0, 0, 0, -4.5991406, 0.15, -1.6246146, 0, 0, 0, 0, 0, 0, -2.6109424, 0.15, -0.56190056, 0, 0, 0, 0, 0, 0, -0.868272, 0.15, 0.868272, 0, 0, 0, 0, 0, 0, 0.56190056, 0.15, 2.6109424, 0, 0, 0, 0, 0, 0, 1.6246146, 0.15, 4.5991406, 0, 0, 0, 0, 0, 0, 2.2790308, 0.15, 6.756461, 0, 0, 0, 0, 0, 0, 2.5, 0.15, 9, 0, 0, 0, 0, 0, 0, 2.5, 0.15, 12),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 11
+
+[sub_resource type="Curve3D" id="Curve3D_frad0"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -2.5, 0.15, 12, 0, 0, 0, 0, 0, 0, -2.5, 0.15, 9, 0, 0, 0, 0, 0, 0, -2.2790308, 0.15, 6.756461, 0, 0, 0, 0, 0, 0, -1.6246146, 0.15, 4.5991406, 0, 0, 0, 0, 0, 0, -0.56190056, 0.15, 2.6109424, 0, 0, 0, 0, 0, 0, 0.868272, 0.15, 0.868272, 0, 0, 0, 0, 0, 0, 2.6109424, 0.15, -0.56190056, 0, 0, 0, 0, 0, 0, 4.5991406, 0.15, -1.6246146, 0, 0, 0, 0, 0, 0, 6.756461, 0.15, -2.2790308, 0, 0, 0, 0, 0, 0, 9, 0.15, -2.5, 0, 0, 0, 0, 0, 0, 12, 0.15, -2.5),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 11
+
+[sub_resource type="Curve3D" id="Curve3D_adou4"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -2.5, 0.15, 12, 0, 0, 0, 0, 0, 0, -2.5, 0.15, -12),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve3D_hjlwu"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -2.5, 0.15, 15, 0, 0, 0, 0, 0, 0, -2.5, 0.15, 14, 0, 0, 0, 0, 0, 0, -2.7209692, 0.15, 11.756461, 0, 0, 0, 0, 0, 0, -3.3753853, 0.15, 9.59914, 0, 0, 0, 0, 0, 0, -4.4380994, 0.15, 7.6109424, 0, 0, 0, 0, 0, 0, -5.868272, 0.15, 5.868272, 0, 0, 0, 0, 0, 0, -7.6109424, 0.15, 4.4380994, 0, 0, 0, 0, 0, 0, -9.59914, 0.15, 3.3753853, 0, 0, 0, 0, 0, 0, -11.756461, 0.15, 2.7209692, 0, 0, 0, 0, 0, 0, -14, 0.15, 2.5, 0, 0, 0, 0, 0, 0, -15, 0.15, 2.5),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 11
+
+[node name="EmptyBakeSource" type="Node3D" unique_id=1601231789]
+
+[node name="Intersection_4WAY_001_N_E_L0" type="Node3D" parent="." unique_id=1092110308]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "R"
+approach = "N"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_N_E_L0" unique_id=1541360228]
+curve = SubResource("Curve3D_uyjkk")
+
+[node name="Intersection_4WAY_001_N_S_L0" type="Node3D" parent="." unique_id=1320360506]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "S"
+approach = "N"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_N_S_L0" unique_id=1945347987]
+curve = SubResource("Curve3D_m65sh")
+
+[node name="Intersection_4WAY_001_N_W_L0" type="Node3D" parent="." unique_id=1161476564]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "L"
+approach = "N"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_N_W_L0" unique_id=2104045859]
+curve = SubResource("Curve3D_30ok5")
+
+[node name="Intersection_4WAY_001_E_N_L0" type="Node3D" parent="." unique_id=214913204]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "L"
+approach = "E"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_E_N_L0" unique_id=1548159750]
+curve = SubResource("Curve3D_cx2ra")
+
+[node name="Intersection_4WAY_001_E_S_L0" type="Node3D" parent="." unique_id=330517076]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "R"
+approach = "E"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_E_S_L0" unique_id=1897861426]
+curve = SubResource("Curve3D_tsvpx")
+
+[node name="Intersection_4WAY_001_E_W_L0" type="Node3D" parent="." unique_id=1207979979]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "S"
+approach = "E"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_E_W_L0" unique_id=244746198]
+curve = SubResource("Curve3D_tkum4")
+
+[node name="Intersection_4WAY_001_S_N_L0" type="Node3D" parent="." unique_id=46999359]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "S"
+approach = "S"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_S_N_L0" unique_id=1984992751]
+curve = SubResource("Curve3D_vdk5a")
+
+[node name="Intersection_4WAY_001_S_E_L0" type="Node3D" parent="." unique_id=204387760]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "L"
+approach = "S"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_S_E_L0" unique_id=362478030]
+curve = SubResource("Curve3D_is4ph")
+
+[node name="Intersection_4WAY_001_S_W_L0" type="Node3D" parent="." unique_id=1160405424]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "R"
+approach = "S"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_S_W_L0" unique_id=1159984990]
+curve = SubResource("Curve3D_5wjl3")
+
+[node name="Intersection_4WAY_001_W_N_L0" type="Node3D" parent="." unique_id=216819342]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "R"
+approach = "W"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_W_N_L0" unique_id=27198929]
+curve = SubResource("Curve3D_frad0")
+
+[node name="Intersection_4WAY_001_W_E_L0" type="Node3D" parent="." unique_id=1580456388]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "S"
+approach = "W"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_W_E_L0" unique_id=201713904]
+curve = SubResource("Curve3D_adou4")
+
+[node name="Intersection_4WAY_001_W_S_L0" type="Node3D" parent="." unique_id=725994293]
+script = ExtResource("1_ua6uu")
+loop = false
+turn = "L"
+approach = "W"
+lane_offset = 0.0
+lane_width = 5.0
+end_behavior = "CHAIN"
+return_route = ""
+
+[node name="Path3D" type="Path3D" parent="Intersection_4WAY_001_W_S_L0" unique_id=1917951582]
+curve = SubResource("Curve3D_hjlwu")

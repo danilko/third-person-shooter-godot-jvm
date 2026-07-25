@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://bsolopiece00001"]
+[gd_scene load_steps=8 format=3 uid="uid://bsolopiece00001"]
 
 ; Fast INNER-LOOP test host for a single district piece (BLENDER_CONVENTIONS "district piece").
 ; Instances ONE piece at origin + a Player + environment — no 4 km streaming — so you can walk the
@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/districts/District_industry_5_1.tscn" id="piece"]
+[ext_resource type="Script" uid="uid://dj0ch24xgin8d" path="res://src/main/java/com/openworld/debug/DebugHarness.java" id="dbgh"]
 
 [sub_resource type="ProceduralSkyMaterial" id="skymat"]
 [sub_resource type="Sky" id="sky"]
@@ -34,6 +35,9 @@ shadow_enabled = true
 [node name="Piece" parent="." instance=ExtResource("piece")]
 
 [node name="WorldSystems" parent="." instance=ExtResource("wsys")]
+
+[node name="DebugHarness" type="Node" parent="."]
+script = ExtResource("dbgh")
 
 [node name="Characters" type="Node" parent="."]
 

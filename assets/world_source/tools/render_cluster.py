@@ -89,7 +89,7 @@ except Exception:
     pass
 
 acam_d = bpy.data.cameras.new("ClusterCam"); acam_d.type = 'ORTHO'
-acam_d.ortho_scale = span
+acam_d.ortho_scale = span; acam_d.clip_end = 100000.0
 acam = bpy.data.objects.new("ClusterCam", acam_d)
 dest.objects.link(acam)
 acam.location = (ccx, ccy, 400)

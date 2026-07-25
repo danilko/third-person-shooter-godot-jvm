@@ -5,8 +5,12 @@
 # (its source_scene_path/output_scene_path are fixed — unlike a district piece, there's only one
 # master, so no per-run throwaway bake scene needs synthesizing).
 #
-#   tools/build_world.sh
+#   tools/build_world.sh [--full | --with-lanes --with-deck --with-floor]
 #   then: <godot-jvm> --path <repo> res://src/main/resources/com/openworld/world/hosts/WorldMaster.tscn
+#
+# DEFAULT IS MINIMAL (region/landmark/water markers only — no arterial lanes, no ArtDeck
+# collision strips, no SafetyFloor; the collision-diagnosis baseline). `--full` restores the
+# complete traffic/ground layer; the granular --with-* flags bisect the collision bodies.
 #
 # Per-district detail is untouched by this script — build_piece.sh handles each district
 # separately; WorldMaster.tscn's zones resolve District_<Name>.tscn lazily at stream time.
@@ -26,7 +30,7 @@ ABS_DIR="$REPO/$RES_DIR"
 mkdir -p "$ABS_DIR"
 
 echo "── 1/3 build world_master.blend"
-BUILD_LOG="$($BLENDER --background --python "$BP/towns/build_world.py" 2>&1)"
+BUILD_LOG="$($BLENDER --background --python "$BP/towns/build_world.py" -- "$@" 2>&1)"
 echo "$BUILD_LOG" | grep -iE "^WORLD:" || true
 BLEND="$BP/world_master.blend"
 [ -f "$BLEND" ] || { echo "ERROR: build_world.py did not produce $BLEND"; exit 1; }

@@ -7,7 +7,8 @@ hand-drawn):
   1. Open districts/District_X.blend, draw poly/bezier curves named road_<name> over the
      PLATEAU road meshes (the rebuild re-imports previous ones into ROADS_SRC to continue).
   2. Per curve, set custom props: lanes (per direction, default 1), oneway (default False),
-     class ('local'/'arterial'/'oneway', default 'local').
+     class ('local'/'arterial'/'oneway', default 'local'), median (physical divider width
+     in metres, default 0 — each direction's lane pack shifts out by median/2).
   3. Run:  blender districts/District_X.blend --background --python tools/save_roads.py
   4. Rebuild the district (tools/build_piece.sh <name>) — build_district.py reads the
      sidecar, regenerates the traffic layer (lib/road_graph.py) and re-imports the curves
@@ -63,6 +64,7 @@ def main():
             "lanes": int(ob.get("lanes", 1) or 1),
             "oneway": bool(ob.get("oneway", False)),
             "class": str(ob.get("class", "local") or "local"),
+            "median": round(float(ob.get("median", 0.0) or 0.0), 3),
             "points": [[round(c, 3) for c in p] for p in points],
         })
 
@@ -74,4 +76,5 @@ def main():
     print(f"save_roads: wrote {len(curves)} curves -> {out_path}")
 
 
-main()
+if __name__ == "__main__":
+    main()

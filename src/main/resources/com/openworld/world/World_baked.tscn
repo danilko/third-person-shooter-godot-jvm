@@ -19,89 +19,44 @@ load_radius = 180.0
 unload_radius = 330.0
 spawn_configs = Array[ExtResource("4_dsxmi")]([SubResource("Resource_kp4eo")])
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lsx0u"]
-transparency = 1
-cull_mode = 2
-shading_mode = 0
-albedo_color = Color(0, 0.7, 1, 0.12)
-
-[sub_resource type="BoxMesh" id="BoxMesh_6v40x"]
-size = Vector3(60, 10, 60)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_8rf5p"]
-transparency = 1
-cull_mode = 2
-shading_mode = 0
-albedo_color = Color(1, 0.85, 0, 0.1)
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_0aj5k"]
-top_radius = 180.0
-bottom_radius = 180.0
-height = 0.1
-radial_segments = 48
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_80hmy"]
-transparency = 1
-cull_mode = 2
-shading_mode = 0
-albedo_color = Color(1, 0.25, 0.2, 0.07)
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_nekkv"]
-top_radius = 330.0
-bottom_radius = 330.0
-height = 0.1
-radial_segments = 48
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_brs58"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_lsx0u"]
 size = Vector3(8, 3, 8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_mij7f"]
+[sub_resource type="BoxShape3D" id="BoxShape3D_6v40x"]
 size = Vector3(7, 4, 7)
 
-[node name="WorldSource" type="Node3D" unique_id=1982373537]
+[node name="WorldSource" type="Node3D" unique_id=970922020]
 
-[node name="ZoneMarker_test" type="Node3D" parent="." unique_id=1101278851]
+[node name="ZoneMarker_test" type="Node3D" parent="." unique_id=1927980535]
 script = ExtResource("1_yl1ba")
 zone = SubResource("Resource_g8keo")
 
-[node name="@MeshInstance3D@269" type="MeshInstance3D" parent="ZoneMarker_test" unique_id=1809449320]
-material_override = SubResource("StandardMaterial3D_lsx0u")
-mesh = SubResource("BoxMesh_6v40x")
-
-[node name="@MeshInstance3D@270" type="MeshInstance3D" parent="ZoneMarker_test" unique_id=2012636215]
-material_override = SubResource("StandardMaterial3D_8rf5p")
-mesh = SubResource("CylinderMesh_0aj5k")
-
-[node name="@MeshInstance3D@271" type="MeshInstance3D" parent="ZoneMarker_test" unique_id=1476780686]
-material_override = SubResource("StandardMaterial3D_80hmy")
-mesh = SubResource("CylinderMesh_nekkv")
-
-[node name="loopA" type="Node3D" parent="." unique_id=207444798]
+[node name="loopA" type="Node3D" parent="." unique_id=1004182718]
 script = ExtResource("6_16cls")
 lane_offset = 1.75
 end_behavior = "DESPAWN"
 
-[node name="@Marker3D@272" type="Marker3D" parent="loopA" unique_id=1294154354]
+[node name="@Marker3D@955" type="Marker3D" parent="loopA" unique_id=1493105183]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.2, 10)
 
-[node name="@Marker3D@273" type="Marker3D" parent="loopA" unique_id=2044764823]
+[node name="@Marker3D@956" type="Marker3D" parent="loopA" unique_id=1767560203]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.2, -10)
 
-[node name="@Marker3D@274" type="Marker3D" parent="loopA" unique_id=74952690]
+[node name="@Marker3D@957" type="Marker3D" parent="loopA" unique_id=1683509450]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, -10)
 
-[node name="@Marker3D@275" type="Marker3D" parent="loopA" unique_id=696736372]
+[node name="@Marker3D@958" type="Marker3D" parent="loopA" unique_id=1074041267]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.2, 10)
 
-[node name="Water_pond" type="Area3D" parent="." unique_id=394387641 groups=["water"]]
+[node name="Water_pond" type="Area3D" parent="." unique_id=2027638496 groups=["water"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, 0)
 
-[node name="@CollisionShape3D@276" type="CollisionShape3D" parent="Water_pond" unique_id=208855214]
-shape = SubResource("BoxShape3D_brs58")
+[node name="@CollisionShape3D@959" type="CollisionShape3D" parent="Water_pond" unique_id=326945567]
+shape = SubResource("BoxShape3D_lsx0u")
 
-[node name="Intersection_main" type="Area3D" parent="." unique_id=1714285477]
+[node name="Intersection_main" type="Area3D" parent="." unique_id=877084973]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 18)
 script = ExtResource("7_qnqnr")
 
-[node name="@CollisionShape3D@277" type="CollisionShape3D" parent="Intersection_main" unique_id=1264319702]
-shape = SubResource("BoxShape3D_mij7f")
+[node name="@CollisionShape3D@960" type="CollisionShape3D" parent="Intersection_main" unique_id=1923747919]
+shape = SubResource("BoxShape3D_6v40x")

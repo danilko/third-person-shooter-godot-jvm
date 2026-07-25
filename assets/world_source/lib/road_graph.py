@@ -53,7 +53,7 @@ class Edge:
     cls        : 'alley'|'local'|'oneway'|'arterial'|'highway' (informational + signals)
     name       : stable route-name stem (unique within the graph)
     """
-    def __init__(self, name, pts, a, b, lanes_f=1, lanes_r=1, cls='local'):
+    def __init__(self, name, pts, a, b, lanes_f=1, lanes_r=1, cls='local', median=0.0):
         self.name = name
         self.pts = [(_f(p[0]), _f(p[1]), _f(p[2]) if len(p) > 2 else 0.0) for p in pts]
         self.a = a
@@ -61,6 +61,7 @@ class Edge:
         self.lanes_f = lanes_f
         self.lanes_r = lanes_r
         self.cls = cls
+        self.median = _f(median)   # physical median width (m); lane packs shift out by median/2
 
 
 class Node:
@@ -93,11 +94,12 @@ class RoadGraph:
         i = self.node_at(x, y, eps)
         return i if i >= 0 else self.add_node(x, y, z)
 
-    def add_edge(self, name, pts, lanes_f=1, lanes_r=1, cls='local', eps=CONNECT_EPS):
+    def add_edge(self, name, pts, lanes_f=1, lanes_r=1, cls='local', eps=CONNECT_EPS,
+                 median=0.0):
         """Add a centerline; its ends snap to (or create) junction nodes."""
         a = self.ensure_node(pts[0][0], pts[0][1], pts[0][2] if len(pts[0]) > 2 else 0.0, eps)
         b = self.ensure_node(pts[-1][0], pts[-1][1], pts[-1][2] if len(pts[-1]) > 2 else 0.0, eps)
-        e = Edge(name, pts, a, b, lanes_f, lanes_r, cls)
+        e = Edge(name, pts, a, b, lanes_f, lanes_r, cls, median)
         self.edges.append(e)
         idx = len(self.edges) - 1
         self.nodes[a].edges.append((idx, 'a'))
@@ -279,20 +281,22 @@ class JunctionOut:
 
 
 def _junction_radius(rg, node):
-    """Stop-line distance from the node centre: half the widest crossing carriageway plus a
-    margin, so lane ends sit just outside the paved junction box on every arm."""
-    widest = 1
+    """Stop-line distance from the node centre: half the widest crossing carriageway (in
+    metres, physical median included) plus a margin, so lane ends sit just outside the paved
+    junction box on every arm."""
+    widest_m = LANE_W
     for (ei, _end) in node.edges:
         e = rg.edges[ei]
-        widest = max(widest, e.lanes_f + e.lanes_r)
-    return (widest * LANE_W) / 2.0 + STOP_MARGIN
+        widest_m = max(widest_m, (e.lanes_f + e.lanes_r) * LANE_W + e.median)
+    return widest_m / 2.0 + STOP_MARGIN
 
 
-def _lane_offset_from_center(lane_idx, lanes):
+def _lane_offset_from_center(lane_idx, lanes, median=0.0):
     """Signed right-of-travel offset of lane `lane_idx` (0 = curb/leftmost … lanes-1 =
     median-most). Keep-left: the whole direction sits LEFT of the centerline, so offsets are
-    negative; curb lane is farthest left."""
-    return -((lanes - lane_idx - 0.5) * LANE_W)
+    negative; curb lane is farthest left. A physical `median` width pushes the whole lane pack
+    a further median/2 out, leaving the strip |offset| < median/2 clear for the divider."""
+    return -(median / 2.0 + (lanes - lane_idx - 0.5) * LANE_W)
 
 
 def generate(rg, radius_fn=None):
@@ -323,7 +327,7 @@ def generate(rg, radius_fn=None):
                 ('R', e.lanes_r, rev, e.a, e.b)):
             for li in range(n_lanes):
                 name = f"{e.name}_{dir_flag}{li}"
-                lp = offset_polyline(pts, _lane_offset_from_center(li, n_lanes))
+                lp = offset_polyline(pts, _lane_offset_from_center(li, n_lanes, e.median))
                 r = LaneRoute(name, lp)
                 lanes.append(r)
                 by_name[name] = r
@@ -396,7 +400,8 @@ def from_curves(curves, eps=CONNECT_EPS):
 
     curves: [(name, [(x, y, z), ...], props)] where props may carry
     'lanes' (per direction, default 1), 'oneway' (bool, default False),
-    'class' (default 'local'). Curves are SPLIT where an interior point of one lies within
+    'class' (default 'local'), 'median' (physical divider width in m, default 0 — lane packs
+    shift out by median/2 each side). Curves are SPLIT where an interior point of one lies within
     eps of another curve's endpoint (a T junction drawn as one long curve + a side street),
     then every touching endpoint clusters into a junction node."""
     # collect split points per curve: any OTHER curve's endpoint near an interior vertex
@@ -410,6 +415,7 @@ def from_curves(curves, eps=CONNECT_EPS):
         lanes = int(props.get('lanes', 1) or 1)
         oneway = bool(props.get('oneway', False))
         cls = str(props.get('class', 'local') or 'local')
+        median = float(props.get('median', 0.0) or 0.0)
         # split at interior vertices that another curve's endpoint touches
         cuts = [0]
         for i in range(1, len(pts) - 1):
@@ -428,7 +434,7 @@ def from_curves(curves, eps=CONNECT_EPS):
                 continue
             seg_name = name if len(cuts) == 2 else f"{name}_s{si}"
             rg.add_edge(seg_name, seg, lanes_f=lanes,
-                        lanes_r=0 if oneway else lanes, cls=cls, eps=eps)
+                        lanes_r=0 if oneway else lanes, cls=cls, eps=eps, median=median)
     return rg
 
 
@@ -599,6 +605,18 @@ def _selftest():
     for c in conns2:
         _assert(c.approach in ('N', 'E', 'S', 'W'), f"{c.name} missing approach")
 
+    # 3) median: a 1-lane-per-direction road with a 4 m physical divider — each direction's
+    #    lane shifts out by median/2, leaving the |y| < 2 m strip clear for the divider.
+    med = ("med", [(0.0, 0.0, 0.0), (100.0, 0.0, 0.0)], {"lanes": 1, "median": 4.0})
+    rg3 = from_curves([med])
+    lanes3, _j3 = generate(rg3)
+    routes3 = {r.name: r for r in lanes3}
+    mf0, mr0 = routes3["med_F0"], routes3["med_R0"]
+    _assert(abs(mf0.pts[0][1] - 3.75) < 1e-6 and abs(mr0.pts[0][1] + 3.75) < 1e-6,
+            f"median offsets wrong: F0 y={mf0.pts[0][1]:.2f} R0 y={mr0.pts[0][1]:.2f} (want ±3.75)")
+    _assert(min(abs(mf0.pts[0][1]), abs(mr0.pts[0][1])) > 2.0,
+            "median strip not clear — a lane sits inside |y| < median/2")
+
     # simplify: a dense 700 m straight collapses to max_gap-spaced support points,
     # endpoints intact; a bend point survives.
     dense = [(x * 7.0, 0.0, 0.0) for x in range(101)]
@@ -611,7 +629,8 @@ def _selftest():
     print("road_graph selftest OK —",
           f"T: {len(rg.edges)} edges/{len(conns)} connectors;",
           f"grid cross: {len(lanes2)} routes/{len(conns2)} connectors,",
-          f"box {j.size_x:.1f} m")
+          f"box {j.size_x:.1f} m;",
+          f"median: F0/R0 at ±{abs(mf0.pts[0][1]):.2f} m")
 
 
 if __name__ == "__main__":

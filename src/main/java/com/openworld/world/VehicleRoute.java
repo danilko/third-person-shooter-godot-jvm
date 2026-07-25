@@ -35,7 +35,7 @@ import java.util.List;
  * </ul>
  */
 @RegisterClass(className = "VehicleRoute")
-public class VehicleRoute extends Node3D {
+public class VehicleRoute extends Node3D implements Lane {
 
     /** {@link #endBehavior} values — exported as String (a raw enum type breaks the registration scanner). */
     public static final String END_CHAIN   = "CHAIN";
@@ -73,6 +73,13 @@ public class VehicleRoute extends Node3D {
 
     /** Optional explicit return lane name for {@link #END_UTURN} (else derived from {@link LaneGraph}). */
     @Export @RegisterProperty public String returnRoute = "";
+
+    // ── Lane interface getters (thin wrappers over the public fields above, needed because an
+    //    interface can't expose a field directly — no behavior change, same values) ───────────
+    @Override public String getTurn() { return turn; }
+    @Override public String getApproach() { return approach; }
+    @Override public String getEndBehavior() { return endBehavior; }
+    @Override public String getReturnRoute() { return returnRoute; }
 
     // Baked (Catmull-Rom smoothed + lane-offset) path cache — rebuilt only if the marker count changes.
     private List<Vector3> baked;

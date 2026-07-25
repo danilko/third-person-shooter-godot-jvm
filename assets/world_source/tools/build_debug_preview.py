@@ -134,6 +134,7 @@ dest.objects.link(sun)
 cam_data = bpy.data.cameras.new("DebugCam")
 cam_data.type = 'ORTHO'
 cam_data.ortho_scale = span
+cam_data.clip_end = kc.VIEW_CLIP_END
 cam = bpy.data.objects.new("DebugCam", cam_data)
 cam.location = (ccx, ccy, 400)
 dest.objects.link(cam)

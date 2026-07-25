@@ -97,9 +97,11 @@ if _gn:
 # reason — a real district's STREET content linked in purely so opening world_master.blend shows it
 # beside the harbor/ring; it must never reach the baked master (that district already streams in on
 # its own via the normal region_ zone mechanism — this would double it up). LAYOUT (build_world.py's
-# theme-coloured Plate_* boxes) and HARBOR (its harbor/Haneda/bridge blockout boxes) are the master's
-# own preview-base geometry, by the same design doc's own words: "replaced by each district piece's
-# own geometry" once it streams in — every gameplay marker they build alongside (region_/lane_/
+# linked-district Piece_* Collection-Instances — every built piece library-linked at its world
+# position — plus fallback Plate_* boxes for unbuilt districts) and HARBOR (its harbor/Haneda/bridge
+# blockout boxes) are the master's own preview layer: each district already streams in on its own at
+# runtime, so exporting the linked instances would double every piece (the glTF exporter expands
+# Collection-Instances into real nodes) — every gameplay marker built alongside (region_/lane_/
 # intersection_/slot_) already lands in MARKERS/LANDMARKS instead, so dropping these two collections
 # loses no gameplay data. Left in, they baked hundreds of raw MeshInstance3D/StaticBody3D/
 # ConcavePolygonShape3D nodes straight into World_master.tscn (never collapsed to MultiMesh — that

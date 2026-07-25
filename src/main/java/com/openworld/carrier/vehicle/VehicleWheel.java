@@ -217,10 +217,17 @@ public class VehicleWheel extends RayCast3D {
     }
 
     public void applyWheelPhysics(float delta, float physDelta, UserCommand cmd) {
-        forceRaycastUpdate();
+        // Landing lead: extend the ray by ~2 ticks of fall distance so a hard landing is
+        // detected BEFORE the ray origin ends up under the surface — a fast fall covers
+        // more than the whole suspension window per 60 Hz tick, after which the ray starts
+        // underground and never sees the ground again (the intermittent high-speed floor
+        // clip). Target is set before the forced update so the lead applies this tick.
+        float fallSpeed = (float) Math.max(0.0, -vehicle.getLinearVelocity().getY());
+        float fallLead  = fallSpeed * physDelta * 2f;
         Vector3 targetPosition = getTargetPosition();
-        targetPosition.setY(-(effRest() + effRadius() + cfg.overExtend));
+        targetPosition.setY(-(effRest() + effRadius() + cfg.overExtend + fallLead));
         setTargetPosition(targetPosition);
+        forceRaycastUpdate();
 
         // Rotate wheel visuals
         Vector3 forwardDir = getGlobalBasis().getZ().times(-1);
@@ -232,11 +239,17 @@ public class VehicleWheel extends RayCast3D {
         if (!groundHit) { lastCompression = 0f; return; }
 
         double  springLen   = getGlobalPosition().distanceTo(groundPoint) - effRadius();
-        double  compression = effRest() - springLen;
+        // A hit past the normal suspension window is only reachable via the fall lead:
+        // no spring force there (negative compression would be suction yanking the car
+        // DOWN); the damping term below still pre-brakes the fall, upward only.
+        boolean leadZoneHit = springLen > effRest() + cfg.overExtend;
+        double  compression = leadZoneHit ? 0.0 : effRest() - springLen;
         lastCompression = (float) compression;
 
+        // Mesh never dangles past the normal window while the lead ray reaches further.
+        double displayLen = Math.min(springLen, effRest() + cfg.overExtend);
         Vector3 wheelMeshPos = wheelMesh.getPosition();
-        wheelMeshPos.setY(GD.moveToward(wheelMeshPos.getY(), -springLen, 5 * getPhysicsProcessDeltaTime()));
+        wheelMeshPos.setY(GD.moveToward(wheelMeshPos.getY(), -displayLen, 5 * getPhysicsProcessDeltaTime()));
         wheelMesh.setPosition(wheelMeshPos);
 
         Vector3 contact  = wheelMesh.getGlobalPosition();
@@ -246,6 +259,7 @@ public class VehicleWheel extends RayCast3D {
         double springForceMag = cfg.springStrength * compression;
         Vector3 tireVelocity  = getPointVelocity(contact);
         double  dampForceMag  = cfg.springDamping * getGlobalBasis().getY().dot(tireVelocity);
+        if (leadZoneHit && dampForceMag > 0.0) dampForceMag = 0.0;   // never pull toward ground
         Vector3 yForce        = groundNormal.times(springForceMag - dampForceMag);
 
         // Motor force. speedRatio is measured in the COMMANDED direction (speed * sign(motor)),
