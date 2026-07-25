@@ -34,10 +34,14 @@ Emits (into collections the Java WorldBaker consumes):
   * slot_<landmark> (LANDMARKS) -> hand-craft hook for a Tokyo hero district piece
     (Shibuya / TokyoStation / Akihabara / Haneda). Baker ignores it until you set its
     `asset_path` to the piece .tscn — same contract as place_manual_slots.
-  * LAYOUT: theme-coloured, elevation-stepped 504 m plates (preview base) + arterial
-    ribbons (the backbone, preview) — replaced by each district piece's own geometry.
-    (export_world.py drops this + HARBOR before the master ever reaches the baker —
-    both are pure Blender-side visualization, never meant to ship.)
+  * LAYOUT: every BUILT district piece TRUE-library-linked (link=True, the link_world.py
+    mechanism) as a `Piece_<gx>_<gy>` Collection-Instance at its true world position —
+    opening world_master.blend shows the REAL assembled world, live-updating when a
+    district source .blend is edited (linked data is read-only here, so the master can
+    never corrupt a piece). A district not built yet falls back to the old theme-coloured
+    elevation-stepped plate as its placeholder. (export_world.py drops LAYOUT + HARBOR
+    before the master ever reaches the baker — both are pure Blender-side visualization,
+    never meant to ship; each district streams in on its own at runtime.)
 
 RUN: blender --background --python towns/build_world.py
      blender --background world_master.blend --python tools/render.py -- _preview_world 0 0 3400
@@ -63,6 +67,8 @@ from world_grid import (
 # master expects there — see world_grid.py's docstring).
 SPAN     = DCELLS * GRID_N            # 432 cells = 3024 m ~ 3 km
 SEAM     = 4.0                        # visual gap between plates so pieces read apart
+PIECE_COLLS = ["STREET", "MANUAL"]    # per-district collections linked into LAYOUT (everything
+                                      # exported: generated street + hand-authored content)
 
 # Tokyo Bay / Haneda island / bridge constants (BAY_*, ISL_*, BR_*) moved to lib/world_grid.py —
 # shared with the overlay generators (overlays/build_rainbow_bridge_overlay.py) so the harbor
@@ -199,7 +205,29 @@ def build_harbor(coll, mk, land):
     return 2  # blockout box count (Bay + island; the bridge moved to its overlay blend)
 
 
-def build():
+def parse_args():
+    """CLI after `--`. DEFAULT IS MINIMAL (collision-diagnosis baseline, 2026-07): the master
+    ships only region/landmark/water markers — no arterial lane markers, no ArtDeck collision
+    strips, no SafetyFloor. `--full` restores the complete traffic/ground layer; the granular
+    `--with-*` flags exist to A/B-bisect which body causes a collision artifact."""
+    import argparse
+    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    ap = argparse.ArgumentParser(prog="build_world.py")
+    ap.add_argument("--full", action="store_true",
+                    help="build everything: arterial lanes + ArtDeck strips + SafetyFloor")
+    ap.add_argument("--with-lanes", action="store_true",
+                    help="include the arterial lane/connector/junction markers")
+    ap.add_argument("--with-deck", action="store_true",
+                    help="include the 14 ArtDeck collision strips")
+    ap.add_argument("--with-floor", action="store_true",
+                    help="include the world-spanning SafetyFloor slab")
+    a = ap.parse_args(argv)
+    if a.full:
+        a.with_lanes = a.with_deck = a.with_floor = True
+    return a
+
+
+def build(opts):
     kc.setup_units()
     asm.wipe_scene()
     layout = kc.get_coll("LAYOUT")
@@ -208,18 +236,41 @@ def build():
     harbor = kc.get_coll("HARBOR")
 
     counts = {k: 0 for k in THEMES}
+    n_linked = n_plate = 0
     for gy in range(GRID_N):
         for gx in range(GRID_N):
             key = theme_at(gx, gy); t = THEMES[key]; counts[key] += 1
             cx, cy = district_center(gx, gy); elev = t["elev"]
+            stem = piece_stem(gx, gy, key)
 
-            # theme plate (preview base). Grid-space bounds, to_world() at the box call.
-            x0 = gx * DISTRICT + SEAM / 2.0; x1 = (gx + 1) * DISTRICT - SEAM / 2.0
-            y0 = gy * DISTRICT + SEAM / 2.0; y1 = (gy + 1) * DISTRICT - SEAM / 2.0
-            # plate top sits just BELOW piece-ground level (elev) so a streamed district piece
-            # lands cleanly on top instead of z-fighting / half-sinking the player into the plate.
-            kc.box(f"Plate_{key}_{gx}_{gy}", to_world(x0), to_world(x1), to_world(y0), to_world(y1),
-                   elev - 0.6, elev - 0.1, layout, t["col"])
+            # District layer: TRUE library link (link=True, the link_world.py mechanism) of the
+            # built piece's exported content (STREET + MANUAL), instanced at its true world
+            # position — the SAME (cx, cy, elev) the region_ marker below hands the runtime, so
+            # what lines up here lines up in-game. Live reference: edit + save a district .blend,
+            # reload the master, the edit shows; read-only here, so the master can never corrupt
+            # a piece. Purely Blender-side preview — export_world.py drops LAYOUT, and linking a
+            # piece's STREET pulls in neither its NEIGHBOR_REF context (separate collection) nor
+            # the master itself, so a district that links the master back via
+            # link_neighbors.py --master creates no load cycle.
+            piece_blend = os.path.join(ROOT, "districts", stem + ".blend")
+            colls = kc.link_collections(piece_blend, PIECE_COLLS) \
+                if os.path.exists(piece_blend) else []
+            if colls:
+                for c in colls:
+                    kc.instance_collection(
+                        layout, f"Piece_{gx}_{gy}" + ("" if c.name == "STREET" else f"_{c.name}"),
+                        c, (cx, cy, elev))
+                n_linked += 1
+            else:
+                # Placeholder plate for a not-yet-built district (grid-space bounds, to_world()
+                # at the box call). Plate top sits just BELOW piece-ground level (elev) so a
+                # streamed district piece lands cleanly on top instead of z-fighting /
+                # half-sinking the player into the plate.
+                x0 = gx * DISTRICT + SEAM / 2.0; x1 = (gx + 1) * DISTRICT - SEAM / 2.0
+                y0 = gy * DISTRICT + SEAM / 2.0; y1 = (gy + 1) * DISTRICT - SEAM / 2.0
+                kc.box(f"Plate_{key}_{gx}_{gy}", to_world(x0), to_world(x1),
+                       to_world(y0), to_world(y1), elev - 0.6, elev - 0.1, layout, t["col"])
+                n_plate += 1
 
             # region_ marker -> WorldZoneMarker + RegionConfig. Named after the ACTUAL piece stem
             # (District_<theme>_<gx>_<gy> — coordinate-named for EVERY district, heroes included;
@@ -228,7 +279,6 @@ def build():
             # piece's .blend/.tscn filename stem. That zoneId is what ZoneDebugOverlay prints
             # ("District: <zoneId>") and WorldZoneManager logs on load/unload — traceable straight
             # to districts/<stem>.blend with no lookup table.
-            stem = piece_stem(gx, gy, key)
             r = bpy.data.objects.new(f"region_{stem}", None)
             r.empty_display_type = 'CUBE'; r.empty_display_size = DISTRICT / 2.0
             r.location = (cx, cy, elev)
@@ -249,9 +299,20 @@ def build():
             # master arterial lanes crossing the district ("art_"). Re-run this master build
             # after adding a sidecar so the meta flips. Count is further scaled by the
             # theme's vehicle_density at load.
-            r["traffic_count"] = 6
             has_roads = os.path.exists(os.path.join(ROOT, "districts", stem + ".roads.json"))
-            r["traffic_route"] = f"{stem}__" if has_roads else "art_"
+            if has_roads:
+                r["traffic_count"] = 6
+                r["traffic_route"] = f"{stem}__"
+            elif opts.with_lanes:
+                r["traffic_count"] = 6
+                r["traffic_route"] = "art_"
+            else:
+                # Minimal master builds no arterial lanes, so the "art_" fallback would name
+                # routes that don't exist. Empty route + 0 count = WorldBaker.buildZone emits
+                # no VehicleSpawnConfig at all (verified graceful) — the zone simply has no
+                # ambient traffic until this district gets a roads sidecar.
+                r["traffic_count"] = 0
+                r["traffic_route"] = ""
             mk.objects.link(r)
 
     # arterial backbone: junction-split multi-lane routes + turn connectors + IntersectionZones
@@ -260,11 +321,15 @@ def build():
     # district-boundary grid lines and didn't route like a real expressway (see the
     # highway/district redesign follow-up); ring_network.py itself is kept for that redesign,
     # just not invoked here for now.
-    n_lane, n_conn, n_ix = asm.lay_road_graph(
-        backbone_graph(), z_fn=_flank_z, z_off=0.6,
-        radius_fn=lambda _rg, _node: ART_STOP_RADIUS)
-    n_deck = backbone_deck(kc.get_coll("ARTDECK"))
-    safety_floor(kc.get_coll("ARTDECK"))   # always-resident catch-all floor (ships with the deck)
+    n_lane = n_conn = n_ix = n_deck = 0
+    if opts.with_lanes:
+        n_lane, n_conn, n_ix = asm.lay_road_graph(
+            backbone_graph(), z_fn=_flank_z, z_off=0.6,
+            radius_fn=lambda _rg, _node: ART_STOP_RADIUS)
+    if opts.with_deck:
+        n_deck = backbone_deck(kc.get_coll("ARTDECK"))
+    if opts.with_floor:
+        safety_floor(kc.get_coll("ARTDECK"))   # always-resident catch-all floor (ships with the deck)
 
     # harbor: Tokyo Bay + Haneda airport island + connecting road/rail bridge.
     build_harbor(harbor, mk, land)
@@ -282,13 +347,16 @@ def build():
     asm.add_camera_sun(layout, target=(to_world(WORLD / 2), to_world(WORLD / 2), 0.0),
                        cam_loc=(to_world(WORLD / 2), to_world(-WORLD * 0.4), WORLD * 0.75), lens=28)
 
+    mode = "full" if (opts.with_lanes and opts.with_deck and opts.with_floor) else \
+           ("minimal" if not (opts.with_lanes or opts.with_deck or opts.with_floor) else "partial")
     summary = "  ".join(f"{k}={v}" for k, v in counts.items())
-    print("WORLD: %.0fx%.0f m  districts=%d (%dx%d, %.0f m)  lanes=%d  connectors=%d  junctions=%d  decks=%d  landmarks=%d  %s"
-          % (WORLD, WORLD, GRID_N * GRID_N, GRID_N, GRID_N, DISTRICT, n_lane, n_conn, n_ix, n_deck, len(LANDMARKS), summary))
+    print("WORLD: %.0fx%.0f m  mode=%s  districts=%d (%dx%d, %.0f m)  linked=%d  plates=%d  lanes=%d  connectors=%d  junctions=%d  decks=%d  floor=%d  landmarks=%d  %s"
+          % (WORLD, WORLD, mode, GRID_N * GRID_N, GRID_N, GRID_N, DISTRICT, n_linked, n_plate,
+             n_lane, n_conn, n_ix, n_deck, 1 if opts.with_floor else 0, len(LANDMARKS), summary))
 
 
 def main():
-    build()
+    build(parse_args())
     if bpy.app.background:
         kc.save_blend(ROOT, "world_master.blend")
 

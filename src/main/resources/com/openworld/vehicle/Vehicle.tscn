@@ -121,6 +121,7 @@ albedo_color = Color(0.93040425, 0.083007835, 3.85046e-07, 1)
 collision_layer = 16
 collision_mask = 19
 mass = 1200.0
+continuous_cd = true
 physics_material_override = SubResource("PhysicsMaterial_x00le")
 linear_damp_mode = 1
 script = ExtResource("1_v")
@@ -269,7 +270,7 @@ process_material = SubResource("ParticleProcessMaterial_dmgfire")
 draw_pass_1 = SubResource("QuadMesh_dmgfire")
 
 [node name="SpeedFX" type="CanvasLayer" parent="." unique_id=1379134600]
-layer = 5
+layer = -1
 visible = false
 
 [node name="SpeedLines" type="ColorRect" parent="SpeedFX" unique_id=1379134601]

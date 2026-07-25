@@ -21,11 +21,16 @@ import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
+import godot.api.BoxShape3D;
+import godot.api.CollisionObject3D;
+import godot.api.CollisionShape3D;
+import godot.api.ConcavePolygonShape3D;
 import godot.api.InputEvent;
 import godot.api.InputEventKey;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.PackedScene;
+import godot.api.Shape3D;
 import godot.core.Key;
 import godot.core.NodePath;
 import godot.core.StringName;
@@ -53,8 +58,13 @@ import godot.api.OS;
  *       to test escort/squad behaviour against the F10 hostiles.
  * F8  — postDebugGunshot(): drops a "player"-faction GUNSHOT stimulus ~35 m in front of the
  *       player so the zone's "enemy" AI investigate the noise (PLAN.md E2 perception test).
+ * Shift+F9 — dumpCollisionInventory(): prints every CollisionObject3D + CollisionShape3D in the
+ *       tree (path, global pos, layer/mask, shape type/size) — the "what is solid here" answer
+ *       when hunting an unexpected collision layer. Headless: launch with `-- --dump-collision`
+ *       to auto-dump ~3 s after scene ready.
  * F4  — spawnOnAllRoutes(): drops one AI vehicle on every VehicleRoute in the scene (PLAN.md I3) —
  *       the one-keypress test for an authored road layout (e.g. a district piece's seam routes).
+ *       Headless: launch with `-- --spawn-all-routes` to auto-fire it ~3 s after scene ready.
  * Shift+F5 — reloadNearestZone(): hot-reloads the district the player is standing in, bypassing
  *       the resource cache — rebake with tools/build_piece.sh, press, see the change in place
  *       (plain F5 stays bakeWorld).
@@ -105,7 +115,9 @@ public class DebugHarness extends Node {
         if (!(event instanceof InputEventKey iek) || !iek.isPressed() || iek.isEcho()) return;
 
         if (iek.getKeycode() == Key.F9) {
-            if (canSpawnLocally()) startDebugMission();
+            // Shift+F9 = collision inventory dump; plain F9 = debug mission.
+            if (iek.isShiftPressed()) dumpCollisionInventory();
+            else if (canSpawnLocally()) startDebugMission();
         } else if (iek.getKeycode() == Key.F10) {
             // Shift+F10 = motorcycle stub walk-test; plain F10 = enemy AI spawn.
             if (iek.isShiftPressed()) spawnDebugCarrier(
@@ -486,6 +498,13 @@ public class DebugHarness extends Node {
     private int autoWalkIndex = 0;
     /** Accumulator for the 5 s auto-walk progress heartbeat (headless log breadcrumb). */
     private double autoWalkLogTimer = 0.0;
+    /** Countdown to the {@code --dump-collision} auto-dump (0 = inactive). Delayed ~3 s past
+     *  {@code _ready} so AutoLoads + the host scene's own content are fully in-tree. */
+    private double dumpCollisionDelay = 0.0;
+    /** Countdown to the {@code --spawn-all-routes} auto-F4 (0 = inactive). Same ~3 s settle as
+     *  the collision dump so every VehicleRoute has registered before the sweep. */
+    private double spawnRoutesDelay = 0.0;
+
     /** Optional zoneId substring from {@code --auto-walk=<filter>} — the tour starts at the first
      * matching marker (targeted headless verification of one district) instead of index 0. */
     private String autoWalkStartFilter = null;
@@ -503,14 +522,15 @@ public class DebugHarness extends Node {
     @Override
     public void _ready() {
         for (String arg : OS.getCmdlineUserArgs()) {
-            if ("--auto-walk".equals(arg)) { autoWalk = true; break; }
-            if (arg.startsWith("--auto-walk=")) {
+            if ("--auto-walk".equals(arg)) { autoWalk = true; }
+            else if (arg.startsWith("--auto-walk=")) {
                 autoWalk = true;
                 autoWalkStartFilter = arg.substring("--auto-walk=".length());
-                break;
             }
+            else if ("--dump-collision".equals(arg)) { dumpCollisionDelay = 3.0; }
+            else if ("--spawn-all-routes".equals(arg)) { spawnRoutesDelay = 3.0; }
         }
-        setPhysicsProcess(autoWalk);
+        setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0);
         if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order"
                 + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
@@ -518,6 +538,20 @@ public class DebugHarness extends Node {
     @RegisterFunction
     @Override
     public void _physicsProcess(double delta) {
+        if (dumpCollisionDelay > 0.0) {
+            dumpCollisionDelay -= delta;
+            if (dumpCollisionDelay <= 0.0) {
+                dumpCollisionInventory();
+                if (!autoWalk && spawnRoutesDelay <= 0.0) setPhysicsProcess(false);
+            }
+        }
+        if (spawnRoutesDelay > 0.0) {
+            spawnRoutesDelay -= delta;
+            if (spawnRoutesDelay <= 0.0) {
+                if (canSpawnLocally()) spawnOnAllRoutes();
+                if (!autoWalk && dumpCollisionDelay <= 0.0) setPhysicsProcess(false);
+            }
+        }
         if (!autoWalk) return;
         WorldZoneManager mgr = WorldZoneManager.get();
         if (mgr == null) return;
@@ -568,6 +602,47 @@ public class DebugHarness extends Node {
         float y = (float) (tp.getY() + AUTO_WALK_ALTITUDE);
         player.setGlobalPosition(new Vector3((float) (pp.getX() + dx / dist * step), y,
                 (float) (pp.getZ() + dz / dist * step)));
+    }
+
+    /**
+     * Shift+F9 / {@code --dump-collision} — full collision inventory of the live scene tree:
+     * one line per {@link CollisionObject3D} (concrete type, node path, global position,
+     * collision layer/mask) and one per {@link CollisionShape3D} (shape type + size/face count).
+     * The "what is solid here, and on which layer" answer when hunting an unexpected collision
+     * surface — grep the output by position or by name. Diagnostic print volume is the point;
+     * it runs only on explicit request.
+     */
+    private void dumpCollisionInventory() {
+        Node root = getTree() != null ? getTree().getRoot() : null;
+        if (root == null) { GD.print("DebugHarness: no scene tree for collision dump"); return; }
+        int[] counts = new int[2];   // [0] collision objects, [1] shapes
+        GD.print("DebugHarness: ── collision inventory ──");
+        dumpCollisionRecursive(root, counts);
+        GD.print("DebugHarness: ── collision inventory done — " + counts[0]
+                + " collision objects, " + counts[1] + " shapes ──");
+    }
+
+    private void dumpCollisionRecursive(Node node, int[] counts) {
+        if (node instanceof CollisionObject3D co) {
+            counts[0]++;
+            Vector3 pos = co.isInsideTree() ? co.getGlobalPosition() : Vector3.Companion.getZERO();
+            GD.print(String.format("  [%s] %s  pos=(%.1f, %.1f, %.1f)  layer=%d mask=%d",
+                    co.getClass().getSimpleName(), co.getPath().getPath(),
+                    pos.getX(), pos.getY(), pos.getZ(),
+                    co.getCollisionLayer(), co.getCollisionMask()));
+        } else if (node instanceof CollisionShape3D cs) {
+            counts[1]++;
+            Shape3D shape = cs.getShape();
+            String desc = shape == null ? "<no shape>" : shape.getClass().getSimpleName();
+            if (shape instanceof BoxShape3D box) desc += " size=" + box.getSize();
+            else if (shape instanceof ConcavePolygonShape3D poly)
+                desc += " faces=" + (poly.getFaces().getSize() / 3);
+            GD.print("      shape " + cs.getPath().getPath() + " -> " + desc);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            Node child = node.getChild(i);
+            if (child != null) dumpCollisionRecursive(child, counts);
+        }
     }
 
     /**

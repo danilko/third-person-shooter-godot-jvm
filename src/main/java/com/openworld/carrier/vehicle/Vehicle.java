@@ -468,15 +468,9 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         boolean isGrounded = false;
         float speed = (float) getLinearVelocity().length();
         updateBoost(cfg, delta);
-        // Arcade gearbox (GTA/NFS standard): throttle AGAINST the rolling direction is a
-        // brake until near-stopped — S at speed slows the car with brake force instead of
-        // full reverse motor thrust (the old sharp stop that flowed straight into reverse),
-        // and W while backing up brakes before driving off forward.
-        float fwdSpeed = (float) getGlobalBasis().getZ().times(-1).dot(getLinearVelocity());
-        if ((cmd.motor < 0f && fwdSpeed > 1.0f) || (cmd.motor > 0f && fwdSpeed < -1.0f)) {
-            cmd.brake = true;
-            cmd.motor = 0f;
-        }
+        // Throttle against the rolling direction is plain counter-thrust: S at speed
+        // decelerates at full motor force and flows straight into (capped) reverse —
+        // the reverseSpeedFraction ceiling in VehicleWheel is what keeps backing up slow.
         for (VehicleWheel w : wheels) {
             w.applyWheelPhysics((float) delta, (float) getPhysicsProcessDeltaTime(), cmd);
             w.applyWheelSteering((float) delta, cmd.steering, cmd.steerToTarget);

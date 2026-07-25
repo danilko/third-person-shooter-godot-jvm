@@ -37,7 +37,7 @@ st = _street if (_street is not None and _street.library is None) else sc.collec
 
 # --- aerial: top orthographic ---
 acam_d = bpy.data.cameras.new("ACam"); acam_d.type = 'ORTHO'
-acam_d.ortho_scale = span
+acam_d.ortho_scale = span; acam_d.clip_end = 100000.0
 acam = bpy.data.objects.new("ACam", acam_d); st.objects.link(acam)
 acam.location = (cx, cy, 200); acam.rotation_euler = (0, 0, 0)
 sc.camera = acam

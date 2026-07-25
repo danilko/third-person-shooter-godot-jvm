@@ -140,8 +140,27 @@ Then open `districts/District_city_1_1.blend` normally and edit. What you get:
 
 ### Inspecting without editing
 
-- `tools/build_debug_preview.py` — assemble any set of districts (linked, world-positioned) into a
-  throwaway `.blend` you can fly around: 
+- **`world_master.blend` itself now shows the real world.** The master build
+  (`towns/build_world.py`) library-links every **built** district's `STREET`/`MANUAL` into
+  `LAYOUT` as a `Piece_<gx>_<gy>` collection-instance at its true world position — the same
+  live-link mechanism as `link_world.py` below — replacing the old theme-coloured `Plate_*`
+  preview boxes (a plate now appears only as the placeholder for a district not built yet).
+  Opening the master shows the assembled world; edits still always happen in each district's
+  own `.blend` (links are read-only), and `export_world.py` drops `LAYOUT` so none of it ever
+  reaches the baked master — each district streams in on its own at runtime.
+- **`tools/link_world.py` → `world_overview.blend` — the whole world, persistently.** One
+  re-runnable file linking **every built district** (`Piece_<gx>_<gy>` collection-instance
+  empties at their true `district_center` + theme elevation), the master's `MARKERS` (+`ARTDECK`
+  when a `--full` master built one), and every `overlays/Overlay_*.blend`. Regenerate with
+  `blender --background --python tools/link_world.py`; open `world_overview.blend` any time
+  after. Because these are **live library links**: edit + save a district source `.blend`, reopen
+  the overview (or File ▸ External Data ▸ Reload), and the edit is there — no rebuild. Content
+  edits always happen in the district's own file (links are read-only here). **Moving a `Piece_*`
+  empty is visualization-only** — runtime positions come solely from
+  `lib/world_grid.py:district_center` (the single source of truth), and every re-run snaps the
+  empties back.
+- `tools/build_debug_preview.py` — same mechanism for an ad-hoc subset (a specific seam pair)
+  into a throwaway `.blend`: 
   `blender --background --python tools/build_debug_preview.py -- _debug_edge districts/District_city_1_1.blend:1:1 districts/District_resid_0_1.blend:0:1`
 - `tools/render_cluster.py` — same idea as a top-down PNG render.
 - `tools/check_seams.py` — engine-free `.seam.json` cross-check of the generated seam routes.
@@ -236,6 +255,12 @@ The first overlay: `Overlay_RainbowBridge` — the real PLATEAU span (joined to 
 
 ## 7. Roads, lanes, intersections & ambient traffic (the blend road system)
 
+> **Superseded, in progress (2026-07-22):** this generator-driven pipeline is being replaced by a
+> mesh-first kit-piece + hand-authored-centerline pipeline — see `road_blender_godot.md` at the
+> repo root for the plan/phase tracker and `addons/road_kit_authoring/README.md` for the new
+> Blender addon. Existing districts on this system keep working unmigrated; don't extend
+> `road_graph.py` further.
+
 Everything cars do is **generated from centerline curves you draw** — you never place individual
 lane markers, connectors or intersection zones by hand. `lib/road_graph.py` turns centerlines
 into per-lane directional routes, junction turn connectors and intersection markers; the baker
@@ -250,6 +275,9 @@ turns those into runtime `VehicleRoute`/`IntersectionZone` nodes.
    - `lanes` — lanes **per direction** (default 1). `lanes = 2` ⇒ a 4-lane two-way road.
    - `oneway` — bool (default False). A one-way road gets `lanes` forward, none reverse.
    - `class` — `'local'` / `'arterial'` / `'oneway'` (default `'local'`); a road-tier tag.
+   - `median` — physical divider width in metres (float, default 0). Each direction's lane pack
+     shifts outward by `median/2`, clearing a center strip for a median bump mesh (see "Divided
+     roads" below).
 3. **Junction rules (how curves connect):** endpoints within **2 m** of each other cluster into
    one junction node. A **T-junction** = the side street's *endpoint* within 2 m of an *interior
    vertex* of the through road (the through curve is split there automatically — don't split it
@@ -266,6 +294,23 @@ turns those into runtime `VehicleRoute`/`IntersectionZone` nodes.
 6. **First sidecar for a district only:** re-run `tools/build_world.sh` once — the master build
    checks for the sidecar and flips that region marker's `traffic_route` meta from `"art_"`
    (arterials-only) to `"<piece>__"` so ambient traffic actually uses your new internal roads.
+
+**Hand-authored blends (no CONFIG entry — kit demos, fully hand-modeled pieces):** the stem-form
+bake skips the regen, so nothing would turn your curves into lane markers. Run the standalone
+generator instead — it collects the local `road_*` curves, wipes only this piece's old
+`lane_`/`intersection_` markers, regenerates the traffic layer under the piece's route prefix and
+re-saves the sidecar, all in place:
+
+```bash
+# the hand-authored loop
+#   draw/edit road_* curves in the blend, then:
+blender districts/District_X.blend --background --python tools/gen_roads_only.py
+tools/build_piece.sh District_X          # stem form, bake-only
+# SoloPiece walk-test; F4 = a car on every route
+```
+
+(`-- --no-sidecar` skips the sidecar re-save if you're mid-experiment and don't want the JSON
+touched yet.)
 
 ### What gets generated (so you can read the result)
 
@@ -293,11 +338,169 @@ disposable traffic, not persistent agents.
 ### Debugging traffic
 
 - **F4** (DebugHarness) drops one AI car on every `VehicleRoute` in the current scene — works in
-  `SoloPiece.tscn` for a quick check of a district's authored lanes.
+  `SoloPiece.tscn` for a quick check of a district's authored lanes. Headless/scripted: launch
+  with `-- --spawn-all-routes` to auto-fire it ~3 s after scene ready.
 - `WorldZoneManager.debugLog` prints per-zone `N cars, M moving, K routed` — routed-but-0-moving
   = cars falling through missing ground; a steady stream of `route-finished` reclaims away from
   map edges = broken junction wiring (usually a curve end that missed the 2 m snap).
 - `tools/build_debug_preview.py` to eyeball generated lane empties over the road meshes in 3D.
+
+### Where the `lanes` / `oneway` / `class` / `median` properties live (exact spot — easy to get wrong)
+
+They are **Custom Properties on the curve OBJECT**, not on the curve data:
+
+> select the `road_*` curve → Properties editor → **Object tab** (orange square) →
+> **Custom Properties** panel → add `lanes` (integer, e.g. `2`).
+
+`save_roads.py` reads `ob.get("lanes")` — a property added on the **Object Data** (green curve)
+tab is silently ignored and the road stays 1-lane. Curves re-imported into `ROADS_SRC` by a
+rebuild already carry the properties (stamped by `import_roads_src`), so for an *existing* road
+you just change the value; only a *newly drawn* curve needs the property added by hand (missing
+= defaults: `lanes 1`, `oneway False`, `class 'local'`).
+
+Alternatively edit the number **directly in the sidecar JSON** (`"lanes": 2` in
+`districts/<piece>.roads.json`) and rebuild — equivalent, since the sidecar is the source of
+truth. Just don't run `save_roads.py` from a stale `.blend` afterwards (it would overwrite your
+JSON edit); rebuild first, then the re-imported curves carry the new value and the round-trip is
+consistent.
+
+### Worked example: multi-lane + junction demo (District_industry_5_1, 2026-07)
+
+The reference setup for showing multi-lane traffic + junction turn legality, chosen because
+Keihinjima is the only district with a sidecar already wired (master `traffic_route` meta already
+flipped to `District_industry_5_1__`), is flat (bay-island DEM), sparse (16 buildings/450 m —
+clear sightlines to watch cars), and the traffic debug tooling (Shift+F5 hot-reload, F3 route
+overlay, `--auto-walk`) was built around it.
+
+- **The whole change was two sidecar numbers:** `road_spine` (arterial) and `road_north_st`
+  bumped `lanes 1 → 2`. Because `road_north_st`'s endpoint already touches an interior vertex of
+  `road_spine` at (204, 146), the existing T-junction became a multi-lane junction with the
+  keep-left legality rules active (curb lane L+S, median lane R+S) — junctions need **no** setup
+  beyond curve topology + lane counts.
+- Rebuild (`tools/build_piece.sh industry_5_1`) then reported `lanes=16 connectors=10
+  junctions=1` (was 8 all-single-lane lanes), and the bake produced 32 routes + 1
+  `IntersectionZone`. Headless verify (`WorldMasterDebug.tscn -- --auto-walk=industry_5_1`):
+  zone streams in, spawns round-robin across both forward lanes (`…spine_s0_F0` / `…spine_s0_F1`).
+- **Known tweak target:** occasional `fell-out` reclaims — the outer lane sits
+  `(1+0.5)×3.5 = 5.25 m` off the centerline and clips the pavement edge in spots. Fix by nudging
+  the `ROADS_SRC` centerline (or widening ground) in Blender, not by touching generated lanes.
+- **To grow the demo into a crossroads:** draw a 4th `road_*` curve whose endpoint lands within
+  2 m of (204, 146), set its `lanes` custom property (Object tab, see above) to 2 if it should be
+  multi-lane, then `save_roads.py` → `build_piece.sh industry_5_1` → walk-test in
+  `SoloPiece.tscn` (F4 to flood the routes, F3 overlay to see them).
+
+### Adding intersections & ramp-style lane splits (what's manually controllable today)
+
+**An intersection is never placed — it is derived from curve topology.** Any node where ≥2 curve
+arms meet (ends within 2 m, or an end on a through road's interior vertex) automatically gets:
+stop-line trimming on every arm (auto radius = half the widest crossing carriageway + 1 m — only
+code-built graphs like the master backbone can override it via `radius_fn`), the legal turn
+connectors, and one `intersection_` box → a runtime `IntersectionZone` (FCFS single-occupancy:
+first arrival holds the junction, other AI queue behind it; **players never yield**). There is no
+per-junction knob in the sidecar; your levers are topology, `lanes`, and `oneway`.
+
+**The "one lane exits to a ramp while the rest continue" case — supported now, via geometry:**
+
+1. Draw the ramp as its own curve (e.g. `road_ramp_x`), custom props `oneway=True`, `lanes=1`,
+   with its **start point within 2 m of an interior vertex** of the main road — the main road
+   auto-splits into a fork node there.
+2. **Make the ramp's first segment depart at ≥45° to the LEFT** (keep-left: exits are curb-side).
+   The movement then classifies as `L`, and keep-left legality does the split for you: **only the
+   curb lane (lane 0) gets the ramp connector** (`next_routes` = [L→ramp, S→continue], weighted
+   0.2/0.6); every other lane gets only the straight connector and continues. After the ≥45°
+   departure the ramp can curve back to run parallel.
+3. **Pitfall — a shallow gore-style departure (<45°) classifies as `S`**, and the straight
+   lane-clamp (`want = min(in_lane, out_lanes-1)`) then maps *every* main-road lane onto the
+   1-lane ramp as a second "straight" option — all lanes may exit, not just one. Until Phase 3
+   gores exist, always author the exaggerated-angle departure.
+4. Merging back: end the ramp within 2 m of the target road (its end, or an interior vertex).
+   The merge node gets connectors plus its own `IntersectionZone`, so ramp traffic FCFS-yields
+   into the target road — crude but functional.
+
+**Not controllable today (this is exactly R Phase 2/3, PLAN.md):** per-junction traffic share
+("10 % take the ramp" — `TURN_WEIGHTS` in `lib/road_graph.py` is a global 0.6/0.2/0.2 constant),
+suppressing the stop-box/throttle-clamp at a gore (through lanes are always trimmed and AI always
+ease off, so free-flow highway exits aren't possible yet), per-route `speedLimit`, and signal
+timing. Cheapest extension if needed before Phase 3: a per-curve custom prop (e.g.
+`class='ramp'` or a `weight` prop) read at the `TURN_WEIGHTS` lookup in `road_graph.generate()`
+to bias ramp uptake per fork. As always: never hand-edit the generated `MARKERS` lane
+empties/connectors or the baked `.tscn` to "fix" a junction — wiped on every rebuild.
+
+### Divided roads (physical median) & road-kit pieces: one centerline or two?
+
+Two facts drive this decision:
+
+- **A two-way curve's centerline is the paint line between directions** — each direction's lane
+  pack sits keep-left of it at `(i+0.5)×3.5 m`. There is **no median-width parameter**: with a
+  physical median bump, the inner lanes (±1.75 m) would drive through it.
+- **A `oneway` curve is NOT the middle of its carriageway** — keep-left offsets put **all** lanes
+  strictly LEFT of the curve in travel direction (`_lane_offset_from_center` is always negative).
+  A oneway curve is therefore the **median-side edge** of its carriageway. Curve point order =
+  travel direction (flip in Edit Mode → Segments → Switch Direction).
+
+**The three models, and when to use each:**
+
+1. **Undivided road (painted centerline only):** one two-way curve. The current model — junctions
+   just work. Use for everything without a physical divider.
+2. **Divided road via two anti-parallel `oneway` curves** — works today, zero code. Draw both
+   curves hugging the median (one per direction, opposite point order); lanes fan out curb-ward
+   automatically. Junction endings need a decision:
+   - *Pinched* (both carriageway ends within 2 m of the cross street → ONE node): compact
+     junction — but forward/reverse are now **different edges**, so the generator's "no U-turn
+     back onto the same edge" exclusion no longer blocks the cross-median U-turn: U-turn
+     connectors ARE generated, and with near-antiparallel headings their L/R classification is
+     geometry-jitter-dependent. Sometimes wanted (GTA-style median U-turns), otherwise noise.
+   - *Separated* (ends > 2 m apart → two T-nodes on the cross street): the wide-median model —
+     each carriageway crossing is its own `IntersectionZone`, cross traffic clears them one at a
+     time, no U-turn connectors. More nodes, more realistic for wide medians.
+3. **`median` width prop on a single centerline** — **built (2026-07)**: a per-curve `median`
+   custom prop (metres, float, default 0) carried through `save_roads.py` → `from_curves` →
+   `generate()`, shifting each direction's lane pack outward by `median/2` (lane offset formula:
+   `median/2 + (i+0.5)×3.5`; junction stop-line radius grows by `median` too). One curve stays
+   the authoring unit, junction generation and the U-turn exclusion stay sane, turn connectors
+   span the median automatically. **Preferred for a modular road-kit piece with a uniform median
+   bump** — the kit mesh stays symmetric about the single centerline and the prop matches the
+   kit's median width parametrically.
+
+**Recommendation:** for the planned road kit, extend the generator with the `median` prop
+(option 3) and keep one centerline down the middle of the kit piece; reserve dual-oneway
+carriageways (option 2) for where the directions genuinely diverge — elevation splits, highway
+carriageways, ramp gores (Phase 3 territory).
+
+**Kit-piece alignment rules:** the visual road mesh and the traffic curves are **independent
+layers** — nothing in the generator reads the mesh; alignment is pure authoring convention. Size
+the kit piece as `2 × lanes × 3.5 m + median width` so generated lanes land on pavement; give the
+median bump its own `-colonly` proxy (it must block cars); place kit pieces from `MANUAL` via
+`instance_<AssetId>` / `asset_path` markers (§8/§10) and draw the `road_*` centerline down the
+piece's middle.
+
+### Worked example: divided-road demo (District_kitdemo_9_9)
+
+`districts/District_kitdemo_9_9.blend` demos all three models side by side, each crossed by a
+N–S street so junction behaviour is exercised too. It is **fully generated** by
+`tools/build_kitdemo.py` (run `blender --background --python tools/build_kitdemo.py` to
+regenerate from scratch), coordinates `9_9` = off the 6×6 world grid, so it is never referenced
+by a master region marker — walk-test it solo:
+
+```bash
+blender --background --python tools/build_kitdemo.py     # (re)generate blend + markers + sidecar
+tools/build_piece.sh District_kitdemo_9_9                # stem form, bake-only
+# run SoloPiece.tscn, press F4 (or launch with `-- --spawn-all-routes`)
+```
+
+Layout (flat ground slab, top z=0):
+
+| model | curves | where | what to look at |
+|---|---|---|---|
+| 1 plain two-way | `road_plain` lanes=1 | y=+60 | lanes at ±1.75 m of the centerline |
+| 2 dual oneway + bump | `road_dual_e`/`road_dual_w`, oneway, y=±5 | bump at ±1.5 m | each curve is the median-side EDGE of its carriageway (lanes land at y=±6.75); opposite point order = opposite travel; 10 m apart ⇒ the cross street forms **two separate T-nodes** (the "separated" model — no U-turn connectors) |
+| 3 single centerline + `median=3.5` | `road_median` | y=−60, bump −61.5..−58.5 | lanes at ±3.5 m clear the bump; junction stays single-node |
+
+The cross street is drawn as **per-crossing segments** (`road_xa`..`road_xe`) whose endpoints
+land on the through roads' interior vertices — that is the junction contract in practice (a
+plain mid-curve crossing creates NO junction; an endpoint within 2 m of an interior vertex
+splits the through road). Everything is hand-adjustable: tweak curves/props in Blender, then the
+`gen_roads_only.py` → `build_piece.sh` loop above.
 
 ## 8. Placing water & other gameplay objects (in Blender — never edit the baked .tscn)
 
@@ -347,3 +550,41 @@ landmark equivalents (`build_district.place_landmark`). Streetwall/building soli
 districts comes from generated convex collision proxies (`lib/buildings.py`,
 `_building_collision`), not per-visual-mesh collision — keep hand-added buildings on that diet
 too: simple `-colonly` boxes.
+
+## 11. Cross-district GPS & race courses (conventions — design notes, R2 not yet implemented)
+
+The structural fact everything here follows from: **district content streams** (its
+`VehicleRoute`s register/deregister with `WorldZoneManager` on tree enter/exit; anything baked
+into a district `.tscn` vanishes on unload), while the **arterial backbone + ARTDECK collision
+deck + safety floor are always resident** in the master. Cross-district features must lean on the
+always-resident layer or on pure data — never on live nodes inside a district that might not be
+loaded.
+
+### GPS
+
+- **Today (I5, done):** the waypoint is a world-XZ position in `WaypointStore`, drawn by
+  radar-style widgets (minimap blip clamp + crosshair arrow). Nothing is per-district, so it
+  already works across the whole map — straight-line guidance only.
+- **Turn-by-turn upgrade (planned):** do **not** pathfind over live `VehicleRoute` nodes —
+  unloaded districts have none. `lib/road_graph.py` already holds the junction-node/edge graph as
+  engine-free data at build time; bake that into an always-resident manifest resource and A* over
+  it: arterials give the inter-district legs, a district's internal graph refines the first/last
+  mile. Draw the result as a minimap polyline. (PLAN.md I6 note: Blender-authored waypoints ride
+  the same bake path.)
+
+### Race courses (R2 design, PLAN.md)
+
+- **Checkpoints must not stream.** A `race_<id>_<idx>` empty baked inside a district `.tscn`
+  disappears mid-race when that district unloads. A cross-district course therefore lives in an
+  **overlay** (§5 — exactly the "long-span content that must never chop at the 504 m grain" case,
+  same precedent as highway/train), or `RaceDirector` holds checkpoint *positions as data* and
+  spawns the `Area3D`s itself for the race's lifetime.
+- **AI racers survive unloaded districts** because ARTDECK + the safety floor guarantee ground
+  everywhere — an arterial-backbone race works with zero streaming concern. A race line through
+  district *interiors* needs those districts loaded: racers cluster near players so proximity
+  streaming mostly covers it; the safety net is a small `RaceDirector` → `WorldZoneManager`
+  "pin these zones while the race runs" extension.
+- **The AI racing line is the same authored-curve pipeline** — a `VehicleRoute` drawn along the
+  course (in the race overlay for cross-district courses), driven by `VehicleAIController`
+  verbatim. Replication is host-authoritative checkpoint grants over the existing world-event
+  seam.

@@ -1,0 +1,48 @@
+[gd_scene load_steps=8 format=3 uid="uid://bsolointersect0001"]
+
+; Fast INNER-LOOP walk/drive-test host for the intersection-prototype demo piece (mirrors
+; SoloPiece.tscn's shape exactly). Instances the baked District_intersectiondemo.tscn (built by
+; tools/build_intersection_piece.sh from a .glb + .lanekit.json exported straight out of
+; kit/intersection_prototype.blend) + a Player + environment, so you can walk it and (via
+; DebugHarness) spawn AI traffic to watch a car actually turn or go straight depending on which
+; PathLaneRoute it lands on.
+; `tools/build_intersection_piece.sh` rewrites the "piece" ext_resource path below to point at
+; whatever it just baked -- run it again after re-exporting from Blender to refresh this scene.
+; Run: open in editor + F6, or:  <godot-jvm> --path <root> res://…/world/hosts/SoloIntersection.tscn
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/districts/District_intersectiondemo.tscn" id="piece"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/debug/DebugHarness.java" id="dbgh"]
+
+[sub_resource type="ProceduralSkyMaterial" id="skymat"]
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("skymat")
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 3
+tonemap_mode = 2
+glow_enabled = true
+
+[node name="SoloIntersection" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.5, 0.75, -0.43301266, 0, 40, 0)
+light_energy = 1.0
+shadow_enabled = true
+
+[node name="Piece" parent="." instance=ExtResource("piece")]
+
+[node name="WorldSystems" parent="." instance=ExtResource("wsys")]
+
+[node name="DebugHarness" type="Node" parent="."]
+script = ExtResource("dbgh")
+
+[node name="Characters" type="Node" parent="."]
+
+[node name="Player" parent="Characters" instance=ExtResource("player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.1, 2.5)

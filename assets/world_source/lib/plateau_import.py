@@ -118,6 +118,16 @@ class TerrainSampler:
 # taper never moves ground under an imported building -- only the empty strip ramps.
 SEAM_TAPER_MARGIN = 20.0
 
+# Terrain overlap past the district square edge (m). The mesh clip runs at
+# `edge_half + GROUND_OVERLAP` while the seam taper stays anchored at `edge_half`, so the
+# overhang strip is clamped FULLY to the seam target elevation (seam_taper weight = 1 beyond the
+# border) — i.e. adjacent districts' overlap bands meet coplanar at the shared flank height
+# instead of spilling at this district's raw datum (the historical seam-collision bug this
+# module's exact clip originally fixed). Purpose: a physical ground overlap at every seam so
+# nothing slips through a hairline gap (the SafetyFloor's old job — removed in the minimal
+# master build), leaving raw material for hand-smoothing borders (AUTHORING_GUIDE §4).
+GROUND_OVERLAP = 2.0
+
 
 def seam_taper(x, y, z, half, targets, margin=SEAM_TAPER_MARGIN):
     """Blend a final (re-based, local-frame) ground height toward the master's seam elevation
@@ -186,7 +196,10 @@ def import_terrain(coll, triangles, ox, oy, ground_ref, tag="Terrain", edge_half
     if not triangles:
         return None
     if edge_half is not None:
-        triangles = [ct for tri in triangles for ct in _clip_tri_to_square(tri, edge_half)]
+        # Clip at edge_half + GROUND_OVERLAP but taper (below) against edge_half: the extra
+        # strip beyond the border is clamped to the seam target elevation, giving neighbours a
+        # small coplanar physical overlap at every seam (see GROUND_OVERLAP comment).
+        triangles = [ct for tri in triangles for ct in _clip_tri_to_square(tri, edge_half + GROUND_OVERLAP)]
         if not triangles:
             return None
     verts, faces = [], []

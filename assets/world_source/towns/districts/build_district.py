@@ -353,7 +353,10 @@ def add_ground_safety_plane(cfg, coll):
     would poke above it as an invisible hovering floor wherever the real ground dips lower.
     A partial-coverage terrain (e.g. a legacy extraction whose DEM radius stops short of the
     square's corners) still gets the plane, exactly as before."""
-    half = DISTRICT / 2.0
+    # + GROUND_OVERLAP: same seam-overlap contract as the DEM terrain clip (plateau_import) —
+    # adjacent districts' ground physically overlaps a couple of metres so nothing slips through
+    # a hairline seam gap now that the master's SafetyFloor is gone (minimal master build).
+    half = DISTRICT / 2.0 + pi.GROUND_OVERLAP
     elev = elev_at(cfg["gx"], cfg["gy"])
     visual = kc.box(f"{cfg['piece']}_GroundSafety", -half, half, -half, half,
                      elev - 1.0, elev - 0.8, coll, "concrete")
@@ -397,6 +400,7 @@ def import_roads_src(data):
         ob["lanes"] = int(c.get("lanes", 1))
         ob["oneway"] = bool(c.get("oneway", False))
         ob["class"] = c.get("class", "local")
+        ob["median"] = float(c.get("median", 0.0))
         src.objects.link(ob)
     return len(data.get("curves", []))
 
@@ -411,7 +415,7 @@ def emit_authored_roads(data):
         stem = stem[len("road_"):] if stem.startswith("road_") else stem
         curves.append((stem, [tuple(p) for p in c["points"]],
                        {"lanes": c.get("lanes", 1), "oneway": c.get("oneway", False),
-                        "class": c.get("class", "local")}))
+                        "class": c.get("class", "local"), "median": c.get("median", 0.0)}))
     return asm.lay_road_graph(rgm.from_curves(curves), z_off=0.3)
 
 

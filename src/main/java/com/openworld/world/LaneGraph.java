@@ -12,12 +12,15 @@ import java.util.Map;
 /**
  * The connected traffic lane-graph (PLAN.md I3b) — <b>nodes = junctions, edges = lanes</b>.
  *
- * <p>Derived from geometry, not hand-authored: every {@link VehicleRoute} in the active scene is a
- * directional lane; lanes whose endpoints fall within {@link #JUNCTION_RADIUS} of each other share a
- * junction. {@link #successorsOf} then returns the lanes a car may continue onto at the end of a lane
+ * <p>Derived from geometry, not hand-authored: every {@link Lane} in the active scene (a
+ * {@link VehicleRoute} or a {@link PathLaneRoute} — any mix) is a directional lane; lanes whose
+ * endpoints fall within {@link #JUNCTION_RADIUS} of each other share a junction.
+ * {@link #successorsOf} then returns the lanes a car may continue onto at the end of a lane
  * (every outgoing lane at its end-junction, excluding the direct reverse), so a car picks a random turn
- * at each junction with no per-route wiring. This scales to any road network (e.g. I6 Blender-authored
- * lanes) where the lightweight {@code VehicleRoute.nextRoutes} strings would not.
+ * at each junction with no per-route wiring. This scales to any road network — a hand-authored
+ * {@code VehicleRoute} network and a Blender-generated {@code PathLaneRoute} intersection connect
+ * automatically wherever their endpoints coincide, since this pass doesn't care which concrete type
+ * it's looking at.
  *
  * <p>Plain Java helper (like {@code SpawnPool}), not a {@code @RegisterClass} / AutoLoad. Cached per
  * scene via the scene-instance id (mirrors {@code WorldZoneManager.detectSceneReload}); routes are
@@ -36,37 +39,37 @@ public final class LaneGraph {
     private static LaneGraph instance;
 
     private long sceneId = 0;
-    private final Map<VehicleRoute, Integer> startJunction = new HashMap<>();
-    private final Map<VehicleRoute, Integer> endJunction   = new HashMap<>();
-    private final Map<Integer, List<VehicleRoute>> outgoing = new HashMap<>();
+    private final Map<Lane, Integer> startJunction = new HashMap<>();
+    private final Map<Lane, Integer> endJunction   = new HashMap<>();
+    private final Map<Integer, List<Lane>> outgoing = new HashMap<>();
 
     private LaneGraph() {}
 
     /** Lanes a car may continue onto at the end of {@code lane} — outgoing lanes at its end-junction,
      *  minus the direct reverse. Empty when the lane dead-ends (no connected lane). */
-    public static List<VehicleRoute> successorsOf(VehicleRoute lane) {
+    public static List<Lane> successorsOf(Lane lane) {
         LaneGraph g = forScene(lane);
         if (g == null) return new ArrayList<>();
         Integer ej = g.endJunction.get(lane);
         if (ej == null) return new ArrayList<>();
-        VehicleRoute rev = g.reverseInternal(lane);
-        List<VehicleRoute> result = new ArrayList<>();
-        for (VehicleRoute o : g.outgoing.getOrDefault(ej, new ArrayList<>()))
+        Lane rev = g.reverseInternal(lane);
+        List<Lane> result = new ArrayList<>();
+        for (Lane o : g.outgoing.getOrDefault(ej, new ArrayList<>()))
             if (o != lane && o != rev) result.add(o);
         return result;
     }
 
     /** The lane running back the way {@code lane} came (starts at its end-junction, ends at its
      *  start-junction) — the U-turn target. Null when none is authored. */
-    public static VehicleRoute reverseOf(VehicleRoute lane) {
+    public static Lane reverseOf(Lane lane) {
         LaneGraph g = forScene(lane);
         return g == null ? null : g.reverseInternal(lane);
     }
 
-    private VehicleRoute reverseInternal(VehicleRoute lane) {
+    private Lane reverseInternal(Lane lane) {
         Integer sj = startJunction.get(lane), ej = endJunction.get(lane);
         if (sj == null || ej == null) return null;
-        for (VehicleRoute o : outgoing.getOrDefault(ej, new ArrayList<>())) {
+        for (Lane o : outgoing.getOrDefault(ej, new ArrayList<>())) {
             if (o == lane) continue;
             Integer oej = endJunction.get(o);
             if (oej != null && oej.equals(sj)) return o;
@@ -74,8 +77,11 @@ public final class LaneGraph {
         return null;
     }
 
-    private static LaneGraph forScene(Node anyNode) {
-        if (anyNode == null || anyNode.getTree() == null) return null;
+    /** {@code Lane} doesn't extend {@code Node} (it's implemented by two unrelated Node3D
+     *  subclasses), so the scene-tree walk needs a concrete Node to start from — every real
+     *  {@code Lane} implementor is one, so this cast always succeeds in practice. */
+    private static LaneGraph forScene(Lane anyLane) {
+        if (!(anyLane instanceof Node anyNode) || anyNode.getTree() == null) return null;
         Node scene = anyNode.getTree().getCurrentScene();
         if (scene == null) return null;
         long id = scene.getInstanceId();
@@ -89,10 +95,10 @@ public final class LaneGraph {
 
     private void build(Node scene) {
         startJunction.clear(); endJunction.clear(); outgoing.clear();
-        List<VehicleRoute> lanes = new ArrayList<>();
+        List<Lane> lanes = new ArrayList<>();
         collect(scene, lanes);
         List<Vector3> junctions = new ArrayList<>();   // representative position per junction id
-        for (VehicleRoute lane : lanes) {
+        for (Lane lane : lanes) {
             Vector3 sp = lane.startPoint(), ep = lane.endPoint();
             if (sp == null || ep == null) continue;
             int sj = junctionFor(sp, junctions);
@@ -114,8 +120,8 @@ public final class LaneGraph {
         return junctions.size() - 1;
     }
 
-    private static void collect(Node node, List<VehicleRoute> out) {
-        if (node instanceof VehicleRoute r) out.add(r);
+    private static void collect(Node node, List<Lane> out) {
+        if (node instanceof Lane r) out.add(r);
         for (Node c : node.getChildren()) collect(c, out);
     }
 }

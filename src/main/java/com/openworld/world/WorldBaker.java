@@ -8,6 +8,9 @@ import godot.annotation.Tool;
 import godot.api.Area3D;
 import godot.api.BoxShape3D;
 import godot.api.CollisionShape3D;
+import godot.api.Curve3D;
+import godot.api.FileAccess;
+import godot.api.JSON;
 import godot.api.Marker3D;
 import godot.api.Mesh;
 import godot.api.MeshInstance3D;
@@ -16,6 +19,7 @@ import godot.api.MultiMeshInstance3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.PackedScene;
+import godot.api.Path3D;
 import godot.api.ResourceSaver;
 import godot.core.Dictionary;
 import godot.core.Error;
@@ -80,6 +84,17 @@ public class WorldBaker extends Node {
     @Export @RegisterProperty public String kitDir =
             "res://src/main/resources/com/openworld/world/kit/";
 
+    /**
+     * Optional path to a Blender-exported {@code .lanekit.json} sidecar (e.g.
+     * {@code assets/world_source/lib/intersection_kit.py}'s {@code export_json}) — one
+     * {@link PathLaneRoute} is built per entry in its {@code lanes} array, added straight under
+     * the baked scene root. Blank (the default) = skip; this is opt-in per-bake rather than
+     * auto-derived from {@link #sourceScenePath} (unlike {@code resolveGeometryPath}'s sibling-
+     * {@code .scn} preference) since there is currently exactly one real fixture to test against —
+     * auto-derivation is a natural follow-up once this is proven on more than the prototype.
+     */
+    @Export @RegisterProperty public String lanekitPath = "";
+
     @RegisterFunction
     @Override
     public void _ready() {
@@ -92,20 +107,27 @@ public class WorldBaker extends Node {
     /** Bake {@link #sourceScenePath} → {@link #outputScenePath} (callable from a dev key / editor toggle). */
     @RegisterFunction
     public void bake() {
-        bake(this, sourceScenePath, outputScenePath, kitDir);
+        bake(this, sourceScenePath, outputScenePath, kitDir, lanekitPath);
     }
 
-    /** Back-compat 3-arg overload (DebugHarness F5): bake with the default kit directory. */
+    /** Back-compat 3-arg overload (DebugHarness F5): bake with the default kit directory, no lanekit sidecar. */
     public static void bake(Node host, String srcPath, String outPath) {
         bake(host, srcPath, outPath, "res://src/main/resources/com/openworld/world/kit/");
+    }
+
+    /** Back-compat 4-arg overload: bake with no lanekit sidecar. */
+    public static void bake(Node host, String srcPath, String outPath, String kitDir) {
+        bake(host, srcPath, outPath, kitDir, "");
     }
 
     /**
      * Load {@code srcPath}, convert named objects, and save a native scene to {@code outPath}. {@code host}
      * must be in the tree (the source is parented to it so global transforms resolve during conversion).
      * {@code kitDir} resolves {@code instance_<assetId>} markers lacking an {@code asset_path} meta.
+     * {@code lanekitPath} (blank = skip) additionally builds {@link PathLaneRoute}s from a
+     * {@code .lanekit.json} sidecar — see {@link #lanekitPath}.
      */
-    public static void bake(Node host, String srcPath, String outPath, String kitDir) {
+    public static void bake(Node host, String srcPath, String outPath, String kitDir, String lanekitPath) {
         Object loaded = GD.load(srcPath);
         if (!(loaded instanceof PackedScene src)) {
             GD.printErr("WorldBaker: could not load source scene '" + srcPath + "'");
@@ -121,6 +143,9 @@ public class WorldBaker extends Node {
         int[] counts = convert(root, kitDir, instanceRoots);
         stripEagerLodLow(root);
 
+        int pathLaneCount = (lanekitPath != null && !lanekitPath.isBlank())
+                ? loadLaneKitSidecar(root, lanekitPath) : 0;
+
         setOwnerRecursive(root, root, instanceRoots);
         PackedScene packed = new PackedScene();
         Error err = packed.pack(root);
@@ -128,7 +153,8 @@ public class WorldBaker extends Node {
             Error save = ResourceSaver.save(packed, outPath, ResourceSaver.SaverFlags.FLAG_NONE);
             GD.print("WorldBaker: baked '" + srcPath + "' → '" + outPath + "' (" + (save == Error.OK ? "saved" : "save FAILED " + save)
                     + ") — routes=" + counts[0] + " zones=" + counts[1] + " spawns=" + counts[2]
-                    + " water=" + counts[3] + " junctions=" + counts[4] + " instances=" + counts[5]);
+                    + " water=" + counts[3] + " junctions=" + counts[4] + " instances=" + counts[5]
+                    + " pathlanes=" + pathLaneCount);
         } else {
             GD.printErr("WorldBaker: pack() failed: " + err);
         }
@@ -338,6 +364,106 @@ public class WorldBaker extends Node {
             vr.addChild(m);
             m.setGlobalPosition(e.getGlobalPosition());
         }
+    }
+
+    /**
+     * Load a {@code .lanekit.json} sidecar (see {@link #lanekitPath}) and build one
+     * {@link PathLaneRoute} per entry in its {@code lanes} array, each holding a {@code Path3D}
+     * child with a {@code Curve3D} populated straight from the entry's sampled {@code points}
+     * (already exact world-space, from {@code intersection_kit.py}'s corner-fillet math — no
+     * further smoothing needed). {@code arms}/{@code ports} are parsed only to look up each lane's
+     * {@code lane_width} and to validate the file shape; they are not otherwise consumed yet —
+     * they exist for a future cross-piece linker (see road_blender_godot.md). Returns the number
+     * of lanes built (0 on any structural problem, logged via {@code GD.printErr}, never throws —
+     * a malformed/missing sidecar must not abort the rest of the bake).
+     */
+    private static int loadLaneKitSidecar(Node root, String path) {
+        if (!FileAccess.fileExists(path)) {
+            GD.printErr("WorldBaker: lanekitPath set but file not found: '" + path + "'");
+            return 0;
+        }
+        String text = FileAccess.getFileAsString(path);
+        Object parsed = JSON.parseString(text);
+        if (!(parsed instanceof Dictionary<?, ?> dict)) {
+            GD.printErr("WorldBaker: lanekit sidecar '" + path + "' did not parse to a JSON object");
+            return 0;
+        }
+        Object lanesObj = dict.get("lanes");
+        if (!(lanesObj instanceof VariantArray<?> lanesArr)) {
+            GD.printErr("WorldBaker: lanekit sidecar '" + path + "' has no 'lanes' array");
+            return 0;
+        }
+        Map<String, Float> laneWidthByArm = new LinkedHashMap<>();
+        Object armsObj = dict.get("arms");
+        if (armsObj instanceof VariantArray<?> armsArr) {
+            for (Object a : armsArr) {
+                if (a instanceof Dictionary<?, ?> armDict) {
+                    String name = jsonString(armDict, "name", null);
+                    if (name != null) laneWidthByArm.put(name, jsonFloat(armDict, "lane_width", 3.5f));
+                }
+            }
+        }
+
+        int built = 0;
+        for (Object laneObj : lanesArr) {
+            if (laneObj instanceof Dictionary<?, ?> laneDict
+                    && buildPathLaneRoute(root, laneDict, laneWidthByArm) != null) built++;
+        }
+        GD.print("WorldBaker: lanekit sidecar '" + path + "' → " + built + " PathLaneRoute(s)");
+        return built;
+    }
+
+    private static PathLaneRoute buildPathLaneRoute(Node root, Dictionary<?, ?> laneDict,
+                                                       Map<String, Float> laneWidthByArm) {
+        String id = jsonString(laneDict, "id", null);
+        Object pointsObj = laneDict.get("points");
+        if (id == null || !(pointsObj instanceof VariantArray<?> pointsArr) || pointsArr.size() < 2) {
+            GD.printErr("WorldBaker: skipping malformed lanekit lane entry (missing id/points)");
+            return null;
+        }
+        String kind = jsonString(laneDict, "kind", "");
+        String fromArm = jsonString(laneDict, "from_arm", "");
+
+        PathLaneRoute lane = new PathLaneRoute();
+        lane.setName(new StringName(id));
+        lane.loop = jsonBool(laneDict, "loop", false);
+        lane.turn = jsonString(laneDict, "turn", "through".equals(kind) ? "S" : "");
+        lane.approach = fromArm;
+        lane.endBehavior = VehicleRoute.END_CHAIN;   // geometry-derived connectivity (LaneGraph) picks the successor
+        lane.laneWidth = laneWidthByArm.getOrDefault(fromArm, 3.5f);
+
+        Curve3D curve = new Curve3D();
+        for (Object ptObj : pointsArr) {
+            if (!(ptObj instanceof VariantArray<?> pt) || pt.size() < 3) continue;
+            curve.addPoint(new Vector3(((Number) pt.get(0)).doubleValue(),
+                    ((Number) pt.get(1)).doubleValue(), ((Number) pt.get(2)).doubleValue()));
+        }
+        curve.setClosed(lane.loop);
+
+        Path3D path3d = new Path3D();
+        path3d.setName(new StringName("Path3D"));
+        path3d.setCurve(curve);
+        lane.addChild(path3d);   // off-tree -- lane._ready() (fires once root.addChild(lane) below
+                                  // brings the whole subtree live) finds Path3D already populated
+        root.addChild(lane);
+        return lane;
+    }
+
+    private static String jsonString(Dictionary<?, ?> d, String key, String def) {
+        Object v = d.get(key);
+        return present(v) ? v.toString() : def;
+    }
+
+    private static float jsonFloat(Dictionary<?, ?> d, String key, float def) {
+        Object v = d.get(key);
+        if (!present(v)) return def;
+        try { return ((Number) v).floatValue(); } catch (Exception e) { return def; }
+    }
+
+    private static boolean jsonBool(Dictionary<?, ?> d, String key, boolean def) {
+        Object v = d.get(key);
+        if (!present(v)) return def;
+        try { return (Boolean) v; } catch (Exception e) { return def; }
     }
 
     private static WorldZoneMarker buildZone(Node root, Node3D empty) {

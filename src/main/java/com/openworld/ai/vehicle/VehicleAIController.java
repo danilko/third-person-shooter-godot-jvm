@@ -6,6 +6,7 @@ import com.openworld.control.UserCommand;
 import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.util.WeightedPick;
 import com.openworld.world.IntersectionZone;
+import com.openworld.world.Lane;
 import com.openworld.world.LaneGraph;
 import com.openworld.world.VehicleRoute;
 import godot.annotation.Export;
@@ -79,7 +80,7 @@ public class VehicleAIController extends Controller {
     private boolean   resolved = false;
 
     private VehicleAIState currentState;
-    private VehicleRoute   route;
+    private Lane            route;
     private IntersectionZone currentIntersection;   // junction we're inside, if any (I3b right-of-way)
     private boolean finished = false;               // reached a dead-end lane → zone despawns this car
 
@@ -88,15 +89,16 @@ public class VehicleAIController extends Controller {
 
     // ── Configuration (set by the spawner before the first tick) ───────────────
 
-    /** Assign the lane this vehicle follows (resets progress + finished). */
-    public void setRoute(VehicleRoute route) {
+    /** Assign the lane this vehicle follows (resets progress + finished) — a {@link VehicleRoute}
+     *  or a {@link com.openworld.world.PathLaneRoute}. */
+    public void setRoute(Lane route) {
         this.route = route;
         finished = false;
         progressInit = false;
         routeProgress = 0.0;
     }
 
-    public VehicleRoute getRoute() { return route; }
+    public Lane getRoute() { return route; }
 
     /**
      * At a lane end, continue onto a connected lane (the lane's explicit weighted {@code nextRoutes}
@@ -108,9 +110,9 @@ public class VehicleAIController extends Controller {
     public boolean advanceToNextRoute() {
         if (finished || route == null) return false;
 
-        VehicleRoute next = route.pickNextRoute();   // explicit override first
+        Lane next = route.pickNextRoute();   // explicit override first
         if (next == null) {
-            List<VehicleRoute> succ = LaneGraph.successorsOf(route);
+            List<Lane> succ = LaneGraph.successorsOf(route);
             if (!succ.isEmpty()) {
                 double[] out = route.endTangentXZ();
                 float[] w = new float[succ.size()];
@@ -126,8 +128,8 @@ public class VehicleAIController extends Controller {
         }
         if (next != null) { setRoute(next); return true; }
 
-        if (VehicleRoute.END_UTURN.equals(route.endBehavior)) {
-            VehicleRoute back = route.resolveRoute(route.returnRoute);
+        if (VehicleRoute.END_UTURN.equals(route.getEndBehavior())) {
+            Lane back = route.resolveRoute(route.getReturnRoute());
             if (back == null) back = LaneGraph.reverseOf(route);
             if (back != null) { setRoute(back); return true; }
         }
@@ -186,15 +188,17 @@ public class VehicleAIController extends Controller {
 
     /** True while riding a generated turn connector that actually bends (turn L/R, not S). */
     public boolean onTurnConnector() {
-        return route != null && route.turn != null && !route.turn.isEmpty() && !"S".equals(route.turn);
+        String turn = route == null ? null : route.getTurn();
+        return turn != null && !turn.isEmpty() && !"S".equals(turn);
     }
 
     /** True within {@link #junctionSlowdown} of the end of a chained lane (a junction is ahead —
      *  the successor may be a hard turn the curvature probe cannot see yet). */
     public boolean approachingJunction() {
+        String turn = route == null ? null : route.getTurn();
         return route != null && !route.isLoop()
-                && VehicleRoute.END_CHAIN.equals(route.endBehavior)
-                && (route.turn == null || route.turn.isEmpty())
+                && VehicleRoute.END_CHAIN.equals(route.getEndBehavior())
+                && (turn == null || turn.isEmpty())
                 && routeProgress >= route.total() - junctionSlowdown;
     }
 

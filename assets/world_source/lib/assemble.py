@@ -1022,7 +1022,8 @@ def place_manual_slots(grid):
 def add_camera_sun(coll, target, cam_loc, lens=24):
     tgt = bpy.data.objects.new("AIM", None); coll.objects.link(tgt); tgt.location = target
     cam_d = bpy.data.cameras.new("Cam"); cam = bpy.data.objects.new("Cam", cam_d)
-    coll.objects.link(cam); cam_d.lens = lens; cam.location = cam_loc
+    coll.objects.link(cam); cam_d.lens = lens; cam_d.clip_end = kc.VIEW_CLIP_END
+    cam.location = cam_loc
     con = cam.constraints.new("TRACK_TO"); con.target = tgt
     con.track_axis = "TRACK_NEGATIVE_Z"; con.up_axis = "UP_Y"
     bpy.context.scene.camera = cam
