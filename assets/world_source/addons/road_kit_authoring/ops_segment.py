@@ -22,9 +22,9 @@ import math
 import bpy
 
 from . import custom_props, paths
-from .ops_intersection import (CURB_STYLE_ITEMS, PRESET_ITEMS, RkaBuildError, active_marker_position,
-                                build_curb, build_intersection_geometry, clear_generated_mesh_objects,
-                                join_meshes, parent_collection_of)
+from .ops_intersection import (CURB_STYLE_ITEMS, PRESET_ITEMS, TRAFFIC_SIDE_ITEMS, RkaBuildError,
+                                active_marker_position, build_curb, build_intersection_geometry,
+                                clear_generated_mesh_objects, join_meshes, parent_collection_of)
 
 _ik = None
 
@@ -39,7 +39,7 @@ def ik():
 
 def _populate_segment_mesh(context, coll, p0, p1, lane_width, lanes, lanes_backward, curb_style,
                             curb_height, curb_thickness, bend, curve_segments, elevation_delta,
-                            bend_z, join_visual_mesh, z_base):
+                            bend_z, join_visual_mesh, z_base, traffic_side='LEFT'):
     """Build the curb + lane-centerline + ribbon objects for one segment INTO `coll` (already
     created/linked) and return `visual_objs`. Shared by `build_segment_geometry` (fresh build,
     also creates the segend_A/segend_B/segbend marker Empties afterward) and
@@ -49,7 +49,8 @@ def _populate_segment_mesh(context, coll, p0, p1, lane_width, lanes, lanes_backw
     k = ik()
     seg = k.build_straight_segment(p0, p1, lane_width, lanes, segment_id="SEG", bend=bend,
                                     segments=curve_segments, z0=0.0, z1=elevation_delta,
-                                    bend_z=bend_z, lanes_backward=lanes_backward)
+                                    bend_z=bend_z, lanes_backward=lanes_backward,
+                                    traffic_side=traffic_side)
 
     def to3(pt):
         return (pt[0], pt[1], z_base + pt[2])
@@ -89,7 +90,8 @@ def _bend_control_point(k, p0, p1, bend):
 def build_segment_geometry(context, parent_coll, p0_raw, direction_deg, length, lane_width, lanes,
                             curb_style, curb_height, curb_thickness, bend, curve_segments,
                             elevation_delta, bend_z, join_visual_mesh, export_path,
-                            gltf_export_path, base_name="Segment", lanes_backward=None):
+                            gltf_export_path, base_name="Segment", lanes_backward=None,
+                            traffic_side='LEFT'):
     """Pure build logic behind `RKA_OT_build_straight_segment` -- no `bpy.ops` dispatch (see
     module docstring). `p0_raw` is `(x, y, z)` -- `z` is the RAW cursor-equivalent height, before
     `context.scene.rka.lane_surface_z` is added (same convention as
@@ -119,7 +121,8 @@ def build_segment_geometry(context, parent_coll, p0_raw, direction_deg, length, 
 
     visual_objs = _populate_segment_mesh(
         context, coll, p0, p1, lane_width, lanes, lanes_backward, curb_style, curb_height,
-        curb_thickness, bend, curve_segments, elevation_delta, bend_z, join_visual_mesh, z)
+        curb_thickness, bend, curve_segments, elevation_delta, bend_z, join_visual_mesh, z,
+        traffic_side)
 
     # Marker Empties -- the live-edit "drag to reshape" handles (see live_edit.py): segend_A/B sit
     # at the two endpoints (drag = change length/direction/elevation), segbend sits at the current
@@ -147,6 +150,7 @@ def build_segment_geometry(context, parent_coll, p0_raw, direction_deg, length, 
         lane_width=lane_width, lanes=lanes, lanes_backward=lanes_backward, curb_style=curb_style,
         curb_height=curb_height, curb_thickness=curb_thickness,
         bend=bend, curve_segments=curve_segments, elevation_delta=elevation_delta, bend_z=bend_z,
+        traffic_side=traffic_side,
         # Full 3D points (raw cursor Z, matching RKA_OT_build_intersection's rka_origin
         # convention) -- lets RKA_OT_insert_intersection_on_segment reconstruct this segment
         # exactly (including its elevation at either end) without re-deriving anything.
@@ -160,7 +164,7 @@ def build_segment_geometry(context, parent_coll, p0_raw, direction_deg, length, 
                 bpy.path.abspath(export_path), p0, p1,
                 lane_width=lane_width, lanes=lanes, segment_id=coll.name, z=z, bend=bend,
                 segments=curve_segments, z0=0.0, z1=elevation_delta, bend_z=bend_z,
-                lanes_backward=lanes_backward)
+                lanes_backward=lanes_backward, traffic_side=traffic_side)
             export_note += ", json -> '%s'" % export_path
         except OSError as exc:
             warnings.append("Built geometry OK, but json export failed: %s" % exc)
@@ -226,11 +230,12 @@ def rebuild_segment_in_place(context, coll):
     curb_thickness = coll.get("rka_curb_thickness", 0.25)
     curve_segments = coll.get("rka_curve_segments", 8)
     join_visual_mesh = any(o.name.startswith("mesh_") for o in coll.objects)
+    traffic_side = coll.get("rka_traffic_side", "LEFT")
 
     clear_generated_mesh_objects(coll)
     _populate_segment_mesh(context, coll, p0, p1, lane_width, lanes, lanes_backward, curb_style,
                             curb_height, curb_thickness, bend, curve_segments, elevation_delta,
-                            bend_z, join_visual_mesh, z_base)
+                            bend_z, join_visual_mesh, z_base, traffic_side)
 
     if bend_obj is not None:
         control = _bend_control_point(k, p0, p1, bend)
@@ -246,12 +251,17 @@ def rebuild_segment_in_place(context, coll):
 
 
 class RKA_OT_build_straight_segment(bpy.types.Operator):
-    """Build one straight (or gently curved/sloped) two-way road segment (curb walls + a
-    lanecl_* centerline and visual asphalt ribbon per lane, both directions) from the 3D cursor,
-    `length` meters along `direction_deg`. Purely additive: creates a new collection, never
-    touches an existing piece. Position the cursor at an existing intersection's port (see its
-    printed port positions, or `lib/intersection_kit.py`'s build_ports) to connect them --
-    LaneGraph does the rest at bake time via proximity, no explicit stitching needed here.
+    """Build one straight (or gently curved/sloped) two-way road segment from the 3D cursor,
+    `length` meters along `direction_deg` -- CURVE-BACKED BY DEFAULT: the segment's pavement lives
+    on a live, editable spine Curve object (`kit_common.road_spine`, GN_RoadProfile attached
+    directly), so extending or reshaping the road afterward is just entering Edit Mode on that
+    spine and adding/dragging control points -- no separate "from curve" step needed (see
+    `RKA_OT_build_segment_from_curve`, which now just seeds a fresh spine from an externally
+    authored curve's sampled points and otherwise shares this exact code path,
+    `_build_segment_from_points`). Purely additive: creates a new collection, never touches an
+    existing piece. Position the cursor at an existing intersection's port (see its printed port
+    positions, or `lib/intersection_kit.py`'s build_ports) to connect them -- LaneGraph does the
+    rest at bake time via proximity, no explicit stitching needed here.
 
     With 'Auto-Advance Cursor' on (default), the 3D cursor moves to this segment's end point
     after building -- so pressing this operator again continues the road from where the last one
@@ -276,10 +286,18 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
         name="Lanes Backward", default=1, min=0, max=3,
         description="Lane count in the B->A direction. 0 makes this a ONE-WAY road (e.g. "
                      "Lanes Forward=1, Lanes Backward=0 = a one-way single-lane road)")
-    curb_style: bpy.props.EnumProperty(
-        name="Curb Style", items=CURB_STYLE_ITEMS, default='BOX',
-        description="BOX = plain flat wall. GUTTER = stepped curb-and-gutter profile matching "
-                     "the real kit_side_straight_city_gutter_curb_w0p6m_l5m piece's silhouette")
+    curb_l_style: bpy.props.EnumProperty(
+        name="Curb Style (Left)", items=CURB_STYLE_ITEMS, default='BOX',
+        description="BOX = plain flat wall. GUTTER = stepped curb-and-gutter profile. NONE = no "
+                     "curb at all on this side (e.g. a rural shoulder or a merge zone)")
+    curb_r_style: bpy.props.EnumProperty(
+        name="Curb Style (Right)", items=CURB_STYLE_ITEMS, default='BOX',
+        description="Independent of the left side -- e.g. a curb on the sidewalk side and NONE "
+                     "on a shoulder/merge side")
+    traffic_side: bpy.props.EnumProperty(
+        name="Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT',
+        description="Which physical lateral half of this segment carries Lanes Forward vs. "
+                     "Lanes Backward. Must match every intersection/transition it connects to")
     curb_height: bpy.props.FloatProperty(name="Curb Height", default=0.15, min=0.01, unit='LENGTH')
     curb_thickness: bpy.props.FloatProperty(
         name="Curb Thickness", description="BOX style: wall thickness. GUTTER style: total "
@@ -288,7 +306,9 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
     bend: bpy.props.FloatProperty(
         name="Bend", description="Lateral offset (m) of a control point at the segment's "
         "midpoint -- 0 (default) is dead straight; nonzero gently curves the road via a "
-        "quadratic bezier (positive = bends left of travel)", default=0.0)
+        "quadratic bezier (positive = bends left of travel). Only shapes the INITIAL spine -- "
+        "add more control points afterward (Edit Mode on the spine object) for anything beyond "
+        "one bump", default=0.0)
     curve_segments: bpy.props.IntProperty(
         name="Curve Segments", description="Polyline segments when Bend/Vertical Bend != 0 "
         "(ignored when both are 0)", default=8, min=2, max=32)
@@ -302,7 +322,7 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
         unit='LENGTH')
     join_visual_mesh: bpy.props.BoolProperty(
         name="Join Into One Mesh", default=False,
-        description="Combine the two curb walls + every lane ribbon into a single mesh object "
+        description="Combine the spine's pavement + curb wall(s) into a single mesh object "
                      "after building")
     auto_advance_cursor: bpy.props.BoolProperty(
         name="Auto-Advance Cursor", default=True,
@@ -314,8 +334,8 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
         "(lib/intersection_kit.py's export_segment_json) here after building. Blank = skip",
         default="", subtype='FILE_PATH')
     gltf_export_path: bpy.props.StringProperty(
-        name="Export .glb", description="Optional: export the built visual geometry (curb walls "
-        "+ driving-surface ribbons -- not the lanecl_* data curves) to a .glb here. Blank = skip",
+        name="Export .glb", description="Optional: export the built visual geometry (spine "
+        "pavement + curb wall(s) -- not the lanecl_* data curves) to a .glb here. Blank = skip",
         default="", subtype='FILE_PATH')
 
     def execute(self, context):
@@ -334,24 +354,34 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
             cx, cy, cz_raw = cursor.x, cursor.y, cursor.z
             parent_coll = context.view_layer.active_layer_collection.collection
 
-        result = build_segment_geometry(
-            context, parent_coll, (cx, cy, cz_raw), self.direction_deg, self.length,
-            self.lane_width, self.lanes, self.curb_style, self.curb_height, self.curb_thickness,
-            self.bend, self.curve_segments, self.elevation_delta, self.bend_z,
+        rka = context.scene.rka
+        z = cz_raw + rka.lane_surface_z
+        k = ik()
+        p0 = (cx, cy)
+        rad = math.radians(self.direction_deg)
+        p1 = (cx + self.length * math.cos(rad), cy + self.length * math.sin(rad))
+        pts = k.segment_spine_3d(p0, p1, self.bend, self.curve_segments, 0.0,
+                                  self.elevation_delta, self.bend_z)
+        pts = [(x, y, z + zr) for (x, y, zr) in pts]
+
+        result = _build_segment_from_points(
+            context, parent_coll, pts, self.lane_width, self.lanes, self.lanes_backward,
+            self.curb_l_style, self.curb_r_style, self.curb_height, self.curb_thickness,
             self.join_visual_mesh, self.export_path, self.gltf_export_path,
-            lanes_backward=self.lanes_backward)
+            traffic_side=self.traffic_side)
 
         for w in result["warnings"]:
             self.report({'WARNING'}, w)
 
         if self.auto_advance_cursor:
-            context.scene.cursor.location = (result["p1"][0], result["p1"][1], result["end_z_raw"])
+            end = result["pts"][-1]
+            context.scene.cursor.location = (end[0], end[1], end[2] - rka.lane_surface_z)
 
         for o in context.selected_objects:
             o.select_set(False)
         self.report(
             {'INFO'},
-            "Built '%s': %d lane(s) forward, %d backward, %.1fm long%s"
+            "Built '%s': %d lane(s) forward, %d backward, %.1fm long, curve-backed%s"
             % (result["coll"].name, self.lanes, self.lanes_backward, self.length,
                result["export_note"]))
         return {'FINISHED'}
@@ -380,7 +410,10 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
     (`RKA_OT_build_intersection`'s `rka_arm_names`/`rka_arm_angles`/`rka_arm_lanes`/`rka_origin`/
     `rka_tail_length` custom properties), so the new segment's own lane offsets land exactly on
     that arm's ports (both are built the same "centerline + symmetric offset" way), not just
-    within `LaneGraph`'s proximity tolerance.
+    within `LaneGraph`'s proximity tolerance. Curve-backed via `_build_segment_from_points` --
+    the exact same GN pipeline `RKA_OT_build_straight_segment` uses, so an extended segment looks
+    and behaves identically to one built directly (previously this used the older ribbon-based
+    `build_segment_geometry`, which visibly differed from a fresh 'Build Straight Segment').
 
     Either select/activate the intersection's collection in the Outliner first, OR click one of
     its 'arm_*' marker Empties in the viewport (its name auto-fills 'Arm' below) -- poll fails if
@@ -402,12 +435,13 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
     bend_z: bpy.props.FloatProperty(
         name="Vertical Bend", default=0.0, unit='LENGTH',
         description="Crest/dip bump (m) at the segment's midpoint")
-    curb_style: bpy.props.EnumProperty(name="Curb Style", items=CURB_STYLE_ITEMS, default='BOX')
+    curb_l_style: bpy.props.EnumProperty(name="Curb Style (Left)", items=CURB_STYLE_ITEMS, default='BOX')
+    curb_r_style: bpy.props.EnumProperty(name="Curb Style (Right)", items=CURB_STYLE_ITEMS, default='BOX')
     curb_height: bpy.props.FloatProperty(name="Curb Height", default=0.15, min=0.01, unit='LENGTH')
     curb_thickness: bpy.props.FloatProperty(name="Curb Thickness", default=0.25, min=0.01, unit='LENGTH')
     join_visual_mesh: bpy.props.BoolProperty(
         name="Join Into One Mesh", default=False,
-        description="Combine the two curb walls + every lane ribbon into a single mesh object "
+        description="Combine the spine's pavement + curb wall(s) into a single mesh object "
                      "after building")
     export_path: bpy.props.StringProperty(
         name="Export .lanekit.json", default="", subtype='FILE_PATH')
@@ -429,6 +463,7 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
         origin = custom_props.read_origin(coll)
         tail_length = coll.get("rka_tail_length", 12.0)
         lane_width = coll.get("rka_lane_width", 5.0)
+        traffic_side = coll.get("rka_traffic_side", "LEFT")
         if arms is None or origin is None:
             self.report({'ERROR'}, "'%s' has no stored arm data -- was it built by 'Build "
                                     "Intersection'?" % coll.name)
@@ -438,17 +473,22 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
             self.report({'ERROR'}, "Arm '%s' not found in '%s' (arms: %s)" %
                          (arm_name, coll.name, ", ".join(a[0] for a in arms)))
             return {'CANCELLED'}
-        _, angle_deg, arm_lanes = match
+        _, angle_deg, arm_lanes, arm_lanes_out = match
 
         # If the arm is one-way (RKA_OT_set_arm_oneway), the extended segment matches its
         # direction automatically: an 'IN'-only arm (only ever RECEIVES traffic, i.e. cars travel
         # TOWARD the junction along it) means 0 lanes LEAVING the junction (forward, A->B, since
         # `angle_deg` points outward/away from the junction) and `arm_lanes` lanes arriving
         # (backward, B->A); 'OUT'-only is the mirror. A plain (both-ways) arm stays symmetric --
-        # the historical behavior.
+        # the historical behavior. ASYMMETRIC WIDENING (`RKA_OT_adjust_arm_lanes_out`): the
+        # forward (departing/CCW, A->B) count uses `arm_lanes_out` when it's a nonzero override,
+        # else falls back to the symmetric `arm_lanes` -- so an extended segment continues an
+        # asymmetric arm with the SAME asymmetric lane counts on each side, not silently
+        # re-symmetrizing it.
         arm_obj = next((o for o in coll.objects if o.get("rka_arm_name") == arm_name), None)
         arm_oneway = (arm_obj.get("rka_arm_oneway", "") or None) if arm_obj is not None else None
-        lanes_forward = 0 if arm_oneway == 'IN' else arm_lanes
+        forward_lanes = arm_lanes_out if arm_lanes_out > 0 else arm_lanes
+        lanes_forward = 0 if arm_oneway == 'IN' else forward_lanes
         lanes_backward = 0 if arm_oneway == 'OUT' else arm_lanes
 
         rad = math.radians(angle_deg)
@@ -456,15 +496,28 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
         px = ox + tail_length * math.cos(rad)
         py = oy + tail_length * math.sin(rad)
 
-        result = build_segment_geometry(
-            context, parent_collection_of(coll), (px, py, oz), angle_deg, self.length, lane_width,
-            lanes_forward, self.curb_style, self.curb_height, self.curb_thickness, self.bend,
-            self.curve_segments, self.elevation_delta, self.bend_z, self.join_visual_mesh,
-            self.export_path, self.gltf_export_path, lanes_backward=lanes_backward)
+        rka = context.scene.rka
+        z = oz + rka.lane_surface_z
+        p0 = (px, py)
+        p1 = (px + self.length * math.cos(rad), py + self.length * math.sin(rad))
+        k = ik()
+        pts = k.segment_spine_3d(p0, p1, self.bend, self.curve_segments, 0.0,
+                                  self.elevation_delta, self.bend_z)
+        pts = [(x, y, z + zr) for (x, y, zr) in pts]
+
+        try:
+            result = _build_segment_from_points(
+                context, parent_collection_of(coll), pts, lane_width, lanes_forward,
+                lanes_backward, self.curb_l_style, self.curb_r_style, self.curb_height,
+                self.curb_thickness, self.join_visual_mesh, self.export_path,
+                self.gltf_export_path, traffic_side=traffic_side)
+        except RkaBuildError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
 
         for w in result["warnings"]:
             self.report({'WARNING'}, w)
-        self.report({'INFO'}, "Extended '%s' arm '%s' by %.1fm%s" %
+        self.report({'INFO'}, "Extended '%s' arm '%s' by %.1fm, curve-backed%s" %
                      (coll.name, arm_name, self.length, result["export_note"]))
         return {'FINISHED'}
 
@@ -525,6 +578,7 @@ class RKA_OT_insert_intersection_on_segment(bpy.types.Operator):
         curb_style = coll.get("rka_curb_style", 'BOX')
         curb_height = coll.get("rka_curb_height", 0.15)
         curb_thickness = coll.get("rka_curb_thickness", 0.25)
+        traffic_side = coll.get("rka_traffic_side", "LEFT")
         x0, y0, z0r = p0[0], p0[1], p0[2]
         x1, y1, z1r = p1[0], p1[1], p1[2]
 
@@ -562,7 +616,7 @@ class RKA_OT_insert_intersection_on_segment(bpy.types.Operator):
                 context, parent, (split_x, split_y, split_zr), self.preset, dir_deg,
                 self.side_angle, "", lane_width, lanes, [0, 0, 0, 0], self.kerb_radius,
                 self.tail_length, 8, curb_style, curb_height, curb_thickness, None,
-                self.join_visual_mesh, "", "")
+                self.join_visual_mesh, "", "", traffic_side)
         except RkaBuildError as exc:
             self.report({'ERROR'}, "Failed to build the replacement intersection: %s" % exc)
             return {'CANCELLED'}
@@ -575,14 +629,14 @@ class RKA_OT_insert_intersection_on_segment(bpy.types.Operator):
         backward_arm = _closest_arm(new_arms, dir_deg + 180.0)[0]
 
         def extend(arm_name, length):
-            _, angle_deg, arm_lanes = next(a for a in new_arms if a[0] == arm_name)
+            _, angle_deg, arm_lanes, _lanes_out = next(a for a in new_arms if a[0] == arm_name)
             rad = math.radians(angle_deg)
             px = split_x + self.tail_length * math.cos(rad)
             py = split_y + self.tail_length * math.sin(rad)
             r = build_segment_geometry(
                 context, parent, (px, py, split_zr), angle_deg, length, lane_width, arm_lanes,
                 curb_style, curb_height, curb_thickness, 0.0, 8, 0.0, 0.0,
-                self.join_visual_mesh, "", "")
+                self.join_visual_mesh, "", "", traffic_side=traffic_side)
             for w in r["warnings"]:
                 self.report({'WARNING'}, w)
 
@@ -627,6 +681,10 @@ class RKA_OT_adjust_segment_lanes(bpy.types.Operator):
             coll = obj.users_collection[0]
         else:
             coll = context.view_layer.active_layer_collection.collection
+        if "rka_lanes_a" in coll.keys():
+            self.report({'ERROR'}, "'%s' is a lane-transition piece -- adjust 'Lanes A'/'Lanes B' "
+                                    "via its Custom Properties panel instead" % coll.name)
+            return {'CANCELLED'}
         key = "rka_lanes_backward" if self.backward else "rka_lanes"
         other_key = "rka_lanes" if self.backward else "rka_lanes_backward"
         new_val = max(0, min(3, int(coll.get(key, 1)) + self.delta))
@@ -636,33 +694,64 @@ class RKA_OT_adjust_segment_lanes(bpy.types.Operator):
                                     "lane somewhere")
             return {'CANCELLED'}
         coll[key] = new_val
-        rebuild_segment_in_place(context, coll)
+        if "rka_curve_object" in coll.keys():
+            # Curve-backed (RKA_OT_build_straight_segment/build_segment_from_curve/extend_from_arm)
+            # -- the pavement's own width comes from the spine's per-point Radius, which a plain
+            # lane-count change never touches on its own (unlike an intersection arm's curb, whose
+            # geometry is re-derived from lanes every rebuild); refresh it here before rebuilding
+            # curb/lanecl_*, else the curb/lane data would show the new count while the pavement
+            # sweep silently kept the OLD width.
+            spine_name = coll.get("rka_curve_object")
+            spine_obj = bpy.data.objects.get(spine_name)
+            if spine_obj is not None and spine_obj.type == 'CURVE':
+                lane_width = coll.get("rka_lane_width", 5.0)
+                fwd = coll.get("rka_lanes", 1) if self.backward else new_val
+                bwd = new_val if self.backward else coll.get("rka_lanes_backward", 1)
+                half_w = max(fwd, bwd) * lane_width
+                for pt in spine_obj.data.splines[0].points:
+                    pt.radius = max(half_w, 1e-3)
+            rebuild_segment_gn_in_place(context, coll)
+        else:
+            rebuild_segment_in_place(context, coll)
         self.report({'INFO'}, "'%s' %s lanes -> %d" %
                      (coll.name, "backward" if self.backward else "forward", new_val))
         return {'FINISHED'}
 
 
-def _populate_segment_mesh_from_spine(context, coll, spine, lane_width, lanes, lanes_backward,
-                                       curb_style, curb_height, curb_thickness, join_visual_mesh):
-    """Like `_populate_segment_mesh`, but for an ARBITRARY 3D spine (already ABSOLUTE world
-    coordinates, e.g. sampled from a hand-authored Curve object) instead of the p0/p1/bend
-    parametric model -- shared by `RKA_OT_build_segment_from_curve` and
-    `rebuild_segment_from_curve_in_place`."""
+def _populate_segment_mesh_gn(context, coll, spine_obj, lane_width, lanes, lanes_backward,
+                               curb_l_style, curb_r_style, curb_height, curb_thickness,
+                               join_visual_mesh, traffic_side='LEFT'):
+    """Curb + lanecl_* objects for a segment whose PAVEMENT already lives on `spine_obj` itself
+    (a live `GN_RoadProfile` modifier -- see `kit_common.road_spine`). Curbs are
+    `paths.kc.curb_loop(closed=False)` (GN, correctly mitered even on a multi-point bent spine)
+    from the SAME tangent-offset points `intersection_kit.build_segment_from_spine` already
+    computes for its `curbs` field (radius 0 everywhere -- an open curb line has no corners to
+    fillet). `lanecl_*` data curves are unchanged. Independent `curb_l_style`/`curb_r_style`
+    (either may be 'NONE'). Returns `visual_objs` INCLUDING `spine_obj` itself, so join/export
+    naturally pick up the pavement mesh too. Does NOT touch/recreate `spine_obj` -- its own
+    control points are the live-edited source of truth (see `rebuild_segment_gn_in_place`)."""
     k = ik()
-    seg = k.build_segment_from_spine(spine, lane_width, lanes, lanes_backward, segment_id="SEG")
+    spine = _spine_control_points(spine_obj)
+    seg = k.build_segment_from_spine(spine, lane_width, lanes, lanes_backward, segment_id="SEG",
+                                      traffic_side=traffic_side)
 
-    visual_objs = []
-    for side, curb_pts in zip(("L", "R"), seg["curbs"]):
-        visual_objs.append(build_curb(
-            "curb_%s" % side, curb_pts, coll, curb_style, curb_height, curb_thickness))
+    visual_objs = [spine_obj]
+    left_pts, right_pts = seg["curbs"]
+    left = paths.kc.curb_loop(
+        "curb_%s_L" % coll.name, [(p[0], p[1], p[2], 0.0) for p in left_pts], coll,
+        curb_style=curb_l_style, curb_height=curb_height, curb_thickness=curb_thickness,
+        closed=False)
+    right = paths.kc.curb_loop(
+        "curb_%s_R" % coll.name, [(p[0], p[1], p[2], 0.0) for p in right_pts], coll,
+        curb_style=curb_r_style, curb_height=curb_height, curb_thickness=curb_thickness,
+        closed=False)
+    visual_objs += [o for o in (left, right) if o is not None]
 
     for m in seg["lanes"]:
         tag = "%s%s_L%d" % (m["from"], m["to"], m["lane_in"])
         paths.kc.poly_curve(
             "lanecl_%s" % tag, m["points"], coll, loop=False,
             lane_width=lane_width, oneway=True, end_behavior='CHAIN')
-        visual_objs.append(paths.kc.flat_ribbon(
-            "ribbon_%s" % tag, m["points"], lane_width / 2.0, coll, matkey="asphalt"))
 
     if join_visual_mesh and visual_objs:
         joined = join_meshes(context, visual_objs, "mesh_%s" % coll.name)
@@ -671,14 +760,81 @@ def _populate_segment_mesh_from_spine(context, coll, spine, lane_width, lanes, l
     return visual_objs
 
 
+def _build_segment_from_points(context, parent_coll, pts, lane_width, lanes, lanes_backward,
+                                curb_l_style, curb_r_style, curb_height, curb_thickness,
+                                join_visual_mesh, export_path, gltf_export_path,
+                                base_name="Segment", traffic_side='LEFT'):
+    """Shared core behind BOTH `RKA_OT_build_straight_segment` (`pts` from p0/p1/bend, via
+    `intersection_kit.segment_spine_3d`) and `RKA_OT_build_segment_from_curve` (`pts` sampled ONCE
+    from an externally authored curve, to seed this new self-contained spine) -- a NEW collection
+    with a live GN-backed spine (`kit_common.road_spine`) through `pts`, plus curb/lanecl_*
+    (`_populate_segment_mesh_gn`). One code path for both operators, so they can never drift
+    apart. `pts` are already-absolute `(x, y, z)` world points (>= 2). `lanes`/`lanes_backward` --
+    see `intersection_kit.build_segment_from_spine` -- may not both be 0."""
+    if lanes <= 0 and lanes_backward <= 0:
+        raise RkaBuildError("a segment needs at least one lane in SOME direction "
+                             "(lanes=%d, lanes_backward=%d)" % (lanes, lanes_backward))
+    half_w = max(lanes, lanes_backward) * lane_width
+
+    n = 1
+    while base_name + ("_%03d" % n) in bpy.data.collections:
+        n += 1
+    coll = bpy.data.collections.new(base_name + ("_%03d" % n))
+    parent_coll.children.link(coll)
+
+    spine_obj = paths.kc.road_spine("spine_%s" % coll.name, pts, coll, half_w, matkey="asphalt")
+
+    visual_objs = _populate_segment_mesh_gn(
+        context, coll, spine_obj, lane_width, lanes, lanes_backward, curb_l_style, curb_r_style,
+        curb_height, curb_thickness, join_visual_mesh, traffic_side)
+
+    # rka_p0/p1 (first/last point) are an approximation for anything downstream expecting the old
+    # 2-point model (e.g. RKA_OT_insert_intersection_on_segment) -- accurate for a straight/gently
+    # bent segment, an approximation (ignores intermediate points) for a heavily curved one; that
+    # operator's own straight-line splice logic was never curve-aware in the first place.
+    custom_props.write_build_settings(
+        coll, lane_width=lane_width, lanes=lanes, lanes_backward=lanes_backward,
+        curb_l_style=curb_l_style, curb_r_style=curb_r_style, curb_height=curb_height,
+        curb_thickness=curb_thickness, curve_object=spine_obj.name, traffic_side=traffic_side,
+        p0=list(pts[0]), p1=list(pts[-1]))
+
+    warnings = []
+    export_note = ""
+    if export_path:
+        try:
+            ik().export_segment_from_spine_json(
+                bpy.path.abspath(export_path), pts, lane_width, lanes, lanes_backward,
+                segment_id=coll.name, traffic_side=traffic_side)
+            export_note += ", json -> '%s'" % export_path
+        except OSError as exc:
+            warnings.append("Built geometry OK, but json export failed: %s" % exc)
+    if gltf_export_path:
+        try:
+            paths.kc.export_gltf(visual_objs, bpy.path.abspath(gltf_export_path))
+            export_note += ", glb -> '%s'" % gltf_export_path
+        except Exception as exc:   # noqa: BLE001 -- bpy.ops export can raise a variety of types
+            warnings.append("Built geometry OK, but glTF export failed: %s" % exc)
+
+    return {"coll": coll, "pts": pts, "spine_obj": spine_obj, "visual_objs": visual_objs,
+            "export_note": export_note, "warnings": warnings}
+
+
 def _sample_curve_world_points(context, curve_obj):
     """Evaluate `curve_obj` (a Curve object, any spline type -- Bezier/NURBS/Poly) through the
-    depsgraph (respecting handles/resolution/modifiers) and return its points as a WORLD-SPACE
-    list of `(x, y, z)` tuples, in spline order. Uses the standard 'evaluated-object to_mesh()'
-    technique (no `bpy.ops`, no temporary scene objects) -- for a plain curve with no bevel/
-    extrude this produces the same edge-strip vertex order as Blender's own Convert To Mesh.
+    depsgraph (respecting handles/resolution) and return its points as a WORLD-SPACE list of
+    `(x, y, z)` tuples, in spline order. Uses the standard 'evaluated-object to_mesh()' technique
+    (no `bpy.ops`, no temporary scene objects) -- for a plain curve with no bevel/extrude/GN
+    modifier this produces the same edge-strip vertex order as Blender's own Convert To Mesh.
     Assumes a single, non-cyclic spline (the expected shape for an authored road path) -- a
-    multi-spline or cyclic curve isn't specifically rejected, just not a case this addon models."""
+    multi-spline or cyclic curve isn't specifically rejected, just not a case this addon models.
+
+    ONLY for an EXTERNALLY-authored curve with no mesh-producing modifier of its own (e.g. the
+    curve `RKA_OT_build_segment_from_curve` samples ONCE to seed a new spine) -- do NOT call this
+    on one of THIS addon's own `spine_*` objects: those carry a live `GN_RoadProfile` modifier, and
+    `to_mesh()`'s depsgraph evaluation returns that modifier's SWEPT PAVEMENT MESH (a handful of
+    offset quad-strip vertices), not the clean centerline the curb/lane math needs -- use
+    `_spine_control_points` for that instead (verified via headless inspection: a 2-point spine
+    with the Road modifier attached evaluates to 8 mesh vertices, not 2 points)."""
     depsgraph = context.evaluated_depsgraph_get()
     eval_obj = curve_obj.evaluated_get(depsgraph)
     mesh = eval_obj.to_mesh()
@@ -686,6 +842,19 @@ def _sample_curve_world_points(context, curve_obj):
     pts = [tuple(mat @ v.co) for v in mesh.vertices]
     eval_obj.to_mesh_clear()
     return pts
+
+
+def _spine_control_points(spine_obj):
+    """The RAW control points of `spine_obj`'s first spline (world-space `(x, y, z)` tuples, in
+    order) -- read directly off the curve data, NO depsgraph/modifier evaluation. This is what
+    every rebuild of THIS addon's own `spine_*` objects must use instead of
+    `_sample_curve_world_points` (see that function's docstring for why: `to_mesh()` on a
+    GN_RoadProfile-modified object returns the swept pavement mesh, not a centerline). Since
+    `kit_common.road_spine` always builds a POLY spline (straight between consecutive control
+    points, no resolution subdivision), the raw points ARE exactly the live-edited path -- editing
+    them in Edit Mode is editing this exact list, so no resampling technique is needed at all."""
+    mat = spine_obj.matrix_world
+    return [tuple(mat @ pt.co.to_3d()) for pt in spine_obj.data.splines[0].points]
 
 
 def _resolve_curve_object(context, name):
@@ -699,15 +868,16 @@ def _resolve_curve_object(context, name):
 
 
 class RKA_OT_build_segment_from_curve(bpy.types.Operator):
-    """Build a road segment whose path follows a hand-authored Blender Curve object EXACTLY (its
-    evaluated points, respecting Bezier handles/resolution) instead of the straight+Bend/Vertical
-    Bend parametric model -- the "author the path with a real Curve" workflow: draw/edit the
-    curve's control points in Edit Mode (add as many as you like, reshape freely, raise/lower
-    individual points for a genuine multi-point slope, not just one bump) and re-run this operator
-    (or just drag a point -- see `rebuild_segment_from_curve_in_place` / live_edit.py) to
-    regenerate the road from it. The curve stays in the scene as the source of truth; this
-    operator's output (curb/lane objects) is fully regenerated each run, same as every other build
-    operator here.
+    """Build a road segment whose INITIAL path follows a hand-authored Blender Curve object
+    exactly (its evaluated points, respecting Bezier handles/resolution) -- the "author the path
+    with a real Curve first" workflow. This samples that curve ONCE to seed a NEW, self-contained
+    spine (`_build_segment_from_points`, the exact same shared core `RKA_OT_build_straight_segment`
+    uses) living inside this operator's own generated collection; from then on THAT new spine, not
+    the original curve you selected, is the live source of truth -- edit its control points
+    (Edit Mode, add as many as you like, reshape freely, raise/lower for a genuine multi-point
+    slope) and the road updates live with no rebuild step for the pavement at all (see
+    `kit_common.road_spine`). The originally-selected curve is left untouched and no longer
+    referenced afterward -- this is a one-time seed, not an ongoing link.
 
     Select the curve (or set 'Curve' by name) first -- poll fails otherwise."""
     bl_idname = "rka.build_segment_from_curve"
@@ -726,7 +896,9 @@ class RKA_OT_build_segment_from_curve(bpy.types.Operator):
         name="Lanes Backward", default=1, min=0, max=3,
         description="Lane count against the curve's direction (end -> start). 0 makes this a "
                      "ONE-WAY road")
-    curb_style: bpy.props.EnumProperty(name="Curb Style", items=CURB_STYLE_ITEMS, default='BOX')
+    curb_l_style: bpy.props.EnumProperty(name="Curb Style (Left)", items=CURB_STYLE_ITEMS, default='BOX')
+    curb_r_style: bpy.props.EnumProperty(name="Curb Style (Right)", items=CURB_STYLE_ITEMS, default='BOX')
+    traffic_side: bpy.props.EnumProperty(name="Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT')
     curb_height: bpy.props.FloatProperty(name="Curb Height", default=0.15, min=0.01, unit='LENGTH')
     curb_thickness: bpy.props.FloatProperty(name="Curb Thickness", default=0.25, min=0.01, unit='LENGTH')
     join_visual_mesh: bpy.props.BoolProperty(name="Join Into One Mesh", default=False)
@@ -738,10 +910,6 @@ class RKA_OT_build_segment_from_curve(bpy.types.Operator):
         return _resolve_curve_object(context, "") is not None
 
     def execute(self, context):
-        if self.lanes == 0 and self.lanes_backward == 0:
-            self.report({'ERROR'}, "Lanes Forward and Lanes Backward can't both be 0 -- a road "
-                                    "needs at least one lane somewhere")
-            return {'CANCELLED'}
         curve_obj = _resolve_curve_object(context, self.curve_object)
         if curve_obj is None:
             self.report({'ERROR'}, "Select a Curve object, or set 'Curve' to one by name")
@@ -754,80 +922,275 @@ class RKA_OT_build_segment_from_curve(bpy.types.Operator):
         parent_coll = (parent_collection_of(curve_obj.users_collection[0])
                         if curve_obj.users_collection
                         else context.view_layer.active_layer_collection.collection)
-        n = 1
-        while ("SegmentCurve_%03d" % n) in bpy.data.collections:
-            n += 1
-        coll = bpy.data.collections.new("SegmentCurve_%03d" % n)
-        parent_coll.children.link(coll)
 
-        visual_objs = _populate_segment_mesh_from_spine(
-            context, coll, spine, self.lane_width, self.lanes, self.lanes_backward,
-            self.curb_style, self.curb_height, self.curb_thickness, self.join_visual_mesh)
+        try:
+            result = _build_segment_from_points(
+                context, parent_coll, spine, self.lane_width, self.lanes, self.lanes_backward,
+                self.curb_l_style, self.curb_r_style, self.curb_height, self.curb_thickness,
+                self.join_visual_mesh, self.export_path, "", base_name="SegmentCurve",
+                traffic_side=self.traffic_side)
+        except RkaBuildError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
 
-        # A reference back to the driving curve, so live-editing ITS control points can rebuild
-        # this segment too (rebuild_segment_from_curve_in_place, watched by live_edit.py).
-        driver = bpy.data.objects.new("segcurve_driver", None)
-        driver.empty_display_type = 'PLAIN_AXES'
-        driver.empty_display_size = 0.5
-        driver.location = spine[0]
-        driver["rka_curve_driver"] = curve_obj.name
-        coll.objects.link(driver)
-
-        custom_props.write_build_settings(
-            coll, lane_width=self.lane_width, lanes=self.lanes, lanes_backward=self.lanes_backward,
-            curb_style=self.curb_style, curb_height=self.curb_height,
-            curb_thickness=self.curb_thickness, curve_object=curve_obj.name)
-
-        export_note = ""
-        if self.export_path:
-            try:
-                ik().export_segment_from_spine_json(
-                    bpy.path.abspath(self.export_path), spine, self.lane_width, self.lanes,
-                    self.lanes_backward, segment_id=coll.name)
-                export_note = ", json -> '%s'" % self.export_path
-            except OSError as exc:
-                self.report({'WARNING'}, "Built geometry OK, but json export failed: %s" % exc)
-
+        for w in result["warnings"]:
+            self.report({'WARNING'}, w)
         for o in context.selected_objects:
             o.select_set(False)
         self.report({'INFO'}, "Built '%s' from curve '%s': %d point(s)%s" %
-                     (coll.name, curve_obj.name, len(spine), export_note))
+                     (result["coll"].name, curve_obj.name, len(spine), result["export_note"]))
         return {'FINISHED'}
 
 
-def rebuild_segment_from_curve_in_place(context, coll):
-    """Live-editing counterpart to `RKA_OT_build_segment_from_curve`: re-samples the driving
-    curve's CURRENT evaluated points (`segcurve_driver`'s `rka_curve_driver` name) and rebuilds in
-    place. Triggered by `live_edit.py` whenever that curve's geometry (editing control points) or
-    transform (moving/rotating the whole curve object) changes. A no-op if the driver marker or
-    the curve it references is missing/deleted, or the curve currently evaluates to under 2
-    points."""
-    driver = next((o for o in coll.objects if "rka_curve_driver" in o.keys()), None)
-    if driver is None:
+def rebuild_segment_gn_in_place(context, coll):
+    """Live-editing counterpart to `_build_segment_from_points`: finds this segment's own spine
+    object (`rka_curve_object`, living INSIDE `coll` -- not an external reference) and re-derives
+    curb/lanecl_* from its CURRENT evaluated points. Triggered by `live_edit.py` whenever that
+    curve's geometry (editing/adding control points) or transform changes -- the exact same
+    `is_updated_geometry` watch that already drove the old external-curve-driver design, now
+    pointed at the segment's own self-contained spine instead.
+
+    Deliberately does NOT delete/recreate the spine object itself (unlike every other rebuild in
+    this addon) -- its own control points ARE the live-edited state; `GN_RoadProfile` already
+    tracks them automatically with zero Python involvement, so touching the spine here would be
+    both unnecessary and wasteful. Only curb_*/lanecl_* (genuinely-separate offset objects) are
+    cleared and regenerated. A no-op if the spine reference is missing/deleted or currently
+    evaluates to under 2 points (e.g. all points briefly deleted mid-edit)."""
+    spine_name = coll.get("rka_curve_object")
+    if not spine_name:
         return
-    curve_obj = bpy.data.objects.get(driver["rka_curve_driver"])
-    if curve_obj is None or curve_obj.type != 'CURVE':
+    spine_obj = bpy.data.objects.get(spine_name)
+    if spine_obj is None or spine_obj.type != 'CURVE':
         return
-    spine = _sample_curve_world_points(context, curve_obj)
+    spine = _spine_control_points(spine_obj)
     if len(spine) < 2:
         return
 
     lane_width = coll.get("rka_lane_width", 5.0)
     lanes = coll.get("rka_lanes", 1)
     lanes_backward = coll.get("rka_lanes_backward", lanes)
-    curb_style = coll.get("rka_curb_style", 'BOX')
+    curb_l_style = coll.get("rka_curb_l_style", coll.get("rka_curb_style", 'BOX'))
+    curb_r_style = coll.get("rka_curb_r_style", coll.get("rka_curb_style", 'BOX'))
     curb_height = coll.get("rka_curb_height", 0.15)
     curb_thickness = coll.get("rka_curb_thickness", 0.25)
     join_visual_mesh = any(o.name.startswith("mesh_") for o in coll.objects)
+    traffic_side = coll.get("rka_traffic_side", "LEFT")
 
     clear_generated_mesh_objects(coll)
-    _populate_segment_mesh_from_spine(context, coll, spine, lane_width, lanes, lanes_backward,
-                                       curb_style, curb_height, curb_thickness, join_visual_mesh)
-    driver.location = spine[0]
+    _populate_segment_mesh_gn(context, coll, spine_obj, lane_width, lanes, lanes_backward,
+                               curb_l_style, curb_r_style, curb_height, curb_thickness,
+                               join_visual_mesh, traffic_side)
+    coll["rka_p0"] = list(spine[0])
+    coll["rka_p1"] = list(spine[-1])
+
+
+# Back-compat alias -- live_edit.py and any external caller referencing the pre-GN name.
+rebuild_segment_from_curve_in_place = rebuild_segment_gn_in_place
+
+
+def _populate_transition_visuals(context, coll, spine_obj, seg, lane_width, curb_l_style,
+                                  curb_r_style, curb_height, curb_thickness, join_visual_mesh):
+    """Curb + lanecl_* objects for a lane-count transition piece, from an already-computed
+    `intersection_kit.build_lane_transition` result `seg` -- shared by
+    `RKA_OT_build_lane_transition` and `rebuild_lane_transition_in_place` so they can't drift
+    apart, same reasoning as every other paired build/rebuild function in this addon."""
+    visual_objs = [spine_obj]
+    left_pts, right_pts = seg["curbs"]
+    left = paths.kc.curb_loop(
+        "curb_%s_L" % coll.name, [(p[0], p[1], p[2], 0.0) for p in left_pts], coll,
+        curb_style=curb_l_style, curb_height=curb_height, curb_thickness=curb_thickness,
+        closed=False)
+    right = paths.kc.curb_loop(
+        "curb_%s_R" % coll.name, [(p[0], p[1], p[2], 0.0) for p in right_pts], coll,
+        curb_style=curb_r_style, curb_height=curb_height, curb_thickness=curb_thickness,
+        closed=False)
+    visual_objs += [o for o in (left, right) if o is not None]
+
+    for m in seg["lanes"]:
+        lane_tag = ("L%d" % m["lane_in"] if m["lane_in"] == m["lane_out"]
+                    else "L%dto%d" % (m["lane_in"], m["lane_out"]))
+        tag = "%s%s_%s" % (m["from"], m["to"], lane_tag)
+        paths.kc.poly_curve("lanecl_%s" % tag, m["points"], coll, loop=False,
+                             lane_width=lane_width, oneway=True, end_behavior='CHAIN')
+
+    if join_visual_mesh and visual_objs:
+        joined = join_meshes(context, visual_objs, "mesh_%s" % coll.name)
+        visual_objs = [joined] if joined else visual_objs
+    return visual_objs
+
+
+class RKA_OT_build_lane_transition(bpy.types.Operator):
+    """Build a lane-COUNT transition (a merge/drop, or the reverse -- a split/add) between p0
+    (`Lanes A` forward/backward) and p1 (`Lanes B`) -- the piece connecting a wide road to a
+    narrower one (or a narrow one to a wider intersection arm), e.g. a 2-lane street narrowing
+    into a 1-lane side street. Straight only (no bend) for now -- see
+    `intersection_kit.build_lane_transition`'s docstring for how a curved/sloped transition could
+    reuse the same per-lane-pair offset math against a custom spine later.
+
+    The pavement is a single `GN_RoadProfile` sweep with a LINEARLY TAPERING per-point Radius
+    (`kit_common.road_spine` already supports a per-point radius list -- no new GN work needed for
+    the taper itself); curbs are `curb_loop(closed=False)` from the SAME tangent-offset points
+    `build_lane_transition` computes, so they narrow/widen exactly in step with the pavement.
+    `Align` -- 'right' (default, a real lane-drop: the curb-side lane(s) continue straight, excess
+    inner lane(s) taper into them) or 'left' (mirror)."""
+    bl_idname = "rka.build_lane_transition"
+    bl_label = "Build Lane Transition"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    direction_deg: bpy.props.FloatProperty(
+        name="Direction", description="Degrees from world +X the transition runs, starting at "
+        "the 3D cursor", default=0.0, min=-360.0, max=360.0)
+    length: bpy.props.FloatProperty(name="Length", default=20.0, min=1.0, unit='LENGTH')
+    lane_width: bpy.props.FloatProperty(name="Lane Width", default=5.0, min=0.5, unit='LENGTH')
+    lanes_a: bpy.props.IntProperty(name="Lanes Forward (Start)", default=2, min=1, max=3)
+    lanes_b: bpy.props.IntProperty(name="Lanes Forward (End)", default=1, min=1, max=3)
+    lanes_backward_a: bpy.props.IntProperty(
+        name="Lanes Backward (Start)", default=0, min=0, max=3,
+        description="0 = symmetric with Lanes Forward (Start)")
+    lanes_backward_b: bpy.props.IntProperty(
+        name="Lanes Backward (End)", default=0, min=0, max=3,
+        description="0 = symmetric with Lanes Forward (End)")
+    align: bpy.props.EnumProperty(
+        name="Align", items=(
+            ('right', "Right (curb-side continues)", "The outer/curb-side lane(s) run straight "
+             "through; the inner lane(s) taper into them -- a real lane-drop"),
+            ('left', "Left (median-side continues)", "Mirror of Right -- inner lane(s) stay put, "
+             "outer lane(s) taper inward"),
+        ), default='right')
+    curb_l_style: bpy.props.EnumProperty(name="Curb Style (Left)", items=CURB_STYLE_ITEMS, default='BOX')
+    curb_r_style: bpy.props.EnumProperty(name="Curb Style (Right)", items=CURB_STYLE_ITEMS, default='BOX')
+    traffic_side: bpy.props.EnumProperty(name="Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT')
+    curb_height: bpy.props.FloatProperty(name="Curb Height", default=0.15, min=0.01, unit='LENGTH')
+    curb_thickness: bpy.props.FloatProperty(name="Curb Thickness", default=0.25, min=0.01, unit='LENGTH')
+    join_visual_mesh: bpy.props.BoolProperty(name="Join Into One Mesh", default=False)
+    export_path: bpy.props.StringProperty(
+        name="Export .lanekit.json", default="", subtype='FILE_PATH')
+
+    def execute(self, context):
+        marker = active_marker_position(context)
+        if marker is not None:
+            (cx, cy), cz_raw, parent_coll = marker
+        else:
+            cursor = context.scene.cursor.location
+            cx, cy, cz_raw = cursor.x, cursor.y, cursor.z
+            parent_coll = context.view_layer.active_layer_collection.collection
+
+        rka = context.scene.rka
+        z = cz_raw + rka.lane_surface_z
+        rad = math.radians(self.direction_deg)
+        p0 = (cx, cy, z)
+        p1 = (cx + self.length * math.cos(rad), cy + self.length * math.sin(rad), z)
+        lanes_backward_a = self.lanes_backward_a or None
+        lanes_backward_b = self.lanes_backward_b or None
+
+        k = ik()
+        try:
+            seg = k.build_lane_transition(p0, p1, self.lane_width, self.lanes_a, self.lanes_b,
+                                           lanes_backward_a, lanes_backward_b, self.align,
+                                           segment_id="TR", traffic_side=self.traffic_side)
+        except ValueError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
+        n = 1
+        while ("Transition_%03d" % n) in bpy.data.collections:
+            n += 1
+        coll = bpy.data.collections.new("Transition_%03d" % n)
+        parent_coll.children.link(coll)
+
+        half_w_a = max(self.lanes_a, lanes_backward_a or self.lanes_a) * self.lane_width
+        half_w_b = max(self.lanes_b, lanes_backward_b or self.lanes_b) * self.lane_width
+        spine_obj = paths.kc.road_spine("spine_%s" % coll.name, [p0, p1], coll,
+                                         [half_w_a, half_w_b], matkey="asphalt")
+
+        visual_objs = _populate_transition_visuals(
+            context, coll, spine_obj, seg, self.lane_width, self.curb_l_style, self.curb_r_style,
+            self.curb_height, self.curb_thickness, self.join_visual_mesh)
+
+        custom_props.write_build_settings(
+            coll, lane_width=self.lane_width, lanes_a=self.lanes_a, lanes_b=self.lanes_b,
+            lanes_backward_a=self.lanes_backward_a, lanes_backward_b=self.lanes_backward_b,
+            align=self.align, curb_l_style=self.curb_l_style, curb_r_style=self.curb_r_style,
+            traffic_side=self.traffic_side,
+            curb_height=self.curb_height, curb_thickness=self.curb_thickness,
+            curve_object=spine_obj.name, p0=list(p0), p1=list(p1))
+
+        export_note = ""
+        if self.export_path:
+            try:
+                ik().export_lane_transition_json(
+                    bpy.path.abspath(self.export_path), p0, p1, self.lane_width, self.lanes_a,
+                    self.lanes_b, lanes_backward_a, lanes_backward_b, self.align,
+                    segment_id=coll.name, traffic_side=self.traffic_side)
+                export_note = ", json -> '%s'" % self.export_path
+            except OSError as exc:
+                self.report({'WARNING'}, "Built geometry OK, but json export failed: %s" % exc)
+
+        for o in context.selected_objects:
+            o.select_set(False)
+        self.report({'INFO'}, "Built '%s': %d->%d lanes forward over %.1fm (align=%s)%s" %
+                     (coll.name, self.lanes_a, self.lanes_b, self.length, self.align, export_note))
+        return {'FINISHED'}
+
+
+def rebuild_lane_transition_in_place(context, coll):
+    """Live-editing counterpart to `RKA_OT_build_lane_transition`: re-derives p0/p1 from the
+    piece's own spine object's CURRENT first/last evaluated points, re-applies the (stored, not
+    user-draggable) per-end taper radii, and rebuilds curb/lanecl_* in place -- same 'don't
+    delete/recreate the spine itself' rule as `rebuild_segment_gn_in_place`, except this piece
+    uses `build_lane_transition`'s tapering lane math instead of the plain
+    `build_segment_from_spine` (a transition's two ends have DIFFERENT lane counts by definition).
+    Routed here instead of `rebuild_segment_gn_in_place` by `live_edit.py` checking for
+    `rka_lanes_a` (a transition-only collection key -- plain segments use singular `rka_lanes`).
+    A no-op if the spine reference is missing/deleted or evaluates to under 2 points."""
+    spine_name = coll.get("rka_curve_object")
+    if not spine_name:
+        return
+    spine_obj = bpy.data.objects.get(spine_name)
+    if spine_obj is None or spine_obj.type != 'CURVE':
+        return
+    spine = _spine_control_points(spine_obj)
+    if len(spine) < 2:
+        return
+    p0, p1 = spine[0], spine[-1]
+
+    lane_width = coll.get("rka_lane_width", 5.0)
+    lanes_a = coll.get("rka_lanes_a", 2)
+    lanes_b = coll.get("rka_lanes_b", 1)
+    lanes_backward_a = coll.get("rka_lanes_backward_a", 0) or None
+    lanes_backward_b = coll.get("rka_lanes_backward_b", 0) or None
+    align = coll.get("rka_align", 'right')
+    curb_l_style = coll.get("rka_curb_l_style", 'BOX')
+    curb_r_style = coll.get("rka_curb_r_style", 'BOX')
+    curb_height = coll.get("rka_curb_height", 0.15)
+    curb_thickness = coll.get("rka_curb_thickness", 0.25)
+    join_visual_mesh = any(o.name.startswith("mesh_") for o in coll.objects)
+    traffic_side = coll.get("rka_traffic_side", "LEFT")
+
+    k = ik()
+    try:
+        seg = k.build_lane_transition(p0, p1, lane_width, lanes_a, lanes_b, lanes_backward_a,
+                                       lanes_backward_b, align, segment_id="TR",
+                                       traffic_side=traffic_side)
+    except ValueError:
+        return
+
+    half_w_a = max(lanes_a, lanes_backward_a or lanes_a) * lane_width
+    half_w_b = max(lanes_b, lanes_backward_b or lanes_b) * lane_width
+    sp = spine_obj.data.splines[0]
+    for i, w in enumerate((half_w_a, half_w_b)):
+        if i < len(sp.points):
+            sp.points[i].radius = max(w, 1e-3)
+
+    clear_generated_mesh_objects(coll)
+    _populate_transition_visuals(context, coll, spine_obj, seg, lane_width, curb_l_style,
+                                  curb_r_style, curb_height, curb_thickness, join_visual_mesh)
+    coll["rka_p0"] = list(p0)
+    coll["rka_p1"] = list(p1)
 
 
 CLASSES = (RKA_OT_build_straight_segment, RKA_OT_extend_from_arm, RKA_OT_insert_intersection_on_segment,
-           RKA_OT_adjust_segment_lanes, RKA_OT_build_segment_from_curve)
+           RKA_OT_adjust_segment_lanes, RKA_OT_build_segment_from_curve, RKA_OT_build_lane_transition)
 
 
 def register():

@@ -82,16 +82,31 @@ def parse_lane_map(text):
     return result
 
 
+TRAFFIC_SIDE_ITEMS = (
+    ('LEFT', "Keep Left (e.g. Japan)", "Arriving/departing lanes occupy the physical lateral "
+     "half this module has always used by default -- keep-left driving convention"),
+    ('RIGHT', "Keep Right (e.g. US)", "Mirrors which physical lateral half of every arm/segment "
+     "is arriving vs. departing -- keep-right driving convention. Must match whatever any "
+     "connected piece was built with, or lanes won't line up at the seam"),
+)
+
+
 CURB_STYLE_ITEMS = (
     ('BOX', "Box (plain wall)", "A flat rectangular wall, the original/default style"),
     ('GUTTER', "City Gutter", "Stepped curb-and-gutter profile -- see kit_common.gutter_curb_profile"),
+    ('NONE', "None (no curb)", "No curb geometry at all for this piece/side -- e.g. a rural "
+     "shoulder, a merge zone, or a transition into open pavement with no curb wall"),
 )
 
 
 def build_curb(name, pts3, coll, style, height, thickness):
-    """Dispatch on `curb_style`: 'BOX' -> the original flat `swept_wall`; 'GUTTER' -> a
-    curb-and-gutter cross-section (`swept_profile` + `gutter_curb_profile`) swept along the same
-    exact points. Shared by `build_intersection_geometry` and `ops_segment.build_segment_geometry`."""
+    """Dispatch on `curb_style`: 'NONE' -> no geometry at all (returns None, caller must skip it);
+    'BOX' -> the original flat `swept_wall`; 'GUTTER' -> a curb-and-gutter cross-section
+    (`swept_profile` + `gutter_curb_profile`) swept along the same exact points. Shared by
+    `ops_segment.build_segment_geometry` (intersections build curbs via `kit_common.curb_loop`
+    instead -- see `_populate_intersection_mesh`)."""
+    if style == 'NONE':
+        return None
     if style == 'GUTTER':
         return paths.kc.swept_profile(
             name, pts3, paths.kc.gutter_curb_profile(thickness, height), coll, matkey="concrete")
@@ -100,19 +115,39 @@ def build_curb(name, pts3, coll, style, height, thickness):
 
 
 def join_meshes(context, objs, name):
-    """Join a list of freshly-created, already-linked-into-the-view-layer mesh Objects into ONE
-    mesh Object -- the "let the intersection mesh be one mesh" request: separate curb/ribbon
-    pieces are convenient to generate (and independently colour/debug during authoring), but a
-    single combined mesh is what actually gets handed to Godot/an artist for export. A 0- or
-    1-object list is a no-op (just a rename, so callers can unconditionally use the returned
-    object's name)."""
+    """Join a list of freshly-created, already-linked-into-the-view-layer Objects into ONE mesh
+    Object -- the "let the intersection mesh be one mesh" request: separate curb/pad/ribbon pieces
+    are convenient to generate (and independently colour/debug during authoring), but a single
+    combined mesh is what actually gets handed to Godot/an artist for export. A 0- or 1-object list
+    is a no-op (just a rename, so callers can unconditionally use the returned object's name).
+
+    Any non-Mesh object (e.g. `kit_common.junction_pad`/`curb_loop`'s Curve objects, whose actual
+    visible geometry comes from a live Nodes modifier) is converted to a real Mesh datablock first
+    (`bpy.ops.object.convert`, which bakes the modifier's evaluated output and removes it) --
+    `bpy.ops.object.join()` itself can't combine mixed Curve/Mesh types, and joining a Curve
+    object's own un-evaluated control points (instead of its GN-modifier mesh output) would silently
+    join the wrong geometry."""
     if not objs:
         return None
     if len(objs) == 1:
-        objs[0].name = name
-        return objs[0]
+        obj = objs[0]
+        if obj.type != 'MESH':
+            for o in context.selected_objects:
+                o.select_set(False)
+            obj.select_set(True)
+            context.view_layer.objects.active = obj
+            bpy.ops.object.convert(target='MESH')
+            obj.select_set(False)
+        obj.name = name
+        return obj
     for o in context.selected_objects:
         o.select_set(False)
+    for o in objs:
+        if o.type != 'MESH':
+            o.select_set(True)
+            context.view_layer.objects.active = o
+            bpy.ops.object.convert(target='MESH')
+            o.select_set(False)
     for o in objs:
         o.select_set(True)
     context.view_layer.objects.active = objs[0]
@@ -124,11 +159,11 @@ def join_meshes(context, objs, name):
 
 
 def clear_generated_mesh_objects(coll):
-    """Remove every curb_*/lanecl_*/ribbon_*/mesh_* object (+ its now-orphaned mesh/curve data)
-    from `coll`, leaving marker Empties (arm_*/segend_*/segbend_*) untouched. The "delete the old
-    generated geometry, keep the live-edit drag handles" step shared by both in-place rebuild
+    """Remove every curb_*/pad_*/lanecl_*/ribbon_*/mesh_* object (+ its now-orphaned mesh/curve
+    data) from `coll`, leaving marker Empties (arm_*/segend_*/segbend_*) untouched. The "delete the
+    old generated geometry, keep the live-edit drag handles" step shared by both in-place rebuild
     paths (`rebuild_intersection_in_place`, `ops_segment.rebuild_segment_in_place`)."""
-    prefixes = ("curb_", "lanecl_", "ribbon_", "mesh_")
+    prefixes = ("curb_", "pad_", "lanecl_", "ribbon_", "mesh_")
     for obj in list(coll.objects):
         if not obj.name.startswith(prefixes):
             continue
@@ -205,33 +240,71 @@ def _arm_lane_list(lanes, lane_arm_overrides, n):
 def _populate_intersection_mesh(context, coll, arms, kerb_radius, tail_length, segments,
                                  lane_width, curb_style, curb_height, curb_thickness, lane_map,
                                  join_visual_mesh, origin_xy, z):
-    """Build the curb + lane-centerline + ribbon objects for one intersection INTO `coll` (already
-    created/linked) and return `(corners, movements, visual_objs)`. Shared by
+    """Build the pad + curb + lane-centerline objects for one intersection INTO `coll` (already
+    created/linked) and return `(boundary, movements, visual_objs)`. Shared by
     `build_intersection_geometry` (fresh build, also creates the arm_* marker Empties afterward)
     and `rebuild_intersection_in_place` (live-edit rebuild, keeps the existing markers) so the two
-    paths can never drift apart -- exactly the same geometry math either way."""
+    paths can never drift apart -- exactly the same geometry math either way.
+
+    Visual pavement is ONE `kit_common.junction_pad` (GN-backed, Fillet Curve + Fill Curve) from
+    `intersection_kit.build_junction_boundary` (the FULL closed footprint, arm tail-caps included)
+    -- purely a function of arm angles/widths, never of which lane movements happen to exist,
+    which is what fixes the old "widen an arm -> curb moves but pavement has a gap" bug (the pad
+    used to be the union of thin per-movement ribbons, capped at `min(a.lanes, b.lanes)` between
+    arm pairs). Curb is ONE `kit_common.curb_loop(closed=False)` object PER CORNER, from
+    `intersection_kit.build_junction_curb_segments` -- deliberately narrower than the pad's
+    boundary: it excludes every arm's own tail-cap (a road can't have a curb wall across its own
+    lanes where it enters the junction) and every through-pair (no wall needed where a road just
+    continues straight). `lanecl_*` lane-centerline data curves (the AI/export layer) are
+    untouched -- still one per legal movement from `build_lane_movements`, still what
+    `export_json` reads.
+
+    `tail_length` is floored to `intersection_kit.recommended_tail_length(arms, kerb_radius,
+    start=tail_length)` before anything else uses it -- never shrinks the requested value (the
+    search starts from it), only raises it for wide (3-4 lane) arms where the requested
+    tail_length would otherwise leave some turn's own arc stranded well past the pad (see that
+    function's docstring for why this needs a numerical search, not a formula). Both the pad/curb
+    boundary and the lane movements use this SAME effective value, so they never disagree."""
     k = ik()
-    corners = k.build_curb_corners(arms, kerb_radius, segments)
+    tail_length = k.recommended_tail_length(arms, kerb_radius, start=tail_length)
     try:
         movements = k.build_lane_movements(arms, kerb_radius, segments, tail_length=tail_length,
                                             lane_map=lane_map)
     except ValueError as exc:
         raise RkaBuildError("Lane Map Override: %s" % exc)
+    boundary = k.build_junction_boundary(arms, kerb_radius, tail_length=tail_length)
+    curb_segments = k.build_junction_curb_segments(arms, kerb_radius, tail_length=tail_length)
 
     cx, cy = origin_xy
 
     def to3(pt2):
         return (cx + pt2[0], cy + pt2[1], z)
 
+    def to3r(pt3):
+        return (cx + pt3[0], cy + pt3[1], z, pt3[2])
+
+    boundary3 = [to3r(p) for p in boundary]
+
     # Short, collection-relative names -- Blender's Outliner already nests these under their
     # collection (which itself carries the full junction_id), and nothing downstream parses these
-    # specific names (WorldBaker's prefix table doesn't include curb_/lanecl_/roadribbon_/arm_ at
-    # all -- every Godot-side lookup goes through the exported JSON's own `id`).
-    visual_objs = []   # curb walls + ribbons only -- fed to gltf_export_path / join_visual_mesh
-    for c in corners:
-        pts3 = [to3(p) for p in c["arc"]]
-        visual_objs.append(build_curb("curb_%s%s" % (c["arm_a"], c["arm_b"]), pts3, coll,
-                                       curb_style, curb_height, curb_thickness))
+    # specific names (WorldBaker's prefix table doesn't include curb_/pad_/lanecl_/arm_ at all --
+    # every Godot-side lookup goes through the exported JSON's own `id`).
+    visual_objs = []   # pad + curb(s) only -- fed to gltf_export_path / join_visual_mesh
+    pad = paths.kc.junction_pad("pad_%s" % coll.name, boundary3, coll, matkey="asphalt",
+                                 segments=segments)
+    if pad is not None:
+        visual_objs.append(pad)
+    # One curb object PER CORNER (build_junction_curb_segments already excludes every arm's own
+    # tail-cap and every through-pair -- an arm opening must never have a curb wall across its own
+    # lanes) instead of a single loop spanning the whole boundary.
+    for idx, seg in enumerate(curb_segments):
+        seg3 = [to3r(p) for p in seg]
+        curb = paths.kc.curb_loop("curb_%s_%d" % (coll.name, idx), seg3, coll,
+                                   curb_style=curb_style, curb_height=curb_height,
+                                   curb_thickness=curb_thickness, matkey="concrete",
+                                   segments=segments, closed=False)
+        if curb is not None:
+            visual_objs.append(curb)
 
     for m in movements:
         pts3 = [to3(p) for p in m["points"]]
@@ -240,14 +313,12 @@ def _populate_intersection_mesh(context, coll, arms, kerb_radius, tail_length, s
         tag = "%s%s_%s" % (m["from"], m["to"], lane_tag)
         paths.kc.poly_curve("lanecl_%s" % tag, pts3, coll, loop=False, lane_width=lane_width,
                              oneway=True, end_behavior='CHAIN')
-        visual_objs.append(paths.kc.flat_ribbon("ribbon_%s" % tag, pts3, lane_width / 2.0, coll,
-                                                 matkey="asphalt"))
 
     if join_visual_mesh and visual_objs:
         joined = join_meshes(context, visual_objs, "mesh_%s" % coll.name)
         visual_objs = [joined] if joined else visual_objs
 
-    return corners, movements, visual_objs
+    return boundary, movements, visual_objs, tail_length
 
 
 def rebuild_intersection_in_place(context, coll):
@@ -281,6 +352,7 @@ def rebuild_intersection_in_place(context, coll):
     curb_thickness = coll.get("rka_curb_thickness", 0.25)
     lane_map = custom_props.read_lane_map_override(coll)
     join_visual_mesh = any(o.name.startswith("mesh_") for o in coll.objects)
+    traffic_side = coll.get("rka_traffic_side", "LEFT")
 
     arm_empties = [o for o in coll.objects if "rka_arm_name" in o.keys()]
     arms = []
@@ -290,18 +362,25 @@ def rebuild_intersection_in_place(context, coll):
             continue   # dropped exactly on the origin mid-drag -- degenerate, skip this arm
         angle_deg = math.degrees(math.atan2(dy, dx)) % 360.0
         oneway = o.get("rka_arm_oneway", "") or None
+        lanes_out_raw = int(o.get("rka_arm_lanes_out", 0))
         arms.append(k.Arm(o["rka_arm_name"], angle_deg, lane_width, int(o.get("rka_arm_lanes", 1)),
-                           oneway=oneway))
+                           oneway=oneway, lanes_out=lanes_out_raw or None,
+                           traffic_side=traffic_side))
     if len(arms) < 3:
         return
 
     clear_generated_mesh_objects(coll)
     try:
-        _populate_intersection_mesh(context, coll, arms, kerb_radius, tail_length, segments,
-                                     lane_width, curb_style, curb_height, curb_thickness, lane_map,
-                                     join_visual_mesh, (ox, oy), z)
+        _, _, _, tail_length = _populate_intersection_mesh(
+            context, coll, arms, kerb_radius, tail_length, segments, lane_width, curb_style,
+            curb_height, curb_thickness, lane_map, join_visual_mesh, (ox, oy), z)
     except RkaBuildError:
         return   # e.g. two arms briefly coincide mid-drag -- leave geometry as the last-good state
+    # `tail_length` above is now the EFFECTIVE value (floored to recommended_tail_length inside
+    # _populate_intersection_mesh) -- re-snapping arm markers and persisting rka_tail_length below
+    # must use THIS value, not the original request, or the markers/stored setting would silently
+    # drift out of sync with where the pad/curb/movements actually ended up.
+    coll["rka_tail_length"] = tail_length
 
     # Re-snap each arm empty back onto the fixed tail_length radius (see docstring) and keep its
     # arrow aligned with the new angle. Guarded by an epsilon so a clean drag (already exactly on
@@ -320,13 +399,15 @@ def rebuild_intersection_in_place(context, coll):
 
     custom_props.write_build_settings(
         coll, arm_names=[a.name for a in arms], arm_angles=[a.angle_deg for a in arms],
-        arm_lanes=[a.lanes for a in arms], arm_oneway=[a.oneway or "" for a in arms])
+        arm_lanes=[a.lanes for a in arms], arm_oneway=[a.oneway or "" for a in arms],
+        arm_lanes_out=[a.lanes_out or 0 for a in arms])
 
 
 def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_deg, side_angle,
                                  arm_angles_str, lane_width, lanes, lane_arm_overrides, kerb_radius,
                                  tail_length, segments, curb_style, curb_height, curb_thickness,
-                                 lane_map, join_visual_mesh, export_path, gltf_export_path):
+                                 lane_map, join_visual_mesh, export_path, gltf_export_path,
+                                 traffic_side='LEFT'):
     """Pure build logic behind `RKA_OT_build_intersection` -- no `bpy.ops` dispatch, so a caller
     that needs to build an intersection as ONE STEP of a larger flat operator
     (`RKA_OT_insert_intersection_on_segment`) can call this directly instead of going through
@@ -339,8 +420,10 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
     BEFORE calling this, since that resolution is itself context/UI-specific and doesn't belong in
     the pure geometry-building step).
 
-    Returns a dict: `{'coll', 'arms', 'corners', 'movements', 'visual_objs', 'export_note',
-    'warnings'}` (`warnings` is a list of str -- non-fatal export failures the caller should
+    Returns a dict: `{'coll', 'arms', 'boundary', 'movements', 'visual_objs', 'export_note',
+    'warnings'}` (`boundary` is the `[(x, y, radius), ...]` pad/curb polygon from
+    `intersection_kit.build_junction_boundary`; `warnings` is a list of str -- non-fatal export
+    failures the caller should
     surface via `self.report({'WARNING'}, ...)` but that don't prevent FINISHED). Raises
     `RkaBuildError` for anything that must abort before any geometry is created."""
     rka = context.scene.rka
@@ -348,13 +431,16 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
 
     if preset == '4WAY':
         arms = k.preset_4way(lane_width=lane_width,
-                              lanes=_arm_lane_list(lanes, lane_arm_overrides, 4))
+                              lanes=_arm_lane_list(lanes, lane_arm_overrides, 4),
+                              traffic_side=traffic_side)
     elif preset == '3WAY_T':
         arms = k.preset_3way_t(side_angle=side_angle, lane_width=lane_width,
-                                lanes=_arm_lane_list(lanes, lane_arm_overrides, 3))
+                                lanes=_arm_lane_list(lanes, lane_arm_overrides, 3),
+                                traffic_side=traffic_side)
     elif preset == '3WAY_Y':
         arms = k.preset_3way_y(angles=(0.0, side_angle, 2.0 * side_angle), lane_width=lane_width,
-                                lanes=_arm_lane_list(lanes, lane_arm_overrides, 3))
+                                lanes=_arm_lane_list(lanes, lane_arm_overrides, 3),
+                                traffic_side=traffic_side)
     else:   # NWAY
         try:
             angles = [float(a.strip()) for a in arm_angles_str.split(",") if a.strip()]
@@ -363,7 +449,8 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
         if len(angles) < 3:
             raise RkaBuildError("NWAY needs at least 3 arm angles")
         arms = k.preset_nway(angles, lane_width=lane_width,
-                              lanes=_arm_lane_list(lanes, lane_arm_overrides, len(angles)))
+                              lanes=_arm_lane_list(lanes, lane_arm_overrides, len(angles)),
+                              traffic_side=traffic_side)
 
     if rotation_deg != 0.0:
         for a in arms:
@@ -379,9 +466,14 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
     coll = bpy.data.collections.new(base_name + ("_%03d" % n))
     parent_coll.children.link(coll)
 
-    corners, movements, visual_objs = _populate_intersection_mesh(
+    boundary, movements, visual_objs, tail_length = _populate_intersection_mesh(
         context, coll, arms, kerb_radius, tail_length, segments, lane_width, curb_style,
         curb_height, curb_thickness, lane_map, join_visual_mesh, (cx, cy), z)
+    # `tail_length` above is now the EFFECTIVE value (floored to recommended_tail_length inside
+    # _populate_intersection_mesh) -- every use below (arm marker placement, the persisted
+    # rka_tail_length, JSON export) must use THIS value, not the original request, or the markers
+    # would be placed at the OLD (too-small) radius while the pad/curb/movements already reflect
+    # the new one.
 
     # Arm marker Empties -- one per arm, at the tail's far end (the same port RKA_OT_extend_from_arm
     # extends from). This is the concrete "place arm at end of each intersection" handle: visible
@@ -402,6 +494,7 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
         arm_obj["rka_arm_angle"] = a.angle_deg
         arm_obj["rka_arm_lanes"] = a.lanes
         arm_obj["rka_arm_oneway"] = a.oneway or ""
+        arm_obj["rka_arm_lanes_out"] = a.lanes_out or 0
         coll.objects.link(arm_obj)
 
     # Permanent record of exactly how this was built -- native custom properties on the
@@ -412,8 +505,8 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
         tail_length=tail_length, segments=segments, curb_style=curb_style,
         curb_height=curb_height, curb_thickness=curb_thickness,
         arm_names=[a.name for a in arms], arm_angles=[a.angle_deg for a in arms],
-        arm_lanes=[a.lanes for a in arms],
-        arm_oneway=[a.oneway or "" for a in arms], lane_map=lane_map,
+        arm_lanes=[a.lanes for a in arms], arm_lanes_out=[a.lanes_out or 0 for a in arms],
+        arm_oneway=[a.oneway or "" for a in arms], lane_map=lane_map, traffic_side=traffic_side,
         # Raw (pre-lane_surface_z-offset) cursor position -- lets RKA_OT_extend_from_arm
         # reconstruct exact world-space port positions/tangents from this collection's own stored
         # arm data, without guessing where it was built.
@@ -435,14 +528,16 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
         except Exception as exc:   # noqa: BLE001 -- bpy.ops export can raise a variety of types
             warnings.append("Built geometry OK, but glTF export failed: %s" % exc)
 
-    return {"coll": coll, "arms": arms, "corners": corners, "movements": movements,
-            "visual_objs": visual_objs, "export_note": export_note, "warnings": warnings}
+    return {"coll": coll, "arms": arms, "boundary": boundary, "movements": movements,
+            "visual_objs": visual_objs, "export_note": export_note, "warnings": warnings,
+            "tail_length": tail_length}
 
 
 class RKA_OT_build_intersection(bpy.types.Operator):
-    """Build one intersection (rounded curb corners + a lanecl_* centerline and visual asphalt
-    ribbon for every legal single-lane movement, plus an 'arm_*' marker Empty at each arm's tail)
-    at the 3D cursor. Purely additive: creates a new collection, never touches lane_kit.blend or
+    """Build one intersection (a GN-filled pavement pad + one continuous GN-swept curb loop, both
+    from the arm-angle-driven boundary polygon, plus a lanecl_* centerline for every legal
+    single-lane movement and an 'arm_*' marker Empty at each arm's tail) at the 3D cursor. Purely
+    additive: creates a new collection, never touches lane_kit.blend or
     any existing piece. Re-run with different settings and compare -- each run gets its own
     collection."""
     bl_idname = "rka.build_intersection"
@@ -492,6 +587,10 @@ class RKA_OT_build_intersection(bpy.types.Operator):
         description="BOX = plain flat wall (original). GUTTER = a stepped curb-and-gutter "
                      "profile matching the real kit_side_straight_city_gutter_curb_w0p6m_l5m "
                      "piece's silhouette (kit/lane_kit.blend), width/height only")
+    traffic_side: bpy.props.EnumProperty(
+        name="Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT',
+        description="Which physical lateral half of every arm is arriving vs. departing. Must "
+                     "match every segment/transition this intersection connects to")
     curb_height: bpy.props.FloatProperty(name="Curb Height", default=0.15, min=0.01, unit='LENGTH')
     curb_thickness: bpy.props.FloatProperty(
         name="Curb Thickness", description="BOX style: wall thickness. GUTTER style: total "
@@ -550,7 +649,7 @@ class RKA_OT_build_intersection(bpy.types.Operator):
                 [self.lanes_arm1, self.lanes_arm2, self.lanes_arm3, self.lanes_arm4],
                 self.kerb_radius, self.tail_length, self.segments, self.curb_style,
                 self.curb_height, self.curb_thickness, lane_map, self.join_visual_mesh,
-                self.export_path, self.gltf_export_path)
+                self.export_path, self.gltf_export_path, self.traffic_side)
         except RkaBuildError as exc:
             self.report({'ERROR'}, str(exc))
             return {'CANCELLED'}
@@ -564,24 +663,27 @@ class RKA_OT_build_intersection(bpy.types.Operator):
 
         for o in context.selected_objects:
             o.select_set(False)
+        corner_count = len([p for p in result["boundary"] if p[2] > 0])
+        if result["tail_length"] > self.tail_length + 1e-3:
+            note += " (tail_length auto-grown %.1fm -> %.1fm for wide arms)" % (
+                self.tail_length, result["tail_length"])
         self.report(
             {'INFO'},
             "Built '%s': %d arm(s), %d curb corner(s), %d lane movement(s) (radius=%.1fm)%s"
-            % (result["coll"].name, len(result["arms"]), len(result["corners"]),
+            % (result["coll"].name, len(result["arms"]), corner_count,
                len(result["movements"]), self.kerb_radius, note))
         return {'FINISHED'}
 
 
 def _live_edit_target_collection(context):
     """The collection a manual 'Rebuild From Handles' should act on: the active object's own
-    piece if it's a marker Empty (arm/segend/segbend, OR a curve-segment's `segcurve_driver`, OR
-    the driving Curve object itself), else the active collection itself if it IS a piece. None if
-    neither resolves."""
+    piece if it's a marker Empty (arm/segend/segbend), OR the piece's own live spine Curve object
+    (a segment/transition's `spine_*`, found by matching `rka_curve_object`), else the active
+    collection itself if it IS a piece. None if neither resolves."""
     obj = context.active_object
     if obj is not None and obj.users_collection:
         keys = obj.keys()
-        if "rka_arm_name" in keys or "rka_segend" in keys or "rka_segbend" in keys \
-                or "rka_curve_driver" in keys:
+        if "rka_arm_name" in keys or "rka_segend" in keys or "rka_segbend" in keys:
             return obj.users_collection[0]
         if obj.type == 'CURVE':
             for coll in bpy.data.collections:
@@ -617,8 +719,13 @@ class RKA_OT_rebuild_from_handles(bpy.types.Operator):
         from . import ops_segment
         if "rka_arm_names" in coll.keys():
             rebuild_intersection_in_place(context, coll)
+        elif "rka_lanes_a" in coll.keys():
+            # A lane-transition piece also carries 'rka_curve_object' (same spine-tracking
+            # convention as a plain curve-backed segment) -- check its own discriminator FIRST so
+            # this doesn't fall into the plain-segment rebuild below and silently un-taper it.
+            ops_segment.rebuild_lane_transition_in_place(context, coll)
         elif "rka_curve_object" in coll.keys():
-            ops_segment.rebuild_segment_from_curve_in_place(context, coll)
+            ops_segment.rebuild_segment_gn_in_place(context, coll)
         else:
             ops_segment.rebuild_segment_in_place(context, coll)
         self.report({'INFO'}, "Rebuilt '%s' from its current handle positions" % coll.name)
@@ -727,6 +834,7 @@ class RKA_OT_add_arm(bpy.types.Operator):
         arm_obj["rka_arm_angle"] = angle_deg
         arm_obj["rka_arm_lanes"] = self.lanes
         arm_obj["rka_arm_oneway"] = ""
+        arm_obj["rka_arm_lanes_out"] = 0
         coll.objects.link(arm_obj)
 
         rebuild_intersection_in_place(context, coll)
@@ -793,8 +901,44 @@ class RKA_OT_set_arm_oneway(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class RKA_OT_adjust_arm_lanes_out(bpy.types.Operator):
+    """ASYMMETRIC WIDENING: +/- the active arm_* marker's `rka_arm_lanes_out` override -- the
+    DEPARTING (CCW) lane count only, independent of `rka_arm_lanes` (which keeps governing the
+    ARRIVING/CW count) -- and immediately rebuild in place. 0 means "no override, symmetric with
+    Lanes" (`Arm.lanes_out=None`, `intersection_kit.py`'s back-compat default); the FIRST press
+    from 0 seeds it at the current symmetric lane count before nudging, so pressing +/- from a
+    fresh arm feels like "peel this side off and adjust it independently" rather than jumping
+    straight to 1. This is the actual "widen only one side" answer -- since arriving lanes occupy
+    the CW curb-to-centerline half and departing lanes occupy the CCW half, growing ONE of
+    lanes/lanes_out moves ONLY that side's curb edge (see `Arm`'s docstring for why a raw sideways
+    shift of an otherwise-symmetric width can't do this correctly)."""
+    bl_idname = "rka.adjust_arm_lanes_out"
+    bl_label = "Adjust Arm Departing Lanes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    delta: bpy.props.IntProperty(default=1)
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and "rka_arm_name" in obj.keys()
+
+    def execute(self, context):
+        obj = context.active_object
+        coll = obj.users_collection[0]
+        current = int(obj.get("rka_arm_lanes_out", 0))
+        base = current if current > 0 else int(obj.get("rka_arm_lanes", 1))
+        new_lanes_out = max(0, min(3, base + self.delta))
+        obj["rka_arm_lanes_out"] = new_lanes_out
+        rebuild_intersection_in_place(context, coll)
+        label = "symmetric (0)" if new_lanes_out == 0 else str(new_lanes_out)
+        self.report({'INFO'}, "Arm '%s' departing lanes -> %s" %
+                     (obj.get("rka_arm_name", "?"), label))
+        return {'FINISHED'}
+
+
 CLASSES = (RKA_OT_build_intersection, RKA_OT_rebuild_from_handles, RKA_OT_adjust_arm_lanes,
-           RKA_OT_add_arm, RKA_OT_remove_arm, RKA_OT_set_arm_oneway)
+           RKA_OT_add_arm, RKA_OT_remove_arm, RKA_OT_set_arm_oneway, RKA_OT_adjust_arm_lanes_out)
 
 
 def register():

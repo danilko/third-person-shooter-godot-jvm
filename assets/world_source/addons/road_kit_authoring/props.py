@@ -59,6 +59,11 @@ class RKA_SceneSettings(bpy.types.PropertyGroup):
                      "owning intersection/segment rebuilds immediately (see live_edit.py). "
                      "Global kill switch -- turn off if it feels laggy on a complex piece; a "
                      "single piece can also opt out via its own 'rka_live_edit' custom property")
+    show_traffic_indicators: bpy.props.BoolProperty(
+        name="Show Incoming/Departure Indicators", default=True,
+        description="Draw a blue 'IN' arrow and an orange 'OUT' arrow at every arm_* marker and "
+                     "segment endpoint, showing which physical lane(s) are arriving vs. departing "
+                     "(see traffic_viz.py) -- a live, no-rebuild-needed viewport overlay")
 
 
 class RKA_CurveSettings(bpy.types.PropertyGroup):
