@@ -51,6 +51,9 @@ class RKA_PT_road_kit(bpy.types.Panel):
         box.label(text="'segbend' to bend/hill it -- all live, no F9 needed.")
         box.operator("rka.rebuild_from_handles", icon='FILE_REFRESH')
         box.label(text="(manual fallback -- use if a drag doesn't auto-update)")
+        box.prop(rka, "show_traffic_indicators")
+        box.label(text="Blue arrow = incoming (arriving) lanes, orange = outgoing")
+        box.label(text="(departing) -- one pair per arm/segment end, updates live.")
 
         active_obj = context.active_object
         active_coll_le = context.view_layer.active_layer_collection.collection
@@ -60,6 +63,12 @@ class RKA_PT_road_kit(bpy.types.Panel):
                        (active_obj["rka_arm_name"], active_obj.get("rka_arm_lanes", 1)))
             row.operator("rka.adjust_arm_lanes", text="", icon='REMOVE').delta = -1
             row.operator("rka.adjust_arm_lanes", text="", icon='ADD').delta = 1
+            lanes_out = active_obj.get("rka_arm_lanes_out", 0)
+            row = box.row(align=True)
+            row.label(text="  Departing (asymmetric): %s" %
+                       ("symmetric" if lanes_out == 0 else str(lanes_out)))
+            row.operator("rka.adjust_arm_lanes_out", text="", icon='REMOVE').delta = -1
+            row.operator("rka.adjust_arm_lanes_out", text="", icon='ADD').delta = 1
             cur_dir = active_obj.get("rka_arm_oneway", "") or 'BOTH'
             row = box.row(align=True)
             row.label(text="Direction:")
@@ -93,13 +102,16 @@ class RKA_PT_road_kit(bpy.types.Panel):
         box.operator("rka.build_intersection", icon='ADD')
         box.label(text="Builds at an active arm_*/segend_*/segbend_* marker if one is")
         box.label(text="selected, else at the 3D cursor. F9 (right after building, before")
-        box.label(text="anything else) to tweak preset/radius/lanes/lane_map/join-mesh.")
+        box.label(text="anything else) to tweak preset/radius/lanes/lane_map/traffic side.")
         box.label(text="Each arm gets an 'arm_*' Empty at its tail -- click one, then")
         box.label(text="'Extend From Arm' below, to grow a road from it.")
 
         box = layout.box()
         box.label(text="Straight Segment", icon='MESH_PLANE')
         box.operator("rka.build_straight_segment", icon='ADD')
+        box.label(text="Curve-backed: pavement lives on a live 'spine_*' Curve object --")
+        box.label(text="select it and enter Edit Mode to add/drag points and reshape/")
+        box.label(text="extend the road live, no rebuild needed for the pavement itself.")
         box.label(text="Same active-marker-or-cursor start point as 'Build Intersection'.")
         box.label(text="Lanes Backward = 0 makes it one-way (1 fwd/0 back = single-lane")
         box.label(text="one-way). F9 (right after building) to tweak Bend/Vertical Bend/")
@@ -115,9 +127,17 @@ class RKA_PT_road_kit(bpy.types.Panel):
         else:
             box.label(text="Select a Curve object (draw one, or Add > Curve) first.")
         box.operator("rka.build_segment_from_curve", icon='ADD')
-        box.label(text="Follows the curve's EXACT evaluated points -- edit its control")
-        box.label(text="points in Edit Mode (add more for a multi-point slope/bend) and")
-        box.label(text="the road updates live (or press 'Rebuild From Handles' above).")
+        box.label(text="Samples that curve ONCE to seed a new self-contained spine --")
+        box.label(text="from then on edit the NEW 'spine_*' object's own points (Edit")
+        box.label(text="Mode), not the original curve, to reshape/extend it live.")
+
+        box = layout.box()
+        box.label(text="Lane Transition (merge/drop)", icon='MOD_EDGESPLIT')
+        box.operator("rka.build_lane_transition", icon='ADD')
+        box.label(text="Tapers Lanes A -> Lanes B over its length (pavement + curb taper")
+        box.label(text="together) -- e.g. a 2-lane street narrowing into a 1-lane arm.")
+        box.label(text="Align 'Right' keeps the curb-side lane straight and merges the")
+        box.label(text="rest into it (a real lane-drop); 'Left' mirrors that.")
 
         box = layout.box()
         box.label(text="Extend / Insert", icon='CON_FOLLOWPATH')

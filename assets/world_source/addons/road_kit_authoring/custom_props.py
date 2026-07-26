@@ -44,17 +44,23 @@ def read_lane_map_override(coll):
 
 
 def read_arms(coll):
-    """Reconstruct the `[(name, angle_deg, lanes), ...]` list this intersection collection was
-    built with, from its `rka_arm_names`/`rka_arm_angles`/`rka_arm_lanes` custom properties (see
-    `write_build_settings`) -- or None if `coll` wasn't built by `RKA_OT_build_intersection`
-    (missing one or more of those keys). `angle_deg` here is already the FINAL, resolved angle
-    (rotation_deg already applied at build time), so callers never need to re-derive it."""
+    """Reconstruct the `[(name, angle_deg, lanes, lanes_out), ...]` list this intersection
+    collection was built with, from its `rka_arm_names`/`rka_arm_angles`/`rka_arm_lanes`/
+    `rka_arm_lanes_out` custom properties (see `write_build_settings`) -- or None if `coll` wasn't
+    built by `RKA_OT_build_intersection` (missing one or more of the first three keys).
+    `angle_deg` here is already the FINAL, resolved angle (rotation_deg already applied at build
+    time), so callers never need to re-derive it. `lanes_out` is 0 (= symmetric with `lanes`,
+    `Arm.lanes_out=None`) unless `RKA_OT_adjust_arm_lanes_out` set an asymmetric-widening override
+    on that arm -- `rka_arm_lanes_out` predates -- older collections without it default to all-0
+    (fully back-compat)."""
     if coll is None:
         return None
     names, angles, lanes = coll.get("rka_arm_names"), coll.get("rka_arm_angles"), coll.get("rka_arm_lanes")
     if names is None or angles is None or lanes is None:
         return None
-    return list(zip(list(names), [float(a) for a in angles], [int(n) for n in lanes]))
+    lanes_out = coll.get("rka_arm_lanes_out")
+    lanes_out = [int(n) for n in lanes_out] if lanes_out is not None else [0] * len(list(names))
+    return list(zip(list(names), [float(a) for a in angles], [int(n) for n in lanes], lanes_out))
 
 
 def read_origin(coll):

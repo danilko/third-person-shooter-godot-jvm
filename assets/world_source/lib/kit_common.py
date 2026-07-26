@@ -888,6 +888,35 @@ def road_from_curve(name, pts, coll, matkey="asphalt", thickness=0.4, z_lift=0.0
     return obj
 
 
+def road_spine(name, pts, coll, radius, matkey="asphalt", thickness=0.4):
+    """A live-editable POLY-spline Curve object through pts=[(x,y,z), ...] with `GN_RoadProfile`
+    attached DIRECTLY to it -- unlike `road_from_curve` (a fresh throwaway NURBS curve rebuilt
+    from scratch every call), this object IS the persistent, user-editable spine: entering Edit
+    Mode and adding/dragging a control point reshapes the pavement immediately via Blender's own
+    dependency graph, no Python rebuild step for the pavement itself (only separately-offset L/R
+    curb walls and lane-centerline data curves need re-sampling afterward -- see
+    `road_kit_authoring/ops_segment.py`). `radius` is either one scalar (every point, a
+    constant-width road) or a list matching `pts` (e.g. a linear lane-count-transition taper --
+    `GN_RoadProfile`'s per-point Radius already does variable-width sweeps natively, no extra GN
+    work needed for a taper). Returns the object (modifier live; glTF export bakes it)."""
+    cu = bpy.data.curves.new(name + "_spine", 'CURVE')
+    cu.dimensions = '3D'
+    sp = cu.splines.new('POLY')
+    sp.points.add(len(pts) - 1)
+    radii = radius if isinstance(radius, (list, tuple)) else [radius] * len(pts)
+    for i, p in enumerate(pts):
+        sp.points[i].co = (p[0], p[1], p[2], 1.0)
+        sp.points[i].radius = max(radii[min(i, len(radii) - 1)], 1e-3)
+    obj = bpy.data.objects.new(name, cu)
+    coll.objects.link(obj)
+    ng, (mat_id, thick_id) = make_road_profile_group()
+    mod = obj.modifiers.new("Road", "NODES")
+    mod.node_group = ng
+    mod[mat_id] = mat(matkey)
+    mod[thick_id] = thickness
+    return obj
+
+
 def make_barrier_profile_group():
     """GN_BarrierProfile: sweep a CONSTANT thin vertical rectangle (thickness x height, both
     group inputs, NOT scaled by the spine radius) along an EDGE curve via Curve to Mesh -> one
@@ -970,6 +999,198 @@ def barrier_from_curve(name, edge_pts, coll, h=1.1, thickness=0.18, matkey="conc
     mod[h_id] = h
     mod[t_id] = thickness
     return obj
+
+
+# ---------------------------------------------- intersection pad/curb (road_kit_authoring, GN)
+def _poly_curve_with_radius(name, pts_radius, coll, closed=True):
+    """A POLY-spline Curve object through pts_radius=[(x,y,z,radius), ...] -- `radius` sets each
+    point's built-in `.radius` (read by `GeometryNodeInputRadius` inside `GN_JunctionPad`/
+    `GN_CurbLoop`, exactly the per-point-radius convention `GN_RoadProfile` already uses for lane
+    width, reused here for per-corner FILLET radius: near-zero on straight/tail points, the
+    corner's own (already clamped by `intersection_kit.build_curb_corners`) fillet radius on
+    actual corner vertices; a `curb_loop(closed=False)` open path -- a segment/transition's own L/R
+    curb line, no corners -- just passes 0 everywhere). Shared by `junction_pad` (always closed)
+    and `curb_loop` (closed for an intersection loop, open for a segment's curb line) -- each
+    builds its OWN boundary object from the same `pts_radius` (two small curve datablocks, not two
+    GN outputs off one object) since a pad (Fill Curve) and a curb (Curve to Mesh) are genuinely
+    different meshes that both need to coexist as separate exportable objects, same as this
+    addon's other pieces."""
+    cu = bpy.data.curves.new(name + "_bound", 'CURVE')
+    cu.dimensions = '3D'
+    sp = cu.splines.new('POLY')
+    sp.points.add(len(pts_radius) - 1)
+    for i, (x, y, z, r) in enumerate(pts_radius):
+        sp.points[i].co = (x, y, z, 1.0)
+        sp.points[i].radius = max(r, 1e-4)   # exactly 0 confuses Fillet Curve's Poly mode
+    sp.use_cyclic_u = closed
+    obj = bpy.data.objects.new(name + "_bound", cu)
+    coll.objects.link(obj)
+    return obj
+
+
+def make_junction_pad_group():
+    """GN_JunctionPad: a closed boundary curve (per-point Radius, see `_poly_curve_with_radius`) ->
+    Fillet Curve (Poly mode, radius from the curve's own per-point Radius, `Limit Radius` on as a
+    second, GN-native safety net alongside `intersection_kit`'s own tangent-length clamp) -> Fill
+    Curve (N-gons) -> one filled pavement mesh, materialed, shade-smooth.
+
+    This is the direct fix for the "widen one arm -> curb moves but pavement doesn't" bug: the pad
+    is generated PURELY from the boundary polygon's own geometry, never from the union of
+    per-lane-movement ribbons (which was capped at `min(a.lanes, b.lanes)` between arm pairs and
+    could leave bare gaps) -- so it can never have a coverage gap regardless of how lane counts
+    differ across arms. Returns `(node_group, (mat_id, seg_id))`."""
+    ng = bpy.data.node_groups.get("GN_JunctionPad")
+    if ng:
+        return ng, (ng["mat_id"], ng["seg_id"])
+    ng = bpy.data.node_groups.new("GN_JunctionPad", "GeometryNodeTree")
+    ifc = ng.interface
+    ifc.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    mat_sock = ifc.new_socket("Material", in_out="INPUT", socket_type="NodeSocketMaterial")
+    seg_sock = ifc.new_socket("Segments", in_out="INPUT", socket_type="NodeSocketInt")
+    seg_sock.default_value = 8
+    ifc.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    nin = ng.nodes.new("NodeGroupInput"); nin.location = (-700, 0)
+    nout = ng.nodes.new("NodeGroupOutput"); nout.location = (700, 0)
+    fillet = ng.nodes.new("GeometryNodeFilletCurve"); fillet.location = (-450, 0)
+    fillet.inputs["Mode"].default_value = "Poly"
+    fillet.inputs["Limit Radius"].default_value = True
+    rad = ng.nodes.new("GeometryNodeInputRadius"); rad.location = (-650, -220)
+    fill = ng.nodes.new("GeometryNodeFillCurve"); fill.location = (-180, 0)
+    fill.inputs["Mode"].default_value = "N-gons"
+    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (60, 0)
+    ss = ng.nodes.new("GeometryNodeSetShadeSmooth"); ss.location = (280, 0)
+    L = ng.links.new
+    L(nin.outputs["Geometry"], fillet.inputs["Curve"])
+    L(rad.outputs["Radius"], fillet.inputs["Radius"])
+    L(nin.outputs["Segments"], fillet.inputs["Count"])
+    L(fillet.outputs["Curve"], fill.inputs["Curve"])
+    L(fill.outputs["Mesh"], setm.inputs["Geometry"])
+    L(nin.outputs["Material"], setm.inputs["Material"])
+    L(setm.outputs["Geometry"], ss.inputs["Geometry"])
+    L(ss.outputs["Geometry"], nout.inputs["Geometry"])
+    ng["mat_id"] = mat_sock.identifier
+    ng["seg_id"] = seg_sock.identifier
+    return ng, (mat_sock.identifier, seg_sock.identifier)
+
+
+def junction_pad(name, boundary_pts_radius, coll, matkey="asphalt", segments=8):
+    """A filled intersection pavement pad from a closed boundary polygon (see
+    `_poly_curve_with_radius`) via `GN_JunctionPad`. Returns the boundary/pad object (modifier
+    live; glTF export bakes it, same convention as `road_from_curve`/`barrier_from_curve`)."""
+    bound = _poly_curve_with_radius(name, boundary_pts_radius, coll, closed=True)
+    ng, (mat_id, seg_id) = make_junction_pad_group()
+    mod = bound.modifiers.new("Pad", "NODES")
+    mod.node_group = ng
+    mod[mat_id] = mat(matkey)
+    mod[seg_id] = segments
+    bound.name = name
+    return bound
+
+
+def make_curb_loop_group():
+    """GN_CurbLoop: the same filleted boundary curve as `GN_JunctionPad`, swept with a
+    caller-supplied cross-section PROFILE object via Curve to Mesh -> one continuous,
+    correctly-mitered curb loop (native Curve to Mesh handles corner miters for free; the old
+    per-corner `swept_wall` code did not). `Profile` is a `NodeSocketObject` (NOT Geometry --
+    assigning an Object directly to a Geometry-typed modifier input silently no-ops in this
+    Blender version; routing it through an Object socket into an internal `Object Info` node is
+    what actually works, verified against Blender 5.1) wired through this group's own `Object
+    Info` node, so `curb_loop` can hand it a small cached BOX/GUTTER cross-section object (see
+    `_curb_profile_object`) without duplicating profile geometry per curb. Returns
+    `(node_group, (mat_id, seg_id, prof_id))`."""
+    ng = bpy.data.node_groups.get("GN_CurbLoop")
+    if ng:
+        return ng, (ng["mat_id"], ng["seg_id"], ng["prof_id"])
+    ng = bpy.data.node_groups.new("GN_CurbLoop", "GeometryNodeTree")
+    ifc = ng.interface
+    ifc.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    mat_sock = ifc.new_socket("Material", in_out="INPUT", socket_type="NodeSocketMaterial")
+    seg_sock = ifc.new_socket("Segments", in_out="INPUT", socket_type="NodeSocketInt")
+    seg_sock.default_value = 8
+    prof_sock = ifc.new_socket("Profile", in_out="INPUT", socket_type="NodeSocketObject")
+    ifc.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    nin = ng.nodes.new("NodeGroupInput"); nin.location = (-700, 0)
+    nout = ng.nodes.new("NodeGroupOutput"); nout.location = (700, 0)
+    fillet = ng.nodes.new("GeometryNodeFilletCurve"); fillet.location = (-450, 100)
+    fillet.inputs["Mode"].default_value = "Poly"
+    fillet.inputs["Limit Radius"].default_value = True
+    rad = ng.nodes.new("GeometryNodeInputRadius"); rad.location = (-650, -140)
+    oi = ng.nodes.new("GeometryNodeObjectInfo"); oi.location = (-450, -260)
+    c2m = ng.nodes.new("GeometryNodeCurveToMesh"); c2m.location = (-180, 0)
+    c2m.inputs["Fill Caps"].default_value = True
+    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (60, 0)
+    ss = ng.nodes.new("GeometryNodeSetShadeSmooth"); ss.location = (280, 0)
+    L = ng.links.new
+    L(nin.outputs["Geometry"], fillet.inputs["Curve"])
+    L(rad.outputs["Radius"], fillet.inputs["Radius"])
+    L(nin.outputs["Segments"], fillet.inputs["Count"])
+    L(nin.outputs["Profile"], oi.inputs["Object"])
+    L(fillet.outputs["Curve"], c2m.inputs["Curve"])
+    L(oi.outputs["Geometry"], c2m.inputs["Profile Curve"])
+    L(c2m.outputs["Mesh"], setm.inputs["Geometry"])
+    L(nin.outputs["Material"], setm.inputs["Material"])
+    L(setm.outputs["Geometry"], ss.inputs["Geometry"])
+    L(ss.outputs["Geometry"], nout.inputs["Geometry"])
+    ng["mat_id"] = mat_sock.identifier
+    ng["seg_id"] = seg_sock.identifier
+    ng["prof_id"] = prof_sock.identifier
+    return ng, (mat_sock.identifier, seg_sock.identifier, prof_sock.identifier)
+
+
+_CURB_PROFILE_CACHE = {}
+
+
+def _curb_profile_object(style, height, thickness):
+    """A cached, un-transformed helper Curve object at the origin representing ONE curb
+    cross-section (local X = lateral offset from the spine, local Y = up -- the same profile-plane
+    convention `GN_BarrierProfile`/`GN_RoadProfile` already use), fed into `GN_CurbLoop`'s Profile
+    input. Cached by `(style, height, thickness)` so repeated builds/rebuilds (live-edit!) reuse
+    one object instead of leaking a new datablock per rebuild; deliberately NOT linked into any
+    scene collection (referenced only by GN modifiers via Object Info, never rendered/exported
+    itself -- `export_gltf` only ever selects the objects it's explicitly given)."""
+    key = (style, round(height, 4), round(thickness, 4))
+    obj = _CURB_PROFILE_CACHE.get(key)
+    if obj is not None and obj.name in bpy.data.objects:
+        return obj
+    if style == 'GUTTER':
+        pts2d = gutter_curb_profile(thickness, height)   # open profile: road edge -> curb top
+        cyclic = False
+    else:   # BOX (default/fallback for any unrecognized style)
+        half_t = thickness / 2.0
+        pts2d = [(-half_t, 0.0), (half_t, 0.0), (half_t, height), (-half_t, height)]
+        cyclic = True
+    cu = bpy.data.curves.new("RKA_CurbProfile_%s" % style, 'CURVE')
+    cu.dimensions = '3D'
+    sp = cu.splines.new('POLY')
+    sp.points.add(len(pts2d) - 1)
+    for i, (lat, h) in enumerate(pts2d):
+        sp.points[i].co = (lat, h, 0.0, 1.0)
+    sp.use_cyclic_u = cyclic
+    obj = bpy.data.objects.new("RKA_CurbProfile_%s" % style, cu)
+    _CURB_PROFILE_CACHE[key] = obj
+    return obj
+
+
+def curb_loop(name, boundary_pts_radius, coll, curb_style='BOX', curb_height=0.15,
+              curb_thickness=0.25, matkey="concrete", segments=8, closed=True):
+    """One continuous, correctly-mitered curb from a boundary/edge polygon via `GN_CurbLoop`.
+    `closed=True` (default) is an intersection's full loop (same boundary `junction_pad` uses);
+    `closed=False` is an OPEN edge line -- a straight/transition segment's own L or R curb, no
+    corners to fillet (pass 0 radius for every point; Fillet Curve is then a no-op). Returns
+    `None` for `curb_style == 'NONE'` (curb toggled off -- the caller skips linking/using the
+    result, no wasted empty object is created at all)."""
+    if curb_style == 'NONE':
+        return None
+    bound = _poly_curve_with_radius(name, boundary_pts_radius, coll, closed=closed)
+    ng, (mat_id, seg_id, prof_id) = make_curb_loop_group()
+    prof_obj = _curb_profile_object(curb_style, curb_height, curb_thickness)
+    mod = bound.modifiers.new("Curb", "NODES")
+    mod.node_group = ng
+    mod[mat_id] = mat(matkey)
+    mod[seg_id] = segments
+    mod[prof_id] = prof_obj
+    bound.name = name
+    return bound
 
 
 def colonly_swept(name, cpts, half_w, coll, z0=-0.4, z1=0.0):
