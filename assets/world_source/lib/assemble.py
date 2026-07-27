@@ -387,17 +387,19 @@ def _route_polyline_markers(coll, route, poly, z_off=0.2, **props):
         lane_empty(mk, route, n, (wx, wy, wz + z_off), **props)
 
 
-def lay_road_graph(rg, z_fn=None, z_off=0.3, simplify=True, radius_fn=None):
+def lay_road_graph(rg, z_fn=None, z_off=0.3, simplify=True, radius_fn=None, driving_side=None):
     """Emit the FULL traffic layer for a road_graph.RoadGraph: per generated lane/turn-connector
     a lane_<route>_<n> empty chain (route metas on the _0 empty; next_routes/next_weights wire
     junction turning as explicit data — never runtime endpoint clustering), plus one
     intersection_<node> empty per junction (size meta → IntersectionZone). All route names get
     the current ROUTE_PREFIX, so a district's graph stays namespaced while the wiring keeps
-    pointing inside itself. Marker z = point z (+ z_fn(x, y) if given) + z_off.
-    Returns (n_lanes, n_connectors, n_junctions)."""
+    pointing inside itself. Marker z = point z (+ z_fn(x, y) if given) + z_off. `driving_side`
+    ('LEFT'/'RIGHT') passes straight through to generate() -- None (default) uses whatever `rg`
+    itself was built with (see road_graph.RoadGraph/from_curves). Returns (n_lanes,
+    n_connectors, n_junctions)."""
     import road_graph as rgm
     mk = _named_coll("MARKERS")
-    lanes, junctions = rgm.generate(rg, radius_fn=radius_fn)
+    lanes, junctions = rgm.generate(rg, radius_fn=radius_fn, driving_side=driving_side)
     n_conn = 0
     for r in lanes:
         pts = rgm.simplify_polyline(r.pts) if (simplify and not r.turn) else r.pts

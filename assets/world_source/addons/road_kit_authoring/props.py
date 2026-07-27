@@ -20,6 +20,17 @@ ROAD_CLASS_ITEMS = (
     ('highway', "Highway", "Highway"),
 )
 
+# Defined here (rather than ops_intersection.py, which uses it too) so RKA_SceneSettings'
+# default_traffic_side can reference it directly -- props.py registers before ops_intersection.py
+# (see __init__.py's load order), so the dependency only works in this direction.
+TRAFFIC_SIDE_ITEMS = (
+    ('LEFT', "Keep Left (e.g. Japan)", "Arriving/departing lanes occupy the physical lateral "
+     "half this module has always used by default -- keep-left driving convention"),
+    ('RIGHT', "Keep Right (e.g. US)", "Mirrors which physical lateral half of every arm/segment "
+     "is arriving vs. departing -- keep-right driving convention. Must match whatever any "
+     "connected piece was built with, or lanes won't line up at the seam"),
+)
+
 
 class RKA_SceneSettings(bpy.types.PropertyGroup):
     grid: bpy.props.FloatProperty(
@@ -64,6 +75,18 @@ class RKA_SceneSettings(bpy.types.PropertyGroup):
         description="Draw a blue 'IN' arrow and an orange 'OUT' arrow at every arm_* marker and "
                      "segment endpoint, showing which physical lane(s) are arriving vs. departing "
                      "(see traffic_viz.py) -- a live, no-rebuild-needed viewport overlay")
+    default_traffic_side: bpy.props.EnumProperty(
+        name="Default Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT',
+        description="Seeds every build operator's own 'Traffic Side' field (still F9-tweakable "
+                     "per piece) -- set this once instead of fixing LEFT->RIGHT on every single "
+                     "build when authoring a keep-right city")
+    marking_dash_length: bpy.props.FloatProperty(
+        name="Marking Dash Length", default=3.0, min=0.05, unit='LENGTH',
+        description="Painted length of each dash in an auto-generated white lane-boundary "
+                     "marking (see 'Auto Lane Markings' on the segment build operators)")
+    marking_gap_length: bpy.props.FloatProperty(
+        name="Marking Gap Length", default=3.0, min=0.05, unit='LENGTH',
+        description="Unpainted gap between dashes")
 
 
 class RKA_CurveSettings(bpy.types.PropertyGroup):

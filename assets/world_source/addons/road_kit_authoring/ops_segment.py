@@ -23,8 +23,10 @@ import bpy
 
 from . import custom_props, paths
 from .ops_intersection import (CURB_STYLE_ITEMS, PRESET_ITEMS, TRAFFIC_SIDE_ITEMS, RkaBuildError,
-                                active_marker_position, build_curb, build_intersection_geometry,
-                                clear_generated_mesh_objects, join_meshes, parent_collection_of)
+                                active_marker_position, arm_or_port_anchor, build_curb,
+                                build_intersection_geometry, clear_generated_mesh_objects,
+                                join_meshes, parent_collection_of, _resolve_curb_asset,
+                                _live_edit_target_collection, get_or_create_origin_marker)
 
 _ik = None
 
@@ -294,6 +296,18 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
         name="Curb Style (Right)", items=CURB_STYLE_ITEMS, default='BOX',
         description="Independent of the left side -- e.g. a curb on the sidewalk side and NONE "
                      "on a shoulder/merge side")
+    curb_asset_collection: bpy.props.StringProperty(
+        name="Curb Asset Piece", description="Name of a linked kit/curb_kit.blend collection's "
+        "mesh object to repeat, when a Curb Style above is 'Asset'. Use 'Link Curb Kit Library' "
+        "first", default="")
+    curb_asset_spacing: bpy.props.FloatProperty(
+        name="Curb Asset Spacing", description="Distance between repeated instances -- should "
+        "equal the chosen piece's own local X length (see its 'rka_curb_asset_length' custom "
+        "property) for seamless tiling", default=2.0, min=0.1, unit='LENGTH')
+    curb_asset_rot_offset_r: bpy.props.FloatProperty(
+        name="Curb Asset R-Side Rotation Offset", default=180.0,
+        description="Extra Z rotation (deg) for the right-side asset row -- 180 keeps an "
+                     "asymmetric piece's front face pointing away from the road on both sides")
     traffic_side: bpy.props.EnumProperty(
         name="Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT',
         description="Which physical lateral half of this segment carries Lanes Forward vs. "
@@ -324,6 +338,11 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
         name="Join Into One Mesh", default=False,
         description="Combine the spine's pavement + curb wall(s) into a single mesh object "
                      "after building")
+    auto_lane_markings: bpy.props.BoolProperty(
+        name="Auto Lane Markings", default=True,
+        description="Generate dashed white internal-lane boundaries and a solid yellow "
+                     "forward/backward boundary automatically (see Marking Dash/Gap Length in "
+                     "the panel, and 'Add Marking Gap' to clear a stretch afterward)")
     auto_advance_cursor: bpy.props.BoolProperty(
         name="Auto-Advance Cursor", default=True,
         description="Move the 3D cursor to this segment's end point after building, so the NEXT "
@@ -337,6 +356,10 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
         name="Export .glb", description="Optional: export the built visual geometry (spine "
         "pavement + curb wall(s) -- not the lanecl_* data curves) to a .glb here. Blank = skip",
         default="", subtype='FILE_PATH')
+
+    def invoke(self, context, event):
+        self.traffic_side = context.scene.rka.default_traffic_side
+        return self.execute(context)
 
     def execute(self, context):
         if self.lanes == 0 and self.lanes_backward == 0:
@@ -368,7 +391,10 @@ class RKA_OT_build_straight_segment(bpy.types.Operator):
             context, parent_coll, pts, self.lane_width, self.lanes, self.lanes_backward,
             self.curb_l_style, self.curb_r_style, self.curb_height, self.curb_thickness,
             self.join_visual_mesh, self.export_path, self.gltf_export_path,
-            traffic_side=self.traffic_side)
+            traffic_side=self.traffic_side, curb_asset_collection=self.curb_asset_collection,
+            curb_asset_spacing=self.curb_asset_spacing,
+            curb_asset_rot_offset_r=self.curb_asset_rot_offset_r,
+            auto_lane_markings=self.auto_lane_markings)
 
         for w in result["warnings"]:
             self.report({'WARNING'}, w)
@@ -437,6 +463,15 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
         description="Crest/dip bump (m) at the segment's midpoint")
     curb_l_style: bpy.props.EnumProperty(name="Curb Style (Left)", items=CURB_STYLE_ITEMS, default='BOX')
     curb_r_style: bpy.props.EnumProperty(name="Curb Style (Right)", items=CURB_STYLE_ITEMS, default='BOX')
+    curb_asset_collection: bpy.props.StringProperty(
+        name="Curb Asset Piece", description="Linked kit/curb_kit.blend collection's mesh "
+        "object, when a Curb Style above is 'Asset'", default="")
+    curb_asset_spacing: bpy.props.FloatProperty(
+        name="Curb Asset Spacing", default=2.0, min=0.1, unit='LENGTH')
+    curb_asset_rot_offset_r: bpy.props.FloatProperty(
+        name="Curb Asset R-Side Rotation Offset", default=180.0,
+        description="Extra Z rotation (deg) for the right-side asset row -- 180 keeps an "
+                     "asymmetric piece's front face pointing away from the road on both sides")
     curb_height: bpy.props.FloatProperty(name="Curb Height", default=0.15, min=0.01, unit='LENGTH')
     curb_thickness: bpy.props.FloatProperty(name="Curb Thickness", default=0.25, min=0.01, unit='LENGTH')
     join_visual_mesh: bpy.props.BoolProperty(
@@ -460,11 +495,10 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
                                     "'arm_*' marker Empties, first")
             return {'CANCELLED'}
         arms = custom_props.read_arms(coll)
-        origin = custom_props.read_origin(coll)
-        tail_length = coll.get("rka_tail_length", 12.0)
+        marker = get_or_create_origin_marker(coll, custom_props.read_origin(coll))
         lane_width = coll.get("rka_lane_width", 5.0)
         traffic_side = coll.get("rka_traffic_side", "LEFT")
-        if arms is None or origin is None:
+        if arms is None or marker is None:
             self.report({'ERROR'}, "'%s' has no stored arm data -- was it built by 'Build "
                                     "Intersection'?" % coll.name)
             return {'CANCELLED'}
@@ -491,8 +525,16 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
         lanes_forward = 0 if arm_oneway == 'IN' else forward_lanes
         lanes_backward = 0 if arm_oneway == 'OUT' else arm_lanes
 
+        # Prefer THIS arm's own tail length (set by `rebuild_intersection_in_place` whenever the
+        # arm was individually dragged/snapped to a non-default distance) over the collection's
+        # shared `rka_tail_length` -- otherwise an extended segment would start `tail_length`
+        # short of/past an arm that was deliberately relocated, not at its actual current tip.
+        default_tail = coll.get("rka_tail_length", 12.0)
+        tail_length = (arm_obj.get("rka_arm_tail_length", default_tail)
+                       if arm_obj is not None else default_tail)
+
         rad = math.radians(angle_deg)
-        ox, oy, oz = origin
+        ox, oy, oz = marker.location.x, marker.location.y, marker.location.z
         px = ox + tail_length * math.cos(rad)
         py = oy + tail_length * math.sin(rad)
 
@@ -510,7 +552,10 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
                 context, parent_collection_of(coll), pts, lane_width, lanes_forward,
                 lanes_backward, self.curb_l_style, self.curb_r_style, self.curb_height,
                 self.curb_thickness, self.join_visual_mesh, self.export_path,
-                self.gltf_export_path, traffic_side=traffic_side)
+                self.gltf_export_path, traffic_side=traffic_side,
+                curb_asset_collection=self.curb_asset_collection,
+                curb_asset_spacing=self.curb_asset_spacing,
+                curb_asset_rot_offset_r=self.curb_asset_rot_offset_r)
         except RkaBuildError as exc:
             self.report({'ERROR'}, str(exc))
             return {'CANCELLED'}
@@ -519,6 +564,91 @@ class RKA_OT_extend_from_arm(bpy.types.Operator):
             self.report({'WARNING'}, w)
         self.report({'INFO'}, "Extended '%s' arm '%s' by %.1fm, curve-backed%s" %
                      (coll.name, arm_name, self.length, result["export_note"]))
+        return {'FINISHED'}
+
+
+class RKA_OT_extend_from_port(bpy.types.Operator):
+    """Extend a new straight segment outward from an existing plain segment's `port_A`/`port_B`
+    end marker (see `ops_segment._place_segment_ports`), continuing with the SAME lane width/
+    lane counts/curb styles/traffic side/curb asset settings the source segment was built with --
+    the segment counterpart of `RKA_OT_extend_from_arm`, for the common "keep building the road
+    from where I left off" workflow without retyping every setting.
+
+    Click a `port_A`/`port_B` marker Empty (the small arrow at each end of a plain GN segment)
+    first -- poll fails otherwise."""
+    bl_idname = "rka.extend_from_port"
+    bl_label = "Extend From Port"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    length: bpy.props.FloatProperty(name="Length", default=40.0, min=1.0, unit='LENGTH')
+    bend: bpy.props.FloatProperty(name="Bend", default=0.0)
+    curve_segments: bpy.props.IntProperty(name="Curve Segments", default=8, min=2, max=32)
+    elevation_delta: bpy.props.FloatProperty(
+        name="Elevation Delta", default=0.0, unit='LENGTH',
+        description="Constant grade/slope from the port to this segment's far end")
+    bend_z: bpy.props.FloatProperty(
+        name="Vertical Bend", default=0.0, unit='LENGTH',
+        description="Crest/dip bump (m) at the segment's midpoint")
+    join_visual_mesh: bpy.props.BoolProperty(name="Join Into One Mesh", default=False)
+    export_path: bpy.props.StringProperty(
+        name="Export .lanekit.json", default="", subtype='FILE_PATH')
+    gltf_export_path: bpy.props.StringProperty(
+        name="Export .glb", default="", subtype='FILE_PATH')
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and "rka_port" in obj.keys() and obj.users_collection
+
+    def execute(self, context):
+        port_obj = context.active_object
+        if port_obj is None or "rka_port" not in port_obj.keys() or not port_obj.users_collection:
+            self.report({'ERROR'}, "Select a 'port_A'/'port_B' marker Empty first")
+            return {'CANCELLED'}
+        coll = port_obj.users_collection[0]
+        if "rka_curve_object" not in coll.keys() or "rka_lanes_a" in coll.keys():
+            self.report({'ERROR'}, "'%s' is not a plain GN segment" % coll.name)
+            return {'CANCELLED'}
+
+        lane_width = coll.get("rka_lane_width", 5.0)
+        lanes = coll.get("rka_lanes", 1)
+        lanes_backward = coll.get("rka_lanes_backward", lanes)
+        curb_l_style = coll.get("rka_curb_l_style", 'BOX')
+        curb_r_style = coll.get("rka_curb_r_style", 'BOX')
+        curb_height = coll.get("rka_curb_height", 0.15)
+        curb_thickness = coll.get("rka_curb_thickness", 0.25)
+        curb_asset_collection = coll.get("rka_curb_asset_collection", "")
+        curb_asset_spacing = coll.get("rka_curb_asset_spacing", 2.0)
+        curb_asset_rot_offset_r = coll.get("rka_curb_asset_rot_offset_r", 180.0)
+        auto_lane_markings = coll.get("rka_auto_lane_markings", True)
+        traffic_side = coll.get("rka_traffic_side", "LEFT")
+
+        angle_deg = port_obj.get("rka_port_heading_deg", 0.0)
+        rad = math.radians(angle_deg)
+        px, py, z = port_obj.location.x, port_obj.location.y, port_obj.location.z
+        p0 = (px, py)
+        p1 = (px + self.length * math.cos(rad), py + self.length * math.sin(rad))
+        k = ik()
+        pts = k.segment_spine_3d(p0, p1, self.bend, self.curve_segments, 0.0,
+                                  self.elevation_delta, self.bend_z)
+        pts = [(x, y, z + zr) for (x, y, zr) in pts]
+
+        try:
+            result = _build_segment_from_points(
+                context, parent_collection_of(coll), pts, lane_width, lanes, lanes_backward,
+                curb_l_style, curb_r_style, curb_height, curb_thickness, self.join_visual_mesh,
+                self.export_path, self.gltf_export_path, traffic_side=traffic_side,
+                curb_asset_collection=curb_asset_collection, curb_asset_spacing=curb_asset_spacing,
+                curb_asset_rot_offset_r=curb_asset_rot_offset_r,
+                auto_lane_markings=auto_lane_markings)
+        except RkaBuildError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
+        for w in result["warnings"]:
+            self.report({'WARNING'}, w)
+        self.report({'INFO'}, "Extended '%s' from '%s' by %.1fm%s" %
+                     (coll.name, port_obj.name, self.length, result["export_note"]))
         return {'FINISHED'}
 
 
@@ -718,33 +848,95 @@ class RKA_OT_adjust_segment_lanes(bpy.types.Operator):
         return {'FINISHED'}
 
 
+def _heading_deg(a, b):
+    return math.degrees(math.atan2(b[1] - a[1], b[0] - a[0]))
+
+
+def _place_segment_ports(coll, pts, lane_width):
+    """Create/re-snap `port_A`/`port_B` marker Empties at the spine's first/last points -- pure
+    CLICK TARGETS for `active_marker_position`/`RKA_OT_extend_from_port` (so a new segment,
+    intersection, or lane transition can start exactly at the end of an existing plain segment,
+    the same way `arm_*` markers already let you continue from an intersection), NOT drag
+    handles: a GN segment's own control points, edited via Edit Mode on the spine itself, are the
+    live-edited source of truth (see `kit_common.road_spine`) -- dragging a port marker does
+    nothing to the geometry, and the marker gets silently re-snapped back to the spine's current
+    endpoint on the next rebuild anyway.
+
+    Deliberately tagged `rka_port` -- NOT `rka_segend` (the legacy ribbon path's marker key) --
+    because `live_edit.py`'s depsgraph handler routes ANY `rka_segend`-tagged marker's owning
+    collection to the LEGACY `rebuild_segment_in_place` (ribbon) rebuild, which would corrupt a
+    modern GN segment's geometry (wrong object set, spine ignored). A key `live_edit.py` doesn't
+    recognize at all means dragging one is simply inert, which is exactly the intended behavior.
+
+    Idempotent (find existing by `rka_port` value within `coll` and update in place, else
+    create) so this same call from `_populate_segment_mesh_gn` handles BOTH the fresh-build case
+    and the re-snap-after-a-spine-edit case with no separate code path to drift out of sync."""
+    ends = (("A", pts[0], _heading_deg(pts[1], pts[0])),      # outward = away from the segment
+            ("B", pts[-1], _heading_deg(pts[-2], pts[-1])))
+    size = min(1.2, lane_width * 0.25)
+    for tag, pos, hd in ends:
+        port = next((o for o in coll.objects if o.get("rka_port") == tag), None)
+        if port is None:
+            port = bpy.data.objects.new("port_%s" % tag, None)
+            port.empty_display_type = 'SINGLE_ARROW'
+            port.empty_display_size = size
+            port["rka_port"] = tag
+            coll.objects.link(port)
+        port.location = pos
+        port.rotation_euler = (0.0, 0.0, math.radians(hd))
+        port["rka_port_heading_deg"] = hd
+
+
 def _populate_segment_mesh_gn(context, coll, spine_obj, lane_width, lanes, lanes_backward,
                                curb_l_style, curb_r_style, curb_height, curb_thickness,
-                               join_visual_mesh, traffic_side='LEFT'):
+                               join_visual_mesh, traffic_side='LEFT', curb_asset_obj=None,
+                               curb_asset_spacing=2.0, curb_asset_rot_offset_r=180.0,
+                               auto_lane_markings=True, marking_gaps=None):
     """Curb + lanecl_* objects for a segment whose PAVEMENT already lives on `spine_obj` itself
     (a live `GN_RoadProfile` modifier -- see `kit_common.road_spine`). Curbs are
     `paths.kc.curb_loop(closed=False)` (GN, correctly mitered even on a multi-point bent spine)
     from the SAME tangent-offset points `intersection_kit.build_segment_from_spine` already
     computes for its `curbs` field (radius 0 everywhere -- an open curb line has no corners to
-    fillet). `lanecl_*` data curves are unchanged. Independent `curb_l_style`/`curb_r_style`
-    (either may be 'NONE'). Returns `visual_objs` INCLUDING `spine_obj` itself, so join/export
-    naturally pick up the pavement mesh too. Does NOT touch/recreate `spine_obj` -- its own
-    control points are the live-edited source of truth (see `rebuild_segment_gn_in_place`)."""
+    fillet), UNLESS that side's style is 'ASSET' -- then `build_curb`/`kit_common.curb_asset_row`
+    repeats `curb_asset_obj` along the same points instead (curb_loop's GN sweep is the wrong
+    technique for discrete repeated objects). `curb_asset_rot_offset_r` (default 180) spins the
+    R-side row so an asymmetric asset piece's front face keeps facing away from the road on both
+    sides (see kit/build_curb_kit.py) -- the L side always uses offset 0. `lanecl_*` data curves
+    are unchanged. Independent `curb_l_style`/`curb_r_style` (either may be 'NONE'/'ASSET'/etc).
+    Returns `visual_objs` INCLUDING `spine_obj` itself, so join/export naturally pick up the
+    pavement mesh too. Does NOT touch/recreate `spine_obj` -- its own control points are the
+    live-edited source of truth (see `rebuild_segment_gn_in_place`)."""
     k = ik()
     spine = _spine_control_points(spine_obj)
+    _place_segment_ports(coll, spine, lane_width)
+    origin_marker = get_or_create_origin_marker(coll, tuple(spine[0]))
+    if origin_marker is not None:
+        origin_marker.location = spine[0]
     seg = k.build_segment_from_spine(spine, lane_width, lanes, lanes_backward, segment_id="SEG",
                                       traffic_side=traffic_side)
 
     visual_objs = [spine_obj]
     left_pts, right_pts = seg["curbs"]
-    left = paths.kc.curb_loop(
-        "curb_%s_L" % coll.name, [(p[0], p[1], p[2], 0.0) for p in left_pts], coll,
-        curb_style=curb_l_style, curb_height=curb_height, curb_thickness=curb_thickness,
-        closed=False)
-    right = paths.kc.curb_loop(
-        "curb_%s_R" % coll.name, [(p[0], p[1], p[2], 0.0) for p in right_pts], coll,
-        curb_style=curb_r_style, curb_height=curb_height, curb_thickness=curb_thickness,
-        closed=False)
+    left_name, right_name = "curb_%s_L" % coll.name, "curb_%s_R" % coll.name
+    if curb_l_style == 'ASSET':
+        left = build_curb(left_name, [(p[0], p[1], p[2]) for p in left_pts], coll, 'ASSET',
+                           curb_height, curb_thickness, asset_obj=curb_asset_obj,
+                           asset_spacing=curb_asset_spacing, asset_rot_offset=0.0)
+    else:
+        left = paths.kc.curb_loop(
+            left_name, [(p[0], p[1], p[2], 0.0) for p in left_pts], coll,
+            curb_style=curb_l_style, curb_height=curb_height, curb_thickness=curb_thickness,
+            closed=False)
+    if curb_r_style == 'ASSET':
+        right = build_curb(right_name, [(p[0], p[1], p[2]) for p in right_pts], coll, 'ASSET',
+                            curb_height, curb_thickness, asset_obj=curb_asset_obj,
+                            asset_spacing=curb_asset_spacing,
+                            asset_rot_offset=curb_asset_rot_offset_r)
+    else:
+        right = paths.kc.curb_loop(
+            right_name, [(p[0], p[1], p[2], 0.0) for p in right_pts], coll,
+            curb_style=curb_r_style, curb_height=curb_height, curb_thickness=curb_thickness,
+            closed=False)
     visual_objs += [o for o in (left, right) if o is not None]
 
     for m in seg["lanes"]:
@@ -757,13 +949,52 @@ def _populate_segment_mesh_gn(context, coll, spine_obj, lane_width, lanes, lanes
         joined = join_meshes(context, visual_objs, "mesh_%s" % coll.name)
         visual_objs = [joined] if joined else visual_objs
 
+    # Markings are deliberately kept OUT of join_visual_mesh's combine (same rationale
+    # kit_common.lane_marking_strip's docstring already gives for Tier-1 seam marking: separate
+    # objects can later be swapped for a dashed/textured decal without touching lane geometry) --
+    # added to visual_objs AFTER the join so gltf_export_path still exports them.
+    visual_objs += _populate_lane_markings(
+        context, coll, spine, lane_width, lanes, lanes_backward, traffic_side,
+        auto_lane_markings=auto_lane_markings, marking_gaps=marking_gaps)
+
     return visual_objs
+
+
+def _populate_lane_markings(context, coll, spine, lane_width, lanes, lanes_backward, traffic_side,
+                             auto_lane_markings=True, marking_gaps=None):
+    """mark_* objects (dashed white internal-lane boundaries + a solid yellow forward/backward
+    boundary, see `intersection_kit.build_segment_lane_markings`/`kit_common.marking_ribbon`) for
+    one segment's spine. `marking_gaps` -- see `RKA_OT_add_marking_gap` -- is a list of
+    `(t0, t1)` normalized-arc-length exclusion ranges (persisted as the segment Collection's
+    `rka_marking_gaps` custom property) so a manually-cleared stretch (a driveway crossing, a
+    merge zone) SURVIVES the addon's delete-and-rebuild-from-scratch live-edit cycle instead of
+    reappearing on the next drag -- see `rebuild_segment_gn_in_place`, which reads it back off
+    `coll` and passes it here; a fresh build has none yet, so it defaults to empty. A no-op
+    (returns []) when `auto_lane_markings` is False."""
+    if not auto_lane_markings:
+        return []
+    rka = context.scene.rka
+    gaps = list(marking_gaps or [])
+    markings = ik().build_segment_lane_markings(spine, lane_width, lanes, lanes_backward, traffic_side)
+    objs = []
+    for i, m in enumerate(markings):
+        matkey = "line_y" if m["kind"] == "yellow" else "line_w"
+        dash_len = 0.0 if m["kind"] == "yellow" else rka.marking_dash_length
+        gap_len = 0.0 if m["kind"] == "yellow" else rka.marking_gap_length
+        obj = paths.kc.marking_ribbon(
+            "mark_%s_%s_%d" % (coll.name, m["kind"], i), m["points"], rka.lane_marking_width / 2.0,
+            coll, matkey, dash_len=dash_len, gap_len=gap_len, exclude_ranges=gaps)
+        if obj is not None:
+            objs.append(obj)
+    return objs
 
 
 def _build_segment_from_points(context, parent_coll, pts, lane_width, lanes, lanes_backward,
                                 curb_l_style, curb_r_style, curb_height, curb_thickness,
                                 join_visual_mesh, export_path, gltf_export_path,
-                                base_name="Segment", traffic_side='LEFT'):
+                                base_name="Segment", traffic_side='LEFT',
+                                curb_asset_collection="", curb_asset_spacing=2.0,
+                                curb_asset_rot_offset_r=180.0, auto_lane_markings=True):
     """Shared core behind BOTH `RKA_OT_build_straight_segment` (`pts` from p0/p1/bend, via
     `intersection_kit.segment_spine_3d`) and `RKA_OT_build_segment_from_curve` (`pts` sampled ONCE
     from an externally authored curve, to seed this new self-contained spine) -- a NEW collection
@@ -781,12 +1012,24 @@ def _build_segment_from_points(context, parent_coll, pts, lane_width, lanes, lan
         n += 1
     coll = bpy.data.collections.new(base_name + ("_%03d" % n))
     parent_coll.children.link(coll)
+    # Same visible/clickable "grab the whole piece from here" anchor RKA_OT_build_intersection
+    # gives every intersection -- see get_or_create_origin_marker's docstring. Purely a UX handle
+    # for a plain/curve segment: the geometry itself already re-derives from the SPINE object's
+    # own live matrix_world (_spine_control_points), so nothing downstream reads this marker's
+    # position for math -- it exists so Freeze For Move / Unfreeze & Rebuild / Rebuild From
+    # Handles have an obvious, consistently-named target to click, instead of relying on the user
+    # finding the (often curb-occluded) spine curve itself. Re-snapped to the spine's current
+    # start point on every rebuild (see rebuild_segment_gn_in_place).
+    get_or_create_origin_marker(coll, tuple(pts[0]))
 
     spine_obj = paths.kc.road_spine("spine_%s" % coll.name, pts, coll, half_w, matkey="asphalt")
 
+    curb_asset_obj = _resolve_curb_asset(curb_asset_collection)
     visual_objs = _populate_segment_mesh_gn(
         context, coll, spine_obj, lane_width, lanes, lanes_backward, curb_l_style, curb_r_style,
-        curb_height, curb_thickness, join_visual_mesh, traffic_side)
+        curb_height, curb_thickness, join_visual_mesh, traffic_side, curb_asset_obj=curb_asset_obj,
+        curb_asset_spacing=curb_asset_spacing, curb_asset_rot_offset_r=curb_asset_rot_offset_r,
+        auto_lane_markings=auto_lane_markings)
 
     # rka_p0/p1 (first/last point) are an approximation for anything downstream expecting the old
     # 2-point model (e.g. RKA_OT_insert_intersection_on_segment) -- accurate for a straight/gently
@@ -796,6 +1039,8 @@ def _build_segment_from_points(context, parent_coll, pts, lane_width, lanes, lan
         coll, lane_width=lane_width, lanes=lanes, lanes_backward=lanes_backward,
         curb_l_style=curb_l_style, curb_r_style=curb_r_style, curb_height=curb_height,
         curb_thickness=curb_thickness, curve_object=spine_obj.name, traffic_side=traffic_side,
+        curb_asset_collection=curb_asset_collection or None, curb_asset_spacing=curb_asset_spacing,
+        curb_asset_rot_offset_r=curb_asset_rot_offset_r, auto_lane_markings=auto_lane_markings,
         p0=list(pts[0]), p1=list(pts[-1]))
 
     warnings = []
@@ -898,16 +1143,31 @@ class RKA_OT_build_segment_from_curve(bpy.types.Operator):
                      "ONE-WAY road")
     curb_l_style: bpy.props.EnumProperty(name="Curb Style (Left)", items=CURB_STYLE_ITEMS, default='BOX')
     curb_r_style: bpy.props.EnumProperty(name="Curb Style (Right)", items=CURB_STYLE_ITEMS, default='BOX')
+    curb_asset_collection: bpy.props.StringProperty(
+        name="Curb Asset Piece", description="Linked kit/curb_kit.blend collection's mesh "
+        "object, when a Curb Style above is 'Asset'", default="")
+    curb_asset_spacing: bpy.props.FloatProperty(
+        name="Curb Asset Spacing", default=2.0, min=0.1, unit='LENGTH')
+    curb_asset_rot_offset_r: bpy.props.FloatProperty(
+        name="Curb Asset R-Side Rotation Offset", default=180.0)
     traffic_side: bpy.props.EnumProperty(name="Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT')
     curb_height: bpy.props.FloatProperty(name="Curb Height", default=0.15, min=0.01, unit='LENGTH')
     curb_thickness: bpy.props.FloatProperty(name="Curb Thickness", default=0.25, min=0.01, unit='LENGTH')
     join_visual_mesh: bpy.props.BoolProperty(name="Join Into One Mesh", default=False)
+    auto_lane_markings: bpy.props.BoolProperty(
+        name="Auto Lane Markings", default=True,
+        description="Generate dashed white internal-lane boundaries and a solid yellow "
+                     "forward/backward boundary automatically")
     export_path: bpy.props.StringProperty(
         name="Export .lanekit.json", default="", subtype='FILE_PATH')
 
     @classmethod
     def poll(cls, context):
         return _resolve_curve_object(context, "") is not None
+
+    def invoke(self, context, event):
+        self.traffic_side = context.scene.rka.default_traffic_side
+        return self.execute(context)
 
     def execute(self, context):
         curve_obj = _resolve_curve_object(context, self.curve_object)
@@ -928,7 +1188,10 @@ class RKA_OT_build_segment_from_curve(bpy.types.Operator):
                 context, parent_coll, spine, self.lane_width, self.lanes, self.lanes_backward,
                 self.curb_l_style, self.curb_r_style, self.curb_height, self.curb_thickness,
                 self.join_visual_mesh, self.export_path, "", base_name="SegmentCurve",
-                traffic_side=self.traffic_side)
+                traffic_side=self.traffic_side, curb_asset_collection=self.curb_asset_collection,
+                curb_asset_spacing=self.curb_asset_spacing,
+                curb_asset_rot_offset_r=self.curb_asset_rot_offset_r,
+                auto_lane_markings=self.auto_lane_markings)
         except RkaBuildError as exc:
             self.report({'ERROR'}, str(exc))
             return {'CANCELLED'}
@@ -973,13 +1236,21 @@ def rebuild_segment_gn_in_place(context, coll):
     curb_r_style = coll.get("rka_curb_r_style", coll.get("rka_curb_style", 'BOX'))
     curb_height = coll.get("rka_curb_height", 0.15)
     curb_thickness = coll.get("rka_curb_thickness", 0.25)
+    curb_asset_obj = _resolve_curb_asset(coll.get("rka_curb_asset_collection", ""))
+    curb_asset_spacing = coll.get("rka_curb_asset_spacing", 2.0)
+    curb_asset_rot_offset_r = coll.get("rka_curb_asset_rot_offset_r", 180.0)
+    auto_lane_markings = coll.get("rka_auto_lane_markings", True)
+    marking_gaps = [tuple(g) for g in coll.get("rka_marking_gaps", [])]
     join_visual_mesh = any(o.name.startswith("mesh_") for o in coll.objects)
     traffic_side = coll.get("rka_traffic_side", "LEFT")
 
     clear_generated_mesh_objects(coll)
     _populate_segment_mesh_gn(context, coll, spine_obj, lane_width, lanes, lanes_backward,
                                curb_l_style, curb_r_style, curb_height, curb_thickness,
-                               join_visual_mesh, traffic_side)
+                               join_visual_mesh, traffic_side, curb_asset_obj=curb_asset_obj,
+                               curb_asset_spacing=curb_asset_spacing,
+                               curb_asset_rot_offset_r=curb_asset_rot_offset_r,
+                               auto_lane_markings=auto_lane_markings, marking_gaps=marking_gaps)
     coll["rka_p0"] = list(spine[0])
     coll["rka_p1"] = list(spine[-1])
 
@@ -988,22 +1259,94 @@ def rebuild_segment_gn_in_place(context, coll):
 rebuild_segment_from_curve_in_place = rebuild_segment_gn_in_place
 
 
+class RKA_OT_add_marking_gap(bpy.types.Operator):
+    """Append a `[t0, t1]` exclusion range (normalized 0=start/1=end along the active segment's
+    spine) to its `rka_marking_gaps` custom property and rebuild markings in place -- the "clear
+    lane markings across a driveway/merge zone" answer. Survives live-edit rebuilds because it's
+    a persisted custom property read back by `_populate_lane_markings` on every rebuild, NOT a
+    delete-the-object action -- hand-deleting a `mark_*` object directly would just get recreated
+    by the next drag's `clear_generated_mesh_objects` + rebuild sweep.
+
+    Select a plain (non-transition) GN segment's spine, one of its `segend_*`/`segbend` markers,
+    or activate its collection first -- poll fails otherwise."""
+    bl_idname = "rka.add_marking_gap"
+    bl_label = "Add Marking Gap"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    t0: bpy.props.FloatProperty(name="From", default=0.4, min=0.0, max=1.0)
+    t1: bpy.props.FloatProperty(name="To", default=0.6, min=0.0, max=1.0)
+
+    @classmethod
+    def poll(cls, context):
+        coll = _live_edit_target_collection(context)
+        return (coll is not None and "rka_curve_object" in coll.keys()
+                and "rka_lanes_a" not in coll.keys())
+
+    def execute(self, context):
+        coll = _live_edit_target_collection(context)
+        if coll is None or "rka_curve_object" not in coll.keys() or "rka_lanes_a" in coll.keys():
+            self.report({'ERROR'}, "Select a plain segment (not a lane transition) first")
+            return {'CANCELLED'}
+        t0, t1 = sorted((self.t0, self.t1))
+        gaps = [list(g) for g in coll.get("rka_marking_gaps", [])]
+        gaps.append([t0, t1])
+        coll["rka_marking_gaps"] = gaps
+        rebuild_segment_gn_in_place(context, coll)
+        self.report({'INFO'}, "Added marking gap [%.2f, %.2f] to '%s'" % (t0, t1, coll.name))
+        return {'FINISHED'}
+
+
+class RKA_OT_clear_marking_gaps(bpy.types.Operator):
+    """Remove every marking gap from the active segment and rebuild -- the inverse of
+    `RKA_OT_add_marking_gap`."""
+    bl_idname = "rka.clear_marking_gaps"
+    bl_label = "Clear Marking Gaps"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        coll = _live_edit_target_collection(context)
+        return coll is not None and bool(coll.get("rka_marking_gaps"))
+
+    def execute(self, context):
+        coll = _live_edit_target_collection(context)
+        coll["rka_marking_gaps"] = []
+        rebuild_segment_gn_in_place(context, coll)
+        self.report({'INFO'}, "Cleared marking gaps on '%s'" % coll.name)
+        return {'FINISHED'}
+
+
 def _populate_transition_visuals(context, coll, spine_obj, seg, lane_width, curb_l_style,
-                                  curb_r_style, curb_height, curb_thickness, join_visual_mesh):
+                                  curb_r_style, curb_height, curb_thickness, join_visual_mesh,
+                                  curb_asset_obj=None, curb_asset_spacing=2.0,
+                                  curb_asset_rot_offset_r=180.0):
     """Curb + lanecl_* objects for a lane-count transition piece, from an already-computed
     `intersection_kit.build_lane_transition` result `seg` -- shared by
     `RKA_OT_build_lane_transition` and `rebuild_lane_transition_in_place` so they can't drift
-    apart, same reasoning as every other paired build/rebuild function in this addon."""
+    apart, same reasoning as every other paired build/rebuild function in this addon. See
+    `_populate_segment_mesh_gn`'s docstring for the ASSET-style curb_asset_* parameters."""
     visual_objs = [spine_obj]
     left_pts, right_pts = seg["curbs"]
-    left = paths.kc.curb_loop(
-        "curb_%s_L" % coll.name, [(p[0], p[1], p[2], 0.0) for p in left_pts], coll,
-        curb_style=curb_l_style, curb_height=curb_height, curb_thickness=curb_thickness,
-        closed=False)
-    right = paths.kc.curb_loop(
-        "curb_%s_R" % coll.name, [(p[0], p[1], p[2], 0.0) for p in right_pts], coll,
-        curb_style=curb_r_style, curb_height=curb_height, curb_thickness=curb_thickness,
-        closed=False)
+    left_name, right_name = "curb_%s_L" % coll.name, "curb_%s_R" % coll.name
+    if curb_l_style == 'ASSET':
+        left = build_curb(left_name, [(p[0], p[1], p[2]) for p in left_pts], coll, 'ASSET',
+                           curb_height, curb_thickness, asset_obj=curb_asset_obj,
+                           asset_spacing=curb_asset_spacing, asset_rot_offset=0.0)
+    else:
+        left = paths.kc.curb_loop(
+            left_name, [(p[0], p[1], p[2], 0.0) for p in left_pts], coll,
+            curb_style=curb_l_style, curb_height=curb_height, curb_thickness=curb_thickness,
+            closed=False)
+    if curb_r_style == 'ASSET':
+        right = build_curb(right_name, [(p[0], p[1], p[2]) for p in right_pts], coll, 'ASSET',
+                            curb_height, curb_thickness, asset_obj=curb_asset_obj,
+                            asset_spacing=curb_asset_spacing,
+                            asset_rot_offset=curb_asset_rot_offset_r)
+    else:
+        right = paths.kc.curb_loop(
+            right_name, [(p[0], p[1], p[2], 0.0) for p in right_pts], coll,
+            curb_style=curb_r_style, curb_height=curb_height, curb_thickness=curb_thickness,
+            closed=False)
     visual_objs += [o for o in (left, right) if o is not None]
 
     for m in seg["lanes"]:
@@ -1059,12 +1402,37 @@ class RKA_OT_build_lane_transition(bpy.types.Operator):
         ), default='right')
     curb_l_style: bpy.props.EnumProperty(name="Curb Style (Left)", items=CURB_STYLE_ITEMS, default='BOX')
     curb_r_style: bpy.props.EnumProperty(name="Curb Style (Right)", items=CURB_STYLE_ITEMS, default='BOX')
+    curb_asset_collection: bpy.props.StringProperty(
+        name="Curb Asset Piece", description="Linked kit/curb_kit.blend collection's mesh "
+        "object, when a Curb Style above is 'Asset'", default="")
+    curb_asset_spacing: bpy.props.FloatProperty(
+        name="Curb Asset Spacing", default=2.0, min=0.1, unit='LENGTH')
+    curb_asset_rot_offset_r: bpy.props.FloatProperty(
+        name="Curb Asset R-Side Rotation Offset", default=180.0)
     traffic_side: bpy.props.EnumProperty(name="Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT')
     curb_height: bpy.props.FloatProperty(name="Curb Height", default=0.15, min=0.01, unit='LENGTH')
     curb_thickness: bpy.props.FloatProperty(name="Curb Thickness", default=0.25, min=0.01, unit='LENGTH')
     join_visual_mesh: bpy.props.BoolProperty(name="Join Into One Mesh", default=False)
     export_path: bpy.props.StringProperty(
         name="Export .lanekit.json", default="", subtype='FILE_PATH')
+
+    def invoke(self, context, event):
+        self.traffic_side = context.scene.rka.default_traffic_side
+        # Anchored build: an arm_*/port_* marker is active -- prefill Direction and Lanes A/
+        # Backward A so the redo panel already shows a transition facing the right way with
+        # matching lane counts. No position offset is needed here (unlike
+        # `RKA_OT_build_intersection`'s anchored build) -- a transition's own start point can sit
+        # exactly at the marker's position with no gap, and `execute()`'s existing
+        # `active_marker_position` call below already places it there.
+        anchor = arm_or_port_anchor(context)
+        if anchor is not None:
+            _, _, heading_deg, lanes_forward, lanes_backward, _ = anchor
+            self.direction_deg = heading_deg
+            if lanes_forward > 0:
+                self.lanes_a = max(1, min(3, lanes_forward))
+            if lanes_backward != lanes_forward:
+                self.lanes_backward_a = max(0, min(3, lanes_backward))
+        return self.execute(context)
 
     def execute(self, context):
         marker = active_marker_position(context)
@@ -1097,21 +1465,31 @@ class RKA_OT_build_lane_transition(bpy.types.Operator):
             n += 1
         coll = bpy.data.collections.new("Transition_%03d" % n)
         parent_coll.children.link(coll)
+        # Same UX-only anchor plain segments get -- see the matching comment in
+        # _build_segment_from_points. Re-snapped to the spine's current start point on every
+        # rebuild (rebuild_lane_transition_in_place).
+        get_or_create_origin_marker(coll, p0)
 
         half_w_a = max(self.lanes_a, lanes_backward_a or self.lanes_a) * self.lane_width
         half_w_b = max(self.lanes_b, lanes_backward_b or self.lanes_b) * self.lane_width
         spine_obj = paths.kc.road_spine("spine_%s" % coll.name, [p0, p1], coll,
                                          [half_w_a, half_w_b], matkey="asphalt")
 
+        curb_asset_obj = _resolve_curb_asset(self.curb_asset_collection)
         visual_objs = _populate_transition_visuals(
             context, coll, spine_obj, seg, self.lane_width, self.curb_l_style, self.curb_r_style,
-            self.curb_height, self.curb_thickness, self.join_visual_mesh)
+            self.curb_height, self.curb_thickness, self.join_visual_mesh,
+            curb_asset_obj=curb_asset_obj, curb_asset_spacing=self.curb_asset_spacing,
+            curb_asset_rot_offset_r=self.curb_asset_rot_offset_r)
 
         custom_props.write_build_settings(
             coll, lane_width=self.lane_width, lanes_a=self.lanes_a, lanes_b=self.lanes_b,
             lanes_backward_a=self.lanes_backward_a, lanes_backward_b=self.lanes_backward_b,
             align=self.align, curb_l_style=self.curb_l_style, curb_r_style=self.curb_r_style,
             traffic_side=self.traffic_side,
+            curb_asset_collection=self.curb_asset_collection or None,
+            curb_asset_spacing=self.curb_asset_spacing,
+            curb_asset_rot_offset_r=self.curb_asset_rot_offset_r,
             curb_height=self.curb_height, curb_thickness=self.curb_thickness,
             curve_object=spine_obj.name, p0=list(p0), p1=list(p1))
 
@@ -1153,6 +1531,9 @@ def rebuild_lane_transition_in_place(context, coll):
     if len(spine) < 2:
         return
     p0, p1 = spine[0], spine[-1]
+    origin_marker = get_or_create_origin_marker(coll, p0)
+    if origin_marker is not None:
+        origin_marker.location = p0
 
     lane_width = coll.get("rka_lane_width", 5.0)
     lanes_a = coll.get("rka_lanes_a", 2)
@@ -1164,6 +1545,9 @@ def rebuild_lane_transition_in_place(context, coll):
     curb_r_style = coll.get("rka_curb_r_style", 'BOX')
     curb_height = coll.get("rka_curb_height", 0.15)
     curb_thickness = coll.get("rka_curb_thickness", 0.25)
+    curb_asset_obj = _resolve_curb_asset(coll.get("rka_curb_asset_collection", ""))
+    curb_asset_spacing = coll.get("rka_curb_asset_spacing", 2.0)
+    curb_asset_rot_offset_r = coll.get("rka_curb_asset_rot_offset_r", 180.0)
     join_visual_mesh = any(o.name.startswith("mesh_") for o in coll.objects)
     traffic_side = coll.get("rka_traffic_side", "LEFT")
 
@@ -1184,13 +1568,17 @@ def rebuild_lane_transition_in_place(context, coll):
 
     clear_generated_mesh_objects(coll)
     _populate_transition_visuals(context, coll, spine_obj, seg, lane_width, curb_l_style,
-                                  curb_r_style, curb_height, curb_thickness, join_visual_mesh)
+                                  curb_r_style, curb_height, curb_thickness, join_visual_mesh,
+                                  curb_asset_obj=curb_asset_obj, curb_asset_spacing=curb_asset_spacing,
+                                  curb_asset_rot_offset_r=curb_asset_rot_offset_r)
     coll["rka_p0"] = list(p0)
     coll["rka_p1"] = list(p1)
 
 
-CLASSES = (RKA_OT_build_straight_segment, RKA_OT_extend_from_arm, RKA_OT_insert_intersection_on_segment,
-           RKA_OT_adjust_segment_lanes, RKA_OT_build_segment_from_curve, RKA_OT_build_lane_transition)
+CLASSES = (RKA_OT_build_straight_segment, RKA_OT_extend_from_arm, RKA_OT_extend_from_port,
+           RKA_OT_insert_intersection_on_segment,
+           RKA_OT_adjust_segment_lanes, RKA_OT_build_segment_from_curve, RKA_OT_build_lane_transition,
+           RKA_OT_add_marking_gap, RKA_OT_clear_marking_gaps)
 
 
 def register():

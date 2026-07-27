@@ -57,6 +57,30 @@ class RKA_OT_link_kit_library(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class RKA_OT_link_curb_kit_library(bpy.types.Operator):
+    """Link every piece Collection from kit/curb_kit.blend into this file -- the same link=True
+    convention RKA_OT_link_kit_library uses for lane_kit.blend. Once linked, pick a collection's
+    name in 'Curb Asset Piece' on any build operator with Curb Style set to 'Asset'."""
+    bl_idname = "rka.link_curb_kit_library"
+    bl_label = "Link Curb Kit Library"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        if not os.path.exists(paths.CURB_KIT_BLEND):
+            self.report({'ERROR'}, "Curb kit not found: %s (run kit/build_curb_kit.py first)"
+                         % paths.CURB_KIT_BLEND)
+            return {'CANCELLED'}
+        with bpy.data.libraries.load(paths.CURB_KIT_BLEND, link=True) as (src, dst):
+            dst.collections = list(src.collections)
+        linked = [c for c in dst.collections if c is not None]
+        if not linked:
+            self.report({'WARNING'}, "No collections found in %s" % paths.CURB_KIT_BLEND)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Linked %d curb kit piece(s): %s" %
+                     (len(linked), ", ".join(c.name for c in linked)))
+        return {'FINISHED'}
+
+
 class RKA_OT_place_piece(bpy.types.Operator):
     """Click to drop linked instances of the active kit piece on the placement grid; Esc/right-click to stop"""
     bl_idname = "rka.place_piece"
@@ -185,7 +209,8 @@ class RKA_OT_rotate_piece_90(bpy.types.Operator):
         return {'FINISHED'}
 
 
-CLASSES = (RKA_OT_link_kit_library, RKA_OT_place_piece, RKA_OT_duplicate_piece, RKA_OT_rotate_piece_90)
+CLASSES = (RKA_OT_link_kit_library, RKA_OT_link_curb_kit_library, RKA_OT_place_piece,
+           RKA_OT_duplicate_piece, RKA_OT_rotate_piece_90)
 
 
 def register():

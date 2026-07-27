@@ -137,7 +137,7 @@ def safety_floor(coll):
     return b
 
 
-def backbone_graph():
+def backbone_graph(driving_side='LEFT'):
     """Junction-split arterial RoadGraph (lib/road_graph.py): nodes at every gridline
     crossing, one edge per inter-crossing segment, ART_LANES per direction. Replaces the
     old whole-line backbone_lanes pairs — lanes now END at each junction and continue via
@@ -145,9 +145,11 @@ def backbone_graph():
     junctions instead of sailing through and despawning at map edges only.
 
     Edge points are sampled every 4 cells so the emitted marker z (via _flank_z) tracks the
-    seam elevation; road_graph.simplify_polyline then thins the straights back out."""
+    seam elevation; road_graph.simplify_polyline then thins the straights back out.
+    `driving_side` ('LEFT' default, or 'RIGHT') is stamped onto the returned RoadGraph -- see
+    road_graph.generate()'s docstring."""
     import road_graph as rgm
-    rg = rgm.RoadGraph()
+    rg = rgm.RoadGraph(driving_side=driving_side)
     lines = [k * DCELLS * CELL for k in range(GRID_N + 1)]   # grid-space coords of arterials
     step = 4 * CELL
 
@@ -221,6 +223,9 @@ def parse_args():
                     help="include the 14 ArtDeck collision strips")
     ap.add_argument("--with-floor", action="store_true",
                     help="include the world-spanning SafetyFloor slab")
+    ap.add_argument("--driving-side", choices=("LEFT", "RIGHT"), default="LEFT",
+                    help="traffic convention for the arterial backbone RoadGraph (default LEFT, "
+                         "matching the current Tokyo/left-hand-traffic world)")
     a = ap.parse_args(argv)
     if a.full:
         a.with_lanes = a.with_deck = a.with_floor = True
@@ -324,7 +329,7 @@ def build(opts):
     n_lane = n_conn = n_ix = n_deck = 0
     if opts.with_lanes:
         n_lane, n_conn, n_ix = asm.lay_road_graph(
-            backbone_graph(), z_fn=_flank_z, z_off=0.6,
+            backbone_graph(driving_side=opts.driving_side), z_fn=_flank_z, z_off=0.6,
             radius_fn=lambda _rg, _node: ART_STOP_RADIUS)
     if opts.with_deck:
         n_deck = backbone_deck(kc.get_coll("ARTDECK"))

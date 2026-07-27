@@ -126,10 +126,19 @@ class Arm:
     original, still-self-tested convention; 'RIGHT' (keep-right, e.g. US) mirrors it. Every arm of
     ONE junction must share the same value (mixing them within a junction isn't physically
     drivable) -- functions taking an arm pair (`curb_edges`, `_junction_corner_vertex`, ...) read
-    it off `arm_a` only and use that for both sides."""
+    it off `arm_a` only and use that for both sides.
+
+    `tail_length` (default None) -- PER-ARM override of how far this one arm's own tail/ports
+    reach out from the junction center, independent of every other arm's. `None` means "use
+    whatever shared scalar the caller passed in" (e.g. `build_junction_boundary`'s own
+    `tail_length` parameter) -- byte-identical to the old all-arms-share-one-scalar behavior, so
+    every existing preset/caller that never sets this is unaffected. This exists so a live-edited
+    arm marker's ACTUAL distance from the origin (e.g. after Grab+snapping it onto an external
+    segment's port -- see `ops_intersection.rebuild_intersection_in_place`) can be preserved
+    exactly instead of being forced back onto one shared radius on the next rebuild."""
 
     def __init__(self, name, angle_deg, lane_width=5.0, lanes=1, oneway=None, lanes_out=None,
-                 traffic_side='LEFT'):
+                 traffic_side='LEFT', tail_length=None):
         self.name = name
         self.angle_deg = angle_norm(angle_deg)
         self.lane_width = lane_width
@@ -137,6 +146,12 @@ class Arm:
         self.oneway = oneway   # None | 'IN' | 'OUT'
         self.lanes_out = lanes_out   # None = symmetric with `lanes` (back-compat default)
         self.traffic_side = traffic_side   # 'LEFT' | 'RIGHT' -- see class docstring
+        self.tail_length = tail_length   # None = use the caller's shared scalar -- see docstring
+
+    def eff_tail_length(self, shared_tail_length):
+        """This arm's own `tail_length` override if set, else the shared scalar every per-arm
+        geometry function already accepts -- the one place that fallback rule lives."""
+        return self.tail_length if self.tail_length is not None else shared_tail_length
 
     def lanes_in_count(self):
         """How many lanes ARRIVE at the junction along this arm (0 if `oneway == 'OUT'`)."""
@@ -317,9 +332,10 @@ def _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg=2.0)
     base_radius = kerb_radius if lane_headroom <= 1 else \
         kerb_radius + (lane_headroom - 0.5) * max(a.lane_width, b.lane_width)
     if tail_length:
+        a_tail, b_tail = a.eff_tail_length(tail_length), b.eff_tail_length(tail_length)
         da, db = arm_dir(a.angle_deg), arm_dir(b.angle_deg)
-        p_out_a = vadd(vscale(lane_perp(da, a.traffic_side), a.out_width()), vscale(da, tail_length))
-        p_in_b = vadd(vscale(lane_perp(db, a.traffic_side), -b.in_width()), vscale(db, tail_length))
+        p_out_a = vadd(vscale(lane_perp(da, a.traffic_side), a.out_width()), vscale(da, a_tail))
+        p_in_b = vadd(vscale(lane_perp(db, a.traffic_side), -b.in_width()), vscale(db, b_tail))
         max_tangent = min(vlen(vsub(vertex, p_out_a)), vlen(vsub(vertex, p_in_b)))
         radius = min(base_radius, max_tangent * math.tan(theta / 2.0))
     else:
@@ -394,10 +410,11 @@ def build_junction_boundary(arms, kerb_radius, tail_length=12.0, through_tol_deg
     for i in range(n):
         a = ordered[i]
         b = ordered[(i + 1) % n]
+        a_tail = a.eff_tail_length(tail_length)
         d = arm_dir(a.angle_deg)
         perp = lane_perp(d, a.traffic_side)
-        p_in = vadd(vscale(perp, -a.in_width()), vscale(d, tail_length))
-        p_out = vadd(vscale(perp, a.out_width()), vscale(d, tail_length))
+        p_in = vadd(vscale(perp, -a.in_width()), vscale(d, a_tail))
+        p_out = vadd(vscale(perp, a.out_width()), vscale(d, a_tail))
         out.append((p_in[0], p_in[1], 0.0))
         out.append((p_out[0], p_out[1], 0.0))
         corner = _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg)
@@ -435,10 +452,10 @@ def build_junction_curb_segments(arms, kerb_radius, tail_length=12.0, through_to
         vertex, radius = corner
         da = arm_dir(a.angle_deg)
         perp_a = lane_perp(da, a.traffic_side)
-        p_out = vadd(vscale(perp_a, a.out_width()), vscale(da, tail_length))
+        p_out = vadd(vscale(perp_a, a.out_width()), vscale(da, a.eff_tail_length(tail_length)))
         db = arm_dir(b.angle_deg)
         perp_b = lane_perp(db, a.traffic_side)
-        p_in_b = vadd(vscale(perp_b, -b.in_width()), vscale(db, tail_length))
+        p_in_b = vadd(vscale(perp_b, -b.in_width()), vscale(db, b.eff_tail_length(tail_length)))
         segments.append([
             (p_out[0], p_out[1], 0.0),
             (vertex[0], vertex[1], radius),
@@ -511,6 +528,7 @@ def build_lane_movements(arms, kerb_radius, segments=8, through_tol_deg=2.0, tai
             if a is b:
                 continue
             da, db = arm_dir(a.angle_deg), arm_dir(b.angle_deg)
+            a_tail, b_tail = a.eff_tail_length(tail_length), b.eff_tail_length(tail_length)
             through = is_through_pair(a.angle_deg, b.angle_deg, through_tol_deg)
             override = lane_map.get((a.name, b.name))
             if override is not None:
@@ -554,8 +572,8 @@ def build_lane_movements(arms, kerb_radius, segments=8, through_tol_deg=2.0, tai
                 p_out = vscale(lane_perp(db, a.traffic_side), b.out_offset(lo))
                 if through:
                     if li == lo:
-                        pts = [vadd(p_in, vscale(da, tail_length)),
-                               vadd(p_out, vscale(db, tail_length))]
+                        pts = [vadd(p_in, vscale(da, a_tail)),
+                               vadd(p_out, vscale(db, b_tail))]
                     else:
                         # Auto-merged through movement (mismatched lane index -- an arm wider than
                         # its through-partner funnels an outer lane into the partner's own
@@ -578,7 +596,9 @@ def build_lane_movements(arms, kerb_radius, segments=8, through_tol_deg=2.0, tai
                         pts = []
                         for k in range(segments + 1):
                             t = k / segments
-                            s = tail_length * (1.0 - 2.0 * t)
+                            # a_tail at t=0, -b_tail at t=1 -- the per-arm generalization of the
+                            # old `tail_length * (1 - 2t)` (byte-identical when a_tail == b_tail).
+                            s = a_tail * (1.0 - t) - b_tail * t
                             ease = t * t * (3.0 - 2.0 * t)
                             lat = lat_in + (lat_out - lat_in) * ease
                             pts.append(vadd(vscale(perp, lat), vscale(da, s)))
@@ -590,7 +610,8 @@ def build_lane_movements(arms, kerb_radius, segments=8, through_tol_deg=2.0, tai
                     edge_out = (p_out, db)
                     try:
                         _, trim_in, trim_out, arc = corner_fillet(
-                            edge_in, edge_out, turn_radius, segments, max_tangent_len=tail_length)
+                            edge_in, edge_out, turn_radius, segments,
+                            max_tangent_len=min(a_tail, b_tail))
                     except ValueError:
                         continue  # near-collinear/degenerate arm pair at this radius -- skip
                     # Measured from p_in/p_out (the arm's own reference line), NOT trim_in/trim_out,
@@ -604,8 +625,8 @@ def build_lane_movements(arms, kerb_radius, segments=8, through_tol_deg=2.0, tai
                     # of arm width/lane count, so it's essentially always `tail_length` in practice.
                     t_in = vlen(vsub(trim_in, p_in)) + 1.0
                     t_out = vlen(vsub(trim_out, p_out)) + 1.0
-                    entry_far = vadd(p_in, vscale(da, max(tail_length, t_in)))
-                    exit_far = vadd(p_out, vscale(db, max(tail_length, t_out)))
+                    entry_far = vadd(p_in, vscale(da, max(a_tail, t_in)))
+                    exit_far = vadd(p_out, vscale(db, max(b_tail, t_out)))
                     pts = [entry_far] + arc + [exit_far]
                     tside = turn_side(vscale(da, -1.0), db)
                     out.append({"id": lane_id, "from": a.name, "to": b.name, "lane": li,
@@ -629,14 +650,15 @@ def build_ports(arms, tail_length=12.0):
     otherwise land short of the arc."""
     out = []
     for a in arms:
+        a_tail = a.eff_tail_length(tail_length)
         d = arm_dir(a.angle_deg)
         perp = lane_perp(d, a.traffic_side)
         for i in range(a.lanes_in_count()):
-            in_pos = vadd(vscale(perp, a.in_offset(i)), vscale(d, tail_length))
+            in_pos = vadd(vscale(perp, a.in_offset(i)), vscale(d, a_tail))
             out.append({"id": "%s_in_L%d" % (a.name, i), "arm": a.name, "lane": i,
                         "direction": "in", "position": in_pos, "tangent": vscale(d, -1.0)})
         for i in range(a.lanes_out_count()):
-            out_pos = vadd(vscale(perp, a.out_offset(i)), vscale(d, tail_length))
+            out_pos = vadd(vscale(perp, a.out_offset(i)), vscale(d, a_tail))
             out.append({"id": "%s_out_L%d" % (a.name, i), "arm": a.name, "lane": i,
                         "direction": "out", "position": out_pos, "tangent": d})
     return out
@@ -724,6 +746,46 @@ def segment_spine_3d(p0, p1, bend=0.0, segments=8, z0=0.0, z1=0.0, bend_z=0.0):
     return [(p[0], p[1], z_at(i)) for i, p in enumerate(spine_2d)]
 
 
+def offset_spine_line(spine, off, traffic_side='LEFT'):
+    """The per-point tangent-offset polyline at lateral offset `off` (see `lane_perp`) from an
+    arbitrary 3D spine `spine = [(x, y, z), ...]` -- factored out of `build_segment_from_spine`
+    (which now just calls this) so a second consumer (`build_segment_lane_markings`, below) can
+    land lane-boundary MARKINGS at exactly the same offsets curbs/lane-centerlines already use,
+    with no risk of drifting apart on a bent/multi-point spine."""
+    n = len(spine)
+
+    def tangent_at(i):
+        a, b = spine[max(0, i - 1)], spine[min(n - 1, i + 1)]
+        return vnorm(vsub((b[0], b[1]), (a[0], a[1])))
+
+    return [(*vadd((spine[i][0], spine[i][1]), vscale(lane_perp(tangent_at(i), traffic_side), off)),
+             spine[i][2]) for i in range(n)]
+
+
+def build_segment_lane_markings(spine, lane_width=5.0, lanes=1, lanes_backward=None,
+                                 traffic_side='LEFT'):
+    """Lane-BOUNDARY lines (not lane centerlines) for a segment built the same way
+    `build_segment_from_spine` lays out its lanes: one SOLID line at the single boundary between
+    the forward and backward lane groups (offset 0 -- always exactly the shared edge of each
+    direction's innermost lane, regardless of asymmetric lane counts either side), only emitted
+    when BOTH `lanes` and `lanes_backward` are > 0 (a genuine two-way segment -- a one-way road
+    has no such boundary to mark); plus one DASHED line at every INTERNAL boundary within each
+    direction's own lane group (offset = i*lane_width forward / -i*lane_width backward, for i in
+    1..count-1 -- none at all when that direction has <= 1 lane). Returns
+    `[{'kind': 'yellow'|'white', 'points': [(x,y,z), ...]}, ...]`, using the SAME
+    `offset_spine_line` curbs/lane-centerlines already use, so a marking always lands exactly
+    between the two lanes it separates even on a bent spine."""
+    lanes_backward = lanes if lanes_backward is None else lanes_backward
+    out = []
+    if lanes > 0 and lanes_backward > 0:
+        out.append({"kind": "yellow", "points": offset_spine_line(spine, 0.0, traffic_side)})
+    for i in range(1, lanes):
+        out.append({"kind": "white", "points": offset_spine_line(spine, i * lane_width, traffic_side)})
+    for i in range(1, lanes_backward):
+        out.append({"kind": "white", "points": offset_spine_line(spine, -i * lane_width, traffic_side)})
+    return out
+
+
 def build_segment_from_spine(spine, lane_width=5.0, lanes=1, lanes_backward=None, segment_id="SEG",
                               traffic_side='LEFT'):
     """Core segment geometry: offset curbs + per-lane centerlines from an ARBITRARY 3D spine
@@ -753,15 +815,9 @@ def build_segment_from_spine(spine, lane_width=5.0, lanes=1, lanes_backward=None
     if lanes <= 0 and lanes_backward <= 0:
         raise ValueError("a segment needs at least one lane in SOME direction "
                           "(lanes=%d, lanes_backward=%d)" % (lanes, lanes_backward))
-    n = len(spine)
-
-    def tangent_at(i):
-        a, b = spine[max(0, i - 1)], spine[min(n - 1, i + 1)]
-        return vnorm(vsub((b[0], b[1]), (a[0], a[1])))
 
     def offset_line(off):
-        return [(*vadd((spine[i][0], spine[i][1]), vscale(lane_perp(tangent_at(i), traffic_side), off)), spine[i][2])
-                for i in range(n)]
+        return offset_spine_line(spine, off, traffic_side)
 
     half_w = max(lanes, lanes_backward) * lane_width
     curbs = [offset_line(half_w), offset_line(-half_w)]
@@ -1754,6 +1810,63 @@ def self_test():
           "lateral lane/curb offsets are measured, verified directly on curb_edges/build_ports and "
           "as a whole-output mirror on axis-aligned segments/transitions; 'LEFT' (keep-left, e.g. "
           "Japan) stays the untouched default")
+
+    # 33. build_segment_lane_markings: a 3-forward/2-backward spine produces exactly 4 markings --
+    #     1 yellow (offset 0, the forward/backward boundary) + 2 white forward (at lane_width and
+    #     2*lane_width) + 1 white backward (at -lane_width); a 1-forward/0-backward (one-way) spine
+    #     produces zero (no same-direction internal boundary, no opposing-direction boundary).
+    mk_spine = segment_spine_3d((0.0, 0.0, 0.0), (40.0, 0.0, 0.0))
+    marks = build_segment_lane_markings(mk_spine, lane_width=3.5, lanes=3, lanes_backward=2)
+    assert len(marks) == 4, len(marks)
+    yellows = [m for m in marks if m["kind"] == "yellow"]
+    whites = [m for m in marks if m["kind"] == "white"]
+    assert len(yellows) == 1 and len(whites) == 3, (len(yellows), len(whites))
+    assert yellows[0]["points"] == offset_spine_line(mk_spine, 0.0, 'LEFT')
+    white_y0 = sorted(m["points"][0][1] for m in whites)
+    assert abs(white_y0[0] - (-3.5)) < 1e-6, white_y0     # backward internal boundary at -lane_width
+    assert abs(white_y0[1] - 3.5) < 1e-6, white_y0        # forward internal boundary at +lane_width
+    assert abs(white_y0[2] - 7.0) < 1e-6, white_y0        # forward internal boundary at +2*lane_width
+    mk_oneway = build_segment_lane_markings(mk_spine, lane_width=3.5, lanes=1, lanes_backward=0)
+    assert mk_oneway == [], mk_oneway
+    print("OK: build_segment_lane_markings (3f/2b -> 1 yellow + 3 white at exact offsets; "
+          "1f/0b one-way -> no markings at all)")
+
+    # 34. Per-arm tail_length override (Arm.tail_length): a 4-way where ONE arm (N) is snapped to
+    #     a shorter reach than the shared default -- its own ports/boundary/curb points must land
+    #     at ITS distance, every other arm stays at the shared default, and the whole thing must be
+    #     byte-identical to the all-None (shared-scalar) case when no arm overrides it.
+    arms_tl = preset_4way(lanes=1)
+    n_arm = next(a for a in arms_tl if a.name == "N")   # 0 deg by preset_4way's naming
+    n_arm.tail_length = 4.0   # much shorter than the shared default of 12.0
+    boundary_tl = build_junction_boundary(arms_tl, kerb_radius=8.0, tail_length=12.0)
+    # Every arm's own tail-cap points (radius 0) must land at exactly ITS effective tail length
+    # (N's own override of 4.0, every other arm still the shared default of 12.0) -- verify by
+    # recomputing each arm's two expected cap points from first principles and matching them
+    # against the boundary's own output.
+    caps = [p for p in boundary_tl if p[2] == 0.0]
+    for a in arms_tl:
+        eff = a.eff_tail_length(12.0)
+        d = arm_dir(a.angle_deg)
+        perp = lane_perp(d, a.traffic_side)
+        expect_in = vadd(vscale(perp, -a.in_width()), vscale(d, eff))
+        expect_out = vadd(vscale(perp, a.out_width()), vscale(d, eff))
+        assert any(vlen(vsub((p[0], p[1]), expect_in)) < 1e-6 for p in caps), (a.name, expect_in, caps)
+        assert any(vlen(vsub((p[0], p[1]), expect_out)) < 1e-6 for p in caps), (a.name, expect_out, caps)
+    ports_tl = build_ports(arms_tl, tail_length=12.0)
+    by_name = {a.name: a for a in arms_tl}
+    for p in ports_tl:
+        expect = by_name[p["arm"]].eff_tail_length(12.0)
+        d = arm_dir(by_name[p["arm"]].angle_deg)
+        along = p["position"][0] * d[0] + p["position"][1] * d[1]   # component along the arm
+        assert abs(along - expect) < 1e-6, (p, expect)
+    # With every arm's tail_length left at None (default), output must match the plain shared-
+    # scalar call exactly -- the override is fully opt-in/back-compat.
+    arms_default = preset_4way(lanes=1)
+    boundary_default = build_junction_boundary(arms_default, kerb_radius=8.0, tail_length=12.0)
+    boundary_shared = build_junction_boundary(preset_4way(lanes=1), kerb_radius=8.0, tail_length=12.0)
+    assert boundary_default == boundary_shared
+    print("OK: Arm.tail_length per-arm override (one arm's ports/boundary/curb reach its own "
+          "distance, others stay on the shared scalar; all-None is byte-identical to before)")
 
     print("ALL SELF-TESTS PASSED")
 
