@@ -75,9 +75,10 @@ class Node:
 
 
 class RoadGraph:
-    def __init__(self):
+    def __init__(self, driving_side='LEFT'):
         self.nodes = []          # [Node]
         self.edges = []          # [Edge]
+        self.driving_side = driving_side   # 'LEFT' | 'RIGHT' -- see generate()'s docstring
 
     def add_node(self, x, y, z=0.0):
         self.nodes.append(Node(x, y, z))
@@ -291,15 +292,19 @@ def _junction_radius(rg, node):
     return widest_m / 2.0 + STOP_MARGIN
 
 
-def _lane_offset_from_center(lane_idx, lanes, median=0.0):
+def _lane_offset_from_center(lane_idx, lanes, median=0.0, driving_side='LEFT'):
     """Signed right-of-travel offset of lane `lane_idx` (0 = curb/leftmost … lanes-1 =
-    median-most). Keep-left: the whole direction sits LEFT of the centerline, so offsets are
-    negative; curb lane is farthest left. A physical `median` width pushes the whole lane pack
-    a further median/2 out, leaving the strip |offset| < median/2 clear for the divider."""
-    return -(median / 2.0 + (lanes - lane_idx - 0.5) * LANE_W)
+    median-most). Keep-left (`driving_side='LEFT'`, default): the whole direction sits LEFT of
+    the centerline, so offsets are negative; curb lane is farthest left. `driving_side='RIGHT'`
+    mirrors the whole lane pack to the positive (right-of-travel) side -- see offset_polyline's
+    right-of-travel sign convention this combines with. A physical `median` width pushes the
+    whole lane pack a further median/2 out, leaving the strip |offset| < median/2 clear for the
+    divider (unaffected by driving_side -- it's symmetric either way)."""
+    mag = median / 2.0 + (lanes - lane_idx - 0.5) * LANE_W
+    return mag if driving_side == 'RIGHT' else -mag
 
 
-def generate(rg, radius_fn=None):
+def generate(rg, radius_fn=None, driving_side=None):
     """RoadGraph -> (lanes: [LaneRoute], junctions: [JunctionOut]).
 
     Per edge, per direction, per lane index: a trimmed offset polyline route named
@@ -308,8 +313,13 @@ def generate(rg, radius_fn=None):
     name, so a district-prefixed lane_ empty stays under Blender's 63-char object-name cap),
     chained in and out with explicit next_routes. Dead ends (degree-1 nodes) leave the
     incoming lanes' end_behavior DESPAWN. radius_fn(rg, node) overrides the derived
-    stop-line radius (e.g. the master's 21 m paved arterial footprint)."""
+    stop-line radius (e.g. the master's 21 m paved arterial footprint). `driving_side`
+    ('LEFT'/'RIGHT') overrides `rg.driving_side` when given; None (default) uses whatever the
+    graph itself was built with (getattr fallback to 'LEFT' for a RoadGraph predating this
+    attribute) -- 'RIGHT' mirrors both the lane-pack offset (_lane_offset_from_center) and the
+    turn-legality/lane-mapping below (curb lane turns right instead of left)."""
     rad = radius_fn or _junction_radius
+    driving_side = driving_side if driving_side is not None else getattr(rg, 'driving_side', 'LEFT')
     lanes = []
     by_name = {}
     # node id -> list of (in_route_name, edge_idx, dir_flag, lane_idx, end_pt, heading)
@@ -327,7 +337,7 @@ def generate(rg, radius_fn=None):
                 ('R', e.lanes_r, rev, e.a, e.b)):
             for li in range(n_lanes):
                 name = f"{e.name}_{dir_flag}{li}"
-                lp = offset_polyline(pts, _lane_offset_from_center(li, n_lanes, e.median))
+                lp = offset_polyline(pts, _lane_offset_from_center(li, n_lanes, e.median, driving_side))
                 r = LaneRoute(name, lp)
                 lanes.append(r)
                 by_name[name] = r
@@ -349,17 +359,25 @@ def generate(rg, radius_fn=None):
                 if out_ei == in_ei:
                     continue                      # no U-turn back onto the same edge
                 turn = turn_of(in_h, out_h)
-                # keep-left legality by lane index
+                # legality by lane index -- driving_side picks which lane index is the
+                # "curb" (turns toward the near side) vs "median" (turns toward the far side)
                 if in_lanes >= 2:
-                    if turn == 'L' and in_li != 0:
-                        continue
-                    if turn == 'R' and in_li != in_lanes - 1:
-                        continue
-                # lane mapping: L curb->curb, R median->median, S clamp
+                    if driving_side == 'RIGHT':
+                        if turn == 'L' and in_li != in_lanes - 1:
+                            continue
+                        if turn == 'R' and in_li != 0:
+                            continue
+                    else:
+                        if turn == 'L' and in_li != 0:
+                            continue
+                        if turn == 'R' and in_li != in_lanes - 1:
+                            continue
+                # lane mapping: curb->curb toward the near side, median->median toward the far
+                # side, S clamp (driving_side swaps which physical lane index is which)
                 if turn == 'L':
-                    want = 0
+                    want = (out_lanes - 1) if driving_side == 'RIGHT' else 0
                 elif turn == 'R':
-                    want = out_lanes - 1
+                    want = 0 if driving_side == 'RIGHT' else (out_lanes - 1)
                 else:
                     want = min(in_li, out_lanes - 1)
                 if out_li != want:
@@ -395,7 +413,7 @@ def generate(rg, radius_fn=None):
 
 # ── adapters ────────────────────────────────────────────────────────────────────────────
 
-def from_curves(curves, eps=CONNECT_EPS):
+def from_curves(curves, eps=CONNECT_EPS, driving_side='LEFT'):
     """Hand-authored Blender road curves -> RoadGraph.
 
     curves: [(name, [(x, y, z), ...], props)] where props may carry
@@ -403,14 +421,15 @@ def from_curves(curves, eps=CONNECT_EPS):
     'class' (default 'local'), 'median' (physical divider width in m, default 0 — lane packs
     shift out by median/2 each side). Curves are SPLIT where an interior point of one lies within
     eps of another curve's endpoint (a T junction drawn as one long curve + a side street),
-    then every touching endpoint clusters into a junction node."""
+    then every touching endpoint clusters into a junction node. `driving_side` ('LEFT' default,
+    or 'RIGHT') is stamped onto the returned RoadGraph -- see generate()'s docstring."""
     # collect split points per curve: any OTHER curve's endpoint near an interior vertex
     endpoints = []
     for name, pts, _props in curves:
         endpoints.append(pts[0])
         endpoints.append(pts[-1])
 
-    rg = RoadGraph()
+    rg = RoadGraph(driving_side=driving_side)
     for name, pts, props in curves:
         lanes = int(props.get('lanes', 1) or 1)
         oneway = bool(props.get('oneway', False))
@@ -577,6 +596,33 @@ def _selftest():
     _assert(f0.pts[1][1] > 0.1 and r0.pts[1][1] < -0.1,
             f"keep-left sides wrong: F0 y={f0.pts[1][1]:.2f} R0 y={r0.pts[1][1]:.2f}")
 
+    # 1b) SAME graph, RIGHT-hand traffic: mirrors intersection_kit.py's own traffic_side='RIGHT'
+    # self-test pattern -- everything above must flip sign/lane-index, nothing else changes.
+    lanes_r, junctions_r = generate(rg, driving_side='RIGHT')
+    routes_r = {r.name: r for r in lanes_r}
+    conns_r = [r for r in lanes_r if r.turn]
+    _assert(conns_r, "RIGHT: no connectors generated")
+    _assert(len(junctions_r) == len(junctions), "RIGHT: junction count changed")
+    f0r = routes_r[[k for k in routes_r if k.endswith("_F0") and k.startswith("main")][0]]
+    r0r = routes_r[f0r.name.replace("_F0", "_R0")]
+    _assert(f0r.pts[1][1] < -0.1 and r0r.pts[1][1] > 0.1,
+            f"RIGHT: keep-right sides wrong: F0 y={f0r.pts[1][1]:.2f} R0 y={r0r.pts[1][1]:.2f}")
+    for c in conns_r:
+        src = [r for r in lanes_r if c.name in r.next_routes]
+        _assert(len(src) == 1, f"RIGHT: connector {c.name} should have exactly 1 source")
+        sname = src[0].name
+        if not sname.startswith("main"):
+            continue                               # 1-lane side road: L/S/R all legal
+        if "_F1" in sname or "_R1" in sname:
+            _assert(c.turn != 'R', f"RIGHT: median lane {sname} may not turn RIGHT ({c.name})")
+        if "_F0" in sname or "_R0" in sname:
+            _assert(c.turn != 'L', f"RIGHT: curb lane {sname} may not turn LEFT ({c.name})")
+    # regression: re-running the default (no driving_side arg) must be byte-identical to the
+    # original LEFT-side result above -- driving_side='RIGHT' must never mutate `rg` itself.
+    lanes_again, _j_again = generate(rg)
+    f0_again = {r.name: r for r in lanes_again}[f0.name]
+    _assert(f0_again.pts[1][1] == f0.pts[1][1], "generate(rg) mutated by a prior RIGHT call")
+
     # 2) TownGrid: 2-lane EW arterial crossing 1-lane NS local at (10,10)
     import road_network as rn
     g = rn.TownGrid()
@@ -628,6 +674,7 @@ def _selftest():
 
     print("road_graph selftest OK —",
           f"T: {len(rg.edges)} edges/{len(conns)} connectors;",
+          f"driving_side='RIGHT' mirrors offsets + turn legality ({len(conns_r)} connectors);",
           f"grid cross: {len(lanes2)} routes/{len(conns2)} connectors,",
           f"box {j.size_x:.1f} m;",
           f"median: F0/R0 at ±{abs(mf0.pts[0][1]):.2f} m")

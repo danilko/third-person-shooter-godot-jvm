@@ -407,7 +407,12 @@ def import_roads_src(data):
 
 def emit_authored_roads(data):
     """Sidecar curves → RoadGraph → traffic markers. Route stems drop the road_ prefix to
-    stay inside Blender's 63-char object-name cap once the piece prefix is added."""
+    stay inside Blender's 63-char object-name cap once the piece prefix is added.
+
+    `data`'s optional top-level "driving_side" field ('LEFT'/'RIGHT') sets the district's
+    traffic convention — absent in every sidecar authored before this feature, so this is a
+    forward-compatible no-op (defaults to 'LEFT', unchanged behavior) until an author's
+    tools/save_roads.py-written sidecar opts in."""
     import road_graph as rgm
     curves = []
     for c in data.get("curves", []):
@@ -416,7 +421,8 @@ def emit_authored_roads(data):
         curves.append((stem, [tuple(p) for p in c["points"]],
                        {"lanes": c.get("lanes", 1), "oneway": c.get("oneway", False),
                         "class": c.get("class", "local"), "median": c.get("median", 0.0)}))
-    return asm.lay_road_graph(rgm.from_curves(curves), z_off=0.3)
+    driving_side = str(data.get("driving_side", "LEFT") or "LEFT")
+    return asm.lay_road_graph(rgm.from_curves(curves, driving_side=driving_side), z_off=0.3)
 
 
 # ── Seams (cross-district route continuity — see world_grid.seam_route_name) ────────────

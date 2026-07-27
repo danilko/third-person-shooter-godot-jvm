@@ -483,6 +483,123 @@ def flat_ribbon(name, pts, half_width, coll, matkey="asphalt"):
     return obj
 
 
+def marking_ribbon(name, pts, half_width, coll, matkey, dash_len=0.0, gap_len=0.0,
+                    exclude_ranges=None):
+    """Flat marking strip following `pts` EXACTLY (same tangent-offset quad-strip technique as
+    `flat_ribbon`), optionally DASHED (both `dash_len` and `gap_len` > 0; either <= 0 means solid
+    -- one continuous strip) and/or with `exclude_ranges` ([(t0, t1), ...], t = normalized
+    cumulative arc length along `pts`, 0 at pts[0] / 1 at pts[-1]) fully OMITTED -- the
+    'survive a live-edit rebuild' answer to clearing a marking across a driveway/merge zone:
+    `exclude_ranges` is meant to be read back from the owning segment's `rka_marking_gaps`
+    custom property on every rebuild, never from hand-deleting a generated object (which the
+    addon's delete-and-rebuild-from-scratch cleanup would silently recreate on the next drag).
+
+    Deliberately does NOT resample `pts` at a fixed spacing (an earlier version called
+    `sample_polyline(pts, 0.25)` unconditionally, which put a vertex every 25 cm regardless of the
+    road spine's own control-point density -- a 40 m straight two-point segment's SOLID yellow
+    line got ~160 quads for what needs exactly one, since `road_spine`/`_spine_control_points`
+    already establish that the pavement itself is straight between consecutive control points, no
+    resolution subdivision -- see their docstrings). Instead this walks `pts` at ITS OWN
+    resolution and inserts extra vertices ONLY exactly where something actually changes: a dash
+    on/off transition, or an exclude-range boundary -- so a solid, ungapped marking on a 2-point
+    straight spine is exactly 2 vertices/1 quad, matching the pavement's own resolution, while a
+    dashed one only gets the handful of extra vertices its dash cycle actually needs, placed at
+    the exact transition arc-length (not snapped to a sampling grid). Returns None if every
+    sub-run ends up skipped (e.g. a gap spanning the whole line)."""
+    exclude_ranges = exclude_ranges or []
+    n = len(pts)
+    if n < 2:
+        return None
+    cum = [0.0]
+    for a, b in zip(pts, pts[1:]):
+        cum.append(cum[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
+    total_len = cum[-1]
+    if total_len < 1e-6:
+        return None
+    dashed = dash_len > 0.0 and gap_len > 0.0
+    cycle = dash_len + gap_len
+
+    # Breakpoints: every ORIGINAL point's own arc length (the spine's own resolution) plus every
+    # dash on/off transition and exclude-range boundary that actually falls on this line --
+    # inserted exactly where needed instead of marching a fixed step across the whole length.
+    breaks = set(cum)
+    if dashed:
+        k = 0
+        while k * cycle < total_len:
+            on_end = k * cycle + dash_len
+            if 0.0 < on_end < total_len:
+                breaks.add(on_end)
+            off_end = (k + 1) * cycle
+            if 0.0 < off_end < total_len:
+                breaks.add(off_end)
+            k += 1
+    for t0, t1 in exclude_ranges:
+        a, b = t0 * total_len, t1 * total_len
+        if 0.0 < a < total_len:
+            breaks.add(a)
+        if 0.0 < b < total_len:
+            breaks.add(b)
+    positions = sorted(breaks)
+
+    def point_at(s):
+        """(x, y, z), heading_rad at arc length `s` along the ORIGINAL `pts` (linear
+        interpolation within whichever original segment contains it -- never off the spine's own
+        straight chords)."""
+        s = max(0.0, min(total_len, s))
+        i = 1
+        while i < n - 1 and cum[i] < s:
+            i += 1
+        a, b = pts[i - 1], pts[i]
+        seg_len = cum[i] - cum[i - 1]
+        t = 0.0 if seg_len < 1e-9 else (s - cum[i - 1]) / seg_len
+        pos = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t)
+        return pos, math.atan2(b[1] - a[1], b[0] - a[0])
+
+    def excluded(t):
+        return any(t0 <= t <= t1 for (t0, t1) in exclude_ranges)
+
+    verts, faces = [], []
+    run = []   # arc-length positions of a contiguous "on" run, flushed into a quad-strip
+
+    def flush():
+        if len(run) < 2:
+            run.clear()
+            return
+        base = len(verts)
+        for s in run:
+            (x, y, z), hd = point_at(s)
+            nx, ny = -math.sin(hd) * half_width, math.cos(hd) * half_width
+            verts.extend([(x - nx, y - ny, z), (x + nx, y + ny, z)])
+        for i in range(len(run) - 1):
+            a, b = base + i * 2, base + (i + 1) * 2
+            faces.append((a, a + 1, b + 1, b))
+        run.clear()
+
+    for j in range(len(positions) - 1):
+        s0, s1 = positions[j], positions[j + 1]
+        if s1 - s0 < 1e-9:
+            continue
+        mid = (s0 + s1) / 2.0
+        on = (not excluded(mid / total_len)) and (not dashed or (mid % cycle) < dash_len)
+        if on:
+            if not run:
+                run.append(s0)
+            run.append(s1)
+        else:
+            flush()
+    flush()
+    if not verts:
+        return None
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    recalc_normals(me)
+    obj = bpy.data.objects.new(name, me)
+    coll.objects.link(obj)
+    obj.data.materials.append(mat(matkey))
+    return obj
+
+
 def swept_profile(name, pts, profile_2d, coll, matkey="concrete"):
     """A solid mesh sweeping an arbitrary 2D cross-section (`profile_2d`, an ordered list of
     `(lateral_offset, height)` pairs) along the 3D polyline `pts=[(x,y,z), ...]` EXACTLY -- the
@@ -1191,6 +1308,30 @@ def curb_loop(name, boundary_pts_radius, coll, curb_style='BOX', curb_height=0.1
     mod[prof_id] = prof_obj
     bound.name = name
     return bound
+
+
+def curb_asset_row(name, boundary_pts_radius, coll, asset_obj, spacing, rot_offset_deg=0.0):
+    """Repeat `asset_obj` (a mesh Object, e.g. from a linked kit/curb_kit.blend collection) along
+    the edge polyline `boundary_pts_radius` (same 4-tuple-or-3-tuple shape `curb_loop()` accepts
+    -- any 4th 'radius' element is ignored here, since ASSET-style curbs never fillet through GN:
+    every boundary this addon ever builds is already an explicit polyline, arcs included as
+    point density, so there is no live corner radius left to resolve at this style). Combines
+    two existing generic building blocks for the first time: `sample_polyline` (position+heading
+    every ~`spacing` m) feeds `instancer` (GN Instance-on-Points, per-point Z-rotation from
+    heading). `rot_offset_deg` (typically 0 or 180) additionally spins every instance around its
+    own Z -- the R-side curb of a two-way segment/corner typically needs 180 relative to the L
+    side so an ASYMMETRIC piece's authored 'front' face (local +Y, see
+    kit/build_curb_kit.py's worked example) keeps facing AWAY from the road on both sides, since
+    both boundaries are sampled in the same spine direction. Returns the single GN-backed
+    instancer Object (None if the boundary has fewer than 2 points after sampling), so it slots
+    into the same 'one curb object per side/corner' convention every other curb style returns."""
+    pts3 = [(p[0], p[1], p[2]) for p in boundary_pts_radius]
+    samples = sample_polyline(pts3, spacing)
+    if not samples:
+        return None
+    coords = [pos for pos, _hd in samples]
+    rots = [(0.0, 0.0, hd + math.radians(rot_offset_deg)) for _pos, hd in samples]
+    return instancer(name, coords, asset_obj, coll, rots=rots)
 
 
 def colonly_swept(name, cpts, half_w, coll, z0=-0.4, z1=0.0):

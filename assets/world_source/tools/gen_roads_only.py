@@ -66,8 +66,10 @@ def clear_generated(piece):
     return len(doomed)
 
 
-def generate(write_sidecar=True):
-    """The reusable driver (build_kitdemo.py calls this in-process)."""
+def generate(write_sidecar=True, driving_side='LEFT'):
+    """The reusable driver (build_kitdemo.py calls this in-process). `driving_side`
+    ('LEFT' default, or 'RIGHT') sets the traffic convention for this piece's RoadGraph —
+    see road_graph.generate()'s docstring."""
     blend = bpy.data.filepath
     if not blend:
         raise SystemExit("gen_roads_only.py: open (or save) a district .blend first")
@@ -78,7 +80,8 @@ def generate(write_sidecar=True):
         raise SystemExit(f"gen_roads_only.py: no road_* curves found in {piece}.blend")
     n_cleared = clear_generated(piece)
     asm.set_route_prefix(piece)
-    n_lane, n_conn, n_ix = asm.lay_road_graph(rgm.from_curves(curves), z_off=0.3)
+    n_lane, n_conn, n_ix = asm.lay_road_graph(
+        rgm.from_curves(curves, driving_side=driving_side), z_off=0.3)
     if write_sidecar:
         save_roads.main()
     print(f"gen_roads_only: {piece} — cleared {n_cleared} old markers; "
@@ -88,8 +91,14 @@ def generate(write_sidecar=True):
 
 
 def main():
+    import argparse
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    generate(write_sidecar="--no-sidecar" not in argv)
+    ap = argparse.ArgumentParser(prog="gen_roads_only.py")
+    ap.add_argument("--no-sidecar", action="store_true")
+    ap.add_argument("--driving-side", choices=("LEFT", "RIGHT"), default="LEFT",
+                    help="traffic convention for this piece's RoadGraph (default LEFT)")
+    a = ap.parse_args(argv)
+    generate(write_sidecar=not a.no_sidecar, driving_side=a.driving_side)
     # view-layer deselect guard (same None-slot idiom as build_district / export_world)
     for o in list(bpy.context.view_layer.objects):
         if o is not None:

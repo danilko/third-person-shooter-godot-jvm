@@ -11,6 +11,7 @@ ADDON_DIR = os.path.dirname(os.path.realpath(__file__))          # .../assets/wo
 WORLD_SOURCE = os.path.dirname(os.path.dirname(ADDON_DIR))       # .../assets/world_source
 LIB_DIR = os.path.join(WORLD_SOURCE, "lib")
 KIT_BLEND = os.path.join(WORLD_SOURCE, "kit", "lane_kit.blend")
+CURB_KIT_BLEND = os.path.join(WORLD_SOURCE, "kit", "curb_kit.blend")
 
 if LIB_DIR not in sys.path:
     sys.path.insert(0, LIB_DIR)
