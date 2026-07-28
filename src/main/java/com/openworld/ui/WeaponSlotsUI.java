@@ -9,6 +9,7 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.NodePath;
 import godot.core.StringNames;
 import godot.global.GD;
@@ -78,12 +79,12 @@ public class WeaponSlotsUI extends PanelContainer {
 
         if (weaponController != null) {
             weaponController.ammoChanged.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onAmmoChanged")),
+                    MethodCallable.createUnsafe(this, "onAmmoChanged"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
         if (c != null) {
             c.changedWeapon.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onWeaponSwitched")),
+                    MethodCallable.createUnsafe(this, "onWeaponSwitched"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
 

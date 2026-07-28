@@ -329,6 +329,46 @@ def colonly_mesh(visual, coll=None):
     return p
 
 
+def colonly_mesh_evaluated(visual, coll=None, name=None):
+    """Like `colonly_mesh()`, but for a GN-modifier-backed object (a Curve with a live Nodes
+    modifier -- `junction_pad`/`road_spine`/`curb_loop`, all of the road_kit_authoring visual
+    pieces) whose OWN `.data` is unevaluated source data (raw curve control points), not the real
+    swept/filled/filleted mesh a viewer actually sees -- `colonly_mesh()`'s plain `visual.data.
+    copy()` would copy the WRONG (pre-modifier) geometry for these. Evaluates the object through
+    the depsgraph first (`bpy.data.meshes.new_from_object`, the same bake glTF export itself
+    performs) so the collision proxy is an EXACT copy of the real, on-screen shape -- corner
+    fillets, tapers, bends, all of it -- with zero hand-rolled approximation math to keep in sync.
+
+    2026-07-27, user-reported/screenshotted (twice): road_kit_authoring's hand-rolled collision
+    helpers (`colonly_polygon`'s corner-squared-off boundary ignoring fillet radius,
+    `colonly_swept`'s per-vertex sweep) visibly diverged from the real curved/filleted visual mesh
+    at corners -- a real, structural coarseness problem, not a one-off bug, and NOT what
+    `colonly_mesh()` already does correctly for real-world (PLATEAU building/landmark) geometry.
+    This closes that gap the same way: don't approximate, copy the truth. Replaces `colonly_polygon`
+    (pad) and `colonly_swept`/`colonly_swept_between` (curb walls, pavement) as the road-piece
+    collision source; `colonly_swept`'s own point-list-driven signature stays available for the few
+    truly synthetic uses that were never GN-Curve objects to begin with (none as of this writing --
+    kept for API stability, not because anything still calls it for road pieces).
+
+    `name` overrides the proxy's own base name (default `visual.name`) -- needed for the pavement
+    case specifically: the pavement collision proxy is built from `spine_<piece>` (the spine object
+    itself is never deleted/recreated by any rebuild, per `rebuild_segment_gn_in_place`'s own
+    docstring), but `clear_generated_mesh_objects`'s cleanup sweep matches a `pave_` prefix, not
+    `spine_` -- passing `name="pave_<piece>"` keeps that convention (and the existing cleanup code)
+    working unchanged; without it, a fresh `pave_`-less orphan would pile up on every rebuild."""
+    c = coll or (visual.users_collection[0] if visual.users_collection else get_coll("ENV"))
+    base = name or visual.name
+    deps = bpy.context.evaluated_depsgraph_get()
+    me = bpy.data.meshes.new_from_object(visual.evaluated_get(deps))
+    p = bpy.data.objects.new(base + "-colonly", me)
+    p.matrix_world = visual.matrix_world
+    c.objects.link(p)
+    p.data.materials.clear()
+    p.data.materials.append(mat("col"))
+    p["proxy_for"] = base
+    return p
+
+
 # ------------------------------------------------------------- lane centerlines
 def centerlines_from_vertex_group(obj, group_name="lanedata"):
     """Extract ordered, directional lane polylines from `group_name` on mesh `obj`. Reused by the
@@ -484,11 +524,14 @@ def flat_ribbon(name, pts, half_width, coll, matkey="asphalt"):
 
 
 def marking_ribbon(name, pts, half_width, coll, matkey, dash_len=0.0, gap_len=0.0,
-                    exclude_ranges=None):
+                    exclude_ranges=None, z_lift=0.01):
     """Flat marking strip following `pts` EXACTLY (same tangent-offset quad-strip technique as
-    `flat_ribbon`), optionally DASHED (both `dash_len` and `gap_len` > 0; either <= 0 means solid
-    -- one continuous strip) and/or with `exclude_ranges` ([(t0, t1), ...], t = normalized
-    cumulative arc length along `pts`, 0 at pts[0] / 1 at pts[-1]) fully OMITTED -- the
+    `flat_ribbon`), lifted `z_lift` (default 0.01m) above the pavement it rides on -- otherwise
+    the marking is exactly coplanar with the road surface (both sample the same spine Z) and
+    z-fights with it in render (2026-07-28, user-requested). Optionally DASHED (both `dash_len`
+    and `gap_len` > 0; either <= 0 means solid -- one continuous strip) and/or with
+    `exclude_ranges` ([(t0, t1), ...], t = normalized cumulative arc length along `pts`, 0 at
+    pts[0] / 1 at pts[-1]) fully OMITTED -- the
     'survive a live-edit rebuild' answer to clearing a marking across a driveway/merge zone:
     `exclude_ranges` is meant to be read back from the owning segment's `rka_marking_gaps`
     custom property on every rebuild, never from hand-deleting a generated object (which the
@@ -569,6 +612,7 @@ def marking_ribbon(name, pts, half_width, coll, matkey, dash_len=0.0, gap_len=0.
         for s in run:
             (x, y, z), hd = point_at(s)
             nx, ny = -math.sin(hd) * half_width, math.cos(hd) * half_width
+            z += z_lift
             verts.extend([(x - nx, y - ny, z), (x + nx, y + ny, z)])
         for i in range(len(run) - 1):
             a, b = base + i * 2, base + (i + 1) * 2
@@ -900,11 +944,30 @@ def instancer_scaled(name, coords, piece, coll, rots, scls):
 
 
 def make_road_profile_group():
-    """GN_RoadProfile: sweep a flat road ribbon along a curve via Curve to Mesh, then
-    Extrude downward for a fixed deck thickness and assign a Material (group input). The
-    curve's per-point RADIUS scales the profile -> a VARIABLE-WIDTH carriageway (true
-    3->2->1 lane taper); its per-point TILT banks the deck. This is the curve->road engine
-    that replaces the old Array+Curve swept deck. Returns (node_group, (mat_id, thick_id))."""
+    """GN_RoadProfile: sweep a flat road ribbon along a curve via Curve to Mesh and assign a
+    Material (group input) -- one filled pavement surface, shade-smooth, no thickness/volume.
+    The curve's per-point RADIUS scales the profile -> a VARIABLE-WIDTH carriageway (true
+    3->2->1 lane taper); its per-point TILT banks the deck. Mirrors `make_junction_pad_group()`'s
+    shape exactly (Fillet/Fill-Curve there, Curve-to-Mesh here, otherwise the same "one flat
+    filled mesh, materialed, shade-smooth" idiom) -- deliberately, see below. Returns
+    `(node_group, (mat_id, thick_id))`; `thick_id`/"Thickness" is kept as an accepted-but-unused
+    input purely so `road_spine()`/`road_from_curve()`/`assemble.py`'s existing
+    `mod[thick_id] = thickness` calls keep working unchanged -- it no longer drives any geometry.
+
+    **Simplified from a solid extruded slab to a flat plane (2026-07-28, user's own question after
+    the bug below was found and fixed: "why is the road segment a box being pushed down, why not
+    just a plane, like the intersection [pad]?").** That question was correct and is the real fix.
+    The previous version swept the ribbon, then Extrude-Mesh'd it downward for a `Thickness`-deep
+    solid deck, which needed a whole apparatus (endpoint tagging, cap-face deletion, a
+    flatten-then-selective-reshade shading pass, and eventually a Join Geometry to restore a
+    missing top face -- see git history / road_blender_godot.md for that chain of fixes) just to
+    behave like a normal road surface. NONE of that is needed: nothing in the codebase reads or
+    depends on the pavement having actual volume (collision, rendering, and every gameplay system
+    only ever care about the top drivable surface), and `GN_JunctionPad` already proves a flat,
+    zero-thickness swept/filled mesh collides and renders correctly for exactly the same kind of
+    surface. A flat ribbon has no side walls, no end caps, and no top/bottom distinction to get
+    wrong -- this eliminates the entire bug class the extrude approach kept reintroducing, for
+    segments AND transitions alike (both go through this same group via `road_spine()`)."""
     ng = bpy.data.node_groups.get("GN_RoadProfile")
     if ng:
         return ng, (ng["mat_id"], ng["thick_id"])
@@ -913,10 +976,10 @@ def make_road_profile_group():
     ifc.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
     mat_sock = ifc.new_socket("Material", in_out="INPUT", socket_type="NodeSocketMaterial")
     thick_sock = ifc.new_socket("Thickness", in_out="INPUT", socket_type="NodeSocketFloat")
-    thick_sock.default_value = 0.4
+    thick_sock.default_value = 0.4   # accepted, unused -- see docstring
     ifc.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
     nin = ng.nodes.new("NodeGroupInput"); nin.location = (-700, 0)
-    nout = ng.nodes.new("NodeGroupOutput"); nout.location = (700, 0)
+    nout = ng.nodes.new("NodeGroupOutput"); nout.location = (500, 0)
     line = ng.nodes.new("GeometryNodeCurvePrimitiveLine"); line.location = (-500, -220)
     line.inputs["Start"].default_value = (-1.0, 0.0, 0.0)   # profile spans the curve normal
     line.inputs["End"].default_value = (1.0, 0.0, 0.0)
@@ -924,22 +987,13 @@ def make_road_profile_group():
     # Blender 5.x Curve to Mesh has an explicit per-point "Scale" field (radius no longer
     # auto-scales) — drive it from the spine's Radius so half_w controls carriageway width.
     rad = ng.nodes.new("GeometryNodeInputRadius"); rad.location = (-500, -60)
-    neg = ng.nodes.new("ShaderNodeMath"); neg.location = (-500, -380)
-    neg.operation = 'MULTIPLY'; neg.inputs[1].default_value = -1.0
-    comb = ng.nodes.new("ShaderNodeCombineXYZ"); comb.location = (-250, -300)
-    ext = ng.nodes.new("GeometryNodeExtrudeMesh"); ext.location = (50, 0); ext.mode = 'FACES'
-    ext.inputs["Individual"].default_value = False     # one solid slab, NOT per-quad (no ribs)
-    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (330, 0)
-    ss = ng.nodes.new("GeometryNodeSetShadeSmooth"); ss.location = (500, 0)   # un-facet the sweep
+    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (60, 0)
+    ss = ng.nodes.new("GeometryNodeSetShadeSmooth"); ss.location = (280, 0)
     L = ng.links.new
     L(nin.outputs["Geometry"], c2m.inputs["Curve"])
     L(line.outputs["Curve"], c2m.inputs["Profile Curve"])
     L(rad.outputs["Radius"], c2m.inputs["Scale"])
-    L(c2m.outputs["Mesh"], ext.inputs["Mesh"])
-    L(nin.outputs["Thickness"], neg.inputs[0])
-    L(neg.outputs["Value"], comb.inputs["Z"])
-    L(comb.outputs["Vector"], ext.inputs["Offset"])
-    L(ext.outputs["Mesh"], setm.inputs["Geometry"])
+    L(c2m.outputs["Mesh"], setm.inputs["Geometry"])
     L(nin.outputs["Material"], setm.inputs["Material"])
     L(setm.outputs["Geometry"], ss.inputs["Geometry"])
     L(ss.outputs["Geometry"], nout.inputs["Geometry"])
@@ -1032,6 +1086,24 @@ def road_spine(name, pts, coll, radius, matkey="asphalt", thickness=0.4):
     mod[mat_id] = mat(matkey)
     mod[thick_id] = thickness
     return obj
+
+
+def set_road_spine_material(spine_obj, matkey):
+    """Update an EXISTING `road_spine()` object's pavement material in place, without touching its
+    shape/thickness -- for changing a segment/transition's pavement material after the fact
+    (2026-07-28, user-reported: material was a build-time-only hardcoded literal, no way to change
+    it afterward at all). `rebuild_segment_gn_in_place`/`rebuild_lane_transition_in_place`
+    deliberately never delete/recreate the spine object itself (its own control points ARE the
+    live-edited shape state), so a material change can't go through the normal "clear + rebuild"
+    path curb/lane data uses -- this updates the live "Road" GN modifier's Material input directly,
+    the same input `road_spine()` itself sets at creation time. No-op (returns False) if `spine_obj`
+    doesn't have a "Road" modifier (not actually a road_spine() object)."""
+    mod = spine_obj.modifiers.get("Road")
+    if mod is None:
+        return False
+    _ng, (mat_id, _thick_id) = make_road_profile_group()
+    mod[mat_id] = mat(matkey)
+    return True
 
 
 def make_barrier_profile_group():
@@ -1155,51 +1227,86 @@ def make_junction_pad_group():
     is generated PURELY from the boundary polygon's own geometry, never from the union of
     per-lane-movement ribbons (which was capped at `min(a.lanes, b.lanes)` between arm pairs and
     could leave bare gaps) -- so it can never have a coverage gap regardless of how lane counts
-    differ across arms. Returns `(node_group, (mat_id, seg_id))`."""
+    differ across arms. Returns `(node_group, (mat_id, seg_id, z_id))`.
+
+    **Z-restore step (2026-07-27, user-reported "collision far from real mesh"/vehicles floating
+    above the visual pad):** `Fill Curve` (N-gons mode) empirically FLATTENS every output vertex
+    to world Z=0 regardless of the input curve's actual height -- confirmed directly: a plain flat
+    closed curve with every point at Z=0.15 fed through Fill Curve alone (no fillet involved)
+    still evaluates to Z=0.0 everywhere. This silently sank every intersection's visual pavement to
+    Z=0 while `colonly_polygon`'s collision proxy (built independently straight from the same
+    boundary points, never routed through Fill Curve) correctly sat at the real height
+    (`lane_surface_z`, ~0.15m by default) -- a ~15-20cm vertical gap between the visible road
+    surface and where vehicles/characters actually rest, exactly the reported symptom. Since every
+    junction pad is flat by construction (`_populate_intersection_mesh.to3r` uses one single `z`
+    for the whole boundary, never per-point height), the fix doesn't need to preserve arbitrary
+    per-point Z through the fill -- a `Separate XYZ` -> `Combine XYZ` (X/Y passthrough, Z replaced
+    by a new `Pad Z` input) -> `Set Position` (Position, not Offset -- REPLACES the wrong Z instead
+    of stacking onto it) restores the correct flat height unconditionally, regardless of whatever
+    height Fill Curve's internals happen to compute."""
     ng = bpy.data.node_groups.get("GN_JunctionPad")
     if ng:
-        return ng, (ng["mat_id"], ng["seg_id"])
+        return ng, (ng["mat_id"], ng["seg_id"], ng["z_id"])
     ng = bpy.data.node_groups.new("GN_JunctionPad", "GeometryNodeTree")
     ifc = ng.interface
     ifc.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
     mat_sock = ifc.new_socket("Material", in_out="INPUT", socket_type="NodeSocketMaterial")
     seg_sock = ifc.new_socket("Segments", in_out="INPUT", socket_type="NodeSocketInt")
     seg_sock.default_value = 8
+    z_sock = ifc.new_socket("Pad Z", in_out="INPUT", socket_type="NodeSocketFloat")
+    z_sock.default_value = 0.0
     ifc.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
     nin = ng.nodes.new("NodeGroupInput"); nin.location = (-700, 0)
-    nout = ng.nodes.new("NodeGroupOutput"); nout.location = (700, 0)
+    nout = ng.nodes.new("NodeGroupOutput"); nout.location = (900, 0)
     fillet = ng.nodes.new("GeometryNodeFilletCurve"); fillet.location = (-450, 0)
     fillet.inputs["Mode"].default_value = "Poly"
     fillet.inputs["Limit Radius"].default_value = True
     rad = ng.nodes.new("GeometryNodeInputRadius"); rad.location = (-650, -220)
     fill = ng.nodes.new("GeometryNodeFillCurve"); fill.location = (-180, 0)
     fill.inputs["Mode"].default_value = "N-gons"
-    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (60, 0)
-    ss = ng.nodes.new("GeometryNodeSetShadeSmooth"); ss.location = (280, 0)
+    pos = ng.nodes.new("GeometryNodeInputPosition"); pos.location = (-180, -240)
+    sepxyz = ng.nodes.new("ShaderNodeSeparateXYZ"); sepxyz.location = (20, -240)
+    combxyz = ng.nodes.new("ShaderNodeCombineXYZ"); combxyz.location = (220, -240)
+    setpos = ng.nodes.new("GeometryNodeSetPosition"); setpos.location = (280, 0)  # restore real Z
+    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (460, 0)
+    ss = ng.nodes.new("GeometryNodeSetShadeSmooth"); ss.location = (680, 0)
     L = ng.links.new
     L(nin.outputs["Geometry"], fillet.inputs["Curve"])
     L(rad.outputs["Radius"], fillet.inputs["Radius"])
     L(nin.outputs["Segments"], fillet.inputs["Count"])
     L(fillet.outputs["Curve"], fill.inputs["Curve"])
-    L(fill.outputs["Mesh"], setm.inputs["Geometry"])
+    L(pos.outputs["Position"], sepxyz.inputs["Vector"])
+    L(sepxyz.outputs["X"], combxyz.inputs["X"])
+    L(sepxyz.outputs["Y"], combxyz.inputs["Y"])
+    L(nin.outputs["Pad Z"], combxyz.inputs["Z"])
+    L(fill.outputs["Mesh"], setpos.inputs["Geometry"])
+    L(combxyz.outputs["Vector"], setpos.inputs["Position"])
+    L(setpos.outputs["Geometry"], setm.inputs["Geometry"])
     L(nin.outputs["Material"], setm.inputs["Material"])
     L(setm.outputs["Geometry"], ss.inputs["Geometry"])
     L(ss.outputs["Geometry"], nout.inputs["Geometry"])
     ng["mat_id"] = mat_sock.identifier
     ng["seg_id"] = seg_sock.identifier
-    return ng, (mat_sock.identifier, seg_sock.identifier)
+    ng["z_id"] = z_sock.identifier
+    return ng, (mat_sock.identifier, seg_sock.identifier, z_sock.identifier)
 
 
 def junction_pad(name, boundary_pts_radius, coll, matkey="asphalt", segments=8):
     """A filled intersection pavement pad from a closed boundary polygon (see
     `_poly_curve_with_radius`) via `GN_JunctionPad`. Returns the boundary/pad object (modifier
-    live; glTF export bakes it, same convention as `road_from_curve`/`barrier_from_curve`)."""
+    live; glTF export bakes it, same convention as `road_from_curve`/`barrier_from_curve`).
+
+    `Pad Z` is read off `boundary_pts_radius[0][2]` -- every point in a junction boundary shares
+    the same Z by construction (a junction pad is always flat), so the first point's Z is the
+    correct flat height for the whole pad; see `make_junction_pad_group`'s docstring for why this
+    needs restoring at all (Fill Curve silently flattens to 0 otherwise)."""
     bound = _poly_curve_with_radius(name, boundary_pts_radius, coll, closed=True)
-    ng, (mat_id, seg_id) = make_junction_pad_group()
+    ng, (mat_id, seg_id, z_id) = make_junction_pad_group()
     mod = bound.modifiers.new("Pad", "NODES")
     mod.node_group = ng
     mod[mat_id] = mat(matkey)
     mod[seg_id] = segments
+    mod[z_id] = boundary_pts_radius[0][2] if boundary_pts_radius else 0.0
     bound.name = name
     return bound
 
@@ -1234,7 +1341,21 @@ def make_curb_loop_group():
     rad = ng.nodes.new("GeometryNodeInputRadius"); rad.location = (-650, -140)
     oi = ng.nodes.new("GeometryNodeObjectInfo"); oi.location = (-450, -260)
     c2m = ng.nodes.new("GeometryNodeCurveToMesh"); c2m.location = (-180, 0)
-    c2m.inputs["Fill Caps"].default_value = True
+    # Fill Caps was unconditionally True (2026-07-28, user-reported: EVERY segment's curb shows a
+    # solid box-shaped end wall exactly where it meets an intersection/another segment -- "align is
+    # at top of the curb, not at road level" -- confirmed directly: an exported curb's end ring at
+    # the connection point has all 4 cross-section corners present, a fully closed box face, not an
+    # open end). Root cause: this curb loop is built from an OPEN (non-cyclic) boundary curve for a
+    # segment's own L/R curb (`curb_loop(..., closed=False)`) -- Curve to Mesh's Fill Caps then caps
+    # BOTH ends of that boundary with the profile's own shape, i.e. a solid curb-height block right
+    # at the connection, the exact same class of bug `GN_RoadProfile`'s pavement had (fixed
+    # 2026-07-28 earlier the same day) but never applied here. Fix is simpler here: Curve to Mesh
+    # has a direct boolean for this (no manual endpoint-tag/delete-geometry plumbing needed like the
+    # pavement fix required). False is safe unconditionally: a CLOSED intersection curb loop
+    # (`closed=True`) is a cyclic boundary curve with no ends at all, so Fill Caps was already a
+    # no-op there -- this only ever changed behavior for open (segment/transition) curbs, which is
+    # exactly the case that needed it.
+    c2m.inputs["Fill Caps"].default_value = False
     setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (60, 0)
     ss = ng.nodes.new("GeometryNodeSetShadeSmooth"); ss.location = (280, 0)
     L = ng.links.new
@@ -1264,10 +1385,21 @@ def _curb_profile_object(style, height, thickness):
     input. Cached by `(style, height, thickness)` so repeated builds/rebuilds (live-edit!) reuse
     one object instead of leaking a new datablock per rebuild; deliberately NOT linked into any
     scene collection (referenced only by GN modifiers via Object Info, never rendered/exported
-    itself -- `export_gltf` only ever selects the objects it's explicitly given)."""
+    itself -- `export_gltf` only ever selects the objects it's explicitly given).
+
+    The cache is a plain Python module global, so it survives a File > New / File > Open in the
+    SAME Blender session (Python globals aren't reset by loading a different .blend) -- the
+    PREVIOUS file's cached object is by then a freed RNA struct, and accessing ANY attribute on it
+    (including `.name`, for the staleness check itself) raises `ReferenceError`, not a clean
+    "not found." Guard with `GD`-style `try/except` instead of a bare attribute read so a stale
+    cross-file reference is treated as a cache miss (rebuilt) rather than crashing the next build."""
     key = (style, round(height, 4), round(thickness, 4))
     obj = _CURB_PROFILE_CACHE.get(key)
-    if obj is not None and obj.name in bpy.data.objects:
+    try:
+        obj_valid = obj is not None and obj.name in bpy.data.objects
+    except ReferenceError:
+        obj_valid = False
+    if obj_valid:
         return obj
     if style == 'GUTTER':
         pts2d = gutter_curb_profile(thickness, height)   # open profile: road edge -> curb top
@@ -1280,8 +1412,18 @@ def _curb_profile_object(style, height, thickness):
     cu.dimensions = '3D'
     sp = cu.splines.new('POLY')
     sp.points.add(len(pts2d) - 1)
+    # `GN_CurbLoop`'s Curve to Mesh sweep maps this profile's local +Y to world -Z, the exact
+    # same quirk `GN_BarrierProfile` already documents/compensates for ("profile-Y -> world -Z
+    # here") -- `_curb_profile_object` never got the matching negation, so every curb hung DOWN
+    # from the road surface instead of rising above it (2026-07-28, user-reported: "intersection
+    # generated mesh is on upper of curb rather than bottom of curb" -- confirmed directly, a
+    # flat curb line at Z=5.0 evaluated to [4.85, 5.0] instead of [5.0, 5.15]; same bug on both
+    # segments and intersections, since both go through this one shared helper). Negate the
+    # height component here, NOT inside `gutter_curb_profile()` itself, which is also used by
+    # `ops_intersection.build_curb`'s GUTTER branch through `swept_profile` -- a different,
+    # hand-rolled sweep with its own (already-correct, un-inverted) Z convention.
     for i, (lat, h) in enumerate(pts2d):
-        sp.points[i].co = (lat, h, 0.0, 1.0)
+        sp.points[i].co = (lat, -h, 0.0, 1.0)
     sp.use_cyclic_u = cyclic
     obj = bpy.data.objects.new("RKA_CurbProfile_%s" % style, cu)
     _CURB_PROFILE_CACHE[key] = obj
@@ -1334,12 +1476,28 @@ def curb_asset_row(name, boundary_pts_radius, coll, asset_obj, spacing, rot_offs
     return instancer(name, coords, asset_obj, coll, rots=rots)
 
 
-def colonly_swept(name, cpts, half_w, coll, z0=-0.4, z1=0.0):
+def colonly_swept(name, cpts, half_w, coll, z0=-0.4, z1=0.0, miter_limit=4.0):
     """A `<name>-colonly` swept solid slab following cpts=[(x,y,z[,...]), ...] with lateral
     half-width `half_w` (scalar OR per-point list), from z+z0 to z+z1. This is the drivable/solid
     COLLISION proxy a swept GN road/wall otherwise LACKS (importer drops the visual and builds a
     CollisionShape3D from the -colonly mesh). Low-poly by construction (one ring per densified
-    point) so seg_len keeps the collider cheap while every segment still spans a vehicle."""
+    point) so seg_len keeps the collider cheap while every segment still spans a vehicle.
+
+    Per-vertex lateral direction is a proper MITER JOIN (2026-07-27, user-reported/screenshotted:
+    a wedge of collision fanning out well past the curb at a sharp corner, well above the visual
+    road) -- bisects the INCOMING edge's own left-normal and the OUTGOING edge's own left-normal,
+    then scales the half-width by `1/cos(half the turn angle)` so both edges' offset lines still
+    meet exactly at the corner (standard 2D polyline-offset miter join). The previous version used
+    a single central-difference chord (`cpts[i+1] - cpts[i-1]`) for the normal at every point --
+    fine for a gentle curve, but at a SHARP corner that chord doesn't match either adjacent edge's
+    true perpendicular, so the swept quad connecting two corner rings could skew/twist into
+    exactly this kind of overshooting wedge, while the visual mesh (Blender's native Curve-to-Mesh/
+    Fillet Curve, which DOES miter corners correctly) stayed clean -- explaining why only the
+    COLLISION looked wrong, never the road surface itself. `miter_limit` (default 4, i.e. never
+    more than 4x half_w) caps the scale for a near-reversal turn (where the two edges point almost
+    opposite ways and a true miter would run to infinity) -- falls back to the incoming edge's own
+    plain perpendicular past that limit, a small square-ish notch instead of a spike, matching
+    ordinary vector-graphics miter-limit behavior."""
     n = len(cpts)
     if n < 2:
         return None
@@ -1347,11 +1505,28 @@ def colonly_swept(name, cpts, half_w, coll, z0=-0.4, z1=0.0):
     verts, faces = [], []
     for i, p in enumerate(cpts):
         x, y, z = p[0], p[1], p[2]
-        a = cpts[max(0, i - 1)]; b = cpts[min(n - 1, i + 1)]
-        tx, ty = b[0] - a[0], b[1] - a[1]
-        L = math.hypot(tx, ty) or 1.0
-        nx, ny = -ty / L, tx / L                        # left normal (lateral)
-        w = hw[i]
+        ein = eout = None
+        if i > 0:
+            ax, ay = p[0] - cpts[i - 1][0], p[1] - cpts[i - 1][1]
+            La = math.hypot(ax, ay) or 1.0
+            ein = (ax / La, ay / La)
+        if i < n - 1:
+            bx, by = cpts[i + 1][0] - p[0], cpts[i + 1][1] - p[1]
+            Lb = math.hypot(bx, by) or 1.0
+            eout = (bx / Lb, by / Lb)
+        ein = ein or eout
+        eout = eout or ein
+        n1x, n1y = -ein[1], ein[0]      # incoming edge's own left normal
+        n2x, n2y = -eout[1], eout[0]    # outgoing edge's own left normal
+        mx, my = n1x + n2x, n1y + n2y
+        mL = math.hypot(mx, my)
+        if mL < 1e-6:
+            nx, ny, scale = n1x, n1y, 1.0     # near-180 reversal -- no well-defined bisector
+        else:
+            nx, ny = mx / mL, my / mL
+            cos_half = max(nx * n1x + ny * n1y, 1.0 / miter_limit)
+            scale = 1.0 / cos_half
+        w = hw[i] * scale
         verts += [(x - nx*w, y - ny*w, z+z0), (x + nx*w, y + ny*w, z+z0),
                   (x + nx*w, y + ny*w, z+z1), (x - nx*w, y - ny*w, z+z1)]
     for i in range(n - 1):
@@ -1361,6 +1536,142 @@ def colonly_swept(name, cpts, half_w, coll, z0=-0.4, z1=0.0):
                   (a+1, b+1, b+2, a+2),                 # +normal side
                   (a, a+3, b+3, b)]                     # -normal side
     faces += [(0, 1, 2, 3), ((n-1)*4, (n-1)*4+3, (n-1)*4+2, (n-1)*4+1)]   # end caps
+    me = bpy.data.meshes.new(name + "-colonly")
+    me.from_pydata(verts, [], faces); me.update(); recalc_normals(me)
+    obj = bpy.data.objects.new(name + "-colonly", me)
+    coll.objects.link(obj)
+    obj.data.materials.append(mat("col"))
+    obj["proxy_for"] = name
+    return obj
+
+
+SHOULDER_MARGIN = 0.4   # m, extra collision-only half-width beyond the curb line -- see docstring
+SEAM_OVERLAP = 0.5      # m, extra collision-only LENGTH past each end -- see docstring
+# Both shrunk 2026-07-27 (from 2.0/1.5) once a much bigger contributor was found and fixed
+# (VehicleAIController.cruiseSpeed 11->7 m/s cut departures from dozens starting at t=2.5s to two
+# starting at t=41.5s on its own) -- the wide margin was then mostly just extra invisible collision
+# floating past the visible curb with little safety benefit left to justify it (and was itself
+# reported as visible: character/vehicle collision sitting perceptibly off the curb line). Kept
+# small and nonzero rather than 0 -- still a bit of forgiveness for ordinary wheel/foot clipping,
+# just not enough to read as a mismatch against the visual road.
+
+
+def colonly_swept_between(name, left_pts, right_pts, coll, z0=-0.4, z1=0.0,
+                           margin=SHOULDER_MARGIN, end_overlap=SEAM_OVERLAP):
+    """A `<name>-colonly` swept solid slab for the PAVEMENT between two parallel offset lines
+    (e.g. a segment/transition's own `curbs` field -- the exact `[left_pts, right_pts]` its visual
+    ribbon/GN sweep already uses), built as `colonly_swept` from the pointwise midpoint centerline
+    with pointwise half-width = half the left/right separation -- so it naturally follows a
+    tapering width (a lane-count transition) with no extra per-caller math.
+
+    This is the drivable-surface collision a segment/transition otherwise LACKS: only the curb
+    EDGES got `colonly_swept` collision (a thin strip at each side), leaving the open lanes between
+    them collision-free -- a vehicle driving the middle of the road fell straight through to
+    whatever's below (ground/terrain, or nothing), landing well beneath the visual pavement while
+    still correctly following its `PathLaneRoute` (a pure geometric path, unaffected by missing
+    collision).
+
+    `margin` (2026-07-27, user-reported "vehicle still on ground even at the beginning" -- traced
+    via a per-vehicle raycast diagnostic to widespread, near-immediate collision departures, not a
+    rare edge case): curb walls are only `curb_height` (~0.15m) tall -- trivially easy for a moving
+    vehicle to hop over. `margin` extends the COLLISION ONLY (never the visual pavement/curb, which
+    are built from the unmodified `left_pts`/`right_pts` elsewhere) a couple meters past each curb
+    line, an invisible shoulder catching ordinary lateral steering drift. **Confirmed (via a
+    per-tick position/velocity trace) NOT the dominant cause on its own** -- widening this alone
+    left departures just as frequent, because most observed falls were a vehicle moving STEADILY
+    FORWARD (accelerating out of a stop, not turning) that cleanly lost support and free-fell
+    (velocity.y matching -9.8 m/s^2 exactly) while still advancing -- a LENGTHWISE gap, not a
+    lateral one.
+
+    `end_overlap` is the fix for that: each piece's collision slab starts/ends EXACTLY at its own
+    p0/p1, meeting the NEXT piece's slab (built independently, from that piece's own p0/p1) at the
+    same point -- geometrically touching, but two separate static colliders meeting at an EXACT
+    shared boundary is exactly the classic "gap between tiles" scenario a fast-moving physics body
+    can tunnel through in a single substep (Jolt, like most engines, doesn't guarantee catching a
+    boundary-straddling contact between two disjoint meshes at speed). `end_overlap` extends the
+    first/last centerline point backward/forward along its own local tangent by that many meters,
+    so consecutive pieces' collision volumes OVERLAP instead of exactly touching, eliminating the
+    seam a vehicle could otherwise slip through mid-crossing. Purely a safety net -- it does not
+    change where a vehicle is intended to drive, only what happens if it strays slightly or crosses
+    a seam at speed."""
+    n = min(len(left_pts), len(right_pts))
+    if n < 2:
+        return None
+    cpts, half_w = [], []
+    for i in range(n):
+        lx, ly, lz = left_pts[i][0], left_pts[i][1], left_pts[i][2]
+        rx, ry, rz = right_pts[i][0], right_pts[i][1], right_pts[i][2]
+        cpts.append(((lx + rx) / 2.0, (ly + ry) / 2.0, (lz + rz) / 2.0))
+        half_w.append(math.hypot(rx - lx, ry - ly) / 2.0 + margin)
+    if end_overlap > 0.0:
+        def extend(p_from, p_to, dist):
+            dx, dy, dz = p_to[0] - p_from[0], p_to[1] - p_from[1], p_to[2] - p_from[2]
+            L = math.sqrt(dx * dx + dy * dy + dz * dz) or 1.0
+            return (p_to[0] + dx / L * dist, p_to[1] + dy / L * dist, p_to[2] + dz / L * dist)
+        # Compute both extensions from the ORIGINAL (pre-mutation) points -- for a 2-point
+        # polyline cpts[-2] IS cpts[0], so mutating cpts[0] before computing the far end would
+        # feed the far end's tangent an already-extended (wrong) reference point.
+        new_first = extend(cpts[1], cpts[0], end_overlap)
+        new_last = extend(cpts[-2], cpts[-1], end_overlap)
+        cpts[0] = new_first
+        cpts[-1] = new_last
+    return colonly_swept(name, cpts, half_w, coll, z0=z0, z1=z1)
+
+
+def colonly_polygon(name, pts_radius, coll, z0=-0.4, z1=0.0, margin=SHOULDER_MARGIN):
+    """A `<name>-colonly` flat filled-polygon collision slab for an intersection PAD footprint
+    (`junction_pad`'s own `boundary_pts_radius`, the same `[(x,y,z,radius), ...]` shape
+    `_poly_curve_with_radius` takes) -- fan-triangulated from the centroid (safe: every boundary
+    `intersection_kit.build_junction_boundary` produces is star-shaped from the junction's own
+    center by construction, since it's built from arm angles radiating outward) and extruded from
+    z+z0 to z+z1, mirroring `colonly_swept`'s low-poly-by-construction philosophy.
+
+    Deliberately built from the RAW control points, ignoring each point's fillet `radius` (a
+    slightly-squared-off coarse footprint instead of the exact filleted arc) -- `junction_pad`'s
+    own object is a GN-modifier-backed Curve with no real mesh data until glTF export bakes the
+    modifier, so there is nothing to read back at author time the way `colonly_mesh()` reads a
+    real visual mesh; a coarse polygon is more than adequate for a collision proxy, same standard
+    every other `-colonly` helper in this module already accepts (`colonly()`'s own box proxy is
+    coarser still). Godot import contract matches every other `-colonly` proxy: visual dropped,
+    `CollisionShape3D` built from this mesh.
+
+    `margin` -- same collision-only shoulder as `colonly_swept_between` (see its docstring for the
+    full rationale: 15cm curb walls are trivially hoppable, and a vehicle that clears one over an
+    elevated road otherwise free-falls). Pushes each boundary point directly away from the pad's
+    own centroid by `margin` meters before triangulating -- valid for this star-shaped boundary
+    (every point already radiates outward from the center by construction), and naturally extends
+    thin arm-tail stubs further along their own already-outward direction rather than sideways.
+
+    `z1` default changed 0.05 -> 0.0 (2026-07-27, user-reported: characters/vehicles visibly
+    floating above the road instead of standing on it) -- the collision top no longer sits above
+    the actual pad height at all; nothing about the coarse-polygon-vs-fillet approximation needs
+    a positive margin here specifically (that concern is about the fillet corners' XY shape, not
+    Z), so there was no real tradeoff in removing it."""
+    n = len(pts_radius)
+    if n < 3:
+        return None
+    cx = sum(p[0] for p in pts_radius) / n
+    cy = sum(p[1] for p in pts_radius) / n
+    z_ref = pts_radius[0][2]
+
+    def push(p):
+        dx, dy = p[0] - cx, p[1] - cy
+        d = math.hypot(dx, dy) or 1.0
+        return (p[0] + dx / d * margin, p[1] + dy / d * margin, p[2])
+
+    pts_radius = [push(p) for p in pts_radius]
+    bot_c = 0
+    bot = [1 + i for i in range(n)]                # bottom boundary verts
+    top_c = 1 + n
+    top = [2 + n + i for i in range(n)]             # top boundary verts
+    verts = [(cx, cy, z_ref + z0)] + [(p[0], p[1], p[2] + z0) for p in pts_radius] \
+          + [(cx, cy, z_ref + z1)] + [(p[0], p[1], p[2] + z1) for p in pts_radius]
+    faces = []
+    for i in range(n):
+        j = (i + 1) % n
+        faces.append((bot_c, bot[j], bot[i]))                  # bottom fan, normal down
+        faces.append((top_c, top[i], top[j]))                  # top fan, normal up
+        faces.append((bot[i], bot[j], top[j], top[i]))         # outward-facing side quad
     me = bpy.data.meshes.new(name + "-colonly")
     me.from_pydata(verts, [], faces); me.update(); recalc_normals(me)
     obj = bpy.data.objects.new(name + "-colonly", me)

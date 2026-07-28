@@ -7,6 +7,7 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.NodePath;
 import godot.core.StringNames;
 import com.openworld.character.Health;
@@ -54,13 +55,13 @@ public class CharacterHUD extends Control {
     Node busNode = getNodeOrNull("/root/EventBus");
     if (busNode instanceof EventBus bus) {
       bus.playerHealthChanged.connectUnsafe(
-          Callable.createUnsafe(this, StringNames.toGodotName("onHealthChanged")),
+          MethodCallable.createUnsafe(this, "onHealthChanged"),
           godot.api.Object.ConnectFlags.DEFAULT);
       bus.pickupInteractChanged.connectUnsafe(
-          Callable.createUnsafe(this, StringNames.toGodotName("onPickupInteractChanged")),
+          MethodCallable.createUnsafe(this, "onPickupInteractChanged"),
           godot.api.Object.ConnectFlags.DEFAULT);
       bus.playerOxygenChanged.connectUnsafe(
-          Callable.createUnsafe(this, StringNames.toGodotName("onOxygenChanged")),
+          MethodCallable.createUnsafe(this, "onOxygenChanged"),
           godot.api.Object.ConnectFlags.DEFAULT);
     }
   }

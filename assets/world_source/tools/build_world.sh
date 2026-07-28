@@ -23,8 +23,7 @@ trap 'rm -f "${CLEANUP_FILES[@]}" 2>/dev/null || true' EXIT
 
 BP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"           # assets/world_source
 REPO="$(cd "$BP/../.." && pwd)"                                 # repo root
-BLENDER="${BLENDER:-blender}"
-GODOT="${GODOT:-/data/danilko/bin/godot.linuxbsd.editor.x86_64.jvm.0.15.0}"
+source "$BP/tools/env.sh"
 RES_DIR="src/main/resources/com/openworld/world/master"        # relative to res://
 ABS_DIR="$REPO/$RES_DIR"
 mkdir -p "$ABS_DIR"

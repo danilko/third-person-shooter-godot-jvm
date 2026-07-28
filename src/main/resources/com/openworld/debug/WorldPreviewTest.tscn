@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/WorldPreviewBuilder.java" id="1_wpt"]
+
+[node name="WorldPreviewTest" type="Node"]
+script = ExtResource("1_wpt")
+master_scene_path = "res://src/main/resources/com/openworld/world/master/World_master.tscn"
+district_stems = "District_industry_5_1,District_city_1_1,District_harbor_0_0"
+output_scene_path = "res://src/main/resources/com/openworld/debug/WorldPreviewTestOut.tscn"
+bake_on_ready = true
+quit_when_done = true

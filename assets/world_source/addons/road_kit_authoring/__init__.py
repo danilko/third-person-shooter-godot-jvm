@@ -18,10 +18,11 @@ from . import ops_intersection
 from . import ops_segment
 from . import live_edit
 from . import traffic_viz
+from . import ops_export
 from . import panel
 
 MODULES = (props, ops_placement, ops_centerline, ops_combine, ops_intersection, ops_segment,
-           live_edit, traffic_viz, panel)
+           live_edit, traffic_viz, ops_export, panel)
 
 
 def register():

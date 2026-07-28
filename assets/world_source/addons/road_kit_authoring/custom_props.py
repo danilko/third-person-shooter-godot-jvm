@@ -63,6 +63,33 @@ def read_arms(coll):
     return list(zip(list(names), [float(a) for a in angles], [int(n) for n in lanes], lanes_out))
 
 
+def read_arms_full(coll, arm_cls):
+    """Reconstruct real `intersection_kit.Arm` objects (not `read_arms`'s plain 4-tuples --
+    those drop `oneway`/`tail_length`/`traffic_side`, which a faithful rebuild needs) from a
+    built intersection collection's `rka_arm_*`/`rka_traffic_side` custom properties -- the exact
+    same fields `ops_intersection.rebuild_intersection_in_place` already reads to rebuild this
+    piece in place, just assembled into `Arm(...)` calls instead of applied directly. `arm_cls` is
+    `intersection_kit.Arm`, passed in rather than imported here so this module (like the rest of
+    `custom_props.py`) stays free of any `intersection_kit`/`bpy` import of its own -- callers
+    already lazily import `intersection_kit` themselves (see `ops_intersection.ik()`/
+    `ops_segment.ik()`). Returns `None` if `coll` wasn't built by `RKA_OT_build_intersection`
+    (mirrors `read_arms`'s own None contract)."""
+    tuples = read_arms(coll)
+    if tuples is None:
+        return None
+    oneway = coll.get("rka_arm_oneway")
+    oneway = [(o or None) for o in oneway] if oneway is not None else [None] * len(tuples)
+    tail_lengths = coll.get("rka_arm_tail_lengths")
+    tail_lengths = ([float(t) for t in tail_lengths] if tail_lengths is not None
+                     else [None] * len(tuples))
+    lane_width = float(coll.get("rka_lane_width", 5.0))
+    traffic_side = coll.get("rka_traffic_side", "LEFT")
+    return [arm_cls(name, angle_deg, lane_width, lanes,
+                     oneway=oneway[i], lanes_out=(lanes_out or None),
+                     traffic_side=traffic_side, tail_length=tail_lengths[i])
+            for i, (name, angle_deg, lanes, lanes_out) in enumerate(tuples)]
+
+
 def read_origin(coll):
     """Read the raw (pre-lane_surface_z-offset) cursor position a piece was built at, as an
     `(x, y, z)` tuple -- or None if `coll` has no `rka_origin` (wasn't built by this addon, or

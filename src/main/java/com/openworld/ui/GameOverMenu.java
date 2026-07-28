@@ -6,6 +6,7 @@ import godot.api.Control;
 import godot.api.Label;
 import godot.api.Node;
 import com.openworld.game.EventBus;
+import com.openworld.game.GameManager;
 
 /**
  * Game-over overlay — display only.
@@ -41,6 +42,10 @@ public class GameOverMenu extends Control {
 
     @RegisterFunction
     public void onQuitPressed() {
+        // See GameManager.prepareForQuit() javadoc: SceneTree.quit() does not emit
+        // Window.close_requested, so the audio-stop-on-quit sweep must be called explicitly here.
+        Node gm = getNodeOrNull("/root/GameManager");
+        if (gm instanceof GameManager manager) manager.prepareForQuit();
         getTree().quit();
     }
 

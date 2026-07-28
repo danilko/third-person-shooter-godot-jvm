@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://b6worldpreview01"]
+
+; Assembles a STATIC, non-streamed preview scene from a chosen set of already-built districts,
+; each placed at the exact world position its own WorldZoneMarker carries in the real master
+; (World_master.tscn) -- P6.10 (road_blender_godot.md Phase 6): "can't see districts assembled
+; together in the Godot editor" (every district is 100% runtime-streamed otherwise). Deliberately
+; selective, not "load all 36 at once" -- set district_stems to a comma-separated allow-list
+; (blank = every district the master has a zone marker for).
+;   • Headless CLI: <godot-jvm-binary> --headless --path <root> \
+;       res://src/main/resources/com/openworld/world/hosts/BuildWorldPreview.tscn
+;   • Editor: open this scene, set district_stems in the Inspector, F6 ("Run Current Scene").
+; Prereq: World_master.tscn must already be built (tools/build_world.sh) -- it's the source of
+; truth for zone positions, never recomputed here. Output: WorldPreview.tscn (open directly in
+; the editor -- it's a plain static scene, no streaming/AutoLoad dependency to view it).
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/WorldPreviewBuilder.java" id="1_wpb"]
+
+[node name="BuildWorldPreview" type="Node" unique_id=900000010]
+script = ExtResource("1_wpb")
+master_scene_path = "res://src/main/resources/com/openworld/world/master/World_master.tscn"
+district_stems = ""
+output_scene_path = "res://src/main/resources/com/openworld/world/WorldPreview.tscn"
+bake_on_ready = true
+quit_when_done = true

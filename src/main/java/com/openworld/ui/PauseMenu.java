@@ -1,8 +1,10 @@
 package com.openworld.ui;
 
+import com.openworld.game.GameManager;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.api.Control;
+import godot.api.Node;
 
 /**
  * Pause-menu visual node — display only.
@@ -34,6 +36,10 @@ public class PauseMenu extends Control {
 
     @RegisterFunction
     public void onQuitPressed() {
+        // GameManager.prepareForQuit() -- see its javadoc: SceneTree.quit() does NOT emit
+        // Window.close_requested, so the audio-stop-on-quit sweep must be called explicitly here.
+        Node gm = getNodeOrNull("/root/GameManager");
+        if (gm instanceof GameManager manager) manager.prepareForQuit();
         getTree().quit();
     }
 

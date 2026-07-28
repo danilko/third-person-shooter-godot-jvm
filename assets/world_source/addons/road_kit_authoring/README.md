@@ -5,16 +5,26 @@ Interactive placement/authoring addon for the mesh-first road kit (`kit/lane_kit
 
 ## Dev install (symlink, not copy — edits here take effect immediately, no addon reinstall)
 
-Find Blender's user addons directory (Edit > Preferences > File Paths, or typically
-`~/.config/blender/<version>/scripts/addons/` on Linux), then:
+From the repo root:
+
+```bash
+tools/install_blender_addon.sh
+```
+
+This symlinks this directory into **every** installed Blender version's addons folder
+(`~/.config/blender/<version>/scripts/addons/`) and enables it headlessly. **Re-run it after
+every Blender upgrade** — Blender's addon config is per-version, so a fresh version directory
+(e.g. after 5.1 → 5.2) does not inherit the symlink from the old one and the panel silently
+disappears until this is re-run. See the top-level `README.md` "World Authoring Setup" section.
+
+Manual fallback (if you only want one specific Blender version wired up):
 
 ```bash
 ln -s "$(pwd)/assets/world_source/addons/road_kit_authoring" \
-    ~/.config/blender/4.x/scripts/addons/road_kit_authoring
+    ~/.config/blender/<version>/scripts/addons/road_kit_authoring
 ```
 
-(run from the repo root; replace `4.x` with your installed Blender version). Enable it in
-Edit > Preferences > Add-ons, search "Road Kit Authoring".
+then enable it in Edit > Preferences > Add-ons, search "Road Kit Authoring".
 
 ## Panel
 

@@ -10,6 +10,7 @@ import godot.api.Input;
 import godot.api.InputEvent;
 import godot.api.Node;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.StringNames;
 
 /**
@@ -45,10 +46,10 @@ public class MenuManager extends CanvasLayer {
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
             bus.allPlayersDied.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onAllPlayersDied")),
+                    MethodCallable.createUnsafe(this, "onAllPlayersDied"),
                     godot.api.Object.ConnectFlags.DEFAULT);
             bus.connectionLost.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onConnectionLost")),
+                    MethodCallable.createUnsafe(this, "onConnectionLost"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
     }
@@ -118,6 +119,10 @@ public class MenuManager extends CanvasLayer {
     }
 
     public void quit() {
+        // See GameManager.prepareForQuit() javadoc: SceneTree.quit() does not emit
+        // Window.close_requested, so the audio-stop-on-quit sweep must be called explicitly here.
+        Node gm = getNodeOrNull("/root/GameManager");
+        if (gm instanceof GameManager manager) manager.prepareForQuit();
         getTree().quit();
     }
 

@@ -364,67 +364,6 @@ def add_ground_safety_plane(cfg, coll):
     bpy.data.objects.remove(visual, do_unlink=True)
 
 
-# ── Hand-authored road spines (districts/<piece>.roads.json sidecar) ────────────────────
-#
-# PLATEAU districts have no solver grid and their road meshes are raw polygon slabs with no
-# centerlines — so internal traffic comes from HAND-AUTHORED centerline curves drawn over
-# the road meshes in Blender (road_<name> poly/bezier curves + lanes/oneway/class custom
-# props). Because this build REGENERATES the .blend (wipe_scene), the curves persist in a
-# git-diffable JSON sidecar, not the blend: edit curves → tools/save_roads.py exports the
-# sidecar → this build re-imports them into a ROADS_SRC collection (round-trip editing,
-# excluded from the glTF export) and generates the full traffic layer from them
-# (lib/road_graph.from_curves → junction-split lanes + turn connectors + intersection
-# markers, all namespaced lane_<piece>__…). No sidecar = arterials-only district, no error.
-
-def load_roads_sidecar(cfg):
-    path = os.path.join(ROOT, "districts", cfg["piece"] + ".roads.json")
-    if not os.path.exists(path):
-        return None
-    import json
-    with open(path) as f:
-        return json.load(f)
-
-
-def import_roads_src(data):
-    """Rebuild the sidecar's road_* curves as editable POLY curve objects in ROADS_SRC."""
-    src = kc.get_coll("ROADS_SRC")
-    for c in data.get("curves", []):
-        cu = bpy.data.curves.new(c["name"], 'CURVE')
-        cu.dimensions = '3D'
-        sp = cu.splines.new('POLY')
-        pts = c["points"]
-        sp.points.add(len(pts) - 1)
-        for i, (x, y, z) in enumerate(pts):
-            sp.points[i].co = (x, y, z, 1.0)
-        ob = bpy.data.objects.new(c["name"], cu)
-        ob["lanes"] = int(c.get("lanes", 1))
-        ob["oneway"] = bool(c.get("oneway", False))
-        ob["class"] = c.get("class", "local")
-        ob["median"] = float(c.get("median", 0.0))
-        src.objects.link(ob)
-    return len(data.get("curves", []))
-
-
-def emit_authored_roads(data):
-    """Sidecar curves → RoadGraph → traffic markers. Route stems drop the road_ prefix to
-    stay inside Blender's 63-char object-name cap once the piece prefix is added.
-
-    `data`'s optional top-level "driving_side" field ('LEFT'/'RIGHT') sets the district's
-    traffic convention — absent in every sidecar authored before this feature, so this is a
-    forward-compatible no-op (defaults to 'LEFT', unchanged behavior) until an author's
-    tools/save_roads.py-written sidecar opts in."""
-    import road_graph as rgm
-    curves = []
-    for c in data.get("curves", []):
-        stem = c["name"]
-        stem = stem[len("road_"):] if stem.startswith("road_") else stem
-        curves.append((stem, [tuple(p) for p in c["points"]],
-                       {"lanes": c.get("lanes", 1), "oneway": c.get("oneway", False),
-                        "class": c.get("class", "local"), "median": c.get("median", 0.0)}))
-    driving_side = str(data.get("driving_side", "LEFT") or "LEFT")
-    return asm.lay_road_graph(rgm.from_curves(curves, driving_side=driving_side), z_off=0.3)
-
-
 # ── Seams (cross-district route continuity — see world_grid.seam_route_name) ────────────
 
 def emit_seam_routes(cfg, mk_coll):
@@ -554,11 +493,6 @@ def build(name):
     n_seam, manifest = emit_seam_routes(cfg, mk_coll)
     stats += f" seam_routes={n_seam}"
 
-    roads = load_roads_sidecar(cfg)
-    if roads:
-        import_roads_src(roads)
-        n_rd, n_cn, n_jn = emit_authored_roads(roads)
-        stats += f" roads[lanes={n_rd} connectors={n_cn} junctions={n_jn}]"
     if cfg["source"] == "plateau" and landmark_name:
         stats += f" landmark={landmark_name}"
 

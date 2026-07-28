@@ -100,6 +100,35 @@ def main():
     print("select_arm smoketest: switching the active piece correctly re-resolves 'N' to '%s's "
           "own arm object" % coll.name)
 
+    # --- Select Piece By Name: 2026-07-28, user-reported -- with NOTHING selected/active,
+    # rka.select_piece's own poll() always fails (it needs something piece-related already
+    # active), so there was no way to select a FIRST piece from the panel at all. Confirm the
+    # by-name variant works from a totally clean slate (nothing selected, nothing active) and its
+    # poll() is unconditional (always True, unlike select_piece).
+    for o in bpy.data.objects:
+        o.select_set(False)
+    context.view_layer.objects.active = None
+    _assert(not bpy.ops.rka.select_piece.poll(),
+            "select_piece's poll should fail with nothing active (the bug this fixes)")
+    _assert(bpy.ops.rka.select_piece_by_name.poll(),
+            "select_piece_by_name's poll should always succeed (no active-object precondition)")
+    ret = bpy.ops.rka.select_piece_by_name(coll_name=coll2.name)
+    _assert(ret == {'FINISHED'}, "select_piece_by_name did not finish: %s" % (ret,))
+    _assert(set(context.selected_objects) == set(coll2.objects),
+            "select_piece_by_name should select every object in the NAMED collection, from a "
+            "clean slate with nothing previously active")
+    print("select_piece_by_name smoketest: selected '%s' from a completely clean slate (nothing "
+          "active/selected beforehand) -- the bootstrapping gap select_piece's poll() left" % coll2.name)
+
+    # bpy.ops raises RuntimeError for an ERROR-reported CANCELLED result -- that IS the expected
+    # outcome here (see smoketest_lane_map_panel.py for the same pattern).
+    try:
+        bpy.ops.rka.select_piece_by_name(coll_name="NotARealPiece")
+        _assert(False, "a bogus coll_name should have raised/CANCELLED, it did not")
+    except RuntimeError as exc:
+        _assert("not a local road_kit_authoring piece" in str(exc), "unexpected error: %s" % exc)
+    print("select_piece_by_name smoketest: a bogus/non-piece collection name is rejected cleanly")
+
     print("SMOKETEST OK")
 
 

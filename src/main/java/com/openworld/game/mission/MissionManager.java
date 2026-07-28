@@ -7,6 +7,7 @@ import godot.api.Node;
 import godot.api.Object;
 import godot.api.Texture2D;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.StringName;
 import godot.core.StringNames;
 import godot.global.GD;
@@ -78,7 +79,7 @@ public class MissionManager extends Node {
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
             bus.characterEliminated.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onCharacterEliminated")),
+                    MethodCallable.createUnsafe(this, "onCharacterEliminated"),
                     Object.ConnectFlags.DEFAULT);
         }
     }

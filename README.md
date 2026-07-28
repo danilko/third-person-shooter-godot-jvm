@@ -320,6 +320,26 @@ You **cannot** use the standard Godot editor. You must download the specific Kot
    ```
 3. Open the `project.godot` file using the **Godot Kotlin/JVM Editor**.
 
+### World Authoring Setup (optional — only if you're editing districts/roads, not just playing)
+
+The open world (`assets/world_source/`) is authored in Blender via the **Road Kit Authoring**
+addon (mesh-first road pieces + lane connectivity export). Requires Blender **4.0+**.
+
+1. Install Blender.
+2. From the repo root, run:
+   ```bash
+   tools/install_blender_addon.sh
+   ```
+   This symlinks the addon into every Blender version you have installed and enables it —
+   no manual Preferences step needed. **Re-run this after every Blender version upgrade**:
+   Blender keeps addon config per-version (`~/.config/blender/<X.Y>/scripts/addons/`), and a
+   fresh version directory does not inherit addons from the old one, so the panel silently
+   disappears after an in-place Blender update until you re-run this script.
+3. Open a district `.blend` under `assets/world_source/districts/` (or `kit/` for the piece
+   library) — the "Road Kit" tab appears in the 3D Viewport sidebar (`N`).
+4. See `assets/world_source/AUTHORING_GUIDE.md` for the authoring workflow and
+   `assets/world_source/addons/road_kit_authoring/README.md` for the addon's own panel reference.
+
 ---
 
 ## 🎮 Controls

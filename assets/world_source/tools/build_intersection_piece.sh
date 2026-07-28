@@ -23,7 +23,7 @@ set -euo pipefail
 
 BP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"           # assets/world_source
 REPO="$(cd "$BP/../.." && pwd)"                                 # repo root
-GODOT="${GODOT:-/data/danilko/bin/godot.linuxbsd.editor.x86_64.jvm.0.15.0}"
+source "$BP/tools/env.sh"
 
 RES_DIR="src/main/resources/com/openworld/world/districts"      # relative to res://
 GLTF_REL="$RES_DIR/District_intersectiondemo.glb"

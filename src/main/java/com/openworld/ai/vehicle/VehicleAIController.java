@@ -43,8 +43,14 @@ public class VehicleAIController extends Controller {
     /** Throttle fraction applied while cruising along the lane (0–1). */
     @RegisterProperty @Export public float cruiseThrottle = 0.4f;
 
-    /** Target cruising speed (m/s) — throttle eases to zero above it (city pace ≈ 11 ≈ 40 km/h). */
-    @RegisterProperty @Export public float cruiseSpeed = 11f;
+    /** Target cruising speed (m/s) — throttle eases to zero above it. Lowered 2026-07-27
+     *  (user-requested experiment: does slower ambient traffic stop flying/pushing off the road at
+     *  corners/seams?) from 11 (~40 km/h, city pace) to 7 (~25 km/h) — a single global default for
+     *  now. Planned follow-up, not built yet: per-road-type speed (highway lanes faster) and
+     *  per-archetype speed (a racing AI faster still) — both would read from data (a road/lane
+     *  property, or a distinct AIBehaviorConfig-style resource per AI archetype) rather than this
+     *  one shared default, once there's a road-type signal to key off of. */
+    @RegisterProperty @Export public float cruiseSpeed = 7f;
 
     /** Speed band (m/s) over which throttle fades from full to zero above cruiseSpeed. */
     @RegisterProperty @Export public float cruiseSpeedFalloff = 3f;

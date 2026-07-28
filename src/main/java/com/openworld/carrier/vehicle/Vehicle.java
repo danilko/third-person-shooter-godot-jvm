@@ -14,6 +14,7 @@ import godot.annotation.RegisterProperty;
 import godot.annotation.RegisterSignal;
 import godot.api.*;
 import godot.core.*;
+import godot.core.MethodCallable;
 import godot.global.GD;
 
 import java.lang.Object;
@@ -182,11 +183,11 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (h instanceof Health hn) {
             healthNode = hn;
             healthNode.died.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onVehicleDestruction")),
+                    MethodCallable.createUnsafe(this, "onVehicleDestruction"),
                     godot.api.Object.ConnectFlags.DEFAULT);
             // Damage wakes a parked (sleeping) body so it reacts to what follows the hit.
             healthNode.hit.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onVehicleDamaged")),
+                    MethodCallable.createUnsafe(this, "onVehicleDamaged"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
 
@@ -1197,7 +1198,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (wreck instanceof Node3D w) w.setGlobalTransform(getGlobalTransform());
         SceneTreeTimer t = getTree().createTimer(cfg.wreckDuration, true, false, false);
         t.connect(new StringName("timeout"),
-                Callable.createUnsafe(wreck, new StringName("queue_free")));
+                MethodCallable.createUnsafe(wreck, "queue_free"));
     }
 
     // ── EntranceArea signals ──────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import godot.annotation.RegisterFunction;
 import godot.api.Area3D;
 import godot.api.Node3D;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.StringName;
 import godot.global.GD;
 
@@ -42,8 +43,8 @@ public class IntersectionZone extends Area3D {
     public void _ready() {
         addToGroup(new StringName(GROUP));
         // godot-kotlin-jvm registers @RegisterFunction methods under their snake_case names.
-        connect(new StringName("body_entered"), Callable.createUnsafe(this, new StringName("on_body_entered")));
-        connect(new StringName("body_exited"), Callable.createUnsafe(this, new StringName("on_body_exited")));
+        connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
+        connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
     }
 
     @RegisterFunction
