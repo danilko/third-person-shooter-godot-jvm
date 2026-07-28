@@ -431,6 +431,7 @@ public class WorldBaker extends Node {
         lane.approach = fromArm;
         lane.endBehavior = VehicleRoute.END_CHAIN;   // geometry-derived connectivity (LaneGraph) picks the successor
         lane.laneWidth = laneWidthByArm.getOrDefault(fromArm, 3.5f);
+        lane.zoneId = jsonString(laneDict, "zone_id", "");
 
         Curve3D curve = new Curve3D();
         for (Object ptObj : pointsArr) {

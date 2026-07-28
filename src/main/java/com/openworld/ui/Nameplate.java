@@ -10,6 +10,7 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.NodePath;
 import godot.core.StringNames;
 
@@ -77,7 +78,7 @@ public class Nameplate extends Node3D {
             }
             applyColor();
             t.getNameplateChangedSignal().connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onTargetChanged")),
+                    MethodCallable.createUnsafe(this, "onTargetChanged"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
 
@@ -89,10 +90,10 @@ public class Nameplate extends Node3D {
             maxHealth = health.maxHealth;
             updateBar(health.getCurrentHealth());
             health.healthChanged.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onHealthChanged")),
+                    MethodCallable.createUnsafe(this, "onHealthChanged"),
                     godot.api.Object.ConnectFlags.DEFAULT);
             health.died.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onDied")),
+                    MethodCallable.createUnsafe(this, "onDied"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
 
@@ -101,7 +102,7 @@ public class Nameplate extends Node3D {
         if (wcNode instanceof WeaponController wc) {
             weaponController = wc;
             wc.ammoChanged.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onAmmoChanged")),
+                    MethodCallable.createUnsafe(this, "onAmmoChanged"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
         // The controller may not have built its slot array yet (its _ready can run after this one);

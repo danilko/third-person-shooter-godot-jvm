@@ -52,9 +52,11 @@ runs the actual rebuilds outside the depsgraph callback / outside the transform 
 step, once activity settles (`_DEBOUNCE_SECONDS`). This also coalesces a whole rapid drag into one
 rebuild instead of dozens, which was wasted work even in the safe (single-marker) case.
 """
+import contextlib
+
 import bpy
 
-_rebuilding = False
+_rebuilding_depth = 0
 _pending_inter = set()
 _pending_seg = set()
 _pending_curve_seg = set()
@@ -64,11 +66,67 @@ _timer_scheduled = False
 _DEBOUNCE_SECONDS = 0.2   # long enough that an in-progress Grab/Rotate has released control back
                            # to Blender's main loop between ticks; short enough to still feel live
 
+_GUARD_RELEASE_SECONDS = _DEBOUNCE_SECONDS + 0.1   # see rebuilding()'s docstring
+
+
+@contextlib.contextmanager
+def rebuilding():
+    """Set a guard so `_on_depsgraph_update` ignores the depsgraph updates a rebuild's OWN object
+    mutations generate -- `clear_generated_mesh_objects` deleting/recreating curb/pad/lanecl_*
+    objects, or an operator writing to the spine curve's own point data first (e.g.
+    `RKA_OT_adjust_segment_lanes` rewriting `spine_obj.data.splines[0].points[i].radius` before
+    calling `rebuild_segment_gn_in_place`).
+
+    `_flush_rebuilds` (the debounced path) already guarded itself this way. But every OTHER
+    caller -- `RKA_OT_adjust_segment_lanes`/`RKA_OT_adjust_transition_lanes`/
+    `RKA_OT_adjust_arm_lanes`/`RKA_OT_add_arm`/`RKA_OT_remove_arm`/`RKA_OT_set_arm_oneway`/
+    `RKA_OT_adjust_arm_lanes_out`/`RKA_OT_unfreeze_and_rebuild`/`RKA_OT_rebuild_from_handles` --
+    calls a `rebuild_*_in_place` function DIRECTLY from its own `execute()`, entirely bypassing
+    `_flush_rebuilds`, and none of them guarded themselves this way. Left unguarded, a direct
+    rebuild that touches the spine's geometry (as `adjust_segment_lanes` does) gets picked up as
+    fresh "dirt" by `_on_depsgraph_update`, which schedules a SECOND, entirely unprompted rebuild
+    of the SAME collection ~`_DEBOUNCE_SECONDS` later via `bpy.app.timers` -- outside any operator/
+    undo context, racing whatever the user does next. This was the confirmed cause of a real
+    segfault inside `clear_generated_mesh_objects` (a double rebuild landing back-to-back on one
+    segment right after a single 'Adjust Segment Lanes' click -- see the crash log's Python
+    backtrace: `_flush_rebuilds` → `rebuild_segment_gn_in_place` → `clear_generated_mesh_objects`,
+    with no user action in between).
+
+    IMPORTANT: `_on_depsgraph_update` for a plain property write (e.g. a curve's point radius) does
+    NOT fire synchronously inside the `with`/decorated call that made the write -- confirmed
+    empirically (forcing an immediate `depsgraph.update()` right after a guarded operator returns
+    still observes the dirtying) -- Blender evaluates and delivers it on a LATER tick, by which
+    point an immediate "reset on `__exit__`" would already have cleared the guard, never actually
+    covering the callback it exists to suppress. So the guard is reference-counted
+    (`_rebuilding_depth`, supporting nesting -- `_flush_rebuilds` is itself inside a `rebuilding()`
+    block calling rebuild functions that enter it again) and each `__exit__` releases its own count
+    via a delayed one-shot `bpy.app.timers` callback (`_GUARD_RELEASE_SECONDS`, comfortably past
+    both a same-tick and a next-redraw-cycle delivery) instead of releasing immediately -- keeping
+    the suppression window open long enough to actually catch the deferred callback.
+
+    Every `rebuild_*_in_place` function wraps its own body in this (see `ops_intersection.
+    rebuild_intersection_in_place` / `ops_segment.rebuild_segment_in_place` / `...
+    rebuild_segment_gn_in_place` / `...rebuild_lane_transition_in_place`), so BOTH call paths --
+    the debounced flush and every direct operator button -- are covered from ONE place. An operator
+    that mutates spine/marker data of its OWN, outside any rebuild function (`RKA_OT_
+    adjust_segment_lanes`'s pre-rebuild radius write), must wrap that mutation in its own
+    `with rebuilding():` block too -- wrapping only the subsequent rebuild call is not enough."""
+    global _rebuilding_depth
+    _rebuilding_depth += 1
+    try:
+        yield
+    finally:
+        def _release():
+            global _rebuilding_depth
+            _rebuilding_depth = max(0, _rebuilding_depth - 1)
+            return None   # one-shot -- do not repeat
+        bpy.app.timers.register(_release, first_interval=_GUARD_RELEASE_SECONDS)
+
 
 @bpy.app.handlers.persistent
 def _on_depsgraph_update(scene, depsgraph):
     global _timer_scheduled
-    if _rebuilding:
+    if _rebuilding_depth > 0:
         return
     rka = getattr(scene, "rka", None)
     if rka is not None and not rka.live_edit_enabled:
@@ -106,6 +164,8 @@ def _on_depsgraph_update(scene, depsgraph):
         # `bpy.data.collections` and matching by NAME (same technique the curve-object lookup
         # below already used) sidesteps the stale/unpopulated cache entirely.
         for coll in bpy.data.collections:
+            if coll.library is not None:
+                continue   # a linked neighbor's own marker could share a locally-dirtied name
             if not coll.get("rka_live_edit", True):
                 continue
             if "rka_arm_names" in coll.keys():
@@ -117,6 +177,8 @@ def _on_depsgraph_update(scene, depsgraph):
 
     if dirty_curve_names:
         for coll in bpy.data.collections:
+            if coll.library is not None:
+                continue
             curve_name = coll.get("rka_curve_object")
             if curve_name in dirty_curve_names and coll.get("rka_live_edit", True):
                 # Both plain curve-backed segments AND lane-transition pieces store their spine
@@ -150,7 +212,7 @@ def _flush_rebuilds():
     docstring's crash fix) once drag activity has settled. Snapshots + clears the pending sets
     FIRST so any new dirtying that arrives while this runs (or that arrived in the debounce
     window) schedules its own fresh timer rather than being silently dropped."""
-    global _rebuilding, _timer_scheduled
+    global _timer_scheduled
     inter, seg, curve_seg, curve_transition = (
         set(_pending_inter), set(_pending_seg), set(_pending_curve_seg), set(_pending_curve_transition))
     _pending_inter.clear()
@@ -160,27 +222,26 @@ def _flush_rebuilds():
     _timer_scheduled = False
 
     from . import ops_intersection, ops_segment
-    _rebuilding = True
-    try:
+    with rebuilding():
         ctx = bpy.context
         for name in inter:
-            coll = bpy.data.collections.get(name)
+            # local_collection, not a bare bpy.data.collections.get(name) -- a linked neighbor's
+            # same-named piece must never be the one silently rebuilt in place. See its docstring.
+            coll = ops_intersection.local_collection(name)
             if coll is not None:
                 ops_intersection.rebuild_intersection_in_place(ctx, coll)
         for name in seg:
-            coll = bpy.data.collections.get(name)
+            coll = ops_intersection.local_collection(name)
             if coll is not None:
                 ops_segment.rebuild_segment_in_place(ctx, coll)
         for name in curve_seg:
-            coll = bpy.data.collections.get(name)
+            coll = ops_intersection.local_collection(name)
             if coll is not None:
                 ops_segment.rebuild_segment_gn_in_place(ctx, coll)
         for name in curve_transition:
-            coll = bpy.data.collections.get(name)
+            coll = ops_intersection.local_collection(name)
             if coll is not None:
                 ops_segment.rebuild_lane_transition_in_place(ctx, coll)
-    finally:
-        _rebuilding = False
     return None   # one-shot -- do not repeat
 
 
@@ -192,10 +253,15 @@ def register():
 def unregister():
     if _on_depsgraph_update in bpy.app.handlers.depsgraph_update_post:
         bpy.app.handlers.depsgraph_update_post.remove(_on_depsgraph_update)
-    global _timer_scheduled
+    global _timer_scheduled, _rebuilding_depth
     if _timer_scheduled and bpy.app.timers.is_registered(_flush_rebuilds):
         bpy.app.timers.unregister(_flush_rebuilds)
     _timer_scheduled = False
+    # Any pending `_release` timer(s) from `rebuilding()` are anonymous closures (a fresh function
+    # object per call), so they can't be targeted by `bpy.app.timers.unregister` individually --
+    # they're harmless no-ops if they fire after unregister (just decrement a counter this module
+    # no longer reads until `register()` runs again), so just reset the counter itself here.
+    _rebuilding_depth = 0
     _pending_inter.clear()
     _pending_seg.clear()
     _pending_curve_seg.clear()

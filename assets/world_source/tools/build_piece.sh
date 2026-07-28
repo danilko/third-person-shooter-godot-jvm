@@ -35,8 +35,7 @@ trap 'rm -f "${CLEANUP_FILES[@]}" 2>/dev/null || true' EXIT
 NAME="${1:?usage: build_piece.sh <name>|District_<theme>_<gx>_<gy>   (e.g. shibuya, or District_city_1_1 to bake an existing .blend without regenerating)}"
 BP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"           # assets/world_source
 REPO="$(cd "$BP/../.." && pwd)"                                 # repo root
-BLENDER="${BLENDER:-blender}"
-GODOT="${GODOT:-/data/danilko/bin/godot.linuxbsd.editor.x86_64.jvm.0.15.0}"
+source "$BP/tools/env.sh"
 # NOT --headless for bake/convert runs: MultiMesh data routes through the RenderingServer, and
 # the headless dummy RS drops the transform buffers (instances collapse to origin).
 RUN=("$GODOT")
@@ -67,7 +66,11 @@ else
 fi
 
 # bake_one <gltf-export-args...> <gltf-relpath> <tscn-relpath> — export (with the given extra
-# export_world.py args) then bake via a throwaway WorldBaker host scene.
+# export_world.py args) then bake via a throwaway WorldBaker host scene. Reads the outer-scope
+# LANEKIT_PATH (set by the caller, only for the full-detail bake — see below) as an absolute
+# filesystem path to a road_kit_authoring combined sidecar (tools/save_lane_kit.py,
+# road_blender_godot.md P6.6); empty/unset means "no lanekit_path property at all" — byte-identical
+# throwaway host scene to before this existed for every piece that has no sidecar yet.
 bake_one() {
   local gltf_rel="$1" tscn_rel="$2"; shift 2
   echo "   export -> res://$gltf_rel"
@@ -84,16 +87,24 @@ bake_one() {
   $GODOT --headless --path "$REPO" --import >/dev/null 2>&1 || true
   local bake_tscn="$REPO/$RES_DIR/_bake_$$_${RANDOM}.tscn"
   CLEANUP_FILES+=("$bake_tscn" "$bake_tscn.import")
-  cat > "$bake_tscn" <<EOF
+  [[ -n "${LANEKIT_PATH:-}" ]] && echo "   lanekit -> $LANEKIT_PATH"
+  {
+    cat <<EOF
 [gd_scene format=3 uid="uid://bpiecebake${RANDOM}"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/world/WorldBaker.java" id="1"]
 [node name="BakePiece" type="Node" unique_id=900000${RANDOM}]
 script = ExtResource("1")
 source_scene_path = "res://$gltf_rel"
 output_scene_path = "res://$tscn_rel"
+EOF
+    if [[ -n "${LANEKIT_PATH:-}" ]]; then
+      printf 'lanekit_path = "%s"\n' "$LANEKIT_PATH"
+    fi
+    cat <<EOF
 bake_on_ready = true
 quit_when_done = true
 EOF
+  } > "$bake_tscn"
   "${RUN[@]}" --path "$REPO" "res://$RES_DIR/$(basename "$bake_tscn")" 2>&1 \
       | grep -iE "WorldBaker: baked" | grep -viE "OCIO" || true
   rm -f "$bake_tscn" "$bake_tscn.import" 2>/dev/null || true
@@ -122,6 +133,13 @@ EOF
   rm -f "$nav_tscn" "$nav_tscn.import" 2>/dev/null || true
 }
 
+# road_kit_authoring combined traffic sidecar (tools/save_lane_kit.py) — only wired into the
+# FULL-DETAIL bake (LOD_LOW is a distant visual-only placeholder, no traffic lanes needed there).
+LANEKIT_PATH=""
+if [[ -f "$BP/districts/$STEM.lanekit.json" ]]; then
+  LANEKIT_PATH="$BP/districts/$STEM.lanekit.json"
+fi
+
 echo "── 2-3/5 export + bake full detail -> $STEM.tscn"
 bake_one "$RES_DIR/$STEM.gltf" "$RES_DIR/$STEM.tscn"
 
@@ -130,7 +148,7 @@ bake_nav "$RES_DIR/$STEM.tscn"
 
 if $HAS_LOD_LOW; then
   echo "── (LOD_LOW) export + bake -> ${STEM}_LOD_LOW.tscn"
-  bake_one "$RES_DIR/${STEM}_LOD_LOW.gltf" "$RES_DIR/${STEM}_LOD_LOW.tscn" --only STREET_LOD_LOW || \
+  LANEKIT_PATH="" bake_one "$RES_DIR/${STEM}_LOD_LOW.gltf" "$RES_DIR/${STEM}_LOD_LOW.tscn" --only STREET_LOD_LOW || \
       echo "   (no STREET_LOD_LOW content — leaving ${STEM}_LOD_LOW.tscn unbaked)"
 else
   echo "── (no STREET_LOD_LOW collection for this piece — PLATEAU precinct, skipping LOD_LOW bake)"

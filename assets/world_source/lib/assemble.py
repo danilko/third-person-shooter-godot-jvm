@@ -387,47 +387,6 @@ def _route_polyline_markers(coll, route, poly, z_off=0.2, **props):
         lane_empty(mk, route, n, (wx, wy, wz + z_off), **props)
 
 
-def lay_road_graph(rg, z_fn=None, z_off=0.3, simplify=True, radius_fn=None, driving_side=None):
-    """Emit the FULL traffic layer for a road_graph.RoadGraph: per generated lane/turn-connector
-    a lane_<route>_<n> empty chain (route metas on the _0 empty; next_routes/next_weights wire
-    junction turning as explicit data — never runtime endpoint clustering), plus one
-    intersection_<node> empty per junction (size meta → IntersectionZone). All route names get
-    the current ROUTE_PREFIX, so a district's graph stays namespaced while the wiring keeps
-    pointing inside itself. Marker z = point z (+ z_fn(x, y) if given) + z_off. `driving_side`
-    ('LEFT'/'RIGHT') passes straight through to generate() -- None (default) uses whatever `rg`
-    itself was built with (see road_graph.RoadGraph/from_curves). Returns (n_lanes,
-    n_connectors, n_junctions)."""
-    import road_graph as rgm
-    mk = _named_coll("MARKERS")
-    lanes, junctions = rgm.generate(rg, radius_fn=radius_fn, driving_side=driving_side)
-    n_conn = 0
-    for r in lanes:
-        pts = rgm.simplify_polyline(r.pts) if (simplify and not r.turn) else r.pts
-        props = {}
-        if r.end_behavior != 'DESPAWN':
-            props["end_behavior"] = r.end_behavior
-        if r.next_routes:
-            props["next_routes"] = ",".join(route_name(x) for x in r.next_routes)
-        if r.next_weights:
-            props["next_weights"] = ",".join(f"{w:.3f}" for w in r.next_weights)
-        if r.turn:
-            props["turn"] = r.turn
-            props["approach"] = r.approach
-            n_conn += 1
-        for n, (x, y, z) in enumerate(pts):
-            wz = z + (z_fn(x, y) if z_fn else 0.0) + z_off
-            lane_empty(mk, r.name, n, (x, y, wz), **props)
-    for j in junctions:
-        e = bpy.data.objects.new(f"intersection_{ROUTE_PREFIX}{j.name}", None)
-        e.empty_display_type = 'PLAIN_AXES'
-        e.empty_display_size = j.size_x / 2.0
-        jz = j.z + (z_fn(j.x, j.y) if z_fn else 0.0) + z_off
-        e.location = (j.x, j.y, jz)
-        e["size"] = [j.size_x, 6.0, j.size_y]
-        mk.objects.link(e)
-    return (len(lanes) - n_conn, n_conn, len(junctions))
-
-
 def _edge_polyline(pts, sgn, extra=0.0):
     """Edge polyline at centreline ± (half_w + extra) (XY perpendicular of the local tangent),
     with the fraction t per point. sgn +1 = left edge, -1 = right edge. `extra` pushes the line

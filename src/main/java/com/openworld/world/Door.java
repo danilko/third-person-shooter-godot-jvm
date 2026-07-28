@@ -11,6 +11,7 @@ import godot.api.Input;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.NodePath;
 import godot.core.StringName;
 import godot.core.Vector3;
@@ -108,7 +109,7 @@ public class Door extends Breakable {
         bindSensor();
         EventBus bus = getEventBus();
         if (bus != null) bus.connect(new StringName("mission_completed"),
-                Callable.createUnsafe(this, new StringName("on_mission_completed")));
+                MethodCallable.createUnsafe(this, "on_mission_completed"));
         setPhysicsProcess(true); // doors tick every frame for the open/close easing
     }
 
@@ -117,8 +118,8 @@ public class Door extends Breakable {
         Node n = getNodeOrNull(sensorPath);
         if (!(n instanceof Area3D a)) return;
         sensor = a;
-        sensor.connect(new StringName("body_entered"), Callable.createUnsafe(this, new StringName("on_sensor_body_entered")));
-        sensor.connect(new StringName("body_exited"), Callable.createUnsafe(this, new StringName("on_sensor_body_exited")));
+        sensor.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_sensor_body_entered"));
+        sensor.connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_sensor_body_exited"));
         // Seed counts from anything already overlapping (e.g. a body spawned inside the zone).
         for (Node3D b : sensor.getOverlappingBodies()) {
             if (!isCharacterBody(b)) continue;

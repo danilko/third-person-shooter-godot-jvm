@@ -1,5 +1,5 @@
 plugins {
-    id("com.utopia-rise.godot-kotlin-jvm") version "0.15.0-4.6"
+    id("com.utopia-rise.godot-kotlin-jvm") version "0.16.3-4.6.3"
 }
 
 repositories {
@@ -29,16 +29,24 @@ godot {
     // ---------Setup-----------------
 
     // the script registration which you'll attach to nodes are generated into this directory
-    registrationFileBaseDir.set(projectDir.resolve("gdj"))
+    // (renamed from registrationFileBaseDir in 0.15.0-4.6 -> registrationFilesDirectory in
+    // 0.16.3-4.6.3; still a plain Directory-valued property, .set(File) still works)
+    registrationFilesDirectory.set(projectDir.resolve("gdj"))
 
-	// Create .gdj files from all JVM scripts
-	isRegistrationFileGenerationEnabled.set(true)
+	// Create .gdj files from all JVM scripts (renamed+INVERTED from the old
+	// isRegistrationFileGenerationEnabled=true -> disableGdj=false in 0.16.3-4.6.3; the new
+	// plugin ALSO always generates its own Entry-metadata registration format under build/
+	// regardless of this flag -- .gdj here is kept on as the project's existing safety net,
+	// per CLAUDE.md/road_blender_godot.md's own ".gdj -> .java migration" note)
+	disableGdj.set(false)
 
-    // defines whether the script registration files should be generated hierarchically according to the classes package path or flattened into `registrationFileBaseDir`
-    //isRegistrationFileHierarchyEnabled.set(true)
+    // defines whether the script registration files should be generated hierarchically according to the classes package path or flattened into `registrationFilesDirectory`
+    // (renamed from isRegistrationFileHierarchyEnabled -> registrationFilesLayoutMode, an enum now)
+    //registrationFilesLayoutMode.set(godot.entrygenerator.settings.RegistrationFileLayoutMode.FLAT)
 
     // defines whether your scripts should be registered with their fqName or their simple name (can help with resolving script name conflicts)
-    //isFqNameRegistrationEnabled.set(false)
+    // (renamed from isFqNameRegistrationEnabled -> registrationNameMode, an enum now)
+    //registrationNameMode.set(godot.entrygenerator.settings.RegisteredNameMode.SIMPLE_NAME)
 
     // ---------Android----------------
 

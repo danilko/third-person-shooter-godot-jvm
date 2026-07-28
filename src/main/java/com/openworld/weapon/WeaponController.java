@@ -5,6 +5,7 @@ import com.openworld.net.NetworkManager;
 import godot.annotation.*;
 import godot.api.*;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.NodePath;
 import godot.core.Signal1;
 import godot.core.Signal2;
@@ -294,7 +295,7 @@ public class WeaponController extends Node {
     // so multi-character HUD/game-state code (C2) can track any character's ammo, not
     // just the local player's. Avoids touching every existing ammoChanged.emit() call site.
     ammoChanged.connectUnsafe(
-        Callable.createUnsafe(this, StringNames.toGodotName("relayAmmoToEventBus")),
+        MethodCallable.createUnsafe(this, "relayAmmoToEventBus"),
         godot.api.Object.ConnectFlags.DEFAULT);
 
     // Have WeaponAudio stop ITSELF the instant it leaves the tree. _exitTree here is too late when a
@@ -303,7 +304,7 @@ public class WeaponController extends Node {
     // quirk). tree_exiting fires while the node is still valid, so a self-stop reliably releases it.
     if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) {
       weaponAudio.connect(new StringName("tree_exiting"),
-          Callable.createUnsafe(weaponAudio, new StringName("stop")));
+          MethodCallable.createUnsafe(weaponAudio, "stop"));
     }
   }
 

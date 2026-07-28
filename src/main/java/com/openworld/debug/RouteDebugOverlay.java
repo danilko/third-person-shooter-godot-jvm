@@ -3,6 +3,7 @@ package com.openworld.debug;
 import com.openworld.character.Player;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.world.IntersectionZone;
+import com.openworld.world.Lane;
 import com.openworld.world.VehicleRoute;
 import com.openworld.world.WorldZoneManager;
 import godot.annotation.RegisterClass;
@@ -23,10 +24,11 @@ import godot.global.GD;
 
 /**
  * Debug-only 3D overlay of the live traffic graph (F3 via {@code DebugHarness}): every registered
- * {@link VehicleRoute} drawn along its <b>driven</b> path ({@link VehicleRoute#pointAtLength} —
- * Catmull-Rom smoothed + lane offset, exactly what cars follow), colored by role, plus yellow
- * {@link IntersectionZone} box outlines. Makes a broken junction snap or a missing turn connector
- * visible at a glance instead of inferred from route-finished reclaim logs.
+ * {@link Lane} — a {@link VehicleRoute} or a {@code PathLaneRoute}, drawn identically — along its
+ * <b>driven</b> path ({@link Lane#pointAtLength} — smoothed/offset or native-baked, exactly what
+ * cars follow), colored by role, plus yellow {@link IntersectionZone} box outlines. Makes a broken
+ * junction snap or a missing turn connector visible at a glance instead of inferred from
+ * route-finished reclaim logs.
  *
  * <p>Colors: plain lane <b>green</b>; junction turn connectors <b>orange</b> (L) / <b>white</b> (S)
  * / <b>magenta</b> (R); a DESPAWN route end gets a short <b>red</b> cross; direction chevrons every
@@ -84,9 +86,9 @@ public class RouteDebugOverlay extends Node3D {
         if (center == null || mgr == null) return;
 
         int drawn = 0;
-        for (VehicleRoute r : mgr.getRoutes().values()) {
+        for (Lane r : mgr.getRoutes().values()) {
             if (drawn >= MAX_ROUTES) break;
-            if (!GD.isInstanceValid(r)) continue;
+            if (!(r instanceof Node3D n) || !GD.isInstanceValid(n)) continue;
             Vector3 entry = r.entryPoint();
             if (entry == null || distXZ(entry, center) > CULL_DIST) continue;
             drawRoute(r);
@@ -97,7 +99,7 @@ public class RouteDebugOverlay extends Node3D {
         if (surfaceOpen) { mesh.surfaceEnd(); surfaceOpen = false; }
     }
 
-    private void drawRoute(VehicleRoute r) {
+    private void drawRoute(Lane r) {
         double total = r.total();
         if (total < 1e-3) return;
         Color color = colorFor(r);
@@ -113,7 +115,7 @@ public class RouteDebugOverlay extends Node3D {
             }
             prev = cur;
         }
-        if (!r.isLoop() && VehicleRoute.END_DESPAWN.equals(r.endBehavior)) cross(prev);
+        if (!r.isLoop() && VehicleRoute.END_DESPAWN.equals(r.getEndBehavior())) cross(prev);
     }
 
     /** Two short wings angled back from the travel direction — an "this way" arrowhead at {@code p}. */
@@ -188,8 +190,9 @@ public class RouteDebugOverlay extends Node3D {
         mesh.surfaceAddVertex(b);
     }
 
-    private Color colorFor(VehicleRoute r) {
-        return switch (r.turn == null ? "" : r.turn) {
+    private Color colorFor(Lane r) {
+        String turn = r.getTurn();
+        return switch (turn == null ? "" : turn) {
             case "L" -> TURN_L;
             case "S" -> TURN_S;
             case "R" -> TURN_R;

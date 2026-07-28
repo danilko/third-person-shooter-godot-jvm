@@ -951,22 +951,32 @@ def build_lane_transition(p0, p1, lane_width=5.0, lanes_a=2, lanes_b=1, lanes_ba
     return {"curbs": curbs, "lanes": lane_list}
 
 
-def export_lane_transition_json(path, p0, p1, lane_width=5.0, lanes_a=2, lanes_b=1,
+def export_lane_transition_dict(p0, p1, lane_width=5.0, lanes_a=2, lanes_b=1,
                                  lanes_backward_a=None, lanes_backward_b=None, align='right',
                                  segment_id="TR", traffic_side='LEFT'):
-    """Write `build_lane_transition`'s lane data to `path` as JSON, same shape/axis-conversion
-    convention as `export_segment_from_spine_json` (`p0`/`p1` already ABSOLUTE world coordinates,
-    Blender-Z-up -> Godot-Y-up: `[x, z, -y]`) -- so `WorldBaker`'s sidecar loader, which only ever
-    reads the top-level `lanes` array, consumes this identically to a plain segment or an
-    intersection, with no Java changes."""
-    import json
+    """The dict half of `export_lane_transition_json` (no file write) -- `p0`/`p1` already
+    ABSOLUTE world coordinates, Blender-Z-up -> Godot-Y-up (`[x, z, -y]`) applied here directly
+    since a transition carries no separate `z` base the way `export_segment_json` does. Same
+    `{"segment_id", "lanes": [...]}` shape every non-intersection export produces, so a combiner
+    (see `lib/lane_kit.py`) can merge intersection/segment/transition pieces uniformly."""
     seg = build_lane_transition(p0, p1, lane_width, lanes_a, lanes_b, lanes_backward_a,
                                  lanes_backward_b, align, segment_id, traffic_side)
     lanes_out = [{"id": m["id"], "from_arm": m["from"], "to_arm": m["to"],
                    "lane_index": m["lane_in"], "lane_index_out": m["lane_out"], "kind": m["kind"],
                    "turn": m["turn"], "oneway": True, "loop": False,
                    "points": [[p[0], p[2], -p[1]] for p in m["points"]]} for m in seg["lanes"]]
-    d = {"segment_id": segment_id, "lanes": lanes_out}
+    return {"segment_id": segment_id, "lanes": lanes_out}
+
+
+def export_lane_transition_json(path, p0, p1, lane_width=5.0, lanes_a=2, lanes_b=1,
+                                 lanes_backward_a=None, lanes_backward_b=None, align='right',
+                                 segment_id="TR", traffic_side='LEFT'):
+    """Write `export_lane_transition_dict`'s data to `path` as JSON -- so `WorldBaker`'s sidecar
+    loader, which only ever reads the top-level `lanes` array, consumes this identically to a
+    plain segment or an intersection, with no Java changes."""
+    import json
+    d = export_lane_transition_dict(p0, p1, lane_width, lanes_a, lanes_b, lanes_backward_a,
+                                     lanes_backward_b, align, segment_id, traffic_side)
     with open(path, "w") as f:
         json.dump(d, f, indent=2)
     return d
@@ -993,45 +1003,59 @@ def build_straight_segment(p0, p1, lane_width=5.0, lanes=1, segment_id="SEG", be
     return build_segment_from_spine(spine, lane_width, lanes, lanes_backward, segment_id, traffic_side)
 
 
-def export_segment_from_spine_json(path, spine, lane_width=5.0, lanes=1, lanes_backward=None,
+def export_segment_from_spine_dict(spine, lane_width=5.0, lanes=1, lanes_backward=None,
                                     segment_id="SEG", traffic_side='LEFT'):
-    """Write `build_segment_from_spine`'s lane data to `path` as JSON, same shape/axis-conversion
-    convention as `export_json` (`godot = (blender_x, z, -blender_y)`) -- unlike
-    `export_segment_json`, `spine` already carries ABSOLUTE world Z per point (e.g. sampled
-    directly from a Blender Curve object's evaluated world-space points), so no separate `z` base
-    argument is added here."""
-    import json
+    """The dict half of `export_segment_from_spine_json` (no file write) -- `spine` already
+    carries ABSOLUTE world Z per point (e.g. sampled directly from a Blender Curve object's
+    evaluated world-space points), so no separate `z` base argument is added here. Same
+    `{"segment_id", "lanes": [...]}` shape every non-intersection export produces."""
     seg = build_segment_from_spine(spine, lane_width, lanes, lanes_backward, segment_id, traffic_side)
     lanes_out = [{"id": m["id"], "from_arm": m["from"], "to_arm": m["to"],
                    "lane_index": m["lane_in"], "lane_index_out": m["lane_out"], "kind": m["kind"],
                    "turn": m["turn"], "oneway": True, "loop": False,
                    "points": [[p[0], p[2], -p[1]] for p in m["points"]]} for m in seg["lanes"]]
-    d = {"segment_id": segment_id, "lanes": lanes_out}
+    return {"segment_id": segment_id, "lanes": lanes_out}
+
+
+def export_segment_from_spine_json(path, spine, lane_width=5.0, lanes=1, lanes_backward=None,
+                                    segment_id="SEG", traffic_side='LEFT'):
+    """Write `export_segment_from_spine_dict`'s data to `path` as JSON, same shape/axis-conversion
+    convention as `export_json` (`godot = (blender_x, z, -blender_y)`)."""
+    import json
+    d = export_segment_from_spine_dict(spine, lane_width, lanes, lanes_backward, segment_id,
+                                        traffic_side)
     with open(path, "w") as f:
         json.dump(d, f, indent=2)
     return d
 
 
-def export_segment_json(path, p0, p1, lane_width=5.0, lanes=1, segment_id="SEG", z=0.0,
+def export_segment_dict(p0, p1, lane_width=5.0, lanes=1, segment_id="SEG", z=0.0,
                          bend=0.0, segments=8, z0=0.0, z1=0.0, bend_z=0.0, lanes_backward=None,
                          traffic_side='LEFT'):
-    """Write `build_straight_segment`'s lane data to `path` as JSON, same shape/axis-conversion
-    convention as `export_json` (`godot = (blender_x, z, -blender_y)`) -- `WorldBaker`'s sidecar
-    loader only ever reads the `lanes` array (`id`/`points`/`loop`/`turn`/`kind`), so this is
-    directly consumable with no Java changes. `z` is the constant world-height base (as before);
-    each point's own relative elevation (`z0`/`z1`/`bend_z` -- see `build_straight_segment`) is
-    ADDED on top, so a flat segment (all defaults) emits exactly `z` unchanged, byte-identical to
-    before this parameter existed. `curbs` are exported too (2D-only in this module; the caller
-    building Blender geometry uses the un-exported `build_straight_segment` return directly for
-    those, same as it already does for intersection corners)."""
-    import json
+    """The dict half of `export_segment_json` (no file write). `z` is the constant world-height
+    base (as before); each point's own relative elevation (`z0`/`z1`/`bend_z` -- see
+    `build_straight_segment`) is ADDED on top, so a flat segment (all defaults) emits exactly `z`
+    unchanged. Same `{"segment_id", "lanes": [...]}` shape every non-intersection export
+    produces."""
     seg = build_straight_segment(p0, p1, lane_width, lanes, segment_id, bend, segments, z0, z1,
                                   bend_z, lanes_backward, traffic_side)
     lanes_out = [{"id": m["id"], "from_arm": m["from"], "to_arm": m["to"],
                    "lane_index": m["lane_in"], "lane_index_out": m["lane_out"], "kind": m["kind"],
                    "turn": m["turn"], "oneway": True, "loop": False,
                    "points": [[p[0], z + p[2], -p[1]] for p in m["points"]]} for m in seg["lanes"]]
-    d = {"segment_id": segment_id, "lanes": lanes_out}
+    return {"segment_id": segment_id, "lanes": lanes_out}
+
+
+def export_segment_json(path, p0, p1, lane_width=5.0, lanes=1, segment_id="SEG", z=0.0,
+                         bend=0.0, segments=8, z0=0.0, z1=0.0, bend_z=0.0, lanes_backward=None,
+                         traffic_side='LEFT'):
+    """Write `export_segment_dict`'s data to `path` as JSON, same shape/axis-conversion
+    convention as `export_json` (`godot = (blender_x, z, -blender_y)`) -- `WorldBaker`'s sidecar
+    loader only ever reads the `lanes` array (`id`/`points`/`loop`/`turn`/`kind`), so this is
+    directly consumable with no Java changes."""
+    import json
+    d = export_segment_dict(p0, p1, lane_width, lanes, segment_id, z, bend, segments, z0, z1,
+                             bend_z, lanes_backward, traffic_side)
     with open(path, "w") as f:
         json.dump(d, f, indent=2)
     return d
@@ -1040,15 +1064,28 @@ def export_segment_json(path, p0, p1, lane_width=5.0, lanes=1, segment_id="SEG",
 # --------------------------------------------------------------------------------- export
 
 def export_dict(arms, kerb_radius, junction_id, segments=8, through_tol_deg=2.0, tail_length=12.0,
-                 lane_map=None):
+                 lane_map=None, center=(0.0, 0.0)):
     """The full graph-shaped export for one junction -- arms as nodes, lane movements as directed
     edges, ports as the seams a future cross-piece linker (or a plain approach lane tile) would
     connect to. Pure data (2D points; a Z is added by the caller, since this module never carries
     one). `lane_map` -- see `build_lane_movements` -- optionally overrides the default
-    lane-to-lane pairing. See `export_json` to write it straight to a sidecar file."""
+    lane-to-lane pairing. See `export_json` to write it straight to a sidecar file.
+
+    `center` -- (x, y), default (0, 0) -- the junction's own world-space position, ADDED to every
+    exported point. Every geometry function this module builds on (`build_lane_movements`,
+    `build_ports`, ...) works in a LOCAL frame centered on the junction (an `Arm` only carries an
+    angle, never a world position), so without this the export is silently junction-relative --
+    correct only for a junction actually built at world origin. **Found and fixed this session**
+    (road_blender_godot.md P6.7): every real intersection built off-origin (i.e. almost all of
+    them) was exporting local coordinates, which happened to go unnoticed by every self-test and
+    the one production caller (`RKA_OT_build_intersection`'s own `export_path`) built/tested at or
+    very near the origin. Default (0, 0) keeps every existing call site (including this module's
+    own self-tests) byte-identical -- this is a strictly additive fix, not a behavior change for
+    anyone already passing world-centered arms/tail_length some other way."""
     movements = build_lane_movements(arms, kerb_radius, segments, through_tol_deg, tail_length,
                                       junction_id=junction_id, lane_map=lane_map)
     ports = build_ports(arms, tail_length)
+    cx, cy = center
     return {
         "junction_id": junction_id,
         "arms": [{"name": a.name, "angle_deg": a.angle_deg, "lanes": a.lanes,
@@ -1057,15 +1094,16 @@ def export_dict(arms, kerb_radius, junction_id, segments=8, through_tol_deg=2.0,
         "lanes": [{"id": m["id"], "from_arm": m["from"], "to_arm": m["to"],
                     "lane_index": m["lane_in"], "lane_index_out": m["lane_out"],
                     "kind": m["kind"], "turn": m["turn"], "oneway": True, "loop": False,
-                    "points": [list(p) for p in m["points"]]} for m in movements],
+                    "points": [[p[0] + cx, p[1] + cy] for p in m["points"]]} for m in movements],
         "ports": [{"id": "%s_%s" % (junction_id, p["id"]), "arm": p["arm"], "lane": p["lane"],
-                    "direction": p["direction"], "position": list(p["position"]),
+                    "direction": p["direction"],
+                    "position": [p["position"][0] + cx, p["position"][1] + cy],
                     "tangent": list(p["tangent"])} for p in ports],
     }
 
 
 def export_json(path, arms, kerb_radius, junction_id, segments=8, through_tol_deg=2.0,
-                 tail_length=12.0, z=0.0, lane_map=None):
+                 tail_length=12.0, z=0.0, lane_map=None, center=(0.0, 0.0)):
     """Write `export_dict`'s data to `path` as JSON, with every 2D (Blender ground-plane) point
     lifted to a 3D **Godot-space** point (this module's 2D math is Blender's X/Y ground plane,
     Z-up; Godot is Y-up) so the Godot side can consume the sidecar's points as world-space
@@ -1073,10 +1111,12 @@ def export_json(path, arms, kerb_radius, junction_id, segments=8, through_tol_de
     -blender_y)` -- the same Blender-Z-up -> Godot-Y-up convention glTF import already applies
     to every other Blender-authored asset in this project, just applied here by hand since this
     sidecar is raw JSON, not glTF. `z` is the (small, near-constant) world height every point
-    sits at -- becomes Godot's Y. No bpy dependency -- callable from a plain `python3`
-    self-test/CI check, not just from inside Blender."""
+    sits at -- becomes Godot's Y. `center` -- see `export_dict` -- the junction's world (x, y);
+    default (0, 0) is byte-identical to before this parameter existed. No bpy dependency --
+    callable from a plain `python3` self-test/CI check, not just from inside Blender."""
     import json
-    d = export_dict(arms, kerb_radius, junction_id, segments, through_tol_deg, tail_length, lane_map)
+    d = export_dict(arms, kerb_radius, junction_id, segments, through_tol_deg, tail_length,
+                     lane_map, center)
     for lane in d["lanes"]:
         lane["points"] = [[p[0], z, -p[1]] for p in lane["points"]]
     for port in d["ports"]:
@@ -1867,6 +1907,78 @@ def self_test():
     assert boundary_default == boundary_shared
     print("OK: Arm.tail_length per-arm override (one arm's ports/boundary/curb reach its own "
           "distance, others stay on the shared scalar; all-None is byte-identical to before)")
+
+    # 35. export_segment_dict/export_segment_from_spine_dict/export_lane_transition_dict (new,
+    #     P6.4) must produce EXACTLY the same dict a file-writing sibling would have written --
+    #     the dict-only split exists so lib/lane_kit.py's combiner can merge multiple pieces in
+    #     memory without a round-trip through temp files.
+    import json
+    import os
+    import tempfile
+    p0s, p1s = (0.0, 0.0, 0.0), (30.0, 10.0, 0.0)
+    d_seg = export_segment_dict(p0s, p1s, lane_width=4.0, lanes=2, segment_id="SEGX", z=1.5,
+                                 lanes_backward=1)
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tf:
+        tf_path = tf.name
+    export_segment_json(tf_path, p0s, p1s, lane_width=4.0, lanes=2, segment_id="SEGX", z=1.5,
+                         lanes_backward=1)
+    with open(tf_path) as f:
+        d_seg_file = json.load(f)
+    assert d_seg == d_seg_file, (d_seg, d_seg_file)
+
+    spine_ex = segment_spine_3d((0.0, 0.0, 2.0), (20.0, 5.0, 3.0))
+    d_spine = export_segment_from_spine_dict(spine_ex, lane_width=3.5, lanes=1, segment_id="SPX")
+    export_segment_from_spine_json(tf_path, spine_ex, lane_width=3.5, lanes=1, segment_id="SPX")
+    with open(tf_path) as f:
+        d_spine_file = json.load(f)
+    assert d_spine == d_spine_file, (d_spine, d_spine_file)
+
+    d_tr = export_lane_transition_dict((0.0, 0.0, 0.0), (25.0, 0.0, 0.0), lanes_a=2, lanes_b=1,
+                                        segment_id="TRX")
+    export_lane_transition_json(tf_path, (0.0, 0.0, 0.0), (25.0, 0.0, 0.0), lanes_a=2, lanes_b=1,
+                                 segment_id="TRX")
+    with open(tf_path) as f:
+        d_tr_file = json.load(f)
+    assert d_tr == d_tr_file, (d_tr, d_tr_file)
+    os.remove(tf_path)
+    print("OK: export_segment_dict/export_segment_from_spine_dict/export_lane_transition_dict "
+          "(new) produce byte-identical output to their file-writing siblings")
+
+    # 36. export_dict/export_json `center` -- found+fixed this session (road_blender_godot.md
+    # P6.7): every geometry function feeding export_dict (build_lane_movements/build_ports) works
+    # in a LOCAL frame centered on the junction (an Arm carries only an angle, never a world
+    # position), so exporting a junction built anywhere OTHER than world origin without `center`
+    # silently produced junction-relative, not world-space, points. Default center=(0,0) must stay
+    # byte-identical to before this parameter existed; a non-zero center must translate every
+    # lane point AND every port position by exactly that offset (tangents are directions, NOT
+    # translated).
+    arms_c = preset_4way(lanes=1)
+    d_origin = export_dict(arms_c, kerb_radius=9.0, junction_id="C")
+    d_default = export_dict(arms_c, kerb_radius=9.0, junction_id="C", center=(0.0, 0.0))
+    assert d_origin == d_default, "default center=(0,0) must be byte-identical to omitting it"
+    cx, cy = 204.0, 146.0
+    d_shifted = export_dict(arms_c, kerb_radius=9.0, junction_id="C", center=(cx, cy))
+    for lane_o, lane_s in zip(d_origin["lanes"], d_shifted["lanes"]):
+        for p_o, p_s in zip(lane_o["points"], lane_s["points"]):
+            assert abs(p_s[0] - p_o[0] - cx) < 1e-9 and abs(p_s[1] - p_o[1] - cy) < 1e-9, \
+                (p_o, p_s, cx, cy)
+    for port_o, port_s in zip(d_origin["ports"], d_shifted["ports"]):
+        assert abs(port_s["position"][0] - port_o["position"][0] - cx) < 1e-9
+        assert abs(port_s["position"][1] - port_o["position"][1] - cy) < 1e-9
+        assert port_s["tangent"] == port_o["tangent"], "a tangent is a direction, never translated"
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tf:
+        tf_path = tf.name
+    written = export_json(tf_path, arms_c, kerb_radius=9.0, junction_id="C", z=1.5,
+                           center=(cx, cy))
+    with open(tf_path) as f:
+        written_file = json.load(f)
+    os.remove(tf_path)
+    assert written == written_file
+    assert written["lanes"][0]["points"][0][0] == d_shifted["lanes"][0]["points"][0][0] + 0.0, \
+        "export_json's x column must match export_dict's shifted x exactly"
+    print("OK: export_dict/export_json `center` (new) translates every lane point + port "
+          "position by exactly (cx, cy), leaves tangents untouched, default (0,0) is "
+          "byte-identical to before this parameter existed")
 
     print("ALL SELF-TESTS PASSED")
 

@@ -15,6 +15,7 @@ import godot.api.Node3D;
 import godot.api.PackedScene;
 import godot.api.Window;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.StringName;
 import godot.core.StringNames;
 import godot.core.Vector3;
@@ -84,8 +85,8 @@ public class GameManager extends Node {
         Node eventBusNode = getNodeOrNull("/root/EventBus");
         if (eventBusNode instanceof EventBus) {
             EventBus bus = (EventBus) eventBusNode;
-            bus.characterSpawned.connectUnsafe(Callable.createUnsafe(this, StringNames.toGodotName("onCharacterSpawned")), godot.api.Object.ConnectFlags.DEFAULT);
-            bus.characterDied.connectUnsafe(Callable.createUnsafe(this, StringNames.toGodotName("onCharacterDied")), godot.api.Object.ConnectFlags.DEFAULT);
+            bus.characterSpawned.connectUnsafe(MethodCallable.createUnsafe(this, "onCharacterSpawned"), godot.api.Object.ConnectFlags.DEFAULT);
+            bus.characterDied.connectUnsafe(MethodCallable.createUnsafe(this, "onCharacterDied"), godot.api.Object.ConnectFlags.DEFAULT);
             // Note: playerDied is intentionally NOT connected here — it fires per dead
             // body. GAME_OVER is driven by the characterSpawned/characterDied "all dead"
             // tracking below, which emits EventBus.allPlayersDied for MenuManager's UI.
@@ -101,7 +102,7 @@ public class GameManager extends Node {
         Window root = (getTree() != null) ? getTree().getRoot() : null;
         if (root != null) {
             root.getCloseRequested().connectUnsafe(
-                Callable.createUnsafe(this, StringNames.toGodotName("onCloseRequested")),
+                MethodCallable.createUnsafe(this, "onCloseRequested"),
                 godot.api.Object.ConnectFlags.DEFAULT);
         }
     }
@@ -118,6 +119,25 @@ public class GameManager extends Node {
      */
     @RegisterFunction
     public void onCloseRequested() {
+        prepareForQuit();
+    }
+
+    /**
+     * The actual audio-stop sweep (see {@link #onCloseRequested}'s javadoc for why it exists) —
+     * factored out so any quit path can call it, not just the OS window-close button. {@code
+     * SceneTree.quit()} — the path every in-game Quit button (PauseMenu/MenuManager/GameOverMenu)
+     * uses — does NOT emit {@code Window.close_requested} (that signal is specifically the
+     * OS/window-manager close request, e.g. the title-bar X or Alt+F4); calling only
+     * {@code getTree().quit()} therefore skipped this sweep entirely for the menu-driven quit —
+     * the far more common way a player actually exits — leaking every still-playing
+     * {@code AudioStreamPlaybackWAV} exactly like the close-requested fix was written to prevent,
+     * just on a different path (found while investigating a reported hang-then-OS-kill on
+     * ESC-menu quit from a large multi-district scene, where many more AI/vehicles' weapon/engine
+     * audio would be live simultaneously than in any single-district test — road_blender_godot.md
+     * "hang and eventually close by the system as crash"). Call this BEFORE {@code
+     * getTree().quit()} from any quit button; a no-op if called with no scene tree.
+     */
+    public void prepareForQuit() {
         if (getTree() == null) return;
         stopAllAudio(getTree().getRoot());
     }

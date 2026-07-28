@@ -22,6 +22,17 @@ public interface Lane {
     /** First point of the lane's raw centerline (no smoothing/offset) — used to cluster junctions. */
     Vector3 startPoint();
 
+    /**
+     * {@link #startPoint()}, cached for the lifetime of this lane's tree entry (static content,
+     * never re-derived). {@code WorldZoneManager.findRoute}'s spawn-time prefix scan distance-
+     * filters every registered lane against this, so it must not re-walk the underlying
+     * representation (a {@code VehicleRoute}'s marker children, a {@code PathLaneRoute}'s baked
+     * curve) per candidate — a plain {@code pointAtLength(0)} would NOT do, since it returns the
+     * smoothed/lane-offset path's start (a different point whenever a lane offset is set) and its
+     * own cache-validity check still re-walks the source data every call.
+     */
+    Vector3 entryPoint();
+
     /** Last point of the lane's raw centerline (no smoothing/offset) — used to cluster junctions. */
     Vector3 endPoint();
 

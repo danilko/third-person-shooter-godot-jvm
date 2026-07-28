@@ -7,6 +7,7 @@ import godot.annotation.RegisterProperty;
 import godot.api.*;
 import com.openworld.carrier.vehicle.Vehicle;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.NodePath;
 import godot.core.StringName;
 import godot.core.StringNames;
@@ -187,7 +188,7 @@ public class AICharacter extends Character {
 
         if (weaponController != null) {
             weaponController.ammoChanged.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onAmmoChanged")),
+                    MethodCallable.createUnsafe(this, "onAmmoChanged"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
 
@@ -270,7 +271,7 @@ public class AICharacter extends Character {
         Node h = target.getNodeOrNull("Health");
         if (h instanceof Health health) {
             health.hit.connectUnsafe(
-                    Callable.createUnsafe(this, StringNames.toGodotName("onEscortTargetDamaged")),
+                    MethodCallable.createUnsafe(this, "onEscortTargetDamaged"),
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
     }

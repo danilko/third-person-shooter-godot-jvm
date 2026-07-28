@@ -3,7 +3,50 @@ import os
 
 import bpy
 
+from . import ops_intersection as opint
 from . import paths
+
+_CURB_STYLE_BUTTONS = (('NONE', "None"), ('BOX', "Box"), ('GUTTER', "Gutter"), ('ASSET', "Asset"))
+
+
+def _draw_material_controls(box, coll):
+    """Pavement/pad + curb material dropdowns for an EXISTING piece (intersection, GN segment, or
+    lane transition) -- 2026-07-28, user-reported: material was a hardcoded literal, no way to
+    change it after the initial build at all (not even F9 -- no property was ever exposed).
+    `layout.operator_menu_enum` gives a clean single-dropdown picker over the full material list
+    without needing dozens of buttons like `_draw_curb_style`'s few-option row does."""
+    pave_key = "rka_pad_matkey" if "rka_arm_names" in coll.keys() else "rka_pave_matkey"
+    cur_pave = coll.get(pave_key, "asphalt")
+    cur_curb = coll.get("rka_curb_matkey", "concrete")
+    box.label(text="Material:")
+    row = box.row(align=True)
+    row.label(text="  Pavement/Pad (%s):" % cur_pave)
+    row.operator_menu_enum("rka.set_pavement_matkey", "matkey", text="Change")
+    row = box.row(align=True)
+    row.label(text="  Curb (%s):" % cur_curb)
+    row.operator_menu_enum("rka.set_curb_matkey", "matkey", text="Change")
+
+
+def _draw_curb_style(box, coll):
+    """Curb Style (Left/Right) buttons for an EXISTING GN segment or lane-transition collection --
+    previously the only way to change curb style after building was Blender's own F9 'Adjust Last
+    Operation' panel, which stops applying the moment any other action runs; these buttons work on
+    whatever piece is currently active/selected, always (see `ops_segment.RKA_OT_set_curb_style`).
+    A depressed button shows the piece's CURRENT style for that side."""
+    cur_l = coll.get("rka_curb_l_style", coll.get("rka_curb_style", "BOX"))
+    cur_r = coll.get("rka_curb_r_style", coll.get("rka_curb_style", "BOX"))
+    box.label(text="Curb Style:")
+    for side_key, side_label, cur in (('L', "Left", cur_l), ('R', "Right", cur_r)):
+        row = box.row(align=True)
+        row.label(text="  %s:" % side_label)
+        for style_key, style_label in _CURB_STYLE_BUTTONS:
+            op = row.operator("rka.set_curb_style", text=style_label, depress=(cur == style_key))
+            op.side, op.style = side_key, style_key
+            op.asset_collection = coll.get("rka_curb_asset_collection", "")
+    if 'ASSET' in (cur_l, cur_r):
+        box.label(text="  Asset piece: '%s'" % coll.get("rka_curb_asset_collection", "(not set)"))
+        box.label(text="  To change it: click Asset above, then set 'Curb Asset Piece' in the")
+        box.label(text="  'Adjust Last Operation' panel (bottom-left of the viewport).")
 
 
 class RKA_PT_road_kit(bpy.types.Panel):
@@ -18,6 +61,18 @@ class RKA_PT_road_kit(bpy.types.Panel):
         rka = context.scene.rka
 
         layout.prop(rka, "default_traffic_side")
+
+        box = layout.box()
+        box.label(text="Godot Export", icon='EXPORT')
+        name = os.path.basename(bpy.data.filepath) if bpy.data.filepath else ""
+        if name.startswith("District_") and name.endswith(".blend"):
+            box.operator("rka.export_to_godot", icon='EXPORT',
+                          text="Export '%s' to Godot" % name[:-len(".blend")])
+            box.label(text="Regenerates the lanekit sidecar + exports/bakes/navmeshes this")
+            box.label(text="district (tools/save_lane_kit.py + build_piece.sh). Watch the")
+            box.label(text="System Console for progress -- takes ~20-40s.")
+        else:
+            box.label(text="Save as District_<theme>_<gx>_<gy>.blend to enable one-click export.")
 
         box = layout.box()
         box.label(text="Kit Library", icon='LIBRARY_DATA_DIRECT')
@@ -63,9 +118,22 @@ class RKA_PT_road_kit(bpy.types.Panel):
         box.label(text="(manual fallback -- use if a drag doesn't auto-update)")
 
         box.operator("rka.select_piece", icon='RESTRICT_SELECT_OFF')
+        box.label(text="(needs something piece-related already active -- click a piece below")
+        box.label(text="first if nothing is selected yet)")
         row = box.row(align=True)
         row.operator("rka.freeze_for_move", icon='PINNED')
         row.operator("rka.unfreeze_and_rebuild", icon='FILE_REFRESH')
+
+        pieces = sorted((c for c in bpy.data.collections
+                          if c.library is None and opint._is_piece_collection(c)),
+                         key=lambda c: c.name)
+        if pieces:
+            box2 = layout.box()
+            box2.label(text="Pieces in this file (%d)" % len(pieces), icon='OUTLINER_OB_EMPTY')
+            box2.label(text="Click to select from nothing -- no Outliner click needed first.")
+            for p in pieces:
+                op = box2.operator("rka.select_piece_by_name", text=p.name)
+                op.coll_name = p.name
         box.label(text="To move/rotate a WHOLE piece: select any part of it (a marker, or")
         box.label(text="even a generated curb/pad/spine), 'Select Piece' (selects every object")
         box.label(text="in it) -- or 'Freeze For Move' first if you want ZERO risk of live-edit")
@@ -76,6 +144,14 @@ class RKA_PT_road_kit(bpy.types.Panel):
         box.label(text="'3D Cursor'/'Median Point' both pivot on the wrong point for this addon.")
         box.label(text="If frozen, 'Unfreeze & Rebuild' when done to bring geometry back in")
         box.label(text="sync and restore your previous Pivot Point setting.")
+
+        row = box.row(align=True)
+        row.operator("rka.freeze_all_for_move", icon='PINNED')
+        row.operator("rka.unfreeze_all_and_rebuild", icon='FILE_REFRESH')
+        box.label(text="Moving/rotating MANY pieces at once (e.g. the whole file): 'Freeze ALL'")
+        box.label(text="first -- doing this with live-edit on WILL crash Blender. Set your own")
+        box.label(text="Pivot Point (e.g. 3D Cursor at your pivot), select everything, Grab/")
+        box.label(text="Rotate/Move freely, then 'Unfreeze ALL & Rebuild'.")
 
         box.prop(rka, "show_traffic_indicators")
         box.label(text="Blue arrow = incoming (arriving) lanes, orange = outgoing")
@@ -128,6 +204,44 @@ class RKA_PT_road_kit(bpy.types.Panel):
             row = box.row(align=True)
             row.operator("rka.add_marking_gap", icon='ADD')
             row.operator("rka.clear_marking_gaps", icon='X')
+        if seg_coll_le is not None and "rka_curve_object" in seg_coll_le.keys():
+            _draw_curb_style(box, seg_coll_le)
+            _draw_material_controls(box, seg_coll_le)
+
+        transition_coll_le = (active_obj.users_collection[0]
+                               if active_obj is not None and active_obj.users_collection
+                               and "rka_lanes_a" in active_obj.users_collection[0].keys()
+                               else (active_coll_le if active_coll_le is not None
+                                     and "rka_lanes_a" in active_coll_le.keys() else None))
+        if transition_coll_le is not None:
+            for end in ('A', 'B'):
+                fwd = transition_coll_le.get("rka_lanes_a" if end == 'A' else "rka_lanes_b", 1)
+                bwd = transition_coll_le.get(
+                    "rka_lanes_backward_a" if end == 'A' else "rka_lanes_backward_b", 0)
+                row = box.row(align=True)
+                row.label(text="End %s Fwd: %d" % (end, fwd))
+                op = row.operator("rka.adjust_transition_lanes", text="", icon='REMOVE')
+                op.end, op.delta = end, -1
+                op = row.operator("rka.adjust_transition_lanes", text="", icon='ADD')
+                op.end, op.delta = end, 1
+                row = box.row(align=True)
+                row.label(text="End %s Back: %s" % (end, "symmetric" if bwd == 0 else str(bwd)))
+                op = row.operator("rka.adjust_transition_lanes", text="", icon='REMOVE')
+                op.end, op.backward, op.delta = end, True, -1
+                op = row.operator("rka.adjust_transition_lanes", text="", icon='ADD')
+                op.end, op.backward, op.delta = end, True, 1
+            _draw_curb_style(box, transition_coll_le)
+            _draw_material_controls(box, transition_coll_le)
+
+        spine_coll_le = (active_obj.users_collection[0]
+                          if active_obj is not None and active_obj.users_collection
+                          and "rka_curve_object" in active_obj.users_collection[0].keys()
+                          else (active_coll_le if active_coll_le is not None
+                                and "rka_curve_object" in active_coll_le.keys() else None))
+        if spine_coll_le is not None:
+            box.operator("rka.select_spine", icon='CURVE_DATA',
+                          text="Select Spine ('%s')" % spine_coll_le.get("rka_curve_object", "?"))
+
         intersection_coll_le = (active_obj.users_collection[0]
                                  if active_obj is not None and active_obj.users_collection
                                  and "rka_arm_names" in active_obj.users_collection[0].keys()
@@ -139,13 +253,20 @@ class RKA_PT_road_kit(bpy.types.Panel):
             for name in intersection_coll_le["rka_arm_names"]:
                 row.operator("rka.select_arm", text=name).arm_name = name
             box.operator("rka.add_arm", icon='ADD', text="Add Arm (widest gap)")
+            has_override = "rka_lane_map" in intersection_coll_le.keys()
+            box.operator("rka.set_lane_map", icon='NODE_COMPOSITING',
+                          text="Edit Lane Map Override" if has_override else "Set Lane Map Override")
+            if has_override:
+                box.label(text="  (override active -- clear the text field and OK to remove)")
+            _draw_material_controls(box, intersection_coll_le)
 
         box = layout.box()
         box.label(text="Intersection (prototype)", icon='MESH_CIRCLE')
         box.operator("rka.build_intersection", icon='ADD')
         box.label(text="Builds at an active arm_*/segend_*/segbend_* marker if one is")
         box.label(text="selected, else at the 3D cursor. F9 (right after building, before")
-        box.label(text="anything else) to tweak preset/radius/lanes/lane_map/traffic side.")
+        box.label(text="anything else) to tweak preset/radius/lanes/traffic side. Lane Map")
+        box.label(text="Override can be set at any time after, below.")
         box.label(text="Each arm gets an 'arm_*' Empty at its tail -- click one, then")
         box.label(text="'Extend From Arm' below, to grow a road from it.")
 

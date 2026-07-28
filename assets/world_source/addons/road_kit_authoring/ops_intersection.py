@@ -26,7 +26,7 @@ import math
 
 import bpy
 
-from . import custom_props, paths
+from . import custom_props, live_edit, paths
 from .props import TRAFFIC_SIDE_ITEMS
 
 _ik = None
@@ -173,11 +173,13 @@ def join_meshes(context, objs, name):
 
 
 def clear_generated_mesh_objects(coll):
-    """Remove every curb_*/pad_*/lanecl_*/ribbon_*/mesh_* object (+ its now-orphaned mesh/curve
-    data) from `coll`, leaving marker Empties (arm_*/segend_*/segbend_*) untouched. The "delete the
-    old generated geometry, keep the live-edit drag handles" step shared by both in-place rebuild
-    paths (`rebuild_intersection_in_place`, `ops_segment.rebuild_segment_in_place`)."""
-    prefixes = ("curb_", "pad_", "lanecl_", "ribbon_", "mesh_", "mark_")
+    """Remove every curb_*/pad_*/pave_*/lanecl_*/ribbon_*/mesh_* object (+ its now-orphaned
+    mesh/curve data) from `coll`, leaving marker Empties (arm_*/segend_*/segbend_*) untouched. The
+    "delete the old generated geometry, keep the live-edit drag handles" step shared by both
+    in-place rebuild paths (`rebuild_intersection_in_place`, `ops_segment.rebuild_segment_in_place`).
+    `pave_*` is the pavement collision proxy (`kit_common.colonly_swept_between`) -- without it in
+    this list, a rebuild would leave the old one orphaned and pile up a new one on every drag."""
+    prefixes = ("curb_", "pad_", "pave_", "lanecl_", "ribbon_", "mesh_", "mark_")
     for obj in list(coll.objects):
         if not obj.name.startswith(prefixes):
             continue
@@ -256,6 +258,31 @@ def arm_or_port_anchor(context):
         lanes_backward = coll.get("rka_lanes_backward", lanes_forward)
         return pos_xy, z_raw, heading_deg, lanes_forward, lanes_backward, parent_coll
     return None
+
+
+def local_collection(name):
+    """`bpy.data.collections[name]`, but skipping any READ-ONLY LINKED collection sharing that
+    name -- mirrors `kit_common.get_coll()`'s own `c.library is None` filter, which the rest of
+    the pipeline (`kit_common.get_coll`, `tools/link_neighbors.py`'s `_local_coll`) already relies
+    on for the same reason: Blender's own duplicate-name auto-suffixing (`Segment_001.001`) only
+    applies WITHIN local data, so a linked library's collection CAN carry the exact bare name a
+    local one also uses, with no rename. This addon's own deterministic auto-naming
+    (`Intersection_<preset>_%03d`, `Segment_%03d`, `Transition_%03d`) makes that collision likely
+    the moment another road_kit_authoring-authored file is linked in read-only (neighbor-district
+    reference while authoring a cross-district network, or two independently-built files sharing
+    numbering) -- an unqualified `bpy.data.collections.get(name)` can then silently resolve onto
+    the wrong (linked) collection instead of the local one being edited, and a rebuild attempt on
+    it either raises (mutating library data) or silently misfires. Returns None if no LOCAL
+    collection has this name (unlike `kit_common.get_coll`, never creates one -- this is a
+    resolve-my-own-piece helper, not a get-or-create one)."""
+    return next((c for c in bpy.data.collections if c.name == name and c.library is None), None)
+
+
+def local_object(name):
+    """Same as `local_collection` but for `bpy.data.objects` -- see its docstring. Used for
+    by-name object lookups (a piece's own spine curve, an arm marker) that must resolve to the
+    LOCAL object even when a linked file's same-named object is also present."""
+    return next((o for o in bpy.data.objects if o.name == name and o.library is None), None)
 
 
 def parent_collection_of(coll, root=None):
@@ -352,11 +379,25 @@ def _populate_intersection_mesh(context, coll, arms, kerb_radius, tail_length, s
     # collection (which itself carries the full junction_id), and nothing downstream parses these
     # specific names (WorldBaker's prefix table doesn't include curb_/pad_/lanecl_/arm_ at all --
     # every Godot-side lookup goes through the exported JSON's own `id`).
+    # Read directly off `coll` (not threaded as a parameter, unlike curb_style etc.) -- both
+    # build_intersection_geometry (fresh build, property absent -> the same "asphalt"/"concrete"
+    # default as before) and rebuild_intersection_in_place (live-edit rebuild, coll already has
+    # whatever RKA_OT_set_piece_matkey last set) read the SAME live value with zero signature
+    # changes, and a fresh build's default behavior is unchanged. See RKA_OT_set_piece_matkey
+    # (2026-07-28, user-reported: material was a hardcoded literal, no way to change it after the
+    # initial build at all -- not even via F9, there was no exposed property anywhere).
+    pad_matkey = coll.get("rka_pad_matkey", "asphalt")
+    curb_matkey = coll.get("rka_curb_matkey", "concrete")
+
     visual_objs = []   # pad + curb(s) only -- fed to gltf_export_path / join_visual_mesh
-    pad = paths.kc.junction_pad("pad_%s" % coll.name, boundary3, coll, matkey="asphalt",
+    pad = paths.kc.junction_pad("pad_%s" % coll.name, boundary3, coll, matkey=pad_matkey,
                                  segments=segments)
     if pad is not None:
         visual_objs.append(pad)
+        # Collision proxy for the pad footprint -- an exact copy of the pad's own EVALUATED
+        # (post-GN-modifier) mesh, so it matches the real filleted/curved visual precisely instead
+        # of approximating it. See kit_common.colonly_mesh_evaluated.
+        paths.kc.colonly_mesh_evaluated(pad, coll)
     # One curb object PER CORNER (build_junction_curb_segments already excludes every arm's own
     # tail-cap and every through-pair -- an arm opening must never have a curb wall across its own
     # lanes) instead of a single loop spanning the whole boundary.
@@ -370,8 +411,12 @@ def _populate_intersection_mesh(context, coll, arms, kerb_radius, tail_length, s
         else:
             curb = paths.kc.curb_loop(name, seg3, coll,
                                        curb_style=curb_style, curb_height=curb_height,
-                                       curb_thickness=curb_thickness, matkey="concrete",
+                                       curb_thickness=curb_thickness, matkey=curb_matkey,
                                        segments=segments, closed=False)
+            if curb is not None:
+                # Curb-wall collision -- an exact copy of the curb's own evaluated mesh (see
+                # kit_common.colonly_mesh_evaluated), not a separately-swept approximation.
+                paths.kc.colonly_mesh_evaluated(curb, coll)
         if curb is not None:
             visual_objs.append(curb)
 
@@ -432,6 +477,7 @@ def get_or_create_origin_marker(coll, fallback_xyz=None):
     return marker
 
 
+@live_edit.rebuilding()
 def rebuild_intersection_in_place(context, coll):
     """Live-editing counterpart to `build_intersection_geometry`: re-derive each arm's ANGLE from
     its `arm_*` marker Empty's CURRENT position (bearing from the LIVE origin marker -- see
@@ -636,7 +682,9 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
 
     n = 1
     base_name = "Intersection_%s" % preset
-    while base_name + ("_%03d" % n) in bpy.data.collections:
+    # local_collection (not a bare name-in-bpy.data.collections test) so a linked neighbor's
+    # same-numbered piece never perturbs local auto-numbering -- see its docstring.
+    while local_collection(base_name + ("_%03d" % n)) is not None:
         n += 1
     coll = bpy.data.collections.new(base_name + ("_%03d" % n))
     parent_coll.children.link(coll)
@@ -699,7 +747,8 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
     if export_path:
         try:
             k.export_json(bpy.path.abspath(export_path), arms, kerb_radius, junction_id=coll.name,
-                           segments=segments, tail_length=tail_length, z=z, lane_map=lane_map)
+                           segments=segments, tail_length=tail_length, z=z, lane_map=lane_map,
+                           center=(cx, cy))
             export_note += ", json -> '%s'" % export_path
         except OSError as exc:
             warnings.append("Built geometry OK, but json export failed: %s" % exc)
@@ -934,6 +983,8 @@ def _live_edit_target_collection(context):
             return obj.users_collection[0]
         if obj.type == 'CURVE':
             for coll in bpy.data.collections:
+                if coll.library is not None:
+                    continue   # a linked neighbor's spine could share this curve's exact name
                 if coll.get("rka_curve_object") == obj.name:
                     return coll
     coll = context.view_layer.active_layer_collection.collection
@@ -981,6 +1032,144 @@ class RKA_OT_rebuild_from_handles(bpy.types.Operator):
             return {'CANCELLED'}
         _rebuild_piece_in_place(context, coll)
         self.report({'INFO'}, "Rebuilt '%s' from its current handle positions" % coll.name)
+        return {'FINISHED'}
+
+
+class RKA_OT_set_lane_map(bpy.types.Operator):
+    """Change the 'Lane Map Override' on an ALREADY-BUILT intersection and rebuild in place --
+    the persistent counterpart to `RKA_OT_build_intersection`'s own `lane_map` field, which only
+    ever appears on Blender's own F9 'Adjust Last Operation' panel and (like every F9 field)
+    silently stops applying the moment any other action runs. Previously the only way to change
+    it afterward was hand-editing the `rka_lane_map` Custom Property's raw nested dict directly via
+    Blender's Object/Collection Properties panel, then separately triggering a rebuild yourself --
+    workable but unfriendly, and easy to typo since there's no validation until the next
+    (unrelated) rebuild silently reads it. This pops up a text-entry dialog with the SAME
+    'From>To:in-out,in-out; From2>To2:in-out' mini-syntax the build operator uses
+    (`parse_lane_map`), pre-filled with the intersection's current override if it has one, and
+    validates immediately on OK -- a malformed clause reports an error and changes nothing, rather
+    than corrupting the stored override.
+
+    Blank text clears the override entirely (reverts to the default i->i lane pairing everywhere),
+    the same as never having set one."""
+    bl_idname = "rka.set_lane_map"
+    bl_label = "Set Lane Map Override"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    lane_map_text: bpy.props.StringProperty(
+        name="Lane Map Override", description="'From>To:in-out,in-out; From2>To2:in-out' -- "
+        "blank clears the override (default i->i pairing everywhere)", default="")
+
+    @classmethod
+    def poll(cls, context):
+        coll = _live_edit_target_collection(context)
+        return coll is not None and "rka_arm_names" in coll.keys()
+
+    def invoke(self, context, event):
+        coll = _live_edit_target_collection(context)
+        if coll is not None and custom_props.LANE_MAP_KEY in coll.keys():
+            current = custom_props.read_lane_map_override(coll)
+            self.lane_map_text = "; ".join(
+                "%s>%s:%s" % (frm, to, ",".join("%d-%d" % p for p in pairs))
+                for (frm, to), pairs in current.items())
+        else:
+            self.lane_map_text = ""
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        coll = _live_edit_target_collection(context)
+        if coll is None or "rka_arm_names" not in coll.keys():
+            self.report({'ERROR'}, "No active intersection piece")
+            return {'CANCELLED'}
+        try:
+            lane_map = parse_lane_map(self.lane_map_text)
+        except ValueError as exc:
+            self.report({'ERROR'}, "Lane Map Override: %s" % exc)
+            return {'CANCELLED'}
+        if lane_map is None:
+            if custom_props.LANE_MAP_KEY in coll.keys():
+                del coll[custom_props.LANE_MAP_KEY]
+        else:
+            coll[custom_props.LANE_MAP_KEY] = custom_props.lane_map_to_custom(lane_map)
+        _rebuild_piece_in_place(context, coll)
+        self.report({'INFO'}, "'%s' lane map override -> %s"
+                     % (coll.name, "cleared" if lane_map is None else "%d clause(s)" % len(lane_map)))
+        return {'FINISHED'}
+
+
+MATKEY_ITEMS = tuple((k, k, "") for k in sorted(paths.kc.MATS.keys()))
+
+
+def _set_piece_matkey(context, target, matkey):
+    """Shared by RKA_OT_set_pavement_matkey/RKA_OT_set_curb_matkey -- see either's docstring for
+    the full rationale (2026-07-28, user-reported: material was a hardcoded Python literal at
+    every build call site, never exposed or persisted anywhere, so there was no way to change it
+    after the initial build at all). Returns (coll, error_message_or_None)."""
+    coll = _live_edit_target_collection(context)
+    if coll is None:
+        return None, "No active piece"
+    key = "rka_curb_matkey" if target == 'CURB' else (
+        "rka_pad_matkey" if "rka_arm_names" in coll.keys() else "rka_pave_matkey")
+    coll[key] = matkey
+    _rebuild_piece_in_place(context, coll)
+    if target == 'PAVEMENT':
+        # An intersection's pad is fully regenerated by _rebuild_piece_in_place (reads
+        # rka_pad_matkey fresh every time) -- this direct update is only needed for a GN
+        # segment/transition's spine, which a rebuild deliberately never deletes/recreates (its
+        # own control points ARE the live-edited shape), so it wouldn't otherwise pick up the new
+        # rka_pave_matkey. local_object() simply won't resolve "spine_<name>" on an intersection
+        # collection, so this is a safe no-op there.
+        spine = local_object("spine_%s" % coll.name)
+        if spine is not None:
+            paths.kc.set_road_spine_material(spine, matkey)
+    return coll, None
+
+
+class RKA_OT_set_pavement_matkey(bpy.types.Operator):
+    """Change the pavement (segment/transition spine) or pad (intersection) material on an
+    ALREADY-BUILT piece -- see `_set_piece_matkey`'s docstring for the full rationale. A separate
+    operator (not a shared one with a `target` enum property) specifically so the panel can use
+    `layout.operator_menu_enum` for a clean dropdown over the full material list -- that API
+    invokes the operator with only the ONE enum property (`matkey`) set from the menu choice, with
+    no way to also pre-select a second `target` property per button."""
+    bl_idname = "rka.set_pavement_matkey"
+    bl_label = "Set Pavement/Pad Material"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    matkey: bpy.props.EnumProperty(name="Material", items=MATKEY_ITEMS, default='asphalt')
+
+    @classmethod
+    def poll(cls, context):
+        return _live_edit_target_collection(context) is not None
+
+    def execute(self, context):
+        coll, err = _set_piece_matkey(context, 'PAVEMENT', self.matkey)
+        if err:
+            self.report({'ERROR'}, err)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "'%s' pavement/pad material -> %s" % (coll.name, self.matkey))
+        return {'FINISHED'}
+
+
+class RKA_OT_set_curb_matkey(bpy.types.Operator):
+    """Change the curb material on an ALREADY-BUILT piece -- see `_set_piece_matkey`'s docstring
+    for the full rationale, and `RKA_OT_set_pavement_matkey`'s for why this is a separate operator
+    rather than one shared class with a `target` property."""
+    bl_idname = "rka.set_curb_matkey"
+    bl_label = "Set Curb Material"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    matkey: bpy.props.EnumProperty(name="Material", items=MATKEY_ITEMS, default='concrete')
+
+    @classmethod
+    def poll(cls, context):
+        return _live_edit_target_collection(context) is not None
+
+    def execute(self, context):
+        coll, err = _set_piece_matkey(context, 'CURB', self.matkey)
+        if err:
+            self.report({'ERROR'}, err)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "'%s' curb material -> %s" % (coll.name, self.matkey))
         return {'FINISHED'}
 
 
@@ -1076,6 +1265,92 @@ class RKA_OT_unfreeze_and_rebuild(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class RKA_OT_freeze_all_for_move(bpy.types.Operator):
+    """Bulk `Freeze For Move`: freezes EVERY local road_kit_authoring piece in the file at once
+    (not just the active one), so a WHOLE road network can be selected and Grab/Rotate/Moved
+    together with zero risk of live-edit regenerating anything mid-drag -- the safe way to
+    reposition many pieces together (e.g. aligning a whole test network onto another district's
+    road, or any multi-piece rearrange), which the single-piece `Freeze For Move` would otherwise
+    need running once per piece for (confirmed real need: road_blender_godot.md -- moving/rotating
+    every piece in `debug_road.blend` at once crashed Blender; `Freeze For Move`'s own docstring
+    already explains why debouncing alone can't fully prevent that -- a depsgraph-driven rebuild
+    can still land mid-drag during a slow move or a pause, regardless of how many pieces are
+    involved. This operator is a pure bulk application of that ALREADY-VERIFIED-SAFE mechanism,
+    not new reentrancy-handling logic).
+
+    Deliberately does NOT touch the active object or Pivot Point (unlike the single-piece
+    version) -- there is no one 'correct' pivot for an arbitrary multi-piece selection; set Pivot
+    Point yourself before rotating (e.g. '3D Cursor', placed at your intended pivot) and avoid
+    'Median Point'/'Individual Origins' for the same reason `Freeze For Move`'s own docstring
+    gives (most generated objects sit at local (0,0,0) with their real shape baked into the mesh/
+    curve data, so a location-based median/individual-origins pivot is meaningless here).
+    Already-frozen pieces are left alone (idempotent -- safe to run again after adding a piece)."""
+    bl_idname = "rka.freeze_all_for_move"
+    bl_label = "Freeze ALL For Move"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return any(coll.library is None and _is_piece_collection(coll)
+                    and coll.get("rka_live_edit", True) for coll in bpy.data.collections)
+
+    def execute(self, context):
+        n = 0
+        for coll in bpy.data.collections:
+            if coll.library is not None or not _is_piece_collection(coll):
+                continue
+            if coll.get("rka_live_edit", True):
+                coll["rka_live_edit"] = False
+                n += 1
+        self.report({'INFO'}, "Froze %d piece(s) -- select everything and Grab/Rotate/Move "
+                               "freely, then 'Unfreeze ALL & Rebuild' when done" % n)
+        return {'FINISHED'}
+
+
+class RKA_OT_unfreeze_all_and_rebuild(bpy.types.Operator):
+    """Bulk `Unfreeze & Rebuild`: re-enables live-edit and rebuilds EVERY currently-frozen local
+    piece in the file. Safe for the same reason the single-piece version is (`Unfreeze & Rebuild`'s
+    own docstring) -- runs as a normal operator call, sequentially, not from inside a depsgraph
+    handler mid-drag, so there is no reentrancy risk no matter how many pieces are rebuilt here.
+    Does not restore any per-piece Pivot Point (the bulk freeze never changed it)."""
+    bl_idname = "rka.unfreeze_all_and_rebuild"
+    bl_label = "Unfreeze ALL & Rebuild"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return any(coll.library is None and _is_piece_collection(coll)
+                    and not coll.get("rka_live_edit", True) for coll in bpy.data.collections)
+
+    def execute(self, context):
+        n = 0
+        for coll in bpy.data.collections:
+            if coll.library is not None or not _is_piece_collection(coll):
+                continue
+            if not coll.get("rka_live_edit", True):
+                coll["rka_live_edit"] = True
+                _rebuild_piece_in_place(context, coll)
+                n += 1
+        self.report({'INFO'}, "Unfroze + rebuilt %d piece(s)" % n)
+        return {'FINISHED'}
+
+
+def _select_piece_objects(context, coll):
+    """Select every object in `coll` (a piece collection), origin marker active + Pivot Point set
+    to 'Active Element'. Shared by `RKA_OT_select_piece` (from whatever's already active) and
+    `RKA_OT_select_piece_by_name` (from a name, no active-object precondition)."""
+    for o in context.selected_objects:
+        o.select_set(False)
+    for o in coll.objects:
+        o.select_set(True)
+    marker = get_or_create_origin_marker(coll, custom_props.read_origin(coll))
+    if marker is not None:
+        marker.select_set(True)
+        context.view_layer.objects.active = marker
+        context.scene.tool_settings.transform_pivot_point = 'ACTIVE_ELEMENT'
+    return marker
+
+
 class RKA_OT_select_piece(bpy.types.Operator):
     """Select EVERY object belonging to the active piece (intersection/segment/lane transition) --
     the "select the whole thing" answer, instead of manually hunting through the Outliner or
@@ -1084,7 +1359,12 @@ class RKA_OT_select_piece(bpy.types.Operator):
     (or Outliner collection) belonging to the piece, frozen or not -- this is a pure selection
     convenience, it never touches `rka_live_edit`. The piece's origin marker ends up active (and
     Pivot Point set to 'Active Element'), so a follow-up Grab/Rotate pivots sensibly whether or not
-    you've also run `Freeze For Move`."""
+    you've also run `Freeze For Move`.
+
+    **This operator's `poll()` needs something piece-related ALREADY active/selected** -- it's a
+    "select the REST of this piece" tool, not a bootstrapping one. To pick a FIRST piece from
+    nothing (no Outliner click needed), use `RKA_OT_select_piece_by_name` instead (the panel's
+    piece list button -- see `panel.py`)."""
     bl_idname = "rka.select_piece"
     bl_label = "Select Piece"
     bl_options = {'REGISTER', 'UNDO'}
@@ -1099,15 +1379,32 @@ class RKA_OT_select_piece(bpy.types.Operator):
             self.report({'ERROR'}, "Select an intersection/segment (or one of its handle "
                                     "Empties) first")
             return {'CANCELLED'}
-        for o in context.selected_objects:
-            o.select_set(False)
-        for o in coll.objects:
-            o.select_set(True)
-        marker = get_or_create_origin_marker(coll, custom_props.read_origin(coll))
-        if marker is not None:
-            marker.select_set(True)
-            context.view_layer.objects.active = marker
-            context.scene.tool_settings.transform_pivot_point = 'ACTIVE_ELEMENT'
+        _select_piece_objects(context, coll)
+        self.report({'INFO'}, "Selected all %d object(s) in '%s'" % (len(coll.objects), coll.name))
+        return {'FINISHED'}
+
+
+class RKA_OT_select_piece_by_name(bpy.types.Operator):
+    """Select a piece by its COLLECTION NAME directly -- 2026-07-28, user-reported: with nothing
+    already selected, `RKA_OT_select_piece`'s poll() always failed (it needs something
+    piece-related ALREADY active), so there was no panel-only way to select a FIRST piece at all,
+    only via the Outliner. Unconditional poll (`coll_name` just needs to resolve to a real LOCAL
+    piece collection) -- the panel's "Pieces in this file" list (see `panel.py`) is built from
+    every `_is_piece_collection` match and wires one of these per piece, `coll_name` preset to that
+    piece's own name via the button's own operator properties."""
+    bl_idname = "rka.select_piece_by_name"
+    bl_label = "Select Piece By Name"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    coll_name: bpy.props.StringProperty(name="Piece", default="")
+
+    def execute(self, context):
+        coll = local_collection(self.coll_name)
+        if coll is None or not _is_piece_collection(coll):
+            self.report({'ERROR'}, "'%s' is not a local road_kit_authoring piece collection"
+                         % self.coll_name)
+            return {'CANCELLED'}
+        _select_piece_objects(context, coll)
         self.report({'INFO'}, "Selected all %d object(s) in '%s'" % (len(coll.objects), coll.name))
         return {'FINISHED'}
 
@@ -1360,9 +1657,11 @@ class RKA_OT_adjust_arm_lanes_out(bpy.types.Operator):
 
 
 CLASSES = (RKA_OT_build_intersection, RKA_OT_rebuild_from_handles, RKA_OT_freeze_for_move,
-           RKA_OT_unfreeze_and_rebuild, RKA_OT_select_piece, RKA_OT_select_arm,
+           RKA_OT_unfreeze_and_rebuild, RKA_OT_freeze_all_for_move, RKA_OT_unfreeze_all_and_rebuild,
+           RKA_OT_select_piece, RKA_OT_select_piece_by_name, RKA_OT_select_arm,
            RKA_OT_adjust_arm_lanes, RKA_OT_add_arm, RKA_OT_remove_arm, RKA_OT_set_arm_oneway,
-           RKA_OT_adjust_arm_lanes_out)
+           RKA_OT_adjust_arm_lanes_out, RKA_OT_set_lane_map,
+           RKA_OT_set_pavement_matkey, RKA_OT_set_curb_matkey)
 
 
 def register():

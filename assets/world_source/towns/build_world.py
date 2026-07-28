@@ -90,13 +90,6 @@ def make_grid():
     return g
 
 
-# Arterial half-footprint: the paved junction block is 3 cells (21 m) wide, so lane stop
-# lines sit at its edge (10.5 m) + 1 m margin — NOT at the lane-count-derived radius
-# road_graph would compute (8 m, inside the pavement).
-ART_LANES = 2                                 # lanes per direction on the backbone
-ART_STOP_RADIUS = (3 * CELL) / 2.0 + 1.0
-
-
 def backbone_deck(coll):
     """Always-resident collision-only deck (21 m wide) under every arterial line — the master
     OWNS the boundary roads, and this is their physical surface. Without it, anything on an
@@ -137,43 +130,6 @@ def safety_floor(coll):
     return b
 
 
-def backbone_graph(driving_side='LEFT'):
-    """Junction-split arterial RoadGraph (lib/road_graph.py): nodes at every gridline
-    crossing, one edge per inter-crossing segment, ART_LANES per direction. Replaces the
-    old whole-line backbone_lanes pairs — lanes now END at each junction and continue via
-    generated turn connectors (data-wired next_routes), so backbone traffic turns at
-    junctions instead of sailing through and despawning at map edges only.
-
-    Edge points are sampled every 4 cells so the emitted marker z (via _flank_z) tracks the
-    seam elevation; road_graph.simplify_polyline then thins the straights back out.
-    `driving_side` ('LEFT' default, or 'RIGHT') is stamped onto the returned RoadGraph -- see
-    road_graph.generate()'s docstring."""
-    import road_graph as rgm
-    rg = rgm.RoadGraph(driving_side=driving_side)
-    lines = [k * DCELLS * CELL for k in range(GRID_N + 1)]   # grid-space coords of arterials
-    step = 4 * CELL
-
-    def samples(a, b):
-        out = list(range(int(a), int(b), int(step)))
-        return out + [int(b)]
-
-    span = SPAN * CELL
-    for i, c in enumerate(lines):
-        for j in range(GRID_N):
-            y0, y1 = lines[j], lines[j + 1]
-            pts = [(to_world(c), to_world(y), 0.0) for y in samples(y0, y1)]
-            rg.add_edge(f"art_v{i}_{j}", pts, lanes_f=ART_LANES, lanes_r=ART_LANES,
-                        cls='arterial', eps=1.0)
-    for j, c in enumerate(lines):
-        for i in range(GRID_N):
-            x0, x1 = lines[i], lines[i + 1]
-            pts = [(to_world(x), to_world(c), 0.0) for x in samples(x0, x1)]
-            rg.add_edge(f"art_h{j}_{i}", pts, lanes_f=ART_LANES, lanes_r=ART_LANES,
-                        cls='arterial', eps=1.0)
-    assert span == lines[-1], "arterial span drifted off the district grid"
-    return rg
-
-
 def build_harbor(coll, mk, land):
     """Tokyo Bay + Haneda airport island blockout + markers. The Rainbow Bridge road/rail is NO
     LONGER blocked out here — it lives in its own overlay blend
@@ -209,26 +165,24 @@ def build_harbor(coll, mk, land):
 
 def parse_args():
     """CLI after `--`. DEFAULT IS MINIMAL (collision-diagnosis baseline, 2026-07): the master
-    ships only region/landmark/water markers — no arterial lane markers, no ArtDeck collision
-    strips, no SafetyFloor. `--full` restores the complete traffic/ground layer; the granular
-    `--with-*` flags exist to A/B-bisect which body causes a collision artifact."""
+    ships only region/landmark/water markers — no ArtDeck collision strips, no SafetyFloor.
+    `--full` restores the complete ground layer; the granular `--with-*` flags exist to
+    A/B-bisect which body causes a collision artifact. (The old arterial lane markers
+    /`--with-lanes`/`--driving-side` — `backbone_graph()`, `lib/road_graph.py` — were removed in
+    P6.8: per-district ambient traffic now comes entirely from each district's own
+    `.lanekit.json`, see the `has_lanekit` check in `build()` below.)"""
     import argparse
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     ap = argparse.ArgumentParser(prog="build_world.py")
     ap.add_argument("--full", action="store_true",
-                    help="build everything: arterial lanes + ArtDeck strips + SafetyFloor")
-    ap.add_argument("--with-lanes", action="store_true",
-                    help="include the arterial lane/connector/junction markers")
+                    help="build everything: ArtDeck strips + SafetyFloor")
     ap.add_argument("--with-deck", action="store_true",
                     help="include the 14 ArtDeck collision strips")
     ap.add_argument("--with-floor", action="store_true",
                     help="include the world-spanning SafetyFloor slab")
-    ap.add_argument("--driving-side", choices=("LEFT", "RIGHT"), default="LEFT",
-                    help="traffic convention for the arterial backbone RoadGraph (default LEFT, "
-                         "matching the current Tokyo/left-hand-traffic world)")
     a = ap.parse_args(argv)
     if a.full:
-        a.with_lanes = a.with_deck = a.with_floor = True
+        a.with_deck = a.with_floor = True
     return a
 
 
@@ -297,40 +251,30 @@ def build(opts):
             # never built one (PLATEAU precincts) just has nothing to show, no error.
             r["geometry_lod_low"] = lod_low_piece_path(gx, gy, key)
             # Ambient-traffic recipe → VehicleSpawnConfig at bake time (WorldBaker.buildZone).
-            # traffic_route is a route-name PREFIX: WorldZoneManager.findRoute collects the
-            # matching lanes near the zone and distributes spawns round-robin. Districts with
-            # a hand-authored roads sidecar (districts/<piece>.roads.json → save_roads.py)
-            # use their own internal lanes ("<piece_stem>__"); the rest fall back to the
-            # master arterial lanes crossing the district ("art_"). Re-run this master build
-            # after adding a sidecar so the meta flips. Count is further scaled by the
-            # theme's vehicle_density at load.
-            has_roads = os.path.exists(os.path.join(ROOT, "districts", stem + ".roads.json"))
-            if has_roads:
+            # road_kit_authoring's `.lanekit.json` (districts/<piece>.lanekit.json →
+            # tools/save_lane_kit.py) is the ONLY traffic source now — the old road_graph.py
+            # `.roads.json` pipeline and the master arterial backbone (`backbone_graph()`/
+            # `--with-lanes`) were removed outright (P6.8; no dual-path kept, every district
+            # regenerates through this pipeline going forward). Every lane in a combined sidecar
+            # is tagged `zone_id = <piece_stem>` by default (lib/lane_kit.py:combine_pieces), so
+            # `traffic_route` is the EXACT stem — WorldZoneManager.findRoute's zone-id-equality
+            # pass matches it directly. No sidecar yet = no ambient traffic for that district
+            # (empty route + 0 count; WorldBaker.buildZone emits no VehicleSpawnConfig at all,
+            # verified graceful) until it's authored. Re-run this master build after adding a
+            # sidecar so the meta flips. Count is further scaled by the theme's vehicle_density.
+            has_lanekit = os.path.exists(os.path.join(ROOT, "districts", stem + ".lanekit.json"))
+            if has_lanekit:
                 r["traffic_count"] = 6
-                r["traffic_route"] = f"{stem}__"
-            elif opts.with_lanes:
-                r["traffic_count"] = 6
-                r["traffic_route"] = "art_"
+                r["traffic_route"] = stem
             else:
-                # Minimal master builds no arterial lanes, so the "art_" fallback would name
-                # routes that don't exist. Empty route + 0 count = WorldBaker.buildZone emits
-                # no VehicleSpawnConfig at all (verified graceful) — the zone simply has no
-                # ambient traffic until this district gets a roads sidecar.
                 r["traffic_count"] = 0
                 r["traffic_route"] = ""
             mk.objects.link(r)
 
-    # arterial backbone: junction-split multi-lane routes + turn connectors + IntersectionZones
-    # (the functional AI/traffic graph), all generated from one RoadGraph. The cosmetic Art_V/H
-    # preview ribbons and the grid-locked C1 Loop ring were removed -- both were tied to the
-    # district-boundary grid lines and didn't route like a real expressway (see the
-    # highway/district redesign follow-up); ring_network.py itself is kept for that redesign,
-    # just not invoked here for now.
-    n_lane = n_conn = n_ix = n_deck = 0
-    if opts.with_lanes:
-        n_lane, n_conn, n_ix = asm.lay_road_graph(
-            backbone_graph(driving_side=opts.driving_side), z_fn=_flank_z, z_off=0.6,
-            radius_fn=lambda _rg, _node: ART_STOP_RADIUS)
+    # ArtDeck collision strips (arterial LANE markers themselves were removed in P6.8 — see
+    # parse_args' docstring; the deck is a pure collision safety net, independent of any lane
+    # graph, and stays regardless of what (if anything) authors traffic on top of it).
+    n_deck = 0
     if opts.with_deck:
         n_deck = backbone_deck(kc.get_coll("ARTDECK"))
     if opts.with_floor:
@@ -352,12 +296,12 @@ def build(opts):
     asm.add_camera_sun(layout, target=(to_world(WORLD / 2), to_world(WORLD / 2), 0.0),
                        cam_loc=(to_world(WORLD / 2), to_world(-WORLD * 0.4), WORLD * 0.75), lens=28)
 
-    mode = "full" if (opts.with_lanes and opts.with_deck and opts.with_floor) else \
-           ("minimal" if not (opts.with_lanes or opts.with_deck or opts.with_floor) else "partial")
+    mode = "full" if (opts.with_deck and opts.with_floor) else \
+           ("minimal" if not (opts.with_deck or opts.with_floor) else "partial")
     summary = "  ".join(f"{k}={v}" for k, v in counts.items())
-    print("WORLD: %.0fx%.0f m  mode=%s  districts=%d (%dx%d, %.0f m)  linked=%d  plates=%d  lanes=%d  connectors=%d  junctions=%d  decks=%d  floor=%d  landmarks=%d  %s"
+    print("WORLD: %.0fx%.0f m  mode=%s  districts=%d (%dx%d, %.0f m)  linked=%d  plates=%d  decks=%d  floor=%d  landmarks=%d  %s"
           % (WORLD, WORLD, mode, GRID_N * GRID_N, GRID_N, GRID_N, DISTRICT, n_linked, n_plate,
-             n_lane, n_conn, n_ix, n_deck, 1 if opts.with_floor else 0, len(LANDMARKS), summary))
+             n_deck, 1 if opts.with_floor else 0, len(LANDMARKS), summary))
 
 
 def main():

@@ -39,134 +39,134 @@ import java.util.List;
 @RegisterClass(className = "WorldZoneMarker")
 public class WorldZoneMarker extends Node3D {
 
-    /** The zone this marker anchors. */
-    @Export @RegisterProperty public WorldZone zone;
+	/** The zone this marker anchors. */
+	@Export @RegisterProperty public WorldZone zone;
 
-    /** Draw the translucent spawn-volume box + load/unload rings at runtime (debug aid). */
-    @Export @RegisterProperty public boolean showDebugVolume = true;
+	/** Draw the translucent spawn-volume box + load/unload rings at runtime (debug aid). */
+	@Export @RegisterProperty public boolean showDebugVolume = true;
 
-    private static final Color IDLE_COLOR   = new Color(0.0, 0.7, 1.0, 0.12);  // cyan  — unloaded
-    private static final Color LOADED_COLOR = new Color(0.1, 1.0, 0.3, 0.20);  // green — streamed in
-    private static final Color LOAD_RING    = new Color(1.0, 0.85, 0.0, 0.10); // yellow ring (load)
-    private static final Color UNLOAD_RING  = new Color(1.0, 0.25, 0.2, 0.07); // red ring  (unload)
+	private static final Color IDLE_COLOR   = new Color(0.0, 0.7, 1.0, 0.12);  // cyan  — unloaded
+	private static final Color LOADED_COLOR = new Color(0.1, 1.0, 0.3, 0.20);  // green — streamed in
+	private static final Color LOAD_RING    = new Color(1.0, 0.85, 0.0, 0.10); // yellow ring (load)
+	private static final Color UNLOAD_RING  = new Color(1.0, 0.25, 0.2, 0.07); // red ring  (unload)
 
-    private StandardMaterial3D volumeMat;  // box material, recoloured on load/unload
-    private final List<Node> debugVisualNodes = new ArrayList<>();
+	private StandardMaterial3D volumeMat;  // box material, recoloured on load/unload
+	private final List<Node> debugVisualNodes = new ArrayList<>();
 
-    /** The eagerly-resident low-detail placeholder tier (see {@link WorldZone#lodLowGeometryPath}),
-     * or null if this zone never baked one, or it is currently removed (full detail is loaded). */
-    private Node lodLowInstance;
+	/** The eagerly-resident low-detail placeholder tier (see {@link WorldZone#lodLowGeometryPath}),
+	 * or null if this zone never baked one, or it is currently removed (full detail is loaded). */
+	private Node lodLowInstance;
 
-    @RegisterFunction
-    @Override
-    public void _ready() {
-        WorldZoneManager mgr = WorldZoneManager.get();
-        if (mgr != null) mgr.registerMarker(this);
-        if (showDebugVolume && zone != null) buildDebugVisuals();
-        instantiateLodLow();   // zone starts "unloaded" — show the placeholder immediately, if any
-    }
+	@RegisterFunction
+	@Override
+	public void _ready() {
+		WorldZoneManager mgr = WorldZoneManager.get();
+		if (mgr != null) mgr.registerMarker(this);
+		if (showDebugVolume && zone != null) buildDebugVisuals();
+		instantiateLodLow();   // zone starts "unloaded" — show the placeholder immediately, if any
+	}
 
-    @RegisterFunction
-    @Override
-    public void _exitTree() {
-        WorldZoneManager mgr = WorldZoneManager.get();
-        if (mgr != null) mgr.unregisterMarker(this);
-    }
+	@RegisterFunction
+	@Override
+	public void _exitTree() {
+		WorldZoneManager mgr = WorldZoneManager.get();
+		if (mgr != null) mgr.unregisterMarker(this);
+	}
 
-    /** Recolour the spawn-volume box to reflect streamed-in (green) vs idle (cyan). */
-    public void setLoadedVisual(boolean loaded) {
-        if (volumeMat != null) volumeMat.setAlbedo(loaded ? LOADED_COLOR : IDLE_COLOR);
-    }
+	/** Recolour the spawn-volume box to reflect streamed-in (green) vs idle (cyan). */
+	public void setLoadedVisual(boolean loaded) {
+		if (volumeMat != null) volumeMat.setAlbedo(loaded ? LOADED_COLOR : IDLE_COLOR);
+	}
 
-    // ── Low-detail placeholder tier (always resident unless the full-detail geometry is loaded) ──
+	// ── Low-detail placeholder tier (always resident unless the full-detail geometry is loaded) ──
 
-    /**
-     * Instance {@link WorldZone#lodLowGeometryPath} as a child, if not already present. A no-op
-     * when the zone has no such path (PLATEAU precincts, most hand-authored pieces) or the file
-     * hasn't been baked yet — {@code exists()} guards against error-log spam either way.
-     */
-    public void instantiateLodLow() {
-        if (lodLowInstance != null && GD.isInstanceValid(lodLowInstance)) return;
-        if (zone == null || zone.lodLowGeometryPath == null || zone.lodLowGeometryPath.isEmpty()) return;
-        if (!ResourceLoader.INSTANCE.exists(zone.lodLowGeometryPath, "")) return;
-        Object o = GD.load(zone.lodLowGeometryPath);
-        if (!(o instanceof PackedScene ps)) return;
-        Node n = ps.instantiate();
-        if (n == null) return;
-        addChild(n);
-        lodLowInstance = n;
-    }
+	/**
+	 * Instance {@link WorldZone#lodLowGeometryPath} as a child, if not already present. A no-op
+	 * when the zone has no such path (PLATEAU precincts, most hand-authored pieces) or the file
+	 * hasn't been baked yet — {@code exists()} guards against error-log spam either way.
+	 */
+	public void instantiateLodLow() {
+		if (lodLowInstance != null && GD.isInstanceValid(lodLowInstance)) return;
+		if (zone == null || zone.lodLowGeometryPath == null || zone.lodLowGeometryPath.isEmpty()) return;
+		if (!ResourceLoader.INSTANCE.exists(zone.lodLowGeometryPath, "")) return;
+		Object o = GD.load(zone.lodLowGeometryPath);
+		if (!(o instanceof PackedScene ps)) return;
+		Node n = ps.instantiate();
+		if (n == null) return;
+		addChild(n);
+		lodLowInstance = n;
+	}
 
-    /**
-     * Free the placeholder tier the instant the real full-detail geometry takes its place.
-     * {@code removeChild} first (synchronous) rather than relying on {@code queueFree()} alone —
-     * {@code queueFree()} only defers to the end of the current idle frame, so a caller that packs
-     * the scene in the same call (e.g. {@code WorldBaker}'s bake-time strip) would otherwise still
-     * see this node as a live child and serialize it anyway.
-     */
-    public void removeLodLow() {
-        if (lodLowInstance != null && GD.isInstanceValid(lodLowInstance)) {
-            removeChild(lodLowInstance);
-            lodLowInstance.queueFree();
-        }
-        lodLowInstance = null;
-    }
+	/**
+	 * Free the placeholder tier the instant the real full-detail geometry takes its place.
+	 * {@code removeChild} first (synchronous) rather than relying on {@code queueFree()} alone —
+	 * {@code queueFree()} only defers to the end of the current idle frame, so a caller that packs
+	 * the scene in the same call (e.g. {@code WorldBaker}'s bake-time strip) would otherwise still
+	 * see this node as a live child and serialize it anyway.
+	 */
+	public void removeLodLow() {
+		if (lodLowInstance != null && GD.isInstanceValid(lodLowInstance)) {
+			removeChild(lodLowInstance);
+			lodLowInstance.queueFree();
+		}
+		lodLowInstance = null;
+	}
 
-    /**
-     * Free the debug spawn-volume box + load/unload rings (see {@link #buildDebugVisuals}).
-     * These are a single-zone dev aid ("so you can see a zone and walk into it") — baking
-     * dozens of them (one per district) into a master-world scene means large overlapping
-     * transparent rings permanently embedded across the whole map, for no runtime benefit.
-     * Same immediate-{@code removeChild}-before-{@code queueFree} reasoning as
-     * {@link #removeLodLow}: a bake-time caller packs the scene in the same call, before a
-     * deferred free would have taken effect.
-     */
-    public void removeDebugVisuals() {
-        for (Node n : debugVisualNodes) {
-            if (GD.isInstanceValid(n)) {
-                removeChild(n);
-                n.queueFree();
-            }
-        }
-        debugVisualNodes.clear();
-        volumeMat = null;
-    }
+	/**
+	 * Free the debug spawn-volume box + load/unload rings (see {@link #buildDebugVisuals}).
+	 * These are a single-zone dev aid ("so you can see a zone and walk into it") — baking
+	 * dozens of them (one per district) into a master-world scene means large overlapping
+	 * transparent rings permanently embedded across the whole map, for no runtime benefit.
+	 * Same immediate-{@code removeChild}-before-{@code queueFree} reasoning as
+	 * {@link #removeLodLow}: a bake-time caller packs the scene in the same call, before a
+	 * deferred free would have taken effect.
+	 */
+	public void removeDebugVisuals() {
+		for (Node n : debugVisualNodes) {
+			if (GD.isInstanceValid(n)) {
+				removeChild(n);
+				n.queueFree();
+			}
+		}
+		debugVisualNodes.clear();
+		volumeMat = null;
+	}
 
-    // ── Debug mesh construction ───────────────────────────────────────────────
+	// ── Debug mesh construction ───────────────────────────────────────────────
 
-    private void buildDebugVisuals() {
-        volumeMat = makeMaterial(IDLE_COLOR);
-        BoxMesh box = new BoxMesh();
-        box.setSize(zone.size);
-        MeshInstance3D boxInst = new MeshInstance3D();
-        boxInst.setMesh(box);
-        boxInst.setMaterialOverride(volumeMat);
-        addChild(boxInst);
-        debugVisualNodes.add(boxInst);
+	private void buildDebugVisuals() {
+		volumeMat = makeMaterial(IDLE_COLOR);
+		BoxMesh box = new BoxMesh();
+		box.setSize(zone.size);
+		MeshInstance3D boxInst = new MeshInstance3D();
+		boxInst.setMesh(box);
+		boxInst.setMaterialOverride(volumeMat);
+		addChild(boxInst);
+		debugVisualNodes.add(boxInst);
 
-        addRing(zone.loadRadius, LOAD_RING);
-        addRing(zone.unloadRadius, UNLOAD_RING);
-    }
+		addRing(zone.loadRadius, LOAD_RING);
+		addRing(zone.unloadRadius, UNLOAD_RING);
+	}
 
-    private void addRing(float radius, Color color) {
-        CylinderMesh disc = new CylinderMesh();
-        disc.setTopRadius(radius);
-        disc.setBottomRadius(radius);
-        disc.setHeight(0.1f);
-        disc.setRadialSegments(48);
-        MeshInstance3D inst = new MeshInstance3D();
-        inst.setMesh(disc);
-        inst.setMaterialOverride(makeMaterial(color));
-        addChild(inst);
-        debugVisualNodes.add(inst);
-    }
+	private void addRing(float radius, Color color) {
+		CylinderMesh disc = new CylinderMesh();
+		disc.setTopRadius(radius);
+		disc.setBottomRadius(radius);
+		disc.setHeight(0.1f);
+		disc.setRadialSegments(48);
+		MeshInstance3D inst = new MeshInstance3D();
+		inst.setMesh(disc);
+		inst.setMaterialOverride(makeMaterial(color));
+		addChild(inst);
+		debugVisualNodes.add(inst);
+	}
 
-    private StandardMaterial3D makeMaterial(Color color) {
-        StandardMaterial3D mat = new StandardMaterial3D();
-        mat.setTransparency(BaseMaterial3D.Transparency.ALPHA);
-        mat.setShadingMode(BaseMaterial3D.ShadingMode.UNSHADED);
-        mat.setCullMode(BaseMaterial3D.CullMode.DISABLED);
-        mat.setAlbedo(color);
-        return mat;
-    }
+	private StandardMaterial3D makeMaterial(Color color) {
+		StandardMaterial3D mat = new StandardMaterial3D();
+		mat.setTransparency(BaseMaterial3D.Transparency.ALPHA);
+		mat.setShadingMode(BaseMaterial3D.ShadingMode.UNSHADED);
+		mat.setCullMode(BaseMaterial3D.CullMode.DISABLED);
+		mat.setAlbedo(color);
+		return mat;
+	}
 }

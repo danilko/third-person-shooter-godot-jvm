@@ -27,9 +27,11 @@ import godot.core.Vector3;
  *
  * <p><b>Connectivity for this route type is entirely geometry-derived</b> ({@link LaneGraph}) —
  * {@link #pickNextRoute()}/{@link #resolveRoute(String)} always return null; there is no
- * explicit-successor string list to parse (unlike {@code VehicleRoute.nextRoutes}). It also does
- * <b>not</b> register with {@link WorldZoneManager}'s route registry — that registry backs
- * ambient-traffic zone spawn configs, an intentionally separate future step for this route type.
+ * explicit-successor string list to parse (unlike {@code VehicleRoute.nextRoutes}). It DOES
+ * register with {@link WorldZoneManager}'s route registry (as of the road_kit_authoring district
+ * integration — see {@code road_blender_godot.md} Phase 6), so a {@code PathLaneRoute} network can
+ * participate in ambient/disposable-traffic zone spawn configs exactly like a {@code VehicleRoute}
+ * network.
  */
 @RegisterClass(className = "PathLaneRoute")
 public class PathLaneRoute extends Node3D implements Lane {
@@ -59,6 +61,12 @@ public class PathLaneRoute extends Node3D implements Lane {
      *  {@link LaneGraph}) — not populated by the current sidecar export; reserved. */
     @Export @RegisterProperty public String returnRoute = "";
 
+    /** Which district/overlay this lane's authored piece belongs to — from the exported
+     *  sidecar's {@code zone_id} (see {@code lib/lane_kit.py:combine_pieces}), the
+     *  property-based replacement for the old {@code "<stem>__"} name-prefix zone convention.
+     *  "" for a lane whose sidecar predates this field. */
+    @Export @RegisterProperty public String zoneId = "";
+
     private static final String PATH_CHILD_NAME = "Path3D";
 
     private Curve3D curve;
@@ -74,6 +82,14 @@ public class PathLaneRoute extends Node3D implements Lane {
         var pathNode = getNodeOrNull(PATH_CHILD_NAME);
         if (pathNode instanceof Path3D p3d) curve = p3d.getCurve();
         ensureBaked();
+        WorldZoneManager mgr = WorldZoneManager.get();
+        if (mgr != null) mgr.registerRoute(this);
+    }
+
+    @RegisterFunction
+    public void _exitTree() {
+        WorldZoneManager mgr = WorldZoneManager.get();
+        if (mgr != null) mgr.unregisterRoute(this);
     }
 
     /** The backing {@link Curve3D}, or null if the expected "Path3D" child is missing/unset. */
@@ -108,6 +124,15 @@ public class PathLaneRoute extends Node3D implements Lane {
         Path3D p3d = pathChild();
         if (curve == null || p3d == null || curve.getPointCount() == 0) return null;
         return p3d.toGlobal(curve.getPointPosition(0));
+    }
+
+    /** {@link #startPoint()}, but O(1) off the already-baked array (no curve/point-count re-read)
+     *  — this route is static/baked-once content, so the plain baked cache doubles as the entry
+     *  cache {@code WorldZoneManager.findRoute}'s per-candidate spawn scan needs. */
+    @Override
+    public Vector3 entryPoint() {
+        ensureBaked();
+        return bakedGlobal.length > 0 ? bakedGlobal[0] : null;
     }
 
     @Override

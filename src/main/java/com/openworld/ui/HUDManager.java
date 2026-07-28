@@ -24,6 +24,7 @@ import godot.api.PackedScene;
 import godot.api.Texture2D;
 import godot.api.Timer;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.HorizontalAlignment;
 import godot.core.NodePath;
 import godot.core.StringNames;
@@ -168,54 +169,54 @@ public class HUDManager extends CanvasLayer {
 	  // playerSpawned fires deferred from Player._ready() so this connection
 	  // is always in place before the signal arrives, regardless of tree order.
 	  bus.playerSpawned.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onPlayerSpawned")),
+		  MethodCallable.createUnsafe(this, "onPlayerSpawned"),
 		  Object.ConnectFlags.DEFAULT);
 	  bus.vehicleEntered.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onVehicleEntered")),
+		  MethodCallable.createUnsafe(this, "onVehicleEntered"),
 		  Object.ConnectFlags.DEFAULT);
 	  bus.vehicleExited.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onVehicleExited")),
+		  MethodCallable.createUnsafe(this, "onVehicleExited"),
 		  Object.ConnectFlags.DEFAULT);
 	  bus.characterEliminated.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterEliminated")),
+		  MethodCallable.createUnsafe(this, "onCharacterEliminated"),
 		  Object.ConnectFlags.DEFAULT);
 
 	  // C2 — multi-character HUD wiring: route per-character events to whichever
 	  // widget (if any) is registered for that characterId via registerCharacterHUD().
 	  bus.characterHealthChanged.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterHealthChanged")),
+		  MethodCallable.createUnsafe(this, "onCharacterHealthChanged"),
 		  Object.ConnectFlags.DEFAULT);
 	  bus.characterAmmoChanged.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterAmmoChanged")),
+		  MethodCallable.createUnsafe(this, "onCharacterAmmoChanged"),
 		  Object.ConnectFlags.DEFAULT);
 	  bus.characterOxygenChanged.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterOxygenChanged")),
+		  MethodCallable.createUnsafe(this, "onCharacterOxygenChanged"),
 		  Object.ConnectFlags.DEFAULT);
 	  bus.characterDied.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterDiedHud")),
+		  MethodCallable.createUnsafe(this, "onCharacterDiedHud"),
 		  Object.ConnectFlags.DEFAULT);
 
 	  // C1 — mission status banner: surfaces start/complete/fail events that were
 	  // previously only visible via GD.print in the console.
 	  bus.missionStarted.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onMissionStarted")),
+		  MethodCallable.createUnsafe(this, "onMissionStarted"),
 		  Object.ConnectFlags.DEFAULT);
 	  bus.missionCompleted.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onMissionCompletedHud")),
+		  MethodCallable.createUnsafe(this, "onMissionCompletedHud"),
 		  Object.ConnectFlags.DEFAULT);
 	  bus.missionFailed.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onMissionFailedHud")),
+		  MethodCallable.createUnsafe(this, "onMissionFailedHud"),
 		  Object.ConnectFlags.DEFAULT);
 
 	  // Pickup toasts route through the same status feed as mission events
 	  // (was previously a dead connection — nothing connected weaponPickedUp).
 	  bus.weaponPickedUp.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onWeaponPickedUp")),
+		  MethodCallable.createUnsafe(this, "onWeaponPickedUp"),
 		  Object.ConnectFlags.DEFAULT);
 
 	  // Damage-direction indicator: routed per-character, filtered to the local player below.
 	  bus.characterDamagedFrom.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onCharacterDamagedFrom")),
+		  MethodCallable.createUnsafe(this, "onCharacterDamagedFrom"),
 		  Object.ConnectFlags.DEFAULT);
 	}
 
@@ -373,7 +374,7 @@ public class HUDManager extends CanvasLayer {
 	Node wcNode = player.getNodeOrNull("WeaponController");
 	if (wcNode instanceof WeaponController wc) {
 	  wc.ammoChanged.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onPlayerAmmoChanged")),
+		  MethodCallable.createUnsafe(this, "onPlayerAmmoChanged"),
 		  Object.ConnectFlags.DEFAULT);
 	  // Wire crosshair spread source once — self-managed from here on.
 	  if (crosshair != null) crosshair.weaponController = wc;
@@ -382,7 +383,7 @@ public class HUDManager extends CanvasLayer {
 	// Drive crosshair visibility from the player's combat-state changes.
 	if (newPlayer instanceof Character c) {
 	  c.changedCombatState.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onPlayerCombatStateChanged")),
+		  MethodCallable.createUnsafe(this, "onPlayerCombatStateChanged"),
 		  Object.ConnectFlags.DEFAULT);
 	}
 
@@ -391,7 +392,7 @@ public class HUDManager extends CanvasLayer {
 	  // healthChanged (not the discrete hit event) so the HUD bar tracks every health
 	  // change — local damage/heal and replicated updates — uniformly.
 	  h.healthChanged.connectUnsafe(
-		  Callable.createUnsafe(this, StringNames.toGodotName("onPlayerHealthChanged")),
+		  MethodCallable.createUnsafe(this, "onPlayerHealthChanged"),
 		  Object.ConnectFlags.DEFAULT);
 	  emitHealth(h.getCurrentHealth());
 	}

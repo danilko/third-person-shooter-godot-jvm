@@ -10,6 +10,7 @@ import godot.api.Area3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.core.Callable;
+import godot.core.MethodCallable;
 import godot.core.StringName;
 import godot.global.GD;
 
@@ -46,8 +47,8 @@ public class InteriorVolume extends Area3D {
     @Override
     public void _ready() {
         addToGroup(new StringName(INTERIOR_GROUP));
-        connect(new StringName("body_entered"), Callable.createUnsafe(this, new StringName("on_body_entered")));
-        connect(new StringName("body_exited"), Callable.createUnsafe(this, new StringName("on_body_exited")));
+        connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
+        connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
     }
 
     @RegisterFunction

@@ -134,6 +134,7 @@ public class VehicleRoute extends Node3D implements Lane {
     /** {@link #startPoint()} cached for the lifetime of this tree entry — the spawn-time prefix
      *  query ({@code WorldZoneManager.findRoute}) distance-filters every registered lane, so it must
      *  not re-walk marker children (JVM-bridge calls) per candidate. Lanes are static content. */
+    @Override
     public Vector3 entryPoint() {
         if (cachedEntry == null) cachedEntry = startPoint();
         return cachedEntry;
@@ -283,7 +284,14 @@ public class VehicleRoute extends Node3D implements Lane {
         if (name == null || name.isBlank()) return null;
         String nm = name.trim();
         WorldZoneManager mgr = WorldZoneManager.get();
-        if (mgr != null) return mgr.routeByName(nm);
+        if (mgr != null) {
+            // The registry is Lane-typed (a PathLaneRoute can register too), but VehicleRoute's
+            // own explicit nextRoutes/returnRoute chaining only ever makes sense VehicleRoute ->
+            // VehicleRoute (a PathLaneRoute has no such field to chain into) -- cross-type
+            // connectivity is LaneGraph's job, not this method's.
+            Lane found = mgr.routeByName(nm);
+            return found instanceof VehicleRoute vr ? vr : null;
+        }
         Node scene = getTree() != null ? getTree().getCurrentScene() : null;
         return scene != null ? findRoute(scene, nm) : null;
     }

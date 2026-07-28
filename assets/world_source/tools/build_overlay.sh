@@ -23,8 +23,7 @@ trap 'rm -f "${CLEANUP_FILES[@]}" 2>/dev/null || true' EXIT
 NAME="${1:?usage: build_overlay.sh <name>|Overlay_<Name>   (e.g. rainbow_bridge, or Overlay_RainbowBridge to bake the existing .blend without regenerating)}"
 BP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"           # assets/world_source
 REPO="$(cd "$BP/../.." && pwd)"                                 # repo root
-BLENDER="${BLENDER:-blender}"
-GODOT="${GODOT:-/data/danilko/bin/godot.linuxbsd.editor.x86_64.jvm.0.15.0}"
+source "$BP/tools/env.sh"
 RUN=("$GODOT")
 command -v xvfb-run >/dev/null 2>&1 && RUN=(xvfb-run -a "$GODOT")
 RES_DIR="src/main/resources/com/openworld/world/overlays"       # relative to res://
@@ -56,19 +55,35 @@ if ! $BLENDER --background "$BLEND" --python-exit-code 1 --python "$BP/tools/exp
 fi
 $GODOT --headless --path "$REPO" --import >/dev/null 2>&1 || true
 
+# road_kit_authoring combined traffic sidecar (tools/save_lane_kit.py) — an overlay's own
+# lanekit.json lives beside its .blend, same convention as a district's (road_blender_godot.md
+# P6.6). Absent = no lanekit_path property at all (byte-identical throwaway host to before).
+LANEKIT_PATH=""
+if [[ -f "$BP/overlays/$STEM.lanekit.json" ]]; then
+  LANEKIT_PATH="$BP/overlays/$STEM.lanekit.json"
+  echo "   lanekit -> $LANEKIT_PATH"
+fi
+
 echo "── 3/3 bake -> res://$RES_DIR/$STEM.tscn"
 BAKE_TSCN="$REPO/$RES_DIR/_bake_$$_${RANDOM}.tscn"
 CLEANUP_FILES+=("$BAKE_TSCN" "$BAKE_TSCN.import")
-cat > "$BAKE_TSCN" <<EOF
+{
+  cat <<EOF
 [gd_scene format=3 uid="uid://boverlaybake${RANDOM}"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/world/WorldBaker.java" id="1"]
 [node name="BakeOverlay" type="Node" unique_id=900002${RANDOM}]
 script = ExtResource("1")
 source_scene_path = "res://$RES_DIR/$STEM.gltf"
 output_scene_path = "res://$RES_DIR/$STEM.tscn"
+EOF
+  if [[ -n "$LANEKIT_PATH" ]]; then
+    printf 'lanekit_path = "%s"\n' "$LANEKIT_PATH"
+  fi
+  cat <<EOF
 bake_on_ready = true
 quit_when_done = true
 EOF
+} > "$BAKE_TSCN"
 "${RUN[@]}" --path "$REPO" "res://$RES_DIR/$(basename "$BAKE_TSCN")" 2>&1 \
     | grep -iE "WorldBaker: baked" | grep -viE "OCIO" || true
 rm -f "$BAKE_TSCN" "$BAKE_TSCN.import" 2>/dev/null || true

@@ -21,11 +21,12 @@ import math
 
 import bpy
 
-from . import custom_props, paths
+from . import custom_props, live_edit, paths
 from .ops_intersection import (CURB_STYLE_ITEMS, PRESET_ITEMS, TRAFFIC_SIDE_ITEMS, RkaBuildError,
                                 active_marker_position, arm_or_port_anchor, build_curb,
                                 build_intersection_geometry, clear_generated_mesh_objects,
-                                join_meshes, parent_collection_of, _resolve_curb_asset,
+                                join_meshes, local_collection, local_object,
+                                parent_collection_of, _resolve_curb_asset,
                                 _live_edit_target_collection, get_or_create_origin_marker)
 
 _ik = None
@@ -59,10 +60,17 @@ def _populate_segment_mesh(context, coll, p0, p1, lane_width, lanes, lanes_backw
 
     # Short, collection-relative names -- see the matching comment in ops_intersection.py.
     visual_objs = []
+    curb_pts3 = []
     for side, curb_pts in zip(("L", "R"), seg["curbs"]):
         pts3 = [to3(p) for p in curb_pts]
+        curb_pts3.append(pts3)
         visual_objs.append(build_curb(
             "curb_%s" % side, pts3, coll, curb_style, curb_height, curb_thickness))
+
+    # Pavement collision -- same fix/rationale as _populate_segment_mesh_gn (this legacy
+    # point-segment path never even had curb-edge collision, only a visual ribbon -- see
+    # kit_common.colonly_swept_between). Not added to visual_objs (collision proxies never are).
+    paths.kc.colonly_swept_between("pave_%s" % coll.name, curb_pts3[0], curb_pts3[1], coll)
 
     for m in seg["lanes"]:
         pts3 = [to3(p) for p in m["points"]]
@@ -116,7 +124,9 @@ def build_segment_geometry(context, parent_coll, p0_raw, direction_deg, length, 
     p1 = (cx + length * math.cos(rad), cy + length * math.sin(rad))
 
     n = 1
-    while base_name + ("_%03d" % n) in bpy.data.collections:
+    # local_collection (not a bare name-in-bpy.data.collections test) so a linked neighbor's
+    # same-numbered piece never perturbs local auto-numbering -- see its docstring.
+    while local_collection(base_name + ("_%03d" % n)) is not None:
         n += 1
     coll = bpy.data.collections.new(base_name + ("_%03d" % n))
     parent_coll.children.link(coll)
@@ -182,6 +192,7 @@ def build_segment_geometry(context, parent_coll, p0_raw, direction_deg, length, 
             "visual_objs": visual_objs, "export_note": export_note, "warnings": warnings}
 
 
+@live_edit.rebuilding()
 def rebuild_segment_in_place(context, coll):
     """Live-editing counterpart to `build_segment_geometry`: re-derive p0/p1 from segend_A/
     segend_B's CURRENT world positions, bend/bend_z from segbend's position (projected onto the
@@ -652,6 +663,41 @@ class RKA_OT_extend_from_port(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class RKA_OT_select_spine(bpy.types.Operator):
+    """Isolate a GN segment/lane-transition's own `spine_*` Curve object as the sole selection/
+    active object -- the quick way to jump from 'everything selected' (e.g. after
+    `rka.select_piece`) straight to the one editable curve (Tab into Edit Mode to reshape/extend it
+    live -- see the 'Straight Segment' panel section), instead of hunting for it by name in an
+    Outliner/viewport that gets busy fast as a road network grows. `rka_curve_object` already
+    stores the spine's exact (globally-unique, unlike `arm_*`) object name, so this is a direct
+    lookup, not a scan."""
+    bl_idname = "rka.select_spine"
+    bl_label = "Select Spine"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        coll = _live_edit_target_collection(context)
+        return coll is not None and "rka_curve_object" in coll.keys()
+
+    def execute(self, context):
+        coll = _live_edit_target_collection(context)
+        if coll is None:
+            self.report({'ERROR'}, "Activate a segment/lane-transition (or one of its objects) "
+                                    "first")
+            return {'CANCELLED'}
+        spine = local_object(coll.get("rka_curve_object"))
+        if spine is None:
+            self.report({'ERROR'}, "'%s' has no spine object (rka_curve_object missing/stale)"
+                                    % coll.name)
+            return {'CANCELLED'}
+        for o in context.selected_objects:
+            o.select_set(False)
+        spine.select_set(True)
+        context.view_layer.objects.active = spine
+        return {'FINISHED'}
+
+
 def _closest_arm(arms, target_deg):
     """The (name, angle_deg, lanes) entry whose angle is nearest `target_deg` -- used to find
     "the arm pointing roughly this way" without assuming a specific preset's arm-naming
@@ -831,20 +877,151 @@ class RKA_OT_adjust_segment_lanes(bpy.types.Operator):
             # geometry is re-derived from lanes every rebuild); refresh it here before rebuilding
             # curb/lanecl_*, else the curb/lane data would show the new count while the pavement
             # sweep silently kept the OLD width.
-            spine_name = coll.get("rka_curve_object")
-            spine_obj = bpy.data.objects.get(spine_name)
-            if spine_obj is not None and spine_obj.type == 'CURVE':
-                lane_width = coll.get("rka_lane_width", 5.0)
-                fwd = coll.get("rka_lanes", 1) if self.backward else new_val
-                bwd = new_val if self.backward else coll.get("rka_lanes_backward", 1)
-                half_w = max(fwd, bwd) * lane_width
-                for pt in spine_obj.data.splines[0].points:
-                    pt.radius = max(half_w, 1e-3)
-            rebuild_segment_gn_in_place(context, coll)
+            #
+            # This write happens OUTSIDE `rebuild_segment_gn_in_place` (which is itself
+            # `@live_edit.rebuilding()`-guarded) -- so it needs its OWN guard here too, or
+            # `_on_depsgraph_update` sees the spine's geometry change as fresh "dirt" on the very
+            # next tick and silently re-queues a REDUNDANT rebuild of this same collection
+            # ~_DEBOUNCE_SECONDS later via `bpy.app.timers`, entirely unprompted -- the confirmed
+            # cause of a real segfault inside `clear_generated_mesh_objects` (a double rebuild
+            # landing back-to-back right after a single 'Adjust Segment Lanes' click; see
+            # `live_edit.rebuilding`'s docstring for the full crash-log trace).
+            with live_edit.rebuilding():
+                spine_name = coll.get("rka_curve_object")
+                spine_obj = local_object(spine_name)
+                if spine_obj is not None and spine_obj.type == 'CURVE':
+                    lane_width = coll.get("rka_lane_width", 5.0)
+                    fwd = coll.get("rka_lanes", 1) if self.backward else new_val
+                    bwd = new_val if self.backward else coll.get("rka_lanes_backward", 1)
+                    half_w = max(fwd, bwd) * lane_width
+                    for pt in spine_obj.data.splines[0].points:
+                        pt.radius = max(half_w, 1e-3)
+                rebuild_segment_gn_in_place(context, coll)
         else:
             rebuild_segment_in_place(context, coll)
         self.report({'INFO'}, "'%s' %s lanes -> %d" %
                      (coll.name, "backward" if self.backward else "forward", new_val))
+        return {'FINISHED'}
+
+
+class RKA_OT_set_curb_style(bpy.types.Operator):
+    """Change curb style (NONE/BOX/GUTTER/ASSET) on an ALREADY-BUILT GN segment or lane transition
+    and rebuild it in place. The build operators (`RKA_OT_build_straight_segment`/
+    `RKA_OT_build_lane_transition`) only expose Curb Style via Blender's own F9 'Adjust Last
+    Operation' panel -- which silently stops applying to the piece the moment ANY other action
+    runs (a well-known, easy-to-hit Blender behavior, not a bug in this addon) -- so there was
+    previously no reliable way to change curb style on a piece after the fact from the Sidebar
+    panel at all. This is that: a persistent button, always live for whatever piece is currently
+    active/selected, regardless of what happened since it was built.
+
+    `side` picks which lateral edge to change ('BOTH' sets L and R to the same style in one
+    click); `asset_collection` only matters when `style == 'ASSET'` -- set it via THIS operator's
+    own F9 redo panel immediately after clicking (same convention the build operators already use
+    for this field; left blank, ASSET silently produces no curb on that side, same as at build
+    time). Only supports the GN spine-backed piece types (`rka_curve_object` present, which is
+    every segment built via the default 'Build Straight Segment'/'Extend From...' operators, plus
+    every lane transition) -- the older ribbon-based legacy point-segment never gained per-side or
+    ASSET curb support at all (see `_populate_segment_mesh`'s single `curb_style` param)."""
+    bl_idname = "rka.set_curb_style"
+    bl_label = "Set Curb Style"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    side: bpy.props.EnumProperty(
+        name="Side", items=[('L', "Left", ""), ('R', "Right", ""), ('BOTH', "Both", "")],
+        default='BOTH')
+    style: bpy.props.EnumProperty(name="Style", items=CURB_STYLE_ITEMS, default='BOX')
+    asset_collection: bpy.props.StringProperty(
+        name="Curb Asset Piece", description="Name of a linked kit/curb_kit.blend collection's "
+        "mesh object to repeat, when Style is 'Asset'. Use 'Link Curb Kit Library' first, then "
+        "type the name here via THIS operator's F9 panel", default="")
+
+    @classmethod
+    def poll(cls, context):
+        coll = _live_edit_target_collection(context)
+        return coll is not None and "rka_curve_object" in coll.keys()
+
+    def execute(self, context):
+        coll = _live_edit_target_collection(context)
+        if coll is None or "rka_curve_object" not in coll.keys():
+            self.report({'ERROR'}, "No active GN segment/lane-transition piece")
+            return {'CANCELLED'}
+        if self.side in ('L', 'BOTH'):
+            coll["rka_curb_l_style"] = self.style
+        if self.side in ('R', 'BOTH'):
+            coll["rka_curb_r_style"] = self.style
+        if self.style == 'ASSET' and self.asset_collection:
+            coll["rka_curb_asset_collection"] = self.asset_collection
+        from . import ops_intersection as opint
+        opint._rebuild_piece_in_place(context, coll)
+        self.report({'INFO'}, "'%s' curb style (%s) -> %s" % (coll.name, self.side, self.style))
+        return {'FINISHED'}
+
+
+class RKA_OT_adjust_transition_lanes(bpy.types.Operator):
+    """+/- lanes at ONE end of a lane transition (`end='A'`/`'B'`, `backward=False`/`True` for
+    that end's forward/backward count) and immediately rebuild it in place -- the transition
+    counterpart of `RKA_OT_adjust_segment_lanes`/`ops_intersection.RKA_OT_adjust_arm_lanes_out`.
+    Transitions previously had NO dedicated lane-count buttons at all (`RKA_OT_adjust_segment_lanes`
+    explicitly refuses a `rka_lanes_a` collection and tells the user to hand-edit `rka_lanes_a`/
+    `rka_lanes_b`/`rka_lanes_backward_a`/`rka_lanes_backward_b` via the Custom Properties panel
+    instead) -- this is the fix for that.
+
+    Backward counts use the SAME 0-means-symmetric-with-forward sentinel
+    `RKA_OT_adjust_arm_lanes_out`/`intersection_kit.build_lane_transition` already use (0 = "same
+    as THIS end's own forward count", not "zero lanes") -- the first +/- press from 0 seeds the
+    override at the CURRENT effective count before nudging, so it reads as "peel this side off and
+    adjust it independently" rather than jumping straight to 1.
+
+    Forward counts (`lanes_a`/`lanes_b`) are clamped to a MINIMUM OF 1, matching
+    `RKA_OT_build_lane_transition`'s own property constraint (never 0) -- unlike a plain segment,
+    a transition's cross-end taper math (`intersection_kit.build_lane_transition`'s
+    `add_direction`/`_transition_lane_pairs`) pairs ONE direction's two ends together (e.g. a
+    2->1 forward taper connects `lanes_a` directly to `lanes_b`), and going to exactly 0 lanes at
+    only ONE end of that pairing (while the other end is still >0) is not a valid taper shape --
+    it raises inside `_transition_lane_pairs` (confirmed by hand: `lanes_a=3, lanes_b=0` throws).
+    Keeping forward >= 1 at both ends everywhere (as the build operator already guarantees)
+    keeps every reachable backward sentinel resolution nonzero too, so backward never needs its
+    own zero-guard here."""
+    bl_idname = "rka.adjust_transition_lanes"
+    bl_label = "Adjust Transition Lanes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    end: bpy.props.EnumProperty(name="End", items=(('A', "A", ""), ('B', "B", "")), default='A')
+    backward: bpy.props.BoolProperty(default=False)
+    delta: bpy.props.IntProperty(default=1)
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        if obj is not None and obj.users_collection and "rka_lanes_a" in obj.users_collection[0].keys():
+            return True
+        coll = context.view_layer.active_layer_collection.collection
+        return coll is not None and "rka_lanes_a" in coll.keys()
+
+    def execute(self, context):
+        obj = context.active_object
+        if obj is not None and obj.users_collection and "rka_lanes_a" in obj.users_collection[0].keys():
+            coll = obj.users_collection[0]
+        else:
+            coll = context.view_layer.active_layer_collection.collection
+
+        fwd_key = "rka_lanes_a" if self.end == 'A' else "rka_lanes_b"
+        bwd_key = "rka_lanes_backward_a" if self.end == 'A' else "rka_lanes_backward_b"
+        forward = int(coll.get(fwd_key, 1))
+        backward_stored = int(coll.get(bwd_key, 0))
+
+        if self.backward:
+            base = backward_stored if backward_stored > 0 else forward
+            new_forward, new_backward = forward, max(0, min(3, base + self.delta))
+        else:
+            new_forward, new_backward = max(1, min(3, forward + self.delta)), backward_stored
+
+        coll[fwd_key] = new_forward
+        coll[bwd_key] = new_backward
+        rebuild_lane_transition_in_place(context, coll)
+        label = "symmetric (0)" if new_backward == 0 else str(new_backward)
+        self.report({'INFO'}, "'%s' end %s -> forward %d, backward %s" %
+                     (coll.name, self.end, new_forward, label))
         return {'FINISHED'}
 
 
@@ -915,6 +1092,7 @@ def _populate_segment_mesh_gn(context, coll, spine_obj, lane_width, lanes, lanes
     seg = k.build_segment_from_spine(spine, lane_width, lanes, lanes_backward, segment_id="SEG",
                                       traffic_side=traffic_side)
 
+    curb_matkey = coll.get("rka_curb_matkey", "concrete")
     visual_objs = [spine_obj]
     left_pts, right_pts = seg["curbs"]
     left_name, right_name = "curb_%s_L" % coll.name, "curb_%s_R" % coll.name
@@ -926,7 +1104,9 @@ def _populate_segment_mesh_gn(context, coll, spine_obj, lane_width, lanes, lanes
         left = paths.kc.curb_loop(
             left_name, [(p[0], p[1], p[2], 0.0) for p in left_pts], coll,
             curb_style=curb_l_style, curb_height=curb_height, curb_thickness=curb_thickness,
-            closed=False)
+            matkey=curb_matkey, closed=False)
+        if left is not None:
+            paths.kc.colonly_mesh_evaluated(left, coll)
     if curb_r_style == 'ASSET':
         right = build_curb(right_name, [(p[0], p[1], p[2]) for p in right_pts], coll, 'ASSET',
                             curb_height, curb_thickness, asset_obj=curb_asset_obj,
@@ -936,8 +1116,19 @@ def _populate_segment_mesh_gn(context, coll, spine_obj, lane_width, lanes, lanes
         right = paths.kc.curb_loop(
             right_name, [(p[0], p[1], p[2], 0.0) for p in right_pts], coll,
             curb_style=curb_r_style, curb_height=curb_height, curb_thickness=curb_thickness,
-            closed=False)
+            matkey=curb_matkey, closed=False)
+        if right is not None:
+            paths.kc.colonly_mesh_evaluated(right, coll)
     visual_objs += [o for o in (left, right) if o is not None]
+
+    # Pavement collision -- an exact copy of the spine's own evaluated (GN-swept) mesh, not a
+    # separately-computed approximation; see kit_common.colonly_mesh_evaluated. `name="pave_..."`
+    # keeps the clear_generated_mesh_objects prefix convention (the spine itself is "spine_...",
+    # never deleted/recreated by a rebuild -- see that function's docstring). Deliberately NOT
+    # added to visual_objs/join (same convention as the curb colonlies above): the driving surface
+    # itself between the two curb lines had no collision at all before this (only the curb EDGES
+    # did), so a vehicle in the middle of the road fell through to whatever's below.
+    paths.kc.colonly_mesh_evaluated(spine_obj, coll, name="pave_%s" % coll.name)
 
     for m in seg["lanes"]:
         tag = "%s%s_L%d" % (m["from"], m["to"], m["lane_in"])
@@ -1008,7 +1199,9 @@ def _build_segment_from_points(context, parent_coll, pts, lane_width, lanes, lan
     half_w = max(lanes, lanes_backward) * lane_width
 
     n = 1
-    while base_name + ("_%03d" % n) in bpy.data.collections:
+    # local_collection (not a bare name-in-bpy.data.collections test) so a linked neighbor's
+    # same-numbered piece never perturbs local auto-numbering -- see its docstring.
+    while local_collection(base_name + ("_%03d" % n)) is not None:
         n += 1
     coll = bpy.data.collections.new(base_name + ("_%03d" % n))
     parent_coll.children.link(coll)
@@ -1022,7 +1215,12 @@ def _build_segment_from_points(context, parent_coll, pts, lane_width, lanes, lan
     # start point on every rebuild (see rebuild_segment_gn_in_place).
     get_or_create_origin_marker(coll, tuple(pts[0]))
 
-    spine_obj = paths.kc.road_spine("spine_%s" % coll.name, pts, coll, half_w, matkey="asphalt")
+    # coll.get(...) here is always the "asphalt" default at fresh-build time (coll is brand new,
+    # no custom props yet) -- see RKA_OT_set_piece_matkey/set_road_spine_material for the
+    # after-the-fact change path (this object's own material can't just be re-derived on rebuild
+    # like curb/lane data, since the spine itself is never deleted/recreated).
+    spine_obj = paths.kc.road_spine("spine_%s" % coll.name, pts, coll, half_w,
+                                     matkey=coll.get("rka_pave_matkey", "asphalt"))
 
     curb_asset_obj = _resolve_curb_asset(curb_asset_collection)
     visual_objs = _populate_segment_mesh_gn(
@@ -1106,7 +1304,7 @@ def _resolve_curve_object(context, name):
     """The Curve object `RKA_OT_build_segment_from_curve` should follow: by explicit `name` if
     given, else the active object if it's a Curve. None if neither resolves."""
     if name:
-        obj = bpy.data.objects.get(name)
+        obj = local_object(name)
         return obj if obj is not None and obj.type == 'CURVE' else None
     obj = context.active_object
     return obj if obj is not None and obj.type == 'CURVE' else None
@@ -1205,6 +1403,7 @@ class RKA_OT_build_segment_from_curve(bpy.types.Operator):
         return {'FINISHED'}
 
 
+@live_edit.rebuilding()
 def rebuild_segment_gn_in_place(context, coll):
     """Live-editing counterpart to `_build_segment_from_points`: finds this segment's own spine
     object (`rka_curve_object`, living INSIDE `coll` -- not an external reference) and re-derives
@@ -1222,7 +1421,7 @@ def rebuild_segment_gn_in_place(context, coll):
     spine_name = coll.get("rka_curve_object")
     if not spine_name:
         return
-    spine_obj = bpy.data.objects.get(spine_name)
+    spine_obj = local_object(spine_name)
     if spine_obj is None or spine_obj.type != 'CURVE':
         return
     spine = _spine_control_points(spine_obj)
@@ -1325,6 +1524,7 @@ def _populate_transition_visuals(context, coll, spine_obj, seg, lane_width, curb
     `RKA_OT_build_lane_transition` and `rebuild_lane_transition_in_place` so they can't drift
     apart, same reasoning as every other paired build/rebuild function in this addon. See
     `_populate_segment_mesh_gn`'s docstring for the ASSET-style curb_asset_* parameters."""
+    curb_matkey = coll.get("rka_curb_matkey", "concrete")
     visual_objs = [spine_obj]
     left_pts, right_pts = seg["curbs"]
     left_name, right_name = "curb_%s_L" % coll.name, "curb_%s_R" % coll.name
@@ -1336,7 +1536,9 @@ def _populate_transition_visuals(context, coll, spine_obj, seg, lane_width, curb
         left = paths.kc.curb_loop(
             left_name, [(p[0], p[1], p[2], 0.0) for p in left_pts], coll,
             curb_style=curb_l_style, curb_height=curb_height, curb_thickness=curb_thickness,
-            closed=False)
+            matkey=curb_matkey, closed=False)
+        if left is not None:
+            paths.kc.colonly_mesh_evaluated(left, coll)
     if curb_r_style == 'ASSET':
         right = build_curb(right_name, [(p[0], p[1], p[2]) for p in right_pts], coll, 'ASSET',
                             curb_height, curb_thickness, asset_obj=curb_asset_obj,
@@ -1346,8 +1548,16 @@ def _populate_transition_visuals(context, coll, spine_obj, seg, lane_width, curb
         right = paths.kc.curb_loop(
             right_name, [(p[0], p[1], p[2], 0.0) for p in right_pts], coll,
             curb_style=curb_r_style, curb_height=curb_height, curb_thickness=curb_thickness,
-            closed=False)
+            matkey=curb_matkey, closed=False)
+        if right is not None:
+            paths.kc.colonly_mesh_evaluated(right, coll)
     visual_objs += [o for o in (left, right) if o is not None]
+
+    # Pavement collision -- same fix/rationale as _populate_segment_mesh_gn: an exact copy of the
+    # spine's own evaluated mesh, which already tapers correctly (GN_RoadProfile's per-point
+    # Radius), so the collision tapers exactly as precisely as the visual does, not approximated
+    # from left_pts/right_pts distance.
+    paths.kc.colonly_mesh_evaluated(spine_obj, coll, name="pave_%s" % coll.name)
 
     for m in seg["lanes"]:
         lane_tag = ("L%d" % m["lane_in"] if m["lane_in"] == m["lane_out"]
@@ -1461,7 +1671,9 @@ class RKA_OT_build_lane_transition(bpy.types.Operator):
             return {'CANCELLED'}
 
         n = 1
-        while ("Transition_%03d" % n) in bpy.data.collections:
+        # local_collection (not a bare name-in-bpy.data.collections test) so a linked neighbor's
+        # same-numbered piece never perturbs local auto-numbering -- see its docstring.
+        while local_collection("Transition_%03d" % n) is not None:
             n += 1
         coll = bpy.data.collections.new("Transition_%03d" % n)
         parent_coll.children.link(coll)
@@ -1473,7 +1685,8 @@ class RKA_OT_build_lane_transition(bpy.types.Operator):
         half_w_a = max(self.lanes_a, lanes_backward_a or self.lanes_a) * self.lane_width
         half_w_b = max(self.lanes_b, lanes_backward_b or self.lanes_b) * self.lane_width
         spine_obj = paths.kc.road_spine("spine_%s" % coll.name, [p0, p1], coll,
-                                         [half_w_a, half_w_b], matkey="asphalt")
+                                         [half_w_a, half_w_b],
+                                         matkey=coll.get("rka_pave_matkey", "asphalt"))
 
         curb_asset_obj = _resolve_curb_asset(self.curb_asset_collection)
         visual_objs = _populate_transition_visuals(
@@ -1511,6 +1724,7 @@ class RKA_OT_build_lane_transition(bpy.types.Operator):
         return {'FINISHED'}
 
 
+@live_edit.rebuilding()
 def rebuild_lane_transition_in_place(context, coll):
     """Live-editing counterpart to `RKA_OT_build_lane_transition`: re-derives p0/p1 from the
     piece's own spine object's CURRENT first/last evaluated points, re-applies the (stored, not
@@ -1524,7 +1738,7 @@ def rebuild_lane_transition_in_place(context, coll):
     spine_name = coll.get("rka_curve_object")
     if not spine_name:
         return
-    spine_obj = bpy.data.objects.get(spine_name)
+    spine_obj = local_object(spine_name)
     if spine_obj is None or spine_obj.type != 'CURVE':
         return
     spine = _spine_control_points(spine_obj)
@@ -1576,8 +1790,9 @@ def rebuild_lane_transition_in_place(context, coll):
 
 
 CLASSES = (RKA_OT_build_straight_segment, RKA_OT_extend_from_arm, RKA_OT_extend_from_port,
-           RKA_OT_insert_intersection_on_segment,
-           RKA_OT_adjust_segment_lanes, RKA_OT_build_segment_from_curve, RKA_OT_build_lane_transition,
+           RKA_OT_select_spine, RKA_OT_insert_intersection_on_segment,
+           RKA_OT_adjust_segment_lanes, RKA_OT_adjust_transition_lanes, RKA_OT_set_curb_style,
+           RKA_OT_build_segment_from_curve, RKA_OT_build_lane_transition,
            RKA_OT_add_marking_gap, RKA_OT_clear_marking_gaps)
 
 
