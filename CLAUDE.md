@@ -286,13 +286,13 @@ lever is baking districts as sub-chunk scenes, not shrinking the budget.
 `geometry_path` `.tscn` when it exists — the baked districts are multi-MB *text* scenes whose
 parse dominates stream-in time even on a worker thread. `DistrictBinaryConverter`
 (`hosts/ConvertDistricts.tscn`, one-shot batch job in the `WorldBaker` idiom, mtime-skips
-unchanged files) resaves them all; `tools/build_piece.sh` runs it automatically as its final step
+unchanged files) resaves them all; `blender/tools/build_piece.sh` runs it automatically as its final step
 (so a fresh bake is never shadowed by a stale `.scn`) — re-run it manually only after baking a
 district by hand. `.scn` files are derived artifacts (delete-and-regenerate safe); the `.tscn`
 stays the source of truth. No master re-bake or `geometry_path` edit is needed for the preference
 to kick in.
 
-**District authoring seam (see `assets/world_source/AUTHORING_GUIDE.md`):** a district rebuild
+**District authoring seam (see `blender/AUTHORING_GUIDE.md`):** a district rebuild
 regenerates the `.blend` **in place** — only the procedural collections (`STREET`, `MARKERS`,
 `STREET_LOD_LOW`, `ROADS_SRC`) are wiped; `MANUAL` (hand-authored content, exported + baked) and
 `NEIGHBOR_REF` (read-only library-linked neighbour/master context from `tools/link_neighbors.py`,
@@ -378,18 +378,25 @@ name grouping).
 direction, 336 lanes + 568 connectors + 49 junctions; `radius_fn` forces stop lines to the 21 m
 paved footprint) + `backbone_deck()`, an always-resident **collision-only deck** under every
 arterial (without it, cars outside streamed districts fall into the void — PLATEAU districts have
-no always-resident ground) + `safety_floor()`, a world-spanning `-colonly` slab (top **Z = −2.5**,
-just below the bay floor −2 / deck ramps ≥ −1 so it never pokes above drivable geometry) in the
-same exported `ARTDECK` collection — the catch-all guaranteeing nothing free-falls out of the
-world no matter what ground a district ships. Authored in the master blend (debuggable there),
-NOT runtime Java. The *accurate* per-district ground is PLATEAU terrain: `extract_plateau.py
---dem` (CityGML `dem:TINRelief`) → `plateau_import.import_terrain` builds a real sloped ground
-mesh (visual + collision) and drapes roads onto it — districts extracted without `--dem` have no
-continuous ground and rely on the floor. District internals — hand-authored curves in a git-diffable sidecar
-`districts/<piece>.roads.json`: draw `road_<name>` curves over the PLATEAU road meshes, set
-`lanes`/`oneway`/`class` props, run `tools/save_roads.py`; the rebuild re-imports them into
-`ROADS_SRC` (excluded from export) and generates the namespaced (`<piece>__…`) traffic layer. No
-sidecar = arterials-only district.
+no always-resident ground) in the same exported `ARTDECK` collection. Authored in the master
+blend (debuggable there), NOT runtime Java. **There is deliberately no world-spanning safety
+floor** (`build_world.safety_floor()`/`--with-floor` and the per-district
+`add_ground_safety_plane()` were both removed outright) — a collision-only floor a
+meter-plus below visual ground silently trapped `Character`/`Player` bodies with no recovery
+path, since neither has any fall-out-of-world safety net (unlike vehicles, which
+`WorldZoneManager.maintainTraffic` reclaims below `Y = -30`). Falling off a road or off the
+ArtDeck now falls through, same as any other gap in authored ground — see
+`AUTHORING_GUIDE.md` for the districts/void-cell design this replaced it with. The *accurate*
+per-district ground is PLATEAU terrain: originally imported via `extract_plateau.py --dem`
+(CityGML `dem:TINRelief`) → `plateau_import.import_terrain`, which built a real sloped ground mesh
+(visual + collision) and draped roads onto it — districts extracted without `--dem` have no
+continuous ground and fall through in the gaps (no safety-floor catch anymore, see above). **That
+extraction/import tooling was removed** once every PLATEAU-derived district/overlay/building asset
+had already produced its permanent output `.blend` — see `AUTHORING_GUIDE.md` §2/§6. Terrain is
+now hand-owned exactly like everything else; road authoring specifically is the
+`road_kit_authoring` addon's mesh-first pieces + `.lanekit.json` sidecar (see "Ambient traffic &
+the road graph" below), not the old `road_<name>` centerline/`.roads.json` pipeline that predates
+it.
 
 **Spawning:** region markers carry `traffic_count`/`traffic_route` → `WorldBaker.buildZone` builds a
 `VehicleSpawnConfig`. `traffic_route` is a route-name **prefix** (`"art_"`, or `"<piece>__"` once a
@@ -421,6 +428,48 @@ see PLAN.md "Roads & Traffic v2".
 (the scene-embedded sub-resource's JVM script binds late, so the setter receives a plain
 `Resource`) — harmless: every spawn path immediately overwrites `characterInfo` with a fresh
 instance per the shared-sub-resource identity rule.
+
+### Terrain & seam alignment (ground is NOT a flat plane)
+
+Each district's real ground is a **DEM-derived heightfield** — originally imported via
+`extract_plateau.py --dem` → `lib/plateau_import.py: import_terrain` (one continuous sloped mesh
+per district, visual + collision in one; that extraction/import code has since been removed, see
+`AUTHORING_GUIDE.md` §2/§6 — every district's terrain is now a permanent, hand-owned part of its
+`.blend`, this just describes how it originally got its shape) — genuinely non-flat wherever DEM
+data was extracted, not a flat square. What makes adjacent districts agree at their shared edge is
+a **theme-elevation-step + taper system**, not literal shared/welded geometry:
+
+- `lib/world_grid.py`'s `THEMES` dict assigns each of the 7 region themes a flat **baseline**
+  elevation (harbor 0, city 2, resid 4, rural 10, mtn 40, snow 90, industry 0) — a coarse
+  staircase across the whole map.
+- The original import blended the real (sloped) terrain height toward that baseline within a
+  border margin of every district edge (`plateau_import.seam_taper()`, no longer present but
+  baked into every existing district's terrain), so the interior keeps real terrain shape but
+  every edge lands at a known, neighbor-predictable value.
+- A `.seam.json` sidecar per district (36 of the 39 district files have one) records each edge's world
+  position, elevation, the neighbor's expected elevation, and route-name chaining;
+  `tools/check_seams.py` (pure Python, no Blender needed) verifies two adjacent `.seam.json` files
+  agree — this is the existing, already-automated seam-alignment QA step, run whenever
+  neighboring districts change.
+
+So cross-district alignment for elevation is a **solved, working system** — districts don't need
+literal vertex-welded ground, they need matching boundary *values* (elevation, route endpoints),
+which the taper + `.seam.json` + `check_seams.py` trio already enforces.
+
+**Road/geometry alignment across a shared seam is a separate, still-manual concern.** Roads are
+authored in one of two ways with very different edit-ability: catalog kit pieces
+(`blender/addons/road_kit_authoring/ops_placement.py`) are Collection-Instance Empties (transform-only,
+mesh owned by the shared `assets/world_source/kit/lane_kit.blend` library); intersections/segments
+(`ops_intersection.py`/`ops_segment.py`) generate **wholly local mesh/curve geometry** per
+district — this is the standard going forward for every district's roads (District_industry_5_1's
+hand-authored `MANUAL` collection is the reference example). Because Blender's Library Override
+system can move/rotate a linked object as a whole but can never edit linked mesh/curve vertex
+data, aligning road geometry that genuinely spans two districts' seam needs either (a) read-only
+whole-world context while editing one district locally (`tools/link_neighbors.py`, extendable to
+every built district, not just immediate neighbors), or (b) a temporary scoped multi-district
+edit session — append (not link) just the districts that need reconciling into one scratch file,
+edit their `MANUAL` content together with full Edit Mode access, then write each district's
+result back into its own file. See `AUTHORING_GUIDE.md` for the current tooling around this.
 
 ### AI spatial perception — StimulusManager (`com.openworld.world`, AutoLoad, E2)
 
