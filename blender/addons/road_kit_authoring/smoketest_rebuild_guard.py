@@ -125,21 +125,24 @@ def main():
     print("rebuild_guard smoketest: adjust_arm_lanes's direct rebuild_intersection_in_place call "
           "doesn't re-queue a redundant rebuild")
 
-    # freeze_for_move + unfreeze_and_rebuild path (RKA_OT_unfreeze_and_rebuild -> _rebuild_piece_in_place)
+    # _rebuild_piece_in_place called directly (the same path live_edit._propagate_links uses for
+    # its per-iteration cascade rebuild -- freeze/unfreeze used to be another direct caller of
+    # this same function before it was removed; this still exercises the identical guard
+    # requirement: a direct rebuild call outside `_flush_rebuilds` must not get picked up as
+    # fresh "dirt" and re-queue a redundant second rebuild).
     for o in bpy.data.objects:
         o.select_set(False)
     arm_n.select_set(True)
     context.view_layer.objects.active = arm_n
-    bpy.ops.rka.freeze_for_move()
     arm_n.location.x += 3.0
     context.view_layer.update()
     live_edit._pending_inter.clear()
     live_edit._timer_scheduled = False
-    ret = bpy.ops.rka.unfreeze_and_rebuild()
-    _assert(ret == {'FINISHED'}, "unfreeze_and_rebuild did not finish: %s" % (ret,))
+    with live_edit.rebuilding():
+        opint._rebuild_piece_in_place(context, coll)
     _settle(context)
-    _assert_nothing_pending("unfreeze_and_rebuild")
-    print("rebuild_guard smoketest: unfreeze_and_rebuild's direct rebuild call doesn't re-queue a "
+    _assert_nothing_pending("_rebuild_piece_in_place")
+    print("rebuild_guard smoketest: a direct _rebuild_piece_in_place call doesn't re-queue a "
           "redundant rebuild")
 
     print("SMOKETEST OK")

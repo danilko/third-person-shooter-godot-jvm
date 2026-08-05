@@ -5,6 +5,7 @@ import bpy
 
 from . import ops_group_edit as ge
 from . import ops_intersection as opint
+from . import ops_segment
 from . import ops_world_session as ws
 from . import paths
 import session_common as sc
@@ -202,12 +203,34 @@ class RKA_PT_road_kit(bpy.types.Panel):
         box.operator("rka.rebuild_from_handles", icon='FILE_REFRESH')
         box.label(text="(manual fallback -- use if a drag doesn't auto-update)")
 
-        box.operator("rka.select_piece", icon='RESTRICT_SELECT_OFF')
-        box.label(text="(needs something piece-related already active -- click a piece below")
-        box.label(text="first if nothing is selected yet)")
         row = box.row(align=True)
-        row.operator("rka.freeze_for_move", icon='PINNED')
-        row.operator("rka.unfreeze_and_rebuild", icon='FILE_REFRESH')
+        row.operator("rka.select_piece", icon='RESTRICT_SELECT_OFF')
+        row.operator("rka.delete_piece", icon='TRASH')
+        box.label(text="(needs something piece-related already active -- click a piece below")
+        box.label(text="first if nothing is selected yet). Delete removes the WHOLE piece --")
+        box.label(text="markers included, confirmation prompt first.")
+
+        box = layout.box()
+        box.label(text="Connect Pieces (live connectivity)", icon='LINKED')
+        box.label(text="'Extend From Arm'/'Extend From Port' already link the new piece to the")
+        box.label(text="arm/port it started from -- drag that arm/port later and the extension")
+        box.label(text="follows automatically, no manual re-adjustment. To link two pieces built")
+        box.label(text="separately: select the TARGET marker (arm_*/port_*/origin) first, then")
+        box.label(text="Shift-click the DEPENDENT's origin marker (or arm_*) LAST so it's active,")
+        row = box.row(align=True)
+        row.operator("rka.connect_markers", icon='LINKED')
+        row.operator("rka.disconnect_marker", icon='UNLINKED')
+        box.label(text="then run Connect. Dragging a linked piece away from its target breaks")
+        box.label(text="the link automatically; Disconnect breaks it without moving anything.")
+
+        box = layout.box()
+        box.label(text="Ground / Road Alignment", icon='MOD_BOOLEAN')
+        box.operator("rka.cut_ground_under_road", icon='MOD_BOOLEAN')
+        box.label(text="Select ALL terrain/ground meshes to cut FIRST (if the ground under a")
+        box.label(text="road is split across several meshes, e.g. a visual + a separate -col")
+        box.label(text="mesh, select every one -- it cuts EACH selected mesh, none are skipped")
+        box.label(text="or auto-picked), then shift-click the road piece LAST so it's active,")
+        box.label(text="then run. Applies a real boolean cut -- undo reverses it.")
 
         pieces = sorted((c for c in bpy.data.collections
                           if c.library is None and opint._is_piece_collection(c)),
@@ -221,33 +244,45 @@ class RKA_PT_road_kit(bpy.types.Panel):
                 op.coll_name = p.name
         box.label(text="To move/rotate a WHOLE piece: select any part of it (a marker, or")
         box.label(text="even a generated curb/pad/spine), 'Select Piece' (selects every object")
-        box.label(text="in it) -- or 'Freeze For Move' first if you want ZERO risk of live-edit")
-        box.label(text="regenerating anything mid-drag -- then Grab/Rotate freely. Both set the")
-        box.label(text="origin marker active + Pivot Point to 'Active Element' (the 3D cursor is")
-        box.label(text="never touched, so other tools relying on it are unaffected).")
+        box.label(text="in it), then Grab/Rotate freely -- sets the origin marker active +")
+        box.label(text="Pivot Point to 'Active Element' (the 3D cursor is never touched, so")
+        box.label(text="other tools relying on it are unaffected).")
         box.label(text="Don't change Pivot Point away from 'Active Element' while rotating --")
         box.label(text="'3D Cursor'/'Median Point' both pivot on the wrong point for this addon.")
-        box.label(text="If frozen, 'Unfreeze & Rebuild' when done to bring geometry back in")
-        box.label(text="sync and restore your previous Pivot Point setting.")
 
-        row = box.row(align=True)
-        row.operator("rka.freeze_all_for_move", icon='PINNED')
-        row.operator("rka.unfreeze_all_and_rebuild", icon='FILE_REFRESH')
-        box.label(text="Moving/rotating MANY pieces at once (e.g. the whole file): 'Freeze ALL'")
-        box.label(text="first -- doing this with live-edit on WILL crash Blender. Set your own")
-        box.label(text="Pivot Point (e.g. 3D Cursor at your pivot), select everything, Grab/")
-        box.label(text="Rotate/Move freely, then 'Unfreeze ALL & Rebuild'.")
+        box.operator("rka.select_road_network", icon='RESTRICT_SELECT_OFF')
+        box.label(text="Moving/rotating MANY pieces at once (e.g. the whole file): 'Select")
+        box.label(text="Whole Road Network' (set your own Pivot Point first, e.g. 3D Cursor at")
+        box.label(text="your pivot), then Grab/Rotate/Move freely -- every piece's geometry")
+        box.label(text="updates in place with no freeze step needed.")
 
         box.prop(rka, "show_traffic_indicators")
         box.label(text="Blue arrow = incoming (arriving) lanes, orange = outgoing")
         box.label(text="(departing) -- one pair per arm/segment end, updates live.")
+        box.prop(rka, "show_lane_indices")
+        box.label(text="Per-lane 'L0'/'L1'/... tags at each connection point -- independent")
+        box.label(text="of the arrows above, no lanecl_* objects needed.")
 
         active_obj = context.active_object
         active_coll_le = context.view_layer.active_layer_collection.collection
         if active_obj is not None and "rka_arm_name" in active_obj.keys():
             row = box.row(align=True)
-            row.label(text="Arm '%s' lanes: %d" %
-                       (active_obj["rka_arm_name"], active_obj.get("rka_arm_lanes", 1)))
+            row.label(text="Arm '%s': %.1f deg" %
+                       (active_obj["rka_arm_name"], active_obj.get("rka_arm_angle", 0.0)))
+            row.operator("rka.set_arm_angle", text="Set Angle...")
+            row = box.row(align=True)
+            row.operator("rka.nudge_arm_angle", text="-5°").delta_deg = -5.0
+            row.operator("rka.nudge_arm_angle", text="-1°").delta_deg = -1.0
+            row.operator("rka.nudge_arm_angle", text="+1°").delta_deg = 1.0
+            row.operator("rka.nudge_arm_angle", text="+5°").delta_deg = 5.0
+            row = box.row(align=True)
+            row.operator("rka.aim_arm_at", text="Match Arm To Selected")
+            box.label(text="(select the target first, Shift-click the arm last)")
+            box.label(text="Moves this arm EXACTLY onto the target's position AND rotates it")
+            box.label(text="to EXACTLY match the target's own tangent, both at once -- other")
+            box.label(text="arms/the intersection center are never touched.")
+            row = box.row(align=True)
+            row.label(text="Lanes: %d" % active_obj.get("rka_arm_lanes", 1))
             row.operator("rka.adjust_arm_lanes", text="", icon='REMOVE').delta = -1
             row.operator("rka.adjust_arm_lanes", text="", icon='ADD').delta = 1
             lanes_out = active_obj.get("rka_arm_lanes_out", 0)
@@ -256,6 +291,12 @@ class RKA_PT_road_kit(bpy.types.Panel):
                        ("symmetric" if lanes_out == 0 else str(lanes_out)))
             row.operator("rka.adjust_arm_lanes_out", text="", icon='REMOVE').delta = -1
             row.operator("rka.adjust_arm_lanes_out", text="", icon='ADD').delta = 1
+            row = box.row(align=True)
+            row.label(text="Median: %.1fm" % active_obj.get("rka_arm_median_width", 0.0))
+            row.operator("rka.adjust_arm_median_width", text="", icon='REMOVE').delta = -1.0
+            row.operator("rka.adjust_arm_median_width", text="", icon='ADD').delta = 1.0
+            box.label(text="(this ONE arm's own median -- a segment linked here tapers its")
+            box.label(text="median against this value, e.g. down to 0 on an untouched arm)")
             cur_dir = active_obj.get("rka_arm_oneway", "") or 'BOTH'
             row = box.row(align=True)
             row.label(text="Direction:")
@@ -271,14 +312,25 @@ class RKA_PT_road_kit(bpy.types.Panel):
                              and "rka_p0" in active_coll_le.keys() else None))
         if seg_coll_le is not None:
             row = box.row(align=True)
-            row.label(text="Fwd: %d" % seg_coll_le.get("rka_lanes", 1))
+            row.label(text="Fwd (start): %d" % seg_coll_le.get("rka_lanes", 1))
             row.operator("rka.adjust_segment_lanes", text="", icon='REMOVE').delta = -1
             row.operator("rka.adjust_segment_lanes", text="", icon='ADD').delta = 1
             row = box.row(align=True)
-            row.label(text="Back: %d" % seg_coll_le.get("rka_lanes_backward", 1))
+            row.label(text="Back (start): %d" % seg_coll_le.get("rka_lanes_backward", 1))
             op = row.operator("rka.adjust_segment_lanes", text="", icon='REMOVE')
             op.delta, op.backward = -1, True
             op = row.operator("rka.adjust_segment_lanes", text="", icon='ADD')
+            op.delta, op.backward = 1, True
+        if seg_coll_le is not None and "rka_curve_object" in seg_coll_le.keys():
+            row = box.row(align=True)
+            row.label(text="Fwd (end): %d" % ops_segment._effective_end_lanes(seg_coll_le, False))
+            row.operator("rka.adjust_segment_lanes_end", text="", icon='REMOVE').delta = -1
+            row.operator("rka.adjust_segment_lanes_end", text="", icon='ADD').delta = 1
+            row = box.row(align=True)
+            row.label(text="Back (end): %d" % ops_segment._effective_end_lanes(seg_coll_le, True))
+            op = row.operator("rka.adjust_segment_lanes_end", text="", icon='REMOVE')
+            op.delta, op.backward = -1, True
+            op = row.operator("rka.adjust_segment_lanes_end", text="", icon='ADD')
             op.delta, op.backward = 1, True
         if seg_coll_le is not None and "rka_lanes_a" not in seg_coll_le.keys():
             box.prop(rka, "marking_dash_length")
@@ -292,6 +344,18 @@ class RKA_PT_road_kit(bpy.types.Panel):
         if seg_coll_le is not None and "rka_curve_object" in seg_coll_le.keys():
             _draw_curb_style(box, seg_coll_le)
             _draw_material_controls(box, seg_coll_le)
+            row = box.row(align=True)
+            row.label(text="Median (start): %.2fm" % seg_coll_le.get("rka_median_width", 0.0))
+            op = row.operator("rka.adjust_median_width", text="", icon='REMOVE')
+            op.delta = -1.0
+            op = row.operator("rka.adjust_median_width", text="", icon='ADD')
+            op.delta = 1.0
+            row = box.row(align=True)
+            row.label(text="Median (end): %.2fm" % ops_segment._effective_end_median(seg_coll_le))
+            op = row.operator("rka.adjust_median_width_end", text="", icon='REMOVE')
+            op.delta = -1.0
+            op = row.operator("rka.adjust_median_width_end", text="", icon='ADD')
+            op.delta = 1.0
 
         transition_coll_le = (active_obj.users_collection[0]
                                if active_obj is not None and active_obj.users_collection
@@ -369,6 +433,13 @@ class RKA_PT_road_kit(bpy.types.Panel):
         box.label(text="LaneGraph auto-links coincident endpoints at bake time.")
         box.label(text="Each end gets a 'port_A'/'port_B' arrow -- click one, then 'Extend")
         box.label(text="From Port' below, to continue with the same lanes/curb settings.")
+        box.label(text="Lane-count TAPER (was the separate 'Lane Transition' tool): F9 after")
+        box.label(text="building, set 'Lanes Forward/Backward (End)' -- e.g. a 2-lane street")
+        box.label(text="narrowing into 1 -- Align 'Right' keeps the curb-side lane straight")
+        box.label(text="and merges the rest into it, 'Left' mirrors that. 'Median/Sidewalk")
+        box.label(text="Width (End)' taper the separation/sidewalk width the same way, even")
+        box.label(text="with lane count unchanged. 'Extend From Arm'/'Extend From Port' below")
+        box.label(text="have the same End fields, for starting a taper exactly at a marker.")
 
         box = layout.box()
         box.label(text="Segment From Curve", icon='CURVE_PATH')
@@ -383,14 +454,6 @@ class RKA_PT_road_kit(bpy.types.Panel):
         box.label(text="Mode), not the original curve, to reshape/extend it live.")
 
         box = layout.box()
-        box.label(text="Lane Transition (merge/drop)", icon='MOD_EDGESPLIT')
-        box.operator("rka.build_lane_transition", icon='ADD')
-        box.label(text="Tapers Lanes A -> Lanes B over its length (pavement + curb taper")
-        box.label(text="together) -- e.g. a 2-lane street narrowing into a 1-lane arm.")
-        box.label(text="Align 'Right' keeps the curb-side lane straight and merges the")
-        box.label(text="rest into it (a real lane-drop); 'Left' mirrors that.")
-
-        box = layout.box()
         box.label(text="Extend / Insert", icon='CON_FOLLOWPATH')
         active_coll = context.view_layer.active_layer_collection.collection
         active_obj = context.active_object
@@ -403,13 +466,11 @@ class RKA_PT_road_kit(bpy.types.Panel):
             box.label(text="Active: port '%s' on '%s'" % (active_obj["rka_port"], owner))
             box.operator("rka.extend_from_port", icon='ADD')
             box.operator("rka.build_intersection", icon='ADD', text="Build Intersection Here")
-            box.operator("rka.build_lane_transition", icon='ADD', text="Build Transition Here")
         elif is_arm_empty:
             box.label(text="Active: arm '%s' (angle %.1f deg)" %
                        (active_obj["rka_arm_name"], active_obj.get("rka_arm_angle", 0.0)))
             box.operator("rka.extend_from_arm", icon='ADD')
             box.operator("rka.build_intersection", icon='ADD', text="Build Intersection Here")
-            box.operator("rka.build_lane_transition", icon='ADD', text="Build Transition Here")
         elif is_intersection:
             box.label(text="Active: '%s' (arms: %s)" % (active_coll.name, ", ".join(active_coll["rka_arm_names"])))
             box.label(text="(or click an 'arm_*' Empty instead of typing 'Arm' below)")

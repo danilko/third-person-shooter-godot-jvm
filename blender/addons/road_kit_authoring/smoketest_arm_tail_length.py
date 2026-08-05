@@ -2,9 +2,9 @@
 """
 smoketest_arm_tail_length.py -- headless verification for the per-arm tail-length fix in
 rebuild_intersection_in_place: an arm deliberately snapped to a non-default distance from the
-origin (simulating Grab+Ctrl-snapping it onto an external segment's port while the intersection is
-frozen) must keep EXACTLY that distance after Unfreeze & Rebuild, while every untouched arm stays
-on the shared tail_length -- the concrete fix for "a careful snap gets discarded on unfreeze".
+origin (simulating Grab+Ctrl-snapping it onto an external segment's port) must keep EXACTLY that
+distance after a rebuild, while every untouched arm stays on the shared tail_length -- the
+concrete fix for "a careful snap gets discarded on rebuild".
 
 RUN: blender --background --python addons/road_kit_authoring/smoketest_arm_tail_length.py
 """
@@ -61,24 +61,17 @@ def main():
             "fresh build: arm N's rka_arm_tail_length custom prop should be 12.0, got %s"
             % arm_n.get("rka_arm_tail_length"))
 
-    # --- Freeze, simulate a Grab+Ctrl-snap that moves arm N to an ARBITRARY new distance (6.5m,
-    # shorter than the shared 12.0) WITHOUT changing its angle, then Unfreeze & Rebuild. Arm N's
-    # distance must come out at exactly 6.5 -- NOT reset to 12.0 -- while E/S/W (never touched)
-    # must stay at exactly 12.0.
-    for o in bpy.data.objects:
-        o.select_set(False)
-    arm_n.select_set(True)
-    context.view_layer.objects.active = arm_n
-    ret = bpy.ops.rka.freeze_for_move()
-    _assert(ret == {'FINISHED'}, "freeze_for_move did not finish: %s" % (ret,))
-
+    # --- Simulate a Grab+Ctrl-snap that moves arm N to an ARBITRARY new distance (6.5m, shorter
+    # than the shared 12.0) WITHOUT changing its angle, then rebuild. Arm N's distance must come
+    # out at exactly 6.5 -- NOT reset to 12.0 -- while E/S/W (never touched) must stay at exactly
+    # 12.0. Rebuild called directly (matching every other smoketest in this suite) since
+    # `bpy.app.timers` doesn't run in `--background` mode.
     new_dist = 6.5
     arm_n.location.x = marker.location.x + new_dist   # angle stays 0 deg (arm N is +X)
     arm_n.location.y = marker.location.y
     context.view_layer.update()
 
-    ret = bpy.ops.rka.unfreeze_and_rebuild()
-    _assert(ret == {'FINISHED'}, "unfreeze_and_rebuild did not finish: %s" % (ret,))
+    opint.rebuild_intersection_in_place(context, coll)
     coll = bpy.data.collections.get(coll.name)
     marker = opint.get_or_create_origin_marker(coll)
     arm_n = next(o for o in coll.objects if o.get("rka_arm_name") == "N")
@@ -88,7 +81,7 @@ def main():
 
     n_dist = _dist_from_origin(arm_n, marker)
     _assert(abs(n_dist - new_dist) < 1e-3,
-            "arm N's deliberately-snapped distance (%.2f) should survive Unfreeze & Rebuild "
+            "arm N's deliberately-snapped distance (%.2f) should survive a rebuild "
             "unchanged, got %.3f (old behavior would force it back to 12.0)" % (new_dist, n_dist))
     _assert(abs(arm_n.get("rka_arm_tail_length", -1.0) - new_dist) < 1e-3,
             "arm N's rka_arm_tail_length custom prop should be updated to %.2f, got %s"
@@ -99,7 +92,7 @@ def main():
                 "untouched arm %s should stay at the shared tail_length (12.0), got %.3f"
                 % (name, d))
     print("arm_tail_length smoketest: arm N kept its manually-snapped distance (%.2f) through "
-          "Unfreeze & Rebuild; E/S/W stayed at the shared default (12.0)" % n_dist)
+          "a rebuild; E/S/W stayed at the shared default (12.0)" % n_dist)
 
     # --- The stored arm_tail_lengths array on the collection must reflect the per-arm values too
     # (mirrors rka_arm_angles -- see custom_props.write_build_settings).
