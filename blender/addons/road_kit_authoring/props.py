@@ -75,6 +75,12 @@ class RKA_SceneSettings(bpy.types.PropertyGroup):
         description="Draw a blue 'IN' arrow and an orange 'OUT' arrow at every arm_* marker and "
                      "segment endpoint, showing which physical lane(s) are arriving vs. departing "
                      "(see traffic_viz.py) -- a live, no-rebuild-needed viewport overlay")
+    show_lane_indices: bpy.props.BoolProperty(
+        name="Show Lane Index Tags", default=False,
+        description="Draw a short tick + 'L0'/'L1'/... label at each INDIVIDUAL lane's own "
+                     "position at every arm/segment connection point (see traffic_viz.py) -- the "
+                     "viewport-visible replacement for the old lanecl_* lane-centerline curves "
+                     "(removed 2026-08, export-redundant), independent of the traffic arrows above")
     default_traffic_side: bpy.props.EnumProperty(
         name="Default Traffic Side", items=TRAFFIC_SIDE_ITEMS, default='LEFT',
         description="Seeds every build operator's own 'Traffic Side' field (still F9-tweakable "

@@ -95,6 +95,12 @@ def main():
         lx, ly = o.location.x - ox, o.location.y - oy
         o.location.x = ox + lx * ca - ly * sa
         o.location.y = oy + lx * sa + ly * ca
+        if "rka_arm_name" in o.keys():
+            # A real Blender Rotate on a multi-object selection spins each object's OWN rotation
+            # by the same amount, not just its position around the pivot -- arm angle is now
+            # authoritative via rotation_euler.z (see ensure_arm_angle_migrated), so the
+            # simulation must do the same or this would incorrectly read as "arm didn't rotate."
+            o.rotation_euler.z += rad
     opint.rebuild_intersection_in_place(context, coll)
     coll = bpy.data.collections.get(coll.name)
     angles_after_rotate = _sorted_angles(coll)

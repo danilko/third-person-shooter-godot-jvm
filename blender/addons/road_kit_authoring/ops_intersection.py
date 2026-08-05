@@ -28,6 +28,7 @@ import bpy
 
 from . import custom_props, live_edit, paths
 from .props import TRAFFIC_SIDE_ITEMS
+import session_common as sc   # lib/ already on sys.path via paths.py, same import ops_world_session.py uses
 
 _ik = None
 
@@ -172,16 +173,64 @@ def join_meshes(context, objs, name):
     return joined
 
 
-def clear_generated_mesh_objects(coll):
-    """Remove every curb_*/pad_*/pave_*/lanecl_*/ribbon_*/mesh_* object (+ its now-orphaned
-    mesh/curve data) from `coll`, leaving marker Empties (arm_*/segend_*/segbend_*) untouched. The
+def clear_generated_mesh_objects(coll, keep_gn_boundaries=False):
+    """Remove every curb_*/pad_*/pave_*/lanecl_*/ribbon_*/mesh_*/sidewalk_*/prop_* object (+ its
+    now-orphaned mesh/curve data) from `coll`, leaving marker Empties (arm_*/segend_*/segbend_*)
+    untouched. The
     "delete the old generated geometry, keep the live-edit drag handles" step shared by both
     in-place rebuild paths (`rebuild_intersection_in_place`, `ops_segment.rebuild_segment_in_place`).
     `pave_*` is the pavement collision proxy (`kit_common.colonly_swept_between`) -- without it in
-    this list, a rebuild would leave the old one orphaned and pile up a new one on every drag."""
-    prefixes = ("curb_", "pad_", "pave_", "lanecl_", "ribbon_", "mesh_", "mark_")
+    this list, a rebuild would leave the old one orphaned and pile up a new one on every drag.
+
+    `keep_gn_boundaries` (2026-08, the crash-surface fix): when True, an object identified as one
+    of these update-in-place-capable kinds is SPARED here but stamped `_rka_touched = False`
+    instead of `True` -- a "provisionally kept, prove yourself" mark, not an unconditional keep:
+      1. a `_poly_curve_with_radius`-built boundary curve -- has a "Pad" or "Curb" GN modifier.
+      2. a collision proxy -- name ends `-colonly` AND carries `proxy_for` (so this can never
+         accidentally spare an unrelated mesh that merely happens to share the suffix). Covers
+         both the export-time GN proxies (`colonly_mesh_evaluated`) AND the legacy point-segment
+         path's own live pavement proxy (`colonly_swept_between`/`colonly_swept`) -- both stamp
+         `proxy_for`, so no separate condition is needed for the legacy one.
+      3. an ASSET-style curb instancer -- name starts with `curb_` (this addon's curb/median
+         ASSET-row naming, see `curb_asset_row`'s callers) AND has a "GN" modifier; deliberately
+         NOT any other `prop_`/`sidewalk_` instancer, which haven't been verified safe to spare.
+      4. a `lanecl_*` lane-centerline data curve (`poly_curve`) -- plain CURVE type.
+      5. a `mark_*` lane-marking mesh (`marking_ribbon`) -- plain MESH type.
+      6. a legacy BOX/GUTTER-style curb wall (`swept_wall`/`swept_profile`, the point-segment
+         path's own curb, e.g. `curb_L`/`curb_R`) -- name starts with `curb_` AND is a plain MESH
+         with NO "GN" modifier (distinguishes it from #3's ASSET instancer, which always has one,
+         and from a GN-based `curb_loop` object, which is a CURVE with a "Curb" modifier and
+         already matches #1).
+      7. a `ribbon_*` legacy pavement strip (`flat_ribbon`) -- plain MESH type.
+    Every update-in-place builder (`junction_pad`/`curb_loop`/`colonly_mesh_evaluated`/
+    `instancer`/`poly_curve`/`marking_ribbon`/`swept_wall`/`swept_profile`/`flat_ribbon`/
+    `colonly_swept`) re-stamps `_rka_touched = True` on whichever object it actually reuses or
+    creates this pass. The catch this closes: a count that can SHRINK between two rebuilds (fewer
+    lanes -> fewer `lanecl_*`, median width dropped to 0 -> its curb objects never regenerated,
+    curb style switched away from ASSET) previously would have left the now-unwanted old object
+    behind forever, since nothing ever calls its builder again to delete it.
+    `sweep_untouched_boundaries` (called by the rebuild function AFTER population finishes)
+    deletes anything still `_rka_touched == False` -- provisionally spared here, never
+    reconfirmed, so genuinely stale. Callers that pass `keep_gn_boundaries=True` only ever do so
+    from the live-drag hot path (`rebuild_intersection_in_place`/`rebuild_segment_gn_in_place`/
+    `ops_segment.rebuild_segment_in_place`), and MUST call `sweep_untouched_boundaries` afterward
+    or stale objects leak; every other caller keeps the unconditional-delete default and never
+    needs the sweep."""
+    prefixes = ("curb_", "pad_", "pave_", "lanecl_", "ribbon_", "mesh_", "mark_", "sidewalk_",
+                "prop_")
     for obj in list(coll.objects):
         if not obj.name.startswith(prefixes):
+            continue
+        if keep_gn_boundaries and (
+                obj.modifiers.get("Pad") is not None or obj.modifiers.get("Curb") is not None
+                or (obj.name.endswith("-colonly") and obj.get("proxy_for") is not None)
+                or (obj.name.startswith("curb_") and obj.modifiers.get("GN") is not None)
+                or (obj.name.startswith("lanecl_") and obj.type == 'CURVE')
+                or (obj.name.startswith("mark_") and obj.type == 'MESH')
+                or (obj.name.startswith("curb_") and obj.type == 'MESH'
+                    and obj.modifiers.get("GN") is None)
+                or (obj.name.startswith("ribbon_") and obj.type == 'MESH')):
+            obj["_rka_touched"] = False
             continue
         data = obj.data
         bpy.data.objects.remove(obj, do_unlink=True)
@@ -190,6 +239,23 @@ def clear_generated_mesh_objects(coll):
                 bpy.data.meshes.remove(data)
             elif isinstance(data, bpy.types.Curve):
                 bpy.data.curves.remove(data)
+
+
+def sweep_untouched_boundaries(coll):
+    """The other half of `clear_generated_mesh_objects(coll, keep_gn_boundaries=True)`: delete
+    any surviving-by-default object still stamped `_rka_touched == False` -- provisionally spared
+    by that call, but its builder was never called again this pass to reconfirm it (a shrunk lane/
+    median/curb-style count, see that function's docstring). Call this ONCE, after population
+    fully finishes, from every rebuild function that passed `keep_gn_boundaries=True`."""
+    for obj in list(coll.objects):
+        if obj.get("_rka_touched") is False:
+            data = obj.data
+            bpy.data.objects.remove(obj, do_unlink=True)
+            if data is not None and data.users == 0:
+                if isinstance(data, bpy.types.Mesh):
+                    bpy.data.meshes.remove(data)
+                elif isinstance(data, bpy.types.Curve):
+                    bpy.data.curves.remove(data)
 
 
 def active_marker_position(context):
@@ -394,10 +460,9 @@ def _populate_intersection_mesh(context, coll, arms, kerb_radius, tail_length, s
                                  segments=segments)
     if pad is not None:
         visual_objs.append(pad)
-        # Collision proxy for the pad footprint -- an exact copy of the pad's own EVALUATED
-        # (post-GN-modifier) mesh, so it matches the real filleted/curved visual precisely instead
-        # of approximating it. See kit_common.colonly_mesh_evaluated.
-        paths.kc.colonly_mesh_evaluated(pad, coll)
+        # `-colonly` collision proxy no longer baked here (2026-08) -- zero authoring-time value,
+        # moved to export-time (`kit_common.bake_colonly_proxies`, called from
+        # `tools/export_world.py`) as the single most expensive/crash-prone live rebuild op.
     # One curb object PER CORNER (build_junction_curb_segments already excludes every arm's own
     # tail-cap and every through-pair -- an arm opening must never have a curb wall across its own
     # lanes) instead of a single loop spanning the whole boundary.
@@ -413,20 +478,16 @@ def _populate_intersection_mesh(context, coll, arms, kerb_radius, tail_length, s
                                        curb_style=curb_style, curb_height=curb_height,
                                        curb_thickness=curb_thickness, matkey=curb_matkey,
                                        segments=segments, closed=False)
-            if curb is not None:
-                # Curb-wall collision -- an exact copy of the curb's own evaluated mesh (see
-                # kit_common.colonly_mesh_evaluated), not a separately-swept approximation.
-                paths.kc.colonly_mesh_evaluated(curb, coll)
+            # `-colonly` collision proxy no longer baked here -- see the pad's matching comment
+            # above; `bake_colonly_proxies` picks up every "Curb"-modifier object generically.
         if curb is not None:
             visual_objs.append(curb)
 
-    for m in movements:
-        pts3 = [to3(p) for p in m["points"]]
-        lane_tag = ("L%d" % m["lane_in"] if m["lane_in"] == m["lane_out"]
-                    else "L%dto%d" % (m["lane_in"], m["lane_out"]))
-        tag = "%s%s_%s" % (m["from"], m["to"], lane_tag)
-        paths.kc.poly_curve("lanecl_%s" % tag, pts3, coll, loop=False, lane_width=lane_width,
-                             oneway=True, end_behavior='CHAIN')
+    # `lanecl_*` lane-centerline curves are no longer built here (2026-08): confirmed export-
+    # redundant -- `tools/save_lane_kit.py` recomputes lane centerlines directly from `movements`/
+    # spine + `rka_*` metadata, never from these live objects -- and they carried no visual mesh
+    # of their own, so they added live-edit object-churn cost with zero authoring-time payoff.
+    # See `traffic_viz.py`'s per-lane tag overlay for the viewport-visible replacement.
 
     if join_visual_mesh and visual_objs:
         joined = join_meshes(context, visual_objs, "mesh_%s" % coll.name)
@@ -477,19 +538,58 @@ def get_or_create_origin_marker(coll, fallback_xyz=None):
     return marker
 
 
+def ensure_arm_angle_migrated(arm_obj, ox, oy):
+    """One-time migration (2026-08, decoupling an arm's angle from its marker POSITION --
+    user-reported, confirmed directly in world_session.blend: "move arm w... edge start to
+    rotate... even though [an unrelated] segment... is original in correct location"). Before
+    this fix, an arm's angle was always recomputed fresh from its marker's POSITION (`atan2`
+    relative to the intersection origin) on every rebuild -- oversensitive to ordinary hand-drag
+    imprecision (a drag meant only to adjust distance almost never lands perfectly radially, so it
+    always changed the angle at least slightly too), which cascaded into
+    `live_edit.move_dependent_marker` rigidly rotating a WHOLE linked segment -- including its
+    already-correctly-placed FAR end -- by that same small, unintended angle on every drag.
+
+    Angle is now read directly from the arm Empty's own `rotation_euler.z` (position only ever
+    supplies its DISTANCE from origin, via plain Euclidean `hypot` -- unaffected by this change,
+    and not oversensitive the way angle was) -- a pure Grab/translate (Blender's G key) never
+    touches the rotation channel at all, so it can no longer change the angle by even a fraction
+    of a degree; only an explicit Rotate (R key) or `RKA_OT_set_arm_angle` does.
+
+    `rka_arm_angle_migrated` stays False for every arm authored/dragged before this fix, whose
+    `rotation_euler.z` was only ever set ONCE at creation time and never kept in sync (angle used
+    to come from position instead) -- it can be arbitrarily stale relative to wherever the arm has
+    actually been dragged to since. This seeds `rotation_euler.z` from the CURRENT position-
+    derived angle -- preserving the intersection's existing visual state exactly -- the ONE time
+    this runs per arm, before rotation becomes authoritative from then on. A freshly-created arm
+    (`build_intersection_geometry`/`RKA_OT_add_arm`) stamps the flag itself at creation (position
+    and rotation already agree by construction), so this is really only ever exercised by
+    already-existing content loaded from before this fix. No-op (and does not stamp the flag) if
+    the arm currently sits exactly on the origin -- a degenerate position has no angle to migrate
+    from; the next rebuild after it moves off-origin will retry."""
+    if arm_obj.get("rka_arm_angle_migrated", False):
+        return
+    dx, dy = arm_obj.location.x - ox, arm_obj.location.y - oy
+    if math.hypot(dx, dy) < 1e-9:
+        return
+    arm_obj.rotation_euler = (0.0, 0.0, math.atan2(dy, dx))
+    arm_obj["rka_arm_angle_migrated"] = True
+
+
 @live_edit.rebuilding()
 def rebuild_intersection_in_place(context, coll):
-    """Live-editing counterpart to `build_intersection_geometry`: re-derive each arm's ANGLE from
-    its `arm_*` marker Empty's CURRENT position (bearing from the LIVE origin marker -- see
-    `get_or_create_origin_marker`), then rebuild curb/lane objects in place -- no new collection,
-    the arm Empties themselves are the drag handles ("bevel-style" adjustment). Called from
-    `live_edit.py`'s `depsgraph_update_post` handler whenever an arm Empty's transform changes.
+    """Live-editing counterpart to `build_intersection_geometry`: read each arm's ANGLE from its
+    `arm_*` marker Empty's own `rotation_euler.z` (see `ensure_arm_angle_migrated` for why NOT
+    position) and its DISTANCE from the marker's position (bearing from the LIVE origin marker --
+    see `get_or_create_origin_marker`), then rebuild curb/lane objects in place -- no new
+    collection, the arm Empties themselves are the drag handles ("bevel-style" adjustment).
+    Called from `live_edit.py`'s `depsgraph_update_post` handler whenever an arm Empty's transform
+    changes.
 
     Each arm's RADIUS (distance from origin) IS now taken from the drag, same as its angle --
     `intersection_kit.Arm.tail_length` is a per-arm override (`eff_tail_length`), so an arm
     dragged/snapped to an arbitrary distance (e.g. Grab+Ctrl-snapped onto an external segment's
-    port while the intersection is frozen -- see `RKA_OT_freeze_for_move`/`RKA_OT_select_arm`)
-    keeps EXACTLY that distance after rebuild instead of being forced back onto one shared radius.
+    port -- see `RKA_OT_select_arm`) keeps EXACTLY that distance after rebuild instead of being
+    forced back onto one shared radius.
     An arm that was never deliberately moved off the shared `tail_length` simply keeps reporting
     that same distance, so this is a strict generalization of the old "arms share one radius"
     behavior, not a separate mode. The per-arm value is persisted on the arm Empty itself
@@ -560,20 +660,26 @@ def rebuild_intersection_in_place(context, coll):
 
     arms = []
     for o in arm_empties:
+        ensure_arm_angle_migrated(o, ox, oy)
         dx, dy = o.location.x - ox, o.location.y - oy
         dist = math.hypot(dx, dy)
         if dist < 1e-9:
             continue   # dropped exactly on the origin mid-drag -- degenerate, skip this arm
-        angle_deg = math.degrees(math.atan2(dy, dx)) % 360.0
+        angle_deg = math.degrees(o.rotation_euler.z) % 360.0
         oneway = o.get("rka_arm_oneway", "") or None
         lanes_out_raw = int(o.get("rka_arm_lanes_out", 0))
+        # tail_pos = this arm's REAL current local position, always -- for an ordinary (never
+        # off-ray-matched) arm this is just `dist * direction(angle_deg)` anyway (byte-identical
+        # to before `Arm.tail_pos` existed), so passing it unconditionally changes nothing for the
+        # common case; see `Arm.tail_center`'s docstring for the case where it's genuinely off-ray.
         arms.append(k.Arm(o["rka_arm_name"], angle_deg, lane_width, int(o.get("rka_arm_lanes", 1)),
                            oneway=oneway, lanes_out=lanes_out_raw or None,
-                           traffic_side=traffic_side, tail_length=dist))
+                           traffic_side=traffic_side, tail_length=dist, tail_pos=(dx, dy),
+                           median_width=float(o.get("rka_arm_median_width", 0.0))))
     if len(arms) < 3:
         return
 
-    clear_generated_mesh_objects(coll)
+    clear_generated_mesh_objects(coll, keep_gn_boundaries=True)
     try:
         _, _, _, tail_length = _populate_intersection_mesh(
             context, coll, arms, kerb_radius, tail_length, segments, lane_width, curb_style,
@@ -581,6 +687,8 @@ def rebuild_intersection_in_place(context, coll):
             curb_asset_obj=curb_asset_obj, curb_asset_spacing=curb_asset_spacing)
     except RkaBuildError:
         return   # e.g. two arms briefly coincide mid-drag -- leave geometry as the last-good state
+    sweep_untouched_boundaries(coll)   # delete anything provisionally spared above but never
+                                        # reconfirmed this pass (see clear_generated_mesh_objects)
     # `tail_length` above is now the EFFECTIVE value (floored to recommended_tail_length inside
     # _populate_intersection_mesh) -- re-snapping arm markers and persisting rka_tail_length below
     # must use THIS value, not the original request, or the markers/stored setting would silently
@@ -595,17 +703,26 @@ def rebuild_intersection_in_place(context, coll):
     # itself just measured FROM this same marker's current position above), it mainly exists to
     # correct float drift and to keep every OTHER arm's stored `rka_arm_tail_length` in sync after
     # a `_populate_intersection_mesh` call that grew the shared scalar for wide-arm clearance.
+    #
+    # 2026-08 EXCEPTION: an arm stamped `rka_arm_tail_pos_locked` (`RKA_OT_aim_arm_at`, matched
+    # exactly onto an external target's position -- see `Arm.tail_pos`) is skipped here entirely.
+    # Without this, THIS SAME re-snap would silently pull the marker back onto its clean angle-ray
+    # on the very next rebuild, undoing the match it took an explicit operator to make -- the
+    # user-reported regression ("arm w position should adjust to match that segment" kept not
+    # sticking). A locked arm's position is only ever changed by another explicit user action
+    # (a further drag, or `RKA_OT_set_arm_angle`/`RKA_OT_nudge_arm_angle`, which clear the lock).
     by_name = {a.name: a for a in arms}
     for o in arm_empties:
         a = by_name.get(o["rka_arm_name"])
         if a is None:
             continue
         eff_tail = a.tail_length if a.tail_length is not None else tail_length
-        d = k.arm_dir(a.angle_deg)
-        want = (ox + d[0] * eff_tail, oy + d[1] * eff_tail, z)
-        cur = (o.location.x, o.location.y, o.location.z)
-        if math.dist(want, cur) > 1e-4:
-            o.location = want
+        if not o.get("rka_arm_tail_pos_locked"):
+            d = k.arm_dir(a.angle_deg)
+            want = (ox + d[0] * eff_tail, oy + d[1] * eff_tail, z)
+            cur = (o.location.x, o.location.y, o.location.z)
+            if math.dist(want, cur) > 1e-4:
+                o.location = want
         o["rka_arm_angle"] = a.angle_deg
         o["rka_arm_tail_length"] = eff_tail
 
@@ -615,6 +732,7 @@ def rebuild_intersection_in_place(context, coll):
         arm_lanes_out=[a.lanes_out or 0 for a in arms],
         arm_tail_lengths=[(a.tail_length if a.tail_length is not None else tail_length)
                            for a in arms],
+        arm_medians=[a.median_width for a in arms],
         # Keep the fallback-seed prop in sync with the LIVE marker on every rebuild -- otherwise
         # it freezes at the build-time position forever, and if the marker object is ever lost
         # (accidental delete, a linked-duplicate collision -- see get_or_create_origin_marker's
@@ -722,6 +840,7 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
         arm_obj["rka_arm_oneway"] = a.oneway or ""
         arm_obj["rka_arm_lanes_out"] = a.lanes_out or 0
         arm_obj["rka_arm_tail_length"] = tail_length
+        arm_obj["rka_arm_angle_migrated"] = True   # fresh -- position/rotation already agree
         coll.objects.link(arm_obj)
 
     # Permanent record of exactly how this was built -- native custom properties on the
@@ -743,6 +862,20 @@ def build_intersection_geometry(context, parent_coll, cursor, preset, rotation_d
         origin=[cx, cy, cz_raw])
 
     warnings = []
+    # `recommended_tail_length`'s numerical search grows `tail_length` to contain every turn
+    # movement inside the pad boundary -- but that search can only widen STRAIGHT tail-caps along
+    # each arm's own axis; it cannot enlarge a DIFFERENT, unrelated corner's own fillet radius. Two
+    # (or more) very wide arms meeting near a much narrower third arm can produce a movement whose
+    # real diagonal sweep no amount of tail_length growth resolves (confirmed: plateaus above the
+    # margin instead of converging) -- surface that here so the artist knows to widen kerb_radius,
+    # add more lanes to the narrow arm, or accept a straighter/manually-overridden lane_map instead
+    # of silently shipping geometry with a lane visibly poking outside the pavement.
+    remaining_overshoot = k.worst_movement_overshoot(arms, kerb_radius, tail_length)
+    if remaining_overshoot > 2.0:
+        warnings.append(
+            "One or more wide-arm turn lanes still reach ~%.1fm outside the pad after "
+            "auto-widening (tail_length=%.1f) -- try a larger Kerb Radius, or check whether two "
+            "very wide arms meet near a much narrower one." % (remaining_overshoot, tail_length))
     export_note = ""
     if export_path:
         try:
@@ -793,11 +926,11 @@ class RKA_OT_build_intersection(bpy.types.Operator):
     lanes: bpy.props.IntProperty(
         name="Lanes Per Direction", description="Default lane count applied to every arm, "
         "overridden per-arm by 'Lanes: Arm N' below (0 = use this default)",
-        default=1, min=1, max=3)
-    lanes_arm1: bpy.props.IntProperty(name="Lanes: Arm 1", default=0, min=0, max=3)
-    lanes_arm2: bpy.props.IntProperty(name="Lanes: Arm 2", default=0, min=0, max=3)
-    lanes_arm3: bpy.props.IntProperty(name="Lanes: Arm 3", default=0, min=0, max=3)
-    lanes_arm4: bpy.props.IntProperty(name="Lanes: Arm 4", default=0, min=0, max=3)
+        default=1, min=1, max=4)
+    lanes_arm1: bpy.props.IntProperty(name="Lanes: Arm 1", default=0, min=0, max=4)
+    lanes_arm2: bpy.props.IntProperty(name="Lanes: Arm 2", default=0, min=0, max=4)
+    lanes_arm3: bpy.props.IntProperty(name="Lanes: Arm 3", default=0, min=0, max=4)
+    lanes_arm4: bpy.props.IntProperty(name="Lanes: Arm 4", default=0, min=0, max=4)
     kerb_radius: bpy.props.FloatProperty(
         name="Kerb Radius",
         description="Curb corner fillet radius, in meters. Real-world urban minimum is ~3.5 m "
@@ -868,7 +1001,7 @@ class RKA_OT_build_intersection(bpy.types.Operator):
             _, _, heading_deg, lanes_forward, _, _ = anchor
             self.rotation_deg = (heading_deg + 180.0) % 360.0
             if lanes_forward > 0:
-                self.lanes_arm1 = max(1, min(3, lanes_forward))
+                self.lanes_arm1 = max(1, min(4, lanes_forward))
         return self.execute(context)
 
     def execute(self, context):
@@ -952,8 +1085,7 @@ def _is_piece_collection(coll):
 
 
 def _live_edit_target_collection(context):
-    """The collection a manual 'Rebuild From Handles'/'Freeze For Move'/'Unfreeze & Rebuild'
-    should act on. Resolution order:
+    """The collection a manual 'Rebuild From Handles' should act on. Resolution order:
 
     1. ANY object the active object's own collection membership already identifies as a piece --
        not just a marker Empty (arm/segend/segbend/port/origin): a `curb_*`/`pad_*`/`lanecl_*`/
@@ -961,10 +1093,11 @@ def _live_edit_target_collection(context):
        every marker of that same piece, so this alone covers clicking (or box-selecting, making
        active) ANY part of a piece -- previously only the small marker Empties resolved, so
        selecting/making-active one of the far more numerous and visually larger generated mesh
-       objects (very plausible during a "select everything, Grab" pass) made Freeze For Move's
-       poll() silently fail, and a user unaware of that would proceed to move it unfrozen -- the
-       exact crash Freeze exists to prevent, for segments/transitions in particular where there's
-       no obvious single handle as prominent as an intersection's `arm_*` arrows.
+       objects (very plausible during a "select everything, Grab" pass) made the old Freeze For
+       Move's poll() silently fail (that operator, and the crash-avoidance need for it, no longer
+       exist -- see `clear_generated_mesh_objects`'s `keep_gn_boundaries` docstring for the actual
+       fix -- but this broader resolution is still the right behavior for any manual rebuild
+       trigger regardless).
     2. Back-compat fallback for an object that (unusually) isn't linked into its own piece's
        collection directly: the old marker-tag check, or an `rka_curve_object`-name search across
        every collection for a Curve object.
@@ -995,10 +1128,11 @@ def _live_edit_target_collection(context):
 
 def _rebuild_piece_in_place(context, coll):
     """Dispatch to the right rebuild function for whatever kind of piece `coll` is -- shared by
-    `RKA_OT_rebuild_from_handles` and `RKA_OT_unfreeze_and_rebuild` so the two can never drift
-    apart on which check runs first (lane-transition's own discriminator, `rka_lanes_a`, MUST be
-    checked before the plain-curve-segment one, since a transition also carries
-    `rka_curve_object` and would otherwise silently un-taper)."""
+    every caller that needs to rebuild an arbitrary piece by its collection alone
+    (`RKA_OT_rebuild_from_handles`, `live_edit._propagate_links`'s per-iteration cascade rebuild)
+    so they can never drift apart on which check runs first (lane-transition's own discriminator,
+    `rka_lanes_a`, MUST be checked before the plain-curve-segment one, since a transition also
+    carries `rka_curve_object` and would otherwise silently un-taper)."""
     from . import ops_segment
     if "rka_arm_names" in coll.keys():
         rebuild_intersection_in_place(context, coll)
@@ -1173,168 +1307,6 @@ class RKA_OT_set_curb_matkey(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class RKA_OT_freeze_for_move(bpy.types.Operator):
-    """Set `rka_live_edit = False` on the active piece so its WHOLE collection can be selected
-    (Outliner > right-click the collection > Select Objects -- more reliable than a viewport
-    box-select, which can miss a small marker) and Grab/Rotate/moved as a rigid group with ZERO
-    risk of the live-edit handler deleting/recreating objects mid-drag: while frozen,
-    `live_edit.py`'s depsgraph handler skips this collection entirely (see its
-    `coll.get("rka_live_edit", True)` checks), so NOTHING regenerates during or after the move,
-    no matter how the transform is done or how long it takes. This is the direct fix for a crash
-    debouncing alone couldn't fully close: a depsgraph-driven rebuild, even delayed, can still
-    land while Blender's own modal Transform operator is still holding the selection (a slow drag,
-    a mid-drag pause) -- freezing removes the rebuild from the picture entirely for the whole
-    operation, instead of trying to time around it.
-
-    Run `Unfreeze & Rebuild` once you're done moving it -- geometry stays exactly as it was
-    (untouched) until then, and rebuilds correctly at the new location/orientation because
-    `get_or_create_origin_marker`'s live origin object moved right along with everything else.
-
-    Also makes the origin marker the ACTIVE object and temporarily switches 'Transform Pivot
-    Point' (viewport header) to 'Active Element' (restored to whatever it was on Unfreeze) --
-    Blender's Rotate (R) pivots around whichever point that setting names, and TWO of its other
-    options are traps for this addon specifically:
-    - '3D Cursor' pivots around wherever the cursor happens to be left (often world origin),
-      swinging the whole piece through a huge arc around an unrelated point instead of spinning it
-      in place -- and this addon deliberately never MOVES the cursor itself to "fix" that, since
-      other tools/plugins rely on its position for their own placement at the same time.
-    - 'Median Point' looks like the fix but ISN'T here: most of a piece's own objects
-      (`curb_*`/`pad_*`/`lanecl_*`/`mark_*`/`ribbon_*`/`spine_*`) are built with their absolute
-      world-space shape baked directly into the mesh/curve data while the OBJECT ITSELF is left at
-      local (0,0,0) (see `kit_common.road_spine`/`_poly_curve_with_radius`) -- so the median of
-      every selected object's own `.location` is dragged toward world origin by however many such
-      objects happen to be selected, reproducing nearly the same bad pivot as '3D Cursor'.
-    'Active Element' sidesteps both: it pivots on exactly ONE object's `.location` -- the origin
-    marker, which this operator makes active for you -- regardless of the cursor or how many
-    zero-origin mesh objects are also selected. If the active object later changes (e.g. a
-    viewport box-select re-picks one under the mouse instead of using the Outliner's 'Select
-    Objects'), just click the origin marker again before rotating. Avoid 'Individual Origins'
-    entirely -- it spins each object about its own point instead of orbiting the group, breaking
-    the rigid-move assumption this whole workflow depends on."""
-    bl_idname = "rka.freeze_for_move"
-    bl_label = "Freeze For Move"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        coll = _live_edit_target_collection(context)
-        return coll is not None and coll.get("rka_live_edit", True)
-
-    def execute(self, context):
-        coll = _live_edit_target_collection(context)
-        coll["rka_live_edit"] = False
-        marker = get_or_create_origin_marker(coll, custom_props.read_origin(coll))
-        ts = context.scene.tool_settings
-        if marker is not None:
-            coll["rka_prev_pivot_point"] = ts.transform_pivot_point
-            ts.transform_pivot_point = 'ACTIVE_ELEMENT'
-            marker.select_set(True)
-            context.view_layer.objects.active = marker
-        self.report({'INFO'}, "'%s' frozen -- Pivot Point set to 'Active Element' (its origin "
-                               "marker, now active) so Rotate pivots on the piece itself, not the "
-                               "3D cursor/world origin. Outliner > right-click its collection > "
-                               "Select Objects, then Grab/Rotate freely. Run 'Unfreeze & Rebuild' "
-                               "when done" % coll.name)
-        return {'FINISHED'}
-
-
-class RKA_OT_unfreeze_and_rebuild(bpy.types.Operator):
-    """Clear `rka_live_edit` (re-enabling automatic live-edit) on the active piece, restore
-    whatever 'Transform Pivot Point' was set to before `Freeze For Move` changed it, and run ONE
-    explicit rebuild immediately -- safe here because it runs as a normal operator call, not from
-    inside a depsgraph handler mid-drag. Use after `Freeze For Move` once you've finished
-    repositioning the piece."""
-    bl_idname = "rka.unfreeze_and_rebuild"
-    bl_label = "Unfreeze & Rebuild"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        coll = _live_edit_target_collection(context)
-        return coll is not None and not coll.get("rka_live_edit", True)
-
-    def execute(self, context):
-        coll = _live_edit_target_collection(context)
-        coll["rka_live_edit"] = True
-        prev_pivot = coll.get("rka_prev_pivot_point")
-        if prev_pivot is not None:
-            context.scene.tool_settings.transform_pivot_point = prev_pivot
-            del coll["rka_prev_pivot_point"]
-        _rebuild_piece_in_place(context, coll)
-        self.report({'INFO'}, "'%s' unfrozen and rebuilt at its new position" % coll.name)
-        return {'FINISHED'}
-
-
-class RKA_OT_freeze_all_for_move(bpy.types.Operator):
-    """Bulk `Freeze For Move`: freezes EVERY local road_kit_authoring piece in the file at once
-    (not just the active one), so a WHOLE road network can be selected and Grab/Rotate/Moved
-    together with zero risk of live-edit regenerating anything mid-drag -- the safe way to
-    reposition many pieces together (e.g. aligning a whole test network onto another district's
-    road, or any multi-piece rearrange), which the single-piece `Freeze For Move` would otherwise
-    need running once per piece for (confirmed real need: road_blender_godot.md -- moving/rotating
-    every piece in `debug_road.blend` at once crashed Blender; `Freeze For Move`'s own docstring
-    already explains why debouncing alone can't fully prevent that -- a depsgraph-driven rebuild
-    can still land mid-drag during a slow move or a pause, regardless of how many pieces are
-    involved. This operator is a pure bulk application of that ALREADY-VERIFIED-SAFE mechanism,
-    not new reentrancy-handling logic).
-
-    Deliberately does NOT touch the active object or Pivot Point (unlike the single-piece
-    version) -- there is no one 'correct' pivot for an arbitrary multi-piece selection; set Pivot
-    Point yourself before rotating (e.g. '3D Cursor', placed at your intended pivot) and avoid
-    'Median Point'/'Individual Origins' for the same reason `Freeze For Move`'s own docstring
-    gives (most generated objects sit at local (0,0,0) with their real shape baked into the mesh/
-    curve data, so a location-based median/individual-origins pivot is meaningless here).
-    Already-frozen pieces are left alone (idempotent -- safe to run again after adding a piece)."""
-    bl_idname = "rka.freeze_all_for_move"
-    bl_label = "Freeze ALL For Move"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        return any(coll.library is None and _is_piece_collection(coll)
-                    and coll.get("rka_live_edit", True) for coll in bpy.data.collections)
-
-    def execute(self, context):
-        n = 0
-        for coll in bpy.data.collections:
-            if coll.library is not None or not _is_piece_collection(coll):
-                continue
-            if coll.get("rka_live_edit", True):
-                coll["rka_live_edit"] = False
-                n += 1
-        self.report({'INFO'}, "Froze %d piece(s) -- select everything and Grab/Rotate/Move "
-                               "freely, then 'Unfreeze ALL & Rebuild' when done" % n)
-        return {'FINISHED'}
-
-
-class RKA_OT_unfreeze_all_and_rebuild(bpy.types.Operator):
-    """Bulk `Unfreeze & Rebuild`: re-enables live-edit and rebuilds EVERY currently-frozen local
-    piece in the file. Safe for the same reason the single-piece version is (`Unfreeze & Rebuild`'s
-    own docstring) -- runs as a normal operator call, sequentially, not from inside a depsgraph
-    handler mid-drag, so there is no reentrancy risk no matter how many pieces are rebuilt here.
-    Does not restore any per-piece Pivot Point (the bulk freeze never changed it)."""
-    bl_idname = "rka.unfreeze_all_and_rebuild"
-    bl_label = "Unfreeze ALL & Rebuild"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        return any(coll.library is None and _is_piece_collection(coll)
-                    and not coll.get("rka_live_edit", True) for coll in bpy.data.collections)
-
-    def execute(self, context):
-        n = 0
-        for coll in bpy.data.collections:
-            if coll.library is not None or not _is_piece_collection(coll):
-                continue
-            if not coll.get("rka_live_edit", True):
-                coll["rka_live_edit"] = True
-                _rebuild_piece_in_place(context, coll)
-                n += 1
-        self.report({'INFO'}, "Unfroze + rebuilt %d piece(s)" % n)
-        return {'FINISHED'}
-
-
 def _select_piece_objects(context, coll):
     """Select every object in `coll` (a piece collection), origin marker active + Pivot Point set
     to 'Active Element'. Shared by `RKA_OT_select_piece` (from whatever's already active) and
@@ -1409,6 +1381,211 @@ class RKA_OT_select_piece_by_name(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class RKA_OT_select_road_network(bpy.types.Operator):
+    """Select EVERY object belonging to EVERY local road piece (intersection/segment/lane
+    transition) in this file in one click -- the missing "select everything" step the "Moving/
+    rotating MANY pieces at once" workflow (see panel: 'Freeze ALL For Move' -> select everything
+    -> Grab/Rotate/Move -> 'Unfreeze ALL & Rebuild') previously left to manual Outliner/box-select.
+
+    Deliberately a PURE SELECTION tool -- no parenting, no joining, nothing moved or re-parented.
+    Blender's own multi-object Grab/Rotate (any pivot, 'Median Point' is fine here -- unlike
+    `Freeze For Move`'s single-piece warning against it, which is about a piece's own LOCAL-space
+    generated sub-objects, not a whole-network multi-select) already moves/rotates every selected
+    object together as a genuinely rigid group -- confirmed the same mechanism
+    `get_or_create_origin_marker`'s own docstring documents for relocating a single piece (select
+    its whole collection, Grab/Rotate it). Parenting every piece under a shared root Empty was
+    considered and REJECTED instead: several rebuild functions (e.g.
+    `rebuild_intersection_in_place`) read an arm/origin marker's `.location` directly as an
+    absolute WORLD position, never `.matrix_world` -- an assumption that only holds today because
+    these markers are never parented. Parenting them would silently break every parented piece's
+    own live-edit angle math the instant a shared parent moved (`.location` staying stale/local
+    while the piece visually moved with its parent) -- a real correctness regression for a cosmetic
+    convenience. A pure selection tool gets the same practical outcome with none of that risk.
+
+    Run `Freeze ALL For Move` FIRST if you want zero risk of live-edit regenerating anything
+    mid-drag (recommended for more than a couple of pieces) -- this operator doesn't freeze
+    anything itself, it only selects."""
+    bl_idname = "rka.select_road_network"
+    bl_label = "Select Whole Road Network"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return any(coll.library is None and _is_piece_collection(coll)
+                   for coll in bpy.data.collections)
+
+    def execute(self, context):
+        for o in context.selected_objects:
+            o.select_set(False)
+        pieces = [coll for coll in bpy.data.collections
+                  if coll.library is None and _is_piece_collection(coll)]
+        total = 0
+        last_marker = None
+        for coll in pieces:
+            for o in coll.objects:
+                o.select_set(True)
+                total += 1
+            marker = get_or_create_origin_marker(coll, custom_props.read_origin(coll))
+            if marker is not None:
+                last_marker = marker
+        if last_marker is not None:
+            context.view_layer.objects.active = last_marker
+        self.report({'INFO'}, "Selected %d object(s) across %d road piece(s)" %
+                     (total, len(pieces)))
+        return {'FINISHED'}
+
+
+class RKA_OT_delete_piece(bpy.types.Operator):
+    """Fully delete the active piece (intersection/segment/lane transition) -- every marker
+    (arm_*/port_*/segend_*/segbend_*/origin) AND every generated object AND the collection itself,
+    not just the generated mesh `clear_generated_mesh_objects` clears for a live-edit rebuild
+    (which deliberately keeps markers -- the wrong tool for actually removing a piece).
+
+    Reuses `session_common.remove_collection_recursive` (`blender/lib/session_common.py`) --
+    already reachable from this addon via the same `sys.path` `paths.py` sets up (the same
+    one-line import `ops_world_session.py` already uses), the SAME recursive collection+contents
+    removal every world-session tool already relies on, just applied to an in-file piece
+    collection instead of a whole-piece `Piece__<id>` wrapper -- no new removal logic.
+
+    Safe with respect to other pieces: lane connectivity is proximity-based at bake time (never a
+    stored object reference -- see CLAUDE.md/LaneGraph), and this session's own `rka_linked_to`
+    (live connectivity between pieces) already treats a link to a deleted marker as a silent
+    no-op, so deleting a piece other pieces were extended from/linked to never dangles or crashes
+    anything -- it just stops propagating to whatever depended on it.
+
+    Confirms first (X/Delete on a whole piece can remove a lot of authored work in one click) --
+    the same `invoke_confirm` pattern this addon already uses for other bulk-destructive
+    operators."""
+    bl_idname = "rka.delete_piece"
+    bl_label = "Delete Piece"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return _live_edit_target_collection(context) is not None
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        coll = _live_edit_target_collection(context)
+        if coll is None:
+            self.report({'ERROR'}, "Select an intersection/segment (or one of its handle "
+                                    "Empties) first")
+            return {'CANCELLED'}
+        name, n_objects = coll.name, len(coll.objects)
+        sc.remove_collection_recursive(coll)
+        self.report({'INFO'}, "Deleted '%s' (%d object(s))" % (name, n_objects))
+        return {'FINISHED'}
+
+
+def _is_link_target_marker(obj):
+    """True if `obj` is a valid link TARGET -- any of this addon's own anchor Empties: an
+    intersection's `arm_*`, a plain segment's `port_A`/`port_B`, or another piece's own
+    `rka_origin_marker` (so links can chain: segment -> segment -> ...). See
+    `live_edit.RKA_LINKED_TO_KEY`'s module-docstring for the connectivity model this feeds."""
+    return (obj is not None and obj.type == 'EMPTY'
+            and ("rka_arm_name" in obj.keys() or "rka_port" in obj.keys()
+                 or ORIGIN_MARKER_KEY in obj.keys()))
+
+
+def _is_link_dependent_marker(obj):
+    """True if `obj` is a valid link DEPENDENT for `RKA_OT_connect_markers` -- narrower than a
+    target: an intersection's `arm_*` (its own position IS the geometry driver, see
+    `live_edit.move_dependent_marker`), a curve-backed segment/transition's own origin marker (the
+    same anchor `ops_segment._stamp_link` already uses for the automatic `Extend From Arm`/
+    `Extend From Port` case, always == the spine's FIRST point), or -- 2026-08, the dual-end
+    linking fix (ROAD_JOINT_TRANSITION_STUDY.md finding #3) -- a plain segment's `port_A`/`port_B`
+    marker (== the spine's first/last point respectively).
+
+    `port_*` used to be excluded entirely ("purely derived/cosmetic... making it the dependent
+    would have no lasting effect: the next rebuild would silently snap it back to the spine's own
+    endpoint") -- true only because nothing ever WROTE a link-driven position into the spine's
+    endpoint before `live_edit.move_dependent_marker` gained that ability alongside the origin
+    marker case (see its own docstring): a live-edit rebuild now re-derives `port_A`/`port_B`'s
+    position FROM the spine's current endpoint, which a link on that port already moved -- so the
+    re-snap is consistent, not a silent revert. This is what lets a segment's FAR end (previously
+    only ever a freely-dragged, never-auto-following point) also track a joint automatically, and
+    -- when BOTH ends are linked -- lets `move_dependent_marker` solve the whole spine's shape
+    instead of one rigid single-anchor transform."""
+    if obj is None or obj.type != 'EMPTY':
+        return False
+    if "rka_arm_name" in obj.keys():
+        return True
+    if not obj.users_collection or "rka_curve_object" not in obj.users_collection[0].keys():
+        return False
+    return ORIGIN_MARKER_KEY in obj.keys() or obj.get("rka_port") in ("A", "B")
+
+
+class RKA_OT_connect_markers(bpy.types.Operator):
+    """Link two ALREADY-BUILT, independently-positioned pieces so one follows the other from now
+    on -- the after-the-fact counterpart to the link `Extend From Arm`/`Extend From Port` already
+    stamp automatically when building a brand-new piece off an arm/port (see
+    `live_edit.RKA_LINKED_TO_KEY`'s docstring for the full connectivity model).
+
+    Select the TARGET marker first (an `arm_*`/`port_*`/origin anchor on the piece that should
+    stay put and be followed), then Shift-click the DEPENDENT marker last so it becomes the
+    active object (an `arm_*` or a curve-backed segment/transition's origin anchor, on the piece
+    that should move to and from then on follow the target) -- the same "active = last selected"
+    convention Blender's own multi-object operators use (Snap To Active, Ctrl+P Parent, ...).
+
+    Snaps the dependent to the target's exact current position (a one-time correction so linking
+    two pieces that don't already meet leaves no visible gap/overlap), stamps `rka_linked_to`,
+    and rebuilds the dependent's own piece immediately."""
+    bl_idname = "rka.connect_markers"
+    bl_label = "Connect Markers (Dependent Follows Target)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        dependent = context.active_object
+        others = [o for o in context.selected_objects if o is not dependent]
+        return (_is_link_dependent_marker(dependent) and len(others) == 1
+                and _is_link_target_marker(others[0]))
+
+    def execute(self, context):
+        from . import live_edit
+        dependent = context.active_object
+        target = next(o for o in context.selected_objects if o is not dependent)
+        dep_coll = dependent.users_collection[0] if dependent.users_collection else None
+        tgt_coll = target.users_collection[0] if target.users_collection else None
+        if dep_coll is not None and dep_coll == tgt_coll:
+            self.report({'ERROR'}, "Can't link a piece's marker to another marker on the SAME piece")
+            return {'CANCELLED'}
+        with live_edit.rebuilding():
+            live_edit.move_dependent_marker(dep_coll, dependent, target)
+        dependent[live_edit.RKA_LINKED_TO_KEY] = target.name
+        if dep_coll is not None:
+            _rebuild_piece_in_place(context, dep_coll)
+        self.report({'INFO'}, "'%s' now follows '%s'" % (dependent.name, target.name))
+        return {'FINISHED'}
+
+
+class RKA_OT_disconnect_marker(bpy.types.Operator):
+    """Clear `rka_linked_to` from the active marker -- an explicit break of a live connectivity
+    link without first moving anything. (The common case doesn't need this: dragging a linked
+    dependent marker away from its target auto-breaks the link on its own -- see
+    `live_edit._break_stale_links`. This is for breaking a link while leaving the piece exactly
+    where it currently sits.)"""
+    bl_idname = "rka.disconnect_marker"
+    bl_label = "Disconnect Marker"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        from . import live_edit
+        obj = context.active_object
+        return obj is not None and live_edit.RKA_LINKED_TO_KEY in obj.keys()
+
+    def execute(self, context):
+        from . import live_edit
+        obj = context.active_object
+        target_name = obj.get(live_edit.RKA_LINKED_TO_KEY, "?")
+        del obj[live_edit.RKA_LINKED_TO_KEY]
+        self.report({'INFO'}, "'%s' no longer follows '%s'" % (obj.name, target_name))
+        return {'FINISHED'}
+
+
 class RKA_OT_select_arm(bpy.types.Operator):
     """Isolate a single arm_* marker Empty as the sole selection/active object -- the quick way to
     go from 'everything selected' (e.g. after `Select Piece`) back to just one arm, so its own
@@ -1480,6 +1657,19 @@ def _widest_gap_angle(angles):
     return best_mid
 
 
+def _propagate_from_arm(context, arm_obj):
+    """After a button (not a drag) changes an arm's width-affecting state (`rka_arm_lanes`/
+    `rka_arm_lanes_out`/`rka_arm_oneway`) and rebuilds its OWN intersection, cascade the same
+    width/lane sync to any segment linked to this arm -- these operators bypass the depsgraph
+    handler entirely (they mutate a custom property + call `rebuild_intersection_in_place`
+    directly), so without this a linked segment's width would only catch up the next time the
+    arm ALSO happens to get dragged. Wrapped in `live_edit.rebuilding()` per
+    `live_edit._propagate_links`'s own contract (it mutates marker/spine state itself)."""
+    from . import live_edit
+    with live_edit.rebuilding():
+        live_edit._propagate_links({arm_obj.name})
+
+
 class RKA_OT_adjust_arm_lanes(bpy.types.Operator):
     """+/- the active arm_* marker's lane count (`rka_arm_lanes`) and immediately rebuild its
     intersection in place. The live-edit drag handler only watches for TRANSFORM changes, not
@@ -1500,10 +1690,279 @@ class RKA_OT_adjust_arm_lanes(bpy.types.Operator):
     def execute(self, context):
         obj = context.active_object
         coll = obj.users_collection[0]
-        new_lanes = max(1, min(3, int(obj.get("rka_arm_lanes", 1)) + self.delta))
+        new_lanes = max(1, min(4, int(obj.get("rka_arm_lanes", 1)) + self.delta))
         obj["rka_arm_lanes"] = new_lanes
         rebuild_intersection_in_place(context, coll)
+        _propagate_from_arm(context, obj)
         self.report({'INFO'}, "Arm '%s' lanes -> %d" % (obj.get("rka_arm_name", "?"), new_lanes))
+        return {'FINISHED'}
+
+
+class RKA_OT_adjust_arm_median_width(bpy.types.Operator):
+    """+/- the active arm_* marker's OWN median width (`rka_arm_median_width`) and immediately
+    rebuild its intersection in place -- the per-arm counterpart to
+    `ops_segment.RKA_OT_adjust_median_width`/`_end` (2026-08, user-reported: "each intersection arm
+    [should]... have [an] idea of median[,] to expand the median of the incoming arm... one arm can
+    use as transition to ease out the median from high count to low count"). PER-ARM, not shared
+    across the intersection -- `intersection_kit.Arm.median_width` is a field on that ONE arm, so
+    one busy approach can carry a wide median while its neighbors stay flush. Feeds straight into
+    `in_width`/`out_width`/`in_offset`/`out_offset` (see `Arm.median_half`), so the pad/curb cap
+    AND every lane centerline at this arm shift outward together -- and into
+    `live_edit._arm_joint_state`, so a segment linked here now tapers its own median against this
+    arm's REAL value instead of always collapsing to 0. Only applies while this arm has lanes in
+    BOTH directions (`Arm.median_half`'s "genuine two-way" rule) -- a one-way arm's median is
+    silently inert, matching a segment's identical rule."""
+    bl_idname = "rka.adjust_arm_median_width"
+    bl_label = "Adjust Arm Median Width"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    delta: bpy.props.FloatProperty(default=1.0)
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and "rka_arm_name" in obj.keys()
+
+    def execute(self, context):
+        obj = context.active_object
+        coll = obj.users_collection[0]
+        new_median = max(0.0, obj.get("rka_arm_median_width", 0.0) + self.delta)
+        obj["rka_arm_median_width"] = new_median
+        rebuild_intersection_in_place(context, coll)
+        _propagate_from_arm(context, obj)
+        self.report({'INFO'}, "Arm '%s' median -> %.1fm" % (obj.get("rka_arm_name", "?"), new_median))
+        return {'FINISHED'}
+
+
+class RKA_OT_set_arm_angle(bpy.types.Operator):
+    """Set the active arm_* marker's bearing (and, optionally, its distance from the
+    intersection origin) to an EXACT numeric value and rebuild in place -- the answer to "hard to
+    align/adjust edge angle" (2026-08, user-reported): getting an arm to land on an exact bearing
+    (e.g. squaring it up at 90 deg to match a linked segment, or fine-tuning by a fraction of a
+    degree) by freehand Grab/mouse-drag alone is genuinely fiddly -- Blender's own angle snapping
+    doesn't apply to a plain Translate on an Empty. This operator sets the marker's `rotation_
+    euler.z` (the arm's now-authoritative angle, see `ensure_arm_angle_migrated`) directly, plus
+    its `(x, y)` from `angle_deg`/`tail_length` (-1 = keep the arm's current distance) so the
+    visual marker position matches too, exactly like `RKA_OT_add_arm` places a fresh arm -- the
+    result is pixel/degree-exact and immediately re-runs the SAME `rebuild_intersection_in_place`
+    + link-propagation cascade a real drag would trigger (`_propagate_from_arm`) -- any segment
+    linked to this arm re-aligns to the new angle in the same click, not just this intersection."""
+    bl_idname = "rka.set_arm_angle"
+    bl_label = "Set Arm Angle"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    angle_deg: bpy.props.FloatProperty(
+        name="Angle", description="Exact bearing (degrees from world +X) to place this arm at",
+        default=0.0, min=-360.0, max=360.0)
+    tail_length: bpy.props.FloatProperty(
+        name="Distance", description="Distance from the intersection origin -- -1 (default) "
+        "keeps the arm's current distance, only the angle changes", default=-1.0, min=-1.0,
+        unit='LENGTH')
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and "rka_arm_name" in obj.keys()
+
+    def invoke(self, context, event):
+        obj = context.active_object
+        self.angle_deg = obj.get("rka_arm_angle", 0.0)
+        self.tail_length = -1.0
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        obj = context.active_object
+        coll = obj.users_collection[0]
+        try:
+            eff_tail = _apply_arm_angle(context, obj, coll, self.angle_deg, self.tail_length)
+        except RkaBuildError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Arm '%s' -> %.2f deg at %.2fm" %
+                    (obj.get("rka_arm_name", "?"), self.angle_deg, eff_tail))
+        return {'FINISHED'}
+
+
+def _apply_arm_angle(context, obj, coll, angle_deg, tail_length=-1.0):
+    """Shared core behind `RKA_OT_set_arm_angle`/`RKA_OT_nudge_arm_angle`: set arm `obj`'s
+    `rotation_euler.z` + `.location` to the classic RAY-BASED position (`origin + tail_length *
+    direction(angle_deg)`, `tail_length` -1 = keep its current distance from origin) and re-run
+    the same rebuild + link-propagation cascade a real drag would trigger. Raises `RkaBuildError`
+    if `coll` has no stored origin or the resolved distance isn't positive -- callers report and
+    cancel. Returns the effective tail_length actually used.
+
+    Always clears `rka_arm_tail_pos_locked` (2026-08) -- an explicit numeric angle/nudge is the
+    classic ray-based workflow, so it deliberately RESETS an arm that was previously matched
+    exactly onto an external target (`RKA_OT_aim_arm_at`) back onto its clean ray; re-run that
+    operator afterward to re-match if a locked arm's angle needed fine-tuning."""
+    k = ik()
+    marker = get_or_create_origin_marker(coll, custom_props.read_origin(coll))
+    if marker is None:
+        raise RkaBuildError("'%s' has no stored origin" % coll.name)
+    ox, oy, oz = marker.location.x, marker.location.y, marker.location.z
+    rka = context.scene.rka
+    z = oz + rka.lane_surface_z
+    cur_dist = math.hypot(obj.location.x - ox, obj.location.y - oy)
+    eff_tail = cur_dist if tail_length < 0.0 else tail_length
+    if eff_tail < 1e-6:
+        raise RkaBuildError("Distance must be positive")
+    d = k.arm_dir(angle_deg)
+    obj.location = (ox + d[0] * eff_tail, oy + d[1] * eff_tail, z)
+    obj.rotation_euler = (0.0, 0.0, math.radians(angle_deg))
+    obj["rka_arm_angle_migrated"] = True
+    obj["rka_arm_tail_pos_locked"] = False
+    rebuild_intersection_in_place(context, coll)
+    _propagate_from_arm(context, obj)
+    return eff_tail
+
+
+def _resolve_target_angle_deg(target, ox, oy):
+    """The angle (deg) `RKA_OT_aim_arm_at` should assign to an arm pointing "at" `target` --
+    prefers the TARGET'S OWN facing direction over the raw bearing from the intersection origin
+    `(ox, oy)` to the target's position whenever that's available and meaningful, since those two
+    are only the SAME value when the target's own piece happens to run exactly radially through
+    THIS origin, which is not generally true.
+
+    2026-08 fix, confirmed directly in world_session.blend (user-reported: "even when t[w]o
+    points matches" the edges still don't overlap): arm_E's bearing-from-origin to Segment_001's
+    `port_A` measured 236.3 deg, while the segment's own ACTUAL tangent there measured 241.2 deg
+    -- a real ~5 deg gap that aiming-by-position-bearing alone can never close, because it isn't
+    even the right quantity -- position and facing direction are independent unless the piece
+    happens to point straight through the origin.
+
+    - `port_A`/`port_B`, or a curve-backed piece's own origin marker (always `== port_A`'s
+      position): the OWNING segment's spine tangent AT THAT END
+      (`live_edit._spine_tangent_angle`) -- the EXACT value the live joint-sync
+      (`_arm_joint_state`, used whenever two pieces are actually LINKED) already treats as "what
+      a properly joined arm's angle must equal" for a flush, gap-free cap. Deliberately NOT the
+      port's own stored `rka_port_heading_deg` -- that is the OPPOSITE direction (the "extend a
+      NEW piece from here" heading a fresh `Extend From Port` would use, see
+      `ops_segment._place_segment_ports`), 180 deg off from what an arm butting AGAINST this end
+      needs.
+    - Another `arm_*` marker: no tangent to defer to (an arm's own angle is already a bearing
+      from ITS OWN origin, meaningless to copy directly onto a different intersection) -- always
+      the raw bearing from `(ox, oy)` to the target's position.
+    - Anything else (a bare Empty, ...): the same raw-bearing fallback, the only sensible
+      definition for a target with no direction of its own.
+
+    Returns None if no bearing/tangent can be determined at all (target sits exactly on the
+    origin, or -- for a port/origin target -- its segment's spine is missing/degenerate, in which
+    case this silently falls through to the position-bearing fallback instead of failing outright)."""
+    port_tag = target.get("rka_port")
+    is_piece_origin = bool(target.get(ORIGIN_MARKER_KEY, False))
+    if port_tag in ("A", "B") or is_piece_origin:
+        coll = target.users_collection[0] if target.users_collection else None
+        spine_name = coll.get("rka_curve_object") if coll is not None else None
+        spine_obj = coll.objects.get(spine_name) if (coll is not None and spine_name) else None
+        if spine_obj is not None and spine_obj.type == 'CURVE':
+            end = "end" if port_tag == "B" else "start"
+            tangent = live_edit._spine_tangent_angle(spine_obj, end)
+            if tangent is not None:
+                return math.degrees(tangent) % 360.0
+    dx, dy = target.location.x - ox, target.location.y - oy
+    if math.hypot(dx, dy) < 1e-6:
+        return None
+    return math.degrees(math.atan2(dy, dx)) % 360.0
+
+
+class RKA_OT_aim_arm_at(bpy.types.Operator):
+    """Move the active arm_* marker EXACTLY onto a target's position AND rotate it to EXACTLY
+    match the target's own facing/tangent -- BOTH at once, not a choice between them -- the
+    "visually align this arm with the road it should connect to" answer (2026-08, user-reported,
+    with a screenshot: a road stub runs off diagonally but the arm/pad edge cuts straight across
+    it; eyeballing or computing the exact angle by hand is slow and error-prone).
+
+    Select the TARGET first, Shift-click the ARM LAST so IT becomes the active object (the one
+    this operator repositions) -- same "active = the one being changed" convention
+    `RKA_OT_connect_markers` already uses (there: select target, Shift-click the dependent last).
+
+    2026-08 history -- this used to be two separate modes ("Aim At" = tangent-exact, "Snap To" =
+    position-exact), because an arm's PAD/CURB cap position used to be locked to `origin + distance
+    * direction(angle)` -- one shared-origin ray, the SAME angle driving both where the cap sits
+    AND which way it faces, so at most one of position/tangent could ever be exact for a target
+    that doesn't happen to sit exactly on that ray. User-reported (world_session.blend, "arm w
+    position/edge should adjust to match that segment -- segment/other arms/intersection center
+    should NOT move"): the cap's POSITION is now independently settable
+    (`intersection_kit.Arm.tail_pos` -- see its docstring) while `angle_deg` still alone controls
+    the cap's ORIENTATION and this arm's own corner-fillet geometry with its neighbors (an off-ray
+    match on ONE arm cannot distort a neighbor's corner -- `curb_edges`/`_junction_corner_vertex`
+    never read `tail_pos` at all), so both position and tangent can now land exactly, together, in
+    one click -- the two modes collapsed back into one operator/button.
+
+    Stamps `rka_arm_tail_pos_locked` so future rebuilds (dragging any OTHER arm, adjusting lanes,
+    etc.) don't silently pull this arm's marker back onto its clean angle-ray -- see
+    `rebuild_intersection_in_place`'s re-snap step. `RKA_OT_set_arm_angle`/`RKA_OT_nudge_arm_angle`
+    both CLEAR this lock (an explicit numeric angle/nudge is the classic ray-based workflow) -- if
+    an already-matched arm needs fine-tuning afterward, re-run this operator rather than nudging.
+
+    Does NOT move the target or create a link -- run `Connect Markers` afterward if you also want
+    this arm to keep tracking the target automatically as it moves later."""
+    bl_idname = "rka.aim_arm_at"
+    bl_label = "Match Arm To Selected"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        if obj is None or "rka_arm_name" not in obj.keys():
+            return False
+        others = [o for o in context.selected_objects if o is not obj]
+        return len(others) == 1
+
+    def execute(self, context):
+        obj = context.active_object
+        target = next(o for o in context.selected_objects if o is not obj)
+        coll = obj.users_collection[0]
+        marker = get_or_create_origin_marker(coll, custom_props.read_origin(coll))
+        if marker is None:
+            self.report({'ERROR'}, "'%s' has no stored origin" % coll.name)
+            return {'CANCELLED'}
+        ox, oy, oz = marker.location.x, marker.location.y, marker.location.z
+        angle_deg = _resolve_target_angle_deg(target, ox, oy)
+        if angle_deg is None:
+            self.report({'ERROR'}, "'%s' sits exactly on the intersection origin -- no bearing "
+                                    "to aim at" % target.name)
+            return {'CANCELLED'}
+        rka = context.scene.rka
+        z = oz + rka.lane_surface_z
+        obj.location = (target.location.x, target.location.y, z)
+        obj.rotation_euler = (0.0, 0.0, math.radians(angle_deg))
+        obj["rka_arm_angle_migrated"] = True
+        obj["rka_arm_tail_pos_locked"] = True
+        rebuild_intersection_in_place(context, coll)
+        _propagate_from_arm(context, obj)
+        self.report({'INFO'}, "Arm '%s' matched to '%s' EXACTLY -- position AND %.2f deg tangent "
+                    "both exact, every other arm/the intersection center untouched" %
+                    (obj.get("rka_arm_name", "?"), target.name, angle_deg))
+        return {'FINISHED'}
+
+
+class RKA_OT_nudge_arm_angle(bpy.types.Operator):
+    """+/- the active arm's angle by a fixed step and rebuild in place -- a quick keyboard/click
+    way to fine-tune a facing direction (2026-08, user-reported: setting an exact angle "seem not
+    accurate and kind of hard to change") without opening `Set Arm Angle`'s numeric dialog every
+    time. Distance from origin is unchanged, matching `RKA_OT_set_arm_angle`."""
+    bl_idname = "rka.nudge_arm_angle"
+    bl_label = "Nudge Arm Angle"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    delta_deg: bpy.props.FloatProperty(default=5.0)
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.active_object
+        return obj is not None and "rka_arm_name" in obj.keys()
+
+    def execute(self, context):
+        obj = context.active_object
+        coll = obj.users_collection[0]
+        new_angle = (math.degrees(obj.rotation_euler.z) + self.delta_deg) % 360.0
+        try:
+            _apply_arm_angle(context, obj, coll, new_angle)
+        except RkaBuildError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Arm '%s' -> %.2f deg" % (obj.get("rka_arm_name", "?"), new_angle))
         return {'FINISHED'}
 
 
@@ -1517,7 +1976,7 @@ class RKA_OT_add_arm(bpy.types.Operator):
     bl_label = "Add Arm"
     bl_options = {'REGISTER', 'UNDO'}
 
-    lanes: bpy.props.IntProperty(name="Lanes", default=1, min=1, max=3)
+    lanes: bpy.props.IntProperty(name="Lanes", default=1, min=1, max=4)
 
     @classmethod
     def poll(cls, context):
@@ -1554,6 +2013,7 @@ class RKA_OT_add_arm(bpy.types.Operator):
         arm_obj["rka_arm_oneway"] = ""
         arm_obj["rka_arm_lanes_out"] = 0
         arm_obj["rka_arm_tail_length"] = tail_length
+        arm_obj["rka_arm_angle_migrated"] = True   # fresh -- position/rotation already agree
         coll.objects.link(arm_obj)
 
         rebuild_intersection_in_place(context, coll)
@@ -1616,6 +2076,7 @@ class RKA_OT_set_arm_oneway(bpy.types.Operator):
         coll = obj.users_collection[0]
         obj["rka_arm_oneway"] = "" if self.mode == 'BOTH' else self.mode
         rebuild_intersection_in_place(context, coll)
+        _propagate_from_arm(context, obj)
         self.report({'INFO'}, "Arm '%s' direction -> %s" % (obj.get("rka_arm_name", "?"), self.mode))
         return {'FINISHED'}
 
@@ -1647,21 +2108,24 @@ class RKA_OT_adjust_arm_lanes_out(bpy.types.Operator):
         coll = obj.users_collection[0]
         current = int(obj.get("rka_arm_lanes_out", 0))
         base = current if current > 0 else int(obj.get("rka_arm_lanes", 1))
-        new_lanes_out = max(0, min(3, base + self.delta))
+        new_lanes_out = max(0, min(4, base + self.delta))
         obj["rka_arm_lanes_out"] = new_lanes_out
         rebuild_intersection_in_place(context, coll)
+        _propagate_from_arm(context, obj)
         label = "symmetric (0)" if new_lanes_out == 0 else str(new_lanes_out)
         self.report({'INFO'}, "Arm '%s' departing lanes -> %s" %
                      (obj.get("rka_arm_name", "?"), label))
         return {'FINISHED'}
 
 
-CLASSES = (RKA_OT_build_intersection, RKA_OT_rebuild_from_handles, RKA_OT_freeze_for_move,
-           RKA_OT_unfreeze_and_rebuild, RKA_OT_freeze_all_for_move, RKA_OT_unfreeze_all_and_rebuild,
-           RKA_OT_select_piece, RKA_OT_select_piece_by_name, RKA_OT_select_arm,
-           RKA_OT_adjust_arm_lanes, RKA_OT_add_arm, RKA_OT_remove_arm, RKA_OT_set_arm_oneway,
-           RKA_OT_adjust_arm_lanes_out, RKA_OT_set_lane_map,
-           RKA_OT_set_pavement_matkey, RKA_OT_set_curb_matkey)
+CLASSES = (RKA_OT_build_intersection, RKA_OT_rebuild_from_handles,
+           RKA_OT_select_piece, RKA_OT_select_piece_by_name, RKA_OT_select_road_network,
+           RKA_OT_delete_piece, RKA_OT_connect_markers, RKA_OT_disconnect_marker, RKA_OT_select_arm,
+           RKA_OT_adjust_arm_lanes, RKA_OT_adjust_arm_median_width, RKA_OT_set_arm_angle, RKA_OT_aim_arm_at,
+           RKA_OT_nudge_arm_angle, RKA_OT_add_arm, RKA_OT_remove_arm,
+           RKA_OT_set_arm_oneway,
+           RKA_OT_adjust_arm_lanes_out, RKA_OT_set_lane_map, RKA_OT_set_pavement_matkey,
+           RKA_OT_set_curb_matkey)
 
 
 def register():

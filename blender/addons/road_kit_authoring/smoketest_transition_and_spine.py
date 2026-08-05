@@ -59,20 +59,21 @@ def main():
     _assert(tr_coll.get("rka_lanes_a") == 3, "end A forward should be 3, got %s" % tr_coll.get("rka_lanes_a"))
     print("transition_lanes smoketest: end A forward 2 -> 3")
 
-    # Backward at end A: sentinel(0, symmetric w/ forward=3) + 1 -> seeds from 3, becomes 4, clamps to 3.
+    # Backward at end A: sentinel(0, symmetric w/ forward=3) + 1 -> seeds from 3, becomes 4 (the
+    # max lane count this addon's IntProperty fields allow elsewhere -- no clamping needed here).
     ret = bpy.ops.rka.adjust_transition_lanes(end='A', backward=True, delta=1)
     _assert(ret == {'FINISHED'}, "adjust_transition_lanes (A back +1) did not finish: %s" % (ret,))
-    _assert(tr_coll.get("rka_lanes_backward_a") == 3,
-            "end A backward should seed from forward (3) then clamp to max 3, got %s"
+    _assert(tr_coll.get("rka_lanes_backward_a") == 4,
+            "end A backward should seed from forward (3) then +1 -> 4, got %s"
             % tr_coll.get("rka_lanes_backward_a"))
-    print("transition_lanes smoketest: end A backward sentinel seeded from forward (3) on first press")
+    print("transition_lanes smoketest: end A backward sentinel seeded from forward (3) then +1 -> 4")
 
-    # Backward at end A: 3 -> 2 (now an explicit override, independent of forward).
+    # Backward at end A: 4 -> 3 (now an explicit override, independent of forward).
     ret = bpy.ops.rka.adjust_transition_lanes(end='A', backward=True, delta=-1)
-    _assert(tr_coll.get("rka_lanes_backward_a") == 2,
-            "end A backward should be 2, got %s" % tr_coll.get("rka_lanes_backward_a"))
+    _assert(tr_coll.get("rka_lanes_backward_a") == 3,
+            "end A backward should be 3, got %s" % tr_coll.get("rka_lanes_backward_a"))
     _assert(tr_coll.get("rka_lanes_a") == 3, "end A forward should be untouched by a backward change")
-    print("transition_lanes smoketest: end A backward explicit override (2), forward untouched")
+    print("transition_lanes smoketest: end A backward explicit override (3), forward untouched")
 
     # End B: forward is at its minimum (1) -- a further "-" must clamp there, not reach 0. Unlike
     # a plain segment, a transition's forward direction pairs lanes_a directly with lanes_b in one

@@ -56,8 +56,8 @@ def main():
     coll = seg_result["coll"]
     _assert(coll.get("rka_curb_l_style", "BOX") == 'BOX', "should start Left=BOX")
     _assert(len(_curb_objs(coll, "L")) == 1, "fresh BOX segment should have a Left curb object")
-    pave_before = [o for o in _colonly_objects(coll) if o.name.startswith("pave_")]
-    _assert(len(pave_before) == 1, "fresh segment should have exactly 1 pavement colonly")
+    _assert(_colonly_objects(coll) == [],
+            "colonly proxies are export-time-only now -- a fresh build should have none live")
 
     # poll() must fail on a non-piece / non-GN-segment selection.
     context.view_layer.objects.active = None
@@ -74,11 +74,8 @@ def main():
     _assert(coll.get("rka_curb_l_style") == 'NONE', "rka_curb_l_style should now be NONE")
     _assert(len(_curb_objs(coll, "L")) == 0, "Left curb object should be gone after style=NONE")
     _assert(len(_curb_objs(coll, "R")) == 1, "Right curb should be untouched by a Left-only change")
-    pave_after_none = [o for o in _colonly_objects(coll) if o.name.startswith("pave_")]
-    _assert(len(pave_after_none) == 1, "pavement colonly must survive a curb-style change "
-            "(it's independent of curb style) -- got %d" % len(pave_after_none))
     print("smoketest_curb_style_panel: disabling the Left curb via the operator removed exactly "
-          "that curb object, left the Right curb + pavement collision untouched")
+          "that curb object, left the Right curb untouched")
 
     # Re-enable both sides via 'BOTH' and confirm no orphaned/duplicate objects accumulate.
     # (left_curb_obj no longer exists -- style=NONE just removed it -- so re-resolve to
@@ -91,14 +88,10 @@ def main():
     _assert(len(_curb_objs(coll, "L")) == 1 and len(_curb_objs(coll, "R")) == 1,
             "re-enabling both sides should produce exactly one curb object each, got L=%d R=%d"
             % (len(_curb_objs(coll, "L")), len(_curb_objs(coll, "R"))))
-    colonly_final = _colonly_objects(coll)
-    pave_final = [o for o in colonly_final if o.name.startswith("pave_")]
-    _assert(len(pave_final) == 1, "still exactly one pavement colonly after two style changes, "
-            "got %d (orphan/duplicate check)" % len(pave_final))
-    _assert(len(colonly_final) == 3, "expect exactly 3 colonlies (curb L + curb R + pavement) "
-            "after settling on GUTTER/GUTTER, got %d" % len(colonly_final))
+    _assert(_colonly_objects(coll) == [],
+            "colonly proxies are export-time-only -- none should exist live after style changes")
     print("smoketest_curb_style_panel: re-enabling both sides (GUTTER) via one 'BOTH' call left "
-          "no orphaned/duplicate curb or pavement colonly objects")
+          "no orphaned/duplicate curb objects")
 
     # Same operator must also work on a lane transition (the other GN spine-backed piece type).
     ret = bpy.ops.rka.build_lane_transition(

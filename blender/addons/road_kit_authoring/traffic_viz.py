@@ -16,7 +16,18 @@ geometry (approximated to the two-endpoint chord for a segment, close enough for
 gizmo -- the actual pavement/curb offsets are computed per-point elsewhere).
 
 Toggle: `scene.rka.show_traffic_indicators` (Live Edit box). Pure viewport aid -- never written to
-any exported data, never affects geometry."""
+any exported data, never affects geometry.
+
+Per-lane index tags (2026-08, `scene.rka.show_lane_indices`, independent toggle): a short tick +
+"L0"/"L1"/... label at each INDIVIDUAL lane's own lateral position at every connection point (an
+arm, or a segment/transition end) -- the viewport-visible replacement for `lanecl_*` lane-
+centerline curves, which were removed from live generation the same day (confirmed export-
+redundant -- `tools/save_lane_kit.py` recomputes lane centerlines independently from spine +
+metadata -- and carried no mesh of their own, so they cost live-edit object-churn with zero
+authoring-time payoff; see `ops_intersection.py`'s `_populate_intersection_mesh`). Reuses the
+exact same (base, tip, color, label) tuple shape and `_arrow_segments`/draw pipeline the traffic
+arrows already use -- a lane tick IS just a very short arrow with a numeric label instead of a
+"FWD n" one, so no separate drawing code is needed."""
 import math
 
 import blf
@@ -27,6 +38,25 @@ from gpu_extras.batch import batch_for_shader
 IN_COLOR = (0.25, 0.55, 1.0, 0.95)
 OUT_COLOR = (1.0, 0.6, 0.15, 0.95)
 ARROW_LENGTH = 3.0
+LANE_TICK_LENGTH = 0.8   # short, deliberately -- a tick is an identity tag, not a direction cue
+
+
+def _lane_ticks(base_xy, base_z, perp, sign, group_dir, lane_width, count, color, prefix):
+    """One short tick + '<prefix><i>' label per individual lane in a same-direction group of
+    `count` lanes, laid out from the centerline outward (`(i + 0.5) * lane_width`, the same
+    per-lane spacing convention `Arm.in_offset`/`out_offset` and the real pavement/marking offsets
+    already use -- see this module's own docstring for why an approximation here is fine: this is
+    a schematic viewport aid, not exported geometry). `sign` flips which side of centerline the
+    group sits on (matches `Arm.in_offset`'s negative / `out_offset`'s positive convention);
+    `group_dir` is the tick's own pointing direction (purely cosmetic, distinguishes at a glance
+    which way that lane's traffic runs)."""
+    out = []
+    for i in range(count):
+        lat = sign * (i + 0.5) * lane_width
+        p = (base_xy[0] + perp[0] * lat, base_xy[1] + perp[1] * lat, base_z)
+        tip = (p[0] + group_dir[0] * LANE_TICK_LENGTH, p[1] + group_dir[1] * LANE_TICK_LENGTH, base_z)
+        out.append((p, tip, color, "%s%d" % (prefix, i)))
+    return out
 
 # Same order of magnitude as LaneGraph's own JUNCTION_RADIUS endpoint-clustering tolerance --
 # "close enough to this arm/segend to be the road it actually continues into."
@@ -107,7 +137,11 @@ def _nearby_outward_direction(pos, endpoints, radius=ARM_LINK_RADIUS):
 def _gather(context):
     scene = context.scene
     rka = getattr(scene, "rka", None)
-    if rka is None or not rka.show_traffic_indicators:
+    if rka is None:
+        return []
+    show_arrows = rka.show_traffic_indicators
+    show_lanes = rka.show_lane_indices
+    if not show_arrows and not show_lanes:
         return []
     from . import ops_intersection, ops_segment
     k = ops_intersection.ik()
@@ -144,8 +178,20 @@ def _gather(context):
         else:
             fwd_a = fwd_b = coll.get("rka_lanes", 1)
             back_a = back_b = coll.get("rka_lanes_backward", fwd_a)
-        items += _segment_arrows(k, p0, True, tangent, lane_width, fwd_a, back_a, traffic_side)
-        items += _segment_arrows(k, p1, False, tangent, lane_width, fwd_b, back_b, traffic_side)
+        if show_arrows:
+            items += _segment_arrows(k, p0, True, tangent, lane_width, fwd_a, back_a, traffic_side)
+            items += _segment_arrows(k, p1, False, tangent, lane_width, fwd_b, back_b, traffic_side)
+        if show_lanes:
+            perp = k.lane_perp(tangent, traffic_side)
+            neg_tangent = (-tangent[0], -tangent[1])
+            # Same per-end color/side/direction convention `_segment_arrows` already uses: at the
+            # A-end, forward lanes are DEPARTING (OUT_COLOR) and backward lanes are ARRIVING
+            # (IN_COLOR); at the B-end it's the mirror. Forward/backward groups sit on opposite
+            # sides of centerline (sign flip), same as `_segment_arrows`'s `fwd_lat`/`back_lat`.
+            items += _lane_ticks(p0, p0[2], perp, 1.0, tangent, lane_width, fwd_a, OUT_COLOR, "F")
+            items += _lane_ticks(p0, p0[2], perp, -1.0, neg_tangent, lane_width, back_a, IN_COLOR, "B")
+            items += _lane_ticks(p1, p1[2], perp, 1.0, tangent, lane_width, fwd_b, IN_COLOR, "F")
+            items += _lane_ticks(p1, p1[2], perp, -1.0, neg_tangent, lane_width, back_b, OUT_COLOR, "B")
 
     for obj in scene.objects:
         keys = obj.keys()
@@ -165,16 +211,30 @@ def _gather(context):
             perp = k.lane_perp(d, traffic_side)
             base = (pos.x, pos.y, pos.z)
             n_in, n_out = a.lanes_in_count(), a.lanes_out_count()
-            if n_in > 0:
+            if show_arrows and n_in > 0:
                 lat = -a.in_width() * 0.5
                 b = (base[0] + perp[0] * lat, base[1] + perp[1] * lat, base[2])
                 tip = (b[0] - d[0] * ARROW_LENGTH, b[1] - d[1] * ARROW_LENGTH, b[2])
                 items.append((b, tip, IN_COLOR, "IN %d" % n_in))
-            if n_out > 0:
+            if show_arrows and n_out > 0:
                 lat = a.out_width() * 0.5
                 b = (base[0] + perp[0] * lat, base[1] + perp[1] * lat, base[2])
                 tip = (b[0] + d[0] * ARROW_LENGTH, b[1] + d[1] * ARROW_LENGTH, b[2])
                 items.append((b, tip, OUT_COLOR, "OUT %d" % n_out))
+            if show_lanes:
+                # Uses Arm.in_offset/out_offset directly -- the REAL per-lane lateral offset this
+                # arm's own curb/pavement geometry is built from (not an approximation), so a
+                # lane's tick lines up exactly with its actual pavement lane.
+                for i in range(n_in):
+                    lat = a.in_offset(i)
+                    p = (base[0] + perp[0] * lat, base[1] + perp[1] * lat, base[2])
+                    tip = (p[0] - d[0] * LANE_TICK_LENGTH, p[1] - d[1] * LANE_TICK_LENGTH, base[2])
+                    items.append((p, tip, IN_COLOR, "L%d" % i))
+                for i in range(n_out):
+                    lat = a.out_offset(i)
+                    p = (base[0] + perp[0] * lat, base[1] + perp[1] * lat, base[2])
+                    tip = (p[0] + d[0] * LANE_TICK_LENGTH, p[1] + d[1] * LANE_TICK_LENGTH, base[2])
+                    items.append((p, tip, OUT_COLOR, "L%d" % i))
         elif obj.get("rka_segend") in ("A", "B"):
             # Legacy 2-point ribbon path (only RKA_OT_insert_intersection_on_segment's internal
             # `extend()` still uses this, via `build_segment_geometry`) -- every OTHER segment

@@ -571,8 +571,24 @@ offset segments from an arbitrary spine, lane-count tapers.
 1. Open a district `.blend`. Use the addon's Sidebar (`N`) panel to build intersections
    (`Build Intersection`, presets 4-way/3-way-T/3-way-Y/N-way) and segments (`Build Straight
    Segment`, or `Extend From Arm`/`Extend From Port` off an existing piece's own marker/port —
-   snaps zero-gap by construction). Drag a piece's own marker Empties to reshape it live
-   (`live_edit.py`'s `depsgraph_update_post` handler rebuilds in place).
+   snaps zero-gap by construction, and stays that way afterward: see "Connect Pieces" below). Drag
+   a piece's own marker Empties to reshape it live (`live_edit.py`'s `depsgraph_update_post`
+   handler rebuilds in place). Lane-count tapers (a "Build Lane Transition") are no longer a
+   separate tool — set `Lanes Forward (End)`/`Lanes Backward (End)` (and/or `Median Width (End)`/
+   `Sidewalk Width (End)` for a width-only taper at constant lane count) on `Build Straight
+   Segment`/`Build Segment From Curve`/`Extend From Arm`/`Extend From Port` themselves; leaving
+   them at their default (`-1` = "same as start") builds a plain constant piece exactly as before.
+
+   **Connect Pieces (live connectivity):** `Extend From Arm`/`Extend From Port` link the new piece
+   to the arm/port it started from — drag that arm/port later (or the whole source piece) and the
+   extension follows automatically, including cascading through a whole chain of pieces built off
+   each other, with no manual re-adjustment. To link two pieces that were built independently and
+   don't already meet: select the TARGET marker (an `arm_*`/`port_*`/origin anchor on the piece
+   that should stay put) first, then Shift-click the DEPENDENT piece's own origin marker (or
+   `arm_*`) LAST so it's active, and run **Connect Markers** (Live Edit box) — it snaps the
+   dependent to the target and links it from then on. Dragging a linked piece away from its target
+   breaks the link automatically (no surprise snap-back later); **Disconnect Marker** breaks a link
+   explicitly without moving anything.
 2. Collect every piece in the open `.blend` into one combined sidecar:
    ```bash
    blender pieces/<piece-id>.blend --background --python blender/tools/save_lane_kit.py
@@ -615,6 +631,32 @@ operator's own F9 redo panel, which stops applying the moment any other action r
 asymmetric ASSET curb mesh (authored to attach on one side only), use the SAME asset collection on
 both Left and Right — the addon automatically spins the right-side row 180° (`curb_asset_rot_offset_r`)
 so it still faces the correct way; no separate right-side asset or two-level gutter+curb split needed.
+
+**Ground/road alignment ("Cut Ground Under Road"):** newly authored `road_kit_authoring` pavement
+sits at a fixed/gently-sloped Z of its own and does **not** automatically know about — or cut a
+hole in — whatever ground mesh is already there, so it can visibly z-fight with/sit on top of
+terrain that already models a road-shaped bump at that spot (the concrete case this fixes:
+`Piece_2_1`'s ground still carries the old baked `District_city_2_1_Terrain-col` +
+`..._Road` combo mesh from the pre-registry PLATEAU-import era, predating this addon). The panel's
+"Ground / Road Alignment" box's **Cut Ground Under Road** button boolean-differences the active
+road piece's own footprint (curb/sidewalk offset lines for a segment, the pad boundary for an
+intersection, both grown by an editable `Margin`) out of a selected ground mesh, down `Cut Depth`
+and up `Cut Rise` from the road's own Z.
+
+**Multiple meshes under the same road — this is the part to get right:** the operator cuts
+**every selected mesh** that isn't part of the road piece's own generated geometry — there is no
+"pick the nearest/topmost one" heuristic. If the ground at that spot is more than one object (a
+visual terrain mesh plus a separate `-col` collision proxy, or — `Piece_2_1`'s exact case — two
+overlapping legacy meshes, `District_city_2_1_Terrain-col` **and** `..._Road`), select **all** of
+them before running the operator, in addition to (not instead of) the road piece itself. A mesh
+you forget to select is left completely untouched — silently, not skipped-with-a-warning — so it
+will keep showing the old bump/z-fight. Workflow: select every ground/terrain mesh to cut first,
+then shift-click any part of the road piece (a segment's spine/curb, or any part of an
+intersection) **last** so it ends up the active object, then run. The operator's own `INFO` report
+after running lists exactly which objects were cut — check it to confirm nothing was missed.
+Applies a real destructive Boolean modifier per target (undo reverses it, same as any other
+operator here) — Blender's boolean solver can still produce imperfect results on some
+concave/sloped DEM topology, so review the cut visually rather than trusting it blind.
 
 **Ambient traffic + zones:** every combined lane is tagged `zone_id` (the `.blend`'s own stem by
 default, overridable per-piece via a manually-added `rka_zone_id` custom property) — a district's

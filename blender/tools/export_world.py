@@ -27,6 +27,8 @@ import bpy, sys, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)                       # blender
+sys.path.insert(0, os.path.join(ROOT, "lib"))       # kit_common.bake_colonly_proxies
+import kit_common as kc
 # res:// world dir the baker reads from.
 PROJECT = os.path.dirname(ROOT)                    # repo root (…/third-person-shooter)
 OUT_DIR = os.path.join(PROJECT, "src", "main", "resources", "com", "openworld", "world")
@@ -86,6 +88,17 @@ if _gn:
     bpy.context.view_layer.objects.active = _gn[0]
     bpy.ops.object.convert(target='MESH')     # applies GN + realizes instances into real mesh
     print("realized %d GN-instanced layers into mesh for export" % len(_gn))
+
+# Bake road_kit_authoring's collision proxies (-colonly) for every pad_/curb_/spine_ GN boundary
+# object. 2026-08: this used to be baked LIVE in Blender during authoring/rebuild -- moved here
+# because a -colonly proxy is invisible/has zero authoring-time value while being the single
+# most expensive+crash-prone live rebuild operation (a to_mesh() depsgraph bake); same exact
+# bake (kit_common.colonly_mesh_evaluated, unchanged), just deferred to when it's actually
+# needed. Runs BEFORE export, same throwaway-load convention as the GN-realize step above --
+# these proxies never touch the source .blend, they only exist for this export.
+_colonly = kc.bake_colonly_proxies(bpy.context.scene.objects, bpy.context.scene.collection)
+if _colonly:
+    print("baked %d road_kit_authoring -colonly collision proxies for export" % len(_colonly))
 
 # Drop kit SOURCE objects before export. load_kits appends every kit piece (SM_*, Road_*, Deco_*, +
 # their -colonly proxies) at ORIGIN; hide_sources only hides them from RENDER, but the exporter takes

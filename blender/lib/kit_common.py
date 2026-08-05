@@ -314,6 +314,46 @@ def cut(target, x0, x1, y0, y1, z0, z1):
         bpy.data.collections.remove(tmp)
 
 
+def prism(name, poly_pts_xy, z0, z1, coll, matkey=None):
+    """A solid vertical prism over an arbitrary (not necessarily convex) closed 2D polygon
+    `poly_pts_xy = [(x, y), ...]` (world/local XY, NOT closed -- no repeated first==last point),
+    from world Z `z0` to `z1`. Same raw vert/face `from_pydata` style as `box()` (an N=4
+    special-case of this), generalized to N points: N bottom verts + N top verts, one bottom N-gon,
+    one top N-gon, N side quads. Winding order doesn't matter -- `recalc_normals` fixes it, same
+    as every other mesh builder here."""
+    n = len(poly_pts_xy)
+    verts = [(x, y, z0) for (x, y) in poly_pts_xy] + [(x, y, z1) for (x, y) in poly_pts_xy]
+    faces = [tuple(range(n)), tuple(range(2 * n - 1, n - 1, -1))]
+    for i in range(n):
+        j = (i + 1) % n
+        faces.append((i, j, n + j, n + i))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    recalc_normals(me)
+    return _new_obj(name, me, coll, matkey)
+
+
+def cut_polygon(target, poly_pts_xy, z0, z1):
+    """Boolean-difference an arbitrary-footprint opening (`prism`, not a box) out of `target`
+    (applies + cleans up) -- the same pattern as `cut()`, generalized from an axis-aligned box to
+    a road's own curved footprint (a segment's curb/sidewalk offset lines, or a junction's
+    `build_junction_boundary` boundary), so a cut follows the road's actual shape instead of
+    over-cutting a bounding box around a bent/curved piece. `z0`/`z1` are ABSOLUTE world Z (not
+    relative to `target`, since a cutter's own local transform is irrelevant to a boolean -- only
+    world-space mesh geometry matters)."""
+    cutter = prism("__cutter_poly", poly_pts_xy, z0, z1, get_coll("__tmp"))
+    m = target.modifiers.new("cut", 'BOOLEAN')
+    m.operation = 'DIFFERENCE'
+    m.object = cutter
+    bpy.context.view_layer.objects.active = target
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    bpy.data.objects.remove(cutter, do_unlink=True)
+    tmp = bpy.data.collections.get("__tmp")
+    if tmp and not tmp.objects:
+        bpy.data.collections.remove(tmp)
+
+
 # ----------------------------------------------------- collision proxy / export
 def colonly(visual, coll=None, inset=0.0):
     """Author a `<Name>-colonly` box proxy spanning the visual's local bounds.
@@ -377,18 +417,94 @@ def colonly_mesh_evaluated(visual, coll=None, name=None):
     itself is never deleted/recreated by any rebuild, per `rebuild_segment_gn_in_place`'s own
     docstring), but `clear_generated_mesh_objects`'s cleanup sweep matches a `pave_` prefix, not
     `spine_` -- passing `name="pave_<piece>"` keeps that convention (and the existing cleanup code)
-    working unchanged; without it, a fresh `pave_`-less orphan would pile up on every rebuild."""
+    working unchanged; without it, a fresh `pave_`-less orphan would pile up on every rebuild.
+
+    UPDATE-IN-PLACE (2026-08, the crash-surface fix -- the same reasoning as
+    `_poly_curve_with_radius`): if an object named `base + "-colonly"` already exists in `c`, its
+    MESH DATA is swapped for a freshly-evaluated one (`obj.data = new_mesh`, then free the old
+    mesh block) instead of deleting/recreating the OBJECT -- reassigning `.data` on a live object
+    is an ordinary, safe Blender operation (unlike `bpy.data.objects.remove`, which is what's
+    actually unsafe to do to an object a modal Transform operator is still holding). This keeps
+    the collision proxy's OWN object identity stable across a rebuild, same as the visual boundary
+    it copies."""
     c = coll or (visual.users_collection[0] if visual.users_collection else get_coll("ENV"))
     base = name or visual.name
     deps = bpy.context.evaluated_depsgraph_get()
     me = bpy.data.meshes.new_from_object(visual.evaluated_get(deps))
+    existing = c.objects.get(base + "-colonly")
+    if existing is not None and existing.type == 'MESH':
+        old_data = existing.data
+        existing.data = me
+        existing.matrix_world = visual.matrix_world
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        me.materials.clear()
+        me.materials.append(mat("col"))
+        existing["proxy_for"] = base
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
     p = bpy.data.objects.new(base + "-colonly", me)
     p.matrix_world = visual.matrix_world
     c.objects.link(p)
     p.data.materials.clear()
     p.data.materials.append(mat("col"))
     p["proxy_for"] = base
+    p["_rka_touched"] = True
     return p
+
+
+def bake_colonly_proxies(objects, target_coll):
+    """Generate a `-colonly` collision proxy for every `pad_*`/`curb_*`/`spine_*` GN-modified
+    Curve object in `objects` (typically a collection's own `.objects`, or a whole scene's),
+    linking each into `target_coll`. 2026-08: this is the EXPORT-TIME replacement for what used
+    to be baked live in Blender during authoring/rebuild (`ops_intersection._populate_
+    intersection_mesh`/`ops_segment._populate_segment_mesh_gn`/`_populate_transition_visuals`
+    each called `colonly_mesh_evaluated` directly) -- moved here because a `-colonly` proxy has
+    ZERO authoring-time value (it's invisible, existing purely so Godot's importer builds a
+    `CollisionShape3D`) while being the single most expensive AND most crash-prone live rebuild
+    operation (a `to_mesh()` depsgraph bake, confirmed to intermittently segfault even in
+    unmodified code in this Blender build). Moving it to export time removes that entire cost/
+    risk from live editing with no change to Godot's output -- same bake, just deferred to when
+    it's actually needed. `tools/export_world.py` calls this once over the whole loaded scene
+    right before glTF export.
+
+    Identifies candidates precisely (a modifier check, not a name-prefix guess) so it can never
+    accidentally catch an ASSET-style curb instancer (no "Pad"/"Curb"/"Road" modifier) or
+    anything unrelated: `junction_pad`/`curb_loop`-built objects (the "Pad"/"Curb" modifier
+    covers pad, L/R curb, median, AND sidewalk objects uniformly -- they all go through
+    `curb_loop`) and `road_spine`-built pavement (the "Road" modifier), the latter renamed
+    `pave_<piece>` to match `colonly_mesh_evaluated`'s existing `name=` convention (the spine
+    object itself is `spine_<piece>`, never `pave_<piece>` -- see that function's own docstring
+    for why the override exists).
+
+    `join_visual_mesh=True` special case: `join_meshes` bakes pad_/curb_/spine_'s GN modifiers
+    away and combines them into ONE plain `mesh_<piece>` object BEFORE export ever runs, so by
+    bake time there's no separate Pad/Curb/Road-modified Curve left for any of the branches above
+    to find. A `mesh_*` object (plain MESH, no live modifier -- already fully realized by the
+    join) gets ONE colonly proxy covering its whole combined footprint via the simpler
+    `colonly_mesh` (a plain data copy -- no depsgraph evaluation needed, there's no live
+    modifier left to evaluate through), rather than the fragmented per-piece colonlies a
+    non-joined build would get. This is a deliberate, arguably better outcome, not a compromise:
+    `join_visual_mesh` exists specifically to reduce object count, so collapsing collision the
+    same way the visual already did is consistent with that intent.
+
+    Returns the list of created/updated proxy objects (idempotent via `colonly_mesh_evaluated`'s
+    own update-in-place logic for the GN cases; `colonly_mesh`'s plain-copy case is delete/
+    recreate, which is fine -- this only ever runs at export time, never mid-drag)."""
+    out = []
+    for o in list(objects):
+        if o.type == 'CURVE':
+            if o.modifiers.get("Pad") is not None or o.modifiers.get("Curb") is not None:
+                out.append(colonly_mesh_evaluated(o, target_coll))
+            elif o.modifiers.get("Road") is not None and o.name.startswith("spine_"):
+                out.append(colonly_mesh_evaluated(o, target_coll,
+                                                    name="pave_" + o.name[len("spine_"):]))
+        elif o.type == 'MESH' and o.name.startswith("mesh_"):
+            existing = target_coll.objects.get(o.name + "-colonly")
+            if existing is not None:
+                bpy.data.objects.remove(existing, do_unlink=True)
+            out.append(colonly_mesh(o, target_coll))
+    return [p for p in out if p is not None]
 
 
 # ------------------------------------------------------------- lane centerlines
@@ -498,7 +614,40 @@ def poly_curve(name, pts, coll, loop=False, lane_width=None, oneway=True, end_be
     `lanecl_*`-shape object `RKA_OT_centerline_from_vertex_group` builds by hand from tagged mesh
     topology (see ops_centerline.py) -- this is the computed-geometry counterpart, used by
     `RKA_OT_build_intersection` for corner/turn centerlines generated from `lib/intersection_kit.py`.
-    Sets `curve.rka_curve` (lane_width/oneway/loop/end_behavior) when `lane_width` is given."""
+    Sets `curve.rka_curve` (lane_width/oneway/loop/end_behavior) when `lane_width` is given.
+
+    UPDATE-IN-PLACE (2026-08, the crash-surface fix): same convention as
+    `_poly_curve_with_radius` -- an existing object named `name` in `coll` with a matching point
+    count is rewritten in place rather than deleted/recreated (this is `lanecl_*`'s own builder,
+    the last remaining delete-recreate surface in the live-drag hot path)."""
+    existing = coll.objects.get(name)
+    if (existing is not None and existing.type == 'CURVE' and existing.data.splines
+            and len(existing.data.splines[0].points) == len(pts)):
+        # The shape is baked as ABSOLUTE world-space coordinates directly into the point data
+        # (not via the object's own transform), so the object's transform must always stay at
+        # identity -- but a reused object's transform is NOT implicitly reset just by rewriting
+        # its point data (unlike the old delete/recreate path, where a fresh object always
+        # started at identity for free). A real Grab/Rotate on a piece selection (`RKA_OT_
+        # select_piece` selects these generated objects too, not just markers) can leave this
+        # object's own location/rotation non-zero, which then double-transforms the already-
+        # absolute point data on every subsequent rebuild -- confirmed root cause of "arm/pad
+        # generation in a strange shape that's still wrong after releasing the drag" (2026-08).
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        sp = existing.data.splines[0]
+        for i, (x, y, z) in enumerate(pts):
+            sp.points[i].co = (x, y, z, 1.0)
+        sp.use_cyclic_u = loop
+        if lane_width is not None:
+            existing.data.rka_curve.lane_width = lane_width
+            existing.data.rka_curve.oneway = oneway
+            existing.data.rka_curve.loop = loop
+            existing.data.rka_curve.end_behavior = end_behavior
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
     cu = bpy.data.curves.new(name, 'CURVE')
     cu.dimensions = '3D'
     sp = cu.splines.new('POLY')
@@ -513,6 +662,7 @@ def poly_curve(name, pts, coll, loop=False, lane_width=None, oneway=True, end_be
         cu.rka_curve.end_behavior = end_behavior
     obj = bpy.data.objects.new(name, cu)
     coll.objects.link(obj)
+    obj["_rka_touched"] = True
     return obj
 
 
@@ -520,7 +670,16 @@ def flat_ribbon(name, pts, half_width, coll, matkey="asphalt"):
     """A flat, constant-`half_width` quad-strip mesh following the 3D polyline pts=[(x,y,z), ...]
     EXACTLY (same tangent-offset technique as `swept_wall`, just horizontal instead of vertical) --
     the visual driving surface under a computed lane centerline (see `poly_curve` /
-    `lib/intersection_kit.py`), so a generated turn reads as an actual road, not a bare line."""
+    `lib/intersection_kit.py`), so a generated turn reads as an actual road, not a bare line.
+
+    UPDATE-IN-PLACE (2026-08, the crash-surface fix -- same convention as `marking_ribbon`,
+    which this mirrors exactly: a dash/gap-free ribbon's vertex count is stable, but swapping an
+    existing object's MESH DATA is safe regardless of whether the new topology matches the old
+    one, unlike deleting the OBJECT, which is what's actually unsafe mid-drag -- so every
+    `ribbon_*` rebuild reuses its object by name unconditionally). This closes the last
+    identity-crash surface in `ops_segment`'s legacy point-segment rebuild path
+    (`rebuild_segment_in_place`), the one still-live-editable piece shape that never got the
+    GN-modifier treatment `road_spine`/`GN_RoadProfile` gave the newer curve-backed segments."""
     n = len(pts)
     if n < 2:
         return None
@@ -539,9 +698,25 @@ def flat_ribbon(name, pts, half_width, coll, matkey="asphalt"):
     me.from_pydata(verts, [], faces)
     me.update()
     recalc_normals(me)
+    existing = coll.objects.get(name)
+    if existing is not None and existing.type == 'MESH':
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        old_data = existing.data
+        existing.data = me
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        me.materials.clear()
+        me.materials.append(mat(matkey))
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
     obj = bpy.data.objects.new(name, me)
     coll.objects.link(obj)
     obj.data.materials.append(mat(matkey))
+    obj["_rka_touched"] = True
     return obj
 
 
@@ -660,9 +835,31 @@ def marking_ribbon(name, pts, half_width, coll, matkey, dash_len=0.0, gap_len=0.
     me.from_pydata(verts, [], faces)
     me.update()
     recalc_normals(me)
+    # UPDATE-IN-PLACE (2026-08, the crash-surface fix): a dash pattern's vertex/face count varies
+    # with segment length/dash settings, so this can't reuse `_poly_curve_with_radius`'s "same
+    # point count" check -- but swapping an existing object's MESH DATA is safe regardless of
+    # whether the new topology matches the old (unlike deleting the OBJECT, which is what's
+    # actually unsafe mid-drag), so every mark_* rebuild reuses its object by name unconditionally.
+    existing = coll.objects.get(name)
+    if existing is not None and existing.type == 'MESH':
+        # Same identity-transform requirement as `_poly_curve_with_radius` -- `verts` above are
+        # absolute world-space coordinates, so a reused object's transform must be reset to
+        # identity, not left however a prior Grab/Rotate on the piece selection may have set it.
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        old_data = existing.data
+        existing.data = me
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        me.materials.clear()
+        me.materials.append(mat(matkey))
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
     obj = bpy.data.objects.new(name, me)
     coll.objects.link(obj)
     obj.data.materials.append(mat(matkey))
+    obj["_rka_touched"] = True
     return obj
 
 
@@ -675,7 +872,10 @@ def swept_profile(name, pts, profile_2d, coll, matkey="concrete"):
     same sign convention as `swept_wall`'s `thickness`); `height` is added to each point's Z.
     Produces the walls between consecutive profile points only (no end caps or a top/bottom
     closing face) -- fine for a curb/gutter that abuts other geometry on its unseen sides; add
-    caps yourself if the profile is meant to be a free-standing closed solid."""
+    caps yourself if the profile is meant to be a free-standing closed solid.
+
+    UPDATE-IN-PLACE (2026-08, the crash-surface fix) -- same convention as `swept_wall`/
+    `flat_ribbon`, closing the legacy GUTTER-style curb's identity-crash surface."""
     n = len(pts)
     m = len(profile_2d)
     if n < 2 or m < 2:
@@ -697,9 +897,25 @@ def swept_profile(name, pts, profile_2d, coll, matkey="concrete"):
     me.from_pydata(verts, [], faces)
     me.update()
     recalc_normals(me)
+    existing = coll.objects.get(name)
+    if existing is not None and existing.type == 'MESH':
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        old_data = existing.data
+        existing.data = me
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        me.materials.clear()
+        me.materials.append(mat(matkey))
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
     obj = bpy.data.objects.new(name, me)
     coll.objects.link(obj)
     obj.data.materials.append(mat(matkey))
+    obj["_rka_touched"] = True
     return obj
 
 
@@ -883,7 +1099,14 @@ def instance_marker(name, asset_path, loc, rot_z, coll, show_proxy=True):
 
 def instancer(name, coords, piece, coll, loc=(0, 0, 0), rot_z=0.0, parent=None, rots=None):
     """Instance `piece` (object or source-name) at each point in `coords`.
-    rots: optional list of (rx,ry,rz) radians per point -> per-instance rotation."""
+    rots: optional list of (rx,ry,rz) radians per point -> per-instance rotation.
+
+    UPDATE-IN-PLACE (2026-08, the crash-surface fix -- same reasoning as
+    `_poly_curve_with_radius`/`colonly_mesh_evaluated`): if an object named `name` already exists
+    in `coll` with a "GN" Nodes modifier, its point-cloud MESH DATA is swapped in place instead of
+    deleting/recreating the object -- this is what makes ASSET-style curb (`curb_asset_row`, this
+    addon's only live-edit-hot-path caller of `instancer`) safe to leave alive across a rebuild,
+    same as the swept-profile curb styles already are."""
     if not coords:
         return None
     piece_name = piece if isinstance(piece, str) else piece.name
@@ -897,6 +1120,25 @@ def instancer(name, coords, piece, coll, loc=(0, 0, 0), rot_z=0.0, parent=None, 
         a = me.attributes.new("rot", 'FLOAT_VECTOR', 'POINT')
         for i, rv in enumerate(rots):
             a.data[i].vector = rv
+    existing = coll.objects.get(name)
+    if existing is not None and existing.type == 'MESH' and existing.modifiers.get("GN") is not None:
+        old_data = existing.data
+        existing.data = me
+        existing.location = loc
+        existing.rotation_euler = (0, 0, math.radians(rot_z))
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        set_mod_input(existing.modifiers["GN"], obj_id,
+                      piece if isinstance(piece, bpy.types.Object) else src(piece))
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
+    if existing is not None:
+        # A same-named object exists but isn't a reusable instancer (e.g. a curb style switched
+        # from BOX/GUTTER -- a Curve with a "Curb" modifier -- to ASSET) -- delete it explicitly
+        # so the fresh object below claims the clean `name` instead of Blender auto-suffixing a
+        # ".001" onto it (which would silently break every exact-name lookup elsewhere, e.g.
+        # `coll.objects["curb_<piece>_L"]`), matching `_poly_curve_with_radius`'s own fallback.
+        bpy.data.objects.remove(existing, do_unlink=True)
     obj = bpy.data.objects.new(name, me)
     coll.objects.link(obj)
     obj.location = loc
@@ -907,6 +1149,7 @@ def instancer(name, coords, piece, coll, loc=(0, 0, 0), rot_z=0.0, parent=None, 
     mod = obj.modifiers.new("GN", "NODES")
     mod.node_group = ng
     set_mod_input(mod, obj_id, piece if isinstance(piece, bpy.types.Object) else src(piece))
+    obj["_rka_touched"] = True
     return obj
 
 
@@ -1029,7 +1272,12 @@ def swept_wall(name, pts, h, coll, matkey="concrete", thickness=0.18, z0=0.0):
     """A CONTINUOUS vertical barrier following the 3D polyline pts=[(x,y,z), ...]: a thin
     solid wall (box section) from z+z0 up by `h`, welded end-to-end with NO gaps — the fix
     for instanced straight panels that gap/overlap on a tight curve. Stays world-vertical
-    (Curve-to-Mesh can't keep a wall profile upright on a banked/climbing spine)."""
+    (Curve-to-Mesh can't keep a wall profile upright on a banked/climbing spine).
+
+    UPDATE-IN-PLACE (2026-08, the crash-surface fix) -- same convention as `flat_ribbon`/
+    `marking_ribbon`: reuses an existing same-named object's mesh data unconditionally instead of
+    deleting/recreating the object, closing the legacy BOX-style curb's identity-crash surface in
+    `ops_segment.rebuild_segment_in_place`."""
     n = len(pts)
     if n < 2:
         return None
@@ -1050,8 +1298,24 @@ def swept_wall(name, pts, h, coll, matkey="concrete", thickness=0.18, z0=0.0):
     faces += [(0, 1, 2, 3), ((n-1)*4, (n-1)*4 + 3, (n-1)*4 + 2, (n-1)*4 + 1)]   # end caps
     me = bpy.data.meshes.new(name)
     me.from_pydata(verts, [], faces); me.update(); recalc_normals(me)
+    existing = coll.objects.get(name)
+    if existing is not None and existing.type == 'MESH':
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        old_data = existing.data
+        existing.data = me
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        me.materials.clear()
+        me.materials.append(mat(matkey))
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
     obj = bpy.data.objects.new(name, me); coll.objects.link(obj)
     obj.data.materials.append(mat(matkey))
+    obj["_rka_touched"] = True
     return obj
 
 
@@ -1226,7 +1490,40 @@ def _poly_curve_with_radius(name, pts_radius, coll, closed=True):
     builds its OWN boundary object from the same `pts_radius` (two small curve datablocks, not two
     GN outputs off one object) since a pad (Fill Curve) and a curb (Curve to Mesh) are genuinely
     different meshes that both need to coexist as separate exportable objects, same as this
-    addon's other pieces."""
+    addon's other pieces.
+
+    UPDATE-IN-PLACE (2026-08, the crash-surface fix): if an object named `name` already exists in
+    `coll` with a POLY spline of the SAME point count, its point data is rewritten in place
+    (whole-tuple `co` writes, matching `road_kit_authoring.live_edit._translate_spine`'s own safe
+    convention) and that SAME object is returned -- no `bpy.data.objects.remove`/`.new` at all.
+    This is what actually removes the "delete the object a modal Transform operator is still
+    holding" crash class for `junction_pad`/`curb_loop`, which previously reconstructed a fresh
+    object (and, worse, a fresh GN modifier -- see `junction_pad`/`curb_loop`'s own update-in-place
+    handling of that) on every single drag tick. Point COUNT changing (e.g. an arm added/removed,
+    or a curb style toggled) is a genuinely different topology -- that case still deletes and
+    rebuilds fresh, same as before, but only ever happens from a deliberate button click, never a
+    live drag, so the reentrancy hazard this fix targets doesn't apply there anyway."""
+    existing = coll.objects.get(name)
+    if (existing is not None and existing.type == 'CURVE' and existing.data.splines
+            and len(existing.data.splines[0].points) == len(pts_radius)):
+        # `pts_radius` are absolute world-space coordinates -- the object's own transform must
+        # stay at identity (see the update-in-place note above), but reusing an object does NOT
+        # implicitly reset a transform a prior Grab/Rotate on the piece selection may have left
+        # non-zero (`RKA_OT_select_piece` selects pad_/curb_ objects too, not just markers).
+        # Confirmed root cause of "arm/pad generation in a strange shape, still wrong after
+        # releasing the drag" (2026-08) -- reset explicitly on every reuse.
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        sp = existing.data.splines[0]
+        for i, (x, y, z, r) in enumerate(pts_radius):
+            sp.points[i].co = (x, y, z, 1.0)
+            sp.points[i].radius = max(r, 1e-4)   # exactly 0 confuses Fillet Curve's Poly mode
+        sp.use_cyclic_u = closed
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
     cu = bpy.data.curves.new(name + "_bound", 'CURVE')
     cu.dimensions = '3D'
     sp = cu.splines.new('POLY')
@@ -1237,6 +1534,8 @@ def _poly_curve_with_radius(name, pts_radius, coll, closed=True):
     sp.use_cyclic_u = closed
     obj = bpy.data.objects.new(name + "_bound", cu)
     coll.objects.link(obj)
+    obj.name = name   # match the update-in-place identity check above on the NEXT call
+    obj["_rka_touched"] = True
     return obj
 
 
@@ -1325,8 +1624,10 @@ def junction_pad(name, boundary_pts_radius, coll, matkey="asphalt", segments=8):
     needs restoring at all (Fill Curve silently flattens to 0 otherwise)."""
     bound = _poly_curve_with_radius(name, boundary_pts_radius, coll, closed=True)
     ng, (mat_id, seg_id, z_id) = make_junction_pad_group()
-    mod = bound.modifiers.new("Pad", "NODES")
-    mod.node_group = ng
+    mod = bound.modifiers.get("Pad")   # reuse the existing modifier when `bound` was updated
+    if mod is None:                     # in place -- a second `.modifiers.new("Pad", ...)` would
+        mod = bound.modifiers.new("Pad", "NODES")   # stack a redundant "Pad.001" instead
+        mod.node_group = ng
     set_mod_input(mod, mat_id, mat(matkey))
     set_mod_input(mod, seg_id, segments)
     set_mod_input(mod, z_id, boundary_pts_radius[0][2] if boundary_pts_radius else 0.0)
@@ -1462,12 +1763,21 @@ def curb_loop(name, boundary_pts_radius, coll, curb_style='BOX', curb_height=0.1
     `None` for `curb_style == 'NONE'` (curb toggled off -- the caller skips linking/using the
     result, no wasted empty object is created at all)."""
     if curb_style == 'NONE':
+        # A rebuild that switches an EXISTING curb to NONE (RKA_OT_set_curb_style) must still
+        # clean up the now-stale object -- `_poly_curve_with_radius`'s update-in-place path is
+        # never reached in this branch (nothing to update it FROM), so this is the one place
+        # left that still needs an explicit delete for the "topology changed" case.
+        stale = coll.objects.get(name)
+        if stale is not None:
+            bpy.data.objects.remove(stale, do_unlink=True)
         return None
     bound = _poly_curve_with_radius(name, boundary_pts_radius, coll, closed=closed)
     ng, (mat_id, seg_id, prof_id) = make_curb_loop_group()
     prof_obj = _curb_profile_object(curb_style, curb_height, curb_thickness)
-    mod = bound.modifiers.new("Curb", "NODES")
-    mod.node_group = ng
+    mod = bound.modifiers.get("Curb")   # reuse in place -- see junction_pad's identical reasoning
+    if mod is None:
+        mod = bound.modifiers.new("Curb", "NODES")
+        mod.node_group = ng
     set_mod_input(mod, mat_id, mat(matkey))
     set_mod_input(mod, seg_id, segments)
     set_mod_input(mod, prof_id, prof_obj)
@@ -1561,10 +1871,30 @@ def colonly_swept(name, cpts, half_w, coll, z0=-0.4, z1=0.0, miter_limit=4.0):
     faces += [(0, 1, 2, 3), ((n-1)*4, (n-1)*4+3, (n-1)*4+2, (n-1)*4+1)]   # end caps
     me = bpy.data.meshes.new(name + "-colonly")
     me.from_pydata(verts, [], faces); me.update(); recalc_normals(me)
+    # UPDATE-IN-PLACE (2026-08, the crash-surface fix): closes the legacy point-segment path's
+    # last identity-crash surface (`ops_segment._populate_segment_mesh`'s own live pavement
+    # collision bake, still called on every `rebuild_segment_in_place` tick). `proxy_for` already
+    # matches `ops_intersection.clear_generated_mesh_objects`'s existing "-colonly" + proxy_for
+    # sparing condition, so no change needed there -- reusing this object is enough.
+    existing = coll.objects.get(name + "-colonly")
+    if existing is not None and existing.type == 'MESH':
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        old_data = existing.data
+        existing.data = me
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        existing["proxy_for"] = name
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
     obj = bpy.data.objects.new(name + "-colonly", me)
     coll.objects.link(obj)
     obj.data.materials.append(mat("col"))
     obj["proxy_for"] = name
+    obj["_rka_touched"] = True
     return obj
 
 

@@ -8,8 +8,11 @@ named arm within the CORRECT intersection (not a same-named arm belonging to a d
 RUN: blender --background --python addons/road_kit_authoring/smoketest_select_piece.py
 """
 import bpy
+import math
 import os
 import sys
+
+import mathutils
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ADDONS_DIR = os.path.dirname(HERE)
@@ -128,6 +131,42 @@ def main():
     except RuntimeError as exc:
         _assert("not a local road_kit_authoring piece" in str(exc), "unexpected error: %s" % exc)
     print("select_piece_by_name smoketest: a bogus/non-piece collection name is rejected cleanly")
+
+    # --- Regression (2026-08, user-reported: "the arm/pad generation seem in strange shape...
+    # still wrong after releasing/finishing the drag"): select_piece selects every generated
+    # pad_/curb_ object too, not just markers, so a real Grab/Rotate on that selection (Pivot
+    # Point = Active Element, exactly what select_piece sets up) rigidly transforms THEIR OWN
+    # object transform -- but pad_/curb_ shape is baked as absolute world-space point data, which
+    # must sit on an identity-transform object. Confirm a rebuild resets that transform back to
+    # identity instead of silently carrying the corruption forward forever.
+    for o in bpy.data.objects:
+        o.select_set(False)
+    for o in coll.objects:
+        o.select_set(True)
+    context.view_layer.objects.active = marker
+    pivot = marker.location.copy()
+    angle = math.radians(25.0)
+    rot_mat = mathutils.Matrix.Rotation(angle, 4, 'Z')
+    for o in coll.objects:
+        rel = o.location - pivot
+        o.location = pivot + rot_mat @ rel
+        o.rotation_euler.z += angle
+    pad = coll.objects["pad_%s" % coll.name]
+    _assert(abs(pad.rotation_euler.z) > 1e-6,
+            "sanity: the simulated rigid rotate should have moved pad's own rotation off identity")
+
+    opint.rebuild_intersection_in_place(context, coll)
+    coll = opint.local_collection(coll.name)
+    pad_after = coll.objects["pad_%s" % coll.name]
+    _assert(pad_after.rotation_euler.z == 0.0 and tuple(pad_after.location) == (0.0, 0.0, 0.0),
+            "a rebuild must reset a reused pad_/curb_ object's transform back to identity -- got "
+            "rotation.z=%.6f location=%r (this was the 'strange shape after drag' bug)"
+            % (pad_after.rotation_euler.z, tuple(pad_after.location)))
+    curb0 = next(o for o in coll.objects if o.name.startswith("curb_%s_" % coll.name))
+    _assert(curb0.rotation_euler.z == 0.0 and tuple(curb0.location) == (0.0, 0.0, 0.0),
+            "a rebuild must also reset a reused curb boundary object's transform to identity")
+    print("select_piece smoketest: a rebuild after a whole-piece Grab/Rotate resets pad_/curb_ "
+          "object transforms back to identity (the select_piece + rigid-transform corruption fix)")
 
     print("SMOKETEST OK")
 

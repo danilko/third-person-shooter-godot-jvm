@@ -35,8 +35,25 @@ def _assert(cond, msg):
         raise AssertionError(msg)
 
 
-def _lanecl_tags(coll):
-    return sorted(o.name for o in coll.objects if o.name.startswith("lanecl_"))
+def _movement_tags(coll):
+    """Recompute the movement set `_populate_intersection_mesh` would build for `coll`'s CURRENT
+    arms + lane_map override, directly from data. Replaces the old lanecl_* live-object scan
+    (those objects were removed 2026-08 -- confirmed export-redundant, no visual mesh of their
+    own) as the observable proxy for "did changing the lane map override actually change which
+    movements are legal" -- same tag format (`<from><to>_L<n>` / `_L<a>to<b>`) those objects used
+    to be named, so this is a like-for-like replacement of the assertion, not a weaker one."""
+    import intersection_kit as k
+    arms = custom_props.read_arms_full(coll, k.Arm)
+    kerb_radius = coll.get("rka_kerb_radius", 9.0)
+    tail_length = coll.get("rka_tail_length", 12.0)
+    lane_map = custom_props.read_lane_map_override(coll)
+    movements = k.build_lane_movements(arms, kerb_radius, tail_length=tail_length, lane_map=lane_map)
+    tags = set()
+    for m in movements:
+        lane_tag = ("L%d" % m["lane_in"] if m["lane_in"] == m["lane_out"]
+                    else "L%dto%d" % (m["lane_in"], m["lane_out"]))
+        tags.add("%s%s_%s" % (m["from"], m["to"], lane_tag))
+    return sorted(tags)
 
 
 def main():
@@ -54,7 +71,7 @@ def main():
         None, False, "", "", 'LEFT')
     coll = result["coll"]
     _assert("rka_lane_map" not in coll.keys(), "fresh build should have no lane_map override")
-    default_tags = _lanecl_tags(coll)
+    default_tags = _movement_tags(coll)
     _assert(len(default_tags) > 0, "should have some default lane movements")
 
     context.view_layer.objects.active = next(o for o in coll.objects if "rka_arm_name" in o.keys())
@@ -102,7 +119,7 @@ def main():
     ret = bpy.ops.rka.set_lane_map('EXEC_DEFAULT', lane_map_text="")
     _assert(ret == {'FINISHED'}, "clearing did not finish: %s" % (ret,))
     _assert("rka_lane_map" not in coll.keys(), "blank text should remove the override entirely")
-    cleared_tags = _lanecl_tags(coll)
+    cleared_tags = _movement_tags(coll)
     _assert(cleared_tags == default_tags,
             "clearing the override should restore the exact original default lane movements")
     print("smoketest_lane_map_panel: blank text cleared the override and restored default lane "

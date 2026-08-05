@@ -16,7 +16,9 @@ from . import ops_centerline
 from . import ops_combine
 from . import ops_intersection
 from . import ops_segment
+from . import ops_ground
 from . import live_edit
+from . import median_merge  # noqa: F401  (no operators of its own -- live_edit calls into it directly)
 from . import traffic_viz
 from . import ops_export
 from . import ops_group_edit
@@ -25,8 +27,8 @@ from . import session_dirty
 from . import panel
 
 MODULES = (props, ops_placement, ops_centerline, ops_combine, ops_intersection, ops_segment,
-           live_edit, traffic_viz, ops_export, ops_group_edit, ops_world_session, session_dirty,
-           panel)
+           ops_ground, live_edit, traffic_viz, ops_export, ops_group_edit, ops_world_session,
+           session_dirty, panel)
 
 
 def register():
