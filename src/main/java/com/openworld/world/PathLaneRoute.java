@@ -9,6 +9,12 @@ import godot.api.Node3D;
 import godot.api.Path3D;
 import godot.core.PackedVector3Array;
 import godot.core.Vector3;
+import godot.global.GD;
+
+import com.openworld.util.WeightedPick;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A directional lane backed by a native {@link Path3D}/{@link Curve3D} instead of the
@@ -25,9 +31,12 @@ import godot.core.Vector3;
  * might still be reshaping), a {@code PathLaneRoute}'s curve is fixed the moment it's built — its
  * arc-length cache is computed once in {@link #_ready()}, not rebuilt on demand.
  *
- * <p><b>Connectivity for this route type is entirely geometry-derived</b> ({@link LaneGraph}) —
- * {@link #pickNextRoute()}/{@link #resolveRoute(String)} always return null; there is no
- * explicit-successor string list to parse (unlike {@code VehicleRoute.nextRoutes}). It DOES
+ * <p><b>Connectivity is geometry-derived by default</b> ({@link LaneGraph}), with an EXPLICIT
+ * override where geometry is not enough: {@link #nextRoutes}/{@link #nextWeights}/
+ * {@link #nextKinds} plus {@link #innerLane}/{@link #outerLane} are baked from the sidecar for
+ * interchange pieces, because at a gore every lane end is within a few metres of every other and
+ * proximity cannot tell a mainline continuing from a ramp departing. A plain lane leaves them
+ * empty and stays entirely on the proximity path. It DOES
  * register with {@link WorldZoneManager}'s route registry (as of the road_kit_authoring district
  * integration — see {@code road_blender_godot.md} Phase 6), so a {@code PathLaneRoute} network can
  * participate in ambient/disposable-traffic zone spawn configs exactly like a {@code VehicleRoute}
@@ -52,6 +61,47 @@ public class PathLaneRoute extends Node3D implements Lane {
 
     /** Lane width (m) — informational, from the exported sidecar's {@code lane_width}. */
     @Export @RegisterProperty public float laneWidth = 3.5f;
+
+    // ── Explicit road-network connectivity (Phase 3) ──────────────────────────────────────────
+    // Endpoint proximity ({@link LaneGraph}) is right for the overwhelming majority of joints and
+    // WRONG at exactly one place: a gore, where every lane end of a mainline and a ramp sits
+    // within a few metres of every other. Geometry there cannot tell a mainline continuing from a
+    // ramp departing, so a car has no basis to choose and an AI has nothing to reason about. These
+    // fields carry the authored answer, baked from the `.lanekit.json` sidecar.
+
+    /** Comma-separated explicit successor lane node names — same format as
+     *  {@code VehicleRoute.nextRoutes}, so {@code util.WeightedPick} parses both. Empty on a plain
+     *  lane, which keeps it on the proximity path. */
+    @Export @RegisterProperty public String nextRoutes = "";
+
+    /** Comma-separated weights parallel to {@link #nextRoutes}. */
+    @Export @RegisterProperty public String nextWeights = "";
+
+    /** Comma-separated movement kinds parallel to {@link #nextRoutes} —
+     *  {@code THROUGH} / {@code EXIT} / {@code ENTRY}. <b>This is what an AI reads to know an
+     *  interchange is an interchange</b>: "the target took the EXIT" is not derivable from
+     *  geometry at a gore. */
+    @Export @RegisterProperty public String nextKinds = "";
+
+    /** The lane immediately INBOARD of this one (toward the centreline) that a car may change
+     *  into, or "". */
+    @Export @RegisterProperty public String innerLane = "";
+
+    /** The lane immediately OUTBOARD of this one (toward the road edge) that a car may change
+     *  into, or "".
+     *
+     *  <p>In/out rather than left/right deliberately: it is measured against the driving divide,
+     *  so it reads the same whichever side of the road the world drives on, and OUTBOARD is always
+     *  the side an exit ramp is on. <b>Lane-change adjacency is not a nicety</b> — an auxiliary
+     *  exit lane BEGINS mid-carriageway with nothing upstream to follow from, so it is reachable
+     *  only by changing lanes. Without this the ramp is in the graph but unreachable. */
+    @Export @RegisterProperty public String outerLane = "";
+
+    /** The multi-piece structure this lane belongs to (e.g. {@code "IC_CHUO_split"}), or "". */
+    @Export @RegisterProperty public String linkGroup = "";
+
+    /** This piece's role in {@link #linkGroup} — {@code trunk} / {@code branch_a} / {@code branch_b}. */
+    @Export @RegisterProperty public String linkRole = "";
 
     /** End-of-lane behaviour: {@link VehicleRoute#END_CHAIN} / {@link VehicleRoute#END_UTURN} /
      *  {@link VehicleRoute#END_DESPAWN}. */
@@ -204,11 +254,62 @@ public class PathLaneRoute extends Node3D implements Lane {
         return best;
     }
 
+    /**
+     * A weighted-random explicit successor from {@link #nextRoutes} / {@link #nextWeights}, or
+     * null when none is set or resolves — in which case {@link LaneGraph}'s endpoint-proximity
+     * derivation still applies, unchanged. Mirrors {@code VehicleRoute.pickNextRoute} exactly,
+     * including keeping weights parallel through resolution so an unresolved name (its district
+     * not streamed in yet) drops its weight with it and the survivors keep their relative bias.
+     */
     @Override
-    public Lane pickNextRoute() { return null; }   // geometry-derived connectivity only (LaneGraph)
+    public Lane pickNextRoute() {
+        if (loop || nextRoutes == null || nextRoutes.isBlank()) return null;
+        float[] baked = WeightedPick.parseWeights(nextWeights);
+        String[] names = nextRoutes.split(",");
+        List<Lane> candidates = new ArrayList<>();
+        List<Float> kept = new ArrayList<>();
+        for (int i = 0; i < names.length; i++) {
+            String nm = names[i].trim();
+            if (nm.isEmpty()) continue;
+            Lane r = resolveRoute(nm);
+            if (r == null || r == this) continue;
+            candidates.add(r);
+            kept.add(baked != null && baked.length == names.length ? baked[i] : 1f);
+        }
+        if (candidates.isEmpty()) return null;
+        float[] w = new float[kept.size()];
+        for (int i = 0; i < w.length; i++) w[i] = kept.get(i);
+        return candidates.get(WeightedPick.pick(candidates.size(), w, GD.randf()));
+    }
 
+    /**
+     * Resolve any lane by node name through the {@link WorldZoneManager} registry — the same
+     * registry read {@code VehicleRoute.resolveRoute} uses, never a scene-tree scan (those were
+     * the "periodic hitch in all movement" regression). Unlike {@code VehicleRoute}'s version this
+     * one is deliberately NOT type-filtered: a baked interchange is all {@code PathLaneRoute}s,
+     * but a hand-authored {@code VehicleRoute} feeding into one is a legitimate network and there
+     * is no reason to refuse it.
+     */
     @Override
-    public Lane resolveRoute(String name) { return null; }
+    public Lane resolveRoute(String name) {
+        if (name == null || name.isBlank()) return null;
+        WorldZoneManager mgr = WorldZoneManager.get();
+        return mgr == null ? null : mgr.routeByName(name.trim());
+    }
+
+    /** The movement kind ({@code THROUGH}/{@code EXIT}/{@code ENTRY}) for successor {@code lane},
+     *  or "" if it is not an explicit successor of this one. What an AI asks when it needs to know
+     *  whether a target leaving this lane took the ramp or stayed on the mainline. */
+    @RegisterFunction
+    public String movementKindTo(String laneName) {
+        if (nextRoutes == null || nextRoutes.isBlank() || laneName == null) return "";
+        String[] names = nextRoutes.split(",");
+        String[] kinds = nextKinds == null ? new String[0] : nextKinds.split(",");
+        for (int i = 0; i < names.length; i++)
+            if (names[i].trim().equals(laneName.trim()))
+                return i < kinds.length ? kinds[i].trim() : "THROUGH";
+        return "";
+    }
 
     @Override public String getTurn() { return turn; }
     @Override public String getApproach() { return approach; }

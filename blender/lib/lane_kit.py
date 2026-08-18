@@ -213,11 +213,80 @@ def combine_pieces(pieces, tolerance=JUNCTION_RADIUS):
             arms_out.append(a)
         all_points.extend(derive_connection_points(piece_id, piece_dict))
 
+    resolve_links(lanes_out)
+
     clusters = cluster_points(all_points, tolerance)
     reports = [classify_cluster(c) for c in clusters]
     order = {"ambiguous": 0, "isolated": 1, "paired": 2}
     reports.sort(key=lambda r: order[r["status"]])
     return {"lanes": lanes_out, "arms": arms_out}, reports
+
+
+def resolve_links(lanes):
+    """Turn each lane's SYMBOLIC references into concrete combined-namespace lane ids:
+    `next_refs` -> `next` / `next_weights` / `next_kinds`, and `neighbor_in`/`neighbor_out` ->
+    `inner_lane`/`outer_lane`.
+
+    Resolution happens HERE because this is the only place that sees every piece. A piece is
+    exported alone and cannot know what its siblings were named -- collection names are
+    auto-numbered at build time, and every id is namespaced `<piece>__<id>` on the way in here.
+    So `lane_export` emits "the piece in my group with role `branch_a`, its slot `A0`" and this
+    pass looks it up.
+
+    EXPLICIT CONNECTIVITY IS ADDITIVE, NEVER SUBTRACTIVE. Only lanes that actually carry
+    references gain a `next`; every plain butt joint stays on the runtime's endpoint-proximity
+    path exactly as before (`LaneGraph`). That matters because proximity is right for the
+    overwhelming majority of joints and wrong only where several lane ends coincide -- a gore,
+    where it cannot tell a mainline continuing from a ramp departing. A reference that does not
+    resolve is dropped rather than guessed at, so a half-built group degrades to proximity instead
+    of inventing a movement."""
+    by_group = {}
+    for l in lanes:
+        g, r, slot = l.get("link_group"), l.get("link_role"), l.get("slot_id")
+        if g and r and slot:
+            by_group.setdefault((g, r, slot), l)
+    # lane-change neighbours are always within the SAME piece
+    by_piece_slot = {(l.get("piece_id"), l.get("slot_id")): l for l in lanes if l.get("slot_id")}
+    for l in lanes:
+        # in/out, not left/right: measured against the driving divide, so the answer does
+        # not flip with `traffic_side`. OUTER is always toward the road edge, which is
+        # where an exit ramp is. See `lane_profile.lane_neighbors`.
+        for src, dst in (("neighbor_in", "inner_lane"), ("neighbor_out", "outer_lane")):
+            nb = l.pop(src, None)
+            if nb:
+                other = by_piece_slot.get((l.get("piece_id"), nb))
+                if other is not None:
+                    l[dst] = other["id"]
+        refs = l.pop("next_refs", None)
+        if not refs:
+            continue
+        ids, weights, kinds = [], [], []
+        for ref in refs:
+            if ref.get("piece"):
+                # A PIECE-addressed ref: an ordinary joint between two collections that meet, with
+                # no structure name to key on (`lane_export.emit_joint_links`). `lane_id` is the
+                # target's own pre-namespace id, which pins the exact lane when several slots
+                # share an id across pieces -- the slot alone is not unique between two arbitrary
+                # collections the way it is within one split group.
+                tgt = by_piece_slot.get((ref["piece"], ref.get("slot")))
+                if tgt is None and ref.get("lane_id"):
+                    tgt = next((o for o in lanes if o.get("piece_id") == ref["piece"]
+                                and o.get("id", "").endswith("__" + ref["lane_id"])), None)
+            else:
+                # `group` present = a reference into a DIFFERENT structure (two interchanges that
+                # abut with no ordinary road between them); absent = within this lane's own.
+                tgt = by_group.get((ref.get("group") or l.get("link_group"),
+                                    ref.get("role"), ref.get("slot")))
+            if tgt is None:
+                continue
+            ids.append(tgt["id"])
+            weights.append(float(ref.get("weight", 1.0)))
+            kinds.append(ref.get("kind", "THROUGH"))
+        if ids:
+            l["next"] = ids
+            l["next_weights"] = weights
+            l["next_kinds"] = kinds
+    return lanes
 
 
 def summarize_reports(reports):

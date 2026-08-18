@@ -432,6 +432,16 @@ public class WorldBaker extends Node {
         lane.endBehavior = VehicleRoute.END_CHAIN;   // geometry-derived connectivity (LaneGraph) picks the successor
         lane.laneWidth = laneWidthByArm.getOrDefault(fromArm, 3.5f);
         lane.zoneId = jsonString(laneDict, "zone_id", "");
+        // Explicit road-network connectivity (Phase 3). Absent on a plain lane, which leaves the
+        // fields empty and keeps it on LaneGraph's endpoint-proximity path exactly as before --
+        // these are ADDITIVE, only interchange pieces carry them.
+        lane.nextRoutes = jsonStringList(laneDict, "next");
+        lane.nextWeights = jsonStringList(laneDict, "next_weights");
+        lane.nextKinds = jsonStringList(laneDict, "next_kinds");
+        lane.innerLane = jsonString(laneDict, "inner_lane", "");
+        lane.outerLane = jsonString(laneDict, "outer_lane", "");
+        lane.linkGroup = jsonString(laneDict, "link_group", "");
+        lane.linkRole = jsonString(laneDict, "link_role", "");
 
         Curve3D curve = new Curve3D();
         for (Object ptObj : pointsArr) {
@@ -448,6 +458,22 @@ public class WorldBaker extends Node {
                                   // brings the whole subtree live) finds Path3D already populated
         root.addChild(lane);
         return lane;
+    }
+
+    /** A JSON array of scalars as the comma-separated string {@code VehicleRoute.nextRoutes} /
+     *  {@code util.WeightedPick} already parse — so the sidecar can stay a natural JSON list while
+     *  the exported Godot property keeps the one format both route types share. Missing/empty
+     *  yields "", which is the "no explicit connectivity here" signal. */
+    private static String jsonStringList(Dictionary<?, ?> d, String key) {
+        Object v = d.get(key);
+        if (!(v instanceof VariantArray<?> arr) || arr.size() == 0) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Object o : arr) {
+            if (!present(o)) continue;
+            if (sb.length() > 0) sb.append(',');
+            sb.append(o.toString());
+        }
+        return sb.toString();
     }
 
     private static String jsonString(Dictionary<?, ?> d, String key, String def) {

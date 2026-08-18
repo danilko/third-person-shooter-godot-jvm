@@ -48,6 +48,13 @@ public final class LaneGraph {
     /** Lanes a car may continue onto at the end of {@code lane} — outgoing lanes at its end-junction,
      *  minus the direct reverse. Empty when the lane dead-ends (no connected lane). */
     public static List<Lane> successorsOf(Lane lane) {
+        // EXPLICIT SUCCESSORS WIN. Proximity is right almost everywhere and wrong at exactly one
+        // place: a gore, where a mainline's and a ramp's lane ends all sit within JUNCTION_RADIUS
+        // of each other, so this pass would return "any of them" and a car would fork at random --
+        // and an AI could not tell which movement a target actually made. A lane that carries
+        // authored successors uses them instead. Everything else falls through unchanged.
+        List<Lane> explicit = explicitSuccessorsOf(lane);
+        if (!explicit.isEmpty()) return explicit;
         LaneGraph g = forScene(lane);
         if (g == null) return new ArrayList<>();
         Integer ej = g.endJunction.get(lane);
@@ -57,6 +64,19 @@ public final class LaneGraph {
         for (Lane o : g.outgoing.getOrDefault(ej, new ArrayList<>()))
             if (o != lane && o != rev) result.add(o);
         return result;
+    }
+
+    /** Authored successors of {@code lane}, resolved through the route registry — empty for any
+     *  lane that carries none (every plain road), which is what keeps this additive. */
+    private static List<Lane> explicitSuccessorsOf(Lane lane) {
+        List<Lane> out = new ArrayList<>();
+        if (!(lane instanceof PathLaneRoute p) || p.nextRoutes == null || p.nextRoutes.isBlank())
+            return out;
+        for (String nm : p.nextRoutes.split(",")) {
+            Lane r = p.resolveRoute(nm);
+            if (r != null && r != lane) out.add(r);
+        }
+        return out;
     }
 
     /** The lane running back the way {@code lane} came (starts at its end-junction, ends at its
