@@ -2430,7 +2430,7 @@ multi-piece export work resumes.
 
 ### Follow-up (2026-07-28): curb end-caps blocking every segment connection — the REAL bug behind the "bump"
 
-**User pushed back** on the Segment_002-only fix above: all 14 segments still showed the issue
+**User pushed back** on the Segment_002-only fix above: all 14 segments stiowed the issue
 live in Godot, and it reproduced on a completely fresh build too (build intersection → Extend
 From Arm → export → walk from the segment toward the intersection = a bump). User's own read was
 sharp and correct: "the road generated segment is below spline/curve of segment road, so the

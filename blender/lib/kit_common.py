@@ -60,13 +60,23 @@ VIEW_CLIP_END = 100000.0
 def setup_view_clip(end=VIEW_CLIP_END):
     """Set the far clip on every 3D viewport of every screen/workspace stored in the file, so
     the saved .blend opens showing the whole world. Works headless too — bpy.data.screens is
-    the file's saved UI data, no window needed."""
+    the file's saved UI data, no window needed.
+
+    THE NEAR CLIP MOVES WITH IT. Depth precision is governed by the RATIO far/near, not by the
+    far plane alone, and Blender's own defaults (0.01 m / 1000 m) sit at 1e5. Pushing the far
+    plane out two orders of magnitude while leaving the near plane at 0.01 takes that ratio to
+    1e7, which z-fights surfaces a few centimetres apart -- exactly the separation a kerb, a
+    painted median and a deck slab sit at. So the near plane is raised to hold the same ratio the
+    default view has, which is invisible at world scale (you cannot get within 10 cm of anything
+    while framing a 3 km island) and keeps close surfaces readable."""
+    near = max(0.01, end / 1.0e5)
     for scr in bpy.data.screens:
         for area in scr.areas:
             if area.type == 'VIEW_3D':
                 for sp in area.spaces:
                     if sp.type == 'VIEW_3D':
                         sp.clip_end = end
+                        sp.clip_start = near
 
 
 def setup_units():
@@ -165,7 +175,61 @@ def get_mat(name, rgba):
     return mat
 
 
+# PROCEDURAL, WORLD-POSITION-based tile/paving materials -- keyed separately from MATS/get_mat
+# (a single flat Base Color) since these need a small shader graph instead. 2026-08, user-asked:
+# "how does most industry work around this" for a tiled-paving LOOK on a sidewalk/curb that must
+# also smoothly follow a curved corner (the geometric-limit problem discrete rigid ASSET tiles
+# have -- see kit_common.curb_asset_row's own docstring). The industry answer or a real texture:
+# UV the mesh from a FIXED reference frame (a "box"/planar projection aligned to a stable axis),
+# NOT the curve's own tangent frame (which stretches/pinches near a corner apex, since the inner
+# and outer rails of a bend cover different arc lengths for the same angular sweep). This project
+# has no image textures at all yet (every MATS entry is a flat color), so the equivalent fix here
+# is a PURELY PROCEDURAL checker pattern read directly from the mesh's own Position -- Blender's
+# 'Checker Texture' shader node takes a Vector input and is evaluated per-shading-point, with NO
+# UV/parametrization involved at all, so it is by construction immune to the pinching problem: a
+# curved corner's checker cells read as perfectly square, cut straight across the bend, because
+# the pattern was never derived from the curve's own geometry in the first place. WORLD position
+# (not a per-piece road-axis) is used deliberately: every piece built through the SAME material
+# then shares the exact same grid automatically, with zero per-piece alignment/rotation logic
+# needed at every joint -- a road-axis-aligned scheme would need to re-derive and match that axis
+# at every seam, reintroducing a smaller version of the same problem being solved.
+TILED_MATS = {
+    # key: (material name, tile color 1, tile color 2, tile size in meters)
+    "concrete_tile": ("M_ConcreteTile", (0.85, 0.83, 0.79, 1), (0.78, 0.76, 0.72, 1), 0.6),
+}
+
+
+def get_tiled_mat(name, rgba1, rgba2, tile_size):
+    """Build (or fetch the cached) procedural checker-pattern material described by
+    `TILED_MATS`'s own module comment -- Geometry (Position, world-space for every GN-built
+    object in this addon, which all sit at an identity transform with positions already baked
+    into local space) -> Checker Texture (Scale = 1/tile_size) -> Base Color."""
+    m = bpy.data.materials.get(name)
+    if m is not None:
+        return m
+    m = bpy.data.materials.new(name)
+    m.diffuse_color = rgba1
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial"); out.location = (400, 0)
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled"); bsdf.location = (150, 0)
+    checker = nt.nodes.new("ShaderNodeTexChecker"); checker.location = (-150, 0)
+    geo = nt.nodes.new("ShaderNodeNewGeometry"); geo.location = (-400, 0)
+    checker.inputs["Scale"].default_value = 1.0 / max(tile_size, 1e-3)
+    checker.inputs["Color1"].default_value = rgba1
+    checker.inputs["Color2"].default_value = rgba2
+    L = nt.links.new
+    L(geo.outputs["Position"], checker.inputs["Vector"])
+    L(checker.outputs["Color"], bsdf.inputs["Base Color"])
+    L(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    return m
+
+
 def mat(key):
+    if key in TILED_MATS:
+        name, c1, c2, tile_size = TILED_MATS[key]
+        return get_tiled_mat(name, c1, c2, tile_size)
     n, c = MATS[key]
     return get_mat(n, c)
 
@@ -453,6 +517,17 @@ def colonly_mesh_evaluated(visual, coll=None, name=None):
     return p
 
 
+def _is_stack_carrier(obj):
+    """A `road_stack` MESH carrier: the whole road as one object's modifier stack.
+
+    Structural test (a `GN_SpineCurve` modifier), not a name guess -- the same question
+    `road_kit_authoring.spine_io.is_stack_carrier` answers, restated here because `lib/` must not
+    import the addon. Keep the two in sync; there are only these two."""
+    return (obj.type == 'MESH' and obj.name.startswith("spine_")
+            and any(m.type == 'NODES' and m.node_group
+                    and m.node_group.name == "GN_SpineCurve" for m in obj.modifiers))
+
+
 def bake_colonly_proxies(objects, target_coll):
     """Generate a `-colonly` collision proxy for every `pad_*`/`curb_*`/`spine_*` GN-modified
     Curve object in `objects` (typically a collection's own `.objects`, or a whole scene's),
@@ -499,6 +574,14 @@ def bake_colonly_proxies(objects, target_coll):
             elif o.modifiers.get("Road") is not None and o.name.startswith("spine_"):
                 out.append(colonly_mesh_evaluated(o, target_coll,
                                                     name="pave_" + o.name[len("spine_"):]))
+        elif _is_stack_carrier(o):
+            # A MODIFIER-STACK piece is ONE object carrying its entire road -- pavement, curbs,
+            # sidewalks, median, the lot -- so it gets ONE proxy covering all of it, for the same
+            # reason `join_visual_mesh` does: there is nothing else to make a separate proxy from.
+            # Named `pave_<piece>` to match the Curve spine's own convention above, so the
+            # existing cleanup sweeps and `proxy_for` tagging keep working unchanged.
+            out.append(colonly_mesh_evaluated(o, target_coll,
+                                                name="pave_" + o.name[len("spine_"):]))
         elif o.type == 'MESH' and o.name.startswith("mesh_"):
             existing = target_coll.objects.get(o.name + "-colonly")
             if existing is not None:
@@ -1155,7 +1238,16 @@ def instancer(name, coords, piece, coll, loc=(0, 0, 0), rot_z=0.0, parent=None, 
 
 def make_gn_group_scaled():
     """Like GN_Instance but also reads a per-point FLOAT_VECTOR `scl` -> instance Scale
-    (e.g. tapered ramp piers: one unit pillar scaled to each cell's height)."""
+    (e.g. tapered ramp piers: one unit pillar scaled to each cell's height; a curb/sidewalk/prop
+    row instance MIRRORED via a negative axis instead of rotated -- see `curb_asset_row`'s R-side
+    docstring).
+
+    2026-08: added the same 'Realize Instances' node `make_gn_group` already has and explains
+    ("the glTF exporter DROPS [bare instances]... collapse to the source at origin") -- this group
+    never had one, so anything built through `instancer_scaled` (tapered piers, and now a mirrored
+    curb/sidewalk/prop row) silently exported empty/at-origin. Confirmed directly: `to_mesh()` on
+    an un-realized instance object returns ZERO vertices, not just "wrong at export time" -- any
+    Python code (verification, collision baking) reading the evaluated mesh was equally broken."""
     ng = bpy.data.node_groups.get("GN_InstanceScaled")
     if ng:
         return ng, ng["obj_id"]
@@ -1175,20 +1267,29 @@ def make_gn_group_scaled():
     scl = ng.nodes.new("GeometryNodeInputNamedAttribute"); scl.location = (-250, 60)
     scl.data_type = "FLOAT_VECTOR"; scl.inputs["Name"].default_value = "scl"
     iop = ng.nodes.new("GeometryNodeInstanceOnPoints"); iop.location = (100, 0)
+    real = ng.nodes.new("GeometryNodeRealizeInstances"); real.location = (250, 0)
     L = ng.links.new
     L(nin.outputs["Geometry"], iop.inputs["Points"])
     L(nin.outputs["Object"], oi.inputs["Object"])
     L(oi.outputs["Geometry"], iop.inputs["Instance"])
     L(rot.outputs["Attribute"], iop.inputs["Rotation"])
     L(scl.outputs["Attribute"], iop.inputs["Scale"])
-    L(iop.outputs["Instances"], nout.inputs["Geometry"])
+    L(iop.outputs["Instances"], real.inputs["Geometry"])
+    L(real.outputs["Geometry"], nout.inputs["Geometry"])
     ng["obj_id"] = obj_sock.identifier
     return ng, obj_sock.identifier
 
 
 def instancer_scaled(name, coords, piece, coll, rots, scls):
     """Instance `piece` at each point with per-point rot AND scl (both FLOAT_VECTOR,
-    same length as coords). Used for tapered piers (a unit pillar scaled per point)."""
+    same length as coords). Used for tapered piers (a unit pillar scaled per point) and a
+    mirrored curb/sidewalk/prop row (`curb_asset_row`'s R-side fix, Scale=(1,-1,1) instead of a
+    180-degree rotation -- see that function's own docstring for why).
+
+    UPDATE-IN-PLACE (2026-08, matching `instancer`'s own crash-surface-safety reasoning exactly --
+    this group runs in the SAME live-edit hot path via `curb_asset_row` now, so it needs the same
+    safety): reuses an existing same-named GN-modifier object's mesh/attributes in place instead
+    of deleting/recreating it."""
     if not coords:
         return None
     ng, obj_id = make_gn_group_scaled()
@@ -1200,12 +1301,160 @@ def instancer_scaled(name, coords, piece, coll, rots, scls):
     for i, (rv, sv) in enumerate(zip(rots, scls)):
         ar.data[i].vector = rv
         asc.data[i].vector = sv
+    existing = coll.objects.get(name)
+    if existing is not None and existing.type == 'MESH' and existing.modifiers.get("GN") is not None:
+        old_data = existing.data
+        existing.data = me
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        set_mod_input(existing.modifiers["GN"], obj_id,
+                      piece if isinstance(piece, bpy.types.Object) else src(piece))
+        existing["_rka_touched"] = True
+        return existing
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
     obj = bpy.data.objects.new(name, me)
     coll.objects.link(obj)
     mod = obj.modifiers.new("GN", "NODES")
     mod.node_group = ng
     set_mod_input(mod, obj_id, piece if isinstance(piece, bpy.types.Object) else src(piece))
+    obj["_rka_touched"] = True
     return obj
+
+
+def make_curb_asset_row_group():
+    """GN_CurbAssetRow: a LIVE Geometry Nodes graph that tiles an Object along a Curve boundary --
+    the genuine Curve+GN architecture BOX-style curb/pad (`GN_CurbLoop`/`GN_JunctionPad`) already
+    use, applied to ASSET-style rows too (2026-08, user-requested repeatedly: "please use GN and
+    curve for them as well"). Unlike the earlier Python-computed-then-baked-to-point-cloud
+    approach this replaces for the common case (see `curb_asset_row`'s own docstring for exactly
+    when that Python path still applies), the resample here is genuinely LIVE: editing the
+    boundary curve's own control points re-triggers this modifier automatically, with zero
+    Python re-invocation needed for the tiling math itself.
+
+    Graph: Curve Length -> Count = max(1, round(Length/Spacing)) computed AS NODES (a Math chain,
+    not Python) so it re-resolves on every curve edit -> Curve To Points (mode=COUNT, Count+1 --
+    see below) -> per-point heading (Z-only, `atan2(Tangent.y, Tangent.x)` + RotOffset, ignoring
+    any Z tilt so props/curbs never lean with a sloped road, matching every other heading
+    convention in this addon) stored as a 'rowrot' point attribute (survives the delete step
+    below, same pattern `GN_Instance`'s own 'rot' attribute uses) -> delete the ONE point at index
+    == Count (Curve To Points' own COUNT mode always places a point AT the far end INCLUSIVE of
+    both boundary ends, so requesting Count+1 points and dropping the very last one leaves exactly
+    Count points spanning [0, Length) with NONE overshooting past the boundary's true end --
+    verified directly: Curve To Points with Count=5 on a 10m line places points at 0/2.5/5/7.5/10,
+    not the 0/2/4/6/8 a fixed-step sampler would use; using that raw output un-trimmed would
+    reproduce the exact "redundant overlapping tail instance" defect the original Python
+    `sample_polyline`-based approach had) -> Object Info (As Instance) -> Instance on Points
+    (Scale=(1,ScaleY,1) -- ScaleY=-1 mirrors the outward-facing local Y axis for an R-side row
+    WITHOUT reversing the length axis, see `curb_asset_row`'s own docstring for why a plain
+    180-degree rotation is wrong for an asymmetric piece) -> Realize Instances (required for glTF
+    export, see `make_gn_group`'s own docstring -- bare un-realized instances export empty/at
+    origin). Returns `(node_group, socket_id_dict)`."""
+    ng = bpy.data.node_groups.get("GN_CurbAssetRow")
+    if ng:
+        return ng, {"Object": ng["obj_id"], "Spacing": ng["sp_id"],
+                     "RotOffset": ng["rot_id"], "ScaleY": ng["scl_id"]}
+    ng = bpy.data.node_groups.new("GN_CurbAssetRow", "GeometryNodeTree")
+    ifc = ng.interface
+    ifc.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    obj_sock = ifc.new_socket("Object", in_out="INPUT", socket_type="NodeSocketObject")
+    sp_sock = ifc.new_socket("Spacing", in_out="INPUT", socket_type="NodeSocketFloat")
+    sp_sock.default_value = 2.0
+    rot_sock = ifc.new_socket("RotOffset", in_out="INPUT", socket_type="NodeSocketFloat")
+    scl_sock = ifc.new_socket("ScaleY", in_out="INPUT", socket_type="NodeSocketFloat")
+    scl_sock.default_value = 1.0
+    ifc.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+
+    nin = ng.nodes.new("NodeGroupInput"); nin.location = (-900, 0)
+    nout = ng.nodes.new("NodeGroupOutput"); nout.location = (1300, 0)
+    L = ng.links.new
+
+    curve_len = ng.nodes.new("GeometryNodeCurveLength"); curve_len.location = (-700, 300)
+    div = ng.nodes.new("ShaderNodeMath"); div.operation = 'DIVIDE'; div.location = (-550, 300)
+    rnd = ng.nodes.new("ShaderNodeMath"); rnd.operation = 'ROUND'; rnd.location = (-400, 300)
+    maxn = ng.nodes.new("ShaderNodeMath"); maxn.operation = 'MAXIMUM'; maxn.location = (-250, 300)
+    maxn.inputs[1].default_value = 1.0
+    plus1 = ng.nodes.new("ShaderNodeMath"); plus1.operation = 'ADD'; plus1.location = (-100, 300)
+    plus1.inputs[1].default_value = 1.0
+    L(nin.outputs["Geometry"], curve_len.inputs["Curve"])
+    L(curve_len.outputs["Length"], div.inputs[0])
+    L(nin.outputs["Spacing"], div.inputs[1])
+    L(div.outputs["Value"], rnd.inputs[0])
+    L(rnd.outputs["Value"], maxn.inputs[0])
+    L(maxn.outputs["Value"], plus1.inputs[0])
+
+    c2p = ng.nodes.new("GeometryNodeCurveToPoints"); c2p.mode = 'COUNT'; c2p.location = (-100, 0)
+    L(nin.outputs["Geometry"], c2p.inputs["Curve"])
+    L(plus1.outputs["Value"], c2p.inputs["Count"])
+
+    # Heading (Z-only) from tangent, stored as an attribute BEFORE deletion (survives it).
+    sepxyz = ng.nodes.new("ShaderNodeSeparateXYZ"); sepxyz.location = (-100, -150)
+    atan2 = ng.nodes.new("ShaderNodeMath"); atan2.operation = 'ARCTAN2'; atan2.location = (60, -150)
+    addrot = ng.nodes.new("ShaderNodeMath"); addrot.operation = 'ADD'; addrot.location = (200, -150)
+    combxyz = ng.nodes.new("ShaderNodeCombineXYZ"); combxyz.location = (340, -150)
+    L(c2p.outputs["Tangent"], sepxyz.inputs["Vector"])
+    L(sepxyz.outputs["Y"], atan2.inputs[0])
+    L(sepxyz.outputs["X"], atan2.inputs[1])
+    L(atan2.outputs["Value"], addrot.inputs[0])
+    L(nin.outputs["RotOffset"], addrot.inputs[1])
+    L(addrot.outputs["Value"], combxyz.inputs["Z"])
+
+    store_rot = ng.nodes.new("GeometryNodeStoreNamedAttribute"); store_rot.location = (500, 0)
+    store_rot.data_type = 'FLOAT_VECTOR'; store_rot.domain = 'POINT'
+    store_rot.inputs["Name"].default_value = "rowrot"
+    L(c2p.outputs["Points"], store_rot.inputs["Geometry"])
+    L(combxyz.outputs["Vector"], store_rot.inputs["Value"])
+
+    # Mark + delete the one OVERSHOOT point (index == Count, the far-end-inclusive extra point
+    # Curve To Points' own COUNT mode always adds -- see this function's own docstring).
+    idx = ng.nodes.new("GeometryNodeInputIndex"); idx.location = (60, -350)
+    idx_f = ng.nodes.new("ShaderNodeMath"); idx_f.operation = 'ADD'; idx_f.location = (200, -350)
+    idx_f.inputs[1].default_value = 0.0
+    cmp = ng.nodes.new("FunctionNodeCompare"); cmp.data_type = 'FLOAT'; cmp.operation = 'EQUAL'
+    cmp.location = (340, -350)
+    L(idx.outputs["Index"], idx_f.inputs[0])
+    L(idx_f.outputs["Value"], cmp.inputs[0])
+    L(maxn.outputs["Value"], cmp.inputs[1])
+
+    delp = ng.nodes.new("GeometryNodeDeleteGeometry"); delp.domain = 'POINT'; delp.location = (700, 0)
+    L(store_rot.outputs["Geometry"], delp.inputs["Geometry"])
+    L(cmp.outputs["Result"], delp.inputs["Selection"])
+
+    read_rot = ng.nodes.new("GeometryNodeInputNamedAttribute"); read_rot.location = (700, -200)
+    read_rot.data_type = 'FLOAT_VECTOR'
+    read_rot.inputs["Name"].default_value = "rowrot"
+
+    oi = ng.nodes.new("GeometryNodeObjectInfo"); oi.location = (500, -400)
+    oi.transform_space = "ORIGINAL"
+    if "As Instance" in oi.inputs:
+        oi.inputs["As Instance"].default_value = True
+    L(nin.outputs["Object"], oi.inputs["Object"])
+
+    scl_comb = ng.nodes.new("ShaderNodeCombineXYZ"); scl_comb.location = (500, -550)
+    scl_comb.inputs["X"].default_value = 1.0
+    scl_comb.inputs["Z"].default_value = 1.0
+    L(nin.outputs["ScaleY"], scl_comb.inputs["Y"])
+
+    iop = ng.nodes.new("GeometryNodeInstanceOnPoints"); iop.location = (900, -200)
+    L(delp.outputs["Geometry"], iop.inputs["Points"])
+    L(oi.outputs["Geometry"], iop.inputs["Instance"])
+    L(read_rot.outputs["Attribute"], iop.inputs["Rotation"])
+    L(scl_comb.outputs["Vector"], iop.inputs["Scale"])
+
+    real = ng.nodes.new("GeometryNodeRealizeInstances"); real.location = (1100, -200)
+    L(iop.outputs["Instances"], real.inputs["Geometry"])
+    L(real.outputs["Geometry"], nout.inputs["Geometry"])
+
+    ng["obj_id"] = obj_sock.identifier
+    ng["sp_id"] = sp_sock.identifier
+    ng["rot_id"] = rot_sock.identifier
+    ng["scl_id"] = scl_sock.identifier
+    socket_ids = {"Object": obj_sock.identifier, "Spacing": sp_sock.identifier,
+                  "RotOffset": rot_sock.identifier, "ScaleY": scl_sock.identifier}
+    return ng, socket_ids
 
 
 def make_road_profile_group():
@@ -1236,19 +1485,40 @@ def make_road_profile_group():
     segments AND transitions alike (both go through this same group via `road_spine()`)."""
     ng = bpy.data.node_groups.get("GN_RoadProfile")
     if ng:
-        return ng, (ng["mat_id"], ng["thick_id"])
+        return ng, (ng["mat_id"], ng["thick_id"], ng["negf_id"], ng["posf_id"])
     ng = bpy.data.node_groups.new("GN_RoadProfile", "GeometryNodeTree")
     ifc = ng.interface
     ifc.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
     mat_sock = ifc.new_socket("Material", in_out="INPUT", socket_type="NodeSocketMaterial")
     thick_sock = ifc.new_socket("Thickness", in_out="INPUT", socket_type="NodeSocketFloat")
     thick_sock.default_value = 0.4   # accepted, unused -- see docstring
+    # ASYMMETRIC CARRIAGEWAY (2026-08, the "one-way roads are built double-width" defect -- see
+    # `intersection_kit.carriageway_extents`). The profile line used to be hardcoded symmetric,
+    # (-1..+1) scaled by the spine's per-point Radius, so the pavement was ALWAYS mirrored about
+    # the spine -- while `build_segment_from_spine` places forward lanes on the positive side and
+    # backward lanes on the negative one. A one-way road therefore swept a whole empty mirror
+    # carriageway (measured: 21.00 m of asphalt for 10.50 m of lanes).
+    # These two fractions move each end of the profile line independently. They are FRACTIONS OF
+    # RADIUS, not metres, so the existing per-point Radius still drives every width taper
+    # untouched: with `radius = (neg + pos) / 2`, setting `Neg Frac = neg / radius` and
+    # `Pos Frac = pos / radius` sweeps exactly `[-neg, +pos]` (the two always sum to 2).
+    # Defaults 1.0/1.0 reproduce the old symmetric sweep byte-for-byte, so every already-built
+    # piece and any caller that never sets them is unaffected.
+    negf_sock = ifc.new_socket("Neg Frac", in_out="INPUT", socket_type="NodeSocketFloat")
+    negf_sock.default_value = 1.0
+    posf_sock = ifc.new_socket("Pos Frac", in_out="INPUT", socket_type="NodeSocketFloat")
+    posf_sock.default_value = 1.0
     ifc.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
     nin = ng.nodes.new("NodeGroupInput"); nin.location = (-700, 0)
     nout = ng.nodes.new("NodeGroupOutput"); nout.location = (500, 0)
     line = ng.nodes.new("GeometryNodeCurvePrimitiveLine"); line.location = (-500, -220)
     line.inputs["Start"].default_value = (-1.0, 0.0, 0.0)   # profile spans the curve normal
     line.inputs["End"].default_value = (1.0, 0.0, 0.0)
+    # Start.x = -Neg Frac, End.x = +Pos Frac (y/z stay 0 -- the profile is a flat lateral line).
+    negx = ng.nodes.new("ShaderNodeMath"); negx.location = (-700, -300)
+    negx.operation = 'MULTIPLY'; negx.inputs[1].default_value = -1.0
+    startv = ng.nodes.new("ShaderNodeCombineXYZ"); startv.location = (-680, -220)
+    endv = ng.nodes.new("ShaderNodeCombineXYZ"); endv.location = (-680, -380)
     c2m = ng.nodes.new("GeometryNodeCurveToMesh"); c2m.location = (-250, 0)
     # Blender 5.x Curve to Mesh has an explicit per-point "Scale" field (radius no longer
     # auto-scales) — drive it from the spine's Radius so half_w controls carriageway width.
@@ -1256,6 +1526,11 @@ def make_road_profile_group():
     setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (60, 0)
     ss = ng.nodes.new("GeometryNodeSetShadeSmooth"); ss.location = (280, 0)
     L = ng.links.new
+    L(nin.outputs["Neg Frac"], negx.inputs[0])
+    L(negx.outputs["Value"], startv.inputs["X"])
+    L(nin.outputs["Pos Frac"], endv.inputs["X"])
+    L(startv.outputs["Vector"], line.inputs["Start"])
+    L(endv.outputs["Vector"], line.inputs["End"])
     L(nin.outputs["Geometry"], c2m.inputs["Curve"])
     L(line.outputs["Curve"], c2m.inputs["Profile Curve"])
     L(rad.outputs["Radius"], c2m.inputs["Scale"])
@@ -1265,7 +1540,10 @@ def make_road_profile_group():
     L(ss.outputs["Geometry"], nout.inputs["Geometry"])
     ng["mat_id"] = mat_sock.identifier
     ng["thick_id"] = thick_sock.identifier
-    return ng, (mat_sock.identifier, thick_sock.identifier)
+    ng["negf_id"] = negf_sock.identifier
+    ng["posf_id"] = posf_sock.identifier
+    return ng, (mat_sock.identifier, thick_sock.identifier,
+                negf_sock.identifier, posf_sock.identifier)
 
 
 def swept_wall(name, pts, h, coll, matkey="concrete", thickness=0.18, z0=0.0):
@@ -1320,11 +1598,14 @@ def swept_wall(name, pts, h, coll, matkey="concrete", thickness=0.18, z0=0.0):
 
 
 def road_from_curve(name, pts, coll, matkey="asphalt", thickness=0.4, z_lift=0.0,
-                    resolution=24):
+                    resolution=24, neg_frac=1.0, pos_frac=1.0):
     """Build a NURBS spine from pts=[(x,y,z,tilt,half_w), ...] (radius=half_w, tilt=bank)
     and apply GN_RoadProfile -> one swept, variable-width, banked, climbing road surface.
     Used for every ramp/connector/merge tail. Returns the road object (modifier live; glTF
-    export bakes it)."""
+    export bakes it).
+
+    `neg_frac`/`pos_frac` -- see `make_road_profile_group`; defaults sweep symmetrically about
+    the spine exactly as before."""
     cu = bpy.data.curves.new(name + "_curve", 'CURVE')
     cu.dimensions = '3D'
     cu.resolution_u = resolution
@@ -1338,15 +1619,18 @@ def road_from_curve(name, pts, coll, matkey="asphalt", thickness=0.4, z_lift=0.0
     sp.use_endpoint_u = True
     obj = bpy.data.objects.new(name, cu)
     coll.objects.link(obj)
-    ng, (mat_id, thick_id) = make_road_profile_group()
+    ng, (mat_id, thick_id, negf_id, posf_id) = make_road_profile_group()
     mod = obj.modifiers.new("Road", "NODES")
     mod.node_group = ng
     set_mod_input(mod, mat_id, mat(matkey))
     set_mod_input(mod, thick_id, thickness)
+    set_mod_input(mod, negf_id, neg_frac)
+    set_mod_input(mod, posf_id, pos_frac)
     return obj
 
 
-def road_spine(name, pts, coll, radius, matkey="asphalt", thickness=0.4):
+def road_spine(name, pts, coll, radius, matkey="asphalt", thickness=0.4,
+                neg_frac=1.0, pos_frac=1.0):
     """A live-editable POLY-spline Curve object through pts=[(x,y,z), ...] with `GN_RoadProfile`
     attached DIRECTLY to it -- unlike `road_from_curve` (a fresh throwaway NURBS curve rebuilt
     from scratch every call), this object IS the persistent, user-editable spine: entering Edit
@@ -1356,7 +1640,13 @@ def road_spine(name, pts, coll, radius, matkey="asphalt", thickness=0.4):
     `road_kit_authoring/ops_segment.py`). `radius` is either one scalar (every point, a
     constant-width road) or a list matching `pts` (e.g. a linear lane-count-transition taper --
     `GN_RoadProfile`'s per-point Radius already does variable-width sweeps natively, no extra GN
-    work needed for a taper). Returns the object (modifier live; glTF export bakes it)."""
+    work needed for a taper). Returns the object (modifier live; glTF export bakes it).
+
+    `neg_frac`/`pos_frac` -- see `make_road_profile_group`. Together with `radius` they express an
+    ASYMMETRIC carriageway (a one-way road, or a two-way road carrying different lane counts each
+    way) without moving the authored spine: pass
+    `radius, shift = intersection_kit.sweep_radius_and_shift(*carriageway_extents(...))` and the
+    matching `neg/radius`, `pos/radius` fractions. Defaults 1.0/1.0 are the old symmetric sweep."""
     cu = bpy.data.curves.new(name + "_spine", 'CURVE')
     cu.dimensions = '3D'
     sp = cu.splines.new('POLY')
@@ -1367,11 +1657,13 @@ def road_spine(name, pts, coll, radius, matkey="asphalt", thickness=0.4):
         sp.points[i].radius = max(radii[min(i, len(radii) - 1)], 1e-3)
     obj = bpy.data.objects.new(name, cu)
     coll.objects.link(obj)
-    ng, (mat_id, thick_id) = make_road_profile_group()
+    ng, (mat_id, thick_id, negf_id, posf_id) = make_road_profile_group()
     mod = obj.modifiers.new("Road", "NODES")
     mod.node_group = ng
     set_mod_input(mod, mat_id, mat(matkey))
     set_mod_input(mod, thick_id, thickness)
+    set_mod_input(mod, negf_id, neg_frac)
+    set_mod_input(mod, posf_id, pos_frac)
     return obj
 
 
@@ -1388,9 +1680,307 @@ def set_road_spine_material(spine_obj, matkey):
     mod = spine_obj.modifiers.get("Road")
     if mod is None:
         return False
-    _ng, (mat_id, _thick_id) = make_road_profile_group()
+    _ng, (mat_id, _thick_id, _negf_id, _posf_id) = make_road_profile_group()
     set_mod_input(mod, mat_id, mat(matkey))
     return True
+
+
+def set_road_spine_profile_fracs(spine_obj, neg_frac, pos_frac):
+    """Update an EXISTING `road_spine()` object's asymmetric-carriageway fractions in place --
+    the same "reach into the live Road modifier" path `set_road_spine_material` uses, and for the
+    same reason: the spine object is never deleted/recreated by a rebuild (its control points ARE
+    the live-edited shape state), so these can't ride along on a clear-and-rebuild the way curb and
+    lane data do.
+
+    Called from `ops_segment._refresh_pavement_radius`, which every lane-count/median adjust
+    operator funnels through. Without it a one-way piece would silently revert to the symmetric
+    double-width sweep (see `make_road_profile_group`) the moment any of those controls was
+    touched, since only the per-point radius was being refreshed. Returns False if `spine_obj`
+    has no "Road" modifier."""
+    mod = spine_obj.modifiers.get("Road")
+    if mod is None:
+        return False
+    _ng, (_mat_id, _thick_id, negf_id, posf_id) = make_road_profile_group()
+    set_mod_input(mod, negf_id, neg_frac)
+    set_mod_input(mod, posf_id, pos_frac)
+    return True
+
+
+def make_road_support_group():
+    """GN_RoadSupport: derive what goes UNDERNEATH a road from how high it sits over the terrain.
+
+    THE RULE, and it is the whole point: there is no separate "viaduct builder" and "ground road
+    builder". A road is a road. Sample the terrain under the spine, take
+    `delta = deck_z - ground_z`, and switch on it:
+
+        delta >  At-Grade   -> DECK   : a swept slab under the full road width
+        delta >  Fill Max   -> + PIER : columns from the ground up to that slab
+        otherwise           -> nothing
+
+    ONE STRUCTURE, THICKENING WITH HEIGHT. There used to be a third case -- an earth EMBANKMENT
+    prism between at-grade and `Fill Max` -- and it was removed (2026-08-15, user's call) once the
+    deck existed: the slab under the road already IS what a road standing a little proud of the
+    ground looks like, so a separate near-ground primitive only added a second thing to keep in
+    agreement with the first. A road now grows exactly one understructure, and height decides
+    whether it needs legs. `island_v3_plan.support_kind` still CLASSIFIES `FILL` and
+    `fill_footprint` still reports the true embankment toe, because that is an authoring-clearance
+    question (what ground a raised road eats, so a block is not laid into it) and is unaffected by
+    how the support is drawn.
+
+    It is a MODIFIER, not a bake, and that is deliberate. The support has to re-derive while a
+    deck height is being dragged, or the piers silently stop matching the road they hold up
+    between rebuilds. `tools/island_v3_plan.py: support_kind()` is the same rule in pure Python
+    and is the SPECIFICATION this must agree with; that one is testable headless, this one is
+    live. Keep them in step.
+
+    CUT/TUNNEL are deliberately NOT emitted here. A trench or a bore is a hole in the terrain,
+    not an object added under a road — it belongs to the ground-cutting pass
+    (`rka.cut_ground_under_road`), and pretending otherwise would put a box where a void is
+    wanted. The Python reference still CLASSIFIES them so the authoring report can say a stretch
+    needs cutting.
+
+    Returns `(node_group, ids)` where ids maps input name -> socket identifier, the same
+    accessor shape the other builders here return for `set_mod_input`."""
+    ng = bpy.data.node_groups.get("GN_RoadSupport")
+    if ng:
+        return ng, ng["sock_ids"].to_dict() if hasattr(ng["sock_ids"], "to_dict") \
+            else dict(ng["sock_ids"])
+    ng = bpy.data.node_groups.new("GN_RoadSupport", "GeometryNodeTree")
+    ifc = ng.interface
+    ifc.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    socks = {}
+    def fin(name, kind, default=None, minv=None):
+        s = ifc.new_socket(name, in_out="INPUT", socket_type=kind)
+        if default is not None:
+            s.default_value = default
+        if minv is not None:
+            s.min_value = minv
+        socks[name] = s.identifier
+        return s
+    fin("Terrain", "NodeSocketObject")
+    fin("Half Width", "NodeSocketFloat", 11.0, 0.0)
+    fin("Pier Spacing", "NodeSocketFloat", 30.0, 1.0)
+    fin("Deck Thickness", "NodeSocketFloat", 1.6, 0.0)
+    fin("Pier Section", "NodeSocketFloat", 2.2, 0.1)
+    fin("At-Grade Tol", "NodeSocketFloat", 0.4, 0.0)
+    fin("Fill Max", "NodeSocketFloat", 4.0, 0.0)
+    fin("Fill Slope", "NodeSocketFloat", 1.5, 0.0)
+    mat = ifc.new_socket("Material", in_out="INPUT", socket_type="NodeSocketMaterial")
+    socks["Material"] = mat.identifier
+    ifc.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+
+    N = ng.nodes.new
+    L = ng.links.new
+    nin = N("NodeGroupInput"); nin.location = (-1400, 0)
+    nout = N("NodeGroupOutput"); nout.location = (1500, 0)
+
+    # --- sample the terrain under every station along the spine -----------------------
+    res = N("GeometryNodeResampleCurve"); res.location = (-1150, 120)
+    # Blender 5.x moved Resample Curve's mode from a node PROPERTY to a menu INPUT SOCKET
+    # (`res.mode` no longer exists), so set it through the socket and tolerate either form.
+    if "Mode" in res.inputs:
+        res.inputs["Mode"].default_value = 'Length'
+    else:
+        res.mode = 'LENGTH'
+    L(nin.outputs["Geometry"], res.inputs["Curve"])
+    L(nin.outputs["Pier Spacing"], res.inputs["Length"])
+
+    terr = N("GeometryNodeObjectInfo"); terr.location = (-1150, -220)
+    terr.transform_space = 'RELATIVE'
+    L(nin.outputs["Terrain"], terr.inputs["Object"])
+
+    pos = N("GeometryNodeInputPosition"); pos.location = (-1150, -60)
+    down = N("ShaderNodeCombineXYZ"); down.location = (-1150, -400)
+    down.inputs["X"].default_value = 0.0
+    down.inputs["Y"].default_value = 0.0
+    down.inputs["Z"].default_value = -1.0
+
+    ray = N("GeometryNodeRaycast"); ray.location = (-900, -160)
+    ray.inputs["Ray Length"].default_value = 10000.0
+    L(terr.outputs["Geometry"], ray.inputs["Target Geometry"])
+    L(pos.outputs["Position"], ray.inputs["Source Position"])
+    L(down.outputs["Vector"], ray.inputs["Ray Direction"])
+
+    deck_z = N("ShaderNodeSeparateXYZ"); deck_z.location = (-900, 60)
+    L(pos.outputs["Position"], deck_z.inputs["Vector"])
+    gnd_z = N("ShaderNodeSeparateXYZ"); gnd_z.location = (-660, -260)
+    L(ray.outputs["Hit Position"], gnd_z.inputs["Vector"])
+
+    delta = N("ShaderNodeMath"); delta.location = (-450, -60); delta.operation = 'SUBTRACT'
+    L(deck_z.outputs["Z"], delta.inputs[0])
+    L(gnd_z.outputs["Z"], delta.inputs[1])
+
+    def cmp(op, a_out, b_out, loc):
+        m = N("ShaderNodeMath"); m.location = loc; m.operation = op
+        L(a_out, m.inputs[0]); L(b_out, m.inputs[1])
+        return m
+    def band(a_out, b_out, loc):
+        b = N("FunctionNodeBooleanMath"); b.location = loc; b.operation = 'AND'
+        L(a_out, b.inputs[0]); L(b_out, b.inputs[1])
+        return b
+
+    is_pier = cmp('GREATER_THAN', delta.outputs[0], nin.outputs["Fill Max"], (-230, 140))
+    pier_sel = band(is_pier.outputs[0], ray.outputs["Is Hit"], (-30, 140))
+
+    cube = N("GeometryNodeMeshCube"); cube.location = (-30, 400)
+    cube.inputs["Size"].default_value = (1.0, 1.0, 1.0)
+
+    tangent = N("GeometryNodeInputTangent"); tangent.location = (-30, 560)
+    align = N("FunctionNodeAlignRotationToVector"); align.location = (180, 560)
+    align.axis = 'Y'
+    L(tangent.outputs["Tangent"], align.inputs["Vector"])
+
+    # --- PIER: column from the ground up to the deck soffit ---------------------------
+    ph = N("ShaderNodeMath"); ph.location = (180, 240); ph.operation = 'SUBTRACT'
+    L(delta.outputs[0], ph.inputs[0])
+    L(nin.outputs["Deck Thickness"], ph.inputs[1])
+    p_scale = N("ShaderNodeCombineXYZ"); p_scale.location = (400, 240)
+    L(nin.outputs["Pier Section"], p_scale.inputs["X"])
+    L(nin.outputs["Pier Section"], p_scale.inputs["Y"])
+    L(ph.outputs[0], p_scale.inputs["Z"])
+
+    p_iop = N("GeometryNodeInstanceOnPoints"); p_iop.location = (620, 340)
+    L(res.outputs["Curve"], p_iop.inputs["Points"])
+    L(pier_sel.outputs[0], p_iop.inputs["Selection"])
+    L(cube.outputs["Mesh"], p_iop.inputs["Instance"])
+    L(align.outputs[0], p_iop.inputs["Rotation"])
+    p_si = N("GeometryNodeScaleInstances"); p_si.location = (840, 340)
+    L(p_iop.outputs["Instances"], p_si.inputs["Instances"])
+    L(p_scale.outputs["Vector"], p_si.inputs["Scale"])
+    # column centre sits half its height below the soffit
+    p_half = N("ShaderNodeMath"); p_half.location = (620, 140); p_half.operation = 'MULTIPLY'
+    L(ph.outputs[0], p_half.inputs[0]); p_half.inputs[1].default_value = 0.5
+    p_off = N("ShaderNodeMath"); p_off.location = (840, 140); p_off.operation = 'ADD'
+    L(p_half.outputs[0], p_off.inputs[0])
+    L(nin.outputs["Deck Thickness"], p_off.inputs[1])
+    p_neg = N("ShaderNodeMath"); p_neg.location = (1020, 140); p_neg.operation = 'MULTIPLY'
+    L(p_off.outputs[0], p_neg.inputs[0]); p_neg.inputs[1].default_value = -1.0
+    p_vec = N("ShaderNodeCombineXYZ"); p_vec.location = (1180, 140)
+    L(p_neg.outputs[0], p_vec.inputs["Z"])
+    p_tr = N("GeometryNodeTranslateInstances"); p_tr.location = (1180, 340)
+    p_tr.inputs["Local Space"].default_value = False
+    L(p_si.outputs["Instances"], p_tr.inputs["Instances"])
+    L(p_vec.outputs["Vector"], p_tr.inputs["Translation"])
+
+    # --- SOFFIT: the deck's UNDERSIDE, spanning the full road width -------------------
+    #
+    # The piers were hanging from a surface that did not exist. `Deck Thickness` was already used
+    # twice -- to shorten each column and to drop it -- so the whole node group was built around a
+    # soffit it never drew: from underneath, a viaduct was a line of columns holding up open air,
+    # and every ramp read as "one-off structure" rather than as a road with a deck.
+    #
+    # SWEPT, NOT INSTANCED, and that is the difference between this and the FILL block above. A
+    # box per station tiles into a straight slab but scallops on a bend -- a 30 m box on a 100 m
+    # radius leaves a 1.1 m sagitta, in and out, along the one surface you actually look at from
+    # below. Curve to Mesh follows the alignment exactly, which is also how every curb, sidewalk
+    # and median in the stack is built (`road_stack.make_profile_sweep_group`), so a deck is now
+    # the same kind of object as the rest of the cross-section instead of its own special case.
+    #
+    # It is cut to the VIADUCT STRETCHES by deleting the points that are not on piers, which
+    # splits the curve into sub-splines -- so one road that runs at grade, climbs onto a viaduct
+    # and comes back down grows exactly one slab, in the right place, with no stretch-finding
+    # logic anywhere. Same rule, same `delta`, as the columns underneath it.
+    sres = N("GeometryNodeResampleCurve"); sres.location = (-1150, 320)
+    if "Mode" in sres.inputs:
+        sres.inputs["Mode"].default_value = 'Length'
+    else:
+        sres.mode = 'LENGTH'
+    L(nin.outputs["Geometry"], sres.inputs["Curve"])
+    # A fraction of the bent spacing: fine enough that the swept slab is smooth on any curve a
+    # road can legally hold, without making the raycast below a per-metre cost.
+    s_step = N("ShaderNodeMath"); s_step.location = (-1370, 320); s_step.operation = 'DIVIDE'
+    L(nin.outputs["Pier Spacing"], s_step.inputs[0]); s_step.inputs[1].default_value = 6.0
+    L(s_step.outputs[0], sres.inputs["Length"])
+
+    s_pos = N("GeometryNodeInputPosition"); s_pos.location = (-950, 480)
+    s_ray = N("GeometryNodeRaycast"); s_ray.location = (-720, 420)
+    s_ray.inputs["Ray Length"].default_value = 10000.0
+    L(terr.outputs["Geometry"], s_ray.inputs["Target Geometry"])
+    L(s_pos.outputs["Position"], s_ray.inputs["Source Position"])
+    L(down.outputs["Vector"], s_ray.inputs["Ray Direction"])
+    s_deck = N("ShaderNodeSeparateXYZ"); s_deck.location = (-720, 600)
+    L(s_pos.outputs["Position"], s_deck.inputs["Vector"])
+    s_gnd = N("ShaderNodeSeparateXYZ"); s_gnd.location = (-500, 540)
+    L(s_ray.outputs["Hit Position"], s_gnd.inputs["Vector"])
+    s_delta = N("ShaderNodeMath"); s_delta.location = (-300, 600); s_delta.operation = 'SUBTRACT'
+    L(s_deck.outputs["Z"], s_delta.inputs[0])
+    L(s_gnd.outputs["Z"], s_delta.inputs[1])
+    s_is = cmp('GREATER_THAN', s_delta.outputs[0], nin.outputs["At-Grade Tol"], (-100, 600))
+    s_sel = band(s_is.outputs[0], s_ray.outputs["Is Hit"], (100, 600))
+    s_not = N("FunctionNodeBooleanMath"); s_not.location = (280, 600)
+    s_not.operation = 'NOT'
+    L(s_sel.outputs[0], s_not.inputs[0])
+
+    s_del = N("GeometryNodeDeleteGeometry"); s_del.location = (440, 640)
+    s_del.domain = 'POINT'
+    s_del.mode = 'ALL'
+    L(sres.outputs["Curve"], s_del.inputs["Geometry"])
+    L(s_not.outputs[0], s_del.inputs["Selection"])
+
+    s_norm = N("GeometryNodeSetCurveNormal"); s_norm.location = (620, 640)
+    # Z Up for the same reason `make_profile_sweep_group` pins it: the default Minimum Twist frame
+    # derives "up" from the curve's own bending, so a deck would roll with the road.
+    if "Mode" in s_norm.inputs:
+        s_norm.inputs["Mode"].default_value = 'Z Up'
+    else:
+        s_norm.mode = 'Z_UP'
+    L(s_del.outputs["Geometry"], s_norm.inputs["Curve"])
+
+    s_quad = N("GeometryNodeCurvePrimitiveQuadrilateral"); s_quad.location = (620, 820)
+    s_w = N("ShaderNodeMath"); s_w.location = (440, 880); s_w.operation = 'MULTIPLY'
+    L(nin.outputs["Half Width"], s_w.inputs[0]); s_w.inputs[1].default_value = 2.0
+    L(s_w.outputs[0], s_quad.inputs["Width"])
+    L(nin.outputs["Deck Thickness"], s_quad.inputs["Height"])
+
+    s_c2m = N("GeometryNodeCurveToMesh"); s_c2m.location = (860, 640)
+    # Capped: a viaduct that starts and stops has real ends, unlike a curb that continues into
+    # the next piece.
+    s_c2m.inputs["Fill Caps"].default_value = True
+    L(s_norm.outputs["Curve"], s_c2m.inputs["Curve"])
+    L(s_quad.outputs["Curve"], s_c2m.inputs["Profile Curve"])
+
+    # Drop it so the slab's TOP face sits on the driving surface, not its centre.
+    s_drop = N("ShaderNodeMath"); s_drop.location = (860, 460); s_drop.operation = 'MULTIPLY'
+    L(nin.outputs["Deck Thickness"], s_drop.inputs[0]); s_drop.inputs[1].default_value = -0.5
+    s_dvec = N("ShaderNodeCombineXYZ"); s_dvec.location = (1040, 460)
+    L(s_drop.outputs[0], s_dvec.inputs["Z"])
+    s_tr = N("GeometryNodeTransform"); s_tr.location = (1180, 640)
+    L(s_c2m.outputs["Mesh"], s_tr.inputs["Geometry"])
+    L(s_dvec.outputs["Vector"], s_tr.inputs["Translation"])
+
+    join = N("GeometryNodeJoinGeometry"); join.location = (1320, 60)
+    L(p_tr.outputs["Instances"], join.inputs["Geometry"])
+    L(s_tr.outputs["Geometry"], join.inputs["Geometry"])
+    # REALIZE before materialing. Unrealized GN instances are invisible to
+    # `bpy.data.meshes.new_from_object()`, which is what every headless check here and the
+    # export path both use -- the supports evaluated to zero vertices until this was added,
+    # while looking perfectly correct in the viewport. Set Material also only applies to real
+    # geometry. Pier/embankment counts are in the hundreds, not the millions, so the lost
+    # instancing is not worth being invisible to the toolchain.
+    real = N("GeometryNodeRealizeInstances"); real.location = (1380, 60)
+    L(join.outputs["Geometry"], real.inputs["Geometry"])
+    setm = N("GeometryNodeSetMaterial"); setm.location = (1420, 60)
+    L(real.outputs["Geometry"], setm.inputs["Geometry"])
+    L(nin.outputs["Material"], setm.inputs["Material"])
+    L(setm.outputs["Geometry"], nout.inputs["Geometry"])
+
+    ng["sock_ids"] = socks
+    return ng, socks
+
+
+def road_support(spine_obj, terrain_obj, half_width=11.0, matkey="concrete", **over):
+    """Attach GN_RoadSupport to an existing road spine curve. LIVE: drag a spine point up and
+    the piers re-derive, because the rule is a modifier and not a bake."""
+    ng, ids = make_road_support_group()
+    mod = spine_obj.modifiers.get("RoadSupport") or \
+        spine_obj.modifiers.new("RoadSupport", 'NODES')
+    mod.node_group = ng
+    vals = dict(Terrain=terrain_obj, **{"Half Width": half_width, "Material": mat(matkey)})
+    vals.update(over)
+    for name, value in vals.items():
+        if name in ids:
+            set_mod_input(mod, ids[name], value)
+    return mod
 
 
 def make_barrier_profile_group():
@@ -1699,6 +2289,80 @@ def make_curb_loop_group():
     return ng, (mat_sock.identifier, seg_sock.identifier, prof_sock.identifier)
 
 
+def curb_outer_clearance(curb_style, curb_thickness, asset_obj=None):
+    """How far a curb wall of `curb_style` genuinely extends past the boundary LINE it was swept
+    from (a segment's `half_w`/`half_w_end`, or an intersection arm's `out_width()`/`in_width()`)
+    -- 2026-08, user-reported: a sidewalk's own offset previously started exactly AT that boundary
+    line, but a BOX curb's profile (`_curb_profile_object`) straddles it symmetrically
+    (`+-curb_thickness/2`), so its OUTER half (e.g. 0.125m at the 0.25m default) visibly overlapped
+    the sidewalk. GUTTER's profile is one-sided (road edge at the line -> curb top at
+    `+curb_thickness`, see `gutter_curb_profile`), so its full thickness extends past the line, not
+    half. NONE has no wall at all (0 clearance -- a sidewalk can start right at the lane edge).
+    Shared by `ops_segment._populate_segment_mesh_gn` and `ops_intersection._populate_
+    intersection_mesh` so a segment's and an intersection's sidewalk offset can never disagree
+    about what "flush against the curb" means.
+
+    ASSET (2026-08 follow-up, user-reported against real content: "the sideway seem not align
+    with asset curb, and only align with box curb... there will be a gap for asset between curb
+    and sideway"): measured directly off the RESOLVED asset object's own local bounding box (its
+    max local Y) -- per `tools/build_curb_kit.py`'s own documented pivot convention (origin at the
+    boundary line, front/outward face on local +Y), the piece's own outermost point IS its real
+    outward clearance, whether it's centered on the line (e.g. `Kit_Curb_JerseyBarrier_L2`,
+    straddling +-0.35m) or purely one-sided (e.g. `Kit_Curb_FencePost_L1`, 0 to +0.1m) -- no new
+    authoring convention needed, every existing kit piece already carries this. Falls back to 0.0
+    when the piece hasn't resolved yet (blank/unlinked -- same 'nothing to measure' case ASSET
+    curbs already have for `bake_colonly_proxies`'s boundary)."""
+    if curb_style == 'GUTTER':
+        return curb_thickness
+    if curb_style == 'ASSET':
+        if asset_obj is None:
+            return 0.0
+        return max(0.0, max(corner[1] for corner in asset_obj.bound_box))
+    if curb_style == 'PROFILE':
+        # Same "measure the resolved piece's own real geometry" approach as ASSET, just off the
+        # extracted profile CURVE's own lateral (local X) extent instead of a raw mesh bound_box
+        # -- see `asset_profile_object`'s own docstring for why this is the right measurement for
+        # a continuously-swept (not tiled) curb.
+        prof_obj = asset_profile_object(asset_obj)
+        if prof_obj is None:
+            return 0.0
+        xs = [pt.co.x for pt in prof_obj.data.splines[0].points]
+        return max(0.0, max(xs)) if xs else 0.0
+    if curb_style == 'NONE':
+        return 0.0
+    return curb_thickness / 2.0   # BOX (default/fallback)
+
+
+def asset_row_width(asset_obj):
+    """The real physical width (local Y bounding-box extent) of a `curb_asset_row` piece -- e.g.
+    a sidewalk kit tile's actual paved width, independent of whatever `sidewalk_*_width` value the
+    caller has separately configured as the design width. `curb_asset_row` centers each instance
+    ON the boundary line it's given (matching `curb_loop`'s own symmetric-profile convention, same
+    as `curb_outer_clearance`'s docstring), so a caller offsetting that boundary line to place a
+    sidewalk/curb/median row must use THIS measured width, not the configured design width, or the
+    placed row lands at the wrong distance from the curb whenever the two disagree.
+
+    2026-08, user-reported: an ASSET-style sidewalk read as broken/misaligned ("previously when
+    using plane seem to be better"). Root cause: `sidewalk_l_width`/`sidewalk_r_width` (design
+    width, e.g. the panel's own `DEFAULT_SIDEWALK_WIDTH = 3.5`) was being used DIRECTLY as the
+    swept width in the offset-line formula (`half_w + curb_clearance + sidewalk_width/2`) -- exact
+    for the procedural `curb_loop(curb_thickness=sidewalk_width)` sweep, since its swept thickness
+    genuinely equals that value, but wrong for an ASSET tile whose OWN physical width is fixed by
+    the chosen kit mesh (e.g. `Kit_Curb_SidewalkTile_L2` is a fixed 3.0m regardless of the dial).
+    A 3.5m-configured sidewalk with a 3.0m-wide tile placed the tile's centerline 0.25m too far
+    out, opening a real gap between the curb's outer edge and the tile's own inner edge (and an
+    equal-sized unexplained overhang past the tile's outer edge) -- confirmed directly against
+    `world_session.blend`'s own authored intersection sidewalk. Callers should measure this BEFORE
+    computing the offset line whenever an asset object is resolved, and fall back to the
+    configured design width otherwise (see `ops_segment._populate_segment_mesh_gn`/
+    `ops_intersection._populate_intersection_sidewalks`). Returns 0.0 for `None` (nothing to
+    measure, caller keeps the design width)."""
+    if asset_obj is None:
+        return 0.0
+    ys = [corner[1] for corner in asset_obj.bound_box]
+    return max(ys) - min(ys) if ys else 0.0
+
+
 _CURB_PROFILE_CACHE = {}
 
 
@@ -1754,14 +2418,127 @@ def _curb_profile_object(style, height, thickness):
     return obj
 
 
+def extract_cross_section_profile(asset_obj, x_frac=0.5):
+    """Slice `asset_obj`'s own mesh at a fixed local X (`x_frac`, default 0.5 = the piece's own
+    local-X MIDPOINT, avoiding any end-cap geometry that wouldn't represent the piece's REPEATING
+    cross-section) and return its cross-section as an ORDERED list of `(lateral, height)` 2D
+    points -- `lateral` = the asset's own local Y (its authored lateral/'outward' axis, see
+    `tools/build_curb_kit.py`'s worked-example pivot convention: "Length runs along local +X...
+    Front/outward face on local +Y"), `height` = the asset's own local Z, UN-negated (matches the
+    plain `pts2d` shape `_curb_profile_object` already expects before ITS OWN `-h` write
+    convention -- see that function's docstring for the profile-plane quirk this shares).
+
+    2026-08, user-requested: "let GN use the outline of a mesh 2d to form more complex shape
+    rather than box... to ensure no gap" -- the CONTINUOUS-sweep answer to the "geometric limit of
+    rigid pieces on a curve" finding (tiling a REPEATED discrete mesh around a corner always
+    shows a joint/gap on the outer edge; sweeping ONE profile continuously, the way BOX-style curb
+    already works, has no joint at all, by construction, regardless of how tight the corner is).
+
+    Uses `bmesh.ops.bisect_plane` (a single planar cut) then walks the resulting cut EDGES into an
+    ordered loop by vertex adjacency (each vertex has exactly 2 cut edges for a simple closed
+    manifold cross-section, the case every current kit piece's own PRIMARY sub-object satisfies --
+    see `_resolve_curb_asset`'s own docstring for what 'primary' means for a multi-part piece,
+    e.g. `Kit_Curb_JerseyBarrier_L2`'s resolved cross-section is its `base` box only, not the
+    separate `_Cap` sub-object, matching the same 'the primary object represents the piece'
+    convention `asset_row_width`/`asset_row_length` already use). Returns `None` if the mesh has
+    no geometry at that X, or the cut isn't a single simple loop (a multi-island or open
+    cross-section -- not a shape this profile-plane sweep can represent; caller falls back the
+    same way an unresolved ASSET piece already does)."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(asset_obj.data)
+    xs = [v.co.x for v in bm.verts]
+    if not xs:
+        bm.free()
+        return None
+    x_cut = min(xs) + (max(xs) - min(xs)) * x_frac
+    geom = list(bm.verts) + list(bm.edges) + list(bm.faces)
+    result = bmesh.ops.bisect_plane(bm, geom=geom, plane_co=(x_cut, 0.0, 0.0),
+                                     plane_no=(1.0, 0.0, 0.0), clear_inner=False, clear_outer=False)
+    cut_edges = [e for e in result['geom_cut'] if isinstance(e, bmesh.types.BMEdge)]
+    if not cut_edges:
+        bm.free()
+        return None
+    adjacency = {}
+    for e in cut_edges:
+        v0, v1 = e.verts
+        adjacency.setdefault(v0, []).append(v1)
+        adjacency.setdefault(v1, []).append(v0)
+    start = cut_edges[0].verts[0]
+    loop = [start]
+    prev, cur = None, start
+    guard = len(cut_edges) + 2   # a simple closed loop visits len(cut_edges) verts at most
+    while len(loop) <= guard:
+        nexts = [v for v in adjacency.get(cur, []) if v is not prev]
+        if not nexts:
+            break
+        nxt = nexts[0]
+        if nxt is start:
+            break
+        loop.append(nxt)
+        prev, cur = cur, nxt
+    pts2d = [(v.co.y, v.co.z) for v in loop]
+    bm.free()
+    return pts2d if len(pts2d) >= 3 else None
+
+
+_ASSET_PROFILE_CACHE = {}
+
+
+def asset_profile_object(asset_obj):
+    """Cached profile Curve object built from `asset_obj`'s own cross-section
+    (`extract_cross_section_profile`) -- the asset-derived counterpart to `_curb_profile_object`,
+    same profile-plane convention (including its `-h` write quirk), same module-global cache
+    idiom (survives a File > New/Open in one session; a stale cross-file reference is treated as
+    a cache miss via the same `ReferenceError` guard). Feeds `GN_CurbLoop`'s Profile input via
+    `curb_loop(curb_style='PROFILE', asset_obj=...)`, so a curb/median/sidewalk can follow the
+    resolved kit piece's own real silhouette while sweeping CONTINUOUSLY along any curve -- no
+    discrete tiling, no per-joint corner seam, by construction. Returns `None` when `asset_obj`
+    doesn't resolve or its cross-section can't be extracted, matching the same 'no piece = no
+    geometry' convention every ASSET-style caller already has."""
+    if asset_obj is None:
+        return None
+    key = asset_obj.name
+    cached = _ASSET_PROFILE_CACHE.get(key)
+    try:
+        cached_valid = cached is not None and cached.name in bpy.data.objects
+    except ReferenceError:
+        cached_valid = False
+    if cached_valid:
+        return cached
+    pts2d = extract_cross_section_profile(asset_obj)
+    if not pts2d:
+        return None
+    cu = bpy.data.curves.new("RKA_AssetProfile_%s" % key, 'CURVE')
+    cu.dimensions = '3D'
+    sp = cu.splines.new('POLY')
+    sp.points.add(len(pts2d) - 1)
+    for i, (lat, h) in enumerate(pts2d):
+        sp.points[i].co = (lat, -h, 0.0, 1.0)   # same '-h' quirk as _curb_profile_object
+    sp.use_cyclic_u = True
+    obj = bpy.data.objects.new("RKA_AssetProfile_%s" % key, cu)
+    _ASSET_PROFILE_CACHE[key] = obj
+    return obj
+
+
 def curb_loop(name, boundary_pts_radius, coll, curb_style='BOX', curb_height=0.15,
-              curb_thickness=0.25, matkey="concrete", segments=8, closed=True):
+              curb_thickness=0.25, matkey="concrete", segments=8, closed=True, asset_obj=None):
     """One continuous, correctly-mitered curb from a boundary/edge polygon via `GN_CurbLoop`.
     `closed=True` (default) is an intersection's full loop (same boundary `junction_pad` uses);
     `closed=False` is an OPEN edge line -- a straight/transition segment's own L or R curb, no
     corners to fillet (pass 0 radius for every point; Fillet Curve is then a no-op). Returns
     `None` for `curb_style == 'NONE'` (curb toggled off -- the caller skips linking/using the
-    result, no wasted empty object is created at all)."""
+    result, no wasted empty object is created at all) OR for `curb_style == 'PROFILE'` when
+    `asset_obj` doesn't resolve/its cross-section can't be extracted (same 'no piece = no
+    geometry' convention ASSET style already has).
+
+    `curb_style == 'PROFILE'` (2026-08, user-requested: "let GN use the outline of a mesh 2d to
+    form more complex shape rather than box... to ensure no gap") sweeps `asset_obj`'s OWN
+    cross-section (`asset_profile_object`) instead of the built-in flat BOX/GUTTER profile --
+    the resolved kit piece's real silhouette (a taper, a lip, anything more complex than a flat
+    rectangle), swept CONTINUOUSLY along any curve exactly like BOX already is, so it has no
+    discrete tiling and therefore no per-joint corner seam at all, unlike ASSET style's repeated
+    instances (see that style's own docstring for the geometric limit this replaces)."""
     if curb_style == 'NONE':
         # A rebuild that switches an EXISTING curb to NONE (RKA_OT_set_curb_style) must still
         # clean up the now-stale object -- `_poly_curve_with_radius`'s update-in-place path is
@@ -1771,11 +2548,26 @@ def curb_loop(name, boundary_pts_radius, coll, curb_style='BOX', curb_height=0.1
         if stale is not None:
             bpy.data.objects.remove(stale, do_unlink=True)
         return None
+    if curb_style == 'PROFILE':
+        prof_obj = asset_profile_object(asset_obj)
+        if prof_obj is None:
+            stale = coll.objects.get(name)
+            if stale is not None:
+                bpy.data.objects.remove(stale, do_unlink=True)
+            return None
+    else:
+        prof_obj = _curb_profile_object(curb_style, curb_height, curb_thickness)
     bound = _poly_curve_with_radius(name, boundary_pts_radius, coll, closed=closed)
     ng, (mat_id, seg_id, prof_id) = make_curb_loop_group()
-    prof_obj = _curb_profile_object(curb_style, curb_height, curb_thickness)
     mod = bound.modifiers.get("Curb")   # reuse in place -- see junction_pad's identical reasoning
-    if mod is None:
+    if mod is None or mod.node_group is not ng:
+        # 2026-08: a same-named object may have survived from ASSET style instead (`curb_asset_row`
+        # now ALSO builds a Curve object sharing this exact name convention, with its own "GN"
+        # modifier, not "Curb") -- `_poly_curve_with_radius`'s reuse check is point-count-only, not
+        # modifier-identity-aware, so clear anything stale before attaching this style's own
+        # modifier (mirrors `curb_asset_row`'s identical fix, same reasoning, opposite direction).
+        for m in list(bound.modifiers):
+            bound.modifiers.remove(m)
         mod = bound.modifiers.new("Curb", "NODES")
         mod.node_group = ng
     set_mod_input(mod, mat_id, mat(matkey))
@@ -1785,26 +2577,322 @@ def curb_loop(name, boundary_pts_radius, coll, curb_style='BOX', curb_height=0.1
     return bound
 
 
-def curb_asset_row(name, boundary_pts_radius, coll, asset_obj, spacing, rot_offset_deg=0.0):
+# Named cross-section silhouettes for `swept_profile_between` -- each a list of `(t, h)` pairs
+# walking the FULL outline in order (both vertical risers and horizontal top segments), `t` in
+# [0,1] = normalized lateral position from the left rail (0) to the right rail (1), `h` in [0,1] =
+# fraction of the caller's own `height` argument raised at that point. 2026-08, user-requested: a
+# median should always be ONE mesh + a gap distance -- what varies is only this silhouette ("two
+# curb" / "one curb" / "one wall" / painted line(s) / no mesh at all), not the mechanism.
+MEDIAN_PROFILES = {
+    # Solid box spanning the WHOLE gap -- "one wall" / a wide "two-lane separator" island
+    # (tune width via the existing Median Width, not a separate parameter).
+    'WALL': [(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0)],
+    # Raised lip at BOTH edges, flat/low in the middle -- reads like the OLD two-separate-curb
+    # look (a raised edge on each side of the gap) but is genuinely ONE continuous mesh, no seam.
+    'DOUBLE_LIP': [(0.0, 0.0), (0.0, 1.0), (0.12, 1.0), (0.12, 0.0),
+                   (0.88, 0.0), (0.88, 1.0), (1.0, 1.0), (1.0, 0.0)],
+    # Raised lip on the LEFT edge only (mirror the two rails to flip sides) -- "one curb".
+    'SINGLE_LIP': [(0.0, 0.0), (0.0, 1.0), (0.2, 1.0), (0.2, 0.0), (1.0, 0.0)],
+    # Flush (h always 0) painted line(s) -- geometry-flat, distinguished visually by matkey
+    # ("line_y") at the call site, not by height. One line centered in the gap...
+    'PAINT_1': [(0.0, 0.0), (0.45, 0.0), (0.45, 0.0), (0.55, 0.0), (0.55, 0.0), (1.0, 0.0)],
+    # ...or two lines, one near each edge (each spans a FRACTION of however wide the gap currently
+    # is, so it narrows/widens with the median the same as everything else here -- an intentional
+    # simplification vs. a fixed absolute paint width, which would need a per-point-varying
+    # profile; fine for a lane-marking-scale stripe).
+    'PAINT_2': [(0.05, 0.0), (0.15, 0.0), (0.15, 0.0), (0.05, 0.0),
+                (0.85, 0.0), (0.95, 0.0), (0.95, 0.0), (0.85, 0.0)],
+}
+
+
+def swept_profile_between(name, left_pts, right_pts, coll, profile=None, height=0.0,
+                           matkey="concrete"):
+    """Sweep an arbitrary 2D cross-section `profile` (see `MEDIAN_PROFILES`; `None` default = a
+    plain flat fill, `[(0,0),(1,0)]`) between two parallel-ish rails (e.g. a segment's own tapered
+    `median_edges`) -- ONE continuous mesh whose silhouette can be a flush fill, a solid wall,
+    curbed lips at one/both edges, or painted line(s), all through the SAME mechanism (2026-08,
+    user-requested: a median should always be a single mesh + a gap distance, only the silhouette
+    should vary). Plain Python vertex/face construction (no GN needed, same low-level technique
+    `flat_ribbon`/`marking_ribbon` already use) -- unlike `curb_loop` (a FIXED-width cross-section
+    swept via Curve to Mesh, can't taper along its own length), this follows each rail's OWN
+    already-tapered points directly, so both the gap WIDTH and every profile point's lateral
+    position taper correctly along the segment. No kit-library asset to link (the bug this
+    replaces: a kit-asset-based single median silently built NOTHING when its target collection
+    wasn't linked/resolved -- this is pure procedural geometry, always available)."""
+    profile = profile or [(0.0, 0.0), (1.0, 0.0)]
+    n = min(len(left_pts), len(right_pts))
+    k = len(profile)
+    if n < 2 or k < 2:
+        return None
+    verts = []
+    for i in range(n):
+        lx, ly, lz = left_pts[i][0], left_pts[i][1], left_pts[i][2]
+        rx, ry, rz = right_pts[i][0], right_pts[i][1], right_pts[i][2]
+        for (t, h) in profile:
+            verts.append((lx + (rx - lx) * t, ly + (ry - ly) * t, lz + (rz - lz) * t + h * height))
+    faces = []
+    for i in range(n - 1):
+        base0, base1 = i * k, (i + 1) * k
+        for j in range(k - 1):
+            faces.append((base0 + j, base0 + j + 1, base1 + j + 1, base1 + j))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.update()
+    recalc_normals(me)
+    # UPDATE-IN-PLACE (same crash-surface-safe reasoning as marking_ribbon/flat_ribbon -- topology
+    # can change (point count) between rebuilds, so this reuses the OBJECT unconditionally rather
+    # than checking point count like _poly_curve_with_radius does).
+    existing = coll.objects.get(name)
+    if existing is not None and existing.type == 'MESH':
+        # A same-named object might be a STALE `instancer()`-built GN object (a piece that used to
+        # be `ASSET_SINGLE`/`curb_asset_row`, now switched to this plain-mesh `SINGLE` style, same
+        # name convention -- `ops_segment.py`'s median block). Its "GN" modifier would otherwise
+        # keep instancing the old asset onto this function's much smaller vertex set (wrong/broken
+        # geometry) -- explicit clear, same "delete the mismatched reuse candidate's stale bits"
+        # reasoning `instancer()` itself uses when the reverse switch happens.
+        for mod in list(existing.modifiers):
+            existing.modifiers.remove(mod)
+        existing.location = (0.0, 0.0, 0.0)
+        existing.rotation_euler = (0.0, 0.0, 0.0)
+        existing.scale = (1.0, 1.0, 1.0)
+        old_data = existing.data
+        existing.data = me
+        if old_data is not None and old_data.users == 0:
+            bpy.data.meshes.remove(old_data)
+        me.materials.clear()
+        me.materials.append(mat(matkey))
+        existing["_rka_touched"] = True   # see ops_intersection.sweep_untouched_boundaries
+        return existing
+    obj = bpy.data.objects.new(name, me)
+    coll.objects.link(obj)
+    obj.data.materials.append(mat(matkey))
+    obj["_rka_touched"] = True
+    return obj
+
+
+def asset_row_length(asset_obj):
+    """The real physical LENGTH (local X bounding-box extent) of a `curb_asset_row` piece -- the
+    axis it tiles along (`tools/build_curb_kit.py`'s pivot convention: "Length runs along local
+    +X"). Counterpart to `asset_row_width` (the lateral/Y extent); used to auto-correct the
+    caller's requested tiling `spacing` so it always evenly divides the piece's own real length
+    (see `curb_asset_row`'s docstring) instead of relying on the caller/user to have measured it
+    by hand. Returns 0.0 for `None`."""
+    if asset_obj is None:
+        return 0.0
+    xs = [corner[0] for corner in asset_obj.bound_box]
+    return max(xs) - min(xs) if xs else 0.0
+
+
+def resample_polyline_even(pts, spacing, include_endpoint=False, phase_offset=0.0):
+    """Resample 3D polyline `pts=[(x,y,z), ...]` into N EVENLY-SPACED anchor points
+    `[(pos, heading_rad), ...]`, where `N = max(1, round(total_length / spacing))` -- so N
+    instances of ~`spacing` length tile the WHOLE polyline with ZERO leftover gap or overlap by
+    construction (`real_spacing = total_length / N` always divides the length exactly, however far
+    `spacing` itself was from a clean divisor). This is the resample step `curb_asset_row` needs
+    and is mathematically identical to what a Geometry Nodes 'Resample Curve' (Count mode) ->
+    'Curve to Points' would produce for this same POLY (straight-segment) boundary -- there's no
+    spline curvature for GN's own curve evaluator to add that this doesn't already capture, so
+    computing it directly here (rather than round-tripping through a live GN modifier) needs no
+    scene-linked helper object and cannot disagree with a downstream Python reader of the result.
+    Each anchor's heading is the LOCAL polyline segment's own tangent (`atan2`), same convention
+    `sample_polyline` already uses.
+
+    Differs from `sample_polyline` (still used by this module's OTHER callers, e.g. `assemble.py`'s
+    pier placement, which want a plain fixed-step walk with an anchor forced at the true endpoint)
+    -- 2026-08, user-reported: an ASSET curb/sidewalk/median row "break[s]... left [a] major
+    gap... instead of smooth line" where BOX (one continuous swept mesh) reads as fine.
+    `sample_polyline`'s fixed-step walk always over/undershoots the boundary's true end by up to a
+    full `spacing`, then unconditionally appends one more anchor exactly at that end regardless of
+    phase -- for a TILED row (not a one-off endpoint anchor) that's either a real leftover gap
+    right before the forced final piece, or a mostly-overlapping double-thickness clump when the
+    two land close together. This function's even-count redistribution instead guarantees every
+    tile boundary lands exactly back-to-back, always.
+
+    `include_endpoint=True` additionally appends the polyline's own exact final point as one MORE
+    anchor past the last regular (evenly-tiled) one -- for a caller that needs an anchor EXACTLY
+    at a boundary's far end regardless of tiling phase (e.g. `median_merge.py`'s cross-piece chain
+    continuity, which asserts a merged row's last point lands byte-exact on the next piece's own
+    port -- see `curb_asset_row`'s own `include_endpoint` passthrough). Defaults off for ordinary
+    visual tiling, which would otherwise reintroduce exactly the double-thickness tail artifact
+    this function exists to remove.
+
+    `phase_offset` (meters, default 0.0) shifts every regular anchor's own distance-along-boundary
+    by this much before placing it -- 2026-08, user-requested streetlight arrays: "Stagger
+    streetlight positions on alternating sides of the street" (a real-world spacing convention, so
+    poles don't line up directly across from each other). An anchor whose shifted distance would
+    land at/past the boundary's true end is simply DROPPED (not wrapped back to the start, which
+    would place it somewhere visually unrelated on a non-cyclic boundary) -- so a nonzero
+    `phase_offset` yields one fewer anchor than the unshifted case, not a repositioned same count.
+    This is a cosmetic spacing tool (streetlights, unlike curb/sidewalk/median tiles, are never
+    meant to butt edge-to-edge), so losing exact 'divides the whole length' coverage right at the
+    shifted end is an acceptable, intended tradeoff -- not reused by any edge-to-edge tiling
+    caller."""
+    if len(pts) < 2:
+        return []
+    segs = []
+    total = 0.0
+    for a, b in zip(pts, pts[1:]):
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        if L < 1e-9:
+            continue
+        segs.append((a, b, L))
+        total += L
+    if not segs:
+        return []
+    n = max(1, round(total / spacing)) if spacing > 1e-9 else 1
+    real_spacing = total / n
+    out = []
+    seg_idx = 0
+    seg_start_d = 0.0
+    a, b, L = segs[0]
+    for i in range(n):
+        d = i * real_spacing + phase_offset
+        if d < 0.0 or d >= total:
+            continue
+        while d > seg_start_d + L + 1e-9 and seg_idx < len(segs) - 1:
+            seg_start_d += L
+            seg_idx += 1
+            a, b, L = segs[seg_idx]
+        t = 0.0 if L < 1e-9 else max(0.0, min(1.0, (d - seg_start_d) / L))
+        pos = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t)
+        hd = math.atan2(b[1] - a[1], b[0] - a[0])
+        out.append((pos, hd))
+    if include_endpoint:
+        last_a, last_b, _ = segs[-1]
+        out.append((tuple(last_b), math.atan2(last_b[1] - last_a[1], last_b[0] - last_a[0])))
+    return out
+
+
+def curb_asset_row(name, boundary_pts_radius, coll, asset_obj, spacing, rot_offset_deg=0.0,
+                    include_endpoint=False, phase_offset=0.0, exclude_positions=None,
+                    exclude_radius=0.0):
     """Repeat `asset_obj` (a mesh Object, e.g. from a linked kit/curb_kit.blend collection) along
     the edge polyline `boundary_pts_radius` (same 4-tuple-or-3-tuple shape `curb_loop()` accepts
     -- any 4th 'radius' element is ignored here, since ASSET-style curbs never fillet through GN:
     every boundary this addon ever builds is already an explicit polyline, arcs included as
-    point density, so there is no live corner radius left to resolve at this style). Combines
-    two existing generic building blocks for the first time: `sample_polyline` (position+heading
-    every ~`spacing` m) feeds `instancer` (GN Instance-on-Points, per-point Z-rotation from
-    heading). `rot_offset_deg` (typically 0 or 180) additionally spins every instance around its
-    own Z -- the R-side curb of a two-way segment/corner typically needs 180 relative to the L
-    side so an ASYMMETRIC piece's authored 'front' face (local +Y, see
+    point density, so there is no live corner radius left to resolve at this style). Combines two
+    existing generic building blocks: `resample_polyline_even` (evenly-tiled position+heading, see
+    its own docstring for why this is the GN-'Resample Curve'-equivalent technique, computed
+    directly since there's no spline curvature involved) feeds `instancer` (GN Instance-on-Points,
+    per-point Z-rotation from heading). `rot_offset_deg` (typically 0 or 180) additionally spins
+    every instance around its own Z -- the R-side curb of a two-way segment/corner typically needs
+    180 relative to the L side so an ASYMMETRIC piece's authored 'front' face (local +Y, see
     tools/build_curb_kit.py's worked example) keeps facing AWAY from the road on both sides, since
     both boundaries are sampled in the same spine direction. Returns the single GN-backed
     instancer Object (None if the boundary has fewer than 2 points after sampling), so it slots
-    into the same 'one curb object per side/corner' convention every other curb style returns."""
+    into the same 'one curb object per side/corner' convention every other curb style returns.
+
+    A `rot_offset_deg` near 180 is handled as a local Y-axis MIRROR (Scale=(1,-1,1) via
+    `instancer_scaled`/`GN_InstanceScaled`), NOT a plain extra Z-rotation -- 2026-08, user-reported:
+    "right side is push back further than segment while left side is push forward than the road
+    segment." Root cause: a full 180-degree Z-rotation flips BOTH local axes together (the
+    outward-facing +Y, the intent, AND the length/tiling +X, an unintended side effect), so the
+    R-side row's own footprint ran BACKWARD from each anchor instead of forward -- confirmed
+    directly, a 40m straight segment's R-side curb evaluated to X in [-2, 38] against the L side's
+    correct [0, 40], a full piece-length regression at both ends. A local Scale is applied in the
+    instance's OWN unrotated frame BEFORE the heading rotation (verified directly against the
+    evaluated mesh), so Scale=(1,-1,1) mirrors ONLY the outward-facing Y axis while the SAME
+    heading-only rotation as the L side keeps the length axis pointing forward on both sides. Any
+    OTHER `rot_offset_deg` value (unused by every real caller in this codebase, which only ever
+    passes 0 or 180) keeps the original plain-rotation behavior, unchanged.
+
+    `spacing` is auto-corrected to the nearest clean multiple of the resolved piece's own REAL
+    length (`asset_row_length`, measured off its local-X bound_box) whenever one resolves -- the
+    "read it back and suggest a matching spacing instead of the user having to measure it by hand"
+    behaviour `tools/build_curb_kit.py`'s worked-example docs always intended but never actually
+    implemented (confirmed via grep: `rka_curb_asset_length` was written at kit-build time but
+    never read back anywhere). This is what makes an arbitrary spacing dial value safe to leave
+    alone -- e.g. the shipped `Kit_Median_YellowSeparator`/`_Island` (2.0m) against the historical
+    `median_asset_spacing` default (3.0m, a genuine out-of-the-box mismatch, separately fixed at
+    its call sites too) now self-corrects to 2.0m even if some other caller still passes 3.0.
+
+    `include_endpoint` -- see `resample_polyline_even`'s own docstring; passed straight through
+    (default False, matching every EXISTING caller's expectations unchanged) for
+    `median_merge.py`'s exact-endpoint chain-continuity need.
+
+    `phase_offset` -- see `resample_polyline_even`'s own docstring; passed straight through
+    (default 0.0, unchanged for every existing caller) -- 2026-08, user-requested streetlight
+    'Stagger... on alternating sides' rule: `ops_segment._populate_segment_mesh_gn` passes half
+    the prop spacing on the R side only.
+
+    `exclude_positions` (world-space `(x,y,z)` points, default None = no filtering) + `exclude_
+    radius` (meters) drop any resampled anchor within `exclude_radius` of ANY of those points
+    before instancing -- 2026-08, user-requested streetlight 'Intersection Exclusion Zone' rule
+    (keep a segment's own streetlight row clear of a nearby intersection's signal poles/gantries).
+    Checked in WORLD space (the anchors computed here already ARE world-space, same as every
+    other `curb_asset_row` caller's boundary), so the caller doesn't need to pre-transform
+    anything.
+
+    IMPLEMENTATION (2026-08, user-requested repeatedly: "please use GN and curve for them as
+    well"): the common case (`include_endpoint=False`, `phase_offset==0.0`, no
+    `exclude_positions` -- i.e. every curb/median/sidewalk row, and a plain prop row with no
+    nearby signal to avoid) now builds a LIVE Curve object + `GN_CurbAssetRow` modifier
+    (`make_curb_asset_row_group`'s own docstring has the full graph writeup) -- the genuine
+    Curve+GN architecture `curb_loop`/BOX style already uses, reused-by-identity across rebuilds
+    exactly like `curb_loop`'s own boundary curve (`_poly_curve_with_radius`). The three NEWER,
+    narrower features above (`median_merge.py`'s exact cross-piece endpoint match, streetlight
+    stagger, streetlight exclusion zone) still go through `_curb_asset_row_python` -- porting
+    those into the live graph would need a Trim Curve (stagger) and a Geometry Proximity +
+    Delete Geometry pass against an externally-supplied point cloud (exclusion), both real GN
+    capabilities but not yet built/verified here; the Python path already correctly implements
+    them and stays available as a deliberate, documented fallback for exactly these three cases,
+    not a general escape hatch."""
+    if include_endpoint or phase_offset != 0.0 or exclude_positions:
+        return _curb_asset_row_python(name, boundary_pts_radius, coll, asset_obj, spacing,
+                                       rot_offset_deg, include_endpoint, phase_offset,
+                                       exclude_positions, exclude_radius)
+    if len(boundary_pts_radius) < 2:
+        return None
+    pts4 = [(p[0], p[1], p[2], 0.0) for p in boundary_pts_radius]
+    piece_len = asset_row_length(asset_obj)
+    if piece_len > 1e-4:
+        spacing = piece_len * max(1, round(spacing / piece_len))
+    curve_obj = _poly_curve_with_radius(name, pts4, coll, closed=False)
+    ng, sock = make_curb_asset_row_group()
+    mod = curve_obj.modifiers.get("GN")
+    if mod is None or mod.node_group is not ng:
+        # A same-named object may have survived from a DIFFERENT curb style sharing this exact
+        # name (`curb_loop`'s own "Curb" modifier for BOX, or a stale modifier from before this
+        # architecture change) -- `_poly_curve_with_radius`'s own reuse check is point-count-only,
+        # not modifier-identity-aware, so this call must own fixing up the modifier stack whenever
+        # it doesn't already have exactly the right one.
+        for m in list(curve_obj.modifiers):
+            curve_obj.modifiers.remove(m)
+        mod = curve_obj.modifiers.new("GN", "NODES")
+        mod.node_group = ng
+    is_mirror = abs((rot_offset_deg % 360.0) - 180.0) < 1e-3
+    set_mod_input(mod, sock["Object"], asset_obj)
+    set_mod_input(mod, sock["Spacing"], spacing)
+    set_mod_input(mod, sock["RotOffset"], 0.0 if is_mirror else math.radians(rot_offset_deg))
+    set_mod_input(mod, sock["ScaleY"], -1.0 if is_mirror else 1.0)
+    curve_obj["_rka_touched"] = True
+    return curve_obj
+
+
+def _curb_asset_row_python(name, boundary_pts_radius, coll, asset_obj, spacing, rot_offset_deg,
+                            include_endpoint, phase_offset, exclude_positions, exclude_radius):
+    """The pre-2026-08 Python-computed-then-baked-to-point-cloud implementation, kept as
+    `curb_asset_row`'s fallback for `include_endpoint`/`phase_offset`/`exclude_positions` -- see
+    that function's own docstring for exactly why these three still use it instead of
+    `GN_CurbAssetRow`. Builds a MESH point-cloud + `GN_Instance`/`GN_InstanceScaled` (the same
+    primitive `instancer`/`instancer_scaled` always used), NOT a Curve object."""
     pts3 = [(p[0], p[1], p[2]) for p in boundary_pts_radius]
-    samples = sample_polyline(pts3, spacing)
+    piece_len = asset_row_length(asset_obj)
+    if piece_len > 1e-4:
+        spacing = piece_len * max(1, round(spacing / piece_len))
+    samples = resample_polyline_even(pts3, spacing, include_endpoint=include_endpoint,
+                                      phase_offset=phase_offset)
+    if exclude_positions and exclude_radius > 0.0:
+        samples = [(pos, hd) for pos, hd in samples
+                   if all(math.dist(pos, ep) >= exclude_radius for ep in exclude_positions)]
     if not samples:
         return None
     coords = [pos for pos, _hd in samples]
+    is_mirror = abs((rot_offset_deg % 360.0) - 180.0) < 1e-3
+    if is_mirror:
+        rots = [(0.0, 0.0, hd) for _pos, hd in samples]
+        scls = [(1.0, -1.0, 1.0)] * len(samples)
+        return instancer_scaled(name, coords, asset_obj, coll, rots, scls)
     rots = [(0.0, 0.0, hd + math.radians(rot_offset_deg)) for _pos, hd in samples]
     return instancer(name, coords, asset_obj, coll, rots=rots)
 

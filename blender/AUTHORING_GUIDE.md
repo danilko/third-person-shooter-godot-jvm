@@ -557,6 +557,16 @@ for context (and as a starting point if an importer is ever rewritten from scrat
 > compatibility, every district regenerates through the addon below. See `road_blender_godot.md`
 > Phase 6 (P6.1-P6.8) for the full migration history/design record.
 
+> **The current road model is the MESH GRAPH, not the per-piece kit described below.** A network is
+> one edge-only mesh (vertex = junction, edge = segment, cross-section on the edge domain) and
+> everything visible — asphalt, kerbs, footways, junction pads, pillars, lane routes — is generated
+> from it, so the generated objects (`<graph>_Carrier`/`_Corners`/`_Nodes`, `RKA_LANE_PREVIEW*`)
+> must never be hand-edited. See the **"Road Graph"** section of
+> `blender/addons/road_kit_authoring/README.md` for the panel workflow, including how to override a
+> ramp's auxiliary lane and how to ask a junction why a movement is missing. The per-piece
+> operators below still exist (`legacy/`) and remain the record of how District_industry_5_1 was
+> authored.
+
 Roads are built as **mesh-first pieces** with the `road_kit_authoring` Blender addon (dev-install:
 `blender/addons/road_kit_authoring/README.md`), not drawn as bare centerlines. Three piece types —
 intersections, straight/curved segments, lane-count transitions — each carry the geometry AND a
@@ -625,12 +635,124 @@ for two overlapping static colliders to work correctly. Editing a road never req
 ground mesh, and re-extracting terrain never requires re-authoring roads.
 
 **Curb style, after the fact:** the panel's "Curb Style" button row (Left/Right ×
-None/Box/Gutter/Asset, shown when a segment or lane-transition piece is active/selected) changes
-curb style on an already-built piece and rebuilds in place — a persistent alternative to the build
-operator's own F9 redo panel, which stops applying the moment any other action runs. For an
-asymmetric ASSET curb mesh (authored to attach on one side only), use the SAME asset collection on
-both Left and Right — the addon automatically spins the right-side row 180° (`curb_asset_rot_offset_r`)
-so it still faces the correct way; no separate right-side asset or two-level gutter+curb split needed.
+None/Box/Asset, shown when a segment, lane-transition, or intersection piece is active/selected)
+changes curb style on an already-built piece and rebuilds in place — a persistent alternative to
+the build operator's own F9 redo panel, which stops applying the moment any other action runs. For
+an asymmetric ASSET curb mesh (authored to attach on one side only), use the SAME asset collection
+on both Left and Right — the addon automatically spins the right-side row 180°
+(`curb_asset_rot_offset_r`) so it still faces the correct way. (2026-08: `Gutter` was removed from
+this list — its one-sided cross-section swept in a fixed physical direction with no per-side
+compensation, so it silently built OUTSIDE the boundary on one side of a two-way road and INSIDE
+it on the other; `Box`'s symmetric profile has no such ambiguity, and `Asset` already had the
+right-side flip mechanism. The underlying `gutter_curb_profile`/`curb_style='GUTTER'` code paths
+still exist in `kit_common.py`/`intersection_kit.py` for old saved content, just not offered here.)
+
+**Median style, after the fact:** like Curb Style above, the panel's "Median Style" button row
+(shown alongside Curb Style on a segment or lane-transition piece) changes median style on an
+already-built piece and rebuilds in place. Two options only (2026-08, collapsed from an earlier
+BOX/GUTTER/ASSET-dual/profile-silhouette set): `None` (just the gap distance — a flush painted
+boundary between the lane markings, no mesh) and `Asset`, which repeats **one** kit-library piece
+along the median's own **centerline** — e.g. `Kit_Median_YellowSeparator` (a flat painted divider)
+or `Kit_Median_Island` (a raised barrier), both shipped in `kit/curb_kit.blend` (link the same way
+as any curb ASSET piece — "Curb Kit Library" box, then set "Median Asset Piece" via this
+operator's own F9 redo panel, or the panel's "Asset" button auto-fills a sane default the first
+time it's clicked on a piece that's never had one set). A chain of 2+ linked segments, all
+`Median Style = Asset` with the same piece, merges automatically into ONE continuous sampled row
+spanning the whole chain (`median_merge.py`, live-synced, no manual step) — otherwise the tiling
+pattern restarts at every joint, which looks broken.
+
+**Sidewalks, after the fact:** sidewalk width (`Sidewalk Width (Left/Right)`, `(End)` for a taper)
+is a full build-time field on `Build Straight Segment`/`Extend From Arm`/`Extend From Port`, and
+also on `Build Intersection` (`Sidewalk Width`, applied symmetrically around every arm — no L/R
+split at an intersection, since a corner isn't a single 2-endpoint direction). 0 width is "off,"
+same convention as median width. The panel's "Sidewalk" rows (on an already-built segment or
+intersection, next to Median Style) make turning it on/off after the fact just as discoverable as
+median width already was.
+
+By default a sidewalk is a procedural `curb_loop`(BOX) sweep, same technique as a curb/median wall
+— but (2026-08, user-requested: "will it be simpler and easily to regenerate all curb/side way
+from asset... just follow the asset library ones") each side also has its own **Sidewalk Asset**
+piece field (segments: `Sidewalk Asset (Left/Right)`; intersections: one shared `Sidewalk Asset`),
+which tiles a real kit mesh (e.g. `Kit_Curb_SidewalkTile_L2`) along the same line instead — set via
+the panel's "Set" button next to each width row, blank = back to the procedural sweep.
+
+A sidewalk always starts flush against the curb's own REAL outer edge, on both a segment and an
+intersection (`kit_common.curb_outer_clearance`, shared by both) — including an ASSET-style curb
+(2026-08 follow-up, user-reported: "the sideway seem not align with asset curb... there will be a
+gap for asset between curb and sideway but not happen to curb box type"): the clearance is now
+measured directly off the resolved kit piece's own bounding box, not hardcoded to 0 as before.
+
+An intersection's sidewalk is now built **PER CORNER**, one strip per real corner (e.g. 4 for a
+4-way) — literally `intersection_kit.build_junction_curb_segments`, the SAME function the curb
+wall itself uses, called again with an `extra_offset` (curb clearance + half the sidewalk width,
+its centerline) so it's pushed further out. This means a sidewalk always follows the pad's own
+curve exactly like the curb does (skipped at every arm's own tail-cap opening and at
+through-pairs, fillet-mitered at the same corner
+vertex), and can never disagree with the curb it sits flush against, by construction — since both
+now come from one function. (2026-08 follow-up, user-reported against real content: a PRIOR
+per-arm-per-side approximation produced a "strange half bake" at each strip's near end and didn't
+follow the pad's curve at all — "should use original curb logic for intersection, and side[walk]
+will just be bigger side[walk] mesh along the curve, instead of per way." This is that.)
+
+**A confirmed, fixed persistence bug (read this if a linked asset piece "stops working"):**
+`RKA_OT_link_curb_kit_library`/`RKA_OT_link_kit_library` used to link every piece Collection into
+`bpy.data` with no real reference anywhere in the local file (every caller resolves a piece purely
+by NAME, off a `rka_*_asset_collection` custom-property string) — Blender silently drops a linked
+Collection with no real referencer on the next save, even though an object pulled out of it and
+wired into a GN modifier stays alive. Confirmed against real content: a library still showed as
+referenced (`bpy.data.libraries`) but held ZERO of its piece Collections — every asset-dependent
+field (median, sidewalk asset, prop, traffic light) that named a piece from it silently built
+nothing, with no error (that's the existing "unresolved asset = no geometry" convention working
+exactly as designed, just against an asset that had already vanished). Both link operators now
+parent every linked piece under a dedicated hidden `RKA_KitLibraryHolder` collection the moment
+it's linked (`ops_placement._kit_library_holder_collection`) — a real, persistent reference, so
+nothing gets dropped on save. **If a file was linked before this fix, click "Link Curb Kit
+Library"/"Link Kit Library" again once** to re-establish it under the new holder.
+
+**Street lamps / props, after the fact (segments only):** a prop row (`Prop Asset (Left/Right)` —
+e.g. a street lamp collection name, `Kit_Curb_StreetLamp_L1` ships in `kit/curb_kit.blend` — + its
+own independent `Prop Spacing`) is a full build-time field on every segment-building operator, and
+the panel's "Street Lamps / Props" rows make turning it on/off after the fact discoverable, same
+convention as sidewalk width. A prop's spacing is independent of the sidewalk — a lamp row still
+walks the curb line at its own interval even with no sidewalk present. **Intersections do not have
+a prop row** (2026-08, replaced by the per-arm Traffic Light feature below) — an intersection
+corner isn't a single direction to space a repeating row along the way a segment's curb/sidewalk
+line is.
+
+**Traffic lights, after the fact (intersections only):** each `arm_*` marker Empty has its own
+"Traffic Light: ON/OFF" toggle (shown on the active-arm row in the panel) and, once on, a
+"Offset" +/- (`rka_arm_traffic_light_radius`, default 3.5 m) — ONE prop per enabled arm, not a
+spaced row, placed diagonally outside that arm's own curb corner (45° between "away from the
+junction" and "away from the road," starting at the true corner vertex, matching a real signal
+pole set back from both the roadway and the crosswalk). Which mesh gets placed is set once per
+intersection via "Traffic Light Asset" (e.g. `Kit_TrafficLight_L1`) — enabling an arm with no
+asset piece set builds nothing, same "asset style + unresolved piece = no geometry" convention
+every other ASSET field already has.
+
+**Adding a turn/merge lane (widening a segment mid-run):** the SAME per-end taper fields used for a
+lane-drop ("Lanes Forward (End)" narrowing a street) also work in reverse — set `Lanes Forward
+(End)` HIGHER than `Lanes Forward (Start)` to grow a lane partway along one segment, e.g. a 2-lane
+approach with a 6.0m median narrowing its median to 2.0m while gaining a 3rd lane for a left-turn
+pocket: `Lanes Forward = 2`, `Lanes Forward (End) = 3`, `Median Width = 6.0`, `Median Width (End) =
+2.0`, `Align = 'Left'` (so the NEW lane appears against the narrowing median — the shape a real
+turn pocket needs — instead of at the curb). One `Build Straight Segment`/`Extend From Arm`/`Extend
+From Port` call does the whole transition; no separate "Lane Transition" piece needed (that tool is
+legacy/back-compat only, see above). This is geometry-only — the added lane is a real, driveable
+lane with correct space, but isn't tagged as turn-only lane-use data in the exported
+`.lanekit.json` (every lane's `kind`/`turn` stays `"through"`/`"S"`); dedicated turn-lane AI/marking
+metadata is a separate, not-yet-built feature. See `smoketest_turn_lane_widen.py` for a worked,
+numerically-verified example (including the "new lane is born exactly coincident with its
+neighbor, not a disconnected floating lane" check).
+
+**Lane-curve preview ("does this match what Godot will get"):** the panel's "Lane Data Preview" box
+(bottom of the Sidebar) has two buttons — "Preview Lane Curves" builds one real Blender Curve
+object per exported lane, directly from the same per-lane `points` data `save_lane_kit.py` writes
+to the `.lanekit.json` sidecar (in Blender-native space, laid right over the authored mesh — not
+Godot's axis/z-lift convention, so it's easy to eyeball against what you're looking at), collected
+into one `RKA_LanePreview` collection; "Clear Lane Curve Preview" deletes that whole collection.
+Manual/on-demand by design (unlike the always-on traffic-arrow/lane-index overlays below) — a prior
+always-regenerating version of this (`lanecl_*` curves) was removed for exactly the live-edit-churn
+cost this one-click/one-click-undo pair avoids.
 
 **Ground/road alignment ("Cut Ground Under Road"):** newly authored `road_kit_authoring` pavement
 sits at a fixed/gently-sloped Z of its own and does **not** automatically know about — or cut a
@@ -670,6 +792,112 @@ pipeline). Re-run the master build (`blender/tools/build_world.py`) after a dist
 `SoloPiece.tscn`); `WorldZoneManager.debugLog` prints per-zone `N cars, M moving, K routed`
 (routed-but-0-moving = falling through missing ground); F3 (`RouteDebugOverlay`) renders every
 `VehicleRoute`/`PathLaneRoute` in the scene, colour-coded.
+
+### The cross-section is a PROFILE, not a lane count (2026-08)
+
+A piece's cross-section is an ordered list of **slots** (`blender/lib/lane_profile.py`), stored on
+the piece collection as `rka_profile` and hand-editable in Blender's Custom Properties panel. Each
+slot has a stable `id`, a `kind` (`TRAVEL`/`AUX`/`SHOULDER`/`MEDIAN`/`SIDEWALK`), a `dir`, a
+width, and its left-hand marking. A `ProfileSet` is several such profiles at **stations** along
+the piece.
+
+Why it replaced the scalars (`rka_lanes`, `rka_lanes_backward`, the five `_end` twins): a lane
+that exists over only PART of a piece — a ramp opening, an auxiliary lane tapering in — is not
+expressible as a lane *count* at all. The same slot `id` at width `w` on one station and `0.0` on
+the next IS the taper, so one interpolation subsumes all five `_end` pairs, and a lane can begin
+partway along a road. Pieces with no `rka_profile` are migrated from their scalars on read, so
+nothing needed re-authoring.
+
+`lane_profile.slot_offset` is the **single** owner of "where is slot *i* laterally". Three
+confirmed defects (one-way pavement built double-width; a split gore seeded ~3.25 m off in a place
+the trunk had no lane; 40 of 111 pieces exporting zero lanes) all came from separate consumers
+re-deriving that with their own conventions. Do not add a second formula.
+
+### Splits and merges are THREE pieces, not five
+
+`Split Line` / `Merge Line` emit `trunk`, `branch_a`, `branch_b`. The trunk is ONE piece whose
+auxiliary lane opens as a *station of its profile* — `trunk_before` / `trunk_taper` / `trunk_aux`
+no longer exist, and the control points at the taper's start and end are inserted into the trunk's
+spine so the authored taper is the built taper.
+
+Layout at the gore, in the driving frame (`+s` = the outside of a keep-left carriageway, the side
+an exit ramp departs to):
+
+```
+[ B0 .. B(b-1) ] [ GORE nose ] [ A0 .. A(a-1) ]
+   branch B                        branch A
+```
+
+Branch B keeps the **inner** lanes, so its spine coincides with the trunk's and **the mainline
+does not move sideways at an exit** (measured on the rebuilt island: mainline hand-off gap
+0.000 m). Branch A departs outboard of the nose. Slot ids survive the gore — the trunk's `A0` is
+the ramp's `A0` — which is what Phase 3's explicit `next_routes` will key on instead of endpoint
+proximity.
+
+An auxiliary lane's free end reports as `[ISOLATED]` in the `save_lane_kit` lint. That is correct
+and expected: a lane that begins mid-carriageway is entered by changing lanes, not by following a
+route from something upstream.
+
+### Layered modifier stack (road_stack.py)
+
+New pieces build every spine-following part — pavement, curb L/R, sidewalk L/R, median, every
+asset row (streetlights, curb kit pieces, props) and the support piers — as **layers of one
+modifier stack on the spine**, rather than sibling objects rebuilt by Python. Editing one control
+point moves all of them live. Asset rows are `GN_AssetRow` (count, spacing, stagger and
+junction-exclusion all as nodes), so a lamp row follows the curve with no operator re-run.
+
+Profile assets keep the existing convention — **local X = lateral, local Y = up** — and drop
+straight into a layer. The spine carrier for stack-built pieces is a **mesh** polyline, because a
+Blender `Curve` datablock cannot hold custom per-point attributes at all and the per-point
+cross-section is the whole point. `spine_io.py` reads either carrier, so both coexist.
+
+### The road network Godot sees (explicit connectivity)
+
+`.lanekit.json` carries, per lane, everything the runtime graph cannot derive from geometry:
+
+| field | meaning |
+|---|---|
+| `next` / `next_weights` / `next_kinds` | explicit successors and the movement each is — `THROUGH` / `EXIT` / `ENTRY` |
+| `inner_lane` / `outer_lane` | the lane you may **change into**, toward the centreline / toward the road edge |
+| `link_group` / `link_role` / `slot_id` | which structure this piece belongs to, and as what |
+
+`WorldBaker` bakes these onto `PathLaneRoute`; `LaneGraph.successorsOf` prefers explicit
+successors and falls back to endpoint proximity, so ordinary road is unaffected — **explicit
+connectivity is additive, never subtractive**.
+
+**Why it is needed at all.** At a gore every lane end of the mainline and the ramp sits within
+`JUNCTION_RADIUS` (4.5 m) of every other, so proximity alone cannot tell a mainline continuing
+from a ramp departing — a car forks at random and an AI cannot tell which movement a target made.
+`PathLaneRoute.movementKindTo(lane)` is the query for "did they take the exit".
+
+**Lane changes are part of the graph, not a nicety.** An auxiliary exit lane *begins*
+mid-carriageway, so nothing upstream flows into it — `save_lane_kit`'s lint correctly reports its
+free end as `[ISOLATED]`. It is reachable only by changing lanes. In/out rather than left/right
+because in/out is measured against the driving divide and so reads the same in keep-left and
+keep-right worlds; OUTER is always the ramp side.
+
+**Check it:** `python3 blender/tools/check_road_network.py <file>.lanekit.json`. It walks explicit
+successors + lane changes + the proximity edges the runtime derives, and fails if an interchange
+is internally broken, missing a movement kind, carrying a dangling reference, or isolated from the
+wider network.
+
+### The expressway ring is TWO one-way carriageways (`LOOP_A` / `LOOP_B`)
+
+An interchange trunk must be a **chunk of the ring**, not a second road laid beside it. The ring
+is therefore emitted in tier `T1C` as two one-way carriageways offset to each direction's median
+edge (the datum a one-way piece anchors its lanes on — *not* the lane block's centre), and
+`interchange_reservations` cuts the ordinary chunks at each interchange's footprint so the
+interchange builds that stretch itself.
+
+Two failure modes this replaced, both found by `check_road_network.py`:
+
+- the ring authored twice (centreline chunks *and* parallel carriageway windows), overlapping
+  geometrically while their lane ends sat 12–42 m apart — 4 of 8 interchanges were islands;
+- interchanges whose 260 m approach footprints **overlap**, leaving no ordinary chunk between
+  them. Each interchange's lead is clamped to where the next one's approach begins, and where
+  they still abut the hand-over is recorded explicitly (`rka_link_next_group`) so the mainline
+  chains `B0 → B0`. The build prints a `NOTE:` naming any interchange too close to its neighbour
+  — that is a spacing decision for the layout, not a bug in the tooling.
 
 ## 8. Placing water & other gameplay objects (in Blender — never edit the baked .tscn)
 

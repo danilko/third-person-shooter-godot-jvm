@@ -85,6 +85,29 @@ def is_through_pair(angle_a, angle_b, tol_deg=2.0):
     return abs(diff - 180.0) <= tol_deg
 
 
+def opposite_arm(a, arms):
+    """The arm most nearly 'through'/opposite `a` (closest to `a.angle_deg + 180`) among `arms`,
+    excluding `a` itself -- the FAR-SIDE reference arm for a dual near/far traffic-signal pole
+    pair (2026-08, user-requested Japanese-intersection signal placement model: a near-side pole
+    (P1) at the approach corner plus a far-side pole (P2) on 'the opposing diagonal corner...
+    along the sightline vector from the right-turn lane'). `P2`'s own corner is then this arm's
+    own near-side corner (mirrors how P1 is derived from `a` -- see
+    `ops_intersection._populate_intersection_traffic_lights`), landing diagonally across the
+    junction from P1 by construction, without needing a separate sightline-angle computation (a
+    3-or-more-arm junction has no single 'exactly opposite' arm in general -- this picks the
+    CLOSEST one by angular distance, which degenerates to the exact opposite for a normal 4-way).
+    Returns `None` if `arms` has fewer than 2 total (nothing to be opposite of)."""
+    others = [x for x in arms if x is not a]
+    if not others:
+        return None
+    target = (a.angle_deg + 180.0) % 360.0
+
+    def ang_dist(x):
+        return abs((x.angle_deg - target + 180.0) % 360.0 - 180.0)
+
+    return min(others, key=ang_dist)
+
+
 def line_intersect_2d(p1, d1, p2, d2, eps=1e-9):
     """Intersection of two infinite 2D lines, each given as point + direction. None if parallel."""
     det = d1[0] * (-d2[1]) - (-d2[0]) * d1[1]
@@ -138,7 +161,8 @@ class Arm:
     exactly instead of being forced back onto one shared radius on the next rebuild."""
 
     def __init__(self, name, angle_deg, lane_width=5.0, lanes=1, oneway=None, lanes_out=None,
-                 traffic_side='LEFT', tail_length=None, tail_pos=None, median_width=0.0):
+                 traffic_side='LEFT', tail_length=None, tail_pos=None, median_width=0.0,
+                 traffic_light=False, traffic_light_radius=3.5):
         self.name = name
         self.angle_deg = angle_norm(angle_deg)
         self.lane_width = lane_width
@@ -163,6 +187,19 @@ class Arm:
                                             # against the ARM'S OWN value at that specific approach
                                             # (`live_edit._arm_joint_state`), not a single shared
                                             # per-intersection number.
+        self.traffic_light = traffic_light   # False (default) = no signal prop on this arm at
+                                              # all. PER-ARM, same rationale as median_width above
+                                              # (2026-08, user-requested: "remove the lamp logic
+                                              # for intersection, but rather leave called 'traffic
+                                              # light'... the lamp is per arm") -- replaces the old
+                                              # spaced prop-row (a street-lamp asset repeated along
+                                              # the sidewalk) with exactly ONE prop per arm, placed
+                                              # diagonally outside that arm's own curb corner -- see
+                                              # `ops_intersection._populate_intersection_traffic_lights`.
+        self.traffic_light_radius = traffic_light_radius   # how far outside the curb corner (m,
+                                                             # along the 45-degree diagonal) this
+                                                             # arm's own light sits -- adjustable
+                                                             # per arm, same knob as median_width.
 
     def eff_tail_length(self, shared_tail_length):
         """This arm's own `tail_length` override if set, else the shared scalar every per-arm
@@ -302,16 +339,20 @@ def consecutive_pairs(arms):
     return [(ordered[k], ordered[(k + 1) % n]) for k in range(n)]
 
 
-def curb_edges(arm_a, arm_b):
+def curb_edges(arm_a, arm_b, extra_offset=0.0):
     """The two curb-edge rays (point, direction) meeting at the corner between CCW-adjacent
     arm_a -> arm_b: arm_a's CCW (leaving-lane) side and arm_b's CW (arriving-lane) side. Uses each
     arm's own `out_width()`/`in_width()` independently (not a shared symmetric `half_width()`), so
     an asymmetric arm (`lanes_out` override) produces a genuinely asymmetric curb -- see `Arm`.
-    Traffic side (`lane_perp`) is read off `arm_a` only -- both arms of one junction must share it."""
+    Traffic side (`lane_perp`) is read off `arm_a` only -- both arms of one junction must share it.
+
+    `extra_offset` (default 0.0, byte-identical to before) pushes BOTH edges further out by the
+    same amount -- e.g. a sidewalk's own outer boundary, offset past the curb by the sidewalk's
+    width (see `build_junction_curb_segments`'s own `extra_offset` docstring)."""
     da, db = arm_dir(arm_a.angle_deg), arm_dir(arm_b.angle_deg)
     pa, pb = lane_perp(da, arm_a.traffic_side), lane_perp(db, arm_a.traffic_side)
-    edge_a = (vscale(pa, arm_a.out_width()), da)
-    edge_b = (vscale(pb, -arm_b.in_width()), db)
+    edge_a = (vscale(pa, arm_a.out_width() + extra_offset), da)
+    edge_b = (vscale(pb, -(arm_b.in_width() + extra_offset)), db)
     return edge_a, edge_b
 
 
@@ -342,12 +383,21 @@ def build_curb_corners(arms, kerb_radius, segments=8, through_tol_deg=2.0, tail_
     return out
 
 
-def _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg=2.0):
+def _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg=2.0, extra_offset=0.0):
     """The rounded corner (vertex, clamped radius) between angularly-adjacent arms a->b, or None
     if it's a through-pair, degenerate, or momentarily coincident mid-drag (skip -- same rationale
     as `build_curb_corners`). Shared by `build_junction_boundary` (the pad's full closed loop,
     corners included) and `build_junction_curb_segments` (curb walls, corners ONLY) so the two
     never disagree on where/how far a corner rounds.
+
+    `extra_offset` (default 0.0, byte-identical to before) computes the SAME corner but pushed
+    further out by a constant amount on both edges -- e.g. a sidewalk's own outer boundary corner,
+    offset past the curb corner by the sidewalk's width (see `_populate_intersection_sidewalks`,
+    2026-08 -- previously sidewalks used an unrelated per-arm approximation that didn't follow the
+    pad's own curve the way the curb wall does; this reuses the EXACT same corner math instead,
+    just offset, so a sidewalk's corner is always geometrically consistent with the curb's own).
+    The fillet radius grows by the same `extra_offset` (an offset curve's corner radius grows with
+    the offset distance, same as a road's own curb-to-sidewalk relationship in real life).
 
     The BASE radius scales with the WIDEST lane that could turn through this corner --
     `build_lane_movements` already gives an outer lane a bigger, more AI-comfortable turn radius
@@ -378,7 +428,7 @@ def _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg=2.0)
     widths are."""
     if is_through_pair(a.angle_deg, b.angle_deg, through_tol_deg):
         return None
-    edge_a, edge_b = curb_edges(a, b)
+    edge_a, edge_b = curb_edges(a, b, extra_offset=extra_offset)
     vertex = line_intersect_2d(edge_a[0], edge_a[1], edge_b[0], edge_b[1])
     if vertex is None:
         return None
@@ -391,11 +441,17 @@ def _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg=2.0)
                          b.lanes_in_count(), b.lanes_out_count())
     base_radius = kerb_radius if lane_headroom <= 1 else \
         kerb_radius + (lane_headroom - 0.5) * max(a.lane_width, b.lane_width)
+    base_radius += extra_offset   # an offset curve's own corner radius grows with the offset --
+                                   # added BEFORE the tangent clamp below, not after, so it's still
+                                   # subject to that same safety clamp (never overshoots this
+                                   # corner's own tangent length) rather than silently exceeding it
     if tail_length:
         a_tail, b_tail = a.eff_tail_length(tail_length), b.eff_tail_length(tail_length)
         da, db = arm_dir(a.angle_deg), arm_dir(b.angle_deg)
-        p_out_a = vadd(vscale(lane_perp(da, a.traffic_side), a.out_width()), vscale(da, a_tail))
-        p_in_b = vadd(vscale(lane_perp(db, a.traffic_side), -b.in_width()), vscale(db, b_tail))
+        p_out_a = vadd(vscale(lane_perp(da, a.traffic_side), a.out_width() + extra_offset),
+                       vscale(da, a_tail))
+        p_in_b = vadd(vscale(lane_perp(db, a.traffic_side), -(b.in_width() + extra_offset)),
+                      vscale(db, b_tail))
         max_tangent = min(vlen(vsub(vertex, p_out_a)), vlen(vsub(vertex, p_in_b)))
         radius = min(base_radius, max_tangent * math.tan(theta / 2.0))
     else:
@@ -573,7 +629,8 @@ def build_junction_boundary(arms, kerb_radius, tail_length=12.0, through_tol_deg
     return out
 
 
-def build_junction_curb_segments(arms, kerb_radius, tail_length=12.0, through_tol_deg=2.0):
+def build_junction_curb_segments(arms, kerb_radius, tail_length=12.0, through_tol_deg=2.0,
+                                  extra_offset=0.0):
     """The CURB-ONLY geometry for an intersection: one small OPEN 3-point segment per real corner
     -- `[(arm_a's OUT tail point, radius 0), (corner vertex, clamped radius), (arm_b's IN tail
     point, radius 0)]` -- and NOTHING ELSE. Deliberately narrower than `build_junction_boundary`
@@ -585,6 +642,14 @@ def build_junction_curb_segments(arms, kerb_radius, tail_length=12.0, through_to
     still includes tail-caps -- it needs the FULL closed area to fill correctly; only the curb
     omits them.)
 
+    `extra_offset` (default 0.0, byte-identical to before -- the curb's own call site) pushes the
+    WHOLE segment set further out by a constant amount, corner radius included -- 2026-08,
+    user-requested ("should use original curb logic for intersection, and side[walk] will just be
+    bigger side[walk] mesh along the curve, instead of per way"): `_populate_intersection_
+    sidewalks` now calls this SAME function with `extra_offset=sidewalk_width` to get one sidewalk
+    segment per corner, following the exact same curve/opening rules the curb wall already uses,
+    instead of the old per-arm-per-side approximation.
+
     Returns `[[(x, y, radius), (x, y, radius), (x, y, radius)], ...]`, one 3-point list per real
     corner, ready for `kit_common.curb_loop(closed=False)` -- each corner becomes its OWN small
     curb object (mirroring how every other piece in this addon builds one curb wall per physical
@@ -595,16 +660,17 @@ def build_junction_curb_segments(arms, kerb_radius, tail_length=12.0, through_to
     for i in range(n):
         a = ordered[i]
         b = ordered[(i + 1) % n]
-        corner = _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg)
+        corner = _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg,
+                                          extra_offset=extra_offset)
         if corner is None:
             continue
         vertex, radius = corner
         da = arm_dir(a.angle_deg)
         perp_a = lane_perp(da, a.traffic_side)
-        p_out = vadd(vscale(perp_a, a.out_width()), a.tail_center(tail_length))
+        p_out = vadd(vscale(perp_a, a.out_width() + extra_offset), a.tail_center(tail_length))
         db = arm_dir(b.angle_deg)
         perp_b = lane_perp(db, a.traffic_side)
-        p_in_b = vadd(vscale(perp_b, -b.in_width()), b.tail_center(tail_length))
+        p_in_b = vadd(vscale(perp_b, -(b.in_width() + extra_offset)), b.tail_center(tail_length))
         segments.append([
             (p_out[0], p_out[1], 0.0),
             (vertex[0], vertex[1], radius),
@@ -624,6 +690,32 @@ def turn_side(entry_dir, exit_dir):
     if cross < -1e-6:
         return "R"
     return "S"
+
+
+def _lane_far_point(arm, lateral_pt, direction, shared_tail_length, min_len=0.0):
+    """The lane far-point basis for `arm`'s own tail region: `lateral_pt + arm.tail_pos` directly
+    (already origin-relative, matching a position-MATCHED/off-ray cap -- see `Arm.tail_center`'s
+    docstring) when `arm.tail_pos` is set, else the original ray point `lateral_pt + direction *
+    max(arm.eff_tail_length(shared_tail_length), min_len)` (`min_len` guards a fillet's own
+    tangent length exceeding a short `tail_length` -- unchanged for every arm that was never
+    exactly position-matched).
+
+    2026-08, user-reported (via the lane-curve preview): a linked segment's own port sits exactly
+    on a MATCHED arm's `tail_pos` (`RKA_OT_aim_arm_at`, `build_junction_boundary`/
+    `build_junction_curb_segments` already follow it), but every lane movement/port touching that
+    arm still ended at the OLD ray point instead -- `Arm.tail_center`'s own docstring explicitly
+    deferred this ("`build_lane_movements`/`build_ports`... deliberately still use the plain ray
+    point... an intentional scope limit... a materially bigger, separate change"). Confirmed
+    directly against `world_session.blend`: arm_N (never matched) previews flush with its segment;
+    arm_E/S/W (all `tail_pos`-locked) preview visibly offset from theirs. This closes that gap for
+    `build_lane_movements`'s turn/straight-through movements and `build_ports`'s own port
+    positions -- the auto-merged THROUGH-taper branch (mismatched lane index on a collinear arm
+    pair) is NOT covered, left on the old ray formula (a materially different, vector-interpolated
+    fix, and a narrower case in practice -- a `tail_pos` match is normally used on a turning side
+    arm, not an opposite-direction through pair)."""
+    if arm.tail_pos is not None:
+        return vadd(lateral_pt, arm.tail_pos)
+    return vadd(lateral_pt, vscale(direction, max(arm.eff_tail_length(shared_tail_length), min_len)))
 
 
 def build_lane_movements(arms, kerb_radius, segments=8, through_tol_deg=2.0, tail_length=12.0,
@@ -721,8 +813,8 @@ def build_lane_movements(arms, kerb_radius, segments=8, through_tol_deg=2.0, tai
                 p_out = vscale(lane_perp(db, a.traffic_side), b.out_offset(lo))
                 if through:
                     if li == lo:
-                        pts = [vadd(p_in, vscale(da, a_tail)),
-                               vadd(p_out, vscale(db, b_tail))]
+                        pts = [_lane_far_point(a, p_in, da, tail_length),
+                               _lane_far_point(b, p_out, db, tail_length)]
                     else:
                         # Auto-merged through movement (mismatched lane index -- an arm wider than
                         # its through-partner funnels an outer lane into the partner's own
@@ -774,8 +866,8 @@ def build_lane_movements(arms, kerb_radius, segments=8, through_tol_deg=2.0, tai
                     # of arm width/lane count, so it's essentially always `tail_length` in practice.
                     t_in = vlen(vsub(trim_in, p_in)) + 1.0
                     t_out = vlen(vsub(trim_out, p_out)) + 1.0
-                    entry_far = vadd(p_in, vscale(da, max(a_tail, t_in)))
-                    exit_far = vadd(p_out, vscale(db, max(b_tail, t_out)))
+                    entry_far = _lane_far_point(a, p_in, da, tail_length, t_in)
+                    exit_far = _lane_far_point(b, p_out, db, tail_length, t_out)
                     pts = [entry_far] + arc + [exit_far]
                     tside = turn_side(vscale(da, -1.0), db)
                     out.append({"id": lane_id, "from": a.name, "to": b.name, "lane": li,
@@ -796,18 +888,19 @@ def build_ports(arms, tail_length=12.0):
     whenever `tail_length` comfortably exceeds that movement's fillet tangent length (true for any
     reasonable tail_length/kerb_radius pairing) -- movements only extend further than this plain
     `tail_length` via their own max()-guard in the rare case a too-short tail_length would
-    otherwise land short of the arc."""
+    otherwise land short of the arc. Also matches a MATCHED arm's own `tail_pos` exactly (see
+    `_lane_far_point`'s docstring) -- a port is a lane's far END, the same point a movement's own
+    `entry_far`/`exit_far` already lands on."""
     out = []
     for a in arms:
-        a_tail = a.eff_tail_length(tail_length)
         d = arm_dir(a.angle_deg)
         perp = lane_perp(d, a.traffic_side)
         for i in range(a.lanes_in_count()):
-            in_pos = vadd(vscale(perp, a.in_offset(i)), vscale(d, a_tail))
+            in_pos = _lane_far_point(a, vscale(perp, a.in_offset(i)), d, tail_length)
             out.append({"id": "%s_in_L%d" % (a.name, i), "arm": a.name, "lane": i,
                         "direction": "in", "position": in_pos, "tangent": vscale(d, -1.0)})
         for i in range(a.lanes_out_count()):
-            out_pos = vadd(vscale(perp, a.out_offset(i)), vscale(d, a_tail))
+            out_pos = _lane_far_point(a, vscale(perp, a.out_offset(i)), d, tail_length)
             out.append({"id": "%s_out_L%d" % (a.name, i), "arm": a.name, "lane": i,
                         "direction": "out", "position": out_pos, "tangent": d})
     return out
@@ -918,6 +1011,16 @@ def _arc_length_fractions(spine):
     return [cum[i] / total if total > 1e-9 else 0.0 for i in range(n)]
 
 
+def arc_length_fractions(spine):
+    """Public name for `_arc_length_fractions` -- per-point normalized cumulative arc length,
+    0 at the first point and 1 at the last. Exposed because `lane_profile` must sample a
+    ProfileSet at the spine's OWN point spacing: a station placed "75% along the road" has to be
+    read at the control point that is 75% along by LENGTH, not at the 75%-of-the-way-through-the
+    -list point. Those differ on any spine whose points are unevenly spaced -- which is every
+    spine with an inserted taper station -- and getting it wrong slides the whole taper."""
+    return _arc_length_fractions(spine)
+
+
 def tapered_scalars(spine, start, end):
     """A plain per-point scalar list blended from `start` to `end` by the SAME arc-length
     weighting `offset_spine_line_tapered` uses for lateral offsets -- for anything that needs a
@@ -941,16 +1044,34 @@ def offset_spine_line_tapered(spine, off_start, off_end, traffic_side='LEFT'):
     `(off_end - off_start) * t` is exactly `0.0` for every point regardless of `t`'s value in that
     case, so `offset_spine_line` (above) is safely just this function called with equal start/end,
     not a parallel implementation that could drift."""
+    fractions = _arc_length_fractions(spine)
+    return offset_spine_line_varying(
+        spine, [off_start + (off_end - off_start) * t for t in fractions], traffic_side)
+
+
+def offset_spine_line_varying(spine, offs, traffic_side='LEFT'):
+    """The most general form: `offs[i]` is spine point `i`'s OWN lateral offset, with no
+    assumption that the sequence is a linear taper at all.
+
+    `offset_spine_line_tapered` (and therefore `offset_spine_line`) are now thin calls into this,
+    so all three share one implementation by construction rather than agreeing by coincidence --
+    the same discipline the tapered/constant pair already had between them.
+
+    This exists for `lane_profile`: once a cross-section is a per-station PROFILE, a lane's offset
+    can move for reasons a two-endpoint taper cannot express -- a lane that appears partway along
+    (a ramp opening, an auxiliary lane), or one whose neighbours change width around it. Those are
+    exactly the cases that previously forced a piece to be chopped into several, which is why the
+    interchange merges in `island_v3_roads.blend` had no lane data. A shorter `offs` than `spine`
+    holds its last value, so a constant is still expressible as a single-element list."""
     n = len(spine)
 
     def tangent_at(i):
         a, b = spine[max(0, i - 1)], spine[min(n - 1, i + 1)]
         return vnorm(vsub((b[0], b[1]), (a[0], a[1])))
 
-    fractions = _arc_length_fractions(spine)
     out = []
     for i in range(n):
-        off = off_start + (off_end - off_start) * fractions[i]
+        off = offs[min(i, len(offs) - 1)] if offs else 0.0
         out.append((*vadd((spine[i][0], spine[i][1]), vscale(lane_perp(tangent_at(i), traffic_side), off)),
                     spine[i][2]))
     return out
@@ -1004,11 +1125,86 @@ def build_segment_lane_markings(spine, lane_width=5.0, lanes=1, lanes_backward=N
     return out
 
 
+def carriageway_extents(lanes, lanes_backward, lane_width, median_half=0.0):
+    """How far the paved carriageway actually reaches on each side of the spine, as
+    `(neg_extent, pos_extent)` -- both POSITIVE distances, measured outward from the spine.
+
+    This module's sign convention (see `build_segment_from_spine`): FORWARD lanes sit at
+    `+(median_half + (i+0.5)*lane_width)` and BACKWARD lanes at the mirrored negative offsets. So
+    the pavement genuinely spans `[-(median_half + lanes_backward*w), +(median_half + lanes*w)]`
+    -- an ASYMMETRIC interval whenever the two directions carry different lane counts.
+
+    2026-08, the "one-way roads are built double-width" defect. Every caller previously used
+    `half_w = median_half + max(lanes, lanes_backward) * lane_width` on BOTH sides, i.e. it
+    mirrored the BUSIER direction onto the quieter one. That is correct only when the two counts
+    are equal, and silently reserves a carriageway that does not exist otherwise:
+
+      * a ONE-WAY road (`lanes_backward = 0`) got a full mirror carriageway of bare asphalt, with
+        every lane sitting in one half of it. Measured on `IC_CHUO_merge_trunk_aux_001` in
+        `island_v3_roads.blend` (3 lanes x 3.5 m, straight along X): the swept pavement is
+        **21.00 m wide for 10.50 m of lanes**.
+      * an ASYMMETRIC two-way road (e.g. `lanes=3, lanes_backward=2`) was over-wide by exactly one
+        lane on the quieter side, for the same reason.
+
+    It also mattered beyond the pavement: `curbs`/`sidewalks` were placed at `+/-half_w` too, so on
+    a one-way road the far curb and its sidewalk were built out in the middle of nothing.
+
+    Symmetric roads are unaffected -- `lanes == lanes_backward` makes both extents equal to the old
+    `half_w`, so every existing two-way piece keeps byte-identical geometry.
+
+    (`median_half` is already 0 unless BOTH directions carry lanes -- see the callers -- so it is
+    simply added to both sides here.)"""
+    return (median_half + lanes_backward * lane_width,
+            median_half + lanes * lane_width)
+
+
+def sweep_profile_fracs(neg_extent, pos_extent, traffic_side='LEFT'):
+    """`(neg_frac, pos_frac)` to hand `kit_common.road_spine`/`GN_RoadProfile` so its swept
+    pavement lands exactly on the `(neg_extent, pos_extent)` carriageway `carriageway_extents`
+    describes -- INCLUDING the axis-flip between the two frames, which is the whole reason this
+    is a function and not an inline division.
+
+    Two independent sign conventions meet here, and they do not agree:
+
+      * `offset_spine_line(+x)` (this module) puts a lane/curb on the LEFT of travel for
+        `traffic_side='LEFT'` and on the RIGHT for `'RIGHT'` -- `lane_perp` flips with the side.
+      * `GN_RoadProfile`'s profile line runs along the swept curve's own local +X, which Curve to
+        Mesh maps to the OPPOSITE lateral direction from `offset_spine_line(+x)` under
+        `traffic_side='LEFT'` (measured directly: `offset_line(+10.5)` lands at world y=+10.50,
+        while a GN sweep of `pos_frac=2, radius=5` spans world y −10.00..0.00).
+
+    So the two fractions are SWAPPED for keep-left traffic and passed straight through for
+    keep-right. This never mattered while the sweep was hardcoded symmetric -- `(1.0, 1.0)` is
+    swap-invariant, which is exactly why the mismatch went unnoticed until the carriageway became
+    asymmetric. Both extents equal still returns `(1.0, 1.0)`, so symmetric roads are unaffected
+    either way.
+
+    Returns `(1.0, 1.0)` for a degenerate zero-width carriageway rather than dividing by zero."""
+    radius = (neg_extent + pos_extent) / 2.0
+    if radius <= 0.0:
+        return 1.0, 1.0
+    a, b = pos_extent / radius, neg_extent / radius
+    return (a, b) if traffic_side == 'LEFT' else (b, a)
+
+
+def sweep_radius_and_shift(neg_extent, pos_extent):
+    """Turn an asymmetric `(neg, pos)` carriageway into the `(radius, lateral_shift)` pair a
+    SYMMETRIC curve sweep needs to reproduce it: a sweep of half-width `radius` whose centreline
+    sits `lateral_shift` to the POSITIVE side of the spine covers exactly `[-neg, +pos]`.
+
+    `kit_common.GN_RoadProfile` sweeps a symmetric profile scaled by the spine's own per-point
+    Radius, so this is how an asymmetric carriageway is expressed without moving the authored
+    spine itself (the spine stays the road's reference line -- lane centrelines, joints and
+    live-edit anchoring all keep measuring from it). `lateral_shift` is 0 for every symmetric
+    road, so the sweep is unchanged there."""
+    return ((neg_extent + pos_extent) / 2.0, (pos_extent - neg_extent) / 2.0)
+
+
 def build_segment_from_spine(spine, lane_width=5.0, lanes=1, lanes_backward=None, segment_id="SEG",
                               traffic_side='LEFT', median_width=0.0, sidewalk_l_width=0.0,
                               sidewalk_r_width=0.0, lanes_end=None, lanes_backward_end=None,
                               align='right', median_width_end=None, sidewalk_l_width_end=None,
-                              sidewalk_r_width_end=None):
+                              sidewalk_r_width_end=None, curb_clearance_l=0.0, curb_clearance_r=0.0):
     """Core segment/transition geometry: offset curbs + per-lane centerlines from an ARBITRARY 3D
     spine polyline `spine = [(x, y, z), ...]` (already resolved -- straight, bent, sloped, or
     sampled from a hand-authored curve; this function doesn't care which). Every point is offset
@@ -1053,12 +1249,25 @@ def build_segment_from_spine(spine, lane_width=5.0, lanes=1, lanes_backward=None
     `sidewalk_l_width`/`sidewalk_r_width` (each default 0.0 = no sidewalk on that side at the
     START, fully back-compatible) -- independent per side, like curb style. A sidewalk is built the
     SAME way a curb is (an offset line fed to the same curb-loop-style sweep), just further out and
-    wider: its own CENTERLINE sits at `half_w + that_side's_width/2` (beyond the curb's own line,
-    never overlapping the roadway), so a BOX-profile sweep of that exact width spans EXACTLY from
-    the curb edge to the sidewalk's outer edge. `sidewalk_l_width_end`/`sidewalk_r_width_end`
-    (default `None` = same as the start value, i.e. constant) let a sidewalk taper the same way the
-    median can. Adds a `'sidewalks'` field: `{'L': offset_line_or_None, 'R': offset_line_or_None}`
-    (None on a side whose width is 0 at BOTH ends).
+    wider: its own CENTERLINE sits at `half_w + curb_clearance + that_side's_width/2` (beyond the
+    curb's own line), so a BOX-profile sweep of that exact width spans EXACTLY from the curb's REAL
+    outer edge to the sidewalk's outer edge. `curb_clearance_l`/`curb_clearance_r` (each default
+    0.0, fully back-compatible -- see `curb_clearance_l`'s own note below) is how far past `half_w`
+    the curb assembly on that side actually extends (e.g. `curb_thickness/2` for a BOX profile,
+    which straddles the boundary line, or the full `curb_thickness` for a GUTTER profile, which is
+    one-sided) -- 2026-08, user-reported: with clearance left at 0 the sidewalk's centerline sits
+    exactly ON the curb's own boundary line, so any curb with real thickness visibly overlaps the
+    sidewalk by half its own width. `sidewalk_l_width_end`/`sidewalk_r_width_end` (default `None` =
+    same as the start value, i.e. constant) let a sidewalk taper the same way the median can. Adds
+    a `'sidewalks'` field: `{'L': offset_line_or_None, 'R': offset_line_or_None}` (None on a side
+    whose width is 0 at BOTH ends).
+
+    `curb_clearance_l`/`curb_clearance_r` (each default 0.0) -- NOT itself curb geometry (this
+    function only computes offset LINES, never builds a curb wall) -- purely how far the CALLER's
+    own curb assembly on that side extends past `half_w`/`half_w_end`, so the sidewalk offset can
+    start after it instead of at the boundary line. A caller building a real curb should pass its
+    own true clearance (see `ops_segment._curb_outer_clearance`); 0.0 is only correct for a curb
+    style with zero real-world footprint (`NONE`) or a caller that doesn't build a curb at all.
 
     `traffic_side` -- see `lane_perp` -- 'LEFT' (default, byte-identical to this function's
     original formulas) keeps FORWARD (A->B) lanes on the left of travel; 'RIGHT' mirrors both
@@ -1098,12 +1307,18 @@ def build_segment_from_spine(spine, lane_width=5.0, lanes=1, lanes_backward=None
         # FAST PATH -- see docstring. The exact original implementation, untouched.
         median_half = median_width / 2.0 if (median_width > 0.0 and lanes > 0 and lanes_backward > 0) \
             else 0.0
-        half_w = median_half + max(lanes, lanes_backward) * lane_width
-        curbs = [offset_line(half_w), offset_line(-half_w)]
+        # ASYMMETRIC extents -- see `carriageway_extents` for why `max(lanes, lanes_backward)` on
+        # both sides was wrong (one-way roads came out double-width, with their curb + sidewalk
+        # built out in the middle of nothing). Equal lane counts give `neg_w == pos_w`, i.e. the
+        # exact old `half_w`, so symmetric roads are untouched.
+        neg_w, pos_w = carriageway_extents(lanes, lanes_backward, lane_width, median_half)
+        curbs = [offset_line(pos_w), offset_line(-neg_w)]
         median_edges = [offset_line(median_half), offset_line(-median_half)] if median_half > 0.0 else []
         sidewalks = {
-            "L": offset_line(half_w + sidewalk_l_width / 2.0) if sidewalk_l_width > 0.0 else None,
-            "R": offset_line(-(half_w + sidewalk_r_width / 2.0)) if sidewalk_r_width > 0.0 else None,
+            "L": (offset_line(pos_w + curb_clearance_l + sidewalk_l_width / 2.0)
+                  if sidewalk_l_width > 0.0 else None),
+            "R": (offset_line(-(neg_w + curb_clearance_r + sidewalk_r_width / 2.0))
+                  if sidewalk_r_width > 0.0 else None),
         }
         lane_list = []
         for i in range(lanes):
@@ -1126,19 +1341,24 @@ def build_segment_from_spine(spine, lane_width=5.0, lanes=1, lanes_backward=None
         else 0.0
     median_half_end = median_width_end / 2.0 if (median_width_end > 0.0 and lanes_end > 0
                                                    and lanes_backward_end > 0) else 0.0
-    half_w_start = median_half_start + max(lanes, lanes_backward) * lane_width
-    half_w_end = median_half_end + max(lanes_end, lanes_backward_end) * lane_width
-    curbs = [offset_line_tapered(half_w_start, half_w_end),
-             offset_line_tapered(-half_w_start, -half_w_end)]
+    # Asymmetric at BOTH ends independently -- see `carriageway_extents`. A taper that also
+    # changes which direction is busier (e.g. 3+0 -> 2+2) now moves each edge by its own amount
+    # instead of mirroring the busier side onto the quieter one at both stations.
+    neg_w_start, pos_w_start = carriageway_extents(lanes, lanes_backward, lane_width,
+                                                    median_half_start)
+    neg_w_end, pos_w_end = carriageway_extents(lanes_end, lanes_backward_end, lane_width,
+                                                median_half_end)
+    curbs = [offset_line_tapered(pos_w_start, pos_w_end),
+             offset_line_tapered(-neg_w_start, -neg_w_end)]
     median_edges = ([offset_line_tapered(median_half_start, median_half_end),
                       offset_line_tapered(-median_half_start, -median_half_end)]
                      if (median_half_start > 0.0 or median_half_end > 0.0) else [])
     sidewalks = {
-        "L": (offset_line_tapered(half_w_start + sidewalk_l_width / 2.0,
-                                   half_w_end + sidewalk_l_width_end / 2.0)
+        "L": (offset_line_tapered(pos_w_start + curb_clearance_l + sidewalk_l_width / 2.0,
+                                   pos_w_end + curb_clearance_l + sidewalk_l_width_end / 2.0)
               if (sidewalk_l_width > 0.0 or sidewalk_l_width_end > 0.0) else None),
-        "R": (offset_line_tapered(-(half_w_start + sidewalk_r_width / 2.0),
-                                   -(half_w_end + sidewalk_r_width_end / 2.0))
+        "R": (offset_line_tapered(-(neg_w_start + curb_clearance_r + sidewalk_r_width / 2.0),
+                                   -(neg_w_end + curb_clearance_r + sidewalk_r_width_end / 2.0))
               if (sidewalk_r_width > 0.0 or sidewalk_r_width_end > 0.0) else None),
     }
 
@@ -1287,18 +1507,25 @@ def build_lane_transition(p0, p1, lane_width=5.0, lanes_a=2, lanes_b=1, lanes_ba
 
 def export_lane_transition_dict(p0, p1, lane_width=5.0, lanes_a=2, lanes_b=1,
                                  lanes_backward_a=None, lanes_backward_b=None, align='right',
-                                 segment_id="TR", traffic_side='LEFT'):
+                                 segment_id="TR", traffic_side='LEFT', godot_space=True):
     """The dict half of `export_lane_transition_json` (no file write) -- `p0`/`p1` already
     ABSOLUTE world coordinates, Blender-Z-up -> Godot-Y-up (`[x, z, -y]`) applied here directly
     since a transition carries no separate `z` base the way `export_segment_json` does. Same
     `{"segment_id", "lanes": [...]}` shape every non-intersection export produces, so a combiner
-    (see `lib/lane_kit.py`) can merge intersection/segment/transition pieces uniformly."""
+    (see `lib/lane_kit.py`) can merge intersection/segment/transition pieces uniformly.
+    `godot_space` -- see `export_segment_from_spine_dict`'s docstring (default True, back-
+    compatible; `False` keeps points plain Blender-native `(x, y, z)`)."""
     seg = build_lane_transition(p0, p1, lane_width, lanes_a, lanes_b, lanes_backward_a,
                                  lanes_backward_b, align, segment_id, traffic_side)
+    pts_out = ((lambda p: [p[0], p[2], -p[1]]) if godot_space else (lambda p: [p[0], p[1], p[2]]))
     lanes_out = [{"id": m["id"], "from_arm": m["from"], "to_arm": m["to"],
                    "lane_index": m["lane_in"], "lane_index_out": m["lane_out"], "kind": m["kind"],
                    "turn": m["turn"], "oneway": True, "loop": False,
-                   "points": [[p[0], p[2], -p[1]] for p in m["points"]]} for m in seg["lanes"]]
+                   # Edge-alignment data -- see `lane_joints`. These builders lay every lane at one
+                   # uniform `lane_width`, so both ends carry it; a profile-described piece reports
+                   # its own per-end widths instead (`lane_profile.export_profile_lanes`).
+                   "width_start": lane_width, "width_end": lane_width,
+                   "points": [pts_out(p) for p in m["points"]]} for m in seg["lanes"]]
     return {"segment_id": segment_id, "lanes": lanes_out}
 
 
@@ -1346,16 +1573,34 @@ def build_straight_segment(p0, p1, lane_width=5.0, lanes=1, segment_id="SEG", be
 
 
 def export_segment_from_spine_dict(spine, lane_width=5.0, lanes=1, lanes_backward=None,
-                                    segment_id="SEG", traffic_side='LEFT'):
+                                    segment_id="SEG", traffic_side='LEFT', godot_space=True):
     """The dict half of `export_segment_from_spine_json` (no file write) -- `spine` already
     carries ABSOLUTE world Z per point (e.g. sampled directly from a Blender Curve object's
     evaluated world-space points), so no separate `z` base argument is added here. Same
-    `{"segment_id", "lanes": [...]}` shape every non-intersection export produces."""
+    `{"segment_id", "lanes": [...]}` shape every non-intersection export produces.
+
+    `godot_space` (default True, back-compatible with every existing caller) applies the
+    Blender-Z-up -> Godot-Y-up remap (`[x, z, -y]`) to every lane point; `False` keeps them plain
+    Blender-native `(x, y, z)` -- 2026-08, user-reported: `ops_lane_preview.py`'s "Preview Lane
+    Curves" button ("lane for segment is in totally different position [than] the actual...
+    segment mesh") always got Godot-space points here regardless of the `godot_space=False` it
+    passed to `lane_export.collect_pieces` -- this function (and `export_lane_transition_dict`/
+    `export_segment_dict` below) had NO such parameter at all and remapped unconditionally, while
+    `lane_export.py`'s own docstring incorrectly claimed "no axis remap ever applied" to the
+    non-intersection paths. Confirmed directly: a segment built along `direction_deg=0` (pure
+    +X, so the bug is invisible to an X-only bounding-box sanity check, exactly why the existing
+    `smoketest_lane_preview.py` didn't catch it) previews with Y and Z swapped/negated relative to
+    its own real mesh."""
     seg = build_segment_from_spine(spine, lane_width, lanes, lanes_backward, segment_id, traffic_side)
+    pts_out = ((lambda p: [p[0], p[2], -p[1]]) if godot_space else (lambda p: [p[0], p[1], p[2]]))
     lanes_out = [{"id": m["id"], "from_arm": m["from"], "to_arm": m["to"],
                    "lane_index": m["lane_in"], "lane_index_out": m["lane_out"], "kind": m["kind"],
                    "turn": m["turn"], "oneway": True, "loop": False,
-                   "points": [[p[0], p[2], -p[1]] for p in m["points"]]} for m in seg["lanes"]]
+                   # Edge-alignment data -- see `lane_joints`. These builders lay every lane at one
+                   # uniform `lane_width`, so both ends carry it; a profile-described piece reports
+                   # its own per-end widths instead (`lane_profile.export_profile_lanes`).
+                   "width_start": lane_width, "width_end": lane_width,
+                   "points": [pts_out(p) for p in m["points"]]} for m in seg["lanes"]]
     return {"segment_id": segment_id, "lanes": lanes_out}
 
 
@@ -1373,18 +1618,24 @@ def export_segment_from_spine_json(path, spine, lane_width=5.0, lanes=1, lanes_b
 
 def export_segment_dict(p0, p1, lane_width=5.0, lanes=1, segment_id="SEG", z=0.0,
                          bend=0.0, segments=8, z0=0.0, z1=0.0, bend_z=0.0, lanes_backward=None,
-                         traffic_side='LEFT'):
+                         traffic_side='LEFT', godot_space=True):
     """The dict half of `export_segment_json` (no file write). `z` is the constant world-height
     base (as before); each point's own relative elevation (`z0`/`z1`/`bend_z` -- see
     `build_straight_segment`) is ADDED on top, so a flat segment (all defaults) emits exactly `z`
     unchanged. Same `{"segment_id", "lanes": [...]}` shape every non-intersection export
-    produces."""
+    produces. `godot_space` -- see `export_segment_from_spine_dict`'s docstring."""
     seg = build_straight_segment(p0, p1, lane_width, lanes, segment_id, bend, segments, z0, z1,
                                   bend_z, lanes_backward, traffic_side)
+    pts_out = ((lambda p: [p[0], z + p[2], -p[1]]) if godot_space
+               else (lambda p: [p[0], p[1], z + p[2]]))
     lanes_out = [{"id": m["id"], "from_arm": m["from"], "to_arm": m["to"],
                    "lane_index": m["lane_in"], "lane_index_out": m["lane_out"], "kind": m["kind"],
                    "turn": m["turn"], "oneway": True, "loop": False,
-                   "points": [[p[0], z + p[2], -p[1]] for p in m["points"]]} for m in seg["lanes"]]
+                   # Edge-alignment data -- see `lane_joints`. These builders lay every lane at one
+                   # uniform `lane_width`, so both ends carry it; a profile-described piece reports
+                   # its own per-end widths instead (`lane_profile.export_profile_lanes`).
+                   "width_start": lane_width, "width_end": lane_width,
+                   "points": [pts_out(p) for p in m["points"]]} for m in seg["lanes"]]
     return {"segment_id": segment_id, "lanes": lanes_out}
 
 
@@ -1428,6 +1679,7 @@ def export_dict(arms, kerb_radius, junction_id, segments=8, through_tol_deg=2.0,
                                       junction_id=junction_id, lane_map=lane_map)
     ports = build_ports(arms, tail_length)
     cx, cy = center
+    _arm_w = {a.name: a.lane_width for a in arms}
     return {
         "junction_id": junction_id,
         "arms": [{"name": a.name, "angle_deg": a.angle_deg, "lanes": a.lanes,
@@ -1436,6 +1688,12 @@ def export_dict(arms, kerb_radius, junction_id, segments=8, through_tol_deg=2.0,
         "lanes": [{"id": m["id"], "from_arm": m["from"], "to_arm": m["to"],
                     "lane_index": m["lane_in"], "lane_index_out": m["lane_out"],
                     "kind": m["kind"], "turn": m["turn"], "oneway": True, "loop": False,
+                    # Edge-alignment data -- see `lane_joints`. A movement is as wide as the arm
+                    # it ENTERS from at its start and the arm it LEAVES by at its end, which is
+                    # exactly what a segment butting against either arm has to match
+                    # edge-for-edge. Per-arm, not one junction-wide number: arms may differ.
+                    "width_start": _arm_w.get(m["from"], 0.0),
+                    "width_end": _arm_w.get(m["to"], 0.0),
                     "points": [[p[0] + cx, p[1] + cy] for p in m["points"]]} for m in movements],
         "ports": [{"id": "%s_%s" % (junction_id, p["id"]), "arm": p["arm"], "lane": p["lane"],
                     "direction": p["direction"],
@@ -1755,8 +2013,23 @@ def self_test():
     assert seg_sw_r_only["sidewalks"]["L"] is None
     assert seg_sw_r_only["sidewalks"]["R"][0][1] == -11.0
     assert seg["sidewalks"] == {"L": None, "R": None}   # default (test 15's plain seg) unchanged
+    # A ONE-WAY road gets BOTH edges served, exactly like a two-way one. This is the property that
+    # makes it correct to leave a one-way spine on the carriageway's INNER edge rather than
+    # re-centring it: `carriageway_extents` returns `(0, n*w)`, so the "R" side's curb and sidewalk
+    # are measured outward from `s = 0` -- which IS that inner edge -- while "L" is measured from
+    # the outer edge. Neither side is skipped and neither is built out in the middle of nothing.
+    # (Re-centring the spine was considered and rejected: it buys a prettier handle and costs the
+    # property that a widening one-way road keeps its existing lanes still.)
+    ow_sw = build_segment_from_spine(spine0, lane_width=5.0, lanes=2, lanes_backward=0,
+                                      segment_id="OWSW", sidewalk_l_width=3.0,
+                                      sidewalk_r_width=1.0)
+    ow_c_l, ow_c_r = ow_sw["curbs"]
+    assert ow_c_l[0][1] == 10.0 and ow_c_r[0][1] == 0.0, (ow_c_l[0], ow_c_r[0])
+    assert ow_sw["sidewalks"]["L"][0][1] == 11.5, ow_sw["sidewalks"]["L"]   # 10.0 + 3.0/2
+    assert ow_sw["sidewalks"]["R"][0][1] == -0.5, ow_sw["sidewalks"]["R"]   # -(0.0 + 1.0/2)
     print("OK: sidewalk_l_width/sidewalk_r_width offset each side's own centerline just beyond "
-          "that side's curb edge, independent per side, None when that side's width is 0")
+          "that side's curb edge, independent per side, None when that side's width is 0, and "
+          "BOTH sides are served on a one-way road")
 
     # 15d. offset_spine_line_tapered with off_start == off_end must be byte-identical to
     #      offset_spine_line, on a real multi-point BENT spine (not just the 2-point case
@@ -1936,7 +2209,35 @@ def self_test():
     assert len(oneway_seg["lanes"]) == 1, len(oneway_seg["lanes"])
     assert oneway_seg["lanes"][0]["from"] == "A" and oneway_seg["lanes"][0]["to"] == "B"
     ow_left, ow_right = oneway_seg["curbs"]
-    assert ow_left[0][1] == 5.0 and ow_right[0][1] == -5.0   # 1 lane wide (5m), not the old 2-lane 10m
+    # ONE lane of 5 m spans exactly 5 m of pavement. This assertion used to read `== 5.0 and
+    # == -5.0` -- 10 m of carriageway for a single 5 m lane -- which contradicted the comment
+    # directly above it ("curb width matches the ACTIVE side (1 lane, not 2)"). See
+    # `carriageway_extents`: the old `max(lanes, lanes_backward)` mirrored the busier direction
+    # onto the empty one, so the far curb was built out in the middle of nothing.
+    assert ow_left[0][1] == 5.0 and ow_right[0][1] == 0.0, (ow_left[0], ow_right[0])
+    assert oneway_seg["lanes"][0]["points"][0][1] == 2.5   # the lane sits INSIDE that 5 m
+    # Asymmetric two-way (3 forward, 2 back): each edge moves by its OWN direction's lane count,
+    # instead of both sitting at the busier side's 3-lane offset.
+    asym = build_straight_segment(p0, p1, lane_width=5.0, lanes=3, segment_id="ASY",
+                                   lanes_backward=2)
+    asym_l, asym_r = asym["curbs"]
+    assert asym_l[0][1] == 15.0 and asym_r[0][1] == -10.0, (asym_l[0], asym_r[0])
+    # ...while an EQUAL split stays exactly where it always was (symmetric roads untouched).
+    sym = build_straight_segment(p0, p1, lane_width=5.0, lanes=2, segment_id="SYM",
+                                  lanes_backward=2)
+    sym_l, sym_r = sym["curbs"]
+    assert sym_l[0][1] == 10.0 and sym_r[0][1] == -10.0, (sym_l[0], sym_r[0])
+    assert carriageway_extents(2, 2, 5.0) == (10.0, 10.0)
+    assert sweep_radius_and_shift(*carriageway_extents(2, 2, 5.0)) == (10.0, 0.0)
+    assert sweep_radius_and_shift(*carriageway_extents(3, 0, 3.5)) == (5.25, 5.25)
+    # sweep_profile_fracs: symmetric is (1,1) either side (swap-invariant, which is why the
+    # GN-frame axis flip stayed invisible until the carriageway became asymmetric); a one-way
+    # road swaps for keep-LEFT and passes straight through for keep-RIGHT.
+    assert sweep_profile_fracs(10.0, 10.0, 'LEFT') == (1.0, 1.0)
+    assert sweep_profile_fracs(10.0, 10.0, 'RIGHT') == (1.0, 1.0)
+    assert sweep_profile_fracs(0.0, 10.5, 'LEFT') == (2.0, 0.0)
+    assert sweep_profile_fracs(0.0, 10.5, 'RIGHT') == (0.0, 2.0)
+    assert sweep_profile_fracs(0.0, 0.0) == (1.0, 1.0)   # degenerate: no divide-by-zero
     try:
         build_straight_segment(p0, p1, lane_width=5.0, lanes=0, segment_id="OW2", lanes_backward=0)
         assert False, "expected ValueError for a segment with zero lanes in both directions"
@@ -2460,6 +2761,32 @@ def self_test():
     print("OK: export_dict/export_json `center` (new) translates every lane point + port "
           "position by exactly (cx, cy), leaves tangents untouched, default (0,0) is "
           "byte-identical to before this parameter existed")
+
+    # 36. opposite_arm (new) -- dual near/far traffic-signal pole support.
+    arms_4way = preset_4way(lane_width=5.0, lanes=1)  # N,E,S,W at 0/90/180/270
+    by_name = {a.name: a for a in arms_4way}
+    assert opposite_arm(by_name["N"], arms_4way).name == "S"
+    assert opposite_arm(by_name["E"], arms_4way).name == "W"
+    assert opposite_arm(by_name["S"], arms_4way).name == "N"
+    assert opposite_arm(by_name["W"], arms_4way).name == "E"
+    arms_offset = preset_nway((342.35, 73.24, 160.11, 245.50), lane_width=5.0, lanes=1,
+                               names=("N", "E", "S", "W"))
+    by_name2 = {a.name: a for a in arms_offset}
+    # Real hand-tuned angles (world_session.blend) -- W (245.50) is closest to N's own +180
+    # (342.35+180=522.35 % 360=162.35) among {E=73.24, S=160.11, W=245.50}... actually S
+    # (160.11) is nearest 162.35, so verify against the ACTUAL nearest, not an assumption.
+    import math as _math
+
+    def _nearest_by_angle(target_deg, arms):
+        return min(arms, key=lambda x: abs((x.angle_deg - target_deg + 180.0) % 360.0 - 180.0))
+    expected_n = _nearest_by_angle((by_name2["N"].angle_deg + 180.0) % 360.0,
+                                    [a for a in arms_offset if a.name != "N"])
+    assert opposite_arm(by_name2["N"], arms_offset).name == expected_n.name
+    assert opposite_arm(by_name2["N"], [by_name2["N"]]) is None, \
+        "no other arms -> nothing to be opposite of"
+    print("OK: opposite_arm (new) finds the angularly-nearest-to-180-degrees arm for a symmetric "
+          "4-way exactly (N<->S, E<->W) and the true angular-nearest on a hand-tuned, non-uniform "
+          "real intersection, None when no other arm exists")
 
     print("ALL SELF-TESTS PASSED")
 

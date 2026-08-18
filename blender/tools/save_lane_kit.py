@@ -14,13 +14,11 @@ Authoring loop:
      freestanding) -- P6.6 wires `lanekit_path` in automatically once `<stem>.lanekit.json`
      exists next to the .blend.
 
-Every piece collection in the file (`road_kit_authoring.ops_intersection._is_piece_collection`)
-is rebuilt into its `export_*_dict` form straight from its own `rka_*` custom properties -- the
-same permanent build-settings record `custom_props.write_build_settings` already writes at
-build/rebuild time, so this tool needs no separate "did you remember to set an export path"
-step per piece. Piece-type dispatch mirrors `ops_intersection._rebuild_piece_in_place`'s exact
-check order (transition's `rka_lanes_a` MUST be checked before the GN-segment `rka_curve_object`
-check, since a transition also carries `rka_curve_object`).
+2026-08: the actual per-piece dict reconstruction (`export_piece_dict`/`collect_pieces`) moved to
+`addons/road_kit_authoring/lane_export.py` -- this script is now a thin wrapper, so the
+interactive addon's own "Preview Lane Curves" button (`ops_lane_preview.py`) can call the SAME
+logic without re-deriving it or needing `tools/` on `sys.path`. See that module's docstring for
+the per-piece dict shape.
 
 Every lane/arm id is namespaced `<piece>__<id>` and tagged `zone_id` (`lib/lane_kit.py`'s
 `combine_pieces`) -- the property-based replacement for the old `<stem>__` name-prefix convention
@@ -44,141 +42,7 @@ sys.path.insert(0, os.path.join(BP, "lib"))
 sys.path.insert(0, os.path.join(BP, "addons"))
 import lane_kit                                    # noqa: E402
 import road_kit_authoring as rka                    # noqa: E402
-from road_kit_authoring import custom_props          # noqa: E402
-from road_kit_authoring import ops_intersection as opint  # noqa: E402
-from road_kit_authoring import ops_segment as opseg  # noqa: E402
-
-_ik = None
-
-
-def ik():
-    global _ik
-    if _ik is None:
-        import intersection_kit as _mod
-        _ik = _mod
-    return _ik
-
-
-def _lane_surface_z():
-    return bpy.context.scene.rka.lane_surface_z
-
-
-def _export_intersection(coll):
-    k = ik()
-    arms = custom_props.read_arms_full(coll, k.Arm)
-    origin = custom_props.read_origin(coll)
-    if arms is None or origin is None or len(arms) < 3:
-        return None
-    kerb_radius = coll.get("rka_kerb_radius", 9.0)
-    tail_length = coll.get("rka_tail_length", 12.0)
-    segments = coll.get("rka_segments", 8)
-    lane_map = custom_props.read_lane_map_override(coll)
-    z = origin[2] + _lane_surface_z()
-    # Same z-lift AND world-center translation `intersection_kit.export_json` applies -- done by
-    # hand here so this tool can call the dict-only `export_dict` directly instead of round-
-    # tripping through a temp file. `center=(origin[0], origin[1])` is REQUIRED, not optional --
-    # export_dict's own geometry is junction-LOCAL (see its docstring); omitting this silently
-    # exported every off-origin intersection at the wrong world position (found this session).
-    d = k.export_dict(arms, kerb_radius, junction_id=coll.name, segments=segments,
-                       tail_length=tail_length, lane_map=lane_map, center=(origin[0], origin[1]))
-    for lane in d["lanes"]:
-        lane["points"] = [[p[0], z, -p[1]] for p in lane["points"]]
-    for port in d["ports"]:
-        port["position"] = [port["position"][0], z, -port["position"][1]]
-    return d
-
-
-def _export_gn_segment(coll):
-    spine_name = coll.get("rka_curve_object")
-    if not spine_name:
-        return None
-    spine_obj = opint.local_object(spine_name)
-    if spine_obj is None or spine_obj.type != 'CURVE':
-        return None
-    # Raw control points, NOT the GN-evaluated pavement-sweep mesh -- see
-    # `ops_segment._spine_control_points`'s own docstring for why `to_mesh()` would be wrong here.
-    spine = opseg._spine_control_points(spine_obj)
-    if len(spine) < 2:
-        return None
-    lane_width = coll.get("rka_lane_width", 5.0)
-    lanes = coll.get("rka_lanes", 1)
-    lanes_backward = coll.get("rka_lanes_backward", lanes)
-    traffic_side = coll.get("rka_traffic_side", "LEFT")
-    return ik().export_segment_from_spine_dict(
-        spine, lane_width=lane_width, lanes=lanes, lanes_backward=lanes_backward,
-        segment_id=coll.name, traffic_side=traffic_side)
-
-
-def _export_transition(coll):
-    spine_name = coll.get("rka_curve_object")
-    if not spine_name:
-        return None
-    spine_obj = opint.local_object(spine_name)
-    if spine_obj is None or spine_obj.type != 'CURVE':
-        return None
-    spine = opseg._spine_control_points(spine_obj)
-    if len(spine) < 2:
-        return None
-    p0, p1 = spine[0], spine[-1]
-    lane_width = coll.get("rka_lane_width", 5.0)
-    lanes_a = coll.get("rka_lanes_a", 2)
-    lanes_b = coll.get("rka_lanes_b", 1)
-    lanes_backward_a = coll.get("rka_lanes_backward_a", 0) or None
-    lanes_backward_b = coll.get("rka_lanes_backward_b", 0) or None
-    align = coll.get("rka_align", 'right')
-    traffic_side = coll.get("rka_traffic_side", "LEFT")
-    return ik().export_lane_transition_dict(
-        p0, p1, lane_width=lane_width, lanes_a=lanes_a, lanes_b=lanes_b,
-        lanes_backward_a=lanes_backward_a, lanes_backward_b=lanes_backward_b, align=align,
-        segment_id=coll.name, traffic_side=traffic_side)
-
-
-def _export_point_segment(coll):
-    if "rka_p0" not in coll.keys() or "rka_p1" not in coll.keys():
-        return None
-    p0_raw, p1_raw = coll["rka_p0"], coll["rka_p1"]
-    lane_width = coll.get("rka_lane_width", 5.0)
-    lanes = coll.get("rka_lanes", 1)
-    lanes_backward = coll.get("rka_lanes_backward", lanes)
-    bend = coll.get("rka_bend", 0.0)
-    bend_z = coll.get("rka_bend_z", 0.0)
-    curve_segments = coll.get("rka_curve_segments", 8)
-    traffic_side = coll.get("rka_traffic_side", "LEFT")
-    z = float(p0_raw[2]) + _lane_surface_z()
-    return ik().export_segment_dict(
-        (p0_raw[0], p0_raw[1]), (p1_raw[0], p1_raw[1]), lane_width=lane_width, lanes=lanes,
-        segment_id=coll.name, z=z, bend=bend, segments=curve_segments, z0=0.0,
-        z1=float(p1_raw[2]) - float(p0_raw[2]), bend_z=bend_z, lanes_backward=lanes_backward,
-        traffic_side=traffic_side)
-
-
-def export_piece_dict(coll):
-    """Dispatch mirrors `ops_intersection._rebuild_piece_in_place`'s own check order exactly --
-    keep the two in sync if either changes."""
-    if "rka_arm_names" in coll.keys():
-        return _export_intersection(coll)
-    elif "rka_lanes_a" in coll.keys():
-        return _export_transition(coll)
-    elif "rka_curve_object" in coll.keys():
-        return _export_gn_segment(coll)
-    else:
-        return _export_point_segment(coll)
-
-
-def collect_pieces(stem):
-    pieces = []
-    colls = sorted((c for c in bpy.data.collections
-                     if c.library is None and opint._is_piece_collection(c)),
-                    key=lambda c: c.name)
-    for coll in colls:
-        d = export_piece_dict(coll)
-        if d is None:
-            print("  skipping %s: could not reconstruct build params from its rka_* properties"
-                  % coll.name)
-            continue
-        zone_id = coll.get("rka_zone_id", stem)
-        pieces.append((coll.name, d, zone_id))
-    return pieces
+from road_kit_authoring import lane_export          # noqa: E402
 
 
 def main():
@@ -190,13 +54,26 @@ def main():
     stem = os.path.splitext(os.path.basename(blend))[0]
     out_path = os.path.join(os.path.dirname(blend), stem + ".lanekit.json")
 
-    pieces = collect_pieces(stem)
+    pieces = lane_export.collect_pieces(stem, bpy.context.scene, bpy.data)
     if not pieces:
         raise SystemExit("save_lane_kit.py: no road_kit_authoring pieces found in %s.blend" % stem)
 
     combined, reports = lane_kit.combine_pieces(pieces)
     for line in lane_kit.summarize_reports(reports):
         print(line)
+
+    # WHICH PIECES THE USER MEANT TO CONNECT, recorded alongside the lanes. Only the .blend knows
+    # this (it lives on the marker Empties), and it is the one thing the sidecar cannot be checked
+    # for without it: a joint no lane crosses leaves NO link to measure, so a gate reading only the
+    # lane graph sees a clean file with a hole in it. Written so `tools/check_road_network.py` can
+    # make that call in CI, with no Blender.
+    unjoined = lane_export.unjoined_joints(combined["lanes"], bpy.data)
+    combined["joints"] = [{"a": a, "b": b} for a, b in
+                          lane_export.authored_joints({p[0] for p in pieces}, bpy.data)]
+    for a, b in unjoined:
+        print("save_lane_kit: WARNING '%s' and '%s' are linked, but NO lane crosses the seam -- "
+              "their ribbons do not meet edge-to-edge anywhere" % (a, b))
+
     with open(out_path, "w") as f:
         json.dump(combined, f, indent=1)
     print("save_lane_kit: wrote %d lane(s) from %d piece(s) -> %s"
