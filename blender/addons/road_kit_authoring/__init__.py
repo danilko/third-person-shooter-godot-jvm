@@ -34,6 +34,7 @@ from . import graph_attrs
 from . import graph_assets
 from . import graph_solve
 from . import graph_nodes  # noqa: F401  (node-group vocabulary; no operators of its own)
+from . import graph_edges  # noqa: F401  (the road outline; pure geometry, no operators)
 from . import graph_build
 from . import graph_export
 from . import graph_overlay

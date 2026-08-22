@@ -35,7 +35,7 @@ RUN:
   blender --background --python blender/tools/island_v3_to_graph.py -- --spacing 16 --dry-run
   blender --background --python blender/tools/island_v3_to_graph.py -- --only RING,LOOP
 """
-import bpy, os, sys, math, time
+import bpy, os, re, sys, math, time
 
 BLENDER_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))     # blender/
 REPO        = os.path.dirname(BLENDER_SRC)
@@ -66,28 +66,41 @@ Z_CROSS_TOL = 4.0     # heights differing by more than this are a flyover, not a
 #: edit in Blender overrides this without touching the generator.
 AUX_LANES = 1
 AUX_TAPER = 90.0
-#: WHICH END OF THE CARRIAGEWAY EVERY EXIT/ENTRY LANE OPENS AT. 'KERB' is the ordinary nearside
-#: answer -- enter and leave the motorway from the OUTERMOST lane, which is what a driver expects
-#: and what keeps the ramp aligned with the lane that opens for it. 'AUTO' measures each ramp and
-#: allows offside (left-hand) ramps; use it only where the layout genuinely has them.
-AUX_SIDE = 'AUTO'
 SNAP_TOL = 26.0       # how far a free endpoint may be from a road before it counts as a T
 WELD_TOL = 8.0        # free endpoints closer than this to each other become one node
 MERGE_TOL = 12.0      # junctions closer than this are the SAME junction, not two
 
 #: Per-tier edge attributes. Lane figures are v3 §5's, unchanged -- this is a change of
+#: Height of the barrier along an expressway edge. Tall enough to read as a wall rather than a
+#: kerb; the same band builds both, so this is the only difference between them.
+WALL_HEIGHT = 1.0
+
 #: REPRESENTATION, not of design, so the widths must come out identical to the old pipeline's.
 TIER_ATTRS = {
+    # A BARRIER, NOT A FOOTWAY. An urban expressway has no pavement to walk on; what runs along
+    # its edge is a wall, and the kit builds one from the same kerb band by giving it a wall's
+    # height (the band is swept at the carriageway edge, so it follows every taper and auxiliary
+    # lane automatically -- and it OPENS where a ramp merges, see `graph_build._point_values`).
     "T1":   dict(lanes_fwd=2, lanes_bwd=2, lane_width=3.50, median_width=1.2,
-                 sidewalk_left_width=0.0, sidewalk_right_width=0.0, curb=False),
+                 sidewalk_left_width=0.0, sidewalk_right_width=0.0, curb=True,
+                 curb_height=WALL_HEIGHT),
     "T1C":  dict(lanes_fwd=2, lanes_bwd=0, lane_width=3.50, median_width=0.0,
-                 sidewalk_left_width=0.0, sidewalk_right_width=0.0, curb=False),
+                 sidewalk_left_width=0.0, sidewalk_right_width=0.0, curb=True,
+                 curb_height=WALL_HEIGHT),
     "T2":   dict(lanes_fwd=2, lanes_bwd=2, lane_width=3.25, median_width=3.0,
                  sidewalk_left_width=4.0, sidewalk_right_width=4.0, curb=True),
     "T3":   dict(lanes_fwd=1, lanes_bwd=1, lane_width=3.25, median_width=0.0,
                  sidewalk_left_width=3.5, sidewalk_right_width=3.5, curb=True),
     "RAMP": dict(lanes_fwd=1, lanes_bwd=0, lane_width=4.50, median_width=0.0,
-                 sidewalk_left_width=0.0, sidewalk_right_width=0.0, curb=False),
+                 sidewalk_left_width=0.0, sidewalk_right_width=0.0, curb=True,
+                 curb_height=WALL_HEIGHT),
+    # EXPRESSWAY-TO-EXPRESSWAY LINK: two lanes, one way. A junction ramp between two motorways
+    # carries a whole carriageway's worth of traffic, not one lane of it -- the airport bridge is
+    # a 2-lane-each-way road, and a 1-lane link would be its bottleneck as well as an obvious
+    # visual mismatch where it meets the bridge.
+    "RAMP2": dict(lanes_fwd=2, lanes_bwd=0, lane_width=3.75, median_width=0.0,
+                  sidewalk_left_width=0.0, sidewalk_right_width=0.0, curb=True,
+                  curb_height=WALL_HEIGHT),
     "TOUGE": dict(lanes_fwd=1, lanes_bwd=1, lane_width=2.75, median_width=0.0,
                   sidewalk_left_width=0.0, sidewalk_right_width=0.0, curb=False),
 }
@@ -100,7 +113,8 @@ LIMITED_ACCESS_TIERS = frozenset(("T1", "T1C"))
 
 #: Kerb corner radius by the widest tier at a junction -- a bus tracks a wider arc off an
 #: arterial than off a lane.
-TIER_FILLET = {"T1": 12.0, "T1C": 12.0, "T2": 8.0, "T3": 5.0, "RAMP": 10.0, "TOUGE": 4.0}
+TIER_FILLET = {"T1": 12.0, "T1C": 12.0, "T2": 8.0, "T3": 5.0, "RAMP": 10.0, "RAMP2": 10.0,
+               "TOUGE": 4.0}
 
 
 # ------------------------------------------------------------------------------- graph assembly
@@ -135,6 +149,83 @@ def _project(p, a0, a1):
     t = max(0.0, min(1.0, t))
     q = (a0[0] + rx * t, a0[1] + ry * t, a0[2] + (a1[2] - a0[2]) * t)
     return t, math.hypot(p[0] - q[0], p[1] - q[1]), q
+
+
+#: How far a ramp touchdown is kept from an existing junction on the road it lands on. Below this
+#: the graph's own `MERGE_TOL` welds them into one node and the merge becomes a junction arm; above
+#: it there is a plain stretch of road for the auxiliary lane to open on. 25 m clears the graph's
+#: own merge tolerance and the junction's setback without dragging the touchdown far from where it
+#: was authored -- the shortest slide that still lands on road rather than in the crossing.
+TOUCHDOWN_CLEAR = 25.0
+
+#: Most a touchdown may be slid to find that clear stretch. Sliding stretches the ramp's last
+#: edge, and a ramp arriving nearly parallel absorbs that almost along its own direction -- but
+#: only up to a point, past which the ramp is being re-routed rather than nudged.
+TOUCHDOWN_SLIDE_MAX = 120.0
+
+
+def _clear_of_junctions(q, line, inserts, jpts, tip, ramp_pts, prev_index):
+    """Slide a touchdown along the road it landed on until it clears existing junctions.
+
+    Returns `(segment index, t, point)` for the new spot, or None to keep the original. The
+    direction is chosen by where the ramp was already heading, so a slid touchdown extends the
+    ramp forwards rather than doubling it back."""
+    _nm, _tier, pts, closed = line
+    n = len(pts)
+    seg = [(k, pts[k], pts[(k + 1) % n]) for k in range(n if closed else n - 1)]
+    cum, total = [0.0], 0.0
+    for _k, a, b in seg:
+        total += math.dist(a[:2], b[:2])
+        cum.append(total)
+
+    def at(s):
+        """(segment index, t, point) at arclength `s`."""
+        s = max(0.0, min(total, s))
+        for k, (_k2, a, b) in enumerate(seg):
+            L = cum[k + 1] - cum[k]
+            if L <= 1e-9:
+                continue
+            if s <= cum[k + 1] or k == len(seg) - 1:
+                t = (s - cum[k]) / L
+                t = max(0.0, min(1.0, t))
+                return k, t, (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t,
+                              a[2] + (b[2] - a[2]) * t)
+        return None
+
+    s_q = None
+    for k, (_k2, a, b) in enumerate(seg):
+        d = math.dist(a[:2], q[:2]) + math.dist(q[:2], b[:2]) - math.dist(a[:2], b[:2])
+        if d < 1e-3:
+            s_q = cum[k] + math.dist(a[:2], q[:2])
+            break
+    if s_q is None:
+        return None
+    taken = []
+    for sj, t, _jid in inserts:
+        if sj < len(seg):
+            taken.append(cum[sj] + (cum[sj + 1] - cum[sj]) * t)
+    if not taken or min(abs(s_q - s) for s in taken) >= TOUCHDOWN_CLEAR:
+        return None
+    # Which way along the road the ramp is already travelling, so the slide goes with it.
+    fwd = 1.0
+    if 0 <= prev_index < len(ramp_pts) or prev_index == -2:
+        near = ramp_pts[prev_index if prev_index != -2 else -2]
+        d_ramp = (tip[0] - near[0], tip[1] - near[1])
+        hit = at(s_q)
+        nxt = at(min(total, s_q + 5.0))
+        if hit is not None and nxt is not None:
+            d_road = (nxt[2][0] - hit[2][0], nxt[2][1] - hit[2][1])
+            if d_ramp[0] * d_road[0] + d_ramp[1] * d_road[1] < 0.0:
+                fwd = -1.0
+    for step in range(1, int(TOUCHDOWN_SLIDE_MAX / 5.0) + 1):
+        for sign in (fwd, -fwd):
+            s = s_q + sign * step * 5.0
+            if s < 0.0 or s > total:
+                continue
+            if min(abs(s - t) for t in taken) < TOUCHDOWN_CLEAR:
+                continue
+            return at(s)
+    return None
 
 
 def build_graph(roads, z_tol=Z_CROSS_TOL, snap_tol=SNAP_TOL, weld_tol=WELD_TOL):
@@ -198,6 +289,20 @@ def build_graph(roads, z_tol=Z_CROSS_TOL, snap_tol=SNAP_TOL, weld_tol=WELD_TOL):
             if best is None:
                 continue
             _d, j, sj, t, q = best
+            # LAND ON THE ROAD, NOT ON A JUNCTION. A ramp that touches down where the arterial
+            # already crosses something turns that junction from a crossroads into a five- or
+            # nine-armed knot: its pad grows to cover the whole road (the island had one of
+            # 3,748 m2), the ramp's traffic has to negotiate the crossing instead of merging, and
+            # no auxiliary lane can open because there is no plain stretch of road to open it on.
+            # A merge wants an ordinary piece of road, so slide the touchdown along the arterial
+            # until it has one -- forward if the ramp will fit, which keeps the ramp travelling
+            # the way it was already going. The ramp gets shorter and steeper for it, which is the
+            # trade the layout wants (a slower slip road that merges beats a fast one that lands
+            # in a crossing).
+            slid = _clear_of_junctions(q, lines[j], ins[j], jpts, p, pts,
+                                       0 if which == 0 else -2)
+            if slid is not None:
+                sj, t, q = slid
             jid = jid_for(q)
             ins[j].append((sj, t, jid))
             endpoint_jid[(i, which)] = jid
@@ -323,7 +428,7 @@ def emit(verts, edges, edge_tier, junction_verts, name="IslandRoads"):
                                 else ga.MEDIAN_NONE)
         e[el["curb_left_on"]] = 1 if a["curb"] else 0
         e[el["curb_right_on"]] = 1 if a["curb"] else 0
-        e[el["curb_height"]] = 0.15 if a["curb"] else 0.0
+        e[el["curb_height"]] = a.get("curb_height", 0.15) if a["curb"] else 0.0
         # SUPPORT IS DERIVED, NOT AUTHORED -- v3 section 6's rule, one number in, one decision
         # out: a surface high enough above its ground gets a deck and piers, and lowering it takes
         # them away again with no separate "is this a bridge" flag anywhere.
@@ -405,9 +510,25 @@ def main():
     bpy.ops.wm.read_homefile(use_empty=True)
     if not hasattr(bpy.types.Scene, "rka_graph"):
         rka.register()
+    # `--outline` builds the kerb/wall from the road surface's boundary rather than by lateral
+    # offset from each chain's centreline. Off by default while both paths are runnable, so a
+    # rebuild of the shipped island is unaffected until the comparison says otherwise.
+    bpy.context.scene.rka_graph.stage_edge_furniture = "--outline" in argv
 
     import island_v3_to_roadkit as R
     roads = R.collect_roads(spacing)
+    # AN ON-RAMP IS DRAWN IN THE DIRECTION IT IS DRIVEN. Every ramp comes out of the plan
+    # authored deck-end-first -- gore first, touchdown last -- and `island_v3_plan.ramps` says so
+    # explicitly: "a consumer that needs it running INTO the mainline simply reverses it". The
+    # legacy roadkit pipeline did that reversal; this one never did, so every ENTRY ramp on the
+    # island was a one-way road pointing OUT of the expressway. `lanes_fwd` is defined against the
+    # edge's own direction, so those ramps were built as second exits: `graph_solve.ramp_services`
+    # classifies a ramp by whether it starts at the gore, and an entry drawn outward starts there
+    # exactly like an exit does. The island therefore had eight off-ramps and no on-ramps at all,
+    # which is a set of dead ends, not an interchange.
+    for _nm, _r in roads.items():
+        if _nm.endswith(P.ENTRY_SUFFIX):
+            _r["pts"] = list(reversed(_r["pts"]))
     if only:
         keep = set(only.split(","))
         roads = {k: v for k, v in roads.items() if k in keep}
@@ -447,21 +568,41 @@ def main():
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     try:
-        n_aux, aux_wrong = gs.auto_aux_lanes(bm, pre, count=AUX_LANES, taper=AUX_TAPER,
-                                             side_mode=AUX_SIDE)
+        n_aux, aux_wrong = gs.auto_aux_lanes(bm, pre, count=AUX_LANES, taper=AUX_TAPER)
         bm.to_mesh(obj.data)
     finally:
         bm.free()
     obj.data.update()
     print("[graph] auto aux lanes: %d chain(s) stamped (%d lane, %.0f m taper)"
           % (n_aux, AUX_LANES, AUX_TAPER))
+    # WHAT DID NOT GET A LANE, and why. A refused merge still connects -- the ramp becomes an
+    # ordinary arm of its junction -- so without this the difference is a lane's width of asphalt
+    # and no way to tell which happened.
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    try:
+        declined = gs.declined_merges(bm, pre)
+    finally:
+        bm.free()
+    if declined:
+        # Grouped by KIND, not by wording: every reason carries its own measurement (the angle,
+        # the metres offside), so keying on the raw string prints one line per ramp.
+        why = {}
+        for _n, _e, reason in declined:
+            key = re.sub(r"\s*\(.*?\)", "", reason.split(" -- ")[0].split(",")[0])
+            key = re.sub(r"\b\d+(\.\d+)?\b", "N", key).strip()
+            why[key] = why.get(key, 0) + 1
+        print("[graph] %d ramp arm(s) connect as ordinary junction arms rather than merges: %s"
+              % (len(declined),
+                 "; ".join("%d %s" % (c, k) for k, c in sorted(why.items(), key=lambda kv: -kv[1]))))
     if aux_wrong:
         # The ramp is on the far side of the carriageway its own traffic uses, so reaching it
         # means crossing the opposing stream. No lane placement can fix that -- the ramp needs
         # moving in the source layout -- so name the nodes rather than quietly building it.
-        print("[graph] %d ramp(s) needed a median-side (left-hand) auxiliary lane: %s"
+        print("[graph] %d ramp(s) run OFFSIDE of the carriageway they serve -- the exit lane "
+              "always opens at the kerb, so these need moving in the layout: %s"
               % (len(aux_wrong),
-                 ", ".join("node %d (%.1f deg)" % w for w in aux_wrong[:8])))
+                 ", ".join("node %d (%.1f m off the mainline)" % w for w in aux_wrong[:8])))
 
     result, carrier = gb.build_object(obj)
     kinds = {}

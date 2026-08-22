@@ -98,77 +98,103 @@ def _offset_polyline(pts, offset):
     return out
 
 
-def chain_lanes(pts, attrs, traffic_side='LEFT', scales=None):
-    """Every drivable lane of one chain: `[(suffix, direction, [points]), ...]`.
+def chain_lanes(pts, attrs, traffic_side='LEFT', counts=None):
+    """Every drivable lane of one chain, as
+    `[(suffix, direction, [points], is_aux, at_start, at_end), ...]`.
 
-    Offsets come from `lane_profile.slot_offset`; the `traffic_side` flip is applied here, at the
-    one boundary, matching `graph_solve.derived_offsets`.
+    `at_start` / `at_end` are `(kerb index, lane count)` for the lane's OWN direction of travel at
+    the end it departs from and the end it arrives at -- what the junction there sees. They are
+    reported per END, not once for the chain, because the two ends of a chain whose lane count
+    varies do not present the same road; None means the lane does not reach that end at all.
 
-    `scales` (per point, from `graph_build.taper_scales`) COLLAPSES AN AUX LANE ALONG ITS TAPER.
-    Through lanes never move -- an aux lane is added OUTSIDE them, so their distance from the
-    divide is the same with it or without it. Only the aux lanes themselves slide inward as the
-    ribbon narrows, ending up on the road edge where the taper closes. Without this the aux route
-    would run at its full-width position the whole way and hang off the asphalt for the entire
-    taper."""
+    `counts` is `graph_build.chain_lane_counts`' per-point `(lanes_fwd, lanes_bwd)` in the chain's
+    walk frame -- the SAME numbers the carrier is swept with, which is what stops a route from
+    running off the asphalt. Two things fall out of it:
+
+      * A LANE'S CENTRELINE IS CLAMPED TO THE OUTERMOST LANE THAT EXISTS THERE. Through lanes
+        never move -- a lane is added OUTSIDE them, so their distance from the divide does not
+        depend on how many there are -- while a lane that has not opened yet rides ON its inboard
+        neighbour and slides out to its own position as its taper opens. That is what a
+        deceleration lane physically IS: before the taper, the traffic that will take the exit is
+        in the through lane, and it peels off along the taper. Clamping to the ROAD EDGE instead
+        (the previous rule, and the reason this is spelled out) put that traffic half a lane
+        outboard of the through lane -- driving down the edge line with two wheels off the
+        asphalt for as long as the lane was closed.
+      * THE ROUTE STILL RUNS THE WHOLE CHAIN, deliberately. An auxiliary lane has no entrance of
+        its own: nothing flows into a route that begins in mid-carriageway, and the only lane
+        change this pipeline can express today is the junction connector at the chain's end (see
+        `movement_verdict`'s "only lane N may move into the opening kerb-side aux lane"). Cutting
+        the route where its lane opens therefore made every ramp on the island unreachable. The
+        honest fix is lane-change adjacency (`inner_lane`/`outer_lane`, which the sidecar and
+        `PathLaneRoute` already carry and nothing yet emits or drives on); until then the route
+        reaches back to the junction, riding its neighbour the whole way."""
     lp = gsolve.lp()
     sign = 1.0 if traffic_side == 'LEFT' else -1.0
     lane_w = float(attrs.get("lane_width", 3.5))
-    aux_l = int(attrs.get("aux_lanes_left", 0))
-    aux_r = int(attrs.get("aux_lanes_right", 0))
-    lanes_l = int(attrs.get("lanes_fwd", 2)) + aux_l
-    lanes_r = int(attrs.get("lanes_bwd", 2)) + aux_r
+    aux_n = {lp.FWD: int(attrs.get("aux_lanes_left", 0)),
+             lp.REV: int(attrs.get("aux_lanes_right", 0))}
+    if counts is None:
+        counts = [(int(attrs.get("lanes_fwd", 2)) + aux_n[lp.FWD],
+                   int(attrs.get("lanes_bwd", 2)) + aux_n[lp.REV])] * len(pts)
+    wide = {lp.FWD: max(c[0] for c in counts), lp.REV: max(c[1] for c in counts)}
     prof = lp.profile_from_scalars(
-        lanes_l, lanes_r, lane_w,
+        int(math.ceil(wide[lp.FWD] - 1e-6)), int(math.ceil(wide[lp.REV] - 1e-6)), lane_w,
         float(attrs.get("median_width", 0.0)),
         float(attrs.get("sidewalk_left_width", 0.0)),
         float(attrs.get("sidewalk_right_width", 0.0)))
-    tapering = scales is not None and (aux_l or aux_r) and any(s < 1.0 - 1e-9 for s in scales)
+
     raw = []
     for i, slot in enumerate(prof.slots):
         if not slot.is_drivable():
             continue
         off = lp.slot_offset(prof, i)
-        raw.append((slot.dir, abs(off), off, i))
-    # WHICH LANES OF A GROUP ARE THE AUX ONES. Normally the outermost -- an ordinary nearside
-    # ramp adds lanes at the kerb. `aux_median_*` says they sit at the MEDIAN end instead, which is
-    # what a left-hand (offside) ramp needs; ranking from the divide instead of from the kerb is
-    # the whole difference, and it is what lets the exporter connect a ramp on either side of a
-    # carriageway without the layout being corrected by hand.
-    med_l = int(attrs.get("aux_median_left", 0))
-    med_r = int(attrs.get("aux_median_right", 0))
-    aux_rank = {}
-    for direction, n_aux, at_median in ((lp.FWD, aux_l, med_l), (lp.REV, aux_r, med_r)):
-        group = sorted([r for r in raw if r[0] == direction],
-                       key=lambda r: (r[1] if at_median else -r[1]))
-        for k in range(min(n_aux, len(group))):
-            aux_rank[group[k][3]] = (k, n_aux)
+        raw.append((slot.dir, abs(off), off))
     built = []
-    for direction, mag, off, slot_i in raw:
-        is_aux = slot_i in aux_rank
-        if tapering and is_aux:
-            k, n_aux = aux_rank[slot_i]
-            # Distance this lane's centre sits outboard of the base (no-aux) road edge.
-            reach = (n_aux - k - 0.5) * lane_w
-            per_point = [sign * (off - math.copysign(reach * (1.0 - s), off)) for s in scales]
-            line = _offset_polyline(pts, per_point)
-        else:
-            line = _offset_polyline(pts, sign * off)
-        built.append((direction, mag, line, is_aux))
-    raw = built
-
-    # CURB INDEX, not slot index. Turn legality is expressed relative to the KERB (index 0 is the
-    # nearside lane, n-1 the median lane), and the slot order runs most-negative to most-positive,
-    # which puts the kerb at opposite ends for the two directions. Ranking by distance from the
-    # divide gives one consistent numbering both ways, which is what the legality table below and
-    # the target-lane clamp both assume.
-    out = []
     for direction in (lp.FWD, lp.REV):
-        group = sorted([r for r in raw if r[0] == direction], key=lambda r: -r[1])
-        for k, (_d, _off, line, is_aux) in enumerate(group):
-            tag = "F" if direction == lp.FWD else "R"
-            out.append(("%s%d" % (tag, k), direction,
-                        line if direction == lp.FWD else list(reversed(line)),
-                        k, len(group), is_aux))
+        # Ranked from the DIVIDE outward: rank 1 is the median lane, rank n the kerb lane. That
+        # is the order lanes appear in as the road widens -- a road gaining a lane gains it at the
+        # kerb -- so "does lane r exist here" is simply "are there at least r lanes here".
+        group = sorted([r for r in raw if r[0] == direction], key=lambda r: r[1])
+        if not group:
+            continue
+        n_max = len(group)
+        base_mag = group[0][1] - 0.5 * lane_w          # the divide: median half, or the centreline
+        col = 0 if direction == lp.FWD else 1
+        for rank, (_d, mag, off) in enumerate(group, start=1):
+            side = 1.0 if off >= 0.0 else -1.0
+            per_point, closed = [], False
+            for k in range(len(pts)):
+                ne = counts[k][col]
+                # The centre of the outermost lane that exists here -- this lane's own place once
+                # it is open, its neighbour's while it is not.
+                held = base_mag + max(min(float(rank), ne) - 0.5, 0.0) * lane_w
+                per_point.append(sign * side * min(mag, held))
+                closed = closed or ne < rank - 1e-6
+            line = _offset_polyline(pts, per_point)
+            kerb_ix = n_max - rank
+            # A lane is auxiliary when it is not part of the through road: inside the authored
+            # aux count, or simply not open for the whole chain.
+            is_aux = kerb_ix < aux_n[direction] or closed
+            built.append({"suffix": "%s%d" % ("F" if direction == lp.FWD else "R", kerb_ix),
+                          "dir": direction, "points": line, "mag": mag, "is_aux": is_aux,
+                          "head": True, "tail": True})
+
+    # END-LOCAL KERB INDEX. Ranked among the lanes that actually reach that end, so the lane
+    # numbering a junction sees always starts at 0 on the kerb of the road that is really there.
+    for end in ("head", "tail"):
+        for direction in (lp.FWD, lp.REV):
+            at = sorted([b for b in built if b["dir"] == direction and b[end]],
+                        key=lambda b: -b["mag"])
+            for k, b in enumerate(at):
+                b[end + "_ix"] = (k, len(at))
+
+    out = []
+    for b in built:
+        fwd = b["dir"] == lp.FWD
+        start = b.get(("head" if fwd else "tail") + "_ix")
+        end = b.get(("tail" if fwd else "head") + "_ix")
+        out.append((b["suffix"], b["dir"], b["points"] if fwd else list(reversed(b["points"])),
+                    b["is_aux"], start, end))
     return out
 
 
@@ -270,41 +296,14 @@ def movement_verdict(lane_in, lane_out, turn, is_gore, tarms, allow_cross, ins, 
         # opened as an unreachable stub: the road visibly widens for an exit that nothing can
         # enter. Measured on the island as three unfed auxiliary lanes (g26_R0, g30_R0, g33_R0).
         # The feeder is the nearest lane that is still ON the trunk after this node.
-        def _feeder(at_median):
+        def _feeder():
             same = [i for i in ins if i[0].rsplit("_", 1)[0] == arm_in
                     and not (i[5] and ramp_departs)]
-            keys = [(i[4] - 1 - i[3]) if at_median else i[3] for i in same]
-            return min(keys) if keys else 0
-        # THE MAINLINE IS ANCHORED AT THE END WHERE THE LANE COUNT DOES NOT CHANGE, which is the
-        # opposite end from wherever the auxiliary lane opens. A nearside aux opens at the kerb, so
-        # the through lanes hold their distance from the MEDIAN; a left-hand aux opens at the
-        # median, so they hold their distance from the KERB. Anchoring always at the median -- the
-        # only case that existed while every ramp was nearside -- left a left-hand merge's kerb
-        # lane fed by nothing at all and pushed its median lane into the aux.
+            return min((i[3] for i in same), default=0)
+        # THE MAINLINE IS ANCHORED AT THE END WHERE THE LANE COUNT DOES NOT CHANGE. The auxiliary
+        # lane always opens at the KERB (see `auto_aux_lanes` for the convention), so the through
+        # lanes hold their distance from the MEDIAN and keep their identity across the gore.
         med_in, med_out = n_in - 1 - cix_in, n_out - 1 - cix_out
-        # ASK THIS MOVEMENT'S OWN CARRIAGEWAY WHERE ITS AUX LANE IS. Taking the first aux lane at
-        # the node let the two directions contaminate each other: a segment between an exit and an
-        # entry carries an aux lane in each direction and they need not be at the same end (island
-        # gore 261 has the exit's deceleration lane at the median and the entry's acceleration
-        # lane at the kerb), so the median anchoring got applied to the carriageway whose lane
-        # opens at the kerb and dropped a through movement. `arm_in`/`arm_out` name exactly the
-        # two lane groups this movement runs through.
-        aux_at_median = False
-        for lane in ([l for l in ins if l[0].rsplit("_", 1)[0] == arm_in]
-                     + [l for l in outs if l[0].rsplit("_", 1)[0] == arm_out]):
-            if lane[5]:
-                aux_at_median = lane[3] == lane[4] - 1
-                break
-        if aux_at_median:
-            if cix_out == min(cix_in, n_out - 1):
-                return None
-            if not aux_out:
-                return "kerb index %d does not continue into %d" % (cix_in, cix_out)
-            feed = _feeder(at_median=True)
-            if med_in != feed:
-                return ("only median-index %d may move into the opening median-side aux lane"
-                        % feed)
-            return None
         if med_out == min(med_in, n_out - 1):
             return None
         # ...except the lane that OPENS here. An auxiliary lane has no counterpart upstream, so the
@@ -312,7 +311,23 @@ def movement_verdict(lane_in, lane_out, turn, is_gore, tarms, allow_cross, ins, 
         # deceleration lane.
         if not aux_out:
             return "median index %d does not continue into %d" % (med_in, med_out)
-        feed = _feeder(at_median=False)
+        # AN ACCELERATION LANE BELONGS TO THE RAMP THAT FEEDS IT. The rule below is about a
+        # DEceleration lane -- one that opens for traffic leaving, which a driver enters from the
+        # through lane beside it. Where the ramp ARRIVES instead, the lane opening at the gore is
+        # the merge lane and the traffic entering it comes up the ramp; letting the trunk's kerb
+        # lane move into it as well puts the mainline into the very lane the ramp is merging from,
+        # which is the "the ramp shares the road's own lanes" case (measured at the island's
+        # IC_YAMATE entry, node 417: g96_F0 fed both g97_F0 and g97_F1).
+        # ...and only for the lane THAT ramp merges into. A gore can open an auxiliary lane on
+        # each carriageway (an entry serving one, an exit serving the other), and an arriving ramp
+        # cannot feed the one running the other way -- it would have to reverse through the gore,
+        # which the guard at the top of this function already forbids. Testing it the same way
+        # keeps the two agreeing; asking only "does a ramp arrive here" left the far carriageway's
+        # lane fed by nothing at the island's node 377.
+        if any(i[2].dot(t_out) > 0.0 for i in ins
+               if i[0].rsplit("_", 1)[0] not in tarms):
+            return "the acceleration lane opening here belongs to the ramp merging into it"
+        feed = _feeder()
         if cix_in != feed:
             return "only lane %d may move into the opening kerb-side aux lane" % feed
         return None
@@ -328,10 +343,9 @@ def movement_verdict(lane_in, lane_out, turn, is_gore, tarms, allow_cross, ins, 
     # rejecting that leaves the whole downstream carriageway unfed.
     if not allow_cross and turn == 'R':
         return "allow_cross is off and reaching this ramp means crossing the opposing carriageway"
-    # A RAMP MOVEMENT CONNECTS TO THE AUXILIARY LANE, WHEREVER IT IS. Anchoring it to kerb index 0
-    # assumed every ramp is nearside; with `aux_median_*` the lane may sit at the median end
-    # instead (a left-hand ramp), so the connection is a plain edge-to-edge question -- which lane
-    # is the aux one -- rather than a position convention that holds for one layout only.
+    # A RAMP MOVEMENT CONNECTS TO THE AUXILIARY LANE. Asked as "which lane is the aux one?" rather
+    # than "is this kerb index 0?", because a trunk may carry more than one and the aux is the lane
+    # that exists FOR this ramp -- the index is a consequence, not the rule.
     if arm_in in tarms:
         arm_has_aux = any(i[5] for i in ins if i[0].rsplit("_", 1)[0] == arm_in)
         if aux_in:
@@ -423,6 +437,12 @@ def collect(graph_obj, traffic_side='LEFT', want_context=False):
         from . import graph_build as gb
         kinds = {n.index: n.kind for n in result.nodes}
         gore = gsolve.rgs().KIND_GORE
+        gore_nodes = {i for i, k in kinds.items() if k == gore}
+        # WHICH LANE GROUP EACH RAMP USES -- the same derivation `auto_aux_lanes` stamped the
+        # lane from and the carrier tapers it with, so all three agree about which end of a chain
+        # the auxiliary lane is full width at.
+        services, _wrong = gsolve.ramp_services(bm, result)
+        aligns = gsolve.ramp_alignments(bm, result)
 
         # PASS 1 -- resolve every chain's real, trimmed centreline.
         built = []
@@ -437,42 +457,51 @@ def collect(graph_obj, traffic_side='LEFT', want_context=False):
             # matches up and the chain ends up with no successors at all.
             if chain and not chain[0][1]:
                 chain = [(e, not f) for e, f in reversed(chain)]
+            # PER POINT, LIKE THE CARRIER. Each point carries the attrs of the edge it arrives
+            # on and that edge's walk direction, because a chain's cross-section is not one
+            # record: a road can gain a lane halfway along, and reading only the last edge (which
+            # is what this did) exported the wrong lane count for everything before it.
             pts, attrs = [], None
             for eidx, forward in chain:
                 e = bm.edges[eidx]
                 v0, v1 = (e.verts[0], e.verts[1]) if forward else (e.verts[1], e.verts[0])
                 if (v1.co - v0.co).length < 1e-9:
                     continue
-                attrs = ga.read_edge(bm, e, el)
+                ea = ga.read_edge(bm, e, el)
+                if attrs is None or (int(ea.get("lanes_fwd", 0)) + int(ea.get("lanes_bwd", 0))
+                                     > int(attrs.get("lanes_fwd", 0))
+                                     + int(attrs.get("lanes_bwd", 0))):
+                    # The chain-level record (lane width, median, footways) comes from its WIDEST
+                    # edge -- the state the full profile has to be able to hold.
+                    attrs = ea
                 if not pts:
-                    pts.append((v0.co.copy(), v0.index))
-                pts.append((v1.co.copy(), v1.index))
+                    pts.append((v0.co.copy(), v0.index, (ea, forward)))
+                pts.append((v1.co.copy(), v1.index, (ea, forward)))
             if len(pts) < 2 or attrs is None:
                 continue
             head_node, tail_node = pts[0][1], pts[-1][1]
             chain_ends[cid] = (head_node, tail_node)
-            chain_pts[cid] = [p for p, _i in pts]
+            chain_pts[cid] = [p for p, _i, _a in pts]
             head_e, head_f = chain[0]
             tail_e, tail_f = chain[-1]
             t0 = result.trim_start[head_e] if head_f else result.trim_end[head_e]
             t1 = result.trim_end[tail_e] if tail_f else result.trim_start[tail_e]
-            trimmed = gb._trim_chain([(p, None) for p, _i in pts], t0, t1)
+            trimmed = gb._trim_chain([(p, a) for p, _i, a in pts], t0, t1)
             if trimmed is None:
                 continue
-            # Same taper the carrier builds, from the same helpers, so the routes sit on the
-            # asphalt that actually gets swept rather than on the untapered full width.
-            tap_s, tap_e = gb.chain_tapers(attrs, attrs,
-                                           kinds.get(head_node) == gore,
-                                           kinds.get(tail_node) == gore)
-            trimmed = gb.taper_breakpoints(trimmed, tap_s, tap_e)
-            scales = gb.taper_scales(trimmed, tap_s, tap_e)
+            # THE SAME WIDTHS THE CARRIER IS SWEPT WITH, from the same function, so the routes sit
+            # on the asphalt that actually gets built rather than on some second interpretation of
+            # the same attributes.
+            trimmed = gb.align_ramp_ends(trimmed, (head_node, tail_node), cid, aligns)
+            trimmed, counts, _opens = gb.chain_lane_counts(
+                trimmed, (head_node, tail_node), gore_nodes, services, cid)
             line = [co for co, _v in trimmed]
             # MEASURE THE LANES, NOT THE CENTRELINE. A chain can span 8 m down the middle while
             # its inner lane collapses to 0.2 m through a tight bend -- offsetting shortens the
             # inside of a curve -- so the centreline alone still let stub routes through.
-            built_lanes = chain_lanes(line, attrs, traffic_side, scales)
+            built_lanes = chain_lanes(line, attrs, traffic_side, counts)
             span = min((sum((pts[i + 1] - pts[i]).length for i in range(len(pts) - 1))
-                        for _s, _d, pts, _c, _n, _a in built_lanes), default=0.0)
+                        for _s, _d, pts, _a, _st, _en in built_lanes), default=0.0)
             built.append((cid, attrs, built_lanes, head_node, tail_node, span))
 
         # A ROAD EATEN TO NOTHING BY ITS JUNCTIONS *IS* THE JUNCTION. Two junctions close enough
@@ -574,20 +603,25 @@ def collect(graph_obj, traffic_side='LEFT', want_context=False):
         for cid, attrs, built_lanes, head_node, tail_node, _span in built:
             if cid in stubs:
                 continue
-            for suffix, direction, lpts, curb_ix, lane_n, is_aux in built_lanes:
+            for suffix, direction, lpts, is_aux, at_start, at_end in built_lanes:
                 lid = "g%d_%s" % (cid, suffix)
                 lanes.append({"id": lid, "points": [_godot(p) for p in lpts],
                               "from_arm": "g%d" % cid, "kind": "through",
                               "lane_width": round(float(attrs.get("lane_width", 3.5)), 3),
                               "next": []})
-                # A lane DEPARTS the node its first point is nearest and ARRIVES at the other.
+                # A lane DEPARTS the node its first point is nearest and ARRIVES at the other --
+                # but only if it REACHES that end. A lane that opens partway along the chain is
+                # not an approach to the junction behind it, and registering it as one invented a
+                # movement into a lane that does not exist there.
                 start_node = head_node if direction == gsolve.lp().FWD else tail_node
                 end_node = tail_node if direction == gsolve.lp().FWD else head_node
                 tans = _tangents(lpts)
-                departures.setdefault(_find(start_node), []).append(
-                    (lid, lpts[0], tans[0], curb_ix, lane_n, is_aux))
-                arrivals.setdefault(_find(end_node), []).append(
-                    (lid, lpts[-1], tans[-1], curb_ix, lane_n, is_aux))
+                if at_start is not None:
+                    departures.setdefault(_find(start_node), []).append(
+                        (lid, lpts[0], tans[0], at_start[0], at_start[1], is_aux))
+                if at_end is not None:
+                    arrivals.setdefault(_find(end_node), []).append(
+                        (lid, lpts[-1], tans[-1], at_end[0], at_end[1], is_aux))
         merged = {n: _find(n) for n in parent if _find(n) != n}
 
         # ---- junction connectors

@@ -43,8 +43,12 @@ carrier, because the graph is a wireframe underneath it.
 - *Build / Solve / Validate / Weld / Auto Aux / Preview / Export* resolve a generated object back
   to its graph, so clicking the road and pressing them works.
 - *Assign To Selected Edges* / *Assign To Selected Nodes* cannot — a stamp writes to the edges you
-  selected, and those are swept output. They now refuse with the name of the object to edit
-  instead. **Select the graph mesh itself, then `Tab` into Edit Mode.**
+  selected, and those are swept output. They refuse with the name of the object to edit instead.
+- **Press *Edit Road Graph* (top of the panel) and it does the finding for you**: from a click on
+  the road, on a corner, on a node pad or on the graph itself, it selects the graph, enters Edit
+  Mode and switches to edge select. The panel shows the same button wherever the brush is hidden,
+  so "I clicked the road and there is nothing to edit" has a button on it rather than a rule to
+  remember.
 
 **Why Assign can look like it does nothing** (three separate causes, each with its own message):
 
@@ -54,18 +58,268 @@ carrier, because the graph is a wireframe underneath it.
 3. The stamp landed but geometry did not move: the **refresh toggle beside Assign** (`auto_build`)
    was off. Press *Build Road Graph* — the attributes are already written.
 
-**Changing a ramp / express-lane exit by hand.** The auxiliary lane at a gore is normally derived —
-*Auto Aux Lanes At Gores* reads the solved gores and stamps the trunk chain that feeds each ramp,
-which is the path the island generator uses. To override one:
+The panel prints the exact list of fields a stamp will write (`writes: lanes_fwd, median_width,
+…`) directly above the button, because the reverse mistake is just as costly: **eight fields are
+ticked by default**, so an Assign meant to change the lane count also rewrites the median, the
+footways and the lane width with whatever the brush holds. Either untick what you do not mean to
+touch, or press the eyedropper (*Pick From Active Edge*) first so the brush already holds that
+road's own values.
+
+**Lane counts have their own +/- buttons** (*Lanes on selected edges*), which read each edge's
+value and add or subtract one. They touch nothing else, they work across a mixed selection (a
+2-lane and a 3-lane stretch selected together each gain a lane rather than both being flattened),
+and they are the right tool for "one more lane here" — the brush is for stamping a whole
+cross-section.
+
+**A vertex with two edges is a shape point, not a junction.** Drawing a road by extruding a vertex
+leaves every interior vertex on `AUTO`, and `AUTO` at valency 2 now means "the road runs straight
+through": one continuous ribbon, no trim, no pad. (Before, each of those vertices ended the chain,
+so a hand-drawn six-vertex expressway came out as five separate two-point ribbons and every
+chain-level feature — the auxiliary-lane taper, the lane-count transition — was confined to one
+segment. The island generator sidestepped it by stamping `NODE_NONE` on all 1543 of its shape
+points, which is why the generated network looked right and hand authoring did not.) Force a real
+junction at valency 2 with `node_type = INTERSECTION`; a lane-count or median change does **not**
+need one — that is a taper, see `lane_transition_length`.
+
+**Making a ramp merge INTO a new lane instead of taking over an existing one.** Press
+***Auto Aux Lanes At Ramps***. It finds every place a one-way arm joins or leaves a wider road —
+a motorway gore *and* a slip road touching down on a street — and stamps the acceleration /
+deceleration lane on the correct lane group of the receiving road, tapering it away from the
+junction. The ramp's traffic then merges into the lane that opened for it; without it the ramp
+merges into the street's existing kerb lane, on top of the cars already there.
+
+**What closes the gap between a ramp and the lane is the node's own patch** — the same
+Python-solved, GN-swept patch every intersection uses, not a separate mechanism. At a gore it is a
+WEDGE rather than a pad: it reaches from the road's kerb out to the ramp's ribbon, and a ramp
+corner that would fall inside the carriageway is clamped back onto the kerb line rather than
+dropped. Both halves of that matter — reaching too far paves over the lanes the ramp is merging
+into, not reaching far enough leaves ramp and lane visibly unjoined.
+
+**A "gore" whose ramp cannot merge is solved as a JUNCTION.** A gore means nothing has to stop; a
+ramp that is refused a lane has nowhere to merge into, so its traffic turns here like any other
+arm. Shown to the solver as an intersection it gets the ordinary corner setbacks and a full pad,
+which is what connects it. (A ramp refused because the road is no wider than itself is a different
+thing — a fork, where both halves carry on — and stays a gore.)
+
+**The barrier wraps the merge; it is never deleted by it.** An expressway's edge is a wall, not a
+footway — the kit builds one from the same kerb band, just at a wall's height (`curb_height`, 1.0 m
+on the island's `T1`/`T1C`/`RAMP` tiers). The kerb LINE is already a function of the point's lane
+count (`offsets_for_counts`), so where an auxiliary lane opens, the wall rides out with it and
+comes back in as it tapers — no switch needed:
+
+```
+|| o2 | o1 ||| i1 | i2 ||   // ramp //   two roads, each fully walled
+|| o2 | o1 ||| i1 | i2 ||// ramp //      the corridor narrows to ONE LANE  <- || stops here
+|| o2 | o1 ||| i1 | i2   // ramp //      only the ramp's wall, on the ramp's own edge
+|| o2 | o1 ||| i1 | i2      ramp    ||   the nose: the ramp's inner wall opens
+|| o2 | o1 ||| i1 | i2   i3         ||   ONE wall, outboard of the auxiliary lane
+|| o2 | o1 ||| i1 | i2   i3         ||   ...held there for `aux_buffer_length`
+|| o2 | o1 ||| i1 | i2 ||                after the taper, back where it was
+```
+
+Three rules, and between them they close every case:
+
+1. **The outer barrier is never removed.** The kerb LINE is already a function of the point's lane
+   count (`offsets_for_counts`), so where an auxiliary lane opens the wall rides out with it and
+   comes back in as it tapers — no switch needed.
+2. **The two barriers in the merge corridor stop where they would collide, and are joined there
+   by an angled piece.** The corridor is bounded by the approaching carriageway's barrier and the
+   ramp's inner one; they converge on the wedge between the two roads, and where they meet, both
+   stop and a short diagonal ties them together — so the fence turns the corner instead of leaving
+   two loose ends and a gap in the road's edge.
+
+   The station is **derived per merge, never authored** (`graph_build.merge_corridor_ends`): it is
+   `gap / sin(convergence angle)`, and across the island's served ramps that angle runs 1.8°–65°,
+   so the distance runs from a couple of metres to a hundred. No constant can serve a 30× spread —
+   which is what "the wall knob doesn't seem to do anything" looked like from the outside. Capped
+   at half the approach chain (`MERGE_WALL_MAX_FRACTION`), and the build prints the range it chose
+   plus any node that hit the cap.
+
+   **`MERGE_WALL_GAP` is a collision margin, not a clearance.** The *lane* keeps its full width —
+   that is what "the merge lane always has one lane of space" means — but the *wall* only has to
+   stay out of that lane and off the ramp's own wall. Demanding a full lane's gap between the two
+   barriers pulled the approach wall back 37 m on the testbed and left 36 m of the mainline's own
+   edge with no barrier on it: a hole in the road's fence, opened while closing one in the ramp's.
+
+   **The joint is a carrier chain, not a special case.** It is emitted the way
+   `graph_solve.build_corner_mesh` emits a junction's kerb corner — a short polyline carrying the
+   same `rka_*` attribute names with every band it does not want written as zero — so the one
+   layer stack sweeps it and there is no second implementation of "what a wall looks like".
+3. **The ramp's own inner wall keeps running** — it sits on the ramp's own edge and blocks nothing,
+   and it is what keeps the wedge between the two roads closed — and stops at the SAME derived
+   station as the approach's, because both bound the same wedge. `RAMP_WALL_OPEN` (12 m, measured
+   from the junction vertex, never from the overshot tip) remains only as the fallback for a ramp
+   with no identifiable approach arm to measure against. Past the vertex
+   *both* of its walls stop: the overshoot exists to overlap the two surfaces, and a ramp still
+   angling in at a few degrees walks its outer wall a metre and a half onto the asphalt over those
+   8 m. From the vertex on, the carriageway's own barrier is the outer wall.
+
+**The ramp arrives at the width of the lane it becomes.** A ramp is wider than a lane (it has
+shoulders — 4.5 m against 3.5 m on the testbed), so swept at its authored width to the very nose
+its edges finish half a metre proud of the carriageway's and the outer wall hands over with a
+sideways step. The ribbon is therefore narrowed onto the lane over the same `ALIGN_BLEND_LENGTH`
+smoothstep that slides it sideways — one gentle movement, about a metre over 120 m — so the two
+walls meet exactly in line. `rka_shift` is untouched, so the lane centre does not move and the
+exported route is unaffected.
+
+Two earlier versions of this are worth knowing about, because both looked plausible. The first
+switched the carriageway's barrier off wherever the auxiliary lane was more than 85 % open: on a
+weaving section, where the lane is held open from one gore to the next, that removed the wall for
+the *whole chain*. The second built the carriageway's barrier unconditionally — which is rule 1,
+and right — but had nothing at all to say about the approaching arm, so its wall ran to the
+junction and 2 m past it, straight through the ramp's entrance.
+
+### The outline path — "Outline Edges" (EXPERIMENTAL, off by default)
+
+Everything above is the **centreline** model: each band outboard of the asphalt is a lateral offset
+from ONE chain's centreline. That is correct only where that chain's ribbon is the outermost thing
+at that station, which is why a merge, a gore or a parallel flyover each needed a rule of its own —
+and why there is always another one. Measured on the island: **257 of 3,736 kerb samples stand on
+another road's asphalt**, and only about a third of those are near a merge. No merge rule can reach
+the rest.
+
+The **Outline Edges** toggle (beside *Build Road Graph*; `stage_edge_furniture`) stages the build
+instead:
+
+```
+STAGE 1  surface        <graph>_Carrier   carriageway + median + deck
+                        <graph>_Nodes     junction pads
+STAGE 1.5  outline      <graph>_Edges     the road surface's outer boundary
+STAGE 2  edge furniture swept on _Edges   kerb, railing   (footway + props: phase B)
+```
+
+`graph_edges.outline()` walks each chain's kerb line and drops the parts that lie inside another
+chain's paved band, then emits the survivors as polylines carrying the same `rka_*` attributes,
+in `build_corner_mesh`'s convention — **the polyline IS the kerb line, so the kerb sits at offset 0
+and everything else rides outboard.** The very same layer stack sweeps it (`edge_spec()`), so there
+is still exactly one description of what a kerb looks like. On the island that gives **0 of 3,441
+boundary vertices on any road's asphalt.**
+
+Three things fall out of the model rather than being arranged:
+
+- **Union and clip are the same computation.** `_profile_offsets` gives `curb_off_left = ppos`
+  while `paved_shift + paved_half = ppos` as well, so the kerb line and the paved edge are one
+  curve. Clipping the kerb line against other roads' bands *is* taking the boundary of the union,
+  and the thing being clipped can never disagree with the thing clipping it.
+- **The corner closes with no joint.** Where chain A's kerb enters chain B's band, refining that
+  transition onto the band edge lands exactly ON B's kerb line — because B's band edge is B's kerb
+  line. A's run ends where B's run passes. That is the whole of `merge_corridor_ends`'
+  `gap / sin(theta)`, its cap and its refusal, arrived at by construction instead of by estimate.
+- **There is no left and right on a boundary**, only inboard and outboard — so the six `_mirror`
+  pairs and the `CurbL`/`CurbR` duplication stop applying to edge furniture, and the long-standing
+  absence of a `PropsR`/`RailR` (street furniture could only ever appear on one side) disappears
+  rather than needing a fix.
+
+What it still cannot do, and says so rather than hiding: where two ribbons run **parallel and
+overlapping** without ever converging, a run stops against a road it never crosses and there is
+nothing to hand the fence over to. Those ends are reported with their coordinates (60 of them on the
+island — the pre-existing parallel overlaps). A polygon clipper would resolve them; walking curve
+pieces cannot. That is the one deliberate deviation from the industry shape of this pipeline, and
+it is the escalation to take if the report ever gets long, rather than adding another special case.
+
+**Turning the flag off removes `_Edges` again** and gives the kerb back to the carrier — otherwise
+the leftover object keeps its stack and keeps sweeping, and the flag looks inert while the kerb is
+built twice.
+
+**A merge follows the direction of travel, both ways.** An arriving ramp attaches to the auxiliary
+lane of the carriageway going ITS way, and that lane opens at that carriageway's kerb; a departing
+ramp leaves from the same lane. Where no such lane can serve it — the ramp is offside, the road is
+no wider than the ramp, or the arm is turning rather than merging — the ramp is simply **one more
+arm of the junction**, and its traffic turns there like any other road. The build prints how many
+arms ended up that way and why (`N ramp arm(s) connect as ordinary junction arms rather than
+merges: ...`), so the difference is never silent.
+
+**When it declines, it says so on the edge.** Select the ramp's edge in Edit Mode and the
+*Active edge* block at the bottom of the panel prints what the kit thinks it is — either
+
+    ramp: merges at node 398 into road g12, forward group (63 deg)
+
+or the reason it was passed over, with the number behind it:
+
+    ramp: meets the road at 84 deg, past the 70 deg merge limit -- read as a turn, not a merge
+
+**To override it, select that edge and press *Merge Selected Ramp Via Aux Lane*.** Pointing at the
+edge is the answer to "is this a ramp?", so that operator skips the angle test entirely: the road
+grows its lane and the merge goes into it. Everything downstream is identical to the automatic
+path. The readout then adds *"but the road it joins already carries an aux lane, so the merge uses
+it"*, so the panel never reports the rule while the file says otherwise.
+
+Two things decide whether an arm qualifies automatically, both deliberately conservative:
+
+- **it must be one-way** — an acceleration lane is for traffic that joins without stopping, and a
+  two-way side street is a junction with a stop line, not a merge;
+- **it must point roughly the way the traffic it joins is going** — `graph_solve.MERGE_ANGLE_DEG`
+  (70°, and the operator's *Merge Angle*) is the cut between "a slip road merging" and "an arm
+  turning at a junction". The same number decides the GEOMETRY: below it, the corner between a
+  one-way arm and the road it joins is built as a nose, not as a junction pad sized to the
+  corner's apex. That one change halved several of the island's touchdown pads (1,042 → 527 m²,
+  1,105 → 549 m²) — a shallow arm's apex always ran into the size cap, which is what "the ramp
+  occupies the whole road" looked like. A junction cannot be a merge for the lanes and a corner
+  for the mesh, so both read this constant.
+
+Doing it by hand instead is a trap worth knowing about: `aux_lanes_left` / `aux_lanes_right` are
+the **forward / backward lane groups of the edge's own direction**, not geometric sides. Stamping
+the wrong one is not a near miss — measured, the widened lane opens on the carriageway going the
+other way, and the ramp ends up with **no successor at all**. Use the operator, or check the
+active-edge readout at the bottom of the panel (`2F/2B (+1/0 aux)`) after stamping.
+
+**A ramp is MOVED onto the lane, never cut short of it.** A ramp's polyline ends at the junction
+vertex, which is on the mainline's centreline — so swept as authored, its last stretch would drive
+diagonally across the road it is joining. The kit eases that stretch sideways onto the auxiliary
+lane instead (`graph_build.align_ramp_ends`, blended over `ALIGN_BLEND_LENGTH` = 120 m), so the
+ramp's edges line up with the lane's edges and the mesh runs all the way in. Everything further
+back is exactly as authored, so the approach stays yours to adjust.
+
+The thing this replaced was a nose setback derived from the angle the ramp came in at: at a
+6° entry that works out to 46 m, so 46 m of ramp was never built and the mesh stopped in mid-air
+short of the junction. Any setback computed from the entry angle has that failure built into it —
+the shallower and more realistic the merge, the bigger the hole. What remains is a metre or two of
+the ramp's own half-width, closed by the gore's nose wedge.
+
+**Changing a ramp / express-lane exit by hand.** The auxiliary lane is normally derived by that
+operator, which is the path the island generator uses. To override one:
 
 - Select the trunk chain's edges (Edit Mode; *Select Whole Road* follows a chain through its shape
   points), then in **Carriageway** tick and set:
   - `aux_lanes_left` / `aux_lanes_right` — how many extra lanes, on the **forward / backward lane
     group**. These are travel-direction groups, *not* geometric sides; putting the lane on the
     wrong group builds it on the carriageway going the other way, where nothing can reach it.
-  - `aux_median_left` / `aux_median_right` — which **end** of that group the lane opens at:
-    `0` = kerb (an ordinary nearside ramp), `1` = median (an offside / left-hand ramp).
-  - `aux_taper_length` — how far back it opens from nothing.
+  - `aux_taper_length` — how far the lane takes to open from nothing.
+  - `aux_buffer_length` — the **extra segment after the merge**: how far past the gore the lane is
+    held at *full* width before that taper starts, so a merge reads `gore → buffer → taper`
+    rather than `gore → taper`. A joining driver gets a full-width lane to settle into instead of
+    merging straight into a closing wedge, and the barrier gets a stretch at full auxiliary width
+    instead of diving back inboard at the nose. (Meeting the ramp's outer wall *exactly* in line is
+    the ramp's width taper, above — the buffer gives that handoff somewhere to land.)
+    Default 40 m (`graph_build.AUX_MERGE_BUFFER`); *Auto Aux Lanes At Ramps* and *Merge Selected
+    Ramp Via Aux Lane* both stamp it, and both expose it as **Buffer After Merge** in the operator
+    panel. Set it to 0 for the old behaviour. Where a chain is too short for buffer *and* taper the
+    buffer yields first — a lane that steps shut is worse than one with no settling length.
+    Both distances are measured from the gore the lane serves.
+    There is no "which end of the group" switch: an auxiliary lane **always** opens at the kerb —
+    which under keep-left is the **left** of the stream's own direction of travel. An eastbound
+    carriageway therefore has its kerb on the NORTH, and a ramp merging into it must approach from
+    the north; one arriving from the south is *offside* and gets **no lane at all** (the panel
+    readout says so on the edge). That refusal is the point: served anyway, the lane opens on the
+    far side of the road from the ramp and the ramp's own mesh is aligned onto a lane it cannot
+    reach. `allow_cross` does not license it — that flag is about whether a MOVEMENT may cross the
+    opposing stream, and an offside ramp at a surface junction still connects, as an ordinary
+    turning arm rather than as a merge.
+    A ramp measured on the median side of the stream it serves is reported as a layout error
+    (`Auto Aux Lanes` names the node) rather than built, because its traffic would have to cross
+    the opposing carriageway to reach it — the layout is what needs fixing.
+  - `lane_transition_length` — how far the road takes to gain or lose **one through lane** where
+    this edge meets one with a different count. Stamp 2 lanes on one edge and 4 on the next and the
+    ribbon steps `2 → 3 → 4`, one transition each, centred on the shared vertex. The vertex between
+    them can be an ordinary `AUTO` one; a straight vertex where only the width changes is treated
+    as a taper, not a junction, so the road stays one continuous ribbon through it.
+- **The two carriageways taper independently, and each opens at ITS OWN gore.** A stretch between
+  an exit and an entry carries an auxiliary lane on each side, each full width at the ramp it
+  serves. Where the **same** side is served at both ends and the gap is under
+  `graph_build.AUX_WEAVE_HOLD` (400 m), the lane is carried straight through as one continuous
+  auxiliary lane — the ordinary weaving section, a genuine third lane between the two ramps.
+  Beyond that it tapers shut after the first ramp and reopens before the second, as a real
+  motorway does.
 - **`allow_cross` on the vertex is what keeps an exit off the wrong carriageway.** It means "may a
   movement here cross the opposing stream?", and it must be **0 on every node of a limited-access
   road** — an exit ramp hangs off one carriageway, and traffic on the other cannot reach it without
