@@ -93,6 +93,10 @@ TIERS = {
     # to claim, so the fillet pass now opens every ramp corner to it.
     "RAMP": dict(lane_width=4.50, lanes=1, lanes_backward=0, median_width=0.0,
                  sidewalk=0.0, curb='NONE', min_radius=None, speed=45),
+    # A motorway-to-motorway link: two lanes one way, and driven faster than a surface-street
+    # ramp because both of its ends are expressway. See `island_v3_to_graph.TIER_ATTRS["RAMP2"]`.
+    "RAMP2": dict(lane_width=3.75, lanes=2, lanes_backward=0, median_width=0.0,
+                  sidewalk=0.0, curb='NONE', min_radius=None, speed=60),
     # The touge is its own tier, not a ramp. v3 §5 specifies an 11 m minimum HAIRPIN radius on
     # purpose — a mountain pass whose corners open up to a ramp's 30 m is no longer a touge.
     # Tiering it correctly turns five "violations" back into the design they always were.
@@ -452,7 +456,7 @@ def collect_roads(spacing):
         q = pinned.get(rid)
         if q is not None:
             p3 = [(q[0], q[1], p3[0][2])] + list(p3[1:])
-        add(rid, "RAMP", p3)
+        add(rid, "RAMP2" if kind == "jct" else "RAMP", p3)
     add("SPIRAL_AIRPORT", "RAMP", P.spiral_ramp((905.0, -720.0))[0])
     add("TOUGE", "TOUGE", G.TOUGE)
     for nm, pts in (("WESTRAD", G.WESTRAD), ("PORTSPUR", G.PORTSPUR),

@@ -131,14 +131,18 @@ class EdgeSpec(object):
     recomputed here -- this module must never grow a second opinion about where a slot is."""
 
     __slots__ = ("index", "v0", "v1", "w_left", "w_right", "paved_left", "paved_right", "avail",
-                 "chain")
+                 "chain", "oneway")
 
     def __init__(self, index, v0, v1, w_left, w_right, paved_left=None, paved_right=None,
-                 avail=None, chain=None):
+                 avail=None, chain=None, oneway=False):
         #: Id of the CHAIN this edge belongs to -- a run of edges joined through shape points,
         #: which is the unit a road is actually trimmed as. Defaults to the edge's own index, so
         #: an unchained graph behaves exactly as before.
         self.chain = index if chain is None else chain
+        #: A ONE-WAY road -- a ramp or slip road. Not a cosmetic label: where a one-way arm meets
+        #: another road at an ACUTE angle it is merging, not turning, and a merge wants a nose and
+        #: a taper rather than a junction pad the size of the corner's apex. See `merge_tol`.
+        self.oneway = bool(oneway)
         self.index = index
         self.v0 = v0
         self.v1 = v1
@@ -345,7 +349,7 @@ class SolveResult(object):
 
 def solve(nodes, edges, min_angle_deg=12.0, max_trim_fraction=0.9, gore_angle_deg=35.0,
           straight_tol_deg=6.0, arc_segments=8, station_fn=None, max_setback_factor=1.5,
-          stub_length=5.0, gore_nose_max=200.0, nose_fn=None):
+          stub_length=5.0, gore_nose_max=200.0, nose_fn=None, merge_angle_deg=60.0):
     """Trim distances, node kinds, corner arcs and patch polygons for the whole graph.
 
     `max_setback_factor` BOUNDS THE JUNCTION, in multiples of the widest approach half-width at
@@ -384,6 +388,8 @@ def solve(nodes, edges, min_angle_deg=12.0, max_trim_fraction=0.9, gore_angle_de
 
     min_sin = math.sin(math.radians(min_angle_deg))
     straight_tol = math.radians(straight_tol_deg)
+    #: Below this, a corner between a ONE-WAY arm and its neighbour is a merge, not a corner.
+    merge_tol = math.radians(merge_angle_deg)
     gore_tol = math.radians(gore_angle_deg)
     results, width_steps, truncated = [], [], []
     # setback[(edge_index, at_start)] -- accumulated as a max over that end's two corners.
@@ -465,6 +471,24 @@ def solve(nodes, edges, min_angle_deg=12.0, max_trim_fraction=0.9, gore_angle_de
                 continue
 
             key_a, key_b = (a.edge.index, a.at_start), (b.edge.index, b.at_start)
+            # A ONE-WAY ARM AT AN ACUTE ANGLE IS MERGING, NOT TURNING. The apex formula below is
+            # about a CORNER -- two roads crossing, with paved area between them for traffic that
+            # turns and yields. A slip road running in alongside a street at 30-45 degrees has no
+            # such corner: its traffic accelerates and merges, and the paved area it needs is the
+            # auxiliary lane, not a pad. Paving to the (capped) apex instead put a 3,748 m2 slab
+            # across the middle of an arterial at the island's IC_CHUO touchdown, trimming all
+            # five arms back 25 m -- "the ramp occupies the whole road" -- and the same at every
+            # other touchdown, because a shallow arm's apex always runs into the cap.
+            #
+            # Sized like the sub-`min_angle_deg` case just below, which is the same situation seen
+            # from a few degrees away: two ribbons running side by side need room to seat between
+            # them, and nothing more.
+            if (a.edge.oneway or b.edge.oneway) and theta < merge_tol:
+                setbacks[key_a] = max(setbacks[key_a], max(a.paved_left, a.paved_right))
+                setbacks[key_b] = max(setbacks[key_b], max(b.paved_left, b.paved_right))
+                notes.append("one-way arm %.0f deg off its neighbour, treated as a merge"
+                             % math.degrees(theta))
+                continue
             sin_t, cos_t = math.sin(theta), math.cos(theta)
             if sin_t < min_sin:
                 # A NEAR-PARALLEL PAIR IS A GORE, NOT A CORNER -- the same reasoning as the
@@ -607,7 +631,11 @@ def _merge_stub_joined_patches(results, edges, setbacks, lengths, by_chain, stub
         for m in members:
             if m is keep:
                 m.patch = pad
-            elif m.patch:
+            else:
+                # NOTED EVEN WHEN THERE WAS NOTHING TO EMPTY. A gore carries no pad of its own any
+                # more (its ramps overlap instead), so gating the note on having had one left an
+                # absorbed gore silent -- and "which junction swallowed this one" is exactly what
+                # the note exists to answer.
                 m.patch = []
                 m.notes.append("junction merged into node %d -- the road between them trims away"
                                % keep.index)
@@ -762,7 +790,17 @@ def _gore_nose(node, trunk, main, ramp, nose_max, nose_fn=None):
     if nose_fn is not None:
         walked = nose_fn(node, trunk, main, ramp)
         if walked is not None:
-            return max(own, min(float(walked), nose_max))
+            # HONOURED EXACTLY, INCLUDING ZERO -- no `own` floor. A ramp that has been aligned
+            # onto the auxiliary lane wants to run right into the junction and OVERLAP the
+            # carriageway there, not stop half its own width short of it. Flooring the setback at
+            # `own` left a stub of bare ground that only the junction pad could cover, and a pad
+            # has to bridge two swept ends exactly -- match their widths, their angles, their
+            # corners -- so every mismatch became a hole. Overlap has none of that: two surfaces
+            # that lie on top of each other cannot leave a gap between them, whatever their
+            # widths or angles. It is the same trade `max_setback_factor` already makes at skew
+            # junctions, and the same reasoning: overlapping asphalt reads as asphalt, an unpaved
+            # sliver reads as a hole in the world.
+            return min(max(float(walked), 0.0), nose_max)
     target = max(trunk.paved_left, trunk.paved_right) + own
     # The mainline's heading THROUGH the node -- the direction the ramp diverges from. `trunk`
     # points back up the arriving road, so its continuation is the opposite bearing.
@@ -841,30 +879,16 @@ def _patch_polygon(node, res, arc_segments):
     A pad held flat at the node's height leaves the carriageway floating above it or buried in it
     wherever an approach is on a grade -- up to a metre on this island's ramps, which reads as the
     junction not lining up with the roads that meet it."""
-    # A GORE'S PAD IS ITS NOSE, AND THE MOUTH WALK CANNOT BUILD IT. A gore deliberately does not
-    # trim its mainline (cutting the through road at a merge is the defect that rule exists to
-    # prevent), so BOTH trunk mouths sit exactly on the node. Walking mouths in angular order then
-    # lays two overlapping cross-bars through one point and closes them into a bow-tie: measured,
-    # all 11 island gores came out at 6-43% of the area their own width needs, four of them
-    # self-intersecting, which is the scrambled sliver a gore shows instead of a nose.
-    #
-    # What is actually missing at a diverge is only the WEDGE between the two ribbons as they
-    # separate -- everything else is already paved by the ribbons themselves, untrimmed. The convex
-    # hull of the mouth ends is exactly the smallest region that closes that wedge, and being convex
-    # it cannot fold. So a gore takes the hull directly rather than being repaired into one after
-    # the fact.
+    # A GORE HAS NO PAD AT ALL, and needs none. Its ramps are not set back: an aligned ramp is
+    # displaced onto the auxiliary lane and swept straight into the junction, so its ribbon
+    # OVERLAPS the carriageway there and the two are continuous by construction. A pad only ever
+    # existed to bridge the gap a setback opened, and bridging is the fragile part -- the wedge has
+    # to match both swept ends in width, heading and corner placement, and every mismatch is a
+    # hole (a 46 m gap, a slab across the lanes, a sliver, a triangle: each was a different one of
+    # those four terms disagreeing). Overlap has no terms to disagree. Verified in the merge
+    # testbed: with the wedge removed the surface is unchanged.
     if res.kind == KIND_GORE:
-        ring = []
-        for a in res.approaches:
-            (mx, my, za), md = a.mouth(node.pos)
-            for lat, w in ((_right(md), a.paved_right), (_left(md), a.paved_left)):
-                q = _add((mx, my), _mul(lat, w))
-                ring.append((q[0], q[1], za))
-        hull = _convex_hull([(p[0], p[1]) for p in ring])
-        if len(hull) >= 3:
-            zof = {(round(p[0], 4), round(p[1], 4)): p[2] for p in ring}
-            return [(h[0], h[1], zof.get((round(h[0], 4), round(h[1], 4)), node.pos[2]))
-                    for h in hull]
+        return []
     pts = []
     corners = {(c.a.edge.index, c.a.at_start): c for c in res.corners}
     for a in res.approaches:
@@ -1219,8 +1243,13 @@ def self_test():
     far[5] = NodeSpec(5, (140, 200, 0))
     far[6] = NodeSpec(6, (140, -200, 0))
     rf = solve(far, me)
-    assert len([n for n in rf.nodes if n.index in (0, 3) and n.patch]) == 2, \
-        "two junctions with a drivable road between them must keep their own pads"
+    # The CROSSING keeps its own pad; the gore never had one to keep (its ramps overlap the
+    # carriageway instead of being set back from it), so what this proves is that the merge keys
+    # on the road between them vanishing rather than on the two being near each other.
+    assert [n.index for n in rf.nodes if n.index in (0, 3) and n.patch] == [3], \
+        "the crossing must keep its own pad when a real road separates it from the gore"
+    assert not any("merged into node" in n for r in rf.nodes for n in r.notes), \
+        "nothing should be merged when a drivable road separates the two"
 
     # f. THE PAD FOLLOWS THE GRADE. A junction whose arms climb must not produce a flat pad -- the
     # ribbon would float above it or sink into it at every mouth.

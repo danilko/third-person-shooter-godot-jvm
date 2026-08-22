@@ -185,46 +185,47 @@ def _test_weld_crossings():
 
 
 
-def _test_median_side_aux():
-    """A ramp on the OFFSIDE of its carriageway must still get a connectable aux lane.
+def _test_aux_is_always_the_kerb_lane():
+    """The auxiliary lane is the OUTERMOST lane of its carriageway -- there is no median option.
 
-    Before `aux_median_*` the generator had only a nearside lane to offer, so an offside ramp
-    either got a lane in the carriageway travelling the other way (which nothing fed) or no lane at
-    all. Both ends of the model are checked here: the lane is ranked from the median, and the
-    mainline then matches lanes from the KERB -- the end its count does not change at."""
+    A ramp is entered and left from the kerb lane; that is the convention `auto_aux_lanes`
+    documents and everything downstream now assumes. There used to be an `aux_median_*` pair that
+    put the lane at the median end for offside (left-hand) ramps. It was derived rather than
+    authored, it kept deriving the WRONG side -- measured on the island, the lane opened at +3.12 m
+    while its own ramp ran at -6.49 m, opposite edges of the road -- and it forced a second
+    anchoring case through every lane-matching rule. It is gone; an offside ramp is reported as a
+    layout error instead.
+
+    Both halves are asserted: the lane is ranked from the kerb, and the mainline then matches
+    lanes from the MEDIAN (the end its count does not change at) so every downstream lane is fed.
+    """
     from road_kit_authoring import graph_export as gex
-    pts = [(0.0, 0.0, 0.0), (100.0, 0.0, 0.0)]
+    from mathutils import Vector
+
+    line = [Vector((0.0, 0.0, 0.0)), Vector((100.0, 0.0, 0.0))]
     attrs = {"lanes_fwd": 2, "lanes_bwd": 0, "lane_width": 3.5, "median_width": 0.0,
              "sidewalk_left_width": 0.0, "sidewalk_right_width": 0.0,
              "aux_lanes_left": 1, "aux_taper_length": 40.0}
-    from mathutils import Vector
-    line = [Vector(p) for p in pts]
-    kerb = gex.chain_lanes(line, dict(attrs, aux_median_left=0), 'LEFT', [1.0, 1.0])
-    med = gex.chain_lanes(line, dict(attrs, aux_median_left=1), 'LEFT', [1.0, 1.0])
-    kerb_aux = [(sfx, cix, n) for sfx, _d, _p, cix, n, is_aux in kerb if is_aux]
-    med_aux = [(sfx, cix, n) for sfx, _d, _p, cix, n, is_aux in med if is_aux]
-    _assert(len(kerb_aux) == 1 and kerb_aux[0][1] == 0,
-            "a nearside aux lane must be the KERB lane (index 0), got %r" % kerb_aux)
-    _assert(len(med_aux) == 1 and med_aux[0][1] == med_aux[0][2] - 1,
-            "an offside aux lane must be the MEDIAN lane (index n-1), got %r" % med_aux)
+    built = gex.chain_lanes(line, attrs, 'LEFT', [(3.0, 0.0), (3.0, 0.0)])
+    aux = [(sfx, st[0], st[1]) for sfx, _d, _p, is_aux, st, _en in built if is_aux]
+    _assert(len(aux) == 1 and aux[0][1] == 0,
+            "the auxiliary lane must be the KERB lane (index 0), got %r" % aux)
+    _assert(not any(k.startswith("aux_median") for k in attrs),
+            "aux_median_* must not be reintroduced as an input")
 
-    # ...and the mainline anchor flips with it: with the aux at the median, the through lanes hold
-    # their KERB index across the nose, so the kerb lane is fed. Anchoring at the median instead
-    # (correct for a nearside aux) left it fed by nothing.
-    V = Vector
+    # The mainline anchors at the median, so a carriageway gaining a kerb-side lane still feeds
+    # every one of its downstream lanes -- including the one that opens.
     def lane(lid, cix, n, is_aux):
-        return (lid, V((0, 0, 0)), V((1, 0, 0)), cix, n, is_aux)
+        return (lid, Vector((0, 0, 0)), Vector((1, 0, 0)), cix, n, is_aux)
     ins = [lane("gA_F0", 0, 2, False), lane("gA_F1", 1, 2, False)]
-    outs = [lane("gB_F0", 0, 3, False), lane("gB_F1", 1, 3, False), lane("gB_F2", 2, 3, True)]
+    outs = [lane("gB_F0", 0, 3, True), lane("gB_F1", 1, 3, False), lane("gB_F2", 2, 3, False)]
     tarms = {"gA", "gB"}
-    fed = set()
-    for i in ins:
-        for o in outs:
-            if gex.movement_verdict(i, o, 'S', True, tarms, 1, ins, outs) is None:
-                fed.add(o[0])
+    fed = {o[0] for i in ins for o in outs
+           if gex.movement_verdict(i, o, 'S', True, tarms, 1, ins, outs) is None}
     _assert(fed == {"gB_F0", "gB_F1", "gB_F2"},
-            "every downstream lane of an offside merge must be fed, got %s" % sorted(fed))
-
+            "every downstream lane of a merge must be fed, got %s" % sorted(fed))
+    print("smoketest_graph_solve: the auxiliary lane is the kerb lane, and every downstream lane "
+          "of a merge is fed")
 
 def _test_explain_node(obj):
     """The movement explanation must come from the rules the exporter obeys, not a copy."""
@@ -375,7 +376,7 @@ def main():
     _test_empty_layers_skipped(obj)
     _test_deck_below_road(obj)
     _test_weld_crossings()
-    _test_median_side_aux()
+    _test_aux_is_always_the_kerb_lane()
     _test_explain_node(obj)
     _test_flow_preview(obj)
     print("smoketest_graph_solve: panel resolves from generated objects; empty layers skipped; "

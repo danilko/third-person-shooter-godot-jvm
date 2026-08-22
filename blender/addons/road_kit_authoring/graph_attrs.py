@@ -43,7 +43,6 @@ import bpy
 #: solver and every operator poll need it.
 GENERATED_TAG = "rka_generated_for"
 
-
 def graph_object(context):
     """The road-graph mesh an operator should act on, resolved from whatever is selected.
 
@@ -59,7 +58,6 @@ def graph_object(context):
     the road now acts on the road's graph, which is what the click meant."""
     return graph_object_from(context.active_object)
 
-
 def graph_object_from(obj):
     """The graph `obj` belongs to: itself, or the owner it names in `GENERATED_TAG`.
 
@@ -71,7 +69,6 @@ def graph_object_from(obj):
         return obj
     src = bpy.data.objects.get(owner)
     return src if src is not None and src.type == 'MESH' else None
-
 
 # ------------------------------------------------------------------ enum <-> int (stable forever)
 
@@ -116,18 +113,19 @@ NODE_GORE = 4
 NODE_NONE = 5
 
 NODE_TYPE_ITEMS = (
-    ('AUTO', "Auto", "Classify from valency: 1 = cap, 2 = bend/taper, >= 3 = intersection or "
-     "gore (detected by tangency)", NODE_AUTO),
+    ('AUTO', "Auto", "Classify from valency: 1 = cap, 2 = SHAPE POINT (the road bends or changes "
+     "width here and runs straight through -- a vertex with two edges is a point on one road, "
+     "not a junction), >= 3 = intersection or gore (detected by tangency)", NODE_AUTO),
     ('BEND', "Bend", "Force a smoothed pass-through even at valency >= 3 (rare)", NODE_BEND),
     ('INTERSECTION', "Intersection", "Force a trimmed + patched junction even at valency 2 -- "
-     "use where the cross-section CHANGES across the node (lane count, median), which a smooth "
-     "fillet cannot represent", NODE_INTERSECTION),
+     "for a road that genuinely STOPS and starts here. A lane-count or median change does NOT "
+     "need this: it is built as a taper (see lane_transition_length)", NODE_INTERSECTION),
     ('CAP', "Cap", "Terminate the road here with an end cap", NODE_CAP),
     ('GORE', "Gore (split/merge)", "Force a tangential split -- ramp nose, Y-fork, lane drop. "
      "No pad, no stop line", NODE_GORE),
     ('NONE', "Shape point (no junction)", "Bend the road here but build NO junction: no trim, no "
-     "pad, and the ribbon stays continuous through it. This is how a vertex is 'not an "
-     "intersection' -- use it for curve control points", NODE_NONE),
+     "pad, and the ribbon stays continuous through it. Same as AUTO at valency 2 -- an explicit "
+     "way to say it, and the only way to say it where three or more edges meet", NODE_NONE),
 )
 
 NODE_TYPE_TO_INT = {it[0]: it[3] for it in NODE_TYPE_ITEMS}
@@ -163,15 +161,24 @@ EDGE_ATTRS = (
     # attaches; away from the gore it closes to nothing. A merge whose aux lane simply APPEARS at
     # full width is the thing this replaces -- a driver cannot enter a lane that starts as a wall.
     ("aux_taper_length", 'FLOAT', 60.0),
-    # WHICH END OF ITS OWN LANE GROUP the aux lane occupies: 0 = the KERB end (an ordinary
-    # nearside exit/entry), 1 = the MEDIAN end (a left-hand exit, the real thing motorways build
-    # where a ramp leaves on the offside). Without this the model could only express a nearside
-    # ramp, so a ramp attaching on the other side of its own carriageway had no lane it could
-    # legally connect to -- the generator either put the lane in the wrong group (orphaning it) or
-    # refused to build one at all and left the ramp meeting a through lane. It is per SIDE because
-    # the two carriageways are independent.
-    ("aux_median_left", 'INT', 0),
-    ("aux_median_right", 'INT', 0),
+    # How far PAST the gore the aux lane is held at full width before that taper starts -- the
+    # buffer segment after the merge. A merge that tapers straight from the nose gives a joining
+    # driver no full-width lane to settle into, and gives the barrier no length to run at full
+    # auxiliary width, so the carriageway's wall dives back inboard the moment the ramp lands on
+    # it and does not line up with the ramp's own outer wall. See `graph_build.AUX_MERGE_BUFFER`.
+    ("aux_buffer_length", 'FLOAT', 40.0),
+    # How long the road takes to gain or lose ONE through lane where two edges disagree about the
+    # count. A lane count is a property of a stretch of road, but the change between two stretches
+    # is a property of the JOINT, and it happens over a distance: 2 lanes meeting 4 opens one lane
+    # at a time (2 -> 3 -> 4) over one of these each, centred on the shared vertex, with a
+    # whole-lane state in between. Without it the ribbon steps its width at a single vertex -- a
+    # wall across half the carriageway, which reads as "the mesh jumps/compresses there".
+    ("lane_transition_length", 'FLOAT', 60.0),
+    # THERE IS NO "WHICH END OF THE GROUP" ATTRIBUTE, deliberately: an auxiliary lane always
+    # opens at the KERB end of the group it belongs to. The median-end option was derived rather
+    # than authored, it kept deriving the wrong side, and it forced a second anchoring case
+    # through every rule downstream -- see `graph_solve.ramp_services` for the single convention
+    # and for what happens to a ramp that genuinely runs on the offside (it is a layout error).
     # ---- median
     ("median_type", 'INT', MEDIAN_NONE),
     ("median_width", 'FLOAT', 0.0),
@@ -254,7 +261,6 @@ VERT_SOLVED_NAMES = tuple(n for n, _t, _d in VERT_SOLVED)
 ALL_EDGE = EDGE_ATTRS + EDGE_SOLVED
 ALL_VERT = VERT_ATTRS + VERT_SOLVED
 
-
 # ------------------------------------------------------------------------------- bmesh (Edit Mode)
 
 def _ensure_layers(layers_owner, table, elements, fill_defaults=True):
@@ -276,25 +282,20 @@ def _ensure_layers(layers_owner, table, elements, fill_defaults=True):
         out[name] = lay
     return out
 
-
 def ensure_edge_layers(bm, fill_defaults=True):
     return _ensure_layers(bm.edges.layers, ALL_EDGE, bm.edges, fill_defaults)
 
-
 def ensure_vert_layers(bm, fill_defaults=True):
     return _ensure_layers(bm.verts.layers, ALL_VERT, bm.verts, fill_defaults)
-
 
 def read_edge(bm, edge, layers=None):
     """This edge's road attributes as a plain dict (defaults for any layer that doesn't exist)."""
     layers = layers if layers is not None else ensure_edge_layers(bm, fill_defaults=False)
     return {n: edge[layers[n]] for n, _t, _d in ALL_EDGE if layers.get(n) is not None}
 
-
 def read_vert(bm, vert, layers=None):
     layers = layers if layers is not None else ensure_vert_layers(bm, fill_defaults=False)
     return {n: vert[layers[n]] for n, _t, _d in ALL_VERT if layers.get(n) is not None}
-
 
 # ---------------------------------------------------------------------------- mesh (Object Mode)
 
@@ -321,13 +322,11 @@ def ensure_mesh_attributes(mesh):
     mesh.update()
     return created
 
-
 # -------------------------------------------------------------------------------------- settings
 
 #: Dynamic-enum items must be kept alive on the Python side or Blender frees the strings it is
 #: still displaying (the classic "garbled/crashing dynamic EnumProperty"). One cache per role.
 _ENUM_CACHE = {}
-
 
 def _role_items(role):
     def items(self, context):
@@ -336,17 +335,14 @@ def _role_items(role):
         return _ENUM_CACHE[role]
     return items
 
-
 #: Brush fields whose stored value is an INT but whose UI is an enum of strings.
 ENUM_BACKED = {"median_type": lambda v: MEDIAN_TYPE_TO_INT[v]}
 ENUM_BACKED.update({n: int for n in ASSET_IDX})
-
 
 def _overlay_modes():
     """Deferred so `graph_overlay` (which imports this module) is not needed at class-body time."""
     from . import graph_overlay
     return graph_overlay.MODES
-
 
 class RKA_GraphSettings(bpy.types.PropertyGroup):
     """The 'brush': values `RKA_OT_graph_assign_edges` stamps onto the selection.
@@ -362,6 +358,15 @@ class RKA_GraphSettings(bpy.types.PropertyGroup):
                     "stamping an attribute changes nothing you can see -- the authored values "
                     "live on the graph edges, and only a Build sweeps them into the mesh, which "
                     "makes a correct assign look like a no-op. Turn off for very large graphs")
+
+    stage_edge_furniture: bpy.props.BoolProperty(
+        name="Outline Edges", default=False,
+        description="Build the kerb and railing from the road surface's OUTLINE "
+                    "(<graph>_Edges) instead of by lateral offset from each chain's centreline. "
+                    "An offset kerb is correct only where its own road is the outermost thing at "
+                    "that station, which is why a wall can end up standing in a neighbouring "
+                    "road's lane at a merge or beside a parallel flyover. EXPERIMENTAL while the "
+                    "two paths are being compared")
 
     overlay_on: bpy.props.BoolProperty(
         name="Graph Overlay", default=True,
@@ -410,6 +415,13 @@ class RKA_GraphSettings(bpy.types.PropertyGroup):
     use_curb_right_on: bpy.props.BoolProperty(name="", default=False)
     curb_right_on: bpy.props.IntProperty(name="Curb Right", default=1, min=0, max=1)
 
+    use_lane_transition_length: bpy.props.BoolProperty(name="", default=False)
+    lane_transition_length: bpy.props.FloatProperty(
+        name="Lane Transition", default=60.0, min=0.0, soft_max=300.0, unit='LENGTH',
+        description="Distance the road takes to gain or lose ONE through lane where this edge "
+                    "meets one with a different count. 2 lanes meeting 4 steps 2 -> 3 -> 4, one "
+                    "transition each, centred on the shared vertex")
+
     use_curb_height: bpy.props.BoolProperty(name="", default=True)
     curb_height: bpy.props.FloatProperty(
         name="Curb Height", default=0.15, min=0.0, soft_max=0.5, unit='LENGTH')
@@ -423,22 +435,19 @@ class RKA_GraphSettings(bpy.types.PropertyGroup):
     use_aux_lanes_right: bpy.props.BoolProperty(name="", default=False)
     aux_lanes_right: bpy.props.IntProperty(name="Aux Lanes R", default=0, min=0, soft_max=3)
 
-    use_aux_median_left: bpy.props.BoolProperty(name="", default=False)
-    aux_median_left: bpy.props.IntProperty(
-        name="Aux At Median L", default=0, min=0, max=1,
-        description="0 = the left group's aux lane is at its KERB (ordinary nearside ramp), "
-                    "1 = at its MEDIAN (a left-hand / offside ramp)")
-
-    use_aux_median_right: bpy.props.BoolProperty(name="", default=False)
-    aux_median_right: bpy.props.IntProperty(
-        name="Aux At Median R", default=0, min=0, max=1,
-        description="Same for the right group")
-
     use_aux_taper_length: bpy.props.BoolProperty(name="", default=False)
     aux_taper_length: bpy.props.FloatProperty(
         name="Aux Taper", default=60.0, min=0.0, soft_max=250.0, unit='LENGTH',
         description="Length over which an aux lane opens, measured back from the gore it serves. "
                     "0 = no taper (the lane appears at full width)")
+
+    use_aux_buffer_length: bpy.props.BoolProperty(name="", default=False)
+    aux_buffer_length: bpy.props.FloatProperty(
+        name="Aux Buffer", default=40.0, min=0.0, soft_max=400.0, unit='LENGTH',
+        description="Extra full-width run held AFTER the gore before the aux lane starts to "
+                    "taper. Gives a merging driver a settling length, and gives the barrier a "
+                    "stretch at full aux width so it meets the ramp's own wall in line. "
+                    "0 = taper starts at the gore")
 
     use_deck_thickness: bpy.props.BoolProperty(name="", default=False)
     deck_thickness: bpy.props.FloatProperty(
@@ -496,7 +505,6 @@ class RKA_GraphSettings(bpy.types.PropertyGroup):
         name="Fillet Radius", default=4.0, min=0.0, soft_max=30.0, unit='LENGTH',
         description="Kerb corner radius: bend smoothing at valency 2, corner arc at a junction")
 
-
 def brush_edge_values(s):
     """The brush's edge fields as an `{attr_name: value}` dict, MASKED by the `use_*` toggles.
     Storage-typed (median_type already an int), so callers write it straight into a layer."""
@@ -508,7 +516,6 @@ def brush_edge_values(s):
         conv = ENUM_BACKED.get(name)
         out[name] = conv(raw) if conv else raw
     return out
-
 
 # ------------------------------------------------------------------------------------- operators
 
@@ -534,13 +541,11 @@ def auto_build(context, op):
     except Exception as exc:                                  # noqa: BLE001 -- see docstring
         op.report({'WARNING'}, "Assigned, but the rebuild failed: %s" % exc)
 
-
 def _edit_bmesh(context):
     obj = context.edit_object
     if obj is None or obj.type != 'MESH':
         return None, None
     return obj, bmesh.from_edit_mesh(obj.data)
-
 
 def reject_generated(context, op):
     """True (and reported) when Edit Mode is on a GENERATED object, where a stamp is meaningless.
@@ -559,7 +564,6 @@ def reject_generated(context, op):
                          "Mode, select '%s' and stamp its edges instead"
               % (obj.name, owner, owner))
     return True
-
 
 class RKA_OT_graph_init_attrs(bpy.types.Operator):
     """Create (or repair) every road attribute on this mesh, seeded with defaults.
@@ -586,7 +590,6 @@ class RKA_OT_graph_init_attrs(bpy.types.Operator):
         self.report({'INFO'}, "Road attributes ready (%d created: %s)"
                     % (len(created), ", ".join(created) if created else "none"))
         return {'FINISHED'}
-
 
 class RKA_OT_graph_assign_edges(bpy.types.Operator):
     """Stamp the brush's enabled fields onto every selected edge."""
@@ -622,7 +625,6 @@ class RKA_OT_graph_assign_edges(bpy.types.Operator):
         self.report({'INFO'}, "Assigned %d field(s) to %d edge(s)" % (len(values), n))
         return {'FINISHED'}
 
-
 class RKA_OT_graph_assign_verts(bpy.types.Operator):
     """Stamp node_type / node_radius / fillet_radius onto every selected vertex."""
     bl_idname = "rka.graph_assign_verts"
@@ -656,7 +658,6 @@ class RKA_OT_graph_assign_verts(bpy.types.Operator):
         self.report({'INFO'}, "Assigned node settings to %d vertex/vertices" % n)
         return {'FINISHED'}
 
-
 class RKA_OT_graph_tag_road(bpy.types.Operator):
     """Give every selected edge the same road id, so it can be reselected as one road later."""
     bl_idname = "rka.graph_tag_road"
@@ -689,7 +690,6 @@ class RKA_OT_graph_tag_road(bpy.types.Operator):
             return {'CANCELLED'}
         self.report({'INFO'}, "Tagged %d edge(s) as road %d" % (n, rid))
         return {'FINISHED'}
-
 
 class RKA_OT_graph_select_road(bpy.types.Operator):
     """Select every edge sharing the active edge's road id, or its whole chain if it has none."""
@@ -733,7 +733,6 @@ class RKA_OT_graph_select_road(bpy.types.Operator):
         self.report({'INFO'}, "Selected %d edge(s) of %s" % (len(picked), what))
         return {'FINISHED'}
 
-
 class RKA_OT_graph_select_similar(bpy.types.Operator):
     """Select every edge whose cross-section matches the active edge's."""
     bl_idname = "rka.graph_select_similar"
@@ -773,6 +772,95 @@ class RKA_OT_graph_select_similar(bpy.types.Operator):
         self.report({'INFO'}, "Selected %d edge(s) with the same cross-section" % n)
         return {'FINISHED'}
 
+#: Counts the +/- buttons drive, in panel order. Label is what the row is called.
+NUDGE_FIELDS = (
+    ("lanes_fwd", "Lanes Fwd"),
+    ("lanes_bwd", "Lanes Bwd"),
+    ("aux_lanes_left", "Aux Fwd"),
+    ("aux_lanes_right", "Aux Bwd"),
+)
+
+class RKA_OT_graph_nudge(bpy.types.Operator):
+    """Add or remove one lane on the selected edges, leaving every other attribute alone.
+
+    THE BRUSH IS THE WRONG TOOL FOR "ONE MORE LANE HERE". It stamps every ticked field at once,
+    and eight are ticked by default, so widening a road also rewrites its median, its footways and
+    its lane width with whatever the brush happens to hold -- and the safe way round that (pick the
+    edge, change one number, untick the rest, assign) is four steps for the single most common
+    edit there is. This is that edit: read each edge's own value, add the delta, write it back.
+
+    RELATIVE, NOT ABSOLUTE, so it works across a mixed selection: a 2-lane stretch and a 3-lane
+    stretch selected together both gain a lane rather than both being flattened to one number."""
+    bl_idname = "rka.graph_nudge"
+    bl_label = "Adjust Lane Count"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    field: bpy.props.EnumProperty(
+        name="Field", items=[(n, lbl, lbl) for n, lbl in NUDGE_FIELDS])
+    delta: bpy.props.IntProperty(name="Delta", default=1)
+
+    @classmethod
+    def poll(cls, context):
+        return context.edit_object is not None and context.edit_object.type == 'MESH'
+
+    def execute(self, context):
+        if reject_generated(context, self):
+            return {'CANCELLED'}
+        obj, bm = _edit_bmesh(context)
+        layers = ensure_edge_layers(bm)
+        lay = layers[self.field]
+        n, lo, hi = 0, None, None
+        for e in bm.edges:
+            if not e.select or e.hide:
+                continue
+            v = max(int(e[lay]) + self.delta, 0)
+            e[lay] = v
+            lo = v if lo is None else min(lo, v)
+            hi = v if hi is None else max(hi, v)
+            n += 1
+        if not n:
+            self.report({'WARNING'}, "No edges selected")
+            return {'CANCELLED'}
+        bmesh.update_edit_mesh(obj.data)
+        auto_build(context, self)
+        span = "%d" % lo if lo == hi else "%d-%d" % (lo, hi)
+        self.report({'INFO'}, "%s = %s on %d edge(s)" % (self.field, span, n))
+        return {'FINISHED'}
+
+class RKA_OT_graph_edit(bpy.types.Operator):
+    """Select this road's GRAPH and enter Edit Mode on it -- the only place attributes can be
+    stamped.
+
+    THE ROAD YOU CAN SEE IS NOT THE ROAD YOU CAN EDIT. The graph is an edge-only wireframe sitting
+    UNDERNEATH the swept surface, so clicking the road in the viewport selects the generated
+    carrier every time. Every button that only READS the graph already resolves that
+    (`graph_object`), but a STAMP cannot: it writes to the selected edges, and the carrier's edges
+    are output that the next Build overwrites. So the honest answer to a click on the road used to
+    be an error message telling the artist to go and find an object they cannot see -- which is
+    indistinguishable from "the panel does nothing". This does the finding."""
+    bl_idname = "rka.graph_edit"
+    bl_label = "Edit Road Graph"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return graph_object(context) is not None
+
+    def execute(self, context):
+        graph = graph_object(context)
+        if graph is None:
+            self.report({'ERROR'}, "No road graph resolved from the selection")
+            return {'CANCELLED'}
+        if context.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT')
+        for obj in context.selected_objects:
+            obj.select_set(False)
+        graph.select_set(True)
+        context.view_layer.objects.active = graph
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_mode(type='EDGE')
+        self.report({'INFO'}, "Editing '%s' -- select edges and Assign" % graph.name)
+        return {'FINISHED'}
 
 class RKA_OT_graph_pick_edge(bpy.types.Operator):
     """Eyedropper: load the active (or first selected) edge's values back into the brush."""
@@ -811,7 +899,6 @@ class RKA_OT_graph_pick_edge(bpy.types.Operator):
                 setattr(s, name, v)
         self.report({'INFO'}, "Picked edge attributes into the brush")
         return {'FINISHED'}
-
 
 class RKA_OT_graph_validate(bpy.types.Operator):
     """Report the graph's topology and flag what would generate broken geometry.
@@ -880,17 +967,16 @@ class RKA_OT_graph_validate(bpy.types.Operator):
                 bm.free()
         return {'FINISHED'}
 
-
 CLASSES = (RKA_GraphSettings, RKA_OT_graph_init_attrs, RKA_OT_graph_assign_edges,
-           RKA_OT_graph_assign_verts, RKA_OT_graph_pick_edge, RKA_OT_graph_validate,
+           RKA_OT_graph_assign_verts, RKA_OT_graph_pick_edge, RKA_OT_graph_edit,
+           RKA_OT_graph_nudge,
+           RKA_OT_graph_validate,
            RKA_OT_graph_tag_road, RKA_OT_graph_select_road, RKA_OT_graph_select_similar)
-
 
 def register():
     for cls in CLASSES:
         bpy.utils.register_class(cls)
     bpy.types.Scene.rka_graph = bpy.props.PointerProperty(type=RKA_GraphSettings)
-
 
 def unregister():
     del bpy.types.Scene.rka_graph

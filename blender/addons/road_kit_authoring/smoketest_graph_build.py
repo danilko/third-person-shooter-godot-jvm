@@ -296,6 +296,10 @@ def main():
     _test_aux_lane_taper()
     _test_chained_gores_keep_their_aux_fed()
     _test_trunk_is_the_wider_road()
+    _test_acceleration_lane_belongs_to_the_ramp()
+    _test_barrier_wraps_the_merge()
+    _test_merge_corridor_setback_is_derived()
+    _test_slip_road_gets_its_own_lane()
     _test_ramp_not_fed_across_the_median()
     _test_gore_merged_into_crossing()
     _test_pillar_height_derived(straight)
@@ -312,12 +316,13 @@ def _test_aux_lane_taper():
     full-width offset while the ribbon narrows -- which puts traffic off the asphalt."""
     from road_kit_authoring import graph_export as gx
 
-    TAPER, LW = 100.0, 3.5
+    TAPER, BUF, LW = 100.0, 40.0, 3.5
     obj = _graph("Ramp",
                  [(0, 0, 0), (-300, 0, 0), (-150, 0, 0), (300, 0, 0), (280, -110, 0)],
                  [(2, 0), (1, 2), (0, 3), (0, 4)])
     obj.data.attributes["node_type"].data[2].value = ga.NODE_NONE      # trunk shape point
     _stamp_edges(obj, lanes_fwd=2, lanes_bwd=0, lane_width=LW, aux_taper_length=TAPER,
+                 aux_buffer_length=BUF,
                  sidewalk_left_width=0.0, sidewalk_right_width=0.0)
     bm = bmesh.new()
     bm.from_mesh(obj.data)
@@ -342,13 +347,22 @@ def _test_aux_lane_taper():
     full = max(w for x, w in trunk if abs(x) < 1e-3)
     _assert(abs(full - base - LW / 2.0) < 1e-3,
             "one aux lane must widen the half-width by %.2f m, got %.3f" % (LW / 2.0, full - base))
-    at_break = [w for x, w in trunk if abs(x + TAPER) < 1e-3]
+    # THE BUFFER COMES FIRST, THEN THE TAPER: `gore -> aux_buffer_length at full width ->
+    # aux_taper_length closing`. The buffer is the extra segment after the merge -- the settling
+    # length for a joining driver, and the run the barrier needs at full auxiliary width so it
+    # meets the ramp's own wall in line instead of diving inboard at the nose.
+    at_buf = [w for x, w in trunk if abs(x + BUF) < 1e-3]
+    _assert(at_buf, "no vertex where the buffer ends (x=-%.0f): aux_buffer_length is not being "
+                    "honoured" % BUF)
+    _assert(abs(at_buf[0] - full) < 1e-3,
+            "the aux lane must still be at FULL width where the buffer ends, got %.3f" % at_buf[0])
+    at_break = [w for x, w in trunk if abs(x + BUF + TAPER) < 1e-3]
     _assert(at_break, "no vertex at the taper breakpoint (x=-%.0f): the authored taper length is "
-                      "being smeared across the last segment instead of honoured" % TAPER)
+                      "being smeared across the last segment instead of honoured" % (BUF + TAPER))
     _assert(abs(at_break[0] - base) < 1e-3,
             "the aux lane must be fully closed where its taper begins, got %.3f" % at_break[0])
-    print("smoketest_graph_build: aux lane opens %.2f -> %.2f m over its %.0f m taper"
-          % (base, full, TAPER))
+    print("smoketest_graph_build: aux lane holds %.2f m at full width past the gore, then opens "
+          "%.2f -> %.2f m over its %.0f m taper" % (BUF, base, full, TAPER))
 
     # ---- 2. the aux lane's ROUTE follows the taper, and it alone reaches the ramp
     lanes, _stats = gx.collect(obj)
@@ -358,15 +372,132 @@ def _test_aux_lane_taper():
             % len(trunk_lanes))
     aux = by_id["g0_F0"]                    # curb index 0 = outermost = the aux lane
     lat = [abs(p[2]) for p in aux["points"]]        # godot z = -blender y
-    _assert(abs(max(lat) - min(lat) - LW / 2.0) < 1e-2,
-            "the aux route must slide inward by half a lane as its taper closes, moved %.3f"
+    # A WHOLE LANE, not half of one. Where the lane is closed its route rides ON the through lane
+    # beside it -- before the taper, the traffic that will take the exit IS in the through lane --
+    # and it slides out to its own centre as the lane opens. The old rule parked it on the road
+    # EDGE instead, half a lane outboard of the through lane, i.e. driving down the edge line.
+    _assert(abs(max(lat) - min(lat) - LW) < 1e-2,
+            "the aux route must slide out by a whole lane as its taper opens, moved %.3f"
             % (max(lat) - min(lat)))
+    _assert(abs(min(lat) - (1.5 * LW)) < 1e-2,
+            "where its lane is closed the aux route must sit on the through lane's centre "
+            "(%.2f m), got %.3f" % (1.5 * LW, min(lat)))
 
     ramp_reached = [lid for lid in ("g0_F0", "g0_F1", "g0_F2")
                     if any("g2_" in nxt for nxt in _reachable(by_id, lid))]
     _assert(ramp_reached == ["g0_F0"],
             "only the aux lane may take the ramp at a gore, but %s can" % ramp_reached)
     print("smoketest_graph_build: ramp reachable only from the aux lane %s" % ramp_reached)
+
+
+def _test_barrier_wraps_the_merge():
+    """The carriageway's barrier is NEVER removed by a merge -- it rides out around the aux lane.
+
+    The defect this pins: the barrier used to be switched off wherever the auxiliary lane was
+    more than `WALL_OPEN_AT` open. A weaving section holds its lane open from end to end, so that
+    switched the wall off for a WHOLE chain -- "sometimes the outside wall misses an entire
+    section" -- and even on a tapered merge it left the outside of the gore unfenced. The kerb
+    LINE already tracks the lane count (`offsets_for_counts`), so the barrier only has to be
+    built: it then runs down the through lanes, out around the auxiliary lane, and back in.
+
+        || o2 | o1 ||| i1 | i2 ||          <- before the merge
+        || o2 | o1 ||| i1 | i2   i3  ||    <- through it: the wall is OUTBOARD of the aux lane
+        || o2 | o1 ||| i1 | i2 ||          <- after the taper, back where it was
+    """
+    TAPER, BUF, LW = 100.0, 40.0, 3.5
+    obj = _graph("Wrap",
+                 [(0, 0, 0), (-300, 0, 0), (-150, 0, 0), (300, 0, 0), (280, -110, 0)],
+                 [(2, 0), (1, 2), (0, 3), (0, 4)])
+    obj.data.attributes["node_type"].data[2].value = ga.NODE_NONE
+    _stamp_edges(obj, lanes_fwd=2, lanes_bwd=0, lane_width=LW, aux_taper_length=TAPER,
+                 aux_buffer_length=BUF, curb_height=1.0,
+                 sidewalk_left_width=0.0, sidewalk_right_width=0.0)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.edges.ensure_lookup_table()
+    layers = ga.ensure_edge_layers(bm)
+    for i in (0, 1):
+        bm.edges[i][layers["aux_lanes_left"]] = 1
+    bm.to_mesh(obj.data)
+    bm.free()
+
+    _result, carrier = gb.build_object(obj)
+    hl = carrier.data.attributes["rka_curb_hl"]
+    hr = carrier.data.attributes["rka_curb_hr"]
+    ol = carrier.data.attributes["rka_curb_ol"]
+    orr = carrier.data.attributes["rka_curb_or"]
+    # THE TRUNK CHAIN ONLY. Both the mainline continuation and the ramp also start at x=0 (and are
+    # carried a couple of metres back past it by `JOIN_OVERSHOOT`), so anything at or near the
+    # gore belongs to three chains at once. `outer` is the kerb line farthest from the centreline
+    # regardless of which side it is on -- the chain may be walked backwards, which swaps them.
+    trunk = sorted([(v.co.x, hl.data[i].value, hr.data[i].value,
+                     max(abs(ol.data[i].value), abs(orr.data[i].value)))
+                    for i, v in enumerate(carrier.data.vertices)
+                    if -301.0 <= v.co.x <= -5.0 and abs(v.co.y) < 1e-3])
+    bare = [x for x, a, b, _o in trunk if a < 0.5 or b < 0.5]
+    _assert(not bare, "the carriageway's barrier must stand at EVERY station -- it is missing at "
+                      "x=%s" % ", ".join("%.0f" % x for x in bare[:6]))
+    at_full = max(o for x, _a, _b, o in trunk if abs(x + BUF) < 1e-3)
+    upstream = min(o for _x, _a, _b, o in trunk)
+    _assert(abs(at_full - upstream - LW) < 1e-2,
+            "the kerb line must ride OUT by the aux lane's whole width (%.2f m), moved %.3f"
+            % (LW, at_full - upstream))
+    print("smoketest_graph_build: barrier stands at all %d trunk stations and rides out %.2f m "
+          "around the aux lane" % (len(trunk), at_full - upstream))
+
+
+def _test_merge_corridor_setback_is_derived():
+    """The approach carriageway's barrier stops one lane clear of the ramp -- AT ANY ANGLE.
+
+    This is the guarantee, stated as a test. The distance a barrier has to be pulled back is
+    `clearance / sin(convergence angle)`, so it is not a property of the kit, it is a property of
+    the two roads: measured across the island's served ramps it ranges from 4 m to 122 m. Any
+    constant is therefore right for one merge and wrong for the rest, which is what "the knob
+    doesn't seem to do anything" looked like. So the assertion is not a number -- it is that
+    HALVING the ramp's approach angle roughly DOUBLES the setback, which only a derivation can do.
+
+    It also pins the defect that started this: the approach's wall used to run to the junction and
+    2 m past it, straight through the ramp's entrance."""
+    LW = 3.5
+
+    def _setback(ramp_y):
+        obj = _graph("Corr%d" % int(ramp_y),
+                     [(0, 0, 0), (-600, 0, 0), (-300, 0, 0), (600, 0, 0), (-500, ramp_y, 0)],
+                     [(2, 0), (1, 2), (0, 3), (4, 0)])
+        obj.data.attributes["node_type"].data[2].value = ga.NODE_NONE
+        _stamp_edges(obj, lanes_fwd=2, lanes_bwd=2, lane_width=LW, curb_height=1.0,
+                     aux_taper_length=90.0, sidewalk_left_width=0.0, sidewalk_right_width=0.0)
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bm.edges.ensure_lookup_table()
+        el = ga.ensure_edge_layers(bm)
+        for i in (0, 1):
+            bm.edges[i][el["aux_lanes_left"]] = 1
+        bm.edges[3][el["lanes_fwd"]] = 1            # the ramp: one way, one lane
+        bm.edges[3][el["lanes_bwd"]] = 0
+        bm.to_mesh(obj.data)
+        bm.free()
+        _result, carrier = gb.build_object(obj)
+        hl = carrier.data.attributes["rka_curb_hl"]
+        hr = carrier.data.attributes["rka_curb_hr"]
+        # The approach chain runs x = -600 -> 0 along y = 0. Its merge-side barrier is whichever
+        # of the two is off by the time it reaches the junction; find where it was last standing.
+        open_at = [v.co.x for i, v in enumerate(carrier.data.vertices)
+                   if abs(v.co.y) < 1e-3 and -601.0 <= v.co.x <= 0.5
+                   and (hl.data[i].value < 0.5 or hr.data[i].value < 0.5)]
+        return None if not open_at else abs(min(open_at))
+
+    steep = _setback(150.0)
+    shallow = _setback(75.0)                        # half the angle -> about twice the setback
+    _assert(steep and shallow, "the approach carriageway's barrier must STOP before the merge; "
+                               "it ran all the way to the junction (steep=%s shallow=%s)"
+            % (steep, shallow))
+    ratio = shallow / steep
+    _assert(1.5 <= ratio <= 2.6,
+            "halving the ramp's approach angle must roughly double the setback (a derivation, not "
+            "a constant): %.1f m -> %.1f m is %.2fx" % (steep, shallow, ratio))
+    print("smoketest_graph_build: merge setback derived from the geometry -- %.0f m at the steep "
+          "angle, %.0f m at half of it (%.2fx)" % (steep, shallow, ratio))
 
 
 def _test_chained_gores_keep_their_aux_fed():
@@ -484,6 +615,152 @@ def _test_trunk_is_the_wider_road():
                {a: widths.get(a) for a in sorted(ramp_arms)}))
     print("smoketest_graph_build: the gore's trunk is the %d-lane road, not the straight %d-lane "
           "ramp" % (narrowest_trunk, widest_ramp))
+
+
+def _test_acceleration_lane_belongs_to_the_ramp():
+    """At an ENTRY, the lane that opens is fed by the ramp -- not shared with the through road.
+
+    The mirror of the deceleration rule beside it. A lane opening at an EXIT is entered from the
+    through lane next to it (that is how a driver reaches a deceleration lane), and the same rule
+    applied blindly at a MERGE put the mainline's kerb lane into the very lane the ramp is merging
+    from: two streams authored into one lane, and on screen the ramp appears to share the road's
+    own lanes rather than to have been given one. Measured at the island's IC_YAMATE entry
+    (node 417), where g96_F0 fed both g97_F0 and g97_F1."""
+    from road_kit_authoring import graph_export as gx
+
+    # Trunk runs west -> east through the gore; the ramp ARRIVES from the NORTH-west, which is
+    # the nearside of an eastbound stream under keep-left (facing east, the kerb is on the left =
+    # north). A ramp on the other side would have to cross the opposing carriageway to reach the
+    # lane, and is refused with exactly that reason -- see `ramp_candidates`.
+    obj = _graph("Merge",
+                 [(0, 0, 0), (-400, 0, 0), (400, 0, 0), (-260, 90, 0)],
+                 [(1, 0), (0, 2), (3, 0)])
+    _stamp_edges(obj, lanes_fwd=2, lanes_bwd=0, lane_width=3.5, aux_taper_length=100.0,
+                 sidewalk_left_width=0.0, sidewalk_right_width=0.0)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.edges.ensure_lookup_table()
+    el = ga.ensure_edge_layers(bm)
+    ramp = bm.edges[2]
+    ramp[el["lanes_fwd"]], ramp[el["lanes_bwd"]] = 1, 0
+    ramp[el["lane_width"]] = 4.5
+    bm.to_mesh(obj.data)
+    bm.free()
+
+    pre = gs.solve_object(obj)
+    _assert(any(n.kind == gs.rgs().KIND_GORE for n in pre.nodes), "this must solve as a gore")
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    n_chains, _wrong = gs.auto_aux_lanes(bm, pre, count=1, taper=100.0)
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+    _assert(n_chains, "the merge must open an acceleration lane")
+
+    gb.build_object(obj)
+    lanes, _stats = gx.collect(obj)
+    by_id = {l["id"]: l for l in lanes}
+    arms = {}
+    for l in lanes:
+        if l["kind"] == "through":
+            arms.setdefault(l["from_arm"], []).append(l["id"])
+    ramp_arm = min(arms, key=lambda a: (len(arms[a]), a))
+
+    def dests(lid):
+        out = set()
+        for nxt in by_id[lid].get("next", []):
+            nl = by_id.get(nxt)
+            if nl is not None:
+                out |= set(nl.get("next", ())) if nl["kind"] == "connector" else {nxt}
+        return out
+
+    ramp_feeds = dests(arms[ramp_arm][0])
+    _assert(ramp_feeds, "the ramp must reach the road it merges into")
+    aux = sorted(ramp_feeds)[0]
+    _assert(aux.rsplit("_", 1)[1][1:] == "0",
+            "the ramp must merge into the kerb-side lane that opened for it, got %s" % aux)
+    others = [lid for lid in by_id
+              if by_id[lid]["kind"] == "through" and lid != arms[ramp_arm][0]
+              and aux in dests(lid)]
+    _assert(not others,
+            "the acceleration lane must be fed by the ramp alone, but %s also moves into it"
+            % others)
+    print("smoketest_graph_build: the acceleration lane at a merge is the ramp's alone (%s -> %s)"
+          % (arms[ramp_arm][0], aux))
+
+
+def _test_slip_road_gets_its_own_lane():
+    """A ramp touching down on a street must be given a lane, not handed an existing one.
+
+    THE CASE THIS COVERS IS NOT A MOTORWAY GORE. A slip road meeting a street at 45 degrees solves
+    as an INTERSECTION, and `auto_aux_lanes` used to look only at solver-detected GORES -- so no
+    acceleration lane was ever added there and the ramp's traffic merged straight into the
+    street's existing kerb lane, on top of the cars already in it. Stamping the vertex GORE by
+    hand did not help either (`_gore_trunk` cannot name a trunk at 45 degrees), and stamping the
+    aux lane by hand hit a worse trap: on the wrong lane group the ramp ended up with no successor
+    at all, and nothing in the panel says which group is which.
+
+    Asserted end to end, because every part of it is invisible on its own: the receiving road
+    gains a lane, and the ramp's movement lands on THAT lane rather than on a through lane."""
+    from road_kit_authoring import graph_export as gx
+
+    # ground street west -> east, with a one-way ramp dropping onto it at ~45 degrees
+    obj = _graph("SlipRoad",
+                 [(-400, 0, 0), (0, 0, 0), (400, 0, 0), (-160, 220, 8.0), (-70, 70, 0.0)],
+                 [(0, 1), (1, 2), (3, 4), (4, 1)])
+    _stamp_edges(obj, lanes_fwd=2, lanes_bwd=2, lane_width=3.5, median_width=1.0,
+                 sidewalk_left_width=0.0, sidewalk_right_width=0.0)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.edges.ensure_lookup_table()
+    el = ga.ensure_edge_layers(bm)
+    for i in (2, 3):
+        bm.edges[i][el["lanes_fwd"]], bm.edges[i][el["lanes_bwd"]] = 1, 0
+        bm.edges[i][el["lane_width"]] = 4.5
+    bm.to_mesh(obj.data)
+    bm.free()
+
+    pre = gs.solve_object(obj)
+    kind = {n.index: n.kind for n in pre.nodes}.get(1)
+    _assert(kind != gs.rgs().KIND_GORE,
+            "this touchdown is meant to solve as an ordinary junction, got %s" % kind)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    n_chains, _wrong = gs.auto_aux_lanes(bm, pre, count=1, taper=90.0)
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+    _assert(n_chains, "no auxiliary lane was stamped where a slip road joins a street")
+
+    gb.build_object(obj)
+    lanes, _stats = gx.collect(obj)
+    by_id = {l["id"]: l for l in lanes}
+    arms = {}
+    for l in lanes:
+        if l["kind"] == "through":
+            arms.setdefault(l["from_arm"], []).append(l["id"])
+    ramp_arm = min(arms, key=lambda a: (len(arms[a]), a))
+    ramp_id = arms[ramp_arm][0]
+    receiving = [a for a in arms if a != ramp_arm]
+    _assert(any(len(arms[a]) == 5 for a in receiving),
+            "the receiving street must gain a lane (2+2 -> 2+2+1), got %s"
+            % {a: len(arms[a]) for a in receiving})
+    dest = set()
+    for nxt in by_id[ramp_id].get("next", []):
+        nxt_lane = by_id.get(nxt)
+        if nxt_lane is None:
+            continue
+        dest |= set(nxt_lane.get("next", []) if nxt_lane["kind"] == "connector" else [nxt])
+    _assert(dest, "the ramp reaches nothing at all")
+    # The auxiliary lane is the outermost of its group, which `chain_lanes` numbers from the kerb
+    # as index 0 -- so a merge into the new lane is a movement into a `*_F0` / `*_R0`.
+    _assert(all(d.rsplit("_", 1)[1][1:] == "0" for d in dest),
+            "the ramp must merge into the kerb-side lane that opened for it, got %s" % sorted(dest))
+    widened = [a for a in receiving if len(arms[a]) == 5][0]
+    _assert("%s_F2" % widened in by_id or "%s_R2" % widened in by_id,
+            "the widened arm should publish a third lane in one direction, got %s" % arms[widened])
+    print("smoketest_graph_build: a 45-degree slip road grows the street a lane and merges into "
+          "it (%s -> %s)" % (ramp_id, sorted(dest)))
 
 
 def _test_ramp_not_fed_across_the_median():

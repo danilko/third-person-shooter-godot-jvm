@@ -555,7 +555,7 @@ def loop_point_at(pt, advance):
     return tuple(poly[0])
 
 
-def entry_endpoints(gore, touchdown, avoid=(), side="FWD"):
+def entry_endpoints(gore, touchdown, avoid=(), side="FWD", serves=None):
     """`(entry_gore, entry_touchdown)` for a pair interchange's ENTRY ramp.
 
     The gore moves along the loop so the two ramps genuinely leave the expressway at different
@@ -606,7 +606,13 @@ def entry_endpoints(gore, touchdown, avoid=(), side="FWD"):
             if clear < ENTRY_GORE_MIN_CLEAR:
                 continue
             pts, _par, _grade, ok = fit_ramp(eg, et, DECK_Z, "ramp", side=side)
-            if not leaves_mainline(pts):
+            # TWO DIFFERENT DIRECTIONS, and they are genuinely different for an entry. `side` is
+            # the direction the polyline is GENERATED in (deck-end-first, so the opposite of the
+            # traffic on it); `serves` is the carriageway the merge feeds. The nearside test is
+            # about the traffic, so it must use `serves` -- measured against the generation
+            # direction it accepted gores whose ramp merged from the offside of the very stream
+            # it joins, which is the one thing no auxiliary lane can serve.
+            if not leaves_mainline(pts) or not leaves_on_the_nearside(pts, serves or side):
                 continue
             score = (1 if ok else 0,
                      min(ramp_radius(pts), RAMP_FIT_TARGET),
@@ -993,6 +999,88 @@ def leaves_mainline(pts, watch=GORE_CLEAR_RUN, clear=GORE_CLEAR_OFFSET):
     return reached >= clear
 
 
+def leaves_on_the_nearside(pts, side, watch=GORE_CLEAR_RUN):
+    """True when the ramp peels off on the KERB side of the carriageway it serves.
+
+    `leaves_mainline` already refuses a ramp that never leaves the expressway; this refuses one
+    that leaves on the WRONG SIDE of it. Under the single convention the pipeline now obeys the
+    auxiliary lane always opens at the kerb, so a ramp on the median side of its own stream has no
+    lane that can serve it -- `auto_aux_lanes` reports exactly that, and the only real fix is to
+    move the ramp. Where the position is already being searched (an entry gore) it is cheaper to
+    never choose such a spot in the first place.
+
+    Measured over the ramp's real polyline for the same reason every other side test here is: the
+    departure tangent of a tangential gore says almost nothing about where the ramp ends up."""
+    if len(pts) < 2:
+        return True
+    g = (pts[0][0], pts[0][1])
+    t = loop_tangent(g)
+    sgn = 1.0 if side == 'FWD' else -1.0
+    d = (t[0] * sgn, t[1] * sgn)
+    run, worst = 0.0, 0.0
+    for i in range(1, len(pts)):
+        run += math.dist(pts[i - 1][:2], pts[i][:2])
+        if run > watch:
+            break
+        cross = d[0] * (pts[i][1] - g[1]) - d[1] * (pts[i][0] - g[0])
+        if abs(cross) > abs(worst):
+            worst = cross
+    return worst >= 0.0
+
+
+#: How far off an arterial's centreline a ramp is aimed, so it arrives on the KERB side of the
+#: carriageway it merges into rather than down the middle of the road. About one lane plus the
+#: median half on this island's arterials -- far enough to put the ramp unambiguously on the near
+#: half, close enough that the graph's snap still welds it to the same junction.
+TOUCHDOWN_KERB_OFFSET = 6.0
+
+
+def arrives_on_the_nearside(pts, watch=80.0):
+    """True when a ramp reaches its TOUCHDOWN on the kerb side of the traffic it will merge into.
+
+    A MEASUREMENT, not a constraint -- nothing in `ramps()` enforces it, deliberately. Aiming the
+    touchdown at the near kerb, and running the ramp straight alongside the road before it, were
+    both tried: they improve THIS number (8 of 9 ramps offside down to 3) and make the built
+    network worse, because a ramp that approaches from the far side has to cross the arterial to
+    reach the near kerb, which changes the arm the solver reads as its host and leaves auxiliary
+    lanes unfed (the movement audit went from 0 problems to 2, then to 4). Landing these ramps
+    nearside needs them re-routed to approach from the other side while still elevated, which is a
+    design decision per interchange, not an offset.
+
+    The companion to `leaves_on_the_nearside`, at the other end of the ramp. Keep-left puts every
+    stream on the LEFT half of its road, so its kerb -- where an auxiliary lane opens and where a
+    merging ramp has to arrive -- is on the left of its direction of travel. A ramp arriving on
+    the other side is beside the OPPOSING carriageway: its traffic would have to cross that
+    carriageway to reach the lane opened for it, which no lane placement can fix (`graph_solve.
+    ramp_candidates` refuses to serve it, and the merge degrades to a turn).
+
+    The ramp's own last stretch gives both terms: its heading IS the direction of the stream it
+    joins (it is one-way and drawn in the direction it is driven), and its offset from the
+    arterial at the touchdown gives the side. So this needs nothing but the ramp itself."""
+    if len(pts) < 3:
+        return True
+    tip = (pts[-1][0], pts[-1][1])
+    road = arterial_tangent(tip)
+    # Travel direction at arrival, measured over the last `watch` metres so a single short
+    # sample cannot decide it.
+    run, back = 0.0, pts[-1]
+    for i in range(len(pts) - 1, 0, -1):
+        run += math.dist(pts[i][:2], pts[i - 1][:2])
+        back = pts[i - 1]
+        if run >= watch:
+            break
+    d = (tip[0] - back[0], tip[1] - back[1])
+    n = math.hypot(*d) or 1.0
+    d = (d[0] / n, d[1] / n)
+    # The arterial's tangent runs either way; take the one the ramp is travelling with.
+    if road[0] * d[0] + road[1] * d[1] < 0.0:
+        road = (-road[0], -road[1])
+    # Left of travel is +cross. The ramp approaches from `back`, so its offset from the road at
+    # the touchdown is what side it came in on.
+    cross = road[0] * (back[1] - tip[1]) - road[1] * (back[0] - tip[0])
+    return cross >= 0.0
+
+
 def departs_tangentially(pts, tangent, tol_deg=None):
     """True when the ramp LEAVES along the mainline rather than turning off it.
 
@@ -1069,6 +1157,12 @@ def fit_ramp(gore, touchdown, dz, kind="ramp", max_parallel=420.0,
                 # remembered, because emitting it and reporting the grade beats emitting a
                 # right-angle stub that no joint can ever connect (which is what the last-resort
                 # fallback used to do -- measured at 65-86 deg on four interchanges).
+                # NOT gated on `leaves_on_the_nearside` here, deliberately. As a fit gate it is
+                # counterproductive: when no candidate satisfies it `fit_ramp` falls through to
+                # its least-bad fallback, which is worse than the near-miss it rejected, and it
+                # also hides the failure from the entry-gore SEARCH -- which uses the same test to
+                # choose a better position and can only do that if it sees the real fit. Measured,
+                # gating here took the island from one offside ramp back to two.
                 if turns_back(pts) or not departs_tangentially(pts, t) \
                         or not leaves_mainline(pts):
                     continue
@@ -1111,6 +1205,7 @@ def ramps():
         # A ramp departs FROM the mainline, so the gore is projected onto it before anything is
         # derived from it -- see `gore_on_loop` for what an unprojected one costs downstream.
         gore = gore_on_loop(gore)
+        aim = touch
         if kind == "jct":
             # Expressway-to-expressway: both ends are already at deck height, so there is no
             # descent -- but that makes the GRADE constraint trivial, not the radius one, and this
@@ -1120,12 +1215,35 @@ def ramps():
             # the self-test's bad list that nothing explained. Fit it exactly like every other
             # ramp with a zero descent -- the search then spends the freed length on radius --
             # and re-stamp the deck height afterwards.
-            pts, par, _grade, ok = fit_ramp(gore, touch, 0.0, "ramp",
+            pts, par, _grade, ok = fit_ramp(gore, aim, 0.0, "ramp",
                                             side=interchange_side(rid))
             p3 = [(p[0], p[1], DECK_Z) for p in pts]
             out.append((rid, p3, par, 0.0, ok, kind))
+            # AND ITS ENTRY. A junction between two expressways is a road you can drive BOTH
+            # ways: with only the exit, the bridge is somewhere traffic can go and never come
+            # back from -- the same dead end the connectivity gate caught when every exit sat on
+            # one carriageway and every entry on the other (ROAD_KIT_REDESIGN.md defect 13). Built
+            # exactly like a "pair" interchange's entry (its own gore, found by searching along
+            # the mainline, and its own alignment), differing only in having no descent to make:
+            # both of its ends are already at deck height.
+            others = [g for r, g, _t, _k, _n in INTERCHANGES if r != rid]
+            # THE SEARCH IS TOLD THE SERVING CARRIAGEWAY, the same one the fit below is told. An
+            # entry SERVES the carriageway it merges into -- the one departing its gore -- and
+            # must therefore lie on THAT stream's nearside, exactly as an exit lies on the
+            # nearside of the stream feeding it. Handing the search the opposite direction made
+            # it grade every candidate against the wrong stream and choose gores whose ramp was
+            # offside of the one it actually feeds; `graph_solve.ramp_services` then reported
+            # them (three of the island's entries, once entries became real merges rather than
+            # second exits).
+            eg, et = entry_endpoints(gore, touch, avoid=others,
+                                     side=_opposite(interchange_side(rid)),
+                                     serves=interchange_side(rid))
+            epts, epar, _eg, eok = fit_ramp(eg, et, 0.0, "ramp",
+                                            side=_opposite(interchange_side(rid)))
+            out.append((rid + ENTRY_SUFFIX, [(p[0], p[1], DECK_Z) for p in epts],
+                        epar, 0.0, eok, kind))
             continue
-        p3, par, grade, ok = fit_ramp(gore, touch, DECK_Z, "ramp",
+        p3, par, grade, ok = fit_ramp(gore, aim, DECK_Z, "ramp",
                                        side=interchange_side(rid))
         # grade_profile ran top->0; re-stamp so the deck end is the deck end.
         out.append((rid, p3, par, grade, ok, kind))
@@ -1134,8 +1252,17 @@ def ramps():
             # exit, so a consumer that needs it running INTO the mainline simply reverses it --
             # the same convention every other ramp here follows.
             others = [g for r, g, _t, _k, _n in INTERCHANGES if r != rid]
+            # THE SEARCH IS TOLD THE SERVING CARRIAGEWAY, the same one the fit below is told. An
+            # entry SERVES the carriageway it merges into -- the one departing its gore -- and
+            # must therefore lie on THAT stream's nearside, exactly as an exit lies on the
+            # nearside of the stream feeding it. Handing the search the opposite direction made
+            # it grade every candidate against the wrong stream and choose gores whose ramp was
+            # offside of the one it actually feeds; `graph_solve.ramp_services` then reported
+            # them (three of the island's entries, once entries became real merges rather than
+            # second exits).
             eg, et = entry_endpoints(gore, touch, avoid=others,
-                                     side=_opposite(interchange_side(rid)))
+                                     side=_opposite(interchange_side(rid)),
+                                     serves=interchange_side(rid))
             # AN ENTRY TAKES THE OPPOSITE SIGN, because it is authored deck-end-first and its
             # consumer REVERSES it (`island_v3_to_roadkit` passes `reversed(entry)` as a
             # 'merge'). After that reversal the ramp arrives at the gore heading the negative of
