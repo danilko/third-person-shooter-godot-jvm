@@ -443,11 +443,41 @@ public class WorldBaker extends Node {
         lane.linkGroup = jsonString(laneDict, "link_group", "");
         lane.linkRole = jsonString(laneDict, "link_role", "");
 
+        // ---- .lanekit v2 fields. Every one is optional: a v1 sidecar leaves them at their
+        // defaults and the lane behaves exactly as it did before the schema bump.
+        lane.speedLimit = jsonFloat(laneDict, "speed_limit", 0f);
+        lane.roadClass = jsonString(laneDict, "road_class", "");
+        lane.junctionId = jsonString(laneDict, "junction_id", "");
+        lane.grade = jsonFloat(laneDict, "grade", 0f);
+        lane.banking = jsonFloat(laneDict, "banking", 0f);
+        lane.spawnableExplicit = present(laneDict.get("spawnable"));
+        lane.spawnable = jsonBool(laneDict, "spawnable", false);
+        if (laneDict.get("lane_width") != null && present(laneDict.get("lane_width"))) {
+            lane.laneWidth = jsonFloat(laneDict, "lane_width", lane.laneWidth);
+        }
+
         Curve3D curve = new Curve3D();
-        for (Object ptObj : pointsArr) {
-            if (!(ptObj instanceof VariantArray<?> pt) || pt.size() < 3) continue;
-            curve.addPoint(new Vector3(((Number) pt.get(0)).doubleValue(),
-                    ((Number) pt.get(1)).doubleValue(), ((Number) pt.get(2)).doubleValue()));
+        // v2 first: `curve` is a list of {p, in, out} with REAL bezier handles, so the Curve3D is
+        // a curve rather than the polyline handed straight back by getBakedPoints(). Blender
+        // already has these tangents — v1 was throwing them away, not lacking them — and the
+        // control points sit at the authored stations, roughly a 5x drop in point count.
+        Object curveObj = laneDict.get("curve");
+        if (curveObj instanceof VariantArray<?> curveArr && curveArr.size() >= 2) {
+            for (Object cObj : curveArr) {
+                if (!(cObj instanceof Dictionary<?, ?> cDict)) continue;
+                Vector3 p = jsonVec3(cDict, "p", null);
+                if (p == null) continue;
+                curve.addPoint(p, jsonVec3(cDict, "in", Vector3.Companion.getZERO()),
+                        jsonVec3(cDict, "out", Vector3.Companion.getZERO()));
+            }
+        }
+        if (curve.getPointCount() < 2) {                 // v1 sidecar, or a malformed curve block
+            curve = new Curve3D();
+            for (Object ptObj : pointsArr) {
+                if (!(ptObj instanceof VariantArray<?> pt) || pt.size() < 3) continue;
+                curve.addPoint(new Vector3(((Number) pt.get(0)).doubleValue(),
+                        ((Number) pt.get(1)).doubleValue(), ((Number) pt.get(2)).doubleValue()));
+            }
         }
         curve.setClosed(lane.loop);
 
@@ -474,6 +504,17 @@ public class WorldBaker extends Node {
             sb.append(o.toString());
         }
         return sb.toString();
+    }
+
+    /** A JSON {@code [x, y, z]} as a {@code Vector3} — already in Godot axes, converted at the one
+     *  conversion site on the Blender side. */
+    private static Vector3 jsonVec3(Dictionary<?, ?> d, String key, Vector3 def) {
+        Object v = d.get(key);
+        if (!(v instanceof VariantArray<?> a) || a.size() < 3) return def;
+        try {
+            return new Vector3(((Number) a.get(0)).doubleValue(), ((Number) a.get(1)).doubleValue(),
+                    ((Number) a.get(2)).doubleValue());
+        } catch (Exception e) { return def; }
     }
 
     private static String jsonString(Dictionary<?, ?> d, String key, String def) {

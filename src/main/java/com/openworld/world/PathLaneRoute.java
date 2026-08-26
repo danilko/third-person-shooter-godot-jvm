@@ -117,6 +117,42 @@ public class PathLaneRoute extends Node3D implements Lane {
      *  "" for a lane whose sidecar predates this field. */
     @Export @RegisterProperty public String zoneId = "";
 
+    // ---- .lanekit v2 -----------------------------------------------------------------------
+    // All ADDITIVE: a lane baked from a v1 sidecar leaves every one of these at its default and
+    // behaves exactly as before. v1 districts must keep working — that is the whole compatibility
+    // contract of the schema bump.
+
+    /** Design/posted speed for this lane, km/h. 0 = unknown, so the AI keeps its own default. */
+    @Export @RegisterProperty public float speedLimit = 0f;
+
+    /** {@code street} / {@code arterial} / {@code expressway} / {@code ramp}, or "". Lets the
+     *  spawner make an arterial busy and a backstreet dead instead of keying density off the
+     *  zone marker alone. */
+    @Export @RegisterProperty public String roadClass = "";
+
+    /** The pad this lane belongs to, for a connector — "" for a through lane. This is the key
+     *  {@code JunctionArbiter} (roads-v2 Phase 2) needs, and emitting it now is what stops the
+     *  whole world needing a re-bake when signals land. */
+    @Export @RegisterProperty public String junctionId = "";
+
+    /** Rise over run along the lane, and superelevation in radians. Advisory: they let the AI
+     *  slow for a bend it has not entered yet. */
+    @Export @RegisterProperty public float grade = 0f;
+    @Export @RegisterProperty public float banking = 0f;
+
+    /** May an ambient car be SPAWNED on this lane?
+     *
+     *  <p>Explicit, because inferring it from a blank {@code turn} letter is exactly how every
+     *  one of the 351 island through lanes shipped unspawnable: the exporter omitted {@code turn},
+     *  {@code WorldBaker} defaulted a {@code kind == "through"} lane to {@code "S"}, and
+     *  {@code isSpawnCandidate} rejects any non-empty turn. A boolean cannot fail that way.
+     *
+     *  <p>{@link #spawnableExplicit} distinguishes "the sidecar said false" from "the sidecar is
+     *  v1 and never said" — without it, defaulting to false would make every already-baked v1
+     *  district stop spawning traffic. */
+    @Export @RegisterProperty public boolean spawnable = false;
+    @Export @RegisterProperty public boolean spawnableExplicit = false;
+
     private static final String PATH_CHILD_NAME = "Path3D";
 
     private Curve3D curve;

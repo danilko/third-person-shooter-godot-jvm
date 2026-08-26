@@ -24,6 +24,7 @@ import importlib.util
 import math
 import os
 import random
+import sys
 
 _here = os.path.dirname(os.path.abspath(__file__))
 _s = importlib.util.spec_from_file_location("island_v3_geom",
@@ -46,63 +47,17 @@ _s.loader.exec_module(G)
 # line. Nothing about the road piece itself changed — only its height did. Because the rule
 # is a pure function of delta, it re-evaluates live while a height is dragged, which is why
 # it belongs in Geometry Nodes (see build_island_v3.py) rather than in a one-time bake.
-SUPPORT_NONE   = "NONE"      # |delta| small — surface sits on the ground
-SUPPORT_FILL   = "FILL"      # low lift — earth embankment, side slope FILL_SLOPE
-SUPPORT_PIER   = "PIER"      # high lift — soffit slab + columns every PIER_SPACING
-SUPPORT_CUT    = "CUT"       # shallow dig — trench walls
-SUPPORT_TUNNEL = "TUNNEL"    # deep dig — bored, portal at each end
-
-AT_GRADE_TOL  = 0.40         # |delta| under this = at grade, nothing underneath
-FILL_MAX      = 4.00         # embankment stops being credible above this
-CUT_MAX       = 3.00         # trench becomes a tunnel below this
-FILL_SLOPE    = 1.5          # 1:1.5 earth batter (run per unit of rise)
-PIER_SPACING  = 30.0         # Shuto viaduct bent spacing, 30-40 m typical
-PIER_SECTION  = 2.20         # square column side
-DECK_THICK    = 1.60         # structural depth under the driving surface
-
-
-def support_kind(surface_z, ground_z):
-    """THE rule. Pure function of the height difference — see the module header."""
-    d = surface_z - ground_z
-    if d > FILL_MAX:
-        return SUPPORT_PIER
-    if d > AT_GRADE_TOL:
-        return SUPPORT_FILL
-    if d >= -AT_GRADE_TOL:
-        return SUPPORT_NONE
-    if d >= -CUT_MAX:
-        return SUPPORT_CUT
-    return SUPPORT_TUNNEL
-
-
-def fill_footprint(surface_z, ground_z, half_width):
-    """Half-width of the embankment toe — how much ground an at-fill road actually eats.
-    Authoring matters: a 27 m arterial lifted 3 m is 40 m wide at the bottom, so a block
-    laid tight against it will be cut into. Returns half_width when there is no fill."""
-    d = surface_z - ground_z
-    if d <= AT_GRADE_TOL or d > FILL_MAX:
-        return half_width
-    return half_width + d * FILL_SLOPE
-
-
-def pier_stations(length, spacing=PIER_SPACING, start=None):
-    """Distances along a run at which columns land. Piers are laid from the run's MIDPOINT
-    outward, not from one end, so a symmetric span (a bridge) gets a symmetric bent line
-    instead of a stub at one abutment."""
-    if length <= 0:
-        return []
-    if start is None:
-        n = max(1, int(round(length / spacing)))
-        step = length / n
-        return [step * (i + 0.5) for i in range(n)]
-    return [s for s in _frange(start, length, spacing)]
-
-
-def _frange(a, b, step):
-    x = a
-    while x < b:
-        yield x
-        x += step
+# THE RULES LIVE IN `blender/lib/road_support.py`, not here. This module is the island PLANNER;
+# the road BUILDER needs the identical rules, and two copies of "what goes under a surface" is
+# defect 1 one level up -- the planner would decide a ramp needs a pier line while the builder drew
+# an embankment, with nothing to report the disagreement. Re-exported so this module's own callers
+# (`build_island_v3.py`, `island_v3_to_graph.py`, `kit_common.py`) keep importing them from here.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "blender", "lib"))
+from road_support import (                                                   # noqa: E402,F401
+    SUPPORT_NONE, SUPPORT_FILL, SUPPORT_PIER, SUPPORT_CUT, SUPPORT_TUNNEL,
+    AT_GRADE_TOL, FILL_MAX, CUT_MAX, FILL_SLOPE, PIER_SPACING, PIER_SECTION, DECK_THICK,
+    support_kind, fill_footprint, pier_stations, _frange)
 
 
 # =============================================================================== height

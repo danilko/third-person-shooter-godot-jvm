@@ -394,7 +394,7 @@ continuous ground and fall through in the gaps (no safety-floor catch anymore, s
 extraction/import tooling was removed** once every PLATEAU-derived district/overlay/building asset
 had already produced its permanent output `.blend` — see `AUTHORING_GUIDE.md` §2/§6. Terrain is
 now hand-owned exactly like everything else; road authoring specifically is the
-`road_kit_authoring` addon's mesh-first pieces + `.lanekit.json` sidecar (see "Ambient traffic &
+`road_kit_authoring` addon's point/port graph + `.lanekit.json` v2 sidecar (see "Ambient traffic &
 the road graph" below), not the old `road_<name>` centerline/`.roads.json` pipeline that predates
 it.
 
@@ -456,13 +456,146 @@ So cross-district alignment for elevation is a **solved, working system** — di
 literal vertex-welded ground, they need matching boundary *values* (elevation, route endpoints),
 which the taper + `.seam.json` + `check_seams.py` trio already enforces.
 
-**Road/geometry alignment across a shared seam is a separate, still-manual concern.** Roads are
-authored in one of two ways with very different edit-ability: catalog kit pieces
-(`blender/addons/road_kit_authoring/ops_placement.py`) are Collection-Instance Empties (transform-only,
-mesh owned by the shared `assets/world_source/kit/lane_kit.blend` library); intersections/segments
-(`ops_intersection.py`/`ops_segment.py`) generate **wholly local mesh/curve geometry** per
-district — this is the standard going forward for every district's roads (District_industry_5_1's
-hand-authored `MANUAL` collection is the reference example). Because Blender's Library Override
+**Road authoring is now the POINT/PORT GRAPH** (`blender/ROAD_POINT_GRAPH.md`, the design of
+record; `blender/addons/road_kit_authoring/point_*.py`). A road is an ordered chain of **road
+points** — an Empty that is simultaneously a *station* (its own cross-section: lanes per direction,
+median, kerbs, footways, structure) and a *port* (its typed `SEGMENT` / `JUNCTION` / `AUX` links).
+A junction is a clique over `JUNCTION` links whose member points **are** the stop lines; a ramp is
+an aux slot plus an `AUX` link. Every along-the-length change — lane drop, lane opening, one-way,
+an acceleration lane with its taper — is just *"two stations that differ"*. The authored record is
+a git-diffable `<stem>.roads.json`; the Empties are a **view** of it. Build emits per road run a
+swept `__surface` carrier (a GN layer stack), `__edges` kerb/footway runs placed against the paved
+**outline** so gores open by themselves, `__edges` kerb/footway/**barrier** runs per junction
+corner too, a pad per junction, a paved **gore strip** per ramp, the terrain cut, and split
+`-colonly` road/footway collision proxies. `blender/tools/check_roads.sh` is the one command
+that runs the gate (17 checks, including a full-plugin pass that drives every operator, draws every panel, and asserts every operator is reachable from a button). `Author ▸ Learn ▸ Add Sample Network` builds a worked example of all four link types; the step-by-step guide is in the addon's `README.md`.
+**The Empty's transform IS the road frame** — position is the station, **local +Y is travel
+direction** (points draw as `ARROWS` so that axis is visible; `SINGLE_ARROW` draws along +Z and
+showed the wrong one), roll is banking, and `tangent_mode = MANUAL` makes the rotation drive the
+curve, with `handle_in`/`handle_out` in metres (0 = the chord). **Rotating a point IS the bend
+gesture — there is no mode to set first.** Points are *born facing their road* (`new_point` takes a
+`facing`; `Extend Road`/`Insert Point` pass the chain direction — never via `face_matrix`, which
+reads a `matrix_world` still identity on a just-created object and would move the station to the
+world origin), and the tool stamps the facing it gave each one in `RKA_Point.auto_tangent` (derived
+state, **not** in `.roads.json`). `read_point` then promotes an AUTO point whose facing has left
+that baseline to MANUAL — a *read-side* derivation, so it takes effect in the overlay, the gate,
+Build and the export at once with no write and no handler. The baseline is what separates a
+rotation from a **drag** (a translate changes the chain tangent while leaving the rotation alone,
+so recomputing-and-comparing would falsely promote every dragged point). `point_ops.sync_facings()`
+is the write half — promotion first, *then* re-face what the tool still owns — run by Build, by the
+live rebuild, and by the `Follow Road (Auto)` button; `point_profile.chain_facings()` is the one
+owner of "which way does this station face". The overlay draws the **resolved centreline**
+(`point_profile.centreline_runs()`, resample-only so it is cheap enough for a per-frame draw
+handler), so a rotation reshapes the road live without any rebuild — `rka_live_rebuild` (off by
+default) is only about the *mesh*. **Straightness is measured, never authored** (`road_points.segment_bend_deg`) — there is no straight/curved flag to keep in sync. The
+`Connections` panel lists the active point's links with derived span / straight-vs-bend / taper
+verdict (the taper number comes from the gate's own `taper_min_length`, so the two cannot
+disagree), and `Connect Selected` is anchored on the **active** point — `AUX` is directed
+(mainline → ramp), so `selected_objects` order was a coin flip. The two previous models are gone: the mesh-graph `graph_*.py` is
+archived under `legacy_graph/` (not imported) and the per-piece generators (`ops_placement.py`,
+`ops_intersection.py`, `ops_segment.py`, …) were **deleted** — see `legacy_graph/README.md`.
+District_industry_5_1's hand-authored `MANUAL` collection predates this and is still valid baked
+geometry; it is no longer the authoring reference.
+
+**One owner per derived fact — the four rules the 2026-08-25 fixes added** (`ROAD_POINT_GRAPH.md`
+§8f has the full write-up; each of these was a user report):
+
+- **Direction has ONE owner: `point_model.station_axis`.** The carriageway honoured a MANUAL
+  tangent while `point_solve.mouth_axis` and `point_validate._axis` each re-derived the direction
+  from the *neighbour's position* — so rotating an intersection mouth bent its street and left the
+  pad exactly where it was. Both now delegate. Rotating a mouth turns its cap, its two fillets and
+  its turn paths.
+- **A pad always tessellates.** `point_solve.pad_triangles` fans from the ring's **kernel point**
+  (`fan_origin`, found by pushing the apex inside the edges it is outside of) and `ear_clip`s when
+  no kernel exists; `build_pad` sweeps exactly that. `pad_not_star_shaped` is a **WARN**, not an
+  ERROR — a 2 cm fold from a hand-drag used to refuse the whole build and name as its remedy an
+  `Auto Setback` that then reported "moved 0". Never let a hand-drag be a build failure.
+- **A ramp is the aux slot's CONTINUATION, not a lane beyond it.** `point_profile.aux_edge_offset`
+  returns the aux slot's **through-lane-side** edge (the gore line), so `lanes_fwd = 3,
+  aux_fwd = 1` is a four-lane carriageway whose outermost lane leaves. `point_solve.ramp_target`
+  is the single owner of where the mouth belongs — and `Align Ramp To Aux` also **faces** it down
+  the mainline (`MANUAL`), because two bands cut on different planes touch at one vertex and open
+  from the next. Divergence is authored at the ramp's *next* point. `solve_gore` paves the wedge
+  between the two roads' own paved edges, from where the signed gap changes sign to a 4 m nose.
+  `check_tapers` exempts the station that owns the `AUX` link: a **departing** lane is not a
+  **merging** lane and needs no merge taper.
+- **Reachability is not geometry, and had no eye.** An `AUX` link exported as *nothing*: the ramp
+  lane had no predecessor, so no ambient car could ever reach a ramp anywhere in the world, with a
+  green gate and perfect geometry. `point_export.wire_ramps` emits the edge (directed by the ramp
+  point's role) and `_aux_handoffs` **ends the exit lane at its gore** so the successor is within
+  `CHAIN_TOL`. `point_preview` (the **Preview** panel) draws the *exported* lane graph — directed
+  lanes, `next` edges, agents walking it on the exported weights — and reports `broken` /
+  `open_end` / `unreached` / `ramp_orphans`. When adding anything to the lane graph, check it
+  there: a build being green says nothing about whether traffic can get to it.
+
+**Five more owners, from the 2026-08-26 follow-up** (`ROAD_POINT_GRAPH.md` §8g; same shape as §8f
+— a rule right for the case in front of you, applied to one nobody had looked at):
+
+- **An exit is a BLOCK of aux slots, not one slot.** `point_profile.aux_block` returns the whole
+  run of same-direction aux slots and the edge facing the through lanes; `aux_edge_offset` is that
+  edge. Anchoring on the *outermost* slot was right at `aux_fwd = 1` and put a two-lane ramp half
+  on the carriageway at `aux_fwd = 2`.
+- **The merge taper is the metric standard × the road's `taper_factor`.** `TAPER_LINEAR_ABOVE` is
+  70 km/h (it was 60, which over-demanded by half across the whole 60–70 band). `taper_factor`
+  (`ROAD_FIELDS`, default 1.0) exists because **the world is not 1:1** — shortening a taper for a
+  compressed map is a visible authored decision on the road, never a constant bent in the checker.
+- **A barrier's HEIGHT is authored, its PLACEMENT is derived.** `RoadData.barrier_height` (0 =
+  none) × the rule in `solve_road`: fenced along the whole length when `ped_access` is off, and
+  only where `delta >= BARRIER_MIN_DELTA` when it is on. It is a layer in `edge_spec()` on the same
+  `deck` node group as the kerb, so it rides the **outline** — which is why it opens across a gore
+  and closes past the nose with no ramp-specific code at all.
+- **A junction corner IS an edge run.** `point_solve.junction_corners` emits one `Corner` per real
+  corner from `intersection_kit.build_junction_curb_segments` (the same curve the pad boundary is
+  rounded with) and `point_build.build_junction_edges` sweeps it with the ordinary `edge_spec()`.
+  Before this, every crossing in the world had four missing pavement corners.
+- **`point_edges.Band.carries_edge` — a pad hands the furniture on, a gore does not.** A run must
+  not suppress its kerb against a footprint that continues it (that gap was the missing corner
+  pavement), but it MUST open across one that does not. A run is a member of both, so membership
+  alone cannot tell them apart; keying on it left a barrier stub standing across the gore paint.
+- **`intersection_kit.curb_edges(..., tail_length=)` anchors each arm's kerb ray on that arm's own
+  `tail_center`, not the origin** (§8h). The origin-anchored ray passes through the cap only
+  because a plain arm's tail centre is a multiple of its direction — an off-ray `tail_pos` (which
+  is what `_PadArm` sets from the AUTHORED mouth) does not satisfy that, so a **rotated** mouth's
+  corner left the cap ~50° out and its footway met the street in a notch. Opt-in by parameter, and
+  byte-identical for any arm without `tail_pos`; `Arm.tail_center`'s docstring records the opposite
+  scope limit, which was right for the model that wrote it and wrong for this one.
+- **`point_edges.covered(..., outward=)` is DIRECTIONAL: "does the pavement continue past this
+  line", not "is there asphalt within 0.6 m".** Where a ramp leaves along the mainline's outer
+  edge, both edges are the outer boundary of the same pavement, and the undirected `NEAR_PAD` slop
+  had each band suppress the OTHER's parapet — 11 m of unwalled edge at the top of a 14 m drop.
+  The probe is taken `NEAR_PAD` **outboard** and must land strictly inside another band.
+  `measure_on_asphalt` uses the same tolerance for the same reason: it measures standing ON asphalt.
+- **A directional `covered` asks TWO questions, and a run's END is CLIPPED, not rounded (§8h.4).**
+  Two user reports, opposite ends of one ramp, one root cause — start/end decided per 4 m sample
+  about features metres across. (a) The outboard probe can step clean OVER a band narrower than
+  `NEAR_PAD`: at a mouth the mainline's outer edge lies 0.5 m inside the ramp's band, the probe
+  landed 3 cm past it, and both parallel edges kept a wall — "one extra wall at the ramp
+  connection". So `covered` now also suppresses when the point ITSELF is `BURIED_TOL` (5 cm) inside
+  another band. That is a tolerance for *exactly on*, not a margin — an edge on another band's
+  boundary is the shared outer boundary and keeps its wall, which is §8h.2's case. (b)
+  `point_edges.open_runs` returns `Run(i0, i1, head, tail)` — still `(i0, i1)` when indexed — whose
+  `head`/`tail` are **bisected onto the covering band's boundary** (`_clip_end`), so a run ends at
+  the mouth it hands over at and starts at the gore nose it must meet, instead of a sample either
+  side. `sub_polyline` + `pe.run_values` emit points and attributes from one place so they cannot
+  come out different lengths. Together these let the gore cap sit FLUSH on the strip's last pair
+  (`GoreSolve.nose`) with both flank walls meeting it — three walls, one closed corner.
+- **A GORE OWNS ITS OWN NOSE — neither flanking road can (§8h.3).** A gore is bare paint
+  (`Band.carries_edge` False), so both flanking walls open across it: right along the join, where a
+  wall would stand in the exit lane, and wrong at the wide end, where the two roads have parted and
+  their walls restart `GORE_NOSE_WIDTH` apart with an open V between them at the tip of a viaduct.
+  Neither road can fill it — the stretch is the other one's asphalt — so `point_solve._gore_nose`
+  emits an ordinary `Corner` and `point_build.build_gore_edges` sweeps it with the ordinary
+  `edge_spec()` (`GORE_*__edges_nose`). **What** it carries is still the roads': each end reads that
+  road's own solved `rka_wall_h`/`rka_curb_h*`/`rka_walk_h*` and the run blends between them, so a
+  fenced highway meeting a fenced ramp is a wall, an approach declaring a footway gets a kerbed
+  island, and a pair declaring neither builds nothing. `GoreSolve.ped_access` is both flanks'
+  answer, so the proxy is `-noped` between an expressway and its ramp and walkable between two
+  streets. **Where** it sits is derived: one `GORE_STEP` past the nose on each road's own edge — the
+  first sample outside the gore's polygon, i.e. exactly where `open_runs` lets that flank's wall
+  resume. `point_build.edge_run_values`/`build_edge_run` are now the one owner of the per-vertex
+  furniture arithmetic, shared by a road flank, a junction corner and this.
+
+**Road/geometry alignment across a shared seam is a separate, still-manual concern.** Because Blender's Library Override
 system can move/rotate a linked object as a whole but can never edit linked mesh/curve vertex
 data, aligning road geometry that genuinely spans two districts' seam needs either (a) read-only
 whole-world context while editing one district locally (`tools/link_neighbors.py`, extendable to

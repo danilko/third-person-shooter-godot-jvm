@@ -1425,8 +1425,17 @@ public class WorldZoneManager extends Node {
 	 *  {@code center}. */
 	private boolean isSpawnCandidate(Lane r, Vector3 center, float maxDist) {
 		if (!(r instanceof Node3D n) || !GD.isInstanceValid(n)) return false;
-		String turn = r.getTurn();
-		if (turn != null && !turn.isEmpty()) return false;
+		// .lanekit v2 says so EXPLICITLY. The old rule below — "spawnable iff the turn letter is
+		// blank" — is what made every exported through lane unspawnable: the exporter omitted
+		// `turn`, WorldBaker defaulted a "through" lane to "S", and this test then rejected it.
+		// A boolean the exporter states outright cannot fail that way; the inference stays only
+		// for districts already baked against v1.
+		if (r instanceof PathLaneRoute p && p.spawnableExplicit) {
+			if (!p.spawnable) return false;
+		} else {
+			String turn = r.getTurn();
+			if (turn != null && !turn.isEmpty()) return false;
+		}
 		Vector3 sp = r.entryPoint();
 		if (sp == null) return false;
 		if (center != null && maxDist > 0) {
