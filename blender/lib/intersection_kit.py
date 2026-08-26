@@ -339,7 +339,7 @@ def consecutive_pairs(arms):
     return [(ordered[k], ordered[(k + 1) % n]) for k in range(n)]
 
 
-def curb_edges(arm_a, arm_b, extra_offset=0.0):
+def curb_edges(arm_a, arm_b, extra_offset=0.0, tail_length=None):
     """The two curb-edge rays (point, direction) meeting at the corner between CCW-adjacent
     arm_a -> arm_b: arm_a's CCW (leaving-lane) side and arm_b's CW (arriving-lane) side. Uses each
     arm's own `out_width()`/`in_width()` independently (not a shared symmetric `half_width()`), so
@@ -348,11 +348,31 @@ def curb_edges(arm_a, arm_b, extra_offset=0.0):
 
     `extra_offset` (default 0.0, byte-identical to before) pushes BOTH edges further out by the
     same amount -- e.g. a sidewalk's own outer boundary, offset past the curb by the sidewalk's
-    width (see `build_junction_curb_segments`'s own `extra_offset` docstring)."""
+    width (see `build_junction_curb_segments`'s own `extra_offset` docstring).
+
+    `tail_length` ANCHORS each ray on that arm's own `tail_center(...)` instead of the origin.
+
+    Passing it matters only for an arm with an off-ray `tail_pos`, and for that arm it is the
+    difference between a corner that is right and one that is 50 degrees out. Without it the ray
+    is `perp * width + t * direction` -- a line through the ORIGIN -- which passes through the
+    arm's cap corner only because a plain arm's `tail_center` is itself a multiple of `direction`.
+    An arm whose cap has been placed off its own angle-ray (`tail_pos`) does not satisfy that, so
+    the corner vertex lands on a line the arm's kerb never touches: the fillet, and anything built
+    from it, then leaves the cap at the wrong angle. For an arm WITHOUT `tail_pos` the anchor is
+    on the ray already, so the line is identical and nothing moves.
+
+    `Arm.tail_center`'s own docstring records the opposite scope limit ("`curb_edges` /
+    `_junction_corner_vertex` never call this at all"), which was a deliberate choice for the
+    model that owned it: there an off-ray cap matched an external port and must not perturb its
+    neighbours. In the point/port model the mouth's authored position and rotation ARE the stop
+    line, so the corner between two mouths has to be built from where those caps actually are.
+    Hence opt-in, by parameter, rather than a change of default."""
     da, db = arm_dir(arm_a.angle_deg), arm_dir(arm_b.angle_deg)
     pa, pb = lane_perp(da, arm_a.traffic_side), lane_perp(db, arm_a.traffic_side)
-    edge_a = (vscale(pa, arm_a.out_width() + extra_offset), da)
-    edge_b = (vscale(pb, -(arm_b.in_width() + extra_offset)), db)
+    oa = arm_a.tail_center(tail_length) if tail_length is not None else (0.0, 0.0)
+    ob = arm_b.tail_center(tail_length) if tail_length is not None else (0.0, 0.0)
+    edge_a = (vadd(oa, vscale(pa, arm_a.out_width() + extra_offset)), da)
+    edge_b = (vadd(ob, vscale(pb, -(arm_b.in_width() + extra_offset))), db)
     return edge_a, edge_b
 
 
@@ -428,7 +448,7 @@ def _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg=2.0,
     widths are."""
     if is_through_pair(a.angle_deg, b.angle_deg, through_tol_deg):
         return None
-    edge_a, edge_b = curb_edges(a, b, extra_offset=extra_offset)
+    edge_a, edge_b = curb_edges(a, b, extra_offset=extra_offset, tail_length=tail_length)
     vertex = line_intersect_2d(edge_a[0], edge_a[1], edge_b[0], edge_b[1])
     if vertex is None:
         return None
@@ -446,12 +466,14 @@ def _junction_corner_vertex(a, b, kerb_radius, tail_length, through_tol_deg=2.0,
                                    # subject to that same safety clamp (never overshoots this
                                    # corner's own tangent length) rather than silently exceeding it
     if tail_length:
-        a_tail, b_tail = a.eff_tail_length(tail_length), b.eff_tail_length(tail_length)
         da, db = arm_dir(a.angle_deg), arm_dir(b.angle_deg)
-        p_out_a = vadd(vscale(lane_perp(da, a.traffic_side), a.out_width() + extra_offset),
-                       vscale(da, a_tail))
-        p_in_b = vadd(vscale(lane_perp(db, a.traffic_side), -(b.in_width() + extra_offset)),
-                      vscale(db, b_tail))
+        # `tail_center`, not `direction * eff_tail_length`: the clamp measures how much tangent
+        # this corner's two arms actually HAVE, so it must measure to the caps where they are.
+        # For an arm with no `tail_pos` the two are the same point.
+        p_out_a = vadd(a.tail_center(tail_length),
+                       vscale(lane_perp(da, a.traffic_side), a.out_width() + extra_offset))
+        p_in_b = vadd(b.tail_center(tail_length),
+                      vscale(lane_perp(db, a.traffic_side), -(b.in_width() + extra_offset)))
         max_tangent = min(vlen(vsub(vertex, p_out_a)), vlen(vsub(vertex, p_in_b)))
         radius = min(base_radius, max_tangent * math.tan(theta / 2.0))
     else:

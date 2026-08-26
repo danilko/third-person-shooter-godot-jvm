@@ -412,10 +412,17 @@ def explain_node(graph_obj, node_index, traffic_side='LEFT'):
     return out
 
 
-def collect(graph_obj, traffic_side='LEFT', want_context=False):
+def collect(graph_obj, traffic_side='LEFT', want_context=False, zone_id=None):
     """Every lane and connector of the whole graph.
 
-    Returns `(lanes, stats)` where a lane is a plain dict ready for `.lanekit.json`."""
+    Returns `(lanes, stats)` where a lane is a plain dict ready for `.lanekit.json`.
+
+    `zone_id` is stamped on every through lane and is what `WorldZoneManager.findRoute`'s SECOND
+    lookup strategy matches on (`zoneId == routeName`); without it a spawn config can only reach
+    these lanes by exact node name or by a `g`-prefix scan. Defaults to the graph object's own name,
+    which is the one string an author already knows."""
+    if zone_id is None:
+        zone_id = graph_obj.name
     result = gsolve.solve_object(graph_obj)
     me = graph_obj.data
     bm = bmesh.new()
@@ -607,6 +614,17 @@ def collect(graph_obj, traffic_side='LEFT', want_context=False):
                 lid = "g%d_%s" % (cid, suffix)
                 lanes.append({"id": lid, "points": [_godot(p) for p in lpts],
                               "from_arm": "g%d" % cid, "kind": "through",
+                              # EMPTY, EXPLICITLY. `WorldBaker` defaults a `kind == "through"` lane
+                              # with no `turn` key to "S", and `WorldZoneManager.isSpawnCandidate`
+                              # rejects any lane with a non-empty turn ("spawning mid-junction would
+                              # drop a car inside the box"). Omitting the key therefore made EVERY
+                              # through lane unspawnable -- 351 of them on the island -- and ambient
+                              # traffic spawned unrouted at the zone centre. `present("")` is true
+                              # in `WorldBaker.jsonString`, so an empty string overrides the default
+                              # where a missing key cannot. `lib/lane_kit.py` blanks `turn` for the
+                              # same reason on the legacy path; this is the graph path catching up.
+                              "turn": "",
+                              "zone_id": zone_id,
                               "lane_width": round(float(attrs.get("lane_width", 3.5)), 3),
                               "next": []})
                 # A lane DEPARTS the node its first point is nearest and ARRIVES at the other --
@@ -837,10 +855,30 @@ def audit_movements(graph_obj, traffic_side='LEFT'):
     return out
 
 
-def export(graph_obj, path, traffic_side='LEFT'):
-    lanes, stats = collect(graph_obj, traffic_side)
+def arms_of(lanes):
+    """The top-level `arms` array, derived from the through lanes already emitted.
+
+    `WorldBaker.buildPathLaneRoute` reads a lane's width ONLY as
+    `laneWidthByArm.getOrDefault(from_arm, 3.5f)`, built from this array -- it never looks at the
+    per-lane `lane_width` key. With no `arms` array every lane therefore baked at the 3.5 m default
+    regardless of what it was authored as. Derived here rather than threaded out of `collect` so
+    there is one source (the lanes themselves) and no second opinion about a width."""
+    widths = {}
+    for lane in lanes:
+        if lane.get("kind") != "through":
+            continue
+        arm = lane.get("from_arm")
+        if arm and arm not in widths:
+            widths[arm] = lane.get("lane_width", 3.5)
+    return [{"name": a, "lane_width": w} for a, w in sorted(widths.items())]
+
+
+def export(graph_obj, path, traffic_side='LEFT', zone_id=None):
+    lanes, stats = collect(graph_obj, traffic_side, zone_id=zone_id)
+    arms = arms_of(lanes)
     with open(path, "w") as fh:
-        json.dump({"lanes": lanes}, fh, indent=1)
+        json.dump({"lanes": lanes, "arms": arms}, fh, indent=1)
+    stats = dict(stats, arms=len(arms))
     return stats
 
 

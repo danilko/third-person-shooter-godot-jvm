@@ -78,7 +78,9 @@ public class CruiseState implements VehicleAIState {
         // retune) that balance lands far above city pace. Ease throttle to zero across the
         // falloff band above cruiseSpeed so traffic keeps its authored speed regardless of
         // how powerful the vehicle archetype is.
-        float over = ((float) body.getLinearVelocity().length() - ctrl.cruiseSpeed)
+        // Per-lane pace when the sidecar gives one (v2 `speed_limit`), else the controller's own
+        // cruiseSpeed — so an expressway lane and a backstreet lane no longer run at one speed.
+        float over = ((float) body.getLinearVelocity().length() - ctrl.effectiveCruiseSpeed())
                 / Math.max(0.1f, ctrl.cruiseSpeedFalloff);
         if (over > 0f) cmd.motor *= Math.max(0f, 1f - over);
         // Junction discipline: the probe above only sees the CURRENT route, so a hard turn

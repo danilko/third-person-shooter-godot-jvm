@@ -7,6 +7,7 @@ import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.util.WeightedPick;
 import com.openworld.world.IntersectionZone;
 import com.openworld.world.Lane;
+import com.openworld.world.PathLaneRoute;
 import com.openworld.world.LaneGraph;
 import com.openworld.world.VehicleRoute;
 import godot.annotation.Export;
@@ -193,6 +194,23 @@ public class VehicleAIController extends Controller {
     }
 
     /** True while riding a generated turn connector that actually bends (turn L/R, not S). */
+    /** The pace this car should hold on the lane it is ACTUALLY on, m/s.
+     *
+     *  <p>{@code .lanekit} v2 carries a per-lane {@code speed_limit}, so an arterial and a
+     *  backstreet no longer share one global {@link #cruiseSpeed} — before this, the only speed
+     *  signal the AI had was a turn letter, which says nothing about a straight road. A v1 lane
+     *  (or any non-{@code PathLaneRoute}) leaves {@code speedLimit} at 0 and falls back to
+     *  {@code cruiseSpeed}, so nothing already baked changes pace.
+     *
+     *  <p>Plain Java, not {@code @RegisterFunction}: only {@link CruiseState} calls it, and
+     *  exposing it to Godot would be one more registered symbol for no caller. */
+    public float effectiveCruiseSpeed() {
+        if (route instanceof PathLaneRoute p && p.speedLimit > 0f) {
+            return p.speedLimit / 3.6f;                 // km/h -> m/s
+        }
+        return cruiseSpeed;
+    }
+
     public boolean onTurnConnector() {
         String turn = route == null ? null : route.getTurn();
         return turn != null && !turn.isEmpty() && !"S".equals(turn);
