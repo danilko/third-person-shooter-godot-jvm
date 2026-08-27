@@ -1,10 +1,9 @@
 package com.openworld.character;
 
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.api.*;
 import godot.annotation.Export;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
+import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
 import java.util.HashMap;
@@ -15,44 +14,35 @@ import com.openworld.movement.character.JumpState;
 import com.openworld.movement.character.MovementState;
 import com.openworld.movement.character.Stance;
 
-@RegisterClass(className = "AnimationController")
+@Script(className = "AnimationController")
 public class AnimationController extends Node {
 
-  @RegisterProperty
   @Export
   public AnimationTree animationTree;
 
-  @RegisterProperty
   @Export
   public CharacterBody3D player;
 
-  @RegisterProperty
   @Export
   public TwoBoneIK3D aimIk;
 
-  @RegisterProperty
   @Export
   public LookAtModifier3D aimSpineModifier;
 
-  @RegisterProperty
   @Export
   public Marker3D weaponIKTarget;
 
   /** Base weapon hold position in camera-local space (upright, no stance offset). */
   @Export
-  @RegisterProperty
   public Vector3 weaponIKBasePosition = new Vector3(0.1f, -0.15f, -0.5f);
 
   @Export
-  @RegisterProperty
   public double animationBlendDuration = 0.25;
 
   @Export
-  @RegisterProperty
   public double animationSpeedDuration = 0.7;
 
   @Export
-  @RegisterProperty
   public double floorBlendSpeed = 10.0;
 
   /**
@@ -61,7 +51,6 @@ public class AnimationController extends Node {
    * {@link #floorBlendSpeed} (which governs the slower lift-off into the air).
    */
   @Export
-  @RegisterProperty
   public double landBlendSpeed = 22.0;
 
   /**
@@ -69,7 +58,6 @@ public class AnimationController extends Node {
    * into camera-local space so strafe animations play relative to the facing direction.
    */
   @Export
-  @RegisterProperty
   public boolean worldSpaceMovement = false;
 
   // NodePath for the animation speed parameter never changes — build it once.
@@ -93,7 +81,7 @@ public class AnimationController extends Node {
   private final Map<String, NodePath> blendPathCache = new HashMap<>();
 
 
-  @RegisterFunction
+  @Register
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || animationTree == null) return;
@@ -130,7 +118,7 @@ public class AnimationController extends Node {
     }
   }
 
-  @RegisterFunction
+  @Register
   public void jump(JumpState jumpState) {
     if (animationTree == null) return;
     // Do not kill the movement blend tween — the jump OneShot plays on top of the
@@ -139,7 +127,7 @@ public class AnimationController extends Node {
     animationTree.set(path, AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
   }
 
-  @RegisterFunction
+  @Register
   public void onSetMovementState(MovementState movementState) {
     currentMovementState = movementState;
     updateAnimationBlend(movementState);
@@ -161,12 +149,12 @@ public class AnimationController extends Node {
     animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
   }
 
-  @RegisterFunction
+  @Register
   public void onWeaponReload() {
     animationTree.set("parameters/Reload/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
   }
 
-  @RegisterFunction
+  @Register
   public void onSetStance(Stance stance) {
     if (animationTree == null) return;
 
@@ -183,7 +171,7 @@ public class AnimationController extends Node {
     updateAimModifiers();
   }
 
-  @RegisterFunction
+  @Register
   public void onSetCombatState(CombatState combatState) {
     if (animationTree == null) return;
     combat = combatState.isCombat();
@@ -204,12 +192,12 @@ public class AnimationController extends Node {
     }
   }
 
-  @RegisterFunction
+  @Register
   public void onSetCamRotation(double newCamRotation) {
     camRotation = newCamRotation;
   }
 
-  @RegisterFunction
+  @Register
   public void onSetMovementDirection(Vector3 movementDirection) {
     double dx = movementDirection.getX();
     double dz = movementDirection.getZ();

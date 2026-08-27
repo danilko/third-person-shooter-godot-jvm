@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Curve3D;
 import godot.api.Node3D;
 import godot.api.Path3D;
@@ -42,25 +41,25 @@ import java.util.List;
  * participate in ambient/disposable-traffic zone spawn configs exactly like a {@code VehicleRoute}
  * network.
  */
-@RegisterClass(className = "PathLaneRoute")
+@Script(className = "PathLaneRoute")
 public class PathLaneRoute extends Node3D implements Lane {
 
     /** True = a closed ring. False = a one-way lane ending in {@link #endBehavior}. */
-    @Export @RegisterProperty public boolean loop = false;
+    @Export public boolean loop = false;
 
     /** Turn movement this lane makes through a junction — "L"/"S"/"R", "" on a plain lane. */
-    @Export @RegisterProperty public String turn = "";
+    @Export public String turn = "";
 
     /** Compass/arm label a car on this connector arrives from — "" on a plain lane. */
-    @Export @RegisterProperty public String approach = "";
+    @Export public String approach = "";
 
     /** Right-side lane offset (m) — reserved, mirrors {@code VehicleRoute.laneOffset}; a
      *  {@code PathLaneRoute}'s curve is already the exact per-lane centerline (baked in Blender),
      *  so this is 0 unless a future consumer wants an additional runtime offset. */
-    @Export @RegisterProperty public float laneOffset = 0f;
+    @Export public float laneOffset = 0f;
 
     /** Lane width (m) — informational, from the exported sidecar's {@code lane_width}. */
-    @Export @RegisterProperty public float laneWidth = 3.5f;
+    @Export public float laneWidth = 3.5f;
 
     // ── Explicit road-network connectivity (Phase 3) ──────────────────────────────────────────
     // Endpoint proximity ({@link LaneGraph}) is right for the overwhelming majority of joints and
@@ -72,20 +71,20 @@ public class PathLaneRoute extends Node3D implements Lane {
     /** Comma-separated explicit successor lane node names — same format as
      *  {@code VehicleRoute.nextRoutes}, so {@code util.WeightedPick} parses both. Empty on a plain
      *  lane, which keeps it on the proximity path. */
-    @Export @RegisterProperty public String nextRoutes = "";
+    @Export public String nextRoutes = "";
 
     /** Comma-separated weights parallel to {@link #nextRoutes}. */
-    @Export @RegisterProperty public String nextWeights = "";
+    @Export public String nextWeights = "";
 
     /** Comma-separated movement kinds parallel to {@link #nextRoutes} —
      *  {@code THROUGH} / {@code EXIT} / {@code ENTRY}. <b>This is what an AI reads to know an
      *  interchange is an interchange</b>: "the target took the EXIT" is not derivable from
      *  geometry at a gore. */
-    @Export @RegisterProperty public String nextKinds = "";
+    @Export public String nextKinds = "";
 
     /** The lane immediately INBOARD of this one (toward the centreline) that a car may change
      *  into, or "". */
-    @Export @RegisterProperty public String innerLane = "";
+    @Export public String innerLane = "";
 
     /** The lane immediately OUTBOARD of this one (toward the road edge) that a car may change
      *  into, or "".
@@ -95,27 +94,27 @@ public class PathLaneRoute extends Node3D implements Lane {
      *  the side an exit ramp is on. <b>Lane-change adjacency is not a nicety</b> — an auxiliary
      *  exit lane BEGINS mid-carriageway with nothing upstream to follow from, so it is reachable
      *  only by changing lanes. Without this the ramp is in the graph but unreachable. */
-    @Export @RegisterProperty public String outerLane = "";
+    @Export public String outerLane = "";
 
     /** The multi-piece structure this lane belongs to (e.g. {@code "IC_CHUO_split"}), or "". */
-    @Export @RegisterProperty public String linkGroup = "";
+    @Export public String linkGroup = "";
 
     /** This piece's role in {@link #linkGroup} — {@code trunk} / {@code branch_a} / {@code branch_b}. */
-    @Export @RegisterProperty public String linkRole = "";
+    @Export public String linkRole = "";
 
     /** End-of-lane behaviour: {@link VehicleRoute#END_CHAIN} / {@link VehicleRoute#END_UTURN} /
      *  {@link VehicleRoute#END_DESPAWN}. */
-    @Export @RegisterProperty public String endBehavior = VehicleRoute.END_CHAIN;
+    @Export public String endBehavior = VehicleRoute.END_CHAIN;
 
     /** Optional explicit return lane name for {@link VehicleRoute#END_UTURN} (else derived from
      *  {@link LaneGraph}) — not populated by the current sidecar export; reserved. */
-    @Export @RegisterProperty public String returnRoute = "";
+    @Export public String returnRoute = "";
 
     /** Which district/overlay this lane's authored piece belongs to — from the exported
      *  sidecar's {@code zone_id} (see {@code lib/lane_kit.py:combine_pieces}), the
      *  property-based replacement for the old {@code "<stem>__"} name-prefix zone convention.
      *  "" for a lane whose sidecar predates this field. */
-    @Export @RegisterProperty public String zoneId = "";
+    @Export public String zoneId = "";
 
     // ---- .lanekit v2 -----------------------------------------------------------------------
     // All ADDITIVE: a lane baked from a v1 sidecar leaves every one of these at its default and
@@ -123,22 +122,22 @@ public class PathLaneRoute extends Node3D implements Lane {
     // contract of the schema bump.
 
     /** Design/posted speed for this lane, km/h. 0 = unknown, so the AI keeps its own default. */
-    @Export @RegisterProperty public float speedLimit = 0f;
+    @Export public float speedLimit = 0f;
 
     /** {@code street} / {@code arterial} / {@code expressway} / {@code ramp}, or "". Lets the
      *  spawner make an arterial busy and a backstreet dead instead of keying density off the
      *  zone marker alone. */
-    @Export @RegisterProperty public String roadClass = "";
+    @Export public String roadClass = "";
 
     /** The pad this lane belongs to, for a connector — "" for a through lane. This is the key
      *  {@code JunctionArbiter} (roads-v2 Phase 2) needs, and emitting it now is what stops the
      *  whole world needing a re-bake when signals land. */
-    @Export @RegisterProperty public String junctionId = "";
+    @Export public String junctionId = "";
 
     /** Rise over run along the lane, and superelevation in radians. Advisory: they let the AI
      *  slow for a bend it has not entered yet. */
-    @Export @RegisterProperty public float grade = 0f;
-    @Export @RegisterProperty public float banking = 0f;
+    @Export public float grade = 0f;
+    @Export public float banking = 0f;
 
     /** May an ambient car be SPAWNED on this lane?
      *
@@ -150,8 +149,8 @@ public class PathLaneRoute extends Node3D implements Lane {
      *  <p>{@link #spawnableExplicit} distinguishes "the sidecar said false" from "the sidecar is
      *  v1 and never said" — without it, defaulting to false would make every already-baked v1
      *  district stop spawning traffic. */
-    @Export @RegisterProperty public boolean spawnable = false;
-    @Export @RegisterProperty public boolean spawnableExplicit = false;
+    @Export public boolean spawnable = false;
+    @Export public boolean spawnableExplicit = false;
 
     private static final String PATH_CHILD_NAME = "Path3D";
 
@@ -162,7 +161,7 @@ public class PathLaneRoute extends Node3D implements Lane {
 
     public PathLaneRoute() { super(); }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         var pathNode = getNodeOrNull(PATH_CHILD_NAME);
@@ -172,7 +171,7 @@ public class PathLaneRoute extends Node3D implements Lane {
         if (mgr != null) mgr.registerRoute(this);
     }
 
-    @RegisterFunction
+    @Register
     public void _exitTree() {
         WorldZoneManager mgr = WorldZoneManager.get();
         if (mgr != null) mgr.unregisterRoute(this);
@@ -248,6 +247,11 @@ public class PathLaneRoute extends Node3D implements Lane {
 
     @Override
     public boolean isLoop() { return loop; }
+
+    /** Setter half of the exported {@code loop} property. */
+    public void setLoop(boolean value) {
+        this.loop = value;
+    }
 
     @Override
     public double total() { ensureBaked(); return totalLen; }
@@ -336,7 +340,7 @@ public class PathLaneRoute extends Node3D implements Lane {
     /** The movement kind ({@code THROUGH}/{@code EXIT}/{@code ENTRY}) for successor {@code lane},
      *  or "" if it is not an explicit successor of this one. What an AI asks when it needs to know
      *  whether a target leaving this lane took the ramp or stayed on the mainline. */
-    @RegisterFunction
+    @Register
     public String movementKindTo(String laneName) {
         if (nextRoutes == null || nextRoutes.isBlank() || laneName == null) return "";
         String[] names = nextRoutes.split(",");
@@ -348,9 +352,29 @@ public class PathLaneRoute extends Node3D implements Lane {
     }
 
     @Override public String getTurn() { return turn; }
+
+    /** Setter half of the exported {@code turn} property. */
+    public void setTurn(String value) {
+        this.turn = value;
+    }
     @Override public String getApproach() { return approach; }
+
+    /** Setter half of the exported {@code approach} property. */
+    public void setApproach(String value) {
+        this.approach = value;
+    }
     @Override public String getEndBehavior() { return endBehavior; }
+
+    /** Setter half of the exported {@code endBehavior} property. */
+    public void setEndBehavior(String value) {
+        this.endBehavior = value;
+    }
     @Override public String getReturnRoute() { return returnRoute; }
+
+    /** Setter half of the exported {@code returnRoute} property. */
+    public void setReturnRoute(String value) {
+        this.returnRoute = value;
+    }
 
     // ── Geometry helpers (deliberately duplicated from VehicleRoute's identical windowed-search
     //    loop rather than extracted into a shared helper — small, self-contained, and this is the

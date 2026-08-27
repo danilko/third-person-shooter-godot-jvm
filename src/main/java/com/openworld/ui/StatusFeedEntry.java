@@ -1,7 +1,7 @@
 package com.openworld.ui;
 
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Label;
 import godot.api.TextureRect;
 import godot.api.Texture2D;
@@ -18,7 +18,7 @@ import godot.core.Vector2;
  * Push to the "status" {@link Feed} instance (top-of-screen) for transient toasts
  * like weapon pickups and mission start/complete/fail.
  */
-@RegisterClass(className = "StatusFeedEntry")
+@Script(className = "StatusFeedEntry")
 public class StatusFeedEntry extends FeedEntry {
 
     private String    pendingMessage = "";
@@ -30,7 +30,7 @@ public class StatusFeedEntry extends FeedEntry {
         this.pendingIcon    = icon;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         super._ready();

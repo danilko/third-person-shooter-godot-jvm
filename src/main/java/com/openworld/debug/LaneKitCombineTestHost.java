@@ -4,9 +4,8 @@ import com.openworld.world.PathLaneRoute;
 import com.openworld.world.WorldBaker;
 import com.openworld.world.WorldZoneManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.PackedScene;
@@ -38,7 +37,7 @@ import java.util.Set;
  * for a different district's {@code .lanekit.json}) — default to the debug_road fixture this
  * test originally shipped against, so the existing {@code LaneKitCombineTest.tscn} is unaffected.
  */
-@RegisterClass(className = "LaneKitCombineTestHost")
+@Script(className = "LaneKitCombineTestHost")
 public class LaneKitCombineTestHost extends Node3D {
 
     private static final String SRC = "res://src/main/resources/com/openworld/debug/EmptyBakeSource.tscn";
@@ -46,16 +45,16 @@ public class LaneKitCombineTestHost extends Node3D {
     // The user-designated AI-drive test fixture (road_blender_godot.md Phase 6) — a small
     // connected network (multiple intersections/segments/one transition), combined by
     // tools/save_lane_kit.py into one sidecar, exactly the multi-piece case P6.4 added.
-    @Export @RegisterProperty
+    @Export
     public String lanekitPath =
             "/data/danilko/git/third-person-shooter/assets/world_source/debug_road.lanekit.json";
-    @Export @RegisterProperty
+    @Export
     public String expectedZoneId = "debug_road";
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
-        WorldBaker.bake(this, SRC, OUT, "res://src/main/resources/com/openworld/world/kit/", lanekitPath);
+        WorldBaker.bakeScene(this, SRC, OUT, "res://src/main/resources/com/openworld/world/kit/", lanekitPath);
 
         java.lang.Object loaded = GD.load(OUT);
         if (!(loaded instanceof PackedScene packed)) { GD.printErr("LKCTEST: bake output missing"); finish(false); return; }

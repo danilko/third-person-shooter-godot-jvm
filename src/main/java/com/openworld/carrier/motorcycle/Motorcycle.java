@@ -2,7 +2,7 @@ package com.openworld.carrier.motorcycle;
 
 import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.carrier.vehicle.VehicleConfig;
-import godot.annotation.RegisterClass;
+import godot.annotation.Script;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -16,7 +16,7 @@ import godot.global.GD;
  * {@code uprightTorque} (set high in the scene's config preset) both holds the bike
  * upright at rest and banks it through corners. Parked sleep freezes it standing.
  */
-@RegisterClass(className = "Motorcycle")
+@Script(className = "Motorcycle")
 public class Motorcycle extends Vehicle {
 
     @Override

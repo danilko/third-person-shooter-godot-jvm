@@ -4,32 +4,27 @@ import godot.api.CollisionShape3D;
 import godot.api.Node;
 import godot.api.RayCast3D;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.core.VariantArray;
 import godot.core.Vector3;
 import godot.global.GD;
 
-@RegisterClass
+@Script
 public class Stance extends Node {
 
   // --- Movement States ---
   @Export
-  @RegisterProperty
   public MovementState idleState;
 
   @Export
-  @RegisterProperty
   public MovementState walkState;
 
   @Export
-  @RegisterProperty
   public MovementState sprintState;
 
   // --- Camera Data ---
   @Export
-  @RegisterProperty
   public double cameraHeight = 1.3;
 
   // --- Animation ---
@@ -41,14 +36,12 @@ public class Stance extends Node {
    * {@code "Crawl"} as a placeholder until a dedicated swim AnimationTree state exists (I1).
    */
   @Export
-  @RegisterProperty
   public String animationStanceKey = "";
 
   // --- Aim / IK ---
 
   /** Local offset added to WeaponIKTarget's base position for this stance. */
   @Export
-  @RegisterProperty
   public Vector3 weaponIKOffset = new Vector3(0, 0, 0);
 
   /**
@@ -56,16 +49,13 @@ public class Stance extends Node {
    * Set to 0 to disable the spine aim modifier entirely for stances where it produces artefacts.
    */
   @Export
-  @RegisterProperty
   public float spineAimMaxAngle = 60.0f;
 
   // --- Collision ---
   @Export
-  @RegisterProperty
   public CollisionShape3D collider;
 
   @Export
-  @RegisterProperty
   public RayCast3D colRaycast;
 
   /**
@@ -87,7 +77,6 @@ public class Stance extends Node {
    * IS a Node, so assigning sibling stances still works. {@link #isBlocked} narrows back.
    */
   @Export
-  @RegisterProperty
   public VariantArray<Node> higherStances = new VariantArray<>(Node.class);
 
   /**
@@ -95,7 +84,7 @@ public class Stance extends Node {
    * Also returns true if any of the {@link #higherStances} are themselves blocked,
    * preventing an upward transition that would collide.
    */
-  @RegisterFunction
+  @Register
   public boolean isBlocked() {
     if (colRaycast != null && colRaycast.isColliding()) return true;
     for (Node taller : higherStances) {

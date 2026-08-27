@@ -7,8 +7,8 @@ import com.openworld.character.Faction;
 import com.openworld.net.NetworkController;
 import com.openworld.character.Player;
 import com.openworld.net.PickupGrantPolicy;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Input;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -54,11 +54,11 @@ import com.openworld.weapon.WeaponItem;
  *
  * AutoLoad entry (add to project.godot after running ./gradlew build):
  *   [autoload]
- *   GameManager="*res://gdj/com/game/GameManager.gdj"
+ *   GameManager="*res://src/main/java/com/openworld/game/GameManager.java"
  *
  * Wire EventBus.playerDied → GameManager.onPlayerDied() in the scene or in _ready().
  */
-@RegisterClass(className = "GameManager")
+@Script(className = "GameManager")
 public class GameManager extends Node {
 
     public enum GameState {
@@ -77,7 +77,7 @@ public class GameManager extends Node {
      */
     private final Set<String> alivePlayerCharacterIds = new HashSet<>();
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         // Connect to EventBus once it is available as a sibling AutoLoad.
@@ -117,7 +117,7 @@ public class GameManager extends Node {
      * wiring. (Mid-session frees — zone unload, despawn — are a separate concern handled by each audio
      * node self-stopping on its own tree_exiting; see WeaponController and the CLAUDE.md audio quirk.)
      */
-    @RegisterFunction
+    @Register
     public void onCloseRequested() {
         prepareForQuit();
     }
@@ -158,7 +158,7 @@ public class GameManager extends Node {
      * down its resource table — otherwise the still-referenced texture is reported as
      * "1 resource still in use at exit" (leaked ObjectDB instance).
      */
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         IconRegistry.clear();
@@ -168,7 +168,7 @@ public class GameManager extends Node {
     // ── State transitions ─────────────────────────────────────────────────────
 
     /** Track every spawned human-controlled (Player) character for the "all dead" check. */
-    @RegisterFunction
+    @Register
     public void onCharacterSpawned(Node node, CharacterInfo info) {
         if (node instanceof Player && info != null && !info.characterId.isEmpty()) {
             alivePlayerCharacterIds.add(info.characterId);
@@ -176,7 +176,7 @@ public class GameManager extends Node {
     }
 
     /** GAME_OVER fires once every tracked Player character has died — not on the first. */
-    @RegisterFunction
+    @Register
     public void onCharacterDied(CharacterInfo info) {
         if (info == null) return;
         if (alivePlayerCharacterIds.remove(info.characterId) && alivePlayerCharacterIds.isEmpty()) {

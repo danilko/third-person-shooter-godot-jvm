@@ -15,7 +15,7 @@ import com.openworld.world.manager.ImpactManager;
 /**
  * Ragdoll + death-visuals behaviour extracted from {@link Character} (WS5 god-class split).
  *
- * Plain collaborator — deliberately NOT a {@code @RegisterClass} Node — owned by a single
+ * Plain collaborator — deliberately NOT a {@code @Script} Node — owned by a single
  * {@link Character} and operating on its node tree. Keeping it un-registered is what makes the
  * extraction scene-safe: no new {@code .gdj} is generated and no scene {@code ext_resource}
  * reference changes. {@code Character} keeps the public-facing method signatures (and their Godot

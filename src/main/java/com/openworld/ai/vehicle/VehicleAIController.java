@@ -11,8 +11,8 @@ import com.openworld.world.PathLaneRoute;
 import com.openworld.world.LaneGraph;
 import com.openworld.world.VehicleRoute;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.RayCast3D;
 import godot.core.Vector3;
@@ -38,11 +38,11 @@ import java.util.List;
  * {@link LaneGraph} (or the lane's explicit {@code nextRoutes}); with no successor it follows the lane's
  * {@code endBehavior} — U-turn (drive back) or despawn (the zone respawns one elsewhere).
  */
-@RegisterClass(className = "VehicleAIController")
+@Script(className = "VehicleAIController")
 public class VehicleAIController extends Controller {
 
     /** Throttle fraction applied while cruising along the lane (0–1). */
-    @RegisterProperty @Export public float cruiseThrottle = 0.4f;
+    @Export public float cruiseThrottle = 0.4f;
 
     /** Target cruising speed (m/s) — throttle eases to zero above it. Lowered 2026-07-27
      *  (user-requested experiment: does slower ambient traffic stop flying/pushing off the road at
@@ -51,34 +51,34 @@ public class VehicleAIController extends Controller {
      *  per-archetype speed (a racing AI faster still) — both would read from data (a road/lane
      *  property, or a distinct AIBehaviorConfig-style resource per AI archetype) rather than this
      *  one shared default, once there's a road-type signal to key off of. */
-    @RegisterProperty @Export public float cruiseSpeed = 7f;
+    @Export public float cruiseSpeed = 7f;
 
     /** Speed band (m/s) over which throttle fades from full to zero above cruiseSpeed. */
-    @RegisterProperty @Export public float cruiseSpeedFalloff = 3f;
+    @Export public float cruiseSpeedFalloff = 3f;
 
     /** Speed-proportional look-ahead: {@code clamp(lookaheadMin + speed·lookaheadSpeedGain, …, lookaheadMax)}. */
-    @RegisterProperty @Export public float lookaheadMin = 4.0f;
-    @RegisterProperty @Export public float lookaheadSpeedGain = 0.5f;
-    @RegisterProperty @Export public float lookaheadMax = 14.0f;
+    @Export public float lookaheadMin = 4.0f;
+    @Export public float lookaheadSpeedGain = 0.5f;
+    @Export public float lookaheadMax = 14.0f;
 
     /** How far beyond the steer look-ahead to probe the lane for an upcoming bend (m) — corner anticipation. */
-    @RegisterProperty @Export public float curvatureProbe = 5.0f;
+    @Export public float curvatureProbe = 5.0f;
 
     /** Heading-error → steer-angle gain. The car commands a target wheel angle ∝ steerGain·sin(error),
      *  saturating to full lock; higher = sharper turn-in. */
-    @RegisterProperty @Export public float steerGain = 2.5f;
+    @Export public float steerGain = 2.5f;
 
     /** How much to cut throttle in turns (0 = never, 1 = stop in a hard turn). */
-    @RegisterProperty @Export public float turnSlowdown = 0.7f;
+    @Export public float turnSlowdown = 0.7f;
 
     /** Distance (m) before a chained lane end at which the car eases off for the junction. The
      *  curvature probe can't see past the current route, so an upcoming 90° turn connector is
      *  invisible until adopted — without this cars enter junctions at full cruise speed and fly
      *  off the turn (roads-v2 Phase 1). */
-    @RegisterProperty @Export public float junctionSlowdown = 18.0f;
+    @Export public float junctionSlowdown = 18.0f;
 
     /** Throttle multiplier while approaching a junction or riding a non-straight turn connector. */
-    @RegisterProperty @Export public float junctionThrottleScale = 0.45f;
+    @Export public float junctionThrottleScale = 0.45f;
 
     private static final double END_THRESHOLD = 3.0;   // m from the lane end = "arrived"
 
@@ -202,7 +202,7 @@ public class VehicleAIController extends Controller {
      *  (or any non-{@code PathLaneRoute}) leaves {@code speedLimit} at 0 and falls back to
      *  {@code cruiseSpeed}, so nothing already baked changes pace.
      *
-     *  <p>Plain Java, not {@code @RegisterFunction}: only {@link CruiseState} calls it, and
+     *  <p>Plain Java, not {@code @Register}: only {@link CruiseState} calls it, and
      *  exposing it to Godot would be one more registered symbol for no caller. */
     public float effectiveCruiseSpeed() {
         if (route instanceof PathLaneRoute p && p.speedLimit > 0f) {

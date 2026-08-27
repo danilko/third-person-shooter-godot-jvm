@@ -4,8 +4,8 @@ import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.world.WorldZone;
 import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.PhysicsDirectSpaceState3D;
@@ -32,7 +32,7 @@ import godot.global.GD;
  *
  * Grep for "TRAFFICDIAG".
  */
-@RegisterClass(className = "TrafficCrashDiagnosticHost")
+@Script(className = "TrafficCrashDiagnosticHost")
 public class TrafficCrashDiagnosticHost extends Node3D {
 
     private static final String DISTRICT =
@@ -93,7 +93,7 @@ public class TrafficCrashDiagnosticHost extends Node3D {
         return Math.abs(hitPos.getY() - pos.getY()) < 2.0f;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         Node characters = new Node();
@@ -130,7 +130,7 @@ public class TrafficCrashDiagnosticHost extends Node3D {
         GD.print("TRAFFICDIAG: zone marker placed at " + MARKER_POS + "; will run " + RUN_SECONDS + "s");
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         timer += delta;

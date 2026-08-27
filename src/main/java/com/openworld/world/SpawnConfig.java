@@ -1,8 +1,7 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Resource;
 import com.openworld.ai.AIBehaviorConfig;
 import com.openworld.character.Faction;
@@ -19,20 +18,20 @@ import com.openworld.character.Faction;
  * ({@code AIBehaviorConfig.patrolRadius}). Leave {@code behaviorConfig} null to use the
  * AICharacter scene default.
  */
-@RegisterClass(className = "SpawnConfig")
+@Script(className = "SpawnConfig")
 public class SpawnConfig extends Resource {
 
     /** Faction string stamped onto each spawned AI's CharacterInfo (see {@link Faction}). */
-    @Export @RegisterProperty public String faction = Faction.ENEMY;
+    @Export public String faction = Faction.ENEMY;
 
     /** Per-AI behaviour profile. Null → AICharacter's shared DEFAULTS apply. */
-    @Export @RegisterProperty public AIBehaviorConfig behaviorConfig;
+    @Export public AIBehaviorConfig behaviorConfig;
 
     /** Number of AIs to spawn for this group when the zone loads. */
-    @Export @RegisterProperty public int count = 3;
+    @Export public int count = 3;
 
     /** Weapon scene each AI is equipped with on spawn. */
-    @Export @RegisterProperty public String weaponScenePath =
+    @Export public String weaponScenePath =
             "res://src/main/resources/com/openworld/weapon/AR4.tscn";
 
     public SpawnConfig() { super(); }

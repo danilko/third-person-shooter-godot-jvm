@@ -3,10 +3,8 @@ package com.openworld.character;
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
-import godot.annotation.RegisterSignal;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.PhysicalBone3D;
 import godot.api.Texture2D;
@@ -17,16 +15,14 @@ import godot.core.Vector3;
 import godot.global.GD;
 import com.openworld.control.Controllable;
 
-@RegisterClass(className = "Health")
+@Script(className = "Health")
 public class Health extends Node {
 
     @Export
-    @RegisterProperty
     public float maxHealth = 100.0f;
 
     /** Display name used in kill notifications. Falls back to the owner node name if empty. */
     @Export
-    @RegisterProperty
     public String displayName = "";
 
     /**
@@ -46,7 +42,6 @@ public class Health extends Node {
      * separate from {@link #healthChanged}: re-deriving a discrete event from the
      * continuously-replicated health value would double-fire it on clients.
      */
-    @RegisterSignal
     public final Signal1<Float> hit = new Signal1<>(this, new StringName("hit"));
 
     /**
@@ -56,13 +51,11 @@ public class Health extends Node {
      * for anything that shows current health — otherwise it won't track on non-authority
      * peers (where damage arrives via replication, not local {@code takeDamage}).
      */
-    @RegisterSignal
     public final Signal1<Float> healthChanged = new Signal1<>(this, new StringName("health_changed"));
 
-    @RegisterSignal
     public final Signal0 died = new Signal0(this, new StringName("died"));
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         currentHealth = maxHealth;
@@ -218,7 +211,7 @@ public class Health extends Node {
         if (busNode instanceof EventBus bus) bus.characterHealthChanged.emit(c.characterInfo, currentHealth);
     }
 
-    @RegisterFunction
+    @Register
     public void heal(float amount) {
         currentHealth = Math.min(maxHealth, currentHealth + amount);
         emitCharacterHealthChanged();

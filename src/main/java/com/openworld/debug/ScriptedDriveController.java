@@ -2,7 +2,7 @@ package com.openworld.debug;
 
 import com.openworld.control.Controller;
 import com.openworld.control.UserCommand;
-import godot.annotation.RegisterClass;
+import godot.annotation.Script;
 
 /**
  * Deterministic test-driver for the headless vehicle physics harness ({@link DriveTestHost}).
@@ -19,7 +19,7 @@ import godot.annotation.RegisterClass;
  *   39–44 s   full reverse input (gearbox: brakes the rolling car first, then backs up
  *             — maxKmh in this phase is the reverse ceiling)
  */
-@RegisterClass(className = "ScriptedDriveController")
+@Script(className = "ScriptedDriveController")
 public class ScriptedDriveController extends Controller {
 
     private double t = 0.0;

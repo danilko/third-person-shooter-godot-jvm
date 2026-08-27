@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.DirectionalLight3D;
 import godot.api.Environment;
 import godot.api.FileAccess;
@@ -65,7 +64,7 @@ import java.util.UUID;
  * {@code _ready()} and cleared in {@code _exitTree()}, where pooled bodies + loaded geometry are
  * also freed (leak discipline — see CLAUDE.md "Known Quirks").
  */
-@RegisterClass(className = "WorldZoneManager")
+@Script(className = "WorldZoneManager")
 public class WorldZoneManager extends Node {
 
 	private static WorldZoneManager instance;
@@ -74,7 +73,7 @@ public class WorldZoneManager extends Node {
 	public static WorldZoneManager get() { return instance; }
 
 	/** Seconds between load/unload evaluations. */
-	@Export @RegisterProperty public float evalInterval = 0.5f;
+	@Export public float evalInterval = 0.5f;
 
 	/**
 	 * Max new zone stream-in pipelines <b>started</b> in a single eval tick. Starting a pipeline is
@@ -86,7 +85,7 @@ public class WorldZoneManager extends Node {
 	 * one zone at a time and time-sliced by {@link #streamBudgetMs} regardless of this value.
 	 * Unloads are not capped (they are batched under the same budget).
 	 */
-	@Export @RegisterProperty public int maxLoadsPerTick = 2;
+	@Export public int maxLoadsPerTick = 2;
 
 	/**
 	 * Per-frame main-thread time budget (milliseconds) for streaming work: entering district
@@ -96,13 +95,13 @@ public class WorldZoneManager extends Node {
 	 * leaves headroom inside a 60Hz physics tick; lower it on Steam Deck if streaming visibly
 	 * dents the frame rate, raise it to stream faster.
 	 */
-	@Export @RegisterProperty public float streamBudgetMs = 4.0f;
+	@Export public float streamBudgetMs = 4.0f;
 
 	/** Max recycled AI bodies the pool retains. */
-	@Export @RegisterProperty public int poolCapacity = 64;
+	@Export public int poolCapacity = 64;
 
 	/** Print per-zone load/unload decisions + pool stats to the Output log (E1 walk-test aid). */
-	@Export @RegisterProperty public boolean debugLog = true;
+	@Export public boolean debugLog = true;
 
 	/**
 	 * Recycle AI bodies through the {@link SpawnPool} across load/unload. <b>Default off / EXPERIMENTAL:</b>
@@ -114,7 +113,7 @@ public class WorldZoneManager extends Node {
 	 * and load instantiates fresh — correct and stutter-tolerable; spreading spawns across frames is the
 	 * proper perf answer (TODO) rather than body reuse. Leave off unless you are actively hardening reuse.
 	 */
-	@Export @RegisterProperty public boolean recycleBodies = false;
+	@Export public boolean recycleBodies = false;
 
 	private static final String AI_SCENE_PATH =
 			"res://src/main/resources/com/openworld/character/AICharacter.tscn";
@@ -189,13 +188,13 @@ public class WorldZoneManager extends Node {
 	 * {@code beginGeometry}. */
 	private final Set<WorldZoneMarker> replaceOnNextLoad = new HashSet<>();
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _ready() {
 		instance = this;
 	}
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _exitTree() {
 		if (instance == this) instance = null;
@@ -367,7 +366,7 @@ public class WorldZoneManager extends Node {
 
 	// ── Streaming tick ──────────────────────────────────────────────────────────
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _physicsProcess(double delta) {
 		detectSceneReload();

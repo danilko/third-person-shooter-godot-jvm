@@ -6,8 +6,8 @@ import com.openworld.character.CharacterInfo;
 import com.openworld.world.LaneGraph;
 import com.openworld.world.PathLaneRoute;
 import com.openworld.world.WorldBaker;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.StringName;
 import godot.core.Vector3;
@@ -34,7 +34,7 @@ import java.util.UUID;
  * straight < 10 deg, measured only while each controller is still actively driving -- see
  * SETTLE_SECONDS/isFinished() below for why).
  */
-@RegisterClass(className = "PathLaneRouteTestHost")
+@Script(className = "PathLaneRouteTestHost")
 public class PathLaneRouteTestHost extends Node3D {
 
     private static final String SRC = "res://src/main/resources/com/openworld/debug/EmptyBakeSource.tscn";
@@ -58,7 +58,7 @@ public class PathLaneRouteTestHost extends Node3D {
     private double timer = RUN_SECONDS;
     private boolean done = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         StaticBody3D ground = new StaticBody3D();
@@ -70,7 +70,7 @@ public class PathLaneRouteTestHost extends Node3D {
         ground.setPosition(new Vector3(0f, -0.5f, 0f));
         addChild(ground);
 
-        WorldBaker.bake(this, SRC, OUT, "res://src/main/resources/com/openworld/world/kit/", LANEKIT);
+        WorldBaker.bakeScene(this, SRC, OUT, "res://src/main/resources/com/openworld/world/kit/", LANEKIT);
 
         java.lang.Object loaded = GD.load(OUT);
         if (!(loaded instanceof PackedScene packed)) { GD.printErr("PLRTEST: bake output missing"); finishNow(); return; }
@@ -175,7 +175,7 @@ public class PathLaneRouteTestHost extends Node3D {
         return v;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (done) return;

@@ -1,6 +1,8 @@
 package com.openworld.camera;
 
-import godot.annotation.*;
+import godot.annotation.Export;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
@@ -10,14 +12,12 @@ import com.openworld.movement.character.CombatState;
 import com.openworld.movement.character.MovementState;
 import com.openworld.movement.character.Stance;
 
-@RegisterClass(className = "TPSCameraController")
+@Script(className = "TPSCameraController")
 public class TPSCameraController extends Node3D {
 
-  @RegisterSignal
   public Signal1<Double> setCamRotation = new Signal1<>(this, new StringName("set_cam_rotation"));
 
   @Export
-  @RegisterProperty
   public CharacterBody3D player;
 
   protected int shoulderDirection = 1;
@@ -31,31 +31,24 @@ public class TPSCameraController extends Node3D {
   protected Character character;
 
   @Export
-  @RegisterProperty
   public double yawSensitivity = 0.07;
 
   @Export
-  @RegisterProperty
   public double pitchSensitivity = 0.07;
 
   @Export
-  @RegisterProperty
   public double pitchMax = 75.0;
 
   @Export
-  @RegisterProperty
   public double pitchMin = -55.0;
 
   @Export
-  @RegisterProperty
   public double shoulderOffsetLerpSpeed = 4.0;
 
   @Export
-  @RegisterProperty
   public double followLerpSpeed = 18.0;
 
   @Export
-  @RegisterProperty
   public double fovTweenDuration = 0.5;
 
   protected ControlRotation controlRotation;
@@ -76,12 +69,11 @@ public class TPSCameraController extends Node3D {
   protected boolean combat = false;
 
   @Export
-  @RegisterProperty
   public double recoilRecoverySpeed = 8.0;
 
   private Tween tween;
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     yawNode   = (Node3D)      getNode(new NodePath("Yaw"));
@@ -126,7 +118,7 @@ public class TPSCameraController extends Node3D {
     setCameraFov();
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _physicsProcess(double delta) {
     Vector2 lookDelta = gatherLookInput(delta);
@@ -175,7 +167,7 @@ public class TPSCameraController extends Node3D {
     controlRotation.recoilYaw   += yawKick;
   }
 
-  @RegisterFunction
+  @Register
   public void onSetCombatState(CombatState combatState) {
     combat    = combatState.isCombat();
     cameraFov = combatState.cameraFov;
@@ -186,7 +178,7 @@ public class TPSCameraController extends Node3D {
     setCameraFov();
   }
 
-  @RegisterFunction
+  @Register
   public void onSetMovementState(MovementState movementState) {
     movementFov = movementState.getCameraFov();
     setCameraFov();
@@ -212,7 +204,7 @@ public class TPSCameraController extends Node3D {
          .setEase(Tween.EaseType.OUT);
   }
 
-  @RegisterFunction
+  @Register
   public void onSetStance(Stance stance) {
     stanceCameraHeight = stance.getCameraHeight();
     applyCameraHeight();

@@ -2,9 +2,8 @@ package com.openworld.ui;
 
 import com.openworld.game.EventBus;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Callable;
 import godot.core.MethodCallable;
@@ -20,10 +19,9 @@ import com.openworld.weapon.WeaponController;
  * {@link HUDManager} and rendered through the shared {@link Feed} components, so this
  * widget stays a thin per-character status panel that survives HUD context switches.
  */
-@RegisterClass(className = "CharacterHUD")
+@Script(className = "CharacterHUD")
 public class CharacterHUD extends Control {
 
-  @RegisterProperty
   @Export
   public NodePath healthLabelPath = new NodePath("Health/ColorRect/Health");
 
@@ -34,7 +32,7 @@ public class CharacterHUD extends Control {
   private ProgressBar oxygenBar;
   private String playerCharacterId = "";
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     if (hasNode(healthLabelPath)) {
@@ -70,7 +68,7 @@ public class CharacterHUD extends Control {
    * Receive EventBus.playerOxygenChanged — fill the swim breath meter and show it only while air is
    * below full (i.e. the swimmer is/was submerged); a full tank hides the widget.
    */
-  @RegisterFunction
+  @Register
   public void onOxygenChanged(float current, float max) {
     if (oxygenRoot == null) return;
     oxygenRoot.setVisible(current < max);
@@ -82,12 +80,12 @@ public class CharacterHUD extends Control {
    * No-op today — ammo is displayed by WeaponSlotsUI / the radial menu; kept as the
    * per-character hook for a future dedicated ammo widget (e.g. co-op squad overlays).
    */
-  @RegisterFunction
+  @Register
   public void onAmmoChanged(int magazine, int reserve) {
   }
 
   /** Receive EventBus.playerHealthChanged (current health for the active player). */
-  @RegisterFunction
+  @Register
   public void onHealthChanged(float currentHealth) {
     if (healthLabel != null) {
       healthLabel.setText(String.valueOf((int) currentHealth));
@@ -95,7 +93,7 @@ public class CharacterHUD extends Control {
   }
 
   /** Receive EventBus.pickupInteractChanged — show/hide the "Press E to pick up" prompt. */
-  @RegisterFunction
+  @Register
   public void onPickupInteractChanged(boolean inRange, String label) {
     if (interactPromptLabel == null) return;
     if (inRange) {

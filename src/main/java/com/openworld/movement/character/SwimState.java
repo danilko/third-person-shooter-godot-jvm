@@ -1,9 +1,8 @@
 package com.openworld.movement.character;
 
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
-import godot.api.Resource;
 import godot.annotation.Export;
+import godot.annotation.Script;
+import godot.api.Resource;
 
 /**
  * Tunables for the SWIM stance (PLAN.md I1 — water traversal). Assigned to
@@ -15,22 +14,19 @@ import godot.annotation.Export;
  * pops out the top, so the stance only reverts when the character leaves the volume horizontally.
  * Placeholder model: a single surface line, no per-vertex water sampling.
  */
-@RegisterClass(className = "SwimState")
+@Script(className = "SwimState")
 public class SwimState extends Resource {
 
   /** Reduced downward gravity while swimming (m/s²). Retained for tuning; the surface spring dominates. */
   @Export
-  @RegisterProperty
   public double swimGravity = 4.0;
 
   /** Buoyancy spring stiffness — vertical velocity ≈ buoyancy × (targetY − bodyY), clamped. */
   @Export
-  @RegisterProperty
   public double buoyancy = 6.0;
 
   /** How far below the water surface the body origin settles (m) — small so the head pokes out. */
   @Export
-  @RegisterProperty
   public double submersionDepth = 0.7;
 
   /**
@@ -38,7 +34,6 @@ public class SwimState extends Resource {
    * the weapon clears the waterline for a clean "tread-water" gunline (GTA/PUBG surface shooting).
    */
   @Export
-  @RegisterProperty
   public double aimSubmersionDepth = 0.53;
 
   /**
@@ -48,7 +43,6 @@ public class SwimState extends Resource {
    * value set here in the {@code .tres} wins.
    */
   @Export
-  @RegisterProperty
   public double swimEnterDepth = 1.4;
 
   /**
@@ -56,22 +50,18 @@ public class SwimState extends Resource {
    * up. Must be {@code < swimEnterDepth} for hysteresis (no SWIM⇄UPRIGHT flicker at the boundary).
    */
   @Export
-  @RegisterProperty
   public double swimExitDepth = 0.93;
 
   /** How far down (m) the floor probe casts to find the bottom; beyond this is treated as deep water. */
   @Export
-  @RegisterProperty
   public double floorProbeLength = 8.0;
 
   /** Physics layer mask the floor probe collides with (default layer 1 = world/static geometry). */
   @Export
-  @RegisterProperty
   public long floorProbeMask = 1;
 
   /** Clamp on the PASSIVE buoyancy-driven vertical velocity (m/s) — the gentle auto-settle speed. */
   @Export
-  @RegisterProperty
   public double maxVerticalSpeed = 2.0;
 
   /**
@@ -79,12 +69,10 @@ public class SwimState extends Resource {
    * so powering to the surface beats waiting for buoyancy. Eases to a stop at the settle line.
    */
   @Export
-  @RegisterProperty
   public double swimAscendSpeed = 4.0;
 
   /** MANUAL dive speed (m/s) while holding crouch/crawl. */
   @Export
-  @RegisterProperty
   public double swimDiveSpeed = 3.0;
 
   /**
@@ -94,7 +82,6 @@ public class SwimState extends Resource {
    * from the depths. A tall dock above this reach still can't be cleared (mantle climb is future work).
    */
   @Export
-  @RegisterProperty
   public double swimJumpSpeed = 4.5;
 
   /**
@@ -103,7 +90,6 @@ public class SwimState extends Resource {
    * it expires the passive buoyancy gently settles it back to the surface if it fell short.
    */
   @Export
-  @RegisterProperty
   public double swimJumpDuration = 0.45;
 
   // ── Breath / oxygen (PLAN.md I1) ────────────────────────────────────────────
@@ -113,7 +99,6 @@ public class SwimState extends Resource {
 
   /** Lung capacity in seconds — how long a fully-submerged swimmer lasts before drowning starts. */
   @Export
-  @RegisterProperty
   public double maxOxygen = 12.0;
 
   /**
@@ -121,22 +106,18 @@ public class SwimState extends Resource {
    * to drain. Must be deeper than {@link #submersionDepth} so ordinary surface swimming never drains.
    */
   @Export
-  @RegisterProperty
   public double submergeDepth = 1.4;
 
   /** Oxygen recovery rate (s of air per real second) once the head is back above water. */
   @Export
-  @RegisterProperty
   public double oxygenRecoverRate = 4.0;
 
   /** Drowning damage applied per {@link #drowningInterval} once oxygen is depleted. */
   @Export
-  @RegisterProperty
   public double drowningDamage = 8.0;
 
   /** Seconds between drowning damage ticks while oxygen is empty. */
   @Export
-  @RegisterProperty
   public double drowningInterval = 1.0;
 
   /**
@@ -145,28 +126,122 @@ public class SwimState extends Resource {
    * cap and is available for future explicit clamping.
    */
   @Export
-  @RegisterProperty
   public double swimSpeed = 2.5;
 
   public double getSwimGravity() { return swimGravity; }
+
+  /** Setter half of the exported {@code swimGravity} property. */
+  public void setSwimGravity(double value) {
+    this.swimGravity = value;
+  }
   public double getBuoyancy() { return buoyancy; }
+
+  /** Setter half of the exported {@code buoyancy} property. */
+  public void setBuoyancy(double value) {
+    this.buoyancy = value;
+  }
   public double getSubmersionDepth() { return submersionDepth; }
+
+  /** Setter half of the exported {@code submersionDepth} property. */
+  public void setSubmersionDepth(double value) {
+    this.submersionDepth = value;
+  }
   public double getAimSubmersionDepth() { return aimSubmersionDepth; }
+
+  /** Setter half of the exported {@code aimSubmersionDepth} property. */
+  public void setAimSubmersionDepth(double value) {
+    this.aimSubmersionDepth = value;
+  }
   public double getSwimEnterDepth() { return swimEnterDepth; }
+
+  /** Setter half of the exported {@code swimEnterDepth} property. */
+  public void setSwimEnterDepth(double value) {
+    this.swimEnterDepth = value;
+  }
   public double getSwimExitDepth() { return swimExitDepth; }
+
+  /** Setter half of the exported {@code swimExitDepth} property. */
+  public void setSwimExitDepth(double value) {
+    this.swimExitDepth = value;
+  }
   public double getFloorProbeLength() { return floorProbeLength; }
+
+  /** Setter half of the exported {@code floorProbeLength} property. */
+  public void setFloorProbeLength(double value) {
+    this.floorProbeLength = value;
+  }
   public long getFloorProbeMask() { return floorProbeMask; }
+
+  /** Setter half of the exported {@code floorProbeMask} property. */
+  public void setFloorProbeMask(long value) {
+    this.floorProbeMask = value;
+  }
   public double getMaxVerticalSpeed() { return maxVerticalSpeed; }
+
+  /** Setter half of the exported {@code maxVerticalSpeed} property. */
+  public void setMaxVerticalSpeed(double value) {
+    this.maxVerticalSpeed = value;
+  }
   public double getSwimAscendSpeed() { return swimAscendSpeed; }
+
+  /** Setter half of the exported {@code swimAscendSpeed} property. */
+  public void setSwimAscendSpeed(double value) {
+    this.swimAscendSpeed = value;
+  }
   public double getSwimDiveSpeed() { return swimDiveSpeed; }
+
+  /** Setter half of the exported {@code swimDiveSpeed} property. */
+  public void setSwimDiveSpeed(double value) {
+    this.swimDiveSpeed = value;
+  }
   public double getSwimJumpSpeed() { return swimJumpSpeed; }
+
+  /** Setter half of the exported {@code swimJumpSpeed} property. */
+  public void setSwimJumpSpeed(double value) {
+    this.swimJumpSpeed = value;
+  }
   public double getSwimJumpDuration() { return swimJumpDuration; }
+
+  /** Setter half of the exported {@code swimJumpDuration} property. */
+  public void setSwimJumpDuration(double value) {
+    this.swimJumpDuration = value;
+  }
   public double getMaxOxygen() { return maxOxygen; }
+
+  /** Setter half of the exported {@code maxOxygen} property. */
+  public void setMaxOxygen(double value) {
+    this.maxOxygen = value;
+  }
   public double getSubmergeDepth() { return submergeDepth; }
+
+  /** Setter half of the exported {@code submergeDepth} property. */
+  public void setSubmergeDepth(double value) {
+    this.submergeDepth = value;
+  }
   public double getOxygenRecoverRate() { return oxygenRecoverRate; }
+
+  /** Setter half of the exported {@code oxygenRecoverRate} property. */
+  public void setOxygenRecoverRate(double value) {
+    this.oxygenRecoverRate = value;
+  }
   public double getDrowningDamage() { return drowningDamage; }
+
+  /** Setter half of the exported {@code drowningDamage} property. */
+  public void setDrowningDamage(double value) {
+    this.drowningDamage = value;
+  }
   public double getDrowningInterval() { return drowningInterval; }
+
+  /** Setter half of the exported {@code drowningInterval} property. */
+  public void setDrowningInterval(double value) {
+    this.drowningInterval = value;
+  }
   public double getSwimSpeed() { return swimSpeed; }
+
+  /** Setter half of the exported {@code swimSpeed} property. */
+  public void setSwimSpeed(double value) {
+    this.swimSpeed = value;
+  }
 
   // Default constructor is required for Godot to instantiate the Resource
   public SwimState() {

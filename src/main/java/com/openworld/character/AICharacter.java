@@ -1,9 +1,8 @@
 package com.openworld.character;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import com.openworld.carrier.vehicle.Vehicle;
 import godot.core.Callable;
@@ -42,7 +41,7 @@ import com.openworld.world.StimulusManager;
  * All per-AI tuning lives in AIBehaviorConfig. Swap a different .tres preset in the
  * inspector to change archetype (soldier, guard, civilian…) without touching code.
  */
-@RegisterClass(className = "AICharacter")
+@Script(className = "AICharacter")
 public class AICharacter extends Character {
 
     public static final float EYE_HEIGHT        = 1.63f;
@@ -51,12 +50,18 @@ public class AICharacter extends Character {
     // ── Behaviour configuration ───────────────────────────────────────────────
 
     /** Per-AI tuning resource. If null, shared DEFAULTS are used. */
-    @Export @RegisterProperty public AIBehaviorConfig behaviorConfig;
+    @Export public AIBehaviorConfig behaviorConfig;
 
     /** Shared defaults — allocated once; never mutated. */
     private static final AIBehaviorConfig DEFAULTS = new AIBehaviorConfig();
 
-    public AIBehaviorConfig getBehaviorConfig() {
+    /**
+     * The tuning config, falling back to the shared defaults when none is assigned.
+     * Deliberately NOT named {@code getBehaviorConfig} — a JavaBean-shaped getter is merged
+     * with the exported {@code behaviorConfig} field into one accessor-bound property, which
+     * would make Godot read (and save) DEFAULTS whenever the field is unset.
+     */
+    public AIBehaviorConfig behaviorConfigOrDefaults() {
         return behaviorConfig != null ? behaviorConfig : DEFAULTS;
     }
 
@@ -64,20 +69,20 @@ public class AICharacter extends Character {
      * World-space Area3D that refills all weapons on entry.
      * Scene-specific node reference — lives here rather than in AIBehaviorConfig.
      */
-    @Export @RegisterProperty public Area3D ammoRefill;
+    @Export public Area3D ammoRefill;
 
     /**
      * NodePath (from scene root) of the Character to escort in EscortState.
      * Resolved to escortTarget in _ready(). Leave empty for non-escort AIs.
      */
-    @Export @RegisterProperty public NodePath escortTargetPath = new NodePath();
+    @Export public NodePath escortTargetPath = new NodePath();
 
     /**
      * NodePath to this AI's {@link AISquad} for editor-placed squads (PLAN.md E3). Resolved in
      * {@code _ready()}. Zone-spawned AI are assigned a squad programmatically via {@link #setSquad}
      * instead. Leave empty for a solo AI.
      */
-    @Export @RegisterProperty public NodePath squadPath = new NodePath();
+    @Export public NodePath squadPath = new NodePath();
 
     /** Runtime squad — shared group awareness (E3). Null = solo. Accessed via {@link #activeSquad()}. */
     private AISquad squad;
@@ -170,7 +175,7 @@ public class AICharacter extends Character {
     private Node cachedTargetVehicle = null;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         useWeaponSpread = false;
@@ -210,7 +215,7 @@ public class AICharacter extends Character {
         if (controller instanceof AIController aiCtrl) aiCtrl.start();
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         if (squad != null && godot.global.GD.isInstanceValid(squad)) squad.unregister(this);
@@ -277,7 +282,7 @@ public class AICharacter extends Character {
     }
 
     /** Called when the escort target's Health emits the hit signal. */
-    @RegisterFunction
+    @Register
     public void onEscortTargetDamaged(float amount) {
         if (controller instanceof AIController aiCtrl) aiCtrl.setEscortTargetAttacked();
     }
@@ -289,7 +294,7 @@ public class AICharacter extends Character {
      * MovementController (_physicsProcess is a separate node) still runs and
      * decelerates the character to rest.
      */
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         lodTimer -= delta;
@@ -400,7 +405,7 @@ public class AICharacter extends Character {
         // (e.g. minimal test scenes) so behaviour is identical, just slower, without it.
         SpatialEntityGrid grid = SpatialEntityGrid.get();
         if (grid != null) {
-            grid.queryRadius(myPos, getBehaviorConfig().detectionRange, targetQueryScratch);
+            grid.queryRadius(myPos, behaviorConfigOrDefaults().detectionRange, targetQueryScratch);
             for (Node node : targetQueryScratch) {
                 Character candidate = evaluateCandidate(node, myFaction, myPos);
                 if (candidate != null && candidateDist < closestDist) {
@@ -458,7 +463,7 @@ public class AICharacter extends Character {
     public Vector3 hearAlarm() {
         StimulusManager sm = StimulusManager.get();
         if (sm == null) return null;
-        float radius = getBehaviorConfig().hearingRadius;
+        float radius = behaviorConfigOrDefaults().hearingRadius;
         Vector3 myPos = getGlobalPosition();
         String myFaction = characterInfo != null ? characterInfo.faction : Faction.ENEMY;
         Vector3 best = null;
@@ -512,9 +517,9 @@ public class AICharacter extends Character {
         if (currentTarget == null) return false;
         Vector3 myPos = getGlobalPosition();
         float dist = (float) myPos.distanceTo(currentTarget.getGlobalPosition());
-        if (dist > getBehaviorConfig().detectionRange) return false;
+        if (dist > behaviorConfigOrDefaults().detectionRange) return false;
 
-        float fovDeg = getBehaviorConfig().detectionFovDeg;
+        float fovDeg = behaviorConfigOrDefaults().detectionFovDeg;
         if (fovDeg < 360.0f && movementDirection.lengthSquared() > 0.001f) {
             Vector3 forward  = movementDirection.normalized();
             Vector3 toTarget = currentTarget.getGlobalPosition().minus(myPos).normalized();
@@ -534,7 +539,7 @@ public class AICharacter extends Character {
         cachedTargetForBone = currentTarget;
         cachedVisibleBone   = null;
         String[] names;
-        switch (getBehaviorConfig().aimBodyPart.toUpperCase()) {
+        switch (behaviorConfigOrDefaults().aimBodyPart.toUpperCase()) {
             case "HEAD":  names = new String[]{"head_2",   "spine_03", "spine_01"}; break;
             case "BODY":  names = new String[]{"spine_01", "spine_03", "thigh_l" }; break;
             case "LEGS":  names = new String[]{"thigh_l",  "thigh_r",  "spine_01"}; break;
@@ -637,7 +642,7 @@ public class AICharacter extends Character {
      */
     public float computeEffectiveHitChance() {
         float moveFactor = Math.min(1.0f, (float) getVelocity().length() / 4.0f);
-        return getBehaviorConfig().hitChance * (1.0f - moveFactor * getBehaviorConfig().moveAccuracyPenalty);
+        return behaviorConfigOrDefaults().hitChance * (1.0f - moveFactor * behaviorConfigOrDefaults().moveAccuracyPenalty);
     }
 
     /**
@@ -652,7 +657,7 @@ public class AICharacter extends Character {
             float spreadDeg = weaponController.getCurrentSpreadDeg();
             weaponSpreadM = hDist * (float) Math.tan(Math.toRadians(spreadDeg));
         }
-        float maxOffset = getBehaviorConfig().aimScatterRadius * (hDist / 10f) + weaponSpreadM;
+        float maxOffset = behaviorConfigOrDefaults().aimScatterRadius * (hDist / 10f) + weaponSpreadM;
         float offset    = godot.global.GD.randf() * maxOffset;
         float angle     = godot.global.GD.randf() * (float) (Math.PI * 2.0);
         return base.plus(new Vector3(
@@ -702,14 +707,14 @@ public class AICharacter extends Character {
     }
 
     public float getEffectiveAttackRange() {
-        float configRange = getBehaviorConfig().attackRange;
+        float configRange = behaviorConfigOrDefaults().attackRange;
         if (weaponController == null) return configRange;
         WeaponItem weapon = weaponController.getWeaponItem(selectBestWeapon());
         if (weapon == null) return configRange;
         return Math.min(configRange, weapon.getEffectiveRange());
     }
 
-    @RegisterFunction
+    @Register
     public void onAmmoChanged(int magazine, int reserve) { cachedBestWeapon = -1; }
 
     public boolean isAtAmmoRefill() {
@@ -721,14 +726,14 @@ public class AICharacter extends Character {
 
     public void setNextPatrolTarget() {
         float angle = godot.global.GD.randf() * (float) Math.PI * 2.0f;
-        float dist  = godot.global.GD.randf() * getBehaviorConfig().patrolRadius;
+        float dist  = godot.global.GD.randf() * behaviorConfigOrDefaults().patrolRadius;
         navAgent.setTargetPosition(spawnPosition.plus(new Vector3(
                 (float) Math.cos(angle) * dist, 0.0f, (float) Math.sin(angle) * dist)));
     }
 
     // ── Signal receivers ──────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     public void onEnemyDamaged(float amount) {
         CharacterController ctrl = getCharacterController();
         if (ctrl != null) ctrl.onDamagedByAttacker(currentTarget);
@@ -750,7 +755,7 @@ public class AICharacter extends Character {
      */
     public void reactToCarjack(Character carjacker) {
         if (carjacker == null || !(controller instanceof AIController ai)) return;
-        if ("FIGHT".equalsIgnoreCase(getBehaviorConfig().reactToCarjack)) {
+        if ("FIGHT".equalsIgnoreCase(behaviorConfigOrDefaults().reactToCarjack)) {
             setFaction(Faction.ENEMY);
             adoptSquadTarget(carjacker, carjacker.getGlobalPosition());
         } else {
@@ -758,7 +763,7 @@ public class AICharacter extends Character {
         }
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void onDied() {
         isDead = true;

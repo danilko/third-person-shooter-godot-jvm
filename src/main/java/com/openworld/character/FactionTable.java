@@ -1,8 +1,7 @@
 package com.openworld.character;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Resource;
 import godot.core.Dictionary;
 
@@ -23,7 +22,7 @@ import godot.core.Dictionary;
  * faction pair absent from the table falls back to the legacy {@code Faction} rule there — making the
  * whole feature a drop-in over the previous hardcoded behaviour.
  */
-@RegisterClass(className = "FactionTable")
+@Script(className = "FactionTable")
 public class FactionTable extends Resource {
 
     public static final String FRIENDLY = "FRIENDLY";
@@ -32,7 +31,7 @@ public class FactionTable extends Resource {
     public static final String DESPISE  = "DESPISE";
 
     /** "factionA>factionB" → relationship string. Editable in the inspector. */
-    @Export @RegisterProperty
+    @Export
     public Dictionary<String, String> relationships = new Dictionary<>(String.class, String.class);
 
     /** Composite key for an ordered faction pair. */

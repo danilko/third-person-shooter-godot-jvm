@@ -2,9 +2,8 @@ package com.openworld.ui;
 
 import com.openworld.character.Character;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Camera3D;
 import godot.api.Control;
 import godot.api.TextureRect;
@@ -35,32 +34,32 @@ import java.util.List;
  * {@code WeaponRadialMenu} uses for its slots). The arc texture is an exported {@link Texture2D}
  * (a red wedge); a plain white placeholder tinted red still reads as a directional mark.
  */
-@RegisterClass(className = "DamageIndicator")
+@Script(className = "DamageIndicator")
 public class DamageIndicator extends Control {
 
   /** Arc texture (ideally a red radial wedge with a transparent centre). Tinted by {@link #tint}. */
-  @Export @RegisterProperty public Texture2D arcTexture;
+  @Export public Texture2D arcTexture;
 
   /** Seconds for an arc at full opacity to fade to nothing. */
-  @Export @RegisterProperty public float fadeSeconds = 1.5f;
+  @Export public float fadeSeconds = 1.5f;
 
   /** Maximum opacity an arc reaches — stacked hits from one direction clamp here. */
-  @Export @RegisterProperty public float maxAlpha = 1.0f;
+  @Export public float maxAlpha = 1.0f;
 
   /** Opacity added to an arc per hit (stacks up to {@link #maxAlpha}). */
-  @Export @RegisterProperty public float alphaPerHit = 0.55f;
+  @Export public float alphaPerHit = 0.55f;
 
   /** Distance (px) from screen centre at which the arc sits. */
-  @Export @RegisterProperty public float radius = 150f;
+  @Export public float radius = 150f;
 
   /** Arc size in px (a wide, short bar reads as an arc segment). */
-  @Export @RegisterProperty public Vector2 arcSize = new Vector2(120f, 22f);
+  @Export public Vector2 arcSize = new Vector2(120f, 22f);
 
   /** Hits within this many radians of an active arc's bearing stack onto it instead of opening a new arc. */
-  @Export @RegisterProperty public float mergeAngleRad = 0.45f;
+  @Export public float mergeAngleRad = 0.45f;
 
   /** Arc colour (alpha is driven per-frame by the fade). */
-  @Export @RegisterProperty public Color tint = new Color(1f, 0.15f, 0.15f, 1f);
+  @Export public Color tint = new Color(1f, 0.15f, 0.15f, 1f);
 
   /** Number of simultaneous directional arcs. */
   private static final int POOL = 6;
@@ -76,7 +75,7 @@ public class DamageIndicator extends Control {
    */
   public void setPlayer(Character c) { }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     setMouseFilter(Control.MouseFilter.IGNORE);
@@ -108,7 +107,7 @@ public class DamageIndicator extends Control {
    * Show / refresh a directional arc toward {@code attackerWorldPos}. Called by HUDManager when the
    * local player takes damage with a known source. No-op until a player + camera are wired.
    */
-  @RegisterFunction
+  @Register
   public void onDamagedFrom(Vector3 attackerWorldPos) {
     if (attackerWorldPos == null) return;
     // Use the viewport's CURRENT camera as the viewpoint — correct whether on foot (TPS/FPS) or in a
@@ -160,7 +159,7 @@ public class DamageIndicator extends Control {
     return weakest;
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _process(double delta) {
     Vector2 center = getViewportRect().getSize().times(0.5f);

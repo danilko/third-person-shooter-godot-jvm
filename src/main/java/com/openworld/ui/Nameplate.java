@@ -5,9 +5,8 @@ import com.openworld.character.NameplateTarget;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Callable;
 import godot.core.MethodCallable;
@@ -40,15 +39,15 @@ import godot.core.StringNames;
  * character, driver enter/exit on a carrier). Visibility is decided by the owning entity
  * (e.g. {@code Character.activateCameraIfOwned} hides the locally-controlled body's own plate).
  */
-@RegisterClass(className = "Nameplate")
+@Script(className = "Nameplate")
 public class Nameplate extends Node3D {
 
     /** Path from this node to the sibling Health node (default: parent's "Health" child). */
-    @RegisterProperty @Export
+    @Export
     public NodePath healthNodePath = new NodePath("../Health");
 
     /** Path from this node to the sibling WeaponController (default: parent's "WeaponController"). */
-    @RegisterProperty @Export
+    @Export
     public NodePath weaponControllerPath = new NodePath("../WeaponController");
 
     private Label       displayName;
@@ -61,7 +60,7 @@ public class Nameplate extends Node3D {
 
     private float maxHealth = 100f;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         displayName   = (Label)              getNodeOrNull("SubViewport/HealthUI/DisplayNameLabel");
@@ -111,25 +110,25 @@ public class Nameplate extends Node3D {
     }
 
     /** Health.healthChanged (fires on local damage/heal and replication). */
-    @RegisterFunction
+    @Register
     public void onHealthChanged(float currentHealth) {
         updateBar(currentHealth);
     }
 
     /** Health.died. */
-    @RegisterFunction
+    @Register
     public void onDied() {
         updateBar(0f);
     }
 
     /** WeaponController.ammoChanged (fires on fire/reload/pickup and replicated apply). */
-    @RegisterFunction
+    @Register
     public void onAmmoChanged(int magazine, int reserve) {
         refreshWeapon();
     }
 
     /** NameplateTarget refresh — name/colour/weapon changed (faction swap, weapon switch, driver enter/exit). */
-    @RegisterFunction
+    @Register
     public void onTargetChanged() {
         if (target != null && displayName != null) displayName.setText(target.getNameplateText());
         applyColor();

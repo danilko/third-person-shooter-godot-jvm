@@ -2,9 +2,8 @@ package com.openworld.camera;
 
 import com.openworld.camera.CameraMode;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.NodePath;
 import godot.core.Transform3D;
@@ -34,50 +33,50 @@ import com.openworld.carrier.vehicle.Vehicle;
  *                 gently follows the vehicle nose angle. No mouse input in this sub-mode.
  *   FPS aim     — holding aim/fire in FPS mode. Mouse drives yaw/pitch freely.
  */
-@RegisterClass(className = "VehicleCameraController")
+@Script(className = "VehicleCameraController")
 public class VehicleCameraController extends Node3D {
 
     // ── Exports ───────────────────────────────────────────────────────────────
 
-    @RegisterProperty @Export public double pitchMin            = -60.0;
-    @RegisterProperty @Export public double pitchMax            =  80.0;
-    @RegisterProperty @Export public double height              =  4.0;
+    @Export public double pitchMin            = -60.0;
+    @Export public double pitchMax            =  80.0;
+    @Export public double height              =  4.0;
     /** Degrees the TPS spring arm tilts downward at rest. Positive = arm extends upward-behind. */
-    @RegisterProperty @Export public double followPitchDeg      =  15.0;
+    @Export public double followPitchDeg      =  15.0;
 
     /** Mouse sensitivity (degrees per raw pixel) — applies in FPS aim and TPS aim modes. */
-    @RegisterProperty @Export public double yawSensitivity      =  0.07;
-    @RegisterProperty @Export public double pitchSensitivity    =  0.07;
+    @Export public double yawSensitivity      =  0.07;
+    @Export public double pitchSensitivity    =  0.07;
     /**
      * Extra sensitivity multiplier applied only in TPS aim mode.
      * TPS camera sits ~8-9 m behind the vehicle, so the same angular change feels smaller
      * than in FPS. Raise this value (default 2×) to compensate for the distance.
      */
-    @RegisterProperty @Export public double tpsAimSensitivityMult = 2.0;
+    @Export public double tpsAimSensitivityMult = 2.0;
 
     /** TPS follow — lerp speed for yaw catching up to vehicle heading after releasing aim. */
-    @RegisterProperty @Export public double yawRecoverySpeed    =  3.0;
+    @Export public double yawRecoverySpeed    =  3.0;
     /**
      * TPS follow — lerp speed for pitch returning to the follow angle.
      * Intentionally slower than yaw to reduce motion sickness on sharp turns.
      */
-    @RegisterProperty @Export public double pitchRecoverySpeed  =  1.5;
+    @Export public double pitchRecoverySpeed  =  1.5;
     /**
      * How fast the internal slope estimate tracks the vehicle's actual slope.
      * Lower values smooth out pitch spikes on landings and handbrake snap-yaws.
      */
-    @RegisterProperty @Export public double slopeSmoothSpeed    =  2.0;
+    @Export public double slopeSmoothSpeed    =  2.0;
 
     /**
      * FPS cockpit — lerp speed for pitch following the vehicle nose angle.
      * Yaw always snaps instantly for direct steering feedback. Pitch is smoothed
      * to reduce vertigo on bumpy terrain.
      */
-    @RegisterProperty @Export public double fpsPitchFollowSpeed =  5.0;
+    @Export public double fpsPitchFollowSpeed =  5.0;
 
-    @RegisterProperty @Export public double recoilRecoverySpeed =  8.0;
+    @Export public double recoilRecoverySpeed =  8.0;
 
-    @RegisterProperty @Export public NodePath fpsCameraMountPath = new NodePath("FPSCameraMount");
+    @Export public NodePath fpsCameraMountPath = new NodePath("FPSCameraMount");
 
     // ── Speed feel (racing-game sense of speed) ───────────────────────────────
     // Perceived speed in racing games is mostly camera FOV widening with speed (the
@@ -87,34 +86,34 @@ public class VehicleCameraController extends Node3D {
     // car actually moves faster.
 
     /** Extra FOV (degrees) added at fovReferenceSpeed. 0 disables the FOV kick. */
-    @RegisterProperty @Export public double fovSpeedBoost     = 18.0;
+    @Export public double fovSpeedBoost     = 18.0;
 
     /** Speed (m/s) at which the full FOV boost and full speed-line intensity are reached. */
-    @RegisterProperty @Export public double fovReferenceSpeed = 30.0;
+    @Export public double fovReferenceSpeed = 30.0;
 
     /** Lerp speed for FOV changes (also eases back down when slowing/exiting). */
-    @RegisterProperty @Export public double fovLerpSpeed      = 4.0;
+    @Export public double fovLerpSpeed      = 4.0;
 
     /** Fraction of fovReferenceSpeed where the speed-line overlay starts fading in. */
-    @RegisterProperty @Export public double speedLinesStartRatio = 0.35;
+    @Export public double speedLinesStartRatio = 0.35;
 
     /**
      * Extra FOV (degrees) at full forward acceleration — the launch/overtake "surge" every
      * arcade racer plays on throttle. Decays as acceleration flattens, independent of speed.
      */
-    @RegisterProperty @Export public double fovAccelBoost     = 5.0;
+    @Export public double fovAccelBoost     = 5.0;
 
     /** Forward acceleration (m/s²) at which the full fovAccelBoost is reached. */
-    @RegisterProperty @Export public double accelReference    = 7.0;
+    @Export public double accelReference    = 7.0;
 
     /** Extra FOV (degrees) while NOS is active (on top of the speed/accel terms). */
-    @RegisterProperty @Export public double fovNosBoost       = 6.0;
+    @Export public double fovNosBoost       = 6.0;
 
     /**
      * Metres the TPS spring arm extends at fovReferenceSpeed — the car shrinks in frame and
      * the world flows past faster (the GTA/Horizon speed pull-back). 0 disables.
      */
-    @RegisterProperty @Export public double armSpeedExtend    = 2.0;
+    @Export public double armSpeedExtend    = 2.0;
 
     // ── Node refs ─────────────────────────────────────────────────────────────
 
@@ -155,7 +154,7 @@ public class VehicleCameraController extends Node3D {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         target = (Node3D) getOwner();
@@ -217,7 +216,7 @@ public class VehicleCameraController extends Node3D {
 
     // ── Input ─────────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _input(InputEvent event) {
         if (activeCamera == null || !activeCamera.isCurrent()) return;
@@ -237,7 +236,7 @@ public class VehicleCameraController extends Node3D {
 
     // ── Physics ───────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (activeCamera != null && activeCamera.isCurrent()

@@ -3,9 +3,8 @@ package com.openworld.world;
 import com.openworld.character.Character;
 import com.openworld.game.EventBus;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Area3D;
 import godot.api.Input;
 import godot.api.Node;
@@ -48,38 +47,38 @@ import godot.core.Vector3;
  * bodies). Lock state stays consistent via the authored initial value + the replicated mission-unlock +
  * the inherited host-authoritative break/restore replication.
  */
-@RegisterClass(className = "Door")
+@Script(className = "Door")
 public class Door extends Breakable {
 
     /** "ROTATE" (hinged) or "SLIDE" (pocket). */
-    @Export @RegisterProperty public String openMode = "ROTATE";
+    @Export public String openMode = "ROTATE";
 
     /** Swing angle in degrees for ROTATE mode (about local +Y). */
-    @Export @RegisterProperty public float openAngleDeg = 90.0f;
+    @Export public float openAngleDeg = 90.0f;
 
     /** Local-space displacement when fully open in SLIDE mode. */
-    @Export @RegisterProperty public Vector3 slideOffset = new Vector3(0, 0, 1.0);
+    @Export public Vector3 slideOffset = new Vector3(0, 0, 1.0);
 
     /** Open/close easing speed (fraction per second). */
-    @Export @RegisterProperty public float openSpeed = 4.0f;
+    @Export public float openSpeed = 4.0f;
 
     /** AUTO: the sensor's occupancy drives open/close. {@code false} = MANUAL (player E-toggle / script). */
-    @Export @RegisterProperty public boolean autoOpen = true;
+    @Export public boolean autoOpen = true;
 
     /** Area3D (a sibling/child path) used as the proximity/occupancy trigger. See class doc for sizing. */
-    @Export @RegisterProperty public NodePath sensorPath = new NodePath();
+    @Export public NodePath sensorPath = new NodePath();
 
     /** While true the door cannot open (authored initial state — consistent on every peer). */
-    @Export @RegisterProperty public boolean locked = false;
+    @Export public boolean locked = false;
 
     /** {@link #tryUnlock(String)} releases the lock when {@code key} matches (blank = no key required). */
-    @Export @RegisterProperty public String unlockKeyId = "";
+    @Export public String unlockKeyId = "";
 
     /** If set, the door auto-unlocks when this mission id completes (blank = any mission completion). */
-    @Export @RegisterProperty public String unlockMissionId = "";
+    @Export public String unlockMissionId = "";
 
     /** A door ignores damage unless this is set; then it can be forced open (gated by {@code breakMinDamage}). */
-    @Export @RegisterProperty public boolean breakable = false;
+    @Export public boolean breakable = false;
 
     private Vector3 closedPos;
     private Vector3 openPos;
@@ -93,7 +92,7 @@ public class Door extends Breakable {
     private boolean localPlayerInSensor;  // local player — drives MANUAL prompt + E
     private EventBus eventBus;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         super._ready(); // Breakable: group registration, breakableId fallback, currentHealth, physics off
@@ -129,14 +128,14 @@ public class Door extends Breakable {
         if (localPlayerInSensor && !autoOpen) emitPrompt(true);
     }
 
-    @RegisterFunction
+    @Register
     public void onSensorBodyEntered(Node3D body) {
         if (!isCharacterBody(body)) return;
         sensorOccupants++;
         if (isLocalPlayerBody(body)) { localPlayerInSensor = true; if (!autoOpen) emitPrompt(true); }
     }
 
-    @RegisterFunction
+    @Register
     public void onSensorBodyExited(Node3D body) {
         if (!isCharacterBody(body)) return;
         sensorOccupants = Math.max(0, sensorOccupants - 1);
@@ -157,8 +156,13 @@ public class Door extends Breakable {
 
     // ── Lock / unlock ───────────────────────────────────────────────────────────
 
+    /** Getter half of the exported {@code locked} property (see {@link #setLocked(boolean)}). */
+    public boolean isLocked() {
+        return locked;
+    }
+
     /** Lock or unlock. Locking also shuts the door. */
-    @RegisterFunction
+    @Register
     public void setLocked(boolean value) {
         locked = value;
         if (locked) open = false;
@@ -166,14 +170,14 @@ public class Door extends Breakable {
     }
 
     /** Release the lock if {@code key} matches {@link #unlockKeyId} (or no key is required). */
-    @RegisterFunction
+    @Register
     public void tryUnlock(String key) {
         if (!locked) return;
         if (unlockKeyId == null || unlockKeyId.isEmpty() || unlockKeyId.equals(key)) setLocked(false);
     }
 
     /** Auto-unlock on a matching mission completion (rides the already-replicated EventBus signal). */
-    @RegisterFunction
+    @Register
     public void onMissionCompleted(String missionId, String winningFaction, String outcomeVariant) {
         if (!locked) return;
         if (unlockMissionId == null || unlockMissionId.isEmpty() || unlockMissionId.equals(missionId)) setLocked(false);
@@ -181,9 +185,9 @@ public class Door extends Breakable {
 
     // ── Manual control (story beats, scripts, or the E key in MANUAL mode) ───────
 
-    @RegisterFunction public void openDoor()   { if (!locked) open = true; }
-    @RegisterFunction public void closeDoor()  { open = false; }
-    @RegisterFunction public void toggleDoor() { open = !locked && !open; }
+    @Register public void openDoor()   { if (!locked) open = true; }
+    @Register public void closeDoor()  { open = false; }
+    @Register public void toggleDoor() { open = !locked && !open; }
 
     /** Doors ignore damage unless {@link #breakable}; then they fall back to {@link Breakable} damage. */
     @Override
@@ -192,7 +196,7 @@ public class Door extends Breakable {
         super.applyDamage(amount, attackerPos); // Breakable also gates on breakMinDamage
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         super._physicsProcess(delta); // Breakable restore-timer (no-op unless a restore is pending)

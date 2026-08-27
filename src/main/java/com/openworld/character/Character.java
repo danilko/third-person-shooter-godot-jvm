@@ -3,10 +3,8 @@ package com.openworld.character;
 import com.openworld.util.CollisionLayers;
 import com.openworld.carrier.vehicle.VehicleWeaponMode;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
-import godot.annotation.RegisterSignal;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
@@ -44,38 +42,28 @@ import com.openworld.world.SpatialEntityGrid;
 import com.openworld.world.manager.ExplosionManager;
 import com.openworld.world.manager.ImpactManager;
 
-@RegisterClass
+@Script
 public class Character extends CharacterBody3D implements Controllable, NameplateTarget {
 
     // ── Signals ──────────────────────────────────────────────────────────────
-    @RegisterSignal
     public final Signal1<JumpState> pressedJump = new Signal1<>(this, new StringName("pressed_jump"));
 
-    @RegisterSignal
     public final Signal1<Stance> changedStance = new Signal1<>(this, new StringName("changed_stance"));
 
-    @RegisterSignal
     public final Signal0 fireWeapon = new Signal0(this, new StringName("fire_weapon"));
 
-    @RegisterSignal
     public final Signal0 notFireWeapon = new Signal0(this, new StringName("not_fire_weapon"));
 
-    @RegisterSignal
     public final Signal1<MovementState> changedMovementState = new Signal1<>(this, new StringName("changed_movement_state"));
 
-    @RegisterSignal
     public final Signal1<Vector3> changedMovementDirection = new Signal1<>(this, new StringName("changed_movement_direction"));
 
-    @RegisterSignal
     public final Signal1<CombatState> changedCombatState = new Signal1<>(this, new StringName("changed_combat_state"));
 
-    @RegisterSignal
     public final Signal1<Integer> changedWeapon = new Signal1<>(this, new StringName("changed_weapon"));
 
-    @RegisterSignal
     public final Signal0 reloadWeapon = new Signal0(this, new StringName("reload_weapon"));
 
-    @RegisterSignal
     public final Signal0 dropWeapon = new Signal0(this, new StringName("drop_weapon"));
 
     /**
@@ -83,23 +71,18 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * weapon changes (faction swap, weapon switch). The nameplate re-reads the getters; health/ammo
      * refresh via the Health/WeaponController node signals.
      */
-    @RegisterSignal
     public final Signal0 nameplateChanged = new Signal0(this, new StringName("nameplate_changed"));
 
     // ── Exports ───────────────────────────────────────────────────────────────
     @Export
-    @RegisterProperty
     public Dictionary<String, JumpState> jumpStates = new Dictionary<>(String.class, JumpState.class);
 
     @Export
-    @RegisterProperty
     public Dictionary<String, NodePath> stances = new Dictionary<>(String.class, NodePath.class);
 
     @Export
-    @RegisterProperty
     public Dictionary<String, CombatState> combatStates = new Dictionary<>(String.class, CombatState.class);
 
-    @RegisterProperty
     @Export
     public CharacterInfo characterInfo;
 
@@ -108,35 +91,27 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * 0 or less skips the ragdoll entirely and freezes the mesh at the last
      * animation pose — cheapest option for large crowd scenes.
      */
-    @RegisterProperty
     @Export
     public float ragdollDuration = 3.0f;
 
-    @RegisterProperty
     @Export
     public WeaponController weaponController;
 
-    @RegisterProperty
     @Export
     public NodePath cameraRootPath = new NodePath("TPSCameraController");
 
-    @RegisterProperty
     @Export
     public NodePath fpsCameraRootPath = new NodePath("FPSCameraController");
 
-    @RegisterProperty
     @Export
     public NodePath aimTargetPath = new NodePath("ActiveCamera/AimRay/AimTarget");
 
-    @RegisterProperty
     @Export
     public NodePath aimRayPath = new NodePath("ActiveCamera/AimRay");
 
-    @RegisterProperty
     @Export
     public NodePath activeCameraPath = new NodePath("ActiveCamera");
 
-    @RegisterProperty
     @Export
     public NodePath physicalBoneSimulatorPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D");
 
@@ -147,7 +122,6 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * entire character appearance; the embedded {@link MeshConfig} wires all dependent
      * component references automatically.
      */
-    @RegisterProperty
     @Export
     public PackedScene characterVisuals;
 
@@ -173,7 +147,6 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     private double drownTimer = 0.0;
     /** Debug aid (PLAN.md I1): when set, the local player shows an on-screen swim/water-depth readout. */
     @Export
-    @RegisterProperty
     public boolean debugSwim = false;
     private Label swimDebugLabel = null;
 
@@ -198,16 +171,13 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     // ── Combat/stance state (read by NetworkManager._physicsProcess for MSG_SNAPSHOT gather,
     // applied on remote peers via applyReplicatedCombatAndStance — see NetworkController) ──
-    @RegisterProperty
     @Export
     public boolean combat = false;
 
-    @RegisterProperty
     @Export
     public int stanceOrdinal = StanceName.UPRIGHT.ordinal();
 
     @Export
-    @RegisterProperty
     public VariantArray<NodePath> headMeshPaths = new VariantArray<>(NodePath.class);
 
     protected ArrayList<Node3D> headMeshes = new ArrayList<>();
@@ -253,7 +223,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     public boolean inputBlocked = false;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         healthNode = (Health) getNode("Health");
@@ -362,7 +332,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         callDeferred(StringNames.toGodotName("applyNameplateVisibility"));
     }
 
-    @RegisterFunction
+    @Register
     public void emitCharacterSpawned() {
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof com.openworld.game.EventBus bus) bus.characterSpawned.emit(this, characterInfo);
@@ -475,11 +445,21 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     public boolean isCombat() { return combat; }
 
+    /** Setter half of the exported {@code combat} property. */
+    public void setCombat(boolean value) {
+        this.combat = value;
+    }
+
     /** Current physics-tick counter — read by NetworkManager when gathering MSG_SNAPSHOT. */
     public long getCurrentTick() { return currentTick; }
 
     /** Current stance ordinal — read by NetworkManager when gathering MSG_SNAPSHOT (mirrors the exported `stanceOrdinal` field). */
     public int getStanceOrdinal() { return stanceOrdinal; }
+
+    /** Setter half of the exported {@code stanceOrdinal} property. */
+    public void setStanceOrdinal(int value) {
+        this.stanceOrdinal = value;
+    }
 
     /**
      * Visual facing — read by NetworkManager when gathering MSG_SNAPSHOT. Facing lives
@@ -536,7 +516,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     }
 
     // ── Physics loop: gather → apply ─────────────────────────────────────────
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         updateSpatialCell(delta);
@@ -555,14 +535,14 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     }
 
     /** Counts down the ragdoll-settle timer and freezes physics when it expires. */
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         ragdoll.tickFreeze(delta);
     }
 
     /** Drop out of the spatial grid when this body leaves the tree (death/despawn). */
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         SpatialEntityGrid grid = SpatialEntityGrid.get();
@@ -620,7 +600,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         if (input.aimTargetPosition != null && aimTarget != null) {
             aimTarget.setGlobalPosition(input.aimTargetPosition);
         }
-        
+
         // ── Fire / not-fire ────────────────────────────────────────────────
         if (input.fire) {
             fireWeapon.emit();
@@ -1054,6 +1034,11 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         return characterInfo;
     }
 
+    /** Setter half of the exported {@code characterInfo} property. */
+    public void setCharacterInfo(CharacterInfo value) {
+        this.characterInfo = value;
+    }
+
     // ── NameplateTarget ─────────────────────────────────────────────────────────
     @Override
     public String getNameplateText() {
@@ -1164,7 +1149,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * once activeCamera/characterInfo are populated and every other _ready() that
      * might also touch the viewport (e.g. vehicle occupancy) has settled.
      */
-    @RegisterFunction
+    @Register
     public void activateCameraIfOwned() {
         if (activeCamera == null) return;
         // isAuthorityFor answers "do I simulate this body" — right for the physics
@@ -1216,7 +1201,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * Replaces the old per-scene `visible = false` override on Player.tscn (which also hid remote
      * players') and the camera-coupled hide inside activateCameraIfOwned.
      */
-    @RegisterFunction
+    @Register
     public void applyNameplateVisibility() {
         if (!isLocallyOwnedPlayer()) return;
         Node nameplate = getNodeOrNull("Nameplate");
@@ -1255,7 +1240,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     }
 
     // ── Override in subclasses ────────────────────────────────────────────────
-    @RegisterFunction
+    @Register
     public void onDied() {
         GD.print(getName() + " died");
         ragdoll.enableDeathVisuals();

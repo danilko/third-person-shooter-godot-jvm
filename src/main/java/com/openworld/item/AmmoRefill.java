@@ -5,8 +5,8 @@ import com.openworld.weapon.WeaponController;
 import com.openworld.game.EventBus;
 import com.openworld.game.GameManager;
 import com.openworld.net.NetworkManager;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Area3D;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -17,12 +17,12 @@ import godot.core.NodePath;
  * Extends Area3D directly — no physics body needed for a fixed station.
  * Will be refactored onto Pickup base when drop/respawn behaviour is added.
  */
-@RegisterClass(className = "AmmoRefill")
+@Script(className = "AmmoRefill")
 public class AmmoRefill extends Area3D {
 
   private static final NodePath WEAPON_CONTROLLER_PATH = new NodePath("WeaponController");
 
-  @RegisterFunction
+  @Register
   public void onBodyEntered(Node3D body) {
     Node character = resolveCharacter(body);
     if (character == null) return;

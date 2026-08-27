@@ -2,7 +2,9 @@ package com.openworld.ui;
 
 import com.openworld.character.Health;
 import com.openworld.carrier.vehicle.Vehicle;
-import godot.annotation.*;
+import godot.annotation.Export;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.NodePath;
 import godot.global.GD;
@@ -18,20 +20,20 @@ import godot.global.GD;
  *   Speed panel  — bottom-centre, large km/h reading
  *   Health panel — bottom-left,   vehicle HP
  */
-@RegisterClass(className = "VehicleHUD")
+@Script(className = "VehicleHUD")
 public class VehicleHUD extends Control {
 
-    @RegisterProperty @Export
+    @Export
     public NodePath speedLabelPath = new NodePath("Speed/ColorRect/SpeedValue");
 
-    @RegisterProperty @Export
+    @Export
     public NodePath healthLabelPath = new NodePath("Health/ColorRect/Health");
 
     private RichTextLabel speedLabel;
     private Label healthLabel;
     private Vehicle vehicle;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         Node s = getNodeOrNull(speedLabelPath);
@@ -43,7 +45,7 @@ public class VehicleHUD extends Control {
         if (h instanceof Label l) healthLabel = l;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         if (vehicle == null) return;

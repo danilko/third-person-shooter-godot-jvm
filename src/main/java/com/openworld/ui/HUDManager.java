@@ -12,9 +12,8 @@ import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.carrier.vehicle.VehicleWeaponMode;
 import godot.api.Node3D;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.CanvasLayer;
 import godot.api.Control;
 import godot.api.Label;
@@ -55,15 +54,15 @@ import com.openworld.item.Pickup;
  * and the WeaponRadialMenu are not table-managed. Add a widget = drop the node + list its name in
  * BASE_LAYOUT.
  */
-@RegisterClass(className = "HUDManager")
+@Script(className = "HUDManager")
 public class HUDManager extends CanvasLayer {
 
   /** Path to the WeaponRadialMenu child (relative to this node). Set empty to skip wiring. */
-  @RegisterProperty @Export
+  @Export
   public NodePath radialMenuPath = new NodePath("WeaponRadialMenu");
 
   /** Scene for {@link DefeatedFeedEntry} rows. Falls back to hard-coded path if null. */
-  @RegisterProperty @Export
+  @Export
   public PackedScene defeatedEntryScene;
 
   private static final String DEFEATED_ENTRY_SCENE_PATH =
@@ -147,7 +146,7 @@ public class HUDManager extends CanvasLayer {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
 	// Feeds are direct children of HUDManager so they stay visible across HUD
@@ -253,7 +252,7 @@ public class HUDManager extends CanvasLayer {
 	applyContext(Situation.ON_FOOT);
   }
 
-  @RegisterFunction
+  @Register
   public void onPlayerSpawned(Node spawnedPlayer) {
 	// playerSpawned fires for *every* Player.tscn instance — including replicated
 	// remote bodies (spawnPlayerBody on the server, spawnReplicatedCharacter on the
@@ -273,7 +272,7 @@ public class HUDManager extends CanvasLayer {
 	wirePlayer(spawnedPlayer);
   }
 
-  @RegisterFunction
+  @Register
   public void onPlayerCombatStateChanged(CombatState state) {
 	refreshCrosshair();
   }
@@ -316,14 +315,14 @@ public class HUDManager extends CanvasLayer {
    * entry — for per-carrier or gameplay tweaks (e.g. a turret carrier hiding the minimap). The id is
    * the widget's node name (e.g. {@code "WeaponSlotsUI"}, {@code "DamageIndicator"}).
    */
-  @RegisterFunction
+  @Register
   public void setWidgetEnabled(String id, boolean enabled) {
 	widgetOverrides.put(id, enabled);
 	applyContext(currentSituation);
   }
 
   /** Drop a runtime override so the widget follows the situation table again. */
-  @RegisterFunction
+  @Register
   public void clearWidgetOverride(String id) {
 	widgetOverrides.remove(id);
 	applyContext(currentSituation);
@@ -422,7 +421,7 @@ public class HUDManager extends CanvasLayer {
    * (filtered by characterId, same as the other per-character HUD routing). The attacker world
    * position came from the authority (single-player/host) or the replicated damage broadcast.
    */
-  @RegisterFunction
+  @Register
   public void onCharacterDamagedFrom(CharacterInfo info, Vector3 source) {
 	if (info == null || damageIndicator == null) return;
 	if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(info.characterId)) return;
@@ -454,7 +453,7 @@ public class HUDManager extends CanvasLayer {
 
   // ── Vehicle HUD switching ─────────────────────────────────────────────────
 
-  @RegisterFunction
+  @Register
   public void onVehicleEntered(Node vehicle, CharacterInfo occupantInfo) {
 	if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
 	currentVehicle = vehicle instanceof Vehicle v ? v : null;
@@ -465,7 +464,7 @@ public class HUDManager extends CanvasLayer {
 	applyContext(situationForVehicle(currentVehicle));
   }
 
-  @RegisterFunction
+  @Register
   public void onVehicleExited(CharacterInfo occupantInfo) {
 	if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
 	Node vhudNode = getNodeOrNull("VehicleHUD");
@@ -476,13 +475,13 @@ public class HUDManager extends CanvasLayer {
 
   // ── Signal relays — player → EventBus ─────────────────────────────────────
 
-  @RegisterFunction
+  @Register
   public void onPlayerAmmoChanged(int magazine, int reserve) {
 	Node busNode = getNodeOrNull("/root/EventBus");
 	if (busNode instanceof EventBus bus) bus.playerAmmoChanged.emit(magazine, reserve);
   }
 
-  @RegisterFunction
+  @Register
   public void onPlayerHealthChanged(float currentHealth) {
 	emitHealth(currentHealth);
   }
@@ -498,23 +497,23 @@ public class HUDManager extends CanvasLayer {
 	statusFeed.push(entry);
   }
 
-  @RegisterFunction
+  @Register
   public void onWeaponPickedUp(String characterId, String weaponName, Texture2D weaponIcon) {
 	if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(characterId)) return;
 	pushStatus("Picked up " + weaponName, weaponIcon);
   }
 
-  @RegisterFunction
+  @Register
   public void onMissionStarted(String missionId, String objectiveType) {
 	pushStatus("Mission started: " + missionId + " (" + objectiveType + ")", null);
   }
 
-  @RegisterFunction
+  @Register
   public void onMissionCompletedHud(String missionId, String winningFaction, String outcomeVariant) {
 	pushStatus("Mission complete — " + winningFaction + " wins (" + outcomeVariant + ")", null);
   }
 
-  @RegisterFunction
+  @Register
   public void onMissionFailedHud(String missionId, String reason) {
 	pushStatus("Mission failed — " + reason, null);
   }
@@ -527,7 +526,7 @@ public class HUDManager extends CanvasLayer {
   }
 
   /** Push a {@link DefeatedFeedEntry} row to the kill feed for any character elimination. */
-  @RegisterFunction
+  @Register
   public void onCharacterEliminated(String attackerName, String attackerFaction,
 									String victimName,   String victimFaction,
 									String weaponName,   Texture2D weaponIcon,
@@ -543,14 +542,14 @@ public class HUDManager extends CanvasLayer {
 
   // ── C2: per-character HUD routing ─────────────────────────────────────────
 
-  @RegisterFunction
+  @Register
   public void onCharacterHealthChanged(CharacterInfo info, float currentHealth) {
 	if (info == null) return;
 	Node hud = characterHUDs.get(info.characterId);
 	if (hud instanceof CharacterHUD ch) ch.onHealthChanged(currentHealth);
   }
 
-  @RegisterFunction
+  @Register
   public void onCharacterAmmoChanged(CharacterInfo info, int magazine, int reserve) {
 	if (info == null) return;
 	Node hud = characterHUDs.get(info.characterId);
@@ -558,7 +557,7 @@ public class HUDManager extends CanvasLayer {
   }
 
   /** Relay the active player's swim oxygen to the FootHUD breath meter (filtered like pickups). */
-  @RegisterFunction
+  @Register
   public void onCharacterOxygenChanged(CharacterInfo info, float current, float max) {
 	if (info == null) return;
 	if (!playerCharacterId.isEmpty() && !playerCharacterId.equals(info.characterId)) return;
@@ -566,7 +565,7 @@ public class HUDManager extends CanvasLayer {
 	if (busNode instanceof EventBus bus) bus.playerOxygenChanged.emit(current, max);
   }
 
-  @RegisterFunction
+  @Register
   public void onCharacterDiedHud(CharacterInfo info) {
 	if (info == null) return;
 	unregisterCharacterHUD(info.characterId);

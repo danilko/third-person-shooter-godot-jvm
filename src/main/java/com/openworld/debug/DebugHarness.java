@@ -19,8 +19,8 @@ import com.openworld.world.VehicleRoute;
 import com.openworld.world.WorldZone;
 import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.BoxShape3D;
 import godot.api.CollisionObject3D;
 import godot.api.CollisionShape3D;
@@ -86,7 +86,7 @@ import godot.api.OS;
  * Delete this class once F1's real debug console (PLAN.md Pre-F1 prerequisite)
  * lands — it supersedes this one-off tool.
  */
-@RegisterClass(className = "DebugHarness")
+@Script(className = "DebugHarness")
 public class DebugHarness extends Node {
 
     private static final String AI_SCENE_PATH =
@@ -109,7 +109,7 @@ public class DebugHarness extends Node {
     /** F3 route/junction 3D debug-draw — lazily constructed, toggled by visibility. */
     private RouteDebugOverlay routeOverlay;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _input(InputEvent event) {
         if (!(event instanceof InputEventKey iek) || !iek.isPressed() || iek.isEcho()) return;
@@ -158,7 +158,7 @@ public class DebugHarness extends Node {
      * source path for the imported {@code .blend} once authored; {@code WorldSource.tscn} is the test stand-in.
      */
     private void bakeWorld() {
-        com.openworld.world.WorldBaker.bake(this,
+        com.openworld.world.WorldBaker.bakeScene(this,
                 "res://src/main/resources/com/openworld/world/WorldSource.tscn",
                 "res://src/main/resources/com/openworld/world/World_baked.tscn");
     }
@@ -518,7 +518,7 @@ public class DebugHarness extends Node {
      * runs. Same marker registry + sort as F1's {@link #teleportToNextZone}, but continuous movement
      * instead of a jump — crossings, hysteresis, and mid-stream cancels all get hit.
      */
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         for (String arg : OS.getCmdlineUserArgs()) {
@@ -535,7 +535,7 @@ public class DebugHarness extends Node {
                 + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (dumpCollisionDelay > 0.0) {

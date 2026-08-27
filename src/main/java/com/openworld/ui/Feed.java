@@ -1,9 +1,8 @@
 package com.openworld.ui;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Control;
 import godot.api.Node;
 import godot.api.VBoxContainer;
@@ -28,22 +27,20 @@ import godot.api.VBoxContainer;
  *   entry.populate(attackerName, attackerFaction, victimName, victimFaction, icon, headshot);
  * </pre>
  */
-@RegisterClass(className = "Feed")
+@Script(className = "Feed")
 public class Feed extends Control {
 
     /** Maximum number of rows visible at once. Oldest is evicted when exceeded. */
-    @RegisterProperty
     @Export
     public int maxEntries = 5;
 
     /** Lifespan in seconds assigned to each entry by the caller as a convenience default. */
-    @RegisterProperty
     @Export
     public float entryLifespan = 4.0f;
 
     private VBoxContainer vBoxContainer;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         vBoxContainer = (VBoxContainer) getNode("VBoxContainer");

@@ -5,9 +5,8 @@ import com.openworld.character.Health;
 import com.openworld.util.ObjectPool;
 import com.openworld.world.StimulusManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.NodePath;
 import godot.core.Vector3;
@@ -29,13 +28,13 @@ import java.util.List;
  * _ready() auto-duplicates each template to poolSizePerLayer instances.
  * Discovery group: "explosion_manager".
  */
-@RegisterClass(className = "ExplosionManager")
+@Script(className = "ExplosionManager")
 public class ExplosionManager extends Node {
 
-    @Export @RegisterProperty public int   poolSizePerLayer = 8;
-    @Export @RegisterProperty public float flashLifetime    = 0.3f;
-    @Export @RegisterProperty public float fireballLifetime = 1.5f;
-    @Export @RegisterProperty public float smokeLifetime    = 8.0f;
+    @Export public int   poolSizePerLayer = 8;
+    @Export public float flashLifetime    = 0.3f;
+    @Export public float fireballLifetime = 1.5f;
+    @Export public float smokeLifetime    = 8.0f;
 
     private static class ParticleEntry {
         final GPUParticles3D particle;
@@ -54,7 +53,7 @@ public class ExplosionManager extends Node {
 
     private int activeCount = 0;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         addToGroup("explosion_manager");
@@ -63,7 +62,7 @@ public class ExplosionManager extends Node {
         smokePool    = buildPool("SMOKE",    smokeEntries);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         if (activeCount == 0) return;

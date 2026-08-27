@@ -14,7 +14,7 @@ import com.openworld.net.NetworkManager;
 /**
  * Vehicle drive-state transitions extracted from {@link Character} (WS5 god-class split).
  *
- * Plain collaborator — NOT a {@code @RegisterClass} Node — owned by a single {@link Character},
+ * Plain collaborator — NOT a {@code @Script} Node — owned by a single {@link Character},
  * so the extraction is scene-safe (no {@code .gdj}, no scene {@code ext_resource} change).
  * {@code Character} keeps the public {@code enterDriveState}/{@code exitDriveState}/
  * {@code applyPassengerWeaponInput} surface that {@code Vehicle} calls and delegates here.

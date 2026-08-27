@@ -1,9 +1,8 @@
 package com.openworld.weapon;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -29,30 +28,30 @@ import com.openworld.world.manager.ExplosionManager;
  *   projectile_scene → RocketProjectile.tscn
  *   auto = false (semi-auto), magazine = 1, reserve = 3
  */
-@RegisterClass(className = "ProjectileItem")
+@Script(className = "ProjectileItem")
 public class ProjectileItem extends WeaponItem {
 
     /** Physics scene to spawn on each shot. */
-    @Export @RegisterProperty public PackedScene projectileScene;
+    @Export public PackedScene projectileScene;
 
     /** Speed injected into each spawned projectile (m/s). */
-    @Export @RegisterProperty public float projectileSpeed = 25f;
+    @Export public float projectileSpeed = 25f;
 
     /** Explosion blast radius injected into each spawned projectile (metres). */
-    @Export @RegisterProperty public float explosionRadius = 8f;
+    @Export public float explosionRadius = 8f;
 
     /** Max damage at the epicentre injected into each spawned projectile. */
-    @Export @RegisterProperty public float explosionMaxDamage = 120f;
+    @Export public float explosionMaxDamage = 120f;
 
     /** Push force applied to bodies in the blast, injected into each spawned projectile. */
-    @Export @RegisterProperty public float explosionPushForce = 20f;
+    @Export public float explosionPushForce = 20f;
 
     private GPUParticles3D muzzleFlashFx;
     private AnimationPlayer muzzleFlashAnimPlayer;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         super._ready();  // Pickup._ready — group + pickupId registration for replication

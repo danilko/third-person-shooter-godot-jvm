@@ -3,8 +3,8 @@ package com.openworld.world.manager;
 import com.openworld.character.Character;
 import com.openworld.weapon.Detonatable;
 import com.openworld.character.Health;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.Texture2D;
 import godot.core.NodePath;
@@ -30,13 +30,13 @@ import com.openworld.world.SurfaceType;
  *
  * Discovery: registers itself in group "impact_manager".
  */
-@RegisterClass(className = "ImpactManager")
+@Script(className = "ImpactManager")
 public class ImpactManager extends Node {
 
     private ParticleManager particleManager;
     private DecalManager    decalManager;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         addToGroup("impact_manager");
@@ -154,7 +154,7 @@ public class ImpactManager extends Node {
                     surface = SurfaceType.FLESH;
                     character = c;
                 } else if (current instanceof HittableBody hb) {
-                    surface = hb.getSurfaceType();
+                    surface = hb.resolveSurfaceType();
                 }
             } else if (character == null && current instanceof Character c) {
                 character = c;

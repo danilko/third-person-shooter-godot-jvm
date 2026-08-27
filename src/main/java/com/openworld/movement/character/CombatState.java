@@ -1,31 +1,25 @@
 package com.openworld.movement.character;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Resource;
 
-@RegisterClass(className = "CombatState")
+@Script(className = "CombatState")
 public class CombatState extends Resource {
 
   @Export
-  @RegisterProperty
   public boolean combat = false;
 
   @Export
-  @RegisterProperty
   public double speedFactor = 1.0f;
 
   @Export
-  @RegisterProperty
   public double accelerationFactor = 1.0f;
 
   @Export
-  @RegisterProperty
   public double cameraDistance = 2.0f;
 
   @Export
-  @RegisterProperty
   public double cameraShoulderOffset = 0.1f;
 
   /**
@@ -35,11 +29,9 @@ public class CombatState extends Resource {
    * a tight over-the-shoulder aim (RE4/PUBG style); 0 leaves the stance height unchanged.
    */
   @Export
-  @RegisterProperty
   public double cameraHeightOffset = 0.0f;
 
   @Export
-  @RegisterProperty
   public double cameraFov = 70.0f;
 
 
@@ -52,11 +44,26 @@ public class CombatState extends Resource {
     return combat;
   }
 
+  /** Setter half of the exported {@code combat} property. */
+  public void setCombat(boolean value) {
+    this.combat = value;
+  }
+
   public double getSpeedFactor() {
     return speedFactor;
   }
 
+  /** Setter half of the exported {@code speedFactor} property. */
+  public void setSpeedFactor(double value) {
+    this.speedFactor = value;
+  }
+
   public double getAccelerationFactor() {
     return accelerationFactor;
+  }
+
+  /** Setter half of the exported {@code accelerationFactor} property. */
+  public void setAccelerationFactor(double value) {
+    this.accelerationFactor = value;
   }
 }

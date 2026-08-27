@@ -1,8 +1,7 @@
 package com.openworld.game.mission;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Resource;
 import godot.core.VariantArray;
 import com.openworld.character.Health;
@@ -23,24 +22,24 @@ import com.openworld.world.manager.ImpactManager;
  * outcome-variant schema MissionDirector (F1) will fold into the player's
  * accumulated variant-membership set — see the "Resolved" design note in PLAN.md.
  */
-@RegisterClass(className = "MissionInfo")
+@Script(className = "MissionInfo")
 public class MissionInfo extends Resource {
 
     /** Stable identifier — addressed by MissionManager, MissionDirector, and SaveSystem. */
-    @RegisterProperty @Export public String missionId = "";
+    @Export public String missionId = "";
 
     /** Factions whose members count as "the player side" for win/loss evaluation. */
-    @RegisterProperty @Export
+    @Export
     public VariantArray<String> playerFactions = new VariantArray<>(String.class);
 
     /** Use MissionObjectiveType constants or a custom objective string. */
-    @RegisterProperty @Export public String objectiveType = MissionObjectiveType.ELIMINATE_ALL;
+    @Export public String objectiveType = MissionObjectiveType.ELIMINATE_ALL;
 
     /** Seconds before the mission auto-fails. 0 = no limit. */
-    @RegisterProperty @Export public float timeLimit = 0f;
+    @Export public float timeLimit = 0f;
 
     /** When false, ImpactManager/Health should ignore damage between playerFactions members. */
-    @RegisterProperty @Export public boolean allowFriendlyFire = false;
+    @Export public boolean allowFriendlyFire = false;
 
     /**
      * Declared set of outcome variants this mission can produce on completion
@@ -48,9 +47,9 @@ public class MissionInfo extends Resource {
      * the objective resolves; MissionDirector (F1) checks membership against this
      * set to drive the unlock graph.
      */
-    @RegisterProperty @Export
+    @Export
     public VariantArray<String> possibleOutcomeVariants = new VariantArray<>(String.class);
 
     /** True when a co-player may join this mission on the opposing faction (PvP-as-variant). */
-    @RegisterProperty @Export public boolean opposingFactionJoinable = false;
+    @Export public boolean opposingFactionJoinable = false;
 }

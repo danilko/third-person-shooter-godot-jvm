@@ -2,9 +2,8 @@ package com.openworld.weapon;
 
 import com.openworld.world.HitInfo;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.RayCast3D;
 import godot.api.Timer;
@@ -29,13 +28,13 @@ import com.openworld.world.manager.ImpactManager;
  * Signal connection in .tscn:
  *   HitTimer.timeout → . on_hit_timer_timeout   (optional visual feedback hook)
  */
-@RegisterClass(className = "MeleeItem")
+@Script(className = "MeleeItem")
 public class MeleeItem extends WeaponItem {
 
     private static final Vector3 TORSO_OFFSET = new Vector3(0, 0.8f, 0);
 
     /** Maximum reach in metres, measured from the character's torso (not the camera). */
-    @Export @RegisterProperty
+    @Export
     public float meleeRange = 1.5f;
 
     /**
@@ -44,14 +43,14 @@ public class MeleeItem extends WeaponItem {
      * target anywhere inside this cone registers even if the crosshair isn't dead-on.
      * 25° gives ~0.7 m of forgiveness at 1.5 m range; tune down for precise weapons.
      */
-    @Export @RegisterProperty
+    @Export
     public float coneAngleDeg = 25f;
 
     /**
      * How long the hit window stays open after a swing starts (seconds).
      * Hit is checked every physics frame during this window; stops on first contact.
      */
-    @Export @RegisterProperty
+    @Export
     public float swingDuration = 0.3f;
 
     protected Timer hitTimer;
@@ -61,7 +60,7 @@ public class MeleeItem extends WeaponItem {
     // Built once in _ready() from coneAngleDeg; accessible to subclasses for override.
     protected float[][] swingOffsets;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         super._ready();  // Pickup._ready — group + pickupId registration for replication
@@ -84,7 +83,7 @@ public class MeleeItem extends WeaponItem {
     @Override
     public float getEffectiveRange() { return meleeRange; }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (swingTimeLeft <= 0) return;
@@ -132,7 +131,7 @@ public class MeleeItem extends WeaponItem {
 
     // ── Signal handler ────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     public void onHitTimerTimeout() {
         // Hook for subclasses or future animation feedback; no hitbox to disable.
     }

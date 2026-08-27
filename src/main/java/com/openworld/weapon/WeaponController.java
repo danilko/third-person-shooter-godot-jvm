@@ -2,7 +2,9 @@ package com.openworld.weapon;
 
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
-import godot.annotation.*;
+import godot.annotation.Export;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Callable;
 import godot.core.MethodCallable;
@@ -34,15 +36,15 @@ import com.openworld.net.NetMessageCodec;
 import com.openworld.net.NetStats;
 import com.openworld.net.NetworkController;
 
-@RegisterClass(className = "WeaponController")
+@Script(className = "WeaponController")
 public class WeaponController extends Node {
 
-  @RegisterProperty @Export public AnimationController animationController;
+  @Export public AnimationController animationController;
 
-  @RegisterProperty @Export
+  @Export
   public NodePath aimRayPath = new NodePath("ActiveCamera/AimRay");
 
-  @RegisterProperty @Export
+  @Export
   public NodePath weaponAttachmentPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment");
 
   /**
@@ -54,16 +56,14 @@ public class WeaponController extends Node {
    * "MarkerRifle" registered here. A shovel with holsterSockets=["MarkerBack"] parks at
    * the Marker3D named "MarkerBack". No code changes needed for new weapons or poses.
    */
-  @RegisterProperty @Export
+  @Export
   public VariantArray<NodePath> socketPaths = new VariantArray<>(NodePath.class);
 
-  @RegisterSignal
   public final Signal1<Float> weaponFired = new Signal1<>(this, new StringName("weapon_fired"));
 
-  @RegisterSignal
   public final Signal2<Integer, Integer> ammoChanged = new Signal2<>(this, new StringName("ammo_changed"));
 
-  @RegisterProperty @Export public AudioStreamPlayer3D weaponAudio;
+  @Export public AudioStreamPlayer3D weaponAudio;
 
   /**
    * Defines the type of each slot by index.
@@ -206,7 +206,7 @@ public class WeaponController extends Node {
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-  @RegisterFunction
+  @Register
   @Override
   public void _process(double delta) {
     // Process equips first (deferred from Area3D body_entered signals)
@@ -243,7 +243,7 @@ public class WeaponController extends Node {
    * single-player never frees a body mid-session, so the cue always finishes naturally. Stopping
    * here releases the playback on every teardown path (despawn, disconnect, engine shutdown).
    */
-  @RegisterFunction
+  @Register
   @Override
   public void _exitTree() {
     silenceAudio();
@@ -261,7 +261,7 @@ public class WeaponController extends Node {
     if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) weaponAudio.stop();
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     weapons = new WeaponItem[slotTypes.length];
@@ -309,7 +309,7 @@ public class WeaponController extends Node {
   }
 
   /** Receives our own ammoChanged signal and re-broadcasts it on EventBus, keyed by owner CharacterInfo. */
-  @RegisterFunction
+  @Register
   public void relayAmmoToEventBus(int magazine, int reserve) {
     if (!(getOwner() instanceof Character c) || c.characterInfo == null) return;
     Node busNode = getNodeOrNull("/root/EventBus");
@@ -352,8 +352,8 @@ public class WeaponController extends Node {
     if (attachment == null) return;
     for (Node child : attachment.getChildren()) {
       if (child.getChildCount() > 0 && child.getChild(0) instanceof WeaponItem w) {
-        int slot = findFreeSlot(w.getSlotType());
-        if (slot < 0) slot = findFirstSlot(w.getSlotType());
+        int slot = findFreeSlot(w.resolveSlotType());
+        if (slot < 0) slot = findFirstSlot(w.resolveSlotType());
         if (slot < 0) continue;
         weapons[slot] = w;
         w.onPickedUp();
@@ -389,12 +389,12 @@ public class WeaponController extends Node {
 
   /**
    * Equips {@code item} into the first free slot whose type matches the weapon's
-   * {@link WeaponItem#getSlotType()}. Falls back to the first slot of that type
+   * {@link WeaponItem#resolveSlotType()}. Falls back to the first slot of that type
    * (displacing the current occupant) if no free slot exists.
    * FIST slot (0) is structurally protected — no other weapon type maps to it.
    */
   public void equipWeapon(WeaponItem item) {
-    WeaponSlotType type = item.getSlotType();
+    WeaponSlotType type = item.resolveSlotType();
     int targetSlot = findFreeSlot(type);
     if (targetSlot < 0) {
       // No free slot of this type — replace the weapon currently HELD if it's this type
@@ -504,7 +504,7 @@ public class WeaponController extends Node {
    * world at the character's feet with a throw impulse.
    * No-op if the active weapon is not droppable (e.g. fist at slot 0).
    */
-  @RegisterFunction
+  @Register
   public void dropCurrentWeapon() {
     WeaponItem current = weapons[activeSlotIndex];
     if (current == null || !current.isDroppable) return;
@@ -540,7 +540,7 @@ public class WeaponController extends Node {
 
   // ── Signal handlers ───────────────────────────────────────────────────────
 
-  @RegisterFunction
+  @Register
   public void onWeaponFire() {
     if (fireTimer.getTimeLeft() > 0 || reloadTimer.getTimeLeft() > 0 || isWeaponTransitioning()) return;
     WeaponItem w = getCurrentWeaponItem();
@@ -594,7 +594,7 @@ public class WeaponController extends Node {
   private boolean loggedCueNoFirearm = false;
 
   /** Network replay hook — plays the firing cosmetics (flash/audio + tracer) without consuming ammo or running hitscan. */
-  @RegisterFunction
+  @Register
   public void playRemoteFireCue() {
     // G4-2 (puppet fire-gate): never render a shot before the weapon is up. Mirror the owner's own
     // onWeaponFire gate — suppress while the holster→draw transition runs OR through the draw-settle
@@ -626,13 +626,13 @@ public class WeaponController extends Node {
     }
   }
 
-  @RegisterFunction
+  @Register
   public void onWeaponNotFire() {
     WeaponItem w = getCurrentWeaponItem();
     if (w != null) w.stopUseWeapon();
   }
 
-  @RegisterFunction
+  @Register
   public void onWeaponReload() {
     WeaponItem w = getCurrentWeaponItem();
     if (w == null || w.isInfiniteAmmo || w.getReserve() == 0 || isWeaponReloading()) return;
@@ -649,7 +649,7 @@ public class WeaponController extends Node {
     reloadSeq = (reloadSeq + 1) & 0xFF;
   }
 
-  @RegisterFunction
+  @Register
   public void onWeaponReloadComplete() {
     WeaponItem w = getCurrentWeaponItem();
     if (w == null) return;
@@ -657,7 +657,7 @@ public class WeaponController extends Node {
     ammoChanged.emit(w.getMagazine(), w.getReserve());
   }
 
-  @RegisterFunction
+  @Register
   public void onSetWeapon(int slotIndex) {
     if (!beginWeaponTransition(slotIndex)) return;
     // G4-1: announce the equip START now (reliable, ordered), so puppets begin the SAME transition
@@ -700,7 +700,7 @@ public class WeaponController extends Node {
     net.sendWeaponSwitch(c.characterInfo.characterId, targetSlot);
   }
 
-  @RegisterFunction
+  @Register
   public void onWeaponTransitionComplete() {
     boolean wasArmed = isArmed();
     activeSlotIndex = pendingSlotIndex;
@@ -746,7 +746,7 @@ public class WeaponController extends Node {
     beginWeaponTransition(slotIndex);
   }
 
-  @RegisterFunction
+  @Register
   public void onSetStance(Stance stance) {
     for (WeaponItem w : weapons) if (w != null) w.onSetStance(stance);
   }

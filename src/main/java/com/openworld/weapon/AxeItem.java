@@ -1,6 +1,6 @@
 package com.openworld.weapon;
 
-import godot.annotation.RegisterClass;
+import godot.annotation.Script;
 
 /**
  * Heavy axe melee weapon (MW2).
@@ -8,6 +8,6 @@ import godot.annotation.RegisterClass;
  * Extends MeleeItem directly — no charge mechanic (contrast with KnifeItem).
  * Tradeoff vs MW1 knife: longer reach and higher per-swing damage at a slower rate.
  */
-@RegisterClass(className = "AxeItem")
+@Script(className = "AxeItem")
 public class AxeItem extends MeleeItem {
 }

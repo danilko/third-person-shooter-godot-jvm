@@ -1,8 +1,7 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Resource;
 import com.openworld.character.FactionTable;
 
@@ -28,11 +27,11 @@ import com.openworld.character.FactionTable;
  * {@code 1.0} bias, {@code null} table, {@code 0} fog), so a zone with no RegionConfig — or a
  * RegionConfig left at defaults — changes nothing.
  */
-@RegisterClass(className = "RegionConfig")
+@Script(className = "RegionConfig")
 public class RegionConfig extends Resource {
 
     /** Human-readable region name (debug / future HUD). */
-    @Export @RegisterProperty public String regionName = "Region";
+    @Export public String regionName = "Region";
 
     /**
      * Faction relationships to install while this region is active (a {@code .tres} authored like
@@ -40,35 +39,35 @@ public class RegionConfig extends Resource {
      * neutral region needn't ship a table; a region that wants its own rules (a gang turf where two
      * ambient factions are hostile) assigns one. Applied via {@code FactionManager.applyTable}.
      */
-    @Export @RegisterProperty public FactionTable factionTable = null;
+    @Export public FactionTable factionTable = null;
 
     /** Multiplier on each {@link SpawnConfig#count} (ambient AI) when a zone in this region loads. */
-    @Export @RegisterProperty public float ambientAiDensity = 1.0f;
+    @Export public float ambientAiDensity = 1.0f;
 
     /** Multiplier on each {@link VehicleSpawnConfig#count} (ambient traffic) for zones in this region. */
-    @Export @RegisterProperty public float vehicleDensity = 1.0f;
+    @Export public float vehicleDensity = 1.0f;
 
     /**
      * Scales the D2 AI-LOD distances ({@code AICharacter.LOD_*_DIST}) while active: {@code > 1} keeps
      * AI fully simulated farther out (open rural region), {@code < 1} shortens active range (dense
      * city — more AI on screen, so tighten the budget). 1.0 = the built-in defaults.
      */
-    @Export @RegisterProperty public float aiLodBias = 1.0f;
+    @Export public float aiLodBias = 1.0f;
 
     /**
      * Sun/key-light colour temperature in Kelvin (warm city ≈ 5200, cool mountain ≈ 8000); applied to
      * the scene's {@code DirectionalLight3D} via a Kelvin→RGB approximation. 0 = leave the light alone.
      */
-    @Export @RegisterProperty public float lightTemperature = 0.0f;
+    @Export public float lightTemperature = 0.0f;
 
     /** Scene {@code Environment} fog density while active (0 = fog off / leave as authored). */
-    @Export @RegisterProperty public float fogDensity = 0.0f;
+    @Export public float fogDensity = 0.0f;
 
     /**
      * Name of the {@code AudioServer} bus to bring up as this region's ambient bed (forward-compat
      * hook — empty = no music change; the ambient-music player itself is a later audio task).
      */
-    @Export @RegisterProperty public String ambientMusicBus = "";
+    @Export public String ambientMusicBus = "";
 
     public RegionConfig() { super(); }
 }

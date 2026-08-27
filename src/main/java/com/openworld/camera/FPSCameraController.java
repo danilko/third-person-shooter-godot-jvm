@@ -1,9 +1,8 @@
 package com.openworld.camera;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node3D;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -22,12 +21,11 @@ import com.openworld.character.Character;
  *     Yaw  (Node3D)
  *       Pitch  (Node3D)
  */
-@RegisterClass(className = "FPSCameraController")
+@Script(className = "FPSCameraController")
 public class FPSCameraController extends Node3D {
 
     /** World-space anchor — assign the NeckAttachment BoneAttachment3D in the inspector. */
     @Export
-    @RegisterProperty
     public Node3D fpsCameraMount;
 
     private Character character;
@@ -35,7 +33,7 @@ public class FPSCameraController extends Node3D {
     private Node3D    pitchNode;
     private Node3D    pivotNode;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         yawNode   = (Node3D) getNode("Yaw");
@@ -45,7 +43,7 @@ public class FPSCameraController extends Node3D {
         if (getParent() instanceof Character c) character = c;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (fpsCameraMount == null || character == null) return;

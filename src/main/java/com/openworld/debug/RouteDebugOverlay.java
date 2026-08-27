@@ -6,8 +6,8 @@ import com.openworld.world.IntersectionZone;
 import com.openworld.world.Lane;
 import com.openworld.world.VehicleRoute;
 import com.openworld.world.WorldZoneManager;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.BaseMaterial3D;
 import godot.api.BoxShape3D;
 import godot.api.CollisionShape3D;
@@ -36,7 +36,7 @@ import godot.global.GD;
  * single {@link ImmediateMesh} LINES surface with vertex colors ({@code no_depth_test} so lanes
  * read through buildings).
  */
-@RegisterClass(className = "RouteDebugOverlay")
+@Script(className = "RouteDebugOverlay")
 public class RouteDebugOverlay extends Node3D {
 
     private static final double REFRESH_INTERVAL = 0.5;
@@ -57,7 +57,7 @@ public class RouteDebugOverlay extends Node3D {
     private double refreshTimer = 0.0;
     private boolean surfaceOpen = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         mesh = new ImmediateMesh();
@@ -67,7 +67,7 @@ public class RouteDebugOverlay extends Node3D {
         addChild(inst);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         if (!isVisible()) return;

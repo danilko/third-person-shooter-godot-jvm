@@ -1,8 +1,7 @@
 package com.openworld.carrier.vehicle;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Curve;
 import godot.api.PackedScene;
 import godot.api.Resource;
@@ -28,25 +27,25 @@ import com.openworld.weapon.FirearmItem;
  *   driftGrip         — how much the car slides while the handbrake is held
  *   driftYawTorque    — how fast steering rotates the car in a drift/burnout
  */
-@RegisterClass(className = "VehicleConfig")
+@Script(className = "VehicleConfig")
 public class VehicleConfig extends Resource {
 
     // ── Suspension — applied to all wheels as shared defaults ─────────────
 
     /** Spring force per metre of compression (N/m). */
-    @Export @RegisterProperty public float springStrength   = 10000f;
+    @Export public float springStrength   = 10000f;
 
     /** Spring damping coefficient — resists oscillation. */
-    @Export @RegisterProperty public float springDamping    = 4500f;
+    @Export public float springDamping    = 4500f;
 
     /** Wheel visual and physics radius (metres). */
-    @Export @RegisterProperty public float wheelRadius      = 0.4f;
+    @Export public float wheelRadius      = 0.4f;
 
     /** Natural rest position: distance from wheel centre to contact point when unloaded. */
-    @Export @RegisterProperty public float restDistance     = 0.5f;
+    @Export public float restDistance     = 0.5f;
 
     /** How far the wheel can extend below rest position before the ray stops. */
-    @Export @RegisterProperty public float overExtend       = 0.3f;
+    @Export public float overExtend       = 0.3f;
 
     /**
      * Number of suspension probe rays per wheel along the rolling (fore/aft) axis.
@@ -55,19 +54,19 @@ public class VehicleConfig extends Resource {
      * single ray falls into a gap — the suspension uses the HIGHEST contact found and the
      * AVERAGED ground normal, which also steadies skid/grip. 3 is a good value.
      */
-    @Export @RegisterProperty public int suspensionSamples = 1;
+    @Export public int suspensionSamples = 1;
 
     /** Fore/aft half-spread (m) of the multi-sample probes along the wheel's rolling axis. */
-    @Export @RegisterProperty public float suspensionSampleSpread = 0.15f;
+    @Export public float suspensionSampleSpread = 0.15f;
 
     // ── Traction ──────────────────────────────────────────────────────────
 
     /** Longitudinal rolling-friction coefficient (no throttle or brake). */
-    @Export @RegisterProperty public float zTraction        = 0.05f;
+    @Export public float zTraction        = 0.05f;
 
     /** Longitudinal friction under braking or parking (≥ 5× zTraction). With the
      *  saturation below, 0.18 ≈ a constant 1.1 g stop — arcade-firm, not neck-snapping. */
-    @Export @RegisterProperty public float zBrakeTraction   = 0.18f;
+    @Export public float zBrakeTraction   = 0.18f;
 
     /**
      * Speed (m/s) at which the longitudinal friction force saturates. The zForce formula is
@@ -77,14 +76,14 @@ public class VehicleConfig extends Resource {
      * (parking friction, low-speed feel). With the default 6: braking ≈ constant 1.5 g,
      * rolling drag caps at a small constant; aeroDragCoefficient takes over at speed.
      */
-    @Export @RegisterProperty public float longFrictionSaturationSpeed = 6f;
+    @Export public float longFrictionSaturationSpeed = 6f;
 
     /**
      * Aerodynamic drag (N per (m/s)²) opposing velocity — the real high-speed limiter once
      * rolling friction saturates. Terminal speed = where motor force at the curve plateau
      * equals aero + saturated rolling drag (the governor at maxSpeed cuts motor first).
      */
-    @Export @RegisterProperty public float aeroDragCoefficient = 0.35f;
+    @Export public float aeroDragCoefficient = 0.35f;
 
     /**
      * Friction-circle cap: maximum lateral acceleration (in g) the tires can generate.
@@ -93,7 +92,7 @@ public class VehicleConfig extends Resource {
      * speed² like NFS/GTA: full sharpness in a parking lot, wide arcs at highway speed.
      * Also budgets the momentumAlignRate assist. 0 = uncapped.
      */
-    @Export @RegisterProperty public float maxLateralG = 1.35f;
+    @Export public float maxLateralG = 1.35f;
 
     // ── Drift (space handbrake) — the whole model is these TWO knobs ──────
     // NFS-Carbon style: rotation is a direct steering-controlled yaw torque, decoupled
@@ -106,7 +105,7 @@ public class VehicleConfig extends Resource {
      * Momentum carries (the alignment assist is off during handbrake); rotation authority
      * comes entirely from driftYawTorque.
      */
-    @Export @RegisterProperty public float driftGrip = 0.05f;
+    @Export public float driftGrip = 0.05f;
 
     /**
      * Yaw torque (N·m) applied per unit of steering while the handbrake is held — how fast
@@ -114,7 +113,7 @@ public class VehicleConfig extends Resource {
      * rotation rate (~2 rad/s at defaults: a full donut in ~3 s). Works from a standstill
      * too when the throttle is open (burnout donuts — gas overrides the parking lock).
      */
-    @Export @RegisterProperty public float driftYawTorque = 9000f;
+    @Export public float driftYawTorque = 9000f;
 
     // ── Parking / idle stability ──────────────────────────────────────────
 
@@ -124,45 +123,45 @@ public class VehicleConfig extends Resource {
      * the RigidBody is put to sleep so wheel forces stop and a character standing
      * against the zero-friction body can no longer shove it.
      */
-    @Export @RegisterProperty public float parkSpeedThreshold = 0.5f;
+    @Export public float parkSpeedThreshold = 0.5f;
 
     /** Continuous low-speed idle dwell (s) before the parked body sleeps (prevents sleep/wake flap). */
-    @Export @RegisterProperty public float parkDelaySeconds = 0.5f;
+    @Export public float parkDelaySeconds = 0.5f;
 
     /**
      * Speed (m/s) below which handbrake / foot-brake-at-idle becomes a hard static lock
      * (velocity zeroed) instead of mere friction — the true parking brake on slopes.
      * Above this speed the handbrake keeps its drift meaning (lateral grip kill only).
      */
-    @Export @RegisterProperty public float parkingLockSpeed = 1.5f;
+    @Export public float parkingLockSpeed = 1.5f;
 
     // ── Power ─────────────────────────────────────────────────────────────
 
     /** Top speed (m/s). Acceleration curve is sampled at (speed/maxSpeed). */
-    @Export @RegisterProperty public float maxSpeed         = 20.0f;
+    @Export public float maxSpeed         = 20.0f;
 
     /** Peak motor force (N). Multiplied by accelerationCurve and throttle input. */
-    @Export @RegisterProperty public float acceleration     = 9000.0f;
+    @Export public float acceleration     = 9000.0f;
 
     /**
      * Force-vs-speed multiplier curve. X = speed ratio (0–1), Y = force multiplier (0–1).
      * Null = linear fallback: multiplier = max(0, 1 − speedRatio).
      */
-    @Export @RegisterProperty public Curve accelerationCurve;
+    @Export public Curve accelerationCurve;
 
     /**
      * Extra motor-force multiplier at standstill (arcade launch punch — GTA/NFS cars
      * over-deliver torque off the line), fading linearly to 1.0 by launchBoostEndRatio
      * of maxSpeed. 1.0 = off. Top-speed behaviour is unaffected.
      */
-    @Export @RegisterProperty public float launchBoost         = 1.3f;
+    @Export public float launchBoost         = 1.3f;
 
     /** Speed ratio (speed/maxSpeed) by which launchBoost has fully faded to 1.0. */
-    @Export @RegisterProperty public float launchBoostEndRatio = 0.3f;
+    @Export public float launchBoostEndRatio = 0.3f;
 
     /** Reverse top speed as a fraction of maxSpeed (arcade: cars back up slowly — ~48 km/h
      *  on the 240 km/h default, instead of full forward speed backwards). */
-    @Export @RegisterProperty public float reverseSpeedFraction = 0.2f;
+    @Export public float reverseSpeedFraction = 0.2f;
 
     /**
      * Arcade corner-speed retention (the NFS/GTA "rail" assist): rate (s⁻¹) at which the
@@ -172,52 +171,52 @@ public class VehicleConfig extends Resource {
      * while handbraking/slipping so drifts stay drifts; scaled down by flatGripScale when
      * any tire is flat. 0 = off (pure tire-scrub physics).
      */
-    @Export @RegisterProperty public float momentumAlignRate   = 4.0f;
+    @Export public float momentumAlignRate   = 4.0f;
 
     // ── Steering ──────────────────────────────────────────────────────────
 
     /** Steering return speed (rad/s) when the player releases the stick. */
-    @Export @RegisterProperty public float tireMaxTurnSpeed   = 2.0f;
+    @Export public float tireMaxTurnSpeed   = 2.0f;
 
     /** Maximum steering angle from straight-ahead (degrees). */
-    @Export @RegisterProperty public float tireMaxTurnDegrees = 25.0f;
+    @Export public float tireMaxTurnDegrees = 25.0f;
 
     // ── NOS / booster ─────────────────────────────────────────────────────
 
     /** Motor-force multiplier while boosting. ≤ 1 disables the booster entirely. */
-    @Export @RegisterProperty public float boostAccelMultiplier = 1.8f;
+    @Export public float boostAccelMultiplier = 1.8f;
 
     /** Top-speed multiplier while boosting (raises the accel-curve ceiling). */
-    @Export @RegisterProperty public float boostMaxSpeedMultiplier = 1.25f;
+    @Export public float boostMaxSpeedMultiplier = 1.25f;
 
     /** Seconds of continuous boost in a full tank. */
-    @Export @RegisterProperty public float boostCapacitySeconds = 4f;
+    @Export public float boostCapacitySeconds = 4f;
 
     /** Seconds of boost regained per second while not boosting. */
-    @Export @RegisterProperty public float boostRechargeRate = 0.5f;
+    @Export public float boostRechargeRate = 0.5f;
 
     // ── Damageable tires ──────────────────────────────────────────────────
 
     /** Hit points per tire (each wheel's TireHit collider routes weapon damage here). */
-    @Export @RegisterProperty public float tireMaxHealth = 60f;
+    @Export public float tireMaxHealth = 60f;
 
     /** Fraction of a tire hit's damage that still reaches the vehicle body Health. */
-    @Export @RegisterProperty public float tireDamagePassthrough = 0.25f;
+    @Export public float tireDamagePassthrough = 0.25f;
 
     /** Effective rolling-radius scale of a flat (rides on the rim; also the visual squash). */
-    @Export @RegisterProperty public float flatRadiusScale = 0.6f;
+    @Export public float flatRadiusScale = 0.6f;
 
     /** Suspension rest-distance scale of a flat — the corner visibly sags. */
-    @Export @RegisterProperty public float flatRestScale = 0.8f;
+    @Export public float flatRestScale = 0.8f;
 
     /** Lateral grip multiplier on a flat wheel — the handling destabilizer. */
-    @Export @RegisterProperty public float flatGripScale = 0.45f;
+    @Export public float flatGripScale = 0.45f;
 
     /** Motor force multiplier on a flat driven wheel. */
-    @Export @RegisterProperty public float flatMotorScale = 0.7f;
+    @Export public float flatMotorScale = 0.7f;
 
     /** Yaw pull torque (N·m at maxSpeed) toward the flat side when flats are asymmetric. */
-    @Export @RegisterProperty public float flatPullTorque = 600f;
+    @Export public float flatPullTorque = 600f;
 
     // ── High-speed stability (GTA-style anti-flip) ────────────────────────
 
@@ -228,17 +227,17 @@ public class VehicleConfig extends Resource {
      * Kept moderate (0.45) now that maxLateralG is the real safety bound — stacking a
      * harsh angle limit on top of the friction circle made top-speed steering feel dead.
      */
-    @Export @RegisterProperty public float steeringHighSpeedFraction = 0.45f;
+    @Export public float steeringHighSpeedFraction = 0.45f;
 
     /** Speed ratio (speed/maxSpeed) at which the steering limit starts shrinking. */
-    @Export @RegisterProperty public float steeringLimitStartRatio = 0.25f;
+    @Export public float steeringLimitStartRatio = 0.25f;
 
     /**
      * How far the lateral grip force's application point is lifted from the tire contact
      * toward center-of-mass height as speed rises (0 = always at the contact — full roll
      * lever arm; 1 = fully at CoM height — grip without roll torque).
      */
-    @Export @RegisterProperty public float lateralForceHeightBlend = 0.85f;
+    @Export public float lateralForceHeightBlend = 0.85f;
 
     /**
      * Speed ratio (speed/maxSpeed) at which lateralForceHeightBlend reaches full strength.
@@ -246,52 +245,52 @@ public class VehicleConfig extends Resource {
      * cornering force (and its roll moment) peaks at MID speeds — the blend must be fully
      * up by then, not only at maxSpeed.
      */
-    @Export @RegisterProperty public float lateralBlendFullRatio  = 0.5f;
+    @Export public float lateralBlendFullRatio  = 0.5f;
 
     /**
      * Anti-roll bar: force (N) per metre of left/right suspension-compression difference,
      * transferred across each axle. 0 = off (escalation lever if the CoM-height blend
      * alone doesn't tame a tall body).
      */
-    @Export @RegisterProperty public float antiRollStiffness = 0f;
+    @Export public float antiRollStiffness = 0f;
 
     /** Downforce (N per (m/s)²) pressing the body along −bodyUp while grounded; capped at ~1× weight. */
-    @Export @RegisterProperty public float downforceCoefficient = 4f;
+    @Export public float downforceCoefficient = 4f;
 
     /** Angular damping while any wheel is grounded (calms roll/pitch jitter without killing yaw). */
-    @Export @RegisterProperty public float groundedAngularDamp = 2f;
+    @Export public float groundedAngularDamp = 2f;
 
     /** Angular damping while fully airborne (low — jumps should tumble naturally). */
-    @Export @RegisterProperty public float airborneAngularDamp = 0.5f;
+    @Export public float airborneAngularDamp = 0.5f;
 
     /** Soft keep-upright corrective torque (N·m at 90° tilt) while grounded. 0 = off. */
-    @Export @RegisterProperty public float uprightTorque = 3000f;
+    @Export public float uprightTorque = 3000f;
 
     // ── Carrier stubs — motorcycle / boat / airplane (drivable prototypes) ─
 
     /** Motorcycle: max lean (deg) into a full-lock turn at speed (banks via the upright assist). */
-    @Export @RegisterProperty public float motorcycleLeanDegrees = 28f;
+    @Export public float motorcycleLeanDegrees = 28f;
 
     /** Boat: hull buoyancy-probe half extents (m) — 4 corner probes at ±width/±length. */
-    @Export @RegisterProperty public float hullHalfWidth  = 1.0f;
-    @Export @RegisterProperty public float hullHalfLength = 2.0f;
+    @Export public float hullHalfWidth  = 1.0f;
+    @Export public float hullHalfLength = 2.0f;
 
     /** Boat: buoyancy spring (N per metre submerged, per probe) and its vertical damping. */
-    @Export @RegisterProperty public float buoyancyStrength = 15000f;
-    @Export @RegisterProperty public float buoyancyDamping  = 3000f;
+    @Export public float buoyancyStrength = 15000f;
+    @Export public float buoyancyDamping  = 3000f;
 
     /** Boat: linear damp while afloat (water resistance). */
-    @Export @RegisterProperty public float waterDrag = 1.0f;
+    @Export public float waterDrag = 1.0f;
 
     /** Boat: yaw torque (N·m) at full rudder. */
-    @Export @RegisterProperty public float rudderTorque = 9000f;
+    @Export public float rudderTorque = 9000f;
 
     /** Airplane: lift (N per (m/s)² of forward speed) along body-up, capped near 1.3× weight. */
-    @Export @RegisterProperty public float liftCoefficient = 8f;
+    @Export public float liftCoefficient = 8f;
 
     /** Airplane: control-surface torques (N·m at full input). */
-    @Export @RegisterProperty public float pitchTorque = 12000f;
-    @Export @RegisterProperty public float rollTorque  = 9000f;
+    @Export public float pitchTorque = 12000f;
+    @Export public float rollTorque  = 9000f;
 
     // ── Combat / weapon ───────────────────────────────────────────────────
 
@@ -301,37 +300,37 @@ public class VehicleConfig extends Resource {
      *   1 = PASSENGER_WEAPON — occupant fires own weapon via vehicle camera
      *   2 = VEHICLE_WEAPON   — vehicle's own FirearmItem fires; occupant weapon disabled
      */
-    @Export @RegisterProperty public int weaponModeIndex = 1;
+    @Export public int weaponModeIndex = 1;
 
     /** Passengers (seats 1..n) may fire their own weapon from the window (GTA drive-by). */
-    @Export @RegisterProperty public boolean passengerSeatsCanShoot = true;
+    @Export public boolean passengerSeatsCanShoot = true;
 
     // ── Collision damage ──────────────────────────────────────────────────
 
     /** Minimum vehicle speed (m/s) needed to deal collision damage. 0 = disabled. */
-    @Export @RegisterProperty public float vehicleCollisionMinSpeed    = 5.0f;
+    @Export public float vehicleCollisionMinSpeed    = 5.0f;
 
     /** Damage per m/s above vehicleCollisionMinSpeed. */
-    @Export @RegisterProperty public float vehicleCollisionDamageScale = 100.0f;
+    @Export public float vehicleCollisionDamageScale = 100.0f;
 
     // ── Destruction explosion ─────────────────────────────────────────────
 
     /** Blast radius (metres) on destruction. 0 = no explosion. */
-    @Export @RegisterProperty public float explosionRadius    = 6f;
+    @Export public float explosionRadius    = 6f;
 
     /** Maximum damage at blast centre; falls off quadratically to zero at radius. */
-    @Export @RegisterProperty public float explosionMaxDamage = 100f;
+    @Export public float explosionMaxDamage = 100f;
 
     /** Physics push force applied to bodies caught in the blast. */
-    @Export @RegisterProperty public float explosionPushForce = 25f;
+    @Export public float explosionPushForce = 25f;
 
     // ── Damage-tier VFX ───────────────────────────────────────────────────
 
     /** Health fraction below which the engine smokes (grey plume). */
-    @Export @RegisterProperty public float damageSmokeFraction = 0.66f;
+    @Export public float damageSmokeFraction = 0.66f;
 
     /** Health fraction below which the engine burns (fire + heavy smoke). */
-    @Export @RegisterProperty public float damageFireFraction = 0.33f;
+    @Export public float damageFireFraction = 0.33f;
 
     // ── Wreck ─────────────────────────────────────────────────────────────
 
@@ -340,15 +339,15 @@ public class VehicleConfig extends Resource {
      * Null = no wreck remains after the explosion.
      * Set per config preset so a sports car gets a different burnt shell than a tank.
      */
-    @Export @RegisterProperty public PackedScene wreckScene;
+    @Export public PackedScene wreckScene;
 
     /** Seconds the wreck node stays in the scene before being removed. */
-    @Export @RegisterProperty public float wreckDuration = 15f;
+    @Export public float wreckDuration = 15f;
 
     // ── Identity ──────────────────────────────────────────────────────────
 
     /** Icon shown in the kill feed when this vehicle kills a character. */
-    @Export @RegisterProperty public Texture2D vehicleIcon;
+    @Export public Texture2D vehicleIcon;
 
     public VehicleConfig() { super(); }
 }

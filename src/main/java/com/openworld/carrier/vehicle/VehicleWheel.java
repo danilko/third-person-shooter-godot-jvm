@@ -2,9 +2,8 @@ package com.openworld.carrier.vehicle;
 
 import com.openworld.control.UserCommand;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -16,7 +15,7 @@ import godot.global.GD;
  * Physics constants (spring, traction, wheelRadius, etc.) come from VehicleConfig via
  * setup() — no per-wheel duplication of values that belong at the vehicle-type level.
  */
-@RegisterClass(className = "VehicleWheel")
+@Script(className = "VehicleWheel")
 public class VehicleWheel extends RayCast3D {
 
     private static final float TWO_PI = (float)(2.0 * Math.PI);
@@ -24,19 +23,19 @@ public class VehicleWheel extends RayCast3D {
     // ── Per-wheel structural exports (set in scene, NOT in VehicleConfig) ─────
 
     /** Optional per-wheel visual mesh override. Null = use the Vehicle's default wheel mesh. */
-    @RegisterProperty @Export public PackedScene wheelScene;
+    @Export public PackedScene wheelScene;
 
     /** True when this wheel is driven by the motor. */
-    @RegisterProperty @Export public boolean isMotor = false;
+    @Export public boolean isMotor = false;
 
     /** True when this wheel turns with steering input. */
-    @RegisterProperty @Export public boolean isSteer = false;
+    @Export public boolean isSteer = false;
 
     /**
      * Tire lateral-grip curve. X = slip ratio (0=aligned, 1=pure sideways), Y = grip [0–1].
      * Rear wheels typically have a softer curve than front wheels to enable controlled drift.
      */
-    @RegisterProperty @Export public Curve gripCurve;
+    @Export public Curve gripCurve;
 
     // ── Config reference (injected by Vehicle._ready via setup()) ─────────────
     private VehicleConfig cfg;
@@ -124,7 +123,7 @@ public class VehicleWheel extends RayCast3D {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         vehicle = (Vehicle) getOwner();

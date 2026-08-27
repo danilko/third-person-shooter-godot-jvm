@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Marker3D;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -34,7 +33,7 @@ import java.util.List;
  *       (GTA-style disposable traffic — avoids a pile-up at a true map edge).
  * </ul>
  */
-@RegisterClass(className = "VehicleRoute")
+@Script(className = "VehicleRoute")
 public class VehicleRoute extends Node3D implements Lane {
 
     /** {@link #endBehavior} values — exported as String (a raw enum type breaks the registration scanner). */
@@ -43,43 +42,63 @@ public class VehicleRoute extends Node3D implements Lane {
     public static final String END_DESPAWN = "DESPAWN";
 
     /** True = a closed ring (cars circulate forever). False = a one-way lane ending in {@link #endBehavior}. */
-    @Export @RegisterProperty public boolean loop = true;
+    @Export public boolean loop = true;
 
     /** Optional comma-separated explicit successor lane names — overrides the geometry-derived
      *  {@link LaneGraph} connectivity when set. */
-    @Export @RegisterProperty public String nextRoutes = "";
+    @Export public String nextRoutes = "";
 
     /** Optional comma-separated weights parallel to {@link #nextRoutes} (baked straight-biased,
      *  e.g. "0.6,0.2,0.2"). Empty/malformed = uniform pick. */
-    @Export @RegisterProperty public String nextWeights = "";
+    @Export public String nextWeights = "";
 
     /** Turn movement this route makes through a junction — "L"/"S"/"R" on a generated turn
      *  connector, "" on a plain lane. Read by the junction right-of-way logic (Phase 2). */
-    @Export @RegisterProperty public String turn = "";
+    @Export public String turn = "";
 
     /** Compass arm ("N"/"E"/"S"/"W") a car on this connector arrives from — the junction
      *  conflict-table key (Phase 2). "" on a plain lane. */
-    @Export @RegisterProperty public String approach = "";
+    @Export public String approach = "";
 
     /** Right-side lane offset (m) applied to the followed path — keeps cars in their lane rather than
      *  riding the marker centerline. Author opposing one-way lanes, or one centerline + ± offset. */
-    @Export @RegisterProperty public float laneOffset = 0f;
+    @Export public float laneOffset = 0f;
 
     /** Lane width (m) — reserved for multi-lane / overtaking; currently informational. */
-    @Export @RegisterProperty public float laneWidth = 3.5f;
+    @Export public float laneWidth = 3.5f;
 
     /** End-of-lane behaviour: {@link #END_CHAIN} / {@link #END_UTURN} / {@link #END_DESPAWN}. */
-    @Export @RegisterProperty public String endBehavior = END_CHAIN;
+    @Export public String endBehavior = END_CHAIN;
 
     /** Optional explicit return lane name for {@link #END_UTURN} (else derived from {@link LaneGraph}). */
-    @Export @RegisterProperty public String returnRoute = "";
+    @Export public String returnRoute = "";
 
     // ── Lane interface getters (thin wrappers over the public fields above, needed because an
     //    interface can't expose a field directly — no behavior change, same values) ───────────
     @Override public String getTurn() { return turn; }
+
+    /** Setter half of the exported {@code turn} property. */
+    public void setTurn(String value) {
+        this.turn = value;
+    }
     @Override public String getApproach() { return approach; }
+
+    /** Setter half of the exported {@code approach} property. */
+    public void setApproach(String value) {
+        this.approach = value;
+    }
     @Override public String getEndBehavior() { return endBehavior; }
+
+    /** Setter half of the exported {@code endBehavior} property. */
+    public void setEndBehavior(String value) {
+        this.endBehavior = value;
+    }
     @Override public String getReturnRoute() { return returnRoute; }
+
+    /** Setter half of the exported {@code returnRoute} property. */
+    public void setReturnRoute(String value) {
+        this.returnRoute = value;
+    }
 
     // Baked (Catmull-Rom smoothed + lane-offset) path cache — rebuilt only if the marker count changes.
     private List<Vector3> baked;
@@ -93,14 +112,14 @@ public class VehicleRoute extends Node3D implements Lane {
 
     // Registered with the WorldZoneManager route registry (register-with-AutoLoad idiom, like
     // Character ↔ SpatialEntityGrid) so every lane lookup is a map read, not a scene-tree walk.
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         WorldZoneManager mgr = WorldZoneManager.get();
         if (mgr != null) mgr.registerRoute(this);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         cachedEntry = null;   // global positions are per scene-instance
@@ -156,6 +175,11 @@ public class VehicleRoute extends Node3D implements Lane {
     }
 
     public boolean isLoop() { return loop; }
+
+    /** Setter half of the exported {@code loop} property. */
+    public void setLoop(boolean value) {
+        this.loop = value;
+    }
 
     // ── Smoothed, lane-offset arc-length sampler ─────────────────────────────────
 

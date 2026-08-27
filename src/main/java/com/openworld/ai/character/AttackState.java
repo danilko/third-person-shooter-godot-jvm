@@ -79,7 +79,7 @@ public class AttackState implements AIState {
                 // pursues toward the target — ChaseState paths around the wall / through the doorway
                 // (using the doorway NavigationLink) and re-enters AttackState once it regains a line,
                 // so it follows you inside instead of camping. A hold-and-shoot AI sweeps the last spot.
-                return (body.getBehaviorConfig().breachWhenBlocked && ctrl.hasLastKnownPosition())
+                return (body.behaviorConfigOrDefaults().breachWhenBlocked && ctrl.hasLastKnownPosition())
                         ? ChaseState.INSTANCE
                         : SearchState.INSTANCE;
             }
@@ -93,16 +93,16 @@ public class AttackState implements AIState {
         float targetY  = (float) targetPos.getY() + AICharacter.TARGET_BODY_HEIGHT;
         float dy       = targetY - (float) eyePos.getY();
         float pitchDeg = (hDist > 0.01f) ? (float) Math.toDegrees(Math.atan2(dy, hDist)) : 0f;
-        boolean pitchOut = pitchDeg > body.getBehaviorConfig().aimPitchMax
-                        || pitchDeg < body.getBehaviorConfig().aimPitchMin;
+        boolean pitchOut = pitchDeg > body.behaviorConfigOrDefaults().aimPitchMax
+                        || pitchDeg < body.behaviorConfigOrDefaults().aimPitchMin;
 
         // ── Combat stance (debounced — minimum 2 s per stance) ───────────────
         // Only evaluate when the hold timer has expired to prevent per-frame
         // oscillation when hasLoS or pitchOut flickers near the threshold.
         ctrl.tickStanceHoldTimer(delta);
-        if (body.getBehaviorConfig().useCombatCrouch && ctrl.canChangeStance()) {
+        if (body.behaviorConfigOrDefaults().useCombatCrouch && ctrl.canChangeStance()) {
             boolean wantCrouch = hasLoS && !pitchOut && ctrl.isReactionReady()
-                    && (!body.getBehaviorConfig().crouchOnSuppression || ctrl.isUnderAttack());
+                    && (!body.behaviorConfigOrDefaults().crouchOnSuppression || ctrl.isUnderAttack());
             StanceName target = wantCrouch ? StanceName.CROUCH : StanceName.UPRIGHT;
             if (target != ctrl.getIntendedAttackStance()) {
                 ctrl.setIntendedAttackStance(target);
@@ -181,7 +181,7 @@ public class AttackState implements AIState {
             cmd.aimTargetPosition = newTarget;
             // Movement is fully controlled by the movement block above.
             // startStillPhase is a no-op when shootStillDuration == 0.
-            ctrl.startStillPhase(body.getBehaviorConfig().shootStillDuration);
+            ctrl.startStillPhase(body.behaviorConfigOrDefaults().shootStillDuration);
             cmd.fire = true;
         }
 

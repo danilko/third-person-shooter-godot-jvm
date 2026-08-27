@@ -3,8 +3,8 @@ package com.openworld.ui;
 import com.openworld.game.EventBus;
 import com.openworld.game.GameManager;
 import com.openworld.net.NetworkManager;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.CanvasLayer;
 import godot.api.Input;
 import godot.api.InputEvent;
@@ -31,13 +31,13 @@ import godot.core.StringNames;
  * Placement: add MenuManager.tscn as a child of World.tscn.
  * Children PauseMenu and GameOverMenu are wired inside MenuManager.tscn.
  */
-@RegisterClass(className = "MenuManager")
+@Script(className = "MenuManager")
 public class MenuManager extends CanvasLayer {
 
     private PauseMenu    pauseMenu;
     private GameOverMenu gameOverMenu;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         pauseMenu    = (PauseMenu)    getNodeOrNull("PauseMenu");
@@ -54,7 +54,7 @@ public class MenuManager extends CanvasLayer {
         }
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _input(InputEvent event) {
         if (event.isActionPressed("ui_cancel", false)) {
@@ -68,7 +68,7 @@ public class MenuManager extends CanvasLayer {
 
     // ── EventBus listener ─────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     public void onAllPlayersDied() {
         showGameOver();
     }
@@ -79,7 +79,7 @@ public class MenuManager extends CanvasLayer {
      * "notify and let the player restart the whole session" behaviour. The session is already
      * torn down by the time this fires (NetworkManager.onHostLost → leaveSession).
      */
-    @RegisterFunction
+    @Register
     public void onConnectionLost(String reason) {
         if (gameOverMenu != null) gameOverMenu.setBanner("Connection lost — " + reason);
         showGameOver();

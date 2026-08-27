@@ -4,9 +4,8 @@ import com.openworld.character.Character;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Callable;
 import godot.core.MethodCallable;
@@ -35,7 +34,7 @@ import java.util.List;
  *   WeaponController.ammoChanged  → refreshAllSlots()
  *   Character.changedWeapon       → onWeaponSwitched()
  */
-@RegisterClass(className = "WeaponSlotsUI")
+@Script(className = "WeaponSlotsUI")
 public class WeaponSlotsUI extends PanelContainer {
 
     private static final int   SLOT_COUNT            = 7;
@@ -43,11 +42,11 @@ public class WeaponSlotsUI extends PanelContainer {
             "res://src/main/resources/com/openworld/ui/WeaponSlotItem.tscn";
 
     /** Slot item scene to instantiate. Wired automatically from SLOT_ITEM_SCENE_PATH. */
-    @Export @RegisterProperty
+    @Export
     public PackedScene slotItemScene;
 
     /** Path to the VBoxContainer that holds slot rows. */
-    @Export @RegisterProperty
+    @Export
     public NodePath slotsPath = new NodePath("Slots");
 
     private Character        character;
@@ -59,7 +58,7 @@ public class WeaponSlotsUI extends PanelContainer {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         // Display-only: never intercept mouse events regardless of screen coverage.
@@ -95,12 +94,12 @@ public class WeaponSlotsUI extends PanelContainer {
 
     // ── Signal receivers ──────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     public void onAmmoChanged(int magazine, int reserve) {
         refreshAllSlots();
     }
 
-    @RegisterFunction
+    @Register
     public void onWeaponSwitched(int slotIndex) {
         activeSlot = slotIndex;
         updateHighlights();

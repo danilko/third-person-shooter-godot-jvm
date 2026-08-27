@@ -2,9 +2,8 @@ package com.openworld.world.manager;
 
 import com.openworld.util.ObjectPool;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Decal;
 import godot.api.Node;
 import godot.core.Basis;
@@ -32,17 +31,15 @@ import java.util.List;
  *
  * Discovery: registers itself in group "decal_manager".
  */
-@RegisterClass(className = "DecalManager")
+@Script(className = "DecalManager")
 public class DecalManager extends Node {
 
     /** Total number of pooled decal instances (template + duplicates). */
     @Export
-    @RegisterProperty
     public int poolSize = 16;
 
     /** Seconds a bullet hole remains visible before being recycled. */
     @Export
-    @RegisterProperty
     public float decalLifetime = 8.0f;
 
     // ── Internal per-decal state ──────────────────────────────────────────────
@@ -61,7 +58,7 @@ public class DecalManager extends Node {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         addToGroup("decal_manager");
@@ -98,7 +95,7 @@ public class DecalManager extends Node {
     }
 
     /** Age every active decal; release back to pool when lifetime expires. */
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         if (pool == null || activeCount == 0) return;

@@ -1,9 +1,8 @@
 package com.openworld.weapon;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 
 /**
  * CS:GO-style knife: tap fire = quick stab, hold fire = heavy slash on release.
@@ -20,20 +19,20 @@ import godot.annotation.RegisterProperty;
  *
  * Scene setup: same as MeleeItem — HitTimer (one_shot=true) required.
  */
-@RegisterClass(className = "KnifeItem")
+@Script(className = "KnifeItem")
 public class KnifeItem extends MeleeItem {
 
     /** Seconds of hold needed to trigger a heavy slash instead of a quick stab. */
-    @Export @RegisterProperty public float chargeThreshold   = 0.5f;
+    @Export public float chargeThreshold   = 0.5f;
 
     /** Damage for the heavy slash. */
-    @Export @RegisterProperty public float heavyDamage       = 100f;
+    @Export public float heavyDamage       = 100f;
 
     /** Reach for the heavy slash (metres from torso). */
-    @Export @RegisterProperty public float heavyMeleeRange   = 2.0f;
+    @Export public float heavyMeleeRange   = 2.0f;
 
     /** Cone half-angle for the heavy slash — wider arc than the quick stab. */
-    @Export @RegisterProperty public float heavyConeAngleDeg = 35f;
+    @Export public float heavyConeAngleDeg = 35f;
 
     private float[][] heavyOffsets;
 
@@ -41,14 +40,14 @@ public class KnifeItem extends MeleeItem {
     private boolean isCharging        = false;
     private boolean heavyAttackActive = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         super._ready();  // builds swingOffsets from coneAngleDeg
         heavyOffsets = buildOffsets(heavyConeAngleDeg);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (isCharging) chargeTime += delta;

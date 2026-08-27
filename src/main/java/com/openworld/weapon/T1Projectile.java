@@ -2,9 +2,8 @@ package com.openworld.weapon;
 
 import com.openworld.world.manager.ExplosionManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Vector3;
 
@@ -21,13 +20,13 @@ import godot.core.Vector3;
  *     CollisionShape3D   (layer 3 / mask world(1); CCD enabled)
  *     MeshInstance3D     (optional visible mesh)
  */
-@RegisterClass(className = "T1Projectile")
+@Script(className = "T1Projectile")
 public class T1Projectile extends RigidBody3D implements Detonatable {
 
-    @Export @RegisterProperty public float fuseTime          = 3f;
-    @Export @RegisterProperty public float explosionRadius    = 5f;
-    @Export @RegisterProperty public float explosionMaxDamage = 80f;
-    @Export @RegisterProperty public float explosionPushForce = 15f;
+    @Export public float fuseTime          = 3f;
+    @Export public float explosionRadius    = 5f;
+    @Export public float explosionMaxDamage = 80f;
+    @Export public float explosionPushForce = 15f;
 
     // Injected by ThrowableItem at throw-time
     public String    attackerName      = "";
@@ -45,13 +44,13 @@ public class T1Projectile extends RigidBody3D implements Detonatable {
     private float   fuseCountdown = 0f;
     private boolean detonated     = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         fuseCountdown = fuseTime;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (detonated) return;
@@ -60,7 +59,7 @@ public class T1Projectile extends RigidBody3D implements Detonatable {
     }
 
     @Override
-    @RegisterFunction
+    @Register
     public void detonate() {
         if (detonated || !isInsideTree()) return;
         detonated = true;

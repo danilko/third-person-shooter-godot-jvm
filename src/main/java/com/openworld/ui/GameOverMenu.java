@@ -1,7 +1,7 @@
 package com.openworld.ui;
 
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Control;
 import godot.api.Label;
 import godot.api.Node;
@@ -15,10 +15,10 @@ import com.openworld.game.GameManager;
  * fires.  This node just displays itself and forwards button signals upward.
  * All state transitions (pause, mouse mode) are owned by MenuManager.
  */
-@RegisterClass(className = "GameOverMenu")
+@Script(className = "GameOverMenu")
 public class GameOverMenu extends Control {
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         hide();
@@ -34,13 +34,13 @@ public class GameOverMenu extends Control {
         if (titleNode instanceof Label label) label.setText(text);
     }
 
-    @RegisterFunction
+    @Register
     public void onRestartPressed() {
         MenuManager mm = menuManager();
         if (mm != null) mm.restart();
     }
 
-    @RegisterFunction
+    @Register
     public void onQuitPressed() {
         // See GameManager.prepareForQuit() javadoc: SceneTree.quit() does not emit
         // Window.close_requested, so the audio-stop-on-quit sweep must be called explicitly here.

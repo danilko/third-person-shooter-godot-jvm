@@ -2,8 +2,8 @@ package com.openworld.debug;
 
 import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.character.CharacterInfo;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -23,7 +23,7 @@ import java.util.UUID;
  * The grep-able health signal is the DRIVETEST SUMMARY block: per-phase top speed and max
  * body tilt (degrees off world-up). Tilt > 60° in any phase = the car flipped.
  */
-@RegisterClass(className = "DriveTestHost")
+@Script(className = "DriveTestHost")
 public class DriveTestHost extends Node3D {
 
     private static final double LOG_INTERVAL = 0.5;
@@ -40,7 +40,7 @@ public class DriveTestHost extends Node3D {
     private double  lastYaw = Double.NaN;
     private boolean done = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         StaticBody3D ground = new StaticBody3D();
@@ -73,7 +73,7 @@ public class DriveTestHost extends Node3D {
         GD.print("DRIVETEST start");
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (vehicle == null || driver == null || done) return;

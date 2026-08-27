@@ -1,9 +1,7 @@
 package com.openworld.character;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Node3D;
 
 /**
@@ -12,11 +10,10 @@ import godot.api.Node3D;
  * attaches it to VisualsMount, and reads meshConfig to wire all mesh-dependent
  * references on its sibling components.
  */
-@RegisterClass(className = "CharacterVisuals")
+@Script(className = "CharacterVisuals")
 public class CharacterVisuals extends Node3D {
 
     /** Describes the node layout inside this visual scene. */
     @Export
-    @RegisterProperty
     public MeshConfig meshConfig;
 }

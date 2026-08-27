@@ -2,7 +2,7 @@ package com.openworld.carrier.aircraft;
 
 import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.carrier.vehicle.VehicleConfig;
-import godot.annotation.RegisterClass;
+import godot.annotation.Script;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -17,7 +17,7 @@ import godot.global.GD;
  * (landing/taxi); at speed the assists stay out of the way so it can actually bank.
  * Seats, boost (afterburner!), authority, destruction, replication inherit from {@link Vehicle}.
  */
-@RegisterClass(className = "Airplane")
+@Script(className = "Airplane")
 public class Airplane extends Vehicle {
 
     @Override

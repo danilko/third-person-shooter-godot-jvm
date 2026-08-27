@@ -2,9 +2,8 @@ package com.openworld.weapon;
 
 import com.openworld.world.manager.ExplosionManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.api.Node3D;
 import godot.core.Vector3;
@@ -25,20 +24,20 @@ import godot.core.Vector3;
  *     Mesh (MeshInstance3D)
  *   Connection: body_entered → on_body_entered (from "." to ".")
  */
-@RegisterClass(className = "RocketProjectile")
+@Script(className = "RocketProjectile")
 public class RocketProjectile extends RigidBody3D implements Detonatable {
 
     /** Forward speed in m/s; overridden at spawn by ProjectileItem.projectileSpeed. */
-    @Export @RegisterProperty public float speed = 25f;
+    @Export public float speed = 25f;
 
     /** Blast radius (metres); overridden at spawn. */
-    @Export @RegisterProperty public float explosionRadius = 8f;
+    @Export public float explosionRadius = 8f;
 
     /** Max damage at epicentre; overridden at spawn. */
-    @Export @RegisterProperty public float explosionMaxDamage = 120f;
+    @Export public float explosionMaxDamage = 120f;
 
     /** Radial push force; overridden at spawn. */
-    @Export @RegisterProperty public float explosionPushForce = 20f;
+    @Export public float explosionPushForce = 20f;
 
     // Injected by ProjectileItem before the node enters the tree.
     public String    attackerName      = "";
@@ -53,7 +52,7 @@ public class RocketProjectile extends RigidBody3D implements Detonatable {
 
     // ── Physics ───────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (detonated) return;
@@ -65,7 +64,7 @@ public class RocketProjectile extends RigidBody3D implements Detonatable {
     // ── Signal callback ───────────────────────────────────────────────────────
 
     /** Connected in RocketProjectile.tscn: body_entered from "." to "." method on_body_entered. */
-    @RegisterFunction
+    @Register
     public void onBodyEntered(Node3D body) {
         detonate();
     }
@@ -73,7 +72,7 @@ public class RocketProjectile extends RigidBody3D implements Detonatable {
     // ── Detonatable ───────────────────────────────────────────────────────────
 
     @Override
-    @RegisterFunction
+    @Register
     public void detonate() {
         if (detonated || !isInsideTree()) return;
         detonated = true;

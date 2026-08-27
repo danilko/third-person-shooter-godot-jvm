@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.annotation.Tool;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -56,27 +55,27 @@ import java.util.Set;
  * not just headless.
  */
 @Tool
-@RegisterClass(className = "WorldPreviewBuilder")
+@Script(className = "WorldPreviewBuilder")
 public class WorldPreviewBuilder extends Node {
 
-    @Export @RegisterProperty public String masterScenePath =
+    @Export public String masterScenePath =
             "res://src/main/resources/com/openworld/world/master/World_master.tscn";
 
     /** Comma-separated district stems to include (e.g. "District_city_1_1,District_industry_5_1")
      *  — blank means every district the master has a zone marker for. */
-    @Export @RegisterProperty public String districtStems = "";
+    @Export public String districtStems = "";
 
-    @Export @RegisterProperty public String outputScenePath =
+    @Export public String outputScenePath =
             "res://src/main/resources/com/openworld/world/WorldPreview.tscn";
 
     /** Build automatically when this node enters the tree (for a dedicated batch-build host). */
-    @Export @RegisterProperty public boolean bakeOnReady = false;
+    @Export public boolean bakeOnReady = false;
 
     /** After an auto-build (the {@link #bakeOnReady} path only), quit the process — same
      *  one-shot-CLI-batch-job idiom as {@link WorldBaker#quitWhenDone}. */
-    @Export @RegisterProperty public boolean quitWhenDone = false;
+    @Export public boolean quitWhenDone = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         if (bakeOnReady) {
@@ -88,17 +87,17 @@ public class WorldPreviewBuilder extends Node {
     /** Build {@link #outputScenePath} from {@link #masterScenePath}'s zone markers, filtered to
      *  {@link #districtStems} (callable from a dev key / editor Inspector button, mirroring
      *  {@link WorldBaker#bake()}). */
-    @RegisterFunction
+    @Register
     public void buildPreview() {
-        buildPreview(this, masterScenePath, districtStems, outputScenePath);
+        buildPreviewScene(this, masterScenePath, districtStems, outputScenePath);
     }
 
     /**
      * @param host   must be in the tree — the master is parented to it so global transforms
-     *               resolve, mirroring {@link WorldBaker#bake(Node, String, String, String, String)}.
+     *               resolve, mirroring {@link WorldBaker#bakeScene(Node, String, String, String, String)}.
      * @param stemsCsv comma-separated allow-list; blank = every zone marker found.
      */
-    public static void buildPreview(Node host, String masterPath, String stemsCsv, String outPath) {
+    public static void buildPreviewScene(Node host, String masterPath, String stemsCsv, String outPath) {
         Object loaded = GD.load(masterPath);
         if (!(loaded instanceof PackedScene masterPacked)) {
             GD.printErr("WorldPreviewBuilder: could not load master scene '" + masterPath + "'");

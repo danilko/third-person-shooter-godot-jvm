@@ -7,8 +7,8 @@ import com.openworld.world.VehicleSpawnConfig;
 import com.openworld.world.WorldZone;
 import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.StringName;
 import godot.core.Vector3;
@@ -39,7 +39,7 @@ import java.util.Set;
  * Grep for "MDSTEST verdict" (PASS iff both zones load with a nonzero {@link PathLaneRoute} count
  * while the player is near them, and both zones fully unload once the player walks far away).
  */
-@RegisterClass(className = "MultiDistrictStreamTestHost")
+@Script(className = "MultiDistrictStreamTestHost")
 public class MultiDistrictStreamTestHost extends Node3D {
 
 	private static final String DISTRICT_A =
@@ -66,7 +66,7 @@ public class MultiDistrictStreamTestHost extends Node3D {
 	private boolean done = false;
 	private boolean checkedLoaded = false;
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _ready() {
 		StaticBody3D floor = new StaticBody3D();
@@ -126,7 +126,7 @@ public class MultiDistrictStreamTestHost extends Node3D {
 		return marker;
 	}
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _physicsProcess(double delta) {
 		if (done) return;

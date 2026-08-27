@@ -1,6 +1,8 @@
 package com.openworld.world.manager;
 
-import godot.annotation.*;
+import godot.annotation.Export;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Vector3;
 
@@ -15,15 +17,13 @@ import java.util.List;
  * unshaded warm-yellow material). _ready() duplicates it to poolSize instances.
  * Add this node to the "bullet_tracer_manager" group via _ready() (done in code).
  */
-@RegisterClass(className = "BulletTracerManager")
+@Script(className = "BulletTracerManager")
 public class BulletTracerManager extends Node3D {
 
     @Export
-    @RegisterProperty
     public float tracerLifetime = 0.06f;
 
     @Export
-    @RegisterProperty
     public int poolSize = 16;
 
     private static class TracerEntry {
@@ -36,7 +36,7 @@ public class BulletTracerManager extends Node3D {
     // Circular scan index: successive acquires start where the last left off (O(1) amortised).
     private int scanHead = 0;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         addToGroup("bullet_tracer_manager");
@@ -53,7 +53,7 @@ public class BulletTracerManager extends Node3D {
         }
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         for (TracerEntry e : entries) {

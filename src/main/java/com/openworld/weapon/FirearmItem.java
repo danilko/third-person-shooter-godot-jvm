@@ -4,9 +4,8 @@ import com.openworld.world.manager.BulletTracerManager;
 import com.openworld.world.HitInfo;
 import com.openworld.net.NetworkManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.api.Object;
 import godot.core.Vector3;
@@ -27,14 +26,14 @@ import com.openworld.world.StimulusManager;
  * WeaponController injects character-level references via setup() during _ready(),
  * then orchestrates rate-limiting, reload timing, and HUD signals.
  */
-@RegisterClass(className = "FirearmItem")
+@Script(className = "FirearmItem")
 public class FirearmItem extends WeaponItem {
 
   private GPUParticles3D muzzleFlashFx;
   private AnimationPlayer muzzleFlashAnimPlayer;
 
   /** How far this shot is audible to AI (PLAN.md E2 — ~150 m urban, raise toward ~400 m for open terrain). */
-  @Export @RegisterProperty public float gunshotHearingRadius = 150f;
+  @Export public float gunshotHearingRadius = 150f;
 
   // Lazy-resolved world manager (ImpactManager is in WeaponItem base)
   private BulletTracerManager bulletTracerManager;
@@ -42,7 +41,7 @@ public class FirearmItem extends WeaponItem {
   private float currentBloom = 0f;
   /** Pellets per shot. 1 = single bullet (default). Set > 1 for shotguns — each
    *  pellet samples the spread cone independently; audio/bloom/recoil fire once. */
-  @Export @RegisterProperty public int pelletCount = 1;
+  @Export public int pelletCount = 1;
 
   private StanceName currentStance = StanceName.UPRIGHT;
 
@@ -61,7 +60,7 @@ public class FirearmItem extends WeaponItem {
    * Discovers weapon-local VFX nodes from the weapon scene. Called once on _ready();
    * VFX live under Muzzle/MuzzleVFX and never change regardless of equip state.
    */
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     super._ready();  // Pickup._ready — group + pickupId registration for replication
@@ -73,7 +72,7 @@ public class FirearmItem extends WeaponItem {
     }
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _physicsProcess(double delta) {
     currentBloom = Math.max(0f, currentBloom - bloomDecaySpeed * (float) delta);

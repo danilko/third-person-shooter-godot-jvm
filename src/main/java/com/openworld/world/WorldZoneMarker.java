@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.BaseMaterial3D;
 import godot.api.BoxMesh;
 import godot.api.CylinderMesh;
@@ -36,14 +35,14 @@ import java.util.List;
  * tints green while the zone is streamed in (driven by {@link #setLoadedVisual} from the manager) and
  * cyan while idle. These are pure debug meshes — delete-free in a shipping build by toggling the flag.
  */
-@RegisterClass(className = "WorldZoneMarker")
+@Script(className = "WorldZoneMarker")
 public class WorldZoneMarker extends Node3D {
 
 	/** The zone this marker anchors. */
-	@Export @RegisterProperty public WorldZone zone;
+	@Export public WorldZone zone;
 
 	/** Draw the translucent spawn-volume box + load/unload rings at runtime (debug aid). */
-	@Export @RegisterProperty public boolean showDebugVolume = true;
+	@Export public boolean showDebugVolume = true;
 
 	private static final Color IDLE_COLOR   = new Color(0.0, 0.7, 1.0, 0.12);  // cyan  — unloaded
 	private static final Color LOADED_COLOR = new Color(0.1, 1.0, 0.3, 0.20);  // green — streamed in
@@ -57,7 +56,7 @@ public class WorldZoneMarker extends Node3D {
 	 * or null if this zone never baked one, or it is currently removed (full detail is loaded). */
 	private Node lodLowInstance;
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _ready() {
 		WorldZoneManager mgr = WorldZoneManager.get();
@@ -66,7 +65,7 @@ public class WorldZoneMarker extends Node3D {
 		instantiateLodLow();   // zone starts "unloaded" — show the placeholder immediately, if any
 	}
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _exitTree() {
 		WorldZoneManager mgr = WorldZoneManager.get();

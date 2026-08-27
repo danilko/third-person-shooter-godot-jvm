@@ -1,7 +1,7 @@
 package com.openworld.debug;
 
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node3D;
 import godot.api.Window;
 import godot.core.Callable;
@@ -18,10 +18,10 @@ import godot.global.GD;
  *
  * Run with: godot --headless res://src/main/resources/com/openworld/debug/QuitSignalCheck.tscn
  */
-@RegisterClass(className = "QuitSignalCheckHost")
+@Script(className = "QuitSignalCheckHost")
 public class QuitSignalCheckHost extends Node3D {
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         Window root = getTree().getRoot();
@@ -35,7 +35,7 @@ public class QuitSignalCheckHost extends Node3D {
                 + "doesn't block synchronously)");
     }
 
-    @RegisterFunction
+    @Register
     public void onCloseRequested() {
         GD.print("QUITCHECK: close_requested fired");
     }

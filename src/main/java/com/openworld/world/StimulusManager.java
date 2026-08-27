@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.core.Vector3;
 
@@ -31,7 +30,7 @@ import java.util.List;
  * set in {@code _ready()} and cleared in {@code _exitTree()}. {@code _process} ages out stimuli older
  * than {@link #stimulusLifetime}. When the AutoLoad is absent (test scenes) callers no-op.
  */
-@RegisterClass(className = "StimulusManager")
+@Script(className = "StimulusManager")
 public class StimulusManager extends Node {
 
     private static StimulusManager instance;
@@ -40,7 +39,7 @@ public class StimulusManager extends Node {
     public static StimulusManager get() { return instance; }
 
     /** Seconds a stimulus stays perceivable before it ages out. */
-    @Export @RegisterProperty public float stimulusLifetime = 5.0f;
+    @Export public float stimulusLifetime = 5.0f;
 
     /** Kinds of perceptible event. GUNSHOT/EXPLOSION/VEHICLE_CRASH are emitted in E2; DEAD_BODY and
      *  PLAYER_SPOTTED are reserved for later perception features (corpse discovery, squad sighting). */
@@ -70,20 +69,20 @@ public class StimulusManager extends Node {
     /** Monotonic seconds accumulated in _process; used as the stimulus clock (no engine time dependency). */
     private double elapsed = 0.0;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         instance = this;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         if (instance == this) instance = null;
         stimuli.clear();
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         elapsed += delta;

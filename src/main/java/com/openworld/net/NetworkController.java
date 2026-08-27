@@ -5,8 +5,8 @@ import com.openworld.net.DeathLatch;
 import com.openworld.net.SnapshotInterpolator;
 import com.openworld.net.TimestampUnwrapper;
 import com.openworld.net.Vec3;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.core.Vector3;
 import com.openworld.ai.AIController;
 import com.openworld.carrier.vehicle.Vehicle;
@@ -32,7 +32,7 @@ import com.openworld.weapon.WeaponController;
  * lag. Combat/stance/health/weapon-slot are discrete — applied once on receipt, not
  * interpolated, the same way applyInput only calls setCombatState()/setStance() on change.
  */
-@RegisterClass(className = "NetworkController")
+@Script(className = "NetworkController")
 public class NetworkController extends Controller {
 
     // ── Near-time snapshot smoothing (engine-free, unit-tested in SnapshotInterpolatorTest) ──
@@ -98,7 +98,7 @@ public class NetworkController extends Controller {
     }
 
     /** Advances the interpolation clock and applies the resulting bracketed/dead-reckoned transform every rendered frame. */
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         // Once dead, the ragdoll (separate PhysicalBone3D physics) owns the body's pose —
