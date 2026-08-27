@@ -46,9 +46,31 @@ a test behind it.
 
 ## Building your first road (View3D ▸ N-panel ▸ **Road Kit**)
 
-**Fastest:** `Author ▸ Learn ▸ Add Sample Network`, then `Build ▸ Build Roads`. That gives you two
-streets crossing, an elevated highway on piers, and an exit ramp — a worked example of all four
-link types to pull apart. Everything below is what it did, by hand.
+**Fastest:** `Author ▸ Learn ▸ Add Sample Network`, then `Build ▸ Build Roads`. Everything below
+is what it did, by hand — and it really did it by hand: **the sample is authored by pressing the
+same operators you press**, so the button that teaches the gestures is also the button that
+exercises them. You get
+
+- two streets crossing (a pad whose mouths are the stop lines, and whose corners grow pavement);
+- an arterial grown from **both ends** — the last extension prepends at `_p000`;
+- an elevated 3+3 expressway on piers with a **weaving section**: an auxiliary lane on *each*
+  carriageway opening over the same span;
+- **a half-interchange**: `demo_hwy_p002` and `demo_main_p007` each accept **a ramp out and a ramp
+  in**. One ramp carries eastbound traffic off the expressway and onto the arterial; the other
+  carries westbound traffic back, and is **two lanes wide**. They run on opposite carriageways,
+  which is what makes it a straight run rather than a loop — and nothing declares any of it: which
+  carriageway each is on is read off which side its mouth sits, and exit-versus-entrance off the
+  ramp's own chain;
+- a one-lane **spur** branched from the middle of the arterial with `Branch Ramp Here`;
+- and therefore five gores of two kinds: fenced-to-fenced and fenced-ramp-to-kerbed-street (where
+  the nose carries the ramp's wall and the street's footway runs on past it), plus the spur's,
+  which is walkable at both flanks and so is the one gore whose proxy is **not** `-noped`.
+
+It is gate-green and its exported lane graph has no broken or unreachable lanes — check with
+`Preview ▸ Flow Report`. Press it again to start over; `Replace` clears the previous one.
+
+Not in it yet: a **ring road** (`is_loop` on the Road panel). A loop is a chain whose last point is
+`Connect`ed back to its first, so the sample is a `Connect` away from carrying one.
 
 Seven panels: **Author** (the gestures), **Road Point** (the active station), **Connections**
 (what it is joined to), **Junction**, **Road** (the corridor's base profile), **Preview** (the
@@ -60,10 +82,31 @@ exported traffic graph), **Build**.
    point. Open the redo panel (bottom-left) to set the name, lane counts and width up front.
 2. With that point active, press `Extend Road` repeatedly. Each press adds a point along the chain
    tangent and links it `SEGMENT`. Drag points with **G** like any Empty; the overlay follows.
+   It works from **either end**: from the last point it appends, from `_p000` it prepends (and
+   renumbers, so the name order still matches the road). An interior point is refused by name —
+   "extend" has no meaning in the middle of a chain.
 3. `Build ▸ Build Roads`.
 
 The chain order **is** the object-name order (`road_new_p000`, `_p001`, …), and **FWD is increasing
 index** — that is what fixes which side is left.
+
+`Extend Road` works from **either end** of a chain and refuses an interior point, naming the two
+gestures that do have a meaning there: `Insert Point` to add a station *between* two, and
+`Branch Ramp Here` to start a new road leaving this one.
+
+If a stretch ends up in the wrong road — the usual way being a ramp grown with `Extend Road` off
+its mainline instead of `New Road`, because it is the gesture already under your hand — press
+`Author ▸ Repair ▸ Tidy Roads`. **It needs no selection**: the connections already say where every
+point belongs. It moves a point whose `SEGMENT` links all land in one other road into that road
+(next to the neighbour it joins, not at the end), and splits a collection holding more than one
+corridor into one collection each — naming a corridor something `AUX`-links into `<road>_ramp`.
+Links are object pointers, so nothing has to be rewired and the `AUX` link from the mainline
+survives the move.
+
+`Author ▸ Corridor ▸ Split To New Road` is the same move done by hand, when you want to choose the
+points and the name yourself. Until you run either, the gate says so as a **warning**
+(`chain_unlinked`) and the build treats the two stretches as separate runs, which is correct — it
+is untidy, not broken.
 
 ### 2. Change the cross-section along it
 
@@ -75,9 +118,17 @@ gate says so and the link draws **red** in the viewport.
 The length it asks for is the real merge-taper standard (`L = W·S²/155` up to 70 km/h, `0.6·W·S`
 above it) — 3.5 m at 80 km/h wants 168 m. **The world is not 1:1**, so if that eats a district,
 lower **`taper_factor`** on the **Road** panel rather than fighting the gate: it scales the demand,
-`1.0` is the book, and it is a visible authored decision on the road it applies to. Two things are
-already exempt and need no factor: a lane **departing onto a ramp** (nobody merges at a gore), and
-a width change at the station that owns the `AUX` link.
+`1.0` is the book, and it is a visible authored decision on the road it applies to. The finding
+names **the factor that would pass**, so there is no number to guess at.
+
+It is measured **per carriageway** and **only within a run**, which is the answer to "why did
+adding an aux lane on one side get more expensive when the other side already had one": a merge is
+one driver moving sideways on one side of the divide, so the demand is the wider of the two sides'
+changes, never their sum. And a lane count that differs across a **junction** costs nothing — the
+pad joins those two mouths, not carriageway.
+
+Two things are exempt outright: a lane **departing onto a ramp** (nobody merges at a gore), and a
+width change at the station that owns the `AUX` link.
 
 - `lanes_fwd` / `lanes_bwd` — `0` on one side gives a one-way street.
 - `drop_side` — *which* lane a decrease removes (kerb-side by default; `MEDIAN` for an offside exit).
@@ -94,7 +145,7 @@ Editing many points at once: select them, make the one you want to copy **from**
 Two ways, and **the active point is always the source** in both:
 
 **By selection** — select two points and press `Author ▸ Connect`. Whatever you clicked *last* is
-the source.
+the source — for `Segment` and `Junction`. `Aux` works from either end (see the table below).
 
 **By name** — select one point and use `Connections ▸ Connect To`: pick the other from the object
 field, then press a type button. No two-object selection to wrangle, which is the better path in a
@@ -104,7 +155,7 @@ dense network.
 |---|---|
 | **Segment** | the carriageway continues from one into the other |
 | **Junction** | both become intersection mouths of one pad |
-| **Aux** | mainline → ramp — **directed**, so the source matters (the target must be a `RAMP_ENTRY`/`RAMP_EXIT` point) |
+| **Aux** | mainline → ramp — the link is **directed**, but the gesture is not: whichever of the two points declares the aux slot is the mainline, so it connects either way round. The other one is stamped `RAMP`. |
 
 ### 3a. Seeing what a point is connected to
 
@@ -183,11 +234,33 @@ Intersection`. That writes the full clique and parents every mouth to a `JCT_*` 
 
 ### 5. A ramp
 
+**The one-button way — `Author ▸ Ramp ▸ Branch Ramp Here`.** Make active *any* point of the road
+the ramp leaves (or joins) — **the middle of a corridor is the normal case**, and `Extend Road`
+deliberately refuses one because "extend" has no meaning there — and press it. It opens the aux
+slot back over the length the taper standard asks for, creates the ramp road with its mouth on the
+gore line and faced down the mainline, bends the second station **outboard**, and leaves that far
+end active so `Extend Road` carries straight on from it. Its options are the ones you would have
+had to know anyway: how many lanes leave, which carriageway (`Forward` / `Reverse`), whether it is
+an **entrance** rather than an exit, and how far along / outboard / down the second station sits.
+
+If the report says the slot *"opens over 90 m (wants 336)"*, the run has no span long enough for
+the taper at that speed — move the mainline stations apart, or lower the road's `taper_factor`.
+
+**The step-by-step way**, when the ramp already exists:
+
 1. `New Road` for the ramp, `lanes_bwd = 0`.
 2. On the mainline point where the exit lane opens, set `aux_fwd = 1`, and on the point at the
-   gore as well — so the lane runs at full width for the deceleration length.
-3. Select the ramp's first point, then the **mainline** point **last** so it is active, and press
-   `Author ▸ Ramp ▸ Make Ramp`.
+   gore as well — so the lane runs at full width for the deceleration length. (Use `aux_bwd` for
+   a ramp off the **reverse** carriageway; the slot has to be on the side the ramp is.)
+3. Select the ramp's mouth and the mainline point — **either order** — and press
+   `Author ▸ Ramp ▸ Make Ramp`. The point declaring the aux slot is the mainline, and **which
+   carriageway is read off which side the mouth is on** — you do not tell it.
+
+   There is **one ramp role** (`RAMP`), not an exit one and an entry one. Which way traffic runs
+   through the link is derived (`point_model.ramp_is_entrance`) from where the mouth sits in the
+   ramp's own run and which way the ramp's lanes run — so an entrance is authored exactly like an
+   exit, and there is no second declaration to get backwards. (`RAMP_ENTRY`/`RAMP_EXIT` still load
+   from older files.)
 4. On the *next* mainline point past the gore, set `aux_fwd` back to `0`.
 
 **The aux BLOCK is the exit lane, and the ramp is its continuation.** `lanes_fwd = 3` with
@@ -197,7 +270,37 @@ and treating the ramp as a fifth lane beyond it is the one thing that makes an e
 
 `aux_fwd = 2` is a **two-lane exit**, and the ramp continues **both**: the gore line is the
 *innermost* aux slot's inner edge, not the outermost's, so widening the exit widens it outward and
-never moves the join. Give the ramp `lanes_fwd = 2` to take the whole block.
+never moves the join. Give the ramp `lanes_fwd = 2` to take the whole block (`Branch Ramp Here`
+does, from its `aux_lanes`).
+
+**One point can take a ramp OUT and a ramp IN.** Declare a slot on each carriageway — `aux_fwd`
+for the one that leaves eastbound, `aux_bwd` for the one that joins westbound — and wire both. They
+are different pavement with different slot ids, so they never collide, and **you do not say which
+ramp is on which**: it is read off which side of the road its mouth sits. Remember that an
+entrance's slot opens *downstream* of its mouth and an exit's *upstream*, and that on opposite
+carriageways "downstream" is opposite ends of the chain.
+
+**Two ramps may also share one carriageway's block** — a two-lane exit that splits, or two ramps
+merging into one two-lane slot. Widen the block (`aux_fwd = 2`) and wire both: it is **divided**
+between them, a slot each, **nearest the through lanes takes the inner slot**, read off where you
+put the mouths. The outer ramp's gore then opens against the **inner ramp** rather than against the
+mainline, because that is what is beside it. Keep the outer one outboard the whole way — two ramps
+that *cross*, or that converge onto the same line, both read in the viewport as z-fighting asphalt
+rather than as an error.
+
+**One aux slot, one ramp, though.** A run exports one lane per slot, so two ramps claiming the same
+`AF0` on the same unbroken stretch leave only one of them reachable by any car — the gate says so
+(`aux_slot_shared`) and names the ways out: widen the block so they take a slot each, put the
+second on the **other carriageway** (`aux_bwd` against `aux_fwd`, different slot ids), or break the
+run between them, which a junction already does. Asking for more ramp lanes than the block has
+slots is `aux_block_oversubscribed`. Nothing about the geometry looks wrong when either happens,
+which is exactly why they are checked.
+
+**A ramp must leave *outboard*.** The station after the mouth has to stand away from the through
+lanes, on the side the aux slot is. Bend it back across the carriageway and the two bands overlap
+for the ramp's whole length: no gore can be paved at all, and the only thing that says so is
+`ramp_wrong_side`. If the ramp needs to end up on the other side of the road, it crosses **over or
+under** further along — never at the mouth.
 
 
 `Make Ramp` calls `Align Ramp To Aux`, which does **two** things:
@@ -219,15 +322,20 @@ reason, that the stretch is the other one's asphalt. So the gore closes it, with
 strip's last pair, flush with the paint, and both flanking walls resume on that same line — three
 pieces of wall meeting at a point, with nothing to line up by hand.
 
-You do not author that either, and there is no gore-specific knob for it. **Each end reads what its
-own road declares** and the cap blends between them:
+You do not author that either, and there is no gore-specific knob for it. **The gore is the ramp's
+divergence, so the nose carries the ramp's own section** — uniformly, not blended with the
+mainline's:
 
-| The two roads declare | The nose becomes |
+| The ramp declares | The nose becomes |
 |---|---|
-| a barrier on both (highway + ramp) | a wall closing the V, at each road's own height |
-| a barrier on one, none on the other | a wall that fades out across the cap, no step |
-| footways | a kerbed pedestrian island, walkable proxy |
-| nothing (`barrier_height = 0`, no kerb, no footway) | nothing built |
+| a barrier (`ped_access` off, the usual expressway ramp) | a wall closing the V, at the ramp's own height |
+| a kerb and footway | a kerbed pedestrian island, walkable proxy |
+| nothing (`barrier_height = 0`, no kerb, no footway) | nothing built — the mainline's values are the fallback only when the ramp declares *nothing at all* |
+
+A ramp leaving an ordinary street is the common case where this matters: the ramp is fenced and the
+street is kerbed and paved, and blending the two gave a wall of falling height standing in a footway
+of growing width — a section neither road has anywhere else. The **mainline's own kerb and footway
+run on past the nose unbroken**; they never stopped, they were only ever opened *across* the paint.
 
 The collision proxy follows the same source: `-noped` unless **both** roads allow pedestrians, so a
 gore between an expressway and its ramp never bakes as a navmesh strip in the middle of an exit,
@@ -316,10 +424,27 @@ network is listed separately as an "open end", because it is expected and would 
 the two lines that matter.
 
 
+### 6c. When something is wrong that you cannot see
+
+`Author ▸ Repair` holds the two whole-scene fixers. Neither takes a selection, because both are for
+the defects that do not show up in the outliner.
+
+**`Repair Links`** — the one the gate has always named. It *drops* a link row that cannot be
+honoured (its target was deleted, it points at itself, at a non-point, at a point in no road, or it
+is a second row to a target already linked — a pair of points carries at most one link), drops the
+ramp's half of an `AUX` pair (`AUX` is directed; a ramp connects only to the aux slot), *restores*
+the missing half of a half-written `SEGMENT` or `JUNCTION` link and completes a junction into the
+full clique, and *writes back* a re-allocated uid after a `Shift+D` on a single point. Where the two
+rows of a pair disagree about type, the more explicit gesture wins: `AUX` over `JUNCTION` over
+`SEGMENT`.
+
+**`Tidy Roads`** — files every point into the road its connections say it belongs to. See §1.
+
 ### 7. Build, check, export
 
 `Build ▸ Validate` first — **a build that fails the gate is a failed build**, and every finding
-names the object to go and fix. Then `Build Roads`, and `Export .lanekit (v2)` for Godot (it
+names the object to go and fix — in the subject *and* in the message, so the `<road>/<point>` it
+tells you to move is one you can type into the outliner's search box. Then `Build Roads`, and `Export .lanekit (v2)` for Godot (it
 refuses while the gate is red). `Live Rebuild` re-sweeps a road when its points settle; the overlay
 follows the drag either way.
 

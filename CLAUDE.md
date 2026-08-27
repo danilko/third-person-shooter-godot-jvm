@@ -595,6 +595,196 @@ geometry; it is no longer the authoring reference.
   resume. `point_build.edge_run_values`/`build_edge_run` are now the one owner of the per-vertex
   furniture arithmetic, shared by a road flank, a junction corner and this.
 
+**And the gesture round, 2026-08-26** (`ROAD_POINT_GRAPH.md` §8i; six user reports). §8f–§8h were
+all *one fact with two owners*; §8i is the other face — **a fact the artist was made to declare
+that the model already knew**, or **an ordering the tool imposed because nobody had asked the
+question from the other side**:
+
+- **`Extend Road` works from EITHER end.** `_next_point_name` only ever hands out the next free
+  index, so a new point was always born at the *tail* of the names however the artist got there:
+  extending `..._p000` misfiled it at the far end of a road it starts, and (the head has no `prev`
+  to take a chord from, so it fell back to its own `+Y` = the way the road already runs) placed it
+  *forward*, back down the road. `chain_unlinked` on an untouched pair, on the next Build. Now the
+  head grows away from the chain and `_renumber(..., at=0)` prepends; an interior point is refused
+  by name.
+- **Which point is the MAINLINE is a fact, not click order** (`point_ops.resolve_aux_pair`). `AUX`
+  stays directed (mainline → ramp) but the gesture works from either end — an entrance ramp reads
+  "ramp joins road", and insisting the mainline be active made every merge unauthorable with the
+  button the panel offers. `Make Ramp` shares the resolution.
+- **ONE ramp role.** `RAMP_ENTRY`/`RAMP_EXIT` fed exactly one decision (which way
+  `point_export.wire_ramps` points the lane edge) while `point_solve` derived the same thing from
+  the chain — and when the two disagreed the geometry was perfect, the gate green, and the traffic
+  wired backwards. `point_model.ramp_is_entrance` is the one owner: the mouth's position in its own
+  **run** plus which way the ramp's lanes run (`lanes_bwd = 1, lanes_fwd = 0` is ordinary, and its
+  head is where cars come *out*). `road_runs` moved to `point_model` for this (a run is a fact about
+  the chain and its links); `point_solve.road_runs` is an alias. The ramp edge is now **added to**
+  the junction connectors rather than dropped when a lane has both — §8f.4's orphan again.
+- **The taper is PER CARRIAGEWAY and only WITHIN a run.** Summing both sides doubled the demand
+  (336 m where the standard asks 168) on the theory that two opposite lane drops compound; they do
+  not — a merge is one driver on one side of the divide, so the demand is the *wider* of the two
+  changes. And walking the chain pairwise measured a taper straight across a junction gap, where the
+  pad joins the mouths and no carriageway exists. `taper_factor` is unchanged (1.0 is the book) but
+  the finding now names the factor that would pass.
+- **A gore's nose carries the RAMP's section, uniformly** — not a blend of the two flanks (§8h.3's
+  blend was right only while both roads declared the same *kind* of furniture; a fenced ramp leaving
+  a kerbed street gave a wall of falling height standing in a widening footway). The mainline's kerb
+  and footway run on past it unbroken. The mainline's values are the fallback only when the ramp
+  declares nothing at all.
+- **A Blender `EnumProperty` is stored by ORDINAL, not identifier** — introduced and caught in this
+  same round. Inserting `RAMP` into the middle of `ROLES` re-read every saved role in every `.blend`
+  (`RAMP_EXIT` → `RAMP_ENTRY`) with nothing to see in any diff. **The enum tuples in `point_model`
+  are append-only**; `_enum_items` emits the 5-tuple form so the numbers are written down.
+- **`Author ▸ Corridor ▸ Split To New Road`** is the repair when a stretch lands in the wrong road
+  (a ramp grown with `Extend Road` off its mainline). Links are object pointers, so the `AUX` link
+  survives the move. `chain_unlinked` is a **WARN** now, not an ERROR: `road_runs` already builds a
+  split chain correctly. The real defect — a point joined to nothing — arrives under its own name,
+  `point_stranded`.
+- **`Author ▸ Repair ▸ Tidy Roads`** does the same filing with **no selection**, from the links
+  alone: a point whose `SEGMENT` links all land in one *other* collection moves there (placed next
+  to the neighbour it joins — appending would repeat §8i.1's defect), and a collection holding more
+  than one **corridor** splits. A *corridor* is not a *run*: `point_model.road_corridors` breaks
+  only where two chain-adjacent points carry neither a `SEGMENT` nor a `JUNCTION` link, because a
+  crossing does not split a street — `road_runs` breaks at the junction gap too, since a lane must
+  not be swept across a pad. One owner, shared with `check_chains`. A split-out corridor something
+  `AUX`-links into is named `<road>_ramp`.
+- **`Author ▸ Repair ▸ Repair Links` now exists.** The gate had named it as the remedy since step 1
+  (`uid_duplicate`: "run Repair Links") and it had never been built. It **drops** what cannot be
+  honoured (a `None`/self/non-point/no-road target, a duplicate row — a pair carries at most ONE
+  link) and the ramp's half of an `AUX` pair; **restores** the missing half of a `SEGMENT`/
+  `JUNCTION` link and completes a junction component into its clique; and **writes back** the uid
+  `read_network`'s `dedupe_uids` re-allocates, which nothing had ever persisted (so the warning
+  could not be cleared). Type conflict between the two rows of a pair: `AUX` > `JUNCTION` >
+  `SEGMENT`.
+- **A finding must name an object in the MESSAGE, not just the subject.** Rule 5 was half-kept:
+  `Validate` translated `Finding.obj` but not the body, where most uids are ("is chain-adjacent to
+  `p_862c8815`", "move `p_5dd247b1` further away"), and `Build`/`Export` translated neither.
+  `point_validate.describe(finding, labels)` is the one owner (regex over `p_` + 8 hex);
+  `point_model.point_labels()` supplies `{uid: "<road>/<object>"}`.
+- **`Add Sample Network` is authored BY THE GESTURES now**, not by the internal helpers. As a
+  data-model fixture it could be perfect while `Extend Road` grew roads backwards and `Make Ramp`
+  refused half the ramps in the world — the smoketest pressed the button and covered neither. It
+  now contains the arrangements that were broken (a head extension, aux lanes on *both*
+  carriageways over one span, one ramp that is an exit at one end and an entrance at the other,
+  and a fenced-ramp-to-kerbed-street gore), so it is evidence rather than illustration; under the
+  old taper rule it would be red. `is_loop` is the one shape it does not carry yet.
+- **A junction arm offers only the lanes that exist AT THE STOP LINE** (`point_export._arm_lanes`)
+  — a pre-existing bug the new sample surfaced. `lane_movements.target_lane` preserves distance
+  from the **kerb**, and an arm was offering every lane of its run including one that opens 200 m
+  past the stop line and is zero width there: both approach lanes shifted one outboard, the
+  straight-ahead movement fed a lane that is not there yet, and the exit's **median** lane came
+  out with no predecessor — at every junction whose exit arm has an aux lane in the same run.
+  Which end is zero decides it, so it is asked per end; `spawnable` is the same fact from one side
+  and is NOT the test. Found by `Preview ▸ Flow Report`, which the smoketest now asserts is clean
+  on the sample.
+- **Object names are GLOBAL — renumber the DESTINATION first when points move between
+  collections.** `_renumber`'s two passes only protect against collisions *within* one collection;
+  a point that has left but not yet been renamed still holds `<src>_pNNN`, so renumbering the
+  source first gets `main_p000.001` back from Blender — a point whose name sorts outside its own
+  chain, which is the one thing the name order has to guarantee. Asserted in the coverage
+  smoketest (no `.` in any point name).
+
+**And the duplicate-and-branch round, 2026-08-27** (`ROAD_POINT_GRAPH.md` §8j; four user reports
+about authoring a *second* ramp). Every one was a derived fact resolved through a proxy that is
+usually right — a **uid** where the ground truth is an **object**, or the **walk direction** where
+the ground truth is the **road** — and every one failed by returning a plausible number rather than
+an error:
+
+- **Membership is read off the OBJECT; links resolve by OBJECT IDENTITY.** Duplicating a road
+  collection gave every copy the original's uid, so `dedupe_uids` dropped the copy's own internal
+  wiring (right for Shift+D on one Empty, wrong for a whole road) and `read_network`'s
+  `{old_uid: new_uid}` remap — only a function while uids are unique, which is exactly what they
+  are not at that moment — rewrote **both** roads' point lists, leaving the ORIGINAL orphaned.
+  `point_model.relink_from_objects` keeps a link row that stays inside the re-allocated set (the
+  copy's own wiring) and drops one that leaves it (a clone's inherited connectivity); a link to an
+  object in no road collection is dropped, not resolved by uid onto whoever shares it. `net.labels`
+  comes from the same read so §8i.10's rule survives the dedupe.
+- **`Author ▸ Ramp ▸ Branch Ramp Here`** is the gesture for a ramp that starts mid-corridor.
+  `Extend Road` refuses an interior station and is right to, but the thing the artist was doing had
+  no gesture at all. It opens the aux slot back to the first span long enough to hold the taper
+  `check_tapers` asks for (an aux count is an integer, so the slot goes zero-to-full across exactly
+  ONE span — opening it on more stations moves which span the change lands on, never lengthens it),
+  places and faces the mouth via `Align Ramp To Aux`, bends the second station **outboard**, and
+  leaves the far end active.
+- **Outboard is a fact about the road, not about the walk.** `point_solve._signed_gap` took its
+  normal off the chord it was walking, so the upstream reading was the downstream one sign-flipped:
+  "which way do the bands part" picked upstream unconditionally, the two edges were paired running
+  opposite ways in world space, and the gore's nose cap came out **22 m long, laid across the
+  merge** — with a green gate, zero residual and zero angle. It now takes a `sense`. The same fix
+  ended the arterial footway that was built across the ramp mouth: `open_runs` opens a kerb across
+  whatever the gore actually covers.
+- **A ramp that bends back ACROSS the road it leaves had no eye on it.** Both ramp checks measure
+  the mouth, and `Align Ramp To Aux` sets both, so a ramp that leaves correctly and then drives
+  through the carriageway passed the whole gate with no gore built and nothing said.
+  `ramp_divergence` measures the station *after* the mouth; `ramp_wrong_side` (ERROR) /
+  `ramp_parallel` (WARN). The sample network's own exit ramp was authored that way.
+- **`ramp_frame_sign` is the product of TWO signs**: which carriageway the aux slot is on
+  (`aux_fwd` vs `aux_bwd` — traffic through a reverse slot runs against the station axis) and which
+  way the ramp's own lanes run. Three places derived it and all three assumed +1, so a
+  reverse-carriageway ramp was faced, placed and edged as a forward one — a two-lane entrance came
+  out as a 600 m hairpin with a 38 m wall down the middle. `Make Ramp` also stopped writing
+  `aux_fwd` unconditionally: `ramp_carriageway` reads it off which side the mouth is on.
+- **One aux slot, one ramp, per run.** `point_profile.aux_slot_ids` is the one owner of which lanes
+  leave (`_aux_handoffs` was still handing over the outermost slot only, so a 2-lane ramp's inner
+  lane had no predecessor — §8g.1 one level up). The structural half is reported, not fixed: a run
+  exports ONE lane per slot, so two ramps on one run — or one station wired to two ramps, where a
+  duplicated ramp collection lands — both claim `AF0` and one is reachable by no car.
+  `check_aux_slots` (ERROR) names both and the two ways out: the other carriageway, or a run break.
+
+**The diverge/merge round, 2026-08-27** (`ROAD_POINT_GRAPH.md` §8k). Two ramps hanging off ONE
+mainline station — a two-lane exit that splits, two ramps merging back into one two-lane slot — is
+the ordinary shape of an interchange, and §8j.6 had just declared it an error. That was right about
+the *run* and wrong about the *station*: a station's aux block is several slots, and what was
+missing was which of them is THIS ramp's.
+
+- **`point_solve.aux_allocation` divides a station's aux block among its ramps**, each taking as
+  many slots as it declares lanes. Order is derived from where the artist put the mouths (nearest
+  the through lanes takes the innermost slot) — not click order (§8i.2) and not uid order, which is
+  invisible and would reshuffle a network on a rename. `aux_gore_offset` replaces "the block's gore
+  line" everywhere, and `wire_ramps` hands each ramp only its own aux lanes. `aux_slot_shared` is
+  narrowed to the same slot claimed twice IN ONE RUN; over-subscription is its own finding.
+- **A gore is against the neighbour on the INBOARD side, which is not always the mainline.** The
+  outer ramp's is the INNER RAMP; measured against the mainline its wedge is struck across the
+  inner ramp's asphalt. `inboard_neighbour` chooses it and reads that road's outboard edge with its
+  own `ramp_frame_sign`.
+- **Two boundaries pair by PROJECTION, never by index** (`_project_signed`). Equal-arclength walks
+  assume both advance together; two sibling ramps do not, so by 90 m the samples lag six metres and
+  the perpendicular offset was measured against a point that is not opposite. Two ramps with a real
+  5 m hole between them read as a gap of zero and no gore was paved.
+- **Which carriageway a ramp is on is a fact about where its mouth is** (`ramp_carriageway`).
+  `Make Ramp` wrote `aux_fwd` unconditionally, putting a westbound ramp's slot on the eastbound
+  carriageway.
+- **"Does this lane exist at the stop line" is asked of the WIDTHS, not of the receiver.**
+  `merge_into`/`opens_from` are both None when `lane_taper_route` cannot resolve a receiver —
+  indistinguishable from a full-length lane. Declaring `aux_bwd` on the arterial was enough to make
+  the junction arm offer the forward aux lane, shift every straight movement one lane outboard, and
+  leave an ordinary through lane reachable by nothing (§8i.13 again, from the other side).
+  `LaneRoute.i0`/`i1` are the question actually being asked.
+
+**One ramp out and one ramp in at one station, 2026-08-27** (`ROAD_POINT_GRAPH.md` §8l) — the
+ordinary half-interchange, and what `Add Sample Network` now carries (the westbound ramp two lanes
+wide, plus a spur branched mid-corridor). Four things were in the way:
+
+- **`aux_block` answered "forward" for a reverse ramp.** A station handing a ramp to each
+  carriageway declares `aux_fwd` AND `aux_bwd`, and the case-free "most slots, ties to FWD" reading
+  then put the reverse ramp's mouth on the forward gore line. `aux_block(profile, direction)` takes
+  the side when the caller knows it, and `point_solve.ramp_side_of` knows it — §8j.4's rule asked
+  per RAMP instead of per station. `aux_allocation` allocates each carriageway separately,
+  `inboard_neighbour` only pairs same-side siblings, and `check_aux_slots` no longer reads one ramp
+  on each side as a collision (`AF*`/`AR*` ids keep them apart by construction).
+- **An entrance's lane was cut off the wrong end.** `_aux_handoffs` ends an aux lane at its gore
+  because *an exit lane has left with the ramp*; applied to an entrance it handed the merging ramp
+  the stretch of slot UPSTREAM of the merge — a successor whose head was 600 m back down the road.
+  An entrance's lane is the acceleration lane and BEGINS at the gore.
+- **Nothing could see that, because every check asked whether an edge EXISTS.** `broken` is no
+  successor, `unreached` no predecessor, `ramp_orphans` nothing leads to a ramp — a successor
+  pointing the wrong way is healthy by all three. `flow_report` now also reports **`misjoined`**: a
+  successor whose head is not where this lane's tail is (`merge` edges exempt — a taper hand-over is
+  lateral and its target spans the run).
+- **`unreached` stopped reporting non-`spawnable` lanes.** A deceleration lane that opens after a
+  junction is supposed to have no predecessor: it is entered by a lane change, and a lane-change
+  edge is `inner_lane`/`outer_lane`, not `next`. It keeps its bite where it matters — a full-width
+  through lane is spawnable, which is §8k.5's case.
+
 **Road/geometry alignment across a shared seam is a separate, still-manual concern.** Because Blender's Library Override
 system can move/rotate a linked object as a whole but can never edit linked mesh/curve vertex
 data, aligning road geometry that genuinely spans two districts' seam needs either (a) read-only
