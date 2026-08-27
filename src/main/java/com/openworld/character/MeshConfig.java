@@ -1,8 +1,7 @@
 package com.openworld.character;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Resource;
 import godot.core.Dictionary;
 import godot.core.NodePath;
@@ -14,38 +13,38 @@ import com.openworld.movement.character.Stance;
  * All NodePaths are relative to the CharacterVisuals root node.
  * Swapping the characterVisuals PackedScene on Character also swaps this config.
  */
-@RegisterClass(className = "MeshConfig")
+@Script(className = "MeshConfig")
 public class MeshConfig extends Resource {
 
-    @Export @RegisterProperty
+    @Export
     public NodePath animationTreePath = new NodePath("AnimationTree");
 
-    @Export @RegisterProperty
+    @Export
     public NodePath physicalBoneSimulatorPath = new NodePath(
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D");
 
-    @Export @RegisterProperty
+    @Export
     public NodePath weaponAttachmentPath = new NodePath(
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment");
 
-    @Export @RegisterProperty
+    @Export
     public NodePath aimSpineModifierPath = new NodePath(
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/SpineAimModifier");
 
 
-    @Export @RegisterProperty
+    @Export
     public NodePath fpsCameraMarkerPath = new NodePath(
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment/MarkerFPSCamera");
 
-    @Export @RegisterProperty
+    @Export
     public NodePath meshRootPath = new NodePath("MeshRoot");
 
     /** Head mesh nodes to hide in FPS mode — paths relative to CharacterVisuals root. */
-    @Export @RegisterProperty
+    @Export
     public VariantArray<NodePath> headMeshPaths = new VariantArray<>(NodePath.class);
 
     /** All weapon-socket Marker3D nodes — paths relative to CharacterVisuals root. */
-    @Export @RegisterProperty
+    @Export
     public VariantArray<NodePath> socketPaths = new VariantArray<>(NodePath.class);
 
     /**
@@ -54,20 +53,20 @@ public class MeshConfig extends Resource {
      * DriveCarrier and other physics-free stances omit an entry here.
      * Wired by Character.wireFromMeshConfig() into each Stance's collider field.
      */
-    @Export @RegisterProperty
+    @Export
     public Dictionary<String, NodePath> stanceColliderPaths = new Dictionary<>(String.class, NodePath.class);
 
     /**
      * Stance name → RayCast3D (ceiling probe) path relative to CharacterVisuals root.
      * Only stances that need ceiling detection (Upright, Crouch) require an entry.
      */
-    @Export @RegisterProperty
+    @Export
     public Dictionary<String, NodePath> stanceRaycastPaths = new Dictionary<>(String.class, NodePath.class);
 
     /**
      * PhysicalBone3D node-name → damage multiplier.
      * Health uses this if non-empty; otherwise falls back to the built-in GodotChan table.
      */
-    @Export @RegisterProperty
+    @Export
     public Dictionary<String, Float> boneHitMultipliers = new Dictionary<>(String.class, Float.class);
 }

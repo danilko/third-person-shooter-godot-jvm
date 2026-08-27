@@ -3,9 +3,8 @@ package com.openworld.weapon;
 import com.openworld.world.manager.ImpactManager;
 import com.openworld.item.Pickup;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.AudioStreamPlayer3D;
 import godot.api.AudioStreamWAV;
 import godot.api.CharacterBody3D;
@@ -20,76 +19,76 @@ import com.openworld.character.AICharacter;
 import com.openworld.character.Character;
 import com.openworld.movement.character.Stance;
 
-@RegisterClass(className = "WeaponItem")
+@Script(className = "WeaponItem")
 public class WeaponItem extends Pickup implements WeaponAction {
 
   // Internal identifier used for event bus payloads and save keys. No spaces.
-  @RegisterProperty @Export public String weaponId = "";
+  @Export public String weaponId = "";
 
   // Human-readable display name: HUD, kill feed, inventory, interact prompt.
-  @RegisterProperty @Export public String weaponName = "";
+  @Export public String weaponName = "";
 
   // WeaponSlotType ordinal: 0=PRIMARY 1=SECONDARY 2=MELEE 3=THROWABLE 4=CONSUMABLE 5=FIST
-  @RegisterProperty @Export public int slotType = 0;
+  @Export public int slotType = 0;
 
   // When false the weapon cannot be dropped (e.g. FistItem). Guards dropCurrentWeapon/dropAllWeapons.
-  @RegisterProperty @Export public boolean isDroppable = true;
+  @Export public boolean isDroppable = true;
 
   // When true magazine/reserve checks are bypassed — weapon has unlimited uses (e.g. FistItem).
-  @RegisterProperty @Export public boolean isInfiniteAmmo = false;
+  @Export public boolean isInfiniteAmmo = false;
 
   // When true, picking this up while the character is unarmed (fist active) makes it
   // the active weapon immediately instead of stowing it in a holster slot — for
   // consumables like throwables where instant access matters more than a deliberate
   // weapon-switch choice. Default false: rifles/pistols/melee always require an
   // explicit slot switch, matching how players expect ranged/melee pickups to behave.
-  @RegisterProperty @Export public boolean autoEquipOnPickup = false;
+  @Export public boolean autoEquipOnPickup = false;
 
   // Index into the AnimationTree weapon blend nodes (WeaponAim, WeaponHold, WeaponChangeAnimation).
   // Decoupled from slot so the same animation pose is used regardless of which slot holds the weapon.
-  @RegisterProperty @Export public int weaponPoseIndex = 0;
+  @Export public int weaponPoseIndex = 0;
 
   // Icon shown in the kill feed and radial menu. Set in the inspector per weapon scene.
-  @RegisterProperty @Export public Texture2D weaponIcon = null;
+  @Export public Texture2D weaponIcon = null;
 
   // Name of the Marker3D socket to attach to when this weapon is the active (held) weapon.
   // Must match a node name registered in WeaponController.socketPaths.
-  @RegisterProperty @Export public String holdSocket = "";
+  @Export public String holdSocket = "";
 
   // Names of Marker3D sockets to try (in order) when parking this weapon in inventory.
   // Each name must match a node registered in WeaponController.socketPaths.
   // The first socket with no other weapon in it is used. Empty array = hide when inactive.
-  @RegisterProperty @Export public PackedStringArray holsterSockets = new PackedStringArray();
+  @Export public PackedStringArray holsterSockets = new PackedStringArray();
 
-  @RegisterProperty @Export public float spread = 0.0f;
+  @Export public float spread = 0.0f;
   // Inaccuracy added per shot; decays at bloomDecaySpeed when not firing.
   // Set bloomDecaySpeed lower than (bloomPerShot × fireRate) for bloom to
   // accumulate during full-auto. Set it higher for semi-auto tap-fire weapons
   // where each shot clears before the next.
-  @RegisterProperty @Export public float bloomPerShot    = 0.0f;
-  @RegisterProperty @Export public float bloomDecaySpeed = 1.0f;
-  @RegisterProperty @Export public float bloomMax        = 0.25f;
-  @RegisterProperty @Export public float reloadSpeed = 0.8f;
+  @Export public float bloomPerShot    = 0.0f;
+  @Export public float bloomDecaySpeed = 1.0f;
+  @Export public float bloomMax        = 0.25f;
+  @Export public float reloadSpeed = 0.8f;
   // switchSpeed is a rate: deploy time = 1/switchSpeed. 2.2 ⇒ ~0.45 s deploy (CS/PUBG-snappy); the
   // post-deploy fire lockout is a small fixed constant (WeaponController.DRAW_SETTLE_SECONDS), not a
   // second full 1/switchSpeed, so total switch ≈ deploy time.
-  @RegisterProperty @Export public float switchSpeed = 2.2f;
-  @RegisterProperty @Export public float fireRate = 8.0f;
-  @RegisterProperty @Export public boolean auto = true;
-  @RegisterProperty @Export public int magazine = 40;
-  @RegisterProperty @Export public int magazineSize = 40;
-  @RegisterProperty @Export public int reserve = 40;
-  @RegisterProperty @Export public int reserveMax = 40;
-  @RegisterProperty @Export public float recoil = 0.8f;
-  @RegisterProperty @Export public float damage = 25.0f;
+  @Export public float switchSpeed = 2.2f;
+  @Export public float fireRate = 8.0f;
+  @Export public boolean auto = true;
+  @Export public int magazine = 40;
+  @Export public int magazineSize = 40;
+  @Export public int reserve = 40;
+  @Export public int reserveMax = 40;
+  @Export public float recoil = 0.8f;
+  @Export public float damage = 25.0f;
 
   // Effective engagement distance in metres. AI uses this (via AICharacter.getEffectiveAttackRange)
   // to cap how far it will try to fight with this weapon — e.g. a melee AI closes to arm's
   // reach instead of standing at AIBehaviorConfig.attackRange and swinging at empty air.
   // MeleeItem overrides getEffectiveRange() to return meleeRange so the two stay in sync.
-  @RegisterProperty @Export public float weaponRange = 50.0f;
-  @RegisterProperty @Export public AudioStreamWAV fireAudio;
-  @RegisterProperty @Export public AudioStreamWAV reloadAudio;
+  @Export public float weaponRange = 50.0f;
+  @Export public AudioStreamWAV fireAudio;
+  @Export public AudioStreamWAV reloadAudio;
 
   // ── Injected references (shared by all weapon subtypes) ─────────────────────
   // Populated by WeaponController.injectCharacterRefs() after discovery/pickup.
@@ -132,7 +131,11 @@ public class WeaponItem extends Pickup implements WeaponAction {
     return owningCharacter != null ? owningCharacter.getGlobalPosition() : null;
   }
 
-  public WeaponSlotType getSlotType() {
+  /**
+   * The exported {@code slotType} ordinal as its enum. Not {@code getSlotType} — that shape
+   * would bind the int field to an enum-typed accessor property (see AICharacter).
+   */
+  public WeaponSlotType resolveSlotType() {
     WeaponSlotType[] types = WeaponSlotType.values();
     if (slotType >= 0 && slotType < types.length) return types[slotType];
     return WeaponSlotType.PRIMARY;
@@ -151,7 +154,7 @@ public class WeaponItem extends Pickup implements WeaponAction {
    * {@link IconRegistry}). MUST call super._ready() or the Pickup base never
    * registers for replication.
    */
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     super._ready();
@@ -165,7 +168,7 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @Override
   protected boolean shouldAutoPickup(Node character) {
     Node wcNode = character.getNodeOrNull(WEAPON_CONTROLLER_PATH);
-    if (wcNode instanceof WeaponController wc) return wc.isSlotFreeFor(getSlotType());
+    if (wcNode instanceof WeaponController wc) return wc.isSlotFreeFor(resolveSlotType());
     return false;
   }
 

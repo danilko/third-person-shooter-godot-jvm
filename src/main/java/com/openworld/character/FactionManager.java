@@ -2,8 +2,8 @@ package com.openworld.character;
 
 import com.openworld.game.GameManager;
 import com.openworld.net.NetworkManager;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.global.GD;
 
@@ -27,7 +27,7 @@ import godot.global.GD;
  * (called on a full restart from {@code GameManager.restartLevel}). Scope a flip to a single mission
  * by calling {@link #reset()} at mission end.
  */
-@RegisterClass(className = "FactionManager")
+@Script(className = "FactionManager")
 public class FactionManager extends Node {
 
     private static final String DEFAULT_TABLE_PATH =
@@ -35,7 +35,7 @@ public class FactionManager extends Node {
 
     private FactionTable table;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         loadDefaultTable();
@@ -78,7 +78,7 @@ public class FactionManager extends Node {
         else loadDefaultTable();
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         // Drop the static back-reference and the resource handle on shutdown (leak discipline —

@@ -2,34 +2,33 @@ package com.openworld.ui;
 
 import com.openworld.weapon.WeaponItem;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.NodePath;
 
-@RegisterClass(className = "WeaponRadialMenuItem")
+@Script(className = "WeaponRadialMenuItem")
 public class WeaponRadialMenuItem extends Control {
 
-  @Export @RegisterProperty public int      index        = 0;
+  @Export public int      index        = 0;
 
   /**
    * Control node positioned at the button's visual centre inside the item.
    * Its rotation is set to -item.rotation in _ready() so all children face
    * up in screen space while staying at the button's world position.
    */
-  @RegisterProperty @Export public NodePath axisPath      = new NodePath("Axis");
-  @RegisterProperty @Export public NodePath weaponIconPath = new NodePath("Axis/WeaponIcon");
-  @RegisterProperty @Export public NodePath weaponNamePath = new NodePath("Axis/WeaponName");
-  @RegisterProperty @Export public NodePath magazinePath   = new NodePath("Axis/Magazine");
-  @RegisterProperty @Export public NodePath reservePath    = new NodePath("Axis/Reserve");
-  @RegisterProperty @Export public NodePath keyLabelPath    = new NodePath("Axis/KeyLabel");
+  @Export public NodePath axisPath      = new NodePath("Axis");
+  @Export public NodePath weaponIconPath = new NodePath("Axis/WeaponIcon");
+  @Export public NodePath weaponNamePath = new NodePath("Axis/WeaponName");
+  @Export public NodePath magazinePath   = new NodePath("Axis/Magazine");
+  @Export public NodePath reservePath    = new NodePath("Axis/Reserve");
+  @Export public NodePath keyLabelPath    = new NodePath("Axis/KeyLabel");
 
     private String[] keyTexts = new String[0];
 
   private WeaponRadialMenu radialMenu;
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
       resolveKeyTexts();
@@ -109,7 +108,7 @@ public class WeaponRadialMenuItem extends Control {
         return fallback;
     }
 
-  @RegisterFunction
+  @Register
   public void onClicked() {
     WeaponRadialMenu rm = getRadialMenu();
     if (rm == null || rm.getCharacter() == null) return;
@@ -123,7 +122,7 @@ public class WeaponRadialMenuItem extends Control {
    * (handled in {@link WeaponRadialMenu#_input}). The Button's {@code texture_hover} provides the
    * visual highlight.
    */
-  @RegisterFunction
+  @Register
   public void onHover() {
     WeaponRadialMenu rm = getRadialMenu();
     if (rm == null || rm.getCharacter() == null) return;

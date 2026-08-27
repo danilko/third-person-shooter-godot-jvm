@@ -3,9 +3,8 @@ package com.openworld.ui;
 import com.openworld.character.Character;
 import com.openworld.weapon.WeaponController;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Control;
 import godot.api.Image;
 import godot.api.ImageTexture;
@@ -24,7 +23,7 @@ import godot.core.Color;
  * asset is needed — radial fill over a ring reveals it clockwise like the CS/Apex reload circle. Reuses
  * the {@link TextureProgressBar} radial fill mode set in the scene ({@code WeaponProgress.tscn}).
  */
-@RegisterClass(className = "WeaponProgress")
+@Script(className = "WeaponProgress")
 public class WeaponProgress extends TextureProgressBar {
 
   /** Diameter of the generated ring texture in px. */
@@ -33,18 +32,18 @@ public class WeaponProgress extends TextureProgressBar {
   private static final float RING_INNER_FRAC = 0.78f;
 
   /** Tint while a weapon switch (deploy) is in progress. */
-  @Export @RegisterProperty public Color switchTint = new Color(0.55f, 0.85f, 1f, 0.9f);
+  @Export public Color switchTint = new Color(0.55f, 0.85f, 1f, 0.9f);
   /** Tint while a reload is in progress. */
-  @Export @RegisterProperty public Color reloadTint = new Color(1f, 0.7f, 0.25f, 0.9f);
+  @Export public Color reloadTint = new Color(1f, 0.7f, 0.25f, 0.9f);
   /** Tint of the always-present background track ring. */
-  @Export @RegisterProperty public Color trackTint = new Color(0f, 0f, 0f, 0.35f);
+  @Export public Color trackTint = new Color(0f, 0f, 0f, 0.35f);
 
   /**
    * Optional ring texture. When assigned (a baked PNG) it is used as-is — cheaper than generating and
    * lets you control the exact look. When left null, a smooth ring is generated once at startup (a
    * one-time cost, then cached; runtime is identical to an asset).
    */
-  @Export @RegisterProperty public Texture2D ringTexture;
+  @Export public Texture2D ringTexture;
 
   private WeaponController weaponController;
 
@@ -53,7 +52,7 @@ public class WeaponProgress extends TextureProgressBar {
     weaponController = (c != null) ? c.weaponController : null;
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     setMouseFilter(Control.MouseFilter.IGNORE);
@@ -70,7 +69,7 @@ public class WeaponProgress extends TextureProgressBar {
     setVisible(false);
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _process(double delta) {
     if (weaponController == null) { setVisible(false); return; }

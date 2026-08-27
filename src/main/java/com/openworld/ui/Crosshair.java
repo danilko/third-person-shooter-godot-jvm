@@ -2,9 +2,8 @@ package com.openworld.ui;
 
 import com.openworld.weapon.WeaponController;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.VariantArray;
 import godot.core.Vector2;
@@ -23,38 +22,38 @@ import godot.global.GD;
  * self-managed read simply overwrites that value the next frame if
  * {@code weaponController} is set.
  */
-@RegisterClass(className = "Crosshair")
+@Script(className = "Crosshair")
 public class Crosshair extends Control {
 
     /**
      * Lerp speed when arms move outward (bloom spike after a shot).
      * Default 60 ≈ instant snap at 60 fps.
      */
-    @Export @RegisterProperty public double crosshairExpandSpeed  = 60.0;
+    @Export public double crosshairExpandSpeed  = 60.0;
 
     // Fast enough to track bloom recovery (~0.5s) so the player gets clear visual
     // feedback when they have first-shot accuracy again — same as CS crosshair behaviour.
-    @Export @RegisterProperty public double crosshairContractSpeed = 8.0;
+    @Export public double crosshairContractSpeed = 8.0;
 
     /**
      * Optional weapon controller for self-managed spread.
      * When set, the crosshair reads {@code getCurrentSpreadDeg()} every frame
      * instead of requiring an external {@code setPositionX()} call.
      */
-    @Export @RegisterProperty public WeaponController weaponController;
+    @Export public WeaponController weaponController;
 
     /**
      * Master visibility flag.  When {@code false} the arms lerp back to centre
      * each frame.  Toggle this from combat-state handlers or vehicle enter/exit
      * instead of hiding the node so the lerp animation still plays.
      */
-    @Export @RegisterProperty public boolean showCrosshair = true;
+    @Export public boolean showCrosshair = true;
 
     /**
      * Arm offset (px) at the tightest accuracy (crosshair fraction 0). The minimum gap so the reticle
      * never fully closes.
      */
-    @Export @RegisterProperty public float minSpreadPixels = 3f;
+    @Export public float minSpreadPixels = 3f;
 
     /**
      * Arm offset (px) at the widest accuracy (crosshair fraction 1). Caps how far the arms open so the
@@ -62,7 +61,7 @@ public class Crosshair extends Control {
      * The fraction is weapon-normalized (WeaponController.getCrosshairSpreadFraction), so this same
      * range serves every weapon with no per-weapon crosshair tuning.
      */
-    @Export @RegisterProperty public float maxSpreadPixels = 90f;
+    @Export public float maxSpreadPixels = 90f;
 
     private VariantArray<Node> lines;
     private float positionX = 0f;
@@ -72,23 +71,29 @@ public class Crosshair extends Control {
         this.positionX = positionX;
     }
 
+    /** Getter half of the exported {@code showCrosshair} property (0.17 binds a property
+     *  that has any accessor through its accessors, so the pair must be complete). */
+    public boolean isShowCrosshair() {
+        return showCrosshair;
+    }
+
     public void setShowCrosshair(boolean show) {
         this.showCrosshair = show;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         lines = getNode("Reticle/Lines").getChildren();
     }
 
-    @RegisterFunction
+    @Register
     public void onWeaponFire(float speedScale) {
         // Bloom expansion is already captured by getCurrentSpreadDeg(), so no
         // separate per-shot animation is needed here.
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         // Self-managed spread: map the weapon-normalized accuracy fraction (0..1) to a fixed pixel

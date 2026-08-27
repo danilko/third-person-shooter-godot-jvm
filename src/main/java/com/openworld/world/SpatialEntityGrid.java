@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.core.StringName;
 import godot.core.Vector3;
@@ -35,7 +34,7 @@ import java.util.Map;
  * absent (test scenes without the AutoLoad) callers fall back to the group scan, so it is a pure
  * drop-in accelerator.
  */
-@RegisterClass(className = "SpatialEntityGrid")
+@Script(className = "SpatialEntityGrid")
 public class SpatialEntityGrid extends Node {
 
     private static SpatialEntityGrid instance;
@@ -44,21 +43,21 @@ public class SpatialEntityGrid extends Node {
     public static SpatialEntityGrid get() { return instance; }
 
     /** Cell edge length in metres. Exported so it can be tuned per scene without code changes. */
-    @Export @RegisterProperty public float cellSize = 50.0f;
+    @Export public float cellSize = 50.0f;
 
     /** cell key → the nodes currently bucketed in that cell. */
     private final Map<Long, List<Node>> cells = new HashMap<>();
     /** node → its current cell key, so {@link #move} only re-buckets on an actual cell change. */
     private final Map<Node, Long> nodeCell = new HashMap<>();
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         instance = this;
         addToGroup(new StringName("spatial_grid"), false);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         if (instance == this) instance = null;

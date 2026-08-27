@@ -3,8 +3,8 @@ package com.openworld.debug;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.CanvasLayer;
 import godot.api.Control;
 import godot.api.Label;
@@ -25,14 +25,14 @@ import godot.global.GD;
  * {@link com.openworld.world.RegionConfig}, the active region name
  * ({@link WorldZoneManager#getActiveRegionMarker}) — so "loaded vs merely nearby" is visible too.
  */
-@RegisterClass(className = "ZoneDebugOverlay")
+@Script(className = "ZoneDebugOverlay")
 public class ZoneDebugOverlay extends CanvasLayer {
 
     private Label label;
     private double refreshTimer = 0.0;
     private static final double REFRESH_INTERVAL = 0.25;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         label = new Label();
@@ -46,7 +46,7 @@ public class ZoneDebugOverlay extends CanvasLayer {
         addChild(label);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         refreshTimer -= delta;

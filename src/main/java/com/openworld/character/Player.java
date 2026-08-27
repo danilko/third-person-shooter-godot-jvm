@@ -3,8 +3,8 @@ package com.openworld.character;
 import com.openworld.game.EventBus;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.carrier.vehicle.Vehicle;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.core.StringName;
 import godot.core.StringNames;
@@ -27,13 +27,13 @@ import com.openworld.ui.HUDManager;
  * single-player, host-arbitrated grant when networked — rather than processing
  * normal character inputs.
  */
-@RegisterClass
+@Script
 public class Player extends Character {
 
     /** Set by the nearest Vehicle's EntranceArea when the player is in range. */
     public Vehicle nearbyVehicle;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         super._ready();
@@ -52,14 +52,14 @@ public class Player extends Character {
      * {@code instanceof Player}, not liveness), so a downed player's ragdoll keeps holding
      * AIs near it ACTIVE until the body is actually freed — preserving prior LOD behaviour.
      */
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         PlayerRegistry.deregister(this);
         super._exitTree();
     }
 
-    @RegisterFunction
+    @Register
     public void emitPlayerSpawned() {
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.playerSpawned.emit(this);
@@ -96,7 +96,7 @@ public class Player extends Character {
         super.applyInput(cmd, delta);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void onDied() {
         setProcessInput(false);

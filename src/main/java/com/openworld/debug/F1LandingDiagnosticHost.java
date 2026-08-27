@@ -3,8 +3,8 @@ package com.openworld.debug;
 import com.openworld.world.WorldZone;
 import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Dictionary;
 import godot.core.RID;
@@ -26,7 +26,7 @@ import godot.global.GD;
  *
  * Grep for "F1DIAG".
  */
-@RegisterClass(className = "F1LandingDiagnosticHost")
+@Script(className = "F1LandingDiagnosticHost")
 public class F1LandingDiagnosticHost extends Node3D {
 
     private static final String DISTRICT =
@@ -41,7 +41,7 @@ public class F1LandingDiagnosticHost extends Node3D {
     private double minYSeenEarly = Double.MAX_VALUE;
     private boolean loggedFirstFrame = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         WorldZone zone = new WorldZone();
@@ -80,7 +80,7 @@ public class F1LandingDiagnosticHost extends Node3D {
         GD.print("F1DIAG: zone marker placed at " + MARKER_POS + " (matches World_master.tscn)");
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         timer += delta;

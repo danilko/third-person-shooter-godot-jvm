@@ -1,8 +1,8 @@
 package com.openworld.world;
 
 import com.openworld.character.Character;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Area3D;
 import godot.api.BoxShape3D;
 import godot.api.CollisionShape3D;
@@ -22,27 +22,27 @@ import godot.core.StringName;
  * {@code body_entered}/{@code body_exited} fire. Membership in group {@code "water"} is for
  * discovery by other systems (e.g. AI water avoidance later).
  */
-@RegisterClass(className = "WaterVolume")
+@Script(className = "WaterVolume")
 public class WaterVolume extends Area3D {
 
   public static final String WATER_GROUP = "water";
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     addToGroup(new StringName(WATER_GROUP));
-    // godot-kotlin-jvm registers @RegisterFunction methods under their snake_case names.
+    // godot-kotlin-jvm registers @Register methods under their snake_case names.
     connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
     connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
   }
 
-  @RegisterFunction
+  @Register
   public void onBodyEntered(Node3D body) {
     Character c = resolveCharacter(body);
     if (c != null) c.setInWater(true, getSurfaceY());
   }
 
-  @RegisterFunction
+  @Register
   public void onBodyExited(Node3D body) {
     Character c = resolveCharacter(body);
     if (c != null) c.setInWater(false, 0.0);
@@ -53,7 +53,7 @@ public class WaterVolume extends Area3D {
    * the swimmer's buoyancy spring so it settles at the water line. Falls back to the area's own
    * global Y if no box shape is found.
    */
-  @RegisterFunction
+  @Register
   public double getSurfaceY() {
     for (Node child : getChildren()) {
       if (child instanceof CollisionShape3D cs && cs.getShape() instanceof BoxShape3D box) {

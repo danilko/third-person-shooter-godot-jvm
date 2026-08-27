@@ -8,8 +8,8 @@ import com.openworld.net.Quat;
 import com.openworld.net.RigidSnapshotInterpolator;
 import com.openworld.net.TimestampUnwrapper;
 import com.openworld.net.Vec3;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.core.Basis;
 import godot.core.Quaternion;
@@ -34,7 +34,7 @@ import com.openworld.character.Health;
  * client-driven vehicle (the host's copy IS this puppet, so the batch entry reads the
  * cached values rather than dead local physics state).
  */
-@RegisterClass(className = "VehicleNetworkController")
+@Script(className = "VehicleNetworkController")
 public class VehicleNetworkController extends Controller {
 
     private final RigidSnapshotInterpolator interpolator = new RigidSnapshotInterpolator();
@@ -136,7 +136,7 @@ public class VehicleNetworkController extends Controller {
     }
 
     /** Advances the interpolation clock and places the frozen body kinematically every rendered frame. */
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         RigidSnapshotInterpolator.Output out = interpolator.advance(delta);

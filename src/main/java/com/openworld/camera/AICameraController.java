@@ -1,15 +1,14 @@
 package com.openworld.camera;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.core.Vector2;
 import godot.core.Vector3;
 import godot.global.GD;
 import com.openworld.character.Character;
 
-@RegisterClass(className = "AICameraController")
+@Script(className = "AICameraController")
 public class AICameraController extends TPSCameraController {
 
   // World-space aim target; null = fall back to body-facing direction.
@@ -22,10 +21,9 @@ public class AICameraController extends TPSCameraController {
    * Lower values make the AI feel slower to react visually; 0 = unlimited (old behaviour).
    */
   @Export
-  @RegisterProperty
   public float aimTrackingDegreesPerSec = 90.0f;
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     super._ready();

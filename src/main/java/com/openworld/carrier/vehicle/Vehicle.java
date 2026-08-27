@@ -8,10 +8,8 @@ import com.openworld.world.manager.ExplosionManager;
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
-import godot.annotation.RegisterSignal;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.*;
 import godot.core.MethodCallable;
@@ -60,7 +58,7 @@ import com.openworld.weapon.WeaponController;
  * All physics constants and combat/damage/wreck config live in VehicleConfig.
  * Assign a .tres preset in the inspector; leave null to use built-in DEFAULTS.
  */
-@RegisterClass(className = "Vehicle")
+@Script(className = "Vehicle")
 public class Vehicle extends RigidBody3D implements Controllable, NameplateTarget {
 
     /** Group tag for vehicles spawned at runtime by {@code WorldZoneManager} (ambient traffic, I3b) —
@@ -70,19 +68,19 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     // ── Inspector exports ─────────────────────────────────────────────────────
 
-    @RegisterProperty @Export public CharacterInfo characterInfo;
+    @Export public CharacterInfo characterInfo;
 
     /**
      * Per-vehicle-type config (suspension, power, damage, wreck, etc.).
      * Null = shared DEFAULTS singleton with the original hard-coded values.
      * Swap a different .tres preset to change vehicle archetype with zero code changes.
      */
-    @RegisterProperty @Export public VehicleConfig vehicleConfig;
+    @Export public VehicleConfig vehicleConfig;
 
     // Scene-structure paths — node positions are scene-specific, not config.
-    @RegisterProperty @Export public NodePath wheelsPath     = new NodePath("Wheels");
-    @RegisterProperty @Export public NodePath driverSeatPath = new NodePath("DriverSeat");
-    @RegisterProperty @Export public NodePath vehicleCamPath = new NodePath("ActiveCamera");
+    @Export public NodePath wheelsPath     = new NodePath("Wheels");
+    @Export public NodePath driverSeatPath = new NodePath("DriverSeat");
+    @Export public NodePath vehicleCamPath = new NodePath("ActiveCamera");
 
     // Damage-source names stamped onto elimination events; also the IconRegistry keys
     // each peer registers the vehicle icon under so a vehicle kill resolves its icon
@@ -145,7 +143,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         if (characterInfo == null) characterInfo = new CharacterInfo();
@@ -317,14 +315,14 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     }
 
     /** Drop out of the spatial grid when the vehicle leaves the tree (destroyed/despawned). */
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         SpatialEntityGrid grid = SpatialEntityGrid.get();
         if (grid != null) grid.unregister(this);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         updateSpatialCell(delta);
@@ -626,7 +624,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     private GPUParticles3D damageSmoke;
     private GPUParticles3D damageFire;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         damageVfxTimer -= delta;
@@ -746,14 +744,14 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     }
 
     /** Damage wake (Health.hit): a shot parked car resumes physics (reacts to later pushes/sag). */
-    @RegisterFunction
+    @Register
     public void onVehicleDamaged(float damage) {
         wakeUp();
     }
 
     // ── Utilities ─────────────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     @Override
     public void _integrateForces(PhysicsDirectBodyState3D state) {
         // Run-over damage is resolved only where the vehicle is simulated (N3): on puppets
@@ -865,6 +863,11 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override public void applyCommand(UserCommand cmd, double delta) { }
     @Override public CharacterInfo getCharacterInfo()                 { return characterInfo; }
 
+    /** Setter half of the exported {@code characterInfo} property. */
+    public void setCharacterInfo(CharacterInfo value) {
+        this.characterInfo = value;
+    }
+
     // ── NameplateTarget ─────────────────────────────────────────────────────────
     // The carrier reuses ui/Nameplate.tscn unchanged: the plate finds its sibling "Health" and
     // "WeaponController" nodes itself, so health + weapon/ammo are the CARRIER's. Only the colour
@@ -872,7 +875,6 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     // is down. tryEnter/tryExit (run on every peer via the host-arbitrated seat change) emit
     // nameplateChanged, so the tint re-derives on every peer with no extra net message.
 
-    @RegisterSignal
     public final Signal0 nameplateChanged = new Signal0(this, new StringName("nameplate_changed"));
 
     @Override
@@ -1133,7 +1135,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      * Ordered reliable sequence for clients, all on channel 0: occupancy-exit (inside the
      * exit grant) → WORLD_EVENT_VEHICLE_WRECK (cosmetics) → MSG_DESPAWN (node removal).
      */
-    @RegisterFunction
+    @Register
     public void onVehicleDestruction() {
         if (!isEmptyOfRiders()) {
             // FORCED unseat, never requestExit: the seat policy denies a host-initiated exit
@@ -1210,7 +1212,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         return true;
     }
 
-    @RegisterFunction
+    @Register
     public void onEntranceBodyEntered(Node3D body) {
         Character c = resolveCharacter(body);
         if (c == null) return;
@@ -1222,7 +1224,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (c instanceof Player p) { p.nearbyVehicle = this; emitEnterPrompt(true); }
     }
 
-    @RegisterFunction
+    @Register
     public void onEntranceBodyExited(Node3D body) {
         Character c = resolveCharacter(body);
         if (c == null) return;

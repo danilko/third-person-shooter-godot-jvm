@@ -1,55 +1,79 @@
 package com.openworld.movement.character;
 
-import godot.annotation.RegisterProperty;
-import godot.api.Resource;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
+import godot.annotation.Script;
+import godot.api.Resource;
 
-@RegisterClass(className = "MovementState")
+@Script(className = "MovementState")
 public class MovementState extends Resource {
 
   public int getId() {
     return id;
   }
 
+  /** Setter half of the exported {@code id} property. */
+  public void setId(int value) {
+    this.id = value;
+  }
+
   public float getMovementSpeed() {
     return movementSpeed;
+  }
+
+  /** Setter half of the exported {@code movementSpeed} property. */
+  public void setMovementSpeed(float value) {
+    this.movementSpeed = value;
   }
 
   public float getAcceleration() {
     return acceleration;
   }
 
+  /** Setter half of the exported {@code acceleration} property. */
+  public void setAcceleration(float value) {
+    this.acceleration = value;
+  }
+
   public float getCameraFov() {
     return cameraFov;
+  }
+
+  /** Setter half of the exported {@code cameraFov} property. */
+  public void setCameraFov(float value) {
+    this.cameraFov = value;
   }
 
   public float getAnimationSpeed() {
     return animationSpeed;
   }
 
+  /** Setter half of the exported {@code animationSpeed} property. */
+  public void setAnimationSpeed(float value) {
+    this.animationSpeed = value;
+  }
+
   public float getNoiseLevel() {
     return noiseLevel;
   }
 
+  /** Setter half of the exported {@code noiseLevel} property. */
+  public void setNoiseLevel(float value) {
+    this.noiseLevel = value;
+  }
+
   @Export
-  @RegisterProperty
   public int id = 0;
 
   @Export
-  @RegisterProperty
   public float movementSpeed = 0.0f;
 
   @Export
-  @RegisterProperty
   public float acceleration = 6.0f;
 
   @Export
-  @RegisterProperty
   public float cameraFov = 75.0f;
 
   @Export
-  @RegisterProperty
   public float animationSpeed = 1.0f;
 
   /**
@@ -60,7 +84,6 @@ public class MovementState extends Resource {
    * is near-silent. Crouch/crawl variants are quieter still. Not wired to anything yet.
    */
   @Export
-  @RegisterProperty
   public float noiseLevel = 1.0f;
 
   // A default constructor is required for Godot to instantiate the Resource

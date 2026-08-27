@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.NavigationMesh;
 import godot.api.NavigationMeshSourceGeometryData3D;
 import godot.api.NavigationRegion3D;
@@ -46,12 +45,12 @@ import godot.global.GD;
  * districts' regions merge into one traversable navmesh at their seam once both are streamed in —
  * per Godot's own edge-connection-margin merging, not anything district-specific here.
  */
-@RegisterClass(className = "NavBaker")
+@Script(className = "NavBaker")
 public class NavBaker extends Node {
 
-    @Export @RegisterProperty public String scenePath = "";
-    @Export @RegisterProperty public boolean bakeOnReady = false;
-    @Export @RegisterProperty public boolean quitWhenDone = false;
+    @Export public String scenePath = "";
+    @Export public boolean bakeOnReady = false;
+    @Export public boolean quitWhenDone = false;
 
     /** Roughly a human character's capsule (CLAUDE.md's stance/movement scale) — not tuned per district. */
     private static final float AGENT_HEIGHT = 1.8f;
@@ -90,7 +89,7 @@ public class NavBaker extends Node {
     private static final float CLIP_Y_MIN = -100f;
     private static final float CLIP_Y_MAX = 1000f;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         if (bakeOnReady) bake();
@@ -104,7 +103,7 @@ public class NavBaker extends Node {
     /**
      * Loads {@code scenePath} (an already-baked native district scene), adds a
      * {@code NavigationRegion3D} baked from its own static-collider geometry, and re-saves over
-     * the same path. {@code host} must be in the tree (mirrors {@code WorldBaker.bake}'s contract).
+     * the same path. {@code host} must be in the tree (mirrors {@code WorldBaker.bakeScene}'s contract).
      */
     public static void bake(Node host, String scenePath) {
         Object loaded = GD.load(scenePath);

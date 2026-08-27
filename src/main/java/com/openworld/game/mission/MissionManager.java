@@ -1,8 +1,8 @@
 package com.openworld.game.mission;
 
 import com.openworld.character.Character;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.Object;
 import godot.api.Texture2D;
@@ -25,7 +25,7 @@ import com.openworld.net.session.PlayerSession;
  *
  * AutoLoad entry (add to project.godot after running ./gradlew build):
  *   [autoload]
- *   MissionManager="*res://gdj/com/game/MissionManager.gdj"
+ *   MissionManager="*res://src/main/java/com/openworld/game/mission/MissionManager.java"
  *
  * Only ELIMINATE_ALL has real tracking today: at startMission() the manager counts
  * living "characters" group members per hostile faction (any faction not listed in
@@ -36,7 +36,7 @@ import com.openworld.net.session.PlayerSession;
  * Gating which mission may start (the unlock-graph) is MissionDirector's job (F1).
  * This class — and the debug harness — call startMission() directly.
  */
-@RegisterClass(className = "MissionManager")
+@Script(className = "MissionManager")
 public class MissionManager extends Node {
 
     private static final StringName CHARACTERS_GROUP = new StringName("characters");
@@ -73,7 +73,7 @@ public class MissionManager extends Node {
         return null;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         Node busNode = getNodeOrNull("/root/EventBus");
@@ -152,7 +152,7 @@ public class MissionManager extends Node {
 
     // ── EventBus listener ─────────────────────────────────────────────────────
 
-    @RegisterFunction
+    @Register
     public void onCharacterEliminated(String attackerName, String attackerFaction,
                                        String victimName, String victimFaction,
                                        String weaponName, Texture2D weaponIcon,

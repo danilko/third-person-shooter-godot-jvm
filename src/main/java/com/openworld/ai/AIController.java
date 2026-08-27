@@ -2,8 +2,8 @@ package com.openworld.ai;
 
 import com.openworld.ai.AIState;
 import com.openworld.ai.character.PatrolState;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.core.Vector3;
 import godot.global.GD;
 import com.openworld.ai.character.ChaseState;
@@ -28,7 +28,7 @@ import com.openworld.movement.character.StanceName;
  * FSM states receive both body and controller explicitly, making their
  * data sources unambiguous.
  */
-@RegisterClass(className = "AIController")
+@Script(className = "AIController")
 public class AIController extends Controller {
 
     // ── FSM ───────────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ public class AIController extends Controller {
     /** Override in subclasses to supply the initial FSM state. */
     protected AIState initialState() { return PatrolState.INSTANCE; }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         // FSM is started by the owning body's _ready() via start() once
@@ -146,11 +146,11 @@ public class AIController extends Controller {
     public void    resetLostTargetTimer()             { lostTargetTimer = 0.0; }
     public void    advanceLostTargetTimer(double d)   { lostTargetTimer += d; }
     public boolean isTargetLost()                     { return lostTargetTimer >= LOST_TARGET_TIMEOUT; }
-    public boolean isSuppressExpired()                { return lostTargetTimer >= getBody().getBehaviorConfig().suppressionDuration; }
+    public boolean isSuppressExpired()                { return lostTargetTimer >= getBody().behaviorConfigOrDefaults().suppressionDuration; }
 
     // ── Reaction-timer helpers ────────────────────────────────────────────────
     public void    advanceReactionTimer(double d) { reactionTimer += d; }
-    public boolean isReactionReady()              { return reactionTimer >= getBody().getBehaviorConfig().reactionTime; }
+    public boolean isReactionReady()              { return reactionTimer >= getBody().behaviorConfigOrDefaults().reactionTime; }
     public void    resetReactionTimer()           { reactionTimer = 0.0; }
 
     // ── Under-attack helpers ──────────────────────────────────────────────────
@@ -188,14 +188,14 @@ public class AIController extends Controller {
             if (len > 0.1) {
                 strafeX = strafeFlipSide * (float) (toTarget.getZ() / len);
                 strafeZ = strafeFlipSide * (float) (-toTarget.getX() / len);
-                strafeTimer = getBody().getBehaviorConfig().strafeChangeDuration;
+                strafeTimer = getBody().behaviorConfigOrDefaults().strafeChangeDuration;
                 return;
             }
         }
         // Fallback: no known position yet — use current flip side along world X
         strafeX = strafeFlipSide;
         strafeZ = 0f;
-        strafeTimer = getBody().getBehaviorConfig().strafeChangeDuration;
+        strafeTimer = getBody().behaviorConfigOrDefaults().strafeChangeDuration;
     }
 
     // ── Still-phase helpers (stop-to-shoot) ──────────────────────────────────
@@ -244,7 +244,7 @@ public class AIController extends Controller {
     // ── Suppression fire ──────────────────────────────────────────────────────
     public Vector3 computeSuppressTarget(float hDist) {
         if (lastKnownTargetPosition == null) return null;
-        float maxOffset = getBody().getBehaviorConfig().aimScatterRadius * 2f * (hDist / 10f);
+        float maxOffset = getBody().behaviorConfigOrDefaults().aimScatterRadius * 2f * (hDist / 10f);
         float offset    = GD.randf() * maxOffset;
         // Scatter in a full 3D sphere so suppression fire spreads in all directions,
         // not just the XY world plane (which produced visible axis-aligned artefacts).

@@ -1,6 +1,6 @@
 # CLAUDE.md — Codebase Reference
 
-Third-person shooter experiment using **Godot 4.6** with the **godot-kotlin-jvm** plugin.
+Third-person shooter experiment using **Godot 4.7** with the **godot-kotlin-jvm** plugin.
 All game logic is written in **Java** (a few stubs in Kotlin). GDScript is not used.
 
 ---
@@ -8,25 +8,26 @@ All game logic is written in **Java** (a few stubs in Kotlin). GDScript is not u
 ## Build & Run
 
 ```bash
-./gradlew build          # compile + regenerate .gdj registration files into gdj/
+./gradlew build          # compile + generate the registrars Godot loads
 ```
 
 Open `project.godot` with the **Godot Kotlin/JVM editor** (not the standard editor).
-Plugin version: `0.15.0-4.6`. JVM toolchain: **JDK 17**.
+Plugin version: `0.17.1-4.7.2` — keep it equal to the editor binary's own
+(`godot --version` → `4.7.2.stable.jvm.0.17.1`). JVM toolchain: **JDK 17**.
 
-Scenes/resources now reference scripts by their **source `.java` path**
-(`res://src/main/java/com/openworld/.../X.java`), not the generated `.gdj` — see the
-`.gdj`→`.java` migration in PLAN.md. `.gdj` generation into `gdj/` is still ON as a
-safety net but is no longer what scenes load. Source of truth is always `src/main/java/`
-— never edit generated files.
+Scenes/resources reference scripts by their **source `.java` path**
+(`res://src/main/java/com/openworld/.../X.java`). As of 0.17 that is the *only* way for a
+project class: `.gdj` registration files are now emitted **only for registered classes coming
+from external dependencies**, of which this project has none — so `gdj/` stays empty and is not
+a fallback. Source of truth is always `src/main/java/` — never edit generated files.
 
 ---
 
 ## Source Layout
 
 All code lives under the **`com.openworld`** root, organized **by domain/concern** (not layer-first).
-Scripts are referenced from scenes by `.java` path (`res://src/main/java/com/openworld/.../X.java`),
-not via generated `.gdj`. The two reorg scripts (`tools/reorg_stage1.py`, `tools/reorg_stage2.py`)
+Scripts are referenced from scenes by `.java` path (`res://src/main/java/com/openworld/.../X.java`);
+`.gdj` is dependency-only under 0.17 and unused here. The two reorg scripts (`tools/reorg_stage1.py`, `tools/reorg_stage2.py`)
 and `tools/REORG_PROGRESS.md` document the move; reuse their pattern for future moves.
 
 ```
@@ -211,7 +212,7 @@ detection that triggers a swap) are AI-perception features not built yet — the
 As a player walks toward a populated area an AI group streams in; walking away streams it back
 out — no scene stutter, no O(n) tree scans, host-authoritative + replicated spawns. Five pieces:
 
-- **`WorldZone`** (`@RegisterClass extends Resource`) — placeholder-AABB zone data: `zoneId`,
+- **`WorldZone`** (`@Script extends Resource`) — placeholder-AABB zone data: `zoneId`,
   `size` (full XZ extents of the spawn box; *center is the marker's world position*),
   `loadRadius`/`unloadRadius` (hysteresis — unload **>** load avoids boundary flicker), nullable
   `geometry` (PackedScene, cosmetic), and two collections built with class tokens —
@@ -221,7 +222,7 @@ out — no scene stutter, no O(n) tree scans, host-authoritative + replicated sp
   `weaponScenePath` (AR4 default). Ambient AI share the `AICharacter.tscn` archetype.
 - **`NamedCharacterConfig`** — stable `characterId`, `displayName`, `faction`, nullable `scene`
   (else AICharacter.tscn), `behaviorConfig`, `weaponScenePath`, `offset` (relative to marker).
-- **`WorldZoneMarker`** (`@RegisterClass extends Node3D`) — the inspector-friendly in-scene anchor
+- **`WorldZoneMarker`** (`@Script extends Node3D`) — the inspector-friendly in-scene anchor
   (a `Resource` AutoLoad can't take an inspector-assigned `.tres`, and a marker is positioned by
   dragging). Holds `@Export WorldZone zone`; **its global position is the zone center**. Registers
   with the manager in `_ready()`, deregisters in `_exitTree()` (the same register-with-AutoLoad
@@ -233,7 +234,7 @@ out — no scene stutter, no O(n) tree scans, host-authoritative + replicated sp
   `release(ai)` removes from tree + enqueues up to `poolCapacity`, else `queueFree`. **Only healthy
   bodies are pooled** — dead AI follow the normal death/ragdoll→free flow, so a recycled body never
   needs un-ragdolling.
-- **`WorldZoneManager`** (`@RegisterClass extends Node`, AutoLoad) — mirrors `SpatialEntityGrid`'s
+- **`WorldZoneManager`** (`@Script extends Node`, AutoLoad) — mirrors `SpatialEntityGrid`'s
   shape (JVM-static `instance`/`get()`, `_exitTree()` frees geometry + clears maps + `pool.clear()`
   for leak discipline). Throttled tick (`evalInterval`, 0.5 s) over registered markers computes
   nearest-player XZ distance via `PlayerRegistry.getPlayers()` (O(playerCount)); `< loadRadius` →
@@ -1233,10 +1234,41 @@ AI input is world-space (set directly by the AI FSM).
 
 ## Godot-Kotlin-JVM Specifics
 
-- Every class exposed to Godot needs `@RegisterClass`, methods need `@RegisterFunction`,
-  properties need `@RegisterProperty` + `@Export`.
-- Signal declarations: `Signal0 / Signal1<T> / … / Signal7<…>` declared as `public final` fields.
-- Class registration is byte-compatible across package moves: `@RegisterClass(className=…)` is
+- **Annotations (0.17 API — the pre-0.17 `@Register*` family is gone).** The plugin runs in the
+  default `Inferred` mode, where an annotation implies what it needs:
+
+  | intent | annotation | replaced |
+  |:--|:--|:--|
+  | expose a class as a Godot script | `@Script` / `@Script(className = "X")` | `@RegisterClass` |
+  | let Godot call an ordinary method | `@Register` | `@RegisterFunction` |
+  | show/edit a property in the Inspector | `@Export` (alone — it implies registration) | `@RegisterProperty` + `@Export` |
+  | register a property without exporting it | `@Visible` | bare `@RegisterProperty` |
+  | name a signal's arguments | `@Emit(parameters = {…})` (optional) | `@RegisterSignal` |
+
+  In **Java** `@Script`'s element is `className` — `@Script("X")` does not compile (Java has no
+  positional annotation arguments), it must be `@Script(className = "X")`. Do not use
+  `import godot.annotation.*;` alongside `import godot.api.*;`: **`godot.api.Script` exists**, and
+  two on-demand imports make `@Script` ambiguous. Import the annotations explicitly.
+- Signal declarations: `Signal0 / Signal1<T> / … / Signal7<…>` declared as `public final` fields —
+  **registered automatically**, no annotation. The registrar names the signal after the *field*
+  (`playerDied` → `player_died`, via `convertToSnakeCase`), which is why the field name and the
+  `new StringName("player_died")` handed to the constructor must stay in sync.
+- **A Java field and its JavaBean accessors are ONE property.** 0.17's language adapter merges
+  `public T x` with `getX`/`isX`/`setX` into a single logical property and then binds it *through
+  the accessors*. Consequences, each of which bit this codebase during the 4.7 upgrade:
+  - A **getter-only** exported property is registered `READ_ONLY` (and its generated registrar does
+    not even compile) — the scene/`.tres` value would never reach the object. Every `@Export` field
+    with an accessor must have **both** halves; `Crosshair.showCrosshair` and `Door.locked` gained a
+    getter, and ~50 tuning fields (`MovementState`, `SwimState`, `VehicleRoute`, …) gained a setter.
+  - A **convenience method that merely looks like a getter** silently hijacks the property. Three
+    were renamed rather than completed, because their return value is not the field's:
+    `AICharacter.behaviorConfigOrDefaults()` (falls back to shared DEFAULTS),
+    `WeaponItem.resolveSlotType()` and `HittableBody.resolveSurfaceType()` (enum views of an
+    `int`/`String` field). Name a derived reader `resolveX()`/`xOrDefaults()`, never `getX()`.
+  - A **registered method must not be overloaded** — the registrar emits a bare `Class::method`
+    reference, which is ambiguous in Kotlin. `WorldBaker.bake()` / `WorldPreviewBuilder.buildPreview()`
+    keep the no-arg registered form; their static helpers are `bakeScene(…)` / `buildPreviewScene(…)`.
+- Class registration is byte-compatible across package moves: `@Script(className=…)` is
   an explicit string (and the default is the simple class name), both package-independent — so the
   `com.openworld.*` reorg did not change any registered type name.
 - Always run `./gradlew build` before opening the editor so registration is up to date.
@@ -1250,7 +1282,7 @@ AI input is world-space (set directly by the AI FSM).
 - `AICharacter.onDied()` must set `isDead = true` **before** calling `super.onDied()` (which stops
   physics processing). If `isDead` is not set first, `gatherInput` can still run on the
   same frame via a pending physics callback.
-- **Do not export a nested/raw generic `Dictionary` from a `@RegisterClass`** (e.g.
+- **Do not export a nested/raw generic `Dictionary` from a `@Script` class** (e.g.
   `@Export Dictionary<String, Dictionary>`). The godot-kotlin-jvm `classGraphSymbolsProcess`
   registration scanner chokes on the raw nested type parameter and dies with `Java heap space` /
   `Requested array size exceeds VM limit` (NOT a real memory shortage — bumping `org.gradle.jvmargs`

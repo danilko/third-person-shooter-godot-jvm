@@ -9,9 +9,8 @@ import com.openworld.world.SpatialEntityGrid;
 import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Camera3D;
 import godot.api.Control;
 import godot.api.Node;
@@ -36,38 +35,38 @@ import java.util.Map;
  *
  * <p>Wired by {@code HUDManager.wirePlayer} (ownership-gated) like {@code WeaponProgress}; not table-managed.
  */
-@RegisterClass(className = "MinimapController")
+@Script(className = "MinimapController")
 public class MinimapController extends Control {
 
     /** World metres from the player edge-to-centre shown on the radar. */
-    @Export @RegisterProperty public float rangeMeters = 60f;
+    @Export public float rangeMeters = 60f;
     /** Blip radius in px. */
-    @Export @RegisterProperty public float blipRadius = 3f;
+    @Export public float blipRadius = 3f;
     /** Background disc colour. */
-    @Export @RegisterProperty public Color backgroundColor = new Color(0f, 0f, 0f, 0.45f);
+    @Export public Color backgroundColor = new Color(0f, 0f, 0f, 0.45f);
     /** Local-player heading-triangle colour. */
-    @Export @RegisterProperty public Color selfColor = new Color(1f, 1f, 1f, 1f);
+    @Export public Color selfColor = new Color(1f, 1f, 1f, 1f);
     /** Zone/region outline colour. */
-    @Export @RegisterProperty public Color regionColor = new Color(0.4f, 0.8f, 1f, 0.5f);
+    @Export public Color regionColor = new Color(0.4f, 0.8f, 1f, 0.5f);
 
     private Character player;
 
     /** Bind to the local player (called by HUDManager.wirePlayer). */
     public void wirePlayer(Player p) { player = p; }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         setMouseFilter(Control.MouseFilter.IGNORE);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         queueRedraw();   // redraw every frame; cheap (a few dozen shapes)
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _draw() {
         Vector2 size = getSize();

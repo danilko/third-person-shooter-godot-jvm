@@ -4,9 +4,8 @@ import godot.api.CharacterBody3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.core.Vector3;
 import godot.global.GD;
 import static java.lang.Math.atan2;
@@ -17,23 +16,19 @@ import com.openworld.control.PlayerController;
 import com.openworld.control.UserCommand;
 import com.openworld.net.NetworkController;
 
-@RegisterClass(className = "MovementController")
+@Script(className = "MovementController")
 public class MovementController extends Node {
 
   @Export
-  @RegisterProperty
   public CharacterBody3D player = null;
 
   @Export
-  @RegisterProperty
   public Node3D meshRoot = null;
 
   @Export
-  @RegisterProperty
   public double rotationSpeed = 8.0;
 
   @Export
-  @RegisterProperty
   public double fallGravity = 45.0;
 
   private double jumpGravity = fallGravity;
@@ -46,7 +41,6 @@ public class MovementController extends Node {
    * When false it is in camera-relative input space and is rotated by camRotation (Player).
    */
   @Export
-  @RegisterProperty
   public boolean worldSpaceMovement = false;
 
   private double camRotation = 0.0;
@@ -58,7 +52,6 @@ public class MovementController extends Node {
   // ── Air strafe (CS/Source-style) ────────────────────────────────────────────
   /** Air acceleration constant — higher gives faster strafe speed-gain. */
   @Export
-  @RegisterProperty
   public double airAccelerate = 80.0;
 
   /**
@@ -68,22 +61,18 @@ public class MovementController extends Node {
    * snapping to {@code speed·dir}. Small by design (Quake's classic ~30 ups ≈ 0.8 m/s).
    */
   @Export
-  @RegisterProperty
   public double airSpeedCap = 0.8;
 
   /** Downward speed (m/s) required before any fall damage is dealt. 0 disables fall damage. */
   @Export
-  @RegisterProperty
   public float fallDamageThreshold = 10.0f;
 
   /** Damage per m/s above fallDamageThreshold on landing. */
   @Export
-  @RegisterProperty
   public float fallDamageScale = 5.0f;
 
   /** Swim tunables (buoyancy / reduced gravity / vertical clamp) — used while {@link #swimming}. */
   @Export
-  @RegisterProperty
   public SwimState swimState = null;
 
   /** True while the body is in a water volume (set by Character.setInWater → setSwimming). */
@@ -95,14 +84,14 @@ public class MovementController extends Node {
   /** Remaining ballistic-breach window (s) after a swim-jump; >0 suspends the buoyancy spring. */
   private double swimJumpTimer = 0.0;
 
-  @RegisterFunction
+  @Register
   public void setSwimming(boolean value, double surfaceY) {
     swimming = value;
     if (value) waterSurfaceY = surfaceY;
     else { swimVertical = 0.0; swimJumpTimer = 0.0; }
   }
 
-  @RegisterFunction
+  @Register
   public void setSwimVertical(double value) {
     swimVertical = value;
   }
@@ -113,7 +102,7 @@ public class MovementController extends Node {
    * surface — you can't launch off the seabed. Starts a {@link SwimState#swimJumpDuration} ballistic
    * window; if the lip isn't cleared, buoyancy settles the body back at the surface afterward.
    */
-  @RegisterFunction
+  @Register
   public void swimJump() {
     if (!swimming || swimState == null || player == null) return;
     double bodyY = player.getGlobalPosition().getY();
@@ -123,7 +112,7 @@ public class MovementController extends Node {
     swimJumpTimer = swimState.getSwimJumpDuration();
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     if (player != null) {
@@ -131,7 +120,7 @@ public class MovementController extends Node {
     }
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || meshRoot == null) return;
@@ -271,33 +260,33 @@ public class MovementController extends Node {
   }
 
 
-  @RegisterFunction
+  @Register
   public void jump(JumpState jumpState) {
     velocity.setY(2.0 * jumpState.getJumpHeight() / jumpState.getApexDuration());
     jumpGravity = velocity.getY() / jumpState.getApexDuration();
   }
 
-  @RegisterFunction
+  @Register
   public void onSetMovementState(MovementState movementState) {
     speed = movementState.getMovementSpeed() * combatSpeedFactor;
     acceleration = movementState.getAcceleration() * combatAccelerationFactor;
   }
 
-  @RegisterFunction
+  @Register
   public void onSetCombatState(CombatState combatState) {
     combat = combatState.isCombat();
     combatSpeedFactor = combatState.getSpeedFactor();
     combatAccelerationFactor = combatState.getAccelerationFactor();
   }
 
-  @RegisterFunction
+  @Register
   public void onSetMovementDirection(Vector3 movementDirection) {
     // Direction is always world-space: AI provides it directly, PlayerController
     // pre-rotates camera-relative WASD by the camera yaw before stamping the UserCommand.
     direction = movementDirection;
   }
 
-  @RegisterFunction
+  @Register
   public void onSetCamRotation(double newCamRotation) {
     camRotation = newCamRotation;
   }

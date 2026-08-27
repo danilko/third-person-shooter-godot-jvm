@@ -5,9 +5,8 @@ import com.openworld.character.Health;
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Area3D;
 import godot.api.Input;
 import godot.api.Node;
@@ -48,25 +47,25 @@ import com.openworld.weapon.WeaponItem;
  *
  * Subclasses override onCharacterEntered(Node) to apply the pickup effect and
  * getInteractLabel() to supply the HUD prompt text.
- * Re-declare @RegisterFunction onBodyEntered calling super so the method appears
+ * Re-declare @Register onBodyEntered calling super so the method appears
  * in the subclass .gdj for scene signal connections.
  */
-@RegisterClass(className = "Pickup")
+@Script(className = "Pickup")
 public class Pickup extends RigidBody3D {
 
   protected static final NodePath WEAPON_CONTROLLER_PATH = new NodePath("WeaponController");
   private static final String PICKUP_AREA = "PickupArea";
 
-  @RegisterProperty @Export public boolean removeOnPickup  = false;
-  @RegisterProperty @Export public boolean pauseOnPickup   = false;
-  @RegisterProperty @Export public boolean requireInteract = false;
+  @Export public boolean removeOnPickup  = false;
+  @Export public boolean pauseOnPickup   = false;
+  @Export public boolean requireInteract = false;
 
   /**
    * Seconds the pickup ignores all body_entered events after being returned to the
    * world (e.g. after a character drops it). Prevents the dropping character from
    * immediately re-acquiring the item. Industry standard: 0.3–0.5 s.
    */
-  @RegisterProperty @Export public float pickupCooldownAfterDrop = 0.5f;
+  @Export public float pickupCooldownAfterDrop = 0.5f;
 
   /**
    * Stable replication identity, mirroring CharacterInfo.characterId. Scene-placed
@@ -74,7 +73,7 @@ public class Pickup extends RigidBody3D {
    * because all peers load the same World.tscn. Runtime-spawned pickups (drops) get a
    * UUID assigned by the originating peer's drop event before any peer references it.
    */
-  @RegisterProperty @Export public String pickupId = "";
+  @Export public String pickupId = "";
 
   /** Group every pickup joins in _ready() — replication handlers resolve pickupId through it. */
   public static final String PICKUPS_GROUP = "pickups";
@@ -94,7 +93,7 @@ public class Pickup extends RigidBody3D {
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   /** Subclass overrides MUST call super._ready() or the pickup never registers for replication. */
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     addToGroup(new StringName(PICKUPS_GROUP));
@@ -106,7 +105,7 @@ public class Pickup extends RigidBody3D {
 
   // ── Tick ─────────────────────────────────────────────────────────────────
 
-  @RegisterFunction
+  @Register
   @Override
   public void _process(double delta) {
     if (pickupCooldown > 0f) pickupCooldown -= (float) delta;
@@ -133,7 +132,7 @@ public class Pickup extends RigidBody3D {
 
   // ── Body detection (connected from PickupArea signals) ────────────────────
 
-  @RegisterFunction
+  @Register
   public void onBodyEntered(Node3D body) {
     if (equipped || pendingCollector != null || pickupCooldown > 0f) return;
     Node character = resolveCharacter(body);
@@ -157,7 +156,7 @@ public class Pickup extends RigidBody3D {
     return !requireInteract;
   }
 
-  @RegisterFunction
+  @Register
   public void onBodyExited(Node3D body) {
     overlappingBodies.remove(body);
     if (overlappingBodies.isEmpty()) emitInteractPrompt(false);
@@ -175,7 +174,7 @@ public class Pickup extends RigidBody3D {
     if (areaNode instanceof Area3D area) area.setDeferred(new StringName("monitoring"), false);
   }
 
-  @RegisterFunction
+  @Register
   public void resumeFromPause() {
     setVisible(true);
     setFreezeEnabled(false);

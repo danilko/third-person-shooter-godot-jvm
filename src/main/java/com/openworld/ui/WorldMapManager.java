@@ -9,9 +9,8 @@ import com.openworld.world.SpatialEntityGrid;
 import com.openworld.world.WorldZoneManager;
 import com.openworld.world.WorldZoneMarker;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Control;
 import godot.api.Input;
 import godot.api.InputEvent;
@@ -38,29 +37,29 @@ import java.util.Map;
  * {@code Character._physicsProcess} feeds an empty command while blocked) and moves itself to the front
  * to capture clicks. <b>Does not pause the simulation</b> (host-authoritative co-op keeps running).
  */
-@RegisterClass(className = "WorldMapManager")
+@Script(className = "WorldMapManager")
 public class WorldMapManager extends Control {
 
     /** World metres from centre to map edge (a zoomed-out view). */
-    @Export @RegisterProperty public float rangeMeters = 250f;
-    @Export @RegisterProperty public Color backgroundColor = new Color(0.02f, 0.03f, 0.05f, 0.85f);
-    @Export @RegisterProperty public Color regionColor = new Color(0.4f, 0.8f, 1f, 0.6f);
-    @Export @RegisterProperty public Color selfColor = new Color(1f, 1f, 1f, 1f);
-    @Export @RegisterProperty public float blipRadius = 4f;
+    @Export public float rangeMeters = 250f;
+    @Export public Color backgroundColor = new Color(0.02f, 0.03f, 0.05f, 0.85f);
+    @Export public Color regionColor = new Color(0.4f, 0.8f, 1f, 0.6f);
+    @Export public Color selfColor = new Color(1f, 1f, 1f, 1f);
+    @Export public float blipRadius = 4f;
 
     private Player player;
     private boolean open = false;
 
     public void wirePlayer(Player p) { player = p; }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         setMouseFilter(Control.MouseFilter.STOP);   // capture clicks while open
         setVisible(false);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _input(InputEvent event) {
         if (event.isActionPressed("map", false, false)) toggle();
@@ -68,7 +67,7 @@ public class WorldMapManager extends Control {
     }
 
     /** Clicks land here (local coords) only while the STOP control is visible/front-most. */
-    @RegisterFunction
+    @Register
     @Override
     public void _guiInput(InputEvent event) {
         if (!open || player == null) return;
@@ -102,13 +101,13 @@ public class WorldMapManager extends Control {
         setVisible(false);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         if (open) queueRedraw();
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _draw() {
         if (!open) return;

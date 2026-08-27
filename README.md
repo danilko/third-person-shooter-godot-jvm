@@ -9,8 +9,8 @@ A prebuilt binary is available on **itch.io**: [third-person-shooter-godot-jvm](
 Watch the gameplay demo on **YouTube**: [third-person-shooter-godot-jvm](https://youtu.be/CiJGKLYyk9Q)
 
 ## 🛠 Tech Stack
-* **Engine:** Godot 4.6 (Custom [Utopia-Rise](https://github.com/utopia-rise/godot-kotlin-jvm) build required)
-* **Plugin:** godot-kotlin-jvm `0.15.0-4.6`
+* **Engine:** Godot 4.7 (Custom [Utopia-Rise](https://github.com/utopia-rise/godot-kotlin-jvm) build required)
+* **Plugin:** godot-kotlin-jvm `0.17.1-4.7.2`
 * **Language:** Java / Kotlin
 * **JDK:** 17 (configured via Gradle JVM toolchain)
 

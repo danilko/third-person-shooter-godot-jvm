@@ -1,9 +1,8 @@
 package com.openworld.debug;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.PackedScene;
 import godot.api.Time;
@@ -18,13 +17,13 @@ import godot.global.GD;
  * in-process) so a queued {@code queueFree()} from a prior iteration can never contaminate the
  * next measurement; average across runs externally instead.
  */
-@RegisterClass(className = "LoadBench")
+@Script(className = "LoadBench")
 public class LoadBench extends Node {
 
-    @Export @RegisterProperty public String scenePath = "";
-    @Export @RegisterProperty public boolean quitWhenDone = true;
+    @Export public String scenePath = "";
+    @Export public boolean quitWhenDone = true;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         Object loaded = GD.load(scenePath);

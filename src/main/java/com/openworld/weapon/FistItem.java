@@ -1,6 +1,6 @@
 package com.openworld.weapon;
 
-import godot.annotation.RegisterClass;
+import godot.annotation.Script;
 import com.openworld.character.CharacterVisuals;
 
 /**
@@ -9,7 +9,7 @@ import com.openworld.character.CharacterVisuals;
  * lifecycle as all other weapons. Never dropped, never picked up from the world.
  * Melee hit logic is stubbed — extend useWeapon() when punch mechanics are needed.
  */
-@RegisterClass(className = "FistItem")
+@Script(className = "FistItem")
 public class FistItem extends MeleeItem {
 
   public FistItem() {

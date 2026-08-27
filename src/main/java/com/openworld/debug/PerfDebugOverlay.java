@@ -1,8 +1,8 @@
 package com.openworld.debug;
 
 import com.openworld.world.WorldZoneManager;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.CanvasLayer;
 import godot.api.Control;
 import godot.api.Label;
@@ -22,7 +22,7 @@ import godot.core.Vector2;
  * <p>The orphan-node count doubles as a live leak check: repeated zone hot-reloads (Shift+F5)
  * with a climbing orphan count = a staged-children/pool leak regression.
  */
-@RegisterClass(className = "PerfDebugOverlay")
+@Script(className = "PerfDebugOverlay")
 public class PerfDebugOverlay extends CanvasLayer {
 
     private Label label;
@@ -30,7 +30,7 @@ public class PerfDebugOverlay extends CanvasLayer {
     private static final double REFRESH_INTERVAL = 0.25;
     private static final double MIB = 1024.0 * 1024.0;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         label = new Label();
@@ -44,7 +44,7 @@ public class PerfDebugOverlay extends CanvasLayer {
         addChild(label);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         if (!isVisible()) return;

@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.annotation.Tool;
 import godot.api.Area3D;
 import godot.api.BoxShape3D;
@@ -59,29 +58,29 @@ import java.util.Set;
  * silently drops it).
  */
 @Tool
-@RegisterClass(className = "WorldBaker")
+@Script(className = "WorldBaker")
 public class WorldBaker extends Node {
 
-    @Export @RegisterProperty public String sourceScenePath =
+    @Export public String sourceScenePath =
             "res://src/main/resources/com/openworld/world/WorldSource.tscn";
-    @Export @RegisterProperty public String outputScenePath =
+    @Export public String outputScenePath =
             "res://src/main/resources/com/openworld/world/World_baked.tscn";
     /** Bake automatically when this node enters the tree (for a dedicated BakeWorld scene). */
-    @Export @RegisterProperty public boolean bakeOnReady = false;
+    @Export public boolean bakeOnReady = false;
     /**
      * After an auto-bake (the {@link #bakeOnReady} path only), quit the process. Lets the BakeWorld
      * scene run as a one-shot CLI batch job — {@code godot --headless … BakeWorld.tscn} bakes and exits.
      * Never fires from the {@link #bake()} method, so {@code DebugHarness} F5 / in-editor {@code @Tool}
      * invocations don't kill the running game.
      */
-    @Export @RegisterProperty public boolean quitWhenDone = false;
+    @Export public boolean quitWhenDone = false;
     /**
      * Base directory for resolving {@code instance_<assetId>} markers whose {@code asset_path} meta is
      * absent: the asset is loaded from {@code kitDir + assetId + ".tscn"}. A marker carrying an explicit
      * {@code asset_path} (res:// path) custom property overrides this — the recommended bridge, since it
      * survives Blender's {@code .NNN} duplicate renaming (see BLENDER_CONVENTIONS "Nested instancing").
      */
-    @Export @RegisterProperty public String kitDir =
+    @Export public String kitDir =
             "res://src/main/resources/com/openworld/world/kit/";
 
     /**
@@ -93,9 +92,9 @@ public class WorldBaker extends Node {
      * {@code .scn} preference) since there is currently exactly one real fixture to test against —
      * auto-derivation is a natural follow-up once this is proven on more than the prototype.
      */
-    @Export @RegisterProperty public String lanekitPath = "";
+    @Export public String lanekitPath = "";
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         if (bakeOnReady) {
@@ -105,19 +104,19 @@ public class WorldBaker extends Node {
     }
 
     /** Bake {@link #sourceScenePath} → {@link #outputScenePath} (callable from a dev key / editor toggle). */
-    @RegisterFunction
+    @Register
     public void bake() {
-        bake(this, sourceScenePath, outputScenePath, kitDir, lanekitPath);
+        bakeScene(this, sourceScenePath, outputScenePath, kitDir, lanekitPath);
     }
 
     /** Back-compat 3-arg overload (DebugHarness F5): bake with the default kit directory, no lanekit sidecar. */
-    public static void bake(Node host, String srcPath, String outPath) {
-        bake(host, srcPath, outPath, "res://src/main/resources/com/openworld/world/kit/");
+    public static void bakeScene(Node host, String srcPath, String outPath) {
+        bakeScene(host, srcPath, outPath, "res://src/main/resources/com/openworld/world/kit/");
     }
 
     /** Back-compat 4-arg overload: bake with no lanekit sidecar. */
-    public static void bake(Node host, String srcPath, String outPath, String kitDir) {
-        bake(host, srcPath, outPath, kitDir, "");
+    public static void bakeScene(Node host, String srcPath, String outPath, String kitDir) {
+        bakeScene(host, srcPath, outPath, kitDir, "");
     }
 
     /**
@@ -127,7 +126,7 @@ public class WorldBaker extends Node {
      * {@code lanekitPath} (blank = skip) additionally builds {@link PathLaneRoute}s from a
      * {@code .lanekit.json} sidecar — see {@link #lanekitPath}.
      */
-    public static void bake(Node host, String srcPath, String outPath, String kitDir, String lanekitPath) {
+    public static void bakeScene(Node host, String srcPath, String outPath, String kitDir, String lanekitPath) {
         Object loaded = GD.load(srcPath);
         if (!(loaded instanceof PackedScene src)) {
             GD.printErr("WorldBaker: could not load source scene '" + srcPath + "'");

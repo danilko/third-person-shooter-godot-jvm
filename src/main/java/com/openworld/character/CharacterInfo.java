@@ -1,8 +1,7 @@
 package com.openworld.character;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.Resource;
 import com.openworld.net.NetworkManager;
 
@@ -19,17 +18,17 @@ import com.openworld.net.NetworkManager;
  * future factions (e.g. "partyA", "civilian"). Hostility is resolved by
  * Faction.areHostile().
  */
-@RegisterClass(className = "CharacterInfo")
+@Script(className = "CharacterInfo")
 public class CharacterInfo extends Resource {
 
     /** UUID assigned at spawn. Auto-generated for local play; pre-set by network authority. */
-    @RegisterProperty @Export public String characterId = "";
+    @Export public String characterId = "";
 
     /** Human-readable name shown in kill feed, HUD prompts, and pickup notifications. */
-    @RegisterProperty @Export public String displayName = "Unknown";
+    @Export public String displayName = "Unknown";
 
     /** Faction membership. Use Faction constants or a custom string for new factions. */
-    @RegisterProperty @Export public String faction = Faction.NEUTRAL;
+    @Export public String faction = Faction.NEUTRAL;
 
     /**
      * The peer that owns/drives this character — replaces Godot's
@@ -39,7 +38,7 @@ public class CharacterInfo extends Resource {
      * every node is its own authority in single-player (where localPeerId is
      * also 1). The server stamps the real peer id at spawn time.
      */
-    @RegisterProperty @Export public int ownerPeerId = 1;
+    @Export public int ownerPeerId = 1;
 
     /**
      * A fresh instance carrying the same field values — used to <b>privatize</b> a

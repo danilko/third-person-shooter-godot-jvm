@@ -68,7 +68,7 @@ public class EscortState implements AIState {
 
         // Follow the escort target.
         float myDist    = (float) body.getGlobalPosition().distanceTo(target.getGlobalPosition());
-        float followDst = body.getBehaviorConfig().followDistance;
+        float followDst = body.behaviorConfigOrDefaults().followDistance;
         cmd.wantCombat = false;
 
         if (myDist > followDst) {

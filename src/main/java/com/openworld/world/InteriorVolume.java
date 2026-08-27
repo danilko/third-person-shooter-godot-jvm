@@ -2,9 +2,8 @@ package com.openworld.world;
 
 import com.openworld.character.Character;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.AudioServer;
 import godot.api.Area3D;
 import godot.api.Node;
@@ -28,22 +27,22 @@ import godot.global.GD;
  * Interior bus + reverb effect are configured. Mirrors {@link WaterVolume}'s Area3D-detects-bodies
  * pattern; a non-blocking overlap so it never affects movement or bullets.
  */
-@RegisterClass(className = "InteriorVolume")
+@Script(className = "InteriorVolume")
 public class InteriorVolume extends Area3D {
 
     public static final String INTERIOR_GROUP = "interior";
 
     /** Audio bus whose effect is toggled while the local player is inside. */
-    @Export @RegisterProperty public String reverbBusName = "Interior";
+    @Export public String reverbBusName = "Interior";
 
     /** Index of the effect on that bus to enable/disable (the reverb). */
-    @Export @RegisterProperty public int reverbEffectIndex = 0;
+    @Export public int reverbEffectIndex = 0;
 
     /** Overlapping local-player count (overlapping interior volumes / re-entry are handled by the count). */
     private int localOccupants = 0;
     private boolean warnedMissingBus = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         addToGroup(new StringName(INTERIOR_GROUP));
@@ -51,14 +50,14 @@ public class InteriorVolume extends Area3D {
         connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
     }
 
-    @RegisterFunction
+    @Register
     public void onBodyEntered(Node3D body) {
         if (!isLocalPlayer(body)) return;
         localOccupants++;
         if (localOccupants == 1) setInteriorAudio(true);
     }
 
-    @RegisterFunction
+    @Register
     public void onBodyExited(Node3D body) {
         if (!isLocalPlayer(body)) return;
         localOccupants = Math.max(0, localOccupants - 1);

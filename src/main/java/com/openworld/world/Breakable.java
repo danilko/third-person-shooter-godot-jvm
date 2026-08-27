@@ -3,9 +3,8 @@ package com.openworld.world;
 import com.openworld.net.NetworkManager;
 import com.openworld.world.manager.ParticleManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.CollisionShape3D;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -42,36 +41,36 @@ import godot.global.GD;
  * break it disables every child {@link CollisionShape3D}, hides any child named {@code "IntactVisual"},
  * and shows any child named {@code "BrokenVisual"} (optional shattered mesh). Restore reverses it.
  */
-@RegisterClass(className = "Breakable")
+@Script(className = "Breakable")
 public class Breakable extends HittableBody {
 
 	public static final String BREAKABLE_GROUP = "breakable";
 
 	/** Stable id used as the replication key. Set this in the editor for networked scenes. */
-	@Export @RegisterProperty public String breakableId = "";
+	@Export public String breakableId = "";
 
 	/** Hit points; depleted by {@link #applyDamage}. */
-	@Export @RegisterProperty public float health = 30.0f;
+	@Export public float health = 30.0f;
 
 	/** Seconds after breaking before it auto-restores (0 = never — restore via story/mission instead). Host-authoritative. */
-	@Export @RegisterProperty public float restoreDelay = 0.0f;
+	@Export public float restoreDelay = 0.0f;
 
 	/** Emit a debris particle burst (this body's {@code surfaceType}) when it breaks. */
-	@Export @RegisterProperty public boolean spawnDebris = true;
+	@Export public boolean spawnDebris = true;
 
 	/**
 	 * Minimum single-hit damage that counts toward breaking. Hits below this are ignored entirely, so a
 	 * tougher pane/door shrugs off weak attacks (fists / light melee) and only yields to real firepower
 	 * (bullets, explosions, heavy melee). Default {@code 0} = any damage applies (current behaviour).
 	 */
-	@Export @RegisterProperty public float breakMinDamage = 0.0f;
+	@Export public float breakMinDamage = 0.0f;
 
 	private float currentHealth;
 	private boolean broken;
 	private double restoreTimer;
 	private ParticleManager particleManager;
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _ready() {
 		addToGroup(new StringName(BREAKABLE_GROUP));
@@ -123,7 +122,7 @@ public class Breakable extends HittableBody {
 	/** True if currently broken (collider disabled / hole open). */
 	public boolean isBroken() { return broken; }
 
-	@RegisterFunction
+	@Register
 	@Override
 	public void _physicsProcess(double delta) {
 		if (restoreTimer <= 0.0) return; // only set while a restore is pending on the authority
@@ -133,10 +132,10 @@ public class Breakable extends HittableBody {
 
 	// ── Visual / collision toggling (deferred — safe outside the physics query flush) ─────────────
 
-	@RegisterFunction
+	@Register
 	public void applyBrokenVisual() { setIntactState(false); }
 
-	@RegisterFunction
+	@Register
 	public void applyIntactVisual() { setIntactState(true); }
 
 	private void setIntactState(boolean intact) {
@@ -158,7 +157,7 @@ public class Breakable extends HittableBody {
 
 	private void emitDebris() {
 		ParticleManager pm = getParticleManager();
-		if (pm != null) pm.spawn(getSurfaceType(), getGlobalPosition());
+		if (pm != null) pm.spawn(resolveSurfaceType(), getGlobalPosition());
 	}
 
 	private ParticleManager getParticleManager() {

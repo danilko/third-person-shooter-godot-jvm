@@ -9,8 +9,8 @@ import com.openworld.net.NetworkController;
 import com.openworld.character.Player;
 import com.openworld.movement.character.StanceName;
 import com.openworld.weapon.WeaponController;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.ENetConnection;
 import godot.api.ENetPacketPeer;
 import godot.api.Node;
@@ -44,7 +44,7 @@ import com.openworld.weapon.WeaponItem;
  *
  * AutoLoad entry (add to project.godot after running ./gradlew build):
  *   [autoload]
- *   NetworkManager="*res://gdj/com/game/NetworkManager.gdj"
+ *   NetworkManager="*res://src/main/java/com/openworld/net/NetworkManager.java"
  *
  * Owns a raw {@link ENetConnection}/{@link ENetPacketPeer} transport directly —
  * deliberately bypassing {@code MultiplayerAPI}/{@code SceneMultiplayer} (and thus
@@ -62,7 +62,7 @@ import com.openworld.weapon.WeaponItem;
  * resolution ({@code MSG_SHOT}), spawning ({@code MSG_SPAWN}/{@code MSG_DESPAWN}), world
  * events ({@code MSG_WORLD_EVENT}), and ownership migration ({@code MSG_OWNERSHIP}).
  */
-@RegisterClass(className = "NetworkManager")
+@Script(className = "NetworkManager")
 public class NetworkManager extends Node {
 
     private static final int DEFAULT_MAX_CLIENTS = 32;
@@ -237,7 +237,7 @@ public class NetworkManager extends Node {
         if (loggedOnceKeys.add(key)) GD.print(message);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         if (connection == null) return;
@@ -454,7 +454,7 @@ public class NetworkManager extends Node {
      * Gated on a wall-clock interval ({@link #REPLICATION_INTERVAL_MS}) rather than a
      * physics-tick count so the 20 Hz send rate survives a sub-60 Hz host physics step.
      */
-    @RegisterFunction
+    @Register
     @Override
     public void _physicsProcess(double delta) {
         if (!isNetworked() || !amServer) return;
@@ -1886,7 +1886,7 @@ public class NetworkManager extends Node {
     }
 
     /** AutoLoad singletons outlive every scene — release the ENet host on shutdown, not just on rehost/rejoin. */
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         resetTransport();

@@ -43,7 +43,7 @@ public class FleeState implements AIState {
         } else {
             fleeDir = new Vector3(1f, 0f, 0f); // no known threat: flee along +X as fallback
         }
-        float goalDist = body.getBehaviorConfig().fleeDistance;
+        float goalDist = body.behaviorConfigOrDefaults().fleeDistance;
         body.getNavAgent().setTargetPosition(myPos.plus(fleeDir.times(goalDist)));
     }
 
@@ -59,7 +59,7 @@ public class FleeState implements AIState {
         Vector3 fleeStart = ctrl.getFleeStartPosition();
         if (fleeStart != null) {
             float distFled = (float) body.getGlobalPosition().distanceTo(fleeStart);
-            if (distFled >= body.getBehaviorConfig().fleeDistance) return PatrolState.INSTANCE;
+            if (distFled >= body.behaviorConfigOrDefaults().fleeDistance) return PatrolState.INSTANCE;
         }
 
         // Nav finished before hitting the distance target (ran into a dead end).

@@ -3,9 +3,8 @@ package com.openworld.control;
 import com.openworld.net.NetworkManager;
 import com.openworld.carrier.vehicle.Vehicle;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Input;
 import godot.api.Node;
 import godot.api.Timer;
@@ -37,7 +36,7 @@ import com.openworld.weapon.FirearmItem;
  * it fully locally; each tick the resulting state (not the command) is reported
  * upstream via NetworkManager.sendOwnedState — see the field-group comment below.
  */
-@RegisterClass(className = "PlayerController")
+@Script(className = "PlayerController")
 public class PlayerController extends Controller {
 
     // Pre-built action name strings to avoid per-frame string concatenation in the input hot-path.
@@ -65,8 +64,8 @@ public class PlayerController extends Controller {
     // stealth key (Shift, the "sprint" action) drops to the slower WALK tier — the
     // quiet "stealth walk" the future reduced-audio/awareness system keys off (the
     // WALK MovementState carries the low noiseLevel).
-    @Export @RegisterProperty public boolean stanceToggleMode  = false;
-    @Export @RegisterProperty public boolean stealthToggleMode = false;
+    @Export public boolean stanceToggleMode  = false;
+    @Export public boolean stealthToggleMode = false;
 
     private final ModalInput crouchInput  = new ModalInput("crouch");
     private final ModalInput crawlInput   = new ModalInput("crawl");
@@ -82,7 +81,7 @@ public class PlayerController extends Controller {
      */
     private static final double MIN_AIM_CONVERGE_DISTANCE = 5.0;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         resolveBody();

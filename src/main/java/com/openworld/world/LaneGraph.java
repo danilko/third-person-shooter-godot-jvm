@@ -22,7 +22,7 @@ import java.util.Map;
  * automatically wherever their endpoints coincide, since this pass doesn't care which concrete type
  * it's looking at.
  *
- * <p>Plain Java helper (like {@code SpawnPool}), not a {@code @RegisterClass} / AutoLoad. Cached per
+ * <p>Plain Java helper (like {@code SpawnPool}), not a {@code @Script} / AutoLoad. Cached per
  * scene via the scene-instance id (mirrors {@code WorldZoneManager.detectSceneReload}); routes are
  * static scene content, so the graph is built once per scene and reused.
  */

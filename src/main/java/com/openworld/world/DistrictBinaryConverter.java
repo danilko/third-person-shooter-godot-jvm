@@ -1,9 +1,8 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.DirAccess;
 import godot.api.Node;
 import godot.api.PackedScene;
@@ -32,17 +31,17 @@ import java.io.File;
  * buffers on the load/save round-trip (same caveat as baking, see {@code WorldBaker.buildMultiMeshes}).
  * Re-run after any district re-bake; unchanged districts are skipped by file mtime.
  */
-@RegisterClass(className = "DistrictBinaryConverter")
+@Script(className = "DistrictBinaryConverter")
 public class DistrictBinaryConverter extends Node {
 
-    @Export @RegisterProperty public String districtsDir =
+    @Export public String districtsDir =
             "res://src/main/resources/com/openworld/world/districts/";
     /** Convert automatically when this node enters the tree (for the ConvertDistricts scene). */
-    @Export @RegisterProperty public boolean convertOnReady = false;
+    @Export public boolean convertOnReady = false;
     /** After an auto-convert, quit the process (one-shot CLI batch job — WorldBaker idiom). */
-    @Export @RegisterProperty public boolean quitWhenDone = false;
+    @Export public boolean quitWhenDone = false;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         if (convertOnReady) {
@@ -52,7 +51,7 @@ public class DistrictBinaryConverter extends Node {
     }
 
     /** Convert every {@code *.tscn} in {@link #districtsDir} whose {@code .scn} is missing or stale. */
-    @RegisterFunction
+    @Register
     public void convertAll() {
         DirAccess dir = DirAccess.open(districtsDir);
         if (dir == null) {

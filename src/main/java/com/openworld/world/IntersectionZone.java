@@ -2,8 +2,8 @@ package com.openworld.world;
 
 import com.openworld.ai.vehicle.VehicleAIController;
 import com.openworld.carrier.vehicle.Vehicle;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Area3D;
 import godot.api.Node3D;
 import godot.core.Callable;
@@ -30,7 +30,7 @@ import java.util.List;
  * forced to yield. Set the area's {@code collision_mask} to the vehicle body layer so the
  * {@code body_entered}/{@code body_exited} signals fire.
  */
-@RegisterClass(className = "IntersectionZone")
+@Script(className = "IntersectionZone")
 public class IntersectionZone extends Area3D {
 
     public static final String GROUP = "intersection";
@@ -38,16 +38,16 @@ public class IntersectionZone extends Area3D {
     /** Vehicles currently inside, in arrival order. Head of the list holds the junction. */
     private final List<Vehicle> queue = new ArrayList<>();
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         addToGroup(new StringName(GROUP));
-        // godot-kotlin-jvm registers @RegisterFunction methods under their snake_case names.
+        // godot-kotlin-jvm registers @Register methods under their snake_case names.
         connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
         connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
     }
 
-    @RegisterFunction
+    @Register
     public void onBodyEntered(Node3D body) {
         if (!(body instanceof Vehicle v)) return;
         if (!(v.getController() instanceof VehicleAIController ctrl)) return; // player isn't auto-yielded
@@ -55,7 +55,7 @@ public class IntersectionZone extends Area3D {
         ctrl.enterIntersection(this);
     }
 
-    @RegisterFunction
+    @Register
     public void onBodyExited(Node3D body) {
         if (!(body instanceof Vehicle v)) return;
         queue.remove(v);

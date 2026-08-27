@@ -2,9 +2,8 @@ package com.openworld.world.manager;
 
 import com.openworld.util.ObjectPool;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.GPUParticles3D;
 import godot.api.Node;
 import godot.core.Vector3;
@@ -32,18 +31,17 @@ import com.openworld.world.SurfaceType;
  * Discovery: registers itself in group "particle_manager".
  * Fallback chain: requested type → DEFAULT → FLESH → silent no-op.
  */
-@RegisterClass(className = "ParticleManager")
+@Script(className = "ParticleManager")
 public class ParticleManager extends Node {
 
     /** Number of pooled instances created per surface type from the template. */
     @Export
-    @RegisterProperty
     public int poolSizePerType = 16;
 
     private final Map<SurfaceType, ObjectPool<GPUParticles3D>> pools =
             new EnumMap<>(SurfaceType.class);
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         addToGroup("particle_manager");

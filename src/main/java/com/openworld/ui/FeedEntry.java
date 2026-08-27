@@ -1,9 +1,8 @@
 package com.openworld.ui;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.HBoxContainer;
 import godot.core.Color;
 
@@ -17,10 +16,9 @@ import godot.core.Color;
  * Subclasses add the visual layout and a typed {@code populate()} method
  * for their specific event data.  Example: {@link DefeatedFeedEntry}.
  */
-@RegisterClass(className = "FeedEntry")
+@Script(className = "FeedEntry")
 public class FeedEntry extends HBoxContainer {
 
-    @RegisterProperty
     @Export
     public float lifespan = 4.0f;
 
@@ -28,13 +26,13 @@ public class FeedEntry extends HBoxContainer {
 
     private double timer = 0.0;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         timer = lifespan;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         timer -= delta;

@@ -3,9 +3,8 @@ package com.openworld.ui;
 import com.openworld.character.Character;
 import com.openworld.character.Player;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Camera3D;
 import godot.api.Control;
 import godot.core.Basis;
@@ -22,33 +21,33 @@ import godot.core.Vector3;
  * waypoint or when the target is within {@link #arriveMeters}. Pure display; drawn procedurally (no
  * texture asset). Wired by {@code HUDManager.wirePlayer}.
  */
-@RegisterClass(className = "GpsArrow")
+@Script(className = "GpsArrow")
 public class GpsArrow extends Control {
 
     /** Distance (px) from the crosshair the arrow sits. */
-    @Export @RegisterProperty public float radius = 70f;
+    @Export public float radius = 70f;
     /** Arrow size in px. */
-    @Export @RegisterProperty public float arrowSize = 14f;
+    @Export public float arrowSize = 14f;
     /** Hide the arrow when within this many metres of the waypoint (you've arrived). */
-    @Export @RegisterProperty public float arriveMeters = 4f;
+    @Export public float arriveMeters = 4f;
 
     private Player player;
 
     public void wirePlayer(Player p) { player = p; }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         setMouseFilter(Control.MouseFilter.IGNORE);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         queueRedraw();
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _draw() {
         if (player == null || !godot.global.GD.isInstanceValid(player)) return;

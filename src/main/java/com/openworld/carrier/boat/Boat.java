@@ -3,7 +3,7 @@ package com.openworld.carrier.boat;
 import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.carrier.vehicle.VehicleConfig;
 import com.openworld.world.WaterVolume;
-import godot.annotation.RegisterClass;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -18,7 +18,7 @@ import godot.global.GD;
  * set {@code downforceCoefficient = 0} in the boat's config preset) keep it level.
  * Seats, boost, authority, destruction, and replication all inherit from {@link Vehicle}.
  */
-@RegisterClass(className = "Boat")
+@Script(className = "Boat")
 public class Boat extends Vehicle {
 
     private static final double WATER_SCAN_INTERVAL = 0.5;

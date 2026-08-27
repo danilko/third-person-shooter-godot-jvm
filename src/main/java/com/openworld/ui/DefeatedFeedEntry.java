@@ -2,9 +2,8 @@ package com.openworld.ui;
 
 import com.openworld.character.Faction;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Label;
 import godot.api.Texture2D;
 import godot.api.TextureRect;
@@ -24,11 +23,10 @@ import godot.api.TextureRect;
  * Extend {@link FeedEntry} for other event types (pickups, objectives, etc.)
  * and push any FeedEntry subclass to a {@link Feed} container.
  */
-@RegisterClass(className = "DefeatedFeedEntry")
+@Script(className = "DefeatedFeedEntry")
 public class DefeatedFeedEntry extends FeedEntry {
 
     /** Texture displayed in the HeadshotIndicator slot when a kill was a headshot. */
-    @RegisterProperty
     @Export
     public Texture2D headshotIcon;
 
@@ -37,13 +35,13 @@ public class DefeatedFeedEntry extends FeedEntry {
     private TextureRect headshotIndicator;
     private Label       victimLabel;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         super._process(delta);
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         super._ready();

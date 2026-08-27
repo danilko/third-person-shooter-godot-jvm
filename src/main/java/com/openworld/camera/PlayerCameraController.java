@@ -1,7 +1,7 @@
 package com.openworld.camera;
 
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Input;
 import godot.api.InputEvent;
 import godot.api.InputEventMouseMotion;
@@ -11,7 +11,7 @@ import com.openworld.control.Controller;
 import com.openworld.control.PlayerController;
 import com.openworld.net.NetworkController;
 
-@RegisterClass(className = "PlayerCameraController")
+@Script(className = "PlayerCameraController")
 public class PlayerCameraController extends TPSCameraController {
 
   // Accumulated raw pixel deltas from all mouse-motion events since last physics step.
@@ -21,7 +21,7 @@ public class PlayerCameraController extends TPSCameraController {
   private double pendingYaw   = 0;
   private double pendingPitch = 0;
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     super._ready();
@@ -55,7 +55,7 @@ public class PlayerCameraController extends TPSCameraController {
     return player instanceof Character c && c.getController() instanceof PlayerController;
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _input(InputEvent event) {
     if (!isLocallyControlled()) return;

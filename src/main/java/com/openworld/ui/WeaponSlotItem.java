@@ -2,9 +2,8 @@ package com.openworld.ui;
 
 import com.openworld.weapon.WeaponItem;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.HBoxContainer;
 import godot.api.Label;
 import godot.api.Node;
@@ -23,18 +22,18 @@ import godot.core.NodePath;
  *
  * Call update() each time weapon state changes.
  */
-@RegisterClass(className = "WeaponSlotItem")
+@Script(className = "WeaponSlotItem")
 public class WeaponSlotItem extends HBoxContainer {
 
     private static final Color COLOR_ACTIVE   = new Color(1.0f, 1.0f, 1.0f, 1.0f);
     private static final Color COLOR_INACTIVE = new Color(0.6f, 0.6f, 0.6f, 0.8f);
     private static final Color COLOR_EMPTY    = new Color(0.4f, 0.4f, 0.4f, 0.5f);
 
-    @Export @RegisterProperty public NodePath keyLabelPath  = new NodePath("KeyLabel");
-    @Export @RegisterProperty public NodePath iconPath      = new NodePath("Icon");
-    @Export @RegisterProperty public NodePath ammoLabelPath = new NodePath("AmmoLabel");
+    @Export public NodePath keyLabelPath  = new NodePath("KeyLabel");
+    @Export public NodePath iconPath      = new NodePath("Icon");
+    @Export public NodePath ammoLabelPath = new NodePath("AmmoLabel");
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         // Node paths are resolved lazily in update(); nothing to initialize here.

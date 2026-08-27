@@ -2,8 +2,8 @@ package com.openworld.control;
 
 import com.openworld.ai.AIState;
 import com.openworld.ai.character.PatrolState;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import com.openworld.ai.AIController;
 import com.openworld.character.AICharacter;
 import com.openworld.net.NetworkController;
@@ -15,12 +15,12 @@ import com.openworld.net.NetworkController;
  * Equivalent to L4D's SurvivorBot — can be swapped for PlayerController
  * (bot-fill / possession) or NetworkController without touching the body.
  */
-@RegisterClass(className = "CharacterController")
+@Script(className = "CharacterController")
 public class CharacterController extends AIController {
 
     private AICharacter body;
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         body = (AICharacter) getOwner();

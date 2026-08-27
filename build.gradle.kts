@@ -1,5 +1,5 @@
 plugins {
-    id("com.utopia-rise.godot-kotlin-jvm") version "0.17.0-4.7.2"
+    id("com.utopia-rise.godot-kotlin-jvm") version "0.17.1-4.7.2"
 }
 
 repositories {
@@ -28,16 +28,13 @@ tasks.withType<Test>().configureEach {
 godot {
     // ---------Setup-----------------
 
-    // the script registration which you'll attach to nodes are generated into this directory
-    // (renamed from registrationFileBaseDir in 0.15.0-4.6 -> registrationFilesDirectory in
-    // 0.16.3-4.6.3; still a plain Directory-valued property, .set(File) still works)
+    // Where .gdj registration files for DEPENDENCY classes land. Since 0.17 a project's own
+    // classes are attached by their .java source path and never get a .gdj, so this directory
+    // stays empty for this project (it has no registered external dependencies) -- it is kept
+    // pointed at the existing, gitignored `gdj/` so one appearing there is immediately visible.
     registrationFilesDirectory.set(projectDir.resolve("gdj"))
 
-	// Create .gdj files from all JVM scripts (renamed+INVERTED from the old
-	// isRegistrationFileGenerationEnabled=true -> disableGdj=false in 0.16.3-4.6.3; the new
-	// plugin ALSO always generates its own Entry-metadata registration format under build/
-	// regardless of this flag -- .gdj here is kept on as the project's existing safety net,
-	// per CLAUDE.md/road_blender_godot.md's own ".gdj -> .java migration" note)
+	// Leave dependency .gdj generation on; it costs nothing while there are no such dependencies.
 	disableGdj.set(false)
 
     // defines whether the script registration files should be generated hierarchically according to the classes package path or flattened into `registrationFilesDirectory`

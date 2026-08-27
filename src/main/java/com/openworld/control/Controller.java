@@ -1,7 +1,7 @@
 package com.openworld.control;
 
 import com.openworld.net.NetworkManager;
-import godot.annotation.RegisterClass;
+import godot.annotation.Script;
 import godot.api.Node;
 import com.openworld.ai.AIController;
 import com.openworld.character.Character;
@@ -27,7 +27,7 @@ import com.openworld.net.NetworkController;
  * Hot-swap (Phase 5): call setTarget() before reparenting to a new body so
  * gatherInput() immediately generates the right command type.
  */
-@RegisterClass(className = "Controller")
+@Script(className = "Controller")
 public class Controller extends Node {
 
     // Explicit target override — set during hot-swap before reparenting.

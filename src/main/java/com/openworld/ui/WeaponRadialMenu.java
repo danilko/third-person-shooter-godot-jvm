@@ -5,9 +5,8 @@ import com.openworld.movement.character.MovementType;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.NodePath;
 import godot.core.Vector3;
@@ -24,17 +23,17 @@ import java.util.List;
  * via wireCharacter(). The menu is context-agnostic — robot, powered armour, or
  * player on foot all work without scene changes.
  */
-@RegisterClass(className = "WeaponRadialMenu")
+@Script(className = "WeaponRadialMenu")
 public class WeaponRadialMenu extends Control {
 
-  @Export @RegisterProperty public Character character;
+  @Export public Character character;
 
   /** Path to the container that holds the radial items (the rotating circle). */
-  @RegisterProperty @Export
+  @Export
   public NodePath circleContainerPath = new NodePath("Panel/Circle");
 
   /** Scene used to instantiate each weapon slot item. Set to WeaponRadialMenuItem.tscn. */
-  @RegisterProperty @Export
+  @Export
   public PackedScene weaponItemTemplate;
 
   private AnimationPlayer  animationPlayer;
@@ -47,7 +46,7 @@ public class WeaponRadialMenu extends Control {
     buildItems();
   }
 
-  @RegisterFunction
+  @Register
   @Override
   public void _ready() {
     animationPlayer = (AnimationPlayer) getNode("AnimationPlayer");
@@ -57,7 +56,7 @@ public class WeaponRadialMenu extends Control {
 
   // ── Input / show / hide ───────────────────────────────────────────────────
 
-  @RegisterFunction
+  @Register
   @Override
   public void _input(InputEvent event) {
     if (getWeaponController() == null) return;
@@ -135,6 +134,11 @@ public class WeaponRadialMenu extends Control {
   // ── Accessors ─────────────────────────────────────────────────────────────
 
   public Character getCharacter() { return character; }
+
+  /** Setter half of the exported {@code character} property. */
+  public void setCharacter(Character value) {
+    this.character = value;
+  }
 
   public int getWeaponCount() {
     WeaponController wc = getWeaponController();

@@ -1,8 +1,8 @@
 package com.openworld.game;
 
 import com.openworld.character.Player;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 
 import java.util.ArrayList;
@@ -25,7 +25,7 @@ import java.util.List;
  * {@code Player._ready()} and removed in {@code Player._exitTree()}, so the list only ever holds
  * in-tree bodies; a defensive {@code isInstanceValid} guard at the read site covers any gap.
  */
-@RegisterClass(className = "PlayerRegistry")
+@Script(className = "PlayerRegistry")
 public class PlayerRegistry extends Node {
 
     private static final List<Player> PLAYERS = new ArrayList<>();
@@ -46,7 +46,7 @@ public class PlayerRegistry extends Node {
     }
 
     /** Drop all references on engine teardown so no {@code Player} (a Godot Object) leaks past exit. */
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         PLAYERS.clear();

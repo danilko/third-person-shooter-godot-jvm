@@ -2,9 +2,7 @@ package com.openworld.weapon;
 
 import com.openworld.world.manager.ExplosionManager;
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.*;
 import godot.core.Vector3;
 import com.openworld.character.Character;
@@ -46,7 +44,7 @@ import com.openworld.item.Pickup;
  * Set projectileScene to the projectile scene (e.g. T1Projectile.tscn); explosion
  * parameters live in the projectile scene itself, not here.
  */
-@RegisterClass(className = "ThrowableItem")
+@Script(className = "ThrowableItem")
 public class ThrowableItem extends WeaponItem implements Detonatable {
 
     public ThrowableItem() {
@@ -55,20 +53,20 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     }
 
     /** Physics scene to instantiate on each throw (e.g. T1Projectile.tscn). */
-    @Export @RegisterProperty public PackedScene projectileScene;
+    @Export public PackedScene projectileScene;
 
     /** Speed of the thrown projectile in m/s. */
-    @Export @RegisterProperty public float throwSpeed = 12f;
+    @Export public float throwSpeed = 12f;
 
     /** Degrees above the aim direction to arc the throw trajectory. */
-    @Export @RegisterProperty public float arcAngleDeg = 25f;
+    @Export public float arcAngleDeg = 25f;
 
     /** Explosion radius when the world pickup is shot (metres). */
-    @Export @RegisterProperty public float explosionRadius    = 5f;
+    @Export public float explosionRadius    = 5f;
     /** Max damage at the epicentre when the world pickup is shot. */
-    @Export @RegisterProperty public float explosionMaxDamage = 80f;
+    @Export public float explosionMaxDamage = 80f;
     /** Push force applied to bodies in the blast when the world pickup is shot. */
-    @Export @RegisterProperty public float explosionPushForce = 15f;
+    @Export public float explosionPushForce = 15f;
 
     // ── Pickup override — stack merging ───────────────────────────────────────
 
@@ -84,9 +82,9 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     protected boolean shouldAutoPickup(Node character) {
         Node wcNode = character.getNodeOrNull(WEAPON_CONTROLLER_PATH);
         if (!(wcNode instanceof WeaponController wc)) return false;
-        if (wc.isSlotFreeFor(getSlotType())) return true;
+        if (wc.isSlotFreeFor(resolveSlotType())) return true;
         if (weaponId.isEmpty()) return false;
-        WeaponItem existing = wc.findWeaponByIdAndType(weaponId, getSlotType());
+        WeaponItem existing = wc.findWeaponByIdAndType(weaponId, resolveSlotType());
         return existing instanceof ThrowableItem ti && ti.magazine < ti.magazineSize;
     }
 
@@ -101,7 +99,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         if (!(wcNode instanceof WeaponController wc)) return;
 
         if (!weaponId.isEmpty()) {
-            WeaponItem existing = wc.findWeaponByIdAndType(weaponId, getSlotType());
+            WeaponItem existing = wc.findWeaponByIdAndType(weaponId, resolveSlotType());
             if (existing instanceof ThrowableItem ti && ti.magazine < ti.magazineSize) {
                 ti.magazine += Math.min(ti.magazineSize - ti.magazine, magazine);
                 // Emit unconditionally so the slot UI / nameplate (which re-scan every slot on
@@ -124,7 +122,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     // ── WeaponAction ──────────────────────────────────────────────────────────
 
     @Override public WeaponType getWeaponType()   { return WeaponType.THROWN; }
-    @Override public WeaponSlotType getSlotType() { return WeaponSlotType.THROWABLE; }
+    @Override public WeaponSlotType resolveSlotType() { return WeaponSlotType.THROWABLE; }
     // Semi-auto by default (auto = false): one grenade per trigger pull. Without the
     // isSemiAutoReady() gate a held throw key spawned multiple grenades back-to-back
     // (capped only by fireRate) both locally and across LAN — the double-throw bug.

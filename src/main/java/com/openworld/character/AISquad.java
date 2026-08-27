@@ -1,9 +1,8 @@
 package com.openworld.character;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Node;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -28,16 +27,16 @@ import java.util.List;
  * skip a redundant faction re-check. {@link #getSharedTarget()} self-clears a dead/freed target (the
  * "lose track" path), so explicit {@link #clearThreat()} is only needed to drop a still-alive one.
  */
-@RegisterClass(className = "AISquad")
+@Script(className = "AISquad")
 public class AISquad extends Node {
 
     /** A spotter's sighting reaches squad-mates within this distance of the spotter (m). */
-    @Export @RegisterProperty public float alertBroadcastRadius = 60.0f;
+    @Export public float alertBroadcastRadius = 60.0f;
 
     /** Seconds since any member last spotted the shared target after which the squad gives up on it
      *  ("loses track"). Refreshed on every {@link #broadcastSpotted}, so it only fires once no member
      *  has seen the target for this long — the still-alive-but-lost path (death auto-clears sooner). */
-    @Export @RegisterProperty public float forgetDuration = 8.0f;
+    @Export public float forgetDuration = 8.0f;
 
     private final List<AICharacter> members = new ArrayList<>();
     private Character sharedTarget;
@@ -90,7 +89,7 @@ public class AISquad extends Node {
         sharedLastKnownPosition = null;
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _process(double delta) {
         elapsed += delta;
@@ -100,7 +99,7 @@ public class AISquad extends Node {
         if (sharedTarget != null && elapsed - lastSpottedTime > forgetDuration) clearThreat();
     }
 
-    @RegisterFunction
+    @Register
     @Override
     public void _exitTree() {
         members.clear();

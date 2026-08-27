@@ -1,8 +1,8 @@
 package com.openworld.ui;
 
 import com.openworld.game.GameManager;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterFunction;
+import godot.annotation.Register;
+import godot.annotation.Script;
 import godot.api.Control;
 import godot.api.Node;
 
@@ -13,28 +13,28 @@ import godot.api.Node;
  * by the parent {@link MenuManager}.  This node just shows/hides itself and
  * forwards button signals upward.
  */
-@RegisterClass(className = "PauseMenu")
+@Script(className = "PauseMenu")
 public class PauseMenu extends Control {
 
-    @RegisterFunction
+    @Register
     @Override
     public void _ready() {
         hide();
     }
 
-    @RegisterFunction
+    @Register
     public void onResumePressed() {
         MenuManager mm = menuManager();
         if (mm != null) mm.resume();
     }
 
-    @RegisterFunction
+    @Register
     public void onRestartPressed() {
         MenuManager mm = menuManager();
         if (mm != null) mm.restart();
     }
 
-    @RegisterFunction
+    @Register
     public void onQuitPressed() {
         // GameManager.prepareForQuit() -- see its javadoc: SceneTree.quit() does NOT emit
         // Window.close_requested, so the audio-stop-on-quit sweep must be called explicitly here.

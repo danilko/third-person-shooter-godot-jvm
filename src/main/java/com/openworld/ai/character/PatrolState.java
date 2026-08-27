@@ -59,7 +59,7 @@ public class PatrolState implements AIState {
 
         if (ctrl.isUnderAttack() && ctrl.hasLastKnownPosition()) {
             // Flee instead of search when configured and out of ammo.
-            if (body.getBehaviorConfig().useFleeOnAttack && !body.hasAnyAmmo()) return FleeState.INSTANCE;
+            if (body.behaviorConfigOrDefaults().useFleeOnAttack && !body.hasAnyAmmo()) return FleeState.INSTANCE;
             return SearchState.INSTANCE;
         }
 

@@ -1,8 +1,7 @@
 package com.openworld.world;
 
 import godot.annotation.Export;
-import godot.annotation.RegisterClass;
-import godot.annotation.RegisterProperty;
+import godot.annotation.Script;
 import godot.api.StaticBody3D;
 import com.openworld.world.manager.ImpactManager;
 
@@ -15,14 +14,17 @@ import com.openworld.world.manager.ImpactManager;
  *
  * Characters resolve to FLESH automatically in ImpactManager — no script needed on them.
  */
-@RegisterClass(className = "HittableBody")
+@Script(className = "HittableBody")
 public class HittableBody extends StaticBody3D {
 
     @Export
-    @RegisterProperty
     public String surfaceType = SurfaceType.DEFAULT.name();
 
-    public SurfaceType getSurfaceType() {
+    /**
+     * The exported {@code surfaceType} name as its enum. Not {@code getSurfaceType} — that
+     * shape would bind the String field to an enum-typed accessor property.
+     */
+    public SurfaceType resolveSurfaceType() {
         try {
             return SurfaceType.valueOf(surfaceType.toUpperCase());
         } catch (IllegalArgumentException e) {
