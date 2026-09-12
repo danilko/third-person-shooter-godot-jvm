@@ -190,6 +190,48 @@ public class AnimationController extends Node {
     animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
   }
 
+  // ── Melee attack one-shot ─────────────────────────────────────────────────
+  //
+  // Same shape as WeaponChange and Reload: an upper-body-filtered OneShot on the chain, fed by a
+  // TimeScale, fed here by a Transition whose inputs are named after their clips. By NAME rather
+  // than by weapon index: a step names the clip it plays (MeleeAttackStep.animation), so a new
+  // weapon or a new step is one Transition input and one action in the .blend, with no index table
+  // to keep in step with weapon_archetypes.json.
+
+  private static final String ATTACK_CLIP    = "parameters/AttackClip/transition_request";
+  private static final String ATTACK_SCALE   = "parameters/AttackScale/scale";
+  private static final String ATTACK_REQUEST = "parameters/Attack/request";
+  /** The time-warp of the swing now playing, remembered so a hitstop can freeze it and give it back. */
+  private float attackScale = 1f;
+
+  /**
+   * Play {@code clip} as the attack one-shot, time-warped so its WHOLE length spans
+   * {@code durationSeconds} — the code owns the swing's timing and the clip is fitted to it (see
+   * {@code MeleeAttackStep}). Returns false when the clip does not exist, which is otherwise silent:
+   * an unknown Transition input simply plays nothing.
+   */
+  public boolean playMeleeAttack(String clip, double durationSeconds) {
+    if (animationTree == null || clip == null || clip.isEmpty()) return false;
+    StringName name = new StringName(clip);
+    if (!animationTree.hasAnimation(name)) return false;
+    double length = animationTree.getAnimation(name).getLength();
+    attackScale = (float) (durationSeconds > 1e-3 ? length / durationSeconds : 1.0);
+    animationTree.set(ATTACK_CLIP, clip);
+    animationTree.set(ATTACK_SCALE, attackScale);
+    animationTree.set(ATTACK_REQUEST, AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
+    return true;
+  }
+
+  /**
+   * Hitstop: freeze the swing on the pose it connected in, then give it back its time-warp. Only
+   * the attack one-shot stops — the legs keep walking and the world keeps running, which is what
+   * makes this safe in multiplayer where a global Engine.time_scale freeze would stall every peer.
+   */
+  public void setMeleeAttackFrozen(boolean frozen) {
+    if (animationTree == null) return;
+    animationTree.set(ATTACK_SCALE, frozen ? 0f : attackScale);
+  }
+
   @Register
   public void onWeaponReload() {
     animationTree.set("parameters/Reload/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());

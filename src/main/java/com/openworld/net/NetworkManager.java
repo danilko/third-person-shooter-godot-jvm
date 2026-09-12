@@ -476,7 +476,8 @@ public class NetworkManager extends Node {
             entries.add(new NetMessageCodec.DecodedSnapshot(c.characterInfo.characterId, c.getCurrentTick(),
                     c.getGlobalPosition(), c.getVelocity(), c.getAimTargetPosition(), c.isCombat(),
                     c.getStanceOrdinal(), wc.getReplicatedActiveSlot(), c.getMovementTypeOrdinal(), c.getFacingYaw(),
-                    health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(), wc.getReloadSeq()));
+                    health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(), wc.getReloadSeq(),
+                    wc.getReplicatedFireStep()));
         }
         broadcastSnapshotBatchChunked(entries);
         broadcastVehicleSnapshots();
@@ -896,7 +897,7 @@ public class NetworkManager extends Node {
             snap = new NetMessageCodec.DecodedSnapshot(snap.characterId(), snap.tick(), pos, snap.velocity(),
                     snap.aimTarget(), snap.combat(), snap.stanceOrdinal(), snap.activeSlotIndex(),
                     snap.movementTypeOrdinal(), snap.yaw(), snap.currentHealth(), snap.senderTimeMs(), snap.fireSeq(),
-                    snap.activeMagazine(), snap.reloadSeq());
+                    snap.activeMagazine(), snap.reloadSeq(), snap.fireStep());
         }
         return snap;
     }
@@ -1945,7 +1946,7 @@ public class NetworkManager extends Node {
                 body.getCurrentTick(), body.getGlobalPosition(), body.getVelocity(), body.getAimTargetPosition(),
                 body.isCombat(), body.getStanceOrdinal(), wc.getReplicatedActiveSlot(), body.getMovementTypeOrdinal(),
                 body.getFacingYaw(), health.getCurrentHealth(), nowMs(), wc.getFireSeq(), wc.getActiveMagazine(),
-                wc.getReloadSeq()));
+                wc.getReloadSeq(), wc.getReplicatedFireStep()));
     }
 
     /**

@@ -133,6 +133,22 @@ public class ImpactManager extends Node {
      * getOwner() is not used because CharacterVisuals is added at runtime (addChild),
      * so bones inside it report CharacterVisuals as their owner, not the Character body.
      */
+    /**
+     * The thing a collider BELONGS TO, as far as an attack is concerned: the Character, else the
+     * node carrying the Health, else the Detonatable, else the Breakable — or null for plain world
+     * geometry. It is the same walk {@link #processHit} applies damage with, so a caller that groups
+     * or filters hits through it (melee cleave, which must hit each target ONCE however many of its
+     * ragdoll bones the sweep overlaps) cannot disagree with where the damage actually goes.
+     */
+    public static Node resolveTarget(Node hitNode) {
+        HitContext ctx = resolveHitContext(hitNode);
+        if (ctx.character != null) return ctx.character;
+        if (ctx.healthOwner != null) return ctx.healthOwner;
+        if (ctx.detonatable instanceof Node d) return d;
+        if (ctx.breakable != null) return ctx.breakable;
+        return null;
+    }
+
     private static HitContext resolveHitContext(Node hitNode) {
         if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT, null, null, null);
         // A world item's collider belongs to its PickupBody, and the ITEM is that body's CHILD --

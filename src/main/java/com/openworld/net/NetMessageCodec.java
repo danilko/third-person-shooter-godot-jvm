@@ -70,16 +70,45 @@ public final class NetMessageCodec {
     // so the puppet's locomotion blend gets the exact movement state.
     private static final int SNAPSHOT_MOVE_TYPE_SHIFT   = 7;
     private static final int SNAPSHOT_MOVE_TYPE_MASK    = 0b11;
+    // Which swing of a melee weapon's chain this shot was (MeleeItem.attackSteps index). Fire is
+    // replicated as STATE, and fireSeq says only THAT a weapon fired -- a puppet reconstructing the
+    // step from its own chain cursor guesses, and cannot guess at all for a knife, whose tap/hold is
+    // not a chain position. Carried in the SPARE BITS of the existing u16 flags word (combat 1 +
+    // stance 3 + slot 3 + move 2 = 9 of 16), so the entry is the same size and
+    // NetworkManager.SNAPSHOT_ENTRY_FIXED_BYTES does not move -- the constant and
+    // putSnapshotEntry have to agree byte for byte or MTU chunking mis-sizes every frame.
+    private static final int SNAPSHOT_FIRE_STEP_SHIFT   = 9;
+    private static final int SNAPSHOT_FIRE_STEP_MASK    = 0b111;
+
+    /**
+     * The flags word, packed and unpacked in ONE place so a new field cannot silently overlap an
+     * existing one — a collision here corrupts a stance or a weapon slot rather than failing.
+     * Engine-free (plain ints), which is what lets {@code SnapshotFlagsTest} sweep every combination.
+     */
+    public static int packSnapshotFlags(boolean combat, int stanceOrdinal, int activeSlotIndex,
+            int movementTypeOrdinal, int fireStep) {
+        return (combat ? SNAPSHOT_FLAG_COMBAT : 0)
+                | ((stanceOrdinal & SNAPSHOT_STANCE_MASK) << SNAPSHOT_STANCE_SHIFT)
+                | ((activeSlotIndex & SNAPSHOT_WEAPON_SLOT_MASK) << SNAPSHOT_WEAPON_SLOT_SHIFT)
+                | ((movementTypeOrdinal & SNAPSHOT_MOVE_TYPE_MASK) << SNAPSHOT_MOVE_TYPE_SHIFT)
+                | ((fireStep & SNAPSHOT_FIRE_STEP_MASK) << SNAPSHOT_FIRE_STEP_SHIFT);
+    }
+
+    public static boolean unpackCombat(int flags)    { return (flags & SNAPSHOT_FLAG_COMBAT) != 0; }
+    public static int unpackStance(int flags)        { return (flags >> SNAPSHOT_STANCE_SHIFT) & SNAPSHOT_STANCE_MASK; }
+    public static int unpackActiveSlot(int flags)    { return (flags >> SNAPSHOT_WEAPON_SLOT_SHIFT) & SNAPSHOT_WEAPON_SLOT_MASK; }
+    public static int unpackMovementType(int flags)  { return (flags >> SNAPSHOT_MOVE_TYPE_SHIFT) & SNAPSHOT_MOVE_TYPE_MASK; }
+    public static int unpackFireStep(int flags)      { return (flags >> SNAPSHOT_FIRE_STEP_SHIFT) & SNAPSHOT_FIRE_STEP_MASK; }
 
     public static PackedByteArray encodeSnapshot(int msgType, String characterId, long tick, Vector3 position,
             Vector3 velocity, Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq) {
+            int activeMagazine, int reloadSeq, int fireStep) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         putSnapshotEntry(buf, characterId, tick, position, velocity, aimTarget, combat, stanceOrdinal,
                 activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine,
-                reloadSeq);
+                reloadSeq, fireStep);
         return buf.getDataArray();
     }
 
@@ -108,7 +137,7 @@ public final class NetMessageCodec {
     public record DecodedSnapshot(String characterId, long tick, Vector3 position, Vector3 velocity,
             Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq) { }
+            int activeMagazine, int reloadSeq, int fireStep) { }
 
     /** One tick's worth of every replicated character's state, sent as a single broadcast frame. */
     public static PackedByteArray encodeSnapshotBatch(int msgType, java.util.List<DecodedSnapshot> entries) {
@@ -118,7 +147,8 @@ public final class NetMessageCodec {
         for (DecodedSnapshot e : entries) {
             putSnapshotEntry(buf, e.characterId(), e.tick(), e.position(), e.velocity(), e.aimTarget(),
                     e.combat(), e.stanceOrdinal(), e.activeSlotIndex(), e.movementTypeOrdinal(),
-                    e.yaw(), e.currentHealth(), e.senderTimeMs(), e.fireSeq(), e.activeMagazine(), e.reloadSeq());
+                    e.yaw(), e.currentHealth(), e.senderTimeMs(), e.fireSeq(), e.activeMagazine(), e.reloadSeq(),
+                    e.fireStep());
         }
         return buf.getDataArray();
     }
@@ -134,17 +164,13 @@ public final class NetMessageCodec {
     private static void putSnapshotEntry(StreamPeerBuffer buf, String characterId, long tick, Vector3 position,
             Vector3 velocity, Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq) {
+            int activeMagazine, int reloadSeq, int fireStep) {
         buf.putUtf8String(characterId);
         buf.put64(tick);
         putVector3(buf, position);
         putVector3(buf, velocity);
         putVector3(buf, aimTarget);
-        int flags = (combat ? SNAPSHOT_FLAG_COMBAT : 0)
-                | ((stanceOrdinal & SNAPSHOT_STANCE_MASK) << SNAPSHOT_STANCE_SHIFT)
-                | ((activeSlotIndex & SNAPSHOT_WEAPON_SLOT_MASK) << SNAPSHOT_WEAPON_SLOT_SHIFT)
-                | ((movementTypeOrdinal & SNAPSHOT_MOVE_TYPE_MASK) << SNAPSHOT_MOVE_TYPE_SHIFT);
-        buf.put16(flags);
+        buf.put16(packSnapshotFlags(combat, stanceOrdinal, activeSlotIndex, movementTypeOrdinal, fireStep));
         buf.putFloat(yaw);
         buf.putFloat(currentHealth);
         buf.put32(senderTimeMs);
@@ -164,10 +190,11 @@ public final class NetMessageCodec {
         Vector3 velocity = getVector3(buf);
         Vector3 aimTarget = getVector3(buf);
         int flags = buf.getU16();
-        boolean combat = (flags & SNAPSHOT_FLAG_COMBAT) != 0;
-        int stanceOrdinal = (flags >> SNAPSHOT_STANCE_SHIFT) & SNAPSHOT_STANCE_MASK;
-        int activeSlotIndex = (flags >> SNAPSHOT_WEAPON_SLOT_SHIFT) & SNAPSHOT_WEAPON_SLOT_MASK;
-        int movementTypeOrdinal = (flags >> SNAPSHOT_MOVE_TYPE_SHIFT) & SNAPSHOT_MOVE_TYPE_MASK;
+        boolean combat = unpackCombat(flags);
+        int stanceOrdinal = unpackStance(flags);
+        int activeSlotIndex = unpackActiveSlot(flags);
+        int movementTypeOrdinal = unpackMovementType(flags);
+        int fireStep = unpackFireStep(flags);
         float yaw = buf.getFloat();
         float currentHealth = buf.getFloat();
         int senderTimeMs = buf.get32();
@@ -176,7 +203,7 @@ public final class NetMessageCodec {
         int reloadSeq = buf.getU8();
         return new DecodedSnapshot(characterId, tick, position, velocity, aimTarget, combat, stanceOrdinal,
                 activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine,
-                reloadSeq);
+                reloadSeq, fireStep);
     }
 
     // ── MSG_IDENTIFY ──────────────────────────────────────────────────────────

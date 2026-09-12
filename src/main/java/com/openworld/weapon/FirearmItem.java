@@ -235,10 +235,6 @@ public class FirearmItem extends WeaponItem {
   //                    weapon and the target stops it. A shot the shooter's own cover blocks now
   //                    hits that cover, instead of leaving the camera on the free side of the wall.
 
-  /** Ignore stage-1 hits this close to the sight origin (camera near-plane / degenerate hits). */
-  private static final float SIGHT_MIN_DISTANCE = 0.1f;
-  /** Ignore stage-2 hits this close to the origin. Small on purpose: a wall 10 cm from the barrel MUST block. */
-  private static final float MUZZLE_MIN_DISTANCE = 0.02f;
   /** Below this the muzzle counts as co-located with the body and the clearance trace is skipped. */
   private static final float MUZZLE_CLEARANCE_MIN = 0.05f;
   /** Tracer length when the shot hits nothing (matches REMOTE_TRACER_LENGTH's convention). */
@@ -266,33 +262,6 @@ public class FirearmItem extends WeaponItem {
     return muzzleTrace && owningCharacter instanceof Character c && c.currentVehicleNode == null;
   }
 
-  /**
-   * Stage 1 — where this shot is AIMED: the world point the sight ray is currently on. This is the
-   * same point the crosshair sits on and (via UserCommand.aimTargetPosition) the point the spine IK
-   * and the visible gun converge on, so what you see aimed at is what the bullet is sent toward.
-   * Falls back to the ray's far end when it hits nothing.
-   */
-  private Vector3 resolveSightPoint(RayCast3D ray) {
-    // A SEATED shooter aims through the carrier's firing sector, not through the camera. The camera
-    // is free to look anywhere (it is a chase camera; in third person it may be behind the car
-    // entirely), so its ray is not this shot's direction -- the clamped aim point is, and it is
-    // already the point the gun is visibly pointing at (Character.applySeatedAimTarget). Reading it
-    // here is what makes the two agree; before this the gun stopped at the seat's limit and the
-    // bullet carried on to whatever the camera had found, which is the drive-by bug.
-    if (owningCharacter instanceof Character c && c.isSeatedAimAnchored()) {
-      Vector3 seated = c.getAimTargetPosition();
-      // getAimTargetPosition falls back to the body origin when the marker is missing; a shot
-      // toward our own feet is worse than the camera ray, so fall through on a degenerate point.
-      if (seated.minus(c.getGlobalPosition()).lengthSquared() > 0.25) return seated;
-    }
-    ray.forceRaycastUpdate();
-    Vector3 origin = ray.getGlobalPosition();
-    if (ray.isColliding()
-        && ray.getCollisionPoint().minus(origin).length() > SIGHT_MIN_DISTANCE) {
-      return ray.getCollisionPoint();
-    }
-    return ray.toGlobal(ray.getTargetPosition());
-  }
 
   /**
    * Stage-2 origin: the weapon's muzzle — pulled back to the shooter's own chest when the barrel has
@@ -372,43 +341,7 @@ public class FirearmItem extends WeaponItem {
     return dir.rotated(axis.normalized(), coneRadius).normalized();
   }
 
-  /** Immutable result of one trace — read after the borrowed RayCast3D has been put back. */
-  private static final class TraceHit {
-    final Node node;
-    final Vector3 point;
-    final Vector3 normal;
-    TraceHit(Node node, Vector3 point, Vector3 normal) {
-      this.node = node; this.point = point; this.normal = normal;
-    }
-  }
 
-  /**
-   * Casts the character's AimRay from an arbitrary world origin/direction and restores it afterwards
-   * — the same borrow-the-ray idiom {@link #resolveServerShot} uses, so a trace keeps the ray's
-   * collision mask and its self-exceptions (own body + ragdoll bones) with no extra query setup.
-   */
-  private TraceHit trace(RayCast3D ray, Vector3 origin, Vector3 dir, float range) {
-    // Both saved values are LOCAL, so putting them back is exact — restoring a global position
-    // instead would re-derive the local one through the parent transform and drift a little every
-    // shot.
-    Vector3 savedPos    = ray.getPosition();
-    Vector3 savedTarget = ray.getTargetPosition();
-
-    ray.setGlobalPosition(origin);
-    ray.setTargetPosition(ray.toLocal(origin.plus(dir.times(range))));
-    ray.forceRaycastUpdate();
-
-    TraceHit hit = null;
-    if (ray.isColliding()
-        && ray.getCollisionPoint().minus(origin).length() > MUZZLE_MIN_DISTANCE) {
-      hit = new TraceHit((ray.getCollider() instanceof Node n) ? n : null,
-                         ray.getCollisionPoint(), ray.getCollisionNormal());
-    }
-
-    ray.setTargetPosition(savedTarget);
-    ray.setPosition(savedPos);
-    return hit;
-  }
 
   /**
    * Host-side resolution of a client's MSG_SHOT (Round 8 — "client-predicted + host-resolved").

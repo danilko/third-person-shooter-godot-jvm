@@ -17,7 +17,11 @@ import bpy
 import os
 import sys
 
-OUT = os.path.join(os.path.dirname(bpy.data.filepath), "merged_animation.glb")
+# Derived from the .blend being exported, so ONE exporter serves every body: merged_animation.blend
+# -> merged_animation.glb, merged_animation_f.blend -> merged_animation_f.glb. A hardcoded output
+# meant a second character could only be built by editing this file, and a mistake there would
+# silently overwrite the first body's export.
+OUT = os.path.splitext(bpy.data.filepath)[0] + ".glb"
 
 arm = bpy.data.objects.get("Godot_Chan_Stealth")
 if arm is not None and arm.animation_data is not None and arm.animation_data.action is not None:

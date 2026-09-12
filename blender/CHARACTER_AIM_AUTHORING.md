@@ -33,7 +33,7 @@ Which one a stance uses is authored in `Character.tscn` on the stance node —
 stance that must not aim at all.
 
 `aim_yaw_limit` on the same node caps how far off straight-ahead the aim may twist the body, so the
-spine and neck cannot reach an angle no person does: **upright 80°, crouch 75°, crawl / seated /
+spine and neck cannot reach an angle no person does: **upright 80°, crouch_idle_deep 75°, crawl / seated /
 swimming 45°**. It is a YAW cap only — elevation is already bounded by the camera (−55…+75), and a
 cap tight enough to matter there measurably clips ordinary aiming.
 
@@ -54,7 +54,7 @@ aim pose it takes exactly:
 **No spine, no pelvis, no legs, no head.** Everything else comes from the stance's own locomotion
 clip. So in an aim pose, only the arms and hands matter — pose the rest however you like, it is
 discarded. This is the single most common surprise: a beautiful crouched aim pose changes nothing,
-because its crouch lives in bones the filter throws away.
+because its crouch_idle_deep lives in bones the filter throws away.
 
 ---
 
@@ -126,7 +126,7 @@ python3 blender/tools/check_character_anim.py
 wandering off — and a movable pink **aim ball** they track.
 
 ```
-1 / 2 / 3   mannequin stance: upright / crouch / crawl
+1 / 2 / 3   mannequin stance: upright / crouch_idle_deep / crawl
 4           combat pose on/off        Q / E   weapon slot
 F           hold fire                 I J K L / U O   move the aim ball
 G           free-fly camera (freezes the Player, since both want WASD)
@@ -145,7 +145,7 @@ the angle between the barrel and the target.
 
 **What good looks like**, measured on the shipped rig — the gate (Player, a 130° view swing):
 
-| | upright | crouch | crawl |
+| | upright | crouch_idle_deep | crawl |
 |---|---:|---:|---:|
 | chest follows the swing | 0.94 | 0.94 | **0.00** (spine must not move) |
 | head follows | 0.94 | 0.94 | 0.93 |

@@ -7,7 +7,7 @@ import com.openworld.character.CharacterVisuals;
  * Permanent unarmed weapon occupying slot 0.
  * Placed in CharacterVisuals WeaponAttachment as a pre-discovered scene node — same
  * lifecycle as all other weapons. Never dropped, never picked up from the world.
- * Melee hit logic is stubbed — extend useWeapon() when punch mechanics are needed.
+ * Its punches are ordinary MeleeAttackSteps (Fist.tscn): a jab and a cross that alternate.
  */
 @Script(className = "FistItem")
 public class FistItem extends MeleeItem {
@@ -25,7 +25,8 @@ public class FistItem extends MeleeItem {
     auto            = false;
   }
 
-  // MeleeItem provides: useWeapon(), canUse(), stopUseWeapon(), getWeaponType(), onHitBoxBodyEntered(), onHitTimerTimeout()
+  // Everything else — the sweep, the chain, the animation — is MeleeItem's, driven by the
+  // attackSteps authored in Fist.tscn (jab, cross).
 
   // Fist is never placed in the world as a pickup.
   @Override protected boolean shouldAutoPickup(godot.api.Node character) { return false; }
