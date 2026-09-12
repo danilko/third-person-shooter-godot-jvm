@@ -1,15 +1,42 @@
 [gd_scene format=3 uid="uid://dmk1knife0001"]
 
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/MeleeAttackStep.java" id="step_script"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/KnifeItem.java" id="1_0jset"]
 [ext_resource type="PackedScene" uid="uid://33coajankfos" path="res://assets/Bayonet.glb" id="2_eltv3"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_mk1_body"]
-size = Vector3(0.05, 0.25, 0.04)
+size = Vector3(0.1, 0.25, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mk1_pickup"]
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="Resource" id="MeleeAttackStep_MW1_0"]
+script = ExtResource("step_script")
+animation = "attack_stab_mw1"
+damage = 40.0
+range = 1.5
+radius = 0.25
+windup = 0.07
+active = 0.05
+recovery = 0.22
+hitstop = 0.04
+camera_kick = 1.0
+
+[sub_resource type="Resource" id="MeleeAttackStep_MW1_1"]
+script = ExtResource("step_script")
+animation = "attack_slash_mw1"
+damage = 100.0
+range = 2.0
+radius = 0.45
+windup = 0.12
+active = 0.08
+recovery = 0.45
+hitstop = 0.09
+camera_kick = 2.5
 
 [node name="MW1" type="Node3D" unique_id=300200001]
 script = ExtResource("1_0jset")
-cone_angle_deg = 15.0
-swing_duration = 0.15
+attack_steps = Array[ExtResource("step_script")]([SubResource("MeleeAttackStep_MW1_0"), SubResource("MeleeAttackStep_MW1_1")])
 weapon_id = "MK1"
 weapon_name = "MK-1"
 slot_type = 2
@@ -29,16 +56,10 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="PickupArea" unique_id=1535295342]
-transform = Transform3D(1, 0, 0, 0, -4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0)
-shape = SubResource("BoxShape3D_mk1_body")
-
-[node name="HitTimer" type="Timer" parent="." unique_id=300200005]
-wait_time = 0.333
-one_shot = true
+shape = SubResource("BoxShape3D_mk1_pickup")
 
 [node name="Bayonet2" parent="." unique_id=1323068417 instance=ExtResource("2_eltv3")]
 transform = Transform3D(-4.371139e-09, 0, 0.1, 0, 0.1, 0, -0.1, 0, -4.371139e-09, 0, 0, 0.046157315)
 
 [connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
 [connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]
-[connection signal="timeout" from="HitTimer" to="." method="on_hit_timer_timeout"]

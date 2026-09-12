@@ -11,6 +11,7 @@ import godot.api.AudioStreamWAV;
 import godot.api.CharacterBody3D;
 import godot.api.Node;
 import godot.api.Node3D;
+import godot.api.RayCast3D;
 import godot.api.Texture2D;
 import godot.core.NodePath;
 import godot.core.PackedStringArray;
@@ -169,7 +170,7 @@ public class WeaponItem extends Pickup implements WeaponAction {
   // Effective engagement distance in metres. AI uses this (via AICharacter.getEffectiveAttackRange)
   // to cap how far it will try to fight with this weapon — e.g. a melee AI closes to arm's
   // reach instead of standing at AIBehaviorConfig.attackRange and swinging at empty air.
-  // MeleeItem overrides getEffectiveRange() to return meleeRange so the two stay in sync.
+  // MeleeItem overrides getEffectiveRange() to return its opening swing's reach, so the two stay in sync.
   @Export public float weaponRange = 50.0f;
   @Export public AudioStreamWAV fireAudio;
   @Export public AudioStreamWAV reloadAudio;
@@ -286,6 +287,85 @@ public class WeaponItem extends Pickup implements WeaponAction {
     reserve  = replicatedReserve;
   }
 
+  // ── Two-stage ("2-way") resolution, shared by every weapon that aims ────────
+  // Stage 1 (sight) — the camera AimRay (player) or the ray AttackState snapped onto its scatter
+  //                   point (AI) says WHERE this attack is aimed.
+  // Stage 2 (reach) — the attack itself is resolved from the CHARACTER toward that point: a
+  //                   firearm traces from its Muzzle, a melee weapon sweeps from the chest. So
+  //                   the camera decides the aim and the body decides what can actually be hit.
+  // Both halves live here so a firearm and a melee weapon cannot come to disagree about either.
+
+  /** Ignore stage-1 hits this close to the sight origin (camera near-plane / degenerate hits). */
+  protected static final float SIGHT_MIN_DISTANCE = 0.1f;
+  /** Ignore stage-2 hits this close to the origin. Small on purpose: a wall 10 cm from the barrel MUST block. */
+  protected static final float MUZZLE_MIN_DISTANCE = 0.02f;
+
+  /**
+   * Stage 1 — where this attack is AIMED: the world point the sight ray is currently on. This is the
+   * same point the crosshair sits on and (via UserCommand.aimTargetPosition) the point the spine IK
+   * and the visible gun converge on, so what you see aimed at is what the bullet is sent toward.
+   * Falls back to the ray's far end when it hits nothing.
+   */
+  protected Vector3 resolveSightPoint(RayCast3D ray) {
+    // A SEATED shooter aims through the carrier's firing sector, not through the camera. The camera
+    // is free to look anywhere (it is a chase camera; in third person it may be behind the car
+    // entirely), so its ray is not this shot's direction -- the clamped aim point is, and it is
+    // already the point the gun is visibly pointing at (Character.applySeatedAimTarget). Reading it
+    // here is what makes the two agree; before this the gun stopped at the seat's limit and the
+    // bullet carried on to whatever the camera had found, which is the drive-by bug.
+    if (owningCharacter instanceof Character c && c.isSeatedAimAnchored()) {
+      Vector3 seated = c.getAimTargetPosition();
+      // getAimTargetPosition falls back to the body origin when the marker is missing; a shot
+      // toward our own feet is worse than the camera ray, so fall through on a degenerate point.
+      if (seated.minus(c.getGlobalPosition()).lengthSquared() > 0.25) return seated;
+    }
+    ray.forceRaycastUpdate();
+    Vector3 origin = ray.getGlobalPosition();
+    if (ray.isColliding()
+        && ray.getCollisionPoint().minus(origin).length() > SIGHT_MIN_DISTANCE) {
+      return ray.getCollisionPoint();
+    }
+    return ray.toGlobal(ray.getTargetPosition());
+  }
+
+  /** Immutable result of one trace — read after the borrowed RayCast3D has been put back. */
+  protected static final class TraceHit {
+    final Node node;
+    final Vector3 point;
+    final Vector3 normal;
+    TraceHit(Node node, Vector3 point, Vector3 normal) {
+      this.node = node; this.point = point; this.normal = normal;
+    }
+  }
+
+  /**
+   * Casts the character's AimRay from an arbitrary world origin/direction and restores it afterwards
+   * — the same borrow-the-ray idiom {@code FirearmItem.resolveServerShot} uses, so a trace keeps the ray's
+   * collision mask and its self-exceptions (own body + ragdoll bones) with no extra query setup.
+   */
+  protected TraceHit trace(RayCast3D ray, Vector3 origin, Vector3 dir, float range) {
+    // Both saved values are LOCAL, so putting them back is exact — restoring a global position
+    // instead would re-derive the local one through the parent transform and drift a little every
+    // shot.
+    Vector3 savedPos    = ray.getPosition();
+    Vector3 savedTarget = ray.getTargetPosition();
+
+    ray.setGlobalPosition(origin);
+    ray.setTargetPosition(ray.toLocal(origin.plus(dir.times(range))));
+    ray.forceRaycastUpdate();
+
+    TraceHit hit = null;
+    if (ray.isColliding()
+        && ray.getCollisionPoint().minus(origin).length() > MUZZLE_MIN_DISTANCE) {
+      hit = new TraceHit((ray.getCollider() instanceof Node n) ? n : null,
+                         ray.getCollisionPoint(), ray.getCollisionNormal());
+    }
+
+    ray.setTargetPosition(savedTarget);
+    ray.setPosition(savedPos);
+    return hit;
+  }
+
   /** Current holder (set by WeaponController.setup), or null while in the world — used for the late-join pickup baseline. */
   public CharacterBody3D getOwningCharacter() { return owningCharacter; }
 
@@ -320,6 +400,29 @@ public class WeaponItem extends Pickup implements WeaponAction {
   public float getCrosshairFraction() { return 0f; }
 
   @Override public void onSetStance(Stance stance) {}
+
+  /**
+   * Seconds this weapon is busy after one use — WeaponController holds the next onWeaponFire off for
+   * this long. A gun's cadence is its fire rate; a melee weapon's is the swing it just started, which
+   * differs step to step (MeleeItem overrides). A method, not an override of getFireRate(): that
+   * accessor is half of the exported fireRate property, and a derived value there would rewrite it.
+   */
+  public double fireInterval() { return 1.0 / Math.max(0.01f, getFireRate()); }
+
+  /**
+   * How long a press that arrives while this weapon is still busy is remembered and fired as soon as
+   * it frees up. 0 (the default) disables buffering — for a gun a buffered shot is a shot the player
+   * did not ask for. Melee buffers, so a tapped combo is not eaten by recovery.
+   */
+  public double fireBufferSeconds() { return 0.0; }
+
+  /**
+   * True when this weapon announces its own fire event rather than having {@code WeaponController}
+   * bump the counter on the press. A gun fires when the trigger is pulled, so the press IS the shot;
+   * a melee weapon's swing may start later (a knife charges on the press and swings on the release)
+   * and carries WHICH swing it was. See {@code WeaponController.reportFireEvent}.
+   */
+  public boolean deferFireEvent() { return false; }
 
   /**
    * Whether dropping this weapon should create a world pickup.
@@ -395,7 +498,7 @@ public class WeaponItem extends Pickup implements WeaponAction {
   public float getRecoil() { return recoil; }
   public void setRecoil(float recoil) { this.recoil = recoil; }
 
-  /** Effective engagement distance in metres — overridden by MeleeItem to mirror meleeRange. */
+  /** Effective engagement distance in metres — MeleeItem returns its opening swing's reach. */
   public float getEffectiveRange() { return weaponRange; }
 
   public AudioStreamWAV getFireAudio() { return fireAudio; }

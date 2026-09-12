@@ -183,6 +183,9 @@ public class NetworkController extends Controller {
             // Fire replicated as state: a changed shot counter means the authority fired since the
             // last snapshot → play the cue here. Mirror the value so a host re-broadcasting this
             // puppet carries the right counter onward to the other clients.
+            // The step must be in place BEFORE the cue: a melee weapon reads it to replay the swing
+            // the owner actually made rather than guessing from its own chain position.
+            wc.applyReplicatedFireStep(snapshot.fireStep());
             if (haveFireSeq && snapshot.fireSeq() != lastFireSeq) wc.playRemoteFireCue();
             wc.setReplicatedFireSeq(snapshot.fireSeq());
             lastFireSeq = snapshot.fireSeq();

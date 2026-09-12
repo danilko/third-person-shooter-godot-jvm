@@ -45,6 +45,10 @@ if len(sys.argv) > 1:                      # optional: check some other export (
     GLB = sys.argv[1]
 TSCN = os.path.join(ROOT, "src", "main", "resources", "com", "openworld",
                     "character", "CharacterVisuals_GodotChan.tscn")
+# A second BODY is a second visuals scene with its own AnimationTree over its own export, and the
+# clip names are the contract between them -- so the gate has to be pointable at either.
+if len(sys.argv) > 2:
+    TSCN = sys.argv[2]
 
 # One entry per blendspace RING: the clips inside a ring are blended continuously, so they must
 # share a Root baseline. A ring may legitimately sit at a different baseline from another ring

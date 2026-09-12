@@ -7,91 +7,55 @@ import godot.annotation.Script;
 /**
  * CS:GO-style knife: tap fire = quick stab, hold fire = heavy slash on release.
  *
- * Light attack (tap, < chargeThreshold):
- *   Fast stab — narrow cone, short range, base damage.
+ * <p>The knife differs from every other melee weapon in ONE thing — how a swing is CHOSEN — so that
+ * is all it overrides. The swings themselves are ordinary {@link MeleeAttackStep}s in
+ * {@code attackSteps} (step 0 the stab, {@link #heavyStepIndex} the slash), and they run through
+ * MeleeItem's sweep, hitstop and animation exactly like an axe's chain does. Before, the knife kept
+ * its own heavy damage/range/cone fields and its own cone table, i.e. a second copy of what a swing
+ * is.
  *
- * Heavy attack (hold ≥ chargeThreshold, release):
- *   Slow slash — wide cone, longer reach, ~2.5× damage.
- *
- * Both attacks use the raycast-cone hit detection from MeleeItem. No Area3D hitbox
- * is needed — the charge time is accumulated in _physicsProcess, and the attack
- * executes in stopUseWeapon on button-release.
- *
- * Scene setup: same as MeleeItem — HitTimer (one_shot=true) required.
+ * <p>The press starts charging and the RELEASE swings, so the swing's timing starts at release.
+ * Buffering is off: this weapon's input IS the hold, and a buffered press would start a charge the
+ * player never held.
  */
 @Script(className = "KnifeItem")
 public class KnifeItem extends MeleeItem {
 
-    /** Seconds of hold needed to trigger a heavy slash instead of a quick stab. */
-    @Export public float chargeThreshold   = 0.5f;
+  /** Seconds of hold needed to trigger the heavy slash instead of the quick stab. */
+  @Export public float chargeThreshold = 0.5f;
 
-    /** Damage for the heavy slash. */
-    @Export public float heavyDamage       = 100f;
+  /** Which of {@code attackSteps} the heavy slash is. The tap always plays step 0. */
+  @Export public int heavyStepIndex = 1;
 
-    /** Reach for the heavy slash (metres from torso). */
-    @Export public float heavyMeleeRange   = 2.0f;
+  private double  chargeTime = 0.0;
+  private boolean isCharging = false;
 
-    /** Cone half-angle for the heavy slash — wider arc than the quick stab. */
-    @Export public float heavyConeAngleDeg = 35f;
+  @Register
+  @Override
+  public void _physicsProcess(double delta) {
+    if (isCharging) chargeTime += delta;
+    super._physicsProcess(delta);
+  }
 
-    private float[][] heavyOffsets;
+  /** Press: start charging. The swing (and its sound) happens on release. */
+  @Override
+  public void useWeapon() {
+    isCharging = true;
+    chargeTime = 0.0;
+  }
 
-    private double  chargeTime        = 0.0;
-    private boolean isCharging        = false;
-    private boolean heavyAttackActive = false;
+  /** Release: a short hold stabs, a long one slashes. */
+  @Override
+  public void stopUseWeapon() {
+    if (!isCharging) return;
+    isCharging = false;
+    playSwingAudio();
+    beginSwing(chargeTime >= chargeThreshold ? heavyStepIndex : 0, false);
+  }
 
-    @Register
-    @Override
-    public void _ready() {
-        super._ready();  // builds swingOffsets from coneAngleDeg
-        heavyOffsets = buildOffsets(heavyConeAngleDeg);
-    }
+  /** No new charge while one is held or a swing is still running. */
+  @Override
+  public boolean canUse() { return !isCharging && super.canUse(); }
 
-    @Register
-    @Override
-    public void _physicsProcess(double delta) {
-        if (isCharging) chargeTime += delta;
-        super._physicsProcess(delta);  // runs the swing-window hit detection
-    }
-
-    // ── WeaponAction ──────────────────────────────────────────────────────────
-
-    /** Press: start charging. Audio and swing execute on release (stopUseWeapon). */
-    @Override
-    public void useWeapon() {
-        isCharging = true;
-        chargeTime = 0.0;
-    }
-
-    /**
-     * Release: execute the attack. Short hold → quick stab; long hold → heavy slash.
-     * Audio plays here (not on press) so the slash sound aligns with the swing.
-     */
-    @Override
-    public void stopUseWeapon() {
-        if (!isCharging) return;
-        isCharging        = false;
-        heavyAttackActive = chargeTime >= chargeThreshold;
-        if (weaponAudio != null && fireAudio != null) {
-            weaponAudio.stop();
-            weaponAudio.setStream(fireAudio);
-            weaponAudio.play();
-        }
-        startSwing();
-    }
-
-    /** Block new charge while already charging or during the swing cooldown. */
-    @Override
-    public boolean canUse() {
-        return !isCharging && super.canUse();
-    }
-
-    /** Selects light or heavy attack parameters based on current charge state. */
-    @Override
-    protected boolean performMeleeHit() {
-        float     dmg = heavyAttackActive ? heavyDamage     : damage;
-        float     rng = heavyAttackActive ? heavyMeleeRange  : meleeRange;
-        float[][] off = heavyAttackActive ? heavyOffsets     : swingOffsets;
-        return performMeleeHitWith(dmg, rng, off);
-    }
+  @Override public double fireBufferSeconds() { return 0.0; }
 }

@@ -1487,8 +1487,9 @@ Details that matter:
   camera-origin one. No message/format change.
 - Shotguns resolve the sight leg + origin **once** per trigger pull and only re-sample the cone per
   pellet.
-- Melee (`MeleeItem`) still cone-casts from the camera; its `meleeRange` is measured from the torso,
-  which bounds the same problem to arm's reach.
+- Melee (`MeleeItem`) runs the SAME two legs — see "W16 — MELEE IS A SWEPT REACH FROM THE CHEST".
+  `resolveSightPoint` and `trace` live on `WeaponItem` for that reason: a firearm and a melee weapon
+  must not come to disagree about where an attack is aimed or what may block it.
 
 ### Hit detection, damage, and impact VFX
 
@@ -1794,17 +1795,17 @@ points disagree on `Root` therefore translates the body, the gun and the hitboxe
 reads as a lurch. Upright obeys this (Root.y spread ≤ 0.028 m). Crouch did not, in three ways, all
 repaired in the `.blend` and verified:
 
-- the four **diagonal** crouch clips had a crouch→walk stand-up baked into their first 7 frames and
+- the four **diagonal** crouch_idle_deep clips had a crouch_idle_deep→walk stand-up baked into their first 7 frames and
   looped it forever — 23 cm of vertical pumping per cycle. The pose at frame 7 was bit-identical to
   frame 31 (max error 0.00000), so `[7..31]` was the real loop;
 - `crouch_walk_forward/back` carried a constant 18.3 cm `Root.location[1]` offset no sibling had;
-- `crouch` (the ring centre) is a far deeper squat than its own eight corners — hips 0.292 vs 0.486.
+- `crouch_idle_deep` (the ring centre) is a far deeper squat than its own eight corners — hips 0.292 vs 0.486.
   A `crouch_idle` clip built from `crouch_walk_forward` frame 1 exists in the `.blend` for this and
   is currently **unused**: wiring it as the blendspace centre is a one-line scene change that takes
   the idle→walk gun step from 0.13 m to 0.00 m.
 
 Measured after the repairs: diagonal in-loop gun bob 0.14 m → 0.05 m (equal to the cardinals), gun Z
-spread across the crouch cardinals 0.22 m → 0.00 m, feet still planted. When adding a locomotion
+spread across the crouch_idle_deep cardinals 0.22 m → 0.00 m, feet still planted. When adding a locomotion
 clip, measure `Root` against its ring first — a per-clip offset is invisible previewing one clip at
 a time and only appears when two are blended.
 
@@ -1843,7 +1844,7 @@ Shoulders-minus-hips yaw with the chest held on an aim target, per blendspace co
 | fwd-left / fwd-right | −42.1° / +45.6° | **−46.1° / +39.8°** | −67.7° / −44.3° |
 
 The **upright** `walk_left`/`walk_right` are turn-and-walk clips, not true strafes, and the
-diagonals in both stances turn too — while the crouch cardinals are proper strafes. With the upper
+diagonals in both stances turn too — while the crouch_idle_deep cardinals are proper strafes. With the upper
 body on the aim, a 40–63° pelvis swing reads as the legs facing the wrong way. **Crawl's chest sits
 −114° off its own hips in the clip itself**, and a spine look-at cannot fix that: the modifier
 *overwrites* `spine_03`, so its result is a function of the parent chain, and a prone `spine_02` is
@@ -1915,7 +1916,7 @@ and a weapon switch must finish before a gun angle means anything (63.0° mid-tr
 settled). Artist-facing guide: **`blender/CHARACTER_AIM_AUTHORING.md`** — aiming is procedural, so
 a new model needs **one aim pose per weapon type**, not one per stance.
 
-**`Stance.aimYawLimit` caps the aim's YAW only** (upright 80, crouch 75, crawl/drive/swim 45) so
+**`Stance.aimYawLimit` caps the aim's YAW only** (upright 80, crouch_idle_deep 75, crawl/drive/swim 45) so
 the spine and neck cannot twist to an inhuman angle. Elevation is deliberately uncapped — the
 camera already bounds it to -55..+75 and a cap tight enough to matter there took upright's chest
 FOLLOW from 0.94 to 0.47. `SpineAimModifier` takes it as `primary_limit_angle` (secondary left at
@@ -1931,7 +1932,7 @@ applied against a bad one.
 
 `AimDebugHost` presses its own keys and moves its own mouse through the real `Input` singleton — so
 the shipped `PlayerController → Character → MovementController` path is what runs — and asserts 12
-cases: walk forward/back/left/right at two view headings, and aim-standing in upright/crouch/crawl.
+cases: walk forward/back/left/right at two view headings, and aim-standing in upright/crouch_idle_deep/crawl.
 **12/12 at 0.0° error.** Run it with
 `godot --headless --path . res://src/main/resources/com/openworld/world/hosts/AimDebugAuto.tscn`;
 `AimDebug.tscn` is the same stand for walking around by hand.
@@ -1955,7 +1956,7 @@ Three things, and only the middle one was the defect the plan had named:
   **The sign is the opposite of a camera's** (a camera looks down −Z); copying that convention onto
   a bone read a perfect track as FOLLOW −0.94.
 - **Crouch and crawl really were inert**, because `Character.tscn` set `spine_aim_max_angle = 0.0`
-  and `updateAimModifiers` read it as an on/off flag. Fixed: crouch **0.00 → 0.94** and crawl
+  and `updateAimModifiers` read it as an on/off flag. Fixed: crouch_idle_deep **0.00 → 0.94** and crawl
   **0.00 → 0.96**, both with the chest within 0.0°/7.5° of the view, matching upright.
 - **`Stance.spineAimMaxAngle` is now `spineAimEnabled`, a boolean — after being made a real angle
   and measured.** W1a did push it into the modifier's `use_angle_limitation`/`primary_limit_angle`/
@@ -2005,7 +2006,7 @@ repair that (the modifier overwrites `spine_03` only, so its result stays a func
 `spine_02`). That needs an authored prone aim set — for which `aim_pistol_crawl-loop` is the
 starting point, and the reason the orphan aim clips are kept rather than deleted.
 
-**The crouch aim CLIP was not the problem.** `merged_animation.blend` carries
+**The crouch_idle_deep aim CLIP was not the problem.** `merged_animation.blend` carries
 `aim_pistol_crouch-loop` and three siblings, and they are real stance poses — but `WeaponBlend` is a
 **filtered** `Blend2` taking only clavicles/arms/hands/fingers from the aim branch, and over those
 **38 filtered bones they are bit-identical to the upright clip** (worst rotation 0.0000°). The
@@ -2047,7 +2048,7 @@ straight-ahead walk and flip it left/right as the parallax changes sides.
 `snap = (1, 1)` already implies, so each corner owns a 45° wedge.
 
 Gated by `AimDebugAuto`: **`strafe 10/10`** (four directions at two view headings plus two in
-crouch) and **`ai 4/4`**, both verified to go to **0** when the old frame is put back. They assert
+crouch_idle_deep) and **`ai 4/4`**, both verified to go to **0** when the old frame is put back. They assert
 the blend INPUT, read off `parameters/<Stance>MovementBlend/blend_position`, never the hips — the
 upright `walk_left`/`walk_right` clips carry up to 63° of hip yaw of their own, so a hips reading
 cannot separate "the wrong clip was chosen" from "the right clip is authored that way".
@@ -2179,7 +2180,7 @@ that is the whole behaviour being bought. Nothing is lost from shooting: the bul
 the muzzle to the point the CAMERA ray found (`FirearmItem`'s two-stage resolution), so it still
 converges on the crosshair while the gun is visibly held lower. **Keep the gap small** — it is
 visible disagreement between the gun and the reticle, and it is reported per case as
-`gun-off-aim`: 15 deg at the top of upright's range, and crouch's view was trimmed 60 → 55
+`gun-off-aim`: 15 deg at the top of upright's range, and crouch_idle_deep's view was trimmed 60 → 55
 precisely because 60 made it 20.
 
 **One implementation, because one limit implemented twice is a limit that disagrees with itself.**
@@ -2230,7 +2231,7 @@ move: the neck keeps its full share at every weight, so the dial does exactly wh
 answer is that what it claims is not worth having. **The large clavicle-vs-chest angle is therefore
 not a defect to tune out; it is what makes prone aiming work at all** while the arms are posed for a
 standing aim on a prone chest (the `WeaponBlend` filter takes clavicles/arms/hands from the aim
-branch, and those are bit-identical to the upright clip — see "The crouch aim CLIP was not the
+branch, and those are bit-identical to the upright clip — see "The crouch_idle_deep aim CLIP was not the
 problem"). The real fix is an authored prone aim pose, where the arms START where a prone shooter's
 arms are and the delta is small again (`AIM_PLAN.md` W4). The knob stays for that day, and for a
 skeleton whose arms are posed differently.
@@ -2274,7 +2275,7 @@ seat the one owner of where the driver is — move `Seat0` and the view moves wi
 the one number here that cannot be derived, so it was **measured, not guessed**
 (`tools/godot/probe_cockpit_eye.gd`, which drives the AnimationTree's `StanceTransition` directly
 and needs no vehicle): a seated driver's eye sits **+0.809 m** above the character origin the
-vehicle pins to the seat, and **0.153 m behind** it — against upright's +1.359 and crouch's +0.791,
+vehicle pins to the seat, and **0.153 m behind** it — against upright's +1.359 and crouch_idle_deep's +0.791,
 which is also the check that the `DriveCarrier` state is real and not a fallback. The old
 `FPSCameraMount` (0, 0.34, −0.80) is kept as the **bonnet** view: it is 0.85 m from the cockpit eye
 and is a genuinely different camera (the car's own front view), not a worse cockpit.
@@ -2373,18 +2374,18 @@ to **-179.5** and never leaves the sector, the posture engages at -110 and retur
 forward, and the worst residual left for spine + collarbones is **68.3 deg against a reach of 100**.
 
 **THE DRIVE CLIPS ARE NAMED AND THE DRIVE RING IS WIRED — the placeholder is in the data, not in
-prose.** `DriveCarrier`'s blendspace played `crouch` at all five points, so the stance had no clip
+prose.** `DriveCarrier`'s blendspace played `crouch_idle_deep` at all five points, so the stance had no clip
 of its own to author and nothing in the file said one was wanted. `assets/merged_animation.blend`
 now carries the drive set, named on the same pattern as every other stance
 (`<pose>_idle-loop`, `aim_<weapon>_<stance>-loop`):
 
 | clip | what it is | copied from |
 |---|---|---|
-| `drive_idle-loop` | the seated pose — **wired** as all five points of `DriveCarrierMovementBlend` | `crouch-loop` |
-| `aim_rifle_drive-loop`, `aim_pistol_drive-loop` | seated forward aim | the crouch aim pair |
-| `aim_rifle_drive_back-loop`, `aim_pistol_drive_back-loop` | seated REAR aim, for the posture above | the crouch aim pair |
+| `drive_idle-loop` | the seated pose — **wired** as all five points of `DriveCarrierMovementBlend` | `crouch_idle_deep-loop` |
+| `aim_rifle_drive-loop`, `aim_pistol_drive-loop` | seated forward aim | the crouch_idle_deep aim pair |
+| `aim_rifle_drive_back-loop`, `aim_pistol_drive_back-loop` | seated REAR aim, for the posture above | the crouch_idle_deep aim pair |
 
-`drive_idle` is copied from `crouch-loop` deliberately — that is the clip the ring played — so
+`drive_idle` is copied from `crouch_idle_deep-loop` deliberately — that is the clip the ring played — so
 wiring the new name changed the seated pose by **nothing**, which is the point of an alignment
 change. Re-measured: the seated eye is +0.791 m (`probe_cockpit_eye.gd`), and the cockpit mount
 carries that number. The four aim clips stay **orphan** on purpose: giving them a home needs a
@@ -2397,11 +2398,11 @@ existing action: no rename, no pipeline change, no scene change.
 **Two names were out of line and are now one convention.** Every clip separates words with `_` and
 keeps the hyphen for the `-loop` suffix Godot's importer strips — except `crawl-idle-loop`, which
 spelled its own exception in the .blend, the scene AND `check_character_anim.py`; it is
-`crawl_idle-loop` now. And the Crouch ring's CENTRE was `crouch` while the .blend carried an unused
+`crawl_idle-loop` now. And the Crouch ring's CENTRE was `crouch_idle_deep` while the .blend carried an unused
 `crouch_idle` and the checker had always *measured* `crouch_idle` — three owners, one of them wrong,
 which is the 0.126 m idle→walk gun step recorded above. The scene plays `crouch_idle` now, so blend,
-scene and checker finally agree; `crouch` becomes an orphan, and measurably nothing moved
-(`AimDebugAuto` unchanged, seated and crouch eyes identical at +0.791). `check_character_anim.py`
+scene and checker finally agree; `crouch_idle_deep` becomes an orphan, and measurably nothing moved
+(`AimDebugAuto` unchanged, seated and crouch_idle_deep eyes identical at +0.791). `check_character_anim.py`
 gained the `drive` ring — one clip, which is the ring's true shape rather than an omission, since a
 seated occupant does not locomote — and PASSes at 51 clips / 5 rings / 0 errors.
 
@@ -2522,7 +2523,7 @@ one-shots stay bare (`jump`, `air_jump`, `reload`, `roll`, `roll_rifle`, `weapon
 reach it, the biggest group being upright locomotion, which had been the implicit default
 (`idle`, `walk_forward`) while every other stance carried its prefix; the aim clips were reordered
 from `aim_<weapon>_<stance>` to `<stance>_aim_<weapon>` so one rule covers both families. Also
-folded in: `walk_backward` -> `upright_walk_back` (crouch already said `back`), `roll-rifle` ->
+folded in: `walk_backward` -> `upright_walk_back` (crouch_idle_deep already said `back`), `roll-rifle` ->
 `roll_rifle` (hyphen is for `-loop` only, the same defect `crawl-idle` had), `T` -> `tpose`, and
 `falling-loop-Godot_Chan_Stealth` — an import artefact duplicating `falling` — deleted.
 
@@ -2575,7 +2576,7 @@ probe drove `StanceTransition` directly with **combat off**; taking a seat sets 
 which switches on the `NeckFront` blend AND the aim modifier — and both move `neck_01`, which is the
 bone `MarkerFPSCamera` hangs off. So the seated-and-armed head is 6 cm higher and 10 cm further
 forward than the seated-and-idle one. **A pose measured in the wrong state is not a measurement of
-that pose**, and the tell was available all along: the same probe reported crouch's eye moving
+that pose**, and the tell was available all along: the same probe reported crouch_idle_deep's eye moving
 ±1.5 cm within its own loop, which should have prompted asking what else moves it.
 
 `probe_vehicle_views.gd` measures the real thing now — the cockpit camera against the driver's eye
@@ -2789,9 +2790,17 @@ not pay for it.
 **Measured equivalence, which is the point of a refactor:** booting `World.tscn`, all ten
 scene-placed weapons come to rest at **byte-identical y** before and after (4.66–4.90, and MW1 at
 −59.05 both ways). Leak signature at headless exit is identical too (3 ObjectDB instances, the
-documented `Rifle_fire.wav` audio-at-quit case). **MW1 falling to −59.05 is a PRE-EXISTING defect and
-not tunneling** — `world_body_continuous_cd = true` on it changes nothing, so it is authored over a
-gap in the ground, which is the designed consequence of there being no world-spanning safety floor.
+documented `Rifle_fire.wav` audio-at-quit case).
+
+**MW1 fell to −59.05 both before and after, and the cause written here first was WRONG** — it was
+recorded as "authored over a gap in the ground" on the strength of `world_body_continuous_cd = true`
+changing nothing. Measured afterwards (W16): a ray at MW1's own XZ finds ground at **y = 4.61**,
+exactly where its neighbours rest. The real cause was its **collider**: a 0.05 × 0.25 × **0.04** m
+box, thinner than any other pickup in the scene (MW2 0.06, PI52 0.064 — both rest), which a physics
+engine will not hold on a heightfield. At 0.10 × 0.25 × 0.10 it rests at **4.64** with the rest. Its
+`PickupArea` was the same blade-sized box, so it was also nearly uncollectable; it has a 0.5 m
+detection volume now, the split `T1.tscn` already had (small body, generous area). **A pickup's
+collider is not its silhouette** — it is what has to rest on ground and be walked into.
 
 Gated by **`tools/godot/probe_weapon_world_body.gd`** (18/18), which drives a real `Player` through a
 real auto-pickup and drop rather than calling the API in a bare tree: the item rides a falling body
@@ -2827,6 +2836,208 @@ merge and displacement guards in `equipWeapon` are written against an equip that
 second consumer.** `WeaponItem.weaponAnimatorPath` covers a pump or a bolt; a magazine that must
 follow the off hand during a reload is the case it does not, and that wants the IK target to switch
 source mid-clip.
+
+### W16 — MELEE IS A SWEPT REACH FROM THE CHEST, AND AN ATTACK IS A DATA TABLE (2026-09-11)
+
+**The target feel is Left 4 Dead, not Dark Souls, and that decides the architecture.** L4D's melee
+is reliable because of a generous hull resolved from the view at a fixed early moment with total
+feedback — the animation is decorative and decides nothing. GTA's is less reliable *because* of its
+extra machinery: target snapping picks someone you did not mean, root-motion commitment delays
+contact, and a staggering NPC leaves "did that connect?" ambiguous. So the Souls/DMC toolkit —
+animation-notify hit windows, target selection, motion warping — is **deliberately not built**; at
+this degree it would subtract feel, not add it.
+
+**What was there:** five rays cast from the **camera** (`weaponController.getAimRay()`), first hit
+only, re-cast every frame for the whole 0.3 s swing. Both of its patches were the camera origin
+showing through — a range measured from the torso rather than from the ray, and a filter rejecting
+upward normals so a downward-tilted camera did not "hit" the floor. It is the melee half of the
+defect the firearm's two-stage resolution closed.
+
+**The two legs are now ONE owner, shared.** `resolveSightPoint` and `trace` (with `TraceHit`) moved
+from `FirearmItem` up to `WeaponItem` — a pure move. Stage 1, the camera says what is aimed at;
+stage 2, the attack is resolved **from the character**: a firearm from its `Muzzle`, a melee weapon
+from its **chest** (`spine_03`'s ragdoll bone, so a crouched swing starts at a crouched chest). The
+answer to "is the hitscan always from the character, whatever the view" is **yes, by construction,
+and in FPS too** — the FPS camera is a filtered neck bone, not the chest, so even there the two are
+not the same point.
+
+**Cleave, and each target once.** The sweep is a capsule spanning `[chest, chest + dir*range]`,
+queried with `intersect_shape` (a static overlap of the WHOLE reach volume, not a `ShapeCast3D`,
+which reports only what is touching at its FIRST contact and so cannot cleave). Results are grouped
+by **`ImpactManager.resolveTarget`** — the same walk that applies the damage — so ten ragdoll bones
+of one character are ONE target, and a per-swing hit set means a multi-frame window cannot hit twice.
+Each target must then trace clear from the chest, so cover blocks a swing exactly as it blocks a
+bullet; a blocked target stays live and may connect later in the window.
+
+**One direction rule, judged along the VIEW.** The swing runs chest → sight point, unless that point
+is not ahead of the chest along the view — which is the camera ray stopping on something BETWEEN the
+camera and the character, i.e. behind them in third person — in which case it runs along the view
+itself. Judged against the view rather than the body's facing, so it needs no knowledge of how far
+the mesh has turned toward the aim yet.
+
+**An attack is DATA: `MeleeAttackStep`** (`animation`, `damage`, `range`, `radius`, `windup`,
+`active`, `recovery`, `hitstop`, `cameraKick`), and a weapon declares an ordered list. The default
+chain walks it while swings keep coming inside `comboResetSeconds` and starts over after a pause —
+so the axe is `[light, heavy]`, "light first, big second", and the fist is `[jab, cross]`. **A
+subclass changes only how a step is CHOSEN:** `KnifeItem` is now just tap → step 0, hold → the heavy
+index, and its parallel heavy damage/range/cone fields and second cone table are gone. Adding a
+melee weapon is a scene with a step table; adding a moveset is rows.
+
+**The code owns the timing and the clip is time-warped to fit it** (`AnimationController
+.playMeleeAttack` scales the clip so its whole length spans `windup + active + recovery`). That is
+L4D's split, and it is what lets feel be tuned without re-authoring and a placeholder of the wrong
+length still play correctly. When real swing clips land, set the step to the clip's own contact
+frames and the scale comes out at 1.
+
+**The attack one-shot is selected BY CLIP NAME, not by weapon index.** `Attack` (a OneShot with
+`WeaponChange`'s upper-body filter) ← `AttackScale` (TimeScale) ← `AttackClip`, an
+`AnimationNodeTransition` whose inputs are named after their clips. The existing one-shots are fed by
+a `BlendSpace1D` on `weaponPoseIndex`; keying attacks the same way would have meant a second index
+table to hold in step with `weapon_archetypes.json`, and W12's rule that an index with no blend point
+is **silent**. A step names its clip, so a new weapon or step is one Transition input and one action.
+
+**Placeholder clips exist per melee weapon** (user-asked), minted through `character_anim_naming
+.json`'s `placeholders` map — the same one-owner mechanism W10 used: `attack_stab_mw1`,
+`attack_slash_mw1`, `attack_swing_mw2`, `attack_chop_mw2`, `attack_jab_fist`,
+`attack_cross_fist`, each a copy of that archetype's `weapon_switch_*`. Per WEAPON rather than per
+grip archetype because a knife's stab and an axe's chop are different art even though the grip is
+one; two weapons may still point at one clip, since the step names it. Replacing any of them is a
+pose edit on an existing action — no rename, no scene change. Measured: 81 → **87 clips**, orphans
+23 → 29 (unwired) → **23** once the tree was wired, `check_character_anim` PASS.
+
+**Feel, which is mostly not detection.** Hitstop freezes the attack one-shot on the pose that
+connected and holds the swing's own clock with it — **local and cosmetic, never `Engine.time_scale`**,
+which in multiplayer would stall every peer for one player's hit. Plus a camera kick on contact, and
+a per-weapon **input buffer** (`WeaponController`, opt-in via `WeaponItem.fireBufferSeconds`, 0 for
+guns because a buffered shot is a shot the player did not ask for): a tap landing during recovery
+fires the moment the weapon frees up, through the ordinary `onWeaponFire` so every gate, cue and
+`fireSeq` bump still runs. Draining checks every gate WITHOUT firing (`readyToFire`), or the drain
+would re-buffer itself and extend the window forever.
+
+Gated by **`tools/godot/probe_melee.gd`** (28/28), which presses the real `fire` action through
+`PlayerController` and measures damage through each target's own `Health.hit`. Cases that can each
+fail for one reason: reach (3.5 m out is on the camera's line and must take nothing), **behind** (a
+wall between camera and character, on a layer the spring arm ignores — a camera-origin swing strikes
+it and whiffs), cover, cleave, hit-once, chain order and restart, buffer, hitstop, FPS parity, the
+axe at exactly **120/60** and the knife at exactly **100/40**.
+
+**An AI is the other half of the path and shares none of the player's rig** — no `PlayerController`,
+no FPS mode, an `AICameraController` instead of a boom — so the last case arms one by walking it over
+a pickup and fires it the way `AttackState` does: **one frame** of `fire` (which is also why an AI
+knife always taps and never charges). It lands 60 × 0.75 = **45.0**. Getting there needed the thing
+`AttackState` does on that same frame and a probe would not think to: **`snapAimRay(target)`**. A
+frozen AI's camera rig had not converged on its own facing and rested 90° off, pointing −X, so the
+swing went nowhere — the aim ray is aimed AT the victim before the swing, not merely resting.
+
+Three probe lessons, each of which cost a wrong reading first:
+- **A target that walks is not a target.** With no `PlayerRegistry` autoload these AI run their full
+  FSM: the far target strolled into reach and the near one turned, so three jabs read
+  `10x0.75, 14x0.75, 10x4.0` — the last a **headshot** — and the chain looked broken when it was not.
+- **Freezing the body is not freezing the POSE.** The AnimationTree is its own node and kept playing,
+  so the bone under the capsule still drifted (an arm, then a torso). Both must stand still.
+- **The bone multiplier is inside the number `hit` reports**, so every chain assertion is a RATIO of
+  two swings into the same target from the same place. It is exact only while both steps meet the
+  same bone — which is why the fist's jab and cross now share a reach (they come off the same
+  shoulder; the cross differs in damage and recovery), and why the axe and knife ratios come out at
+  exactly 2.00 and 2.50.
+
+**Known limits, on purpose.** A puppet replays the chain from its OWN position (`fireSeq` carries no
+step), so a knife's tap/hold is not knowable remotely and replays as the light swing; and the knife
+bumps `fireSeq` on the PRESS while its swing starts on RELEASE, so a remote knife swing leads by the
+charge time — both pre-existing shapes of "fire is replicated as state". The next step up, if a
+weapon ever needs blade-accurate contact, is socket sweeps between frames driven by animation notify
+tracks — additive, and the trace code does not change.
+
+### W17 — A CLIP NAME SAYS THE MOTION; THE TABLE SAYS THE ROLE (2026-09-11, user-asked)
+
+`attack_light_b_fist` was the name that prompted this, and it is wrong in a way worth naming: `light`
+and `b` are the step's JOB in the chain, which `MeleeAttackStep` already owns (its damage, its
+recovery, its place in the order). Putting that in the clip too gives the fact two owners, and the
+second one cannot be edited — re-ordering a chain would rename art. **The clip says what the body
+DOES; the table says what the swing is FOR.** So: `attack_jab_fist`, `attack_cross_fist`,
+`attack_stab_mw1`, `attack_slash_mw1` (the two `KnifeItem`'s own doc has always called them),
+`attack_swing_mw2`, `attack_chop_mw2`. Re-rolling the axe's chain to heavy-first is now a data edit
+with no clip touched.
+
+Three more renames, each a name that described something the clip is not:
+
+- **`upright_idle_<arch>` → `upright_hold_<arch>`** (9). It is the weapon HOLD pose fed to the
+  filtered `WeaponBlend`, and it sat one underscore away from `upright_idle`, the locomotion idle of
+  the upright ring — two unrelated things reading as one family.
+- **`on_air_<weapon>` → `air_aim_<weapon>`**. These are aim poses; under their own name they join the
+  `<stance>_aim_<weapon>` family they belong to and sort with it.
+- **`crawl_high` → `crawl_idle_high`, `crouch` → `crouch_idle_deep`** — orphan pose variants whose
+  names read like a stance rather than a variant of one.
+
+**What was deliberately NOT flattened:** `<stance>_aim_<arch>` keeps its stance prefix even though
+the aim branch is archetype-only today, because the family is genuinely two-dimensional — its
+`crouch_`/`crawl_`/`drive_`/`swim_` siblings already exist as orphans and a stance-driven branch
+inside `WeaponAim` is the change that reaches them (W7, W10). Renaming them to `<arch>_aim` would
+read better today and fight the direction of travel. `weapon_switch_<arch>` stays for the same reason
+it always had: a stance-agnostic one-shot stays bare.
+
+**The safety net is what makes a 19-clip rename survivable**, and it is the same one W10 relied on:
+one map (`character_anim_naming.json`) drives the `.blend`, and `check_character_anim.py`'s
+**`tree_refs`** ERRORS when the AnimationTree names a clip the export does not have — so a missed
+reference cannot pass quietly. Two traps specific to renaming clips that are also PLACEHOLDERS:
+the placeholder map is keyed by NAME, so its keys must be re-keyed in the same pass or the old names
+are minted straight back on the next run; and a historical `renames` entry whose TARGET is being
+renamed must be re-pointed at the final name, or the map stops being old→current for a fresh import.
+Measured after: 87 clips, `tree_refs` 64, orphans 23, 0 errors — every number unchanged but the names.
+
+### W18 — A SECOND BODY IS A SECOND `CharacterVisuals`, AND CLIP NAMES ARE THE CONTRACT (2026-09-11)
+
+**What actually differs between a male and a female character is the LOWER BODY, and the tree already
+says so.** `WeaponBlend` is a *filtered* `Blend2` taking only clavicles, arms, hands and fingers from
+the aim branch, and the `Attack`, `WeaponChange` and `Reload` one-shots carry that same upper-body
+filter. So every weapon-owned clip — 9 aim poses, 9 hold poses, 9 switch one-shots, 6 attacks — is
+**upper body only** and is dictated by the WEAPON, not by the body holding it. They are shared. What
+reads as male/female is posture and gait: the locomotion rings, **~29 clips** (upright 9, crouch 9,
+crawl 5, swim 5, drive 1). A second body costs those, **not** 29 + 33 — there is no per-weapon
+full-body set, and the combinatorial explosion people fear (archetypes × genders × stances) does not
+exist here. It is the line the industry draws too: GTA V and Cyberpunk author gendered idle/walk/run
+and share the weapon poses; Elden Ring shares combat movesets outright because the weapon defines
+them.
+
+**The swap unit already existed:** `Character.characterVisuals` is one exported `PackedScene`, and
+the `MeshConfig` embedded in that scene rewires every dependent path (mesh root, sockets, modifiers,
+stance colliders, bone multipliers). So the scaffold is
+`CharacterVisuals_GodotChanF.tscn` → `assets/merged_animation_f.tscn` → `assets/merged_animation_f.glb`,
+built from `assets/merged_animation_f.blend`.
+
+**Identical clip NAMES are what make it free.** All the Java addresses clips by name
+(`playMeleeAttack("attack_chop_mw2")`, `parameters/<Stance>MovementBlend/blend_position`), so a second
+body with the same names needs **no code, no rewiring and no second probe suite** — which is exactly
+why W17's naming pass was worth doing first. Divergent proportions do not force duplicated poses
+either: `SupportHandIKModifier` solves the off hand to the weapon's own `SupportPoint` (W14) and
+`GripPoint` carries the weapon's fit (W13), so those absorb a different skeleton instead of
+multiplying art.
+
+Two tools stopped being single-body, and both were one line from silently breaking a second:
+`export_character.py`'s output is **derived from the .blend being exported** (it was hardcoded to
+`merged_animation.glb`, so building a second body would have overwritten the first), and
+`check_character_anim.py` takes an optional second argument for the visuals scene, so the same gate
+can be pointed at either body. The variant passes it identically: **87 clips, 6 rings, 0 errors**,
+the same 23 orphans.
+
+**The placeholder is a byte-identical copy on purpose**, and LFS makes that nearly free — the copy
+shares the original's object id until it is actually edited, so the repo pays only when there is real
+content to pay for. Author the ~29 locomotion clips one at a time; everything else already works.
+
+Gated by **`tools/godot/probe_character_variant.gd`** (8/8): the swap took (each body loads its own
+export), the **clip-name sets are identical both ways** (87 = 87, nothing missing, nothing extra —
+the contract itself, asserted because the failure is silent: a renamed clip does not error, the
+branch goes quiet and the skeleton drifts to REST, which by eye looks like a neutral authored pose),
+the melee path runs unchanged on the second body (its fist lands and plays `attack_jab_fist`), and
+the **eye offset matches the base body to 0.0003 m**. That last one is the live tripwire: the variant
+is a copy today, so it must measure identically; the day its locomotion is genuinely authored, that
+case failing is the gate telling you to re-measure the FPS and cockpit mounts (W11 — a pose measured
+in the wrong state is not a measurement of that pose).
+
+**One probe lesson worth keeping:** measured one after the other, two byte-identical bodies read
+**5 mm apart**. Each 60-frame window caught the shared idle loop at a different phase, and the neck
+the eye mount rides was simply somewhere else. Averaging is not enough — **two bodies must be
+sampled on the SAME frames**, or a looping clip's phase becomes the difference between them.
 
 ## Godot-Kotlin-JVM Specifics
 

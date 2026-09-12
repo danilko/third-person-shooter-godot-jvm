@@ -402,6 +402,33 @@ public class WeaponController extends Node {
     if (!pendingEquips.contains(item)) pendingEquips.add(item);
   }
 
+  /**
+   * "This weapon just fired, and it was attack {@code step}." Bumps the rolling counter every peer
+   * watches (fire is replicated as STATE) and records WHICH swing it was, so a puppet replays the
+   * one the owner made instead of reconstructing it from its own chain cursor — which cannot be
+   * right for a knife, whose tap/hold is not a chain position at all. Called for every weapon: the
+   * ordinary ones from {@code onWeaponFire}, a melee weapon from its own swing start.
+   */
+  public void reportFireEvent(int step) {
+    fireSeq = (fireSeq + 1) & 0xFF;
+    fireStep = Math.max(0, Math.min(MAX_FIRE_STEP, step));
+  }
+
+  /** Widest step index the snapshot's spare flag bits carry (NetMessageCodec, 3 bits). */
+  private static final int MAX_FIRE_STEP = 7;
+  private int fireStep = 0;
+
+  public int getReplicatedFireStep() { return fireStep; }
+
+  /**
+   * Puppet side: the OWNER's step, applied from the snapshot before the cue plays (and mirrored
+   * forward so a re-broadcasting host carries the right value on to other clients). Registered —
+   * unlike its {@code fireSeq} sibling — because it is the one value the puppet replay cannot be
+   * driven without, and {@code playRemoteFireCue} on the far side of it already is.
+   */
+  @Register
+  public void applyReplicatedFireStep(int step) { fireStep = Math.max(0, Math.min(MAX_FIRE_STEP, step)); }
+
   /** See {@link #synchronousEquip} — toggled by the network collect path around its equip. */
   public void setSynchronousEquip(boolean on) { synchronousEquip = on; }
 
@@ -560,17 +587,19 @@ public class WeaponController extends Node {
 
   @Register
   public void onWeaponFire() {
-    if (fireTimer.getTimeLeft() > 0 || reloadTimer.getTimeLeft() > 0 || isWeaponTransitioning()) return;
+    if (reloadTimer.getTimeLeft() > 0 || isWeaponTransitioning()) return;
+    if (fireTimer.getTimeLeft() > 0) { rememberBlockedPress(); return; }
     WeaponItem w = getCurrentWeaponItem();
     if (w == null) return;
     if (!w.isInfiniteAmmo && w.getMagazine() == 0) { onWeaponReload(); return; }
-    if (!w.canUse()) return;
+    if (!w.canUse()) { rememberBlockedPress(); return; }
     // The weapon's OWN moving parts (pump, bolt, cylinder) -- see WeaponItem.weaponAnimatorPath.
     // Placed after every gate, so a shot that was suppressed moves nothing.
     w.playMotion(w.fireAnimation);
 
-    fireTimer.setWaitTime(1.0 / w.getFireRate());
+    fireTimer.setWaitTime(w.fireInterval());
     fireTimer.start();
+    bufferedFireUntilMs = 0;
 
     w.useWeapon();
     weaponFired.emit(w.getFireRate() * 0.2f);
@@ -578,7 +607,10 @@ public class WeaponController extends Node {
     // Fire is replicated as STATE: bump the rolling shot counter that rides the snapshot stream.
     // Remote peers play the muzzle/tracer cue when they see this change (NetworkController), so no
     // separate (droppable) fire message is needed. u8 on the wire — only change-detection matters.
-    fireSeq = (fireSeq + 1) & 0xFF;
+    // A weapon whose shot does not happen on the press reports its own event instead — see
+    // WeaponItem.deferFireEvent (a knife charges on the press and swings on the release, so a bump
+    // here would send the cue early by the whole charge time).
+    if (!w.deferFireEvent()) reportFireEvent(0);
     // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
     if (!w.isInfiniteAmmo && w.getMagazine() == 0) w.onMagazineEmpty();
   }
@@ -651,9 +683,57 @@ public class WeaponController extends Node {
 
   @Register
   public void onWeaponNotFire() {
+    // Drain the input buffer: a press that landed while the weapon was still busy fires the moment
+    // it frees up, through the ordinary onWeaponFire so every gate, cue and fireSeq bump still runs.
+    if (bufferedFireUntilMs > 0) {
+      if (Time.INSTANCE.getTicksMsec() > bufferedFireUntilMs) {
+        bufferedFireUntilMs = 0;
+      } else if (readyToFire()) {
+        bufferedFireUntilMs = 0;
+        onWeaponFire();
+      }
+    }
     WeaponItem w = getCurrentWeaponItem();
     if (w != null) w.stopUseWeapon();
   }
+
+  // ── Input buffer ─────────────────────────────────────────────────────────
+  //
+  // A tap that lands while the weapon is still recovering is otherwise simply lost — the "my combo
+  // input got eaten" complaint every melee game fields. Holding fire never needed this (onWeaponFire
+  // runs every frame it is held, so the next swing starts the frame the weapon frees up); a TAP does.
+  // Opt-in per weapon (WeaponItem.fireBufferSeconds, default 0), because for a gun a buffered shot
+  // is a shot the player did not ask for.
+  private long bufferedFireUntilMs = 0;
+
+  /** Every gate onWeaponFire checks, without firing — so draining the buffer can never re-buffer. */
+  private boolean readyToFire() {
+    if (fireTimer.getTimeLeft() > 0 || reloadTimer.getTimeLeft() > 0 || isWeaponTransitioning()) return false;
+    WeaponItem w = getCurrentWeaponItem();
+    return w != null && w.canUse();
+  }
+
+  private void rememberBlockedPress() {
+    WeaponItem w = getCurrentWeaponItem();
+    if (w == null || w.fireBufferSeconds() <= 0) return;
+    bufferedFireUntilMs = Time.INSTANCE.getTicksMsec() + (long) (w.fireBufferSeconds() * 1000.0);
+  }
+
+  /**
+   * The AnimationController, re-resolved from the scene-exported reference rather than read through
+   * it. The export says WHICH node; a scene-exported node reference can be a second JVM wrapper with
+   * every Java field at its default (CLAUDE.md, "SOLVED: the player's ~90 degree body rotation"), and
+   * the attack one-shot reads Java state (the tree reference) on the far side.
+   */
+  public AnimationController animation() {
+    if (resolvedAnimation != null && GD.isInstanceValid(resolvedAnimation)) return resolvedAnimation;
+    resolvedAnimation = null;
+    if (animationController == null) return null;
+    Node n = getNodeOrNull(animationController.getPath());
+    resolvedAnimation = n instanceof AnimationController ac ? ac : animationController;
+    return resolvedAnimation;
+  }
+  private AnimationController resolvedAnimation;
 
   @Register
   public void onWeaponReload() {
