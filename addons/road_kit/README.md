@@ -31,6 +31,10 @@ of truth; the `RoadKitNetwork → RoadKitRoad → RoadKitPoint` nodes are its ed
    bridges and piers stand on the real ground), writes `<network>.zones.json` from the markers, runs the
    whole build on a thread (python3 lanes → Blender meshes → export + bake, ~30 s for DebugRoads) and
    wires each built piece into its ZoneMarker's `Zone` in one undo step. Save the scene afterwards.
+   **Draft Surface** (on by default) draws the solver's tarmac, pads, gores, footways and kerb lines on
+   every refresh — exactly what Build will sweep, so a junction's pad, setbacks and fillets show while you
+   tweak. It wears the kit's own materials, taken off the built pieces (Preview Pieces); before any build
+   it is the engine's default grey.
 6. **Preview Pieces** — tick it to see the BUILT roads (tarmac, kerbs, piers) placed exactly where
    `ZoneManager` will stream them. It is never saved and refreshes itself after each Build.
 7. **Stamp Terrain** writes the roads into the Terrain3D height field (cut and fill, derived from the

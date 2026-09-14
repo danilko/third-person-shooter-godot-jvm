@@ -3539,6 +3539,40 @@ non-@tool JVM script is a placeholder, which no SceneTree test sees:
   points (`force` to clear on purpose), `_refresh` skips an unloaded network, and the self-test asserts the
   record survives opening the scene.
 
+**The draft surface: the road you are editing, not the last build (B10.1, 2026-09-14).** Until now the
+editor showed a thin centreline until a ~30 s Blender build. `roadkit_cli.py bands` returns the paved
+footprint Build sweeps, from the solve Build runs (`point_edges.solve_all`): a road run's strip between
+`RoadSolve.edges_left/right`, a pad's `JunctionSolve.fan`, a gore's `GoreSolve.tris`, and the kerb /
+footway lines of `point_edges.road_edge_runs` / `junction_edge_runs` / `gore_edge_runs`. Those three
+are new and are the ONE enumeration of edge runs: `point_build.build_edges` / `build_junction_edges` /
+`build_gore_edges` became thin loops over them, so the draft and the build cannot disagree about where a
+kerb stops. The overlay uploads it (`road_kit_overlay.gd draft()`, an `ArrayMesh` child of the unowned
+overlay, never saved) on every refresh; dock checkbox **Draft Surface**, EditorSettings
+`road_kit/draft_surface`, ON by default. Each `bands[i]` names its owner and triangle range, for the
+viewport's click-select (B10.3).
+- **Materials come off the base meshes, never built in code** (user request): `materials_from(node)`
+  collects surface materials by `resource_name` from the Preview Pieces holder, the same `M_Asphalt` /
+  `M_ConcreteTile` / `M_LineW` every baked piece carries from `road_kit.blend`. Nothing built yet →
+  engine default material. The overlay's line material is a `.tres` too (`road_kit_overlay_lines.tres`).
+- **Measured on DebugRoads:** 60 ms wall for the CLI (budget 300; solve 22 ms). RoadKitSample is
+  ~400 ms, 260 of it `kerb_runs` — the caching lever if a big network drags.
+- **The draft IS the build, within the sweep's own frame:** every one of 2370 draft tarmac/pad vertices
+  lies on a built tarmac triangle, worst **0.067 m** — the GN sweep lays each cross-section in the
+  curve's frame, which drifts from the per-sample normal on a grade. Control: one station moved 10 m →
+  2055/2382.
+- **Finding (the build, not the draft): a run's END is cut on its last CHORD by the sweep**, while the
+  solver's edges and the pad ring cut it on the mouth's axis (`point_profile.run_end_axes`, §8o). 24
+  run-end vertices, worst **0.328 m** at DebugRoads junction 1 (loop mouth); the built road surface ends
+  up to 1.5 m short of the draft's cap corner and the pad ring meets it with a step. B10.7 (mesh from the
+  Python edges) removes it by construction.
+- **Finding: 85 of 1781 lane samples stand on no paving in draft OR build** — turn connectors at
+  junction 2 swinging up to 9 m outside the pad, and junction 1's turn paths riding 0.3–0.8 m off its
+  planar pad. Draft and build agree on all of them; the lanes are what is wrong.
+- Gate trap: a degenerate built triangle makes the closest-point test NaN, and `minf(0.0, NaN)` is NaN —
+  it threw away an exact hit and read as a 4.8 m parity failure. Compare with `if d < best`.
+- Gate `test_roadkit_draft.gd` 13/13, in `check_roads.sh`; the editor self-test now also refreshes a
+  scratch copy of the record and asserts the draft wears `M_Asphalt` inside the real editor.
+
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 
 `TERRAIN3D_TRANSITION.md` is the history of record. Ground moved from the Blender bake to in-engine

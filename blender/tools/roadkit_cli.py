@@ -15,6 +15,7 @@ converts a preview; the record itself stays in the kit's frame, converted once b
     python3 blender/tools/roadkit_cli.py setback     <record> [--margin 2.0]   (rewrites the record)
     python3 blender/tools/roadkit_cli.py centrelines <record> [--step 4.0] [--zones <zones.json>]
     python3 blender/tools/roadkit_cli.py lanekit     <record> <out.lanekit.json>
+    python3 blender/tools/roadkit_cli.py bands       <record> [--ground <stem>.ground.json]
     python3 blender/tools/roadkit_cli.py corridors   <record> [--ground <stem>.ground.json]
     python3 blender/tools/roadkit_cli.py ramp        <record> <uid_a> <uid_b> [--lanes 1]   (rewrites the record)
     python3 blender/tools/roadkit_cli.py pieces      <record> <zones.json> <out_dir> <prefix> [--dry-run]
@@ -197,6 +198,73 @@ def cmd_corridors(a):
     return gate
 
 
+def _left_offset(pts, dist):
+    """`pts` pushed `dist[i]` metres to each vertex's LEFT in plan (Z-up), the tangent averaged over
+    the two neighbouring chords. A DRAWING helper only: the footway's outer line in the draft."""
+    out = []
+    n = len(pts)
+    for i, p in enumerate(pts):
+        a, b = pts[max(i - 1, 0)], pts[min(i + 1, n - 1)]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        ln = (dx * dx + dy * dy) ** 0.5 or 1.0
+        out.append((p[0] - dy / ln * dist[i], p[1] + dx / ln * dist[i], p[2]))
+    return out
+
+
+def _flat(tris):
+    return [c for t in tris for v in t for c in pe.godot(v)]
+
+
+def cmd_bands(a):
+    """B10.1: the DRAFT SURFACE -- exactly the footprints Build sweeps, from the solve Build runs
+    (`point_edges.solve_all`), so the editor can show a junction's pad, setbacks, fillets and gores
+    while it is being tweaked without a Blender round trip. Nothing here is geometry of its own: road
+    triangles are the strip between `RoadSolve.edges_left/right`, a pad is `JunctionSolve.fan`, a gore
+    is `GoreSolve.tris`, and the kerb/footway lines are `point_edges.*_edge_runs` -- the same runs the
+    `__edges` carriers are swept on. Godot axes, the network's frame, flat `[x,y,z, ...]` arrays of
+    whole triangles (`surface`, `walk`) and polylines (`kerbs`). `bands[i]` names the owner of
+    triangles `tri_start .. tri_start + tri_count` of `surface[kind]` -- a road run's strip is
+    `(L[i], R[i], R[i+1]), (L[i], R[i+1], L[i+1])`, so its end cross-sections are the first and last pair."""
+    import time
+    t0 = time.time()
+    net = pm.load_network(a.record)
+    grid = pg.load_ground(a.ground) if a.ground else None
+    solves, jsolves, gsolves, bands = ped.solve_all(net, grid)
+    surface, walk, kerbs, owners = {"road": [], "pad": [], "gore": []}, [], [], []
+    runs = []
+    for s in solves:
+        L, R = s.edges_left, s.edges_right
+        tris = []
+        for i in range(len(L) - 1):
+            tris += [(L[i], R[i], R[i + 1]), (L[i], R[i + 1], L[i + 1])]
+        owners.append({"kind": "road", "owner": s.road.name, "uids": list(s.uids),
+                       "tri_start": len(surface["road"]) // 9, "tri_count": len(tris)})
+        surface["road"] += _flat(tris)
+        runs += ped.road_edge_runs(s, bands)
+    for j in jsolves:
+        owners.append({"kind": "pad", "owner": "JCT:" + j.uids[0][:8], "uids": list(j.uids),
+                       "tri_start": len(surface["pad"]) // 9, "tri_count": len(j.fan)})
+        surface["pad"] += _flat(j.fan)
+        runs += ped.junction_edge_runs(j)
+    for g in gsolves:
+        owners.append({"kind": "gore", "owner": "GORE:" + g.ramp_uid[:8], "uids": [g.main_uid, g.ramp_uid],
+                       "tri_start": len(surface["gore"]) // 9, "tri_count": len(g.tris)})
+        surface["gore"] += _flat(g.tris)
+        runs += ped.gore_edge_runs(g)
+    for _sfx, pts, w, k, _wall, sgn in runs:
+        top = [(p[0], p[1], p[2] + float(k[i])) for i, p in enumerate(pts)]
+        kerbs.append([c for p in top for c in pe.godot(p)])
+        if any(float(x) > 1e-6 for x in w):
+            outer = _left_offset(top, [sgn * 2.0 * float(x) for x in w])
+            kerbs.append([c for p in outer for c in pe.godot(p)])
+            for i in range(len(top) - 1):
+                walk += _flat([(top[i], outer[i], outer[i + 1]), (top[i], outer[i + 1], top[i + 1])])
+    return {"surface": surface, "walk": walk, "kerbs": kerbs, "bands": owners,
+            "counts": {"roads": len(solves), "pads": len(jsolves), "gores": len(gsolves),
+                       "edge_runs": len(runs)},
+            "ms": round((time.time() - t0) * 1000.0, 1)}
+
+
 def cmd_ramp(a):
     """`Make Ramp` + `Align Ramp To Aux` on the record (`point_record_ops.make_ramp`)."""
     net = pm.load_network(a.record)
@@ -267,6 +335,8 @@ def main(argv=None):
     s.set_defaults(fn=cmd_centrelines)
     s = sub.add_parser("corridors"); s.add_argument("record"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_corridors)
+    s = sub.add_parser("bands"); s.add_argument("record"); s.add_argument("--ground", default="")
+    s.set_defaults(fn=cmd_bands)
     s = sub.add_parser("lanekit"); s.add_argument("record"); s.add_argument("out")
     s.set_defaults(fn=cmd_lanekit)
     s = sub.add_parser("ramp"); s.add_argument("record"); s.add_argument("uid_a"); s.add_argument("uid_b")

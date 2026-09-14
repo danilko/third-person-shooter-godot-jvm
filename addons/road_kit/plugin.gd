@@ -21,6 +21,7 @@ const Fields := preload("res://addons/road_kit/road_kit_fields.gd")
 ## which is the build's input and is written only by Build.
 const PREVIEW_ZONES := "user://road_kit_preview.zones.json"
 const PREVIEW_SETTING := "road_kit/preview_pieces"
+const DRAFT_SETTING := "road_kit/draft_surface"
 
 var dock: VBoxContainer
 var status: Label
@@ -28,6 +29,7 @@ var findings: ItemList
 var link_type: OptionButton
 var build_thread: Thread
 var preview_pieces: CheckBox
+var draft_surface: CheckBox
 var gizmo: EditorNode3DGizmoPlugin
 var ramp_lanes: SpinBox
 var ramp_carriageway: OptionButton
@@ -118,6 +120,19 @@ func _enter_tree() -> void:
 		get_editor_interface().get_editor_settings().set_setting(PREVIEW_SETTING, on)
 		_on_preview_pieces(on))
 	dock.add_child(preview_pieces)
+	# B10.1: the solver's paved footprint drawn on every refresh -- the road you are editing, not the
+	# last build. ON by default, remembered.
+	draft_surface = CheckBox.new()
+	draft_surface.text = "Draft Surface (solver's tarmac + kerbs, live)"
+	if not es.has_setting(DRAFT_SETTING):
+		es.set_setting(DRAFT_SETTING, true)
+	draft_surface.button_pressed = bool(es.get_setting(DRAFT_SETTING))
+	draft_surface.toggled.connect(func(on):
+		get_editor_interface().get_editor_settings().set_setting(DRAFT_SETTING, on)
+		var n := _network()
+		if n != null:
+			_refresh(n))
+	dock.add_child(draft_surface)
 	findings = ItemList.new()
 	findings.custom_minimum_size = Vector2(0, 160)
 	findings.item_selected.connect(_on_finding_selected)
@@ -398,6 +413,15 @@ func _refresh(net: Node) -> void:
 		ov.name = "_RoadKitOverlay"
 		net.add_child(ov)
 	ov.redraw(net, r, markers)
+	if draft_surface != null and draft_surface.button_pressed:
+		var b := Service.run("bands", net.record_path)
+		if b.get("failed", false):
+			ov.clear_draft()
+			_say({"ok": false, "message": "draft surface: " + str(b.get("error", ""))})
+		else:
+			ov.draft(b, OverlayScript.materials_from(Preview.find(get_editor_interface().get_edited_scene_root())))
+	else:
+		ov.clear_draft()
 	# Face the points the tool owns (after `_save_for_service` has promoted the rotated ones).
 	Service.face_network(net)
 
@@ -656,4 +680,22 @@ func _selftest(scene_path: String) -> void:
 		for mi in meshes:
 			aabb = aabb.merge(mi.global_transform * mi.get_aabb())
 		print("[selftest]   ", c.name, " visible=", c.is_visible_in_tree(), " meshes=", meshes.size(), " aabb=", aabb)
+	# B10.1: load the record into a SCRATCH copy (a refresh saves the record) and refresh -- the draft
+	# surface must appear, wearing the kit's materials taken off the preview's base meshes.
+	if net != null and draft_surface.button_pressed:
+		var scratch := "user://roadkit_selftest.roads.json"
+		DirAccess.copy_absolute(ProjectSettings.globalize_path(net.record_path), ProjectSettings.globalize_path(scratch))
+		net.record_path = scratch
+		net.load_record()
+		_refresh(net)
+		var draft = net.get_node_or_null("_RoadKitOverlay/" + OverlayScript.DRAFT_NAME)
+		var mats := []
+		if draft != null:
+			for si in draft.mesh.get_surface_count():
+				var m: Material = draft.mesh.surface_get_material(si)
+				mats.append(m.resource_name if m != null else "<default>")
+		print("[selftest] draft surface: ", draft != null, " materials ", mats)
+		if draft == null or mats.has("<default>"):
+			get_tree().quit(1)
+			return
 	get_tree().quit()
