@@ -81,7 +81,7 @@ public class AnimationController extends Node {
    * {@link #player} as the JVM instance Godot bound the script to, when it is an AI.
    *
    * <p>A node reference exported through the scene is resolved at instantiate time, and
-   * godot-kotlin-jvm 0.17 can hand back a SECOND JVM wrapper for that engine object — same
+   * godot-jvm can hand back a SECOND JVM wrapper for that engine object — same
    * `get_instance_id()`, different Java object, none of the state its own `_ready()` wrote.
    * Engine calls are fine on either (which is why `player.isOnFloor()` above never noticed);
    * Java fields are not. Measured on this class: the exported reference IS the stale one, so

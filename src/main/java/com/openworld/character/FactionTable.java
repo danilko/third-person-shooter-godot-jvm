@@ -13,7 +13,7 @@ import godot.core.Dictionary;
  * <p>Storage is a flat {@code String → String} dictionary keyed by {@code "factionA>factionB"}
  * (see {@link #key}); values are one of {@link #FRIENDLY}/{@link #NEUTRAL}/{@link #HOSTILE}/
  * {@link #DESPISE}. A flat string dictionary (rather than a nested one) is both the inspector-friendly
- * shape and the one the godot-kotlin-jvm registration scanner handles — same shape the codebase
+ * shape and the one the godot-jvm registration scanner handles — same shape the codebase
  * already uses elsewhere (e.g. {@code MeshConfig.boneHitMultipliers}). Pairs are written in both
  * directions on {@link #setRelationship} and {@link #relationship} also checks the reverse, so a
  * table authored one-way still resolves.

@@ -33,12 +33,9 @@ Two things this stand still cannot see, both checked with one-off probes under
 `tools/godot/` conventions and recorded in W3 below: **which shoulder** the TPS boom sits over, and
 whether **FPS and TPS agree**. Add a case before trusting either again.
 
-**That is the STOCK Godot binary, and it is the only one to use now** — `blender/tools/env.sh`
-holds the same path as the one default every tool script shares. godot-jvm `1.0.0-dev3` ships as
-the `addons/jvm/` GDExtension, so the runtime comes from the project; a custom build with the JVM
-module compiled in loads it twice and dies with `Version mismatch! C++ module is : 0.17.1-4.7.2 /
-Jar is : 1.0.0-dev3` plus every AutoLoad failing to instantiate — which reads as a broken project
-rather than a wrong binary.
+**That is the standard Godot editor** — `blender/tools/env.sh` holds the same path as the one
+default every tool script shares. godot-jvm `1.0.0-rc1` is a GDExtension add-on in `addons/jvm/`,
+so no custom engine build is needed.
 
 Companion probe, for the spawn-order question specifically: the same binary with
 `--headless --path . --script tools/godot/probe_camera_frame.gd`.

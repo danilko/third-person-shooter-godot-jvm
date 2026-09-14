@@ -468,8 +468,8 @@ So a road has **two independent halves**, authored separately:
 imported scene into a native `.tscn`.** No hand-placement of roads/lanes/zones in `.tscn`.
 
 - **Conversion mechanism — a Java `WorldBaker` that bakes to a native `.tscn`** (NOT
-  `EditorScenePostImport`). **Verified:** godot-kotlin-jvm `0.15.0-4.6` exposes **no editor API**
-  (`EditorScenePostImport`/`EditorPlugin` are absent from every dependency jar), so a Java post-import
+  `EditorScenePostImport`). **Verified:** godot-jvm `1.0.0-rc1` exposes **no editor API**
+  (no `Editor*` class, including `EditorScenePostImport`/`EditorPlugin`, is in its API jar), so a Java post-import
   script is impossible, and a GDScript one breaks the no-GDScript rule + can't reuse the Java converters.
   Instead `world/WorldBaker.java` loads the imported `.blend`/`.glb` scene, walks it, converts **named**
   objects → gameplay nodes (reusing `VehicleRoute`, `Zone`, etc.), sets `owner` on every node, and
@@ -478,12 +478,12 @@ imported scene into a native `.tscn`.** No hand-placement of roads/lanes/zones i
 - **Three ways to trigger the bake** (all bake `source_scene_path` → `output_scene_path`):
   - **Headless CLI — the scriptable one-shot (`BakeWorld.tscn`, `bake_on_ready` + `quit_when_done`):**
     ```
-    <godot-jvm-binary> --headless --path <project-root> \
+    <godot-editor> --headless --path <project-root> \
       res://src/main/resources/com/openworld/world/BakeWorld.tscn
     ```
     Passing the scene path as the positional arg runs it as the main scene; `_ready` bakes, prints a
     per-type summary, and `getTree().quit()` exits the process — no interactive editor. *(Depends on
-    godot-kotlin-jvm bootstrapping the JVM under `--headless`; if that fails on your build, use one of the
+    godot-jvm bootstrapping the JVM under `--headless`; if that fails on your build, use one of the
     two fallbacks below — neither quits the running instance.)*
   - **Editor:** open `BakeWorld.tscn`, **F6** ("Run Current Scene").
   - **In-game:** `DebugHarness` **F5**.
@@ -624,7 +624,7 @@ geometry, so it streams for free and honours the seam contract above).
 | Topology | Arbitrary (cliffs/overhangs/caves) | Heightmap only |
 | Streaming / LOD | Via zone chunks (already built) | Built-in clipmap |
 | In-engine sculpt / splat paint | No (UV/shader in Blender) | Yes |
-| Dependency | None | Plugin coupled to `0.15.0-4.6` |
+| Dependency | None | Extra GDExtension add-on |
 
 - **Collision:** trimesh `StaticBody3D` per chunk (from the chunk's mesh or a `-col` proxy) — per-chunk
   keeps each collision body manageable and unloads with the zone.
@@ -636,8 +636,8 @@ geometry, so it streams for free and honours the seam contract above).
 
 ## Import / version pipeline
 
-- Confirm everyone runs compatible Blender + godot-kotlin-jvm plugin versions
-  (current project: plugin `0.15.0-4.6`, JDK 17 — see `CLAUDE.md`).
+- Confirm everyone runs compatible Blender + Godot versions: the standard Godot 4.7.2+ editor, with
+  godot-jvm `1.0.0-rc1` as the in-project `addons/jvm/` add-on, and JDK 17+ — see `CLAUDE.md`.
 - Agree on import presets per asset class (static mesh vs. skeleton+animation —
   `assets/merged_animation.blend` is the existing example of the latter) so
   re-imports stay reproducible across machines.

@@ -67,7 +67,7 @@ public class MovementController extends Node {
    * The same body as {@link #player}, but the JVM instance Godot actually bound the script to.
    *
    * <p>A node reference exported through the scene (`node_paths=PackedStringArray("player")`) is
-   * resolved when the scene is instantiated, and godot-kotlin-jvm 0.17 hands back a SECOND JVM
+   * resolved when the scene is instantiated, and godot-jvm hands back a SECOND JVM
    * wrapper for that engine object — same `get_instance_id()`, different Java object, and none of
    * the state the body's own `_ready()` wrote. Engine calls (`isOnFloor`, `getGlobalPosition`,
    * `moveAndSlide`) go through the bridge and are correct on either wrapper, which is why this hid

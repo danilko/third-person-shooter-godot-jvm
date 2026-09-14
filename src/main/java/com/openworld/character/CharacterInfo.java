@@ -48,7 +48,7 @@ public class CharacterInfo extends Resource {
      * object rewrites the identity of every sibling instance (the traffic-vehicle aliasing
      * bug). We privatize by copying fields into a brand-new instance rather than relying on
      * {@code resource_local_to_scene} (whose instantiate-time {@code duplicate()} reenters the
-     * godot-kotlin-jvm TransferContext and throws a {@code Shared Buffer Error}).
+     * godot-jvm TransferContext and throws a {@code Shared Buffer Error}).
      */
     public static CharacterInfo copyOf(CharacterInfo src) {
         CharacterInfo c = new CharacterInfo();

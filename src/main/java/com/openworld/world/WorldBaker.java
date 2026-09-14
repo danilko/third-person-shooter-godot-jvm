@@ -41,7 +41,7 @@ import java.util.Set;
  * native {@code .tscn} via {@link PackedScene#pack} + {@link ResourceSaver}. The game then loads that
  * native scene at runtime — no per-load walk of the source.
  *
- * <p>Chosen over {@code EditorScenePostImport} because godot-kotlin-jvm exposes no editor API in this
+ * <p>Chosen over {@code EditorScenePostImport} because godot-jvm exposes no editor API in this
  * project (verified), so the conversion must run as ordinary Java that reuses the game classes
  * ({@link VehicleRoute}, {@link Zone}, …). Run it from a dev key ({@code DebugHarness}) or a
  * {@code BakeWorld} scene with {@link #bakeOnReady}; re-run when the source changes.

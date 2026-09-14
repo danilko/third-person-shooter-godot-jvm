@@ -26,12 +26,12 @@ import java.util.List;
  * a {@code MultiMesh} carries no collision of its own).
  *
  * <p>Uses the runtime (non-editor) navmesh-baking API — the same class of workaround
- * {@code WorldBaker} already established as the only option here (godot-kotlin-jvm 0.15.0-4.6
+ * {@code WorldBaker} already established as the only option here (godot-jvm 1.0.0-rc1
  * exposes no editor API — see CLAUDE.md Known Quirks). <b>Deliberately calls the two-step
  * {@link NavigationServer3D#parseSourceGeometryData}/{@link NavigationServer3D#bakeFromSourceGeometryData}
  * pair, not the single-call {@code NavigationMeshGenerator.bake()} convenience wrapper</b> — that
  * wrapper was verified (empirically, against a trivial hand-built ground plane) to silently return
- * zero polygons in this godot-kotlin-jvm binding, while the explicit two-step call it should be
+ * zero polygons in this godot-jvm binding, while the explicit two-step call it should be
  * equivalent to works correctly. {@code STATIC_COLLIDERS} parsing means this needs only
  * {@code PhysicsServer3D}-side shape data, not a live {@code RenderingServer} — unlike
  * {@code WorldBaker}'s MultiMesh step, this bake works fine under {@code --headless}.

@@ -2,7 +2,6 @@
 
 Third-person shooter experiment using **Godot 4.7** with the **[godot-jvm](https://github.com/utopia-rise/godot-jvm)** binding
 (`1.0.0-rc1`, shipped as the in-project `addons/jvm/` GDExtension; docs: https://godot-jvm.dev/en/1.0/).
-The project was called **godot-kotlin-jvm** before 1.0; notes below that cite `0.17` record behaviour measured on that release.
 All game logic is written in **Java** (a few stubs in Kotlin). GDScript is not used.
 
 ---
@@ -18,16 +17,13 @@ Open `project.godot` with the **stock Godot 4.7.2 editor** —
 default (`blender/tools/env.sh`) and what every headless check must run under. JVM toolchain:
 **JDK 17**.
 
-> **Do NOT use the old `godot.linuxbsd.editor.x86_64.jvm` build.** Since godot-jvm 1.0 (first
-> seen here at `1.0.0-dev3`; now `1.0.0-rc1` — `build.gradle.kts`: `com.utopia-rise.godot-jvm`) the runtime ships **with the project**, as the
-> `addons/jvm/` GDExtension — so a binary with the JVM module compiled in loads it twice. The
-> symptom is not "wrong binary": it is `Attempt to register extension class 'JvmScript', which
-> appears to be already registered`, then `Version mismatch! C++ module is : 0.17.1-4.7.2 / Jar is
-> : 1.0.0-dev3` (the message as first recorded; the jar version reads whatever the addon is), then **every AutoLoad failing with "does not inherit from 'Node'"** — i.e. it
-> reads as a completely broken project. Keep the Gradle plugin version equal to the addon's — both are `1.0.0-rc1` today; upgrade them together.
+godot-jvm **`1.0.0-rc1`** is a **GDExtension add-on** that ships with the project in `addons/jvm/`,
+so the **standard Godot editor** is all that is needed — no custom engine build. Keep the Gradle
+plugin (`build.gradle.kts`: `com.utopia-rise.godot-jvm`) and the `addons/jvm/` add-on on the same
+version (both `1.0.0-rc1`) and upgrade them together.
 
 Scenes/resources reference scripts by their **source `.java` path**
-(`res://src/main/java/com/openworld/.../X.java`). As of 0.17 that is the *only* way for a
+(`res://src/main/java/com/openworld/.../X.java`). Under godot-jvm `1.0.0-rc1` that is the *only* way for a
 project class: `.gdj` registration files are now emitted **only for registered classes coming
 from external dependencies**, of which this project has none — so `gdj/` stays empty and is not
 a fallback. Source of truth is always `src/main/java/` — never edit generated files.
@@ -63,7 +59,7 @@ rewriting it would make the record lie about what was actually built. New writin
 
 All code lives under the **`com.openworld`** root, organized **by domain/concern** (not layer-first).
 Scripts are referenced from scenes by `.java` path (`res://src/main/java/com/openworld/.../X.java`);
-`.gdj` is dependency-only under 0.17 and unused here. The two reorg scripts (`tools/reorg_stage1.py`, `tools/reorg_stage2.py`)
+`.gdj` is dependency-only under godot-jvm `1.0.0-rc1` and unused here. The two reorg scripts (`tools/reorg_stage1.py`, `tools/reorg_stage2.py`)
 and `tools/REORG_PROGRESS.md` document the move; reuse their pattern for future moves.
 
 ```
@@ -1861,7 +1857,7 @@ zero). Prone aiming needs an authored prone aim set.
 
 **One engine object, TWO JVM wrappers.** A node reference exported through a scene
 (`node_paths=PackedStringArray("player")`, i.e. `@Export CharacterBody3D player`) is resolved when
-the scene is instantiated, and godot-jvm (measured on 0.17) can hand back a **second JVM instance** for
+the scene is instantiated, and godot-jvm can hand back a **second JVM instance** for
 that engine object — identical `get_instance_id()`, different Java object, and **none of the state
 the body's own `_ready()` wrote**. Engine calls (`isOnFloor`, `getGlobalPosition`, `moveAndSlide`)
 go through the bridge and are correct on either wrapper, which is exactly why this hid for so long;
@@ -3227,7 +3223,7 @@ holster placement, projectile authority, lag compensation.
 
 ## Godot-JVM Specifics
 
-- **Annotations (0.17 API — the pre-0.17 `@Register*` family is gone).** The plugin runs in the
+- **Annotations (godot-jvm `1.0.0-rc1` API — the older `@Register*` family is gone).** The plugin runs in the
   default `Inferred` mode, where an annotation implies what it needs:
 
   | intent | annotation | replaced |
@@ -3246,7 +3242,7 @@ holster placement, projectile authority, lag compensation.
   **registered automatically**, no annotation. The registrar names the signal after the *field*
   (`playerDied` → `player_died`, via `convertToSnakeCase`), which is why the field name and the
   `new StringName("player_died")` handed to the constructor must stay in sync.
-- **A Java field and its JavaBean accessors are ONE property.** 0.17's language adapter merges
+- **A Java field and its JavaBean accessors are ONE property.** godot-jvm's language adapter merges
   `public T x` with `getX`/`isX`/`setX` into a single logical property and then binds it *through
   the accessors*. Consequences, each of which bit this codebase during the 4.7 upgrade:
   - A **getter-only** exported property is registered `READ_ONLY` (and its generated registrar does

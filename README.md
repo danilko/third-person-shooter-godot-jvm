@@ -314,10 +314,6 @@ Character display names are configured via the `displayName` export property on 
 * **JDK 17 or newer.** Gradle's toolchain resolver downloads one automatically if it can't find one.
 * Git LFS, which stores the binary assets and addons: `git lfs install` before cloning.
 
-> **Do not use a custom Godot editor build with the JVM module compiled into the engine.** Together
-> with the in-project addon it loads the runtime twice, and every AutoLoad then fails with "does not
-> inherit from 'Node'".
-
 ### Build Instructions
 1. Clone the repository.
 2. Run the Gradle build to compile the Java sources and generate the class registrations Godot loads:

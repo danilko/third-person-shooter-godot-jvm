@@ -97,7 +97,7 @@ public class TPSCameraController extends Node3D {
 
 
     // Re-resolve the export before reading a single Java field off it. `player` is serialized as
-    // node_paths and godot-kotlin-jvm 0.17 can hand back a SECOND JVM wrapper for that engine
+    // node_paths and godot-jvm can hand back a SECOND JVM wrapper for that engine
     // object -- same instance id, different Java object, every Java field at its default. Engine
     // calls work on either (which is why springArm.addExcludedObject above is fine on the raw
     // export), Java state does not, and which exports are affected depends on resolution order and

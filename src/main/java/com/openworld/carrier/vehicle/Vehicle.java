@@ -284,7 +284,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 detachController();
                 vnc.queueFree();
             }
-            // Kotlin/JVM binding gotcha: Godot 4's `freeze` property is setFreezeEnabled.
+            // godot-jvm binding gotcha: Godot 4's `freeze` property is setFreezeEnabled.
             setFreezeEnabled(false);
         } else {
             if (controller == null) {

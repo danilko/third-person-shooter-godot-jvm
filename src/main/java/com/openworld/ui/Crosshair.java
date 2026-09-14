@@ -102,7 +102,7 @@ public class Crosshair extends Control {
         this.positionX = positionX;
     }
 
-    /** Getter half of the exported {@code showCrosshair} property (0.17 binds a property
+    /** Getter half of the exported {@code showCrosshair} property (godot-jvm binds a property
      *  that has any accessor through its accessors, so the pair must be complete). */
     public boolean isShowCrosshair() {
         return showCrosshair;

@@ -31,7 +31,7 @@ public class WaterVolume extends Area3D {
   @Override
   public void _ready() {
 	addToGroup(new StringName(WATER_GROUP));
-	// godot-kotlin-jvm registers @Register methods under their snake_case names.
+	// godot-jvm registers @Register methods under their snake_case names.
 	connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
 	connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
   }

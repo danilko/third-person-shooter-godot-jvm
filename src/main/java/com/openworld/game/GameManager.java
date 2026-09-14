@@ -93,7 +93,7 @@ public class GameManager extends Node {
         }
 
         // Stop all in-flight weapon SFX the instant the OS requests a window close, while every
-        // node and the JVM are still alive. At the real quit the godot-kotlin-jvm runtime is torn
+        // node and the JVM are still alive. At the real quit the godot-jvm runtime is torn
         // down BEFORE the final SceneTree node teardown, so a WeaponController's
         // tree_exiting → weaponAudio.stop self-stop never runs for bodies still alive at quit —
         // their in-flight reload/fire AudioStreamPlaybackWAV leaks ("Resource still in use:
@@ -109,7 +109,7 @@ public class GameManager extends Node {
 
     /**
      * Window close handler (see _ready). Stops EVERY audio player in the tree before the quit tears
-     * it down. At app exit the godot-kotlin-jvm runtime is cleaned before the final node teardown, so
+     * it down. At app exit the godot-jvm runtime is cleaned before the final node teardown, so
      * a JVM-registered tree_exiting/_exitTree stop never releases an in-flight playback — any
      * AudioStreamPlayer{,2D,3D} still playing at quit leaks its AudioStreamPlaybackWAV ("Resource
      * still in use" / leaked ObjectDB). This is a single generic sweep on purpose: it is NOT
