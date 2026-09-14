@@ -620,27 +620,10 @@ def build_edges(solve, bands, coll, name, style=None):
     reports the stretches of each paved boundary that are not buried in another road's asphalt;
     the furniture is built on those and nowhere else. There is no `RAMP_WALL_OPEN` constant, no
     merge-corridor solve and no ramp-specific branch -- the previous model needed all three and
-    still "sometimes missed an entire section of wall"."""
-    out = []
-    runs = pe.kerb_runs(solve, bands)
-    for side, edge in (("left", solve.edges_left), ("right", solve.edges_right)):
-        sgn = 1.0 if side == "left" else -1.0
-        kerb_key = "rka_curb_hl" if side == "left" else "rka_curb_hr"
-        walk_key = "rka_walk_hl" if side == "left" else "rka_walk_hr"
-        for n, run in enumerate(runs[side]):
-            pts = pe.sub_polyline(edge, run)
-            if len(pts) < 2:
-                continue
-            # `run_values` and `sub_polyline` are two readings of the same run, clipped ends and
-            # all, so the polyline and its attributes cannot come out different lengths.
-            vals = pe.run_values(solve.values, run)
-            out.append(build_edge_run(
-                pts,
-                [v[walk_key] for v in vals],
-                [v[kerb_key] for v in vals],
-                [v["rka_wall_h"] for v in vals],
-                sgn, coll, "%s%s_%s_%d" % (name, SUFFIX_EDGE, side, n), style))
-    return out
+    still "sometimes missed an entire section of wall". Which runs exist is
+    `point_edges.road_edge_runs`, shared with the editor's draft surface."""
+    return [build_edge_run(pts, walk, kerb, wall, sgn, coll, "%s%s_%s" % (name, SUFFIX_EDGE, sfx), style)
+            for sfx, pts, walk, kerb, wall, sgn in pe.road_edge_runs(solve, bands)]
 
 
 # ------------------------------------------------------------------------------- the markings
@@ -747,13 +730,8 @@ def build_junction_edges(jsolve, coll, name, style=None):
     Outboard is to the RIGHT here: `intersection_kit` emits the pad's boundary CCW, so a corner
     that runs CCW around it has the outside on its right, which is the opposite of a road's LEFT
     flank. That sign is the only thing that differs from `build_edges`."""
-    out = []
-    for i, c in enumerate(jsolve.corners):
-        if len(c.points) < 2:
-            continue
-        out.append(build_edge_run(c.points, c.walk, c.kerb, c.wall, -1.0, coll,
-                                  "%s%s_c%d" % (name, SUFFIX_EDGE, i), style))
-    return out
+    return [build_edge_run(pts, walk, kerb, wall, sgn, coll, "%s%s_%s" % (name, SUFFIX_EDGE, sfx), style)
+            for sfx, pts, walk, kerb, wall, sgn in pe.junction_edge_runs(jsolve)]
 
 
 # ------------------------------------------------------------------------------- the gore
@@ -818,15 +796,8 @@ def build_gore_edges(gsolve, coll, name, style=None):
     (`point_solve._gore_nose`), so a highway's barrier meeting a ramp's barrier is a wall, an
     approach that declares a footway gets a kerbed island, and a pair that declares neither builds
     nothing -- which is what the empty check below is for, not a special case for expressways."""
-    c = getattr(gsolve, "nose", None)
-    if c is None or len(c.points) < 2:
-        return []
-    if math.dist(c.points[0][:2], c.points[-1][:2]) < 1e-3:
-        return []                     # a degenerate cap: two coincident edges, nothing to close
-    if not any(abs(v) > 1e-6 for v in list(c.kerb) + list(c.walk) + list(c.wall)):
-        return []
-    return [build_edge_run(c.points, c.walk, c.kerb, c.wall, gsolve.nose_sgn, coll,
-                           name + SUFFIX_EDGE + "_nose", style)]
+    return [build_edge_run(pts, walk, kerb, wall, sgn, coll, name + SUFFIX_EDGE + "_" + sfx, style)
+            for sfx, pts, walk, kerb, wall, sgn in pe.gore_edge_runs(gsolve)]
 
 
 # ------------------------------------------------------------------- the ground cut lives ELSEWHERE

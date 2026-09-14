@@ -405,6 +405,47 @@ def run_values(values, run):
     return out
 
 
+def road_edge_runs(solve, bands):
+    """`[(suffix, points, walk, kerb, wall, sgn)]` -- one road run's kerb/footway carriers, over the
+    OPEN runs only. THE one enumeration of edge runs: `point_build.build_edges` sweeps these and
+    `roadkit_cli.py bands` draws them, so the draft and the build cannot disagree about where a
+    kerb stops. `sgn` is which side of the polyline the furniture stands on (+1 = its left)."""
+    out = []
+    runs = kerb_runs(solve, bands)
+    for side, edge in (("left", solve.edges_left), ("right", solve.edges_right)):
+        kerb_key = "rka_curb_hl" if side == "left" else "rka_curb_hr"
+        walk_key = "rka_walk_hl" if side == "left" else "rka_walk_hr"
+        for n, run in enumerate(runs[side]):
+            pts = sub_polyline(edge, run)
+            if len(pts) < 2:
+                continue
+            vals = run_values(solve.values, run)
+            out.append(("%s_%d" % (side, n), pts, [v[walk_key] for v in vals],
+                        [v[kerb_key] for v in vals], [v["rka_wall_h"] for v in vals],
+                        1.0 if side == "left" else -1.0))
+    return out
+
+
+def junction_edge_runs(jsolve):
+    """A pad's corners as edge runs. Outboard is to the RIGHT: the ring is CCW, so a corner running
+    CCW around it has the outside on its right."""
+    return [("c%d" % i, c.points, c.walk, c.kerb, c.wall, -1.0)
+            for i, c in enumerate(jsolve.corners) if len(c.points) >= 2]
+
+
+def gore_edge_runs(gsolve):
+    """A gore's nose cap as an edge run, or nothing when there is no V to close (see
+    `point_build.build_gore_edges`)."""
+    c = getattr(gsolve, "nose", None)
+    if c is None or len(c.points) < 2:
+        return []
+    if math.dist(c.points[0][:2], c.points[-1][:2]) < 1e-3:
+        return []
+    if not any(abs(v) > 1e-6 for v in list(c.kerb) + list(c.walk) + list(c.wall)):
+        return []
+    return [("nose", c.points, c.walk, c.kerb, c.wall, gsolve.nose_sgn)]
+
+
 def measure_on_asphalt(samples, bands, skip=(), z_tol=Z_TOL):
     """How many of `samples` stand on another road's asphalt. The gate's number, and the one this
     module exists to drive to zero -- reported rather than asserted, because at a legitimate gore

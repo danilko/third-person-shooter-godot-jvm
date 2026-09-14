@@ -87,12 +87,13 @@ if [ "$QUICK" -eq 0 ]; then
   run "test_roadkit_ground" gd tools/godot/test_roadkit_ground.gd
   run "test_roadkit_zones" gd tools/godot/test_roadkit_zones.gd -- "$GT/z.json"
   run "test_roadkit_preview" gd tools/godot/test_roadkit_preview.gd
+  run "test_roadkit_draft (B10.1 draft surface = the build)" gd tools/godot/test_roadkit_draft.gd
   run "probe_road_ground (DebugWorld supports on the ground)" gd tools/godot/probe_road_ground.gd
   run "probe_road_stamp (DebugWorld terrain carries the roads)" gd tools/godot/probe_road_stamp.gd
   # Inside the REAL editor, where a non-@tool JVM script is a placeholder: the plugin opens DebugWorld
   # and must show its road pieces without being asked -- and without writing its unloaded (empty)
   # network over the record, which it once did (`plugin.gd _selftest`).
-  run "editor self-test (road pieces shown on scene open)" bash -c "cd '$ROOT' && ROADKIT_EDITOR_SELFTEST=res://src/main/resources/com/openworld/world/DebugWorld.tscn timeout -k 5 300 '$GODOT' --headless --editor --path . 2>&1 | tee /dev/stderr | grep -q 'preview shown on open: true'"
+  run "editor self-test (pieces shown on open, draft surface wears the kit's materials)" bash -c "cd '$ROOT' && ROADKIT_EDITOR_SELFTEST=res://src/main/resources/com/openworld/world/DebugWorld.tscn timeout -k 5 300 '$GODOT' --headless --editor --path . > '$GT/selftest.log' 2>&1; cat '$GT/selftest.log' >&2; grep -q 'preview shown on open: true' '$GT/selftest.log' && grep -q 'draft surface: true materials \[\"M_Asphalt' '$GT/selftest.log'"
   rm -rf "$GT"
 fi
 

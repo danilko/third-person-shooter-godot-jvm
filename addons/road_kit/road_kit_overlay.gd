@@ -15,6 +15,13 @@ const COLORS := {"SEGMENT": Color(0.3, 0.9, 0.3), "JUNCTION": Color(1.0, 0.85, 0
 const BEYOND := Color(1.0, 0.5, 0.1)
 const CROSS := Color(1.0, 0.2, 0.9)
 const RING_SEGMENTS := 72
+const LINES := preload("res://addons/road_kit/road_kit_overlay_lines.tres")
+const DRAFT_NAME := "_Draft"
+## The kit's own material per draft layer, by name -- the names `road_kit.blend` gives them and every
+## baked piece carries (`kit_common.MATS`). Looked up on the base meshes, never built here.
+const DRAFT_MATERIALS := {"tarmac": "M_Asphalt", "walk": "M_ConcreteTile", "kerb": "M_LineW"}
+## Lifted off the solver's surface so the draft does not z-fight a Preview Pieces mesh at the same height.
+const DRAFT_LIFT := 0.08
 
 ## Zone id -> colour: evenly spaced hues over the ids in sorted order, so the same scene draws the same
 ## colours every time. "" (resident) is white.
@@ -32,10 +39,7 @@ func redraw(net: Node, data, markers: Array = []) -> Dictionary:
 	var runs: Array = data if data is Array else data.get("runs", [])
 	var extra: Dictionary = {} if data is Array else data
 	var im := ImmediateMesh.new()
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.vertex_color_use_as_albedo = true
-	mat.no_depth_test = true
+	var mat: Material = LINES
 	var ids := []
 	for m in markers:
 		var z = m.get("zone")
@@ -143,3 +147,69 @@ func _ring(im: ImmediateMesh, mat: Material, xf: Transform3D, c: Vector3, radius
 		im.surface_set_color(col)
 		im.surface_add_vertex(xf * (c + Vector3(cos(a) * radius, 0.0, sin(a) * radius)))
 	im.surface_end()
+
+## Every surface material under `node` (the base meshes -- a Preview Pieces holder, a built piece), by
+## `resource_name`.
+static func materials_from(node: Node) -> Dictionary:
+	var out := {}
+	if node == null:
+		return out
+	for mi in node.find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var m: Material = mi.get_surface_override_material(s) if mi.get_surface_override_material(s) != null else mi.mesh.surface_get_material(s)
+			if m != null and m.resource_name != "":
+				out[m.resource_name] = m
+	return out
+
+## B10.1: the DRAFT SURFACE -- tarmac (roads, pads, gores), footways and kerb lines, from
+## `roadkit_cli.py bands`: exactly the footprints Build sweeps, uploaded and never re-derived. Its
+## materials are the kit's own, taken from `materials` (`materials_from` the base meshes); one that is
+## missing -- nothing built yet -- leaves the engine default. A child of this unowned overlay, so it is
+## never saved. Returns `{"tris", "walk_tris", "kerb_lines", "materials"}` (how many layers found theirs).
+func draft(data: Dictionary, materials: Dictionary = {}) -> Dictionary:
+	clear_draft()
+	var mi := MeshInstance3D.new()
+	mi.name = DRAFT_NAME
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var am := ArrayMesh.new()
+	var tarmac := PackedFloat32Array()
+	for key in ["road", "pad", "gore"]:
+		tarmac.append_array(PackedFloat32Array(data.get("surface", {}).get(key, [])))
+	var walk := PackedFloat32Array(data.get("walk", []))
+	var lines := PackedVector3Array()
+	for flat in data.get("kerbs", []):
+		for i in flat.size() / 3 - 1:
+			lines.append(Vector3(flat[3 * i], flat[3 * i + 1] + DRAFT_LIFT * 1.5, flat[3 * i + 2]))
+			lines.append(Vector3(flat[3 * i + 3], flat[3 * i + 4] + DRAFT_LIFT * 1.5, flat[3 * i + 5]))
+	var found := 0
+	for layer in [["tarmac", Mesh.PRIMITIVE_TRIANGLES, _lift(tarmac, DRAFT_LIFT)],
+			["walk", Mesh.PRIMITIVE_TRIANGLES, _lift(walk, DRAFT_LIFT)], ["kerb", Mesh.PRIMITIVE_LINES, lines]]:
+		var verts: PackedVector3Array = layer[2]
+		if verts.is_empty():
+			continue
+		var arr := []
+		arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX] = verts
+		am.add_surface_from_arrays(layer[1], arr)
+		var m = materials.get(DRAFT_MATERIALS[layer[0]])
+		if m != null:
+			am.surface_set_material(am.get_surface_count() - 1, m)
+			found += 1
+	mi.mesh = am
+	add_child(mi)
+	return {"tris": tarmac.size() / 9, "walk_tris": walk.size() / 9, "kerb_lines": data.get("kerbs", []).size(), "materials": found}
+
+func clear_draft() -> void:
+	var old := get_node_or_null(DRAFT_NAME)
+	if old != null:
+		remove_child(old)
+		old.free()
+
+static func _lift(flat: PackedFloat32Array, lift: float) -> PackedVector3Array:
+	var verts := PackedVector3Array()
+	verts.resize(flat.size() / 3)
+	for i in verts.size():
+		verts[i] = Vector3(flat[3 * i], flat[3 * i + 1] + lift, flat[3 * i + 2])
+	return verts
