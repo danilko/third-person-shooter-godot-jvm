@@ -1,6 +1,6 @@
 # World rebuild — island v3 from the ground up
 
-> **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — `W17` is decided with Terrain3D step 4 (item 3.1: dropped if the road addon is retired); `W7`+`W11` are 3.3, `W8` is 3.4, `W6` is 3.5, Step 3 is 3.6 — re-scoped onto road-generator, not built in Blender. This file stays as design, measurements and history.
+> **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — `W17` is decided with Terrain3D step 4 (item 3.1: dropped if the road addon is retired); `W7`+`W11` are 3.3, `W8` is 3.4, `W6` is 3.5, Step 3 is 3.6 — re-scoped onto the Godot-authored Road Kit (road-generator was removed 2026-09-13), not built in Blender. This file stays as design, measurements and history.
 
 **Status: STEP 1 DONE, STEP 2 ALL BUT DONE — the whole island's ground and roads are playable
 in-game as one BASE piece (2026-08-29), walk-tested 2026-08-30, and since then the sea has a FLOOR,

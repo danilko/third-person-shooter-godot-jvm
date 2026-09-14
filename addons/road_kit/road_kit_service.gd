@@ -21,8 +21,12 @@ static func run(cmd: String, record_path: String, extra: Array = []) -> Dictiona
 		return {"failed": true, "error": "roadkit_cli %s exited %d: %s" % [cmd, code, text.substr(0, 400)]}
 	return parsed
 
-## The whole build (lanes, meshes, bake). Blocking — call it from a Thread.
-static func build_piece(record_path: String, piece: String) -> Dictionary:
+## The whole build (lanes, meshes, bake). Blocking — call it from a Thread. With a zones sidecar
+## (`road_kit_zones.gd`) `piece` is a prefix and the network is cut into one piece per zone.
+static func build_piece(record_path: String, piece: String, zones_path: String = "") -> Dictionary:
 	var out := []
-	var code := OS.execute("bash", [ProjectSettings.globalize_path(BUILD), ProjectSettings.globalize_path(record_path), piece], out, true)
+	var args := [ProjectSettings.globalize_path(BUILD), ProjectSettings.globalize_path(record_path), piece]
+	if zones_path != "":
+		args.append(ProjectSettings.globalize_path(zones_path))
+	var code := OS.execute("bash", args, out, true)
 	return {"ok": code == 0, "log": "".join(out)}

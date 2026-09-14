@@ -888,6 +888,7 @@ public class ZoneManager extends Node {
 			t.pendingChildren.add(child);
 		}
 		t.marker.addChild(geo);
+		t.marker.zone.placeGeometry(geo, t.marker);
 		t.geoRoot = geo;
 		t.lz.geometryInstance = geo;
 		t.phase = Phase.GEO_ENTER;
@@ -1509,7 +1510,7 @@ public class ZoneManager extends Node {
 	 * in order: (1) exact node-name match; (2) <b>zone-id equality</b> — every {@link PathLaneRoute}
 	 * whose {@link PathLaneRoute#zoneId} equals {@code routeName} exactly (the property-based zone tag
 	 * {@code lib/lane_kit.py}'s combiner stamps on every lane); (3) otherwise {@code routeName} is a
-	 * <b>prefix</b> (e.g. {@code "art_"}, {@code "Lane_"} for road-generator lanes). Strategies (2)/(3)
+	 * <b>prefix</b> (e.g. {@code "art_"}, {@code "Lane_"} for the removed road-generator's lanes). Strategies (2)/(3)
 	 * collect the plain lanes (never a turn connector — a car set down mid-junction lands inside the
 	 * box) whose entry lies within {@code maxDist} of the zone, filtered by {@link #spawnableByReach}.
 	 * Empty when nothing matches.

@@ -1,5 +1,10 @@
 # Terrain3D + road-generator transition
 
+> **road-generator was REMOVED on 2026-09-13** (user decision): roads are the Godot-authored Road Kit
+> (`CLAUDE.md` "Road Kit — option B"), DebugWorld's road was converted to a Road Kit network
+> (`DebugRoads`), and `RoadNetworkBridge`, `bake_road_terrain.gd`, the addon and `road_demos/` are
+> gone. Terrain3D stays. Everything below about road-generator is history.
+
 > **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — step 4 is item 3.1, the lane-data oddities 3.2, spawn placement / stuck cars 0.4 (done), the camera far plane 0.3 (not a defect), the horizon band 3.7, the mission-vehicle rule 4.2. This file stays as design, measurements and history.
 
 > **Progress tracker for a multi-session effort.** Decided 2026-09-06. Ground and roads leave the

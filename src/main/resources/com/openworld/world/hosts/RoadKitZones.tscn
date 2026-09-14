@@ -1,0 +1,82 @@
+[gd_scene format=3]
+
+; Road Kit B6 host (PLAN.md 3.1): ONE continuous network (the kit's sample record) cut into a road
+; piece per zone by `point_zones.py` and streamed by two ZoneMarkers. The network is deliberately
+; NOT at the origin, so a piece placed in its marker's frame instead of the network's is visibly off.
+; Each load radius covers the farthest point of its zone's roads (west 610 m, east 1417 m), which is
+; what `point_zones`' zone_beyond_load asks for.
+; The markers' geometry_* fields are exactly what the Road Kit dock's Build writes — asserted by
+; tools/godot/test_roadkit_zones.gd (plan_wiring reports 0 changes). Runtime gate:
+; tools/godot/probe_road_zones.gd.
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ZoneMarker.java" id="zmark"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Zone.java" id="zone"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/VehicleSpawnConfig.java" id="vspawn"]
+[ext_resource type="Script" path="res://addons/road_kit/road_kit_network.gd" id="rknet"]
+
+[sub_resource type="BoxShape3D" id="ground_shape"]
+size = Vector3(4400, 1, 2000)
+
+[sub_resource type="Resource" id="traffic_west"]
+script = ExtResource("vspawn")
+count = 4
+cruise_throttle = 0.4
+route_name = "west"
+
+[sub_resource type="Resource" id="zone_west"]
+script = ExtResource("zone")
+zone_id = "west"
+size = Vector3(900, 12, 900)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_RoadKitZones_west.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)
+vehicle_spawn_configs = Array[ExtResource("vspawn")]([SubResource("traffic_west")])
+
+[sub_resource type="Resource" id="zone_east"]
+script = ExtResource("zone")
+zone_id = "east"
+size = Vector3(1400, 12, 900)
+load_radius = 1500.0
+unload_radius = 1900.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_RoadKitZones_east.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)
+
+[node name="RoadKitZones" type="Node3D"]
+
+[node name="Ground" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1000, -0.7, 40)
+
+[node name="Shape" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("ground_shape")
+
+[node name="RoadKitZones" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 40)
+script = ExtResource("rknet")
+record_path = "res://assets/world_source/pieces/RoadKitSample.roads.json"
+
+[node name="Characters" type="Node" parent="."]
+
+[node name="Player" parent="Characters" instance=ExtResource("player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 825, 1.0, 60)
+
+[node name="PlayerSpawn" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 825, 1.0, 60)
+
+[node name="Zones" type="Node" parent="."]
+
+[node name="West" type="Node3D" parent="Zones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 250, 0, 40)
+script = ExtResource("zmark")
+zone = SubResource("zone_west")
+
+[node name="East" type="Node3D" parent="Zones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1400, 0, -60)
+script = ExtResource("zmark")
+zone = SubResource("zone_east")
+
+[node name="WorldSystems" parent="." instance=ExtResource("wsys")]

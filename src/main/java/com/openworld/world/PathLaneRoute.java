@@ -158,7 +158,8 @@ public class PathLaneRoute extends Node3D implements Lane {
     /**
      * Optional explicit source {@link Path3D}, instead of the {@code "Path3D"} child.
      *
-     * <p>Added for the road-generator bridge: that addon's {@code RoadLane} <b>is</b> a
+     * <p>Added for the road-generator bridge (both removed 2026-09-13; nothing sets this today, and
+     * it is kept as the one-branch seam for any future externally owned curve): that addon's {@code RoadLane} <b>is</b> a
      * {@code Path3D}, generated as a child of a {@code RoadPoint} by the plugin and re-created
      * whenever the road rebuilds — so it can neither be renamed to {@code "Path3D"} nor reparented
      * under a lane node without fighting the generator. Pointing at it costs one indirection and
