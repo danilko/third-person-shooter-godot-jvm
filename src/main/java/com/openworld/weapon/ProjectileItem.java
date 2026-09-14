@@ -69,6 +69,9 @@ public class ProjectileItem extends WeaponItem {
     @Override public WeaponType getWeaponType()    { return WeaponType.RANGED; }
     @Override public float getCurrentSpreadDeg()   { return 0f; }
 
+    /** A rocket leaves the muzzle toward the aim point, so the launcher must be pointing at it. */
+    @Override protected boolean launchesTowardAim() { return true; }
+
     /** Semi-auto lock: one shot per trigger pull. */
     @Override
     public boolean canUse() {

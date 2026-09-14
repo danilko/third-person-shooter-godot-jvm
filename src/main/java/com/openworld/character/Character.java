@@ -875,6 +875,15 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     }
 
 
+    /**
+     * The {@code Stance} node for the stance this body is in now, or null before the stances are
+     * cached. Named {@code resolveX}, not {@code getX}: a getter-shaped method would be merged into
+     * a registered property of that name (CLAUDE.md, "Godot-Kotlin-JVM Specifics").
+     */
+    public Stance resolveCurrentStance() {
+        return stanceCache.get(currentStanceName);
+    }
+
     public void setMovementState(MovementType type) {
         Stance stanceNode = stanceCache.get(currentStanceName);
         if (stanceNode == null) return;

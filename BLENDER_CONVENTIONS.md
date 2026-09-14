@@ -667,6 +667,6 @@ import preset already works — this decision is about world/kit geometry.)
 ## Source control for `.blend` files
 
 - `.blend` files are large binaries — the repo already carries
-  `assets/merged_animation.blend` and `assets/ui/AssaultRifle_5.blend`. Decide
+  `assets/merged_animation.blend` and the weapon models under `assets/weapons/`. Decide
   *before* volume grows: Git LFS, a separate asset repo, or committing only the
   exported/imported result and keeping `.blend` sources elsewhere.

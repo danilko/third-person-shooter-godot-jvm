@@ -1,6 +1,17 @@
 package com.openworld.debug;
 
 import com.openworld.camera.AICameraController;
+import com.openworld.character.AICharacter;
+import com.openworld.character.CharacterInfo;
+import com.openworld.character.Faction;
+import com.openworld.character.Health;
+import com.openworld.weapon.FirearmItem;
+import com.openworld.weapon.WeaponController;
+import com.openworld.world.manager.ImpactManager;
+import godot.api.Engine;
+import godot.core.MethodCallable;
+import java.util.ArrayDeque;
+import java.util.UUID;
 import com.openworld.character.Character;
 import com.openworld.character.ShoulderAimModifier;
 import godot.annotation.Export;
@@ -150,6 +161,26 @@ public class AimDebugHost extends Node3D {
     private boolean playerHidden;       // "no character" mode: fly with nobody driving
     private boolean firing;
 
+    // ── Shooting bench (PLAN.md 0.2 follow-up) ───────────────────────────────────────────────
+    /** Weapons the bench can put in an AI's hands, cycled with [ and ]. */
+    private static final String[] BENCH_WEAPONS = {
+        "AR4", "AR212", "SG1", "PI52", "ATL4", "T1", "MW1", "MW2",
+    };
+    private static final String WEAPON_DIR = "res://src/main/resources/com/openworld/weapon/";
+    private int benchWeaponIndex = 0;
+    private WeaponItem benchItem;             // the weapon the mannequin was armed with
+    private boolean benchSlotSynced;
+    private boolean targetPlayer;             // T: aim at the Player's chest instead of the ball
+    private AICharacter opponent;             // N: a real AICharacter with its real AIController brain
+    private StaticBody3D coverWall;           // B
+    private boolean playerInvulnerable;       // P
+    private float playerMaxHealth = -1f;
+    private int shotCount;
+    private final ArrayDeque<String> shotLog = new ArrayDeque<>();
+    /** Damage per victim since the last flush -- a shot's damage is applied BEFORE weaponFired. */
+    private final java.util.LinkedHashMap<String, float[]> pendingHits = new java.util.LinkedHashMap<>();
+    private static final int SHOT_LOG_LINES = 12;
+
     @Register
     @Override
     public void _ready() {
@@ -269,7 +300,7 @@ public class AimDebugHost extends Node3D {
      * {@link com.openworld.character.ShoulderAimModifier} applies.
      *
      * <p>It is parented under the weapon's own marker and NOT equipped through WeaponController:
-     * the muzzle's pose is a function of {@code MarkerAR4} and {@code hand_r} either way, and
+     * the muzzle's pose is a function of {@code SocketRifle} and {@code hand_r} either way, and
      * equipping would drag in ammo, audio and network state this stand has no use for.
      */
     private void armStand(Skeleton3D skel) {
@@ -278,9 +309,9 @@ public class AimDebugHost extends Node3D {
 
     private void armStandOn(Node body, Skeleton3D skel) {
         if (findByName(body, "Muzzle") != null) return;            // already armed
-        Node marker = findByName(skel, "MarkerAR4");
+        Node marker = findByName(skel, "SocketRifle");
         if (marker == null) {
-            GD.INSTANCE.print("[AimDebug] armStand: no MarkerAR4 -- gun angle stays unmeasured");
+            GD.INSTANCE.print("[AimDebug] armStand: no SocketRifle -- gun angle stays unmeasured");
             return;
         }
         Object res = GD.INSTANCE.load("res://src/main/resources/com/openworld/weapon/AR4.tscn");
@@ -303,6 +334,13 @@ public class AimDebugHost extends Node3D {
         aimBall = buildAimBall();
         if (spawnProps) buildProps();
         spawnMannequin(new Vector3(3.0, 1.0, 0.0));
+        // Damage is applied by ImpactManager, which weapons find through its group. World.tscn
+        // carries one; this stand did not, so every shot here hit things and hurt nobody.
+        ImpactManager impacts = new ImpactManager();
+        impacts.setName("ImpactManager");
+        addChild(impacts);
+        armBenchMannequin();
+        watchShooter(player, "onPlayerShot", "onPlayerHit");
     }
 
     /** Where the driven test parks the AI subject: clear of the Player, which walks ~10 m per case. */
@@ -450,7 +488,11 @@ public class AimDebugHost extends Node3D {
         // marker back every frame. Measured: gun 91.6 deg off the ball with the command alone.
         driveMannequinAim();
 
-        if (mannequin != null) armStandNode(mannequin);   // no-op once anything holds a Muzzle
+        // The bench arms the mannequin for real (armBenchMannequin), so the measuring-only AR4
+        // armStandNode parents onto a socket is not used here -- it would dangle a second gun on
+        // any body holding a weapon with no Muzzle (a knife, a grenade).
+        syncBenchSlot();
+        flushHits();
         if (flying && flyCam != null) flyStep(delta);
     }
 
@@ -465,12 +507,13 @@ public class AimDebugHost extends Node3D {
      */
     private void driveMannequinAim() {
         if (aimBall == null) return;
-        if (pose != null) pose.aimTargetPosition = aimBall.getGlobalPosition();
+        Vector3 target = benchTarget();
+        if (pose != null) pose.aimTargetPosition = target;
         if (aiCamera == null && mannequin != null) {
             Node n = findByName(mannequin, "TPSCameraController");
             if (n instanceof AICameraController ac) aiCamera = ac;
         }
-        if (aiCamera != null) aiCamera.setAimTarget(aimBall.getGlobalPosition());
+        if (aiCamera != null) aiCamera.setAimTarget(target);
     }
 
     /** WASD + R/F, relative to where the fly camera is looking. Shift is a 4x sprint. */
@@ -584,6 +627,308 @@ public class AimDebugHost extends Node3D {
         else if (code == Key.G) toggleFly();
         else if (code == Key.F) toggleFire();
         else if (code == Key.H) togglePlayer();
+        else if (code == Key.BRACKETLEFT) cycleBenchWeapon(-1);
+        else if (code == Key.BRACKETRIGHT) cycleBenchWeapon(1);
+        else if (code == Key.T) targetPlayer = !targetPlayer;
+        else if (code == Key.Y) aiShot(false);
+        else if (code == Key.C) aiShot(true);
+        else if (code == Key.N) toggleOpponent();
+        else if (code == Key.B) toggleCoverWall();
+        else if (code == Key.P) togglePlayerInvulnerable();
+    }
+
+
+    // ── Shooting bench ───────────────────────────────────────────────────────────────────────
+    //
+    // "Can the AI still hit me, and when should it not?" is a question about the SHOT, and the
+    // pose readout above cannot answer it: a gun can point at the ball and the bullet still land
+    // somewhere else. So the bench fires the shipped path and logs what each shot did, at the
+    // instant it was fired -- which weapon, how many frames the fire gate held the press
+    // (WeaponItem.pointsAtAim), how far the held gun pointed from its aim point, and what the
+    // muzzle trace actually hit and how far the gun pointed from THAT.
+    //
+    // Two shooters, because they answer different questions. The MANNEQUIN is scripted: it holds a
+    // pose and fires exactly when told, the way AttackState fires (snap the aim ray, one frame of
+    // trigger), so a case can be repeated. The OPPONENT is a stock AICharacter with its own
+    // AIController -- target discovery, reaction time, hit-chance roll, strafing -- i.e. the thing
+    // that shot you in a play test, in a room where you can see it.
+
+    /** Where the mannequin aims: the ball, or the Player's chest (the bone AI aim at most). */
+    private Vector3 benchTarget() {
+        if (targetPlayer && player instanceof Character c && !playerHidden) {
+            Node3D chest = c.getPhysicalBoneNode("spine_03");
+            return chest != null ? chest.getGlobalPosition()
+                                 : c.getGlobalPosition().plus(new Vector3(0, 1.1, 0));
+        }
+        return aimBall.getGlobalPosition();
+    }
+
+    /** Load one of {@link #BENCH_WEAPONS} and queue it into {@code body}'s inventory, as a pickup would. */
+    private WeaponItem equipBenchWeapon(Node body) {
+        if (!(body.getNodeOrNull(new NodePath("WeaponController")) instanceof WeaponController wc)) return null;
+        String path = WEAPON_DIR + BENCH_WEAPONS[benchWeaponIndex] + ".tscn";
+        if (!(GD.INSTANCE.load(path) instanceof PackedScene ps)
+                || !(ps.instantiate() instanceof WeaponItem item)) {
+            GD.INSTANCE.printErr("[AimDebug] bench: could not load a WeaponItem from " + path);
+            return null;
+        }
+        // The same deferred path ZoneManager and DebugHarness use: the item must be in the tree
+        // before WeaponController reparents it onto the body's socket.
+        addChild(item);
+        if (body instanceof Node3D b3) item.setGlobalPosition(b3.getGlobalPosition());
+        wc.requestEquip(item);
+        return item;
+    }
+
+    private void armBenchMannequin() {
+        if (mannequin == null) return;
+        benchItem = equipBenchWeapon(mannequin);
+        benchSlotSynced = false;
+        watchShooter(mannequin, "onMannequinShot", "onMannequinHit");
+    }
+
+    /** Once the equip lands, select the slot it landed in (the equip is deferred to _process). */
+    private void syncBenchSlot() {
+        if (benchSlotSynced || benchItem == null || !(mannequin instanceof Character c)
+                || c.weaponController == null) return;
+        for (int i = 0; i < c.weaponController.getSlotCount(); i++) {
+            if (c.weaponController.getWeaponItem(i) == benchItem) {
+                mannequinWeapon = i;
+                if (pose != null) pose.desiredWeapon = i;
+                benchSlotSynced = true;
+                return;
+            }
+        }
+    }
+
+    /**
+     * A different weapon means a fresh mannequin, not a swap in place: dropping the old one would
+     * leave it lying at the mannequin's feet, where the auto-pickup takes it straight back.
+     */
+    private void cycleBenchWeapon(int dir) {
+        benchWeaponIndex = Math.floorMod(benchWeaponIndex + dir, BENCH_WEAPONS.length);
+        if (mannequin != null && GD.INSTANCE.isInstanceValid(mannequin)) {
+            Vector3 at = mannequin.getGlobalPosition();
+            double yawDeg = Math.toDegrees(mannequin.getRotation().getY());
+            boolean combat = pose != null && pose.wantCombat;
+            mannequin.queueFree();
+            mannequin = null;
+            pose = null;
+            aiCamera = null;
+            double savedYaw = bodyYawDegrees;
+            bodyYawDegrees = yawDeg;
+            spawnMannequin(at);
+            bodyYawDegrees = savedYaw;
+            if (pose != null) {
+                pose.wantCombat = combat;
+                pose.fire = firing;
+            }
+            armBenchMannequin();
+        }
+        logLine("-- mannequin armed with " + BENCH_WEAPONS[benchWeaponIndex]);
+    }
+
+    /**
+     * One AI shot. {@code flick} first turns the mannequin's body half round, so its target is
+     * suddenly BEHIND it on the frame it fires -- the reported case, where the gun still points
+     * the old way. The body turn is the body's own yaw, which MovementController reads every
+     * frame, so the mesh really does face away until it turns back.
+     */
+    private void aiShot(boolean flick) {
+        if (pose == null || mannequin == null) return;
+        if (flick) {
+            Vector3 r = mannequin.getRotation();
+            mannequin.setRotation(new Vector3(r.getX(), r.getY() + Math.PI, r.getZ()));
+        }
+        pose.pressFire(benchTarget());
+        logLine("-- " + (flick ? "FLICK: mannequin turned 180, then " : "") + "one AI shot at "
+                + (targetPlayer ? "PLAYER" : "ball"));
+    }
+
+    private void toggleOpponent() {
+        if (opponent != null && GD.INSTANCE.isInstanceValid(opponent)) {
+            opponent.queueFree();
+            opponent = null;
+            logLine("-- opponent removed");
+            return;
+        }
+        if (!(GD.INSTANCE.load(aiScenePath) instanceof PackedScene ps)
+                || !(ps.instantiate() instanceof AICharacter ai)) return;
+        CharacterInfo info = new CharacterInfo();   // never the scene's shared sub-resource
+        info.characterId = UUID.randomUUID().toString();
+        info.displayName = "Bench Opponent";
+        info.faction = Faction.ENEMY;
+        ai.characterInfo = info;
+        Vector3 from = player != null ? player.getGlobalPosition() : Vector3.Companion.getZERO();
+        double yaw = player != null ? player.getRotation().getY() : 0.0;
+        ai.setPosition(from.plus(new Vector3(0, 0, -14).rotated(new Vector3(0, 1, 0), (float) yaw)));
+        addChild(ai);
+        opponent = ai;
+        equipBenchWeapon(ai);
+        watchShooter(ai, "onOpponentShot", "onOpponentHit");
+        logLine("-- real AI opponent spawned 14 m in front of the player with " + BENCH_WEAPONS[benchWeaponIndex]);
+    }
+
+    /** A wall across the line from the shooter (the opponent if present, else the mannequin) to the Player. */
+    private void toggleCoverWall() {
+        if (coverWall != null) {
+            coverWall.queueFree();
+            coverWall = null;
+            return;
+        }
+        Node3D shooter = opponent != null && GD.INSTANCE.isInstanceValid(opponent) ? opponent : mannequin;
+        if (shooter == null || player == null) return;
+        Vector3 a = player.getGlobalPosition();
+        Vector3 b = shooter.getGlobalPosition();
+        Vector3 mid = a.plus(b).times(0.5f);
+        coverWall = new StaticBody3D();
+        coverWall.setName("BenchCover");
+        CollisionShape3D cs = new CollisionShape3D();
+        BoxShape3D box = new BoxShape3D();
+        box.setSize(new Vector3(3, 3, 0.4));
+        cs.setShape(box);
+        coverWall.addChild(cs);
+        MeshInstance3D mi = new MeshInstance3D();
+        BoxMesh bm = new BoxMesh();
+        bm.setSize(new Vector3(3, 3, 0.4));
+        mi.setMesh(bm);
+        mi.setMaterialOverride(material(new Color(0.55, 0.55, 0.6, 1.0)));
+        coverWall.addChild(mi);
+        addChild(coverWall);
+        Vector3 centre = new Vector3(mid.getX(), 1.5, mid.getZ());
+        coverWall.lookAtFromPosition(centre, new Vector3(b.getX(), 1.5, b.getZ()), new Vector3(0, 1, 0), false);
+    }
+
+    private void togglePlayerInvulnerable() {
+        if (!(player != null && player.getNodeOrNull(new NodePath("Health")) instanceof Health h)) return;
+        playerInvulnerable = !playerInvulnerable;
+        if (playerInvulnerable) {
+            playerMaxHealth = h.maxHealth;
+            h.maxHealth = 1_000_000f;
+        } else if (playerMaxHealth > 0f) {
+            h.maxHealth = playerMaxHealth;
+        }
+        h.resetFull();
+        for (Node3D body : new Node3D[] {mannequin, opponent}) {
+            if (body != null && GD.INSTANCE.isInstanceValid(body)
+                    && body.getNodeOrNull(new NodePath("Health")) instanceof Health bh) bh.resetFull();
+        }
+    }
+
+    private String healthText(Node3D body) {
+        if (body != null && body.getNodeOrNull(new NodePath("Health")) instanceof Health h) {
+            return String.format("%.0f", h.getCurrentHealth());
+        }
+        return "-";
+    }
+
+    /** Log every shot this body's weapon fires and every hit its Health takes. */
+    private void watchShooter(Node3D body, String shotMethod, String hitMethod) {
+        if (body == null) return;
+        if (body.getNodeOrNull(new NodePath("WeaponController")) instanceof WeaponController wc) {
+            // weaponFired, not ammoChanged: ammoChanged also fires on every equip and ammo refresh.
+            wc.weaponFired.connectUnsafe(MethodCallable.createUnsafe(this, shotMethod), godot.api.Object.ConnectFlags.DEFAULT);
+        }
+        if (body.getNodeOrNull(new NodePath("Health")) instanceof Health h) {
+            h.hit.connectUnsafe(MethodCallable.createUnsafe(this, hitMethod), godot.api.Object.ConnectFlags.DEFAULT);
+        }
+    }
+
+    @Register public void onPlayerShot(float recoilScale)    { logShot("YOU", player); }
+    @Register public void onMannequinShot(float recoilScale) { logShot("MANQ", mannequin); }
+    @Register public void onOpponentShot(float recoilScale)  { logShot("OPP", opponent); }
+    @Register public void onPlayerHit(float damage)    { logHit("PLAYER", player, damage); }
+    @Register public void onMannequinHit(float damage) { logHit("MANNEQUIN", mannequin, damage); }
+    @Register public void onOpponentHit(float damage)  { logHit("OPPONENT", opponent, damage); }
+
+    /**
+     * Runs synchronously inside {@code WeaponController.onWeaponFire} (its {@code weaponFired}
+     * signal), right after {@code useWeapon}, so
+     * the aim ray still holds the LAST muzzle trace of this shot ({@code WeaponItem.trace} restores
+     * the ray's transform but does not re-cast). For a shotgun that is the last pellet. A rocket or
+     * grenade has no trace -- its hit arrives later as an explosion, and shows up as a Health hit.
+     */
+    private void logShot(String who, Node3D shooterNode) {
+        if (!(shooterNode instanceof Character shooter) || shooter.weaponController == null) return;
+        WeaponController wc = shooter.weaponController;
+        WeaponItem w = wc.getCurrentWeaponItem();
+        if (w == null) return;
+        String held = "-";
+        if (shooterNode == mannequin && pose != null && pose.lastFirePressFrame >= 0) {
+            long frames = Engine.INSTANCE.getPhysicsFrames() - pose.lastFirePressFrame;
+            if (frames <= 15) held = frames + "f";
+            pose.lastFirePressFrame = -1;
+        }
+        Vector3 gunPos = w.getGlobalPosition();
+        Vector3 gunFwd = w.getGlobalBasis().getZ().times(-1f);
+        double offAim = yawBetween(gunFwd, shooter.getAimTargetPosition().minus(gunPos));
+
+        String result;
+        RayCast3D ray = wc.getAimRay();
+        if (!(w instanceof FirearmItem)) {
+            result = "(no trace: projectile / melee)";
+        } else if (ray == null || !ray.isColliding()) {
+            result = "nothing";
+        } else {
+            Object col = ray.getCollider();
+            Vector3 p = ray.getCollisionPoint();
+            Node target = col instanceof Node n ? ImpactManager.resolveTarget(n) : null;
+            String what = target == null ? (col instanceof Node n ? n.getName().toString() : "?")
+                    : target == player ? "PLAYER"
+                    : target == mannequin ? "MANNEQUIN"
+                    : target == opponent ? "OPPONENT"
+                    : target.getName().toString();
+            if (target != null && target == shooterNode) what += " (SELF!)";
+            Vector3 toHit = p.minus(gunPos);
+            double offHit = toHit.lengthSquared() < 1e-6f ? Double.NaN
+                    : Math.toDegrees(gunFwd.angleTo(toHit));
+            result = String.format("%s @%.1fm  gun-off-hit %s", what, toHit.length(), fmtDeg(offHit));
+        }
+        logLine(String.format("#%d %-4s %-5s %-3s gun-off-aim %s  ->  %s",
+                ++shotCount, who, w.getName().toString(), held, fmtDeg(offAim), result));
+        flushHits();
+    }
+
+    /**
+     * Collected, not printed: a hitscan shot applies its damage inside {@code useWeapon}, before
+     * {@code weaponFired} names the shot, so the shot line flushes these under itself. Anything
+     * still pending at the end of a frame (an explosion, a melee swing) is flushed on its own.
+     */
+    private void logHit(String who, Node3D body, float damage) {
+        float[] acc = pendingHits.computeIfAbsent(who, k -> new float[2]);
+        acc[0] += 1f;
+        acc[1] += damage;
+        if (body == player && playerInvulnerable
+                && player.getNodeOrNull(new NodePath("Health")) instanceof Health h) h.resetFull();
+    }
+
+    private void flushHits() {
+        for (var e : pendingHits.entrySet()) {
+            float[] acc = e.getValue();
+            Node3D body = "PLAYER".equals(e.getKey()) ? player
+                    : "MANNEQUIN".equals(e.getKey()) ? mannequin : opponent;
+            logLine(String.format("     %s took %.1f%s (hp %s)", e.getKey(), acc[1],
+                    acc[0] > 1f ? String.format(" in %.0f hits", acc[0]) : "", healthText(body)));
+        }
+        pendingHits.clear();
+    }
+
+    private void logLine(String line) {
+        GD.INSTANCE.print("[AimBench] " + line);
+        shotLog.addLast(line);
+        while (shotLog.size() > SHOT_LOG_LINES) shotLog.removeFirst();
+    }
+
+    /** Horizontal angle between two directions, degrees. */
+    private static double yawBetween(Vector3 a, Vector3 b) {
+        Vector3 ha = new Vector3(a.getX(), 0, a.getZ());
+        Vector3 hb = new Vector3(b.getX(), 0, b.getZ());
+        if (ha.lengthSquared() < 1e-6f || hb.lengthSquared() < 1e-6f) return Double.NaN;
+        return Math.toDegrees(ha.angleTo(hb));
+    }
+
+    private static String fmtDeg(double d) {
+        return Double.isNaN(d) ? "n/a" : String.format("%.1f°", d);
     }
 
     /** The key legend plus the mannequin's live aim numbers -- the thing you actually watch. */
@@ -595,6 +940,8 @@ public class AimDebugHost extends Node3D {
          .append("  1/2/3 mannequin stance   4 combat on/off   Q/E weapon slot\n")
          .append("  F hold fire   I/J/K/L move aim ball, U/O height\n")
          .append("  G free-fly camera (WASD + R/F, mouse, Shift fast)   H drop the player\n")
+         .append("  SHOOTING: [ ] AI weapon   T target ball/PLAYER   Y one AI shot   C flick: turn away + shoot\n")
+         .append("            N real AI opponent (its own brain)   B cover wall   P player invulnerable\n")
          .append("  PLAYER: WASD + mouse + right-mouse aim (your own hands)\n")
          .append("          walk into the CAR or the POOL for DriveCarrier / Swim\n")
          .append("\n")
@@ -611,6 +958,13 @@ public class AimDebugHost extends Node3D {
              .append("\n");
         }
         b.append(setupLine(player, "PLAYER   ")).append(setupLine(mannequin, "MANNEQUIN"));
+        if (opponent != null && GD.INSTANCE.isInstanceValid(opponent)) b.append(setupLine(opponent, "OPPONENT "));
+        b.append(String.format("bench: weapon %s   target %s   cover %s   player %s (hp %s)\n",
+                BENCH_WEAPONS[benchWeaponIndex], targetPlayer ? "PLAYER" : "ball",
+                coverWall != null ? "ON" : "off", playerInvulnerable ? "INVULNERABLE" : "mortal",
+                healthText(player)));
+        b.append("shots (who  weapon  press->shot  gun-off-aim  ->  hit  @dist  gun-off-hit):\n");
+        for (String line : shotLog) b.append("  ").append(line).append("\n");
         b.append("\n");
         return b.toString();
     }
@@ -1475,7 +1829,7 @@ public class AimDebugHost extends Node3D {
      * <p><b>It reads {@code n/a} today because this stand is unarmed.</b>
      * CharacterVisuals_GodotChan instances only {@code Fist} under WeaponAttachment (a MeleeItem,
      * which has no {@code Muzzle}); the firearms are added elsewhere. Arming the stand -- instance
-     * AR4 under {@code MarkerAR4} and equip it through WeaponController -- is what turns this into
+     * AR4 under {@code SocketRifle} and equip it through WeaponController -- is what turns this into
      * a real assertion, and is the thing to do BEFORE authoring any per-stance aim clip, since the
      * gun angle is the only number that says whether such a clip is needed. See AIM_PLAN.md W4.
      */
@@ -1495,12 +1849,12 @@ public class AimDebugHost extends Node3D {
             }
             // else: holding something with no muzzle (fist, knife) -- fall through
         }
-        // Fallback: the rifle armStand() parks in MarkerAR4. That marker IS the authored hold
+        // Fallback: the rifle armStand() parks in SocketRifle. That socket IS the authored hold
         // offset for an AR4 and hangs off the hand_r BoneAttachment3D, so a gun sitting in it is
         // exactly where a held one would be -- which is what makes it a fair thing to measure
         // while the body happens to be holding a fist (slot 0). Deterministic, unlike a
         // depth-first hunt for any "Muzzle" in the subtree.
-        Node marker = findByName(body, "MarkerAR4");
+        Node marker = findByName(body, "SocketRifle");
         if (marker != null && findByName(marker, "Muzzle") instanceof Node3D m) return m;
         return null;
     }

@@ -75,9 +75,11 @@ public class WeaponItem extends Pickup implements WeaponAction {
    * ARCHETYPE and each weapon aligns itself to it, which is the same split
    * {@code weaponPoseIndex} already makes for the pose.
    *
-   * <p>A launcher is the case that shows why it matters: it rides on the SHOULDER, so its tube sits
-   * high and back relative to the hand compared to a rifle. That is a translation of this marker,
-   * not a new animation — though the ARM pose really is authored art (`weaponPoseIndex` 2).
+   * <p><b>A conforming weapon does not need one</b>, and none of the shipped weapons has one: the
+   * weapon standard (blender/WEAPON_AUTHORING.md) puts the model ORIGIN on the grip, so identity
+   * already lands the grip on the archetype socket ({@code SocketRifle}, {@code SocketPistol}, ...).
+   * This marker is the escape hatch for an asset whose origin cannot be moved — keep it for that,
+   * not as a second place to tune a fit.
    */
   @Export public String gripPoint = "GripPoint";
 
@@ -319,6 +321,19 @@ public class WeaponItem extends Pickup implements WeaponAction {
       // toward our own feet is worse than the camera ray, so fall through on a degenerate point.
       if (seated.minus(c.getGlobalPosition()).lengthSquared() > 0.25) return seated;
     }
+    // An AI aims a shot by pointing its ray at the chosen point on the frame it presses fire
+    // (AttackState -> AICharacter.snapAimRay). The fire gate can hold that press a frame or two
+    // (pointsAtAim), and the snap is in the RAY's local space, so by the time the shot resolves the
+    // camera rig has carried the ray somewhere else -- measured on the AimWorkbench bench: a shot
+    // held 2 frames after the target swung behind the AI went nowhere. Re-point it at the aim point
+    // the command still carries (AttackState sends the same point every frame), which is exactly the
+    // original snap whenever the shot was not held. Only for weapons the gate can hold: melee is
+    // never held, so its sight leg is left exactly as it was.
+    if (launchesTowardAim() && owningCharacter instanceof AICharacter ai) {
+      Vector3 aimAt = ai.getAimTargetPosition();
+      // getAimTargetPosition falls back to the body origin without a marker; never aim at our feet.
+      if (aimAt.minus(ai.getGlobalPosition()).lengthSquared() > 0.25) ai.snapAimRay(aimAt);
+    }
     ray.forceRaycastUpdate();
     Vector3 origin = ray.getGlobalPosition();
     if (ray.isColliding()
@@ -415,6 +430,47 @@ public class WeaponItem extends Pickup implements WeaponAction {
    * did not ask for. Melee buffers, so a tapped combo is not eaten by recovery.
    */
   public double fireBufferSeconds() { return 0.0; }
+
+  /**
+   * How far (yaw, degrees) the held weapon may point away from its aim point and still fire. The
+   * steady-state gap is 1-3 degrees (the aim pose), so this only bites during a turn.
+   */
+  public static final double FIRE_AIM_TOLERANCE_DEG = 15.0;
+
+  /**
+   * True for a weapon whose shot or projectile LEAVES THE WEAPON toward the aim point (a gun's
+   * muzzle trace, a launched rocket, a thrown grenade), so the weapon must be pointing at that
+   * point before it fires. False for melee, which resolves from the chest (W16).
+   */
+  protected boolean launchesTowardAim() { return false; }
+
+  /**
+   * Whether the held weapon points at the aim point closely enough to fire ({@link
+   * #FIRE_AIM_TOLERANCE_DEG}, yaw only). Named as a question, not {@code isX}: a getter-shaped
+   * method would be merged into a registered property.
+   *
+   * <p><b>Why (PLAN.md 0.2):</b> every view traces the shot from the animated gun, so a shot fired
+   * while the body is still turning after a flick leaves a gun pointing the old way and crosses the
+   * shooter's own body. {@code MovementController.keepAimWithinReach} keeps the body within the aim
+   * reach, which leaves one frame — the camera has moved, the body has not been updated yet — where
+   * this gate holds the press ({@code WeaponController.onWeaponFire}). Measured with
+   * {@code tools/godot/probe_self_hit.gd}.
+   *
+   * <p>Yaw only, on purpose: the elevation gap at the top of a stance's view range is a documented
+   * gun-vs-reticle difference (W5), and gating on it would refuse shots there outright. A seated
+   * occupant is exempt — the carrier clamps that aim point itself ({@code Vehicle.clampSeatAim}).
+   */
+  public boolean pointsAtAim() {
+    if (!launchesTowardAim() || !(owningCharacter instanceof Character c)) return true;
+    if (c.currentVehicleNode != null) return true;
+    Vector3 toAim = c.getAimTargetPosition().minus(getGlobalPosition());
+    Vector3 forward = getGlobalBasis().getZ().times(-1f);
+    toAim = new Vector3(toAim.getX(), 0f, toAim.getZ());
+    forward = new Vector3(forward.getX(), 0f, forward.getZ());
+    // An aim point on top of the weapon, or a weapon pointing straight up or down, has no yaw.
+    if (toAim.lengthSquared() < 0.25f || forward.lengthSquared() < 1e-4f) return true;
+    return Math.toDegrees(forward.angleTo(toAim)) <= FIRE_AIM_TOLERANCE_DEG;
+  }
 
   /**
    * True when this weapon announces its own fire event rather than having {@code WeaponController}

@@ -3039,6 +3039,186 @@ in the wrong state is not a measurement of that pose).
 the eye mount rides was simply somewhere else. Averaging is not enough — **two bodies must be
 sampled on the SAME frames**, or a looping clip's phase becomes the difference between them.
 
+### W19 — A WEAPON IS ITS REAL SIZE, AND A CONFORMING MODEL NEEDS NO TRANSFORM (2026-09-11, user-asked)
+
+**The standard is in `blender/WEAPON_AUTHORING.md`; the table is `blender/tools/weapon_models.json`;
+the build is `blender/tools/build_weapon.py`; the gate is `tools/godot/probe_weapon_scale.gd`.**
+Four rules: 1 unit = 1 **metre** at real-world length, **−Z** is the muzzle/blade direction, **+Y**
+up, and the model **origin is the grip**. The last one is what makes `WeaponItem.alignmentFor`
+identity, so the character's socket carries no per-weapon fudge — and together they mean **a
+conforming model needs no transform on its scene instance at all**, which is the rule the gate
+actually asserts.
+
+**The origin rule was STATED here and never MEASURED, and it was false for every model — W20.**
+
+**What was there:** every source mesh was authored 10× too large and yawed 90°, and every weapon
+scene undid it by hand with `scale 0.1` and a rotated basis — measured, all nine identically. Two
+costs, and the second is the one that bit: the correction lived in nine scenes instead of one, and
+because each `0.1` was a **guess rather than a conversion**, nothing agreed with life.
+
+| weapon | was | real | ratio |
+|---|---|---|---|
+| AR4 / AR212 | 0.549 / 0.517 m | 0.90 | 61% / 57% |
+| SG1 | 0.521 | 1.00 | 52% |
+| PI52 | 0.182 | 0.22 | 83% |
+| MW1 (bayonet) | 0.117 | 0.30 | **39%** |
+| T1 (grenade) | 0.300 | 0.09 | **333%** |
+
+A 0.55 m "assault rifle" on a 1.49 m character reads as an SMG and a 0.30 m grenade is a melon. None
+of those sizes was chosen; they fell out of a per-weapon fudge factor. All eight now measure their
+declared length to **0.0%**.
+
+**On the arcade question, which is a real one here:** the world is deliberately not 1:1 — road lanes
+are 4.5 m rather than the book's 3.25 (`seed_district_roads.LANE_WIDTH`) because a 2.0 m car in a
+3.25 m lane drives like a lorry in a tunnel. That is a **vehicle-scale** decision and it does not
+reach hand props: a weapon is measured against the hand holding it, and the hand is metric. So
+weapons are life-size and the two scales do not have to be reconciled.
+
+**The correction is GONE, not relocated — and that took a second pass (user-asked).** The first
+version computed it at build time: read the raw art, apply `scale 0.1 x k`, a yaw and a grip offset,
+every run. That beats nine scenes each carrying the fudge, but it keeps the same defect one level up:
+**the asset is still wrong and something has to keep fixing it**, the real size lives in a JSON field
+rather than in the model, and an artist opening the source still sees a 10x weapon. So the model is
+simply RIGHT now. `build_weapon.py --init` bakes the convention undo, the scale-to-life and the grip
+offset into `assets/weapons/<id>.blend` **once** and then APPLIES every transform, so each object
+sits at location 0 / rotation 0 / **scale 1** with metre-correct mesh data (PI52 even had a
+non-uniform 0.889 object scale, now baked out). The ordinary build opens that `.blend`, verifies, and
+exports applying **nothing**; the raw art in `assets/` is never modified and never ships. A new
+weapon is simply modelled at its real size — there is no scale factor to work out because there is
+no scale factor anywhere. Markers and colliders scaled with their models. The primitives (ATL4's
+cylinder, MW2's box, T1's box) took the same metre rule directly, and ATL4 shows why a uniform scale
+is not always the answer: its tube was authored 0.16 m across where an AT4 is 0.084, so length and
+bore had to be set independently rather than multiplied by one factor.
+
+**Two collider rules came out of it**, both from defects already paid for:
+- **No axis thinner than 0.05 m.** MW1 shipped a 0.04 m box and fell to y = −59 in `World.tscn`,
+  which was misread as a hole in the ground for a whole session (W15/W16). **A pickup's collider is
+  not its silhouette** — it is what has to rest on ground, so it may be fatter than the art.
+- **A `PickupArea` is a DETECTION volume, not the body shape.** Several weapons shared one box for
+  both, which made them nearly uncollectable; MW1 and MW2 now follow `T1.tscn`'s split — small body,
+  roomy area.
+
+**`length_m` flipped from an input to an ASSERTION**, which is the whole point of the second pass:
+the build measures the `.blend` and refuses to export one that has drifted, naming the rule that
+broke. Verified by scuffing a model on purpose — an un-applied `scale 1.5` on AR4 is refused with
+*"still carries a transform … Apply it (Object ▸ Apply ▸ All Transforms) — the model IS the weapon"*
+and exit 1. A guard that has never been seen to fire is not a guard.
+
+Gated by **`probe_weapon_scale.gd`** (37/37), reading the same JSON the build reads so the gate and
+the build cannot disagree about what a weapon is supposed to be: declared length to within 2%, **the
+instance transform is identity**, the muzzle is on −Z, and the two collider rules. One trap it hit
+while being written and that will catch the next person: a weapon added to a bare scene **wraps
+itself in a `PickupBody`** (W15) and LENDS it the authored `CollisionShape3D` children, so the item's
+own shapes vanish and the collider checks silently measure nothing at all — call `on_picked_up()`
+first, the same thing `WeaponController` does before reparenting onto a socket.
+
+### W20 — THE ORIGIN IS THE GRIP, MEASURED; ONE SOCKET PER ARCHETYPE; A LIBRARY FILE (2026-09-13, user-asked)
+
+Prompted by "the shotgun pokes over the shoulder — is the character too short or the weapon too
+large?" **Neither.** GodotChan measures **1.49 m** to the crown (the docs had said ~1.7 m — never
+measured; corrected everywhere), SG1 is a real 0.98 m, and a 1.0 m gun on a 1.49 m body is simply the
+proportion of a 1.17 m gun on a 1.75 m man. What was wrong was **where the gun sat in the hand**, and
+it was wrong in a way W19 had written down as solved.
+
+**W19 said "the origin is the grip" and nothing checked it.** Side renders with the origin marked
+showed every raw model's origin wherever a centring offset had left it: SG1's on the RECEIVER, ahead
+of the trigger (0.48 m from the butt, against ~0.27 for a hand on the stock wrist); AR4's above the
+magazine; the bayonet's on the BLADE. The stocks themselves were correctly proportioned (SG1
+trigger-to-butt 0.36 m = a Remington 870's 14 in length of pull). **The per-weapon markers on the
+character were compensating**, weapon by weapon — measured in hand space, the grips landed 4 cm (AR4),
+7 cm (AR212), 10 cm (MW1) and **15 cm (SG1)** from the palm. W19's `grip_offset` had copied each scene
+instance's old translation, which was a centring offset, not a grip.
+
+**Fixed in the models, then asserted.** Each `.blend`'s origin was moved to the centre of the firing
+hand's fist on the grip (placed on zoomed renders with a 1 cm grid), and three lengths that W19 had
+guessed were taken from a named reference instead (`reference` in `weapon_models.json`): AR4 0.90 ->
+**0.88** (AKMS), AR212 0.90 -> **0.84** (M4), SG1 1.00 -> **0.98** (870, 18.5 in). `build_weapon.py`
+now refuses a model whose origin has moved: `grip_to_rear_m` (origin to rearmost point, 1 cm) is
+asserted beside `length_m`, and each weapon's meshes must sit in a collection named `<id>`. The
+long guns now read 0.281 / 0.259 / 0.272 m grip-to-butt — consistent, which is the point. Also
+found and fixed on the way: `Muzzle` markers floated **8-16 cm past the barrel** (now the measured
+bore tip), and only AR4 had a `SupportPoint` (AR212 and SG1 now have measured ones on the handguard
+and pump). Scene colliders are the mesh AABB (thin axes clamped to 0.08 m), pickup areas ≥ 0.5 m.
+
+**One socket per GRIP ARCHETYPE** — what W13 said the character should need and never got:
+`MarkerAR4/AR212/SG1/PI52/ATL4/Fist` became `SocketRifle`, `SocketPistol`, `SocketLauncher`,
+`SocketMelee`, `SocketFist` (both body variants, and `MeshConfig.socketPaths`). The rifle and pistol
+sockets are **the grip positions AR4 and PI52 already had** (`MarkerX * T(grip)`), because those two
+were the weapons the aim stand and the support-hand probe had been tuned against — so they look
+exactly as before, and every other weapon moves ONTO the tuned fit. The finger bones put the palm's
+fist centre about 4 cm from the socket, within the resolution of the estimate. Measured after, in
+the aim pose: all three long guns grip-to-palm **0.042 m**, stock end **0.08-0.10 m behind the
+shoulder joint** (SG1 was 0.24). That remaining 10 cm is the ARM POSE, not the weapon: the rifle aim
+clip holds the hand only 0.17 m in front of the shoulder, where a shouldered stock needs ~0.26-0.28.
+That is authored animation, and the next step.
+
+**No shipped weapon has a `GripPoint` now** (ATL4's primitive was re-origined; MW2's axe box now
+extends down −Z from its grip like the knife). The mechanism stays as the escape hatch for an asset
+whose origin cannot be moved; `probe_weapon_sockets.gd` asserts every weapon in the table conforms
+AND that the hatch still lands a runtime-added marker on the socket. Holstered long guns hang by the
+grip now, so they sit differently on the back sockets than before — `holsterPoint` exists if that
+needs tuning.
+
+**`assets/weapons/WeaponLibrary.blend` is the "zoo"** (`blender/tools/build_weapon_library.py`):
+every weapon LINKED from its own `.blend` (one owner — an edit there shows up on reload), all grips
+on one vertical line, a red bar under each at the reference's real length with a blue tick where
+the real trigger is, the primitives as boxes, and the character with a 1.49 m stick. It is a view:
+nothing reads it and nothing exports it. It is what would have shown every defect above at a glance.
+
+**Legacy removed:** the raw source art (`assets/{AssaultRifle_4,AssaultRifle2_1,Pistol_5,Shotgun_1,
+Bayonet}.glb`), `build_weapon.py --init` and its `source_convention`/`grip_offset`,
+`assets/ui/AssaultRifle_5.blend` (a 5.4 m icon-render leftover) and `assets/merged_animation_bak.blend`.
+Weapon scenes instance their model as a node named `Model`.
+
+### W21 — THE GUN FACES ITS SHOT BEFORE IT FIRES (2026-09-13, PLAN.md 0.2)
+
+"Flick behind and the bullet hits me." **The cause had already gone** (W15): a held weapon was a
+`RigidBody3D` on the PICKUP layer, which the AimRay's mask includes, so a backward shot traced from
+the muzzle through the gun's own box and `ImpactManager` walked up from the gun to the shooter's
+`Health` — reproduced by putting that collider back (20 damage to the shooter). **What was still
+live is the precondition:** the body turns toward the aim by a `rotationSpeed` lerp while the spine
+and shoulders stop at `Stance.aimYawLimit`, so for several frames after a 135–180° flick the shot
+left a gun pointing **84–102°** away from it, back across the body, in both views.
+
+**Both views keep the two-stage trace from the animated gun** (it is what closes "behind a wall
+but still killed someone"); what changed is that the gun is on target when it fires:
+- `MovementController.keepAimWithinReach` — while in combat the body never lags the aim point by
+  more than `aimYawLimit − 10°`, so the aim modifiers can always carry the gun the rest of the way.
+  Small turns keep the smooth lerp. It is the split Source's player models and Lyra's
+  "orient to controller while aiming" make.
+- `WeaponItem.pointsAtAim` (15°, yaw only — the W5 elevation gap is by design) gates
+  `WeaponController.onWeaponFire` for weapons that `launchesTowardAim()` (firearm muzzle trace,
+  rocket, grenade). The press is **held, not dropped** (`AIM_HOLD_SECONDS` 0.15, independent of
+  `fireBufferSeconds`), because the body lands one frame late: the camera moves at the end of a
+  frame and the shot fires at the start of the next, before `MovementController` has run.
+
+Measured by `tools/godot/probe_self_hit.gd` (real input, AR4, TPS+FPS, 56 flicks): worst
+gun-off-shot **102.0° → 13.9°**, 0 presses lost, the gate adds **exactly 1 frame** in 11 cases
+and nothing in the rest. `AimDebugAuto`, `probe_melee`, `probe_driveby_aim`, `probe_fps_camera`,
+`probe_vehicle_views`, `probe_weapon_world_body` unchanged. Probe trap: an AR4 left at 2 rounds
+reloads on the next press, which reads exactly like the gate eating it — refill between cases.
+
+**The AI half, and the bench that found it.** An AI aims a shot by pointing its ray at the chosen
+point on the frame it presses fire (`AttackState` → `AICharacter.snapAimRay`), in the ray's LOCAL
+space. When the gate holds that press, the camera rig has carried the ray elsewhere by the time the
+shot resolves: a shot held 2 frames after the target swung behind the AI hit **nothing**.
+`WeaponItem.resolveSightPoint` re-snaps onto the aim point the command still carries (identical when
+not held), for `launchesTowardAim()` weapons only — melee is never held, and re-snapping it broke
+`probe_melee`'s AI case, which aims with the ray alone.
+
+`AimWorkbench.tscn` is now also a **shooting bench**: `[`/`]` arm the AI with any weapon (for real,
+through `requestEquip`), `T` aims it at the Player instead of the ball, `Y` fires one shot the way
+`AttackState` does (`ScriptedInputController.pressFire`), `C` turns it 180° and fires on the same
+frame, `N` spawns a stock `AICharacter` with its own brain, `B` drops cover between the shooter and
+the Player, `P` makes the Player invulnerable. Every shot is logged in the overlay (and stdout,
+`[AimBench]`): shooter, weapon, frames the gate held it, gun-off-aim, what the muzzle trace hit, and
+gun-off-hit, with the damage it did grouped under it. The stand had no `ImpactManager`, so until now
+nothing in it could take damage. `tools/godot/probe_aim_bench.gd` drives those keys headless.
+
+**Open work is in `PLAN.md`'s Work queue** (P1–P2 and 5.1): seeded one-message shot + host validation, host-resolved
+melee, per-shot remote cues, the stock-to-shoulder gate and rifle pose re-author, procedural recoil kick,
+holster placement, projectile authority, lag compensation.
+
 ## Godot-Kotlin-JVM Specifics
 
 - **Annotations (0.17 API — the pre-0.17 `@Register*` family is gone).** The plugin runs in the
@@ -3244,14 +3424,14 @@ publishes one per `RoadLane`. Two rules came out of it, both measured:
   disconnect — app keeps running, so `close_requested` has not fired) = each audio node self-stops on its own
   `tree_exiting` (a one-liner, only needed on nodes that can be freed *while playing*). The two are
   complementary; neither replaces the other.
-- Weapon scenes are discovered dynamically: `WeaponController` iterates children of
-  `WeaponAttachment` at `_ready()` — add a new weapon by adding a `Marker3D` wrapper with a
-  `WeaponItem` subclass scene (e.g. `FirearmItem`) as its only child.
-- `WeaponPickup` finds its `WeaponItem` child lazily in `onCharacterEntered` (not `_ready()`)
-  because `WeaponController.spawnPickup()` reparents the weapon after `addChild()`, so `_ready()`
-  fires before the weapon is attached.
-- `Pickup.pause()` calls `setFreezeEnabled(true)` (not `setFreeze`) — the Kotlin/JVM binding
-  exposes the Godot 4 `freeze` property as `setFreezeEnabled / isFreezeEnabled`.
+- A weapon BORN HELD (authored inside the character, like `Fist`) is discovered by
+  `WeaponController.discoverPrePlacedWeapons`: it takes the first child of each `WeaponAttachment`
+  child that is a `WeaponItem`. The sockets are per GRIP ARCHETYPE (`SocketRifle`, `SocketPistol`,
+  `SocketLauncher`, `SocketMelee`, `SocketFist` — W20), never per weapon; a weapon names its own in
+  `holdSocket`.
+- The Kotlin/JVM binding exposes a `RigidBody3D`'s Godot 4 `freeze` property as
+  `setFreezeEnabled / isFreezeEnabled`, not `setFreeze` (`Vehicle` uses it). A weapon is no longer a
+  body at all (W15), so `Pickup.pause()` detaches its world body instead of freezing anything.
 - `ENetConnection.createHost/createHostBound` take `(… maxPeers, maxChannels, inBandwidth,
   outBandwidth)` — all-int positional args. Putting the channel count one slot too far right
   silently caps outgoing bandwidth at N bytes/s (ENet then throttle-drops unreliable packets

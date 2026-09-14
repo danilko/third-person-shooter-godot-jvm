@@ -593,6 +593,9 @@ public class WeaponController extends Node {
     if (w == null) return;
     if (!w.isInfiniteAmmo && w.getMagazine() == 0) { onWeaponReload(); return; }
     if (!w.canUse()) { rememberBlockedPress(); return; }
+    // Held, not dropped: the body brings the weapon onto the aim within a frame or two
+    // (MovementController.keepAimWithinReach), and a press eaten by a turn reads as a dead trigger.
+    if (!w.pointsAtAim()) { holdPressForAim(); return; }
     // The weapon's OWN moving parts (pump, bolt, cylinder) -- see WeaponItem.weaponAnimatorPath.
     // Placed after every gate, so a shot that was suppressed moves nothing.
     w.playMotion(w.fireAnimation);
@@ -710,7 +713,20 @@ public class WeaponController extends Node {
   private boolean readyToFire() {
     if (fireTimer.getTimeLeft() > 0 || reloadTimer.getTimeLeft() > 0 || isWeaponTransitioning()) return false;
     WeaponItem w = getCurrentWeaponItem();
-    return w != null && w.canUse();
+    return w != null && w.canUse() && w.pointsAtAim();
+  }
+
+  /**
+   * How long a press held back by {@link WeaponItem#pointsAtAim} is kept. Independent of the
+   * weapon's own {@code fireBufferSeconds} (0 for guns): that one decides whether a press during
+   * RECOVERY counts, which is a feel choice; this one is a press the player made while already
+   * able to fire, delayed only until the weapon faces the shot — measured at about one frame.
+   */
+  private static final double AIM_HOLD_SECONDS = 0.15;
+
+  private void holdPressForAim() {
+    long until = Time.INSTANCE.getTicksMsec() + (long) (AIM_HOLD_SECONDS * 1000.0);
+    if (until > bufferedFireUntilMs) bufferedFireUntilMs = until;
   }
 
   private void rememberBlockedPress() {

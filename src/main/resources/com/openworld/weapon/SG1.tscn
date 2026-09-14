@@ -4,13 +4,13 @@
 [ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="2_6mbq6"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="2_muzzle"]
 [ext_resource type="AudioStream" uid="uid://c333cb6cupk6h" path="res://assets/audio/Rifle_reload.wav" id="3_1rd4b"]
-[ext_resource type="PackedScene" uid="uid://dwk0e4c5s26wu" path="res://assets/Shotgun_1.glb" id="3_kvyhh"]
+[ext_resource type="PackedScene" path="res://assets/weapons/SG1.glb" id="3_kvyhh"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_sg1_body"]
-size = Vector3(0.065, 0.105, 0.625)
+size = Vector3(0.08, 0.1771, 0.98)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_sg1_pickup"]
-size = Vector3(0.065, 0.105, 0.625)
+size = Vector3(0.5, 0.5, 1.18)
 
 [node name="SG1" type="Node3D" unique_id=300100001]
 script = ExtResource("1_sg1")
@@ -18,7 +18,7 @@ pellet_count = 8
 weapon_id = "SG1"
 weapon_name = "SG-1"
 weapon_pose_index = 1
-hold_socket = "MarkerSG1"
+hold_socket = "SocketRifle"
 holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
 spread = 3.0
 bloom_per_shot = 1.0
@@ -37,6 +37,7 @@ reload_audio = ExtResource("3_1rd4b")
 require_interact = true
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=300100002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0048, -0.2185)
 shape = SubResource("BoxShape3D_sg1_body")
 
 [node name="PickupArea" type="Area3D" parent="." unique_id=300100003]
@@ -44,15 +45,18 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=300100004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0048, -0.2185)
 shape = SubResource("BoxShape3D_sg1_pickup")
 
+[node name="SupportPoint" type="Marker3D" parent="." unique_id=939809191]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0323, -0.4145)
+
 [node name="Muzzle" type="Marker3D" parent="." unique_id=300100005]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.33357924)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0497, -0.7085)
 
 [node name="MuzzleVFX" parent="Muzzle" unique_id=300100006 instance=ExtResource("2_muzzle")]
 
-[node name="Shotgun_12" parent="." unique_id=1405520847 instance=ExtResource("3_kvyhh")]
-transform = Transform3D(-4.371139e-09, 0, 0.1, 0, 0.1, 0, -0.1, 0, -4.371139e-09, 0, 0, 0.10992032)
+[node name="Model" parent="." unique_id=1405520847 instance=ExtResource("3_kvyhh")]
 
 [connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
 [connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

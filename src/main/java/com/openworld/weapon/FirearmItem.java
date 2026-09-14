@@ -252,6 +252,8 @@ public class FirearmItem extends WeaponItem {
     for (int i = 0; i < pellets; i++) resolveShot(ray, origin, sightPoint);
   }
 
+  @Override protected boolean launchesTowardAim() { return muzzleTrace; }
+
   /**
    * True when this shot should leave the muzzle rather than the camera. On-foot characters only:
    * a seated occupant's gun (and a vehicle's own mounted weapon) sits inside/against the carrier's

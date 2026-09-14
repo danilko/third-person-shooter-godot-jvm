@@ -4,14 +4,14 @@
 [ext_resource type="Texture2D" uid="uid://xfaneftulo6j" path="res://assets/ui/AR4.png" id="2_fu3cl"]
 [ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="3_gt4sh"]
 [ext_resource type="AudioStream" uid="uid://c333cb6cupk6h" path="res://assets/audio/Rifle_reload.wav" id="4_bxm8d"]
-[ext_resource type="PackedScene" uid="uid://dlfyhi6367wjr" path="res://assets/AssaultRifle_4.glb" id="5_fu3cl"]
+[ext_resource type="PackedScene" path="res://assets/weapons/AR4.glb" id="5_fu3cl"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="6_muzzle"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_fu3cl"]
-size = Vector3(0.215, 0.105, 0.625)
+size = Vector3(0.08, 0.2565, 0.88)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_v5ooh"]
-size = Vector3(0.215, 0.105, 0.625)
+size = Vector3(0.5, 0.5, 1.08)
 
 [node name="AR4" type="Node3D" unique_id=1788483088]
 script = ExtResource("1_fu3cl")
@@ -19,7 +19,7 @@ weapon_id = "AR4"
 weapon_name = "AR-4"
 weapon_pose_index = 1
 weapon_icon = ExtResource("2_fu3cl")
-hold_socket = "MarkerAR4"
+hold_socket = "SocketRifle"
 holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
 spread = 0.01
 bloom_per_shot = 0.05
@@ -38,7 +38,7 @@ reload_audio = ExtResource("4_bxm8d")
 require_interact = true
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=100000002]
-transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0038, -0.1589)
 shape = SubResource("BoxShape3D_fu3cl")
 
 [node name="PickupArea" type="Area3D" parent="." unique_id=100000003]
@@ -46,19 +46,18 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=1413815656]
-transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0038, -0.1589)
 shape = SubResource("BoxShape3D_v5ooh")
 
 [node name="SupportPoint" type="Marker3D" parent="." unique_id=491564193]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.03, -0.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0196, -0.308)
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=491564192]
-transform = Transform3D(1, 2.9802322e-08, 0, -2.9802322e-08, 0.9999999, 2.9802322e-08, 1.7881393e-07, -2.9802322e-08, 1, 0, 0, -0.34146672)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0793, -0.5989)
 
 [node name="MuzzleVFX" parent="Muzzle" unique_id=1249537148 instance=ExtResource("6_muzzle")]
 
-[node name="AssaultRifle_42" parent="." unique_id=791353034 instance=ExtResource("5_fu3cl")]
-transform = Transform3D(-4.371139e-09, 0, 0.1, 0, 0.1, 0, -0.1, 0, -4.371139e-09, 0, -0.048481856, 0.09002228)
+[node name="Model" parent="." unique_id=791353034 instance=ExtResource("5_fu3cl")]
 
 [connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
 [connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]
