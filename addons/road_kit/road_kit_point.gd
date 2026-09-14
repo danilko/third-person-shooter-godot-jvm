@@ -14,8 +14,24 @@ var fields: Dictionary = FieldSet.defaults(Fields.POINT_FIELDS)
 ## [{"target": uid, "type": "SEGMENT"|"JUNCTION"|"AUX"}] — by uid, which survives a rename.
 @export var links: Array[Dictionary] = []
 
-func _get_property_list() -> Array:
+func _get_property_list() -> Array[Dictionary]:
 	return FieldSet.property_list(Fields.POINT_FIELDS, PREFIX, "Road Point")
+
+## In the editor a point reports its own moves and edits to its network, which the plugin debounces into
+## a refresh of the overlay and draft surface (B10.2).
+func _enter_tree() -> void:
+	if Engine.is_editor_hint():
+		set_notify_transform(true)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED:
+		_edited()
+
+func _edited() -> void:
+	var road := get_parent()
+	var net := road.get_parent() if road != null else null
+	if net != null and net.has_method("notify_edited"):
+		net.notify_edited()
 
 func _get(property: StringName):
 	var s := String(property)
@@ -29,8 +45,23 @@ func _set(property: StringName, value) -> bool:
 		var row := FieldSet.row_of(Fields.POINT_FIELDS, s.substr(PREFIX.length()))
 		if not row.is_empty():
 			fields[row[0]] = FieldSet.coerce(row, value)
+			_edited()
+			update_gizmos()
 			return true
 	return false
+
+## A point's node name: `<road>_pNNN` in chain order, then a TAG for what the point is, so the Scene dock
+## tells them apart at a glance (`RoadKitNetwork.name_tag` decides it from the links):
+##   `_jct`  a junction mouth -- a stop line of a pad (JUNCTION links)
+##   `_ramp` a ramp's mouth (a RAMP role, or the target of an AUX link)
+##   `_aux`  a mainline station a ramp leaves from (it carries the AUX link)
+##   `_end`  a road end that joins nothing (a dead end, or TERMINUS)
+##   (none)  a plain station along the road
+## Derived: every renumber rewrites it, and nothing reads a point by its name (links are by uid).
+const ROLE_TAGS := {"INTERSECTION": "_jct", "RAMP": "_ramp", "RAMP_ENTRY": "_ramp", "RAMP_EXIT": "_ramp", "TERMINUS": "_end"}
+
+static func point_name(road_name: String, index: int, tag: String) -> String:
+	return "%s_p%03d%s" % [road_name, index, tag]
 
 var uid: String:
 	get: return fields.get("uid", "")
@@ -101,11 +132,19 @@ func set_network_transform(xf: Transform3D) -> void:
 func kit_tangent() -> Vector3:
 	return Frame.to_kit(-network_transform().basis.z).normalized()
 
-func to_record() -> Dictionary:
+## `links_out` replaces the node's own links in the record: the network passes the links it DERIVES from
+## the live tree (`RoadKitNetwork.record_links` -- a point Godot's own Delete took out of the tree leaves no
+## dangling link behind), and `role_out` the role those links still support.
+func to_record(links_out = null, role_out: String = "") -> Dictionary:
 	sync_promotion()
-	var d := FieldSet.to_dict(Fields.POINT_FIELDS, fields, ["uid"])
+	var f := fields
+	if role_out != "" and role_out != str(fields.get("role", "")):
+		f = fields.duplicate()
+		f["role"] = role_out
+	var d := FieldSet.to_dict(Fields.POINT_FIELDS, f, ["uid"])
 	d["pos"] = Frame.to_array(Frame.to_kit(network_transform().origin))
-	d["links"] = links.map(func(l): return {"target": l["target"], "type": l["type"]})
+	var ls: Array = links if links_out == null else links_out
+	d["links"] = ls.map(func(l): return {"target": l["target"], "type": l["type"]})
 	if fields.get("tangent_mode", "AUTO") == "MANUAL":
 		d["tangent"] = Frame.to_array(kit_tangent())
 	return d

@@ -43,7 +43,7 @@ for f in "$BP"/lib/road_points.py "$BP"/lib/lane_movements.py "$BP"/lib/lane_pro
          "$BP"/lib/road_support.py \
          "$ADDON"/point_model.py "$ADDON"/point_profile.py "$ADDON"/point_solve.py \
          "$ADDON"/point_edges.py "$ADDON"/point_validate.py "$ADDON"/point_export.py \
-         "$ADDON"/point_style.py "$ADDON"/point_zones.py "$ADDON"/point_ground.py "$ADDON"/point_record_ops.py; do
+         "$ADDON"/point_style.py "$ADDON"/point_zones.py "$ADDON"/point_ground.py "$ADDON"/point_record_ops.py "$ADDON"/point_digest.py "$ADDON"/point_mesh.py; do
   [ -f "$f" ] && run "$(basename "$f")" python3 "$f"
 done
 
@@ -84,16 +84,26 @@ if [ "$QUICK" -eq 0 ]; then
   run "compare_roads_records (Godot-written == kit)" python3 "$BP/tools/compare_roads_records.py" "$SAMPLE" "$GT/rt.roads.json"
   run "test_roadkit_gestures" gd tools/godot/test_roadkit_gestures.gd -- "$GT/g.roads.json"
   run "test_roadkit_b8 (repairs, branch, bend, gizmo)" gd tools/godot/test_roadkit_b8.gd
+  run "test_roadkit_handles (B10.4 junction move/rotate, setback, lanes, fillet)" gd tools/godot/test_roadkit_handles.gd
+  run "test_roadkit_tool (B10.3 viewport tool: select, draw, insert, delete, connect)" gd tools/godot/test_roadkit_tool.gd
+  run "test_roadkit_native_delete (B10.8 Godot's own Delete + undo, name tags)" gd tools/godot/test_roadkit_native_delete.gd
   run "test_roadkit_ground" gd tools/godot/test_roadkit_ground.gd
   run "test_roadkit_zones" gd tools/godot/test_roadkit_zones.gd -- "$GT/z.json"
   run "test_roadkit_preview" gd tools/godot/test_roadkit_preview.gd
   run "test_roadkit_draft (B10.1 draft surface = the build)" gd tools/godot/test_roadkit_draft.gd
+  # B10.7: while two builders exist they must agree -- the pure-Python sweep against the baked DebugRoads pieces.
+  PC="$ROOT/src/main/resources/com/openworld/world/pieces"
+  run "roadkit_mesh_parity (point_mesh == the Blender build, DebugRoads)" python3 "$BP/tools/roadkit_mesh_parity.py" \
+      "$ROOT/assets/world_source/pieces/DebugRoads.roads.json" "$PC/Roads_DebugRoads_debug_a.gltf" "$PC/Roads_DebugRoads_debug_b.gltf" \
+      --ground "$ROOT/assets/world_source/pieces/DebugRoads.ground.json" --assert
   run "probe_road_ground (DebugWorld supports on the ground)" gd tools/godot/probe_road_ground.gd
   run "probe_road_stamp (DebugWorld terrain carries the roads)" gd tools/godot/probe_road_stamp.gd
-  # Inside the REAL editor, where a non-@tool JVM script is a placeholder: the plugin opens DebugWorld
-  # and must show its road pieces without being asked -- and without writing its unloaded (empty)
-  # network over the record, which it once did (`plugin.gd _selftest`).
-  run "editor self-test (pieces shown on open, draft surface wears the kit's materials)" bash -c "cd '$ROOT' && ROADKIT_EDITOR_SELFTEST=res://src/main/resources/com/openworld/world/DebugWorld.tscn timeout -k 5 300 '$GODOT' --headless --editor --path . > '$GT/selftest.log' 2>&1; cat '$GT/selftest.log' >&2; grep -q 'preview shown on open: true' '$GT/selftest.log' && grep -q 'draft surface: true materials \[\"M_Asphalt' '$GT/selftest.log'"
+  # Inside the REAL editor, where a non-@tool JVM script is a placeholder (`plugin.gd _selftest`): the
+  # plugin opens DebugWorld and must show its road pieces and LOAD its points without being asked, leave
+  # the scene unmodified and the record byte-identical; a click on a point selects it; a sideways move
+  # drapes it and locks a mouth's setback; a save writes exactly that into the record and no point into
+  # the scene; Ctrl+Z commits nothing. It edits and saves the real files and restores them byte for byte.
+  run "editor self-test (B10.0 editable points, pieces on open, draft materials)" bash -c "cd '$ROOT' && ROADKIT_EDITOR_SELFTEST=res://src/main/resources/com/openworld/world/DebugWorld.tscn timeout -k 5 300 '$GODOT' --headless --editor --path . > '$GT/selftest.log' 2>&1; grep '\[selftest\]' '$GT/selftest.log' >&2; grep -q 'selftest\] RESULT PASS' '$GT/selftest.log'"
   rm -rf "$GT"
 fi
 

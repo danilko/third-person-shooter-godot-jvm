@@ -1,0 +1,21 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/debug/NetLaunchTestHost.java" id="1_nlt"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/ATL4.tscn" id="2_atl4"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/T1.tscn" id="3_t1"]
+
+[node name="NetLaunchTest" type="Node3D"]
+script = ExtResource("1_nlt")
+
+[node name="Characters" type="Node" parent="."]
+
+[node name="PlayerSpawn" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="Pickups" type="Node" parent="."]
+
+[node name="ATL4" parent="Pickups" instance=ExtResource("2_atl4")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 6)
+
+[node name="T1" parent="Pickups" instance=ExtResource("3_t1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.6, 6)

@@ -128,7 +128,8 @@ public class VehicleNetworkController extends Controller {
 
         Node weaponNode = vehicle.getNodeOrNull(new godot.core.NodePath("WeaponController"));
         if (weaponNode instanceof WeaponController wc) {
-            if (haveFireSeq && snap.fireSeq() != lastFireSeq) wc.playRemoteFireCue();
+            // N3: one cue per shot the counter says happened (capped), not one per changed value.
+            wc.playRemoteFireCues(FireCuePolicy.cuesFor(haveFireSeq, lastFireSeq, snap.fireSeq(), FireCuePolicy.MAX_CUES));
             wc.setReplicatedFireSeq(snap.fireSeq());
         }
         lastFireSeq = snap.fireSeq();

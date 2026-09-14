@@ -7,9 +7,9 @@ extends RefCounted
 ## instances every ZoneMarker's geometry piece (and the network's resident piece, when the build made
 ## one) under ONE editor-only node that nothing saves:
 ##
-## * the node has NO OWNER, and neither does anything under it but the pieces' own internals (which are
-##   owned by their piece root) -- `PackedScene.pack` writes only nodes owned by the scene root, so a
-##   save writes none of it (`test_roadkit_preview.gd` asserts that, with a control that sets an owner);
+## * the node has NO OWNER, and neither does anything under it (a piece's internals are un-owned too, so
+##   the 3D editor gives them no gizmo and a click passes through to the road points) --
+##   `PackedScene.pack` writes only nodes owned by the scene root, so a save writes none of it (`test_roadkit_preview.gd` asserts that, with a control that sets an owner);
 ## * it is `top_level`, so a child's `transform` IS its world transform, whatever the scene root does;
 ## * placement is `Zone.placeGeometry`'s rule, re-stated for a tool script (the Java is not `@Tool`):
 ##   a `geometry_world_placed` zone at `geometry_world_transform`, any other at its marker's position.
@@ -80,5 +80,11 @@ static func _add(holder: Node3D, path: String, name: String, xf: Transform3D, re
 	inst.name = name
 	holder.add_child(inst)
 	inst.transform = xf
+	# NOT PICKABLE. A piece's internals are owned by its own root, and the 3D editor gives a gizmo -- and
+	# so a click target -- to any owned node under the edited scene; a click then resolved to the nearest
+	# editable ancestor, which is the SCENE ROOT, and a road point sitting on the tarmac could not be
+	# clicked at all (B10.0). The preview is a picture, so nothing in it is owned.
+	for n in inst.find_children("*", "", true, false):
+		n.owner = null
 	placed.append({"name": name, "path": path, "transform": xf})
 	return true

@@ -18,8 +18,8 @@ static func coerce(row: Array, v):
 		"e": return v if row[3].has(v) else row[2]
 	return v
 
-static func property_list(table: Array, prefix: String, group: String, skip: Array = []) -> Array:
-	var out := [{"name": group, "type": TYPE_NIL, "usage": PROPERTY_USAGE_GROUP, "hint_string": prefix}]
+static func property_list(table: Array, prefix: String, group: String, skip: Array = []) -> Array[Dictionary]:
+	var out: Array[Dictionary] = [{"name": group, "type": TYPE_NIL, "usage": PROPERTY_USAGE_GROUP, "hint_string": prefix}]
 	for row in table:
 		if skip.has(row[0]):
 			continue

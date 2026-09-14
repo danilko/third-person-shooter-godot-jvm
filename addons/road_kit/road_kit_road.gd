@@ -14,8 +14,8 @@ const BASE := "base_"
 var fields: Dictionary = FieldSet.defaults(Fields.ROAD_FIELDS)
 var base: Dictionary = FieldSet.defaults(Fields.POINT_FIELDS)
 
-func _get_property_list() -> Array:
-	var out := FieldSet.property_list(Fields.ROAD_FIELDS, PREFIX, "Road", ["name"])
+func _get_property_list() -> Array[Dictionary]:
+	var out: Array[Dictionary] = FieldSet.property_list(Fields.ROAD_FIELDS, PREFIX, "Road", ["name"])
 	out.append_array(FieldSet.property_list(Fields.POINT_FIELDS, BASE, "Base Cross-Section", ["uid", "schema_ver", "role"]))
 	return out
 
@@ -33,13 +33,34 @@ func _set(property: StringName, value) -> bool:
 		var row := FieldSet.row_of(Fields.ROAD_FIELDS, s.substr(PREFIX.length()))
 		if not row.is_empty():
 			fields[row[0]] = FieldSet.coerce(row, value)
+			_edited()
 			return true
 	if s.begins_with(BASE):
 		var row := FieldSet.row_of(Fields.POINT_FIELDS, s.substr(BASE.length()))
 		if not row.is_empty():
 			base[row[0]] = FieldSet.coerce(row, value)
+			_edited()
 			return true
 	return false
+
+func _edited() -> void:
+	var net := get_parent()
+	if net != null and net.has_method("notify_edited"):
+		net.notify_edited()
+
+## A dragged ROAD node moves its points (a point's record position composes the road's transform), so it
+## reports its moves too.
+func _enter_tree() -> void:
+	if Engine.is_editor_hint():
+		set_notify_transform(true)
+		# A point added, removed or re-ordered (Godot's own Delete, a paste, dragging it in the Scene dock,
+		# an undo of any of those) changes the chain.
+		if not child_order_changed.is_connected(_edited):
+			child_order_changed.connect(_edited)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED:
+		_edited()
 
 func points() -> Array:
 	return get_children().filter(func(c): return c.get_script() == PointScript)

@@ -95,10 +95,13 @@ class Band(object):
     """One paved footprint: a closed XY polygon, plus the centreline it came from so the test can
     ask "and how high is that surface here?" without a 3D containment test."""
 
-    __slots__ = ("owner", "poly", "spine", "members", "carries_edge", "x0", "y0", "x1", "y1")
+    __slots__ = ("owner", "poly", "spine", "members", "carries_edge", "x0", "y0", "x1", "y1", "tris")
 
-    def __init__(self, owner, poly, spine, members=(), carries_edge=False):
+    def __init__(self, owner, poly, spine, members=(), carries_edge=False, tris=()):
         self.owner = owner
+        #: The footprint's own surface TRIANGLES where it has them (a pad's fan) -- the height a
+        #: corridor must follow is read off these, never re-derived (`_pad_corridors`).
+        self.tris = list(tris)
         self.poly = poly
         #: The point uids this footprint belongs to, for a band that is not a whole road -- a pad,
         #: a gore.
@@ -195,7 +198,7 @@ def band_of_junction(jsolve):
     return Band("JCT:" + jsolve.uids[0][:8],
                 [(p[0], p[1]) for p in jsolve.boundary],
                 [tuple(m.pos) for m in jsolve.mouths] + [jsolve.centre],
-                members=jsolve.uids, carries_edge=True)
+                members=jsolve.uids, carries_edge=True, tris=jsolve.fan)
 
 
 def band_of_gore(gsolve):
@@ -515,7 +518,8 @@ def band_corridors(bands, owners=False):
         spine = list(getattr(band, "spine", ()) or ())
         poly = list(getattr(band, "poly", ()) or ())
         if str(band.owner).startswith("JCT:"):
-            out.extend((l, h, band.owner) if owners else (l, h) for l, h in _pad_corridors(spine, poly))
+            out.extend((l, h, band.owner) if owners else (l, h)
+                       for l, h in _pad_corridors(spine, poly, getattr(band, "tris", ())))
             continue
         m = len(spine)
         if m < 2 or len(poly) != 2 * m:
@@ -545,7 +549,7 @@ class _At(object):
         self.pos = pos
 
 
-def _pad_corridors(spine, ring):
+def _pad_corridors(spine, ring, tris=()):
     """A junction pad as corridors: one SPOKE from the fan centre to every boundary vertex.
 
     THE PAD WAS SILENTLY DROPPED until B7 (2026-09-14). `band_corridors` read every band as a road
@@ -558,9 +562,11 @@ def _pad_corridors(spine, ring):
     half the longer of its two edges -- so neighbouring spokes overlap at the ring, where they are
     furthest apart, and the fan has no gaps. Spokes to the RAW ring were wrong the other way: a cap
     corner's edge is the whole mouth (18 m on a T2), so its spoke claimed 9 m of the approach road
-    beyond the pad and put the ground 0.85 m under a lane there. Height is the pad's own rule,
-    `point_solve._idw_z` over the mouths (the last spine entry is the centre), at every point of the
-    spoke -- IDW is not linear along it."""
+    beyond the pad and put the ground 0.85 m under a lane there. Height is the pad's own SURFACE --
+    `point_solve.pad_z` over its triangles (`tris`), at every point of the spoke -- and the IDW rule over
+    the mouths only where a spoke point is off them (or no triangles were handed over). Re-deriving the
+    IDW here was a second owner of pad height, and it disagreed by 0.26 m the day the pad's own rule
+    moved to the stop line (B10.0b)."""
     if len(spine) < 3 or len(ring) < 3:
         return []
     mouths = [_At(p) for p in spine[:-1]]
@@ -583,7 +589,10 @@ def _pad_corridors(spine, ring):
         for k in range(PAD_SPOKE_STEPS + 1):
             t = k / float(PAD_SPOKE_STEPS)
             px, py = c[0] + (x - c[0]) * t, c[1] + (y - c[1]) * t
-            line.append((px, py, cz if k == 0 else ps._idw_z(mouths, (px, py)), half))
+            z = ps.pad_z(tris, (px, py)) if tris else None
+            if z is None:
+                z = cz if k == 0 else ps._idw_z(mouths, (px, py))
+            line.append((px, py, z, half))
         out.append((line, 0.0))
     return out
 

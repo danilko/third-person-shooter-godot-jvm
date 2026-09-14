@@ -5,8 +5,9 @@ extends SceneTree
 ## On DebugWorld's DebugRoads network: `roadkit_cli.py bands` answers inside the 300 ms budget; every
 ## tarmac and pad vertex of the draft lies (8 cm) on a tarmac triangle of the BUILT pieces
 ## `Roads_DebugRoads_debug_a/_b` -- the draft is Build's footprint, not a second road model; draft and
-## build agree on whether each lane point of those pieces stands on paving; the overlay uploads it; and a save writes none of
-## it. CONTROL: the same draft from a copy of the record with one station moved 10 m no longer matches
+## build agree on whether each lane point of those pieces stands on paving, and every one of them DOES
+## (B10.0b); every run-end vertex of the draft lies on the build too (B10.0b); the overlay uploads it; and
+## a save writes none of it. CONTROL: the same draft from a copy of the record with one station moved 10 m no longer matches
 ## the build, so the parity check can see a draft that is not the build.
 
 const Service := preload("res://addons/road_kit/road_kit_service.gd")
@@ -130,9 +131,9 @@ func _rel(root: Node3D, n: Node3D) -> Transform3D:
 
 ## `{"on", "total", "worst", "ends", "end_worst"}` over the draft's tarmac + pad vertices: how many lie on
 ## a built tarmac triangle within TOL. A road run's END cross-section (its first and last edge pair) is
-## counted apart, in `ends`/`end_worst`: the build's Geometry Nodes sweep cuts a run's end on its last
-## CHORD while the solver (and the pad ring it meets) cut it on the mouth's axis, so there the build --
-## not the draft -- is off (a finding; PLAN.md B10.7 removes it by building from these same edges).
+## counted apart, in `ends`/`end_worst`: `Curve to Mesh` cuts a run's end on the carrier's last CHORD
+## while the solver (and the pad ring it meets) cut it on the mouth's axis -- `point_build.END_LEAD` gives
+## the carrier a lead chord along that axis, so this is asserted, and a seam far off it is its own case.
 func _parity(grid: Dictionary, bands: Dictionary) -> Dictionary:
 	var ends := {}
 	var rf: Array = bands["surface"]["road"]
@@ -189,7 +190,8 @@ func _initialize() -> void:
 	var grid := _built_triangles(lanes)
 	var par := _parity(grid, bands)
 	check(par["total"] > 0 and par["on"] == par["total"], "every draft tarmac/pad vertex lies on the built tarmac (%.0f cm)" % (TOL * 100.0), "%d/%d, worst %.3f m" % [par["on"], par["total"], par["worst"]])
-	print("  finding: %d run-end vertices, worst %.3f m off the built sweep (its end is cut on the last chord)" % [par["ends"], par["end_worst"]])
+	# B10.0b: the sweep's end frame is the mouth axis (`point_build.END_LEAD`). Before: 0.328 m at junction 1.
+	check(par["ends"] > 0 and par["end_worst"] <= TOL, "every run-end vertex lies on the built sweep (%.0f cm)" % (TOL * 100.0), "%d vertices, worst %.3f m" % [par["ends"], par["end_worst"]])
 	# Draft and build must AGREE on every lane sample -- whether it stands on paving or not. The ones on
 	# NEITHER are a finding about the road (turn paths leaving a pad), reported, not a draft defect.
 	var agree := 0
@@ -204,7 +206,10 @@ func _initialize() -> void:
 			continue
 		agree += 1 if d == b else 0
 		off += 0 if d else 1
-	check(lanes.size() > 0 and agree + seam == lanes.size(), "draft and build agree on every built lane point", "%d/%d agree, %d at a run-end seam; %d off paving (finding)" % [agree, lanes.size(), seam, off])
+	check(lanes.size() > 0 and agree + seam == lanes.size(), "draft and build agree on every built lane point", "%d/%d agree, %d at a run-end seam" % [agree, lanes.size(), seam])
+	# B10.0b: a turn path stays on its pad (`point_solve.contain_turns`) and rides its surface
+	# (`turn_path`). Before: 85 of 1781 samples off paving at both junctions.
+	check(off == 0, "every built lane point stands on paving (%.2f m)" % LANE_TOL, "%d off" % off)
 
 	var ov: MeshInstance3D = OverlayScript.new()
 	ov.name = "_RoadKitOverlay"

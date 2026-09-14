@@ -105,11 +105,25 @@ public class Health extends Node {
         applyDamage(damage, headshot, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos);
     }
 
+    /**
+     * What a client may still relay (PLAN.md N2/N4 — firearms resolve on the host via MSG_SHOT, melee via
+     * MSG_MELEE, rockets and grenades via MSG_LAUNCH): damage to an entity it OWNS, which its own simulation dealt
+     * (a fall, drowning, its vehicle's collision) — SELF, naming the victim as responsible. The host refuses
+     * anything else ({@code DamageRequestPolicy}).
+     */
     private void relayDamageToAuthority(Controllable c, float finalDamage, boolean headshot,
             String weaponName, String attackerName, String attackerFaction) {
         Node netNode = getNodeOrNull("/root/NetworkManager");
         if (!(netNode instanceof NetworkManager net) || !net.isNetworked()) return;
-        net.requestDamage(c.getCharacterInfo().characterId, finalDamage, headshot, weaponName, attackerName, attackerFaction);
+        String victimId = c.getCharacterInfo().characterId;
+        if (!net.isAuthorityFor(c.getCharacterInfo())) {
+            // N4: shots, swings and explosives all resolve on the host, so damage to an entity this peer does
+            // not own is a prediction that must not be applied twice — never relayed.
+            com.openworld.net.NetStats.increment("damage_relay_suppressed");
+            return;
+        }
+        net.requestDamage(victimId, victimId, com.openworld.net.DamageRequestPolicy.Kind.SELF,
+                finalDamage, headshot, weaponName, attackerName, attackerFaction);
     }
 
     /**

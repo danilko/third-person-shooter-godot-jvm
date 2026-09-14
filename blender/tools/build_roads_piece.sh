@@ -17,6 +17,11 @@
 # supports stand on the real ground under every sample. Without one they stand on a lerp of the
 # stations' own `ground_z`, which is only right where the ground between two stations is straight.
 #
+# DIRTY_ONLY=1 (B10.6, the plugin's Build) rebuilds only the pieces whose DIGEST -- a hash of what the
+# piece emits, from the same solve (`point_digest.py`) -- differs from the one recorded when that piece
+# last baked (`<record stem>.build.json`), or whose scene is missing. Nothing dirty: no Blender at all.
+# Without it every piece is rebuilt, and the manifest is rewritten either way.
+#
 # Run by the Godot Road Kit plugin's Build button, or by hand. NO_SOLO=1 is set so the shared
 # SoloPiece.tscn host is not re-pointed by a plugin build.
 set -euo pipefail
@@ -42,7 +47,7 @@ mkdir -p "$PIECES"
 echo "── 1/3 lane graph (python3)${ZONES:+, cut by zone}"
 TABLE="$(mktemp)"
 trap 'rm -f "$TABLE"' EXIT
-python3 "$BP/tools/roadkit_cli.py" pieces "$RECORD" "${ZONES:-}" "$PIECES" "$PIECE" > "$TABLE"
+python3 "$BP/tools/roadkit_cli.py" pieces "$RECORD" "${ZONES:-}" "$PIECES" "$PIECE" --ground "${GROUND:-}" > "$TABLE"
 python3 - "$TABLE" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -60,19 +65,54 @@ if d["dangling"]:
     print("   ERROR: successor(s) naming no lane: %s" % d["dangling"][:4])
 sys.exit(0 if d["written"] else 1)
 PY
-mapfile -t NAMES < <(python3 -c "import json,sys; [print(p['piece']) for p in json.load(open(sys.argv[1]))['pieces']]" "$TABLE")
+MANIFEST="${RECORD%.roads.json}.build.json"
+mapfile -t NAMES < <(python3 - "$TABLE" "$MANIFEST" "$REPO/$RES_DIR" "${DIRTY_ONLY:-0}" <<'PY'
+import json, os, sys
+table, manifest, res_dir, dirty_only = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1"
+built = json.load(open(manifest)).get("pieces", {}) if os.path.exists(manifest) else {}
+for p in json.load(open(table))["pieces"]:
+    clean = (dirty_only and p.get("digest") and built.get(p["piece"]) == p["digest"]
+             and os.path.exists(os.path.join(res_dir, p["piece"] + ".tscn")))
+    if clean:
+        print("   clean %s -- not rebuilt" % p["piece"], file=sys.stderr)
+    else:
+        print(p["piece"])
+PY
+)
+echo "ROADKIT_DIRTY $(IFS=,; echo "${NAMES[*]}")"
+if [ "${#NAMES[@]}" -eq 0 ]; then
+  echo "── nothing changed since the last build"
+fi
 
-echo "── 2/3 meshes (blender, headless)${GROUND:+, over the sampled ground}"
-"$BLENDER" --background --python-exit-code 1 --python "$BP/tools/roadkit_build_mesh.py" -- \
-    --record "$RECORD" --zones "${ZONES:-}" --prefix "$PIECE" --out-dir "$PIECES" --ground "${GROUND:-}" 2>&1 \
-  | grep -E "^==|Error|refused|ground grid|terrain below" | grep -v OCIO || true
-for n in "${NAMES[@]}"; do
-  [ -f "$PIECES/$n.blend" ] || { echo "ERROR: mesh build produced no $n.blend"; exit 1; }
-done
+if [ "${#NAMES[@]}" -gt 0 ]; then
+  echo "── 2/3 meshes (blender, headless)${GROUND:+, over the sampled ground}: ${NAMES[*]}"
+  "$BLENDER" --background --python-exit-code 1 --python "$BP/tools/roadkit_build_mesh.py" -- \
+      --record "$RECORD" --zones "${ZONES:-}" --prefix "$PIECE" --out-dir "$PIECES" --ground "${GROUND:-}" \
+      --only "$(IFS=,; echo "${NAMES[*]}")" 2>&1 \
+    | grep -E "^==|Error|refused|ground grid|terrain below" | grep -v OCIO || true
+  for n in "${NAMES[@]}"; do
+    [ -f "$PIECES/$n.blend" ] || { echo "ERROR: mesh build produced no $n.blend"; exit 1; }
+  done
+fi
 
 for n in "${NAMES[@]}"; do
   echo "── 3/3 export + bake $n"
   NO_SOLO=1 "$BP/tools/build_piece.sh" "$n"
+  # Record what this piece now IS, only once it has baked -- a failed bake leaves it dirty.
+  python3 - "$TABLE" "$MANIFEST" "$n" <<'PY'
+import json, os, sys
+table, manifest, name = sys.argv[1:4]
+d = json.load(open(manifest)) if os.path.exists(manifest) else {}
+d.setdefault("pieces", {})
+for p in json.load(open(table))["pieces"]:
+    if p["piece"] == name:
+        d["pieces"][name] = p.get("digest", "")
+tmp = manifest + ".tmp"
+with open(tmp, "w") as fh:
+    json.dump(d, fh, indent=1, sort_keys=True)
+    fh.write("\n")
+os.replace(tmp, manifest)
+PY
 done
 
 python3 - "$TABLE" "$RES_DIR" <<'PY'

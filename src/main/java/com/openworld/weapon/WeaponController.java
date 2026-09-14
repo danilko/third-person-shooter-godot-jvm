@@ -227,6 +227,15 @@ public class WeaponController extends Node {
   @Register
   @Override
   public void _process(double delta) {
+    // N3: the rest of a replicated burst, one cue per remembered shot at the weapon's own rhythm.
+    if (pendingRemoteCues > 0) {
+      remoteCueCountdown -= delta;
+      if (remoteCueCountdown <= 0.0) {
+        pendingRemoteCues--;
+        remoteCueCountdown = remoteCueGap();
+        playRemoteFireCue();
+      }
+    }
     // Process equips first (deferred from Area3D body_entered signals)
     if (!pendingEquips.isEmpty()) {
       equippedThisPass.clear();
@@ -592,6 +601,11 @@ public class WeaponController extends Node {
 
   @Register
   public void onWeaponFire() {
+    // Whether this call STARTS a press: onWeaponFire runs every frame fire is held, and only a press that
+    // begins while the weapon is busy is a tap worth buffering (see rememberBlockedPress).
+    long frame = Engine.INSTANCE.getPhysicsFrames();
+    freshPress = frame > lastFireCallFrame + 1;
+    lastFireCallFrame = frame;
     if (reloadTimer.getTimeLeft() > 0 || isWeaponTransitioning()) return;
     if (fireTimer.getTimeLeft() > 0) { rememberBlockedPress(); return; }
     WeaponItem w = getCurrentWeaponItem();
@@ -621,6 +635,12 @@ public class WeaponController extends Node {
     if (!w.deferFireEvent()) reportFireEvent(0);
     // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
     if (!w.isInfiniteAmmo && w.getMagazine() == 0) w.onMagazineEmpty();
+  }
+
+  /** Why a press might not fire right now — the fire gate's timers, for headless checks. */
+  public String fireGateReport() {
+    return String.format(java.util.Locale.ROOT, "fireTimer %.3f reloadTimer %.3f transitioning %s buffered %s",
+        fireTimer.getTimeLeft(), reloadTimer.getTimeLeft(), isWeaponTransitioning(), bufferedFireUntilMs > 0);
   }
 
   /** Next hitscan trigger-pull counter (PLAN.md N1) — the seed and ordering key of one pull. */
@@ -657,6 +677,35 @@ public class WeaponController extends Node {
   // One-shot guard for the cue-divergence diagnostic below — the cue fires per shot (up to
   // ~10/s under sustained fire), so an unguarded print would flood the console.
   private boolean loggedCueNoFirearm = false;
+
+  /** N3: remote cues still to play from the last replicated counter change, and the time to the next one. */
+  private int pendingRemoteCues = 0;
+  private double remoteCueCountdown = 0.0;
+
+  /**
+   * Network replay: the owner fired {@code count} times since the last snapshot this puppet saw
+   * ({@code net.FireCuePolicy} reads that off the wrapping counter). The first cue plays now and the rest at the
+   * weapon's own fire interval, so a burst a dropped snapshot collapsed is still heard as a burst. A melee weapon
+   * replays only its latest swing: a swing restarts the one before it, and the step that rides the snapshot is
+   * the latest one.
+   */
+  public void playRemoteFireCues(int count) {
+    if (count <= 0) return;
+    if (getCurrentWeaponItem() instanceof MeleeItem) count = 1;
+    playRemoteFireCue();
+    if (count > 1) {
+      NetStats.increment("fire_cue_burst_replayed");
+      pendingRemoteCues = Math.min(com.openworld.net.FireCuePolicy.MAX_CUES - 1, pendingRemoteCues + count - 1);
+      remoteCueCountdown = remoteCueGap();
+    }
+  }
+
+  /** Seconds between replayed cues: the held weapon's fire interval, kept between two frames and 0.12 s. */
+  private double remoteCueGap() {
+    WeaponItem w = getCurrentWeaponItem();
+    double gap = w != null ? w.fireInterval() : 0.1;
+    return Math.max(0.033, Math.min(0.12, gap));
+  }
 
   /** Network replay hook — plays the firing cosmetics (flash/audio + tracer) without consuming ammo or running hitscan. */
   @Register
@@ -737,9 +786,20 @@ public class WeaponController extends Node {
     if (until > bufferedFireUntilMs) bufferedFireUntilMs = until;
   }
 
+  /** The physics frame of the last onWeaponFire call, and whether the current call started a press. */
+  private long lastFireCallFrame = -2;
+  private boolean freshPress = true;
+
+  /**
+   * Buffers a TAP the weapon was too busy for. Only a press that STARTS while blocked counts: a press being
+   * HELD re-fires on its own the frame the weapon frees up, and buffering its later frames turned one
+   * two-frame tap into two swings whenever a swing was shorter than the buffer (probe_melee: jab AND cross
+   * from one tap on the fist, measured 2 hits after the first press). Every other frame of a held press is
+   * not a new input.
+   */
   private void rememberBlockedPress() {
     WeaponItem w = getCurrentWeaponItem();
-    if (w == null || w.fireBufferSeconds() <= 0) return;
+    if (!freshPress || w == null || w.fireBufferSeconds() <= 0) return;
     bufferedFireUntilMs = Time.INSTANCE.getTicksMsec() + (long) (w.fireBufferSeconds() * 1000.0);
   }
 

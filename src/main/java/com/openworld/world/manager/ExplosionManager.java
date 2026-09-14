@@ -107,6 +107,7 @@ public class ExplosionManager extends Node {
 
     /** Spawn all three VFX layers at the given world position. */
     public void spawnExplosion(Vector3 center) {
+        com.openworld.net.NetStats.increment("explosion_vfx");   // N4: one per blast on every peer, never two
         spawnLayer(flashPool,    center);
         spawnLayer(fireballPool, center);
         spawnLayer(smokePool,    center.plus(new Vector3(0f, 0.2f, 0f)));

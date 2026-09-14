@@ -172,16 +172,98 @@ def _norm2(a):
 CONNECTOR_SAMPLES = 18
 
 
+def arc_handle(chord, d0, d1):
+    """Handle length of the cubic that is a CIRCULAR ARC from heading `d0` to heading `d1` over
+    `chord`: `(4/3) tan(theta/4) chord / (2 sin(theta/2))`, which is `chord / 3` for a straight
+    movement and grows with the turn (0.39 chord at 90 deg, against 0.33).
+
+    A turn path is an arc because the kerb return it must stay inside is one (`contain_turns`): the
+    old flat `chord / 3` bowed a sharp turn TOWARDS its chord -- straight into the corner the kerb
+    rounds -- and on DebugRoads' 95 deg `east` movement no fillet that still ends at the mouths could
+    contain it. (`point_export._arc_handle` is the same formula for a lane span.)"""
+    dot = max(-1.0, min(1.0, d0[0] * d1[0] + d0[1] * d1[1]))
+    theta = math.acos(dot)
+    if theta < 1e-4:
+        return chord / 3.0
+    theta = min(theta, math.pi - 1e-3)
+    return (4.0 / 3.0) * math.tan(theta / 4.0) * chord / (2.0 * math.sin(theta / 2.0))
+
+
+#: A movement turning by less than this is a cubic (`bezier_through`); a sharper one is a line, an
+#: arc and a line (`turn_shape`).
+TURN_ARC_MIN_DEG = 20.0
+
+
+def turn_shape(p0, d0, p1, d1, n=CONNECTOR_SAMPLES):
+    """`(points, breaks)` -- a turn path's PLAN-VIEW shape, the one owner of it. `breaks` are the
+    sample indices where the shape changes (start, arc start, arc end, end), so a curve fitted to it
+    puts control points there.
+
+    A real turn is DRIVEN as a kerb return is BUILT: straight along the approach, a circular arc, and
+    straight out -- the largest arc through the point where the two lane lines meet (its tangent
+    length is the shorter leg), so on an asymmetric corner the straight part takes up the difference.
+    The pad's kerb arc (`contain_turns`) sits concentric inside it, which is what makes a corner
+    containable at all: a single cubic between the mouths of DebugRoads' 95 deg `east` movement could
+    not be, whatever its handles, because its corner has one leg 13 m longer than the other.
+    A movement that turns by less than `TURN_ARC_MIN_DEG`, or whose lane lines do not meet ahead of
+    both mouths (a straight-through, a lane shift), stays the cubic."""
+    dot = max(-1.0, min(1.0, d0[0] * d1[0] + d0[1] * d1[1]))
+    theta = math.acos(dot)
+    cross = d0[0] * d1[1] - d0[1] * d1[0]
+    if math.degrees(theta) >= TURN_ARC_MIN_DEG and abs(cross) > 1e-9:
+        # p0 + d0*s == p1 - d1*u, i.e. d0*s + d1*u == p1 - p0 (Cramer).
+        rx, ry = p1[0] - p0[0], p1[1] - p0[1]
+        sv = (rx * d1[1] - ry * d1[0]) / cross
+        uv = (d0[0] * ry - d0[1] * rx) / cross
+        if sv > 1e-3 and uv > 1e-3:
+            t = min(sv, uv)
+            x = (p0[0] + d0[0] * sv, p0[1] + d0[1] * sv)
+            a = (x[0] - d0[0] * t, x[1] - d0[1] * t)
+            b = (x[0] + d1[0] * t, x[1] + d1[1] * t)
+            radius = t * math.tan((math.pi - theta) / 2.0)
+            side = 1.0 if cross > 0 else -1.0
+            centre = (a[0] - d0[1] * radius * side, a[1] + d0[0] * radius * side)
+            lead, arc, tail = sv - t, radius * theta, uv - t
+            total = lead + arc + tail
+            pts, breaks = [], [0]
+
+            def z_at(dist):
+                return p0[2] + (p1[2] - p0[2]) * (dist / total if total > 1e-9 else 0.0)
+
+            parts = [(lead, "lead"), (arc, "arc"), (tail, "tail")]
+            walked = 0.0
+            for length, kind in parts:
+                k = max(1, int(round(n * length / total))) if length > 1e-6 else 0
+                for i in range(1 if pts else 0, k + 1):
+                    u = i / float(k) if k else 0.0
+                    if kind == "lead":
+                        xy = (p0[0] + (a[0] - p0[0]) * u, p0[1] + (a[1] - p0[1]) * u)
+                    elif kind == "arc":
+                        ang0 = math.atan2(a[1] - centre[1], a[0] - centre[0])
+                        ang = ang0 + side * theta * u
+                        xy = (centre[0] + radius * math.cos(ang), centre[1] + radius * math.sin(ang))
+                    else:
+                        xy = (b[0] + (p1[0] - b[0]) * u, b[1] + (p1[1] - b[1]) * u)
+                    pts.append((xy[0], xy[1], z_at(walked + length * u)))
+                if k:
+                    walked += length
+                    breaks.append(len(pts) - 1)
+            pts[-1] = tuple(p1)
+            return pts, sorted(set(breaks))
+    pts, _a, _b = bezier_through(p0, d0, p1, d1, n)
+    return pts, [0, len(pts) - 1]
+
+
 def bezier_through(p0, d0, p1, d1, n=CONNECTOR_SAMPLES):
     """A cubic from `p0` along `d0` to `p1` along `d1` -- sampled points plus its two control
-    handles. Handle length is a third of the chord, the standard choice that keeps a 90 deg turn
-    looking like a turn rather than a corner.
+    handles. Handle length is `arc_handle`: a circular arc when the turn is symmetric, a third of
+    the chord when it is straight.
 
     THE ONE OWNER of the turn-connector shape: `point_export` emits these as `.lanekit` control
     points and `point_solve` draws them as the pad's movement preview, and the two must be the
     same curve or the cars drive somewhere the artist cannot see."""
     chord = math.dist(p0[:2], p1[:2]) or 1.0
-    h = chord / 3.0
+    h = arc_handle(chord, d0, d1)
     a = [p0[k] + d0[k] * h for k in range(2)] + [p0[2] + (p1[2] - p0[2]) / 3.0]
     b = [p1[k] - d1[k] * h for k in range(2)] + [p0[2] + 2.0 * (p1[2] - p0[2]) / 3.0]
     out = []
@@ -511,6 +593,35 @@ def solve_road(net, road, uids=None, ground_fn=None):
                      values, is_loop, left, right, routes)
 
 
+#: How far inside each OPEN end of a run the carrier gets a second vertex, along that end sample's
+#: own tangent. `Curve to Mesh` cuts a poly curve's end cross-section square to its LAST CHORD, while
+#: the solver -- and the pad ring that meets it -- cuts it on the mouth's axis
+#: (`point_profile.run_end_axes`); a 2 cm lead chord along the solver's tangent makes the sweep's end
+#: frame that axis. Measured before: run-end vertices up to 0.33 m off the draft at DebugRoads'
+#: junction 1, the road surface ending 1.5 m short of the pad corner. Short enough to add no visible
+#: geometry, long enough that the curve's tangent is not numerical noise.
+END_LEAD = 0.02
+
+
+def carrier_points(solve):
+    """`(verts, values)` of a run's carrier: the solver's samples, plus a lead vertex `END_LEAD` inside
+    each open end along that end sample's tangent (see `END_LEAD`), carrying its end's values."""
+    verts = [tuple(s.pos) for s in solve.samples]
+    values = list(solve.values)
+    if solve.is_loop or len(verts) < 2:
+        return verts, values
+    head, tail = solve.samples[0], solve.samples[-1]
+    if math.dist(verts[0], verts[1]) > 2.0 * END_LEAD:
+        t = head.tangent
+        verts.insert(1, tuple(verts[0][k] + t[k] * END_LEAD for k in range(3)))
+        values.insert(1, values[0])
+    if math.dist(verts[-1], verts[-2]) > 2.0 * END_LEAD:
+        t = tail.tangent
+        verts.insert(len(verts) - 1, tuple(verts[-1][k] - t[k] * END_LEAD for k in range(3)))
+        values.insert(len(values) - 1, values[-1])
+    return verts, values
+
+
 def solve_network(net, ground_fn=None):
     """Every run of every road. Returns `{road_name: [RoadSolve, ...]}` in chain order."""
     out = {}
@@ -532,7 +643,7 @@ class Mouth(object):
 
     __slots__ = ("uid", "point", "road", "pos", "out_dir", "bearing", "lanes_in", "lanes_out",
                  "lane_width", "half_in", "half_out", "profile", "arm", "fwd_leaves", "normal",
-                 "walk_in", "walk_out", "kerb_in", "kerb_out", "wall_h")
+                 "walk_in", "walk_out", "kerb_in", "kerb_out", "wall_h", "cap")
 
     def __init__(self, uid, point, road, pos, out_dir, lanes_in, lanes_out, lane_width,
                  half_in, half_out, profile, fwd_leaves=True, normal=(0.0, 1.0, 0.0),
@@ -562,6 +673,12 @@ class Mouth(object):
         self.kerb_in, self.kerb_out = kerb_in, kerb_out
         self.wall_h = wall_h
         self.arm = None
+        #: The stop line kerb to kerb, world XY: `(−s end, +s end)`. What the pad's height is pinned to
+        #: (`_idw_z`), because the road's end cross-section is flat along it.
+        p_pos = half_out if fwd_leaves else half_in
+        p_neg = half_in if fwd_leaves else half_out
+        self.cap = ((pos[0] - normal[0] * p_neg, pos[1] - normal[1] * p_neg),
+                    (pos[0] + normal[0] * p_pos, pos[1] + normal[1] * p_pos))
 
     def dir_in(self):
         """The direction of travel of an ARRIVING vehicle: into the pad."""
@@ -757,7 +874,14 @@ def _idw_z(mouths, xy, power=2.0):
     actually matters -- the pad must meet each approach at that approach's own elevation."""
     num = den = 0.0
     for m in mouths:
-        d2 = (m.pos[0] - xy[0]) ** 2 + (m.pos[1] - xy[1]) ** 2
+        # Distance to the mouth's STOP LINE, not its centre: the road ends in a flat cross-section, so
+        # the pad must meet that whole edge at the road's height. Measured from the centre point, a
+        # cap corner 9 m out took 0.31 m of its neighbours' heights and the pad stepped against the
+        # road along DebugRoads' `link` mouth. (A stand-in with only `.pos` -- `seed_district_roads`
+        # -- keeps the point rule; the weights are geometry either way, so `_idw_z` stays linear in
+        # the mouth heights.)
+        cap = getattr(m, "cap", None)
+        d2 = _seg_dist2(xy, cap[0], cap[1]) if cap else (m.pos[0] - xy[0]) ** 2 + (m.pos[1] - xy[1]) ** 2
         if d2 < 1e-9:
             return m.pos[2]
         w = 1.0 / (d2 ** (power / 2.0))
@@ -792,53 +916,84 @@ class _PadArm(ik.Arm):
         return self._half_out
 
 
-def _round_ring(ring, segments=8):
+#: How much of an edge running from a rounded corner to a CAP point the corner's arc may take.
+CAP_EDGE_REACH = 0.98
+
+#: How far inside the pad ring every legal turn path must stay, in metres -- half the car's hull
+#: (2.00 m), so a car driving a connector keeps its wheels on the pad (`contain_turns`).
+TURN_CLEARANCE = 1.0
+
+#: Each pass of `contain_turns` grows a corner that a turn path escapes past by this factor (plus
+#: `TURN_GROW_STEP` metres, so a zero radius grows at all); it stops when the ring stops changing.
+TURN_GROW_FACTOR = 1.25
+TURN_GROW_STEP = 1.0
+TURN_GROW_PASSES = 40
+
+
+def _round_ring(ring, segments=8, owners=None):
     """Expand `[(x, y, radius)]` into a plain point ring, rounding every vertex with a radius.
 
     `build_junction_boundary` returns the fillet as a vertex PLUS a radius, because its own
     downstream (`kit_common._poly_curve_with_radius`) rounds it in Geometry Nodes. A triangle fan
     needs the arc as real points, so it is expanded here -- with the tangent length clamped to
     half of each adjoining edge, which is what stops a large `fillet_radius` on a short arm from
-    eating past its neighbour's corner and inverting the ring."""
+    eating past its neighbour's corner and inverting the ring.
+
+    `owners`, when a list is passed, receives per output vertex the index of the ring vertex it came
+    from -- which corner an arc point rounds."""
     n = len(ring)
     out = []
     for i in range(n):
-        px, py, r = ring[i]
-        v = (px, py)
-        if r <= 1e-6 or n < 3:
-            out.append(v)
-            continue
-        a = ring[(i - 1) % n][:2]
-        b = ring[(i + 1) % n][:2]
-        da, db = _sub2(a, v), _sub2(b, v)
-        la, lb = _len2(da), _len2(db)
-        if la < 1e-9 or lb < 1e-9:
-            out.append(v)
-            continue
-        ua, ub = (da[0] / la, da[1] / la), (db[0] / lb, db[1] / lb)
-        cosang = max(-1.0, min(1.0, ua[0] * ub[0] + ua[1] * ub[1]))
-        half = math.acos(cosang) / 2.0
-        if half < 1e-6 or abs(half - math.pi / 2.0) < 1e-6:
-            out.append(v)
-            continue
-        t = min(r / math.tan(half), la * 0.5, lb * 0.5)
-        ta = (v[0] + ua[0] * t, v[1] + ua[1] * t)
-        tb = (v[0] + ub[0] * t, v[1] + ub[1] * t)
-        eff = t * math.tan(half)
-        # Arc centre lies along the angle bisector, `eff / sin(half)` from the vertex.
-        bis = _norm2((ua[0] + ub[0], ua[1] + ub[1]))
-        c = (v[0] + bis[0] * eff / math.sin(half), v[1] + bis[1] * eff / math.sin(half))
-        a0 = math.atan2(ta[1] - c[1], ta[0] - c[0])
-        a1 = math.atan2(tb[1] - c[1], tb[0] - c[0])
-        d = a1 - a0
-        while d > math.pi:
-            d -= 2 * math.pi
-        while d < -math.pi:
-            d += 2 * math.pi
-        for k in range(segments + 1):
-            ang = a0 + d * k / float(segments)
-            out.append((c[0] + eff * math.cos(ang), c[1] + eff * math.sin(ang)))
+        before = len(out)
+        _round_vertex(ring, i, segments, out)
+        if owners is not None:
+            owners.extend([i] * (len(out) - before))
     return out
+
+
+def _round_vertex(ring, i, segments, out):
+    """`_round_ring` for one vertex: append its point, or its arc, to `out`."""
+    n = len(ring)
+    px, py, r = ring[i]
+    v = (px, py)
+    if r <= 1e-6 or n < 3:
+        out.append(v)
+        return
+    a = ring[(i - 1) % n][:2]
+    b = ring[(i + 1) % n][:2]
+    da, db = _sub2(a, v), _sub2(b, v)
+    la, lb = _len2(da), _len2(db)
+    if la < 1e-9 or lb < 1e-9:
+        out.append(v)
+        return
+    ua, ub = (da[0] / la, da[1] / la), (db[0] / lb, db[1] / lb)
+    cosang = max(-1.0, min(1.0, ua[0] * ub[0] + ua[1] * ub[1]))
+    half = math.acos(cosang) / 2.0
+    if half < 1e-6 or abs(half - math.pi / 2.0) < 1e-6:
+        out.append(v)
+        return
+    # Half an edge shared with another ROUNDED vertex, so two arcs cannot overlap; nearly the whole
+    # edge towards a cap point (radius 0), which no arc will claim -- a corner grown to contain
+    # its turn paths (`contain_turns`) may need to start right at the mouth.
+    lim_a = la * (0.5 if ring[(i - 1) % n][2] > 1e-6 else CAP_EDGE_REACH)
+    lim_b = lb * (0.5 if ring[(i + 1) % n][2] > 1e-6 else CAP_EDGE_REACH)
+    t = min(r / math.tan(half), lim_a, lim_b)
+    ta = (v[0] + ua[0] * t, v[1] + ua[1] * t)
+    tb = (v[0] + ub[0] * t, v[1] + ub[1] * t)
+    eff = t * math.tan(half)
+    # Arc centre lies along the angle bisector, `eff / sin(half)` from the vertex.
+    bis = _norm2((ua[0] + ub[0], ua[1] + ub[1]))
+    c = (v[0] + bis[0] * eff / math.sin(half), v[1] + bis[1] * eff / math.sin(half))
+    a0 = math.atan2(ta[1] - c[1], ta[0] - c[0])
+    a1 = math.atan2(tb[1] - c[1], tb[0] - c[0])
+    d = a1 - a0
+    while d > math.pi:
+        d -= 2 * math.pi
+    while d < -math.pi:
+        d += 2 * math.pi
+    for k in range(segments + 1):
+        ang = a0 + d * k / float(segments)
+        out.append((c[0] + eff * math.cos(ang), c[1] + eff * math.sin(ang)))
 
 
 def clamp_corners(ring, mouths, cx, cy, kerb_radius):
@@ -977,11 +1132,20 @@ def _cap_points(m, tail_length=1.0):
             ik.vadd(ik.vscale(perp, m.arm.out_width()), c))
 
 
-def junction_corners(mouths, kerb_radius, cx, cy, segments=8):
+def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None):
     """`[Corner]` -- one per real corner of the pad. A through-pair contributes none, because the
-    road runs straight on through and its own edge run already owns that stretch."""
+    road runs straight on through and its own edge run already owns that stretch. `ring` (the pad's
+    own, local) supplies each corner's SOLVED radius -- grown by `contain_turns` -- so the kerb
+    rounds exactly as far as the pad does."""
     arms = [m.arm for m in mouths]
     segs = ik.build_junction_curb_segments(arms, kerb_radius, tail_length=1.0)
+    if ring:
+        solved = [v for v in ring if v[2] > 1e-6]
+        for seg in segs:
+            if len(seg) == 3 and solved:
+                v = min(solved, key=lambda r: _len2(_sub2(r[:2], seg[1][:2])))
+                if _len2(_sub2(v[:2], seg[1][:2])) < 1e-3:
+                    seg[1] = (seg[1][0], seg[1][1], v[2])
     caps = {m.uid: _cap_points(m) for m in mouths}
     out = []
     for seg in segs:
@@ -1008,8 +1172,175 @@ def junction_corners(mouths, kerb_radius, cx, cy, segments=8):
     return out
 
 
-def solve_junction(net, uids, segments=8, ground_fn=None):
-    """A clique -> its pad. `uids` is one component from `NetworkData.junction_cliques()`."""
+def _point_in_ring(p, flat):
+    inside = False
+    n = len(flat)
+    j = n - 1
+    for i in range(n):
+        xi, yi = flat[i]
+        xj, yj = flat[j]
+        if (yi > p[1]) != (yj > p[1]):
+            x = xi + (p[1] - yi) * (xj - xi) / ((yj - yi) or 1e-12)
+            if p[0] < x:
+                inside = not inside
+        j = i
+    return inside
+
+
+def _seg_dist2(p, a, b):
+    d = _sub2(b, a)
+    L = d[0] * d[0] + d[1] * d[1]
+    t = 0.0 if L < 1e-12 else max(0.0, min(1.0, ((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / L))
+    q = (a[0] + d[0] * t - p[0], a[1] + d[1] * t - p[1])
+    return q[0] * q[0] + q[1] * q[1]
+
+
+def _cap_edge(a, b, caps, tol=0.05):
+    """True when ring edge `a`-`b` is one arm's CAP -- where the pad hands over to a road, not a kerb.
+    A turn path starts ON its cap, so clearance is measured against kerb edges only."""
+    for p_in, p_out in caps:
+        if ((_len2(_sub2(a, p_in)) < tol and _len2(_sub2(b, p_out)) < tol)
+                or (_len2(_sub2(a, p_out)) < tol and _len2(_sub2(b, p_in)) < tol)):
+            return True
+    return False
+
+
+def escaped_turn_points(flat, turn_xy, caps, clearance=TURN_CLEARANCE):
+    """The turn-path samples (local XY) that are outside the ring `flat`, or inside it but closer than
+    `clearance` to a KERB edge of it."""
+    kerbs = [(flat[i], flat[(i + 1) % len(flat)]) for i in range(len(flat))
+             if not _cap_edge(flat[i], flat[(i + 1) % len(flat)], caps)]
+    c2 = clearance * clearance
+    out = []
+    for p in turn_xy:
+        # A path starts and ends ON its cap: a boundary point is inside, whatever the parity test says.
+        on_cap = any(_seg_dist2(p, a, b) < 0.05 * 0.05 for a, b in caps)
+        if (not on_cap and not _point_in_ring(p, flat)) or any(_seg_dist2(p, a, b) < c2 - 1e-9 for a, b in kerbs):
+            out.append(p)
+    return out
+
+
+def contain_turns(ring, turn_xy, caps, segments=8, clearance=TURN_CLEARANCE):
+    """`(ring, grown)` -- the pad ring with each corner's fillet radius grown until every legal turn
+    path stays `clearance` inside it; `grown` is how many corners had to grow.
+
+    SWEPT-PATH SIZING, the rule a real junction's kerb returns are designed by: the kerb follows the
+    vehicle, not the other way round. `turn_shape` is the one owner of a turn path's shape, and
+    the pad ring was sized by `fillet_radius` alone, so a road bending through its own crossing (the
+    85 deg `east` at DebugRoads' junction 2) sent every movement between its two mouths straight
+    across the unpaved corner notch -- 7-23 m off the tarmac, with a green gate and a pad that looked
+    right. Growing the fillet is monotonic (a bigger arc only ever adds pavement at its corner), so
+    each escaping sample grows the corner vertex nearest it until nothing escapes or the ring stops
+    changing (the arc already reaches the mouths -- a through-pair or a dropped corner has no vertex
+    to grow, and is left to the gate)."""
+    radii = [v[2] for v in ring]
+    corners = [i for i, r in enumerate(radii) if r > 1e-6]
+    grown = set()
+    prev = None
+    for _ in range(TURN_GROW_PASSES):
+        cur = [(v[0], v[1], radii[i]) for i, v in enumerate(ring)]
+        owners = []
+        flat = _round_ring(cur, segments, owners)
+        if flat == prev:
+            break
+        prev = flat
+        bad = escaped_turn_points(flat, turn_xy, caps, clearance)
+        if not bad or not corners:
+            break
+        # Each escaping sample grows the corner whose KERB it escapes past: the nearest non-cap edge
+        # of the rounded ring, owned by whichever of its two ends is a rounded corner. (The nearest
+        # corner VERTEX is not it -- a corner between two arms 40 deg apart has its vertex on the far
+        # side of the pad, 53 m from the notch it rounds.)
+        grow = set()
+        m = len(flat)
+        for p in bad:
+            best, owner = None, None
+            for k in range(m):
+                a, b = flat[k], flat[(k + 1) % m]
+                ends = [o for o in (owners[k], owners[(k + 1) % m]) if radii[o] > 1e-6]
+                if not ends or _cap_edge(a, b, caps):
+                    continue
+                d2 = _seg_dist2(p, a, b)
+                if best is None or d2 < best:
+                    best, owner = d2, ends[0]
+            if owner is not None:
+                grow.add(owner)
+        for i in grow:
+            radii[i] = radii[i] * TURN_GROW_FACTOR + TURN_GROW_STEP
+            grown.add(i)
+    return [(v[0], v[1], radii[i]) for i, v in enumerate(ring)], len(grown)
+
+
+def turns_off_pad(j, clearance=TURN_CLEARANCE):
+    """`[(turn, depth, outside, blocker_uid)]` -- every legal movement of the solved pad `j` that
+    `contain_turns` could NOT keep `clearance` inside its ring: `depth` is how far past the kerb it
+    goes (`outside`) or how far short of the clearance it stays, and `blocker_uid` is the mouth
+    nearest the worst sample other than the movement's own two -- the arm in its way. What is left
+    here is layout, not a radius: a mouth standing in another movement's path, or a corner too tight
+    for its own arms to round."""
+    flat = [(p[0], p[1]) for p in j.boundary]
+    caps = [m.cap for m in j.mouths]
+    kerbs = [(flat[i], flat[(i + 1) % len(flat)]) for i in range(len(flat))
+             if not _cap_edge(flat[i], flat[(i + 1) % len(flat)], caps)]
+    out = []
+    for t in j.turns:
+        if not t["ok"] or not t["points"]:
+            continue
+        bad = escaped_turn_points(flat, [(p[0], p[1]) for p in t["points"]], caps, clearance)
+        if not bad:
+            continue
+        worst, worst_p, worst_out = -1.0, None, False
+        for p in bad:
+            d = math.sqrt(min(_seg_dist2(p, a, b) for a, b in kerbs)) if kerbs else 0.0
+            outside = not _point_in_ring(p, flat)
+            depth = d if outside else clearance - d
+            if (outside, depth) > (worst_out, worst):
+                worst, worst_p, worst_out = depth, p, outside
+        others = [m for m in j.mouths if m.uid not in (t["from"], t["to"])]
+        blocker = min(others, key=lambda m: _seg_dist2(worst_p, m.cap[0], m.cap[1])).uid if others else None
+        out.append((t, worst, worst_out, blocker))
+    return out
+
+
+def pad_z(fan, xy):
+    """The pad SURFACE's height at `xy` -- off its own triangles, which is what is built, drawn and
+    driven on. None outside every triangle."""
+    for a, b, c in fan:
+        d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1])
+        if abs(d) < 1e-12:
+            continue
+        l1 = ((b[1] - c[1]) * (xy[0] - c[0]) + (c[0] - b[0]) * (xy[1] - c[1])) / d
+        l2 = ((c[1] - a[1]) * (xy[0] - c[0]) + (a[0] - c[0]) * (xy[1] - c[1])) / d
+        l3 = 1.0 - l1 - l2
+        if l1 >= -1e-7 and l2 >= -1e-7 and l3 >= -1e-7:
+            return l1 * a[2] + l2 * b[2] + l3 * c[2]
+    return None
+
+
+def turn_path(p0, d0, p1, d1, fan, mouths, n=CONNECTOR_SAMPLES):
+    """A turn path ON the pad: `turn_shape`'s plan view, each sample's height read off the pad's own
+    triangles (`pad_z`, IDW where a sample is off them). `(points, breaks)`.
+
+    ONE OWNER of where a car crossing a pad is, for the export's connector and the pad's movement
+    preview. The cubic's own Z ran straight from mouth to mouth while the pad between them is IDW
+    from every mouth, triangulated -- with a 1.1 m step between mouths the two parted by up to
+    0.81 m (DebugRoads' junction 1), a car driving through the tarmac or hovering over it."""
+    pts, breaks = turn_shape(p0, d0, p1, d1, n)
+    if not fan:
+        return pts, breaks
+    out = []
+    for i, p in enumerate(pts):
+        if i == 0 or i == len(pts) - 1:
+            out.append(p)
+            continue
+        z = pad_z(fan, p)
+        out.append((p[0], p[1], z if z is not None else _idw_z(mouths, p)))
+    return out, breaks
+
+
+def solve_junction(net, uids, segments=8, ground_fn=None, contain=True):
+    """A clique -> its pad. `uids` is one component from `NetworkData.junction_cliques()`. `contain`
+    False skips `contain_turns` -- the self-test's control, never a build option."""
     mouths = [build_mouth(net, u, ground_fn) for u in uids if u in net.points]
     if len(mouths) < 2:
         return None
@@ -1036,17 +1367,22 @@ def solve_junction(net, uids, segments=8, ground_fn=None):
     arms = [m.arm for m in mouths]
     ring = ik.build_junction_boundary(arms, kerb_radius, tail_length=1.0)
     ring, _limit = clamp_corners(ring, mouths, cx, cy, kerb_radius)
+    # The kerb follows the vehicle: grow each corner until every legal turn path is on the pad.
+    turn_xy = [(p[0] - cx, p[1] - cy) for t in build_turns(mouths) if t["ok"] for p in t["points"]]
+    caps = [_cap_points(m) for m in mouths]
+    if contain:
+        ring, _grown = contain_turns(ring, turn_xy, caps, segments)
     flat = _round_ring(ring, segments)
     boundary = [(x + cx, y + cy, _idw_z(mouths, (x + cx, y + cy))) for (x, y) in flat]
 
     apex, fan, star_ok, star_worst = pad_triangles(boundary, mouths, (cx, cy))
-    turns = build_turns(mouths)
-    corners = junction_corners(mouths, kerb_radius, cx, cy, segments)
+    turns = build_turns(mouths, fan=fan)
+    corners = junction_corners(mouths, kerb_radius, cx, cy, segments, ring=ring)
     return JunctionSolve(list(uids), centre, mouths, boundary, fan, turns, kerb_radius,
                          star_ok, star_worst, fan_apex=apex, corners=corners)
 
 
-def build_turns(mouths, segments=9):
+def build_turns(mouths, segments=9, fan=None):
     """Every legal movement through the pad, as a sampled cubic plus its verdict.
 
     Legality is `lane_movements` and ONLY `lane_movements` -- the same rule set the `.lanekit`
@@ -1078,7 +1414,7 @@ def build_turns(mouths, segments=9):
                         continue
                     if v.to_lane is not None and v.to_lane != idx_out:
                         continue          # this movement belongs to a different exit lane
-                    pts, _a, _b = bezier_through(p_in, d_in, p_out, d_out, segments)
+                    pts, _breaks = turn_path(p_in, d_in, p_out, d_out, fan, mouths, segments)
                     out.append({"from": mi.uid, "to": mo.uid, "lane_in": idx_in,
                                 "lane_out": idx_out, "ok": True, "reason": "",
                                 "turn": v.turn, "points": pts})
@@ -2099,6 +2435,47 @@ def self_test():
     # Every connector actually bridges the two lanes it claims to.
     for t in legal:
         assert len(t["points"]) >= 4
+    ok += 1
+
+    # ---- a turn is DRIVEN as a kerb return is BUILT: line, arc, line --------------------------
+    arc, br = turn_shape((0.0, 0.0, 0.0), (1.0, 0.0), (10.0, 10.0, 0.0), (0.0, 1.0), 36)
+    assert br == [0, 36], br
+    assert all(abs(math.dist(q[:2], (0.0, 10.0)) - 10.0) < 1e-6 for q in arc), "a symmetric 90 deg turn is one arc"
+    lead, br = turn_shape((0.0, 0.0, 0.0), (1.0, 0.0), (30.0, 10.0, 0.0), (0.0, 1.0), 36)
+    assert len(br) == 3 and all(abs(q[1]) < 1e-9 for q in lead[:br[1] + 1]), "the longer leg is driven straight first"
+    assert math.dist(lead[-1], (30.0, 10.0, 0.0)) < 1e-9 and math.dist(lead[0], (0.0, 0.0, 0.0)) < 1e-9
+    near, br = turn_shape((0.0, 0.0, 0.0), (1.0, 0.0), (40.0, 3.0, 0.0), (1.0, 0.0), 18)
+    assert br == [0, 18], "a lane shift stays the cubic"
+    ok += 1
+
+    # ---- the kerb follows the vehicle: a road bending through its own crossing ---------------
+    # West arm, south arm, east arm, mouths 30 m out. Every movement between west and south turns
+    # 90 deg on a 28 m arc, which a 6 m kerb return leaves out over the unpaved corner; the grown
+    # corner contains it, and the pad meets each mouth's stop line at that road's own height.
+    bent = pm.NetworkData()
+    stub = pm.PointData(lane_width=3.5, median_width=0.0, lanes_fwd=1, lanes_bwd=1)
+    mouths_b = []
+    for name, far, mouth, z in (("w", (-120.0, 0.0), (-30.0, 0.0), 0.0), ("s", (0.0, -120.0), (0.0, -30.0), 1.5),
+                                ("e", (120.0, 0.0), (30.0, 0.0), 0.0)):
+        road = bent.add_road(pm.RoadData(name, stub, road_class="street"))
+        a = bent.add_station(road, far + (z,), has_ground_z=True)
+        b = bent.add_station(road, mouth + (z,), has_ground_z=True, role=pm.INTERSECTION)
+        bent.link(a.uid, b.uid, pm.LINK_SEGMENT)
+        mouths_b.append(b.uid)
+    for i, a in enumerate(mouths_b):
+        for b in mouths_b[i + 1:]:
+            bent.link(a, b, pm.LINK_JUNCTION)
+    raw = solve_junction(bent, mouths_b, contain=False)
+    grown = solve_junction(bent, mouths_b)
+    assert turns_off_pad(raw), "CONTROL: without contain_turns the west-south movements leave the pad"
+    assert not turns_off_pad(grown), turns_off_pad(grown)
+    for m in grown.mouths:
+        for end in m.cap:
+            assert abs(_idw_z(grown.mouths, end) - m.pos[2]) < 1e-6, "the pad meets its stop line at the road's height"
+    for t in grown.turns:
+        for q in t["points"][1:-1]:
+            z = pad_z(grown.fan, q)
+            assert z is None or abs(q[2] - z) < 1e-6, "a turn path rides the pad's own surface"
     ok += 1
 
     # ---- the star-shaped test really fails when a mouth is dragged inside its neighbour ------

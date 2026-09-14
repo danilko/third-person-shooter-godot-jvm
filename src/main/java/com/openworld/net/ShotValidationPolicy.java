@@ -76,14 +76,23 @@ public final class ShotValidationPolicy {
         /** Refill headroom over the weapon's nominal rate (frame quantisation of the client's fire timer). */
         public static final double RATE_SLACK = 1.15;
 
-        private double tokens = BURST;
+        private final double burst;
+        private double tokens;
         private double lastSeconds = Double.NaN;
+
+        public RateBudget() { this(BURST); }
+
+        /** A budget allowing {@code burst} back-to-back uses (N2's AREA damage requests take several per blast). */
+        public RateBudget(double burst) {
+            this.burst = Math.max(1.0, burst);
+            this.tokens = this.burst;
+        }
 
         /** Takes one token if available, refilling at {@code shotsPerSecond * RATE_SLACK} since last call. */
         public boolean tryConsume(double nowSeconds, double shotsPerSecond) {
             if (!Double.isNaN(lastSeconds)) {
                 double dt = Math.max(0.0, nowSeconds - lastSeconds);
-                tokens = Math.min(BURST, tokens + dt * Math.max(0.0, shotsPerSecond) * RATE_SLACK);
+                tokens = Math.min(burst, tokens + dt * Math.max(0.0, shotsPerSecond) * RATE_SLACK);
             }
             lastSeconds = nowSeconds;
             if (tokens < 1.0) return false;
