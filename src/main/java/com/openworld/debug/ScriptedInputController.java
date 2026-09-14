@@ -4,7 +4,9 @@ import com.openworld.control.Controller;
 import com.openworld.control.UserCommand;
 import com.openworld.movement.character.MovementType;
 import com.openworld.movement.character.StanceName;
+import com.openworld.character.AICharacter;
 import godot.annotation.Script;
+import godot.api.Engine;
 import godot.core.Vector3;
 
 /**
@@ -48,7 +50,22 @@ public class ScriptedInputController extends Controller {
     public boolean reload = false;
 
     private boolean enterExitPending = false;
+    private boolean firePending = false;
+    private Vector3 fireSnapTarget = null;
     private long tick = 0;
+    /** Physics frame on which the last {@link #pressFire} was delivered, or -1. */
+    public long lastFirePressFrame = -1;
+
+    /**
+     * Queue ONE frame of trigger, the way {@code AttackState} fires: on that same frame the body's
+     * aim ray is snapped onto {@code snapAimAt} ({@code AICharacter.snapAimRay}) and the command's
+     * aim point is set to it. Holding {@link #fire} instead leaves the ray wherever the camera rig
+     * rests, which is not what a real AI shot does. {@code null} fires without snapping.
+     */
+    public void pressFire(Vector3 snapAimAt) {
+        firePending = true;
+        fireSnapTarget = snapAimAt;
+    }
 
     /** Queue a single {@code use_carrier} press, consumed by the next {@link #gatherInput}. */
     public void pressEnterExit() { enterExitPending = true; }
@@ -67,6 +84,15 @@ public class ScriptedInputController extends Controller {
         if (desiredWeapon >= 0) cmd.desiredWeapon = desiredWeapon;
         cmd.aimTargetPosition = aimTargetPosition;
         cmd.fire = fire;
+        if (firePending) {
+            firePending = false;
+            lastFirePressFrame = Engine.INSTANCE.getPhysicsFrames();
+            if (fireSnapTarget != null && getParent() instanceof AICharacter ai) {
+                ai.snapAimRay(fireSnapTarget);
+                cmd.aimTargetPosition = fireSnapTarget;
+            }
+            cmd.fire = true;
+        }
         cmd.reload = reload;
         cmd.tick = ++tick;
         enterExitPending = false;
