@@ -1,5 +1,7 @@
 # Aim, facing and the camera frame — plan of record
 
+> **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — the remaining aim CONTENT (prone aim set, true upright strafes, swim and seated aim poses) is P6 there. This file stays as design, measurements and history.
+
 Status as of **2026-09-08** — **W1, W2, W3 and W4 are all closed.** Written to be picked up cold in
 a later session.
 

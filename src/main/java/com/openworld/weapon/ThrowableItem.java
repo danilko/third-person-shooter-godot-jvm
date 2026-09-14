@@ -128,6 +128,8 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     // isSemiAutoReady() gate a held throw key spawned multiple grenades back-to-back
     // (capped only by fireRate) both locally and across LAN — the double-throw bug.
     @Override public boolean canUse()             { return magazine > 0 && isSemiAutoReady(); }
+    /** Thrown from the hand toward the aim point, so the hand must be facing it. */
+    @Override protected boolean launchesTowardAim() { return true; }
 
     @Override
     public void useWeapon() {

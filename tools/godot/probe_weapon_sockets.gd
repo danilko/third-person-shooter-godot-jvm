@@ -1,5 +1,5 @@
 extends SceneTree
-## Does a weapon's own GripPoint actually place it, and does a weapon without one still behave?
+## Do shipped weapons conform (origin = grip, no GripPoint), and does the GripPoint escape hatch still place a weapon?
 ##
 ##   godot --headless --path . --script tools/godot/probe_weapon_sockets.gd
 ##
@@ -21,8 +21,9 @@ extends SceneTree
 ## `set("freeze", true)`. A held weapon is a plain Node3D now (see item/PickupBody.java), so there
 ## is nothing to freeze and the error is 0.
 
-const ATL4 := "res://src/main/resources/com/openworld/weapon/ATL4.tscn"   # has a GripPoint
-const AR4  := "res://src/main/resources/com/openworld/weapon/AR4.tscn"    # has none
+const AR4  := "res://src/main/resources/com/openworld/weapon/AR4.tscn"
+const SCENES := "res://src/main/resources/com/openworld/weapon/%s.tscn"
+const TABLE := "res://blender/tools/weapon_models.json"
 
 var fails := 0
 
@@ -45,8 +46,30 @@ func _initialize() -> void:
 	print("")
 	print("=== weapon-owned grip alignment ===")
 
-	# 1. A weapon that declares a GripPoint must land that POINT on the socket.
-	var launcher: Node3D = (load(ATL4) as PackedScene).instantiate() as Node3D
+	# 0. The standard puts every model's ORIGIN on its grip, so no shipped weapon may still carry a
+	#    GripPoint: one would be a second, silent place to tune a fit the model already states. (Every
+	#    raw model's origin used to sit wherever a centring offset left it, and one socket per weapon
+	#    on the character hid that -- see blender/WEAPON_AUTHORING.md.)
+	var cfg: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(TABLE))
+	var ids: Array = []
+	for w in cfg["weapons"]:
+		ids.append(w["id"])
+	for id in cfg["primitives"]:
+		if typeof(cfg["primitives"][id]) == TYPE_DICTIONARY:
+			ids.append(id)
+	for id in ids:
+		var w: Node = (load(SCENES % id) as PackedScene).instantiate()
+		_check("%s conforms: no GripPoint" % id, w.get_node_or_null("GripPoint") == null,
+			"origin is the grip" if w.get_node_or_null("GripPoint") == null else "still carries a GripPoint")
+		w.free()
+
+	# 1. The escape hatch still works: a weapon that declares a GripPoint lands that POINT on the
+	#    socket. No shipped weapon needs one, so the probe gives an AR4 one at runtime.
+	var launcher: Node3D = (load(AR4) as PackedScene).instantiate() as Node3D
+	var gp := Marker3D.new()
+	gp.name = "GripPoint"
+	gp.position = Vector3(0.0, -0.055, 0.1133)
+	launcher.add_child(gp)
 	socket.add_child(launcher)
 	# What WeaponController does before it reparents onto a socket. Without it the item is loose in
 	# the world as far as it can tell, and correctly wraps itself in a PickupBody -- see
@@ -58,7 +81,7 @@ func _initialize() -> void:
 	await physics_frame
 	var grip: Node3D = launcher.get_node_or_null("GripPoint") as Node3D
 	if grip == null:
-		print("FAIL: ATL4 has no GripPoint child")
+		print("FAIL: the runtime GripPoint did not resolve")
 		quit(1)
 		return
 	launcher.transform = launcher.call("alignment_for", false)

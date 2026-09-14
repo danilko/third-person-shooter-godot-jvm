@@ -1,5 +1,7 @@
 # Terrain3D + road-generator transition
 
+> **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — step 4 is item 3.1, the stuck-car cause 3.2, `findRoute` chain order 0.4, the camera far plane 0.3, the horizon band 3.7, the mission-vehicle rule 4.2. This file stays as design, measurements and history.
+
 > **Progress tracker for a multi-session effort.** Decided 2026-09-06. Ground and roads leave the
 > Blender bake pipeline for in-engine **Terrain3D 1.0.2** + **road-generator 0.9.3**, both
 > GDExtension/addon, both under `addons/` and tracked with git LFS. Companion docs:

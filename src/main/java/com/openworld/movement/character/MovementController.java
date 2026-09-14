@@ -318,6 +318,7 @@ public class MovementController extends Node {
 
     Vector3 currentRot = meshRoot.getRotation();
     double newMeshY = GD.lerpAngle(currentRot.getY(), targetRotation, rotationSpeed * delta);
+    if (combat) newMeshY = keepAimWithinReach(newMeshY, targetRotation);
 
     // Update only the Y axis
     meshRoot.setRotation(new Vector3(currentRot.getX(), newMeshY, currentRot.getZ()));
@@ -371,6 +372,40 @@ public class MovementController extends Node {
   /** The cosine of the body's own `floor_max_angle` — one owner, so a steeper body steps steeper. */
   private double floorNormalMin() {
     return Math.cos(player.getFloorMaxAngle());
+  }
+
+  /**
+   * How far inside the stance's aim reach the body is held, in degrees. The aim modifiers can carry
+   * the gun right up to {@code Stance.aimYawLimit}; holding the body a little inside it leaves the
+   * clip's own pose (and the one-frame order of body vs. bones) room without the gun visibly lagging.
+   */
+  private static final double AIM_REACH_MARGIN_DEG = 10.0;
+
+  /**
+   * While aiming, the body turns toward the aim point smoothly — but never lags it by more than the
+   * upper body can twist to cover ({@code Stance.aimYawLimit}, minus a margin). Past that the body
+   * is brought round at once.
+   *
+   * <p><b>Why (PLAN.md 0.2):</b> both views trace a bullet from the animated gun's muzzle to the
+   * crosshair point (the cover fix — "behind a wall but still killed someone"). With only the
+   * {@code rotationSpeed} lerp, a 180 degree flick left the body most of the way round for several
+   * frames while the spine and shoulders stopped at their limit, so a shot fired in that window left
+   * a gun pointing 84-102 degrees away from it — straight back across the shooter
+   * ({@code tools/godot/probe_self_hit.gd}). This is the same split Source's player models make
+   * (the upper body is on the aim, the lower body catches up only past a fixed twist) and Lyra's
+   * "orient to controller while aiming": the gun is on target the frame the view is, so the shot
+   * can fire immediately and still come from the gun.
+   *
+   * <p>A small turn is untouched — it stays inside the reach and keeps the smooth lerp. A stance
+   * with no yaw cap ({@code aimYawLimit <= 0}) is left alone, since its bones can take any heading.
+   */
+  private double keepAimWithinReach(double meshYaw, double targetYaw) {
+    Character c = body();
+    var stance = c != null ? c.resolveCurrentStance() : null;
+    if (stance == null || stance.getAimYawLimit() <= 0f) return meshYaw;
+    double reach = Math.toRadians(Math.max(0.0, stance.getAimYawLimit() - AIM_REACH_MARGIN_DEG));
+    double lag = GD.wrapf(meshYaw - targetYaw, -Math.PI, Math.PI);
+    return Math.abs(lag) > reach ? targetYaw + Math.copySign(reach, lag) : meshYaw;
   }
 
   /** Horizontal distance (squared, m^2) below which an aim point is too close/underfoot to yaw toward. */

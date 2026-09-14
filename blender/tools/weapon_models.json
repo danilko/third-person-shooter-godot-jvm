@@ -1,0 +1,71 @@
+{
+  "note": "The weapon table. The MODEL is the weapon: assets/weapons/<id>.blend holds it at its real size, origin on the grip, every transform applied; `build_weapon.py` only proves that and exports it. Sizes come from a REFERENCE weapon, never from eyeballing. Cross-check any weapon against the others and the character in assets/weapons/WeaponLibrary.blend (`build_weapon_library.py`). See blender/WEAPON_AUTHORING.md.",
+  "standard": {
+    "units": "1 unit = 1 METRE. The character is metric (GodotChan measures 1.49 m to the crown) and a weapon is held in its hand, so a weapon is its real-world size. The 4.5 m arcade road lane is a VEHICLE-scale decision and does not reach hand props.",
+    "forward": "-Z is the muzzle/blade direction, +Y is up (Godot axes; in Blender that is +Y forward, +Z up) — the same convention as the character mesh, so a weapon points where the character points.",
+    "origin": "The model ORIGIN is the GRIP: the centre of the firing hand's fist on the grip (pistol grip, stock wrist, knife handle). The character then needs ONE socket per grip archetype (SocketRifle, SocketPistol, ...), not one per weapon.",
+    "collection": "Every mesh lives in ONE collection named <id>; WeaponLibrary.blend links the weapon by that name.",
+    "result": "A conforming model needs NO transform on its scene instance AND none in its own .blend (location 0, rotation 0, scale 1). A transform surviving in either place is something compensating for an asset that does not conform.",
+    "length_m": "ASSERTED: the reference weapon's overall length. The build refuses a model that has drifted from it by more than 0.5%.",
+    "grip_to_rear_m": "ASSERTED: distance from the origin to the rearmost point (the butt pad on a long gun). The build refuses a model whose origin has moved more than 1 cm — this is what proves the origin is still on the grip. On a stocked long gun expect ~0.26-0.30 m (trigger-to-butt, the 'length of pull', is ~0.33-0.36 m and the fist sits ~6 cm behind the trigger).",
+    "reference": "The real weapon the size and proportions are taken from. Approximate public specifications, recorded so the next person checks against the same thing. Fictional weapons still get a real reference."
+  },
+  "weapons": [
+    {
+      "id": "AR4",
+      "length_m": 0.88,
+      "grip_to_rear_m": 0.281,
+      "reference": {"based_on": "AKMS (AKM, side-folding stock extended)", "overall_m": 0.88, "barrel_m": 0.415, "length_of_pull_m": 0.34},
+      "real": "AK-pattern assault rifle"
+    },
+    {
+      "id": "AR212",
+      "length_m": 0.84,
+      "grip_to_rear_m": 0.259,
+      "reference": {"based_on": "M4 carbine (stock extended)", "overall_m": 0.838, "barrel_m": 0.368, "length_of_pull_m": 0.33},
+      "real": "AR-15-pattern carbine"
+    },
+    {
+      "id": "SG1",
+      "length_m": 0.98,
+      "grip_to_rear_m": 0.272,
+      "reference": {"based_on": "Remington 870, 18.5 in barrel", "overall_m": 0.98, "barrel_m": 0.47, "length_of_pull_m": 0.356},
+      "real": "pump-action shotgun"
+    },
+    {
+      "id": "PI52",
+      "length_m": 0.22,
+      "grip_to_rear_m": 0.041,
+      "reference": {"based_on": "Beretta 92FS / M9", "overall_m": 0.217, "barrel_m": 0.125, "height_m": 0.137},
+      "real": "full-size service pistol"
+    },
+    {
+      "id": "MW1",
+      "length_m": 0.3,
+      "grip_to_rear_m": 0.068,
+      "reference": {"based_on": "USMC KA-BAR fighting knife", "overall_m": 0.302, "blade_m": 0.178},
+      "real": "fighting knife / bayonet"
+    }
+  ],
+  "primitives": {
+    "note": "These weapons have no mesh asset — their look is a primitive mesh authored in the .tscn. They take the same metre, forward and origin-on-grip rules, applied to the primitive: `size` is the primitive in Godot axes (x, y, z) and `center` is where its middle sits relative to the grip.",
+    "ATL4": {
+      "size": [0.09, 0.09, 1.02],
+      "center": [0.0, 0.055, -0.1133],
+      "reference": {"based_on": "AT4 disposable launcher", "overall_m": 1.016, "calibre_m": 0.084},
+      "real": "shoulder-fired launcher tube"
+    },
+    "MW2": {
+      "size": [0.087, 0.175, 0.8],
+      "center": [0.0, 0.0, -0.3],
+      "reference": {"based_on": "felling axe, 32 in haft", "overall_m": 0.81},
+      "real": "felling axe"
+    },
+    "T1": {
+      "size": [0.064, 0.064, 0.09],
+      "center": [0.0, 0.0, 0.0],
+      "reference": {"based_on": "M67 fragmentation grenade", "overall_m": 0.089, "diameter_m": 0.064},
+      "real": "hand grenade"
+    }
+  }
+}

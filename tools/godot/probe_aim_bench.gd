@@ -1,0 +1,54 @@
+extends SceneTree
+## Smoke-drives the AimWorkbench shooting bench headless: presses its keys through the host's own
+## `_input` and lets it print its `[AimBench]` shot log, which is what this run is read for.
+##
+##   godot --headless --path . --script tools/godot/probe_aim_bench.gd 2>&1 | grep AimBench
+##
+## It asserts only what it can see from outside (the scene loads, nothing errors); whether each
+## shot hit what it should is read off the log, the same log a human reads in the overlay.
+
+const BENCH := "res://src/main/resources/com/openworld/world/hosts/AimWorkbench.tscn"
+
+var host: Node
+
+func _tick(n: int) -> void:
+	for i in range(n):
+		await physics_frame
+
+func _key(code: Key, label: String) -> void:
+	print("[AimBenchProbe] press %s" % label)
+	var ev := InputEventKey.new()
+	ev.physical_keycode = code
+	ev.pressed = true
+	host.call("_input", ev)
+
+func _initialize() -> void:
+	host = (load(BENCH) as PackedScene).instantiate()
+	root.add_child(host)
+	await _tick(120)                               # visuals, stances, the mannequin's equip
+
+	_key(KEY_P, "P  player invulnerable")
+	_key(KEY_T, "T  target the player")
+	await _tick(90)                                # the AI camera tracks at 90 deg/s
+	_key(KEY_Y, "Y  one AI shot at the player")
+	await _tick(40)
+	_key(KEY_C, "C  flick: turn away, then shoot")
+	await _tick(40)
+	_key(KEY_C, "C  flick back")
+	await _tick(60)
+	_key(KEY_B, "B  cover wall between mannequin and player")
+	await _tick(10)
+	_key(KEY_Y, "Y  shot into the wall")
+	await _tick(40)
+	_key(KEY_B, "B  wall off")
+	_key(KEY_BRACKETRIGHT, "]  AR212")
+	_key(KEY_BRACKETRIGHT, "]  SG1")
+	await _tick(150)
+	_key(KEY_Y, "Y  shotgun shot at the player")
+	await _tick(60)
+	_key(KEY_N, "N  real AI opponent (SG1)")
+	await _tick(600)
+	_key(KEY_B, "B  cover wall between opponent and player")
+	await _tick(400)
+	print("[AimBenchProbe] done")
+	quit(0)

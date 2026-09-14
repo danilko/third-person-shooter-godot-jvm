@@ -10,7 +10,7 @@
 [sub_resource type="Resource" id="Resource_meshcfg"]
 script = ExtResource("2_mc")
 head_mesh_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/eyes"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_001"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_002"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_003"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/head"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/headphones")])
-socket_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/MarkerAR212"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/MarkerAR4"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/MarkerPI52"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/MarkerATL4"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/MarkerSG1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker2"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker3"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker4"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker2"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker3"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker4")])
+socket_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketRifle"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketPistol"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketLauncher"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketMelee"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketFist"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker2"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker3"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker4"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker2"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker3"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker4")])
 stance_collider_paths = Dictionary[String, NodePath]({
 "Crawl": NodePath("StanceCollisions/Crawl"),
 "Crouch": NodePath("StanceCollisions/Crouch"),
@@ -844,24 +844,21 @@ transform = Transform3D(-0.705421, -0.12272642, 0.69808286, 0.6874221, 0.1215406
 bone_name = "hand_r"
 bone_idx = 27
 
-[node name="MarkerPI52" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=705266691]
-transform = Transform3D(0.74569666, 0.6550852, 0.12166013, -0.01777947, 0.2020934, -0.9792062, -0.66604924, 0.7280271, 0.16234744, 0.0010022521, 0.12815338, 0.042752564)
+[node name="SocketPistol" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=705266691]
+transform = Transform3D(0.74569666, 0.6550852, 0.12166013, -0.01777947, 0.2020934, -0.9792062, -0.66604924, 0.7280271, 0.16234744, -0.02311414, 0.048525073, 0.017877875)
 
-[node name="MarkerAR212" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=319299075]
-transform = Transform3D(0.6900703, 0.6733904, 0.26523632, -0.06445983, 0.42220625, -0.90420604, -0.72086734, 0.6068676, 0.33475876, 0.021424174, 0.11001903, 0.04295042)
+[node name="SocketRifle" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1933143355]
+transform = Transform3D(0.6613714, 0.69001216, 0.2940622, -0.053957373, 0.43480435, -0.8989074, -0.74811614, 0.57864416, 0.32479876, -0.01170855, 0.022783384, 0.027736973)
 
-[node name="MarkerAR4" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1933143355]
-transform = Transform3D(0.6613714, 0.69001216, 0.2940622, -0.053957373, 0.43480435, -0.8989074, -0.74811614, 0.57864416, 0.32479876, -0.0059680343, 0.17060035, 0.022150606)
+[node name="SocketMelee" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1900001003]
+transform = Transform3D(0.6613714, 0.69001216, 0.2940622, -0.053957373, 0.43480435, -0.8989074, -0.74811614, 0.57864416, 0.32479876, -0.01170855, 0.022783384, 0.027736973)
 
-[node name="MarkerFist" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1900001001]
+[node name="SocketFist" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1900001001]
 
-[node name="Fist" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/MarkerFist" unique_id=1900001002 instance=ExtResource("4_fist")]
+[node name="Fist" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketFist" unique_id=1900001002 instance=ExtResource("4_fist")]
 
-[node name="MarkerATL4" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1376252111]
+[node name="SocketLauncher" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1376252111]
 transform = Transform3D(-0.70337325, 0.617558, 0.35198143, -0.44242784, 0.007218167, -0.896778, -0.5563525, -0.7864935, 0.26814628, 0.14720833, 0.08463359, 0.05154237)
-
-[node name="MarkerSG1" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1394892240]
-transform = Transform3D(0.6900703, 0.6733904, 0.26523632, -0.06445983, 0.42220625, -0.90420604, -0.72086734, 0.6068676, 0.33475876, 0.021424174, 0.11001903, 0.04295042)
 
 [node name="SpineAimModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=178617703]
 unique_name_in_owner = false
