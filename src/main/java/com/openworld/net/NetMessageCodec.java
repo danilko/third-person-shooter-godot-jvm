@@ -298,36 +298,43 @@ public final class NetMessageCodec {
 
     // ── MSG_SHOT (client → host, host-resolved bullets) ───────────────────────
     //
-    // [tag u8][shooterCharacterId utf8][origin 3×float][direction 3×float][weaponSlot u8]
+    // [tag u8][shooterCharacterId utf8][weaponSlot u8][shotSeq u32][origin 3×float][aim 3×float][spreadDeg float]
     //
-    // The owning client predicts the cosmetic shot locally (muzzle/tracer/recoil/bloom) but does
-    // NOT apply damage; it sends the post-spread ray (origin + world direction) here and the HOST
-    // raycasts it against authoritative positions to resolve the hit and apply damage ("client-
-    // predicted + host-resolved", the L4D/CS model). The slot lets the host pick the same weapon's
-    // stats for the resolve. Reliable (channel 0) — a dropped shot would silently miss.
+    // ONE message per trigger pull (PLAN.md N1). The owning client predicts the cosmetic shot locally
+    // but applies no damage; it sends the pull's INPUTS — the origin (muzzle), the PRE-spread aim, the
+    // full cone angle and its shot counter — and the host validates them (ShotValidationPolicy) and
+    // regenerates every pellet from seed(shooterId, shotSeq) with SpreadPattern, exactly as the client
+    // did. The slot picks the host copy's weapon, whose damage and pellet count are used — never the
+    // client's. Reliable on channel 1, so a lost shot neither vanishes nor head-of-line-blocks the
+    // damage/pickup/spawn traffic on channel 0.
 
-    public static PackedByteArray encodeShot(int msgType, String shooterCharacterId, Vector3 origin,
-            Vector3 direction, int weaponSlot) {
+    public static PackedByteArray encodeShot(int msgType, String shooterCharacterId, int weaponSlot, long shotSeq,
+            Vector3 origin, Vector3 aim, float spreadDeg) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(shooterCharacterId);
-        putVector3(buf, origin);
-        putVector3(buf, direction);
         buf.put8(weaponSlot);
+        buf.put32((int) shotSeq);
+        putVector3(buf, origin);
+        putVector3(buf, aim);
+        buf.putFloat(spreadDeg);
         return buf.getDataArray();
     }
 
     /** Decodes the body following the tag byte. Caller must have already consumed it. */
     public static DecodedShot decodeShot(StreamPeerBuffer buf) {
         String shooterCharacterId = buf.getUtf8String();
-        Vector3 origin = getVector3(buf);
-        Vector3 direction = getVector3(buf);
         int weaponSlot = buf.getU8();
-        return new DecodedShot(shooterCharacterId, origin, direction, weaponSlot);
+        long shotSeq = buf.getU32();
+        Vector3 origin = getVector3(buf);
+        Vector3 aim = getVector3(buf);
+        float spreadDeg = buf.getFloat();
+        return new DecodedShot(shooterCharacterId, weaponSlot, shotSeq, origin, aim, spreadDeg);
     }
 
-    /** Carrier for a decoded MSG_SHOT body — the host-resolved bullet request. */
-    public record DecodedShot(String shooterCharacterId, Vector3 origin, Vector3 direction, int weaponSlot) { }
+    /** Carrier for a decoded MSG_SHOT body — one host-resolved trigger pull. */
+    public record DecodedShot(String shooterCharacterId, int weaponSlot, long shotSeq, Vector3 origin, Vector3 aim,
+            float spreadDeg) { }
 
     // ── MSG_OWNERSHIP (ownership migration, reliable) ─────────────────────────
     //

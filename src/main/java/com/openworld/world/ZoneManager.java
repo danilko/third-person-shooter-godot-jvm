@@ -30,6 +30,7 @@ import com.openworld.character.Player;
 import com.openworld.game.GameManager;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.net.NetworkManager;
+import com.openworld.util.LaneReach;
 import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 
@@ -153,6 +154,12 @@ public class ZoneManager extends Node {
 		final List<AISquad>     squads = new ArrayList<>();   // one per SpawnConfig group (E3) → freed
 		final List<Vehicle>     vehicles = new ArrayList<>(); // VehicleSpawnConfig traffic (I3) → freed
 		final Map<Vehicle, AICharacter> driverOf = new HashMap<>(); // traffic car → its AI driver (I3c)
+		/** Advances on every ambient-car placement attempt, so successive spawns rotate through the
+		 *  zone's lanes. It used to be {@code vehicles.size()}, which repeats: every top-up after one
+		 *  reclaim asked for the same index, i.e. the same lane and the same point on it. */
+		int trafficCursor;
+		/** One "no lane matches this route yet" log per zone, not one per 0.5 s top-up tick. */
+		boolean laneMissLogged;
 		Node geometryInstance;                                // cosmetic, freed on unload
 	}
 
@@ -617,12 +624,13 @@ public class ZoneManager extends Node {
 				// impossible — baked VehicleRoutes register in _ready, so the registry was complete
 				// before the first eval tick — but road-generator builds its RoadLanes through
 				// call_deferred and RoadNetworkBridge publishes a few frames after that, so a zone
-				// streaming in during that window spawns its whole fleet unrouted (measured: the zone
-				// LOADED one log line before the bridge published). A road rebuild destroys and
-				// re-creates every lane, which can strand a car the same way. Reclaiming is the fix
+				// streaming in during that window used to spawn its whole fleet unrouted (measured: the
+				// zone LOADED one log line before the bridge published) — spawnTrafficCar now holds the
+				// fleet until a lane exists. A road rebuild destroys and re-creates every lane, which
+				// can still strand a car that way. Reclaiming is the fix
 				// rather than re-routing in place, because placing a car on a lane already has ONE
-				// owner — vehicleStartPoint, on the top-up path below, which also spreads the fleet by
-				// VEHICLE_QUEUE_SPACING. Adopting a route here would be a SECOND placement path, and
+				// owner — spawnTrafficCar, which also rotates lanes and keeps a spawn clearance.
+				// Adopting a route here would be a SECOND placement path, and
 				// two of those disagree: measured, it left two cars on one lane nose to tail with the
 				// front one stuck in BrakeState. Ambient traffic is disposable by design, and this
 				// only fires in the seconds after a zone loads.
@@ -684,31 +692,15 @@ public class ZoneManager extends Node {
 			int target = 0;
 			for (VehicleSpawnConfig vc : configs) target += scaledCount(vc.count, vehDensity);
 			Vector3 center = marker.getGlobalPosition();
-			int spawnIdx = lz.vehicles.size();
 			for (int k = lz.vehicles.size(); k < target && !configs.isEmpty(); k++) {
 				VehicleSpawnConfig vc = configs.get(k % configs.size());
-				Lane route = findRoute(vc.routeName, center, marker.zone.unloadRadius, spawnIdx);
-				// Spawn-gate by PLAYER distance, not just zone distance: the cull above reclaims any
-				// car farther than unloadRadius from every player, but findRoute only checks the lane
-				// entry against the ZONE CENTER — on a 504 m district a far-side entry can sit beyond
-				// unloadRadius from the player, so the car would be reclaimed next tick and respawned
-				// forever (a 4-cars-per-tick reclaim/spawn loop in the log). Skip that lane for now
-				// (spawnIdx still advances, so the round-robin tries other lanes); 0.9 leaves
-				// hysteresis between the spawn gate and the reclaim radius.
-				if (route != null) {
-					Vector3 entry = route.entryPoint();
-					if (entry != null
-							&& nearestPlayerDistXZ(entry) > marker.zone.unloadRadius * 0.9f) {
-						spawnIdx++;
-						continue;
-					}
-				}
-				Vehicle v = spawnVehicle(vc, center, container, route, spawnIdx++, lz);
-				if (v != null) {
-					lz.vehicles.add(v);
-					if (debugLog) GD.print("ZoneManager: traffic spawn in '" + marker.zone.zoneId
-							+ "' lane=" + (route instanceof Node3D n ? n.getName().toString() : "<none>"));
-				}
+				// Spawn-gated by PLAYER distance (gateOnPlayers): the cull above reclaims any car farther
+				// than unloadRadius from every player, but a lane entry is only filtered against the ZONE
+				// CENTER — on a 504 m district a far-side entry can sit beyond unloadRadius from the
+				// player, and that car would be reclaimed next tick and respawned forever.
+				Vehicle v = spawnTrafficCar(vc, center, container, marker.zone, lz, true);
+				if (v == null) break;   // no free lane this tick — the next tick tries again
+				lz.vehicles.add(v);
 			}
 		}
 	}
@@ -1000,10 +992,8 @@ public class ZoneManager extends Node {
 			if (vc == null) continue;
 			int n = scaledCount(vc.count, vehDensity);
 			for (int i = 0; i < n; i++) {
-				final int idx = i;
 				t.spawnWork.add(() -> {
-					Lane route = findRoute(vc.routeName, center, zone.unloadRadius, idx);
-					Vehicle v = spawnVehicle(vc, center, container, route, idx, t.lz);
+					Vehicle v = spawnTrafficCar(vc, center, container, zone, t.lz, false);
 					if (v != null) t.lz.vehicles.add(v);
 				});
 			}
@@ -1288,8 +1278,9 @@ public class ZoneManager extends Node {
 	 * {@code Vehicle._ready} for replication to resolve — Round 11 N3), places it on the route, and
 	 * attaches a {@link VehicleAIController} bound to that route. Returns the body, or null on failure.
 	 */
-	private Vehicle spawnVehicle(VehicleSpawnConfig vc, Vector3 center, Node container,
-								 Lane route, int index, LoadedZone lz) {
+	private Vehicle spawnVehicle(VehicleSpawnConfig vc, Node container, Placement at, int index,
+								 LoadedZone lz) {
+		Lane route = at.lane();
 		Object loaded = GD.load(vc.vehicleScenePath);
 		if (!(loaded instanceof PackedScene scene)) return null;
 		Node inst = scene.instantiate();
@@ -1306,7 +1297,11 @@ public class ZoneManager extends Node {
 		v.characterInfo.faction = vc.faction;
 
 		container.addChild(v);
-		v.setGlobalPosition(vehicleStartPoint(route, center, index));
+		v.setGlobalPosition(at.position());
+		// Face along the lane. A car used to spawn at its default heading (-Z) whatever way its lane
+		// ran: one set down across a west-running lane crept 6 m north on full steer and cut throttle
+		// and stopped for good (measured, probe_traffic_spawn.gd) — the "car at ~0 m/s" shape.
+		if (at.facing() != null) v.lookAt(at.position().plus(at.facing()), new Vector3(0, 1, 0));
 
 		VehicleAIController ctrl = new VehicleAIController();
 		ctrl.cruiseThrottle = vc.cruiseThrottle;
@@ -1381,23 +1376,10 @@ public class ZoneManager extends Node {
 		v.queueFree();
 	}
 
-	/** Metres between successive cars queued at a one-way lane's entry (≈ one car length). */
-	private static final float VEHICLE_QUEUE_SPACING = 6.0f;
-
 	/** World-Y below every drivable surface (bay floor is -2, decks ramp ≥ -1) — a traffic car
 	 *  under this has fallen out of the world and is reclaimed. */
 	private static final float FELL_OUT_Y = -30.0f;
 
-	/**
-	 * Start position for a streamed vehicle.
-	 *
-	 * <p>A <b>loop</b> (ring) lane distributes cars around the ring (so they don't all stack at one
-	 * point). A one-way {@code DESPAWN} lane instead spawns at the <b>lane entry</b> ({@code waypoints[0]},
-	 * the zone-side end) — a topped-up car then enters where traffic originates rather than popping in
-	 * mid-corridor in the player's view (PLAN.md I3b "Respawn polish"). Successive cars are nudged a few
-	 * metres up the first lane segment so they queue in-lane instead of overlapping. Falls back to the
-	 * zone center when the route has no markers.
-	 */
 	/** True when any of this zone's vehicle configs asks for a named route — so a car without one
 	 *  is a defect rather than an intentionally free-roaming car. */
 	private static boolean namesARoute(List<VehicleSpawnConfig> configs) {
@@ -1407,53 +1389,138 @@ public class ZoneManager extends Node {
 		return false;
 	}
 
-	private Vector3 vehicleStartPoint(Lane route, Vector3 center, int index) {
-		if (route == null) return center;
-		double total = route.total();
-		if (total <= 1e-6) {
-			Vector3 sp = route.startPoint();
-			return sp != null ? sp : center;
-		}
-		if (route.isLoop()) {
-			// Arc-length scatter (was a raw marker-index scatter, VehicleRoute-only via
-			// waypoints()) -- not expressible against the Lane interface, since a PathLaneRoute
-			// has no discrete marker list, only a baked Curve3D. Spacing is now a fixed physical
-			// distance (VEHICLE_QUEUE_SPACING) rather than however dense the author's markers
-			// happen to be -- visually similar or better for existing VehicleRoute loops, never
-			// worse, but not byte-identical (see road_blender_godot.md Phase 6 notes).
-			return route.pointAtLength((index * VEHICLE_QUEUE_SPACING) % total);
-		}
-		// Step forward along the smoothed/offset path, but never past it (stay within the lane).
-		double step = Math.min(index * VEHICLE_QUEUE_SPACING, total * 0.9);
-		return route.pointAtLength(step);
-	}
+	/** Where and which way an ambient car is set down: a lane (null = free-roaming, no route asked
+	 *  for), a point on it and the lane's XZ travel direction there. */
+	private record Placement(Lane lane, Vector3 position, Vector3 facing) {}
 
 	/**
-	 * Resolve a {@link Lane} for spawn <b>index</b> of a zone at <b>center</b>. Three lookup
-	 * strategies, in order: (1) exact node-name match; (2) <b>zone-id equality</b> — every
-	 * {@link PathLaneRoute} whose {@link PathLaneRoute#zoneId} equals {@code routeName} exactly
-	 * (the property-based zone tag {@code lib/lane_kit.py}'s combiner stamps on every lane —
-	 * road_kit_authoring's replacement for the old name-prefix convention, see
-	 * road_blender_godot.md Phase 6 P6.4); (3) otherwise {@code routeName} is treated as a
-	 * <b>prefix</b> (roads-v2 Phase 1 — e.g. {@code "art_"} = the master arterial lanes,
-	 * {@code "District_X__"} = that district's authored lanes) — the original, still-unchanged
-	 * behavior for a {@link VehicleRoute} district. Either strategy (2)/(3) collects the matching
-	 * plain lanes (never a turn connector — spawning mid-junction would drop a car inside the box)
-	 * whose entry lies within {@code maxDist} of the zone (a map-wide prefix/zone must not spawn a
-	 * car kilometres away), and picks round-robin by spawn index — that spread IS the multi-lane
-	 * spawn distribution. Null when nothing matches (car spawns unrouted at the center).
-	 *
-	 * <p>All lookups go through the {@link #routes} registry (never a scene-tree walk); each pass
-	 * reads only plain-Java state per candidate ({@link #isSpawnCandidate}), so it stays cheap at
-	 * hundreds of lanes — works identically for a {@link VehicleRoute} or a {@link PathLaneRoute}.
-	 * The zone-id pass is a full scan of {@link #routes} (no sorted-key shortcut, unlike the
-	 * prefix pass) — fine at authoring-time lane counts, not meant for world-wide scale in one
-	 * zone's spawn tick.
+	 * Clearance around a spawn point, in metres: nothing — car, character or player — may stand closer.
+	 * It is the car's forward obstacle probe (Vehicle.tscn {@code ObstacleRay}: 1.6 m ahead of the
+	 * origin plus 7 m of ray) with a metre to spare, so a car is never born with its ray already
+	 * tripped — which parks it in BrakeState for as long as the thing ahead does not move.
 	 */
-	private Lane findRoute(String routeName, Vector3 center, float maxDist, int index) {
-		if (routeName == null || routeName.isEmpty()) return null;
+	private static final float TRAFFIC_SPAWN_CLEARANCE = 10.0f;
+
+	/** Queue slots tried along one non-loop lane, {@link #TRAFFIC_SPAWN_CLEARANCE} apart, before the
+	 *  next lane is tried. */
+	private static final int TRAFFIC_QUEUE_SLOTS = 3;
+
+	/**
+	 * The one owner of placing an ambient car, for both a zone load and a top-up (PLAN.md 0.4).
+	 * Walks the zone's candidate lanes in reach order ({@link #spawnLanes}), starting at the zone's
+	 * rotating {@link LoadedZone#trafficCursor}, and takes the first that passes the player gate (when
+	 * asked) and has a clear slot. Null when nothing is free this time — a car is never forced onto an
+	 * occupied point, and a later tick tries again.
+	 *
+	 * <p>A config that names a route no published lane matches spawns NOTHING. It used to spawn the car
+	 * unrouted at the zone centre, so a zone loading before road-generator's lanes were published
+	 * dropped its whole fleet on one point 0.1 m apart, to be reclaimed as {@code unrouted} half a
+	 * second later. A config with no route at all is a free-roaming car and still spawns at the centre.
+	 */
+	private Vehicle spawnTrafficCar(VehicleSpawnConfig vc, Vector3 center, Node container, Zone zone,
+									LoadedZone lz, boolean gateOnPlayers) {
+		boolean wantsRoute = vc.routeName != null && !vc.routeName.isEmpty();
+		if (!wantsRoute) {
+			if (!isClear(center)) return null;
+			return spawnVehicle(vc, container, new Placement(null, center, null), lz.trafficCursor++, lz);
+		}
+		List<Lane> lanes = spawnLanes(vc.routeName, center, zone.unloadRadius);
+		if (lanes.isEmpty()) {
+			if (debugLog && !lz.laneMissLogged) {
+				GD.print("ZoneManager: no lane matches route '" + vc.routeName + "' near '" + zone.zoneId
+						+ "' yet — holding its traffic until one is published");
+			}
+			lz.laneMissLogged = true;
+			return null;
+		}
+		lz.laneMissLogged = false;
+		for (int tries = 0; tries < lanes.size(); tries++) {
+			int idx = lz.trafficCursor++;
+			Lane lane = lanes.get(Math.floorMod(idx, lanes.size()));
+			Vector3 entry = lane.entryPoint();
+			// 0.9 leaves hysteresis between this gate and the out-of-range reclaim radius.
+			if (gateOnPlayers && entry != null
+					&& nearestPlayerDistXZ(entry) > zone.unloadRadius * 0.9f) continue;
+			Placement at = placementOn(lane);
+			if (at == null) continue;
+			Vehicle v = spawnVehicle(vc, container, at, idx, lz);
+			if (v != null && debugLog) {
+				GD.print("ZoneManager: traffic spawn in '" + zone.zoneId + "' lane="
+						+ (lane instanceof Node3D n ? n.getName().toString() : "<lane>"));
+			}
+			return v;
+		}
+		return null;
+	}
+
+	/** The first clear queue slot on {@code lane}, facing its travel direction; null when all are taken.
+	 *  A loop offers slots all the way round the ring; a one-way lane only near its entry, so a
+	 *  topped-up car appears where traffic comes from, never mid-corridor in the player's view. */
+	private Placement placementOn(Lane lane) {
+		double total = lane.total();
+		if (total <= 1e-6) {
+			Vector3 sp = lane.startPoint();
+			return sp != null && isClear(sp) ? new Placement(lane, sp, null) : null;
+		}
+		int slots = lane.isLoop()
+				? Math.max(1, (int) Math.floor(total / TRAFFIC_SPAWN_CLEARANCE))
+				: TRAFFIC_QUEUE_SLOTS;
+		for (int k = 0; k < slots; k++) {
+			double s = lane.isLoop() ? k * TRAFFIC_SPAWN_CLEARANCE
+					: Math.min(k * TRAFFIC_SPAWN_CLEARANCE, total * 0.9);
+			Vector3 p = lane.pointAtLength(s);
+			if (p == null || !isClear(p)) continue;
+			return new Placement(lane, p, travelDirection(lane, s, total));
+		}
+		return null;
+	}
+
+	/** Unit XZ direction of travel at arc length {@code s}, or null where the lane gives none. */
+	private static Vector3 travelDirection(Lane lane, double s, double total) {
+		double a = s, b = s + 2.0;
+		if (!lane.isLoop() && b > total) { a = Math.max(0.0, total - 2.0); b = total; }
+		Vector3 pa = lane.pointAtLength(a), pb = lane.pointAtLength(b);
+		if (pa == null || pb == null) return null;
+		double dx = pb.getX() - pa.getX(), dz = pb.getZ() - pa.getZ();
+		double len = Math.sqrt(dx * dx + dz * dz);
+		return len < 1e-4 ? null : new Vector3(dx / len, 0, dz / len);
+	}
+
+	/** True when no registered body (car, character, player) stands within
+	 *  {@link #TRAFFIC_SPAWN_CLEARANCE} of {@code p}. Degrades to "clear" without the grid AutoLoad. */
+	private boolean isClear(Vector3 p) {
+		SpatialEntityGrid grid = SpatialEntityGrid.get();
+		if (grid == null) return true;
+		grid.queryRadius(p, TRAFFIC_SPAWN_CLEARANCE, clearanceScratch);
+		double r2 = (double) TRAFFIC_SPAWN_CLEARANCE * TRAFFIC_SPAWN_CLEARANCE;
+		for (Node n : clearanceScratch) {
+			if (!(n instanceof Node3D b) || !GD.isInstanceValid(b)) continue;
+			Vector3 q = b.getGlobalPosition();
+			double dx = q.getX() - p.getX(), dy = q.getY() - p.getY(), dz = q.getZ() - p.getZ();
+			if (dx * dx + dy * dy + dz * dz < r2) return false;
+		}
+		return true;
+	}
+
+	private final List<Node> clearanceScratch = new ArrayList<>();
+
+	/**
+	 * The lanes an ambient car for {@code routeName} may spawn on, best first. Three lookup strategies,
+	 * in order: (1) exact node-name match; (2) <b>zone-id equality</b> — every {@link PathLaneRoute}
+	 * whose {@link PathLaneRoute#zoneId} equals {@code routeName} exactly (the property-based zone tag
+	 * {@code lib/lane_kit.py}'s combiner stamps on every lane); (3) otherwise {@code routeName} is a
+	 * <b>prefix</b> (e.g. {@code "art_"}, {@code "Lane_"} for road-generator lanes). Strategies (2)/(3)
+	 * collect the plain lanes (never a turn connector — a car set down mid-junction lands inside the
+	 * box) whose entry lies within {@code maxDist} of the zone, filtered by {@link #spawnableByReach}.
+	 * Empty when nothing matches.
+	 *
+	 * <p>All lookups go through the {@link #routes} registry (never a scene-tree walk). The zone-id
+	 * pass is a full scan of {@link #routes} — fine at authoring-time lane counts.
+	 */
+	private List<Lane> spawnLanes(String routeName, Vector3 center, float maxDist) {
+		if (routeName == null || routeName.isEmpty()) return List.of();
 		Lane exact = routeByName(routeName);
-		if (exact != null) return exact;
+		if (exact != null) return List.of(exact);
 
 		List<Lane> zoneMatches = new ArrayList<>();
 		for (Lane r : routes.values()) {
@@ -1462,18 +1529,43 @@ public class ZoneManager extends Node {
 				zoneMatches.add(r);
 			}
 		}
-		if (!zoneMatches.isEmpty()) return zoneMatches.get(Math.floorMod(index, zoneMatches.size()));
+		if (!zoneMatches.isEmpty()) return spawnableByReach(zoneMatches, maxDist);
 
 		List<Lane> matches = new ArrayList<>();
 		for (Map.Entry<String, Lane> e : routes.tailMap(routeName).entrySet()) {
 			if (!e.getKey().startsWith(routeName)) break;   // sorted map — past the prefix block
 			if (isSpawnCandidate(e.getValue(), center, maxDist)) matches.add(e.getValue());
 		}
-		if (matches.isEmpty()) return null;
-		return matches.get(Math.floorMod(index, matches.size()));
+		return matches.isEmpty() ? matches : spawnableByReach(matches, maxDist);
 	}
 
-	/** Shared "is this lane a legal ambient-spawn point" filter for both {@link #findRoute}
+	/**
+	 * The candidates a car may be set down on, judged by the lane GRAPH, not by name (PLAN.md 0.4):
+	 * only lanes from which a car can drive at least {@code enough} metres — the zone's unload
+	 * radius, past which it leaves range before its road ends — in name order; or, when no lane is
+	 * that long, all of them, longest first. Name order used to put cars on a lane with no successor
+	 * (road-generator names sort {@code _1, _10, _11, _2}), and the car drove one segment and was
+	 * reclaimed. Reach follows exactly what {@link VehicleAIController#advanceToNextRoute} does at a
+	 * lane end: {@link LaneGraph#successorsOf} (explicit {@code nextRoutes} first), and the return lane
+	 * for a U-turn lane.
+	 */
+	private static List<Lane> spawnableByReach(List<Lane> candidates, float enough) {
+		if (candidates.size() < 2) return candidates;
+		return LaneReach.orderForSpawn(candidates, ZoneManager::drivableSuccessors, Lane::total,
+				enough > 0 ? enough : Double.POSITIVE_INFINITY);
+	}
+
+	private static List<Lane> drivableSuccessors(Lane lane) {
+		List<Lane> next = LaneGraph.successorsOf(lane);
+		if (next.isEmpty() && VehicleRoute.END_UTURN.equals(lane.getEndBehavior())) {
+			Lane back = lane.resolveRoute(lane.getReturnRoute());
+			if (back == null) back = LaneGraph.reverseOf(lane);
+			if (back != null) next = List.of(back);
+		}
+		return next;
+	}
+
+	/** Shared "is this lane a legal ambient-spawn point" filter for both {@link #spawnLanes}
 	 *  passes: a live node, not a turn connector (spawning mid-junction would drop a car inside
 	 *  the box), and — when a zone/distance context is given — within {@code maxDist} of
 	 *  {@code center}. */

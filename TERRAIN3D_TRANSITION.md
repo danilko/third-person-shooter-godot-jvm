@@ -1,6 +1,6 @@
 # Terrain3D + road-generator transition
 
-> **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — step 4 is item 3.1, the stuck-car cause 3.2, `findRoute` chain order 0.4, the camera far plane 0.3, the horizon band 3.7, the mission-vehicle rule 4.2. This file stays as design, measurements and history.
+> **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — step 4 is item 3.1, the lane-data oddities 3.2, spawn placement / stuck cars 0.4 (done), the camera far plane 0.3 (not a defect), the horizon band 3.7, the mission-vehicle rule 4.2. This file stays as design, measurements and history.
 
 > **Progress tracker for a multi-session effort.** Decided 2026-09-06. Ground and roads leave the
 > Blender bake pipeline for in-engine **Terrain3D 1.0.2** + **road-generator 0.9.3**, both
@@ -123,15 +123,14 @@ the failure visible either way; it is what caught this.
 
 ## Open
 
-- **Why a car gets stuck in the first place is still undiagnosed** — the `stalled` reclaim below
-  clears it, but it is a safety net, not a cause. Two shapes were measured: one car resting **1.4 m
-  proud of the terrain** at velocity ~0, and one sitting in `BrakeState` with its forward obstacle
-  ray permanently tripped by a car ahead it never got past. Both are vehicle physics/AI on a newly
-  authored road, not the lane graph.
-- **`findRoute`'s round-robin picks lanes in NAME order, which is not CHAIN order.** A car that
-  lands on the terminal lane of a direction drives one segment and finishes. `debug_a`'s
-  `route_name` is `"Lane_pR"` (the direction that chains through the whole road) rather than
-  `"Lane_"` for that reason — a workaround, not a fix.
+- **Why a car gets stuck — mostly found (2026-09-13, PLAN.md 0.4).** Both measured shapes were
+  SPAWN placement, not vehicle physics: cars were set down at a fixed −Z heading across their lane
+  (one crept 6 m and stopped at ~0 m/s), and a repeating top-up index stacked respawns on the same
+  point, tripping each other's obstacle rays (`BrakeState` forever). Fixed in
+  `ZoneManager.spawnTrafficCar`; 240 s on DebugWorld now reads longest idle 0.1 s. The "1.4 m proud
+  of the terrain" reading was not reproduced after the fix — re-open PLAN.md 3.2 only if it is.
+- ~~`findRoute`'s round-robin picks lanes in NAME order~~ — fixed (PLAN.md 0.4): lanes are filtered
+  by drivable reach over the lane graph, and `debug_a` uses the plain `"Lane_"` prefix again.
 - **A dark band under the horizon** seen from altitude. The water-edge and `ground_color`
   hypotheses were both tested and disproved; most likely Sky3D's atmosphere below its horizon line.
 - **Camera `far = 100000`** — checked 2026-09-13 and NOT a defect: Forward+ uses reverse-Z (precision is set by `near`), and the 16 384 m water plane needs a far plane past ~14.6 km; see PLAN.md 0.3. (Was: "almost certainly unintended, and harmful to

@@ -240,16 +240,81 @@ public class FirearmItem extends WeaponItem {
   /** Tracer length when the shot hits nothing (matches REMOTE_TRACER_LENGTH's convention). */
   private static final float TRACER_MISS_LENGTH = 200f;
 
-  /** Resolves the sight point and shot origin once, then traces one bullet per pellet through them. */
+  /**
+   * One trigger pull (PLAN.md N1): resolve the sight point, the origin, the PRE-spread aim and the cone
+   * once, then derive every pellet from a seed ({@link SpreadPattern}). A networked client predicts the
+   * cosmetics and sends the host ONE message carrying exactly those inputs; the host regenerates the
+   * same pellets from them ({@link #resolveServerShot}). It used to send one post-spread ray per pellet —
+   * eight reliable messages per SG1 pull, sharing channel 0 with damage, pickups and spawns.
+   */
   private void fireShot() {
     RayCast3D ray = getEffectiveAimRay();
     if (ray == null) return;
 
     Vector3 sightPoint = resolveSightPoint(ray);
     Vector3 origin = useMuzzleTrace() ? resolveShotOrigin(ray) : ray.getGlobalPosition();
-    // Every pellet of one trigger pull shares the sight point and the origin; only the cone sample differs.
+    Vector3 toTarget = sightPoint.minus(origin);
+    if (toTarget.lengthSquared() < 1e-6f) return;
+    Vector3 aim = toTarget.normalized();
+    // Player: sample the spread cone around the muzzle→target line. AI: AttackState already baked its
+    // scatter into the sight point via snapAimRay — scattering again would override that.
+    float spreadDeg = (owningCharacter instanceof Character c && c.useWeaponSpread) ? getCurrentSpreadDeg() : 0f;
+    long shotSeq = weaponController != null ? weaponController.nextShotSeq() : 0L;
+    // Reach at least as far as the ray's own resting length, so a shot that misses (spread / AI
+    // scatter) keeps travelling past the aim point instead of stopping in mid-air.
+    float range = (float) Math.max(ray.getTargetPosition().length(), toTarget.length());
+
+    boolean client = isNetworkedClient();
+    // Host-resolved bullets: a client predicts the cosmetics but applies no damage — the host re-traces
+    // the same pellets against authoritative positions. The origin reported is the muzzle, so the host
+    // re-runs the very same cover test rather than a camera-origin one.
+    if (client) sendShotToHost(origin, aim, spreadDeg, shotSeq);
+    lastShotPelletHits = resolvePellets(ray, origin, aim, spreadDeg, shotSeq, shooterId(), range, !client, true);
+  }
+
+  /** The id this weapon's shots are seeded with — the holder's character id, "" when there is none. */
+  private String shooterId() {
+    return owningCharacter instanceof Character c && c.characterInfo != null ? c.characterInfo.characterId : "";
+  }
+
+  /**
+   * Pellet hits of the most recent pull this weapon resolved, one entry per pellet ("-" for a miss) —
+   * the hit node's name. Read by the N1 two-instance check to compare the client's prediction with the
+   * host's resolution of the same pull; not gameplay state.
+   */
+  public java.util.List<String> lastShotPelletHits = java.util.List.of();
+
+  /**
+   * Trace every pellet of one pull through {@code origin} along its seeded direction. {@code applyDamage}
+   * is the authority (server / single-player) path; otherwise only the impact visuals play.
+   * Returns the per-pellet hit names (see {@link #lastShotPelletHits}).
+   */
+  private java.util.List<String> resolvePellets(RayCast3D ray, Vector3 origin, Vector3 aim, float spreadDeg,
+                                                long shotSeq, String shooter, float range,
+                                                boolean applyDamage, boolean drawTracers) {
+    long seed = SpreadPattern.seedFor(shooter, shotSeq);
     int pellets = Math.max(1, pelletCount);
-    for (int i = 0; i < pellets; i++) resolveShot(ray, origin, sightPoint);
+    java.util.List<String> hits = new java.util.ArrayList<>(pellets);
+    var im = getImpactManager();
+    for (int i = 0; i < pellets; i++) {
+      double[] d = SpreadPattern.direction(aim.getX(), aim.getY(), aim.getZ(), spreadDeg * 0.5, seed, i);
+      Vector3 dir = new Vector3(d[0], d[1], d[2]);
+      TraceHit hit = trace(ray, origin, dir, range);
+      hits.add(hit != null && hit.node != null ? hit.node.getName().toString() : "-");
+      if (hit != null && im != null) {
+        HitInfo info = new HitInfo(hit.node, hit.point, hit.normal);
+        if (applyDamage) {
+          im.processHit(info, damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
+                        resolveAttackerPosition());
+        } else {
+          im.processVisualHit(info);
+        }
+      }
+      if (drawTracers) {
+        spawnBulletTracer(hit != null ? hit.point : origin.plus(dir.times(Math.min(range, TRACER_MISS_LENGTH))));
+      }
+    }
+    return hits;
   }
 
   @Override protected boolean launchesTowardAim() { return muzzleTrace; }
@@ -284,103 +349,39 @@ public class FirearmItem extends WeaponItem {
     return trace(ray, chest, toMuzzle.normalized(), reach) != null ? chest : muzzle;
   }
 
-  /** Stage 2 — trace one bullet from the gun toward the sight point and apply/report the result. */
-  private void resolveShot(RayCast3D ray, Vector3 origin, Vector3 sightPoint) {
-    Vector3 toTarget = sightPoint.minus(origin);
-    if (toTarget.lengthSquared() < 1e-6f) return;
-    Vector3 dir = toTarget.normalized();
-
-    // Player: sample the spread cone around the muzzle→target line. AI: AttackState already baked its
-    // scatter into the sight point via snapAimRay — scattering again would override that.
-    if (owningCharacter instanceof Character c && c.useWeaponSpread) dir = applySpread(dir);
-
-    // Reach at least as far as the ray's own resting length, so a shot that misses (spread / AI
-    // scatter) keeps travelling past the aim point instead of stopping in mid-air.
-    float range = (float) Math.max(ray.getTargetPosition().length(), toTarget.length());
-    TraceHit hit = trace(ray, origin, dir, range);
-
-    if (isNetworkedClient()) {
-      // Host-resolved bullets: predict the cosmetics here (muzzle/recoil/bloom/tracer already done),
-      // but DON'T apply damage — send the post-spread ray to the host, which re-traces it against
-      // authoritative positions. The reported origin is now the muzzle, so the host re-runs the very
-      // same cover test rather than a camera-origin one.
-      sendShotToHost(origin, dir);
-      if (hit != null) {
-        var im = getImpactManager();
-        if (im != null) im.processVisualHit(new HitInfo(hit.node, hit.point, hit.normal));
-      }
-    } else if (hit != null) {
-      // Server / single-player: resolve fully and locally (VFX + damage).
-      var im = getImpactManager();
-      if (im != null) {
-        im.processHit(new HitInfo(hit.node, hit.point, hit.normal),
-                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
-                      resolveAttackerPosition());
-      }
-    }
-
-    spawnBulletTracer(hit != null ? hit.point
-                                  : origin.plus(dir.times(Math.min(range, TRACER_MISS_LENGTH))));
-  }
-
   /**
-   * One sample of the circular spread cone around {@code dir} — a random axis perpendicular to the
-   * shot plus a sqrt-distributed angle, so pellets fill the disk uniformly (no diagonal bulge from
-   * sampling pitch and yaw independently). Rotating the direction rather than the ray's own
-   * transform keeps the cone centred on the muzzle→target line, whatever the ray is resting at.
+   * Host-side resolution of a client's MSG_SHOT (PLAN.md N1). The pull arrives as its inputs — origin,
+   * PRE-spread aim, cone and counter — already validated by {@code ShotValidationPolicy}, and the host
+   * regenerates the very pellets the client predicted and resolves them authoritatively (damage +
+   * impact). Two things are the host's own, never the client's: the pellet count and damage (this
+   * weapon's), and the cover test — the chest→origin clearance is re-run against the host copy, so a
+   * client reporting a muzzle on the far side of a wall is pulled back to its chest exactly as a local
+   * shot would be. No tracer here: the host's (and every viewer's) muzzle/tracer cue rides the
+   * shooter's snapshot fireSeq, and drawing one here too would double it on the host.
    */
-  private Vector3 applySpread(Vector3 dir) {
-    float halfSpread = getCurrentSpreadDeg() * 0.5f;
-    if (halfSpread <= 0f) return dir;
-    double coneAngle  = GD.randfRange(0, (float) (2.0 * Math.PI));
-    double coneRadius = Math.toRadians(Math.sqrt(GD.randf()) * halfSpread);
-    Vector3 side = dir.cross(Vector3.Companion.getUP());
-    if (side.lengthSquared() < 1e-6f) side = dir.cross(Vector3.Companion.getRIGHT());
-    side = side.normalized();
-    Vector3 lift = side.cross(dir).normalized();
-    Vector3 axis = side.times((float) Math.cos(coneAngle))
-                       .plus(lift.times((float) Math.sin(coneAngle)));
-    return dir.rotated(axis.normalized(), coneRadius).normalized();
-  }
-
-
-
-  /**
-   * Host-side resolution of a client's MSG_SHOT (Round 8 — "client-predicted + host-resolved").
-   * Re-aims this weapon's AimRay along the client-reported world ray (post-spread already baked in,
-   * so no extra spread here) and resolves the hit authoritatively — damage, impact VFX, tracer — then
-   * restores the ray. Sign/rotation-agnostic: {@code toLocal} makes the cast land exactly on
-   * {@code origin + dir*range} regardless of the ray's resting orientation. The AimRay already
-   * excludes the shooter's own physical bones (Character._ready), so self-hits are impossible.
-   */
-  public void resolveServerShot(Vector3 origin, Vector3 direction) {
+  public java.util.List<String> resolveServerShot(Vector3 origin, Vector3 aim, float spreadDeg, long shotSeq,
+                                                  String shooter) {
     RayCast3D ray = getEffectiveAimRay();
-    if (ray == null || direction.lengthSquared() < 1e-6f) return;
-
-    Vector3 savedPos = ray.getGlobalPosition();
-    Vector3 savedTarget = ray.getTargetPosition();
-    float range = (float) Math.max(50.0, savedTarget.length());
-
-    ray.setGlobalPosition(origin);
-    ray.setTargetPosition(ray.toLocal(origin.plus(direction.normalized().times(range))));
-    ray.forceRaycastUpdate();
-
-    if (ray.isColliding() && ray.getCollisionPoint().minus(origin).length() > 0.1) {
-      Node hitNode = (ray.getCollider() instanceof Node n) ? n : null;
-      var im = getImpactManager();
-      if (im != null) {
-        im.processHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()),
-                      damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
-                      resolveAttackerPosition());
-      }
-    }
-    // No tracer here: this runs on the host for a client's shot, and the host's (and every other
-    // viewer's) muzzle/tracer cue rides the shooter's snapshot fireSeq. Drawing one here too would
-    // double the tracer on the host. Damage/impact above is the host's only job for a relayed shot.
-
-    ray.setTargetPosition(savedTarget);
-    ray.setGlobalPosition(savedPos);
+    if (ray == null || aim.lengthSquared() < 1e-6f) return java.util.List.of();
+    Vector3 from = clearOriginOnHost(ray, origin);
+    float range = (float) Math.max(50.0, ray.getTargetPosition().length());
+    lastShotPelletHits = resolvePellets(ray, from, aim.normalized(), spreadDeg, shotSeq, shooter, range, true, false);
+    return lastShotPelletHits;
   }
+
+  /** {@link #resolveShotOrigin}'s cover test, run from the host copy's chest to a REPORTED origin. */
+  private Vector3 clearOriginOnHost(RayCast3D ray, Vector3 reported) {
+    if (owningCharacter == null) return reported;
+    Vector3 body  = owningCharacter.getGlobalPosition();
+    Vector3 chest = new Vector3(body.getX(), reported.getY(), body.getZ());
+    Vector3 toOrigin = reported.minus(chest);
+    float reach = (float) toOrigin.length();
+    if (reach < MUZZLE_CLEARANCE_MIN) return reported;
+    return trace(ray, chest, toOrigin.normalized(), reach) != null ? chest : reported;
+  }
+
+  /** The host copy's muzzle — what a reported origin is validated against. */
+  public Vector3 muzzlePosition() { return weaponMuzzle().getGlobalPosition(); }
 
   /** True on a networked non-host peer — its firearm shots are predicted locally but resolved by the host. */
   private boolean isNetworkedClient() {
@@ -395,12 +396,12 @@ public class FirearmItem extends WeaponItem {
     return netNode instanceof NetworkManager net && net.isNetworked() && net.isServer();
   }
 
-  /** Sends this shot's post-spread ray to the host for authoritative resolution. */
-  private void sendShotToHost(Vector3 origin, Vector3 direction) {
+  /** Sends this pull's inputs to the host for authoritative resolution — one message per pull (N1). */
+  private void sendShotToHost(Vector3 origin, Vector3 aim, float spreadDeg, long shotSeq) {
     if (!(owningCharacter instanceof Character c) || c.characterInfo == null || weaponController == null) return;
     Node netNode = getNodeOrNull("/root/NetworkManager");
     if (netNode instanceof NetworkManager net) {
-      net.sendShot(c.characterInfo.characterId, origin, direction, weaponController.getWeapon());
+      net.sendShot(c.characterInfo.characterId, weaponController.getWeapon(), shotSeq, origin, aim, spreadDeg);
     }
   }
 
