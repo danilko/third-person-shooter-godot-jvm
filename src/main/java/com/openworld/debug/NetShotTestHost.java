@@ -60,9 +60,13 @@ public class NetShotTestHost extends Node3D {
     /** Where NetShotTest.tscn places the SG1 pickup — the client walks its body onto it. */
     private static final Vector3 PICKUP_AT = new Vector3(0, 1.0, 6);
     private static final int PULLS = 10;
-    private static final double TIMEOUT_S = 90.0;
+    private static final double TIMEOUT_S = 110.0;
 
     private boolean host;
+    /** A third peer that only watches: does it see the client's shots as real pellets (N1b)? */
+    private boolean observer;
+    private boolean dropResults;
+    private boolean wasConnected;
     private double clock;
     private NetworkManager net;
 
@@ -70,6 +74,8 @@ public class NetShotTestHost extends Node3D {
     private boolean sawClient;
     private double clientGoneAt = -1;
     private Health targetHealth;
+    private long lastSeenShotCount;
+    private double lastShotAt;
     private float targetHpStart;
 
     // client
@@ -84,10 +90,13 @@ public class NetShotTestHost extends Node3D {
     public void _ready() {
         for (String a : OS.INSTANCE.getCmdlineUserArgs()) {
             if (a.equals("--role=host")) host = true;
+            if (a.equals("--role=observer")) observer = true;
+            if (a.equals("--drop-results")) dropResults = true;
         }
         Node n = getNodeOrNull("/root/NetworkManager");
         net = n instanceof NetworkManager nm ? nm : null;
         net.debugShots = true;
+        net.debugDropShotResults = dropResults;
 
         buildGround();
         if (getTree().getFirstNodeInGroup("impact_manager") == null) addChild(new ImpactManager());
@@ -98,7 +107,7 @@ public class NetShotTestHost extends Node3D {
         } else {
             net.joinServer("127.0.0.1", PORT);
         }
-        GD.print("[netshot] role=" + (host ? "host" : "client"));
+        GD.print("[netshot] role=" + role());
     }
 
     private void buildGround() {
@@ -146,7 +155,23 @@ public class NetShotTestHost extends Node3D {
     public void _physicsProcess(double delta) {
         clock += delta;
         if (clock > TIMEOUT_S) finish("TIMEOUT");
-        if (host) hostStep(); else clientStep();
+        if (host) hostStep(); else if (observer) observerStep(); else clientStep();
+    }
+
+    private String role() {
+        return host ? "host" : observer ? (dropResults ? "observer-drop" : "observer") : "client";
+    }
+
+    /** Stand out of the line of fire and watch; finish when the host goes away. */
+    private void observerStep() {
+        if (net.isNetworked() && clock > 1.0) wasConnected = true;
+        for (Node node : getTree().getNodesInGroup(new StringName("characters"))) {
+            if (node instanceof Player p && p.characterInfo != null && net.isAuthorityFor(p.characterInfo)) {
+                Vector3 spot = new Vector3(dropResults ? -15 : 15, 1.0, 10);
+                if (p.getGlobalPosition().distanceTo(spot) > 1.0) p.setGlobalPosition(spot);
+            }
+        }
+        if (wasConnected && !net.isNetworked()) finish("host left");
     }
 
     private Player remotePlayer() {
@@ -164,6 +189,11 @@ public class NetShotTestHost extends Node3D {
             clientGoneAt = clock;
         }
         if (clientGoneAt >= 0 && clock - clientGoneAt > 1.0) finish("client left");
+        long seen = NetStats.get("shot_accepted") + NetStats.get("shot_rejected_stale_seq")
+                + NetStats.get("shot_rejected_too_fast") + NetStats.get("shot_rejected_origin_too_far")
+                + NetStats.get("shot_rejected_aim_diverged") + NetStats.get("shot_rejected_spread_too_narrow");
+        if (seen != lastSeenShotCount) { lastSeenShotCount = seen; lastShotAt = clock; }
+        if (seen >= PULLS + 10 && clock - lastShotAt > 3.0) finish("client done");
     }
 
     private void clientStep() {
@@ -200,11 +230,19 @@ public class NetShotTestHost extends Node3D {
             if (!wc.isWeaponTransitioning()) wc.onSetWeapon(sgSlot);
             return;
         }
-        if (nextPullAt < 0) nextPullAt = clock + 1.5;   // let the draw and the aim settle
+        // Wait for the watching peers (N1b) — the script starts them after this client has the gun, so
+        // their bodies cannot spawn onto the pickup — then let the draw and the aim settle.
+        if (nextPullAt < 0) {
+            int players = 0;
+            for (Node node : getTree().getNodesInGroup(new StringName("characters"))) if (node instanceof Player) players++;
+            if (players < 3) return;
+            nextPullAt = clock + 2.0;
+        }
 
         if (sg.lastShotPelletHits != lastSeenHits && !sg.lastShotPelletHits.isEmpty()) {
             lastSeenHits = sg.lastShotPelletHits;
-            GD.print("[shot] client predicted #" + (pullsDone - 1) + " -> " + lastSeenHits);
+            GD.print("[shot] client predicted #" + (pullsDone - 1) + " dirs " + sg.lastShotDirectionDigest
+                    + " -> " + lastSeenHits);
         }
         if (releaseInFrames >= 0 && --releaseInFrames < 0) Input.INSTANCE.actionRelease(new StringName("fire"));
         if (pullsDone < PULLS && clock >= nextPullAt && releaseInFrames < 0) {
@@ -212,11 +250,41 @@ public class NetShotTestHost extends Node3D {
             Input.INSTANCE.actionPress(new StringName("fire"), 1.0f);
             releaseInFrames = 3;
             pullsDone++;
-            nextPullAt = clock + 0.9;
+            nextPullAt = clock + Math.max(0.9, sg.fireInterval() * 1.5);   // SG1 fires once a second
         }
         if (pullsDone >= PULLS && doneAt < 0) doneAt = clock;
-        if (doneAt >= 0 && clock - doneAt > 2.0) finish("pulls done");
+        if (doneAt >= 0) forgeStep(me, sgSlot, target);
     }
+
+    /**
+     * The CONTROL for the host's validation: after the honest pulls, send shots a buggy or forged client
+     * could send, straight through {@code sendShot}, spaced so each one meets a refilled fire budget and
+     * is refused for its own reason — then a burst the budget must cut. Without these the gate would pass
+     * a host that accepts anything.
+     */
+    private void forgeStep(Player me, int slot, Node3D target) {
+        String id = me.characterInfo.characterId;
+        Vector3 origin = me.getGlobalPosition().plus(new Vector3(0, 1.2, 0));
+        Vector3 aim = target.getGlobalPosition().plus(new Vector3(0, 1.1, 0)).minus(origin).normalized();
+        double t = clock - doneAt;
+        int step = (int) Math.floor((t - 2.0) / 1.6);   // one forged shot every 1.6 s after a 2 s settle
+        if (t < 2.0 || step <= forgeStepDone) return;
+        forgeStepDone = step;
+        switch (step) {
+            case 0 -> { net.sendShot(id, slot, 0, origin, aim, 4f); GD.print("[forge] replayed shotSeq 0"); }
+            case 1 -> { net.sendShot(id, slot, 1000, origin.plus(new Vector3(10, 0, 0)), aim, 4f); GD.print("[forge] origin 10 m off"); }
+            case 2 -> { net.sendShot(id, slot, 1001, origin, aim, 0f); GD.print("[forge] zero cone"); }
+            case 3 -> { net.sendShot(id, slot, 1002, origin, aim.times(-1f), 4f); GD.print("[forge] aim reversed"); }
+            case 4 -> {
+                for (int i = 0; i < 6; i++) net.sendShot(id, slot, 1003 + i, origin, aim, 4f);
+                GD.print("[forge] burst of 6");
+            }
+            case 6 -> finish("pulls + forgeries done");
+            default -> { }
+        }
+    }
+
+    private int forgeStepDone = -1;
 
     private static Node findWeaponController(Node body) {
         return body.getNodeOrNull(new NodePath("WeaponController"));
@@ -227,11 +295,12 @@ public class NetShotTestHost extends Node3D {
     private void finish(String why) {
         if (finished) return;
         finished = true;
-        StringBuilder sb = new StringBuilder("[netshot] SUMMARY role=" + (host ? "host" : "client") + " (" + why + ")");
+        StringBuilder sb = new StringBuilder("[netshot] SUMMARY role=" + role() + " (" + why + ")");
         for (String k : new String[] {"shot_sent", "shot_accepted", "shot_invalid", "shot_slot_mismatch",
                 "shot_slot_fallback", "shot_rejected_stale_seq", "shot_rejected_too_fast",
                 "shot_rejected_origin_too_far", "shot_rejected_aim_diverged", "shot_rejected_spread_too_narrow",
-                "drop_rate_limited"}) {
+                "drop_rate_limited", "shot_result_batches_sent", "shot_result_received", "shot_result_tracer",
+                "cue_fallback_tracer", "cue_tracer_superseded", "cue_tracer_waited_for_result"}) {
             sb.append(' ').append(k).append('=').append(NetStats.get(k));
         }
         if (host && targetHealth != null) {

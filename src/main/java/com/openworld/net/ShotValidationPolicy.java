@@ -11,8 +11,8 @@ package com.openworld.net;
  * is left to judge is whether that aim and cone are plausible for the host's copy of the shooter.
  *
  * <p><b>Every tolerance here is about latency, not about exactness.</b> The host judges against its
- * own interpolated puppet — position and aim point ~50-100 ms stale, velocity (and so movement
- * spread) smoothed, and no bloom at all, because bloom only accumulates where {@code useWeapon} runs.
+ * own interpolated puppet — position and aim point ~50-100 ms stale, and no pose: a puppet does not
+ * animate the owner's aim, so its muzzle is cosmetic and the origin is judged against the BODY.
  * The limits exist to reject a shot nowhere near what the body could have fired (a buggy or forged
  * client), never to adjudicate a close call; a legitimate shot refused reads to the player as a dead
  * trigger, which is worse than the cheat it guards. Every refusal is counted by the caller.
@@ -22,14 +22,16 @@ public final class ShotValidationPolicy {
     public enum Verdict { ACCEPT, STALE_SEQ, TOO_FAST, ORIGIN_TOO_FAR, AIM_DIVERGED, SPREAD_TOO_NARROW }
 
     /**
-     * @param originToleranceM   client muzzle vs the host copy's muzzle. A sprinting body covers ~0.7 m
-     *                           in 100 ms, plus snapshot interpolation.
+     * @param originToleranceM   how far OUTSIDE the host copy's body volume the reported origin may be
+     *                           (the caller measures the excess). A sprinting body covers ~0.7 m in
+     *                           100 ms, plus snapshot interpolation.
      * @param aimToleranceDeg    client aim vs the host copy's replicated aim direction. The aim point
      *                           rides the 30 Hz snapshot on another channel, so a fast turn legitimately
      *                           reads tens of degrees apart for a frame or two.
-     * @param spreadFloorFraction the client's cone must be at least this fraction of the host's own
-     *                           estimate — the host sees base + movement + stance but never bloom, so its
-     *                           estimate is a LOWER bound and a client under half of it shrank the cone.
+     * @param spreadFloorFraction the client's cone must be at least this fraction of the weapon's
+     *                           MINIMUM for the host-known stance ({@code FirearmItem.minimumSpreadDeg}).
+     *                           0.5 is the widest stance ratio (upright 1.0 → crawl 0.5), so a stance
+     *                           change the host has not seen yet can never refuse an honest shot.
      * @param spreadSlackDeg     absolute slack under that floor (covers a near-zero base spread).
      */
     public record Limits(double originToleranceM, double aimToleranceDeg,
@@ -47,7 +49,7 @@ public final class ShotValidationPolicy {
      * @param aimAngleDeg     angle between the reported aim and the host copy's aim direction
      *                        (pass 0 when the host copy has no usable aim point)
      * @param clientSpreadDeg the full cone angle the client used
-     * @param hostSpreadDeg   the host copy's own {@code getCurrentSpreadDeg()}
+     * @param hostSpreadDeg   the weapon's minimum cone in the host copy's stance
      */
     public static Verdict evaluate(long shotSeq, long lastAcceptedSeq, boolean fireBudgetOk,
                                    double originDistM, double aimAngleDeg,

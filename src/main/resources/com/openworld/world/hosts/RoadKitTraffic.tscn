@@ -1,0 +1,55 @@
+[gd_scene format=3]
+
+; Road-system evaluation host (PLAN.md 3.1, 2026-09-13): the Blender road kit's sample network baked
+; by `blender/tools/build_roadkit_sample_piece.py` + `build_piece.sh RoadKitSample`, with one zone
+; streaming ambient traffic onto its lanes (route prefix "demo_"). Driven by
+; tools/godot/probe_road_traffic.gd, which runs the same measurement on DebugWorld (road-generator).
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/pieces/RoadKitSample.tscn" id="piece"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ZoneMarker.java" id="zmark"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Zone.java" id="zone"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/VehicleSpawnConfig.java" id="vspawn"]
+
+[sub_resource type="BoxShape3D" id="ground_shape"]
+size = Vector3(4000, 1, 2000)
+
+[sub_resource type="Resource" id="traffic"]
+script = ExtResource("vspawn")
+count = 6
+cruise_throttle = 0.4
+route_name = "demo_"
+
+[sub_resource type="Resource" id="zone_x"]
+script = ExtResource("zone")
+zone_id = "roadkit_cross"
+size = Vector3(80, 12, 80)
+vehicle_spawn_configs = Array[ExtResource("vspawn")]([SubResource("traffic")])
+
+[node name="RoadKitTraffic" type="Node3D"]
+
+[node name="Ground" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 900, -0.7, 0)
+
+[node name="Shape" type="CollisionShape3D" parent="Ground"]
+shape = SubResource("ground_shape")
+
+[node name="Piece" parent="." instance=ExtResource("piece")]
+
+[node name="Characters" type="Node" parent="."]
+
+[node name="Player" parent="Characters" instance=ExtResource("player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 330, 1.0, 80)
+
+[node name="PlayerSpawn" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 330, 1.0, 80)
+
+[node name="Zones" type="Node" parent="."]
+
+[node name="Cross" type="Node3D" parent="Zones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 251.75, 0, 0)
+script = ExtResource("zmark")
+zone = SubResource("zone_x")
+
+[node name="WorldSystems" parent="." instance=ExtResource("wsys")]

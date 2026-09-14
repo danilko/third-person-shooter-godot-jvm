@@ -336,6 +336,72 @@ public final class NetMessageCodec {
     public record DecodedShot(String shooterCharacterId, int weaponSlot, long shotSeq, Vector3 origin, Vector3 aim,
             float spreadDeg) { }
 
+    // ── MSG_SHOT_RESULT_BATCH (host → peers, cosmetic, unreliable) ────────────
+    //
+    // [tag u8][count u16] then per entry:
+    //   [shooterCharacterId utf8][weaponSlot u8][shotSeq u32][pellets u8]
+    //   per pellet: [kind u8][end 3×float] and, when kind > 0, [normal 3×float]
+    //   kind 0 = miss (end = where the tracer stops), kind k > 0 = hit on SurfaceType ordinal k-1.
+    //
+    // PLAN.md N1b: what a host-resolved pull actually hit, so peers other than the shooter draw the
+    // real tracers and impacts instead of one tracer toward the replicated aim point. Cosmetic only —
+    // damage never rides it — so it is unreliable on channel 3 and a lost one falls back to the
+    // puppet's aim tracer (FirearmItem.playRemoteFireCue).
+
+    /** One pellet of a resolved pull: {@code kind} 0 = miss, else SurfaceType ordinal + 1. */
+    public record PelletResult(int kind, Vector3 end, Vector3 normal) { }
+
+    /** One resolved pull. */
+    public record ShotResult(String shooterCharacterId, int weaponSlot, long shotSeq, java.util.List<PelletResult> pellets) {
+        /** Encoded size, for MTU chunking. */
+        public int wireBytes() {
+            int b = 4 + shooterCharacterId.getBytes(java.nio.charset.StandardCharsets.UTF_8).length + 1 + 4 + 1;
+            for (PelletResult p : pellets) b += 1 + 12 + (p.kind() > 0 ? 12 : 0);
+            return b;
+        }
+    }
+
+    public static PackedByteArray encodeShotResultBatch(int msgType, java.util.List<ShotResult> results) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.put16(results.size());
+        for (ShotResult r : results) {
+            buf.putUtf8String(r.shooterCharacterId());
+            buf.put8(r.weaponSlot());
+            buf.put32((int) r.shotSeq());
+            buf.put8(Math.min(255, r.pellets().size()));
+            int n = 0;
+            for (PelletResult p : r.pellets()) {
+                if (n++ >= 255) break;
+                buf.put8(p.kind());
+                putVector3(buf, p.end());
+                if (p.kind() > 0) putVector3(buf, p.normal());
+            }
+        }
+        return buf.getDataArray();
+    }
+
+    /** Decodes the body following the tag byte. Caller must have already consumed it. */
+    public static java.util.List<ShotResult> decodeShotResultBatch(StreamPeerBuffer buf) {
+        int count = buf.getU16();
+        java.util.List<ShotResult> out = new java.util.ArrayList<>(Math.min(count, 64));
+        for (int i = 0; i < count; i++) {
+            String id = buf.getUtf8String();
+            int slot = buf.getU8();
+            long seq = buf.getU32();
+            int pellets = buf.getU8();
+            java.util.List<PelletResult> ps = new java.util.ArrayList<>(pellets);
+            for (int k = 0; k < pellets; k++) {
+                int kind = buf.getU8();
+                Vector3 end = getVector3(buf);
+                Vector3 normal = kind > 0 ? getVector3(buf) : null;
+                ps.add(new PelletResult(kind, end, normal));
+            }
+            out.add(new ShotResult(id, slot, seq, ps));
+        }
+        return out;
+    }
+
     // ── MSG_OWNERSHIP (ownership migration, reliable) ─────────────────────────
     //
     // [tag u8][characterId utf8][newOwnerPeerId i32]

@@ -65,6 +65,14 @@ public class MissionManager extends Node {
         activeSessions.remove(peerId);
     }
 
+    /** Finds a CONNECTED session owning the given characterId — a second live instance of one install. */
+    public PlayerSession findConnectedSessionByCharacterId(String characterId) {
+        for (PlayerSession session : activeSessions.values()) {
+            if (session.isConnected && characterId.equals(session.characterId)) return session;
+        }
+        return null;
+    }
+
     /** Finds a disconnected session owning the given characterId — the rejoin lookup Step 6 needs. */
     public PlayerSession findDisconnectedSessionByCharacterId(String characterId) {
         for (PlayerSession session : activeSessions.values()) {

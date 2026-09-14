@@ -2,7 +2,10 @@
 
 Third-person shooter experiment using **Godot 4.7** with the **[godot-jvm](https://github.com/utopia-rise/godot-jvm)** binding
 (`1.0.0-rc1`, shipped as the in-project `addons/jvm/` GDExtension; docs: https://godot-jvm.dev/en/1.0/).
-All game logic is written in **Java** (a few stubs in Kotlin). GDScript is not used.
+All game logic is written in **Java** (a few stubs in Kotlin). **GDScript is used for EDITOR TOOLING
+ONLY** (decided 2026-09-13): godot-jvm rc1 ships `@Tool` but no editor API (0 `godot/api/Editor*`
+classes), so editor plugins, docks and gizmos are GDScript — `addons/road_kit/` is the first — and
+they call into Java or external tools for logic. Never GDScript for runtime gameplay.
 
 ---
 
@@ -1423,11 +1426,13 @@ Current weapon values:
 - Pistol: first shot 0.05° (5 px crosshair gap from draw — visibly less precise than rifle); bloom
   clears between taps so sustained semi-auto accuracy stays near base spread.
 
-Spread is applied as a **circular cone** in `FirearmItem.applySpread`: random perpendicular axis +
-`sqrt(rand) × halfSpread` angle → uniform disk distribution (no diagonal bulge from independent
-pitch/yaw sampling). It rotates the shot **direction** around the muzzle→target line (see
-"Two-stage hit resolution" below) rather than the AimRay's own transform, so the cone stays centred
-on the shot whatever the ray is resting at. Skipped entirely at zero spread.
+Spread is a **circular cone** from `weapon.SpreadPattern` (engine-free, unit-tested): random
+perpendicular axis + `sqrt(u) × halfSpread` angle → uniform disk distribution (no diagonal bulge from
+independent pitch/yaw sampling), rotating the shot **direction** around the muzzle→target line (see
+"Two-stage hit resolution" below). Skipped entirely at zero spread. **It is deterministic** (PLAN.md N1):
+every pellet is a pure function of `(aim, halfSpread, seed(shooterId, shotSeq), pelletIndex)` with its
+own SplitMix64 PRNG — never `GD.randf` — so the host regenerates a client's exact pellets. See
+"Networked shots — one seeded message per pull" below.
 
 AI bypasses spread entirely (`useWeaponSpread = false` on the AICharacter); accuracy is controlled
 by `hitChance` + `aimScatterRadius` in `AttackState`.
@@ -1484,11 +1489,67 @@ Details that matter:
   `forceRaycastUpdate`, then restores the **local** values — restoring globals would drift), the
   same idiom `resolveServerShot` uses. So a trace inherits the ray's collision mask and its
   self-exceptions (own body + ragdoll bones) with no query setup, and can never self-hit.
-- **Networked:** the origin a client reports in `MSG_SHOT` is now the **muzzle**, so the host's
-  `resolveServerShot` re-runs the very same cover test against authoritative positions instead of a
-  camera-origin one. No message/format change.
+- **Networked:** the origin a client reports in `MSG_SHOT` is the **muzzle**, and the host's
+  `resolveServerShot` re-runs the chest→origin cover test on its own copy, so a reported muzzle on the
+  far side of a wall is pulled back to the chest exactly as a local shot would be.
 - Shotguns resolve the sight leg + origin **once** per trigger pull and only re-sample the cone per
   pellet.
+
+### Networked shots — one seeded message per pull (PLAN.md N1, 2026-09-13)
+
+A client used to send **one reliable `MSG_SHOT` per pellet** (8 per SG1 pull) carrying a post-spread
+ray the host traced as given — trusted origin, trusted direction, no rate/cone check, on channel 0
+with damage, pickups and spawns. Now a pull is ONE message on its own reliable **channel 1**:
+`shooterId, slot, shotSeq u32, origin, aim (PRE-spread), spreadDeg`. The client generates its pellets
+from exactly those values **after rounding origin and aim to float32** — generating from the doubles
+first made 1 pull in 10 differ in the fifth decimal from the host's regeneration. The host
+(`NetworkManager.validateShot` → engine-free `net.ShotValidationPolicy`) refuses, each counted as
+`shot_rejected_<verdict>`: a counter that does not advance (`STALE_SEQ`; per sender+shooter, cleared
+on disconnect so a rejoin's fresh counter works), an empty per-weapon token bucket refilled at the
+weapon's fire rate with a burst of 3 (`TOO_FAST` — a plain minimum interval would refuse honest pulls
+that a reliable resend delivers together), an origin more than 1 m outside the shooter's **body
+volume** (`ORIGIN_TOO_FAR`), an aim > 35° from the host copy's replicated aim point (`AIM_DIVERGED`),
+and a cone under half the weapon's `minimumSpreadDeg()` for the host-known stance
+(`SPREAD_TOO_NARROW`). Two measured traps shaped those rules:
+- **A host puppet does not animate the owner's pose.** Its muzzle is cosmetic: a standing client
+  firing from the shoulder had its host copy holding the same SG1 at the hip, 1.17 m away, on every
+  shot. So the origin is judged against the replicated BODY, never the puppet's muzzle bone.
+- **A host puppet is never on the floor**, so its live `getCurrentSpreadDeg()` carries the airborne ×2
+  (6.0° vs the client's 4.0°) and would refuse an honest crouched shot. The floor is the weapon's
+  minimum for the stance (no movement, no bloom, no air) × 0.5 — the widest stance ratio, so a stance
+  change the host has not seen yet never refuses a shot.
+The "any held firearm" slot fallback is gone (a sibling weapon's damage/pellets would be a different
+shot); the current item is still used, counted as `shot_slot_fallback`.
+
+Gate: **`tools/net/run_net_shot_test.sh`** — two headless processes of `debug/NetShotTest.tscn`
+(`NetShotTestHost`, `--role=host|client`); the client collects a scene SG1 pickup, aims with its real
+`PlayerController` and pulls 10 times through `Input`, then sends 10 forged shots. Asserts 20 messages
+for 10 pulls + 10 forgeries, 10/10 honest pulls resolved, **10/10 pulls with identical pellet rays**
+(a direction digest), each forgery refused for its own reason, the burst cut, and damage landed.
+Pellet HITS agree ~90%, not 100%, by design: the target's hitboxes are animated and the client's
+puppet of it is centimetres off the host's.
+
+**Other peers see the real pellets (N1b).** The host queues a `ShotResult` for every pull it resolves —
+a relayed client pull (excluding that client, who predicted it) and its own shooters' pulls (host
+player, AI) — and flushes them once per frame as one `MSG_SHOT_RESULT_BATCH` per peer on **unreliable
+channel 3**: per pellet an end point, plus the `SurfaceType` and normal for a hit. A peer draws a tracer
+per pellet from its puppet's muzzle and `ImpactManager.processVisualImpact`. The fire cue that rides
+the snapshot's `fireSeq` keeps flash + audio, but its single aim-point tracer is now a FALLBACK: drawn
+only if no result arrives within 150 ms, skipped if one arrived in the last **300** ms. The windows are
+asymmetric on purpose — the cue travels client → host → peer on the 30 Hz snapshot relay and was
+measured arriving over 150 ms after its own result under load, which drew a second tracer. The host
+draws a relayed pull's real tracers itself and suppresses the cue's the same way. Gated by the same
+script, now with two watching peers: one must receive a result per resolved pull with the host's
+pellet count and hits and draw 8 tracers each with 0 fallbacks; the other drops results and must draw
+exactly one fallback per pull (the control). **Not exercised by the gate:** results for the HOST's own
+shooters (no host-side shooter in the harness) — same queue, exclusion -1.
+
+**Two game instances on one install share a `PersistentPlayerId`** (`user://player_id.cfg`), which is
+exactly how LAN co-op is tested on one PC. The host used to spawn the second instance's body with the
+FIRST peer's characterId — three bodies, one identity, and a client that could not tell which it owned
+(the harness's observers took over the shooter's body). `GameManager.onPeerIdentified` now gives a peer
+whose id a CONNECTED session already holds `id#peerId` (counted `identify_duplicate_player_id`); a
+disconnected session still matches first, so a real rejoin is unchanged.
 - Melee (`MeleeItem`) runs the SAME two legs — see "W16 — MELEE IS A SWEPT REACH FROM THE CHEST".
   `resolveSightPoint` and `trace` live on `WeaponItem` for that reason: a firearm and a melee weapon
   must not come to disagree about where an attack is aimed or what may block it.
@@ -3266,6 +3327,42 @@ holster placement, projectile authority, lag compensation.
 
 ---
 
+## Road Kit — option B: author in Godot, solve in python3, mesh in Blender (2026-09-13)
+
+Supersedes the road-generator half of the section below (PLAN.md 3.1). The Blender road kit's
+solver was kept and its authoring moved into the Godot editor, where zones, Terrain3D and building
+scenes live. **Three owners, one contract (`.roads.json`, the kit's `point_model` schema, Z-up):**
+
+| layer | where | what |
+|---|---|---|
+| authoring | `addons/road_kit/` (GDScript editor plugin) | `RoadKitNetwork` → `RoadKitRoad` → `RoadKitPoint` nodes; a road's CHILD ORDER is its chain; links by uid; the dock's gestures (`road_kit_gestures.gd`, pure functions, headless-testable); overlay of the solver's resolved centrelines; undo = restore the record |
+| rules | `blender/tools/roadkit_cli.py` (plain python3) | `validate`, `setback`, `centrelines`, `lanekit`, `ramp` over the record, using the kit's existing pure modules — no Blender |
+| meshes | `blender/tools/roadkit_build_mesh.py` (headless Blender) | `load_record` + `point_build`, then `build_piece.sh` export/bake; `build_roads_piece.sh <record> <Piece>` runs all three steps (17 s on the sample) |
+
+Rules that came with it, each measured:
+- **The field table is GENERATED** into `road_kit_fields.gd` (`blender/tools/gen_roadkit_godot_fields.py`,
+  `--check` fails when stale). A second hand-copied table is the drift the kit's own field-table rule
+  exists to prevent.
+- **Coordinates convert in ONE GDScript place** (`road_kit_frame.gd`, kit `(x,y,z)` → Godot
+  `(x,z,-y)`, mirroring `point_export.godot`). Record positions are in the NETWORK node's frame,
+  composed from local transforms, so import/export works outside the scene tree. Gate:
+  `test_roadkit_record.gd` + `compare_roads_records.py` — 0 differences on the sample network, and
+  the lanekit from the Godot-written record equals Blender's export (worst delta 0.0).
+- **Solver facts are never re-derived in GDScript.** A ramp's mouth position, carriageway and taper
+  opening are `roadkit_cli.py ramp` (a port of `Make Ramp` + `open_aux_slot` + `Align Ramp To Aux`
+  over the record); the GDScript `make_ramp` that guessed them was deleted.
+- **Sibling scripts are referenced by PRELOAD, never by `class_name`.** A headless `--script` run
+  and a fresh checkout have no global class cache; a `class_name` type hint then fails to parse and
+  the script is dead (read as a hang, since the error aborts before `quit()`). Parse-check addon files
+  with `godot --headless --check-only --script res://<file>` — verified to catch a strict-typing error.
+- **Ground heights come from Terrain3D** (`Gestures.sample_ground`, before every service call), and
+  must be the NATURAL ground: stamping road corridors into the height map comes after sampling, or
+  the kit's CARVED_FLAG trap returns. Blender keeps a record height when its scene has no terrain.
+- Gates: `test_roadkit_record.gd`, `test_roadkit_gestures.gd` (16/16 — a gesture-authored network
+  passes the kit's gate with 0 errors and exports 34 lanes), `test_roadkit_ground.gd` (3/3).
+  Still to build (PLAN.md 3.1): zones (B6), corridor stamp into Terrain3D (B7), the remaining
+  gestures and gizmos (B8), retiring road-generator and the Blender authoring UI (B9).
+
 ## Ground and roads are moving to Terrain3D + road-generator (2026-09-06)
 
 `TERRAIN3D_TRANSITION.md` is the plan and progress of record. Everything below about the Blender
@@ -3355,6 +3452,12 @@ publishes one per `RoadLane`. Two rules came out of it, both measured:
 - `AICharacter.onDied()` must set `isDead = true` **before** calling `super.onDied()` (which stops
   physics processing). If `isDead` is not set first, `gatherInput` can still run on the
   same frame via a pending physics callback.
+- **godot-jvm 1.0.0-rc1: `Dictionary.put(k, v)` throws on a typed non-nullable value** (e.g.
+  `Dictionary<String, String>`) — `put` calls `get(key, null)` to return the old value, and the `null`
+  default fails the STRING converter's `require(any is String)` (`IllegalArgumentException: Failed
+  requirement`). Use `set(k, v)`. It broke every runtime faction flip, and a joining client dropped the
+  faction baseline as "malformed" (found by `tools/net/run_net_shot_test.sh`; `FactionTable` fixed).
+  `NetworkManager`'s malformed-packet log now names the tag and the top stack frames — it named neither.
 - **Do not export a nested/raw generic `Dictionary` from a `@Script` class** (e.g.
   `@Export Dictionary<String, Dictionary>`). The godot-jvm `classGraphSymbolsProcess`
   registration scanner chokes on the raw nested type parameter and dies with `Java heap space` /

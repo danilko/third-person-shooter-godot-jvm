@@ -48,11 +48,19 @@ public class FactionTable extends Resource {
         return reverse != null ? reverse.toString() : null;
     }
 
-    /** Set a (symmetric) relationship between two factions at runtime — mission betrayals, etc. */
+    /**
+     * Set a (symmetric) relationship between two factions at runtime — mission betrayals, etc.
+     *
+     * <p>{@code set}, NOT {@code put}: in godot-jvm 1.0.0-rc1 {@code Dictionary.put} first calls
+     * {@code get(key, null)} to return the previous value, and that pushes the {@code null} default
+     * through the typed STRING converter, which throws {@code IllegalArgumentException: Failed
+     * requirement}. Every runtime flip threw — including the late-join faction baseline, which a
+     * client dropped as a malformed packet (found by tools/net/run_net_shot_test.sh).
+     */
     public void setRelationship(String a, String b, String rel) {
         if (a == null || b == null || rel == null) return;
-        relationships.put(key(a, b), rel);
-        relationships.put(key(b, a), rel);
+        relationships.set(key(a, b), rel);
+        relationships.set(key(b, a), rel);
     }
 
     /** All stored directed relationships as {factionA, factionB, relationship} triples (for the net baseline). */

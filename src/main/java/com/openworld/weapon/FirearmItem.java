@@ -18,6 +18,8 @@ import com.openworld.movement.character.Stance;
 import com.openworld.movement.character.StanceName;
 import com.openworld.world.manager.ImpactManager;
 import com.openworld.world.StimulusManager;
+import com.openworld.world.SurfaceType;
+import com.openworld.net.NetStats;
 
 /**
  * Hitscan firearm. Owns: spread calculation, recoil, muzzle flash, fire audio,
@@ -87,6 +89,10 @@ public class FirearmItem extends WeaponItem {
   @Override
   public void _physicsProcess(double delta) {
     currentBloom = Math.max(0f, currentBloom - bloomDecaySpeed * (float) delta);
+    if (fallbackTracerAtMs > 0 && Time.INSTANCE.getTicksMsec() >= fallbackTracerAtMs) {
+      fallbackTracerAtMs = 0;
+      drawAimTracer();
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -147,13 +153,63 @@ public class FirearmItem extends WeaponItem {
     // Other clients also run this but don't post (their AI are puppets that never poll). Reuses the
     // existing fire replication — no new network message.
     if (isServerPeer()) postGunshotStimulus();
+    // The TRACER is no longer the cue's (N1b): the real pellets arrive as a shot result (a client) or
+    // are resolved here (the host). The cue and the result travel on different channels and either
+    // may land first, so the cue's single aim tracer is only a FALLBACK — drawn if no result has come
+    // in RESULT_WAIT_MS, skipped if one came in just before.
+    long now = Time.INSTANCE.getTicksMsec();
+    if (now - lastShotResultMs < CUE_AFTER_RESULT_MS) {
+      NetStats.increment("cue_tracer_superseded");
+      return;
+    }
+    fallbackTracerAtMs = now + RESULT_WAIT_MS;
+  }
+
+  /** How long a fire cue waits for its shot result before drawing the aim tracer instead (N1b). */
+  private static final long RESULT_WAIT_MS = 150;
+  /**
+   * How recent a result must be for an arriving cue to count as ITS cue, already drawn. Longer than
+   * the wait: the cue rides the 30 Hz snapshot relay (client → host → peer) and was measured arriving
+   * over 150 ms after its own result under a four-process headless load, which drew a spurious second
+   * tracer. The cost is cosmetic and bounded — a result LOST within this window of the previous one
+   * (sustained auto fire) draws no tracer for that one shot.
+   */
+  private static final long CUE_AFTER_RESULT_MS = 300;
+  private long lastShotResultMs = -100_000;
+  private long fallbackTracerAtMs = 0;
+
+  /** The cue's fallback: one tracer from this puppet's muzzle toward its replicated aim point. */
+  private void drawAimTracer() {
     if (!(owningCharacter instanceof Character c)) return;
     Vector3 origin = weaponMuzzle().getGlobalPosition();
     Vector3 dir = c.getAimTargetPosition().minus(origin);
     if (dir.lengthSquared() < 1e-6f) return;
+    NetStats.increment("cue_fallback_tracer");
     BulletTracerManager tm = getBulletTracerManager();
     if (tm != null) {
       tm.spawnTracer(origin, origin.plus(dir.normalized().times(REMOTE_TRACER_LENGTH)));
+    }
+  }
+
+  /**
+   * A peer replaying a host-resolved pull (PLAN.md N1b): one tracer per pellet from this puppet's own
+   * muzzle to where the host found that pellet stopped, and the impact visuals for each hit on the
+   * surface the host reported. Cancels the fire cue's pending fallback tracer.
+   */
+  public void playRemoteShotResult(com.openworld.net.NetMessageCodec.ShotResult result) {
+    lastShotResultMs = Time.INSTANCE.getTicksMsec();
+    if (fallbackTracerAtMs > 0) NetStats.increment("cue_tracer_waited_for_result");
+    fallbackTracerAtMs = 0;
+    Vector3 muzzle = weaponMuzzle().getGlobalPosition();
+    BulletTracerManager tm = getBulletTracerManager();
+    var im = getImpactManager();
+    SurfaceType[] surfaces = SurfaceType.values();
+    for (var p : result.pellets()) {
+      NetStats.increment("shot_result_tracer");
+      if (tm != null) tm.spawnTracer(muzzle, p.end());
+      if (p.kind() > 0 && im != null) {
+        im.processVisualImpact(surfaces[Math.min(p.kind() - 1, surfaces.length - 1)], p.end(), p.normal());
+      }
     }
   }
 
@@ -180,6 +236,22 @@ public class FirearmItem extends WeaponItem {
     if (owningCharacter == null) return 0f;
     float speed = (float) owningCharacter.getVelocity().length();
     return (spread + currentBloom + speed * MOVEMENT_SPREAD_PER_MPS) * stanceMultiplier(owningCharacter);
+  }
+
+  /**
+   * The narrowest cone this weapon can have in its holder's current stance: base spread × the stance
+   * multiplier, with no movement, no bloom and no airborne penalty (PLAN.md N1). The host validates a
+   * client's reported cone against THIS rather than {@link #getCurrentSpreadDeg()}: a host puppet is
+   * never simulated onto the floor, so the live estimate carries the airborne ×2 and would refuse an
+   * honest crouched shot, while bloom — the one term that only widens — never exists on the host copy.
+   */
+  public float minimumSpreadDeg() {
+    if (currentStance == StanceName.SWIM) return spread * SWIM_SPREAD_MULT;
+    return switch (currentStance) {
+      case CROUCH -> spread * CROUCH_SPREAD_MULT;
+      case CRAWL  -> spread * CRAWL_SPREAD_MULT;
+      default     -> spread;
+    };
   }
 
   /** Reference movement speed (m/s ≈ sprint) defining the top of the crosshair spread envelope. */
@@ -252,10 +324,14 @@ public class FirearmItem extends WeaponItem {
     if (ray == null) return;
 
     Vector3 sightPoint = resolveSightPoint(ray);
-    Vector3 origin = useMuzzleTrace() ? resolveShotOrigin(ray) : ray.getGlobalPosition();
+    // Origin and aim are rounded to float32 BEFORE the pellets are generated, because float32 is what
+    // MSG_SHOT carries: the host regenerates from the decoded values, so the client must generate from
+    // the very same ones. Generating from the double first made 1 pull in 10 differ in the fifth
+    // decimal of its pellet directions (measured, tools/net/run_net_shot_test.sh).
+    Vector3 origin = wireRounded(useMuzzleTrace() ? resolveShotOrigin(ray) : ray.getGlobalPosition());
     Vector3 toTarget = sightPoint.minus(origin);
     if (toTarget.lengthSquared() < 1e-6f) return;
-    Vector3 aim = toTarget.normalized();
+    Vector3 aim = wireRounded(toTarget.normalized());
     // Player: sample the spread cone around the muzzle→target line. AI: AttackState already baked its
     // scatter into the sight point via snapAimRay — scattering again would override that.
     float spreadDeg = (owningCharacter instanceof Character c && c.useWeaponSpread) ? getCurrentSpreadDeg() : 0f;
@@ -270,6 +346,14 @@ public class FirearmItem extends WeaponItem {
     // re-runs the very same cover test rather than a camera-origin one.
     if (client) sendShotToHost(origin, aim, spreadDeg, shotSeq);
     lastShotPelletHits = resolvePellets(ray, origin, aim, spreadDeg, shotSeq, shooterId(), range, !client, true);
+    // The host's own shooters (host player, AI): every client sees them only as puppets, so send what
+    // the pull hit to all of them (N1b).
+    if (!client) queueResultForPeers(shotSeq, -1);
+  }
+
+  /** {@code v} as float32 components — the precision MSG_SHOT carries. */
+  private static Vector3 wireRounded(Vector3 v) {
+    return new Vector3((double) (float) v.getX(), (double) (float) v.getY(), (double) (float) v.getZ());
   }
 
   /** The id this weapon's shots are seeded with — the holder's character id, "" when there is none. */
@@ -284,6 +368,13 @@ public class FirearmItem extends WeaponItem {
    */
   public java.util.List<String> lastShotPelletHits = java.util.List.of();
 
+  /** Digest of the pellet DIRECTIONS of that pull — equal on client and host when both regenerated the
+   *  same cone from the same seed, whatever the hitboxes were doing. Diagnostic, like the hits. */
+  public String lastShotDirectionDigest = "";
+
+  /** Where each pellet of the last resolved pull stopped — what a host broadcasts to peers (N1b). */
+  private java.util.List<com.openworld.net.NetMessageCodec.PelletResult> lastShotPellets = java.util.List.of();
+
   /**
    * Trace every pellet of one pull through {@code origin} along its seeded direction. {@code applyDamage}
    * is the authority (server / single-player) path; otherwise only the impact visuals play.
@@ -295,12 +386,22 @@ public class FirearmItem extends WeaponItem {
     long seed = SpreadPattern.seedFor(shooter, shotSeq);
     int pellets = Math.max(1, pelletCount);
     java.util.List<String> hits = new java.util.ArrayList<>(pellets);
+    java.util.List<com.openworld.net.NetMessageCodec.PelletResult> results = new java.util.ArrayList<>(pellets);
     var im = getImpactManager();
+    double digest = 0;
     for (int i = 0; i < pellets; i++) {
       double[] d = SpreadPattern.direction(aim.getX(), aim.getY(), aim.getZ(), spreadDeg * 0.5, seed, i);
+      digest += (i + 1) * (d[0] + 3 * d[1] + 7 * d[2]);
       Vector3 dir = new Vector3(d[0], d[1], d[2]);
       TraceHit hit = trace(ray, origin, dir, range);
       hits.add(hit != null && hit.node != null ? hit.node.getName().toString() : "-");
+      if (hit != null) {
+        SurfaceType s = im != null ? im.surfaceOf(hit.node) : SurfaceType.DEFAULT;
+        results.add(new com.openworld.net.NetMessageCodec.PelletResult(s.ordinal() + 1, hit.point, hit.normal));
+      } else {
+        results.add(new com.openworld.net.NetMessageCodec.PelletResult(0,
+            origin.plus(dir.times(Math.min(range, TRACER_MISS_LENGTH))), null));
+      }
       if (hit != null && im != null) {
         HitInfo info = new HitInfo(hit.node, hit.point, hit.normal);
         if (applyDamage) {
@@ -314,6 +415,8 @@ public class FirearmItem extends WeaponItem {
         spawnBulletTracer(hit != null ? hit.point : origin.plus(dir.times(Math.min(range, TRACER_MISS_LENGTH))));
       }
     }
+    lastShotDirectionDigest = String.format(java.util.Locale.ROOT, "%.5f", digest);
+    lastShotPellets = results;
     return hits;
   }
 
@@ -356,17 +459,37 @@ public class FirearmItem extends WeaponItem {
    * impact). Two things are the host's own, never the client's: the pellet count and damage (this
    * weapon's), and the cover test — the chest→origin clearance is re-run against the host copy, so a
    * client reporting a muzzle on the far side of a wall is pulled back to its chest exactly as a local
-   * shot would be. No tracer here: the host's (and every viewer's) muzzle/tracer cue rides the
-   * shooter's snapshot fireSeq, and drawing one here too would double it on the host.
+   * shot would be. The result goes to every peer except the shooter's owner (N1b).
    */
   public java.util.List<String> resolveServerShot(Vector3 origin, Vector3 aim, float spreadDeg, long shotSeq,
-                                                  String shooter) {
+                                                  String shooter, int weaponSlot, int ownerPeerId) {
     RayCast3D ray = getEffectiveAimRay();
     if (ray == null || aim.lengthSquared() < 1e-6f) return java.util.List.of();
     Vector3 from = clearOriginOnHost(ray, origin);
     float range = (float) Math.max(50.0, ray.getTargetPosition().length());
-    lastShotPelletHits = resolvePellets(ray, from, aim.normalized(), spreadDeg, shotSeq, shooter, range, true, false);
+    // The host draws this pull's real tracers itself and marks the result as in, so the shooter's
+    // fireSeq cue on this puppet does not add its own aim tracer on top (N1b).
+    lastShotResultMs = Time.INSTANCE.getTicksMsec();
+    fallbackTracerAtMs = 0;
+    // `aim` exactly as decoded — SpreadPattern normalises it the same way the client's copy was.
+    lastShotPelletHits = resolvePellets(ray, from, aim, spreadDeg, shotSeq, shooter, range, true, true);
+    queueResultForPeers(shotSeq, ownerPeerId, shooter, weaponSlot);
     return lastShotPelletHits;
+  }
+
+  /** Host: hand the last resolved pull's pellets to the NetworkManager for every peer but {@code exclude}. */
+  private void queueResultForPeers(long shotSeq, int excludePeerId) {
+    if (weaponController == null) return;
+    queueResultForPeers(shotSeq, excludePeerId, shooterId(), weaponController.getWeapon());
+  }
+
+  private void queueResultForPeers(long shotSeq, int excludePeerId, String shooter, int weaponSlot) {
+    if (shooter == null || shooter.isEmpty()) return;
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    if (netNode instanceof NetworkManager net && net.isNetworked() && net.isServer()) {
+      net.queueShotResult(new com.openworld.net.NetMessageCodec.ShotResult(shooter, weaponSlot, shotSeq,
+          lastShotPellets), excludePeerId);
+    }
   }
 
   /** {@link #resolveShotOrigin}'s cover test, run from the host copy's chest to a REPORTED origin. */
