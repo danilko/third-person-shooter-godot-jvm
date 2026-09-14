@@ -128,14 +128,30 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     // isSemiAutoReady() gate a held throw key spawned multiple grenades back-to-back
     // (capped only by fireRate) both locally and across LAN — the double-throw bug.
     @Override public boolean canUse()             { return magazine > 0 && isSemiAutoReady(); }
-    /** Thrown from the hand toward the aim point, so the hand must be facing it. */
-    @Override protected boolean launchesTowardAim() { return true; }
+    /**
+     * NOT gated on facing the aim (W21's {@code pointsAtAim}). That gate compares the HELD ITEM's model forward
+     * with the aim, which is a gun barrel's direction and nothing a grenade in the hand has: its forward is
+     * wherever the hold pose leaves it, so the gate never opened and no grenade could be thrown at all —
+     * found by the N4 launch check (fire pressed with a ready T1, nothing launched, single-player included).
+     * And the gate's reason does not apply: a throw's direction is body → aim point ({@link #resolveAimDir}),
+     * it leaves in front of the chest, and it ignores collisions with its thrower.
+     */
+    @Override protected boolean launchesTowardAim() { return false; }
 
     @Override
     public void useWeapon() {
         isWeaponFired = true;
         decrementMagazine();
-        spawnProjectile(false);
+        Vector3[] in = launchInputs();
+        if (in != null) {
+            // N4: a client predicts a cosmetic grenade and the host throws the one that damages.
+            if (NetRole.client(this)) {
+                sendLaunchToHost(in[0], in[1]);
+                launch(in[0], in[1], true);
+            } else {
+                launch(in[0], in[1], false);
+            }
+        }
         playThrowAudio();
     }
 
@@ -148,7 +164,25 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     @Override
     public void playRemoteFireCue() {
         playThrowAudio();
-        spawnProjectile(true);
+        // N4: on the host this puppet's real grenade arrives as MSG_LAUNCH — a cue copy would be a second one.
+        if (NetRole.host(this)) { com.openworld.net.NetStats.increment("launch_cue_host_skipped"); return; }
+        Vector3[] in = launchInputs();
+        if (in != null) launch(in[0], in[1], true);
+    }
+
+    /** Host: throw a client's validated launch as the authoritative grenade (PLAN.md N4). */
+    public void launchFrom(Vector3 origin, Vector3 aim) {
+        launch(origin, aim, false);
+    }
+
+    private void sendLaunchToHost(Vector3 origin, Vector3 aim) {
+        com.openworld.net.NetworkManager net = NetRole.net(this);
+        if (net == null || weaponController == null || !(owningCharacter instanceof Character c) || c.characterInfo == null) return;
+        net.sendLaunch(c.characterInfo.characterId, weaponController.getWeapon(), weaponController.nextShotSeq(), origin, aim);
+    }
+
+    private String attackerId() {
+        return owningCharacter instanceof Character c && c.characterInfo != null ? c.characterInfo.characterId : "";
     }
 
     private void playThrowAudio() {
@@ -205,21 +239,26 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
      * Spawns the thrown projectile. {@code cosmetic} true is the puppet replay: aim comes from
      * the replicated aim point (no aimRay on a puppet) and the projectile deals no damage.
      */
-    private void spawnProjectile(boolean cosmetic) {
-        if (projectileScene == null || owningCharacter == null) return;
-
+    /** `[origin, aim]` of a throw now (the aim BEFORE the arc), or null — what a client reports in MSG_LAUNCH. */
+    private Vector3[] launchInputs() {
+        if (projectileScene == null || owningCharacter == null) return null;
         Vector3 aimDir = resolveAimDir();
-        if (aimDir == null) return;
+        if (aimDir == null) return null;
+        // Spawn near the character's shoulder, slightly forward of the body
+        Vector3 spawnPos = owningCharacter.getGlobalPosition()
+                .plus(new Vector3(0f, 1.4f, 0f))
+                .plus(aimDir.times(0.4f));
+        return new Vector3[] {spawnPos, aimDir};
+    }
+
+    private void launch(Vector3 spawnPos, Vector3 aimDir, boolean cosmetic) {
+        if (projectileScene == null || owningCharacter == null || aimDir.lengthSquared() < 1e-6f) return;
+        aimDir = aimDir.normalized();
 
         // Arc: rotate upward around the axis perpendicular to aim and world-up
         Vector3 right = aimDir.cross(Vector3.Companion.getUP()).normalized();
         if (right.lengthSquared() < 0.001f) right = Vector3.Companion.getRIGHT();
         Vector3 throwDir = aimDir.rotated(right, (float) Math.toRadians(arcAngleDeg)).normalized();
-
-        // Spawn near the character's shoulder, slightly forward of the body
-        Vector3 spawnPos = owningCharacter.getGlobalPosition()
-                .plus(new Vector3(0f, 1.4f, 0f))
-                .plus(aimDir.times(0.4f));
 
         Node projectile = projectileScene.instantiate();
 
@@ -227,6 +266,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         // Explosion parameters are scene-configured inside the projectile scene itself.
         if (projectile instanceof T1Projectile gp) {
             gp.cosmetic = cosmetic;
+            gp.attackerId = attackerId();
             if (!cosmetic) {
                 gp.attackerName      = resolveAttackerName();
                 gp.attackerFaction   = resolveAttackerFaction();
@@ -236,6 +276,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         }
 
         getTree().getCurrentScene().addChild(projectile);
+        if (cosmetic) ProjectileLedger.register(attackerId(), projectile);
 
         if (projectile instanceof Node3D n3d) n3d.setGlobalPosition(spawnPos);
         if (projectile instanceof RigidBody3D rb) {

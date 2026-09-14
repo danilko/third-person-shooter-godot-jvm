@@ -112,6 +112,9 @@ public class NetworkManager extends Node {
     private static final int MSG_VEHICLE_SPAWN          = 24; // I3b — host→all: streamed ambient-traffic vehicle spawn (counterpart of MSG_SPAWN)
     private static final int MSG_WAYPOINT               = 25; // I5  — owner→host→all: GPS waypoint set/clear (faction-coloured teammate marker)
     private static final int MSG_SHOT_RESULT_BATCH      = 26; // N1b — host→peers: what resolved pulls hit (cosmetic tracers + impacts)
+    private static final int MSG_MELEE                  = 27; // N2  — client→host: a swing's inputs; the host runs the sweep
+    private static final int MSG_LAUNCH                 = 28; // N4  — client→host: a rocket/grenade's inputs; the host flies it
+    private static final int MSG_DETONATION             = 29; // N4  — host→all: where a host projectile exploded
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -164,14 +167,15 @@ public class NetworkManager extends Node {
                     MSG_WORLD_EVENT, MSG_OWNERSHIP, MSG_PICKUP_REQUEST, MSG_PICKUP_TAKEN,
                     MSG_WEAPON_DROPPED, MSG_ELIMINATION, MSG_INVENTORY,
                     MSG_VEHICLE_SEAT_REQUEST, MSG_VEHICLE_OCCUPANCY, MSG_WEAPON_SWITCH,
-                    MSG_VEHICLE_SPAWN, MSG_WAYPOINT ->
+                    MSG_VEHICLE_SPAWN, MSG_WAYPOINT, MSG_DETONATION ->
                     new ChannelSpec(0, ENetPacketPeer.FLAG_RELIABLE);
             case MSG_SNAPSHOT, MSG_SNAPSHOT_BATCH, MSG_VEHICLE_SNAPSHOT, MSG_VEHICLE_SNAPSHOT_BATCH ->
                     new ChannelSpec(2, 0L);
             // Shots get their own reliable lane (PLAN.md N1): a resent shot must not stall damage,
             // pickups and spawns on channel 0, and vice versa. Ordered within the channel, which is
             // what lets the host treat a non-advancing shotSeq as a replay.
-            case MSG_SHOT -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
+            // Swings share the shots' lane (N2): the same reliable, ordered stream of attack inputs.
+            case MSG_SHOT, MSG_MELEE, MSG_LAUNCH -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
             // Shot results are cosmetic and superseded by the next pull: unreliable, own lane (N1b).
             case MSG_SHOT_RESULT_BATCH -> new ChannelSpec(3, 0L);
             default -> throw new IllegalArgumentException("No channel mapping for MSG_* tag " + msgType);
@@ -739,6 +743,9 @@ public class NetworkManager extends Node {
         peersById.remove(id);
         rateLimiters.remove(id);
         forgetShotState(id);
+        forgetMeleeState(id);
+        forgetLaunchState(id);
+        damageBudgets.remove(id);
         GD.print("NetworkManager: peer disconnected — " + id);
 
         GameManager manager = gameManager();
@@ -795,6 +802,9 @@ public class NetworkManager extends Node {
                 case MSG_DAMAGE_REQUEST -> handleDamageRequestMessage(senderPeerId, buf);
                 case MSG_DAMAGE_BROADCAST -> handleDamageBroadcastMessage(senderPeerId, buf);
                 case MSG_SHOT -> handleShotMessage(senderPeerId, buf);
+                case MSG_MELEE -> handleMeleeMessage(senderPeerId, buf);
+                case MSG_LAUNCH -> handleLaunchMessage(senderPeerId, buf);
+                case MSG_DETONATION -> handleDetonationMessage(senderPeerId, buf);
                 case MSG_WORLD_EVENT -> handleWorldEventMessage(senderPeerId, buf);
                 case MSG_OWNERSHIP -> handleOwnershipMessage(senderPeerId, buf);
                 case MSG_PICKUP_REQUEST -> handlePickupRequestMessage(senderPeerId, buf);
@@ -1174,25 +1184,54 @@ public class NetworkManager extends Node {
         }
     }
 
-    /** Client → authority: apply damage the relaying peer already resolved against its raycast — requestDamage's old body, isMultiplayerAuthority() swapped for isAuthorityFor() (Phase 0 checklist item 22). */
+    /**
+     * Client → host: damage the client's OWN simulation resolved and cannot hand to the host as inputs (PLAN.md
+     * N2). It used to be accepted for any victim, from anyone, naming nobody — one forged packet killed anyone.
+     * Now the request names the entity responsible and its kind, and {@link DamageRequestPolicy} decides: SELF
+     * damage (a fall, drowning, the sender's own vehicle) must be to an entity the sender owns and name it as the
+     * attacker; AREA damage (the sender's own explosive, until N4) must name an attacker the sender owns and
+     * draws on a per-sender budget. Melee and firearms never come this way (MSG_MELEE / MSG_SHOT). Every refusal
+     * is counted {@code damage_request_rejected_<verdict>}.
+     */
     private void handleDamageRequestMessage(int senderPeerId, StreamPeerBuffer buf) {
         NetMessageCodec.DecodedDamageRequest req = NetMessageCodec.decodeDamageRequest(buf);
         if (!isValidDamageRequest(req)) {
             dropInvalid("damage_request", "MSG_DAMAGE_REQUEST", senderPeerId);
             return;
         }
+        if (!isServer()) return;
         // Entity-generic (N3): victims may be Characters or Vehicles — both carry Health.
         com.openworld.control.Controllable victim = findControllableById(req.victimCharacterId());
-        if (!(victim instanceof Node victimNode) || !isServer()) return;
-
+        com.openworld.control.Controllable attacker = findControllableById(req.attackerCharacterId());
+        DamageRequestPolicy.Kind kind = DamageRequestPolicy.kindOf(req.kind());
+        boolean budgetOk = kind != DamageRequestPolicy.Kind.AREA || damageBudgets
+                .computeIfAbsent(senderPeerId, k -> new ShotValidationPolicy.RateBudget(DamageRequestPolicy.AREA_BURST))
+                .tryConsume(nowMs() / 1000.0, DamageRequestPolicy.AREA_PER_SECOND);
+        DamageRequestPolicy.Verdict verdict = DamageRequestPolicy.evaluate(senderPeerId, kind,
+                ownerOf(victim), ownerOf(attacker), victim != null && victim == attacker, budgetOk, req.finalDamage());
+        if (verdict != DamageRequestPolicy.Verdict.ACCEPT) {
+            com.openworld.net.NetStats.increment("damage_request_rejected_" + verdict.name().toLowerCase());
+            logOnce("damage-rejected:" + verdict + ":" + senderPeerId,
+                    "NetworkManager: rejecting MSG_DAMAGE_REQUEST from peer " + senderPeerId + " — " + verdict
+                            + " (victim " + req.victimCharacterId() + ", attacker " + req.attackerCharacterId()
+                            + ", kind " + req.kind() + ", " + req.finalDamage() + ")");
+            return;
+        }
+        if (!(victim instanceof Node victimNode)) return;
         Health health = findHealth(victimNode);
         if (health == null) return;
-        // attackerPos is null on this relay path (the client sent only the attacker's name, not a
-        // position). The common firearm path resolves on the host via MSG_SHOT, where the shooter's
-        // host-side position is known. The broadcast (incl. the direction cue) now happens inside
-        // applyDamage on the server — covering host-originated damage too — so no explicit broadcast here.
+        com.openworld.net.NetStats.increment("damage_request_accepted");
+        Vector3 source = kind == DamageRequestPolicy.Kind.AREA && attacker instanceof godot.api.Node3D a ? a.getGlobalPosition() : null;
         health.applyNetworkDamage(req.finalDamage(), req.headshot(), req.weaponName(),
-                req.attackerName(), req.attackerFaction(), null);
+                req.attackerName(), req.attackerFaction(), source);
+    }
+
+    /** Per sender: the AREA damage-request budget (N2). Cleared on disconnect. */
+    private final Map<Integer, ShotValidationPolicy.RateBudget> damageBudgets = new HashMap<>();
+
+    /** An entity's owning peer, or {@link Integer#MIN_VALUE} when there is no entity. */
+    private static int ownerOf(com.openworld.control.Controllable c) {
+        return c != null && c.getCharacterInfo() != null ? c.getCharacterInfo().ownerPeerId : Integer.MIN_VALUE;
     }
 
     /** Authority → all: momentary hit-reaction cue — broadcastDamage's old body, isMultiplayerAuthority() swapped for isAuthorityFor(). Non-authority peers only; the authority already played it locally via applyDamage. */
@@ -1412,17 +1451,7 @@ public class NetworkManager extends Node {
                 seqKey + "|" + shot.weaponSlot(), k -> new ShotValidationPolicy.RateBudget());
         boolean budgetOk = budget.tryConsume(nowMs() / 1000.0, firearm.getFireRate());
 
-        Vector3 body = shooter.getGlobalPosition();
-        double originDist;
-        if (shooter.currentVehicleNode != null) {
-            originDist = Math.max(0.0, shot.origin().distanceTo(body) - SEATED_ORIGIN_REACH_M);
-        } else {
-            double dx = shot.origin().getX() - body.getX(), dz = shot.origin().getZ() - body.getZ();
-            double dy = shot.origin().getY() - body.getY();
-            double outside = Math.max(0.0, Math.hypot(dx, dz) - SHOOTER_REACH_M);
-            double below = Math.max(0.0, SHOOTER_LOW_M - dy), above = Math.max(0.0, dy - SHOOTER_HIGH_M);
-            originDist = Math.max(outside, Math.max(below, above));   // metres OUTSIDE the volume
-        }
+        double originDist = originOutsideBody(shooter, shot.origin());
         double aimAngle = 0.0;
         Vector3 toAim = shooter.getAimTargetPosition().minus(shot.origin());
         if (toAim.lengthSquared() > 0.25) {
@@ -1443,6 +1472,214 @@ public class NetworkManager extends Node {
                     + " parent " + firearm.getParent().getName());
         }
         return v;
+    }
+
+    /** Metres a reported attack origin lies OUTSIDE the host copy's body volume (0 inside) — shots and swings. */
+    private static double originOutsideBody(Character attacker, Vector3 origin) {
+        Vector3 body = attacker.getGlobalPosition();
+        if (attacker.currentVehicleNode != null) {
+            return Math.max(0.0, origin.distanceTo(body) - SEATED_ORIGIN_REACH_M);
+        }
+        double dx = origin.getX() - body.getX(), dz = origin.getZ() - body.getZ();
+        double dy = origin.getY() - body.getY();
+        double outside = Math.max(0.0, Math.hypot(dx, dz) - SHOOTER_REACH_M);
+        double below = Math.max(0.0, SHOOTER_LOW_M - dy), above = Math.max(0.0, dy - SHOOTER_HIGH_M);
+        return Math.max(outside, Math.max(below, above));
+    }
+
+    // ── Melee resolved on the host (PLAN.md N2) ───────────────────────────────
+
+    /** Per sender+attacker: last accepted swingSeq. Per sender+attacker+slot: swing-rate budget. Cleared on disconnect. */
+    private final Map<String, Long> lastMeleeSeq = new HashMap<>();
+    private final Map<String, ShotValidationPolicy.RateBudget> meleeBudgets = new HashMap<>();
+
+    /**
+     * Client → host: one swing as its inputs. Validated like a shot ({@link MeleeValidationPolicy}: owner, an
+     * advancing counter, the weapon's swing rate, a chest inside the body volume, an aim near the replicated
+     * one, a step the weapon has), then the host runs the sweep on its copy ({@code MeleeItem.resolveServerSwing})
+     * and applies the damage. Counted {@code melee_accepted} / {@code melee_rejected_<verdict>}.
+     */
+    private void handleMeleeMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedMelee m = NetMessageCodec.decodeMelee(buf);
+        if (!isValidIdentifier(m.attackerCharacterId()) || !isFiniteVector3(m.origin()) || !isFiniteVector3(m.aim())
+                || m.aim().lengthSquared() < 1e-6 || m.weaponSlot() >= WEAPON_SLOT_COUNT) {
+            com.openworld.net.NetStats.increment("melee_invalid");
+            dropInvalid("melee", "MSG_MELEE", senderPeerId);
+            return;
+        }
+        if (!isServer()) return;
+        Character attacker = findCharacterById(m.attackerCharacterId());
+        if (attacker == null || attacker.characterInfo == null) {
+            com.openworld.net.NetStats.increment("melee_unknown_attacker");
+            return;
+        }
+        if (attacker.characterInfo.ownerPeerId != senderPeerId) {
+            com.openworld.net.NetStats.increment("melee_rejected_not_owner");
+            logOnce("melee-not-owner:" + senderPeerId, "NetworkManager: dropping MSG_MELEE from peer " + senderPeerId
+                    + " — does not own " + m.attackerCharacterId());
+            return;
+        }
+        WeaponController wc = findWeaponController(attacker);
+        com.openworld.weapon.MeleeItem melee = wc != null && wc.getWeaponItem(m.weaponSlot()) instanceof com.openworld.weapon.MeleeItem mi ? mi
+                : wc != null && wc.getCurrentWeaponItem() instanceof com.openworld.weapon.MeleeItem cur ? cur : null;
+        if (melee == null) {
+            com.openworld.net.NetStats.increment("melee_no_weapon");
+            logOnce("melee-no-weapon:" + m.attackerCharacterId(), "NetworkManager: dropping MSG_MELEE for "
+                    + m.attackerCharacterId() + " — host copy holds no melee weapon in slot " + m.weaponSlot());
+            return;
+        }
+        String key = senderPeerId + "|" + m.attackerCharacterId();
+        long last = lastMeleeSeq.getOrDefault(key, -1L);
+        boolean budgetOk = m.swingSeq() > last && meleeBudgets.computeIfAbsent(key + "|" + m.weaponSlot(),
+                k -> new ShotValidationPolicy.RateBudget()).tryConsume(nowMs() / 1000.0,
+                MeleeValidationPolicy.swingsPerSecond(melee.shortestStepSeconds()));
+        double aimAngle = 0.0;
+        Vector3 toAim = attacker.getAimTargetPosition().minus(m.origin());
+        if (toAim.lengthSquared() > 0.25) aimAngle = Math.toDegrees(toAim.normalized().angleTo(m.aim().normalized()));
+        MeleeValidationPolicy.Verdict v = MeleeValidationPolicy.evaluate(m.swingSeq(), last, budgetOk,
+                originOutsideBody(attacker, m.origin()), aimAngle, m.stepIndex(), melee.stepCount(),
+                MeleeValidationPolicy.Limits.DEFAULT);
+        if (v != MeleeValidationPolicy.Verdict.ACCEPT) {
+            com.openworld.net.NetStats.increment("melee_rejected_" + v.name().toLowerCase());
+            logOnce("melee-rejected:" + v + ":" + m.attackerCharacterId(), "NetworkManager: rejecting MSG_MELEE #"
+                    + m.swingSeq() + " from peer " + senderPeerId + " — " + v);
+            return;
+        }
+        lastMeleeSeq.put(key, m.swingSeq());
+        com.openworld.net.NetStats.increment("melee_accepted");
+        melee.resolveServerSwing(m.origin(), m.aim().normalized(), m.stepIndex(), m.swingSeq(), debugShots);
+    }
+
+    /** Client → host: a swing's inputs (N2). No-op on the host / single-player, where the swing resolves locally. */
+    public void sendMelee(String attackerCharacterId, int weaponSlot, long swingSeq, int stepIndex, Vector3 origin, Vector3 aim) {
+        if (!isNetworked() || isServer()) return;
+        com.openworld.net.NetStats.increment("melee_sent");
+        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeMelee(MSG_MELEE, attackerCharacterId, weaponSlot, swingSeq,
+                stepIndex, origin, aim));
+    }
+
+    // ── Projectiles flown by the host (PLAN.md N4) ────────────────────────────
+
+    /** Per sender+attacker: last accepted launchSeq. Per sender+attacker+slot: fire budget. Cleared on disconnect. */
+    private final Map<String, Long> lastLaunchSeq = new HashMap<>();
+    private final Map<String, ShotValidationPolicy.RateBudget> launchBudgets = new HashMap<>();
+
+    /**
+     * Client → host: a rocket or grenade as its inputs. Judged by {@link ShotValidationPolicy} exactly like a
+     * shot with no cone (owner, an advancing counter, the weapon's fire-rate budget, an origin inside the body
+     * volume, an aim near the replicated one), then the host flies the ONLY projectile that damages
+     * ({@code launchFrom}); its detonation reaches every peer as MSG_DETONATION. Counted
+     * {@code launch_accepted} / {@code launch_rejected_<verdict>}.
+     */
+    private void handleLaunchMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedLaunch l = NetMessageCodec.decodeLaunch(buf);
+        if (!isValidIdentifier(l.attackerCharacterId()) || !isFiniteVector3(l.origin()) || !isFiniteVector3(l.aim())
+                || l.aim().lengthSquared() < 1e-6 || l.weaponSlot() >= WEAPON_SLOT_COUNT) {
+            com.openworld.net.NetStats.increment("launch_invalid");
+            dropInvalid("launch", "MSG_LAUNCH", senderPeerId);
+            return;
+        }
+        if (!isServer()) return;
+        Character attacker = findCharacterById(l.attackerCharacterId());
+        if (attacker == null || attacker.characterInfo == null) {
+            com.openworld.net.NetStats.increment("launch_unknown_attacker");
+            return;
+        }
+        if (attacker.characterInfo.ownerPeerId != senderPeerId) {
+            com.openworld.net.NetStats.increment("launch_rejected_not_owner");
+            logOnce("launch-not-owner:" + senderPeerId, "NetworkManager: dropping MSG_LAUNCH from peer " + senderPeerId
+                    + " — does not own " + l.attackerCharacterId());
+            return;
+        }
+        WeaponController wc = findWeaponController(attacker);
+        com.openworld.weapon.WeaponItem w = wc != null ? wc.getWeaponItem(l.weaponSlot()) : null;
+        if (!(w instanceof com.openworld.weapon.ProjectileItem) && !(w instanceof com.openworld.weapon.ThrowableItem)) {
+            w = wc != null ? wc.getCurrentWeaponItem() : null;
+        }
+        if (!(w instanceof com.openworld.weapon.ProjectileItem) && !(w instanceof com.openworld.weapon.ThrowableItem)) {
+            com.openworld.net.NetStats.increment("launch_no_launcher");
+            logOnce("launch-no-launcher:" + l.attackerCharacterId(), "NetworkManager: dropping MSG_LAUNCH for "
+                    + l.attackerCharacterId() + " — host copy holds no launcher in slot " + l.weaponSlot());
+            return;
+        }
+        String key = senderPeerId + "|" + l.attackerCharacterId();
+        long last = lastLaunchSeq.getOrDefault(key, -1L);
+        ShotValidationPolicy.Verdict v;
+        if (l.launchSeq() <= last) {
+            v = ShotValidationPolicy.Verdict.STALE_SEQ;
+        } else {
+            boolean budgetOk = launchBudgets.computeIfAbsent(key + "|" + l.weaponSlot(), k -> new ShotValidationPolicy.RateBudget())
+                    .tryConsume(nowMs() / 1000.0, Math.max(0.2, w.getFireRate()));
+            double aimAngle = 0.0;
+            Vector3 toAim = attacker.getAimTargetPosition().minus(l.origin());
+            if (toAim.lengthSquared() > 0.25) aimAngle = Math.toDegrees(toAim.normalized().angleTo(l.aim().normalized()));
+            v = ShotValidationPolicy.evaluate(l.launchSeq(), last, budgetOk, originOutsideBody(attacker, l.origin()),
+                    aimAngle, 0.0, 0.0, ShotValidationPolicy.Limits.DEFAULT);
+        }
+        if (v != ShotValidationPolicy.Verdict.ACCEPT) {
+            com.openworld.net.NetStats.increment("launch_rejected_" + v.name().toLowerCase());
+            logOnce("launch-rejected:" + v + ":" + l.attackerCharacterId(), "NetworkManager: rejecting MSG_LAUNCH #"
+                    + l.launchSeq() + " from peer " + senderPeerId + " — " + v);
+            return;
+        }
+        lastLaunchSeq.put(key, l.launchSeq());
+        com.openworld.net.NetStats.increment("launch_accepted");
+        if (w instanceof com.openworld.weapon.ProjectileItem p) p.launchFrom(l.origin(), l.aim());
+        else if (w instanceof com.openworld.weapon.ThrowableItem t) t.launchFrom(l.origin(), l.aim());
+    }
+
+    /** Set by the N4 check's control observer: host detonations are ignored, so every copy takes the timeout path. */
+    public boolean debugDropDetonations = false;
+
+    /** Client → host: a launch's inputs (N4). No-op on the host / single-player, where the launch is authoritative. */
+    public void sendLaunch(String attackerCharacterId, int weaponSlot, long launchSeq, Vector3 origin, Vector3 aim) {
+        if (!isNetworked() || isServer()) return;
+        com.openworld.net.NetStats.increment("launch_sent");
+        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeLaunch(MSG_LAUNCH, attackerCharacterId, weaponSlot, launchSeq, origin, aim));
+    }
+
+    /** Host → all: a host projectile exploded at {@code point} (N4). */
+    public void broadcastDetonation(String attackerCharacterId, Vector3 point) {
+        if (!isNetworked() || !isServer() || attackerCharacterId == null || attackerCharacterId.isEmpty()) return;
+        com.openworld.net.NetStats.increment("detonation_broadcast");
+        broadcastMessage(NetMessageCodec.encodeDetonation(MSG_DETONATION, attackerCharacterId, point), null);
+    }
+
+    /**
+     * Host → client: a host projectile exploded. The oldest cosmetic copy this peer is flying for that attacker
+     * explodes at the host's point ({@code ProjectileLedger}); with none (never spawned, or it already timed out)
+     * the explosion is drawn at the point anyway. A client-sent one is dropped.
+     */
+    private void handleDetonationMessage(int senderPeerId, StreamPeerBuffer buf) {
+        NetMessageCodec.DecodedDetonation d = NetMessageCodec.decodeDetonation(buf);
+        if (!isValidIdentifier(d.attackerCharacterId()) || !isFiniteVector3(d.point())) {
+            dropInvalid("detonation", "MSG_DETONATION", senderPeerId);
+            return;
+        }
+        if (isServer()) return;
+        if (debugDropDetonations) { com.openworld.net.NetStats.increment("detonation_dropped_debug"); return; }
+        com.openworld.net.NetStats.increment("detonation_received");
+        com.openworld.weapon.CosmeticProjectile copy = com.openworld.weapon.ProjectileLedger.takeOldest(d.attackerCharacterId());
+        if (copy != null) {
+            copy.snapDetonate(d.point());
+            return;
+        }
+        com.openworld.net.NetStats.increment("detonation_no_local_copy");
+        if (getTree().getFirstNodeInGroup("explosion_manager") instanceof com.openworld.world.manager.ExplosionManager mgr) {
+            mgr.spawnExplosion(d.point());
+        }
+    }
+
+    private void forgetLaunchState(int peerId) {
+        String prefix = peerId + "|";
+        lastLaunchSeq.keySet().removeIf(k -> k.startsWith(prefix));
+        launchBudgets.keySet().removeIf(k -> k.startsWith(prefix));
+    }
+
+    private void forgetMeleeState(int peerId) {
+        String prefix = peerId + "|";
+        lastMeleeSeq.keySet().removeIf(k -> k.startsWith(prefix));
+        meleeBudgets.keySet().removeIf(k -> k.startsWith(prefix));
     }
 
     private void forgetShotState(int peerId) {
@@ -1884,6 +2121,7 @@ public class NetworkManager extends Node {
 
     private boolean isValidDamageRequest(NetMessageCodec.DecodedDamageRequest req) {
         return isValidIdentifier(req.victimCharacterId())
+                && isValidIdentifier(req.attackerCharacterId())
                 && isFiniteDouble(req.finalDamage()) && req.finalDamage() >= 0
                 && isBoundedString(req.weaponName())
                 && isBoundedString(req.attackerName())
@@ -2049,6 +2287,7 @@ public class NetworkManager extends Node {
         loggedOnceKeys.clear();   // a fresh session may legitimately re-hit one-shot diagnostics
         lastAcceptedUpstream.clear();
         lastOwnedStateSendMsById.clear();
+        com.openworld.weapon.ProjectileLedger.clear();   // N4: cosmetic copies belong to the session
     }
 
     /**
@@ -2156,11 +2395,14 @@ public class NetworkManager extends Node {
     // names/signatures Health/WeaponController call are unchanged, only the transport is.
 
     /** Client → authority: encodes + relays a resolved hit to the server (only the server can be addressed directly — star topology). Called by Health.relayDamageToAuthority. */
-    public void requestDamage(String victimCharacterId, float finalDamage, boolean headshot,
-            String weaponName, String attackerName, String attackerFaction) {
+    public void requestDamage(String victimCharacterId, String attackerCharacterId, DamageRequestPolicy.Kind kind,
+            float finalDamage, boolean headshot, String weaponName, String attackerName, String attackerFaction) {
+        com.openworld.net.NetStats.increment("damage_request_sent");
         sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeDamageRequest(MSG_DAMAGE_REQUEST,
-                victimCharacterId, finalDamage, headshot, weaponName, attackerName, attackerFaction));
+                victimCharacterId, attackerCharacterId, kind.ordinal(), finalDamage, headshot, weaponName,
+                attackerName, attackerFaction));
     }
+
 
     /**
      * Authority → all: encodes + broadcasts the momentary hit-reaction cue, plus the attacker's world

@@ -45,7 +45,7 @@ _PROFILE_FIX = (0.0, 0.0, 3.141592653589793)
 #: old sockets, and reusing it silently drops whatever the new stack tries to feed it -- which
 #: reads as "my change had no effect" rather than as an error. Stamped on each built group and
 #: checked on reuse.
-GROUP_VERSION = 3
+GROUP_VERSION = 5
 
 
 def _new_group(name):
@@ -238,9 +238,24 @@ def make_deck_group():
     L(mesh, ext.inputs["Mesh"])
     L(down.outputs["Vector"], ext.inputs["Offset"])
     L(thick, ext.inputs["Offset Scale"])
+    # A CLOSED PRISM, not a moved face (B10.7, measured against the pure-Python sweep `point_mesh`).
+    # `Extrude Mesh` MOVES the faces it extrudes, and with `Individual` at its default every face got its
+    # own four walls: a kerb swept at its top height ended with its only horizontal face at ROAD level (a
+    # hollow kerb -- faces at 10.46 m, walls to 10.61 m on DebugRoads), a deck's only horizontal face was
+    # its soffit still facing UP (a bridge had no underside from below), and every segment carried hidden
+    # internal walls. So: one region (walls on its boundary only), the moved copy flipped to face DOWN
+    # and OUT, and the swept band joined back on as the top.
+    ext.inputs["Individual"].default_value = False
+    # The WHOLE extruded copy is flipped, walls included: extruding against the band's up normal winds
+    # the side walls inward too (signed volume of a kerb -1.8 m3 where it is +2.0).
+    flip = ng.nodes.new("GeometryNodeFlipFaces"); flip.location = (250, -120)
+    L(ext.outputs["Mesh"], flip.inputs["Mesh"])
+    join = ng.nodes.new("GeometryNodeJoinGeometry"); join.location = (250, 60)
+    L(mesh, join.inputs["Geometry"])
+    L(flip.outputs["Mesh"], join.inputs["Geometry"])
 
-    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (320, 0)
-    L(ext.outputs["Mesh"], setm.inputs["Geometry"])
+    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (420, 0)
+    L(join.outputs["Geometry"], setm.inputs["Geometry"])
     L(nin.outputs["Material"], setm.inputs["Material"])
     L(setm.outputs["Geometry"], nout.inputs["Geometry"])
     return ng

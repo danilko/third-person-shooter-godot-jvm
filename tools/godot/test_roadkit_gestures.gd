@@ -35,7 +35,9 @@ func _initialize() -> void:
 	check("extend from the HEAD prepends", h["ok"] and main.points()[0] == h["node"] and main.points()[1] == head_before, h["message"])
 	var interior := G.extend_road(main.points()[4])
 	check("extend refuses an interior point", not interior["ok"], interior["message"])
-	check("names follow the chain", main.points()[0].name == "main_p000" and main.points()[-1].name == "main_p%03d" % (main.points().size() - 1))
+	# `_end`: both ends of a road that joins nothing yet (RoadKitPoint.point_name's tag).
+	check("names follow the chain", main.points()[0].name == "main_p000_end" and main.points()[1].name == "main_p001" \
+			and main.points()[-1].name == "main_p%03d_end" % (main.points().size() - 1), "%s .. %s" % [main.points()[0].name, main.points()[-1].name])
 
 	r = G.new_road(net, "cross", Vector3(0, 0, 200), Vector3.FORWARD)
 	var cross: Node = r["node"]

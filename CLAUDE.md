@@ -1551,6 +1551,92 @@ FIRST peer's characterId — three bodies, one identity, and a client that could
 whose id a CONNECTED session already holds `id#peerId` (counted `identify_duplicate_player_id`); a
 disconnected session still matches first, so a real rejoin is unchanged.
 - Melee (`MeleeItem`) runs the SAME two legs — see "W16 — MELEE IS A SWEPT REACH FROM THE CHEST".
+
+### Melee resolved on the host; the damage-request hole closed (PLAN.md N2, 2026-09-14)
+
+Before N2 a client resolved its own swing, and `Health.takeDamage` relayed the FINAL number in
+`MSG_DAMAGE_REQUEST`, naming nobody. The host checked only that the fields were well-formed, so one
+forged packet could kill anyone.
+- **`MSG_MELEE` (tag 27, reliable channel 1 beside `MSG_SHOT`)**: `attackerId, slot, swingSeq u32 (the
+  weapon controller's shot counter), stepIndex, origin (chest), aim`, sent by the owner client when the
+  swing's ACTIVE window opens. The host (`handleMeleeMessage` → engine-free `net.MeleeValidationPolicy`)
+  refuses a non-owner, a counter that does not advance, a step the weapon lacks, a burst past the swing
+  budget (a `RateBudget` refilled at one per the weapon's SHORTEST step), a chest outside the body volume
+  (`originOutsideBody`, now shared with shots) and an aim more than 35° off the replicated one. It counts
+  `melee_accepted` / `melee_rejected_<verdict>`, then `MeleeItem.resolveServerSwing` runs the SAME sweep
+  (`sweepFrom`, the one owner of the capsule / group-by-target / LoS-from-chest logic) over the same active
+  window. The chest rides the host copy's body as it moves, and damage is authoritative. The client's own
+  sweep only PREDICTS: impacts, hitstop, kick, no damage (`melee_predicted_hits`).
+- **`MSG_DAMAGE_REQUEST` names the responsible entity and a kind**, judged by `net.DamageRequestPolicy`.
+  SELF (a fall, drowning, the sender's own vehicle) must be to an entity the sender owns and name it as the
+  attacker. AREA (the sender's own explosive, until N4) must name an attacker the sender owns and draws on a
+  per-sender budget (burst 12, 6/s). Damage above 500 is refused, an empty attacker id is malformed, and
+  every refusal is counted `damage_request_rejected_<verdict>`. `Health.relayDamageToAuthority` picks the
+  kind from ownership of the victim, and `NetworkManager.localAttackerId` supplies the sender's player.
+- **An input-buffer bug found on the way**, pre-existing and not N2's: `onWeaponFire` runs every frame fire is
+  HELD, and a blocked frame buffered itself as a new tap. So one 2-frame tap on the fist played jab AND cross
+  whenever the swing was shorter than the 0.2 s buffer, and `probe_melee` had been failing 4 checks
+  (reproduced on HEAD's Java). `WeaponController.rememberBlockedPress` now buffers only a press that STARTS
+  while the weapon is busy (a physics-frame edge); the mid-recovery tap check still passes.
+- Gates: `tools/net/run_net_melee_test.sh` (`debug/NetMeleeTest.tscn`, `NetMeleeTestHost`), 15/15 in 22 s.
+  A client knife taps 6 times through `Input`: 6 `MSG_MELEE`, 6 accepted, 6 resolved hits = 6 predicted,
+  target damage exactly 6 × 30 (stab 40 × 0.75). Each forgery is refused for its own reason: an attacker it
+  does not own, "self" damage on someone else, unattributed, 100 000 damage, a replayed swing, a swing from
+  10 m, a swing for a body it does not own. One honest self-damage request is accepted. `probe_melee` PASS,
+  `run_net_shot_test.sh` 18/18, `probe_self_hit` PASS, unit tests `MeleeValidationPolicyTest` /
+  `DamageRequestPolicyTest`. Test trap: each stab's knockback pushes the target 0.3 m back (1.10 → 1.93 m
+  over three hits, out of a knife's reach), so a stand that does not follow its target reads as half the
+  swings missing on BOTH sides.
+
+**A remote fire cue per shot, not per changed counter (PLAN.md N3, 2026-09-14).** A puppet played ONE cue
+whenever the replicated u8 `fireSeq` changed, so a dropped snapshot — or the host re-broadcasting two
+client snapshots in one interval — collapsed a full-auto burst into one sound and tracer. The counter
+already says how many shots happened: `net.FireCuePolicy.cuesFor(haveLast, last, now, cap)` is the
+wrapping delta, capped at `MAX_CUES` (4 — past that a gap is a stall or a rejoin, not a burst), and 0 on the
+first snapshot. `NetworkController` and `VehicleNetworkController` hand it to
+`WeaponController.playRemoteFireCues`, which plays the first cue now and the rest at the held weapon's fire
+interval (kept between two frames and 0.12 s, in `_process`) and counts `fire_cue_burst_replayed`. A melee
+weapon replays only its latest swing: a swing restarts the one before it, and the step on the snapshot is
+the latest. The draw-window gate inside `playRemoteFireCue` applies to every replayed cue. Gates:
+`FireCuePolicyTest` (one shot, a collapsed burst, wrap at 255, cap, first snapshot, the melee cap of 1);
+`probe_melee`'s puppet replay still passes; `run_net_shot_test.sh` still one fallback per pull.
+
+**Rockets and grenades are flown by the host; clients relay no damage but their own (PLAN.md N4,
+2026-09-14).** A client simulated its own rocket or grenade and relayed the blast's damage per victim, while
+every other peer flew a cosmetic copy from the fire cue that could explode somewhere else. The blast players
+saw and the damage applied could disagree.
+- **`MSG_LAUNCH` (tag 28, channel 1)**: `attackerId, slot, launchSeq, origin, aim` (a grenade's aim BEFORE
+  its arc). The owner client sends it and flies a COSMETIC predicted copy. The host judges it with
+  `ShotValidationPolicy` at a cone of 0 (owner, advancing counter, the weapon's fire-rate budget, origin in the
+  body volume, aim within 35°, a launcher in the slot) and flies the only projectile that damages
+  (`ProjectileItem.launchFrom` / `ThrowableItem.launchFrom`). Counted `launch_accepted` /
+  `launch_rejected_<verdict>`. **On the host a puppet's fire cue no longer spawns a copy**
+  (`launch_cue_host_skipped`), because its real projectile arrives as the message.
+- **`MSG_DETONATION` (tag 29, reliable channel 0)**: `attackerId, point`, broadcast when a host projectile
+  explodes. A peer's cosmetic copies are filed per attacker, oldest first (`weapon.ProjectileLedger`;
+  launches and detonations of one attacker arrive in order), and the host's k-th detonation explodes the
+  k-th live copy AT THE HOST'S POINT (`CosmeticProjectile.snapDetonate`). A copy that reaches its own
+  detonation first hides and waits 0.5 s for that point, then explodes where it is
+  (`detonation_local_timeout`). A detonation with no copy draws the explosion at the point. The ledger is
+  cleared with the session.
+- **Damage requests**: `DamageRequestPolicy.AREA_ALLOWED = false` (`KIND_REFUSED`), and
+  `Health.relayDamageToAuthority` sends only SELF damage (fall, drowning, the peer's own vehicle). Damage
+  predicted on an entity the peer does not own is never relayed (`damage_relay_suppressed`).
+  `NetworkManager.localAttackerId` is gone.
+- **A grenade could never be thrown** (found by this check, single-player included). W21's `pointsAtAim` gate
+  compares the HELD ITEM's model forward with the aim, which is a barrel's direction and nothing a grenade in
+  the hand has. `ThrowableItem.launchesTowardAim()` is now false: a throw's direction is body → aim point, it
+  leaves in front of the chest and ignores its thrower, so the gate's self-hit reason does not apply.
+- Gate `tools/net/run_net_launch_test.sh` (`debug/NetLaunchTest.tscn`, `NetLaunchTestHost`; host, client, an
+  observer and a CONTROL observer that drops detonations), 22/22. The client fires 3 rockets and throws 2
+  grenades through `Input`: 9 launches sent (5 + 4 forged), 5 accepted, 5 host cue copies skipped, 5
+  detonations broadcast, one explosion drawn per blast on host, client and observer, each copy snapped to the
+  host's point (prediction 0.00–0.18 m off), no damage from any predicted blast. Refused forgeries: replayed,
+  from 10 m, for a body the sender does not own, aimed backwards. The control observer times out and explodes
+  every copy exactly once. `run_net_melee_test.sh` 16/16 (its AREA forgery now `KIND_REFUSED`),
+  `run_net_shot_test.sh` 18/18, unit tests green. Harness trap: switching weapon on the frame after a press
+  drops the press W21's aim gate is holding for one frame, so a stand that switches straight after its last
+  rocket loses that rocket.
   `resolveSightPoint` and `trace` live on `WeaponItem` for that reason: a firearm and a melee weapon
   must not come to disagree about where an attack is aimed or what may block it.
 
@@ -3572,6 +3658,257 @@ viewport's click-select (B10.3).
   it threw away an exact hit and read as a 4.8 m parity failure. Compare with `if d < best`.
 - Gate `test_roadkit_draft.gd` 13/13, in `check_roads.sh`; the editor self-test now also refreshes a
   scratch copy of the record and asserts the draft wears `M_Asphalt` inside the real editor.
+
+**Points are editable the moment a scene opens, and the record is their ONLY saved copy (B10.0,
+2026-09-14).** The user could not hand-fix DebugRoads' junctions: a saved scene held only the
+`RoadKitNetwork` node, its points appeared only after the dock's Load Record (which nothing prompted),
+Preview Pieces showed a baked mesh that looked editable and was not, and a point had no click target in
+the viewport. Worse, **the committed `DebugRoads.roads.json` had been overwritten by a 2-point `road_0`**
+— `New Road` pressed on that unloaded view, which the empty-network guard did not catch because the
+network was no longer empty. Restored from `f8b7859`. What changed, each asserted in the editor self-test:
+- **`RoadKitNetwork.needs_load`**: an editor-instanced network with no roads and a record with points
+  (set in `_ready`, editor only — a `--script` tool or the game builds its own). `save_record` refuses it
+  like an empty network; the plugin's `_adopt` loads it on `scene_changed` and before any dock action.
+  Loading is not an undo action, so the scene is not marked modified; the record stays byte-identical.
+- **The scene never stores a road.** On `NOTIFICATION_EDITOR_PRE_SAVE` the network writes its record
+  (only if the text changed) and clears its roads' and points' owners — `PackedScene.pack` skips an
+  unowned node's whole subtree, measured, even an owned child under it — and restores them on
+  `POST_SAVE` (and deferred, in case a failed save never sends it). So a scene save IS a record save, and
+  there is no second copy to disagree with.
+- **`from_record` reconciles instead of rebuilding**: a road keeps its node by name and a point by uid
+  (moved between roads, re-ordered, renamed through temporary names). Selection and the editor's own undo
+  entries (a Move, an inspector edit) keep pointing at live nodes across gestures and undo.
+- **Clickable points.** `road_kit_gizmo.gd` adds collision segments (a 1.5 m cross + post and the travel
+  arrow); junction mouths are drawn yellow, ramps cyan, termini red. **Preview piece internals are
+  un-owned now**: owned by their piece root, each got a gizmo, and a click on the tarmac under a point
+  resolved to its nearest editable ancestor — the SCENE ROOT. Control: no collision → the click selects
+  the Terrain3D `Surface` mesh.
+- A selected point is labelled in the viewport (road, chain index, role, uid, MANUAL / setback locked).
+- **Edits refresh themselves.** Points and roads `set_notify_transform` in the editor and report
+  transform and `rk_*` changes to the network (`edited`); the plugin debounces 0.25 s (`SETTLE_SECONDS`)
+  and refreshes only when `record_text()` differs from the last refresh (so its own re-facing cannot
+  loop). While the mouse is held it only redraws.
+- **On release a sideways-moved point is DRAPED**: one that sat at grade (height − ground within
+  `DRAPE_BAND` −0.5..1.5 m) keeps that height above the NATURAL ground at its new place; a deck or pier
+  station keeps the artist's height. A moved junction mouth gets `setback_locked`. One undo step, and
+  none at all when nothing changed. **An undo or redo is not a drag**: `version_changed` with a history
+  that did not grow suppresses the drape, or undoing a Move would re-drape, commit, and destroy the redo
+  history (measured: history 3 → 1 before the guard).
+- `_get_property_list` returns `Array[Dictionary]` (the editor logged the compat ERROR on every open).
+- Gate: the editor self-test (`plugin.gd _selftest`, `check_roads.sh` greps `RESULT PASS`) edits and
+  saves the REAL DebugWorld scene and record and restores both byte for byte. It picks the at-grade mouth
+  and move crossing the most ground (loop_p000, 3.17 m), clicks it through the 3D viewport's input
+  surface after framing it with F, and asserts: 21/21 points loaded, all owned, scene unmodified, record
+  byte-identical, click selects the point, drape to 0.01 m, setback locked, save writes no point into the
+  `.tscn` and exactly `pos`/`setback_locked`/`fillet_radius` of that one point into the record, Ctrl+Z ×3
+  commits nothing and returns the point to 0.0000 m with redo intact. Controls (no collision, no drape, no
+  owner strip) fail 5 checks. Two self-test traps: undo through `get_history_undo_redo(id).undo()`
+  bypasses the manager ("Inconsistent redo history", no `version_changed`) — push Ctrl+Z instead; and a
+  point created by `add_child` gets its owner afterwards, so it needs `update_gizmos()` for the 3D editor
+  to request its gizmo.
+
+**A JUNCTION'S KERB FOLLOWS THE VEHICLE, AND A CAR CROSSING A PAD RIDES ITS SURFACE (B10.0b,
+2026-09-14).** B10.1's two findings, both fixed in the rules rather than by hand, measured on DebugRoads
+(built pieces, `test_roadkit_draft.gd`): lane samples off paving **85 → 0**, run-end vertices off the
+draft **0.328 → 0.004 m**; RoadKitSample 20 → 0.
+- **Swept-path sizing: `point_solve.contain_turns`.** The pad ring was sized by `fillet_radius` alone and
+  `bezier_through` owned the turn shape, so junction 2's `east` — bending ~95° through its own crossing,
+  mouths 40 m out — sent every movement between its two mouths across the unpaved corner notch, 7–23 m
+  off the tarmac with a green gate. Each ring corner's radius now grows (×1.25 + 1 m per pass) until every
+  legal turn path is `TURN_CLEARANCE` (1.0 m, half the car's hull) inside the ring; the kerb corners take
+  the same solved radii (`junction_corners(ring=)`), so pad and kerb agree. Growth is monotonic, so it
+  stops when nothing escapes or the ring stops changing. An escaping sample grows the corner whose KERB
+  EDGE it is nearest to (`_round_ring(owners=)`), never the nearest corner VERTEX — a corner between arms
+  40° apart has its vertex on the far side of the pad, 53 m from the notch it rounds, and growing by
+  vertex distance grew the wrong (already clamped) corner and stopped. A corner may now take 98% of an
+  edge that runs to a CAP point (`CAP_EDGE_REACH`); half an edge is kept only between two rounded corners.
+  A path's first and last samples lie ON its cap, so a point within 5 cm of a cap counts as inside —
+  without that, boundary parity grew three corners for nothing.
+- **A turn is driven as a kerb return is built: `point_solve.turn_shape`** — straight along the longer
+  approach, the largest circular arc through the point where the two lane lines meet (tangent length =
+  the shorter leg), straight out; a movement turning < `TURN_ARC_MIN_DEG` (20°) or whose lane lines do not
+  meet ahead of both mouths (straight-through, lane shift) stays a cubic, now with circular-arc handles
+  (`arc_handle`, chord/3 only when straight). This is what makes a corner containable at all: the kerb arc
+  sits concentric inside it. A single cubic between the mouths could not be contained whatever its handles
+  (one leg 13 m longer than the other), and chord/3 handles bowed a sharp turn toward its chord, into the
+  corner. Two sign errors cost a round each and are worth a unit check next time: the fillet radius is
+  `t · tan(interior / 2)` (dividing drew a zig-zag), and `u` from `d0·s + d1·u = p1 − p0` is Cramer over
+  `cross(d0, d1)` (over −cross the arc branch only ran in the wrong cases).
+- **A turn path's HEIGHT is the pad's: `turn_path` reads each sample off the pad's own triangles
+  (`pad_z`).** The cubic's Z ran straight between mouths while the pad is IDW-from-mouths, triangulated;
+  with 1.1 m between junction 1's mouths they parted by up to 0.81 m. `point_export` now builds each
+  connector from the solved pad and fits its `curve` with `curve_points` (control points at the arc's
+  breaks, and wherever else 0.05 m needs one) — `JunctionSolve.turns`, the export and the preview share it.
+- **The pad meets its stop line at the road's height: `_idw_z` weights by distance to each mouth's CAP
+  SEGMENT (`Mouth.cap`)**, not its centre point. A cap corner 9 m out took 0.31 m of the neighbours'
+  heights and the pad stepped against the road along `link`'s mouth. A stand-in with only `.pos`
+  (`seed_district_roads`) keeps the point rule; the weights are geometry either way, so `_idw_z` stays
+  linear in the mouth heights (the pad-lift property `W20` relies on).
+- **A run's END is cut on the mouth axis in the BUILD too: `point_build.END_LEAD`.** `Curve to Mesh` (and
+  `GN_PointSpine`'s stored lateral) take a poly curve's end frame from its last CHORD, while the solver and
+  the pad ring use `run_end_axes`; `carrier_points` inserts a vertex 2 cm inside each open end along that
+  end sample's own tangent, with the end's values.
+- **What is left is layout, and the gate names it: `turn_off_pad` (WARN, `point_solve.turns_off_pad`)**,
+  on the mouth nearest the worst sample other than the movement's own two. DebugRoads has one: `link →
+  east` straight crosses the end of `spur`'s carriageway, 2.22 m past the pad, because the `spur` mouth
+  (2-point road) faces 79° off its pad centre. Pulling it out 6/10/15 m along its road does not clear it
+  (2.00/2.00/1.21 m) — the remedy is turning the mouth, a hand edit.
+- Self-tests (`point_solve.py`, 20): turn_shape's arc/line/cubic cases; a 3-arm pad bending 90° through
+  30 m mouths contains every movement, with the CONTROL `solve_junction(contain=False)` failing; the pad
+  meets every cap at the road height; every turn sample rides `pad_z`. `test_roadkit_draft.gd` asserts
+  both former findings.
+
+**The intersection tweak is handles on the point (B10.4, 2026-09-14).** `road_kit_gizmo.gd` draws and
+`road_kit_handles.gd` (a `RefCounted` — an `EditorNode3DGizmoPlugin` "can only be instantiated by
+editor", so logic kept in the gizmo is untestable headless) owns what each does, through pure
+`road_kit_gestures.gd` operations: every point has two LANE-COUNT handles at the outer edge of each
+carriageway (`lane_edge_offset` / `lanes_for_offset`; FWD is `+s`, the point's local −X), and a junction
+mouth adds a SETBACK handle (`slide_along_axis`: along the mouth's own flattened axis, locks the setback),
+a FILLET handle (the radius the pad starts from — `contain_turns` may grow it) and the whole junction's
+MOVE and ROTATE handles at the mouths' centroid (`junction_translate` / `junction_rotate`). There is no
+junction node to parent the mouths under, so the kit's "turning a crossing promotes nothing" is kept by
+rotating each mouth's `auto_facing` baseline with it; a hand turn of one mouth still promotes (the
+control). Drags project onto the horizontal plane through the point or pad centre, and each is ONE
+record-restoring undo step (`Handles.end` → `{before, after}`); cancel restores the record exactly. Gates:
+`test_roadkit_handles.gd` 13/13 (rotate promotes none, move touches only the clique, setback 5e-6 m off
+its axis, lane counts ±half a lane, fillet, a rotate drag through `drag_to` passes the kit's gate, cancel
+restores); the editor self-test drags the ROTATE handle through the real gizmo plugin with the viewport's
+camera, checks all 3 mouths turned and the action is "Road Kit: rotate junction", and Ctrl+Z restores it.
+Self-test trap: after the undo checks there is redo history, which a new commit truncates — identify the
+action by `get_current_action_name()`, never by history count.
+
+**A viewport tool mode, road-generator style (B10.3, 2026-09-14).** A toolbar in
+`CONTAINER_SPATIAL_EDITOR_MENU` (Off / Select / Draw Road / Insert / Delete / Connect) and
+`set_input_event_forwarding_always_enabled()`, so a click anywhere reaches `plugin._forward_3d_gui_input`
+— not only while a road node is selected. `road_kit_tool.gd` (a `RefCounted`, so testable) owns what a
+click does, over the existing gestures: picking is screen-space (a point within 14 px, a centreline within
+12 px of the overlay's last `centrelines` runs, which now carry each run's `uids` so a click names its
+span); DRAW lands each station on Terrain3D's surface in plan (`get_intersection(..., gpu_mode=false)`,
+miss = `z > 3.4e38` or NaN) at the NATURAL ground's height + 0.10 m drape (`road_kit_ground.natural_height`,
+so a stamped terrain cannot lift a new road onto the old one), else on the network's y = 0 plane; CONNECT
+joins two ends of one road by SEGMENT, makes or grows a junction across roads, and hands off to
+`roadkit_cli.py ramp` (the solver places a ramp) when one pick is an interior station with aux lanes. The
+plugin wraps every click that changes the network in one record-restoring undo step named after the mode,
+and Esc / right-click finishes an open sequence. Gates: `test_roadkit_tool.gd` 12/12 (a real Camera3D over
+the sample network: pick, select road, Alt-select junction, insert at the click with the gate still 0
+errors, delete, draw 3 stations at the clicks, Esc then a NEW road, connect SEGMENT and junction, and on
+DebugWorld a drawn station at natural ground + drape rather than the stamped surface) and the editor
+self-test sends a left click through `_forward_3d_gui_input` in Insert mode and undoes it. Two traps: in a
+`SceneTree._initialize` a node added to `root` is not `is_inside_tree()` until the first `await
+process_frame` (every `global_position` errors); and a GDScript parse error in `plugin.gd` makes the editor
+self-test HANG to its timeout — always `--check-only` the plugin first.
+
+**Dragging a road is a move, baked on release (B10.5, 2026-09-14).** A `RoadKitRoad` node dragged with the
+stock gizmo already moves its points (a point's record position composes its road's transform), but it
+left the road node carrying an offset every later edit had to compose. On release (`_drape_moved`) each
+road with a non-identity transform is baked into its points (`Gestures.bake_road_transform`: road back at
+identity, every network transform unchanged, the facing baseline turned with it so nothing is promoted to
+MANUAL), and — dock option "Dragging a road moves its junctions", on by default — every OTHER road's mouth
+at its junctions moves by that junction's mean mouth displacement (`move_junction_partners`), so a pad
+travels with the road instead of stretching across the gap. The bake, the partners and the drape are ONE
+undo step ("Road Kit: Move Road") back to the last refreshed record; an undo/redo is never baked (the
+road's transform may then keep an offset until the next edit, which is harmless — the record composes it).
+Gates: `test_roadkit_handles.gd` (bake keeps every network transform, a 10° turn promotes none, partners
+follow, bystanders do not) and the editor self-test drags road `east` with a real Move action (4 partner
+mouths follow, one step, Ctrl+Z restores the record).
+
+**Build rebuilds only the zones whose output changed (B10.6, 2026-09-14).** Which zones an edit touched is
+NOT a record diff — the whole network is solved for every piece (a kerb opens against a neighbour's asphalt,
+a pad corner grows for another road's turn, a gore goes with its ramp's zone). `point_digest.piece_digests`
+asks the OUTPUT instead: per piece, a SHA-1 of what it emits from the same solve and cut the build runs —
+its runs' carrier samples and values, edge runs, marking runs, pads (ring, fan, corners), gores, its own
+`split_doc` lanekit and its roads' authored fields — rounded to 0.1 mm, salted with the builder's source
+(`point_build`, `point_nodes`, `point_solve`, `point_edges`, `kit_common`, …) and `road_kit.blend`'s size
+and mtime, so a builder change dirties everything. `roadkit_cli.py pieces` reports a `digest` per piece
+(now with `--ground`, the same ground the mesh build uses); `build_roads_piece.sh` with `DIRTY_ONLY=1`
+skips a piece whose digest equals the one in `<stem>.build.json` and whose scene exists, runs Blender only
+on the dirty ones (`roadkit_build_mesh.py --only`) — and not at all when none is — and writes a piece's
+digest into the manifest only after it has BAKED, so a failed bake stays dirty. The manifest belongs to the
+committed pieces; commit it with them. Dock: **Build Piece (changed zones)** is the default, **Rebuild All
+Pieces** forces it, and a build that rebuilt something on a stamped network says to press Stamp Terrain.
+Measured on DebugRoads (2 zones): cold 40.7 s, nothing changed **5.2 s** (no Blender), one interior station
+of `east` moved **23.4 s** — `debug_b` rebuilt, `debug_a` reported clean. Gate: `point_digest.py`
+self-test (in `check_roads.sh`): re-solving reproduces every digest, a station moved in one zone of the
+testbed dirties that piece only, moving it back restores the digests.
+
+**Does the road mesh need Blender? Measured, then decided (B10.7, 2026-09-14).** `point_mesh.py` re-sweeps
+every layer `point_build` hands Geometry Nodes — carriageway, median, deck, pillars, kerb, footway,
+barrier, markings, pads, gores — in pure Python from the same solve and the same layer table, and
+`blender/tools/roadkit_mesh_parity.py` compares it with the baked glTF object by object, material by
+material (area, triangle count, sampled surface distance both ways) plus the drivable surface under every
+lane sample. `roadkit_cli.py mesh` hands the result to Godot (`gltf_tris.py` is the reader).
+- **Parity.** DebugRoads: carriageway, pads, markings exact (p95 0.000 m both ways); road surface under
+  2 255 lane samples max **2.6 mm** apart. RoadKitSample (ramps, gores, footways, median): footway, gore,
+  median, pad, markings exact; 6 046 lane samples max **8.4 mm**; no object in only one build. Kerbs and
+  decks exact after the GN fix below, barriers within 0.4% area (Blender evaluates an extrusion's
+  thickness per FACE, so a wall's end segment steps where the solver's per-vertex value ramps).
+- **Speed.** Python sweep 65–90 ms (DebugRoads) / 526–605 ms (RoadKitSample); **177 ms end to end** into
+  Godot `ArrayMesh`es with trimesh collision for DebugRoads, 848 ms for RoadKitSample — against ~40 s for
+  the Blender build of DebugRoads before export and bake.
+- **What the spike found in the SHIPPED build, and fixed in `GN_PointDeck` (GROUP_VERSION 5):** `Extrude
+  Mesh` MOVES the faces it extrudes, and with `Individual` at its default every face got its own four walls.
+  So every kerb was hollow (its only horizontal face at road level, 10.46 m, walls to 10.61 m), every bridge
+  deck had no underside from below (the soffit still faced up), side walls faced inward (a kerb's signed
+  volume −1.8 m³ against +5.46 once fixed), and every segment carried hidden internal walls. Now: one
+  region, the moved copy flipped (bottom down, walls out), the swept band joined back on as the top.
+  Measured after: kerb 492/492 triangles and deck 556/556 equal to the Python sweep, volumes equal (deck
+  2355.2 vs 2355.9 m³). DebugRoads and RoadKitZones pieces rebuilt (the digest salt caught the builder
+  change and dirtied every piece by itself).
+- **Not ported, so NOT yet a replacement:** profile ASSETS (artist-modelled sections from `road_kit.blend`
+  — neither sample network uses one), style slots (material by name), vertex normals (Blender's glTF
+  carries NORMAL; neither carries UVs, the kit's materials are world-position procedural), the `-colonly`
+  road/walk/`-noped` collision split, and the piece SCENE (today glTF → `WorldBaker` → `NavBaker`).
+- **Decision:** the pure-Python sweep becomes the ONE owner of road geometry (PLAN.md 3.1 **B11**): port the
+  five items above, write the piece scene from Godot, gate it with `roadkit_mesh_parity.py` +
+  `probe_road_ground`/`probe_road_stamp`/`probe_traffic_spawn`/`probe_road_zones`, then make it the Build
+  and retire the Blender road build like B9 (`build_island_base.py` keeps Blender until the island is
+  rebuilt on Terrain3D). Until then Blender is the build, and `check_roads.sh` runs
+  `roadkit_mesh_parity.py --assert` on DebugRoads so the two cannot drift (control: Python's deck moved
+  10 cm → `surface/M_Concrete: surface distance p95 0.100`, exit 1).
+
+**Editing is live, Godot's Delete is a road gesture, and a name says what a point is (B10.8, 2026-09-14,
+user-reported: "dragging freezes the editor", "delete like a Godot node", "everything has the same name").**
+- **THE FREEZE WAS ONE COMMAND.** With ZoneMarkers in the scene every refresh ran `centrelines --zones`,
+  which drew the cross-zone successor edges by running the whole gate and a whole lane export —
+  **3.1 s blocking on DebugRoads** (6 s of it `check_path_fidelity`, fitting every lane twice) — on every
+  pause of a drag and every release. `roadkit_cli.py live` answers centrelines + draft bands + facings +
+  junction centres in ONE process (**0.09 s**, cross edges only with `--cross`, 3.4 s). The plugin runs it on
+  worker threads in two LATEST-WINS slots (FAST, and CROSS for the edges), from scratch copies under
+  `user://road_kit_live/` — never the real record mid-drag — and sends a drag every `LIVE_TICK` (50 ms)
+  while the button is held, so the road follows the mouse. Nothing is saved, draped or faced mid-drag; a
+  result is faced only if the record still matches the one sent. Main-thread cost per tick is asserted by
+  the editor self-test (`LIVE_TICK_BUDGET_MS`). Validate and Flow Report (2–6 s) run on a thread too
+  (`_service_async`); Build already did.
+- **Facing the point under the gizmo quietly made it MANUAL.** A settle mid-drag re-faced every AUTO point,
+  the gizmo then wrote its pre-drag basis back on the next mouse move, and `was_rotated()` read the
+  difference as a hand rotation. Facings now land only after release.
+- **SELECT took the PRESS**, so a move-gizmo arrow lying along a road (over its centreline) selected the road
+  instead of starting the drag — "dragging does not work". The press and release now pass through; a click
+  (release within 4 px of the press) selects the road, deferred after the editor's own click-select.
+- **Links in the record are DERIVED from the live tree** (`RoadKitNetwork.record_links`), so the Scene dock's
+  Delete needs no hook and its undo (which just re-adds the node) restores the record exactly: a link to a
+  point no longer in the tree is not written; SEGMENT/JUNCTION links are written on both ends; two points
+  left chain-adjacent by deleted stations are joined (through remembered links, `_known_links`); a
+  SEGMENT that skips exactly one live station linking both ends is dropped; an INTERSECTION with no
+  JUNCTION left is written as SEGMENT. `Gestures.delete_point` joins the neighbours the same way (it used to
+  cut the road). `child_order_changed` on roads and the network is the edit signal; names renumber on settle.
+- **Names carry a tag** (`RoadKitNetwork.name_tag`): `_jct` junction mouth, `_ramp` ramp mouth, `_aux` the
+  mainline station a ramp leaves, `_end` a road end joining nothing, none for a plain station; each point's
+  `editor_description` (the Scene-dock tooltip) lists its role and links, and the overlay floats a
+  `JUNCTION (n)` label listing the mouths over every pad. Nothing reads a point by name.
+- **The record cannot be lost by a crash or a commit.** `save_record` writes `<record>.tmp` and renames it over
+  the record (atomic), skips an unchanged write, and tracks the text it last read or wrote: a record changed
+  on disk (a git checkout) is RELOADED as an undo step (`_reload_if_changed_on_disk`), never saved over —
+  also on scene save.
+- **DebugRoads' west junction is one clean T** (user request). `loop_p010` had been deleted in the editor,
+  leaving `link_p000` + `loop_p000` a 2-arm pad; the committed version had that mouth 74° off its pad
+  centre because `loop_p009` jogged 25 m north. Rebuilt as a T — loop's tail and `link` the through road,
+  loop's head the stem — dropping that station, mouths on their approach lines, AUTO facings, one
+  `auto_setback` (a second pass grew it, W17): 0 errors, no finding on the pad, 0 of 465 nearby lane samples
+  off paving. The tail mouth is `loop_p009_jct` now.
+- Gates: `test_roadkit_native_delete.gd` (in `check_roads.sh`), and the editor self-test's new steps — SELECT
+  click pass-through, a Scene-dock delete + Ctrl+Z, a record changed on disk reloaded both ways, the junction
+  labels, the live-tick cost.
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 

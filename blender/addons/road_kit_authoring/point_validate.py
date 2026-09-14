@@ -698,6 +698,22 @@ def check_pads(net, out):
                 out(Finding("mouth_unreachable", WARN, m.uid,
                             "no legal movement reaches or leaves this arm -- check its lane "
                             "counts, allow_cross and allow_uturn"))
+        # The pad's corners were grown to keep every movement on it (`point_solve.contain_turns`);
+        # what is still off it is LAYOUT -- a mouth in another movement's way, or a corner its own
+        # arms are too short to round. A WARN: the build is watertight, the car just clips the kerb.
+        seen = set()
+        for t, depth, outside, blocker in psolve.turns_off_pad(j):
+            key = (t["from"], t["to"])
+            if key in seen:
+                continue
+            seen.add(key)
+            where = ("leaves the pad by %.2f m" % depth if outside else
+                     "passes %.2f m from its kerb (a car needs %.1f m)" % (psolve.TURN_CLEARANCE - depth, psolve.TURN_CLEARANCE))
+            out(Finding("turn_off_pad", WARN, blocker or comp[0],
+                        "the %s movement from %s to %s %s beside this arm -- pull this mouth further "
+                        "from the crossing, or turn it out of that path" % (
+                            {"L": "left", "R": "right", "S": "straight", "U": "U-turn"}.get(t["turn"], t["turn"]),
+                            t["from"], t["to"], where)))
 
 
 # ------------------------------------------------------------------------------- the gate

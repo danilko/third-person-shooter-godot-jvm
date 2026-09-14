@@ -25,14 +25,21 @@ static func run(cmd: String, record_path: String, extra: Array = []) -> Dictiona
 ## The whole build (lanes, meshes, bake). Blocking — call it from a Thread. With a zones sidecar
 ## (`road_kit_zones.gd`) `piece` is a prefix and the network is cut into one piece per zone.
 ## With a ground sidecar (`road_kit_ground.gd`, B6b) the supports stand on the sampled Terrain3D.
-static func build_piece(record_path: String, piece: String, zones_path: String = "", ground_path: String = "") -> Dictionary:
+## B10.6: `dirty_only` rebuilds only the pieces whose emitted content changed since they last baked
+## (`point_digest.py`, the `<stem>.build.json` manifest); `dirty` in the answer lists the pieces rebuilt.
+static func build_piece(record_path: String, piece: String, zones_path: String = "", ground_path: String = "", dirty_only: bool = true) -> Dictionary:
 	var out := []
-	var args := [ProjectSettings.globalize_path(BUILD), ProjectSettings.globalize_path(record_path), piece]
+	var args := ["DIRTY_ONLY=%d" % (1 if dirty_only else 0), "bash", ProjectSettings.globalize_path(BUILD), ProjectSettings.globalize_path(record_path), piece]
 	args.append(ProjectSettings.globalize_path(zones_path) if zones_path != "" else "")
 	if ground_path != "":
 		args.append(ProjectSettings.globalize_path(ground_path))
-	var code := OS.execute("bash", args, out, true)
-	return {"ok": code == 0, "log": "".join(out)}
+	var code := OS.execute("env", args, out, true)
+	var log_text := "".join(out)
+	var dirty := []
+	for line in log_text.split("\n"):
+		if line.begins_with("ROADKIT_DIRTY "):
+			dirty = Array(line.substr(14).strip_edges().split(",", false))
+	return {"ok": code == 0, "log": log_text, "dirty": dirty}
 
 ## B8: a gesture the SOLVER owns, applied to the record -- save (which promotes any hand-rotated point
 ## first), run `cmd`, reload the network from the rewritten record and face the points the tool owns.

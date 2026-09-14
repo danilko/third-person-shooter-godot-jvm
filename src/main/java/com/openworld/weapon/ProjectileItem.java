@@ -85,7 +85,15 @@ public class ProjectileItem extends WeaponItem {
         playFireAudio();
         triggerMuzzleFlash();
         applyRecoil();
-        spawnProjectile(false);
+        Vector3[] in = launchInputs();
+        if (in == null) return;
+        // N4: a client predicts a cosmetic rocket and the host flies the one that damages.
+        if (NetRole.client(this)) {
+            sendLaunchToHost(in[0], in[1]);
+            launch(in[0], in[1], true);
+        } else {
+            launch(in[0], in[1], false);
+        }
     }
 
     /**
@@ -98,7 +106,25 @@ public class ProjectileItem extends WeaponItem {
     public void playRemoteFireCue() {
         playFireAudio();
         triggerMuzzleFlash();
-        spawnProjectile(true);
+        // N4: on the host this puppet's real rocket arrives as MSG_LAUNCH — a cue copy would be a second rocket.
+        if (NetRole.host(this)) { com.openworld.net.NetStats.increment("launch_cue_host_skipped"); return; }
+        Vector3[] in = launchInputs();
+        if (in != null) launch(in[0], in[1], true);
+    }
+
+    /** Host: fly a client's validated launch as the authoritative rocket (PLAN.md N4). */
+    public void launchFrom(Vector3 origin, Vector3 aim) {
+        launch(origin, aim, false);
+    }
+
+    private void sendLaunchToHost(Vector3 origin, Vector3 aim) {
+        com.openworld.net.NetworkManager net = NetRole.net(this);
+        if (net == null || weaponController == null || !(owningCharacter instanceof Character c) || c.characterInfo == null) return;
+        net.sendLaunch(c.characterInfo.characterId, weaponController.getWeapon(), weaponController.nextShotSeq(), origin, aim);
+    }
+
+    private String attackerId() {
+        return owningCharacter instanceof Character c && c.characterInfo != null ? c.characterInfo.characterId : "";
     }
 
     // stopUseWeapon() (clears the semi-auto lock) is inherited from WeaponItem.
@@ -130,8 +156,10 @@ public class ProjectileItem extends WeaponItem {
         c.applyRecoil(recoil, horizRecoil);
     }
 
-    private void spawnProjectile(boolean cosmetic) {
-        if (projectileScene == null || owningCharacter == null) return;
+    /** `[origin, aim]` of a launch from this weapon now, or null when there is no aim — derived identically on
+     *  every peer (see below), and what a client reports in MSG_LAUNCH. */
+    private Vector3[] launchInputs() {
+        if (projectileScene == null || owningCharacter == null) return null;
 
         // Spawn geometry is derived IDENTICALLY on every peer — authority and puppet alike — so the
         // rocket leaves the barrel along the same line for the shooter and every observer. Origin is
@@ -148,14 +176,19 @@ public class ProjectileItem extends WeaponItem {
         Vector3 aimDir;
         if (owningCharacter instanceof Character c) {
             Vector3 dir = c.getAimTargetPosition().minus(spawnPos);
-            if (dir.lengthSquared() < 1e-6f) return;
+            if (dir.lengthSquared() < 1e-6f) return null;
             aimDir = dir.normalized();
         } else if (muzzle instanceof Node3D m3d) {
             aimDir = m3d.getGlobalBasis().getZ().times(-1f).normalized();  // muzzle forward (-Z)
         } else {
-            return;
+            return null;
         }
+        return new Vector3[] {spawnPos, aimDir};
+    }
 
+    private void launch(Vector3 spawnPos, Vector3 aimDir, boolean cosmetic) {
+        if (projectileScene == null || owningCharacter == null || aimDir.lengthSquared() < 1e-6f) return;
+        aimDir = aimDir.normalized();
         Node projectile = projectileScene.instantiate();
 
         // Inject all parameters before the node enters the tree.
@@ -165,6 +198,7 @@ public class ProjectileItem extends WeaponItem {
             rp.explosionRadius    = explosionRadius;
             rp.explosionMaxDamage = explosionMaxDamage;
             rp.explosionPushForce = explosionPushForce;
+            rp.attackerId         = attackerId();
             if (!cosmetic) {
                 rp.attackerName       = resolveAttackerName();
                 rp.attackerFaction    = resolveAttackerFaction();
@@ -174,6 +208,7 @@ public class ProjectileItem extends WeaponItem {
         }
 
         getTree().getCurrentScene().addChild(projectile);
+        if (cosmetic) ProjectileLedger.register(attackerId(), projectile);
 
         if (projectile instanceof Node3D n3d) {
             n3d.setGlobalPosition(spawnPos);

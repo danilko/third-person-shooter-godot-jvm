@@ -568,9 +568,8 @@ def _adjacency(lanes, profiles):
 
 # ------------------------------------------------------------------------------- junctions
 
-#: The turn-connector shape, owned by `point_solve` so the exported curve and the pad's on-screen
-#: movement preview are the same cubic. Returns `(sampled_points, handle_a, handle_b)`.
-_bezier_through = ps.bezier_through
+#: The turn-connector shape is `point_solve.turn_path` -- owned there so the exported curve and the
+#: pad's on-screen movement preview are the same path.
 
 
 def _lane_dir(lane, at_end):
@@ -598,6 +597,10 @@ def _arm_lanes(lanes_by_uid, uid, side):
     return [l for l in lanes_by_uid.get((uid, key), []) if not l.get(flag)]
 
 
+#: Samples of a connector's path on its pad -- what its exported curve is fitted to.
+CONNECTOR_FIT_SAMPLES = 36
+
+
 def build_junctions(net, lanes_by_uid, all_lanes):
     """One pad -> its turn connectors and its `junctions[]` entry.
 
@@ -607,6 +610,8 @@ def build_junctions(net, lanes_by_uid, all_lanes):
     junctions, connectors = [], []
     for comp in net.junction_cliques():
         jid = "j%s" % comp[0][2:]
+        # The SOLVED pad: its triangles are what a connector's height is read off (`turn_path`).
+        js = ps.solve_junction(net, comp)
         cx = sum(net.points[u].pos[0] for u in comp) / len(comp)
         cy = sum(net.points[u].pos[1] for u in comp) / len(comp)
         cz = sum(net.points[u].pos[2] for u in comp) / len(comp)
@@ -653,18 +658,17 @@ def build_junctions(net, lanes_by_uid, all_lanes):
                         continue
                     p0 = lane["_world"][-1]
                     p1 = target["_world"][0]
-                    pts, a, b = _bezier_through(p0, d_in, p1, d_out)
+                    pts, breaks = ps.turn_path(p0, d_in, p1, d_out, js.fan if js else None,
+                                               js.mouths if js else (), CONNECTOR_FIT_SAMPLES)
                     cid = "c%s_%s__%s" % (jid, lane["id"], target["id"])
                     connectors.append({
                         "id": cid,
                         "points": [godot(p) for p in pts],
-                        # Three control points is a cubic exactly: start, its out handle, the end
-                        # and its in handle. Nothing is approximated on the way out.
-                        "curve": [{"p": godot(p0), "in": godot((0, 0, 0)),
-                                   "out": godot([a[k] - p0[k] for k in range(3)])},
-                                  {"p": godot(p1),
-                                   "in": godot([b[k] - p1[k] for k in range(3)]),
-                                   "out": godot((0, 0, 0))}],
+                        # FITTED to the path on the pad (`curve_points`, control points at the shape's
+                        # breaks -- arc start and end -- and wherever else the fit needs one to stay
+                        # within CURVE_FIT_TOL): a turn is a line, an arc and a line, and its height
+                        # follows the pad's triangles, neither of which one cubic can carry.
+                        "curve": curve_points(pts, breaks),
                         "kind": "connector",
                         "from_arm": lane["from_arm"],
                         "turn": verdict.turn,

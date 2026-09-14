@@ -298,6 +298,12 @@ def gen_collection_names():
 
 # ------------------------------------------------------------------------------- the carrier
 
+#: The carrier's end lead and its vertices are `point_solve.carrier_points` -- one owner, shared with the
+#: pure-Python sweep (`point_mesh`).
+END_LEAD = ps.END_LEAD
+carrier_points = ps.carrier_points
+
+
 def _carrier_mesh(name, solve):
     """One polyline, every `CARRIER_ATTRS` value written onto the point domain.
 
@@ -305,7 +311,7 @@ def _carrier_mesh(name, solve):
     carry reads 0 and sweeps a zero-width band -- silently -- which at thirty-odd names is
     indistinguishable from "my change had no effect" (3.1)."""
     me = bpy.data.meshes.new(name)
-    verts = [tuple(s.pos) for s in solve.samples]
+    verts, values = carrier_points(solve)
     edges = [(i, i + 1) for i in range(len(verts) - 1)]
     if solve.is_loop and len(verts) > 2:
         edges.append((len(verts) - 1, 0))
@@ -313,7 +319,7 @@ def _carrier_mesh(name, solve):
     me.update()
     for a in ps.CARRIER_ATTRS:
         att = me.attributes.new(name=a.name, type='FLOAT', domain='POINT')
-        att.data.foreach_set("value", [float(v.get(a.name, a.default)) for v in solve.values])
+        att.data.foreach_set("value", [float(v.get(a.name, a.default)) for v in values])
     missing = [a.name for a in ps.CARRIER_ATTRS if me.attributes.get(a.name) is None]
     assert not missing, "carrier is missing declared attributes: %s" % missing
     return me

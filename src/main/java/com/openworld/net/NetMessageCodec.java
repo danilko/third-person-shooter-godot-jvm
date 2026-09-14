@@ -237,11 +237,13 @@ public final class NetMessageCodec {
     // [tag u8][victimCharacterId utf8][finalDamage float][headshot u8]
     // [weaponName utf8][attackerName utf8][attackerFaction utf8]
 
-    public static PackedByteArray encodeDamageRequest(int msgType, String victimCharacterId, float finalDamage,
-            boolean headshot, String weaponName, String attackerName, String attackerFaction) {
+    public static PackedByteArray encodeDamageRequest(int msgType, String victimCharacterId, String attackerCharacterId,
+            int kind, float finalDamage, boolean headshot, String weaponName, String attackerName, String attackerFaction) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(victimCharacterId);
+        buf.putUtf8String(attackerCharacterId);
+        buf.put8(kind);
         buf.putFloat(finalDamage);
         buf.put8(headshot ? 1 : 0);
         buf.putUtf8String(weaponName);
@@ -253,17 +255,115 @@ public final class NetMessageCodec {
     /** Decodes the body following the tag byte. Caller must have already consumed it. */
     public static DecodedDamageRequest decodeDamageRequest(StreamPeerBuffer buf) {
         String victimCharacterId = buf.getUtf8String();
+        String attackerCharacterId = buf.getUtf8String();
+        int kind = buf.getU8();
         float finalDamage = buf.getFloat();
         boolean headshot = buf.getU8() != 0;
         String weaponName = buf.getUtf8String();
         String attackerName = buf.getUtf8String();
         String attackerFaction = buf.getUtf8String();
-        return new DecodedDamageRequest(victimCharacterId, finalDamage, headshot, weaponName, attackerName, attackerFaction);
+        return new DecodedDamageRequest(victimCharacterId, attackerCharacterId, kind, finalDamage, headshot,
+                weaponName, attackerName, attackerFaction);
     }
 
-    /** Carrier for a decoded MSG_DAMAGE_REQUEST body — matches Health.relayDamageToAuthority's parameter list. */
-    public record DecodedDamageRequest(String victimCharacterId, float finalDamage, boolean headshot,
-            String weaponName, String attackerName, String attackerFaction) { }
+    /**
+     * Carrier for a decoded MSG_DAMAGE_REQUEST body. {@code attackerCharacterId} names the entity RESPONSIBLE
+     * (the host checks the sender owns it) and {@code kind} is {@code DamageRequestPolicy.Kind}'s ordinal
+     * (PLAN.md N2 — the request used to name nobody).
+     */
+    public record DecodedDamageRequest(String victimCharacterId, String attackerCharacterId, int kind, float finalDamage,
+            boolean headshot, String weaponName, String attackerName, String attackerFaction) { }
+
+    // ── MSG_MELEE (client → host, reliable channel 1) ─────────────────────────
+    //
+    // [tag u8][attackerCharacterId utf8][weaponSlot u8][swingSeq u32][stepIndex u8][origin 3×float][aim 3×float]
+    //
+    // PLAN.md N2: a client's swing as its INPUTS, sent when the swing's active window opens — where it started
+    // (the chest), where it was aimed, which step of the chain. The host runs the sweep on its own copy.
+
+    public static PackedByteArray encodeMelee(int msgType, String attackerCharacterId, int weaponSlot, long swingSeq,
+            int stepIndex, Vector3 origin, Vector3 aim) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(attackerCharacterId);
+        buf.put8(weaponSlot);
+        buf.put32((int) swingSeq);
+        buf.put8(stepIndex);
+        putVector3(buf, origin);
+        putVector3(buf, aim);
+        return buf.getDataArray();
+    }
+
+    /** Decodes the body following the tag byte. Caller must have already consumed it. */
+    public static DecodedMelee decodeMelee(StreamPeerBuffer buf) {
+        String attackerCharacterId = buf.getUtf8String();
+        int weaponSlot = buf.getU8();
+        long swingSeq = buf.getU32();
+        int stepIndex = buf.getU8();
+        Vector3 origin = getVector3(buf);
+        Vector3 aim = getVector3(buf);
+        return new DecodedMelee(attackerCharacterId, weaponSlot, swingSeq, stepIndex, origin, aim);
+    }
+
+    /** Carrier for a decoded MSG_MELEE body — one host-resolved swing. */
+    public record DecodedMelee(String attackerCharacterId, int weaponSlot, long swingSeq, int stepIndex,
+            Vector3 origin, Vector3 aim) { }
+
+    // ── MSG_LAUNCH (client → host, reliable channel 1) ────────────────────────
+    //
+    // [tag u8][attackerCharacterId utf8][weaponSlot u8][launchSeq u32][origin 3×float][aim 3×float]
+    //
+    // PLAN.md N4: a client's rocket or grenade as its INPUTS — where it leaves and where it is aimed (a
+    // grenade's arc is the weapon's, applied by the host). The host spawns the only projectile that damages.
+
+    public static PackedByteArray encodeLaunch(int msgType, String attackerCharacterId, int weaponSlot, long launchSeq,
+            Vector3 origin, Vector3 aim) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(attackerCharacterId);
+        buf.put8(weaponSlot);
+        buf.put32((int) launchSeq);
+        putVector3(buf, origin);
+        putVector3(buf, aim);
+        return buf.getDataArray();
+    }
+
+    /** Decodes the body following the tag byte. Caller must have already consumed it. */
+    public static DecodedLaunch decodeLaunch(StreamPeerBuffer buf) {
+        String attackerCharacterId = buf.getUtf8String();
+        int weaponSlot = buf.getU8();
+        long launchSeq = buf.getU32();
+        Vector3 origin = getVector3(buf);
+        Vector3 aim = getVector3(buf);
+        return new DecodedLaunch(attackerCharacterId, weaponSlot, launchSeq, origin, aim);
+    }
+
+    /** Carrier for a decoded MSG_LAUNCH body — one host-spawned projectile. */
+    public record DecodedLaunch(String attackerCharacterId, int weaponSlot, long launchSeq, Vector3 origin, Vector3 aim) { }
+
+    // ── MSG_DETONATION (host → all, reliable channel 0) ───────────────────────
+    //
+    // [tag u8][attackerCharacterId utf8][point 3×float]
+    //
+    // PLAN.md N4: where the host's projectile exploded. Every peer's cosmetic copy of that attacker's oldest
+    // live projectile explodes THERE, so the blast players see is the blast that dealt the damage.
+
+    public static PackedByteArray encodeDetonation(int msgType, String attackerCharacterId, Vector3 point) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(attackerCharacterId);
+        putVector3(buf, point);
+        return buf.getDataArray();
+    }
+
+    /** Decodes the body following the tag byte. Caller must have already consumed it. */
+    public static DecodedDetonation decodeDetonation(StreamPeerBuffer buf) {
+        String attackerCharacterId = buf.getUtf8String();
+        Vector3 point = getVector3(buf);
+        return new DecodedDetonation(attackerCharacterId, point);
+    }
+
+    public record DecodedDetonation(String attackerCharacterId, Vector3 point) { }
 
     // ── MSG_DAMAGE_BROADCAST ──────────────────────────────────────────────────
     //

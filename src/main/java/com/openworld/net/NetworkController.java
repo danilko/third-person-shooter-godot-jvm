@@ -186,7 +186,8 @@ public class NetworkController extends Controller {
             // The step must be in place BEFORE the cue: a melee weapon reads it to replay the swing
             // the owner actually made rather than guessing from its own chain position.
             wc.applyReplicatedFireStep(snapshot.fireStep());
-            if (haveFireSeq && snapshot.fireSeq() != lastFireSeq) wc.playRemoteFireCue();
+            // N3: one cue per shot the counter says happened (capped), not one per changed value.
+            wc.playRemoteFireCues(FireCuePolicy.cuesFor(haveFireSeq, lastFireSeq, snapshot.fireSeq(), FireCuePolicy.MAX_CUES));
             wc.setReplicatedFireSeq(snapshot.fireSeq());
             lastFireSeq = snapshot.fireSeq();
             haveFireSeq = true;

@@ -2,6 +2,7 @@ package com.openworld.weapon;
 
 import com.openworld.character.AnimationController;
 import com.openworld.character.Character;
+import com.openworld.net.NetworkManager;
 import com.openworld.world.HitInfo;
 import com.openworld.world.manager.ImpactManager;
 import godot.annotation.Export;
@@ -135,6 +136,16 @@ public class MeleeItem extends WeaponItem {
     return i;
   }
 
+  /** How many steps the chain has (the host validates a client's step index against it, N2). */
+  public int stepCount() { return Math.max(1, steps().size()); }
+
+  /** The shortest step's whole duration, seconds — the fastest this weapon can legitimately swing (N2). */
+  public double shortestStepSeconds() {
+    double best = Double.MAX_VALUE;
+    for (MeleeAttackStep s : steps()) best = Math.min(best, s.totalDuration());
+    return best == Double.MAX_VALUE ? 0.5 : best;
+  }
+
   /** Index of the swing in progress, or -1 when idle. */
   public int currentStepIndex() { return phase == Phase.IDLE ? -1 : stepIndex; }
 
@@ -226,6 +237,7 @@ public class MeleeItem extends WeaponItem {
   @Register
   @Override
   public void _physicsProcess(double delta) {
+    if (!serverSwings.isEmpty()) processServerSwings((float) delta);
     if (phase == Phase.IDLE || step == null) return;
     // Hitstop holds the clock as well as the pose, so the rest of the swing keeps the timing the
     // (frozen) animation is showing.
@@ -241,9 +253,11 @@ public class MeleeItem extends WeaponItem {
     if (phase == Phase.WINDUP && phaseLeft <= 0f) {
       phase = Phase.ACTIVE;
       phaseLeft += step.active;
+      if (!cosmetic && isNetworkedClient()) sendSwingToHost();
     }
     if (phase == Phase.ACTIVE) {
       // At least one sweep per swing even at active = 0: the frame the window opens always resolves.
+      // On a networked client the sweep PREDICTS (impacts, hitstop, kick) and the host applies the damage.
       if (!cosmetic) sweep();
       if (phaseLeft <= 0f) {
         phase = Phase.RECOVERY;
@@ -257,6 +271,71 @@ public class MeleeItem extends WeaponItem {
     }
   }
 
+  // ── Networked: the host resolves a client's swing (PLAN.md N2) ────────────────
+
+  /** A client's swing the host is resolving: its step, where it started, where the body was, its aim. */
+  private static final class ServerSwing {
+    final MeleeAttackStep step; final Vector3 chest0; final Vector3 body0; final Vector3 aim; final long seq;
+    final boolean debug; final Set<Long> hits = new HashSet<>(); final List<String> names = new ArrayList<>();
+    float left; boolean swept;
+    ServerSwing(MeleeAttackStep step, Vector3 chest0, Vector3 body0, Vector3 aim, long seq, boolean debug) {
+      this.step = step; this.chest0 = chest0; this.body0 = body0; this.aim = aim; this.seq = seq; this.debug = debug;
+      this.left = step.active;
+    }
+  }
+
+  private final List<ServerSwing> serverSwings = new ArrayList<>();
+
+  /**
+   * Host: resolve a client's swing on this copy — the SAME sweep a local swing runs, over the same active
+   * window, from the reported chest (carried along with the host copy's body as it moves during the window)
+   * along the reported aim, applying damage. The inputs were validated by {@code MeleeValidationPolicy}. The
+   * attack's animation and sound already play from the snapshot's fire cue; this adds only the contact.
+   */
+  public void resolveServerSwing(Vector3 chest, Vector3 aim, int stepIndex, long seq, boolean debug) {
+    List<MeleeAttackStep> s = steps();
+    if (s.isEmpty() || owningCharacter == null) return;
+    MeleeAttackStep st = s.get(Math.floorMod(stepIndex, s.size()));
+    serverSwings.add(new ServerSwing(st, chest, owningCharacter.getGlobalPosition(), aim, seq, debug));
+    processServerSwings(0f);   // the frame the window opens always resolves, as a local swing does
+  }
+
+  private void processServerSwings(float delta) {
+    for (java.util.Iterator<ServerSwing> it = serverSwings.iterator(); it.hasNext(); ) {
+      ServerSwing sw = it.next();
+      if (sw.swept) sw.left -= delta;
+      Vector3 chest = sw.chest0.plus(owningCharacter.getGlobalPosition().minus(sw.body0));
+      sweepFrom(chest, sw.aim, sw.step, sw.hits, true, false, sw.names);
+      sw.swept = true;
+      if (sw.left <= 0f) {
+        for (int i = 0; i < sw.names.size(); i++) com.openworld.net.NetStats.increment("melee_resolved_hits");
+        if (sw.debug) godot.global.GD.INSTANCE.print("[melee] host resolved #" + sw.seq + " -> " + sw.names
+            + " chest " + chest + " aim " + sw.aim + " body " + owningCharacter.getGlobalPosition());
+        it.remove();
+      }
+    }
+  }
+
+  /** Client: send the swing starting its active window to the host — chest, aim and step (N2). */
+  private void sendSwingToHost() {
+    if (!(owningCharacter instanceof Character c) || c.characterInfo == null || weaponController == null) return;
+    RayCast3D ray = weaponController.getAimRay();
+    if (ray == null) return;
+    Vector3 chest = chestPoint();
+    Vector3 dir = swingDirection(ray, chest);
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    if (netNode instanceof NetworkManager net) {
+      net.sendMelee(c.characterInfo.characterId, weaponController.getWeapon(), weaponController.nextShotSeq(),
+          stepIndex, chest, dir);
+    }
+  }
+
+  /** True on a networked non-host peer — its swings are predicted locally and resolved by the host. */
+  private boolean isNetworkedClient() {
+    Node netNode = getNodeOrNull("/root/NetworkManager");
+    return netNode instanceof NetworkManager net && net.isNetworked() && !net.isServer();
+  }
+
   // ── The sweep ────────────────────────────────────────────────────────────
 
   /**
@@ -267,18 +346,29 @@ public class MeleeItem extends WeaponItem {
    */
   private void sweep() {
     if (owningCharacter == null || !owningCharacter.isInsideTree()) return;
+    RayCast3D ray = weaponController != null ? weaponController.getAimRay() : null;
+    if (ray == null) return;
+    Vector3 chest = chestPoint();
+    sweepFrom(chest, swingDirection(ray, chest), step, hitThisSwing, !isNetworkedClient(), true, null);
+  }
+
+  /**
+   * One frame of a contact window from {@code chest} along {@code dir}: {@code authoritative} applies the damage
+   * (host / single-player), otherwise only the impact plays (a client's prediction); {@code feel} runs this
+   * swing's hitstop and kick on first contact (never on a host resolving someone else's swing). Hit names go to
+   * {@code hitsOut} when given.
+   */
+  private void sweepFrom(Vector3 chest, Vector3 dir, MeleeAttackStep st, Set<Long> hitSet, boolean authoritative,
+                         boolean feel, List<String> hitsOut) {
     ImpactManager im = getImpactManager();
     RayCast3D ray = weaponController != null ? weaponController.getAimRay() : null;
-    if (im == null || ray == null) return;
-
-    Vector3 chest = chestPoint();
-    Vector3 dir = swingDirection(ray, chest);
-    float range = Math.max(0.1f, step.range);
+    if (im == null || ray == null || owningCharacter == null || !owningCharacter.isInsideTree()) return;
+    float range = Math.max(0.1f, st.range);
     Vector3 tip = chest.plus(dir.times(range));
 
     // 1. Everything in reach.
     PhysicsDirectSpaceState3D space = owningCharacter.getWorld3d().getDirectSpaceState();
-    VariantArray<Dictionary<Object, Object>> overlaps = space.intersectShape(sweepQuery(chest, dir, range, ray), MAX_OVERLAPS);
+    VariantArray<Dictionary<Object, Object>> overlaps = space.intersectShape(sweepQuery(chest, dir, range, st, ray), MAX_OVERLAPS);
 
     Node vehicle = owningCharacter instanceof Character c ? c.currentVehicleNode : null;
     Map<Long, Node3D> nearest = new HashMap<>();
@@ -288,7 +378,7 @@ public class MeleeItem extends WeaponItem {
       Node target = ImpactManager.resolveTarget(collider);
       if (target == null || target.equals(vehicle)) continue;   // world geometry, or our own ride
       long key = target.getInstanceId();
-      if (hitThisSwing.contains(key)) continue;
+      if (hitSet.contains(key)) continue;
       double d = distanceToSegment(collider.getGlobalPosition(), chest, tip);
       Double best = nearestDist.get(key);
       if (best == null || d < best) { nearest.put(key, collider); nearestDist.put(key, d); }
@@ -299,21 +389,30 @@ public class MeleeItem extends WeaponItem {
       Node3D aimAt = e.getValue();
       Vector3 to = aimAt.getGlobalPosition().minus(chest);
       float len = (float) to.length();
-      if (len < 1e-3f) { connect(im, e.getKey(), new HitInfo(aimAt, aimAt.getGlobalPosition(), dir.times(-1f))); continue; }
-      TraceHit line = trace(ray, chest, to.normalized(), len + step.radius);
-      if (line == null) {
-        // Nothing reported between us: the chest is already inside the target (point blank). A
-        // blocker would have been hit on the way, so a clear line is exactly what this means.
-        connect(im, e.getKey(), new HitInfo(aimAt, aimAt.getGlobalPosition(), dir.times(-1f)));
-      } else if (line.node != null
-          && e.getKey() == instanceIdOf(ImpactManager.resolveTarget(line.node))) {
-        connect(im, e.getKey(), new HitInfo(line.node, line.point, line.normal));
+      HitInfo info = null;
+      if (len < 1e-3f) {
+        info = new HitInfo(aimAt, aimAt.getGlobalPosition(), dir.times(-1f));
+      } else {
+        TraceHit line = trace(ray, chest, to.normalized(), len + st.radius);
+        if (line == null) {
+          // Nothing reported between us: the chest is already inside the target (point blank). A
+          // blocker would have been hit on the way, so a clear line is exactly what this means.
+          info = new HitInfo(aimAt, aimAt.getGlobalPosition(), dir.times(-1f));
+        } else if (line.node != null
+            && e.getKey() == instanceIdOf(ImpactManager.resolveTarget(line.node))) {
+          info = new HitInfo(line.node, line.point, line.normal);
+        }
+      }
+      if (info != null) {
+        hitSet.add(e.getKey());
+        if (hitsOut != null) hitsOut.add(ImpactManager.resolveTarget(info.hitNode).getName().toString());
+        connect(im, info, st, authoritative, feel);
       }
       // else: something else is in the way — this target stays live and may connect next frame.
     }
 
     // 3. A swing into a wall with nothing to hit still lands: one impact on the surface in front.
-    if (!connected && !surfaceStruck) {
+    if (feel && !connected && !surfaceStruck) {
       TraceHit wall = trace(ray, chest, dir, range);
       if (wall != null && wall.node != null && ImpactManager.resolveTarget(wall.node) == null) {
         surfaceStruck = true;
@@ -322,11 +421,15 @@ public class MeleeItem extends WeaponItem {
     }
   }
 
-  private void connect(ImpactManager im, long key, HitInfo info) {
-    hitThisSwing.add(key);
-    im.processHit(info, step.damage, getDisplayName(), weaponIcon,
-        resolveAttackerName(), resolveAttackerFaction(), resolveAttackerPosition());
-    if (connected) return;
+  private void connect(ImpactManager im, HitInfo info, MeleeAttackStep st, boolean authoritative, boolean feel) {
+    if (authoritative) {
+      im.processHit(info, st.damage, getDisplayName(), weaponIcon,
+          resolveAttackerName(), resolveAttackerFaction(), resolveAttackerPosition());
+    } else {
+      im.processVisualHit(info);
+      com.openworld.net.NetStats.increment("melee_predicted_hits");   // a client's own prediction (N2)
+    }
+    if (!feel || connected) return;
     connected = true;
     if (step.hitstop > 0f) {
       hitstopLeft = step.hitstop;
@@ -361,10 +464,10 @@ public class MeleeItem extends WeaponItem {
   }
 
   /** A capsule spanning [chest, chest + dir*range], on the AimRay's mask, blind to our own body. */
-  private PhysicsShapeQueryParameters3D sweepQuery(Vector3 chest, Vector3 dir, float range, RayCast3D ray) {
+  private PhysicsShapeQueryParameters3D sweepQuery(Vector3 chest, Vector3 dir, float range, MeleeAttackStep st, RayCast3D ray) {
     if (sweepShape == null) sweepShape = new CapsuleShape3D();
     if (sweepQuery == null) sweepQuery = new PhysicsShapeQueryParameters3D();
-    float radius = Math.max(0.05f, step.radius);
+    float radius = Math.max(0.05f, st.radius);
     sweepShape.setRadius(radius);
     sweepShape.setHeight(Math.max(2f * radius, range));   // a capsule's height INCLUDES its caps
     // Capsule axis is local +Y: build a basis whose Y is the swing direction.

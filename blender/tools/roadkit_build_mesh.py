@@ -41,6 +41,7 @@ def main():
     ap.add_argument("--prefix", default="")
     ap.add_argument("--out-dir", default="")
     ap.add_argument("--ground", default="")
+    ap.add_argument("--only", default="", help="comma-separated piece names to build (B10.6); empty = all")
     a = ap.parse_args(argv)
     if not a.prefix and not a.out:
         raise SystemExit("roadkit_build_mesh.py: pass --out, or --prefix and --out-dir (with --zones to cut by zone)")
@@ -58,8 +59,12 @@ def main():
         from road_kit_authoring import point_model as pm, point_zones as pz
         zones = pz.load_zones(a.zones) if a.zones and os.path.exists(a.zones) else []
         part = pz.partition(pm.load_network(os.path.abspath(a.record)), zones)
+        only = {n for n in a.only.split(",") if n}
         for zone in sorted(part.pieces()):
             piece = pz.piece_name(a.prefix, zone)
+            if only and piece not in only:
+                print("== skip %s (clean)" % piece)
+                continue
             res = bpy.ops.rka.point_build(zones_path=os.path.abspath(a.zones) if zones else "", zone=zone,
                                           ground_path=ground)
             print("== build %s (zone '%s'): %s" % (piece, zone, res))

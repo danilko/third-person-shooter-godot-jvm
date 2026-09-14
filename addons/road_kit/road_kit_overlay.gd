@@ -35,8 +35,12 @@ static func zone_colors(ids: Array) -> Dictionary:
 
 ## `data` is the CLI's `centrelines` object (`runs`, and with `--zones` also `pads` and `cross`);
 ## `markers` the scene's ZoneMarkers. Returns `{"runs", "zones", "cross", "beyond"}` counts drawn.
+## The last `centrelines` runs drawn -- what the viewport tool picks a road or a span from (B10.3).
+var runs_drawn: Array = []
+
 func redraw(net: Node, data, markers: Array = []) -> Dictionary:
 	var runs: Array = data if data is Array else data.get("runs", [])
+	runs_drawn = runs
 	var extra: Dictionary = {} if data is Array else data
 	var im := ImmediateMesh.new()
 	var mat: Material = LINES
@@ -106,6 +110,41 @@ func redraw(net: Node, data, markers: Array = []) -> Dictionary:
 		counts["zones"] += 1
 	mesh = im
 	return counts
+
+const JCT_LABEL := "_JctLabel"
+## How far above a junction's centre its label floats (metres).
+const JCT_LABEL_LIFT := 6.0
+
+## A label floating over every junction -- "JUNCTION (3)" and the mouths that make it, by the names the
+## Scene dock shows -- so a pad reads as ONE thing in the viewport, not as three unrelated points.
+## `junctions` is `roadkit_cli.py live`'s: `[{"uids", "centre"}]`, centre in Godot axes, network frame.
+## Returns how many were drawn. Children of this unowned overlay, never saved.
+func junction_labels(net: Node, junctions: Array) -> int:
+	for c in get_children():
+		if String(c.name).begins_with(JCT_LABEL):
+			remove_child(c)
+			c.free()
+	var names := {}
+	for p in net.all_points():
+		names[p.uid] = String(p.name)
+	var n := 0
+	for j in junctions:
+		var c: Array = j.get("centre", [0, 0, 0])
+		var label := Label3D.new()
+		label.name = "%s%d" % [JCT_LABEL, n]
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.no_depth_test = true
+		label.fixed_size = true
+		label.pixel_size = 0.001
+		label.font_size = 26
+		label.outline_size = 8
+		label.modulate = COLORS["JUNCTION"]
+		var uids: Array = j.get("uids", [])
+		label.text = "JUNCTION (%d)\n%s" % [uids.size(), "\n".join(PackedStringArray(uids.map(func(u): return names.get(u, u))))]
+		label.position = Vector3(float(c[0]), float(c[1]) + JCT_LABEL_LIFT, float(c[2]))
+		add_child(label)
+		n += 1
+	return n
 
 func _strip(im: ImmediateMesh, mat: Material, pts: Array, col: Color, lift: float) -> void:
 	im.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, mat)

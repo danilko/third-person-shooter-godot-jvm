@@ -18,12 +18,13 @@ converts a preview; the record itself stays in the kit's frame, converted once b
     python3 blender/tools/roadkit_cli.py bands       <record> [--ground <stem>.ground.json]
     python3 blender/tools/roadkit_cli.py corridors   <record> [--ground <stem>.ground.json]
     python3 blender/tools/roadkit_cli.py ramp        <record> <uid_a> <uid_b> [--lanes 1]   (rewrites the record)
-    python3 blender/tools/roadkit_cli.py pieces      <record> <zones.json> <out_dir> <prefix> [--dry-run]
+    python3 blender/tools/roadkit_cli.py pieces      <record> <zones.json> <out_dir> <prefix> [--dry-run] [--ground <g.json>]
     python3 blender/tools/roadkit_cli.py merge|split <record> <uid,uid,...> [--keep uid --at-keep | --name n]
     python3 blender/tools/roadkit_cli.py renumber|repair|tidy <record>           (rewrite the record)
     python3 blender/tools/roadkit_cli.py cross_section <record> <src> <uid,...> <LANES,WIDTH,...>
     python3 blender/tools/roadkit_cli.py branch_ramp <record> <uid> [--lanes 1 --carriageway FWD --entrance ...]
     python3 blender/tools/roadkit_cli.py facings|flow <record>
+    python3 blender/tools/roadkit_cli.py live        <record> [--zones z.json] [--draft] [--cross]
 
 Exit code 0 unless the command itself failed (a red gate is a RESULT, reported in the JSON).
 """
@@ -50,6 +51,8 @@ import point_ground as pg         # noqa: E402
 import road_support as rs         # noqa: E402
 import point_record_ops as ro     # noqa: E402
 import point_flow as pf           # noqa: E402
+import point_digest as pdg        # noqa: E402
+import point_mesh as pmsh         # noqa: E402
 
 
 def _findings(net):
@@ -83,13 +86,18 @@ def cmd_centrelines(a):
     it into and whether it reaches past that zone's load radius (`beyond`), and `cross` lists every
     successor edge that leaves its lane's zone, with the lane's points -- the hand-overs that only
     resolve while both pieces are loaded. Everything here is asked of `point_zones`, never derived."""
-    net = pm.load_network(a.record)
-    zones = pz.load_zones(a.zones) if a.zones and os.path.exists(a.zones) else []
+    return _centrelines(pm.load_network(a.record), a.step, a.zones, cross=True)
+
+
+def _centrelines(net, step, zones_path, cross=True):
+    """`cross` costs a gate run and a whole lane export (~3 s on DebugRoads, `path_deviation` fitting
+    every lane twice) -- `live` asks for it only once a drag has ended."""
+    zones = pz.load_zones(zones_path) if zones_path and os.path.exists(zones_path) else []
     part = pz.partition(net, zones) if zones else None
     beyond = {f["obj"] for f in part.findings if f["code"] == "zone_beyond_load"} if part else set()
     out = []
-    for name, pts, uids in pp.centreline_runs(net, step=a.step, with_uids=True):
-        row = {"road": name, "points": [pe.godot(p) for p in pts]}
+    for name, pts, uids in pp.centreline_runs(net, step=step, with_uids=True):
+        row = {"road": name, "points": [pe.godot(p) for p in pts], "uids": list(uids)}
         if part is not None:
             first = part.run_of_uid.get(uids[0], uids[0])
             row.update({"first": first, "zone": part.runs.get(first, pz.RESIDENT), "beyond": first in beyond})
@@ -101,16 +109,17 @@ def cmd_centrelines(a):
                                             sum(net.points[m].pos[1] for m in c) / len(c),
                                             sum(net.points[m].pos[2] for m in c) / len(c)))}
                        for c in net.junction_cliques() for u, z in [(min(c), part.pad_zone(c))]]
-        cross = []
-        if not _findings(net)["errors"]:
+    if part is not None and cross:
+        edges = []
+        if not pv.errors(pv.validate(net)):
             doc = pe.export_network(net)
             pz.stamp_lanes(doc, part, net)
             by_id = {l["id"]: l for l in doc.get("lanes", ())}
             for lane, nxt in pz.cross_zone_report(doc)[0]:
-                cross.append({"lane": lane, "next": nxt, "zone": by_id[lane].get("zone_id", pz.RESIDENT),
+                edges.append({"lane": lane, "next": nxt, "zone": by_id[lane].get("zone_id", pz.RESIDENT),
                               "next_zone": by_id[nxt].get("zone_id", pz.RESIDENT),
                               "points": by_id[lane].get("points", [])})
-        res["cross"] = cross
+        res["cross"] = edges
     return res
 
 
@@ -143,13 +152,15 @@ def cmd_pieces(a):
     if not zones:
         cross = []   # an unzoned doc's zone_id is the legacy per-road tag, not a cut
     counts = part.pieces()
+    # B10.6: what each piece EMITS, hashed -- a build skips a piece whose digest is the one it last baked.
+    digests = pdg.piece_digests(net, zones, pg.load_ground(a.ground) if a.ground else None) if not gate["errors"] else {}
     pieces = []
     for zone in sorted(counts):
         sub = pz.split_doc(doc, zone) if zones else doc
         piece = pz.piece_name(a.prefix, zone)
         path = os.path.join(a.out_dir, piece + ".lanekit.json")
         row = dict(counts[zone], zone=zone, piece=piece, lanes=len(sub.get("lanes", ())),
-                   junctions=len(sub.get("junctions", ())), lanekit=path)
+                   junctions=len(sub.get("junctions", ())), lanekit=path, digest=digests.get(zone, ""))
         if not gate["errors"] and not dangling and not a.dry_run:
             os.makedirs(a.out_dir, exist_ok=True)
             tmp = path + ".tmp"
@@ -225,10 +236,12 @@ def cmd_bands(a):
     whole triangles (`surface`, `walk`) and polylines (`kerbs`). `bands[i]` names the owner of
     triangles `tri_start .. tri_start + tri_count` of `surface[kind]` -- a road run's strip is
     `(L[i], R[i], R[i+1]), (L[i], R[i+1], L[i+1])`, so its end cross-sections are the first and last pair."""
+    return _bands(pm.load_network(a.record), pg.load_ground(a.ground) if a.ground else None)
+
+
+def _bands(net, grid):
     import time
     t0 = time.time()
-    net = pm.load_network(a.record)
-    grid = pg.load_ground(a.ground) if a.ground else None
     solves, jsolves, gsolves, bands = ped.solve_all(net, grid)
     surface, walk, kerbs, owners = {"road": [], "pad": [], "gore": []}, [], [], []
     runs = []
@@ -263,6 +276,23 @@ def cmd_bands(a):
             "counts": {"roads": len(solves), "pads": len(jsolves), "gores": len(gsolves),
                        "edge_runs": len(runs)},
             "ms": round((time.time() - t0) * 1000.0, 1)}
+
+
+def cmd_mesh(a):
+    """B10.7 SPIKE: the whole network's meshes from the pure-Python sweep (`point_mesh`), Godot axes, the
+    network's frame: `{"objects": {name: {material: [x,y,z, ...] (whole triangles)}}, "ms", "tris"}`.
+    What a Godot-side build would upload; measured against the Blender build by `roadkit_mesh_parity.py`."""
+    import time
+    t0 = time.time()
+    net = pm.load_network(a.record)
+    objs = pmsh.build(net, pg.load_ground(a.ground) if a.ground else None)
+    out, tris = {}, 0
+    for name, mats in objs.items():
+        out[name] = {}
+        for mat, ts in mats.items():
+            out[name][mat] = [round(c, 4) for t in ts for p in t for c in pe.godot(p)]
+            tris += len(ts)
+    return {"objects": out, "tris": tris, "ms": round((time.time() - t0) * 1000.0, 1)}
 
 
 def cmd_ramp(a):
@@ -312,6 +342,26 @@ def cmd_facings(a):
     return {"facings": {u: pe.godot(v) for u, v in ro.facings(net).items()}}
 
 
+def cmd_live(a):
+    """THE EDITOR'S LIVE REFRESH, in one process: `centrelines` (with `--zones`), `bands` (with
+    `--draft`) and `facings`, each over its own fresh read of the record. Without `--cross` the
+    cross-zone successor edges are skipped -- they need the gate and a full lane export, seconds on a
+    real network, which is what froze the editor on every pause of a drag. `junctions` names every pad:
+    its centre (Godot axes) and its mouths, for the viewport's junction labels."""
+    import time
+    t0 = time.time()
+    out = {"centrelines": _centrelines(pm.load_network(a.record), a.step, a.zones, cross=a.cross)}
+    if a.draft:
+        out["bands"] = _bands(pm.load_network(a.record), None)
+    net = pm.load_network(a.record)
+    out["facings"] = {u: pe.godot(v) for u, v in ro.facings(net).items()}
+    out["junctions"] = [{"uids": list(c), "centre": pe.godot(
+        (sum(net.points[m].pos[0] for m in c) / len(c), sum(net.points[m].pos[1] for m in c) / len(c),
+         sum(net.points[m].pos[2] for m in c) / len(c)))} for c in net.junction_cliques()]
+    out["ms"] = round((time.time() - t0) * 1000.0, 1)
+    return out
+
+
 def cmd_flow(a):
     """Preview > Flow Report over the exported lane graph (`point_flow.flow_report`), uids resolved."""
     net = pm.load_network(a.record)
@@ -333,8 +383,13 @@ def main(argv=None):
     s = sub.add_parser("centrelines"); s.add_argument("record")
     s.add_argument("--step", type=float, default=None); s.add_argument("--zones", default="")
     s.set_defaults(fn=cmd_centrelines)
+    s = sub.add_parser("live"); s.add_argument("record")
+    s.add_argument("--step", type=float, default=None); s.add_argument("--zones", default="")
+    s.add_argument("--draft", action="store_true"); s.add_argument("--cross", action="store_true")
+    s.set_defaults(fn=cmd_live)
     s = sub.add_parser("corridors"); s.add_argument("record"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_corridors)
+    s = sub.add_parser("mesh"); s.add_argument("record"); s.add_argument("--ground", default=""); s.set_defaults(fn=cmd_mesh)
     s = sub.add_parser("bands"); s.add_argument("record"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_bands)
     s = sub.add_parser("lanekit"); s.add_argument("record"); s.add_argument("out")
@@ -343,6 +398,7 @@ def main(argv=None):
     s.add_argument("--lanes", type=int, default=1); s.set_defaults(fn=cmd_ramp)
     s = sub.add_parser("pieces"); s.add_argument("record"); s.add_argument("zones")
     s.add_argument("out_dir"); s.add_argument("prefix"); s.add_argument("--dry-run", action="store_true")
+    s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_pieces)
     s = sub.add_parser("merge"); s.add_argument("record"); s.add_argument("uids")
     s.add_argument("--keep", default=""); s.add_argument("--at-keep", action="store_true")
