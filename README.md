@@ -421,30 +421,10 @@ range instead of relying on bare fists.
 
 ## 📚 Credits & Assets
 
-### Code & Logic
-* Base Third Person Controller by **Johnny Rouddro**: [YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY) | [GitHub](https://github.com/JohnnyRouddro/Godot_Third_Person_Controller) | [Itch.io](https://johnnyrouddro.itch.io/godot-4-third-person-controller)
-
-### Models & External Assets
-* **Weapon Models:** [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius.
-* **Additional Assets:** [Godot Asset Library](https://godotengine.org/asset-library/asset/781).
-
-# PLATEAU data attribution
-
-Real-world building/road/bridge geometry under `assets/*.json` is derived from
-[Project PLATEAU](https://www.mlit.go.jp/plateau/) (3D city model data), published by Japan's
-Ministry of Land, Infrastructure, Transport and Tourism (MLIT), and distributed via the
-[G-Spatial Information Center](https://www.geospatial.jp/ckan/dataset/plateau).
-
-Licensed **CC BY 4.0** — free for commercial and non-commercial use, attribution required.
-
-**Required credit line (include in any public build/release):** "Data: Project PLATEAU (MLIT)".
-
-Raw source CityGML/OBJ downloads (multi-hundred-MB zips per municipality/tile) are **not** committed
-to this repo — only the extracted/filtered/reprojected `data/*.json` (a few hundred KB to low MB per
-precinct) is. Re-run `extract_plateau.py` against the source tiles to regenerate.
-
-Note:
-Did use Gemini/Claude AI during debugging/documentation.
+All third-party code, assets and data, with their licences and required attribution lines, are
+listed in one place: **[CREDITS.md](CREDITS.md)**. That includes the base controller by Johnny
+Rouddro, Quaternius weapon models, Terrain3D / road-generator / Sky3D, the ambientCG terrain
+textures, and the Project PLATEAU data ("Data: Project PLATEAU (MLIT)", CC BY 4.0).
 
 ---
 

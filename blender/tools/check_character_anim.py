@@ -3,7 +3,7 @@
 
     python3 blender/tools/check_character_anim.py
 
-Checks the facts that were each a shipped defect (PLAN.md "Crouch/crawl aiming, the crouch
+Checks the facts that were each a shipped defect (`PLAN.archive.md`, "Crouch/crawl aiming, the crouch
 'knock', and the 90-degree-off torso"), so a re-export cannot quietly reintroduce them:
 
   duplicate_clips   an action exported twice (active + stashed) comes back as ONE animation with

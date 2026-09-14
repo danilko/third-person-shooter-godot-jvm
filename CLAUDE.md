@@ -1768,7 +1768,7 @@ two-stage trace this makes the three agree — body, bone-driven gun, and bullet
 ## Animation — the export pipeline, the Root-bone rule, and how to MEASURE it (2026-09-07)
 
 The AnimationTree, `AnimationController`, `PlayerController` and the stances are **as committed** —
-a session of changes to them was reverted after making things worse (PLAN.md, "Reverted: the aim /
+a session of changes to them was reverted after making things worse (`PLAN.archive.md`, "Reverted: the aim /
 rotation changes"). What survives below is only what was measured. The player-facing rotation
 complaint (lower body ~90° off the aim while the AI is correct) is **still unexplained** — see the
 end of this section for what was ruled out, so the next attempt does not re-tread it.

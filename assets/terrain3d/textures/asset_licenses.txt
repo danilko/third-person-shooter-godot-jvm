@@ -1,12 +1,30 @@
+Terrain textures used by assets/terrain3d/terrain_assets.tres
+(the Terrain3D texture list for world/World.tscn and world/DebugWorld.tscn).
+Project-wide credits: CREDITS.md at the repository root.
+
+ambientCG textures
+------------------
 All ambientCG assets are provided under the
 Creative Commons CC0 1.0 Universal License.
 https://docs.ambientcg.com/license/
 
-Grass:
-https://ambientcg.com/view?id=Ground037
+These two sets are byte-identical copies of the ones shipped in the
+Terrain3D demo (demo/assets/textures/), repacked by Terrain3D as
+<name>_alb_ht.png (albedo + height) and <name>_nrm_rgh.png (normal + roughness).
 
-Rock:
-https://ambientcg.com/view?id=Rock030
+Grass (Terrain3D texture id 0):
+  ground037_alb_ht.png, ground037_nrm_rgh.png
+  https://ambientcg.com/view?id=Ground037
 
-Cliff:
-https://ambientcg.com/view?id=Rock023
+Cliff (id 1) and Seabed (id 3, the same set tinted and rescaled):
+  rock023_alb_ht.png, rock023_nrm_rgh.png
+  https://ambientcg.com/view?id=Rock023
+
+Project-generated textures
+--------------------------
+Sand (id 2):
+  sand_alb_ht.png, sand_nrm_rgh.png
+  Generated procedurally (value noise, numpy) by tools/make_sand_texture.py,
+  part of this project and covered by its LICENSE. Not made with an
+  image-generation model. Re-running the script reproduces both files
+  pixel for pixel (fixed seed).

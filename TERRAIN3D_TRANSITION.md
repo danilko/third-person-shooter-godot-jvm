@@ -134,8 +134,8 @@ the failure visible either way; it is what caught this.
   `"Lane_"` for that reason — a workaround, not a fix.
 - **A dark band under the horizon** seen from altitude. The water-edge and `ground_color`
   hypotheses were both tested and disproved; most likely Sky3D's atmosphere below its horizon line.
-- **`Character.tscn` camera `far = 100000`** (100 km) — almost certainly unintended, and harmful to
-  depth precision.
+- **Camera `far = 100000`** — checked 2026-09-13 and NOT a defect: Forward+ uses reverse-Z (precision is set by `near`), and the 16 384 m water plane needs a far plane past ~14.6 km; see PLAN.md 0.3. (Was: "almost certainly unintended, and harmful to
+  depth precision.")
 - **Terrain3D `region_size` has no measurable frame-time effect** — A/B'd four sizes twice; the
   control run inverted the result. Do not tune it for performance.
 
