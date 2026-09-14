@@ -102,6 +102,22 @@ public class ImpactManager extends Node {
      * networked client to show its own predicted bullet impact (the shooter feels instant feedback)
      * while the host owns the actual damage via the MSG_SHOT path (Round 8 — host-resolved bullets).
      */
+    /** Surface a collider presents to a bullet — the same walk {@link #processHit} uses. */
+    public SurfaceType surfaceOf(Node hitNode) {
+        return resolveHitContext(hitNode).surface;
+    }
+
+    /**
+     * Impact visuals for a hit known only by WHAT it was and WHERE — a peer replaying a host-resolved
+     * shot (N1b) has no collider, only the surface the host reported.
+     */
+    public void processVisualImpact(SurfaceType surface, godot.core.Vector3 point, godot.core.Vector3 normal) {
+        ParticleManager pm = getParticleManager();
+        if (pm != null) pm.spawn(surface != null ? surface : SurfaceType.DEFAULT, point);
+        DecalManager dm = getDecalManager();
+        if (dm != null && normal != null) dm.spawn(point, normal);
+    }
+
     public void processVisualHit(HitInfo info) {
         HitContext ctx = resolveHitContext(info.hitNode);
         ParticleManager pm = getParticleManager();

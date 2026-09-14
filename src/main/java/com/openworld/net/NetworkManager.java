@@ -111,6 +111,7 @@ public class NetworkManager extends Node {
     private static final int MSG_WEAPON_SWITCH          = 23; // G4-1 — owner→host→all: ordered equip-start event (puppet draws promptly, fire can't precede draw)
     private static final int MSG_VEHICLE_SPAWN          = 24; // I3b — host→all: streamed ambient-traffic vehicle spawn (counterpart of MSG_SPAWN)
     private static final int MSG_WAYPOINT               = 25; // I5  — owner→host→all: GPS waypoint set/clear (faction-coloured teammate marker)
+    private static final int MSG_SHOT_RESULT_BATCH      = 26; // N1b — host→peers: what resolved pulls hit (cosmetic tracers + impacts)
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -144,8 +145,7 @@ public class NetworkManager extends Node {
     //       DAMAGE_BROADCAST, SPAWN, DESPAWN, WORLD_EVENT, OWNERSHIP → FLAG_RELIABLE
     //   1 — shots (must arrive, own lane — PLAN.md N1):   SHOT → FLAG_RELIABLE
     //   2 — continuous snapshots (drop freely):           SNAPSHOT/BATCH → 0 (unreliable)
-    //   (channel 3 — the retired weapon-fire-cue lane — is currently unassigned; CHANNEL_COUNT
-    //   stays 4 so it is provisioned for reuse)
+    //   3 — shot results (cosmetic, drop freely — N1b):  SHOT_RESULT_BATCH → 0 (unreliable)
     //
     // sendMessage/broadcastMessage are the only call points that need to know this
     // table — handlers just hand them an already-framed payload from
@@ -172,6 +172,8 @@ public class NetworkManager extends Node {
             // pickups and spawns on channel 0, and vice versa. Ordered within the channel, which is
             // what lets the host treat a non-advancing shotSeq as a replay.
             case MSG_SHOT -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
+            // Shot results are cosmetic and superseded by the next pull: unreliable, own lane (N1b).
+            case MSG_SHOT_RESULT_BATCH -> new ChannelSpec(3, 0L);
             default -> throw new IllegalArgumentException("No channel mapping for MSG_* tag " + msgType);
         };
     }
@@ -267,6 +269,7 @@ public class NetworkManager extends Node {
             }
             dispatchEnetEvent(type, event);
         }
+        flushShotResults();
         // Host-loss watchdog (client only): ENet's own DISCONNECT can lag, so an app-level
         // staleness check declares the host gone when no packet has arrived for HOST_TIMEOUT_MS —
         // see onHostLost. Skipped on the host and once already handled this session.
@@ -761,6 +764,7 @@ public class NetworkManager extends Node {
     // corrupt peersById/idsByPeer/gameplay state.
 
     private void onPacketReceived(int senderPeerId, PackedByteArray data) {
+        int tagForLog = -1;
         try {
             // Any byte from the server proves it's alive — stamp liveness before validation so
             // even a malformed/rate-limited packet defers the host-loss watchdog (see onHostLost).
@@ -782,6 +786,7 @@ public class NetworkManager extends Node {
             StreamPeerBuffer buf = new StreamPeerBuffer();
             buf.setDataArray(data);
             int msgType = buf.getU8();
+            tagForLog = msgType;
 
             switch (msgType) {
                 case MSG_SNAPSHOT -> handleSnapshotMessage(senderPeerId, buf);
@@ -810,12 +815,17 @@ public class NetworkManager extends Node {
                 case MSG_VEHICLE_SPAWN -> handleVehicleSpawnMessage(senderPeerId, buf);
                 case MSG_WEAPON_SWITCH -> handleWeaponSwitchMessage(senderPeerId, buf);
                 case MSG_WAYPOINT -> handleWaypointMessage(senderPeerId, buf);
+                case MSG_SHOT_RESULT_BATCH -> handleShotResultBatch(senderPeerId, buf);
                 default -> GD.print("NetworkManager: dropping packet from " + senderPeerId
                         + " — unknown message tag " + msgType);
             }
         } catch (Exception e) {
             com.openworld.net.NetStats.increment("drop_malformed");
-            GD.print("NetworkManager: dropping malformed packet from " + senderPeerId + " — " + e.getMessage());
+            StackTraceElement[] st = e.getStackTrace();
+            StringBuilder where = new StringBuilder();
+            for (int i = 0; i < Math.min(10, st.length); i++) where.append(i == 0 ? " at " : " < ").append(st[i]);
+            GD.print("NetworkManager: dropping malformed packet (tag " + tagForLog + ") from " + senderPeerId
+                    + " — " + e + where);
         }
     }
 
@@ -1282,9 +1292,85 @@ public class NetworkManager extends Node {
         }
         com.openworld.net.NetStats.increment("shot_accepted");
         java.util.List<String> hits = firearm.resolveServerShot(shot.origin(), shot.aim(), shot.spreadDeg(),
-                shot.shotSeq(), shot.shooterCharacterId());   // damage + impact (cosmetics ride fireSeq)
+                shot.shotSeq(), shot.shooterCharacterId(), shot.weaponSlot(), senderPeerId);
         if (debugShots) {
-            GD.print("[shot] host resolved #" + shot.shotSeq() + " for " + shot.shooterCharacterId() + " -> " + hits);
+            int hitCount = 0;
+            for (String h : hits) if (!"-".equals(h)) hitCount++;
+            GD.print("[shot] host resolved #" + shot.shotSeq() + " dirs " + firearm.lastShotDirectionDigest
+                    + " hits " + hitCount + " -> " + hits);
+        }
+    }
+
+    // ── Shot results to peers (PLAN.md N1b) ───────────────────────────────────
+
+    private record QueuedShotResult(NetMessageCodec.ShotResult result, int excludePeerId) { }
+    private final List<QueuedShotResult> pendingShotResults = new ArrayList<>();
+
+    /** Set by the N1b two-instance check to exercise the fallback path: incoming results are ignored. */
+    public boolean debugDropShotResults = false;
+
+    /**
+     * Host: queue what a resolved pull hit, for every peer except {@code excludePeerId} (the shooter's
+     * owner, who predicted it; -1 for none). Flushed once per frame as one batch per peer, so a room of
+     * AI firing does not become one packet per shot.
+     */
+    public void queueShotResult(NetMessageCodec.ShotResult result, int excludePeerId) {
+        if (!isNetworked() || !isServer() || peersById.isEmpty()) return;
+        pendingShotResults.add(new QueuedShotResult(result, excludePeerId));
+    }
+
+    private void flushShotResults() {
+        if (pendingShotResults.isEmpty()) return;
+        if (!amServer) { pendingShotResults.clear(); return; }
+        for (Integer peerId : peersById.keySet()) {
+            List<NetMessageCodec.ShotResult> chunk = new ArrayList<>();
+            int bytes = 3;
+            for (QueuedShotResult q : pendingShotResults) {
+                if (q.excludePeerId() == peerId) continue;
+                int b = q.result().wireBytes();
+                if (!chunk.isEmpty() && bytes + b > MAX_BATCH_PAYLOAD_BYTES) {
+                    sendMessage(peerId, NetMessageCodec.encodeShotResultBatch(MSG_SHOT_RESULT_BATCH, chunk));
+                    chunk = new ArrayList<>();
+                    bytes = 3;
+                }
+                chunk.add(q.result());
+                bytes += b;
+            }
+            if (!chunk.isEmpty()) {
+                com.openworld.net.NetStats.increment("shot_result_batches_sent");
+                sendMessage(peerId, NetMessageCodec.encodeShotResultBatch(MSG_SHOT_RESULT_BATCH, chunk));
+            }
+        }
+        pendingShotResults.clear();
+    }
+
+    private void handleShotResultBatch(int senderPeerId, StreamPeerBuffer buf) {
+        List<NetMessageCodec.ShotResult> results = NetMessageCodec.decodeShotResultBatch(buf);
+        if (amServer || senderPeerId != SERVER_PEER_ID) {
+            dropInvalid("shot_result", "MSG_SHOT_RESULT_BATCH", senderPeerId);
+            return;
+        }
+        if (debugDropShotResults) return;
+        for (NetMessageCodec.ShotResult r : results) {
+            if (!isValidIdentifier(r.shooterCharacterId())) continue;
+            boolean finite = true;
+            for (NetMessageCodec.PelletResult p : r.pellets()) {
+                finite &= isFiniteVector3(p.end()) && (p.normal() == null || isFiniteVector3(p.normal()));
+            }
+            if (!finite) { com.openworld.net.NetStats.increment("drop_invalid_shot_result"); continue; }
+            Character shooter = findCharacterById(r.shooterCharacterId());
+            WeaponController wc = shooter != null ? findWeaponController(shooter) : null;
+            if (wc == null) { com.openworld.net.NetStats.increment("shot_result_unknown_shooter"); continue; }
+            FirearmItem firearm = wc.getWeaponItem(r.weaponSlot()) instanceof FirearmItem f ? f
+                    : wc.getCurrentWeaponItem() instanceof FirearmItem g ? g : null;
+            if (firearm == null) { com.openworld.net.NetStats.increment("shot_result_no_firearm"); continue; }
+            com.openworld.net.NetStats.increment("shot_result_received");
+            firearm.playRemoteShotResult(r);
+            if (debugShots) {
+                int hits = 0;
+                for (NetMessageCodec.PelletResult p : r.pellets()) if (p.kind() > 0) hits++;
+                GD.print("[shot] peer got result #" + r.shotSeq() + " pellets " + r.pellets().size() + " hits " + hits);
+            }
         }
     }
 
@@ -1295,8 +1381,19 @@ public class NetworkManager extends Node {
     private final Map<String, Long> lastShotSeq = new HashMap<>();
     private final Map<String, ShotValidationPolicy.RateBudget> shotBudgets = new HashMap<>();
 
-    /** How far from the shooter's BODY a seated shooter's reported origin may be: its origin is the
-     *  carrier camera's ray, which a chase boom holds several metres off (FirearmItem.useMuzzleTrace). */
+    /**
+     * The volume a reported shot origin must lie in, around the host copy's body. Not the host copy's
+     * MUZZLE: a puppet does not animate the owner's pose — measured on the two-instance check, a
+     * standing client firing from the shoulder had its host copy holding the same SG1 at the hip,
+     * 1.17 m away, on every shot — so a muzzle check refused every honest shot. The body position is
+     * replicated state; the muzzle is cosmetic. Horizontal: shoulder offset + a long gun's barrel.
+     * Vertical: prone muzzle to a raised aim over a standing head.
+     */
+    private static final double SHOOTER_REACH_M = 1.4;
+    private static final double SHOOTER_LOW_M = -0.3;
+    private static final double SHOOTER_HIGH_M = 2.2;
+    /** A seated shooter's origin is the carrier camera's ray, which a chase boom holds metres off
+     *  (FirearmItem.useMuzzleTrace). */
     private static final double SEATED_ORIGIN_REACH_M = 15.0;
 
     /**
@@ -1315,26 +1412,35 @@ public class NetworkManager extends Node {
                 seqKey + "|" + shot.weaponSlot(), k -> new ShotValidationPolicy.RateBudget());
         boolean budgetOk = budget.tryConsume(nowMs() / 1000.0, firearm.getFireRate());
 
+        Vector3 body = shooter.getGlobalPosition();
         double originDist;
         if (shooter.currentVehicleNode != null) {
-            originDist = Math.max(0.0, shot.origin().distanceTo(shooter.getGlobalPosition()) - SEATED_ORIGIN_REACH_M);
+            originDist = Math.max(0.0, shot.origin().distanceTo(body) - SEATED_ORIGIN_REACH_M);
         } else {
-            originDist = shot.origin().distanceTo(firearm.muzzlePosition());
+            double dx = shot.origin().getX() - body.getX(), dz = shot.origin().getZ() - body.getZ();
+            double dy = shot.origin().getY() - body.getY();
+            double outside = Math.max(0.0, Math.hypot(dx, dz) - SHOOTER_REACH_M);
+            double below = Math.max(0.0, SHOOTER_LOW_M - dy), above = Math.max(0.0, dy - SHOOTER_HIGH_M);
+            originDist = Math.max(outside, Math.max(below, above));   // metres OUTSIDE the volume
         }
         double aimAngle = 0.0;
         Vector3 toAim = shooter.getAimTargetPosition().minus(shot.origin());
         if (toAim.lengthSquared() > 0.25) {
             aimAngle = Math.toDegrees(toAim.normalized().angleTo(shot.aim().normalized()));
         }
-        double hostSpread = shooter.useWeaponSpread ? firearm.getCurrentSpreadDeg() : 0.0;
+        double hostSpread = shooter.useWeaponSpread ? firearm.minimumSpreadDeg() : 0.0;
 
         ShotValidationPolicy.Verdict v = ShotValidationPolicy.evaluate(shot.shotSeq(), last, budgetOk,
                 originDist, aimAngle, shot.spreadDeg(), hostSpread, ShotValidationPolicy.Limits.DEFAULT);
         if (v == ShotValidationPolicy.Verdict.ACCEPT) lastShotSeq.put(seqKey, shot.shotSeq());
         else if (debugShots) {
+            WeaponController wcDbg = findWeaponController(shooter);
             GD.print("[shot] host REJECTED #" + shot.shotSeq() + " " + v + String.format(
-                    " origin %.2f m, aim %.1f deg, spread client %.2f / host %.2f", originDist, aimAngle,
-                    shot.spreadDeg(), hostSpread));
+                    " origin %.2f m outside, aim %.1f deg, spread client %.2f / host min %.2f", originDist, aimAngle,
+                    shot.spreadDeg(), hostSpread)
+                    + " | client origin " + shot.origin() + " host muzzle " + firearm.muzzlePosition()
+                    + " body " + shooter.getGlobalPosition() + " in hand " + (wcDbg != null && wcDbg.getCurrentWeaponItem() == firearm)
+                    + " parent " + firearm.getParent().getName());
         }
         return v;
     }

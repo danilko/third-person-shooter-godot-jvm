@@ -310,6 +310,21 @@ public class GameManager extends Node {
         MissionManager missions = getMissionManager();
         if (missions == null) return;
 
+        // Two game instances on ONE install share user://player_id.cfg, so they identify with the same
+        // id — which is exactly how LAN co-op is tested on a single PC. Taken as-is, the second peer got
+        // a body with the FIRST peer's characterId: three bodies with one identity, and a client that
+        // could no longer tell which one it owned (found by tools/net/run_net_shot_test.sh, whose
+        // observers stole the shooter's body). A live session already holding the id means this is a
+        // second instance, not a rejoin: give it a distinct id. A DISCONNECTED session still matches
+        // below, so a real rejoin is unchanged; a suffixed instance simply does not rejoin its body.
+        if (missions.findConnectedSessionByCharacterId(persistentPlayerId) != null) {
+            String distinct = persistentPlayerId + "#" + peerId;
+            com.openworld.net.NetStats.increment("identify_duplicate_player_id");
+            GD.print("GameManager: peer " + peerId + " identified with an id a connected peer already holds"
+                    + " (a second instance of one install) — using " + distinct);
+            persistentPlayerId = distinct;
+        }
+
         NetworkManager net = getNetworkManager();
 
         PlayerSession session = missions.findDisconnectedSessionByCharacterId(persistentPlayerId);

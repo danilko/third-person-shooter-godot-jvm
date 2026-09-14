@@ -158,6 +158,10 @@ echo "── 5/6 refresh binary district scenes (.tscn -> .scn)"
 "${RUN[@]}" --path "$REPO" res://src/main/resources/com/openworld/world/hosts/ConvertPieces.tscn 2>&1 \
     | grep -iE "PieceBinaryConverter: done" || true
 
+if [[ "${NO_SOLO:-0}" == "1" ]]; then
+  echo "── 6/6 (NO_SOLO=1 — SoloPiece.tscn left alone)"
+  exit 0
+fi
 echo "── 6/6 point SoloPiece.tscn at $STEM.tscn"
 SOLO="$REPO/src/main/resources/com/openworld/world/hosts/SoloPiece.tscn"
 python3 - "$SOLO" "res://$RES_DIR/$STEM.tscn" <<'PY'
