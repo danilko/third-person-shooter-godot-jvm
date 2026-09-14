@@ -107,7 +107,7 @@ public class ZoneManager extends Node {
 	/**
 	 * Recycle AI bodies through the {@link SpawnPool} across load/unload. <b>Default off / EXPERIMENTAL:</b>
 	 * reusing a full character body subtree (detach via {@code removeChild}, re-attach via {@code addChild})
-	 * is unsafe in godot-kotlin-jvm — the body carries a {@code top_level} camera, a muzzle-flash
+	 * is unsafe in godot-jvm — the body carries a {@code top_level} camera, a muzzle-flash
 	 * {@code GPUParticles3D}, and a nameplate {@code SubViewport}, and re-attaching that subtree
 	 * dereferences transforms/particles in a half-initialised state ({@code get_global_transform "not
 	 * inside tree"} / {@code particles is null}) → native use-after-free crash. With it off, unload frees

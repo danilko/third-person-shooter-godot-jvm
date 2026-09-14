@@ -84,7 +84,7 @@ public class HUDManager extends CanvasLayer {
   /**
    * Declarative source of truth: which registry widgets are visible per situation. Edit this table to
    * change the HUD layout; adding a widget = drop its node in HUDManager.tscn + list its name here.
-   * Kept as a code table (not an exported nested Dictionary, which crashes the godot-kotlin-jvm
+   * Kept as a code table (not an exported nested Dictionary, which crashes the godot-jvm
    * registration scanner — see CLAUDE.md). Player health ({@code FootHUD}) is listed in every vehicle
    * situation so it stays visible while riding (the occupant's body is exposed). The Crosshair and the
    * WeaponRadialMenu are intentionally NOT table-managed: the crosshair has finer combat/weapon-mode

@@ -45,9 +45,9 @@ water mask sees characters, mesh box == collision box, background NONE).
   ridged mountain shaping (`tools/godot/shape_terrain.gd`), height/slope painting
   (`tools/godot/paint_terrain.gd`), a generated sand texture (`tools/make_sand_texture.py`).
 - [x] **3 — First road + the lane adapter.** Below.
-- [ ] **4 — Retire the Blender road path.** `assets/world_source/tools/env.sh` still points at the
-  obsolete JVM-module Godot binary; that file is the marker for what is still wired to the old
-  pipeline.
+- [ ] **4 — Retire the Blender road path.** The Blender road/bake scripts under `blender/tools/`
+  are what is still wired to the old pipeline (they already run the standard Godot editor, via
+  `blender/tools/env.sh`).
 
 ## Step 3 — what landed, and what it measures
 

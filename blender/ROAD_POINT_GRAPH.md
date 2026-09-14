@@ -960,7 +960,7 @@ Gate first (redesign defect 11: *a gate that cannot pass is worse than no gate*)
 | **0.5** ✅ **DONE 2026-08-22** | **SPIKE** — 2 000 Empties (40 roads × 50), each with a 10-field `PropertyGroup` + a `links` `CollectionProperty`, plus `depsgraph_update_post` and a timer. Blender 5.2, headless | **Results in §8a. Both decisions settled: Objects are the carrier (the contingency is NOT needed), and all four predicted correctness landmines are real.** |
 | **1** ✅ **DONE 2026-08-22** | `lib/road_points.py` (incl. `lane_taper_route`), `lib/lane_movements.py`, `point_model.py`, `point_profile.py`, `point_validate.py` | **All six `python3` self-tests green** (33 assertions). The testbed — 6-point road + 4-arm junction + ramp — is built in `point_validate.build_testbed()` purely through the data model, gates clean, and round-trips byte-stable through `.roads.json` (4.5 KB, 324 diffable lines) with the gate still green on the RELOADED record. Seven deliberate defects are caught by code and object name: half-written JUNCTION link, chain hole, dangling link, taper-too-short, ramp edge residual, ramp with no aux slot, ramp back-link. **Four corrections were forced out by writing the tests** — see §8b |
 | **2** ✅ **DONE 2026-08-22** | `point_ops.py` (15 operators) + `smoketest_point_ops.py` | **All 8 operator smoketests green** under `blender --background --python-exit-code 1`. The step-1 testbed is rebuilt entirely through `New Road` / `Extend Road` / `Make Intersection` / `Make Ramp` / `Insert Point` / `Delete Point` / `Connect Selected` / `Apply Cross-Section` and gates clean; the `.roads.json` written by `Save Road Record` rebuilds the Empties byte-identically via `Load Road Record`. Registers alongside `graph_*` with a clean disable/re-enable cycle. Two real bugs found — see §8c. **Deferred to their own steps** (not part of step 2's criterion): `Auto Setback` and `Fit Ramp Grade` (need the solver, step 4), `Split`/`Reverse`/`Merge Roads`, `Resample`, `Duplicate Road`/`Duplicate Junction`, `Repair Links`, and the craft tooling of §4.1 |
-| **3** ✅ **DONE 2026-08-22** (Blender + Java; in-engine run BLOCKED, see §8d) | `point_export.py` + `.lanekit` **v2** + the Java reader (§6.1–6.2) | **8 export self-tests green**, and `check_lanekit_graph.py` passes on the testbed: 14 through lanes + 14 connectors, **junction gaps 0.000 m** (v1 needed up to 4.5 m of slack), 0 reversed. 3 bezier control points replace 60 polyline points on a mainline lane. `spawnable` is explicit, `junctions[]`/`arms[]`/`roads[]` emitted, aux lanes carry `inner_lane`. Java side compiles and `./gradlew build` is green on the 0.16.3 plugin: `WorldBaker` reads `{p, in, out}` with a v1 `points` fallback, `PathLaneRoute` gained `speedLimit`/`roadClass`/`junctionId`/`grade`/`banking`/`spawnable`+`spawnableExplicit`, `isSpawnCandidate` tests the flag (v1 inference kept), `CruiseState` paces off `effectiveCruiseSpeed()`. **Not yet run inside Godot** — see §8d |
+| **3** ✅ **DONE 2026-08-22** (Blender + Java; in-engine run was blocked, since resolved — see §8d) | `point_export.py` + `.lanekit` **v2** + the Java reader (§6.1–6.2) | **8 export self-tests green**, and `check_lanekit_graph.py` passes on the testbed: 14 through lanes + 14 connectors, **junction gaps 0.000 m** (v1 needed up to 4.5 m of slack), 0 reversed. 3 bezier control points replace 60 polyline points on a mainline lane. `spawnable` is explicit, `junctions[]`/`arms[]`/`roads[]` emitted, aux lanes carry `inner_lane`. Java side compiles and `./gradlew build` is green: `WorldBaker` reads `{p, in, out}` with a v1 `points` fallback, `PathLaneRoute` gained `speedLimit`/`roadClass`/`junctionId`/`grade`/`banking`/`spawnable`+`spawnableExplicit`, `isSpawnCandidate` tests the flag (v1 inference kept), `CruiseState` paces off `effectiveCruiseSpeed()`. **Not yet run inside Godot** — see §8d |
 | **4** ✅ **DONE 2026-08-22** | `point_solve.py`, `point_edges.py`, `point_nodes.py`, `point_build.py`, `lib/road_support.py` | **10 solve + 7 edge self-tests green under plain `python3`, 10 build smoketests green headless**, proven against the three shapes that killed the previous two models: a **gore**, a **15-degree skew junction**, and a **parallel overlap that never converges**. `lib/road_support.py` MOVED out of `tools/island_v3_plan.py` (which re-exports it), verified behaviour-neutral. **§3.2's open decision is settled — differently from the plan: there is no polygon clipper and no boundary walk, see §8e.** Two real defects found by the tests — see §8e. |
 | **5** ✅ **DONE 2026-08-22** | `point_panel.py`, `point_overlay.py`, `point_live.py` | **9 smoketests green.** `point_live.dirty_set()` is asserted DIRECTLY rather than inferred from what geometry exists: dragging a point marks its road plus every road across a JUNCTION or AUX link, and nothing else; a write into `ROAD_MANAGER_GEN` marks nothing (the debounce settles); undo re-marks everything. **A seventh landmine, not on the plan's list of six, was found here and is real** — see §8e. |
 | 6 ⏸ **DEFERRED (user's call, 2026-08-22)** | `island_v3_to_points.py` | The island is to be redesigned or re-authored on the new model later; it explicitly gets no vote on the design, so it is not a gate on steps 4–7. The step-4/5 acceptance shapes (gore, skew, parallel overlap) are therefore **constructed deliberately in the smoketests** rather than found on the island — which is stricter, not weaker: they are reproducible and they fail loudly. |
@@ -1087,21 +1087,9 @@ unconditionally dies with `already registered as a subclass 'RKA_Link'`.
 
 ## 8d. What is NOT done, and what blocks it (2026-08-22)
 
-**The Godot-side runtime verification of step 3 is blocked by something that predates this work.**
-`build.gradle.kts` in the working tree bumps godot-kotlin-jvm to **0.17.0-4.7.2**, and 0.17 replaced
-`@RegisterClass` / `@RegisterFunction` / `@RegisterProperty` with a single `@Register` annotation.
-Every one of the ~100 registered Java classes still uses the old API, so `./gradlew build` fails with
-`cannot find symbol: class RegisterClass` in files nothing in this rewrite touches
-(`MovementState`, `GameManager`, ...).
-
-Established by measurement, not assumption: reverting **only** `build.gradle.kts` to 0.16.3-4.6.3
-makes `./gradlew build` **succeed** with all of step 3's Java changes in place. So the road work is
-green and the 0.17 annotation migration is a separate, pre-existing task. The bumped file has been
-left exactly as it was found -- reverting someone's in-progress upgrade is not this work's call.
-
-Until that migration lands, step 3's last acceptance clause -- *"a Godot bake spawns cars off it with
-smooth bezier paths"* -- cannot be run. Everything upstream of it is verified: the schema, the
-emitter, the standing gate, and the Java that reads it (compiled).
+**Resolved since:** the Godot-side runtime verification of step 3 was blocked here by an unfinished
+annotation migration in the Java codebase. That migration is done — the project now builds against
+godot-jvm `1.0.0-rc1` (`@Script` / `@Register` / `@Export`, see `CLAUDE.md` "Godot-JVM Specifics").
 
 **Superseded by §8e** (2026-08-22): `point_edges.py` and `Auto Setback` are now done. The §3.2
 decision was settled on a *constructed* parallel overlap rather than one of the island's 60 — see
@@ -1110,7 +1098,7 @@ proposed.
 
 **Still not started, with reasons:**
 
-* **The Godot in-engine run of step 3.** Blocked above; nothing in the road work can unblock it.
+* **The Godot in-engine run of step 3.** No longer blocked (see above); not yet re-run.
 * **`Fit Ramp Grade`** — `road_support.run_needed` / `grade_profile` are in place, so this is now
   only an operator shell over them.
 * **The remaining 4.1 craft tooling** (`Split`/`Reverse`/`Merge Roads`, `Resample`,
@@ -1127,7 +1115,7 @@ proposed.
   new machinery.
 * **LOD (§3.4)** — the `STREET_LOD_LOW` flat/kerbless/asset-free variant is one more GN stack
   configuration off the same carrier, not a second model.
-* **`LaneNetwork` node consolidation (step 4b)** — separable, and gated on the same 0.17 migration.
+* **`LaneNetwork` node consolidation (step 4b)** — separable; its annotation-migration gate is gone.
 
 ## 8e. Steps 4, 5 and 7 results (2026-08-22)
 

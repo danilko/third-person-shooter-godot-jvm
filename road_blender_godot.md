@@ -1470,44 +1470,21 @@ concrete need for it shows up. Reasoning:
       **Verified**: `./gradlew build`+`test` pass; real headless run against 3 real districts
       produces a correct, lightweight, directly-openable-in-the-editor static preview scene.
 
-  ### Toolchain upgrade: godot-kotlin-jvm 0.15.0-4.6 -> 0.16.3-4.6.3 (2026-07-27, user-requested)
+  ### Toolchain upgrade: Gradle DSL + callable API migration (2026-07-27, user-requested)
 
-  Binary path (every tool script's `GODOT` default, `reference_godot_jvm_binary` memory) switched
-  to `/data/danilko/bin/godot.linuxbsd.editor.x86_64.jvm.0.16.3`; `build.gradle.kts` plugin
-  version was already bumped by the user to `0.16.3-4.6.3`, but the `godot {}` DSL block was not
-  yet updated to match — a real, breaking, multi-version API jump, not a drop-in bump. Two
-  breaking changes found and fixed (confirmed via an actual full rebuild, not assumed from a
-  changelog):
+  A breaking plugin upgrade, fixed and confirmed by a full rebuild. The project now runs godot-jvm
+  `1.0.0-rc1` as a GDExtension add-on (`addons/jvm/`) under the standard Godot editor — see
+  `CLAUDE.md` Build & Run for the current setup. Two API facts from this migration still hold:
   1. **`godot {}` DSL renames**: `registrationFileBaseDir` -> `registrationFilesDirectory`;
-     `isRegistrationFileGenerationEnabled` -> `disableGdj` (renamed **and inverted** — `true` used
-     to mean "generate", `false` now means "don't disable", i.e. still generate). Confirmed via
-     `javap` on the new plugin jar's `GodotExtension.class` (`~/.gradle/caches/modules-2/.../
-     godot-gradle-plugin/0.16.3-4.6.3/.../godot-gradle-plugin-0.16.3-4.6.3.jar`) rather than
-     guessing from the compiler's bare "unresolved reference" error. The commented-out hierarchy/
-     fqName flags renamed too (`registrationFilesLayoutMode`/`registrationNameMode`, now enums) —
-     left commented, matching their prior state. `.gdj` generation stays ON (kept as the existing
-     safety net, unchanged intent) — the new plugin ALSO always generates its own Entry-metadata
-     registration format under `build/` regardless of this flag (a second, parallel mechanism now
-     — the old checked-in `src/main/resources/META-INF/services/godot.registration.Entry` legacy
-     service file is superseded by it and was removed, per the plugin's own build-log message).
-  2. **`Callable.createUnsafe(Object, StringName)` removed entirely** — the reflection-by-name
-     signal-binding idiom used at ~48 call sites across 15 files. Replaced by
-     `MethodCallable.createUnsafe(Object, String)` (`godot.core.MethodCallable`, confirmed via
-     `javap` on `godot-core-library-debug-0.16.3-4.6.3.jar` — the arity-typed `MethodCallable0..16`
-     family alongside it suggests a longer-term, more type-safe direction, but the plain
-     `createUnsafe` overload still covers this project's existing pattern unchanged) — same
-     `(target, methodName)` shape, just a plain `String` instead of `StringName`/
-     `StringNames.toGodotName(...)` for the name argument. Every call site fixed mechanically
-     (`Callable.createUnsafe(X, StringNames.toGodotName("Y"))` / `Callable.createUnsafe(X, new
-     StringName("Y"))` -> `MethodCallable.createUnsafe(X, "Y")`) + `import godot.core.
-     MethodCallable;` added to each of the 15 files; the old `Callable` import/type usage
-     elsewhere (e.g. `connect(new StringName("signal"), ...)`'s own signal-name argument, `Callable`
-     as a variable/return type) is untouched — only the `createUnsafe` factory call itself moved.
-  **Verified**: `./gradlew build`+`test` pass; the new binary actually RUNS correctly too, not
-  just compiles — `QuitSignalCheck.tscn`, `LaneKitCombineTest.tscn` (82 lanes, PASS), and
-  `MultiZoneStreamTest.tscn` (84+12 lanes, 6 vehicles, PASS) all re-run clean under
-  `godot.linuxbsd.editor.x86_64.jvm.0.16.3`/Godot 4.6.3. The old 0.15.0 binary is left on disk
-  untouched as a fallback, just no longer what any tool script defaults to.
+     `isRegistrationFileGenerationEnabled` -> `disableGdj` (renamed **and inverted**). The legacy
+     `src/main/resources/META-INF/services/godot.registration.Entry` service file is superseded by
+     the plugin's generated registration under `build/` and was removed.
+  2. **`Callable.createUnsafe(Object, StringName)` is gone.** Use
+     `MethodCallable.createUnsafe(Object, String)` (`godot.core.MethodCallable`) — same
+     `(target, methodName)` shape with a plain `String` name. All ~48 call sites across 15 files were
+     migrated mechanically.
+  **Verified**: `./gradlew build`+`test` pass, and `QuitSignalCheck.tscn`, `LaneKitCombineTest.tscn`
+  (82 lanes, PASS) and `MultiZoneStreamTest.tscn` (84+12 lanes, 6 vehicles, PASS) re-ran clean.
       needed) — an enable-as-needed / Terrain3D-style toggle so only the district(s) you're
       actively debugging are loaded, still deferred (low priority, no immediate need identified).**
 
@@ -2133,9 +2110,8 @@ concrete need for it shows up. Reasoning:
 
   ### Tooling: centralized the Godot binary path (2026-07-27, user-reported)
 
-  The Godot binary was renamed/replaced (`godot.linuxbsd.editor.x86_64.jvm.0.16.3` →
-  `godot.linuxbsd.editor.x86_64.jvm`, no version suffix) outside any session activity, breaking 4
-  separate hardcoded `GODOT="${GODOT:-/data/.../jvm.0.16.3}"` lines across `tools/build_piece.sh`/
+  The Godot binary path changed outside any session activity, breaking 4
+  separate hardcoded `GODOT="${GODOT:-...}"` lines across `tools/build_piece.sh`/
   `build_overlay.sh`/`build_world.sh`/`build_intersection_piece.sh`. New `tools/env.sh` (sourced by
   all 4 via `source "$BP/tools/env.sh"` right after `BP` is computed) is now the single place that
   default lives — still honors an environment override (`GODOT=/other/path tools/build_piece.sh`).
@@ -2578,21 +2554,10 @@ progressively more special-case machinery (tag endpoints, delete caps, two-pass 
 in a missing face) to keep behaving correctly, that is itself a signal to step back and ask whether
 the underlying approach is right at all — which is exactly what the user's question did.
 
-### Tooling: the Godot binary is the STOCK one now (2026-09-08, user-requested)
+### Tooling: the standard Godot editor (2026-09-08, user-requested)
 
-`blender/tools/env.sh`'s `GODOT` default moved from `godot.linuxbsd.editor.x86_64.jvm` to
-`/data/danilko/bin/Godot_v4.7.2-stable_linux.x86_64`, and every remaining reference to the old
-binary outside this file's dated history was updated with it (`AIM_PLAN.md`, `CLAUDE.md`'s
-Build & Run, 35 stale `.jvm.0.15.0` entries in `.claude/settings.local.json`).
-
-**Why the old one is now actively wrong, not merely old.** `build.gradle.kts` is on
-`com.utopia-rise.godot-jvm` `1.0.0-dev3`, which ships the runtime **with the project** as the
-`addons/jvm/` GDExtension. A binary with the JVM module compiled in therefore loads it twice, and
-the failure does not name the binary: `Attempt to register extension class 'JvmScript', which
-appears to be already registered` → `Version mismatch! C++ module is : 0.17.1-4.7.2 / Jar is :
-1.0.0-dev3` → **every AutoLoad failing with "does not inherit from 'Node'"**. That reads as a
-completely broken project, which is exactly how it cost a debugging detour this session before
-`AimDebugAuto.tscn` was run under the stock binary and came back clean.
-
-The entries above this one keep the old paths on purpose — they are dated records of what was true
-when they were written, and `env.sh` has been the single owner of the default since 2026-07-27.
+`blender/tools/env.sh`'s `GODOT` default is the standard Godot editor,
+`/data/danilko/bin/Godot_v4.7.2-stable_linux.x86_64`. godot-jvm `1.0.0-rc1` is a GDExtension add-on
+that ships with the project in `addons/jvm/`, so no custom engine build is needed. Keep the Gradle
+plugin and the add-on on the same version and upgrade them together. `env.sh` has been the single
+owner of the default since 2026-07-27.

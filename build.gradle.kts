@@ -38,7 +38,7 @@ godot {
 
     // ---------Android----------------
 
-    // NOTE: Make sure you read: https://godot-kotl.in/en/stable/user-guide/exporting/#android as not all jvm libraries are compatible with android!
+    // NOTE: Make sure you read: https://godot-jvm.dev/en/1.0/build/export/android/ as not all jvm libraries are compatible with android!
     // IMPORTANT: Android export should to be considered from the start of development!
     //isAndroidExportEnabled.set(ANDROID_ENABLED)
     //d8ToolPath.set(File("D8_TOOL_PATH"))
@@ -46,7 +46,7 @@ godot {
 
     // --------IOS and Graal------------
 
-    // NOTE: this is an advanced feature! Read: https://godot-kotl.in/en/stable/user-guide/advanced/graal-vm-native-image/
+    // NOTE: this is an advanced feature! Read: https://godot-jvm.dev/en/1.0/build/export/graalvm-native-image/
     // IMPORTANT: Graal Native Image needs to be considered from the start of development!
     //isGraalNativeImageExportEnabled.set(IS_GRAAL_VM_ENABLED)
     //graalVmDirectory.set(File("GRAAL_VM_DIR"))
@@ -55,7 +55,7 @@ godot {
 
 	// --------Library authors------------
 
-	// library setup. See: https://godot-kotl.in/en/stable/develop-libraries/
+	// library setup. See: https://godot-jvm.dev/en/1.0/build/libraries/
     //classPrefix.set("MyCustomClassPrefix")
     //projectName.set("LibraryProjectName")
     //projectName.set("LibraryProjectName")
