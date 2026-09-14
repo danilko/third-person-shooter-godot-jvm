@@ -401,8 +401,9 @@ def chain_facings(net, resolve=True):
     return out
 
 
-def centreline_runs(net, step=None):
-    """`[(road_name, [pos, ...]), ...]` -- the RESOLVED centreline of every chain run.
+def centreline_runs(net, step=None, with_uids=False):
+    """`[(road_name, [pos, ...]), ...]` -- the RESOLVED centreline of every chain run
+    (`(road_name, [pos, ...], [uid, ...])` with `with_uids`, so a caller can say which run it is).
 
     Cheap on purpose: `resample` only, no profile widths, no support, no ground raycast -- this
     feeds the viewport overlay, which redraws per region per frame while a point is being rotated.
@@ -429,7 +430,8 @@ def centreline_runs(net, step=None):
             sts = stations(rpts, is_loop,
                            end_axes=(None if is_loop else run_end_axes(net, rpts)))
             kw = {} if step is None else {"step": step}
-            out.append((road.name, [s.pos for s in rp.resample(sts, is_loop, **kw)]))
+            pts = [s.pos for s in rp.resample(sts, is_loop, **kw)]
+            out.append((road.name, pts, run) if with_uids else (road.name, pts))
     return out
 
 

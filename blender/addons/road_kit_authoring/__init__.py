@@ -3,7 +3,7 @@ bl_info = {
     "author": "third-person-shooter",
     "version": (0, 3, 0),
     "blender": (4, 0, 0),
-    "location": "View3D > Sidebar > Road Kit",
+    "location": "headless: blender/tools/roadkit_build_mesh.py (authoring is the Godot Road Kit plugin)",
     "description": "Point/port road authoring: an Empty per road station, carrying its own "
                     "cross-section and its own typed links.",
     "category": "Object",
@@ -29,14 +29,10 @@ bl_info = {
 #   point_build    carrier + stack + pads + ground cut + collision; ROAD_MANAGER_GEN lifetime
 #   point_style    what a road is MADE OF: a material or a swept profile asset, per layer
 #   point_export   .lanekit.json v2 -- bezier handles FITTED to the lane, junctions[], `spawnable`
-#   point_ops      the authoring gestures
-#   point_panel    the point INSPECTOR (deliberately not a stamping brush)
-#   point_overlay  the GPU overlay -- what makes hundreds of points legible, and what follows a
-#                  drag in real time
-#   point_preview  the TRAFFIC FLOW preview -- the same GPU-overlay discipline pointed at the
-#                  EXPORTED lane graph rather than the authored one, because the two are not the
-#                  same object and only the exported one ships
-#   point_live     depsgraph dirty set + debounced rebuild; geometry on SETTLE only
+#   point_ops      the headless pipeline's operators (seeder + builds); authoring is the Godot plugin's
+#   point_record_ops  the record-level repairs and ramp gestures the Godot plugin calls (pure)
+#   point_flow     the lane-graph flow report (pure)
+#   point_zones / point_ground  the per-zone cut and the Terrain3D ground sidecar (pure)
 #
 # The two models this replaces are archived under `legacy_graph/` (the mesh graph) and were
 # deleted (the per-piece generators) -- see `legacy_graph/README.md`. Neither is imported.
@@ -50,13 +46,11 @@ from . import point_style  # noqa: F401  (style slots; pure resolution, no opera
 from . import point_edges  # noqa: F401  (the road edge; pure geometry, no operators)
 from . import point_ops
 from . import point_build
-from . import point_panel
-from . import point_overlay
-from . import point_preview
-from . import point_live
 
-MODULES = (point_ops, point_build, point_panel, point_overlay, point_preview,
-           point_live)
+# B9 (PLAN.md 3.1, 2026-09-14): authoring is the Godot plugin's. The panels, the GPU overlay, the flow
+# preview's drawing (`point_flow` keeps the report) and the live rebuild are deleted; what registers
+# is what the headless pipeline drives.
+MODULES = (point_ops, point_build)
 
 
 def register():

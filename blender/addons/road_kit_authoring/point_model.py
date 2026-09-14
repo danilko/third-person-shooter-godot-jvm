@@ -1049,6 +1049,15 @@ def link_order(net, road):
         if len(order) != len(comp):               # unreachable for deg<=2, but never emit a partial
             tangled.extend(comp)
             continue
+        # KEEP THE ROAD'S DIRECTION. Starting at the end that sorts first is right for a road that is
+        # only shuffled in the middle, and REVERSED it when the head itself moved: a point dragged
+        # from the head to the tail made the old tail sort first, and the repair handed back the
+        # whole chain backwards -- which swaps what `lanes_fwd` and `lanes_bwd` mean on every
+        # station. The orientation that agrees with more of the current order wins (ties keep it).
+        def rising(seq):
+            return sum(1 for x, y in zip(seq, seq[1:]) if rank[y] > rank[x])
+        if rising(order[::-1]) > rising(order):
+            order.reverse()
         comps.append(order)
     comps.sort(key=lambda c: min(rank[u] for u in c))
     return comps, tangled

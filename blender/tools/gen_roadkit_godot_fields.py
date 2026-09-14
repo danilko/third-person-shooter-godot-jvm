@@ -19,6 +19,7 @@ REPO = os.path.dirname(BP)
 sys.path.insert(0, os.path.join(BP, "addons", "road_kit_authoring"))
 sys.path.insert(0, os.path.join(BP, "lib"))
 import point_model as pm  # noqa: E402
+import point_record_ops as ro  # noqa: E402
 
 OUT = os.path.join(REPO, "addons", "road_kit", "road_kit_fields.gd")
 
@@ -54,6 +55,11 @@ const SCHEMA_VER := %d
 const DELTA_FIELDS := [%s]
 const LINK_TYPES := [%s]
 const ROLES := [%s]
+## A point turned further than this from the facing the tool gave it was ROTATED by hand -- the bend
+## gesture (`point_model.was_rotated`).
+const ROTATED_TOL_DEG := %r
+## Apply Cross-Section's field groups (`point_record_ops.MASK_GROUPS`).
+const MASK_GROUPS := [%s]
 
 const POINT_FIELDS := [
 %s
@@ -64,6 +70,7 @@ const ROAD_FIELDS := [
 ]
 """ % (pm.SCHEMA_VER, ", ".join('"%s"' % f for f in pm.DELTA_FIELDS),
        ", ".join('"%s"' % t for t in pm.LINK_TYPES), ", ".join('"%s"' % r for r in pm.ROLES),
+       float(pm.ROTATED_TOL_DEG), ", ".join('"%s"' % g for g in sorted(ro.MASK_GROUPS)),
        _table(pm.POINT_FIELDS), _table(pm.ROAD_FIELDS))
 
 

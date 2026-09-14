@@ -1,4 +1,8 @@
-"""Step 2's acceptance test: build the step-1 testbed scene PURELY through operators, headless.
+"""Step 2's acceptance test: build the step-1 testbed scene through the HEADLESS PIPELINE's operators.
+
+Since B9 (PLAN.md 3.1) the interactive gestures are the Godot plugin's; what is left in Blender is what
+the island seeder and the builds drive (New Road, Extend Road, Connect, Make Intersection, the record),
+plus `point_record_ops` applied to the record for the ramp -- which is exactly how a tool now does it.
 
     blender --background --python-exit-code 1 \
             --python blender/addons/road_kit_authoring/smoketest_point_ops.py
@@ -23,6 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "lib"))
 from road_kit_authoring import point_model as pm         # noqa: E402
 from road_kit_authoring import point_ops as po           # noqa: E402
 from road_kit_authoring import point_validate as pv      # noqa: E402
+from road_kit_authoring import point_record_ops as ro     # noqa: E402
 
 
 def _wipe():
@@ -49,6 +54,14 @@ def _pts(name):
     return po.points_in(_coll(name))
 
 
+def _unlink(a, b):
+    """Both rows of a pair -- what the retired Disconnect Selected wrote."""
+    for x, y in ((a, b), (b, a)):
+        for i in range(len(x.rka_pt.links) - 1, -1, -1):
+            if x.rka_pt.links[i].target is y:
+                x.rka_pt.links.remove(i)
+
+
 def build_through_operators():
     """The same scene as `point_validate.build_testbed()`, but every edit is an operator call."""
     _wipe()
@@ -69,29 +82,29 @@ def build_through_operators():
     cp = _pts("road_cross")
     assert len(cp) == 4, cp
 
-    # -- the 4-arm pad. The two mainline mouths are ADJACENT members of one 6-point chain: a
-    #    crossing does not split the street.
-    _sel(mp[2], mp[3])
-    bpy.ops.rka.disconnect_selected()
-    _sel(cp[1], cp[2])
-    bpy.ops.rka.disconnect_selected()
-    _sel(mp[2], mp[3], cp[1], cp[2])
-    bpy.ops.rka.make_intersection(fillet_radius=6.0)
-
-    # -- the ramp ------------------------------------------------------------------------------
+    # -- the ramp, as a tool does it now: the record gesture on the network, projected back ------
     bpy.ops.rka.new_road(name="ramp_e", x=480.0, y=40.0, lanes_fwd=1, lanes_bwd=0,
                          median_width=0.0, road_class="ramp")
     bpy.ops.rka.extend_road(use_delta=True, dx=140.0, dy=29.0)
-    rr = _pts("ramp_e")
-    _sel(rr[0], mp[4])                      # active = the MAINLINE point
-    bpy.ops.rka.make_ramp(role=pm.RAMP_EXIT, aux_lanes=1, align=True)
+    net = pm.read_network()
+    ro.make_ramp(net, _pts("ramp_e")[0].rka_pt.uid, mp[4].rka_pt.uid, lanes=1)
+    po.apply_network(net)
+    bpy.context.view_layer.update()
+    mp, cp, rr = _pts("road_main"), _pts("road_cross"), _pts("ramp_e")
+
+    # -- the 4-arm pad. The two mainline mouths are ADJACENT members of one 6-point chain: a
+    #    crossing does not split the street.
+    _unlink(mp[2], mp[3])
+    _unlink(cp[1], cp[2])
+    _sel(mp[2], mp[3], cp[1], cp[2])
+    bpy.ops.rka.make_intersection(fillet_radius=6.0)
     return mp, cp, rr
 
 
 def main():
     # The repo addon is symlinked into Blender's addons dir and auto-enables, so it is normally
     # ALREADY registered by the time this runs. Register only if it is not.
-    if not hasattr(bpy.types, "RKA_OT_validate"):
+    if not hasattr(bpy.types, "RKA_OT_point_build"):
         po.register()
     ok = 0
     mp, cp, rr = build_through_operators()
@@ -189,7 +202,7 @@ def main():
 
     # -- Make Ramp aligned the ramp to the aux slot edge, with no pad ----------------------------
     ramp0 = _pts("ramp_e")[0]
-    assert ramp0.rka_pt.role == pm.RAMP_EXIT and ramp0.rka_pt.lanes_bwd == 0
+    assert ramp0.rka_pt.role == pm.RAMP and ramp0.rka_pt.lanes_bwd == 0
     main4 = _pts("road_main")[4]
     assert main4.rka_pt.aux_fwd == 1, "the MAINLINE point owns the aux slot"
     # The GORE LINE is the aux slot's THROUGH-LANE edge (y = 7.5 here: median 0.5 + F0 3.5 +
@@ -205,57 +218,6 @@ def main():
     assert ramp0.rka_pt.tangent_mode == pm.MANUAL, "that facing is pinned, not swept away by Build"
     assert not [f for f in findings if f.code.startswith("ramp_")]
     print("OK: Make Ramp opens the aux slot, writes the AUX link, and aligns mouth AND facing")
-    ok += 1
-
-    # -- Insert Point must change NOTHING ---------------------------------------------------------
-    _sel(_pts("road_main")[0], _pts("road_main")[1])
-    bpy.ops.rka.insert_point(t=0.5)
-    after_pts = _pts("road_main")
-    assert len(after_pts) == 7
-    assert [o.name for o in after_pts] == [po.point_name(_coll("road_main"), i)
-                                           for i in range(7)], \
-        "chain order IS name order -- an inserted point must renumber, not append"
-    net2 = pm.read_network()
-    assert not pv.errors(pv.validate(net2)), "inserting a point must not break the gate"
-    assert len(net2.roads["road_main"].points) == 7
-    print("OK: Insert Point splits the link, interpolates the profile and renumbers the chain")
-    ok += 1
-
-    # -- Delete Point strips inbound links --------------------------------------------------------
-    victim = _pts("road_main")[1]
-    _sel(victim)
-    bpy.ops.rka.delete_point()
-    net3 = pm.read_network()
-    codes = {f.code for f in pv.errors(pv.validate(net3))}
-    assert "link_dangling" not in codes, "deletion must leave no dangling reference"
-    # The hole IS reported: the point left joined to nothing is an ERROR under its own name, and
-    # the seam it leaves in the chain is a WARN (a road that splits into two runs still builds).
-    assert "point_stranded" in codes, codes
-    assert "chain_unlinked" in {f.code for f in pv.validate(net3)}, "reported, as a warning"
-    assert len(_pts("road_main")) == 6
-    # Repair by re-linking across the hole, exactly as `Connect Selected` would.
-    m = _pts("road_main")
-    _sel(m[0], m[1])
-    bpy.ops.rka.connect_selected(type=pm.LINK_SEGMENT)
-    assert not pv.errors(pv.validate(pm.read_network())), "Connect Selected closes the hole"
-    print("OK: Delete Point leaves no zombie and no dangling link; Connect Selected repairs")
-    ok += 1
-
-    # -- the mask defaults to NOTHING --------------------------------------------------------------
-    m = _pts("road_main")
-    _sel(m[5], m[0])
-    m[0].rka_pt.lanes_fwd = 4
-    # `bpy.ops` turns a reported ERROR into a RuntimeError, so a refusal is caught, not compared.
-    try:
-        bpy.ops.rka.apply_cross_section()
-        raise AssertionError("an empty field mask must refuse, not silently rewrite the median")
-    except RuntimeError as exc:
-        assert "mask defaults to nothing" in str(exc), exc
-    assert m[5].rka_pt.lanes_fwd == 2
-    _sel(m[5], m[0])
-    bpy.ops.rka.apply_cross_section(groups={'LANES'})
-    assert m[5].rka_pt.lanes_fwd == 4 and m[5].rka_pt.profile_mode == pm.OVERRIDE
-    print("OK: Apply Cross-Section refuses an empty mask and copies only the ticked group")
     ok += 1
 
     # -- the record round-trips, and the Empties are a VIEW of it -----------------------------------
@@ -329,16 +291,16 @@ def main():
     print("OK: duplicating a whole road keeps the copy's own wiring and orphans nothing")
     ok += 1
 
-    # -- ADD SAMPLE NETWORK IS IDEMPOTENT (user-reported) ----------------------------------------
-    # A second press used to raise `IndexError` and leave the network half-built, after which Build
-    # failed the gate on three unaligned ramp mouths -- with the PREVIOUS build's geometry still
-    # standing, so it read as "the roads built but the markings did not". Cause: `replace` deleted
-    # the point objects but not the collections they emptied, and names are GLOBAL, so the freshly
-    # branched `demo_spur` became `demo_spur.001` while every lookup found the stale empty one.
+    # -- LOADING THE SAMPLE RECORD AND BUILDING IS REPEATABLE (user-reported, as Add Sample Network) ---
+    # A second press used to leave the network half-built with the PREVIOUS build's geometry still
+    # standing. Names are GLOBAL, so a stale empty collection pushed the new road to `<name>.001`.
+    # The sample is the committed record now (B9 retired the button that authored it).
     _wipe()
     shape = []
+    sample = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(HERE))),
+                          "assets", "world_source", "pieces", "RoadKitSample.roads.json")
     for _ in range(3):
-        bpy.ops.rka.demo_network()
+        bpy.ops.rka.load_record(filepath=sample)
         bpy.ops.rka.point_build()
         gen = pm._local(bpy.data.collections, pm.ROAD_MANAGER_GEN)
         objs = []
@@ -356,12 +318,8 @@ def main():
     assert not [n for n in shape[0][2] if "." in n], \
         "a stale empty collection kept its name and pushed the new road to <name>.001: %s" \
         % shape[0][2]
-    jct_parents = [o for o in bpy.data.objects
-                   if o.type == 'EMPTY' and o.name.startswith("JCT_") and o.parent is None]
-    assert len(jct_parents) == 1, \
-        "one crossing, one junction parent -- %d left as debris" % len(jct_parents)
-    print("OK: Add Sample Network + Build is repeatable -- %d objects, %d marking(s), no stale "
-          "collection or junction parent after 3 presses" % (shape[0][0], shape[0][1]))
+    print("OK: Load Record + Build is repeatable -- %d objects, %d marking(s), no stale collection "
+          "after 3 presses" % (shape[0][0], shape[0][1]))
     ok += 1
 
     print("\nALL OPERATOR SMOKETESTS PASSED (%d)" % ok)

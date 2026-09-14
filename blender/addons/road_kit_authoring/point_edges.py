@@ -436,6 +436,117 @@ def _straight(net, pm, name, y, n=2, length=400.0, z=0.0, x0=0.0, **base):
     return road
 
 
+
+def solve_all(net, ground=None):
+    """Solve every road, clique and gore, and collect the bands. `(solves, jsolves, gsolves, bands)`.
+
+    ONE OWNER of the solve ORDER, because two things need it: `build_network`, which emits the
+    meshes, and `road_corridors`, which the terrain builder asks for the ground carve. Order is not
+    negotiable -- the edge furniture is a fact about TWO roads at once, so every carrier must exist
+    before any band is collected."""
+    solves, jsolves = [], ps.solve_junctions(net, ground_fn=ground)
+    for road in net.roads.values():
+        for uids in ps.road_runs(net, road):
+            s = ps.solve_road(net, road, uids, ground)
+            if s is not None:
+                solves.append(s)
+    # The gore is solved from the finished carriers, not alongside them: its two boundaries ARE
+    # the two roads' own paved edges, so it cannot exist until both roads have some.
+    gsolves = ps.solve_gores(net, solves)
+    return solves, jsolves, gsolves, collect_bands(solves, jsolves, gsolves)
+
+
+def band_corridors(bands, owners=False):
+    """Every built surface as `(polyline, half)` for `island_v3_terrain.Carve` -- the ground the
+    road needs cleared, expressed as a centreline the terrain can carve to.
+
+    THE WIDTH IS READ OFF THE BAND, not from the road's authored numbers: `band.poly` is the paved
+    outline (left edge out, right edge back), so the distance from a spine point to its own two
+    edge points IS the half-width there, aux lanes, median tapers and all. One owner, and it cannot
+    disagree with the mesh that was just swept from the same band.
+
+    Junction pads and gores are bands too, and they are included on purpose -- a pad is a paved
+    surface the ground must clear exactly as a carriageway is. An ELEVATED stretch needs no case:
+    the carve is a `min`, so a deck 18 m over the bay proposes a ceiling far above the water and
+    changes nothing."""
+    out = []
+    for band in bands:
+        spine = list(getattr(band, "spine", ()) or ())
+        poly = list(getattr(band, "poly", ()) or ())
+        if str(band.owner).startswith("JCT:"):
+            out.extend((l, h, band.owner) if owners else (l, h) for l, h in _pad_corridors(spine, poly))
+            continue
+        m = len(spine)
+        if m < 2 or len(poly) != 2 * m:
+            continue
+        line = []
+        for i, (sx, sy, sz) in enumerate(spine):
+            lx, ly = poly[i][0], poly[i][1]
+            rx, ry = poly[2 * m - 1 - i][0], poly[2 * m - 1 - i][1]
+            half = max(math.hypot(lx - sx, ly - sy), math.hypot(rx - sx, ry - sy))
+            # `sz` is the spine's OWN height, not `band.surface_z(sx, sy)` -- which is a
+            # nearest-sample lookup over this very list and would answer with the same number by a
+            # longer route, or with a neighbour's where two samples land close together.
+            line.append((sx, sy, sz, half))
+        out.append((line, 0.0, band.owner) if owners else (line, 0.0))
+    return out
+
+
+#: Points along one pad spoke, and the longest ring edge between two spokes (see `_pad_corridors`).
+PAD_SPOKE_STEPS = 6
+PAD_RING_STEP = 3.0
+
+
+class _At(object):
+    __slots__ = ("pos",)
+
+    def __init__(self, pos):
+        self.pos = pos
+
+
+def _pad_corridors(spine, ring):
+    """A junction pad as corridors: one SPOKE from the fan centre to every boundary vertex.
+
+    THE PAD WAS SILENTLY DROPPED until B7 (2026-09-14). `band_corridors` read every band as a road
+    band -- `spine` of m samples, `poly` of 2m edge points -- and skipped anything else, while its own
+    docstring said pads were included on purpose. A pad's band is its boundary RING plus its mouths
+    and centre, so `len(poly) == 2 * len(spine)` was false for every pad and the carve cleared the
+    streets up to each mouth and left the crossing itself standing (DebugRoads: 2 of 2 pads missing).
+
+    The ring is first resampled so no edge is longer than `PAD_RING_STEP`, and a spoke's half-width is
+    half the longer of its two edges -- so neighbouring spokes overlap at the ring, where they are
+    furthest apart, and the fan has no gaps. Spokes to the RAW ring were wrong the other way: a cap
+    corner's edge is the whole mouth (18 m on a T2), so its spoke claimed 9 m of the approach road
+    beyond the pad and put the ground 0.85 m under a lane there. Height is the pad's own rule,
+    `point_solve._idw_z` over the mouths (the last spine entry is the centre), at every point of the
+    spoke -- IDW is not linear along it."""
+    if len(spine) < 3 or len(ring) < 3:
+        return []
+    mouths = [_At(p) for p in spine[:-1]]
+    c = spine[-1]
+    cz = c[2] if len(c) > 2 else ps._idw_z(mouths, c)
+    dense = []
+    for i in range(len(ring)):
+        ax, ay = ring[i][0], ring[i][1]
+        bx, by = ring[(i + 1) % len(ring)][0], ring[(i + 1) % len(ring)][1]
+        k = max(1, int(math.ceil(math.hypot(bx - ax, by - ay) / PAD_RING_STEP)))
+        for j in range(k):
+            dense.append((ax + (bx - ax) * j / float(k), ay + (by - ay) * j / float(k)))
+    n = len(dense)
+    out = []
+    for i in range(n):
+        x, y = dense[i]
+        prev, nxt = dense[i - 1], dense[(i + 1) % n]
+        half = max(math.hypot(prev[0] - x, prev[1] - y), math.hypot(nxt[0] - x, nxt[1] - y)) / 2.0
+        line = []
+        for k in range(PAD_SPOKE_STEPS + 1):
+            t = k / float(PAD_SPOKE_STEPS)
+            px, py = c[0] + (x - c[0]) * t, c[1] + (y - c[1]) * t
+            line.append((px, py, cz if k == 0 else ps._idw_z(mouths, (px, py)), half))
+        out.append((line, 0.0))
+    return out
+
+
 def self_test():
     try:
         from . import point_model as pm, point_validate as pv

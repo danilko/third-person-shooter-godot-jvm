@@ -13,10 +13,16 @@ converts a preview; the record itself stays in the kit's frame, converted once b
 
     python3 blender/tools/roadkit_cli.py validate    <record>
     python3 blender/tools/roadkit_cli.py setback     <record> [--margin 2.0]   (rewrites the record)
-    python3 blender/tools/roadkit_cli.py centrelines <record> [--step 4.0]
+    python3 blender/tools/roadkit_cli.py centrelines <record> [--step 4.0] [--zones <zones.json>]
     python3 blender/tools/roadkit_cli.py lanekit     <record> <out.lanekit.json>
+    python3 blender/tools/roadkit_cli.py corridors   <record> [--ground <stem>.ground.json]
     python3 blender/tools/roadkit_cli.py ramp        <record> <uid_a> <uid_b> [--lanes 1]   (rewrites the record)
     python3 blender/tools/roadkit_cli.py pieces      <record> <zones.json> <out_dir> <prefix> [--dry-run]
+    python3 blender/tools/roadkit_cli.py merge|split <record> <uid,uid,...> [--keep uid --at-keep | --name n]
+    python3 blender/tools/roadkit_cli.py renumber|repair|tidy <record>           (rewrite the record)
+    python3 blender/tools/roadkit_cli.py cross_section <record> <src> <uid,...> <LANES,WIDTH,...>
+    python3 blender/tools/roadkit_cli.py branch_ramp <record> <uid> [--lanes 1 --carriageway FWD --entrance ...]
+    python3 blender/tools/roadkit_cli.py facings|flow <record>
 
 Exit code 0 unless the command itself failed (a red gate is a RESULT, reported in the JSON).
 """
@@ -38,6 +44,11 @@ import point_profile as pp        # noqa: E402
 import point_export as pe         # noqa: E402
 import point_zones as pz          # noqa: E402
 import lane_profile as lp         # noqa: E402
+import point_edges as ped         # noqa: E402
+import point_ground as pg         # noqa: E402
+import road_support as rs         # noqa: E402
+import point_record_ops as ro     # noqa: E402
+import point_flow as pf           # noqa: E402
 
 
 def _findings(net):
@@ -67,9 +78,39 @@ def cmd_setback(a):
 
 
 def cmd_centrelines(a):
+    """The overlay's picture. With `--zones` (B6c) each run also says which zone `point_zones` cuts
+    it into and whether it reaches past that zone's load radius (`beyond`), and `cross` lists every
+    successor edge that leaves its lane's zone, with the lane's points -- the hand-overs that only
+    resolve while both pieces are loaded. Everything here is asked of `point_zones`, never derived."""
     net = pm.load_network(a.record)
-    runs = pp.centreline_runs(net, step=a.step)
-    return {"runs": [{"road": name, "points": [pe.godot(p) for p in pts]} for name, pts in runs]}
+    zones = pz.load_zones(a.zones) if a.zones and os.path.exists(a.zones) else []
+    part = pz.partition(net, zones) if zones else None
+    beyond = {f["obj"] for f in part.findings if f["code"] == "zone_beyond_load"} if part else set()
+    out = []
+    for name, pts, uids in pp.centreline_runs(net, step=a.step, with_uids=True):
+        row = {"road": name, "points": [pe.godot(p) for p in pts]}
+        if part is not None:
+            first = part.run_of_uid.get(uids[0], uids[0])
+            row.update({"first": first, "zone": part.runs.get(first, pz.RESIDENT), "beyond": first in beyond})
+        out.append(row)
+    res = {"runs": out}
+    if part is not None:
+        res["pads"] = [{"uid": u, "zone": z, "beyond": u in beyond,
+                        "centre": pe.godot((sum(net.points[m].pos[0] for m in c) / len(c),
+                                            sum(net.points[m].pos[1] for m in c) / len(c),
+                                            sum(net.points[m].pos[2] for m in c) / len(c)))}
+                       for c in net.junction_cliques() for u, z in [(min(c), part.pad_zone(c))]]
+        cross = []
+        if not _findings(net)["errors"]:
+            doc = pe.export_network(net)
+            pz.stamp_lanes(doc, part, net)
+            by_id = {l["id"]: l for l in doc.get("lanes", ())}
+            for lane, nxt in pz.cross_zone_report(doc)[0]:
+                cross.append({"lane": lane, "next": nxt, "zone": by_id[lane].get("zone_id", pz.RESIDENT),
+                              "next_zone": by_id[nxt].get("zone_id", pz.RESIDENT),
+                              "points": by_id[lane].get("points", [])})
+        res["cross"] = cross
+    return res
 
 
 def cmd_lanekit(a):
@@ -124,91 +165,95 @@ def cmd_pieces(a):
     return gate
 
 
-def _declares_aux(p):
-    return int(p.aux_fwd) + int(p.aux_bwd) > 0
-
-
-def resolve_aux_pair(net, a, b):
-    """`(mainline_uid, ramp_uid)` -- `point_ops.resolve_aux_pair`'s scoring over record points, so
-    which point is the mainline is a fact about the two points, never click order."""
-    pa, pb = net.points[a], net.points[b]
-
-    def score(main, ramp):
-        s = 0
-        if _declares_aux(main):
-            s += 3
-        if pm.is_ramp_role(ramp.role):
-            s += 2
-        if pm.is_ramp_role(main.role):
-            s -= 2
-        if _declares_aux(ramp):
-            s -= 1
-        if ramp.lanes_bwd == 0 or ramp.lanes_fwd == 0:
-            s += 1
-        if main.lanes_bwd == 0 or main.lanes_fwd == 0:
-            s -= 1
-        return s
-    return (a, b) if score(pa, pb) >= score(pb, pa) else (b, a)
-
-
-def open_aux_slot(net, main_uid, lanes, field, entrance):
-    """`point_ops.open_aux_slot` over the record: open the slot back along the run to the first span
-    long enough for the taper the gate asks for (`point_validate.taper_min_length`), so a one-click
-    ramp does not leave the gate red. Returns `(stations, span, want)`."""
-    road = net.road_of(main_uid)
-    res = net.resolved(main_uid)
-    width = lanes * res.lane_width
-    want = pv.taper_min_length(width, res.design_speed, getattr(road, "taper_factor", 1.0))
-    run = pm.run_of(net, main_uid)
-    step = -1 if (field == "aux_fwd") != bool(entrance) else 1
-    j, chain, span = run.index(main_uid), [main_uid], 0.0
-    while True:
-        p = net.points[chain[-1]]
-        setattr(p, field, max(getattr(p, field), lanes))
-        k = j + step
-        if not (0 <= k < len(run)):
-            span = 0.0
-            break
-        a, b = net.points[run[j]].pos, net.points[run[k]].pos
-        span = ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2) ** 0.5
-        if span >= want:
-            break
-        chain.append(run[k])
-        j = k
-    return len(chain), span, want
+def cmd_corridors(a):
+    """B7: every built surface as a corridor the Godot terrain stamp deforms Terrain3D to -- the SAME
+    corridors `point_build.road_corridors` hands the island's ground carve (`point_edges.band_corridors`,
+    widths read off the solved bands, pads and gores included), solved over the same ground sidecar the
+    mesh build used. Each point is `[x, y, z, half, ground, kind]` in GODOT axes and the network's frame:
+    `ground` is the NATURAL ground under it (null off the grid) and `kind` is `road_support.support_kind`
+    of the two -- the stamp may FILL only where the kit did not put the road on piers."""
+    net = pm.load_network(a.record)
+    gate = _findings(net)
+    if gate["errors"]:
+        gate["corridors"] = []
+        return gate
+    grid = pg.load_ground(a.ground) if a.ground else None
+    bands = ped.solve_all(net, grid)[3]
+    out = []
+    kinds = {}
+    for line, _half, owner in ped.band_corridors(bands, owners=True):
+        pts = []
+        for (x, y, z, half) in line:
+            g = grid(x, y) if grid is not None else None
+            kind = rs.support_kind(z, g) if g is not None else "UNKNOWN"
+            kinds[kind] = kinds.get(kind, 0) + 1
+            gx, gy, gz = pe.godot((x, y, z))
+            pts.append([gx, gy, gz, round(float(half), 4), None if g is None else round(float(g), 4), kind])
+        out.append({"owner": str(owner), "points": pts})
+    gate.update({"corridors": out, "kinds": kinds, "ground": bool(grid),
+                 # The batter rules, from their one owner, so the stamp copies no constant.
+                 "cut_slope": rs.CUT_SLOPE, "fill_slope": rs.FILL_SLOPE, "fill_max": rs.FILL_MAX,
+                 "cut_max": rs.CUT_MAX})
+    return gate
 
 
 def cmd_ramp(a):
-    """`Make Ramp` + `Align Ramp To Aux` (point_ops) on the record: AUX link mainline -> ramp, the
-    ramp one-way and typed RAMP, the aux slot opened on the carriageway the mouth is on and back to a
-    taper-length span, and the mouth placed on the gore line facing down the mainline."""
+    """`Make Ramp` + `Align Ramp To Aux` on the record (`point_record_ops.make_ramp`)."""
     net = pm.load_network(a.record)
-    main_uid, ramp_uid = resolve_aux_pair(net, a.uid_a, a.uid_b)
-    main, ramp = net.points[main_uid], net.points[ramp_uid]
-    ramp.role = pm.RAMP
-    if not ramp.lanes_fwd and not ramp.lanes_bwd:
-        ramp.lanes_fwd = a.lanes
-    elif ramp.lanes_fwd and ramp.lanes_bwd:
-        ramp.lanes_bwd = 0
-    ramp.profile_mode = pm.OVERRIDE
-    field = "aux_fwd" if ps.ramp_carriageway(net, main_uid, ramp.pos) == lp.FWD else "aux_bwd"
-    net.unlink(main_uid, ramp_uid)
-    net.link(main_uid, ramp_uid, pm.LINK_AUX)
-    entrance = pm.ramp_is_entrance(net, ramp_uid)
-    stations, span, want = open_aux_slot(net, main_uid, a.lanes, field, entrance)
-    got = ps.ramp_target(net, main_uid, ramp_uid)
-    aligned = got is not None
-    if aligned:
-        pos, ax, _side = got
-        ax = ps.ramp_facing(net, main_uid, ramp_uid) or ax
-        ramp.pos = tuple(pos)
-        ramp.tangent_mode = pm.MANUAL
-        ramp.tangent = (ax[0], ax[1], 0.0)
+    res = ro.make_ramp(net, a.uid_a, a.uid_b, a.lanes)
     pm.save_network(net, a.record)
     out = _findings(net)
-    out.update({"mainline": main_uid, "ramp": ramp_uid, "field": field, "entrance": entrance,
-                "slot_stations": stations, "taper_span": span, "taper_want": want, "aligned": aligned})
+    out.update(res)
     return out
+
+
+def _record_op(fn):
+    """B8: a gesture from `point_record_ops` over the record -- load, apply, save, report. A refused
+    gesture (`GestureError`) is a result, not a crash, and writes nothing."""
+    def run(a):
+        net = pm.load_network(a.record)
+        try:
+            msg, extra = fn(net, a)
+        except ro.GestureError as e:
+            return {"failed": True, "error": str(e)}
+        pm.save_network(net, a.record)
+        out = _findings(net)
+        out.update(extra)
+        out["message"] = msg
+        return out
+    return run
+
+
+def _uids(s):
+    return [u for u in s.split(",") if u]
+
+
+cmd_merge = _record_op(lambda net, a: ro.merge_points(net, _uids(a.uids), a.keep or None, a.at_keep))
+cmd_split = _record_op(lambda net, a: ro.split_road(net, _uids(a.uids), a.name))
+cmd_renumber = _record_op(lambda net, a: ro.renumber_roads(net))
+cmd_repair = _record_op(lambda net, a: ro.repair_links(net))
+cmd_tidy = _record_op(lambda net, a: ro.tidy_roads(net))
+cmd_cross_section = _record_op(lambda net, a: ro.apply_cross_section(net, a.src, _uids(a.uids), _uids(a.groups)))
+cmd_branch_ramp = _record_op(lambda net, a: ro.branch_ramp(
+    net, a.uid, a.name, a.lanes, a.carriageway, a.entrance, a.length, a.spread, a.drop))
+
+
+def cmd_facings(a):
+    """`{uid: [x, y, z]}` in GODOT axes -- the facing the tool gives every point it owns."""
+    net = pm.load_network(a.record)
+    return {"facings": {u: pe.godot(v) for u, v in ro.facings(net).items()}}
+
+
+def cmd_flow(a):
+    """Preview > Flow Report over the exported lane graph (`point_flow.flow_report`), uids resolved."""
+    net = pm.load_network(a.record)
+    gate = _findings(net)
+    if gate["errors"]:
+        gate["report"] = None
+        return gate
+    rep = pf.flow_report(pe.export_network(net))
+    gate["report"] = rep
+    return gate
 
 
 def main(argv=None):
@@ -218,7 +263,10 @@ def main(argv=None):
     s = sub.add_parser("setback"); s.add_argument("record")
     s.add_argument("--margin", type=float, default=2.0); s.set_defaults(fn=cmd_setback)
     s = sub.add_parser("centrelines"); s.add_argument("record")
-    s.add_argument("--step", type=float, default=None); s.set_defaults(fn=cmd_centrelines)
+    s.add_argument("--step", type=float, default=None); s.add_argument("--zones", default="")
+    s.set_defaults(fn=cmd_centrelines)
+    s = sub.add_parser("corridors"); s.add_argument("record"); s.add_argument("--ground", default="")
+    s.set_defaults(fn=cmd_corridors)
     s = sub.add_parser("lanekit"); s.add_argument("record"); s.add_argument("out")
     s.set_defaults(fn=cmd_lanekit)
     s = sub.add_parser("ramp"); s.add_argument("record"); s.add_argument("uid_a"); s.add_argument("uid_b")
@@ -226,6 +274,22 @@ def main(argv=None):
     s = sub.add_parser("pieces"); s.add_argument("record"); s.add_argument("zones")
     s.add_argument("out_dir"); s.add_argument("prefix"); s.add_argument("--dry-run", action="store_true")
     s.set_defaults(fn=cmd_pieces)
+    s = sub.add_parser("merge"); s.add_argument("record"); s.add_argument("uids")
+    s.add_argument("--keep", default=""); s.add_argument("--at-keep", action="store_true")
+    s.set_defaults(fn=cmd_merge)
+    s = sub.add_parser("split"); s.add_argument("record"); s.add_argument("uids")
+    s.add_argument("--name", default=""); s.set_defaults(fn=cmd_split)
+    for n, fn in (("renumber", cmd_renumber), ("repair", cmd_repair), ("tidy", cmd_tidy),
+                  ("facings", cmd_facings), ("flow", cmd_flow)):
+        s = sub.add_parser(n); s.add_argument("record"); s.set_defaults(fn=fn)
+    s = sub.add_parser("cross_section"); s.add_argument("record"); s.add_argument("src")
+    s.add_argument("uids"); s.add_argument("groups"); s.set_defaults(fn=cmd_cross_section)
+    s = sub.add_parser("branch_ramp"); s.add_argument("record"); s.add_argument("uid")
+    s.add_argument("--name", default=""); s.add_argument("--lanes", type=int, default=1)
+    s.add_argument("--carriageway", default="FWD", choices=("FWD", "BWD"))
+    s.add_argument("--entrance", action="store_true")
+    s.add_argument("--length", type=float, default=80.0); s.add_argument("--spread", type=float, default=25.0)
+    s.add_argument("--drop", type=float, default=0.0); s.set_defaults(fn=cmd_branch_ramp)
     a = ap.parse_args(argv)
     try:
         out = a.fn(a)
