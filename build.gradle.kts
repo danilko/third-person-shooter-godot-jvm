@@ -1,5 +1,5 @@
 plugins {
-    id("com.utopia-rise.godot-jvm") version "1.0.0-dev3"
+    id("com.utopia-rise.godot-jvm") version "1.0.0-rc1"
 }
 
 repositories {
@@ -27,15 +27,6 @@ tasks.withType<Test>().configureEach {
 
 godot {
     // ---------Setup-----------------
-
-    // Where .gdj registration files for DEPENDENCY classes land. Since 0.17 a project's own
-    // classes are attached by their .java source path and never get a .gdj, so this directory
-    // stays empty for this project (it has no registered external dependencies) -- it is kept
-    // pointed at the existing, gitignored `gdj/` so one appearing there is immediately visible.
-    registrationFilesDirectory.set(projectDir.resolve("gdj"))
-
-	// Leave dependency .gdj generation on; it costs nothing while there are no such dependencies.
-	disableGdj.set(false)
 
     // defines whether the script registration files should be generated hierarchically according to the classes package path or flattened into `registrationFilesDirectory`
     // (renamed from isRegistrationFileHierarchyEnabled -> registrationFilesLayoutMode, an enum now)
