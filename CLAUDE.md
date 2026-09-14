@@ -1,7 +1,8 @@
 # CLAUDE.md — Codebase Reference
 
-Third-person shooter experiment using **Godot 4.7** with the **godot-jvm** plugin
-(`1.0.0-dev3`, shipped as the in-project `addons/jvm/` GDExtension).
+Third-person shooter experiment using **Godot 4.7** with the **[godot-jvm](https://github.com/utopia-rise/godot-jvm)** binding
+(`1.0.0-rc1`, shipped as the in-project `addons/jvm/` GDExtension; docs: https://godot-jvm.dev/en/1.0/).
+The project was called **godot-kotlin-jvm** before 1.0; notes below that cite `0.17` record behaviour measured on that release.
 All game logic is written in **Java** (a few stubs in Kotlin). GDScript is not used.
 
 ---
@@ -17,13 +18,13 @@ Open `project.godot` with the **stock Godot 4.7.2 editor** —
 default (`blender/tools/env.sh`) and what every headless check must run under. JVM toolchain:
 **JDK 17**.
 
-> **Do NOT use the old `godot.linuxbsd.editor.x86_64.jvm` build.** As of godot-jvm `1.0.0-dev3`
-> (`build.gradle.kts`: `com.utopia-rise.godot-jvm`) the runtime ships **with the project**, as the
+> **Do NOT use the old `godot.linuxbsd.editor.x86_64.jvm` build.** Since godot-jvm 1.0 (first
+> seen here at `1.0.0-dev3`; now `1.0.0-rc1` — `build.gradle.kts`: `com.utopia-rise.godot-jvm`) the runtime ships **with the project**, as the
 > `addons/jvm/` GDExtension — so a binary with the JVM module compiled in loads it twice. The
 > symptom is not "wrong binary": it is `Attempt to register extension class 'JvmScript', which
 > appears to be already registered`, then `Version mismatch! C++ module is : 0.17.1-4.7.2 / Jar is
-> : 1.0.0-dev3`, then **every AutoLoad failing with "does not inherit from 'Node'"** — i.e. it
-> reads as a completely broken project. Keep the Gradle plugin version equal to the addon's.
+> : 1.0.0-dev3` (the message as first recorded; the jar version reads whatever the addon is), then **every AutoLoad failing with "does not inherit from 'Node'"** — i.e. it
+> reads as a completely broken project. Keep the Gradle plugin version equal to the addon's — both are `1.0.0-rc1` today; upgrade them together.
 
 Scenes/resources reference scripts by their **source `.java` path**
 (`res://src/main/java/com/openworld/.../X.java`). As of 0.17 that is the *only* way for a
@@ -362,7 +363,7 @@ do **not** carry their own navigation — AI use the level's `NavigationRegion3D
 parent/world concern.
 
 **Body recycling is OFF by default (`recycleBodies`, EXPERIMENTAL).** Reusing a full character body
-subtree (detach via `removeChild`, re-attach via `addChild`) is **unsafe** in godot-kotlin-jvm: the
+subtree (detach via `removeChild`, re-attach via `addChild`) is **unsafe** in godot-jvm: the
 body carries a `top_level` camera (`TPSCameraController.setAsTopLevel`), a muzzle-flash
 `GPUParticles3D`, and a nameplate `SubViewport`, and re-attaching that subtree leaves them
 half-initialised — `get_global_transform "not inside tree"` / `particles is null` errors, then a
@@ -495,9 +496,14 @@ it.
 **Spawning:** region markers carry `traffic_count`/`traffic_route` → `WorldBaker.buildZone` builds a
 `VehicleSpawnConfig`. `traffic_route` is a route-name **prefix** (`"art_"`, or `"<piece>__"` once a
 sidecar exists — the master build flips the meta by checking for the sidecar, so re-run it after
-authoring): `ZoneManager.findRoute(name, center, maxDist, index)` matches exact first, else
-prefix-collects plain lanes (never turn connectors) whose entry is within `unloadRadius`,
-round-robin by spawn index in name order — that spread IS the multi-lane spawn distribution.
+authoring): `ZoneManager.spawnLanes(name, center, maxDist)` matches exact first, else
+prefix-collects plain lanes (never turn connectors) whose entry is within `unloadRadius`, then keeps
+only those a car can drive at least `unloadRadius` from (`util.LaneReach`, over the same
+`LaneGraph.successorsOf` the AI follows — name order put cars on lanes with no successor).
+`spawnTrafficCar` is the ONE placement owner (zone load and top-up alike): a per-zone rotating
+cursor over those lanes, a slot with nothing within `TRAFFIC_SPAWN_CLEARANCE` (10 m, the obstacle
+ray's reach), the car **faced along its lane**, and no spawn at all while a named route matches no
+lane yet. See "Ambient spawn placement" under Terrain3D below.
 **All lane lookups are registry reads, never scene-tree walks:** `VehicleRoute._ready/_exitTree`
 register/deregister with a `TreeMap` on `ZoneManager` (the Character↔SpatialEntityGrid
 idiom; sorted names make the prefix query ordered for free), and `entryPoint()` caches the first
@@ -1702,7 +1708,7 @@ so it stays visible while riding (the seated occupant is exposed). Add a widget 
 Runtime flexibility: `setWidgetEnabled(id, bool)` / `clearWidgetOverride(id)` (a `widgetOverrides` map
 that wins over the table) force a widget on/off regardless of situation (per-carrier/gameplay tweaks).
 The table is **code, not an exported `Dictionary`** — a nested generic `Dictionary` export crashes the
-godot-kotlin-jvm registration scanner (see Known Quirks).
+godot-jvm registration scanner (see Known Quirks).
 
 ### Weapon switch/reload progress ring (`WeaponProgress`)
 
@@ -1855,7 +1861,7 @@ zero). Prone aiming needs an authored prone aim set.
 
 **One engine object, TWO JVM wrappers.** A node reference exported through a scene
 (`node_paths=PackedStringArray("player")`, i.e. `@Export CharacterBody3D player`) is resolved when
-the scene is instantiated, and godot-kotlin-jvm 0.17 can hand back a **second JVM instance** for
+the scene is instantiated, and godot-jvm (measured on 0.17) can hand back a **second JVM instance** for
 that engine object — identical `get_instance_id()`, different Java object, and **none of the state
 the body's own `_ready()` wrote**. Engine calls (`isOnFloor`, `getGlobalPosition`, `moveAndSlide`)
 go through the bridge and are correct on either wrapper, which is exactly why this hid for so long;
@@ -3219,7 +3225,7 @@ nothing in it could take damage. `tools/godot/probe_aim_bench.gd` drives those k
 melee, per-shot remote cues, the stock-to-shoulder gate and rifle pose re-author, procedural recoil kick,
 holster placement, projectile authority, lag compensation.
 
-## Godot-Kotlin-JVM Specifics
+## Godot-JVM Specifics
 
 - **Annotations (0.17 API — the pre-0.17 `@Register*` family is gone).** The plugin runs in the
   default `Inferred` mode, where an annotation implies what it needs:
@@ -3289,11 +3295,24 @@ publishes one per `RoadLane`. Two rules came out of it, both measured:
   later — measured, a zone LOADED one log line before the bridge published and spawned its whole
   fleet unrouted. `ZoneManager.maintainTraffic`'s cull gained an **`unrouted`** reason beside dead /
   route-finished / fell-out / out-of-range, and the existing top-up respawns the car. Re-routing it
-  in place was tried and reverted: that is a SECOND placement path competing with
-  `vehicleStartPoint`, and the two disagreed — it left two cars on one lane nose to tail, the front
-  one stuck in `BrakeState`. Reclaiming keeps one owner for "where does a car start on a lane",
-  which also spreads a fleet by `VEHICLE_QUEUE_SPACING`, and ambient traffic is disposable by
-  design. Measured: 3 `unrouted` reclaims, once each, then `3 routed` with no churn.
+  in place was tried and reverted: that is a SECOND placement path, and the two disagreed — it left
+  two cars on one lane nose to tail, the front one stuck in `BrakeState`. Since 0.4 the fleet is
+  not spawned at all until a lane matches (`spawnTrafficCar` holds it and logs once), so `unrouted`
+  now only covers a road rebuild stranding a car.
+- **Ambient spawn placement had three defects, and one caused the other two to look like physics**
+  (2026-09-13, PLAN.md 0.4, gate `tools/godot/probe_traffic_spawn.gd`). (1) Lanes were taken in
+  NAME order (`_1, _10, _11, _2`), not chain order, so a car could land on a lane with no successor.
+  (2) The top-up index was `vehicles.size()`, which repeats — two respawns in a row were set down on
+  the same point, and on HEAD 19 of 21 spawns went to one lane. (3) A car spawned at its default
+  heading (−Z) whatever way its lane ran; one set across a west-running lane crept 6 m north on full
+  steer and stopped for good, 54 m from the player — inside the 60 m `stallReclaimMinDist`, so it
+  was never reclaimed, and the respawns stacked on it until the fleet read **0 moving**. That is
+  the "car at ~0 m/s" shape recorded as unexplained. **Ordering alone did not fix (1)**: once the
+  cursor rotates, a short lane merely waits its turn (9 of 22 cars ran out within 160 m), so
+  `LaneReach.orderForSpawn` FILTERS to lanes that reach far enough. Measured after, 240 s on
+  DebugWorld with the plain `Lane_` prefix (the `Lane_pR` workaround is gone): 15 cars over 7
+  lanes, each driving 393–528 m, nearest car at spawn ≥ 13 m, heading within 6° of the lane,
+  longest idle 0.1 s; HEAD fails clearance (7.6 m), heading (164°) and rotation (19/21).
 
 - **A car can be alive, routed, in range and still not drive**, and every reclaim reason missed it:
   dead / route-finished / fell-out / out-of-range are all false for a stuck car, so it was immortal
@@ -3341,7 +3360,7 @@ publishes one per `RoadLane`. Two rules came out of it, both measured:
   physics processing). If `isDead` is not set first, `gatherInput` can still run on the
   same frame via a pending physics callback.
 - **Do not export a nested/raw generic `Dictionary` from a `@Script` class** (e.g.
-  `@Export Dictionary<String, Dictionary>`). The godot-kotlin-jvm `classGraphSymbolsProcess`
+  `@Export Dictionary<String, Dictionary>`). The godot-jvm `classGraphSymbolsProcess`
   registration scanner chokes on the raw nested type parameter and dies with `Java heap space` /
   `Requested array size exceeds VM limit` (NOT a real memory shortage — bumping `org.gradle.jvmargs`
   does not help). Use a flat `Dictionary<String, String>` (compose keys, e.g. `"a>b"`) — the shape
@@ -3355,7 +3374,7 @@ publishes one per `RoadLane`. Two rules came out of it, both measured:
   and `Character._ready`/`Vehicle._ready` **privatize** a scene-supplied (empty-`characterId`) one via
   `CharacterInfo.copyOf` before stamping the UUID. **Do NOT use `resource_local_to_scene = true` on a
   JVM-scripted Resource** to force per-instance copies — its instantiate-time `duplicate()` reenters the
-  godot-kotlin-jvm `TransferContext` shared buffer and throws `Shared Buffer Error: JVM expected a LONG
+  godot-jvm `TransferContext` shared buffer and throws `Shared Buffer Error: JVM expected a LONG
   but received a BOOL` (the int `ownerPeerId` read colliding with the bool `resource_local_to_scene`
   write). Copy fields in plain Java instead. Read-only shared configs (`VehicleConfig`,
   `AIBehaviorConfig`) are fine embedded/shared — never mutated per-instance, so leave them as-is (and
@@ -3409,7 +3428,7 @@ publishes one per `RoadLane`. Two rules came out of it, both measured:
   For any other node that plays audio and can be freed while playing, prefer the **self-stop on
   `tree_exiting`** pattern over a parent/sibling `_exitTree` stop.
   **App-exit does NOT go through `tree_exiting`** (this was the residual leak): at real quit the
-  godot-kotlin-jvm runtime is torn down ("Cleaning JVM Memory…") *before* the final SceneTree node teardown,
+  godot-jvm runtime is torn down ("Cleaning JVM Memory…") *before* the final SceneTree node teardown,
   so a JVM-registered `tree_exiting` → stop never runs for any body still alive at quit — the local player's
   (or any still-loaded AI's) in-flight reload/fire playback leaks (`Resource still in use: Rifle_reload.wav`).
   The reliable hook is the **root `Window.close_requested` signal**, which fires while every node and the JVM
@@ -3429,7 +3448,7 @@ publishes one per `RoadLane`. Two rules came out of it, both measured:
   child that is a `WeaponItem`. The sockets are per GRIP ARCHETYPE (`SocketRifle`, `SocketPistol`,
   `SocketLauncher`, `SocketMelee`, `SocketFist` — W20), never per weapon; a weapon names its own in
   `holdSocket`.
-- The Kotlin/JVM binding exposes a `RigidBody3D`'s Godot 4 `freeze` property as
+- The godot-jvm binding exposes a `RigidBody3D`'s Godot 4 `freeze` property as
   `setFreezeEnabled / isFreezeEnabled`, not `setFreeze` (`Vehicle` uses it). A weapon is no longer a
   body at all (W15), so `Pickup.pause()` detaches its world body instead of freezing anything.
 - `ENetConnection.createHost/createHostBound` take `(… maxPeers, maxChannels, inBandwidth,

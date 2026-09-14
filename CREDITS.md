@@ -7,7 +7,8 @@ each item, and the credit line where one is required. The project itself is MIT 
 need it:
 
 - **CC BY 4.0** entries need visible attribution.
-- **MIT / OFL** entries need their licence notice shipped with the software.
+- **MIT / OFL** entries need their licence notice shipped with the software. The notice for Johnny
+  Rouddro's project is copied in full at the end of this file, because it is no longer on that repo's current branch.
 
 A Godot export normally leaves `.txt`/`.md` files out, so the `LICENSE` files inside `addons/` do
 not reach players on their own.
@@ -24,7 +25,7 @@ not reach players on their own.
 
 | What | Author | Licence | Notes |
 |---|---|---|---|
-| Base third-person controller ([YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY), [GitHub](https://github.com/JohnnyRouddro/Godot_Third_Person_Controller), [itch.io](https://johnnyrouddro.itch.io/godot-4-third-person-controller)) | Johnny Rouddro | Code: Unlicense · Assets: CC0 1.0 | Heavily re-architected here |
+| Base third-person shooter ([Godot Asset Library #716](https://godotengine.org/asset-library/asset/716), [GitHub](https://github.com/JohnnyRouddro/Godot_Third_Person_Shooter), tutorial on [YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) | Johnny Rouddro | MIT (see notice below) | Heavily re-architected here |
 | Custom raycast vehicle physics tutorial ([YouTube](https://www.youtube.com/@octodemy)) | octodemy | Tutorial reference | Re-architected here |
 
 ## Engine, runtime & addons
@@ -32,7 +33,7 @@ not reach players on their own.
 | Component | Path | Author | Licence |
 |---|---|---|---|
 | Godot Engine 4.7 | — | Juan Linietsky, Ariel Manzur and contributors | MIT |
-| godot-kotlin-jvm (`1.0.0-dev3`) | `addons/jvm/` | Utopia-Rise and contributors | MIT |
+| [godot-jvm](https://github.com/utopia-rise/godot-jvm) (`1.0.0-rc1`) | `addons/jvm/` | Utopia-Rise and contributors | MIT |
 | Embedded Java runtime (OpenJDK 17) | `jvm/` (build output, not in git) | Oracle and OpenJDK contributors | GPL v2 with the Classpath Exception |
 | Terrain3D | `addons/terrain_3d/`, `demo/` | Cory Petkovsek, Roope Palmroos and contributors | MIT |
 | road-generator (incl. its default road material/texture) | `addons/road-generator/`, `road_demos/` | Moo-Ack! Productions | MIT |
@@ -63,10 +64,12 @@ There is a per-folder copy of this list in `assets/terrain3d/textures/asset_lice
 
 | Asset | Path | Source | Licence |
 |---|---|---|---|
-| Weapon models (AR4, AR212, PI52, SG1, MW1) | `assets/weapons/` | [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius, re-scaled and re-origined here | CC0 1.0 |
+| Weapon models (AR4, AR212, PI52, SG1, MW1) | `assets/weapons/` | [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius, re-scaled and re-origined here | CC0 1.0 (no attribution required; credited as thanks) |
 | Weapon models (ATL4, MW2, T1) | `assets/weapons/` | Primitive shapes built by this project | Project (MIT) |
 | Prototype grid textures | `addons/kenney_prototype_textures/` | [Kenney Prototype Textures](https://godotengine.org/asset-library/asset/781), Kenney (packaged by Calinou) | CC0 1.0 |
-| Character model "Godot-chan" + textures | `assets/merged_animation*.blend/.glb`, `assets/textures/`, `assets/merged_animation*_*.png/.jpg` | Johnny Rouddro's third-person controller project (its assets are published as CC0) | CC0 1.0 |
+| Character model "Godot-chan", textures and animations | `assets/merged_animation*.blend/.glb`, `assets/textures/`, `assets/merged_animation*_*.png/.jpg` | Johnny Rouddro, [Godot Third Person Shooter](https://godotengine.org/asset-library/asset/716) (Asset Library #716) | MIT |
+| Weapon sound effects | `assets/audio/Pistol_fire.wav`, `Pistol_reload.wav`, `Rifle_fire.wav`, `Rifle_reload.wav` | Johnny Rouddro, [Godot Third Person Shooter](https://godotengine.org/asset-library/asset/716) (Asset Library #716) | MIT |
+| Muzzle-flash sprite | `assets/ui/flash1.png` | Johnny Rouddro, [Godot Third Person Shooter](https://godotengine.org/asset-library/asset/716) (Asset Library #716) | MIT |
 | Aldrich font | `assets/ui/Aldrich-Regular.ttf` | Matthew Desmond (MADType) | SIL Open Font License 1.1 |
 | DSEG7 Classic Mini font | `assets/ui/DSEG7ClassicMini-Bold.ttf` | keshikan (http://www.keshikan.net) | SIL Open Font License 1.1 |
 
@@ -83,21 +86,52 @@ through the [G-Spatial Information Center](https://www.geospatial.jp/ckan/datase
   downloads are not committed.
 - **More detail:** `assets/world_source/plateau/ATTRIBUTION.md`.
 
-## Sources still to confirm
-
-Nothing in the repo records where these came from. Before a commercial release, confirm the origin
-and licence of each one and move it into a table above:
-
-- Sound effects: `assets/audio/Pistol_fire.wav`, `Pistol_reload.wav`, `Rifle_fire.wav`,
-  `Rifle_reload.wav`
-- Muzzle-flash sprite: `assets/ui/flash1.png`
-- Character animations in `assets/merged_animation.blend`, beyond those inherited from the base
-  controller project
-- Who originally modelled Godot-chan (the base project's page does not name them)
-
 ## AI tool use
 
 Gemini and Claude were used as assistants for debugging, documentation and tooling code. None of the
-assets with a confirmed source above were made by an AI image or media generator. The procedural
-sand texture is plain noise math, not model output. The items under "Sources still to confirm" have
-not been checked for this yet.
+assets listed above were made by an AI image or media generator. The procedural sand texture is
+plain noise math, not model output.
+
+## Licence notices
+
+### Johnny Rouddro — Godot_Third_Person_Shooter
+
+The source of the Godot-chan character model, textures and animations, the four weapon sounds, and
+`assets/ui/flash1.png`. The four sounds, `flash1.png` and `armor_texture.png` are byte-identical to
+the copies in [the repository](https://github.com/JohnnyRouddro/Godot_Third_Person_Shooter). The
+character model and animations have since been modified and merged here (`merged_animation*.blend`).
+
+**Obtained from** the [Godot Asset Library entry #716](https://godotengine.org/asset-library/asset/716),
+"Godot Third Person Shooter" v1.0.0 by JohnnyRouddro (Godot 3.2, submitted 2020-09-09). The entry
+lists the licence as **MIT** and still downloads the pinned commit
+[`6ebacbc`](https://github.com/JohnnyRouddro/Godot_Third_Person_Shooter/archive/6ebacbcf8fd5274efa49005d6289908e53361458.zip),
+which contains the `LICENSE` reproduced below.
+
+The GitHub repository shipped that licence from its first commit (2020-09-06). The author later deleted
+`LICENSE` from the repository's current branch on 2025-12-21 (commit `cac4447`), so there it survives only in the history, e.g. at commit
+[`6ebacbc`](https://github.com/JohnnyRouddro/Godot_Third_Person_Shooter/blob/6ebacbcf8fd5274efa49005d6289908e53361458/LICENSE). It is reproduced here so
+the notice ships with this project.
+
+```
+MIT License
+
+Copyright (c) 2020 JohnnyRouddro
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

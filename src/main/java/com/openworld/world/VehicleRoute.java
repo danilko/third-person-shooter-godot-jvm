@@ -151,7 +151,7 @@ public class VehicleRoute extends Node3D implements Lane {
     private Vector3 cachedEntry;
 
     /** {@link #startPoint()} cached for the lifetime of this tree entry — the spawn-time prefix
-     *  query ({@code ZoneManager.findRoute}) distance-filters every registered lane, so it must
+     *  query ({@code ZoneManager.spawnLanes}) distance-filters every registered lane, so it must
      *  not re-walk marker children (JVM-bridge calls) per candidate. Lanes are static content. */
     @Override
     public Vector3 entryPoint() {

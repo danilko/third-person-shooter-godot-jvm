@@ -141,11 +141,11 @@ public class NetworkManager extends Node {
     // CHANNEL_COUNT = 4 above already provisions channels 0-3 in hostServer/joinServer.
     //
     //   0 — control/handshake/events (must arrive): IDENTIFY, DAMAGE_REQUEST,
-    //       DAMAGE_BROADCAST, SPAWN, DESPAWN, SHOT,
-    //       WORLD_EVENT, OWNERSHIP                         → FLAG_RELIABLE
+    //       DAMAGE_BROADCAST, SPAWN, DESPAWN, WORLD_EVENT, OWNERSHIP → FLAG_RELIABLE
+    //   1 — shots (must arrive, own lane — PLAN.md N1):   SHOT → FLAG_RELIABLE
     //   2 — continuous snapshots (drop freely):           SNAPSHOT/BATCH → 0 (unreliable)
-    //   (channels 1/3 — the retired command-upstream and weapon-fire-cue lanes — are
-    //   currently unassigned; CHANNEL_COUNT stays 4 so they're provisioned for reuse)
+    //   (channel 3 — the retired weapon-fire-cue lane — is currently unassigned; CHANNEL_COUNT
+    //   stays 4 so it is provisioned for reuse)
     //
     // sendMessage/broadcastMessage are the only call points that need to know this
     // table — handlers just hand them an already-framed payload from
@@ -160,7 +160,7 @@ public class NetworkManager extends Node {
             // state that already includes every event sent before it, so same-channel ordering
             // guarantees a manifest can never be overtaken by an older event it supersedes (a
             // cross-channel manifest racing ahead of its grant echo would double-equip).
-            case MSG_IDENTIFY, MSG_DAMAGE_REQUEST, MSG_DAMAGE_BROADCAST, MSG_SPAWN, MSG_DESPAWN, MSG_SHOT,
+            case MSG_IDENTIFY, MSG_DAMAGE_REQUEST, MSG_DAMAGE_BROADCAST, MSG_SPAWN, MSG_DESPAWN,
                     MSG_WORLD_EVENT, MSG_OWNERSHIP, MSG_PICKUP_REQUEST, MSG_PICKUP_TAKEN,
                     MSG_WEAPON_DROPPED, MSG_ELIMINATION, MSG_INVENTORY,
                     MSG_VEHICLE_SEAT_REQUEST, MSG_VEHICLE_OCCUPANCY, MSG_WEAPON_SWITCH,
@@ -168,6 +168,10 @@ public class NetworkManager extends Node {
                     new ChannelSpec(0, ENetPacketPeer.FLAG_RELIABLE);
             case MSG_SNAPSHOT, MSG_SNAPSHOT_BATCH, MSG_VEHICLE_SNAPSHOT, MSG_VEHICLE_SNAPSHOT_BATCH ->
                     new ChannelSpec(2, 0L);
+            // Shots get their own reliable lane (PLAN.md N1): a resent shot must not stall damage,
+            // pickups and spawns on channel 0, and vice versa. Ordered within the channel, which is
+            // what lets the host treat a non-advancing shotSeq as a replay.
+            case MSG_SHOT -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
             default -> throw new IllegalArgumentException("No channel mapping for MSG_* tag " + msgType);
         };
     }
@@ -731,6 +735,7 @@ public class NetworkManager extends Node {
         if (id == null) return;
         peersById.remove(id);
         rateLimiters.remove(id);
+        forgetShotState(id);
         GD.print("NetworkManager: peer disconnected — " + id);
 
         GameManager manager = gameManager();
@@ -1247,34 +1252,97 @@ public class NetworkManager extends Node {
         }
         FirearmItem firearm = wc.getWeaponItem(shot.weaponSlot()) instanceof FirearmItem f ? f : null;
         if (firearm == null) {
-            // The host puppet's slot diverged from the owner's inventory (the "client fires,
-            // host shows nothing" bug class — MSG_INVENTORY reconciliation heals the state,
-            // this keeps the bullets landing meanwhile). Fall back to the puppet's current
-            // item, then any held firearm: stats stay host-authoritative either way, only
-            // the damage value may briefly come from a sibling weapon. Counted so divergence
-            // frequency stays visible.
+            // The host puppet's slot diverged from the owner's inventory (MSG_INVENTORY reconciliation
+            // heals it). Resolve with the puppet's CURRENT firearm meanwhile, counted. The old "any held
+            // firearm" fallback is gone (N1): a sibling weapon's damage and pellet count would make the
+            // host's regenerated pull a different shot from the one the client fired.
             com.openworld.net.NetStats.increment("shot_slot_mismatch");
             if (wc.getCurrentWeaponItem() instanceof FirearmItem current) {
                 firearm = current;
-            } else {
-                for (int i = 0; i < wc.getSlotCount() && firearm == null; i++) {
-                    if (wc.getWeaponItem(i) instanceof FirearmItem any) firearm = any;
-                }
-            }
-            if (firearm != null) {
                 com.openworld.net.NetStats.increment("shot_slot_fallback");
                 logOnce("shot-fallback:" + shot.shooterCharacterId(),
                         "NetworkManager: MSG_SHOT slot " + shot.weaponSlot() + " empty on host copy of "
-                                + shot.shooterCharacterId() + " — resolving with '" + firearm.getDisplayName()
-                                + "' until inventory reconciles");
+                                + shot.shooterCharacterId() + " — resolving with its current '"
+                                + firearm.getDisplayName() + "' until inventory reconciles");
             } else {
                 com.openworld.net.NetStats.increment("shot_dropped_no_firearm");
                 GD.print("NetworkManager: dropping MSG_SHOT for " + shot.shooterCharacterId()
-                        + " — host copy holds no firearm at all (slot " + shot.weaponSlot() + ")");
+                        + " — host copy holds no firearm in slot " + shot.weaponSlot() + " or in hand");
                 return;
             }
         }
-        firearm.resolveServerShot(shot.origin(), shot.direction());   // raycast + damage (cosmetics ride fireSeq)
+
+        ShotValidationPolicy.Verdict verdict = validateShot(senderPeerId, shooter, firearm, shot);
+        if (verdict != ShotValidationPolicy.Verdict.ACCEPT) {
+            com.openworld.net.NetStats.increment("shot_rejected_" + verdict.name().toLowerCase());
+            logOnce("shot-rejected:" + verdict + ":" + shot.shooterCharacterId(),
+                    "NetworkManager: rejecting MSG_SHOT #" + shot.shotSeq() + " from peer " + senderPeerId
+                            + " for " + shot.shooterCharacterId() + " — " + verdict);
+            return;
+        }
+        com.openworld.net.NetStats.increment("shot_accepted");
+        java.util.List<String> hits = firearm.resolveServerShot(shot.origin(), shot.aim(), shot.spreadDeg(),
+                shot.shotSeq(), shot.shooterCharacterId());   // damage + impact (cosmetics ride fireSeq)
+        if (debugShots) {
+            GD.print("[shot] host resolved #" + shot.shotSeq() + " for " + shot.shooterCharacterId() + " -> " + hits);
+        }
+    }
+
+    /** Prints one line per resolved client shot (host) — set by the N1 two-instance check. */
+    public boolean debugShots = false;
+
+    /** Per sender+shooter: last accepted shotSeq. Per sender+shooter+slot: fire-rate budget. Cleared on disconnect. */
+    private final Map<String, Long> lastShotSeq = new HashMap<>();
+    private final Map<String, ShotValidationPolicy.RateBudget> shotBudgets = new HashMap<>();
+
+    /** How far from the shooter's BODY a seated shooter's reported origin may be: its origin is the
+     *  carrier camera's ray, which a chase boom holds several metres off (FirearmItem.useMuzzleTrace). */
+    private static final double SEATED_ORIGIN_REACH_M = 15.0;
+
+    /**
+     * Gathers the host copy's view of one pull and asks {@link ShotValidationPolicy}. On ACCEPT the
+     * sequence advances; a rejected pull leaves it alone, so a burst of forged counters cannot push
+     * the honest sequence out of reach.
+     */
+    private ShotValidationPolicy.Verdict validateShot(int senderPeerId, Character shooter, FirearmItem firearm,
+            NetMessageCodec.DecodedShot shot) {
+        String seqKey = senderPeerId + "|" + shot.shooterCharacterId();
+        long last = lastShotSeq.getOrDefault(seqKey, -1L);
+        if (shot.shotSeq() <= last) {
+            return ShotValidationPolicy.Verdict.STALE_SEQ;   // before spending a budget token on a replay
+        }
+        ShotValidationPolicy.RateBudget budget = shotBudgets.computeIfAbsent(
+                seqKey + "|" + shot.weaponSlot(), k -> new ShotValidationPolicy.RateBudget());
+        boolean budgetOk = budget.tryConsume(nowMs() / 1000.0, firearm.getFireRate());
+
+        double originDist;
+        if (shooter.currentVehicleNode != null) {
+            originDist = Math.max(0.0, shot.origin().distanceTo(shooter.getGlobalPosition()) - SEATED_ORIGIN_REACH_M);
+        } else {
+            originDist = shot.origin().distanceTo(firearm.muzzlePosition());
+        }
+        double aimAngle = 0.0;
+        Vector3 toAim = shooter.getAimTargetPosition().minus(shot.origin());
+        if (toAim.lengthSquared() > 0.25) {
+            aimAngle = Math.toDegrees(toAim.normalized().angleTo(shot.aim().normalized()));
+        }
+        double hostSpread = shooter.useWeaponSpread ? firearm.getCurrentSpreadDeg() : 0.0;
+
+        ShotValidationPolicy.Verdict v = ShotValidationPolicy.evaluate(shot.shotSeq(), last, budgetOk,
+                originDist, aimAngle, shot.spreadDeg(), hostSpread, ShotValidationPolicy.Limits.DEFAULT);
+        if (v == ShotValidationPolicy.Verdict.ACCEPT) lastShotSeq.put(seqKey, shot.shotSeq());
+        else if (debugShots) {
+            GD.print("[shot] host REJECTED #" + shot.shotSeq() + " " + v + String.format(
+                    " origin %.2f m, aim %.1f deg, spread client %.2f / host %.2f", originDist, aimAngle,
+                    shot.spreadDeg(), hostSpread));
+        }
+        return v;
+    }
+
+    private void forgetShotState(int peerId) {
+        String prefix = peerId + "|";
+        lastShotSeq.keySet().removeIf(k -> k.startsWith(prefix));
+        shotBudgets.keySet().removeIf(k -> k.startsWith(prefix));
     }
 
     /**
@@ -1725,9 +1793,13 @@ public class NetworkManager extends Node {
     private boolean isValidShot(NetMessageCodec.DecodedShot shot) {
         return isValidIdentifier(shot.shooterCharacterId())
                 && isFiniteVector3(shot.origin())
-                && isFiniteVector3(shot.direction())
+                && isFiniteVector3(shot.aim()) && shot.aim().lengthSquared() > 1e-6
+                && isFiniteDouble(shot.spreadDeg()) && shot.spreadDeg() >= 0 && shot.spreadDeg() <= MAX_SHOT_SPREAD_DEG
                 && shot.weaponSlot() >= 0 && shot.weaponSlot() < WEAPON_SLOT_COUNT;
     }
+
+    /** A cone wider than any weapon's airborne worst case is malformed, not generous. */
+    private static final double MAX_SHOT_SPREAD_DEG = 90.0;
 
     private boolean isValidWorldEvent(NetMessageCodec.DecodedWorldEvent event) {
         if (event.key() == null || event.key().length() > MAX_STRING_LENGTH
@@ -1955,9 +2027,12 @@ public class NetworkManager extends Node {
      * against authoritative positions and applies the damage (see {@link #handleShotMessage}). No-op
      * on the host / single-player, where {@code FirearmItem.performHitscan} resolves locally.
      */
-    public void sendShot(String shooterCharacterId, Vector3 origin, Vector3 direction, int weaponSlot) {
+    public void sendShot(String shooterCharacterId, int weaponSlot, long shotSeq, Vector3 origin, Vector3 aim,
+            float spreadDeg) {
         if (!isNetworked() || isServer()) return;
-        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeShot(MSG_SHOT, shooterCharacterId, origin, direction, weaponSlot));
+        com.openworld.net.NetStats.increment("shot_sent");
+        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeShot(MSG_SHOT, shooterCharacterId, weaponSlot, shotSeq,
+                origin, aim, spreadDeg));
     }
 
     // ── Damage authority + event broadcasts (Part G — Step 3) ────────────────

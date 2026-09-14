@@ -1,6 +1,6 @@
-# Godot Kotlin/JVM Open World First/Third Person Network Multiplayer Shooter
+# Godot JVM Open World First/Third Person Network Multiplayer Shooter
 
-A technical exploration of 3D game first/third person network multiplayer shooter mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. 
+A technical exploration of 3D game first/third person network multiplayer shooter mechanics in **Godot 4.7** using the **[godot-jvm](https://github.com/utopia-rise/godot-jvm)** binding (Java/Kotlin).
 
 ## 🎮 Play the Game
 A prebuilt binary is available on **itch.io**: [third-person-shooter-godot-jvm](https://danil-ko.itch.io/third-person-shooter-godot-jvm)
@@ -9,14 +9,14 @@ A prebuilt binary is available on **itch.io**: [third-person-shooter-godot-jvm](
 Watch the gameplay demo on **YouTube**: [third-person-shooter-godot-jvm](https://youtu.be/CiJGKLYyk9Q)
 
 ## 🛠 Tech Stack
-* **Engine:** Godot 4.7 (Custom [Utopia-Rise](https://github.com/utopia-rise/godot-kotlin-jvm) build required)
-* **Plugin:** godot-kotlin-jvm `0.17.1-4.7.2`
-* **Language:** Java / Kotlin
-* **JDK:** 17 (configured via Gradle JVM toolchain)
+* **Engine:** Godot **4.7.2** or newer, the official editor (no custom engine build)
+* **Binding:** [godot-jvm](https://github.com/utopia-rise/godot-jvm) `1.0.0-rc1`, shipped in this repo as the `addons/jvm/` GDExtension ([docs](https://godot-jvm.dev/en/1.0/))
+* **Language:** Java (a few Kotlin stubs)
+* **JDK:** 17 or newer (set by the Gradle JVM toolchain, which downloads it if missing)
 
 ## ✨ Features & Modifications
 This project is based on:
- - Johnny Rouddro's Third Person Controller tutorial ([YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) with several architectural changes and gameplay tweaks.
+ - Johnny Rouddro's Third Person Shooter ([GitHub](https://github.com/JohnnyRouddro/Godot_Third_Person_Shooter), tutorial on [YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) with several architectural changes and gameplay tweaks.
  - octodemy's Custom Raycast Vehicle Physics in Godot ([YouTube](https://www.youtube.com/@octodemy)) with several architectural changes and gameplay tweaks.
 
 * **Input-Driven Character Architecture:** `Character` (base) → `Player` / `AICharacter`. Each body delegates its "brain" to a `Controller` (`PlayerController` for keyboard/mouse, `AIController` for the FSM) via the `Controllable` interface. All state transitions go through a `UserCommand` snapshot, making human input, AI, and network input (`NetworkController`) interchangeable.
@@ -170,7 +170,7 @@ LoS is detected via a dedicated **SightRay** that is completely independent of t
 
 A ~3 km × 3 km, 36-district open world assembled from a Blender-authored layout (an arterial road
 backbone + individually-built district pieces) and baked into native Godot scenes by a custom Java
-bake pipeline — the godot-kotlin-jvm plugin build used here ships no editor scripting API, so the
+bake pipeline — godot-jvm ships no editor scripting API, so the
 "turn named Blender markers into gameplay nodes" step runs as ordinary game code instead of an
 editor plugin.
 
@@ -310,15 +310,25 @@ Character display names are configured via the `displayName` export property on 
 ## 🚀 Getting Started
 
 ### Prerequisites
-You **cannot** use the standard Godot editor. You must download the specific Kotlin-JVM enabled editor from [Utopia-Rise Releases](https://github.com/utopia-rise/godot-kotlin-jvm).
+* The **official Godot 4.7.2 (or newer) editor** from [godotengine.org](https://godotengine.org/download). godot-jvm is a GDExtension addon, and this repo already includes it under `addons/jvm/`, so there is nothing extra to install into Godot.
+* **JDK 17 or newer.** Gradle's toolchain resolver downloads one automatically if it can't find one.
+* Git LFS, which stores the binary assets and addons: `git lfs install` before cloning.
+
+> **Do not use a custom Godot editor build with the JVM module compiled into the engine.** Together
+> with the in-project addon it loads the runtime twice, and every AutoLoad then fails with "does not
+> inherit from 'Node'".
 
 ### Build Instructions
 1. Clone the repository.
-2. Run the Gradle build task to generate the necessary JVM wrappers:
+2. Run the Gradle build to compile the Java sources and generate the class registrations Godot loads:
    ```bash
    ./gradlew build
    ```
-3. Open the `project.godot` file using the **Godot Kotlin/JVM Editor**.
+3. Open `project.godot` in the official Godot editor.
+
+Keep the Gradle plugin version (`com.utopia-rise.godot-jvm` in `build.gradle.kts`) equal to the
+`addons/jvm/` addon version. When upgrading, replace both together, following the
+[godot-jvm documentation](https://godot-jvm.dev/en/1.0/).
 
 ### World Authoring Setup (optional — only if you're editing districts/roads, not just playing)
 
@@ -422,7 +432,7 @@ range instead of relying on bare fists.
 ## 📚 Credits & Assets
 
 All third-party code, assets and data, with their licences and required attribution lines, are
-listed in one place: **[CREDITS.md](CREDITS.md)**. That includes the base controller by Johnny
+listed in one place: **[CREDITS.md](CREDITS.md)**. That includes the base shooter project by Johnny
 Rouddro, Quaternius weapon models, Terrain3D / road-generator / Sky3D, the ambientCG terrain
 textures, and the Project PLATEAU data ("Data: Project PLATEAU (MLIT)", CC BY 4.0).
 

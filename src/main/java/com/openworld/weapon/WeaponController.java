@@ -89,6 +89,11 @@ public class WeaponController extends Node {
   // Rolling reload counter (u8), same pattern as fireSeq — remote peers play the reload animation
   // when it changes, so a reloading character is visibly reloading on every screen (a tactical tell).
   private int reloadSeq = 0;
+  // Trigger-pull counter for this controller's hitscan shots (PLAN.md N1): seeds the deterministic
+  // spread and orders MSG_SHOT on the host. Monotonic, never wrapped in practice (u32 on the wire).
+  // Unlike fireSeq it is not replicated: only the owner fires, and the host tracks the last accepted
+  // value per sender, so a rejoin's fresh controller starting at 0 again is a fresh sequence.
+  private long shotSeq = 0;
 
   // Weapons queued for equip/drop; drained in _process (idle). A held weapon is no longer a
   // physics body, so this is no longer the CollisionObject-reparent restriction it was built for —
@@ -617,6 +622,9 @@ public class WeaponController extends Node {
     // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
     if (!w.isInfiniteAmmo && w.getMagazine() == 0) w.onMagazineEmpty();
   }
+
+  /** Next hitscan trigger-pull counter (PLAN.md N1) — the seed and ordering key of one pull. */
+  public long nextShotSeq() { return shotSeq++; }
 
   /** Rolling shot counter sampled into each snapshot (fire-as-state). */
   public int getFireSeq() { return fireSeq; }
