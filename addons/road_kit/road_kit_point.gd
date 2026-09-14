@@ -39,6 +39,38 @@ var uid: String:
 static func new_uid() -> String:
 	return "p_%08x" % (randi() & 0x7fffffff | (randi() & 1) << 31)
 
+## The facing (network frame, Godot axes) the TOOL last gave this point, or ZERO if it never has. Derived
+## state -- not in the record, like the kit's `RKA_Point.auto_tangent`. A hand rotation is measured
+## against it (`was_rotated`), which is what separates a ROTATION from a DRAG: a translate leaves the
+## basis alone, so it can never read as one.
+var auto_facing := Vector3.ZERO
+
+## Face `dir` (network frame) and stamp it as the tool's facing. Keeps the position.
+func face(dir: Vector3) -> void:
+	var d := dir.normalized()
+	if d.length() < 0.5:
+		return
+	var up := Vector3.UP if absf(d.y) < 0.99 else Vector3.FORWARD
+	var xf := network_transform()
+	set_network_transform(Transform3D(Basis.looking_at(d, up), xf.origin))
+	auto_facing = d
+
+## THE ROTATION IS THE BEND GESTURE (`point_model.was_rotated`). An AUTO point the artist turned away
+## from the facing the tool gave it has been shaped by hand.
+func was_rotated() -> bool:
+	if auto_facing == Vector3.ZERO:
+		return false
+	var now := -network_transform().basis.z.normalized()
+	return rad_to_deg(now.angle_to(auto_facing)) > Fields.ROTATED_TOL_DEG
+
+## Promote a hand-rotated AUTO point to MANUAL -- the write half of the gesture, run before the record
+## is read so the tangent the artist gave is the one the solver sweeps. Returns true when it promoted.
+func sync_promotion() -> bool:
+	if fields.get("tangent_mode", "AUTO") == "AUTO" and was_rotated():
+		fields["tangent_mode"] = "MANUAL"
+		return true
+	return false
+
 func link_to(target_uid: String, type: String = "SEGMENT") -> void:
 	for l in links:
 		if l["target"] == target_uid:
@@ -70,6 +102,7 @@ func kit_tangent() -> Vector3:
 	return Frame.to_kit(-network_transform().basis.z).normalized()
 
 func to_record() -> Dictionary:
+	sync_promotion()
 	var d := FieldSet.to_dict(Fields.POINT_FIELDS, fields, ["uid"])
 	d["pos"] = Frame.to_array(Frame.to_kit(network_transform().origin))
 	d["links"] = links.map(func(l): return {"target": l["target"], "type": l["type"]})
@@ -90,3 +123,6 @@ func from_record(d: Dictionary) -> void:
 			var up := Vector3.UP if absf(t.normalized().y) < 0.99 else Vector3.FORWARD
 			basis = Basis.looking_at(t.normalized(), up)
 	set_network_transform(Transform3D(basis, pos))
+	# A MANUAL facing is the artist's; an AUTO point has no facing until the tool gives it one
+	# (`Gestures.apply_facings`), so there is nothing yet to have been rotated away from.
+	auto_facing = Vector3.ZERO

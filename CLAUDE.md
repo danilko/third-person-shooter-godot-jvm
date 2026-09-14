@@ -567,7 +567,7 @@ swept `__surface` carrier (a GN layer stack), `__edges` kerb/footway runs placed
 **outline** so gores open by themselves, `__edges` kerb/footway/**barrier** runs per junction
 corner too, a pad per junction, a paved **gore strip** per ramp, the terrain cut, and split
 `-colonly` road/footway collision proxies. `blender/tools/check_roads.sh` is the one command
-that runs the gate (18 checks, including a full-plugin pass that drives every operator, draws every panel, and asserts every operator is reachable from a button). `Author ▸ Learn ▸ Add Sample Network` builds a worked example of all four link types; the step-by-step guide is in the addon's `README.md`.
+that runs the gate (31 checks since B9: the pure self-tests, the headless pipeline smoketests and every Godot plugin test; the Blender panels it used to draw are retired). The worked example of all four link types is `assets/world_source/pieces/RoadKitSample.roads.json`; the editing how-to is `addons/road_kit/README.md`.
 **The Empty's transform IS the road frame** — position is the station, **local +Y is travel
 direction** (points draw as `ARROWS` so that axis is visible; `SINGLE_ARROW` draws along +Z and
 showed the wrong one), roll is banking, and `tangent_mode = MANUAL` makes the rotation drive the
@@ -3397,6 +3397,147 @@ lane registry is global, so they resolve whenever both pieces are loaded.
   over from the west pad's connector onto an east lane, walking away unloads west and leaves exactly
   the 6 east→west successors unresolved, and walking back resolves them all. `-- --control` (marker
   frame) fails 4 of them.
+
+**Ground (B6b, 2026-09-14): a support stands on the ground under EACH SAMPLE, and the ground is
+Terrain3D's.** The kit decides NONE/FILL/PIER every 4 m from `surface_z − ground_z`
+(`point_solve.solve_road`) with `ground_fn` as the sampler — a raycast into the Blender scene. A road
+authored in Godot is built in a Blender session with NO terrain, so every sample missed and fell back
+to a lerp of its stations' `ground_z`: DebugRoads' `link` (3 stations, 20.9 m over the gap the user
+dug between the islands) had **no support at all** — its stations were draped to the old ground, so
+the lerp read 0.1 m everywhere. Now the dock's Build (and `tools/godot/write_roadkit_ground.gd`)
+samples Terrain3D on a 2 m grid over the network's footprint + 60 m (`road_kit_ground.gd`, network
+frame, kit axes, float32 `<stem>.ground.bin` + `<stem>.ground.json`; 424×180 in 58 ms), and
+`point_ground.GroundGrid` — bilinear, a NaN cell or the outside is a MISS (None), never 0 — is passed
+as `build_network(ground=)` (`rka.point_build(ground_path=)`, `roadkit_build_mesh.py --ground`,
+`build_roads_piece.sh`'s 4th argument). The road's own heights are NOT re-draped: the support is
+derived from the gap, which is the point. Rules:
+- **The kit sweeps no embankment.** `road_support` sizes a FILL toe and nothing builds it, so a road
+  0.4–4 m over the ground floats until the terrain carries it (B7's stamp). The gate reports FILL
+  (120 samples on DebugRoads, mostly `spur`) and does not assert it.
+- **A span over a cliff edge is carried by the edge.** Pillars are laid at `PIER_SPACING` along the
+  carrier, so the first column can be 30 m in from where the ground falls away; the gate accepts a
+  PIER sample within 18 m of a column foot on the terrain OR of ground rising to within `FILL_MAX` of
+  the deck.
+- `write_roadkit_ground.gd` also re-samples each station's `ground_z` into the record, as every dock
+  service call does (a pad reads its mouths' station ground); on DebugRoads that moved exactly one
+  station, link's middle one, 10.36 → −10.40.
+- `<stem>.ground.bin` is un-ignored (`.gitignore` ignores `*.bin`) and LFS-tracked: once B7 has
+  stamped a network it is the ONLY record of the natural ground under its roads.
+- The grid is snapped to multiples of its step in the network frame, so on an unrotated network every
+  sample IS a Terrain3D vertex (2 m) and B7's restore is exact.
+- Gate **`tools/godot/probe_road_ground.gd`** (instances every ZoneMarker's road piece where
+  `Zone.placeGeometry` puts it, walks every lane every 4 m against Terrain3D, reads column feet off the
+  baked `__surface` meshes): **213/213** pier samples supported, no column stopping short of the
+  ground; the same pieces built without the sidecar: **111/213**. `probe_traffic_spawn.gd` 6/6
+  (a car still drives `link`), `probe_road_zones.gd` 12/12, `check_roads.sh` PASS=20.
+
+**Seeing it while editing (B6c, 2026-09-14).** A built road is instanced by `ZoneManager` at runtime
+and a `ZoneMarker`'s box is runtime-only too, so the editor showed neither. The dock's **Preview
+Pieces** (`road_kit_preview.gd`) instances every Zone's `geometry_path` (plus a resident
+`Roads_<network>` piece) under ONE `top_level`, UNOWNED node, placed by `Zone.placeGeometry`'s rule
+re-stated in GDScript (the Java is not `@Tool`); an unowned node is not written by `PackedScene.pack`,
+and the gate proves it with a control that gives the node an owner. It re-reads the scenes
+(`CACHE_MODE_REPLACE`) after each Build. **Refresh Preview** now passes `--zones` (written to
+`user://`, never over the build's own sidecar) and `roadkit_cli.py centrelines` answers per run
+`zone`/`beyond` and the `cross` successor lanes from `point_zones` — the overlay colours, never
+decides. Gate `test_roadkit_preview.gd` 12/12; how-to in `addons/road_kit/README.md`.
+
+**The roads are written into Terrain3D (B7, 2026-09-14): carve AND fill, derived from the natural
+ground.** `road_kit_stamp.gd` (dock **Stamp Terrain / Restore Terrain**, headless
+`tools/godot/stamp_roadkit_terrain.gd`) sets every terrain vertex near a road from the network's
+natural-ground sidecar and `roadkit_cli.py corridors` — `point_edges.band_corridors` (moved out of
+`point_build` with `solve_all`, which alias them, so the CLI needs no bpy), each point carrying the
+natural ground and `road_support.support_kind`. Inside a corridor's paved half-width + `VERGE` (6 m:
+a 4 m footway + one 2 m cell) the ground is the road surface − 5 cm; outside, a 1:1 cut batter and a
+1:1.5 fill batter. Rules, each a measured defect first:
+- **FILL, where the island's `Carve` is carve-only.** Its reason — "`road_support` owns FILL and builds
+  the embankment" — is false in the kit: `rka_fill_w` is computed and nothing sweeps it. A Terrain3D
+  world's height field is the only thing that can carry a road 0.4–4 m up. The bay-fill hazard is kept
+  away by classification: a corridor point may fill only if it is not PIER/TUNNEL (the nearer end of
+  a segment decides).
+- **A fill batter runs until it meets the ground**, never to a fixed toe (a toe cut-off stood a
+  20.8 m wall beside DebugRoads), and **only the NEAREST corridor fills** (the max of every corridor's
+  floor spilled the last fill before a bridge 30 m under the deck: 116 of 199 clear-span samples
+  buried → 2).
+- **Each corridor is its nearest segment.** Every segment in reach measured a graded road's further
+  segments from their end caps and capped the ground at the lowest (0.75 m of air under `loop`).
+- **On a road the road decides; off every road the batters do.** In a band the ground is the nearest
+  corridor's surface, capped by any corridor within one terrain CELL of standing on it or more than
+  `UNDERPASS` (3 m) below (a street under a deck) — a hairpin's lower leg must not cut under the
+  upper leg, a junction's lower approach not under the pad.
+- **`band_corridors` had never included a pad**, though its docstring said so: a pad band is a ring
+  plus mouths, so `len(poly) == 2 * len(spine)` skipped every one. `_pad_corridors` fans spokes from
+  the centre to a ring resampled at 3 m (spokes to the raw ring let a 18 m cap edge claim 9 m of the
+  approach road), heights by `point_solve._idw_z` along each spoke. This also changes the island
+  carve's input (`build_island_base`), which has not been rebuilt since.
+- **Idempotent by construction and reversible:** heights derive from the natural sidecar, the vertices
+  the previous stamp reached (`<stem>.stamp.json`) are re-derived too, and a stamp record makes
+  `road_kit_ground` read the sidecar as the ground where it covers (the CARVED_FLAG trap), and refuse
+  to sample at all if the record exists and the sidecar does not. Restore puts the natural ground back
+  and deletes the record.
+- Gate **`tools/godot/probe_road_stamp.gd`** on the saved DebugWorld terrain: no ground proud of any
+  lane (0.05 m) or pad mesh vertex (0.15 m) — 0; every lane the kit calls FILL at grade on the stamped
+  ground 132/132 (natural ground, the control: 0/132); clear-PIER samples still over the natural ground
+  190/192; stamping again changes 0 vertices; restore worst 0.0000 m. 14 103 vertices touched (raise
+  histogram ≤4 m 3369, 4–8 m 1384, 8–16 m 322, >16 m 56 — the abutment spill cones). B6b's
+  `probe_road_ground.gd` still passes on the stamped terrain (202/202). `check_world_envelope.gd`'s
+  "mesh box matches the collision box" FAIL on DebugWorld is pre-existing (same on the unstamped terrain).
+
+**The remaining gestures (B8, 2026-09-14).** Every rule that is not a plain node edit lives once, in
+`blender/addons/road_kit_authoring/point_record_ops.py` over `NetworkData` (pure python3, self-tested,
+in `check_roads.sh`), reached through `roadkit_cli.py merge|split|renumber|repair|tidy|cross_section|
+branch_ramp|facings|flow`; the dock runs each as `Service.record_gesture` — save (promoting rotated
+points), run, reload, face — in ONE undo step. B9 retires the Blender operators these restate, so this
+module is the owner. The Preview panel's flow report moved to pure `point_flow.py` (`point_preview`
+imports it back). Rules that came with it:
+- **Rotation is the bend gesture in Godot too.** `RoadKitPoint.auto_facing` is the facing the tool gave
+  (stamped by `face()` from `roadkit_cli.py facings` = `point_profile.chain_facings`, and at birth);
+  `to_record` promotes an AUTO point turned more than `ROTATED_TOL_DEG` (0.5°, now generated into
+  `road_kit_fields.gd` with `MASK_GROUPS`) from it to MANUAL. A drag leaves the basis alone, so it can
+  never read as a rotation — the gate's control. A point loaded from the record has no facing until the
+  plugin faces it, which every refresh does.
+- **A record gesture reloads the network, so node references do not survive it** — carry uids.
+- **`point_model.link_order` reversed a road whose HEAD was dragged to the tail**: it started at the end
+  that sorts first, which is then the old tail, so Renumber handed the chain back backwards and swapped
+  what `lanes_fwd`/`lanes_bwd` mean on every station. The orientation agreeing with more of the current
+  order now wins (a 3-point road is genuinely ambiguous). This fixes the Blender operator as well.
+- **Branch Ramp Here re-aligns once the ramp has two stations**: aligned with only its mouth, a
+  reverse-carriageway exit sat one lane (4.50 m) off the gore line (`ramp_edge_residual`).
+- **There is no junction handle node in Godot** — a road's CHILD ORDER is its chain, so a mouth cannot
+  be re-parented under one. **Select Junction** selects the clique and the editor's multi-selection
+  pivot is the handle. Turning a crossing that way promotes its mouths to MANUAL (the kit's parent-frame
+  baseline has no equivalent without a parent).
+- `road_kit_gizmo.gd` draws each point's travel arrow and `handle_in`/`handle_out` handles on its own
+  axis; a drag is a LENGTH (`handle_length` projects the mouse ray onto the axis, clamped at 0) and makes
+  the point MANUAL.
+- Gate `test_roadkit_b8.gd` 15/15. `check_roads.sh` now also runs the field-table check and every Godot
+  plugin test (section 4, PASS=31 in 1m46s); `timeout -k` because a hung Godot ignores SIGTERM.
+
+**The Blender authoring UI is retired (B9, 2026-09-14).** Deleted: `point_panel`, `point_overlay`,
+`point_preview` (its report lives on in pure `point_flow`), `point_live`, `smoketest_point_live`, and 20
+interactive operators (Insert/Merge/Split/Tidy/Renumber/Repair/Disconnect/Delete/Select/Jump/Align
+Tangent/Sync Facings/Recentre/Validate/Make Ramp/Align Ramp/Branch Ramp/Apply Cross-Section/Add Sample
+Network) — their rules are `point_record_ops`'s. `point_ops` keeps what a TOOL drives: New Road, Extend
+Road, Connect, Make Intersection (`seed_district_roads.py`), Auto Setback, Load/Save Record, Export
+Lanekit, Link Road Kit, plus the helpers `point_build` calls. `make_ramp`/`resolve_aux_pair` moved into
+`point_record_ops` (the CLI's `ramp` calls them). The smoketests now drive that pipeline
+(`smoketest_point_coverage` 34 checks, the sample network loaded from `RoadKitSample.roads.json`;
+`smoketest_point_addon` asserts no `RKA_PT_*` is registered). `build_intersection_prototype.py`, which
+called an operator that no longer existed, is in `archive/dead_tools/`. The addon README is now a module
+map; the old Blender how-to is in git history.
+
+**Two editor defects, found by running the plugin INSIDE the editor** (`ROADKIT_EDITOR_SELFTEST=<scene>
+godot --headless --editor`, the `_selftest` hook in `plugin.gd`, in `check_roads.sh`) — in the editor a
+non-@tool JVM script is a placeholder, which no SceneTree test sees:
+- **The road did not "show up" because nothing showed it.** Preview Pieces instanced both DebugRoads
+  pieces correctly in the real editor — it just had to be ticked, per scene. It is now ON by default
+  (EditorSettings `road_kit/preview_pieces`) and rebuilt on every `scene_changed`.
+- **A refresh on an UNLOADED network wiped the record.** A saved scene holds `RoadKitNetwork` without its
+  points until Load Record; the preview-on-open path called `_refresh` → `_save_for_service` →
+  `save_record` and wrote an empty network over `DebugRoads.roads.json` (restored from git, ground
+  re-sampled). `RoadKitNetwork.save_record` now refuses to write an empty network over a record that has
+  points (`force` to clear on purpose), `_refresh` skips an unloaded network, and the self-test asserts the
+  record survives opening the scene.
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 

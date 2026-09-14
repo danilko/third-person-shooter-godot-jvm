@@ -14,6 +14,7 @@ const RoadScript := preload("res://addons/road_kit/road_kit_road.gd")
 const PointScript := preload("res://addons/road_kit/road_kit_point.gd")
 const NetworkScript := preload("res://addons/road_kit/road_kit_network.gd")
 const Fields := preload("res://addons/road_kit/road_kit_fields.gd")
+const Ground := preload("res://addons/road_kit/road_kit_ground.gd")
 
 ## Default spacing of a new station along its road, metres.
 const STEP := 40.0
@@ -69,6 +70,7 @@ static func _new_point(net: Node, road: Node, at_index: int, xf: Transform3D) ->
 	road.move_child(p, at_index)
 	_own(p, net)
 	p.set_network_transform(xf)
+	p.auto_facing = -xf.basis.z.normalized()      # born facing its road: that is the tool's facing
 	return p
 
 static func link(a: Node, b: Node, type: String) -> void:
@@ -228,6 +230,62 @@ static func make_intersection(points: Array) -> Dictionary:
 			link(ms[i], ms[j], "JUNCTION")
 	return _ok("junction of %d mouths" % ms.size())
 
+## Face every point the tool still owns along its road (`facings` is `roadkit_cli.py facings`, the
+## solver's `point_profile.chain_facings`, Godot axes) -- AFTER promoting the ones the artist rotated,
+## or the re-face would overwrite the very rotation it is meant to notice (`point_ops.sync_facings`).
+## `{"ok", "message", "promoted", "refaced"}`.
+static func apply_facings(net: Node, facings: Dictionary) -> Dictionary:
+	var promoted := 0
+	var refaced := 0
+	for p in net.all_points():
+		if p.fields.get("tangent_mode", "AUTO") != "AUTO":
+			continue
+		if p.sync_promotion():
+			promoted += 1
+			continue
+		var f = facings.get(p.uid)
+		if f == null:
+			continue
+		var d := Vector3(float(f[0]), float(f[1]), float(f[2]))
+		if p.auto_facing == Vector3.ZERO or rad_to_deg((-p.network_transform().basis.z).angle_to(d)) > Fields.ROTATED_TOL_DEG:
+			refaced += 1
+		p.face(d)
+	return {"ok": true, "message": "%d rotated point(s) now shape their road, %d re-faced" % [promoted, refaced],
+			"promoted": promoted, "refaced": refaced}
+
+## `Follow Road (Auto)`: hand the facing back to the tool -- AUTO, re-faced along the chain.
+static func follow_road(points: Array, facings: Dictionary) -> Dictionary:
+	var n := 0
+	for p in points:
+		if not is_point(p):
+			continue
+		p.fields["tangent_mode"] = "AUTO"
+		var f = facings.get(p.uid)
+		if f != null:
+			p.face(Vector3(float(f[0]), float(f[1]), float(f[2])))
+		n += 1
+	return _ok("%d point(s) follow their road again" % n) if n > 0 else _fail("select road points")
+
+## Every mouth of the junction `point` belongs to (the JUNCTION component), for Select Junction: moving
+## or turning that selection moves the whole crossing. There is no handle node in Godot -- a road's
+## CHILD ORDER is its chain, so a mouth cannot be re-parented under one -- and the editor's own
+## multi-selection pivot is the handle.
+static func junction_members(point: Node) -> Array:
+	if not is_point(point):
+		return []
+	var net := network_of(point)
+	var seen := {point.uid: point}
+	var stack := [point]
+	while not stack.is_empty():
+		var cur: Node = stack.pop_back()
+		for l in cur.links:
+			if l["type"] == "JUNCTION" and not seen.has(l["target"]):
+				var q = net.find_point(l["target"])
+				if q != null:
+					seen[q.uid] = q
+					stack.append(q)
+	return seen.values() if seen.size() > 1 else []
+
 ## A RAMP is not a GDScript gesture on purpose: where its mouth belongs (the gore line), which
 ## carriageway feeds it and how far back the aux slot must open for the taper are solver facts owned
 ## by `point_solve`, reached through `roadkit_cli.py ramp` (the plugin's Make Ramp button).
@@ -240,10 +298,14 @@ static func make_intersection(points: Array) -> Dictionary:
 ##
 ## SAMPLE THE NATURAL GROUND. Once roads are stamped into the height map, sampling again reads the
 ## road's own height back as ground — the kit's CARVED_FLAG trap (a second build "found" the ground
-## meeting the road at 195 of 225 stations). The corridor stamp must run after this, never before.
+## meeting the road at 195 of 225 stations). So a stamped network reads its ground sidecar, which is
+## the natural ground, wherever it covers (`road_kit_ground.natural_height`).
 static func sample_ground(net: Node, terrain: Node) -> Dictionary:
 	if terrain == null or terrain.get("data") == null:
 		return _fail("no Terrain3D data to sample")
+	var src: Dictionary = Ground.natural_source(net)
+	if src.is_empty() and FileAccess.file_exists(Ground.stamp_record_path(str(net.get("record_path")))):
+		return _fail("%s is stamped into the terrain but its natural ground sidecar is missing -- not re-sampling the stamped roads as ground" % net.name)
 	var in_tree: bool = net.is_inside_tree()
 	var to_world: Transform3D = net.global_transform if in_tree else net.transform
 	var hits := 0
@@ -251,7 +313,7 @@ static func sample_ground(net: Node, terrain: Node) -> Dictionary:
 	for p in net.all_points():
 		var local: Vector3 = p.network_transform().origin
 		var world: Vector3 = to_world * local
-		var h: float = terrain.data.get_height(world)
+		var h: float = Ground.natural_height(net, terrain, src, world)
 		if is_nan(h):
 			misses += 1
 			continue

@@ -8,6 +8,11 @@ const SCHEMA_VER := 1
 const DELTA_FIELDS := ["lanes_fwd", "lanes_bwd", "aux_fwd", "aux_bwd"]
 const LINK_TYPES := ["SEGMENT", "JUNCTION", "AUX"]
 const ROLES := ["SEGMENT", "INTERSECTION", "RAMP_ENTRY", "RAMP_EXIT", "TERMINUS", "RAMP"]
+## A point turned further than this from the facing the tool gave it was ROTATED by hand -- the bend
+## gesture (`point_model.was_rotated`).
+const ROTATED_TOL_DEG := 0.5
+## Apply Cross-Section's field groups (`point_record_ops.MASK_GROUPS`).
+const MASK_GROUPS := ["JUNCTION", "LANES", "MEDIAN", "SIDES", "STRUCTURE", "WIDTH"]
 
 const POINT_FIELDS := [
 	["uid", "s", "", []],

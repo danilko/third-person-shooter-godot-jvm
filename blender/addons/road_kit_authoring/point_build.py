@@ -1043,56 +1043,10 @@ def _road_of(net, uid):
     return None
 
 
-def solve_all(net, ground=None):
-    """Solve every road, clique and gore, and collect the bands. `(solves, jsolves, gsolves, bands)`.
-
-    ONE OWNER of the solve ORDER, because two things need it: `build_network`, which emits the
-    meshes, and `road_corridors`, which the terrain builder asks for the ground carve. Order is not
-    negotiable -- the edge furniture is a fact about TWO roads at once, so every carrier must exist
-    before any band is collected."""
-    solves, jsolves = [], ps.solve_junctions(net, ground_fn=ground)
-    for road in net.roads.values():
-        for uids in ps.road_runs(net, road):
-            s = ps.solve_road(net, road, uids, ground)
-            if s is not None:
-                solves.append(s)
-    # The gore is solved from the finished carriers, not alongside them: its two boundaries ARE
-    # the two roads' own paved edges, so it cannot exist until both roads have some.
-    gsolves = ps.solve_gores(net, solves)
-    return solves, jsolves, gsolves, pe.collect_bands(solves, jsolves, gsolves)
-
-
-def band_corridors(bands):
-    """Every built surface as `(polyline, half)` for `island_v3_terrain.Carve` -- the ground the
-    road needs cleared, expressed as a centreline the terrain can carve to.
-
-    THE WIDTH IS READ OFF THE BAND, not from the road's authored numbers: `band.poly` is the paved
-    outline (left edge out, right edge back), so the distance from a spine point to its own two
-    edge points IS the half-width there, aux lanes, median tapers and all. One owner, and it cannot
-    disagree with the mesh that was just swept from the same band.
-
-    Junction pads and gores are bands too, and they are included on purpose -- a pad is a paved
-    surface the ground must clear exactly as a carriageway is. An ELEVATED stretch needs no case:
-    the carve is a `min`, so a deck 18 m over the bay proposes a ceiling far above the water and
-    changes nothing."""
-    out = []
-    for band in bands:
-        spine = list(getattr(band, "spine", ()) or ())
-        poly = list(getattr(band, "poly", ()) or ())
-        m = len(spine)
-        if m < 2 or len(poly) != 2 * m:
-            continue
-        line = []
-        for i, (sx, sy, sz) in enumerate(spine):
-            lx, ly = poly[i][0], poly[i][1]
-            rx, ry = poly[2 * m - 1 - i][0], poly[2 * m - 1 - i][1]
-            half = max(math.hypot(lx - sx, ly - sy), math.hypot(rx - sx, ry - sy))
-            # `sz` is the spine's OWN height, not `band.surface_z(sx, sy)` -- which is a
-            # nearest-sample lookup over this very list and would answer with the same number by a
-            # longer route, or with a neighbour's where two samples land close together.
-            line.append((sx, sy, sz, half))
-        out.append((line, 0.0))
-    return out
+#: ONE OWNER each, in `point_edges` since B7 (PLAN.md 3.1): both are pure, and the Godot terrain
+#: stamp asks for corridors through `roadkit_cli.py corridors`, which has no bpy.
+solve_all = pe.solve_all
+band_corridors = pe.band_corridors
 
 
 def road_corridors(scene=None, net=None, ground=None):
@@ -1105,7 +1059,7 @@ def road_corridors(scene=None, net=None, ground=None):
     return band_corridors(solve_all(net, ground)[3])
 
 
-def build_network(net, scene=None, sample_ground=True, part=None, zone=None):
+def build_network(net, scene=None, sample_ground=True, part=None, zone=None, ground=None):
     """Build everything. Returns a report dict the panel and the smoketests both read.
 
     `part` + `zone` (PLAN.md 3.1 B6) emit only what `point_zones` cut into that zone -- one piece of
@@ -1124,7 +1078,13 @@ def build_network(net, scene=None, sample_ground=True, part=None, zone=None):
     # ground, so sampling a ground already carved to the last pass derives a lower road, which
     # carves deeper, forever. See `island_v3_terrain.Carve` ("one direction of derivation") and
     # `build_island_base._emit_ground`.
-    ground = ground_sampler(scene) if sample_ground else None
+    #
+    # `ground` (PLAN.md 3.1 B6b) is a `point_ground.GroundGrid` -- the Terrain3D ground the Godot
+    # plugin sampled -- and when given it IS the sampler: a road authored in Godot is built in a
+    # session with no terrain, where the raycast would miss everywhere and every support would lerp
+    # its stations' `ground_z` instead of standing on the ground under each sample.
+    if ground is None:
+        ground = ground_sampler(scene) if sample_ground else None
 
     solves, jsolves, gsolves, bands = solve_all(net, ground)
 
@@ -1227,6 +1187,8 @@ class RKA_OT_point_build(bpy.types.Operator):
     zones_path: bpy.props.StringProperty(default="", subtype='FILE_PATH')
     #: The zone to emit when `zones_path` is set; "" is the resident piece (runs in no zone).
     zone: bpy.props.StringProperty(default="")
+    #: B6b: a `<stem>.ground.json` height grid (`point_ground`); blank raycasts this scene's terrain.
+    ground_path: bpy.props.StringProperty(default="", subtype='FILE_PATH')
 
     def execute(self, context):
         try:
@@ -1266,7 +1228,17 @@ class RKA_OT_point_build(bpy.types.Operator):
             except ImportError:
                 import point_zones as pz
             part = pz.partition(net, pz.load_zones(bpy.path.abspath(self.zones_path)))
-        rep = build_network(net, context.scene, part=part, zone=self.zone)
+        grid = None
+        if self.ground_path:
+            try:
+                from . import point_ground as pg
+            except ImportError:
+                import point_ground as pg
+            grid = pg.load_ground(bpy.path.abspath(self.ground_path))
+        rep = build_network(net, context.scene, part=part, zone=self.zone, ground=grid)
+        if grid is not None:
+            self.report({'INFO'}, "ground grid: %d sample(s) on the terrain, %d off it"
+                        % (grid.hits, grid.misses))
         for name, worst in rep["not_star"]:
             self.report({'WARNING'}, "%s pad ring folds %.2f m -- ear-clipped instead of fanned; "
                                      "Auto Setback tidies it" % (name, worst))

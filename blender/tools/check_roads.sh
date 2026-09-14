@@ -4,7 +4,8 @@
 # The repo has no CI and the verification story has always been "run these by hand" -- which is the
 # same story the previous addon had, with ~3.5 kLOC of smoketests, and it did not prevent this
 # rewrite. Hand-run discipline is exactly what decays once a project gets boring, so the five steps
-# are wrapped here for a git hook or a GitHub Action to run as a unit.
+# are wrapped here for a git hook or a GitHub Action to run as a unit. Section 4 is the Godot plugin
+# (PLAN.md 3.1 option B), which authors the records the rest of this gate checks.
 #
 # USAGE:
 #     blender/tools/check_roads.sh          # everything
@@ -42,7 +43,7 @@ for f in "$BP"/lib/road_points.py "$BP"/lib/lane_movements.py "$BP"/lib/lane_pro
          "$BP"/lib/road_support.py \
          "$ADDON"/point_model.py "$ADDON"/point_profile.py "$ADDON"/point_solve.py \
          "$ADDON"/point_edges.py "$ADDON"/point_validate.py "$ADDON"/point_export.py \
-         "$ADDON"/point_style.py "$ADDON"/point_zones.py; do
+         "$ADDON"/point_style.py "$ADDON"/point_zones.py "$ADDON"/point_ground.py "$ADDON"/point_record_ops.py; do
   [ -f "$f" ] && run "$(basename "$f")" python3 "$f"
 done
 
@@ -67,6 +68,32 @@ if [ "$QUICK" -eq 0 ]; then
     # --python-exit-code BEFORE --python, or a crashing test exits 0. See run_smoketests.sh.
     run "$(basename "$f" .py)" "$BLENDER" --background --python-exit-code 1 --python "$f"
   done
+fi
+
+echo
+echo "== 4. the Godot plugin (option B): field table, record, gestures, zones, ground, preview =="
+run "gen_roadkit_godot_fields.py --check" python3 "$BP/tools/gen_roadkit_godot_fields.py" --check
+if [ "$QUICK" -eq 0 ]; then
+  source "$HERE/env.sh"
+  # `timeout -k`: a GDScript error inside `_initialize` HANGS instead of exiting, and a hung Godot
+  # does not always honour SIGTERM.
+  gd() { (cd "$ROOT" && timeout -k 5 300 "$GODOT" --headless --path . --script "$@"); }
+  GT="$(mktemp -d)"
+  SAMPLE="$ROOT/assets/world_source/pieces/RoadKitSample.roads.json"
+  run "test_roadkit_record (round trip)" gd tools/godot/test_roadkit_record.gd -- "$SAMPLE" "$GT/rt.roads.json"
+  run "compare_roads_records (Godot-written == kit)" python3 "$BP/tools/compare_roads_records.py" "$SAMPLE" "$GT/rt.roads.json"
+  run "test_roadkit_gestures" gd tools/godot/test_roadkit_gestures.gd -- "$GT/g.roads.json"
+  run "test_roadkit_b8 (repairs, branch, bend, gizmo)" gd tools/godot/test_roadkit_b8.gd
+  run "test_roadkit_ground" gd tools/godot/test_roadkit_ground.gd
+  run "test_roadkit_zones" gd tools/godot/test_roadkit_zones.gd -- "$GT/z.json"
+  run "test_roadkit_preview" gd tools/godot/test_roadkit_preview.gd
+  run "probe_road_ground (DebugWorld supports on the ground)" gd tools/godot/probe_road_ground.gd
+  run "probe_road_stamp (DebugWorld terrain carries the roads)" gd tools/godot/probe_road_stamp.gd
+  # Inside the REAL editor, where a non-@tool JVM script is a placeholder: the plugin opens DebugWorld
+  # and must show its road pieces without being asked -- and without writing its unloaded (empty)
+  # network over the record, which it once did (`plugin.gd _selftest`).
+  run "editor self-test (road pieces shown on scene open)" bash -c "cd '$ROOT' && ROADKIT_EDITOR_SELFTEST=res://src/main/resources/com/openworld/world/DebugWorld.tscn timeout -k 5 300 '$GODOT' --headless --editor --path . 2>&1 | tee /dev/stderr | grep -q 'preview shown on open: true'"
+  rm -rf "$GT"
 fi
 
 echo

@@ -1,7 +1,8 @@
 """build_roadkit_sample_piece.py -> assets/world_source/pieces/RoadKitSample.blend (+ .lanekit.json)
 
-The road-system evaluation of 2026-09-13 (PLAN.md 3.1): the road kit's own `Add Sample Network`
-(two streets crossing, an elevated highway with a weave, ramps, a shared auxiliary lane) built into a
+The road-system evaluation of 2026-09-13 (PLAN.md 3.1): the road kit's sample network (two streets
+crossing, an elevated highway with a weave, ramps, a shared auxiliary lane -- its committed record,
+`RoadKitSample.roads.json`, since B9 retired the `Add Sample Network` button that authored it) built into a
 piece so `build_piece.sh RoadKitSample` takes it through the real export -> WorldBaker bake, and
 `debug/RoadKitTrafficTestHost` drives traffic on it. No terrain: the question is the lane graph.
 
@@ -21,9 +22,9 @@ import road_kit_authoring as rka                                            # no
 
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    if not hasattr(bpy.types.Scene, "rka"):
+    if not hasattr(bpy.types, "RKA_OT_point_build"):
         rka.register()
-    print("== sample network:", bpy.ops.rka.demo_network())
+    print("== sample network:", bpy.ops.rka.load_record(filepath=os.path.join(PIECES, "RoadKitSample.roads.json")))
     for o in bpy.context.selected_objects:
         o.select_set(False)
     print("== auto setback:", bpy.ops.rka.auto_setback())

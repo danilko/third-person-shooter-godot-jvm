@@ -79,8 +79,17 @@ func load_record(path: String = "") -> Array:
 		return ["could not parse %s" % p]
 	return from_record(parsed)
 
-func save_record(path: String = "") -> Error:
+## Refuses (ERR_ALREADY_IN_USE) to write an EMPTY network over a record that has points: a saved scene
+## holds the network node without its points until Load Record, and a service call on that unloaded
+## view wiped `DebugRoads.roads.json` once (2026-09-14, the editor's preview-on-open path). Clearing a
+## record on purpose is `force`.
+func save_record(path: String = "", force: bool = false) -> Error:
 	var p := path if path != "" else record_path
+	if not force and all_points().is_empty() and FileAccess.file_exists(p):
+		var old = JSON.parse_string(FileAccess.get_file_as_string(p))
+		if typeof(old) == TYPE_DICTIONARY and not (old.get("points", []) as Array).is_empty():
+			push_warning("RoadKitNetwork %s: not saving an unloaded (empty) network over %s -- Load Record first" % [name, p])
+			return ERR_ALREADY_IN_USE
 	var f := FileAccess.open(p, FileAccess.WRITE)
 	if f == null:
 		return FileAccess.get_open_error()

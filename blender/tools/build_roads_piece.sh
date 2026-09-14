@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build_roads_piece.sh <record.roads.json> <PieceName> [<zones.json>] -- road option B's whole build
+# build_roads_piece.sh <record.roads.json> <PieceName> [<zones.json>|""] [<ground.json>] -- road option B's whole build
 # (PLAN.md 3.1).
 #
 #   1. python3 roadkit_cli.py pieces    -> pieces/<Piece>.lanekit.json   (lane graph, no Blender)
@@ -13,15 +13,24 @@
 #   ROADKIT_PIECES {"pieces": [{"zone": ..., "piece": ..., "scene": "res://..."}]}
 # which is what the plugin wires into each ZoneMarker's Zone.
 #
+# With a ground sidecar (B6b, `<stem>.ground.json`, the Terrain3D height grid the plugin samples) the
+# supports stand on the real ground under every sample. Without one they stand on a lerp of the
+# stations' own `ground_z`, which is only right where the ground between two stations is straight.
+#
 # Run by the Godot Road Kit plugin's Build button, or by hand. NO_SOLO=1 is set so the shared
 # SoloPiece.tscn host is not re-pointed by a plugin build.
 set -euo pipefail
-USAGE="usage: build_roads_piece.sh <record.roads.json> <PieceName> [<zones.json>]"
+USAGE="usage: build_roads_piece.sh <record.roads.json> <PieceName> [<zones.json>|\"\"] [<ground.json>]"
 RECORD="$(cd "$(dirname "${1:?$USAGE}")" && pwd)/$(basename "$1")"
 PIECE="${2:?$USAGE}"
 ZONES=""
 if [[ -n "${3:-}" ]]; then
   ZONES="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"
+fi
+GROUND=""
+if [[ -n "${4:-}" ]]; then
+  GROUND="$(cd "$(dirname "$4")" && pwd)/$(basename "$4")"
+  [ -f "$GROUND" ] || { echo "ERROR: no ground sidecar at $GROUND"; exit 1; }
 fi
 BP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPO="$(cd "$BP/.." && pwd)"
@@ -53,10 +62,10 @@ sys.exit(0 if d["written"] else 1)
 PY
 mapfile -t NAMES < <(python3 -c "import json,sys; [print(p['piece']) for p in json.load(open(sys.argv[1]))['pieces']]" "$TABLE")
 
-echo "── 2/3 meshes (blender, headless)"
+echo "── 2/3 meshes (blender, headless)${GROUND:+, over the sampled ground}"
 "$BLENDER" --background --python-exit-code 1 --python "$BP/tools/roadkit_build_mesh.py" -- \
-    --record "$RECORD" --zones "${ZONES:-}" --prefix "$PIECE" --out-dir "$PIECES" 2>&1 \
-  | grep -E "^==|Error|refused" | grep -v OCIO || true
+    --record "$RECORD" --zones "${ZONES:-}" --prefix "$PIECE" --out-dir "$PIECES" --ground "${GROUND:-}" 2>&1 \
+  | grep -E "^==|Error|refused|ground grid|terrain below" | grep -v OCIO || true
 for n in "${NAMES[@]}"; do
   [ -f "$PIECES/$n.blend" ] || { echo "ERROR: mesh build produced no $n.blend"; exit 1; }
 done
