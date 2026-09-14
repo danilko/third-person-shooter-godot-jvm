@@ -42,7 +42,7 @@ for f in "$BP"/lib/road_points.py "$BP"/lib/lane_movements.py "$BP"/lib/lane_pro
          "$BP"/lib/road_support.py \
          "$ADDON"/point_model.py "$ADDON"/point_profile.py "$ADDON"/point_solve.py \
          "$ADDON"/point_edges.py "$ADDON"/point_validate.py "$ADDON"/point_export.py \
-         "$ADDON"/point_style.py; do
+         "$ADDON"/point_style.py "$ADDON"/point_zones.py; do
   [ -f "$f" ] && run "$(basename "$f")" python3 "$f"
 done
 

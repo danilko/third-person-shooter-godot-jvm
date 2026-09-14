@@ -1,15 +1,16 @@
 extends SceneTree
-## Road-system evaluation (PLAN.md 3.1): the SAME traffic measurement on two road systems.
+## Road-system evaluation (PLAN.md 3.1): the SAME traffic measurement on two Road Kit worlds.
 ##
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_road_traffic.gd -- --scene=roadkit
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_road_traffic.gd -- --scene=debugworld
 ##
 ## roadkit    = world/hosts/RoadKitTraffic.tscn — the Blender road kit's sample network, baked.
-## debugworld = world/DebugWorld.tscn — road-generator + RoadNetworkBridge.
+## debugworld = world/DebugWorld.tscn — the DebugRoads network, streamed per zone (it was road-generator
+##              + RoadNetworkBridge when this probe compared the two systems; both removed 2026-09-13).
 ##
 ## Every 0.25 s each streamed car is attributed to the lane it is on (nearest PathLaneRoute curve within
 ## 1.5 m), so a car's path becomes a lane sequence. Reported, not asserted: cars spawned, lane hand-overs,
-## junction lanes driven (a lane with a junction_id, or a road-generator intersection lane), distinct
+## junction lanes driven (a lane with a junction_id), distinct
 ## junction movements, metres driven per car, cars left idle, and ZoneManager's reclaim reasons.
 
 const SCENES := {
@@ -32,7 +33,7 @@ func _collect(n: Node) -> void:
 			p = n.get_node_or_null("Path3D")
 		if p != null and p.curve != null:
 			var jid := str(n.get("junction_id"))
-			lanes.append({"name": str(n.name), "path": p, "junction": jid != "" or str(n.name).begins_with("cj")})
+			lanes.append({"name": str(n.name), "path": p, "junction": jid != ""})
 	for c in n.get_children():
 		_collect(c)
 

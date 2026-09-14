@@ -145,7 +145,7 @@ public class WorldPreviewBuilder extends Node {
             if (instance == null) { skippedMissing++; continue; }
             instance.setName(new StringName(zone.zoneId));
             previewRoot.addChild(instance);
-            if (instance instanceof Node3D n3d) n3d.setGlobalPosition(marker.getGlobalPosition());
+            zone.placeGeometry(instance, marker);
             // Owner stamped on the INSTANCE ROOT ONLY, its own internals left untouched -- same
             // technique WorldBaker's own `instanceRoots` exclusion uses (see its class javadoc):
             // owning every descendant too would make pack() FLATTEN each district's full content

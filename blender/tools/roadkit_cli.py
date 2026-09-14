@@ -16,6 +16,7 @@ converts a preview; the record itself stays in the kit's frame, converted once b
     python3 blender/tools/roadkit_cli.py centrelines <record> [--step 4.0]
     python3 blender/tools/roadkit_cli.py lanekit     <record> <out.lanekit.json>
     python3 blender/tools/roadkit_cli.py ramp        <record> <uid_a> <uid_b> [--lanes 1]   (rewrites the record)
+    python3 blender/tools/roadkit_cli.py pieces      <record> <zones.json> <out_dir> <prefix> [--dry-run]
 
 Exit code 0 unless the command itself failed (a red gate is a RESULT, reported in the JSON).
 """
@@ -35,6 +36,7 @@ import point_validate as pv       # noqa: E402
 import point_solve as ps          # noqa: E402
 import point_profile as pp        # noqa: E402
 import point_export as pe         # noqa: E402
+import point_zones as pz          # noqa: E402
 import lane_profile as lp         # noqa: E402
 
 
@@ -79,6 +81,46 @@ def cmd_lanekit(a):
     doc = pe.write(net, a.out)
     gate.update({"written": True, "lanes": len(doc.get("lanes", ())),
                  "junctions": len(doc.get("junctions", ()))})
+    return gate
+
+
+def cmd_pieces(a):
+    """B6: cut ONE network into a piece per zone (`point_zones`). Writes `<out_dir>/<piece>.lanekit.json`
+    per piece and reports the table the build script and the plugin's marker wiring both read -- so
+    neither of them computes a piece name or a zone for itself."""
+    net = pm.load_network(a.record)
+    zones = pz.load_zones(a.zones) if a.zones and os.path.exists(a.zones) else []
+    gate = _findings(net)
+    part = pz.partition(net, zones)
+    gate["findings"] += part.findings
+    gate["warnings"] += len(part.findings)
+    doc = pe.export_network(net) if not gate["errors"] else {"lanes": [], "junctions": []}
+    if zones:
+        pz.stamp_lanes(doc, part, net)
+    cross, dangling = pz.cross_zone_report(doc)
+    if not zones:
+        cross = []   # an unzoned doc's zone_id is the legacy per-road tag, not a cut
+    counts = part.pieces()
+    pieces = []
+    for zone in sorted(counts):
+        sub = pz.split_doc(doc, zone) if zones else doc
+        piece = pz.piece_name(a.prefix, zone)
+        path = os.path.join(a.out_dir, piece + ".lanekit.json")
+        row = dict(counts[zone], zone=zone, piece=piece, lanes=len(sub.get("lanes", ())),
+                   junctions=len(sub.get("junctions", ())), lanekit=path)
+        if not gate["errors"] and not dangling and not a.dry_run:
+            os.makedirs(a.out_dir, exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump(sub, fh, indent=1, sort_keys=True)
+                fh.write("\n")
+            os.replace(tmp, path)
+        pieces.append(row)
+    gate.update({"written": bool(not gate["errors"] and not dangling and not a.dry_run),
+                 "zones": len(zones), "pieces": pieces, "lanes": len(doc.get("lanes", ())),
+                 "cross_zone": len(cross), "dangling": [list(d) for d in dangling],
+                 "runs": [{"road": part.run_road[f], "first": f, "zone": z}
+                          for f, z in sorted(part.runs.items(), key=lambda kv: (part.run_road[kv[0]], kv[0]))]})
     return gate
 
 
@@ -181,6 +223,9 @@ def main(argv=None):
     s.set_defaults(fn=cmd_lanekit)
     s = sub.add_parser("ramp"); s.add_argument("record"); s.add_argument("uid_a"); s.add_argument("uid_b")
     s.add_argument("--lanes", type=int, default=1); s.set_defaults(fn=cmd_ramp)
+    s = sub.add_parser("pieces"); s.add_argument("record"); s.add_argument("zones")
+    s.add_argument("out_dir"); s.add_argument("prefix"); s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(fn=cmd_pieces)
     a = ap.parse_args(argv)
     try:
         out = a.fn(a)

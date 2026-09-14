@@ -36,7 +36,6 @@ not reach players on their own.
 | [godot-jvm](https://github.com/utopia-rise/godot-jvm) (`1.0.0-rc1`) | `addons/jvm/` | Utopia-Rise and contributors | MIT |
 | Embedded Java runtime (OpenJDK 17) | `jvm/` (build output, not in git) | Oracle and OpenJDK contributors | GPL v2 with the Classpath Exception |
 | Terrain3D | `addons/terrain_3d/`, `demo/` | Cory Petkovsek, Roope Palmroos and contributors | MIT |
-| road-generator (incl. its default road material/texture) | `addons/road-generator/`, `road_demos/` | Moo-Ack! Productions | MIT |
 | Sky3D | `addons/sky_3d/` | Cory Petkovsek (Tokisan Games) and contributors | MIT |
 | Sky3D shaders (from TimeOfDay v1) | `addons/sky_3d/shaders/` | J. Cuéllar | MIT |
 

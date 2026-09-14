@@ -3329,7 +3329,7 @@ holster placement, projectile authority, lag compensation.
 
 ## Road Kit — option B: author in Godot, solve in python3, mesh in Blender (2026-09-13)
 
-Supersedes the road-generator half of the section below (PLAN.md 3.1). The Blender road kit's
+Supersedes road-generator, which is now removed (PLAN.md 3.1; see the section below). The Blender road kit's
 solver was kept and its authoring moved into the Godot editor, where zones, Terrain3D and building
 scenes live. **Three owners, one contract (`.roads.json`, the kit's `point_model` schema, Z-up):**
 
@@ -3360,31 +3360,75 @@ Rules that came with it, each measured:
   the kit's CARVED_FLAG trap returns. Blender keeps a record height when its scene has no terrain.
 - Gates: `test_roadkit_record.gd`, `test_roadkit_gestures.gd` (16/16 — a gesture-authored network
   passes the kit's gate with 0 errors and exports 34 lanes), `test_roadkit_ground.gd` (3/3).
-  Still to build (PLAN.md 3.1): zones (B6), corridor stamp into Terrain3D (B7), the remaining
-  gestures and gizmos (B8), retiring road-generator and the Blender authoring UI (B9).
+  Still to build (PLAN.md 3.1): corridor stamp into Terrain3D (B7), the remaining gestures and
+  gizmos (B8), retiring the Blender authoring UI (B9).
 
-## Ground and roads are moving to Terrain3D + road-generator (2026-09-06)
+**Zones (B6, 2026-09-13): author ONE network, let the build cut it.** The dock's Build writes the
+scene's ZoneMarkers to `<stem>.zones.json` (`road_kit_zones.gd`: each centre in the NETWORK's frame,
+kit axes, `Zone.size`'s XZ footprint as the box) and `build_roads_piece.sh <record> Roads_<net>
+<zones.json>` builds one piece per zone. `point_zones.py` is the ONE owner of the cut, asked by both
+the lane export (`roadkit_cli.py pieces`) and the mesh build (`point_build.build_network(part=,
+zone=)`), so tarmac and lanes cannot land in different pieces. Rules: a station is in the SMALLEST
+box containing it, else the nearest centre within `load_radius`; a **RUN** (not a road — a long
+arterial is cut at its own crossings, never mid-carriageway) takes its road's authored `zone_id` if
+that names a marker (else reported `zone_id_unknown` and derived), else its stations' majority; a
+pad goes with its clique centre; a gore with its ramp's run; anything in no zone goes to the
+resident piece `Roads_<net>`, which is exactly the old single-piece build. The **whole** network is
+still solved per piece — a kerb beside a ramp is a fact about both roads — and only emission is
+filtered: measured on the sample, 81 objects = 52 + 29, every one byte-identical in vertex count and
+position sum to the unzoned build, and the unzoned lanekit is unchanged byte for byte. A lane's
+`zone_id` is its zone, so a `VehicleSpawnConfig.route_name` of the zone id spawns on exactly that
+zone's lanes (`ZoneManager.spawnLanes`' zone-id pass). Successor names cross pieces untouched; the
+lane registry is global, so they resolve whenever both pieces are loaded.
+- **A cut piece is placed in the NETWORK's frame, not its marker's.** `ZoneManager` parents a zone's
+  geometry under the marker, which is right for a district authored about its own centre and put the
+  sample's pieces **1403.6 m** off (the probe's control). `Zone.geometryWorldPlaced` +
+  `geometryWorldTransform` (written by the dock from the network's global transform) and
+  `Zone.placeGeometry` — the one placement rule, used by the streamed tier, the LOD-low tier and
+  `WorldPreviewBuilder` — so dragging a marker never drags the road. Moving the NETWORK needs a Build.
+- **Wiring** (`plan_wiring`, one undo step): a Zone takes its piece's scene path and the placement; a
+  Zone already streaming something that is not one of this network's pieces keeps it and is reported
+  (one geometry per zone); a Zone whose road piece this build did not produce is CLEARED, so a stale
+  piece file cannot stream roads that are gone; the resident piece is reported, never silently lost.
+- Gates: `point_zones.py` self-test (in `check_roads.sh`, now 19), `test_roadkit_zones.gd` (17/17 with
+  a build log: the committed `hosts/RoadKitZones.tscn` needs ZERO wiring changes), and
+  **`probe_road_zones.gd`** (12/12): both pieces stream and sit at the network's transform, every lane
+  starts where its lanekit says (0.0000 m), every successor resolves with both loaded, a car hands
+  over from the west pad's connector onto an east lane, walking away unloads west and leaves exactly
+  the 6 east→west successors unresolved, and walking back resolves them all. `-- --control` (marker
+  frame) fails 4 of them.
 
-`TERRAIN3D_TRANSITION.md` is the plan and progress of record. Everything below about the Blender
-ground/road bake still describes what is in the repo and how the island was authored — it is being
-replaced, not corrected. The short version: `ROAD_POINT_GRAPH.md` §8v's rule (**the road deforms the
-height field, it does not cut it**) is what `RoadTerrain3DConnector` implements natively, so we stop
-maintaining our own offline version of it. `world/World.tscn` is the real world; `world/DebugWorld
-.tscn` is a small-scale version of the *entire* world for fast iteration. Both are gated by
-`tools/godot/check_world_envelope.gd`.
+## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 
-The seam into this project's traffic is **one indirection, not a second `Lane`**: `PathLaneRoute`
-already implements `world.Lane` over a native `Curve3D`, and a `RoadLane` **is** a `Path3D`, so
-`PathLaneRoute.sourcePath` points one at an externally owned curve and `world.RoadNetworkBridge`
-publishes one per `RoadLane`. Two rules came out of it, both measured:
+`TERRAIN3D_TRANSITION.md` is the history of record. Ground moved from the Blender bake to in-engine
+**Terrain3D** and stays there. Roads moved to **road-generator** for a week and were then replaced by
+the Godot-authored Road Kit (option B, above); the addon, its `road_demos/`, `world.RoadNetworkBridge`
+and `tools/godot/bake_road_terrain.gd` are **deleted** (user decision, 2026-09-13). `world/World.tscn`
+is the real world; `world/DebugWorld.tscn` is a small-scale version of the *entire* world for fast
+iteration. Both are gated by `tools/godot/check_world_envelope.gd`.
 
-- **The terrain connector is an AUTHORING step, not a runtime one.** `configure_road_update_signal`
-  early-returns outside the editor, and correctly so: it writes into the Terrain3D height map on
-  disk. `tools/godot/bake_road_terrain.gd` is that operation headless, and it **fails a bake that
-  changed nothing** — a silent no-op looks exactly like a working one. `do_full_refresh()` only
-  queues; the work happens in `_physics_process`, so read the terrain back after frames have run.
-- **The lane registry is no longer complete at spawn time.** Baked `VehicleRoute`s registered in
-  `_ready`; road-generator builds through `call_deferred` and the bridge publishes a few frames
+**DebugWorld's road is a Road Kit network now** — `DebugRoads` (`assets/world_source/pieces/
+DebugRoads.roads.json`), cut by its two zones into `Roads_DebugRoads_debug_a` / `_debug_b`, and
+debug_a's traffic route is its zone id. It was converted once from the road-generator points
+(position, and the authored basis at each junction mouth faced along its chain; interior stations
+take the kit's own facing, because road-generator's 5 m default handles made near-polyline corners
+that folded the inner lanes back on themselves, 177° measured). Three decisions in that conversion,
+each measured: road-generator's fork at `RP_008` (two roads claiming one point, no junction — the
+source of 3.2's duplicated lanes and self-successor) is DROPPED, not turned into a Y junction (an
+invented one hooked two lanes 170° at its mouths), leaving `spur` a dead end; **Auto Setback was not
+pressed** — it grew junction 2 to a ~190 m pad over terrain that was only ever flattened along
+road-generator's corridor, while the authored mouths keep it at 15–43 m with 0 gate errors; and every
+station is draped 0.10 m onto the sampled Terrain3D ground (they sat up to 1.44 m off it; before draping two
+ambient cars spawned at junction-1 mouths fell out of the world within 3 s, after it none did in 240 s). The terrain keeps the
+road-generator flattening baked into its height map; the Road Kit's own corridor stamp is B7.
+
+The seam into traffic is unchanged in shape: every lane is a `PathLaneRoute` over a native
+`Curve3D`. `PathLaneRoute.sourcePath` (an externally owned `Path3D`) outlived the bridge it was
+added for; it costs one branch and nothing uses it today. Rules from the road-generator week that
+still hold:
+
+- **The lane registry is not guaranteed complete at spawn time.** Baked `VehicleRoute`s registered in
+  `_ready`; road-generator built through `call_deferred` and the bridge published a few frames
   later — measured, a zone LOADED one log line before the bridge published and spawned its whole
   fleet unrouted. `ZoneManager.maintainTraffic`'s cull gained an **`unrouted`** reason beside dead /
   route-finished / fell-out / out-of-range, and the existing top-up respawns the car. Re-routing it

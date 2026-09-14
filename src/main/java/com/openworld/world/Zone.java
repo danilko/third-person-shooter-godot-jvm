@@ -2,8 +2,11 @@ package com.openworld.world;
 
 import godot.annotation.Export;
 import godot.annotation.Script;
+import godot.api.Node;
+import godot.api.Node3D;
 import godot.api.PackedScene;
 import godot.api.Resource;
+import godot.core.Transform3D;
 import godot.core.Vector3;
 import godot.core.VariantArray;
 
@@ -60,6 +63,19 @@ public class Zone extends Resource {
      */
     @Export public String lodLowGeometryPath = "";
 
+    /**
+     * Where this zone's geometry sits. {@code false} (every district piece): the piece is authored
+     * in the MARKER's frame and rides the marker. {@code true}: the piece is authored in a WORLD
+     * frame of its own and is placed at {@link #geometryWorldTransform} whatever the marker does —
+     * a road piece cut out of one continuous network (PLAN.md 3.1 B6, `point_zones.py`) is baked in
+     * the network's frame, and dragging a zone marker must not drag the road. The Road Kit plugin
+     * writes both on every build, from the network node's global transform.
+     */
+    @Export public boolean geometryWorldPlaced = false;
+
+    /** The geometry root's GLOBAL transform when {@link #geometryWorldPlaced}; ignored otherwise. */
+    @Export public Transform3D geometryWorldTransform = new Transform3D();
+
     /** Ambient AI spawn groups streamed in on load. */
     @Export
     public VariantArray<SpawnConfig> spawnConfigs = new VariantArray<>(SpawnConfig.class);
@@ -82,4 +98,15 @@ public class Zone extends Resource {
     @Export public RegionConfig regionConfig = null;
 
     public Zone() { super(); }
+
+    /**
+     * The ONE placement rule for an instanced geometry root that has just been added under
+     * {@code marker} — used by the streamed tier, the LOD-low tier and the world preview, so the
+     * three cannot come to disagree about where a piece is.
+     */
+    public void placeGeometry(Node root, Node3D marker) {
+        if (!(root instanceof Node3D n3d)) return;
+        if (geometryWorldPlaced) n3d.setGlobalTransform(geometryWorldTransform);
+        else if (n3d.getParent() != marker) n3d.setGlobalPosition(marker.getGlobalPosition());
+    }
 }

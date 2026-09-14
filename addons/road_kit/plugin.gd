@@ -11,6 +11,7 @@ const Gestures := preload("res://addons/road_kit/road_kit_gestures.gd")
 const Service := preload("res://addons/road_kit/road_kit_service.gd")
 const NetworkScript := preload("res://addons/road_kit/road_kit_network.gd")
 const OverlayScript := preload("res://addons/road_kit/road_kit_overlay.gd")
+const Zones := preload("res://addons/road_kit/road_kit_zones.gd")
 
 var dock: VBoxContainer
 var status: Label
@@ -315,15 +316,46 @@ func _on_build() -> void:
 		return
 	var piece := "Roads_" + String(net.name)
 	var record: String = net.record_path
-	status.text = "building %s (python3 lanes -> Blender meshes -> bake)..." % piece
+	# B6: the scene's ZoneMarkers cut the network into a piece per zone. No markers -> one piece.
+	var markers := Zones.markers_in(get_editor_interface().get_edited_scene_root())
+	var zones_path := ""
+	var notes := []
+	if not markers.is_empty():
+		var rec := Zones.zones_record(net, markers)
+		notes.append_array(rec["warnings"])
+		zones_path = Zones.sidecar_path(record)
+		if Zones.write_sidecar(zones_path, rec) != OK:
+			_say({"ok": false, "message": "could not write " + zones_path})
+			return
+	status.text = "building %s%s (python3 lanes -> Blender meshes -> bake)..." % [piece, " per zone (%d marker(s))" % markers.size() if zones_path != "" else ""]
 	build_thread = Thread.new()
 	build_thread.start(func():
-		var r := Service.build_piece(record, piece)
-		call_deferred("_build_done", piece, r))
+		var r := Service.build_piece(record, piece, zones_path)
+		call_deferred("_build_done", piece, r, net, notes))
 
-func _build_done(piece: String, r: Dictionary) -> void:
+func _build_done(piece: String, r: Dictionary, net: Node, notes: Array) -> void:
 	build_thread.wait_to_finish()
 	var log_text: String = r["log"]
-	var tail := "\n".join(log_text.split("\n").slice(-6))
-	_say({"ok": r["ok"], "message": ("built %s" % piece if r["ok"] else "build FAILED") + "\n" + tail})
+	var lines := Array(log_text.split("\n")).filter(func(l): return not l.begins_with("ROADKIT_PIECES "))
+	var tail := "\n".join(PackedStringArray(lines.slice(-6)))
+	var wired := ""
+	if r["ok"] and is_instance_valid(net):
+		var markers := Zones.markers_in(get_editor_interface().get_edited_scene_root())
+		var pieces := Zones.pieces_from_log(log_text)
+		var plan := Zones.plan_wiring(net, markers, pieces, piece)
+		notes.append_array(plan["notes"])
+		if not plan["changes"].is_empty():
+			# One undo step for the whole wiring, as a property change on each Zone -- so the scene is
+			# marked modified and Ctrl+Z puts every marker back.
+			var ur := get_undo_redo()
+			ur.create_action("Road Kit: Wire Road Pieces", UndoRedo.MERGE_DISABLE, net)
+			for c in plan["changes"]:
+				ur.add_do_property(c["zone"], c["property"], c["new"])
+				ur.add_undo_property(c["zone"], c["property"], c["old"])
+			ur.commit_action()
+		wired = "\n%d piece(s), %d zone field(s) wired" % [pieces.size(), plan["changes"].size()]
+	var msg := ("built %s" % piece if r["ok"] else "build FAILED") + wired
+	for n in notes:
+		msg += "\n• " + str(n)
+	_say({"ok": r["ok"], "message": msg + "\n" + tail})
 	get_editor_interface().get_resource_filesystem().scan()

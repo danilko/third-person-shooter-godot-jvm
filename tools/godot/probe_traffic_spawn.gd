@@ -3,8 +3,10 @@ extends SceneTree
 ##
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_traffic_spawn.gd
 ##
-## Runs the real DebugWorld (zone `debug_a`, plain `Lane_` route prefix) with the Player held alive
-## and follows every streamed car from spawn to reclaim. Pair it with ZoneManager's own
+## Runs the real DebugWorld (zone `debug_a`, whose route `debug_a` is the zone id its Road Kit lanes
+## carry -- PLAN.md 3.1 B6) with the Player held alive and follows every streamed car from spawn to
+## reclaim. The road is `Roads_DebugRoads_debug_a/_b`, streamed with the two zones; it was a
+## road-generator network published by RoadNetworkBridge until both were removed (2026-09-13). Pair it with ZoneManager's own
 ## `traffic spawn ... lane=` / `traffic reclaim (...)` lines, which land in the same stdout.
 ##
 ## Three defects this guards, all found together (0.4):
@@ -37,7 +39,7 @@ var done: Array = []
 var gaps: Array = []
 var facing_errors: Array = []
 var lane_counts := {}
-var bridge: Node
+var world: Node
 var fails := 0
 
 func _check(label: String, ok: bool, detail: String) -> void:
@@ -48,11 +50,17 @@ func _check(label: String, ok: bool, detail: String) -> void:
 func _yaw(v: Vector3) -> float:
 	return rad_to_deg(atan2(-v.x, -v.z))
 
-## The published lane a spawn point sits on, and that lane's travel direction there.
+## Every PathLaneRoute currently in the tree -- i.e. the lanes of the road pieces streamed in.
+func _lanes() -> Array:
+	return world.find_children("*", "Node", true, false).filter(func(n):
+		var s = n.get_script()
+		return s != null and str(s.resource_path).ends_with("PathLaneRoute.java"))
+
+## The streamed lane a spawn point sits on, and that lane's travel direction there.
 func _lane_at(p: Vector3) -> Dictionary:
 	var best := {"name": "", "dist": INF, "dir": Vector3.ZERO}
-	for lane in bridge.get_children():
-		var path: Path3D = lane.get_node_or_null(lane.get("source_path"))
+	for lane in _lanes():
+		var path: Path3D = lane.get_node_or_null("Path3D")
 		if path == null or path.curve == null:
 			continue
 		var c: Curve3D = path.curve
@@ -69,7 +77,7 @@ func _initialize() -> void:
 	var w: Node = (load(WORLD) as PackedScene).instantiate()
 	root.add_child(w)
 	current_scene = w   # ZoneManager and LaneGraph both resolve the world through current_scene
-	bridge = w.get_node("RoadNetworkBridge")
+	world = w
 	var player: Node3D = w.get_node("Characters/Player")
 	var health: Node = player.get_node("Health")
 	health.set("max_health", 1000000.0)
@@ -86,7 +94,7 @@ func _initialize() -> void:
 				for o in get_nodes_in_group(STREAMED):
 					if o != v:
 						gap = min(gap, (o as Node3D).global_position.distance_to(p))
-				var early: bool = int(bridge.call("published_count")) == 0
+				var early: bool = _lanes().is_empty()
 				var heading := _yaw(-(v as Node3D).global_basis.z)
 				cars[id] = {"node": v, "spawn": f, "last": p, "dist": 0.0, "early": early, "mark": p,
 						"moved_frame": f}

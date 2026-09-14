@@ -26,13 +26,7 @@
 [ext_resource type="PackedScene" uid="uid://dvq2be1wcewoe" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="22_wsys"]
 [ext_resource type="PackedScene" uid="uid://dmk2axe000002" path="res://src/main/resources/com/openworld/weapon/MW2.tscn" id="23_mw2ax"]
 [ext_resource type="Script" uid="uid://c72nxrh65t2ct" path="res://src/main/java/com/openworld/world/WaterVolume.java" id="25_water"]
-[ext_resource type="Script" uid="uid://dx0pklu2apuar" path="res://addons/road-generator/nodes/road_intersection.gd" id="40_h88lp"]
-[ext_resource type="Script" uid="uid://cob3ih0wpthwf" path="res://addons/road-generator/procgen/intersection_ngon.gd" id="41_5ftgs"]
-[ext_resource type="Script" uid="uid://daqkof5rxarjx" path="res://src/main/java/com/openworld/world/RoadNetworkBridge.java" id="rg_bridge"]
-[ext_resource type="Script" uid="uid://cph7euje06kel" path="res://addons/road-generator/nodes/road_container.gd" id="rg_container"]
-[ext_resource type="Script" uid="uid://bxp3i4cnonh8y" path="res://addons/road-generator/nodes/road_manager.gd" id="rg_manager"]
-[ext_resource type="Script" uid="uid://difs1qg4mpcpw" path="res://addons/road-generator/nodes/road_point.gd" id="rg_point"]
-[ext_resource type="Script" uid="uid://dg25avte7aket" path="res://addons/road-generator/connectors/terrain3d_road_connector.gd" id="rg_t3dconn"]
+[ext_resource type="Script" uid="uid://bw60dstm6flrq" path="res://addons/road_kit/road_kit_network.gd" id="rk_net"]
 [ext_resource type="Script" uid="uid://deo0gxkmk2ahd" path="res://addons/sky_3d/src/Sky3D.gd" id="sky_2_cejat"]
 [ext_resource type="Script" uid="uid://cjmkcj8hwm7ts" path="res://addons/sky_3d/src/TimeOfDay.gd" id="sky_3"]
 [ext_resource type="Script" uid="uid://b4tkplvh7fq40" path="res://addons/sky_3d/src/SkyDome.gd" id="sky_4"]
@@ -145,7 +139,6 @@ suspension_samples = 3
 max_speed = 120.0
 acceleration_curve = ExtResource("7_71gat")
 wreck_scene = ExtResource("9_560of")
-metadata/_custom_type_script = "uid://cuac11don07ow"
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_water2"]
 size = Vector3(8192, 80, 8192)
@@ -218,12 +211,16 @@ script = ExtResource("3_spawn")
 script = ExtResource("18_x5eyh")
 count = 3
 cruise_throttle = 0.4
-route_name = "Lane_"
+route_name = "debug_a"
 
 [sub_resource type="Resource" id="Zone_a"]
 script = ExtResource("3_zone")
 zone_id = "debug_a"
 size = Vector3(80, 12, 80)
+load_radius = 360.0
+unload_radius = 500.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_DebugRoads_debug_a.tscn"
+geometry_world_placed = true
 spawn_configs = Array[ExtResource("3_spawn")]([SubResource("SpawnConfig_a")])
 vehicle_spawn_configs = Array[ExtResource("18_x5eyh")]([SubResource("VehicleSpawn_a")])
 
@@ -235,6 +232,10 @@ count = 4
 script = ExtResource("3_zone")
 zone_id = "debug_b"
 size = Vector3(80, 12, 80)
+load_radius = 250.0
+unload_radius = 400.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_DebugRoads_debug_b.tscn"
+geometry_world_placed = true
 spawn_configs = Array[ExtResource("3_spawn")]([SubResource("SpawnConfig_b")])
 
 [sub_resource type="ShaderMaterial" id="sky_ShaderMaterial_v8wrf"]
@@ -247,12 +248,12 @@ shader_parameter/atm_darkness = 0.5
 shader_parameter/atm_sun_intensity = 18.0
 shader_parameter/atm_day_tint = Color(0.807843, 0.909804, 1, 1)
 shader_parameter/atm_horizon_light_tint = Color(0.980392, 0.635294, 0.462745, 1)
-shader_parameter/atm_night_tint = Color(0.092826754, 0.11009715, 0.1381609, 0.55048573)
+shader_parameter/atm_night_tint = Color(0, 0, 0, 0)
 shader_parameter/atm_level_params = Vector3(1, 0, 0)
 shader_parameter/atm_thickness = 0.7
 shader_parameter/atm_beta_ray = Vector3(5.804544e-06, 1.3562913e-05, 3.311258e-05)
 shader_parameter/atm_beta_mie = Vector3(3.038e-08, 3.038e-08, 3.038e-08)
-shader_parameter/sun_light_color = Color(0.98, 0.523, 0.294, 1)
+shader_parameter/sun_light_color = Color(1, 1, 1, 1)
 shader_parameter/sun_disk_color = Color(0.996094, 0.541334, 0.140076, 1)
 shader_parameter/sun_disk_intensity = 30.0
 shader_parameter/sun_disk_size = 0.02
@@ -266,7 +267,7 @@ shader_parameter/moon_texture_flip_u = false
 shader_parameter/moon_texture_flip_v = false
 shader_parameter/moon_size = 0.07
 shader_parameter/atm_moon_mie_tint = Color(0.137255, 0.184314, 0.292196, 1)
-shader_parameter/atm_moon_mie_intensity = 0.5323409682512283
+shader_parameter/atm_moon_mie_intensity = 0.0
 shader_parameter/atm_moon_partial_mie_phase = Vector3(0.36, 1.64, 1.6)
 shader_parameter/starmap_color = Color(0.709804, 0.709804, 0.709804, 0.854902)
 shader_parameter/starmap_texture = ExtResource("sky_5_0j4pb")
@@ -274,7 +275,7 @@ shader_parameter/starmap_flip_u = false
 shader_parameter/starmap_flip_v = false
 shader_parameter/starmap_alignment = Vector3(2.68288, -0.25891, 0.40101)
 shader_parameter/star_rotation_offset = 9.38899
-shader_parameter/star_rotation = -12.96852158482779
+shader_parameter/star_rotation = -11.01861428735807
 shader_parameter/star_tilt = -1.2915436464758039
 shader_parameter/star_field_color = Color(1, 1, 1, 1)
 shader_parameter/star_field_texture = ExtResource("sky_8_humls")
@@ -290,8 +291,8 @@ shader_parameter/cirrus_absorption = 2.0
 shader_parameter/cirrus_sky_tint_fade = 0.5
 shader_parameter/cirrus_size = 1.0
 shader_parameter/cirrus_uv = Vector2(0.16, 0.11)
-shader_parameter/cirrus_position1 = Vector2(0.2960717, 0.2960717)
-shader_parameter/cirrus_position2 = Vector2(0.2960717, 0.2960717)
+shader_parameter/cirrus_position1 = Vector2(0.018314049, 0.018314049)
+shader_parameter/cirrus_position2 = Vector2(0.018314049, 0.018314049)
 shader_parameter/cirrus_texture = ExtResource("sky_6_1g8sw")
 shader_parameter/cumulus_visible = true
 shader_parameter/cumulus_intensity = 0.6
@@ -301,7 +302,7 @@ shader_parameter/cumulus_absorption = 2.0
 shader_parameter/cumulus_noise_freq = 2.7
 shader_parameter/cumulus_sky_tint_fade = 0.0
 shader_parameter/cumulus_size = 0.5
-shader_parameter/cumulus_position = Vector2(26.492332, 26.492332)
+shader_parameter/cumulus_position = Vector2(0.09157034, 0.09157034)
 shader_parameter/cumulus_texture = ExtResource("sky_5_rt0jr")
 shader_parameter/cumulus_partial_mie_phase = Vector3(0.957564, 1.042436, 0.412)
 shader_parameter/cumulus_mie_intensity = 1.0
@@ -311,7 +312,7 @@ shader_parameter/azimuthal_grid_rotation_offset = 0.03
 shader_parameter/show_equatorial_grid = false
 shader_parameter/equatorial_grid_color = Color(0, 0.75, 1, 1)
 shader_parameter/equatorial_grid_rotation_offset = 0.03
-shader_parameter/moon_matrix = Basis(0.4542532, 0.85636175, 0.24555777, -0.29554006, 0.4048853, -0.8652884, -0.84042263, 0.32048786, 0.43700963)
+shader_parameter/moon_matrix = Basis(0.5295543, -0.81541526, -0.2338166, 0.22860953, 0.40262485, -0.8863582, 0.8168904, 0.41592214, 0.39962345)
 
 [sub_resource type="Sky" id="sky_Sky_0j4pb"]
 sky_material = SubResource("sky_ShaderMaterial_v8wrf")
@@ -320,22 +321,12 @@ sky_material = SubResource("sky_ShaderMaterial_v8wrf")
 background_mode = 2
 sky = SubResource("sky_Sky_0j4pb")
 ambient_light_source = 3
-ambient_light_color = Color(0.35, 0.2667349, 0.2506361, 1)
-ambient_light_sky_contribution = 0.7
+ambient_light_color = Color(1, 1, 1, 1)
 reflected_light_source = 2
 tonemap_mode = 3
 tonemap_white = 6.0
 
 [sub_resource type="CameraAttributesPractical" id="sky_CameraAttributesPractical_d0ed4"]
-
-[sub_resource type="Resource" id="Resource_y4gdf"]
-script = ExtResource("41_5ftgs")
-
-[sub_resource type="Resource" id="Resource_h88lp"]
-script = ExtResource("41_5ftgs")
-
-[sub_resource type="Resource" id="Resource_5ftgs"]
-script = ExtResource("41_5ftgs")
 
 [node name="DebugWorld" type="Node3D" unique_id=822990337]
 
@@ -522,15 +513,6 @@ vertex_spacing = 2.0
 top_level = true
 metadata/_edit_lock_ = true
 
-[node name="WorldEnvironment#DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=336851902]
-transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 4.677, 0)
-light_energy = 0.7
-sky_mode = 1
-
-[node name="WorldEnvironment#DirectionalLight3D2" type="DirectionalLight3D" parent="." unique_id=7119178]
-transform = Transform3D(0.9658932, -0.07774715, -0.24699299, 0.078457184, 0.996893, -0.00698126, 0.24676836, -0.012635224, 0.9689921, 0, 4.677, 0)
-light_energy = 0.03
-
 [node name="AmmoRefill" type="Area3D" parent="." unique_id=671726989]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250, 14.750076, 0)
 collision_mask = 2
@@ -574,7 +556,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -40, 0)
 shape = SubResource("BoxShape3D_water2")
 
 [node name="Surface" type="MeshInstance3D" parent="WaterVolume" unique_id=720000779]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -40, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.60690117, -39.999977, 0.07562256)
 cast_shadow = 0
 mesh = SubResource("BoxMesh_water2")
 surface_material_override/0 = SubResource("ShaderMaterial_water")
@@ -609,12 +591,15 @@ transform = Transform3D(1, 0, 0, 0, -0.004537884, -0.9999897, 0, 0.99998957, -0.
 
 [node name="T1_2" parent="Pickups" unique_id=100200001 instance=ExtResource("17_imhx0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -253.92575, 15.487059, 0)
+world_body_continuous_cd = false
 
 [node name="T1_3" parent="Pickups" unique_id=669037550 instance=ExtResource("17_imhx0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -253.82593, 15.117927, 0.347946)
+world_body_continuous_cd = false
 
 [node name="T1" parent="Pickups" unique_id=42787189 instance=ExtResource("17_imhx0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -253.86383, 14.743529, 0)
+world_body_continuous_cd = false
 
 [node name="ATL4" parent="Pickups" unique_id=200200001 instance=ExtResource("18_eg1nj")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -255.60349, 14.741947, 0)
@@ -632,32 +617,30 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -247.5, 14.887523, 3.57179)
 environment = SubResource("sky_Environment_1g8sw")
 camera_attributes = SubResource("sky_CameraAttributesPractical_d0ed4")
 script = ExtResource("sky_2_cejat")
-current_time = 18.49278444441072
+current_time = 10.999493333329537
 wind_speed = 7.000000000000001
 wind_direction = 2.35619451204804
 metadata/_custom_type_script = "uid://deo0gxkmk2ahd"
 
 [node name="SunLight" type="DirectionalLight3D" parent="Sky3D" unique_id=2039265666]
-transform = Transform3D(0.34285337, -0.23530354, -0.9094415, 0, 0.9681203, -0.25048575, 0.93938893, 0.085879885, 0.3319233, -0.9094415, -0.25048575, 0.3319233)
-light_color = Color(0.98, 0.523, 0.294, 1)
-light_energy = 0.0
+transform = Transform3D(0.94712985, -0.24269584, 0.20986584, 0, 0.65409255, 0.7564145, -0.32085034, -0.71642274, 0.61951065, 0.20986584, 0.7564145, 0.61951065)
+shadow_enabled = true
 directional_shadow_blend_splits = true
 directional_shadow_max_distance = 600.0
 
 [node name="MoonLight" type="DirectionalLight3D" parent="Sky3D" unique_id=77847850]
-transform = Transform3D(0, -0.54193157, -0.8404226, 0.80639255, -0.49700955, 0.32048783, -0.59138054, -0.6777105, 0.43700963, -0.8404226, 0.32048783, 0.43700963)
+transform = Transform3D(0, -0.57679296, 0.81689036, 0.6928369, 0.589055, 0.41592214, -0.7210943, 0.5659718, 0.39962342, 0.81689036, 0.41592214, 0.39962342)
 light_color = Color(0.572549, 0.776471, 0.956863, 1)
-light_energy = 0.0014262876
-shadow_enabled = true
+light_energy = 0.0
 directional_shadow_blend_splits = true
 directional_shadow_max_distance = 256.0
 
 [node name="SkyDome" type="Node" parent="Sky3D" unique_id=787810982]
 script = ExtResource("sky_4")
-sun_azimuth = -4.3624363
-sun_altitude = -1.8239783
-moon_azimuth = -4.232879
-moon_altitude = -1.2445519
+sun_azimuth = -2.8149655
+sun_altitude = -0.7129824
+moon_azimuth = -2.0257673
+moon_altitude = -1.1418397
 fog_density = 0.01
 wind_speed = 7.000000000000001
 wind_direction = 2.35619451204804
@@ -665,271 +648,11 @@ wind_direction = 2.35619451204804
 [node name="TimeOfDay" type="Node" parent="Sky3D" unique_id=874700447]
 script = ExtResource("sky_3")
 dome_path = NodePath("../SkyDome")
-current_time = 18.49278444441072
-day = 2
+current_time = 10.999493333329537
+day = 3
 
-[node name="RoadManager" type="Node3D" parent="." unique_id=910011001]
-script = ExtResource("rg_manager")
-
-[node name="Roads" type="Node3D" parent="RoadManager" unique_id=910011002]
-script = ExtResource("rg_container")
-use_lowpoly_preview = true
-collider_group_name = "road"
-generate_ai_lanes = true
-edge_containers = Array[NodePath]([NodePath(""), NodePath("")])
-edge_rp_targets = Array[NodePath]([NodePath(""), NodePath("")])
-edge_rp_target_dirs = Array[int]([-1, -1])
-edge_rp_locals = Array[NodePath]([NodePath("RP_004"), NodePath("RP_004")])
-edge_rp_local_dirs = Array[int]([0, 1])
-
-[node name="p000" type="Node3D" parent="RoadManager/Roads" unique_id=910012000]
-transform = Transform3D(-0.010223731, 0, 0.9999477, 0, 1, 0, -0.9999477, 0, -0.010223731, -250.23602, 14, 58.4591)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_pt_init = NodePath("../p011")
-next_pt_init = NodePath("../p001")
-
-[node name="p001" type="Node3D" parent="RoadManager/Roads" unique_id=910012001]
-transform = Transform3D(0.03518995, 0, 0.99938065, 0, 1, 0, -0.99938065, 0, 0.03518995, -220, 14, 59.491394)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_pt_init = NodePath("../p000")
-next_pt_init = NodePath("../p002")
-
-[node name="p002" type="Node3D" parent="RoadManager/Roads" unique_id=910012002]
-transform = Transform3D(0.106323786, 0, 0.99433154, 0, 1, 0, -0.99433154, 0, 0.106323786, -192, 13.8, 59.89357)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_pt_init = NodePath("../p001")
-next_pt_init = NodePath("../p003")
-
-[node name="p003" type="Node3D" parent="RoadManager/Roads" unique_id=910012003]
-transform = Transform3D(-0.17153916, 0, 0.9851773, 0, 1, 0, -0.9851773, 0, -0.17153916, -167.31, 13.2, 35.213554)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_pt_init = NodePath("../p002")
-next_pt_init = NodePath("../p004")
-
-[node name="p004" type="Node3D" parent="RoadManager/Roads" unique_id=910012004]
-transform = Transform3D(0.8501812, 0, 0.5264902, 0, 1, 0, -0.5264902, 0, 0.8501812, -143.47676, 12.14, 44.14)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_pt_init = NodePath("../p003")
-next_pt_init = NodePath("../Intersection")
-
-[node name="p006" type="Node3D" parent="RoadManager/Roads" unique_id=910012006]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -162.39182, 11.239588, 77.08243)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_pt_init = NodePath("../Intersection")
-next_pt_init = NodePath("../p007")
-
-[node name="p007" type="Node3D" parent="RoadManager/Roads" unique_id=910012007]
-transform = Transform3D(0.8794776, 0, -0.47594023, 0, 1, 0, 0.47594023, 0, 0.8794776, -176.05, 10.776445, 95.66)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_pt_init = NodePath("../p006")
-next_pt_init = NodePath("../p008")
-
-[node name="p008" type="Node3D" parent="RoadManager/Roads" unique_id=910012008]
-transform = Transform3D(0.9196088, 0, -0.39283544, 0, 1, 0, 0.39283544, 0, 0.9196088, -185.65, 8.208886, 110.87)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-next_mag = 34.724194
-prior_pt_init = NodePath("../p007")
-next_pt_init = NodePath("../p009")
-
-[node name="RP_001" type="Node3D" parent="RoadManager/Roads" unique_id=1048105021]
-transform = Transform3D(-0.35034332, -9.350163e-09, 0.93662137, 0, 1, 9.982863e-09, -0.93662137, 3.4974295e-09, -0.35034332, -128.19946, 10.610001, 55.259087)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-next_mag = 8.0
-prior_pt_init = NodePath("../Intersection")
-next_pt_init = NodePath("../RP_002")
-
-[node name="Intersection" type="Node3D" parent="RoadManager/Roads" unique_id=2047141281 node_paths=PackedStringArray("edge_points")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -145.41945, 10.61, 61.99)
-script = ExtResource("40_h88lp")
-settings = SubResource("Resource_y4gdf")
-edge_points = [NodePath("../p004"), NodePath("../RP_001"), NodePath("../p006")]
-
-[node name="RP_002" type="Node3D" parent="RoadManager/Roads" unique_id=578989250]
-transform = Transform3D(-0.81296027, -9.350163e-09, 0.58231926, -5.5646914e-09, 1, 8.288051e-09, -0.58231926, 3.4974292e-09, -0.81296027, -45.194767, 10.610001, 21.17406)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 8.0
-next_mag = 17.015474
-prior_pt_init = NodePath("../RP_001")
-next_pt_init = NodePath("../RP_003")
-
-[node name="RP_003" type="Node3D" parent="RoadManager/Roads" unique_id=1627334943]
-transform = Transform3D(0.24790044, -9.350163e-09, 0.9687855, 5.706169e-09, 1, 8.1912885e-09, -0.9687855, 3.4974297e-09, 0.24790044, 104.244286, 10.610001, 13.276047)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 17.015474
-next_mag = 77.6799
-prior_pt_init = NodePath("../RP_002")
-next_pt_init = NodePath("../Intersection2")
-
-[node name="p009" type="Node3D" parent="RoadManager/Roads" unique_id=440130952]
-transform = Transform3D(0.22684556, 0, -0.9739308, 0, 1, 0, 0.9739308, 0, 0.22684556, -241.19144, 8.208885, 152.56204)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 34.724194
-next_mag = 42.40792
-prior_pt_init = NodePath("../p008")
-next_pt_init = NodePath("../p010")
-
-[node name="p010" type="Node3D" parent="RoadManager/Roads" unique_id=1438695923]
-transform = Transform3D(-0.49653077, 0, -0.8680191, 0, 1, 0, 0.8680191, 0, -0.49653077, -324.7497, 8.208885, 138.01057)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 42.40792
-next_mag = 33.887295
-prior_pt_init = NodePath("../p009")
-next_pt_init = NodePath("../p011")
-
-[node name="p011" type="Node3D" parent="RoadManager/Roads" unique_id=951820690]
-transform = Transform3D(-0.96738964, 0, -0.25329295, 0, 1, 0, 0.25329295, 0, -0.96738964, -364.1902, 8.208885, 82.89395)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 33.887295
-next_mag = 33.887295
-prior_pt_init = NodePath("../p010")
-next_pt_init = NodePath("../p000")
-
-[node name="RP_005" type="Node3D" parent="RoadManager/Roads" unique_id=795105344]
-transform = Transform3D(0.96294534, -9.350163e-09, -0.26969668, 8.060451e-09, 1, -5.889542e-09, 0.26969668, 3.4974301e-09, 0.96294534, 155.79214, 10.610001, 53.43937)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 51.111717
-next_mag = 54.42535
-prior_pt_init = NodePath("../Intersection2")
-next_pt_init = NodePath("../RP_006")
-
-[node name="RP_006" type="Node3D" parent="RoadManager/Roads" unique_id=1725440571]
-transform = Transform3D(-0.076622106, -9.350163e-09, 0.99706024, 2.7707194e-09, 1, 9.590656e-09, -0.99706024, 3.4974301e-09, -0.07662211, 255.52213, 10.610001, 144.10031)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 54.42535
-next_mag = 47.168602
-prior_pt_init = NodePath("../RP_005")
-next_pt_init = NodePath("../RP_007")
-
-[node name="RP_007" type="Node3D" parent="RoadManager/Roads" unique_id=373138444]
-transform = Transform3D(-0.7938492, -9.350163e-09, 0.6081147, -5.2957807e-09, 1, 8.462404e-09, -0.6081147, 3.4974301e-09, -0.7938492, 336.6556, 10.610001, 95.966484)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 47.168602
-next_mag = 51.88034
-prior_pt_init = NodePath("../RP_006")
-next_pt_init = NodePath("../RP_008")
-
-[node name="RP_008" type="Node3D" parent="RoadManager/Roads" unique_id=904109305]
-transform = Transform3D(-0.9911774, -9.350163e-09, -0.13254212, -9.731227e-09, 1, 2.2272832e-09, 0.13254212, 3.4974301e-09, -0.9911774, 360.19897, 10.610001, -5.087906)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 51.88034
-next_mag = 21.97842
-prior_pt_init = NodePath("../RP_007")
-next_pt_init = NodePath("../RP_011")
-
-[node name="RP_009" type="Node3D" parent="RoadManager/Roads" unique_id=544814515]
-transform = Transform3D(-0.4800179, -9.350163e-09, -0.8772587, -7.556396e-09, 1, -6.523684e-09, 0.8772587, 3.4974297e-09, -0.4800179, 299.84567, 10.610001, -83.597595)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 49.513363
-next_mag = 81.33994
-prior_pt_init = NodePath("../RP_008")
-next_pt_init = NodePath("../RP_010")
-
-[node name="RP_010" type="Node3D" parent="RoadManager/Roads" unique_id=895839079]
-transform = Transform3D(0.553343, -9.350163e-09, -0.8329536, 2.2606508e-09, 1, -9.723531e-09, 0.8329536, 3.49743e-09, 0.553343, 138.49341, 10.610001, -11.592453)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 81.33994
-next_mag = 81.33994
-prior_pt_init = NodePath("../RP_009")
-next_pt_init = NodePath("../Intersection2")
-
-[node name="Intersection2" type="Node3D" parent="RoadManager/Roads" unique_id=30189864 node_paths=PackedStringArray("edge_points")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 128.80067, 10.610008, 21.026798)
-script = ExtResource("40_h88lp")
-settings = SubResource("Resource_h88lp")
-edge_points = [NodePath("../RP_003"), NodePath("../RP_010"), NodePath("../RP_011"), NodePath("../RP_005")]
-
-[node name="RP_004" type="Node3D" parent="RoadManager/Roads" unique_id=1655340615]
-transform = Transform3D(0.15804757, 0, 0.9874315, 0, 1, 0, -0.9874315, 0, 0.15804757, 234.90665, 10.610008, 38.010048)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 2, 1, 1])
-lanes = Array[int]([2, 4, 4, 2])
-
-[node name="RP_011" type="Node3D" parent="RoadManager/Roads" unique_id=71921330]
-transform = Transform3D(0.36498606, -9.940009e-09, -0.931013, 2.767687e-09, 1, -9.591531e-09, 0.931013, 9.2402264e-10, 0.36498606, 176.80789, 10.610001, -8.492245)
-script = ExtResource("rg_point")
-traffic_dir = Array[int]([2, 1])
-auto_lanes = false
-lanes = Array[int]([2, 2])
-prior_mag = 21.97842
-next_mag = 21.97842
-prior_pt_init = NodePath("../RP_008")
-next_pt_init = NodePath("../Intersection2")
-
-[node name="Intersection3" type="Node3D" parent="RoadManager/Roads" unique_id=2004366738]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 317.00192, 10.610001, 3.0495796)
-script = ExtResource("40_h88lp")
-settings = SubResource("Resource_5ftgs")
-
-[node name="RoadTerrain3DConnector" type="Node" parent="." unique_id=910011003 node_paths=PackedStringArray("terrain", "road_manager")]
-script = ExtResource("rg_t3dconn")
-terrain = NodePath("../NavigationRegion3D/Terrain3D")
-road_manager = NodePath("../RoadManager")
-edge_margin = 1.5
-edge_falloff = 6.0
-
-[node name="RoadNetworkBridge" type="Node" parent="." unique_id=910011004]
-script = ExtResource("rg_bridge")
-road_manager_path = NodePath("../RoadManager")
-build_delay_frames = 6
+[node name="DebugRoads" type="Node3D" parent="." unique_id=910011010]
+script = ExtResource("rk_net")
+record_path = "res://assets/world_source/pieces/DebugRoads.roads.json"
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

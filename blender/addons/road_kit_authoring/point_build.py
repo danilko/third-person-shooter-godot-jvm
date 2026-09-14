@@ -1105,8 +1105,12 @@ def road_corridors(scene=None, net=None, ground=None):
     return band_corridors(solve_all(net, ground)[3])
 
 
-def build_network(net, scene=None, sample_ground=True):
+def build_network(net, scene=None, sample_ground=True, part=None, zone=None):
     """Build everything. Returns a report dict the panel and the smoketests both read.
+
+    `part` + `zone` (PLAN.md 3.1 B6) emit only what `point_zones` cut into that zone -- one piece of
+    a network authored as one. The WHOLE network is still solved: a kerb beside a ramp is a fact
+    about both roads, and a road in the next zone is still beside it.
 
     ORDER MATTERS AND IS NOT NEGOTIABLE: solve every road and every clique FIRST, collect the
     bands, and only then emit. The edge furniture is a fact about TWO roads at once -- how far a
@@ -1138,13 +1142,22 @@ def build_network(net, scene=None, sample_ground=True):
     # the same slot differently.
     styles = {name: pstyle.resolve(road, material_fn=material)
               for name, road in net.roads.items()}
+    def mine_run(s):
+        return part is None or part.run_zone(s.uids) == zone
+
     for road_name, runs in by_road.items():
+        # The run INDEX names the objects, so filter inside the loop -- dropping another zone's run
+        # first would renumber this zone's and a piece's object names would depend on the cut.
+        if not any(mine_run(s) for s in runs):
+            continue
         coll = gen_group(road_name, scene)
         report["roads"] += 1
         style = styles.get(road_name)
         for slot, kind, missing_name in (style.missing() if style else ()):
             report.setdefault("missing_style", []).append((road_name, slot, kind, missing_name))
         for i, s in enumerate(runs):
+            if not mine_run(s):
+                continue
             name = road_name if len(runs) == 1 else "%s_%d" % (road_name, i)
             surf = build_carrier(s, coll, name, style)
             edges = build_edges(s, bands, coll, name, style)
@@ -1156,6 +1169,8 @@ def build_network(net, scene=None, sample_ground=True):
             cols = build_collision([surf], edges, coll, name, bool(s.road.ped_access))
             report["colonly"] += len(cols)
 
+    jsolves = [j for j in jsolves if part.pad_zone(j.uids) == zone] if part else jsolves
+    gsolves = [g for g in gsolves if part.gore_zone(g.ramp_uid) == zone] if part else gsolves
     if jsolves:
         jcoll = gen_group(pm.JUNCTIONS, scene)
         for j in jsolves:
@@ -1208,6 +1223,11 @@ class RKA_OT_point_build(bpy.types.Operator):
     bl_label = "Build Roads"
     bl_options = {'REGISTER', 'UNDO'}
 
+    #: B6: a `<stem>.zones.json` (`point_zones`); blank builds the whole network as one piece.
+    zones_path: bpy.props.StringProperty(default="", subtype='FILE_PATH')
+    #: The zone to emit when `zones_path` is set; "" is the resident piece (runs in no zone).
+    zone: bpy.props.StringProperty(default="")
+
     def execute(self, context):
         try:
             from . import point_validate as pv
@@ -1239,7 +1259,14 @@ class RKA_OT_point_build(bpy.types.Operator):
                 self.report({'ERROR'}, pv.describe(f, label))
             self.report({'ERROR'}, "%d gate error(s) -- nothing built" % len(errs))
             return {'CANCELLED'}
-        rep = build_network(net, context.scene)
+        part = None
+        if self.zones_path:
+            try:
+                from . import point_zones as pz
+            except ImportError:
+                import point_zones as pz
+            part = pz.partition(net, pz.load_zones(bpy.path.abspath(self.zones_path)))
+        rep = build_network(net, context.scene, part=part, zone=self.zone)
         for name, worst in rep["not_star"]:
             self.report({'WARNING'}, "%s pad ring folds %.2f m -- ear-clipped instead of fanned; "
                                      "Auto Setback tidies it" % (name, worst))

@@ -93,6 +93,7 @@ public class ZoneMarker extends Node3D {
 		Node n = ps.instantiate();
 		if (n == null) return;
 		addChild(n);
+		zone.placeGeometry(n, this);
 		lodLowInstance = n;
 	}
 

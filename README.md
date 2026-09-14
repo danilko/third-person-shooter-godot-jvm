@@ -429,7 +429,7 @@ range instead of relying on bare fists.
 
 All third-party code, assets and data, with their licences and required attribution lines, are
 listed in one place: **[CREDITS.md](CREDITS.md)**. That includes the base shooter project by Johnny
-Rouddro, Quaternius weapon models, Terrain3D / road-generator / Sky3D, the ambientCG terrain
+Rouddro, Quaternius weapon models, Terrain3D / Sky3D, the ambientCG terrain
 textures, and the Project PLATEAU data ("Data: Project PLATEAU (MLIT)", CC BY 4.0).
 
 ---
