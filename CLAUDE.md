@@ -3368,6 +3368,110 @@ nothing in it could take damage. `tools/godot/probe_aim_bench.gd` drives those k
 melee, per-shot remote cues, the stock-to-shoulder gate and rifle pose re-author, procedural recoil kick,
 holster placement, projectile authority, lag compensation.
 
+### W22 — THE STOCK BELONGS IN THE SHOULDER POCKET, AND THE POCKET IS MEASURED OFF THE SKIN (2026-09-14, PLAN.md A1)
+
+W20 put every long gun's grip on the palm and left the butt wherever the arm pose happened to put it.
+A1 is the gate for that, written BEFORE the pose re-author (A2) so the re-author has a target, and it
+**fails on the poses that ship today — 6 of 6, on purpose.**
+
+- **`StockPoint`** (a `Marker3D` on AR4 / AR212 / SG1) is the centre of the butt pad, read off a side
+  silhouette of each model's `.blend` on a 1 cm grid: AR4 (0, 0.033, 0.281), AR212 (0, 0.046, 0.259),
+  SG1 (0, −0.037, 0.265). SG1's pad is slanted and its stock drops well below the bore. ATL4 has no stock,
+  so it has no marker.
+- **The shoulder pocket is a fixed offset from `upperarm_r` in `clavicle_r`'s orthonormalised frame**
+  (`probe_weapon_fit.POCKET_IN_CLAVICLE`), so it rolls with the shoulder when the aim modifier moves it.
+  It was DERIVED from the character's own skinned `armor` mesh: in the hold pose, the frontmost skin
+  vertex in a column 2–7 cm inboard of the joint and 0–4 cm below it, which is 4.3 cm inboard, 3.3 cm
+  below and 8.6 cm in front of the joint centre. The probe re-derives it every run and fails on
+  more than 1.5 cm of drift, because a second body (W18) would make the constant quietly wrong.
+- **Two measurement traps.** `MeshInstance3D.bake_mesh_from_current_skeleton_pose` is refused headless
+  ("The source mesh must have its skin registered with a valid skeleton"), so the probe skins the
+  vertices by hand from `get_bone_global_pose`, which is the PRE-modifier pose. That is only valid in
+  the hold pose, where no aim modifier runs. Every other bone read goes through a `BoneAttachment3D`.
+  And an aimed arm sits in front of the chest, so the same skin column taken in the aim pose finds the
+  FOREARM (0.45 m out) rather than the chest.
+
+Measured on today's poses (MeshRoot frame):
+
+| weapon | aim: stock vs pocket (right / up / fwd) | aim miss | hold: stock vs joint (up) |
+|---|---|---:|---:|
+| AR4 | −0.002 / −0.016 / −0.188 | 0.189 m | **+0.073** |
+| AR212 | −0.002 / −0.003 / −0.166 | 0.166 m | **+0.067** |
+| SG1 | −0.001 / −0.086 / −0.171 | 0.191 m | **+0.014** |
+
+**Laterally the fit is already exact. The whole miss is fore-aft**, plus SG1's dropped stock. The palm
+sits 0.205 m in front of the joint, and a shouldered stock needs it at pocket depth plus grip-to-butt,
+about **0.37–0.39 m**. PLAN.md's earlier "0.27" was measured from the pocket, not from the joint. In
+the hold pose all three stocks sit ABOVE the shoulder (muzzle down, butt high), where a low ready puts
+them below it. Gate: `tools/godot/probe_weapon_fit.gd` (equips through a real pickup and
+`on_set_weapon`, holds `aim` through `Input`). `-- --visuals=res://…/CharacterVisuals_X.tscn` measures
+another body or a scratch export of an unexported pose, without touching the shipped `.glb`. That is how
+the user's bladed `upright_aim_rifle` edit was studied: it blades the shoulders +34.8° through the
+collarbones, but carries the firing arm 27.9° off the aim, which the W21 fire gate would refuse. Its
+numbers are in PLAN.md "combat §A2".
+
+### W23 — THE AIM MODIFIERS AIM THE GUN; THE STOCK IS IK'D INTO THE POCKET; THE AIM CLIP OWNS THE UPPER SPINE (2026-09-14, PLAN.md A2.0–A2.3)
+
+**A2.0 — study a pose by its CLIP, not only through the rig.** `tools/godot/study_character_pose.sh [<blend>]`
+exports a scratch copy to `assets/_study/`, re-points uid-stripped copies of `merged_animation.tscn` and the
+visuals scene at it (a copied `uid=` wins over the path and silently loads the SHIPPED clip), runs `--import`,
+then `probe_pose_clip.gd` (the clip on a bare `AnimationPlayer`, tree and modifiers off, so
+`get_bone_global_pose` IS the final pose) and `probe_weapon_fit.gd`, and deletes the folder (`KEEP=1` keeps it).
+`probe_pose_clip.gd -- --compare=res://assets/merged_animation.tscn --all` diffs every clip against the shipped
+export. The user's saved `upright_aim_rifle` (17:26:44) was the 2026-09-14 snapshot exactly; its clip truth is a
+**40.1° blade = 5.2° spine + 34.8° collarbones with the gun 33.2° right of the aim** (the rig showed 27.9°
+because `WeaponBlend` drops the spine twist). Trap: a "spine share" from the clavicle ORIGINS read 32° — they
+sit a few cm apart; use `spine_03`'s own +X (flipped to agree with the hip axis — the import's 180° puts it on
+the body's left).
+
+**A2.1 — `ShoulderAimModifier.aimHeldWeapon`: the reference is the held weapon's BORE** whenever
+`WeaponItem.aimsAlongBore()` (firearms, launcher) and the weapon hangs from `weaponBone` (`hand_r`); else the
+chest as before (melee, fist, throwable, a holstered weapon mid-switch). A chest reference throws away any
+authored chest-to-gun relationship — a bladed rifle hold is exactly that — and the gun then points wherever
+the clip left it. The weapon's skeleton-space transform comes from `HeldWeaponPose`: the weapon RELATIVE to its
+`BoneAttachment3D` (exact, both nodes update together) composed onto the bone pose AS THIS PASS SEES IT — the
+weapon's own global transform is last frame's. The carrier bone moves the gun as it turns it, so the delta is
+solved twice ("turn, see where the gun went, aim again"). Measured: study pose gun-off-aim **27.9° → 0.0°**
+(control 27.9°); AI gun-off-aim 2.0 → 0.2°; crawl down 5.0 → 1.5°. **The stance limits now bind the GUN**:
+at every cap the gun sits exactly on `aimPitchMax/Min` (upright 45.0/−65.0, crouch 40.0/−60.0, crawl 30.0) and
+the view-vs-gun gap is exactly W5's designed 15°; AimDebugAuto's limit bands assert the gun (crawl gained a real
+band). **Consequence:** the torso spends the clip's gun offset — the study pose's blade collapsed 34.8° → 6.9°.
+An authored blade survives only if the clip's bore is already on the body's forward line.
+
+**A2.2 — `StockMountIKModifier` (firing arm):** while `engaged` (combat in a stance with
+`Stance.stockMountEnabled` — Upright/Crouch; off for Crawl, DriveCarrier, Swim until A2.5) and the held weapon
+has a `StockPoint`, the hand is TRANSLATED by stock→pocket (never turned — the aim already pointed the bore) and
+`upperarm_r`/`lowerarm_r` are solved by `TwoBoneIK` (shared with `SupportHandIKModifier` now; clip elbow plane,
+reach clamped). Pocket = `pocketOffset` (the W22 constant, owned here; the probe reads it) in `clavicle_r`'s
+orthonormalised frame. Eases over `blendSeconds` (0.1). Skeleton order: spine aim, shoulder aim, stock mount,
+(recoil A3), support hand. `lastHandMove()`/`lastShortfall()` are registered for probes. Measured: aim stock-to-
+pocket **0.001–0.002 m** on AR4/AR212/SG1 on BOTH bodies (hand moved 0.17–0.19 m, palm now 0.37–0.39 m in front
+of the joint), gun still on the line; `--stock-weight=0` puts the A1 failures back. **Not solvable in code: the
+support hand.** The left arm is **0.416 m**; SupportPoint sits 0.50–0.62 m from the left shoulder with the clip's
+arm (so the pre-A2 0.08–0.20 m misses were already pure reach) and 0.64–0.77 m once shouldered (misses
+0.23–0.36 m). `SupportHandIKModifier` also now places its target from this pass's pose (after the stock mount)
+instead of the marker's stale global.
+
+**A2.3 — `WeaponTorsoBlend`, a stance-gated layer, NOT more bones in `WeaponBlend`.** `WeaponBlend` feeds every
+stance, combat or not, and the archetype clips are standing poses: their spine on a crouched or prone body would
+stand it up. The layer (filter `spine_03`, `neck_01`, `head_2`) is eased to 1 only in combat with
+`Stance.weaponTorsoLayer` (Upright). **A blend-tree node's output can feed ONE input** — connecting
+`CombatTransition` to a second node made Godot refuse the connection (`Condition "output == p_output_node"`)
+and the WHOLE tree stopped evaluating: every stance read the rest pose (cockpit eye 1.348 m in all three). So
+the layer has its own copy of the aim blendspace, `WeaponAimTorso`, indexed in `onWeaponEquip`. Filter width was
+measured on AimDebugAuto's combat strafe cases (chest vs mesh; the strafe lines now print hips/chest/gun):
+layer off −2.3/+5.7°, spine_01..03 −21.2/+13.2°, **shipped spine_03+neck+head −5.8/+14.4°** — spine_01/02 carry
+the turn-and-walk clips' counter-rotation of a 55–63° hip swing (spine_01 alone sways 14.5° walking and 20–22°
+strafing). The remaining left-strafe cost is `upright_walk_left` counter-rotating `spine_03` itself. Also fixed on
+the way: `AnimationController.setHolster` wrote `WeaponBlend/blend_position`, which a Blend2 does not have, so the
+story hook had never done anything.
+
+Gates after all three: `probe_weapon_fit` aim 3/3 seated + on line on both bodies (hold 3/3 FAIL — A2.4 content);
+AimDebugAuto `yaw 12/12, pitch 3/3, strafe 10/10, ai 8/8, limit 6/6, clav 1/1`; `probe_self_hit` worst 13.0°;
+`probe_driveby_aim`, `probe_fps_camera`, `probe_vehicle_views`, `probe_support_hand_ik`, `probe_melee`,
+`probe_weapon_{sockets,archetypes,scale,world_body}`, `probe_character_variant` PASS; cockpit eyes unchanged
+(1.359/0.787/0.808); `check_character_anim` PASS on both bodies; `World.tscn` boots clean; `./gradlew test` green.
+
 ## Godot-JVM Specifics
 
 - **Annotations (godot-jvm `1.0.0-rc1` API — the older `@Register*` family is gone).** The plugin runs in the

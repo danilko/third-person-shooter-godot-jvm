@@ -133,6 +133,7 @@ idle_state = ExtResource("11_kuqdj")
 walk_state = ExtResource("12_agpyf")
 sprint_state = ExtResource("13_jwg7l")
 camera_height = 1.4
+weapon_torso_layer = true
 collider = NodePath("../../UprightCollision")
 col_raycast = NodePath("../../UprightCollision/RayCast3D")
 
@@ -149,6 +150,7 @@ sprint_state = ExtResource("16_u0j3k")
 camera_height = 0.82
 spine_aim_enabled = false
 shoulder_aim_enabled = true
+stock_mount_enabled = false
 collider = NodePath("../../CrawlCollision")
 
 [node name="DriveCarrier" type="Node" parent="Stances" unique_id=838124124]
@@ -164,6 +166,7 @@ walk_state = ExtResource("22_arx8k")
 sprint_state = ExtResource("22_arx8k")
 spine_aim_enabled = true
 shoulder_aim_enabled = true
+stock_mount_enabled = false
 
 [node name="Swim" type="Node" parent="Stances" unique_id=838124999 node_paths=PackedStringArray("collider")]
 script = ExtResource("7_2iqcg")
@@ -179,6 +182,7 @@ camera_height = 0.82
 animation_stance_key = "Crawl"
 spine_aim_enabled = false
 shoulder_aim_enabled = true
+stock_mount_enabled = false
 collider = NodePath("../../CrawlCollision")
 
 [node name="WeaponController" type="Node" parent="." unique_id=384125234 node_paths=PackedStringArray("animation_controller", "weapon_audio")]

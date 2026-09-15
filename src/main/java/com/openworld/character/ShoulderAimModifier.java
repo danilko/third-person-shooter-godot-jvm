@@ -1,7 +1,11 @@
 package com.openworld.character;
 
+import com.openworld.weapon.WeaponController;
+import com.openworld.weapon.WeaponItem;
 import godot.annotation.Export;
+import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.api.Node;
 import godot.api.Skeleton3D;
 import godot.api.SkeletonModifier3D;
 import godot.core.Basis;
@@ -199,8 +203,50 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
     public VariantArray<String> getDrivenBones() { return drivenBones; }
     public void setDrivenBones(VariantArray<String> v) { this.drivenBones = v; }
 
+    /**
+     * Aim the HELD WEAPON's bore at the target instead of the reference bone's forward, whenever the
+     * weapon in hand is one whose shot leaves the weapon ({@code WeaponItem.aimsAlongBore()}: guns,
+     * the launcher). PLAN.md A2.1.
+     *
+     * <p><b>Why the chest is the wrong reference for a gun.</b> Aiming {@code spine_03}'s +Z at the
+     * target throws away any authored relationship between the chest and the gun. A shouldered rifle
+     * is held BLADED -- the chest turned ~30 deg off the line while the bore stays on it -- so a chest
+     * reference un-blades the pose by exactly the authored blade, and the gun then points wherever the
+     * clip left it relative to the chest. Measured on the 2026-09-14 study pose: the chest aimed at the
+     * target left the gun 27.9 deg off it, past the fire gate's 15. With the bore as the reference the
+     * same driven bones turn until the BORE is on the target, which is the one direction the shot and
+     * {@code WeaponItem.pointsAtAim} actually care about, and the blade survives.
+     *
+     * <p>Melee, fists, throwables and an empty hand keep the chest reference (they resolve from the
+     * chest, W16), and so does a weapon that is not hanging from {@link #weaponBone} -- a holstered one
+     * mid-switch.
+     */
+    @Export
+    public boolean aimHeldWeapon = true;
+
+    public boolean getAimHeldWeapon() { return aimHeldWeapon; }
+    public void setAimHeldWeapon(boolean v) { this.aimHeldWeapon = v; }
+
+    /** The bone a held weapon hangs from (via the {@code WeaponAttachment} BoneAttachment3D). */
+    @Export
+    public String weaponBone = "hand_r";
+
+    public String getWeaponBone() { return weaponBone; }
+    public void setWeaponBone(String v) { this.weaponBone = v; }
+
+    private WeaponController weaponController;
+    private boolean controllerResolved = false;
+
+    /** Which reference the last pass used: true = the held weapon's bore. For probes and the workbench. */
+    private boolean lastAimedBore = false;
+
+    /** Whether the last modification aimed the held weapon's bore (true) or the reference bone (false). */
+    @Register
+    public boolean aimedWithBore() { return lastAimedBore; }
+
     @Override
     public void _processModification() {
+        lastAimedBore = false;
         Skeleton3D skel = getSkeleton();
         if (skel == null || targetNode == null || targetNode.isEmpty()) return;
         if (!(getNodeOrNull(targetNode) instanceof Node3D target)) return;
@@ -208,26 +254,33 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
         int refIdx = skel.findBone(referenceBone);
         if (refIdx < 0) return;
 
-        // Where the chest is and where it currently points. +Z is this rig's chest forward --
-        // measured, not assumed: in the rest pose spine_03's +Z lands on the mesh forward and its
-        // +X on the clavicle_l - clavicle_r axis. (Note that is the OPPOSITE sign to a camera.)
-        Basis skelBasis = skel.getGlobalTransform().getBasis();
-        Transform3D refGlobal = skel.getBoneGlobalPose(refIdx);
-        Vector3 refOrigin = skel.getGlobalTransform().times(refGlobal.getOrigin());
-        Vector3 from = skel.getGlobalTransform().getBasis().times(refGlobal.getBasis().getZ());
-        Vector3 to = target.getGlobalPosition().minus(refOrigin);
-        if (to.length() < MIN_AIM_DISTANCE || from.lengthSquared() < 1e-8) return;
+        Transform3D skelXf = skel.getGlobalTransform();
+        Basis skelBasis = skelXf.getBasis();
+        Vector3 targetPos = target.getGlobalPosition();
 
-        // Cap the YAW before deriving the delta, and cap it about the BODY'S UP AXIS, not the
-        // reference bone's. That distinction is the whole correctness of this: in crawl spine_03 is
-        // pitched ~88 degrees face-down, so its local x/z plane is very nearly the world VERTICAL
-        // plane -- clamping "yaw" there clamps world PITCH. Measured, that took crawl's head FOLLOW
-        // from 0.93 to 0.32 on a pure elevation swing. Rotating about the body's up instead cannot
-        // touch elevation at all, by construction.
-        //
+        // The reference: the held weapon's bore when there is one to aim (see aimHeldWeapon), else
+        // where the chest points. +Z is this rig's chest forward -- measured, not assumed: in the rest
+        // pose spine_03's +Z lands on the mesh forward and its +X on the clavicle_l - clavicle_r axis.
+        // (Note that is the OPPOSITE sign to a camera; a weapon's bore is its -Z, W19.)
+        Vector3 from;
+        Vector3 pivot;
+        int carrier = -1;                                   // index into drivenBones that carries the gun
+        Transform3D gun = aimHeldWeapon ? heldWeaponInSkeleton(skel) : null;
+        if (gun != null) {
+            from = skelBasis.times(gun.getBasis().getZ()).times(-1.0f);
+            pivot = skelXf.times(gun.getOrigin());
+            carrier = carrierOf(skel, skel.findBone(weaponBone));
+            lastAimedBore = true;
+        } else {
+            Transform3D refGlobal = skel.getBoneGlobalPose(refIdx);
+            from = skelBasis.times(refGlobal.getBasis().getZ());
+            pivot = skelXf.times(refGlobal.getOrigin());
+        }
+        if (from.lengthSquared() < 1e-8) return;
+        Vector3 fromN = from.normalized();
+
         // "Straight ahead" comes from {@link #bodyForwardNode}; see its docs for why neither the
         // reference bone nor the skeleton node can supply it.
-        Vector3 want = to.normalized();
         Vector3 up = new Vector3(0.0, 1.0, 0.0);
         Node3D frame = (bodyForwardNode == null || bodyForwardNode.isEmpty())
                 ? null
@@ -238,6 +291,63 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
             if (bodyFlat.lengthSquared() > 1e-6) bodyFlat = bodyFlat.normalized();
             else bodyFlat = Vector3.Companion.getZERO();
         }
+
+        // The delta, kept as AXIS + ANGLE so a bone can take a fraction of it (see drivenWeights).
+        // Scaling the angle about the same axis is the right partial rotation -- it is the slerp from
+        // identity, on the shortest arc.
+        //
+        // A gun is not at the bone the rotation is applied about, so turning its carrier also MOVES
+        // the gun, and the direction from the gun to the target changes with it. Two passes of "turn,
+        // see where the gun went, aim again from there" settle that (the second moves it by
+        // millimetres); the chest reference needs one, since its origin is the bone's own.
+        Vector3 axis = null;
+        double angle = 0.0;
+        Vector3 p = pivot;
+        int passes = (carrier >= 0) ? 2 : 1;
+        for (int pass = 0; pass < passes; pass++) {
+            Vector3 to = targetPos.minus(p);
+            if (to.length() < MIN_AIM_DISTANCE) return;
+            Vector3 want = clampAim(to.normalized(), bodyFlat, up);
+            axis = rotationAxis(fromN, want);
+            if (axis == null) return;
+            angle = angleBetween(fromN, want);
+            if (carrier >= 0) {
+                int cIdx = skel.findBone(drivenBones.get(carrier));
+                Vector3 c = skelXf.times(skel.getBoneGlobalPose(cIdx).getOrigin());
+                p = c.plus(new Basis(axis, angle * weightFor(carrier)).times(pivot.minus(c)));
+            }
+        }
+
+        // Apply it to each driven bone about that bone's OWN origin, so the shoulders and head
+        // swing while the spine, pelvis and legs stay exactly as the clip authored them.
+        Basis toLocal = skelBasis.inverse();
+        Basis full = new Basis(axis, angle);
+        for (int i = 0; i < drivenBones.size(); i++) {
+            String name = drivenBones.get(i);
+            if (name == null || name.isEmpty()) continue;
+            int idx = skel.findBone(name);
+            if (idx < 0) continue;
+            float w = weightFor(i);
+            if (w <= 0.0f) continue;                       // this bone keeps the clip's pose
+            Basis delta = (w >= 0.999f) ? full : new Basis(axis, angle * w);
+            Transform3D g = skel.getBoneGlobalPose(idx);
+            // world-space rotate, brought back into skeleton space; the origin is untouched.
+            Basis rotated = toLocal.times(delta).times(skelBasis).times(g.getBasis());
+            skel.setBoneGlobalPose(idx, new Transform3D(rotated, g.getOrigin()));
+        }
+    }
+
+    /**
+     * The target direction with the stance's limits applied: yaw first, then elevation, both about
+     * the world horizon so the two axes stay independent.
+     */
+    private Vector3 clampAim(Vector3 want, Vector3 bodyFlat, Vector3 up) {
+        // Cap the YAW before deriving the delta, and cap it about the BODY'S UP AXIS, not the
+        // reference bone's. That distinction is the whole correctness of this: in crawl spine_03 is
+        // pitched ~88 degrees face-down, so its local x/z plane is very nearly the world VERTICAL
+        // plane -- clamping "yaw" there clamps world PITCH. Measured, that took crawl's head FOLLOW
+        // from 0.93 to 0.32 on a pure elevation swing. Rotating about the body's up instead cannot
+        // touch elevation at all, by construction.
         if (bodyFlat.lengthSquared() > 0.5 && yawLimitDegrees > 0.0f && yawLimitDegrees < 180.0f) {
             Vector3 flatW = planar(want, up);
             if (flatW.lengthSquared() > 1e-6) {
@@ -275,31 +385,37 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
                 }
             }
         }
+        return want;
+    }
 
-        // The delta the chest WOULD have taken, kept as AXIS + ANGLE so a bone can take a
-        // fraction of it (see drivenWeights). Scaling the angle about the same axis is the right
-        // partial rotation -- it is the slerp from identity, on the shortest arc.
-        Vector3 axis = rotationAxis(from.normalized(), want);
-        if (axis == null) return;
-        double angle = angleBetween(from.normalized(), want);
-
-        // Apply it to each driven bone about that bone's OWN origin, so the shoulders and head
-        // swing while the spine, pelvis and legs stay exactly as the clip authored them.
-        Basis toLocal = skelBasis.inverse();
-        Basis full = new Basis(axis, angle);
-        for (int i = 0; i < drivenBones.size(); i++) {
-            String name = drivenBones.get(i);
-            if (name == null || name.isEmpty()) continue;
-            int idx = skel.findBone(name);
-            if (idx < 0) continue;
-            float w = weightFor(i);
-            if (w <= 0.0f) continue;                       // this bone keeps the clip's pose
-            Basis delta = (w >= 0.999f) ? full : new Basis(axis, angle * w);
-            Transform3D g = skel.getBoneGlobalPose(idx);
-            // world-space rotate, brought back into skeleton space; the origin is untouched.
-            Basis rotated = toLocal.times(delta).times(skelBasis).times(g.getBasis());
-            skel.setBoneGlobalPose(idx, new Transform3D(rotated, g.getOrigin()));
+    /** The held weapon in skeleton space for this pass, or null when the chest reference applies (see {@link #aimHeldWeapon}). */
+    private Transform3D heldWeaponInSkeleton(Skeleton3D skel) {
+        if (!controllerResolved) {
+            controllerResolved = true;
+            weaponController = HeldWeaponPose.findController(this);
         }
+        if (weaponController == null) return null;
+        WeaponItem held = weaponController.getCurrentWeaponItem();
+        if (held == null || !held.aimsAlongBore()) return null;
+        return HeldWeaponPose.weaponInSkeleton(skel, held, weaponBone);
+    }
+
+    /** The index in {@link #drivenBones} of the bone that carries {@code boneIdx} (itself or its nearest driven ancestor), or -1. */
+    private int carrierOf(Skeleton3D skel, int boneIdx) {
+        for (int b = boneIdx; b >= 0; b = skel.getBoneParent(b)) {
+            String nm = skel.getBoneName(b);
+            for (int i = 0; i < drivenBones.size(); i++) {
+                if (nm.equals(drivenBones.get(i))) return i;
+            }
+        }
+        return -1;
+    }
+
+    @Register
+    @Override
+    public void _exitTree() {
+        weaponController = null;
+        controllerResolved = false;
     }
 
     /** {@code v} with its component along {@code up} removed. */

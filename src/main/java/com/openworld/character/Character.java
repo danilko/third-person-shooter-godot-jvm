@@ -438,6 +438,11 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
                     }
                 }
             }
+            if (!meshConfig.stockMountModifierPath.isEmpty()
+                    && visualsInstance.getNodeOrNull(meshConfig.stockMountModifierPath)
+                            instanceof StockMountIKModifier smm) {
+                ac.stockMountModifier = smm;
+            }
         }
 
         // ── WeaponController ──────────────────────────────────────────────
