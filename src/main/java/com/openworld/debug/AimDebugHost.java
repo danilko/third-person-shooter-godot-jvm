@@ -1124,9 +1124,11 @@ public class AimDebugHost extends Node3D {
         final Vector2 blend;      // STRAFE/AI: the blendspace corner the legs must be sent to, or null
         final Vector3 ball;       // AI only: where the aim ball sits, relative to the AI subject
         final Vector3 aiMove;     // AI only: world-space walk intent written into the command
-        // LIMIT only: the band the CHEST must stay inside, or NaN where the chest does not carry
-        // the aim (crawl pins it -- see ShoulderAimModifier).
-        double chestMax = Double.NaN, chestMin = Double.NaN;
+        // LIMIT only: the elevation band the GUN must stay inside (Stance.aimPitch*), or NaN for no
+        // bone assertion. The GUN, since PLAN.md A2.1: ShoulderAimModifier aims the held weapon's
+        // bore, so the stance's bone limit now binds the bore, and the chest sits wherever the clip
+        // holds it relative to the gun (1 deg off upright; pinned at -88 prone).
+        double gunMax = Double.NaN, gunMin = Double.NaN;
         Case(String name, String stance, String move, boolean combat, double mouseDx, double mouseDy,
              Against against, double expected, Axis axis, Vector2 blend, Vector3 ball, Vector3 aiMove) {
             this.name = name; this.stance = stance; this.move = move; this.combat = combat;
@@ -1134,7 +1136,7 @@ public class AimDebugHost extends Node3D {
             this.expected = expected; this.axis = axis; this.blend = blend;
             this.ball = ball; this.aiMove = aiMove;
         }
-        Case chest(double lo, double hi) { this.chestMin = lo; this.chestMax = hi; return this; }
+        Case gun(double lo, double hi) { this.gunMin = lo; this.gunMax = hi; return this; }
         static Case yaw(String name, String stance, String move, boolean combat, double mouseDx,
                         Against against, double expected) {
             return new Case(name, stance, move, combat, mouseDx, 0.0, against, expected, Axis.YAW,
@@ -1354,17 +1356,18 @@ public class AimDebugHost extends Node3D {
         // them would measure a body still looking at the sky.
         // TWO assertions per case, because there are two limits and they are deliberately
         // different numbers: the VIEW stops at Stance.viewPitch* (a player must still be able to
-        // look at a rooftop) and the CHEST stops at Stance.aimPitch* (a trunk arches about 45 deg,
-        // not 80). Asserting only the view is what let the 1:1 chest through -- the chest bound is
-        // the half that says the BODY held a pose a body can hold. NaN for crawl: it pins the
-        // chest at -87 and spends the aim in the neck and clavicles, so a chest band is the wrong
-        // question there (the pitch FOLLOW pair above is the one that covers it).
-        cases.add(Case.limit("limit up, upright", "", -12000.0, 60.0).chest(-999, 45.0));
-        cases.add(Case.limit("limit down, upright", "", 12000.0, -75.0).chest(-65.0, 999));
-        cases.add(Case.limit("limit up, crouch", "crouch", -12000.0, 55.0).chest(-999, 40.0));
-        cases.add(Case.limit("limit down, crouch", "crouch", 12000.0, -70.0).chest(-60.0, 999));
-        cases.add(Case.limit("limit up, crawl", "crawl", -12000.0, 40.0));
-        cases.add(Case.limit("limit down, crawl", "crawl", 12000.0, -35.0));
+        // look at a rooftop) and the BONES stop at Stance.aimPitch* (a trunk arches about 45 deg,
+        // not 80). Asserting only the view is what let the 1:1 chest through -- the bone bound is
+        // the half that says the BODY held a pose a body can hold. Since A2.1 the aim modifiers aim
+        // the GUN, so the band is on the gun's elevation -- which also gives crawl a real band (it
+        // pins the chest at -88 and spends the aim in the neck and clavicles; a chest band was the
+        // wrong question there, a gun band is not).
+        cases.add(Case.limit("limit up, upright", "", -12000.0, 60.0).gun(-999, 45.0));
+        cases.add(Case.limit("limit down, upright", "", 12000.0, -75.0).gun(-65.0, 999));
+        cases.add(Case.limit("limit up, crouch", "crouch", -12000.0, 55.0).gun(-999, 40.0));
+        cases.add(Case.limit("limit down, crouch", "crouch", 12000.0, -70.0).gun(-60.0, 999));
+        cases.add(Case.limit("limit up, crawl", "crawl", -12000.0, 40.0).gun(-999, 30.0));
+        cases.add(Case.limit("limit down, crawl", "crawl", 12000.0, -35.0).gun(-30.0, 999));
 
         // ── THE CLAVICLE SPLIT (report only) ──────────────────────────────────────────────────
         // Prone, the delta is measured from a chest that points at the FLOOR, so the rotation
@@ -1473,7 +1476,7 @@ public class AimDebugHost extends Node3D {
             return caseIndex < cases.size();
         }
         if (c.axis == Axis.STRAFE) {
-            measureStrafe(c, camYaw, aimYaw, bodyYaw, meshYaw);
+            measureStrafe(c, camYaw, aimYaw, bodyYaw, meshYaw, hipsYaw);
             advance();
             return caseIndex < cases.size();
         }
@@ -1531,20 +1534,36 @@ public class AimDebugHost extends Node3D {
      * from the corner alone: a body facing the wrong way strafes into the correct corner of a
      * frame that is itself rotated.
      */
-    private void measureStrafe(Case c, double camYaw, double aimYaw, double bodyYaw, double meshYaw) {
+    private void measureStrafe(Case c, double camYaw, double aimYaw, double bodyYaw, double meshYaw,
+                               double hipsYaw) {
         Vector2 actual = blendPosition(c.stance);
         boolean ok = actual != null
                 && Math.abs(actual.getX() - c.blend.getX()) <= BLEND_TOLERANCE
                 && Math.abs(actual.getY() - c.blend.getY()) <= BLEND_TOLERANCE;
         if (!ok) strafeFailures++;
         double meshFacingNow = wrap(bodyYaw + meshYaw + 180.0);
+        // Report only: how far the CHEST (spine_03's own +X, the clavicle axis -- the clavicle ORIGINS
+        // sit a few cm apart and read a 5 deg twist as 32) sits off the mesh while strafing, and the gun.
+        // A2.3's torso layer replaces the locomotion clip's spine in combat, and the upright strafe
+        // clips swing the hips up to 63 deg and counter-rotate the spine; this is where that shows.
+        double chestMesh = Double.NaN;
+        if (spine3 != null && thighL != null && thighR != null) {
+            Vector3 hipAxis = thighL.getGlobalPosition().minus(thighR.getGlobalPosition());
+            Vector3 chestX = spine3.getGlobalTransform().getBasis().getX();
+            if (chestX.dot(hipAxis) < 0) chestX = chestX.times(-1.0f);
+            double chestYaw = yaw(new Vector3(chestX.getX(), 0, chestX.getZ()).normalized()
+                    .cross(new Vector3(0, 1, 0)));
+            chestMesh = wrap(chestYaw - meshFacingNow);
+        }
         GD.INSTANCE.print(String.format(
-                "[AimDebug] %-4s %-32s blend = %s  expected (%.0f, %.0f)  | mesh-aim %6.1f  mesh-cam %6.1f",
+                "[AimDebug] %-4s %-32s blend = %s  expected (%.0f, %.0f)  | mesh-aim %6.1f  mesh-cam %6.1f"
+                        + "  | hips-mesh %6.1f  chest-mesh %6.1f  gun-off-aim %s",
                 ok ? "PASS" : "FAIL", c.name,
                 actual == null ? "<no AnimationTree>"
                         : String.format("(%5.2f, %5.2f)", actual.getX(), actual.getY()),
                 c.blend.getX(), c.blend.getY(),
-                wrap(meshFacingNow - aimYaw), wrap(meshFacingNow - camYaw)));
+                wrap(meshFacingNow - aimYaw), wrap(meshFacingNow - camYaw),
+                wrap(hipsYaw - meshFacingNow), chestMesh, gunText(gunAimError())));
     }
 
     private Vector2 blendPosition(String stance) {
@@ -1704,22 +1723,27 @@ public class AimDebugHost extends Node3D {
         double viewPitch = pitchOf(cameraForward());
         double chestPitch = pitchOf(chestForward());
         double headPitch = pitchOf(headForward());
+        Node3D muzzle = activeMuzzle(player);
+        double gunPitch = muzzle == null ? Double.NaN
+                : pitchOf(muzzle.getGlobalTransform().getBasis().getZ().times(-1.0f));
         double err = viewPitch - c.expected;
         boolean viewOk = Math.abs(err) <= TOLERANCE_DEG;
-        boolean chestOk = true;
-        String chestNote = "";
-        if (!Double.isNaN(c.chestMax)) {
-            chestOk = chestPitch <= c.chestMax + TOLERANCE_DEG
-                   && chestPitch >= c.chestMin - TOLERANCE_DEG;
-            chestNote = String.format(" [chest band %.0f..%.0f]",
-                    Math.max(c.chestMin, -90.0), Math.min(c.chestMax, 90.0));
+        boolean gunOk = true;
+        String gunNote = "";
+        if (!Double.isNaN(c.gunMax)) {
+            // An unarmed stand cannot answer the question, and that is a failure, not a pass.
+            gunOk = !Double.isNaN(gunPitch)
+                   && gunPitch <= c.gunMax + TOLERANCE_DEG
+                   && gunPitch >= c.gunMin - TOLERANCE_DEG;
+            gunNote = String.format(" [gun band %.0f..%.0f]",
+                    Math.max(c.gunMin, -90.0), Math.min(c.gunMax, 90.0));
         }
-        boolean ok = viewOk && chestOk;
+        boolean ok = viewOk && gunOk;
         if (!ok) limitFailures++;
         GD.INSTANCE.print(String.format(
-                "[AimDebug] %-4s %-22s view %7.1f  expected %7.1f  err %6.2f | chest %7.1f head %7.1f%s%s",
-                ok ? "PASS" : "FAIL", c.name, viewPitch, c.expected, err, chestPitch, headPitch,
-                chestNote, chestOk ? "" : "  <<< BODY PAST ITS LIMIT"));
+                "[AimDebug] %-4s %-22s view %7.1f  expected %7.1f  err %6.2f | gun %7.1f chest %7.1f head %7.1f%s%s",
+                ok ? "PASS" : "FAIL", c.name, viewPitch, c.expected, err, gunPitch, chestPitch, headPitch,
+                gunNote, gunOk ? "" : "  <<< BODY PAST ITS LIMIT"));
     }
 
     /** The shoulder-aim modifier on the Player, by node name; null once looked up and absent. */

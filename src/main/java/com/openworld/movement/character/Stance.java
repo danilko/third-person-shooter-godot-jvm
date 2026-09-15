@@ -63,6 +63,30 @@ public class Stance extends Node {
   public boolean spineAimEnabled = true;
 
   /**
+   * Whether a long gun's stock is IK'd into the shoulder pocket while aiming in this stance
+   * ({@code StockMountIKModifier}, PLAN.md A2.2). On for the standing stances the pocket was measured
+   * in; off where the shoulder carries something else -- prone (the arms reach forward along the
+   * ground), a vehicle seat (the drive-by posture) and swimming -- until A2.5 measures them.
+   */
+  @Export
+  public boolean stockMountEnabled = true;
+
+  /**
+   * Whether, while aiming, the SPINE, NECK and HEAD come from the weapon's aim clip instead of the
+   * locomotion clip (the {@code WeaponTorsoBlend} layer, PLAN.md A2.3).
+   *
+   * <p>A shouldered long gun is held BLADED, and a blade lives in the spine: the torso turns off the
+   * line while the bore stays on it. {@code WeaponBlend}'s filter takes only collarbones, arms and hands
+   * from the aim branch, so an authored spine twist or head lean was discarded before it reached the
+   * body. It is a separate layer, gated per stance, rather than more bones in that filter, because
+   * {@code WeaponBlend} runs in EVERY stance, combat or not, and the archetype aim/hold clips are
+   * authored standing: putting their spine on a crouched or prone body would stand it up. Off until a
+   * stance's aim clip is authored for it (A2.5 measures crouch/crawl/drive/swim).
+   */
+  @Export
+  public boolean weaponTorsoLayer = false;
+
+  /**
    * Whether this stance aims with its SHOULDERS and HEAD instead of its chest.
    *
    * <p>The complement of {@link #spineAimEnabled}, for a stance whose body must stay where the clip
@@ -256,6 +280,12 @@ public class Stance extends Node {
 
   public boolean isSpineAimEnabled() { return spineAimEnabled; }
   public void setSpineAimEnabled(boolean v) { this.spineAimEnabled = v; }
+
+  public boolean isWeaponTorsoLayer() { return weaponTorsoLayer; }
+  public void setWeaponTorsoLayer(boolean v) { this.weaponTorsoLayer = v; }
+
+  public boolean isStockMountEnabled() { return stockMountEnabled; }
+  public void setStockMountEnabled(boolean v) { this.stockMountEnabled = v; }
 
   public boolean isShoulderAimEnabled() { return shoulderAimEnabled; }
   public void setShoulderAimEnabled(boolean v) { this.shoulderAimEnabled = v; }

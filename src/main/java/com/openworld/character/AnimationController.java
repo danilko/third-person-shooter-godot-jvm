@@ -37,6 +37,10 @@ public class AnimationController extends Node {
   @Export
   public ShoulderAimModifier shoulderAimModifier;
 
+  /** Firing-arm IK seating a long gun's stock in the shoulder pocket — see {@link StockMountIKModifier}. */
+  @Export
+  public StockMountIKModifier stockMountModifier;
+
   @Export
   public double animationBlendDuration = 0.25;
 
@@ -114,6 +118,14 @@ public class AnimationController extends Node {
   // swim pose plays fully instead of blending to the airborne/falling pose while floating off-floor.
   private boolean swimming = false;
   private boolean combat = false;
+
+  /** WeaponTorsoBlend: where it is heading (0/1, set with the aim modifiers) and where it is. */
+  private double torsoLayerTarget = 0.0;
+  private double torsoLayer = 0.0;
+
+  /** Seconds to ease the aim clip's torso in or out (PLAN.md A2.3) -- matches the stock mount's blend. */
+  @Export
+  public double torsoLayerBlendSeconds = 0.1;
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
   private MovementState currentMovementState = null;
@@ -141,6 +153,16 @@ public class AnimationController extends Node {
       animationTree.set("parameters/AirJump/request", fadeOut);
     }
     wasOnFloor = onFloor;
+
+    // The aim clip's torso (Stance.weaponTorsoLayer), eased so entering and leaving the aim does not
+    // snap the spine. Written only while it moves, like the floor blend below.
+    if (torsoLayer != torsoLayerTarget) {
+      double step = torsoLayerBlendSeconds <= 0.0 ? 1.0 : delta / torsoLayerBlendSeconds;
+      torsoLayer = torsoLayer < torsoLayerTarget
+          ? Math.min(torsoLayerTarget, torsoLayer + step)
+          : Math.max(torsoLayerTarget, torsoLayer - step);
+      animationTree.set("parameters/WeaponTorsoBlend/blend_amount", torsoLayer);
+    }
 
     // Treat swimming as grounded for the floor blend — a floating swimmer is off-floor, but the
     // placeholder swim pose should not blend toward the falling animation.
@@ -180,11 +202,17 @@ public class AnimationController extends Node {
    */
   public void setHolster(boolean holster) {
     if (animationTree == null) return;
-    animationTree.set("parameters/WeaponBlend/blend_position", holster ? 0 : 1);
+    // blend_amount: WeaponBlend is a Blend2. This wrote `blend_position` (a BlendSpace parameter),
+    // which AnimationTree.set ignores silently, so the hook had never done anything.
+    animationTree.set("parameters/WeaponBlend/blend_amount", holster ? 0 : 1);
   }
 
   public void onWeaponEquip(int animationWeaponIndex) {
     animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
+    // The torso layer's own copy of the aim branch: a blend-tree node's output can feed ONE input
+    // (Godot refuses the second connection and the whole tree stops evaluating -- measured, every
+    // stance read the rest pose), so WeaponTorsoBlend cannot share CombatTransition with WeaponBlend.
+    animationTree.set("parameters/WeaponAimTorso/blend_position", animationWeaponIndex);
     animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
     animationTree.set("parameters/WeaponChangeAnimation/blend_position", animationWeaponIndex);
     animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
@@ -289,6 +317,12 @@ public class AnimationController extends Node {
     applyAimLimits(aimSpineModifier, spine, currentStance,
         staged ? currentStance.getSpineAimYawLimit() : currentStance.getAimYawLimit());
     applyAimLimits(shoulderAimModifier, shoulder, currentStance, currentStance.getAimYawLimit());
+    // The stock mount eases itself in and out (and does nothing for a weapon with no StockPoint), so
+    // it only needs to know whether this is a shouldered aim at all.
+    if (stockMountModifier != null) {
+      stockMountModifier.setEngaged(combat && currentStance.isStockMountEnabled());
+    }
+    torsoLayerTarget = (combat && currentStance.isWeaponTorsoLayer()) ? 1.0 : 0.0;
   }
 
   private void applyAimLimits(ShoulderAimModifier m, boolean active, Stance stance, float yawLimit) {

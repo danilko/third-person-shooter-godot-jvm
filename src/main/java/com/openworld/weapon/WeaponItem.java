@@ -445,6 +445,14 @@ public class WeaponItem extends Pickup implements WeaponAction {
   protected boolean launchesTowardAim() { return false; }
 
   /**
+   * Whether the aim modifiers should aim this weapon's BORE (its -Z) rather than the chest
+   * ({@code ShoulderAimModifier}, PLAN.md A2.1): exactly the weapons the fire gate holds, because
+   * those are the ones whose shot leaves the weapon. Public view of {@link #launchesTowardAim()} for
+   * the character package; named as a question so it is not merged into a registered property.
+   */
+  public boolean aimsAlongBore() { return launchesTowardAim(); }
+
+  /**
    * Whether the held weapon points at the aim point closely enough to fire ({@link
    * #FIRE_AIM_TOLERANCE_DEG}, yaw only). Named as a question, not {@code isX}: a getter-shaped
    * method would be merged into a registered property.

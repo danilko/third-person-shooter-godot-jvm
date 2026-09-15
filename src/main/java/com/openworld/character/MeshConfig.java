@@ -36,6 +36,11 @@ public class MeshConfig extends Resource {
     public NodePath shoulderAimModifierPath = new NodePath(
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/ShoulderAimModifier");
 
+    /** The firing-arm stock-mount IK — see {@link StockMountIKModifier}. Empty = none. */
+    @Export
+    public NodePath stockMountModifierPath = new NodePath(
+            "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/StockMountIKModifier");
+
 
     @Export
     public NodePath fpsCameraMarkerPath = new NodePath(
