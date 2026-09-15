@@ -121,6 +121,12 @@ public class AnimationController extends Node {
 
   /** WeaponTorsoBlend: where it is heading (0/1, set with the aim modifiers) and where it is. */
   private double torsoLayerTarget = 0.0;
+  private boolean weaponPosed = true;
+
+  private boolean isOneShotActive(String node) {
+    java.lang.Object v = animationTree.get("parameters/" + node + "/active");
+    return v instanceof Boolean b && b;
+  }
   private double torsoLayer = 0.0;
 
   /** Seconds to ease the aim clip's torso in or out (PLAN.md A2.3) -- matches the stock mount's blend. */
@@ -162,6 +168,22 @@ public class AnimationController extends Node {
           ? Math.min(torsoLayerTarget, torsoLayer + step)
           : Math.max(torsoLayerTarget, torsoLayer - step);
       animationTree.set("parameters/WeaponTorsoBlend/blend_amount", torsoLayer);
+    }
+
+    // Is the held weapon POSED (no switch/draw, reload or attack one-shot moving it)? The aim modifiers only
+    // trust its bore then, and the stock mount only seats it then -- a rifle being drawn points anywhere, and
+    // aiming it spun the upper body up to 145 deg (probe_switch_spin.gd). Read only while aiming: three
+    // bridge reads a frame is not free on an AI.
+    if (combat) {
+      boolean posed = !isOneShotActive("WeaponChange") && !isOneShotActive("Reload") && !isOneShotActive("Attack");
+      if (posed != weaponPosed) {
+        weaponPosed = posed;
+        if (aimSpineModifier != null) aimSpineModifier.setWeaponPosed(posed);
+        if (shoulderAimModifier != null) shoulderAimModifier.setWeaponPosed(posed);
+        if (stockMountModifier != null && currentStance != null) {
+          stockMountModifier.setEngaged(posed && currentStance.isStockMountEnabled());
+        }
+      }
     }
 
     // Treat swimming as grounded for the floor blend — a floating swimmer is off-floor, but the
@@ -320,7 +342,7 @@ public class AnimationController extends Node {
     // The stock mount eases itself in and out (and does nothing for a weapon with no StockPoint), so
     // it only needs to know whether this is a shouldered aim at all.
     if (stockMountModifier != null) {
-      stockMountModifier.setEngaged(combat && currentStance.isStockMountEnabled());
+      stockMountModifier.setEngaged(combat && weaponPosed && currentStance.isStockMountEnabled());
     }
     torsoLayerTarget = (combat && currentStance.isWeaponTorsoLayer()) ? 1.0 : 0.0;
   }

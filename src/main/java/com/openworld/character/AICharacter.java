@@ -754,7 +754,8 @@ public class AICharacter extends Character {
      * </ul>
      */
     public void reactToCarjack(Character carjacker) {
-        if (carjacker == null || !(controller instanceof AIController ai)) return;
+        // A dead driver pulled out of the seat has nothing to react with (PLAN.md 0.2).
+        if (carjacker == null || isDead || !isAlive() || !(controller instanceof AIController ai)) return;
         if ("FIGHT".equalsIgnoreCase(behaviorConfigOrDefaults().reactToCarjack)) {
             setFaction(Faction.ENEMY);
             adoptSquadTarget(carjacker, carjacker.getGlobalPosition());

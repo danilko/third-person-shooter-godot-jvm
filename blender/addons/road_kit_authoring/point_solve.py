@@ -1167,7 +1167,13 @@ def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None):
             t = i / float(n)
             walk.append(a.walk_out + (b.walk_in - a.walk_out) * t)
             kerb.append(a.kerb_out + (b.kerb_in - a.kerb_out) * t)
-            wall.append(a.wall_h + (b.wall_h - a.wall_h) * t)
+            # A barrier on one arm and none on the other is a STEP at the corner's middle, never a
+            # blend: a blend is a wedge rising along the whole corner arc, a ramp a car drives up
+            # (PLAN.md 0.1; `point_edges.step_walls` turns the step into a 2 cm face).
+            if (a.wall_h > 0.0) != (b.wall_h > 0.0):
+                wall.append(a.wall_h if t < 0.5 else b.wall_h)
+            else:
+                wall.append(a.wall_h + (b.wall_h - a.wall_h) * t)
         out.append(Corner(a.uid, b.uid, pts, walk, kerb, wall))
     return out
 

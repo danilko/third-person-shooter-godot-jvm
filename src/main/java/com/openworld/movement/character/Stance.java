@@ -80,8 +80,9 @@ public class Stance extends Node {
    * from the aim branch, so an authored spine twist or head lean was discarded before it reached the
    * body. It is a separate layer, gated per stance, rather than more bones in that filter, because
    * {@code WeaponBlend} runs in EVERY stance, combat or not, and the archetype aim/hold clips are
-   * authored standing: putting their spine on a crouched or prone body would stand it up. Off until a
-   * stance's aim clip is authored for it (A2.5 measures crouch/crawl/drive/swim).
+   * authored standing: putting their FULL spine on a crouched or prone body would stand it up. On for Upright
+   * and Crouch (W24: with only spine_03/neck/head in the layer the crouch lean survives in spine_01/02 and the
+   * crouched upper body measures identical to upright); off for Crawl, DriveCarrier and Swim.
    */
   @Export
   public boolean weaponTorsoLayer = false;

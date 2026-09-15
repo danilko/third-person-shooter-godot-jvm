@@ -330,6 +330,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override
     public void _physicsProcess(double delta) {
         updateSpatialCell(delta);
+        watchDriverDefeat();
 
         cmd.motor     = 0;
         cmd.steering  = 0;
@@ -462,6 +463,49 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 else          vehicleWeaponController.onWeaponNotFire();
             }
         }
+    }
+
+    // ── A defeated driver (PLAN.md 0.2) ───────────────────────────────────────
+
+    /** Whether the seat-0 occupant was alive last tick -- the edge {@link #watchDriverDefeat} acts on. */
+    private boolean driverWasAlive = true;
+
+    /**
+     * The driver died in the seat. An ambient car's brain is on the VEHICLE (Design B), so killing
+     * the person at the wheel used to change nothing: the car drove on down its lane with a corpse
+     * in it. Now the brain goes with the driver -- the car coasts (no throttle, no brake, no steer),
+     * rolls to rest and parks, and ZoneManager reclaims it out of sight. The body stays in the seat
+     * (GTA's model; {@code CharacterRagdoll.enableSeatedDeath}), so the car is still AI-OCCUPIED and
+     * a player takes it by the carjack path, which pulls the corpse out.
+     *
+     * <p>Detected as an EDGE on every peer, because the nameplate tint re-derives from the occupant's
+     * health everywhere and needs a signal to do it; {@code Health.died} fires only where damage is
+     * applied. Only the simulating peer holds a brain to drop, so the car's behaviour stays
+     * host-authoritative with no new message -- the replicated body is what clients see.
+     *
+     * <p>A PLAYER driver is deliberately not touched here: a dead player's controller belongs to the
+     * death and respawn flow, not to the car.
+     */
+    private void watchDriverDefeat() {
+        Character d = occupant;
+        boolean alive = d == null || !GD.isInstanceValid(d) || d.isAlive();
+        if (alive) {
+            driverWasAlive = true;
+            return;
+        }
+        if (!driverWasAlive) return;
+        driverWasAlive = false;
+        nameplateChanged.emit();
+        if (isAiDriven()) {
+            removeAiDriverBrain();
+            GD.print("[Vehicle] " + (characterInfo != null ? characterInfo.displayName : getName())
+                    + ": driver defeated -- coasting to rest");
+        }
+    }
+
+    /** True when the driver seat holds a dead body (the car coasts, and is reclaimable at rest). */
+    public boolean hasDefeatedDriver() {
+        return occupant != null && GD.isInstanceValid(occupant) && !occupant.isAlive();
     }
 
     // ── Locomotion hook (carrier-type seam) ───────────────────────────────────
@@ -977,7 +1021,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (seat < 0 || seat >= seatPostureYawApplied.length) return 0.0;
         VehicleConfig cfg = getConfig();
         double target = 0.0;
-        if (cfg != null && cfg.rearAimBodyYaw != 0.0 && rider.isSeatedAimAnchored()) {
+        if (cfg != null && cfg.rearAimBodyYaw != 0.0 && rider.isSeatedAimAnchored() && rider.isAlive()) {
             // Measured against the CAR, not against the body: the heading the player is asking for
             // must not depend on the posture the last frame chose, or the two feed each other.
             Vector3 toAim = rider.getAimTargetPosition().minus(rider.getGlobalPosition());

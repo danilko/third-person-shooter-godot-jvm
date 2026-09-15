@@ -93,6 +93,14 @@ final class CharacterDriveState {
     void exit() {
         owner.currentVehicleNode = null;
         owner.vehicleDriver = false;
+        // A corpse leaves its seat as a ragdoll, not as a character getting out: none of the restore
+        // below applies to it (no stance, no combat, no processing, no collision capsule), and
+        // re-enabling physics would stand a dead body back up. PLAN.md 0.2.
+        if (owner.ragdoll.isSeatedCorpse()) {
+            owner.vehicleWeaponMode = VehicleWeaponMode.NONE;
+            owner.ragdoll.releaseSeatedCorpse();
+            return;
+        }
         // Restore body rotation so MovementController's playerInitRotation stays valid.
         owner.setGlobalRotation(preDriveRotation);
         owner.setCollisionLayer(CollisionLayers.CHARACTER);
