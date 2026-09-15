@@ -180,7 +180,10 @@ func _initialize() -> void:
 			r["%s head off bore up" % w] = perp.y
 			if m.has("SupportPoint"):
 				var sup: Vector3 = gun_xf * (m["SupportPoint"] as Transform3D).origin
-				r["%s left hand - SupportPoint (m)" % w] = sup.distance_to(P.call("hand_l"))
+				# the hand's GRIP point, 0.75 of the way to the middle knuckle (SupportHandIKModifier.gripFraction)
+				var hl: Vector3 = P.call("hand_l")
+				var grip_pt: Vector3 = hl + (to_body * sk.get_bone_global_pose(sk.find_bone("middle_01_l")).origin - hl) * 0.75
+				r["%s left grip - SupportPoint (m)" % w] = sup.distance_to(grip_pt)
 		r["palm(hand_r) in front of joint (m)"] = joint.z - hand_xf.origin.z
 		for k in r:
 			if not rows.has(k):

@@ -408,6 +408,50 @@ def run_values(values, run):
     return out
 
 
+#: How far a barrier takes to rise from nothing to its full height where it starts or stops: a
+#: near-vertical end face rather than a slope.
+#:
+#: A BARRIER IS ON OR OFF, NEVER A WEDGE. The solver decides the barrier per sample (full height where
+#: the road is off the ground, nothing where it is not), and the sweep interpolates every attribute
+#: between samples -- so the span where a parapet begins was swept as a 4 m wedge rising from the kerb
+#: to 1 m. That wedge is a jump ramp standing on the road edge: on DebugRoads' bridge approach a car at
+#: 37 m/s with a wheel on the edge line drove up it and left the ground at 11.5 m/s (PLAN.md 0.1,
+#: `tools/godot/probe_road_launch.gd`). Real highways retired the "ramped end" barrier terminal for
+#: the same reason. Same length as `point_solve.END_LEAD`, for the same reason: short enough to be a
+#: face, long enough that the prism has no degenerate quad.
+WALL_END_STEP = 0.02
+
+
+def step_walls(points, walk, kerb, wall):
+    """`(points, walk, kerb, wall)` with every barrier start and end made a STEP (see `WALL_END_STEP`).
+
+    Where one vertex carries a barrier and its neighbour carries none, a vertex is inserted
+    `WALL_END_STEP` from the bare one, at the barrier's full height: the wall covers the whole span
+    and closes with a 2 cm face. It errs toward MORE fence, not less -- the sample with no barrier
+    is where the ground was still close, the one with it is where it had gone, and the drop is
+    somewhere between. Kerb and footway are interpolated at the new vertex as they always were; only
+    the barrier's zero-to-full transition is not a lerp. Two non-zero heights still blend (two roads'
+    `barrier_height` meeting is not a ramp from the kerb)."""
+    pts, wk, kb, wl = [points[0]], [walk[0]], [kerb[0]], [wall[0]]
+    for i in range(1, len(points)):
+        a, b = points[i - 1], points[i]
+        on_a, on_b = float(wall[i - 1]) > 0.0, float(wall[i]) > 0.0
+        span = math.dist(a, b)
+        if on_a != on_b and span > 2.0 * WALL_END_STEP:
+            t = WALL_END_STEP / span
+            if on_a:                       # the barrier ENDS: full height until just before b
+                t = 1.0 - t
+            pts.append(tuple(pa + (pb - pa) * t for pa, pb in zip(a, b)))
+            wk.append(walk[i - 1] + (walk[i] - walk[i - 1]) * t)
+            kb.append(kerb[i - 1] + (kerb[i] - kerb[i - 1]) * t)
+            wl.append(wall[i - 1] if on_a else wall[i])
+        pts.append(b)
+        wk.append(walk[i])
+        kb.append(kerb[i])
+        wl.append(wall[i])
+    return pts, wk, kb, wl
+
+
 def road_edge_runs(solve, bands):
     """`[(suffix, points, walk, kerb, wall, sgn)]` -- one road run's kerb/footway carriers, over the
     OPEN runs only. THE one enumeration of edge runs: `point_build.build_edges` sweeps these and
@@ -423,16 +467,16 @@ def road_edge_runs(solve, bands):
             if len(pts) < 2:
                 continue
             vals = run_values(solve.values, run)
-            out.append(("%s_%d" % (side, n), pts, [v[walk_key] for v in vals],
-                        [v[kerb_key] for v in vals], [v["rka_wall_h"] for v in vals],
-                        1.0 if side == "left" else -1.0))
+            pts, walk, kerb, wall = step_walls(pts, [v[walk_key] for v in vals],
+                                               [v[kerb_key] for v in vals], [v["rka_wall_h"] for v in vals])
+            out.append(("%s_%d" % (side, n), pts, walk, kerb, wall, 1.0 if side == "left" else -1.0))
     return out
 
 
 def junction_edge_runs(jsolve):
     """A pad's corners as edge runs. Outboard is to the RIGHT: the ring is CCW, so a corner running
     CCW around it has the outside on its right."""
-    return [("c%d" % i, c.points, c.walk, c.kerb, c.wall, -1.0)
+    return [("c%d" % i,) + step_walls(c.points, c.walk, c.kerb, c.wall) + (-1.0,)
             for i, c in enumerate(jsolve.corners) if len(c.points) >= 2]
 
 
@@ -446,7 +490,7 @@ def gore_edge_runs(gsolve):
         return []
     if not any(abs(v) > 1e-6 for v in list(c.kerb) + list(c.walk) + list(c.wall)):
         return []
-    return [("nose", c.points, c.walk, c.kerb, c.wall, gsolve.nose_sgn)]
+    return [("nose",) + step_walls(c.points, c.walk, c.kerb, c.wall) + (gsolve.nose_sgn,)]
 
 
 def measure_on_asphalt(samples, bands, skip=(), z_tol=Z_TOL):
@@ -679,6 +723,23 @@ def self_test():
 
     # ---- a stub run is dropped rather than built ------------------------------------------------
     assert open_runs(s_solo.edges_left, b_solo, ("solo",), min_length=1e9) == []
+    ok += 1
+
+    # ---- a barrier starts with a FACE, never a ramp (PLAN.md 0.1) --------------------------------
+    line = [(float(x), 0.0, 0.0) for x in range(0, 17, 4)]
+    p2, w2, k2, h2 = step_walls(line, [0.0] * 5, [0.15] * 5, [0.0, 0.0, 1.0, 1.0, 0.0])
+    # Every span that CARRIES any wall carries the full wall except a 2 cm face at each end.
+    for i in range(1, len(p2)):
+        lo, hi = min(h2[i - 1], h2[i]), max(h2[i - 1], h2[i])
+        if hi > 0.0 and lo == 0.0:
+            assert math.dist(p2[i - 1], p2[i]) <= WALL_END_STEP + 1e-9, (i, p2[i - 1], p2[i])
+    assert len(p2) == 7 and abs(p2[2][0] - 4.02) < 1e-9 and abs(p2[5][0] - 15.98) < 1e-9, p2
+    assert all(abs(k - 0.15) < 1e-12 for k in k2)
+    # Control: the unstepped list is the wedge -- a 4 m span from 0 to 1 m.
+    assert max(math.dist(line[i - 1], line[i]) for i in (2, 4)) == 4.0
+    # Two non-zero heights still blend, and a wall-free run is untouched.
+    assert step_walls(line, [0.0] * 5, [0.15] * 5, [1.0, 1.2, 1.2, 1.0, 1.0])[0] == line
+    assert step_walls(line, [0.0] * 5, [0.15] * 5, [0.0] * 5)[0] == line
     ok += 1
 
     print("point_edges.py: %d checks PASS" % ok)

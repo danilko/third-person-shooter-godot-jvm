@@ -4,9 +4,15 @@ import com.openworld.util.CollisionLayers;
 import godot.api.AnimationTree;
 import godot.api.CollisionShape3D;
 import godot.api.Node;
+import godot.api.Node3D;
 import godot.api.PhysicalBone3D;
+import godot.api.PhysicalBoneSimulator3D;
 import godot.api.PhysicsServer3D;
+import godot.api.Skeleton3D;
+import godot.api.SkeletonModifier3D;
+import godot.core.Basis;
 import godot.core.NodePath;
+import godot.core.Quaternion;
 import godot.core.Vector3;
 import com.openworld.movement.character.MovementController;
 import com.openworld.movement.character.Stance;
@@ -36,6 +42,26 @@ final class CharacterRagdoll {
 
     private double  ragdollFreezeCountdown = -1.0;
     private boolean ragdollFrozen          = false;
+
+    /**
+     * True while this body is a corpse held in a vehicle seat (PLAN.md 0.2). A seated occupant who
+     * dies stays where they died -- GTA's model: the driver slumps over the wheel, the car rolls on,
+     * and the body only drops out when someone opens the door -- so the ragdoll is NOT started
+     * (bones simulating inside a moving car's hull would tumble through it and out). The body is
+     * frozen in a slumped pose instead, and {@link #releaseSeatedCorpse()} starts the ordinary
+     * ragdoll the moment the seat lets it go.
+     */
+    private boolean seatedCorpse = false;
+
+    /**
+     * The slump: each bone pitched FORWARD about the body's own lateral axis, degrees, spine to head.
+     * Procedural and deliberately modest -- a placeholder until an authored seated-death clip exists
+     * (P6). The chest folds ~38 degrees further than the seated clip and the neck and head another
+     * ~55: measured on DebugWorld, the chest leans about 25 degrees more than the living, aiming driver,
+     * whose shoulder modifier had been holding it up.
+     */
+    private static final String[] SLUMP_BONES   = {"spine_01", "spine_02", "spine_03", "neck_01", "head_2"};
+    private static final double[]  SLUMP_DEGREES = {8.0, 10.0, 20.0, 30.0, 25.0};
 
     CharacterRagdoll(Character owner) {
         this.owner = owner;
@@ -71,11 +97,92 @@ final class CharacterRagdoll {
         if (animationTree == null) animationTree = (AnimationTree) owner.getNodeOrNull("AnimationTree");
         if (animationTree != null) animationTree.setActive(false);
 
+        if (owner.currentVehicleNode != null) {
+            enableSeatedDeath();
+            return;
+        }
+
         enableRagdoll();
 
         // Disabled current stance to let ragdoll take over
         Stance s = owner.stanceCache.get(owner.currentStanceName);
         if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
+    }
+
+    /** True while a seated corpse is waiting for its seat to release it. */
+    boolean isSeatedCorpse() { return seatedCorpse; }
+
+    /**
+     * Death in a seat: no simulation, a frozen slumped pose. The aim/IK modifiers are switched off
+     * (they would keep turning a dead body's shoulders toward its last aim point) and the bones leave
+     * the hitbox layer for the same reason {@link #enableRagdoll()} takes them off it -- a corpse must
+     * not block line of sight or soak up a shot meant for whoever is behind it.
+     */
+    private void enableSeatedDeath() {
+        seatedCorpse = true;
+        Skeleton3D skel = skeleton();
+        if (skel != null) {
+            for (int i = 0; i < skel.getChildCount(); i++) {
+                Node child = skel.getChild(i);
+                if (child instanceof SkeletonModifier3D m && !(child instanceof PhysicalBoneSimulator3D)) {
+                    m.setActive(false);
+                }
+            }
+            slump(skel);
+        }
+        if (owner.physicalBoneSimulator != null) {
+            for (int i = 0; i < owner.physicalBoneSimulator.getChildCount(); i++) {
+                if (owner.physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone) {
+                    bone.setCollisionLayerValue(CollisionLayers.LAYER_HITBOX, false);
+                }
+            }
+        }
+    }
+
+    /**
+     * The seat has let the corpse go (a carjack pulled it out, the car was freed): start the ordinary
+     * ragdoll from the slumped pose. Called from {@code CharacterDriveState.exit}, after the body has
+     * been placed beside the car. {@code _process} is switched back on because it is what pumps the
+     * ragdoll's settle-and-freeze timer, and a driver's processing was turned off when they sat down.
+     */
+    void releaseSeatedCorpse() {
+        if (!seatedCorpse) return;
+        seatedCorpse = false;
+        owner.setProcess(true);
+        enableRagdoll();
+        Stance s = owner.stanceCache.get(owner.currentStanceName);
+        if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
+    }
+
+    private Skeleton3D skeleton() {
+        return owner.physicalBoneSimulator != null && owner.physicalBoneSimulator.getParent() instanceof Skeleton3D sk
+                ? sk : null;
+    }
+
+    /**
+     * Pitch the slump chain forward about the BODY's lateral axis. The axis is taken from
+     * {@code MeshRoot} (-Z forward, +X right) and expressed in each bone's own frame, so the result
+     * does not depend on how the importer oriented the bones -- W1's lesson (a bone's local axes are
+     * whatever the rig says, and `spine_03`'s +X is the body's LEFT on this one). Rotating every bone
+     * about ONE world axis also keeps a child's axis fixed while its parent turns, so the chain
+     * composes with no re-read of the pose.
+     */
+    private void slump(Skeleton3D skel) {
+        Node meshRoot = owner.visualsInstance != null && owner.meshConfig != null
+                ? owner.visualsInstance.getNodeOrNull(owner.meshConfig.meshRootPath) : null;
+        if (!(meshRoot instanceof Node3D mr)) return;
+        Vector3 rightWorld = mr.getGlobalTransform().getBasis().getColumn(0).normalized();
+        Vector3 axisSkel = skel.getGlobalTransform().getBasis().inverse().times(rightWorld).normalized();
+        for (int i = 0; i < SLUMP_BONES.length; i++) {
+            int idx = skel.findBone(SLUMP_BONES[i]);
+            if (idx < 0) continue;
+            Basis boneGlobal = skel.getBoneGlobalPose(idx).getBasis();
+            Vector3 axisLocal = boneGlobal.inverse().times(axisSkel).normalized();
+            // About the body's RIGHT axis a positive angle tips +Y (up the spine) toward +Z, which is
+            // the body's BACK on a -Z-forward mesh -- so forward is negative.
+            Quaternion bend = new Quaternion(axisLocal, -Math.toRadians(SLUMP_DEGREES[i]));
+            skel.setBonePoseRotation(idx, skel.getBonePoseRotation(idx).times(bend));
+        }
     }
 
     private void enableRagdoll() {

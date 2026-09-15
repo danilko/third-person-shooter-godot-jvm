@@ -890,7 +890,7 @@ bone_idx = 27
 transform = Transform3D(0.74569666, 0.6550852, 0.12166013, -0.01777947, 0.2020934, -0.9792062, -0.66604924, 0.7280271, 0.16234744, -0.02311414, 0.048525073, 0.017877875)
 
 [node name="SocketRifle" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1933143355]
-transform = Transform3D(0.6613714, 0.69001216, 0.2940622, -0.053957373, 0.43480435, -0.8989074, -0.74811614, 0.57864416, 0.32479876, -0.01170855, 0.022783384, 0.027736973)
+transform = Transform3D(0.82521909, 0.52192223, 0.21589106, 0.10821795, 0.22904845, -0.9673807, -0.55434722, 0.82166433, 0.13253367, -0.019617233, 0.069908433, 0.013880314)
 
 [node name="SocketMelee" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1900001003]
 transform = Transform3D(0.6613714, 0.69001216, 0.2940622, -0.053957373, 0.43480435, -0.8989074, -0.74811614, 0.57864416, 0.32479876, -0.01170855, 0.022783384, 0.027736973)
@@ -900,7 +900,7 @@ transform = Transform3D(0.6613714, 0.69001216, 0.2940622, -0.053957373, 0.434804
 [node name="Fist" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketFist" unique_id=1900001002 instance=ExtResource("4_fist")]
 
 [node name="SocketLauncher" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1376252111]
-transform = Transform3D(-0.70337325, 0.617558, 0.35198143, -0.44242784, 0.007218167, -0.896778, -0.5563525, -0.7864935, 0.26814628, 0.14720833, 0.08463359, 0.05154237)
+transform = Transform3D(0.82521909, 0.52192223, 0.21589106, 0.10821795, 0.22904845, -0.9673807, -0.55434722, 0.82166433, 0.13253367, -0.019617233, 0.069908433, 0.013880314)
 
 [node name="SpineAimModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=178617703]
 unique_name_in_owner = false
@@ -1241,6 +1241,8 @@ shape = SubResource("CapsuleShape3D_2pmfg")
 
 [node name="StockMountIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="15" unique_id=178617706]
 script = ExtResource("7_stockmount")
+mount_markers = Array[String](["StockPoint", "ShoulderRestPoint"])
+mount_offsets = Array[Vector3]([Vector3(-0.0221, -0.0284, 0.0775), Vector3(0.0582, 0.0246, -0.0002)])
 
 [node name="SupportHandIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="16" unique_id=178617705]
 unique_name_in_owner = false

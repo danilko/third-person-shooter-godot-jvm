@@ -99,15 +99,19 @@ func _initialize() -> void:
 			distinct.append(v)
 	print("")
 	print("  %d distinct hand pose(s) across %d archetypes" % [distinct.size(), ARCHETYPES.size()])
-	# Today every new archetype is a COPY of pistol or rifle, so exactly two clusters is the
-	# correct answer and a third would mean something resolved to rest.
-	if distinct.size() != 2:
-		print("  FAIL  expected 2 clusters (every placeholder is a copy of pistol or rifle); a third")
-		print("        cluster is an index that resolved to nothing. Re-run after authoring poses")
-		print("        and raise this number deliberately.")
+	# The clusters are the authored hold poses: pistol (and the six placeholders copied from it),
+	# rifle (a patrol carry, CLAUDE.md W24) and launcher (its own carry, W25). A count other than EXPECTED_CLUSTERS is either a new authored pose (raise it
+	# deliberately) or an index that resolved to nothing.
+	const EXPECTED_CLUSTERS := 3
+	if distinct.size() != EXPECTED_CLUSTERS:
+		print("  FAIL  expected %d clusters (pistol family, rifle, launcher); a different count is an" % EXPECTED_CLUSTERS)
+		print("        index that resolved to nothing, or a newly authored pose -- raise the number deliberately.")
+		fails += 1
+	elif poses[2].distance_to(poses[1]) < REST_TOLERANCE:
+		print("  FAIL  launcher collapsed onto rifle, so the third cluster is something else")
 		fails += 1
 	else:
-		print("  PASS  every index resolves; 2 clusters = the pistol and rifle bases")
+		print("  PASS  every index resolves; %d clusters = pistol family, rifle, launcher" % EXPECTED_CLUSTERS)
 
 	# 2. The two shipped archetypes must still differ from each other -- if they collapsed together
 	#    the branch is not blending at all and check 1 would pass vacuously.

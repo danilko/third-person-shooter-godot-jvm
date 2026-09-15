@@ -11,11 +11,17 @@ import godot.api.SkeletonModifier3D;
 import godot.core.Basis;
 import godot.core.NodePath;
 import godot.core.Transform3D;
+import godot.core.VariantArray;
 import godot.core.Vector3;
 
 /**
- * Two-bone IK on the FIRING arm that puts a long gun's butt pad in the shoulder pocket while aiming
- * (PLAN.md A2.2).
+ * Two-bone IK on the FIRING arm that puts a weapon's MOUNT marker on a body ANCHOR while aiming (PLAN.md A2.2;
+ * generalised in W25): a long gun's butt pad ({@code StockPoint}) in the shoulder pocket, a launcher tube
+ * ({@code ShoulderRestPoint}) on top of the shoulder. The table is {@link #mountMarkers} /
+ * {@link #mountOffsets}, index-parallel; a held weapon uses the FIRST marker it declares, and a weapon that
+ * declares none (a pistol) is left alone. A new mount kind is one row, set per body in the visuals scene
+ * (the anchors are facts about the body's skin) -- {@code blender/tools/pose_weapon_hold.py --apply-anchor}
+ * writes them from a weapon model the artist placed in the pose.
  *
  * <h2>Why it exists</h2>
  *
@@ -44,7 +50,7 @@ import godot.core.Vector3;
  * <h2>When</h2>
  *
  * Only while {@link #engaged} (set by {@code AnimationController}: combat, in a stance with
- * {@code Stance.stockMountEnabled}) AND the weapon in hand declares a {@link #stockPointName} marker AND
+ * {@code Stance.stockMountEnabled}) AND the weapon in hand declares one of {@link #mountMarkers} AND
  * hangs from {@link #endBone}. The weight eases in and out over {@link #blendSeconds}, so leaving the
  * aim returns the arm to the clip's hold pose instead of snapping.
  *
@@ -61,19 +67,38 @@ public class StockMountIKModifier extends SkeletonModifier3D {
     @Export public String lowerBone = "lowerarm_r";
     /** The hand the weapon hangs from. */
     @Export public String endBone = "hand_r";
-    /** The bone whose frame carries {@link #pocketOffset} (the collarbone, so the pocket follows the shoulder). */
+    /** The bone whose frame carries {@link #mountOffsets} (the collarbone, so the pocket follows the shoulder). */
     @Export public String pocketBone = "clavicle_r";
 
+    /** Defaults for {@link #mountMarkers}; parsed by {@code pose_weapon_hold.py}, keep the literal shape. */
+    static final String[] DEFAULT_MOUNT_MARKERS = {"StockPoint", "ShoulderRestPoint"};
     /**
-     * The shoulder pocket relative to {@link #upperBone}'s origin, in {@link #pocketBone}'s
-     * orthonormalised basis, metres. Derived 2026-09-14 on CharacterVisuals_GodotChan from the frontmost
-     * {@code armor} skin vertex 2-7 cm inboard of and 0-4 cm below the shoulder joint in the hold pose:
-     * body frame 4.3 cm inboard, 3.3 cm below, 8.6 cm in front of the joint centre (CLAUDE.md W22).
+     * Defaults for {@link #mountOffsets}: each anchor relative to {@link #upperBone}'s origin, in
+     * {@link #pocketBone}'s orthonormalised basis, metres. The pocket was derived off the skin (W22); the body
+     * scenes override both with the values the placed-model solve wrote (W25).
      */
-    @Export public Vector3 pocketOffset = new Vector3(-0.0280, -0.0419, 0.0880);
+    static final Vector3[] DEFAULT_MOUNT_OFFSETS = {
+            new Vector3(-0.0280, -0.0419, 0.0880),
+            new Vector3(0.0582, 0.0246, -0.0002),
+    };
 
-    /** Marker on the held weapon at the centre of its butt pad. A weapon without one is left alone. */
-    @Export public String stockPointName = "StockPoint";
+    /** Weapon marker names, index-parallel with {@link #mountOffsets}. The held weapon's FIRST match mounts. */
+    @Export public VariantArray<String> mountMarkers = defaultMarkers();
+
+    /** Body anchors for {@link #mountMarkers}, index-parallel. */
+    @Export public VariantArray<Vector3> mountOffsets = defaultOffsets();
+
+    private static VariantArray<String> defaultMarkers() {
+        VariantArray<String> a = new VariantArray<>(String.class);
+        for (String m : DEFAULT_MOUNT_MARKERS) a.append(m);
+        return a;
+    }
+
+    private static VariantArray<Vector3> defaultOffsets() {
+        VariantArray<Vector3> a = new VariantArray<>(Vector3.class);
+        for (Vector3 v : DEFAULT_MOUNT_OFFSETS) a.append(v);
+        return a;
+    }
 
     /** Seconds to ease the solve fully in or out. */
     @Export public float blendSeconds = 0.1f;
@@ -92,10 +117,10 @@ public class StockMountIKModifier extends SkeletonModifier3D {
     public void setEndBone(String v) { this.endBone = v; }
     public String getPocketBone() { return pocketBone; }
     public void setPocketBone(String v) { this.pocketBone = v; }
-    public Vector3 getPocketOffset() { return pocketOffset; }
-    public void setPocketOffset(Vector3 v) { this.pocketOffset = v; }
-    public String getStockPointName() { return stockPointName; }
-    public void setStockPointName(String v) { this.stockPointName = v; }
+    public VariantArray<String> getMountMarkers() { return mountMarkers; }
+    public void setMountMarkers(VariantArray<String> v) { this.mountMarkers = v; }
+    public VariantArray<Vector3> getMountOffsets() { return mountOffsets; }
+    public void setMountOffsets(VariantArray<Vector3> v) { this.mountOffsets = v; }
     public float getBlendSeconds() { return blendSeconds; }
     public void setBlendSeconds(float v) { this.blendSeconds = v; }
     public float getMaxWeight() { return maxWeight; }
@@ -108,6 +133,11 @@ public class StockMountIKModifier extends SkeletonModifier3D {
     private float weight = 0.0f;
     private double shortfall = 0.0;
     private double moved = 0.0;
+    private String mountName = "";
+
+    /** The mount marker the held weapon is using ("" when none) -- for probes. */
+    @Register
+    public String currentMount() { return mountName; }
 
     /** How far (m) the stock was still from the pocket after the last solve -- non-zero only when out of reach. */
     @Register
@@ -130,8 +160,19 @@ public class StockMountIKModifier extends SkeletonModifier3D {
             weaponController = HeldWeaponPose.findController(this);
         }
         WeaponItem held = weaponController == null ? null : weaponController.getCurrentWeaponItem();
-        Node3D stock = (held != null && stockPointName != null && !stockPointName.isEmpty()
-                && held.getNodeOrNull(new NodePath(stockPointName)) instanceof Node3D m) ? m : null;
+        Node3D stock = null;
+        Vector3 anchorOffset = null;
+        mountName = "";
+        if (held != null && mountMarkers != null && mountOffsets != null) {
+            int n = (int) Math.min(mountMarkers.size(), mountOffsets.size());
+            for (int i = 0; i < n && stock == null; i++) {
+                if (held.getNodeOrNull(new NodePath(mountMarkers.get(i))) instanceof Node3D m) {
+                    stock = m;
+                    anchorOffset = mountOffsets.get(i);
+                    mountName = mountMarkers.get(i);
+                }
+            }
+        }
         Transform3D gun = (stock != null) ? HeldWeaponPose.weaponInSkeleton(skel, held, endBone) : null;
 
         // Ease toward the wanted weight, on the frame delta (clamped, so a hitch cannot jump it).
@@ -151,7 +192,7 @@ public class StockMountIKModifier extends SkeletonModifier3D {
 
         Vector3 stockPos = HeldWeaponPose.markerInSkeleton(gun, held, stock).getOrigin();
         Basis pocketFrame = skel.getBoneGlobalPose(ip).getBasis().orthonormalized();
-        Vector3 pocket = skel.getBoneGlobalPose(iu).getOrigin().plus(pocketFrame.times(pocketOffset));
+        Vector3 pocket = skel.getBoneGlobalPose(iu).getOrigin().plus(pocketFrame.times(anchorOffset));
 
         Transform3D hand = skel.getBoneGlobalPose(ie);
         Vector3 target = hand.getOrigin().plus(pocket.minus(stockPos).times(weight));

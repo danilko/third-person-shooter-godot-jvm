@@ -653,13 +653,22 @@ public class ZoneManager extends Node {
 						&& v.getController() instanceof VehicleAIController c3
 						&& c3.stalledFor() > vehicleStallTimeout
 						&& nearestPlayerDistXZ(v.getGlobalPosition()) > stallReclaimMinDist;
-				if (dead || fin || fell || far || unrouted || stalled) {
+				// A car whose driver was killed in the seat has no brain left (Vehicle.watchDriverDefeat) and
+				// so is neither unrouted nor stalled by the rules above -- it coasts to rest and would sit
+				// there until the player walked out of range. Reclaimed once it has STOPPED and is out of
+				// sight, under the same distance gate as a stall, so a player who just shot the driver
+				// still finds the car and the body where they left them. PLAN.md 0.2.
+				boolean abandoned = !dead && !fin && !fell && !far && !unrouted && !stalled
+						&& v.hasDefeatedDriver()
+						&& v.getLinearVelocity().length() < ABANDONED_SPEED
+						&& nearestPlayerDistXZ(v.getGlobalPosition()) > stallReclaimMinDist;
+				if (dead || fin || fell || far || unrouted || stalled || abandoned) {
 					// "finished" reclaims should be ~0 away from map edges once lanes chain through
 					// junctions (roads-v2 Phase 1) — a steady stream of them means broken wiring.
 					if (debugLog) GD.print("ZoneManager: traffic reclaim in '" + marker.zone.zoneId
 							+ "' (" + (dead ? "dead" : fin ? "route-finished"
 									 : fell ? "fell-out" : far ? "out-of-range"
-									 : unrouted ? "unrouted" : "stalled") + ")");
+									 : unrouted ? "unrouted" : stalled ? "stalled" : "abandoned") + ")");
 					freeTrafficCar(lz, v, net);
 					it.remove();
 				}
@@ -1376,6 +1385,9 @@ public class ZoneManager extends Node {
 		silenceWeaponAudio(v);
 		v.queueFree();
 	}
+
+	/** m/s under which a car with a defeated driver counts as having come to rest (see {@code abandoned}). */
+	private static final double ABANDONED_SPEED = 1.0;
 
 	/** World-Y below every drivable surface (bay floor is -2, decks ramp ≥ -1) — a traffic car
 	 *  under this has fallen out of the world and is reclaimed. */

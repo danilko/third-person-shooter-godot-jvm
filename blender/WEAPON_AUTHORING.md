@@ -44,8 +44,20 @@ that CLASS — `SocketRifle`, `SocketPistol`, `SocketLauncher`, `SocketMelee`, `
 `WeaponAttachment`, and a weapon names its own in `holdSocket`. So a new rifle needs **no character
 edit at all**. The per-weapon fit that genuinely differs lives on the weapon:
 
-* `SupportPoint` — where the off hand goes (`SupportHandIKModifier` solves the arm to it). Put it
-  under the handguard / pump, about where the off hand's wrist sits.
+* `SupportPoint` — where the off hand GRIPS (`SupportHandIKModifier` puts the hand's knuckle line, 0.75 of
+  the way from wrist to middle knuckle, on it and keeps the hand's authored orientation). Put it on the
+  handguard / pump centre line **where the character's arm reaches with the stock shouldered**: GodotChan's
+  arm (shoulder to wrist) is 0.416 m, which reaches about 0.23–0.25 m ahead of the pistol grip — the rear
+  of a rifle handguard (AR4 z −0.25, AR212 −0.23) and the rear edge of a pump (SG1 −0.30, still 4 cm
+  short). `probe_weapon_fit.gd` asserts it per weapon. (Before 2026-09-14 this was the WRIST position.)
+* A MOUNT marker, if the archetype mounts (`weapon_archetypes.json` `holds`): `StockPoint` at the butt-pad centre for
+  a shouldered long gun, `ShoulderRestPoint` on the underside of a launcher tube where it rests on the shoulder.
+  `StockMountIKModifier` puts the first one the weapon declares on its body anchor while aiming; a pistol declares
+  none.
+* **Fastest way to fit a weapon by eye** (W25): place its model in `merged_animation.blend` in the aim pose, pose the
+  hands round it, then `blender -b assets/merged_animation.blend --python blender/tools/pose_weapon_hold.py -- adopt
+  --hold <archetype> --placed <ID> --apply` writes the socket, the mount anchor and the `SupportPoint` that
+  reproduce it; `remove-object <ID> --save` takes the model out again.
 * `Muzzle` — the bore tip, exactly. It is the shot origin and the flash position; a muzzle floating
   past the barrel starts every cover test in mid-air.
 * `GripPoint` — **not needed by a conforming weapon, and none of ours has one.** It is the escape

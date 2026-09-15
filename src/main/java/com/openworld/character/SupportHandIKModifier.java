@@ -38,6 +38,14 @@ import godot.core.Vector3;
  * {@link TwoBoneIK} on {@code upperarm_l -> lowerarm_l -> hand_l} (shared with
  * {@link StockMountIKModifier}): elbow plane from the current pose, reach clamped to the arm.
  *
+ * <p><b>The marker is where the hand GRIPS, not where the wrist is</b> (PLAN.md A2.4, CLAUDE.md W24). A
+ * hand closes round a handguard at its knuckle line, {@link #gripFraction} of the way from the wrist
+ * ({@code hand_l}'s origin) to the middle knuckle, so the wrist target is the marker pulled back through
+ * the hand. And the hand KEEPS its orientation through the solve: the clip authors how the hand sits on
+ * the gun, and the aim modifiers turn hand and gun together, so the pre-solve rotation is already the
+ * right one. Without it the forearm's swing turned the hand with it, and a hand that reached the marker
+ * still did not wrap the handguard.
+ *
  * <p>Ordering matters: this must sit AFTER {@link ShoulderAimModifier} and {@link StockMountIKModifier}
  * among the skeleton's children, because both move the weapon and the hand has to be placed on the
  * weapon as it ends up, not as the clip left it.
@@ -59,6 +67,19 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
      */
     @Export public String supportPointName = "SupportPoint";
 
+    /** The bone that, with {@link #gripFraction}, defines where along the hand it closes on the weapon. */
+    @Export public String gripBone = "middle_01_l";
+
+    /**
+     * Where the hand grips, as a fraction of the rest-pose offset from {@link #endBone} to {@link #gripBone}
+     * (0 = the wrist, the pre-A2.4 behaviour). Kept in step with {@code blender/tools/pose_weapon_hold.py}'s
+     * {@code GRIP_FRACTION}, which authors the clips against the same point.
+     */
+    @Export public float gripFraction = 0.75f;
+
+    /** Keep the hand's pre-solve orientation (the clip's grip on the gun) instead of letting the forearm turn it. */
+    @Export public boolean keepHandRotation = true;
+
     /**
      * How much of the solve to apply, 0..1. Exists for blending the hand OFF the weapon — a reload
      * takes the support hand to the magazine, and a throw takes it away entirely — rather than for
@@ -71,6 +92,11 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
 
     private WeaponController weaponController;
     private boolean controllerResolved = false;
+    private double gripMiss = -1.0;
+
+    /** Distance (m) from the hand's grip point to the marker after the last solve; -1 when nothing was solved. */
+    @Register
+    public double lastGripMiss() { return gripMiss; }
 
     public String getUpperBone() { return upperBone; }
     public void setUpperBone(String v) { this.upperBone = v; }
@@ -80,6 +106,12 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
     public void setEndBone(String v) { this.endBone = v; }
     public String getSupportPointName() { return supportPointName; }
     public void setSupportPointName(String v) { this.supportPointName = v; }
+    public String getGripBone() { return gripBone; }
+    public void setGripBone(String v) { this.gripBone = v; }
+    public float getGripFraction() { return gripFraction; }
+    public void setGripFraction(float v) { this.gripFraction = v; }
+    public boolean getKeepHandRotation() { return keepHandRotation; }
+    public void setKeepHandRotation(boolean v) { this.keepHandRotation = v; }
     public float getWeight() { return weight; }
     public void setWeight(float v) { this.weight = v; }
     public NodePath getCharacterPath() { return characterPath; }
@@ -108,6 +140,7 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
 
     @Override
     public void _processModification() {
+        gripMiss = -1.0;
         if (weight <= 0.0f) return;
         Skeleton3D skel = getSkeleton();
         if (skel == null) return;
@@ -132,7 +165,22 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
         Vector3 t = (gun != null)
                 ? HeldWeaponPose.markerInSkeleton(gun, held, marker).getOrigin()
                 : skel.getGlobalTransform().affineInverse().times(marker.getGlobalPosition());
-        TwoBoneIK.solve(skel, iu, il, ie, t, weight);
+        // The grip point in the hand's REST frame, carried by the hand's current (kept) rotation.
+        Transform3D hand = skel.getBoneGlobalPose(ie);
+        int ig = skel.findBone(gripBone);
+        Vector3 grip = Vector3.Companion.getZERO();
+        if (ig >= 0 && gripFraction != 0.0f) {
+            grip = skel.getBoneGlobalRest(ie).affineInverse().times(skel.getBoneGlobalRest(ig).getOrigin())
+                    .times(gripFraction);
+        }
+        Vector3 wrist = t.minus(hand.getBasis().orthonormalized().times(grip));
+        Vector3 solved = TwoBoneIK.solve(skel, iu, il, ie, wrist, weight);
+        if (solved == null) return;
+        if (keepHandRotation) {
+            skel.setBoneGlobalPose(ie, new Transform3D(hand.getBasis(), solved));
+        }
+        Transform3D after = skel.getBoneGlobalPose(ie);
+        gripMiss = after.getOrigin().plus(after.getBasis().orthonormalized().times(grip)).minus(t).length();
     }
 
     /** The bone the weapon hangs from, used to place {@link #supportPointName} in this pass's pose. */

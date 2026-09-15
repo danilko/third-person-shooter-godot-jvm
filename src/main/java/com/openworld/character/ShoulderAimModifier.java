@@ -227,6 +227,35 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
     public boolean getAimHeldWeapon() { return aimHeldWeapon; }
     public void setAimHeldWeapon(boolean v) { this.aimHeldWeapon = v; }
 
+    /**
+     * Set every frame by {@code AnimationController}: the held weapon is in its HOLD or AIM pose -- no weapon
+     * switch, draw, reload or attack one-shot is moving it. While it is not, the bore is not aimed at anything
+     * (a rifle being drawn points at the floor or behind the character), and aiming it spun the upper body up to
+     * 145 deg on every switch to a rifle (user report 2026-09-15, {@code probe_switch_spin.gd}). The bore
+     * reference is then eased OUT to the chest reference and back IN once the weapon is posed again.
+     */
+    @Export
+    public boolean weaponPosed = true;
+
+    public boolean getWeaponPosed() { return weaponPosed; }
+    public void setWeaponPosed(boolean v) { this.weaponPosed = v; }
+
+    /** Seconds to ease between the chest and the bore reference. */
+    @Export
+    public float boreBlendSeconds = 0.15f;
+
+    public float getBoreBlendSeconds() { return boreBlendSeconds; }
+    public void setBoreBlendSeconds(float v) { this.boreBlendSeconds = v; }
+
+    /** The pre-fix behaviour, for the probe's control: trust the bore even while a one-shot moves the weapon. */
+    @Export
+    public boolean boreDuringOneShots = false;
+
+    public boolean getBoreDuringOneShots() { return boreDuringOneShots; }
+    public void setBoreDuringOneShots(boolean v) { this.boreDuringOneShots = v; }
+
+    private double boreWeight = 0.0;
+
     /** The bone a held weapon hangs from (via the {@code WeaponAttachment} BoneAttachment3D). */
     @Export
     public String weaponBone = "hand_r";
@@ -258,27 +287,6 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
         Basis skelBasis = skelXf.getBasis();
         Vector3 targetPos = target.getGlobalPosition();
 
-        // The reference: the held weapon's bore when there is one to aim (see aimHeldWeapon), else
-        // where the chest points. +Z is this rig's chest forward -- measured, not assumed: in the rest
-        // pose spine_03's +Z lands on the mesh forward and its +X on the clavicle_l - clavicle_r axis.
-        // (Note that is the OPPOSITE sign to a camera; a weapon's bore is its -Z, W19.)
-        Vector3 from;
-        Vector3 pivot;
-        int carrier = -1;                                   // index into drivenBones that carries the gun
-        Transform3D gun = aimHeldWeapon ? heldWeaponInSkeleton(skel) : null;
-        if (gun != null) {
-            from = skelBasis.times(gun.getBasis().getZ()).times(-1.0f);
-            pivot = skelXf.times(gun.getOrigin());
-            carrier = carrierOf(skel, skel.findBone(weaponBone));
-            lastAimedBore = true;
-        } else {
-            Transform3D refGlobal = skel.getBoneGlobalPose(refIdx);
-            from = skelBasis.times(refGlobal.getBasis().getZ());
-            pivot = skelXf.times(refGlobal.getOrigin());
-        }
-        if (from.lengthSquared() < 1e-8) return;
-        Vector3 fromN = from.normalized();
-
         // "Straight ahead" comes from {@link #bodyForwardNode}; see its docs for why neither the
         // reference bone nor the skeleton node can supply it.
         Vector3 up = new Vector3(0.0, 1.0, 0.0);
@@ -292,31 +300,31 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
             else bodyFlat = Vector3.Companion.getZERO();
         }
 
-        // The delta, kept as AXIS + ANGLE so a bone can take a fraction of it (see drivenWeights).
-        // Scaling the angle about the same axis is the right partial rotation -- it is the slerp from
-        // identity, on the shortest arc.
-        //
-        // A gun is not at the bone the rotation is applied about, so turning its carrier also MOVES
-        // the gun, and the direction from the gun to the target changes with it. Two passes of "turn,
-        // see where the gun went, aim again from there" settle that (the second moves it by
-        // millimetres); the chest reference needs one, since its origin is the bone's own.
-        Vector3 axis = null;
-        double angle = 0.0;
-        Vector3 p = pivot;
-        int passes = (carrier >= 0) ? 2 : 1;
-        for (int pass = 0; pass < passes; pass++) {
-            Vector3 to = targetPos.minus(p);
-            if (to.length() < MIN_AIM_DISTANCE) return;
-            Vector3 want = clampAim(to.normalized(), bodyFlat, up);
-            axis = rotationAxis(fromN, want);
-            if (axis == null) return;
-            angle = angleBetween(fromN, want);
-            if (carrier >= 0) {
-                int cIdx = skel.findBone(drivenBones.get(carrier));
-                Vector3 c = skelXf.times(skel.getBoneGlobalPose(cIdx).getOrigin());
-                p = c.plus(new Basis(axis, angle * weightFor(carrier)).times(pivot.minus(c)));
+        // The reference: where the chest points, blended toward the held weapon's bore while there is a posed
+        // weapon to aim (see aimHeldWeapon, weaponPosed). +Z is this rig's chest forward -- measured, not
+        // assumed: in the rest pose spine_03's +Z lands on the mesh forward and its +X on the
+        // clavicle_l - clavicle_r axis. (Note that is the OPPOSITE sign to a camera; a weapon's bore is its -Z, W19.)
+        Transform3D refGlobal = skel.getBoneGlobalPose(refIdx);
+        double[] chest = solveDelta(skel, skelXf, skelBasis.times(refGlobal.getBasis().getZ()),
+                skelXf.times(refGlobal.getOrigin()), -1, targetPos, bodyFlat, up);
+        Transform3D gun = aimHeldWeapon ? heldWeaponInSkeleton(skel) : null;
+        double dt = Math.min(0.1, getProcessDeltaTime());
+        boolean trustBore = gun != null && (weaponPosed || boreDuringOneShots);
+        double step = boreBlendSeconds <= 0.0f ? 1.0 : dt / boreBlendSeconds;
+        boreWeight = trustBore ? Math.min(1.0, boreWeight + step) : Math.max(0.0, boreWeight - step);
+        if (gun == null) boreWeight = 0.0;                   // nothing to aim: no memory of the last gun
+        double[] aim = chest;
+        if (boreWeight > 0.0) {
+            double[] bore = solveDelta(skel, skelXf, skelBasis.times(gun.getBasis().getZ()).times(-1.0f),
+                    skelXf.times(gun.getOrigin()), carrierOf(skel, skel.findBone(weaponBone)), targetPos, bodyFlat, up);
+            if (bore != null) {
+                aim = (chest == null || boreWeight >= 1.0) ? bore : slerpAxisAngle(chest, bore, boreWeight);
+                lastAimedBore = boreWeight >= 0.5;
             }
         }
+        if (aim == null || aim[3] == 0.0) return;
+        Vector3 axis = new Vector3(aim[0], aim[1], aim[2]);
+        double angle = aim[3];
 
         // Apply it to each driven bone about that bone's OWN origin, so the shoulders and head
         // swing while the spine, pelvis and legs stay exactly as the clip authored them.
@@ -335,6 +343,67 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
             Basis rotated = toLocal.times(delta).times(skelBasis).times(g.getBasis());
             skel.setBoneGlobalPose(idx, new Transform3D(rotated, g.getOrigin()));
         }
+    }
+
+    /**
+     * The world rotation (axis x, y, z, angle) that turns {@code from} onto the target, or null when there is
+     * nothing to do. A gun is not at the bone the rotation is applied about, so turning its carrier also MOVES
+     * the gun, and the direction from the gun to the target changes with it: two passes of "turn, see where the
+     * gun went, aim again from there" settle that (the second moves it by millimetres); the chest reference
+     * ({@code carrier < 0}) needs one, since its origin is the bone's own.
+     */
+    private double[] solveDelta(Skeleton3D skel, Transform3D skelXf, Vector3 from, Vector3 pivot, int carrier,
+                                Vector3 targetPos, Vector3 bodyFlat, Vector3 up) {
+        if (from.lengthSquared() < 1e-8) return null;
+        Vector3 fromN = from.normalized();
+        Vector3 axis = null;
+        double angle = 0.0;
+        Vector3 p = pivot;
+        int passes = (carrier >= 0) ? 2 : 1;
+        for (int pass = 0; pass < passes; pass++) {
+            Vector3 to = targetPos.minus(p);
+            if (to.length() < MIN_AIM_DISTANCE) return null;
+            Vector3 want = clampAim(to.normalized(), bodyFlat, up);
+            axis = rotationAxis(fromN, want);
+            if (axis == null) {
+                // Already on the target: a ZERO rotation, not "no answer". Returning null here read as "this
+                // reference has nothing to aim" and the blend fell back to the chest for those frames -- a
+                // one-frame un-blade every time the bore settled exactly on the aim (probe_switch_spin.gd).
+                return new double[] {0.0, 1.0, 0.0, 0.0};
+            }
+            angle = angleBetween(fromN, want);
+            if (carrier >= 0) {
+                int cIdx = skel.findBone(drivenBones.get(carrier));
+                Vector3 c = skelXf.times(skel.getBoneGlobalPose(cIdx).getOrigin());
+                p = c.plus(new Basis(axis, angle * weightFor(carrier)).times(pivot.minus(c)));
+            }
+        }
+        return new double[] {axis.getX(), axis.getY(), axis.getZ(), angle};
+    }
+
+    /** Spherical interpolation between two axis-angle rotations, as axis-angle. */
+    private static double[] slerpAxisAngle(double[] a, double[] b, double t) {
+        double[] qa = quat(a), qb = quat(b);
+        double dot = qa[0] * qb[0] + qa[1] * qb[1] + qa[2] * qb[2] + qa[3] * qb[3];
+        if (dot < 0) { for (int i = 0; i < 4; i++) qb[i] = -qb[i]; dot = -dot; }
+        double[] q = new double[4];
+        if (dot > 0.9995) {
+            for (int i = 0; i < 4; i++) q[i] = qa[i] + (qb[i] - qa[i]) * t;
+        } else {
+            double th = Math.acos(dot), s0 = Math.sin((1 - t) * th) / Math.sin(th), s1 = Math.sin(t * th) / Math.sin(th);
+            for (int i = 0; i < 4; i++) q[i] = qa[i] * s0 + qb[i] * s1;
+        }
+        double n = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+        for (int i = 0; i < 4; i++) q[i] /= n;
+        double ang = 2 * Math.acos(Math.max(-1.0, Math.min(1.0, q[3])));
+        double sn = Math.sqrt(Math.max(0.0, 1 - q[3] * q[3]));
+        if (sn < 1e-6) return new double[] {a[0], a[1], a[2], 0.0};
+        return new double[] {q[0] / sn, q[1] / sn, q[2] / sn, ang};
+    }
+
+    private static double[] quat(double[] aa) {
+        double h = aa[3] * 0.5, s = Math.sin(h);
+        return new double[] {aa[0] * s, aa[1] * s, aa[2] * s, Math.cos(h)};
     }
 
     /**

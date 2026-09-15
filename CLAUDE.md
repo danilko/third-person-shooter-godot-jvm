@@ -1797,11 +1797,29 @@ implements `NameplateTarget`:
   (same node names as on `Character`).
 - emits `nameplateChanged` in `tryEnter`/`tryExit`; both run on **every peer** (host-arbitrated seat
   change), so the tint re-derives everywhere with no new message — occupancy already replicates.
-- **Auto-exit when the seated occupant is defeated** ("shot through the open vehicle") is still a
-  separate *Vehicle gameplay* concern, not nameplate (not built): on the occupant's `Health.died` the
-  host would run `Vehicle.tryExit()` + broadcast occupancy; the plate then goes neutral *because* the
-  seat emptied — `tryExit` already emits `nameplateChanged`. Damage reaching a seated occupant is
-  hit/collision routing on the occupant's `Health`.
+- **A defeated driver stays in the seat, GTA-style, and the car coasts (PLAN.md 0.2, 2026-09-14; user
+  decision: "stay seated", not eject).** An ambient car's brain is on the VEHICLE (Design B), so killing the
+  AI at the wheel used to change nothing. `Vehicle.watchDriverDefeat` (top of `_physicsProcess`, an EDGE on
+  every peer so the plate re-tints everywhere; `Health.died` fires only where damage is applied) emits
+  `nameplateChanged` and, where a `VehicleAIController` is present (the simulating peer), frees it: no
+  throttle, brake or steer, so the car coasts until it stops or hits something, then parks. No new message.
+  A PLAYER driver is deliberately not touched. The body is a SEATED CORPSE
+  (`CharacterRagdoll.enableSeatedDeath`): AnimationTree off, every aim/IK modifier off, bones off the hitbox
+  layer, NO simulation (bones in a moving hull tumble out of it), and a procedural slump. The slump pitches
+  `spine_01..head_2` forward about MeshRoot's lateral axis, expressed in each bone's own frame, so it does not
+  depend on how the importer oriented the bones. It is a placeholder for an authored clip (P6). The car is
+  still `isAiOccupied`, so a player takes it by the carjack path; `CharacterDriveState.exit` sees the corpse
+  and `releaseSeatedCorpse` starts the ordinary ragdoll beside the car. `reactToCarjack` ignores a dead AI.
+  `ZoneManager` reclaims such a car as **`abandoned`** once it is below 1 m/s and beyond
+  `stallReclaimMinDist` of every player (no brain means neither `unrouted` nor `stalled` could fire).
+  `Vehicle.updateSeatPosture` skips a dead rider. Gate **`tools/godot/probe_dead_driver.gd`** (20/20, uses
+  `debug/VehicleProbeHelper` for the unregistered seat/kill/carjack calls): brain dropped, plate neutral,
+  car at rest (4.0 s from 22.7 m/s on east_R1 — it runs off the curving lane into the verge), corpse within
+  1 cm (plus one tick of travel) of `Seat0`, not simulating, chest leaning 30.7° → 49.9°; the control car
+  still driving at 22.8 m/s; a carjack seats the player and ragdolls the corpse; an ambient car reclaimed as
+  `abandoned` 9 s after its driver dies. With the hook disabled: the three car checks fail. Probe trap: a
+  carjacked player is PINNED to the seat, so moving them does nothing, and the car 250 m east unloads zone
+  `debug_a` and every ambient car in it. Exit first.
 
 > A base `Carrier` class above `Vehicle` was considered and **deferred**: reuse is achieved through
 > the `NameplateTarget` / `Controllable` interfaces (the codebase idiom), so a class hierarchy buys
@@ -3472,6 +3490,167 @@ AimDebugAuto `yaw 12/12, pitch 3/3, strafe 10/10, ai 8/8, limit 6/6, clav 1/1`; 
 `probe_weapon_{sockets,archetypes,scale,world_body}`, `probe_character_variant` PASS; cockpit eyes unchanged
 (1.359/0.787/0.808); `check_character_anim` PASS on both bodies; `World.tscn` boots clean; `./gradlew test` green.
 
+### W24 — THE RIFLE POSES ARE SOLVED, NOT NUDGED; THE SUPPORT HAND GRIPS WHERE THE ARM REACHES (2026-09-14, PLAN.md A2.4–A2.5)
+
+**`blender/tools/pose_weapon_hold.py` (then `pose_long_gun.py`) authors `upright_aim_rifle` and `upright_hold_rifle` from the constants the
+game reads** (`SocketRifle`, the weapon markers, `StockMountIKModifier`'s anchors, all parsed out of their
+files). A pose nudged by eye passes some facts and silently fails the others; the user's 22:48 save was the third
+such pose (blade 43.3° but 36° of it in the collarbones, gun 9° off the line, stock 10–13 cm behind the pocket).
+Frames, verified to reproduce `probe_pose_clip.gd` to the millimetre: the glTF exporter changes axes on the ROOT
+joint only, so a Godot bone-local transform applies unchanged to the Blender pose bone; body = `(-x, z, y)` of
+armature space; a `.tscn` `Transform3D(...)` is ROW-major. `measure` prints blade (spine vs collarbone share),
+gun yaw/pitch, stock vs pocket, support grip vs `SupportPoint`, right eye vs the bore (and clearance over the
+gun's top), elbow flare, and POKE — how deep the gun's surface sits inside the skinned body. `--render <dir>`
+writes Workbench contact sheets (front, both sides, top, 3/4, TPS). Poke-test traps: keep the hands IN the BVH
+and skip samples whose nearest face is a hand's (removing hand faces leaves a hole at the wrist, and every
+sample inside the fist read 15 cm deep in the forearm); leave hair out (open cards); exclude the last 4 cm of
+the stock (the butt pad is meant to press into the pocket).
+
+Solve order, each step reading the previous: blade (spine_03 twist, then the LEFT collarbone reaching), a 12°
+shrug of the right collarbone (lifts the pocket toward the cheek), gun (bore on the forward line, level, butt
+pad on the pocket), firing arm two-bone to the grip (elbow flared 40°), support arm to the grip point with the
+clip's hand-to-gun orientation, fingers curled absolutely (45/60/40°), then the head by a 3-angle minimise
+(nod, tilt toward the stock, turn) inside a neck's comfortable range. Shipped: `--spine 26 --collarbones 18
+--shrug 12` → blade **44.5° (spine 26 / collarbones 18.5)**, gun 0.00°, AR4 stock 0.000 m, support grip 0.012 m,
+right eye 3.9 cm left of the bore and 5.8 cm over the gun's top (head tilt at its 18° cap — a closer weld
+needs a laid-over head), poke ≤ 1.1 cm on AR4/AR212, 2.4 cm on SG1 (its dropped stock). The hold is a
+PATROL CARRY, not a low ready: grip 12 cm inboard / 22 cm below / 22 cm ahead of the shoulder, muzzle 35° down
+and 55° across the body. A forward low ready was tried first and cannot work with this arm: the support hand
+fell 12–22 cm short, and pulling the stock to the chest to help poked 3–4.5 cm into it. Across the body the
+support grip is 0.000–0.021 m off, poke ≤ 2.1 cm (the stock pinched under the forearm), stock 3.4 cm below the
+joint; the clip's breathing is kept (a constant local delta per key). Both clips are copied into
+`merged_animation_f.blend` (`copy-from`): weapon clips are shared (W18).
+
+**The support hand's REACH decided where it grips.** GodotChan's arm is 0.416 m shoulder→wrist (28% of height;
+a human's is ~33%), which reaches ~0.235 m ahead of the pistol grip with the blade above — the rear of a
+handguard, not its middle and not a pump. So:
+- **`SupportPoint` means the GRIP now, not the wrist.** `SupportHandIKModifier.gripFraction` (0.75 of the way to
+  `middle_01_l`, from the skeleton rest) is where a hand closes round a handguard; the wrist target is the marker
+  pulled back through the hand. And `keepHandRotation`: TwoBoneIK turns the hand with its parents, so a hand that
+  reached the marker still did not wrap the handguard (the control turns it 17.6°). `lastGripMiss()` is registered.
+- Markers moved to where the arm reaches: **AR4 (0, 0.08, −0.25)**, **AR212 (0, 0.085, −0.23)**, **SG1
+  (0, 0.015, −0.30)** — SG1's is the pump's rear edge and still 4.0 cm short (a pump is further than this arm
+  reaches with the stock shouldered; the user allowed the shotgun to be the compromise). A longer-armed body
+  is the real fix and is the user's call. `WEAPON_AUTHORING.md` carries the rule.
+
+**Crouch takes the torso layer too** (`Stance.weaponTorsoLayer` on Crouch). With only `spine_03`, neck and head
+in the layer, spine_01/02 keep the crouch lean and the gun-referenced aim re-levels the chest, so the crouched
+upper body measures IDENTICAL to upright (blade 44.5°, head over the stock). Without it the head keeps the
+crouch clip's orientation 8 cm off the stock while the spine aim still twists the chest (blade 46.7°). Crawl,
+DriveCarrier and Swim do not mount the stock; crawl measures gun on the line and AR4's stock on the pocket from
+the clip alone, but the arms are still standing arms on a prone chest (W4's authored prone set is still needed).
+
+Gates: `probe_weapon_fit.gd` **PASS on both bodies and `--stance=crouch`** (new `--stance=`, `--torso-layer-on=`;
+now asserts the support grip, 5 cm), with the StockMount hand move **0.000 m** on AR4 (the clip is right, the IK
+has nothing to do); control `--stock-weight=0 --aim-reference=chest --torso-layer=off` → gun 26° off, 4 FAIL.
+`probe_support_hand_ik.gd` grip 0.002 m, hand turned 0.27° (control `--control`: 0.052 m, 17.6°, 2 FAIL).
+`probe_weapon_archetypes.gd` now expects 3 clusters (the launcher is still the pre-A2.4 rifle copy). AimDebugAuto
+`yaw 12/12, pitch 3/3, strafe 10/10, ai 8/8, limit 6/6, clav 1/1`; `probe_self_hit` worst 12.8°;
+`probe_driveby_aim` 8/8 (worst residual 82.1°); `probe_character_variant`, `probe_melee`, `probe_fps_camera`,
+`probe_vehicle_views`, `probe_weapon_{sockets,scale,world_body}` PASS; cockpit eyes unchanged; `check_character_anim`
+PASS on both bodies; `World.tscn` boots clean; `./gradlew test` green.
+
+### W25 — ONE HOLD MODEL FOR EVERY WEAPON: SOCKET + ARCHETYPE CLIP + AIM + MOUNT IK + SUPPORT IK (2026-09-15)
+
+**The rifle's base is now the artist's own placement.** The user placed an `AR4` model in `merged_animation.blend`
+level on the forward line, stock high on the shoulder, and posed both hands round it by eye. It sat 5 cm ahead of and
+21° off the clip hand's socket fit, so re-solving the arms to the old socket (tried, rendered) put the fist low on the
+grip and the left hand over the handguard, where the user had it cupped under. The pose is therefore ADOPTED, not
+re-solved: `pose_weapon_hold.py adopt --placed AR4 --apply` derives the three pieces of data that reproduce it in
+game and writes them where the game reads them. `SocketRifle` (both bodies: 5.0 cm / 21.1° from the W20 fit),
+the `StockPoint` anchor (−0.0221, −0.0284, 0.0775), and AR4's `SupportPoint` (0.0116, 0.0206, −0.2368), 3 cm under
+the handguard at its rear. AR212 and SG1 take the same relation to their own handguard/pump. The clip's bones are
+untouched, and in game the stock IK now moves the hand **0.000 m** on AR4 and the grip is 0.000 m off. The rifle
+hold was re-solved for the new socket. The placed `AR4` was then removed from the `.blend` (`remove-object`).
+With the authored head that low, the headphones sit 4.6 cm into AR4's receiver; left as authored.
+
+**The model is the CS / Left 4 Dead / GTA one, and it is now one row per archetype**
+(`weapon_archetypes.json` `holds`):
+1. The weapon hangs from the firing hand at ONE socket per archetype (`SocketRifle`, `SocketPistol`,
+   `SocketLauncher`, …).
+2. ONE upper-body clip pair per archetype (`upright_aim_<arch>`, `upright_hold_<arch>`) supplies the class of hold.
+3. The aim modifiers point the BORE (W23).
+4. **Mount IK** puts a marker on the weapon at a body anchor.
+5. **Support IK** puts the off hand's grip on `SupportPoint` (W24).
+
+A new weapon of an existing archetype is markers only. A new archetype is a row, a socket, a clip pair and a solve.
+
+- **`StockMountIKModifier` is a general mount IK now.** `mount_markers` / `mount_offsets` are index-parallel. A held
+  weapon mounts with the FIRST marker it declares (`current_mount()` is registered). A weapon declaring none, like a
+  pistol, is left alone. The anchors are facts about the body's skin, so each visuals scene owns them. The Java
+  `DEFAULT_MOUNT_*` arrays are the fallback and are parsed by the tool, so keep their literal shape. `pocketOffset` /
+  `stockPointName` are gone.
+- **`pose_weapon_hold.py`** (was `pose_long_gun.py`) takes `--hold <archetype>`. Commands:
+  - `measure [--placed OBJ] [--render DIR]`
+  - `solve-aim` with placement `mount` (marker on anchor, bore level) or `eye_line` (the bore `sight_drop` under
+    the right eye, the grip `reach` ahead of the shoulder — for a stockless weapon)
+  - `adopt [--placed OBJ] --apply` (derive socket/anchor/SupportPoint from a pose the artist made)
+  - `solve-hold`, `body-anchor r u f`, `skin-anchor`, `remove-object`, `copy-from`
+
+  Row arguments are the shipped defaults, and the command line overrides them. Primitive weapons (ATL4) are
+  sampled/rendered as their box. Scene weapon models are hidden in renders unless `--show-placed`.
+- **Pistol:** the authored two-handed isosceles clip was already sound (gun on the line, no poke), so it is kept.
+  PI52 gained a `SupportPoint` ADOPTED from it (0.0105, −0.0473, 0.0193: the left hand cupping under and behind the
+  grip), so the support IK now holds that grip through aim and stance changes.
+- **Launcher (first pass):** ATL4 gained `ShoulderRestPoint` (0, 0.01, 0.25 — the tube's underside 25 cm behind the
+  grip) and a `SupportPoint` under the tube. Its anchor is on the deltoid 2 cm outboard of / 6 cm above the joint
+  (0.0582, 0.0246, −0.0002). A skin-derived "top of the shoulder" is INBOARD of the joint and put the tube through
+  this character's head and headphones. `SocketLauncher` was stale (it held the grip 17 cm from the wrist) and now
+  equals the rifle's hand fit. Aim: blade 34°, tube on the anchor, grip 0.000 m, eye 10 cm left of the bore, 3.3 cm
+  of tube inside the right headphone cup (the head is kept as authored: an AT4 sight is beside the tube, not above
+  it). Hold: carried low across the body, support grip 5.8 cm short.
+
+Gates: `probe_weapon_fit.gd` now covers **AR4, AR212, SG1, PI52, ATL4** through each weapon's own mount (PASS on
+both bodies and `--stance=crouch`). SG1 grip 3.3 cm, every other grip and mount 0.000–0.002 m. The pocket-vs-skin
+check is "within 2 cm" (the pocket is authored now; 1.5 cm measured). Also passing: `probe_support_hand_ik`,
+`probe_weapon_{archetypes,sockets,scale,world_body}`, `probe_character_variant`, `probe_melee`, `probe_self_hit`
+(worst 12.7°), `probe_fps_camera`, `probe_vehicle_views`, `probe_driveby_aim` (82.1°); AimDebugAuto 40/40;
+`check_character_anim` PASS on both bodies; `World.tscn` 0 errors; `./gradlew test` green.
+
+### W26 — A BORE IS ONLY AIMED WHILE THE WEAPON IS POSED; THE PRONE BODY IS SYMMETRIC (2026-09-15, user-reported)
+
+**"An AI's upper body spins nearly 360° when it switches to a rifle."** At the end of a switch the rifle becomes the
+held weapon and the `WeaponChange` draw one-shot starts. `ShoulderAimModifier` aims the held weapon's BORE (W23),
+and for the length of that clip the bore is being swung up from the holster, so the spine chased it. An AI is in
+combat while it switches, and a player usually is not. Reproduced on a player holding `aim`
+(`tools/godot/probe_switch_spin.gd`): chest overshoot **120°**, travel **309°** per switch to AR4; pistol switches
+were fine.
+- `AnimationController` sets `weaponPosed` (no `WeaponChange` / `Reload` / `Attack` one-shot active, read only in
+  combat) on both aim modifiers and gates `StockMountIKModifier.engaged` with it.
+- The modifier always solves the CHEST reference, and eases the BORE reference in and out over `boreBlendSeconds`
+  (0.15 s, a quaternion slerp of the two deltas).
+- During a draw or reload the chest squares to the target, then re-blades once the gun is up.
+- A trap this introduced, with an eye on it: the delta solve returned null for "already on target", and the blend
+  read that as "no bore" (a one-frame un-blade whenever the bore settled exactly). It returns a zero rotation now.
+- Result: overshoot **6°**, travel **89°** (the chest squaring and re-blading, 26° each way). `-- --control`
+  (`bore_during_one_shots`) puts the spin back.
+
+**"Crawl always leans left and rocks left/right while moving."** Yaw about world up barely sees a prone body. The lean
+was in the LEGS: `crawl_idle` had the hips yawed 8.2° and the left knee 38 cm out against the right knee's 13 cm.
+The rocking was the crawl cycle swinging the hips 29° peak-to-peak; the chest was already steady (1.2°).
+`crawl_left/right/back` are still copies of `crawl_forward` (W10 placeholders). Fixed in the clips with
+`pose_weapon_hold.py`, both bodies:
+- `symmetrize --action crawl_idle-loop`: each side is averaged with the other's mirror, centre bones with their own.
+  The rig is X-symmetric to 0.0002 and the mirror is a reflection conjugate of each bone's rest frame.
+- `damp-hip-yaw --factor 0.8` on the four moving crawls: the pelvis turns about world up by −0.8 × its hip yaw,
+  then `spine_03` gets its world orientation back, so the chest and aim do not move while the legs still alternate.
+
+Measured in game: idle hip yaw **+0.0°**, knee asymmetry **0.000 m**; moving hip sway **5.7°** (was 29).
+`tools/godot/probe_crawl_balance.gd` asserts those and compares crawl's chest and head against upright. Its
+`--dump=` writes the FINAL in-game bone pose (after every modifier), and `pose_weapon_hold.py render-dump` renders
+it headless. The glTF axis change sits on the root joint only, so a Godot skeleton-space bone transform is
+`G2B @ G` with no right-hand conversion.
+
+**What a balanced prone set looks like, still to author:** a symmetric prone idle is what `symmetrize` produced.
+The moving crawl should keep hip yaw within about ±3° with the chest on the aim line, as PUBG and Arma prone do, and
+their characters lower the weapon while crawling. Strafing and backing need their OWN clips: an elbow-and-knee
+sideways shuffle and a push back, not the forward crawl played sideways. The prone AIM set is still W4.
+
+Gates: `probe_switch_spin` and `probe_crawl_balance` PASS; `probe_weapon_fit` PASS (default, female, crouch, crawl);
+`probe_support_hand_ik`, `probe_weapon_{archetypes,sockets,world_body}`, `probe_character_variant`, `probe_melee`,
+`probe_self_hit`, `probe_fps_camera`, `probe_vehicle_views`, `probe_driveby_aim`; AimDebugAuto 40/40;
+`check_character_anim` PASS on both bodies; `World.tscn` 0 errors; `./gradlew test` green.
+
 ## Godot-JVM Specifics
 
 - **Annotations (godot-jvm `1.0.0-rc1` API — the older `@Register*` family is gone).** The plugin runs in the
@@ -4013,6 +4192,39 @@ user-reported: "dragging freezes the editor", "delete like a Godot node", "every
 - Gates: `test_roadkit_native_delete.gd` (in `check_roads.sh`), and the editor self-test's new steps — SELECT
   click pass-through, a Scene-dock delete + Ctrl+Z, a record changed on disk reloaded both ways, the junction
   labels, the live-tick cost.
+
+**A BARRIER IS ON OR OFF, NEVER A WEDGE — the "car launched at speed" bug (PLAN.md 0.1, 2026-09-14,
+user-reported: "randomly spikes upward at high speed, worse near the bridge and close to a wall").** The
+solver decides `rka_wall_h` per 4 m sample (full `barrier_height` where the road is ≥ `BARRIER_MIN_DELTA`
+off the ground, 0 elsewhere) and the sweep interpolates every attribute between samples, so the span where
+a parapet BEGINS was swept as a 4 m wedge rising from the kerb to 1 m, collision included. On DebugRoads'
+`link`, where the bridge leaves the island, that is a jump ramp standing on the road edge: a car at 37 m/s
+with its outer wheels on the edge line climbed it and left the ground at up to 23.6 m/s of vertical speed.
+(Real highways retired the "ramped end" barrier terminal for the same reason.) `point_edges.step_walls` is
+now applied inside all three edge-run enumerations (`road_edge_runs` / `junction_edge_runs` /
+`gore_edge_runs`), so the Blender build, the pure-Python sweep, the draft and the digest all see it: where
+one vertex has a barrier and its neighbour none, a vertex goes in `WALL_END_STEP` (2 cm) from the bare one at
+full height, so the wall covers the whole span and ends in a face. It errs toward more fence. Two non-zero
+heights still blend. `point_solve.junction_corners` had the same wedge along a whole corner arc when one arm
+is fenced and the other not; it now steps at the corner's middle. Found with two new tools:
+- **`tools/godot/probe_road_launch.gd`** — the gate. `debug/LaneDriveProbeController` (the ordinary traffic
+  brain, aimed at a lane by name, blind to other cars, optionally riding `lateral_offset` m beside the lane)
+  drives Vehicle.tscn through DebugWorld's streamed pieces. A LAUNCH is the body's vertical speed RELATIVE
+  TO THE LANE'S OWN RISE RATE going up by more than 3 m/s within 0.25 s while on the road. Measured against
+  the road, not the world: a sag at 32 m/s is legitimately a 3.8 m/s change, and the first detector read
+  grades as launches. A per-tick threshold was the first detector too, and it missed launches that build
+  over several ticks (31 m/s with no flag). Each launch prints every body contact and every wheel ray.
+  GATE_CASES: 0 on-road launches over 6 cases; control (the pieces built before `step_walls`): 6 launches
+  on the two edge-line cases, worst 23.6 m/s.
+- **`tools/godot/probe_road_section.gd`** — a collision cross-section of a streamed lane (`--half`), or a
+  lengthwise one at a lateral offset (`--along --lat`): every collider a vertical ray passes through, top
+  first. It is what showed the wedge (10.61 → 11.61 m over 4.25 m), which no visual shows.
+
+Still open, found by the same probe (PLAN.md 3.1 B12): **DebugRoads' west pad is steep and folded.** Its
+three mouths sit at 10.46 / 12.97 / 11.02 m with two stop lines ~9 m apart, and the single-apex fan
+(`pad_triangles`) concentrates that into turn paths up to 40.5% grade. The dense IDW field is still 22%. A car
+crossing at 37 m/s leaves the pad at up to 5 m/s. Two separate causes: layout (a pad grade the gate does not
+check) and tessellation (a fan roughly doubles the field's own grade).
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 
