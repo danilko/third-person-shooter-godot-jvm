@@ -68,7 +68,7 @@ func _floor(parent: Node) -> void:
 	parent.add_child(b)
 
 ## Spawn a Player, drop `weapon_id` on it and bring it to the hand. Returns [player, gun, controller].
-func _armed(world: Node3D, weapon_id: String, at: Vector3) -> Array:
+func _armed(world: Node3D, weapon_id: String, at: Vector3, brisk: bool = true) -> Array:
 	var p: Node3D = (load(PLAYER) as PackedScene).instantiate() as Node3D
 	world.add_child(p)
 	p.position = at
@@ -87,10 +87,12 @@ func _armed(world: Node3D, weapon_id: String, at: Vector3) -> Array:
 		print("  FAIL  %s never became the active weapon (parent %s)" % [weapon_id, gun.get_parent().name])
 		fails += 1
 		return []
-	# Combat, so the W21 aim gate is not what blocks a shot, and a brisk cadence.
+	# Combat, so the W21 aim gate is not what blocks a shot, and (unless the case is measuring the
+	# weapon's own cadence) a brisk one, because these cases are about the reload RULE, not the tuning.
 	p.set("combat", true)
-	gun.set("fire_rate", 8.0)
-	gun.set("reload_speed", 4.0)
+	if brisk:
+		gun.set("fire_rate", 8.0)
+		gun.set("reload_speed", 4.0)
 	await _tick(20)
 	return [p, gun, wc]
 
@@ -117,6 +119,23 @@ func _empty(gun: Node3D, wc: Node, cap: int) -> int:
 		presses += 1
 		print("  press %d: %s" % [presses, _state(gun, wc)])
 	return presses
+
+## Press (repeatedly, if the draw-settle eats the first one) until the magazine DROPS, and return the
+## physics frame it dropped on. -1 if it never did.
+func _shoot_until_drop(gun: Node3D, budget_frames: int) -> int:
+	var before: int = int(gun.get("magazine"))
+	var waited := 0
+	while waited < budget_frames:
+		Input.action_press("fire")
+		await _tick(PRESS_FRAMES)
+		Input.action_release("fire")
+		waited += PRESS_FRAMES
+		for i in range(RELEASE_FRAMES):
+			await physics_frame
+			waited += 1
+			if int(gun.get("magazine")) < before:
+				return Engine.get_physics_frames()
+	return -1
 
 func _state(gun: Node3D, wc: Node) -> String:
 	return "mag %d/%d reserve %d reloads %d%s" % [
@@ -238,6 +257,32 @@ func _initialize() -> void:
 		_check("the stack did not refill itself", not is_instance_valid(gun) or int(gun.get("magazine")) == 0,
 			"magazine %s, reserve %s" % [str(gun.get("magazine")) if is_instance_valid(gun) else "-",
 				str(gun.get("reserve")) if is_instance_valid(gun) else "-"])
+		p.queue_free()
+		await _tick(5)
+
+	# ── 5. a BOLT ACTION is the fire rate, not a reload ──────────────────────────────────────
+	# The design question this settles (user, 2026-09-16): a bolt cycle needs a hard per-shot
+	# cooldown and one shot per trigger pull, and `auto = false` + `fireRate` are exactly that. If it
+	# were built on the reload path instead, every shot would move reserve into the magazine, bump the
+	# replicated reloadSeq (so every peer would play a reload cue per shot) and read as "reloading" to
+	# the HUD ring. So the assertion is BOTH halves: the cadence is 1/fire_rate, and nothing reloads
+	# while the magazine still has rounds.
+	print("")
+	print("=== SR3 at its shipped rate: the bolt cycle is the fire timer, not a reload ===")
+	a = await _armed(world, "SR3", Vector3(x + 8.0, 1.2, 0), false)
+	if not a.is_empty():
+		var p: Node3D = a[0]
+		var gun: Node3D = a[1]
+		var wc: Node = a[2]
+		var want: float = 1.0 / float(gun.get("fire_rate"))
+		var f0: int = await _shoot_until_drop(gun, 300)
+		var f1: int = await _shoot_until_drop(gun, 300)
+		var got: float = float(f1 - f0) / 60.0
+		print("  two shots %d frames apart = %.3f s (1/fire_rate = %.3f s); %s" % [f1 - f0, got, want, _state(gun, wc)])
+		_check("the bolt cadence is 1/fire_rate", f0 > 0 and f1 > 0 and absf(got - want) < 0.12,
+			"%.3f s between shots, wanted %.3f" % [got, want])
+		_check("no reload while the magazine has rounds", int(wc.call("reloads_started")) == 0 and int(gun.get("magazine")) > 0,
+			"%d reload(s), %s" % [int(wc.call("reloads_started")), _state(gun, wc)])
 		p.queue_free()
 		await _tick(5)
 
