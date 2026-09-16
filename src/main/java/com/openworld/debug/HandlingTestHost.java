@@ -380,7 +380,7 @@ public class HandlingTestHost extends Node3D {
         bounds = new WorldBounds();
         bounds.setName(new godot.core.StringName("TestBounds"));
         bounds.halfExtent = BOUNDS_HALF;
-        bounds.softMargin = 6f;
+        bounds.warnMargin = 6f;
         bounds.floorY = (float) baselineY - 40f;
         addChild(bounds);
     }

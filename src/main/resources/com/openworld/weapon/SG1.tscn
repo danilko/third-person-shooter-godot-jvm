@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://biahtc64fjcgq"]
 
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/SG1.tres" id="90_stats"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FirearmItem.java" id="1_sg1"]
 [ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="2_6mbq6"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="2_muzzle"]
@@ -14,28 +15,14 @@ size = Vector3(0.5, 0.5, 1.18)
 
 [node name="SG1" type="Node3D" unique_id=300100001]
 script = ExtResource("1_sg1")
-pellet_count = 8
+stats = ExtResource("90_stats")
 weapon_id = "SG1"
 weapon_name = "SG-1"
-weapon_pose_index = 1
+weapon_archetype = "rifle"
 hold_socket = "SocketRifle"
 holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
-spread = 3.0
-bloom_per_shot = 1.0
-bloom_decay_speed = 2.0
-bloom_max = 5.0
-reload_speed = 0.4
-fire_rate = 1.0
 magazine = 6
-magazine_size = 6
 reserve = 18
-reserve_max = 18
-recoil = 2.5
-kick_back = 0.050
-kick_pitch = 6.0
-kick_spring = 14.0
-kick_damping = 1.0
-damage = 15.0
 fire_audio = ExtResource("2_6mbq6")
 reload_audio = ExtResource("3_1rd4b")
 require_interact = true

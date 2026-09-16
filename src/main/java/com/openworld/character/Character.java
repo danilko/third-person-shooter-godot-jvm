@@ -15,6 +15,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;
 import com.openworld.camera.ControlRotation;
+import com.openworld.camera.ScopeSway;
 import com.openworld.camera.FPSCameraController;
 import com.openworld.camera.TPSCameraController;
 import com.openworld.carrier.vehicle.Vehicle;
@@ -94,6 +95,17 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      */
     @Export
     public float ragdollDuration = 3.0f;
+
+    /**
+     * Seconds a full breath lasts while held behind a scope (PLAN.md 2.7 piece 2). The breath is this
+     * body's, not the weapon's — the weapon only says how far it wanders ({@code scopeSwayDegrees}).
+     */
+    @Export
+    public double breathHoldSeconds = 4.0;
+
+    /** Seconds an emptied breath takes to refill. The shooter is winded until it is half back. */
+    @Export
+    public double breathRecoverSeconds = 5.0;
 
     @Export
     public WeaponController weaponController;
@@ -284,7 +296,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
             // never hit self (spread < 0.5deg), but MeleeItem casts this ray through a +/-25deg cone
             // that can tilt onto the character's own capsule and deal self-damage. Excepting the body
             // here is rotation-independent, so it covers every cone ray (and hardens firearm hitscan).
-            aimRay.addException(this);
+            com.openworld.util.RayExclusions.add(aimRay, this);
         }
         if (hasNode(cameraRootPath)) {
             cameraRoot = (Node3D) getNode(cameraRootPath);
@@ -519,7 +531,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         if (aimRay == null) return;
         for (int i = 0; i < sim.getChildCount(); i++) {
             Node child = sim.getChild(i);
-            if (child instanceof PhysicalBone3D bone) aimRay.addException(bone);
+            if (child instanceof PhysicalBone3D bone) com.openworld.util.RayExclusions.add(aimRay, bone);
         }
     }
 
@@ -542,20 +554,20 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      */
     public void addAimExceptionsTo(RayCast3D ray) {
         if (ray == null) return;
-        ray.addException(this);
+        com.openworld.util.RayExclusions.add(ray, this);
         if (physicalBoneSimulator == null) return;
         for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
-            if (physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone) ray.addException(bone);
+            if (physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone) com.openworld.util.RayExclusions.add(ray, bone);
         }
     }
 
     /** Undo {@link #addAimExceptionsTo} — a carrier's ray must see the next body that stands there. */
     public void removeAimExceptionsFrom(RayCast3D ray) {
         if (ray == null) return;
-        ray.removeException(this);
+        com.openworld.util.RayExclusions.remove(ray, this);
         if (physicalBoneSimulator == null) return;
         for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
-            if (physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone) ray.removeException(bone);
+            if (physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone) com.openworld.util.RayExclusions.remove(ray, bone);
         }
     }
 
@@ -677,6 +689,12 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * input source (local, AI, network) produces identical results.
      */
     protected void applyInput(UserCommand input, double delta) {
+
+        // ── Scope intent ───────────────────────────────────────────────────
+        // Before the seated early return, so a passenger's release is heard too. What the intent is
+        // ALLOWED to mean is derived (isScoped below), never latched here.
+        if (weaponController != null) weaponController.setScopeRequested(input.wantScope);
+        holdBreathRequested = input.holdBreath;
 
         // ── Seated passenger (multi-seat) ──────────────────────────────────
         // The body is pinned to its seat by the vehicle each tick; movement/jump/stance/swim
@@ -1114,6 +1132,143 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     }
 
     /**
+     * True while this character is looking through a scoped weapon's optic (PLAN.md 2.7 piece 1).
+     *
+     * <p>Fully derived — see {@code WeaponController.isScoped()} for why nothing latches it. The two
+     * conditions this level adds are the ones the weapon cannot see: a dead body does not aim, and a
+     * body in a seat is looking through the carrier's view (the driver) or is in no position to
+     * shoulder a rifle (a passenger's drive-by is a hip shot, {@code Vehicle.clampSeatAim}).
+     */
+    public boolean isScoped() {
+        return isScopeRaised() && weaponController.scopedNow();
+    }
+
+    /**
+     * The scope is RAISED: aim held on a scoped weapon, alive, on foot — zoomed or not. The first-person
+     * view and the scoped shot's origin follow this; the zoom and the optic follow {@link #isScoped()},
+     * which additionally drops while a bolt gun cycles or reloads ({@code WeaponController.scopeRaisedNow}).
+     */
+    /**
+     * The fastest this body can move right now, m/s: its stance's sprint speed x the combat speed factor
+     * x the raised scope's slowdown (PLAN.md 2.8 items 3-4). {@code weapon.Accuracy} expresses its
+     * standing threshold as a fraction of this, so a scoped slowdown lowers the threshold with it. 0 when
+     * unknown (no stance cached, a stance with no sprint).
+     */
+    public double maxMoveSpeed() {
+        Stance s = stanceCache.get(currentStanceName);
+        if (s == null || s.sprintState == null) return 0.0;
+        MovementController mc = movementController();
+        double combat = mc != null ? mc.combatSpeedFactorNow() : 1.0;
+        return s.sprintState.getMovementSpeed() * combat * scopeMoveSpeedFactor();
+    }
+
+    /** Max-speed multiplier while a scope is RAISED (its {@code ScopeConfig.moveSpeedFactor}), else 1. */
+    public double scopeMoveSpeedFactor() {
+        com.openworld.weapon.ScopeConfig sc = isScopeRaised() ? weaponController.heldScope() : null;
+        return sc != null ? Math.max(0.0, sc.moveSpeedFactor) : 1.0;
+    }
+
+    /** Stopping deceleration multiplier while a scope is RAISED ({@code ScopeConfig.stopAccelerationFactor}), else 1. */
+    public double scopeStopAccelerationFactor() {
+        com.openworld.weapon.ScopeConfig sc = isScopeRaised() ? weaponController.heldScope() : null;
+        return sc != null ? Math.max(1.0, sc.stopAccelerationFactor) : 1.0;
+    }
+
+    public boolean isScopeRaised() {
+        return weaponController != null
+                && currentVehicleNode == null
+                && isAlive()
+                && weaponController.scopeRaisedNow();
+    }
+
+    /**
+     * {@link #isScoped()} for GDScript — the gate ({@code tools/godot/probe_sniper_scope.gd}) has to
+     * call it. Question-named for the reason {@code WeaponController.reloadingNow} is: godot-jvm
+     * merges a registered {@code isX()} into a getter-only property, which then registers READ_ONLY
+     * and cannot be called.
+     */
+    @Register
+    public boolean scopedNow() { return isScoped(); }
+
+    /**
+     * Whether the on-foot view is FIRST PERSON this frame — <b>the one question both rigs ask</b>,
+     * and the reason scoping cannot strand the player in first person.
+     *
+     * <p>{@link #isFpsMode} is the player's PREFERENCE, toggled by the {@code view} key and mirrored
+     * into a carrier seat by W6. The scope is a separate, momentary state on top of it. Deriving the
+     * view as {@code scoped || preference} keeps the preference untouched, so releasing the aim
+     * button returns the player to exactly the view they chose, with no second write to get wrong —
+     * the same split W6 made when it stopped the on-foot and carrier rigs being two independent
+     * latches of one fact.
+     */
+    public boolean isFirstPersonView() {
+        // RAISED, not zoomed: a bolt gun drops its zoom for every cycle, and flicking a third-person
+        // player to the boom and back on each shot would be the view fighting the player.
+        return isFpsMode || isScopeRaised();
+    }
+
+    // ── Scope sway + held breath (PLAN.md 2.7 piece 2) ──────────────────────
+
+    /** This tick's hold-breath input, raw ({@code UserCommand.holdBreath}). */
+    private boolean holdBreathRequested = false;
+
+    /** The drift and the breath. State lives here because the lungs are this body's. */
+    private final ScopeSway scopeSway = new ScopeSway();
+
+    /**
+     * Advance the scope's drift one tick and publish it into {@link #controlRotation}, where both rigs
+     * add it beside the recoil offset.
+     *
+     * <p>Called by {@code TPSCameraController._physicsProcess} — the node that already decays the
+     * recoil and gets a frame in every mode, which this body's own {@code _physicsProcess} does not
+     * (the driver's seat switches it off). Nothing here is latched: not scoped means the level eases to
+     * zero, so a death, a switch or a car door settles the view the same way letting go of aim does.
+     */
+    public void tickScopeSway(double delta) {
+        boolean scoped = isScoped();
+        // Every AI rig calls this every frame and none of them ever scopes: at rest there is nothing to
+        // advance, and the steadiness below is an engine call (isOnFloor) not worth paying per AI.
+        if (!scoped && scopeSway.atRest()) {
+            scopeSway.observeInput(holdBreathRequested);
+            controlRotation.swayPitch = 0.0;
+            controlRotation.swayYaw   = 0.0;
+            return;
+        }
+        double amplitude = weaponController != null ? weaponController.scopeSwayDegrees() : 0.0;
+        scopeSway.holdSeconds    = breathHoldSeconds;
+        scopeSway.recoverSeconds = breathRecoverSeconds;
+        scopeSway.tick(delta, scoped, holdBreathRequested, amplitude, swaySteadiness());
+        controlRotation.swayPitch = scopeSway.pitch();
+        controlRotation.swayYaw   = scopeSway.yaw();
+    }
+
+    /**
+     * How steady this body holds a scope: prone is steadiest, a braced crouch next, and a shooter in
+     * the air or treading water is worst. The same ordering {@code FirearmItem}'s stance spread uses,
+     * with prone further apart — a bipod-less prone shot is the classic steady position.
+     */
+    private double swaySteadiness() {
+        if (currentStanceName == StanceName.SWIM || !isOnFloor()) return 2.0;
+        return switch (currentStanceName) {
+            case CROUCH -> 0.6;
+            case CRAWL  -> 0.35;
+            default     -> 1.0;
+        };
+    }
+
+    /** The breath reserve, 0..1 — for the HUD and the gate ({@code probe_scope_sway.gd}). */
+    @Register
+    public double breathNow() { return scopeSway.breath(); }
+
+    /** Whether a held breath is steadying the scope right now. */
+    @Register
+    public boolean holdingBreathNow() { return scopeSway.holding(); }
+
+    /** Whether this body is winded from holding its breath too long. */
+    @Register
+    public boolean windedNow() { return scopeSway.winded(); }
+
+    /**
      * How far this body can turn its aim off its own facing in the seated stance, degrees — the
      * RIG's reach, for a carrier to compare its authored firing sector against. Negative when the
      * stance is not loaded (nothing to say, so nothing is warned).
@@ -1414,8 +1569,10 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * owns the camera — which changes when the character sits down:
      *
      * <ul>
-     *   <li><b>On foot</b> — the FPS rig is mounted on {@code neck_01}, so {@link #isFpsMode} IS
-     *       the answer.</li>
+     *   <li><b>On foot</b> — the FPS rig is mounted on {@code neck_01}, so
+     *       {@link #isFirstPersonView()} IS the answer. It is the derived view, not the raw
+     *       {@link #isFpsMode} preference, so a SCOPED player is behind their own eyes and the head
+     *       goes with it — one more condition in the derivation, not a fourth latch (PLAN.md 2.7).</li>
      *   <li><b>Driving</b> — the camera is the carrier's, and the carrier has three views. Only its
      *       cockpit view is in the driver's skull; its TPS boom and its bonnet mount (0, 0.34,
      *       -0.80, over the nose) are not, so the head stays on in both. The carrier is the one
@@ -1436,7 +1593,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     public void refreshHeadVisibility() {
         boolean insideOwnEyes = (vehicleDriver && currentVehicleNode instanceof Vehicle v)
                 ? v.isViewInsideOccupantHead(this)
-                : isFpsMode;
+                : isFirstPersonView();
         boolean visible = !insideOwnEyes;
         if (visible != headVisibleApplied) setHeadVisible(visible);
     }

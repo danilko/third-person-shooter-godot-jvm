@@ -10,11 +10,12 @@ import com.openworld.character.Character;
 
 /**
  * First-person camera controller — positions the shared ActiveCamera at the character's eye point
- * each frame when {@code is_fps_mode} is true.
+ * each frame when the on-foot view is first person ({@code Character.isFirstPersonView()} —
+ * the {@code is_fps_mode} preference, or a scoped weapon).
  *
  * <p>No Camera3D lives here. The single {@code Character.activeCamera} is written by whichever
- * controller is active: {@link TPSCameraController} writes when {@code !isFpsMode}, this node
- * writes when {@code isFpsMode}. AimRay and AimTarget follow ActiveCamera automatically.
+ * controller is active: {@link TPSCameraController} writes when the view is not first person, this
+ * node writes when it is. AimRay and AimTarget follow ActiveCamera automatically.
  *
  * <h2>Orientation never comes from the bone</h2>
  * The view's rotation is {@link ControlRotation} — the same world rotation the TPS rig uses — so
@@ -163,8 +164,9 @@ public class FPSCameraController extends Node3D {
         // the STANCE's, published there by TPSCameraController.onSetStance — so prone cannot pitch
         // to a place the neck could not follow, and the two rigs cannot disagree about the limit.
         ControlRotation cr = character.controlRotation;
-        double effYaw   = cr.yaw + cr.recoilYaw;
-        double effPitch = GD.clamp(cr.pitch + cr.recoilPitch, cr.pitchMin, cr.pitchMax);
+        // Sway is advanced by TPSCameraController (which processes in every mode) and read here.
+        double effYaw   = cr.yaw + cr.recoilYaw + cr.swayYaw;
+        double effPitch = GD.clamp(cr.pitch + cr.recoilPitch + cr.swayPitch, cr.pitchMin, cr.pitchMax);
 
         Vector3 yr = yawNode.getRotationDegrees();
         yr.setY(effYaw);
@@ -174,8 +176,11 @@ public class FPSCameraController extends Node3D {
         pr.setX(effPitch);
         pitchNode.setRotationDegrees(pr);
 
-        // Write the FPS view transform to the shared ActiveCamera when in FPS mode.
-        if (character.isFpsMode && character.activeCamera != null) {
+        // Write the FPS view transform to the shared ActiveCamera whenever the on-foot view is
+        // first person. That is the DERIVED view (`isFpsMode || scoped`), not the preference: a
+        // player scoping from third person is looking through this rig for as long as they hold the
+        // button, and releasing hands the camera straight back to the TPS boom with nothing written.
+        if (character.isFirstPersonView() && character.activeCamera != null) {
             character.activeCamera.setGlobalTransform(pivotNode.getGlobalTransform());
         }
     }
@@ -207,7 +212,16 @@ public class FPSCameraController extends Node3D {
         double len = dev.length();
         if (len > maxBoneOffset && len > 1e-6) dev = dev.times((float) (maxBoneOffset / len));
 
-        Vector3 target = baseline.plus(dev.times((float) boneMotionScale));
+        // A SCOPED eye admits NONE of it. Through an optic the leftover bob is magnified by the
+        // scope's own zoom (3.75x on SR3), so the fraction that reads as "a walk" unscoped reads as
+        // an unusable picture scoped; and the loop this rig sits in — bone -> camera -> aim target ->
+        // ShoulderAimModifier -> bone — has that much more gain the further the view is zoomed. W11
+        // took the same decision for the cockpit view and for the same reason: a view you AIM from
+        // wants to be steady, so it comes off a fixed point. The slow baseline is kept, so the eye
+        // still follows a stance change or a genuine head turn.
+        double scale = character.isScoped() ? 0.0 : boneMotionScale;
+
+        Vector3 target = baseline.plus(dev.times((float) scale));
         smoothed = smoothed.lerp(target, weight(positionSmoothing, delta));
         return frame.toGlobal(smoothed);
     }

@@ -51,6 +51,10 @@ check("CONTROL: a zero cone is refused", stat("shot_rejected_spread_too_narrow")
 check("CONTROL: a reversed aim is refused", stat("shot_rejected_aim_diverged") == 1, f"aim_diverged={stat('shot_rejected_aim_diverged')}")
 check("CONTROL: a burst of 6 is cut by the fire budget", 3 <= stat("shot_rejected_too_fast") <= 5,
       f"too_fast={stat('shot_rejected_too_fast')}, accepted={stat('shot_accepted')} (= {pulls} honest + burst survivors)")
+check("2.8 item 9: the client's hits are confirmed to it by the host", int(cs.get("hit_confirmed_local", 0)) > 0,
+      f"hit_confirmed_local={cs.get('hit_confirmed_local')} (host target_damage={hs.get('target_damage')})")
+check("  ... and an observer gets none credited to itself", int(summary(obs).get("hit_confirmed_local", 1)) == 0,
+      f"observer hit_confirmed_local={summary(obs).get('hit_confirmed_local')}")
 check("nothing rate-limited", hs.get("drop_rate_limited") == "0", f"drop_rate_limited={hs.get('drop_rate_limited')}")
 both = [n for n in cp if n in hp]
 dirs_same = [n for n in both if hp[n][0] == cp[n][0]]

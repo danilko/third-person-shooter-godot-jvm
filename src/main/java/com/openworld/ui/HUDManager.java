@@ -116,6 +116,9 @@ public class HUDManager extends CanvasLayer {
   private WeaponSlotsUI   weaponSlotsUI;
   private DamageIndicator damageIndicator;
   private WeaponProgress  weaponProgress;
+  private ScopeOverlay    scopeOverlay;  // 2.7 — self-gated sniper optic
+  private AreaWarning     areaWarning;   // P0 0.6 — self-gated world-edge warning
+  private HitMarker       hitMarker;     // 2.8 item 9 — confirmed-hit marker
   private MinimapController minimap;     // I5 — always-on radar
   private WorldMapManager   worldMap;    // I5 — toggled full map
   private GpsArrow          gpsArrow;    // I5 — world-space waypoint arrow
@@ -232,6 +235,7 @@ public class HUDManager extends CanvasLayer {
 	  String name = child.getName().toString();
 	  if (name.equals("Feed") || name.equals("StatusFeed") || name.equals("Crosshair")
 		  || name.equals("WeaponRadialMenu") || name.equals("WeaponProgress")
+		  || name.equals("ScopeOverlay") || name.equals("AreaWarning") || name.equals("HitMarker")
 		  || name.equals("Minimap") || name.equals("WorldMap") || name.equals("GpsArrow")) continue;
 	  widgets.put(name, c);
 	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
@@ -241,6 +245,15 @@ public class HUDManager extends CanvasLayer {
 	// table-managed — cache it directly to wire its controller.
 	Node wp = getNodeOrNull("WeaponProgress");
 	if (wp instanceof WeaponProgress w) weaponProgress = w;
+	// ScopeOverlay is self-gated too, and deliberately so: the scope is not a SITUATION (it comes
+	// and goes on the aim button and on every interruption that ends it), so the table could only
+	// hold a stale answer. It polls WeaponController.isScoped() like WeaponProgress polls the
+	// reload timer.
+	Node so = getNodeOrNull("ScopeOverlay");
+	if (so instanceof ScopeOverlay s2) scopeOverlay = s2;
+	// AreaWarning: the world edge's warning band (WorldBounds), event-driven and self-gated.
+	if (getNodeOrNull("AreaWarning") instanceof AreaWarning aw) areaWarning = aw;
+	if (getNodeOrNull("HitMarker") instanceof HitMarker hm) hitMarker = hm;
 	// I5 navigation widgets — always-on / self-toggled, not table-managed (like WeaponProgress).
 	Node mm = getNodeOrNull("Minimap");
 	if (mm instanceof MinimapController m) minimap = m;
@@ -407,6 +420,15 @@ public class HUDManager extends CanvasLayer {
 	}
 	if (weaponProgress != null && newPlayer instanceof Character c) {
 	  weaponProgress.wireCharacter(c);
+	}
+	if (scopeOverlay != null && newPlayer instanceof Character c) {
+	  scopeOverlay.wireCharacter(c);
+	}
+	if (areaWarning != null && newPlayer instanceof Character c) {
+	  areaWarning.wireCharacter(c);
+	}
+	if (hitMarker != null && newPlayer instanceof Character c) {
+	  hitMarker.wireCharacter(c);
 	}
 	// The reticle follows this character's SEATED aim point. It self-gates on
 	// Character.isSeatedAimAnchored(), so on foot this reference changes nothing.

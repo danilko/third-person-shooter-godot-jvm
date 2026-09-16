@@ -29,6 +29,13 @@ public class ControlRotation {
     public double pitch       = 0.0;
     public double recoilPitch = 0.0;
     public double recoilYaw   = 0.0;
+    /**
+     * The scope's drift, degrees, added beside the recoil offset by both rigs and likewise never
+     * written into {@link #yaw}/{@link #pitch} (the mouse intent). Owned by {@link ScopeSway} through
+     * {@code Character.tickScopeSway}; zero whenever nothing scoped is up (PLAN.md 2.7 piece 2).
+     */
+    public double swayPitch   = 0.0;
+    public double swayYaw     = 0.0;
     public double pitchMin    = -75.0;
     public double pitchMax    =  55.0;
 }

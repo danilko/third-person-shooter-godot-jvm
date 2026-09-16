@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://b4prneetdkcsn"]
 
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/AR4.tres" id="90_stats"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FirearmItem.java" id="1_fu3cl"]
 [ext_resource type="Texture2D" uid="uid://xfaneftulo6j" path="res://assets/ui/AR4.png" id="2_fu3cl"]
 [ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="3_gt4sh"]
@@ -15,28 +16,15 @@ size = Vector3(0.5, 0.5, 1.08)
 
 [node name="AR4" type="Node3D" unique_id=1788483088]
 script = ExtResource("1_fu3cl")
+stats = ExtResource("90_stats")
 weapon_id = "AR4"
 weapon_name = "AR-4"
-weapon_pose_index = 1
+weapon_archetype = "rifle"
 weapon_icon = ExtResource("2_fu3cl")
 hold_socket = "SocketRifle"
 holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
-spread = 0.01
-bloom_per_shot = 0.05
-bloom_decay_speed = 0.3
-reload_speed = 0.4
-switch_speed = 2.2
-fire_rate = 10.0
 magazine = 30
-magazine_size = 30
 reserve = 60
-reserve_max = 60
-recoil = 1.0
-kick_back = 0.020
-kick_pitch = 2.5
-kick_spring = 22.0
-kick_damping = 1.0
-damage = 20.0
 fire_audio = ExtResource("3_gt4sh")
 reload_audio = ExtResource("4_bxm8d")
 require_interact = true

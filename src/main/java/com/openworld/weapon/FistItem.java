@@ -16,7 +16,7 @@ public class FistItem extends MeleeItem {
     weaponId        = "fist";
     weaponName      = "Fist";
     slotType        = WeaponSlotType.FIST.ordinal();
-    weaponPoseIndex = 0;
+    weaponArchetype = "fist";
     isDroppable    = false;
     isInfiniteAmmo = true;
     switchSpeed    = 1.5f;

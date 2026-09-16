@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://bb60nshfmm7so"]
 
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/PI52.tres" id="90_stats"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FirearmItem.java" id="1_wa52e"]
 [ext_resource type="Texture2D" uid="uid://km3ugbyo5fy8" path="res://assets/ui/PI52.png" id="2_4tcni"]
 [ext_resource type="AudioStream" uid="uid://c0v8ncowcuy0l" path="res://assets/audio/Pistol_fire.wav" id="3_t6cmh"]
@@ -16,30 +17,15 @@ size = Vector3(0.5, 0.5, 0.5)
 [node name="PI52" type="Node3D" unique_id=358619058]
 transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
 script = ExtResource("1_wa52e")
+stats = ExtResource("90_stats")
 weapon_id = "PI52"
 weapon_name = "PI-52"
 slot_type = 1
 weapon_icon = ExtResource("2_4tcni")
 hold_socket = "SocketPistol"
 holster_sockets = PackedStringArray("ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2", "ShortWeaponHolsterMaker3", "ShortWeaponHolsterMaker4")
-spread = 0.05
-bloom_per_shot = 0.05
-bloom_decay_speed = 2.0
-bloom_max = 0.2
-reload_speed = 0.5
-switch_speed = 2.2
-fire_rate = 6.0
-auto = false
 magazine = 15
-magazine_size = 15
 reserve = 30
-reserve_max = 30
-recoil = 0.5
-kick_back = 0.012
-kick_pitch = 3.0
-kick_spring = 26.0
-kick_damping = 1.0
-damage = 10.0
 fire_audio = ExtResource("3_t6cmh")
 reload_audio = ExtResource("4_l5qg7")
 require_interact = true

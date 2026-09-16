@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://02yvfqf1pq5u"]
 
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/Fist.tres" id="90_stats"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/MeleeAttackStep.java" id="step_script"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FistItem.java" id="1_fist"]
 
@@ -29,6 +30,7 @@ camera_kick = 1.2
 
 [node name="Fist" type="Node3D" unique_id=100001001]
 script = ExtResource("1_fist")
+stats = ExtResource("90_stats")
 attack_steps = Array[ExtResource("step_script")]([SubResource("MeleeAttackStep_Fist_0"), SubResource("MeleeAttackStep_Fist_1")])
-weapon_pose_index = 5
+weapon_archetype = "fist"
 

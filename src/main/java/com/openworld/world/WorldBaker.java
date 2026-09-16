@@ -653,7 +653,7 @@ public class WorldBaker extends Node {
         Vector3 size = metaVec3(empty, "size", new Vector3(4032f, 4000f, 4032f));
         bounds.setHalfExtent((float) (Math.min(size.getX(), size.getZ()) * 0.5));
         bounds.setFloorY(metaFloat(empty, "floor", -64f));
-        bounds.setSoftMargin(metaFloat(empty, "soft_margin", 80f));
+        bounds.setWarnMargin(metaFloat(empty, "warn_margin", 80f));
         root.addChild(bounds);
         bounds.setGlobalPosition(empty.getGlobalPosition());
     }

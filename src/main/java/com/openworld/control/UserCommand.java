@@ -28,6 +28,25 @@ public class UserCommand {
     // ── Combat ────────────────────────────────────────────────────────────────
     public boolean wantCombat;
 
+    /**
+     * Raw "looking down the sights" intent for this tick — the aim button HELD, nothing else.
+     *
+     * <p>Deliberately NOT {@link #wantCombat}, which is a wider thing: it is also set by firing, by
+     * the aim-stay timer, and unconditionally in first person. The scope is the one consumer that
+     * needs the button itself, because a scoped rifle carried in FPS must not be permanently scoped.
+     * What it is allowed to mean is decided downstream — {@code WeaponController.isScoped()} asks the
+     * held weapon whether it has a scope at all, and {@code Character.isScoped()} refuses while dead
+     * or riding — so this stays a plain intent and every way out of the scope is a derivation rather
+     * than a call site somebody has to remember (PLAN.md 2.7 piece 1).
+     */
+    public boolean wantScope;
+
+    /**
+     * Hold-breath input, raw — the key held. Only means anything while scoped, and whether a hold is
+     * running is {@code camera.ScopeSway}'s to decide (it needs a fresh press and breath to spend).
+     */
+    public boolean holdBreath;
+
     // ── Weapon actions ────────────────────────────────────────────────────────
     public boolean fire;
     public boolean reload;
@@ -80,6 +99,8 @@ public class UserCommand {
         movementDirection = new Vector3();
         movementType      = MovementType.IDLE;
         wantCombat        = false;
+        wantScope         = false;
+        holdBreath        = false;
         fire              = false;
         reload            = false;
         drop              = false;
@@ -109,6 +130,8 @@ public class UserCommand {
                 movementDirection.getZ());
         c.movementType    = movementType;
         c.wantCombat      = wantCombat;
+        c.wantScope       = wantScope;
+        c.holdBreath      = holdBreath;
         c.fire            = fire;
         c.reload          = reload;
         c.drop            = drop;

@@ -424,7 +424,7 @@ public class MeleeItem extends WeaponItem {
   private void connect(ImpactManager im, HitInfo info, MeleeAttackStep st, boolean authoritative, boolean feel) {
     if (authoritative) {
       im.processHit(info, st.damage, getDisplayName(), weaponIcon,
-          resolveAttackerName(), resolveAttackerFaction(), resolveAttackerPosition());
+          resolveAttackerName(), resolveAttackerFaction(), resolveAttackerPosition(), resolveAttackerId());
     } else {
       im.processVisualHit(info);
       com.openworld.net.NetStats.increment("melee_predicted_hits");   // a client's own prediction (N2)

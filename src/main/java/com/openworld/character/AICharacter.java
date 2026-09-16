@@ -126,6 +126,10 @@ public class AICharacter extends Character {
     /** Current LOD tier — read by AIController (FSM gating) and AnimationController (pose gating). */
     public AILodLevel getLodLevel() { return lodLevel; }
 
+    /** {@link #getLodLevel()} ordinal (0 ACTIVE, 1 PASSIVE, 2 FROZEN) for headless checks. */
+    @Register
+    public int lodLevelNow() { return lodLevel.ordinal(); }
+
     /** Back-compat shorthand: kept so existing FROZEN-only callers keep working. */
     public boolean isLodFrozen() { return lodLevel == AILodLevel.FROZEN; }
 

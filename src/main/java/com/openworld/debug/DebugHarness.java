@@ -148,8 +148,17 @@ public class DebugHarness extends Node {
         } else if (iek.getKeycode() == Key.F1) {
             teleportToNextZone();
         } else if (iek.getKeycode() == Key.F2) {
-            dropWeaponHere();
+            // Shift+F2 = toggle the world edge's debug planes (wall red, warning band yellow).
+            if (iek.isShiftPressed()) toggleBoundsVolume(); else dropWeaponHere();
         }
+    }
+
+    /** Shift+F2 — show/hide {@code WorldBounds}' wall and warning-band planes (PLAN.md P0 0.6). */
+    private void toggleBoundsVolume() {
+        com.openworld.world.WorldBounds wb = com.openworld.world.WorldBounds.get();
+        if (wb == null) { GD.print("DebugHarness: no WorldBounds in this scene"); return; }
+        wb.setShowDebugVolume(!wb.showDebugVolume);
+        GD.print("DebugHarness: world bounds debug volume " + (wb.showDebugVolume ? "on" : "off"));
     }
 
     /**
@@ -529,15 +538,36 @@ public class DebugHarness extends Node {
             }
             else if ("--dump-collision".equals(arg)) { dumpCollisionDelay = 3.0; }
             else if ("--spawn-all-routes".equals(arg)) { spawnRoutesDelay = 3.0; }
+            else if ("--net=host".equals(arg)) { netAction = "host"; netDelay = 2.0; }
+            else if ("--net=join".equals(arg)) { netAction = "join"; netDelay = 2.0; }
+            else if ("--net-diag".equals(arg)) { NetworkManager.NET_DEBUG_VEHICLES = true; }
+            else if (arg.startsWith("--hold-action=")) { holdAction = arg.substring("--hold-action=".length()); }
         }
-        setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0);
+        setPhysicsProcess(autoWalk || dumpCollisionDelay > 0.0 || spawnRoutesDelay > 0.0 || netDelay > 0.0 || holdAction != null);
         if (autoWalk) GD.print("DebugHarness: auto-walk enabled — touring every zone marker in zoneId order"
                 + (autoWalkStartFilter != null ? ", starting at first match of '" + autoWalkStartFilter + "'" : ""));
     }
 
+    /** {@code -- --net=host|join}: press F6/F7 ~2 s after ready (headless co-op runs, PLAN.md P0 0.5). */
+    private String netAction = null;
+    private double netDelay = 0.0;
+    /** {@code -- --hold-action=<action>}: hold an input action from 6 s after ready (a real walk, not the auto-walk drag). */
+    private String holdAction = null;
+    private double holdDelay = 6.0;
+
     @Register
     @Override
     public void _physicsProcess(double delta) {
+        if (holdAction != null) {
+            holdDelay -= delta;
+            if (holdDelay <= 0.0) godot.api.Input.actionPress(new StringName(holdAction));
+        }
+        if (netDelay > 0.0) {
+            netDelay -= delta;
+            if (netDelay <= 0.0) {
+                if ("host".equals(netAction)) hostDebugServer(); else joinDebugServer();
+            }
+        }
         if (dumpCollisionDelay > 0.0) {
             dumpCollisionDelay -= delta;
             if (dumpCollisionDelay <= 0.0) {
@@ -561,7 +591,8 @@ public class DebugHarness extends Node {
 
         Player player = null;
         for (Player p : PlayerRegistry.getPlayers()) {
-            if (GD.isInstanceValid(p)) { player = p; break; }
+            // The LOCAL player: on a networked client the registry also holds the host's puppet.
+            if (GD.isInstanceValid(p) && p.isLocalOwnedPlayer()) { player = p; break; }
         }
         if (player == null) return;
 

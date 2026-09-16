@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://bk5bkbssdlaa4"]
 
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/T1.tres" id="90_stats"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/ThrowableItem.java" id="1_ti"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/T1Projectile.tscn" id="2_proj"]
 
@@ -15,16 +16,15 @@ size = Vector3(0.064, 0.064, 0.09)
 [node name="T1" type="Node3D" unique_id=507572094]
 world_body_continuous_cd = true
 script = ExtResource("1_ti")
-weapon_pose_index = 8
+stats = ExtResource("90_stats")
+weapon_archetype = "throwable"
 projectile_scene = ExtResource("2_proj")
 explosion_radius = 10.0
 weapon_id = "T1"
 weapon_name = "T1 Grenade"
 slot_type = 3
 magazine = 1
-magazine_size = 6
 reserve = 0
-reserve_max = 0
 
 [node name="PickupArea" type="Area3D" parent="." unique_id=1787117722]
 collision_layer = 0

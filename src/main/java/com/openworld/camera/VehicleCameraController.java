@@ -228,7 +228,7 @@ public class VehicleCameraController extends Node3D {
         if (tpsSpringArm != null) baseSpringLength = tpsSpringArm.getLength();
         if (target instanceof CollisionObject3D co) {
             if (tpsSpringArm != null) tpsSpringArm.addExcludedObject(co.getRid());
-            if (aimRay != null)       aimRay.addException(co);
+            if (aimRay != null)       com.openworld.util.RayExclusions.add(aimRay, co);
         }
 
         setAsTopLevel(true);

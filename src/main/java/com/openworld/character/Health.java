@@ -78,6 +78,13 @@ public class Health extends Node {
     public void takeDamage(Node hitNode, float baseDamage, String weaponName,
                            Texture2D weaponIcon, String attackerName, String attackerFaction,
                            Vector3 attackerPos) {
+        takeDamage(hitNode, baseDamage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos, "");
+    }
+
+    /** @param attackerId the attacker's characterId ("" unknown) — only the hit marker reads it. */
+    public void takeDamage(Node hitNode, float baseDamage, String weaponName,
+                           Texture2D weaponIcon, String attackerName, String attackerFaction,
+                           Vector3 attackerPos, String attackerId) {
         if (currentHealth <= 0) return;
 
         boolean headshot = (hitNode instanceof PhysicalBone3D)
@@ -102,7 +109,7 @@ public class Health extends Node {
             }
         }
 
-        applyDamage(damage, headshot, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos);
+        applyDamage(damage, headshot, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos, attackerId);
     }
 
     /**
@@ -135,18 +142,20 @@ public class Health extends Node {
     public void applyNetworkDamage(float finalDamage, boolean headshot, String weaponName,
             String attackerName, String attackerFaction, Vector3 attackerPos) {
         if (currentHealth <= 0) return;
-        applyDamage(finalDamage, headshot, weaponName, null, attackerName, attackerFaction, attackerPos);
+        applyDamage(finalDamage, headshot, weaponName, null, attackerName, attackerFaction, attackerPos, "");
     }
 
     private void applyDamage(float damage, boolean headshot, String weaponName, Texture2D weaponIcon,
-                             String attackerName, String attackerFaction, Vector3 attackerPos) {
+                             String attackerName, String attackerFaction, Vector3 attackerPos, String attackerId) {
         currentHealth = Math.max(0.0f, currentHealth - damage);
         hit.emit(damage);
         emitCharacterHealthChanged();
         emitDamagedFrom(attackerPos);
+        boolean killed = currentHealth <= 0;
+        emitDamageDealt(attackerId, damage, headshot, killed);
         // Server is the single site that broadcasts the per-hit cue + attacker source to clients
         // (covers host-originated AND client-relayed damage; the relay path flows through here too).
-        maybeBroadcastDamageCue(damage, attackerPos);
+        maybeBroadcastDamageCue(damage, attackerPos, attackerId, headshot, killed);
         if (currentHealth <= 0) {
             Node busNode = getNodeOrNull("/root/EventBus");
             if (busNode instanceof EventBus bus) {
@@ -189,15 +198,29 @@ public class Health extends Node {
      * to clients. The victim may be a Character or a Vehicle — both are Controllable with CharacterInfo.
      * Non-networked / client peers no-op (clients receive the cue via handleDamageBroadcastMessage).
      */
-    private void maybeBroadcastDamageCue(float damage, Vector3 attackerPos) {
+    private void maybeBroadcastDamageCue(float damage, Vector3 attackerPos, String attackerId, boolean headshot,
+                                         boolean killed) {
         Node owner = getOwner();
         if (!(owner instanceof Controllable ctrl) || ctrl.getCharacterInfo() == null) return;
         String id = ctrl.getCharacterInfo().characterId;
         if (id == null || id.isEmpty()) return;
         Node netNode = getNodeOrNull("/root/NetworkManager");
         if (netNode instanceof NetworkManager net && net.isNetworked() && net.isServer()) {
-            net.broadcastDamage(id, damage, attackerPos != null, attackerPos);
+            net.broadcastDamage(id, damage, attackerPos != null, attackerPos, attackerId, headshot, killed);
         }
+    }
+
+    /**
+     * Emit {@code EventBus.damageDealt} for the hit marker (PLAN.md 2.8 item 9) on the peer that applied the
+     * damage. Skipped for an unknown attacker and for damage a body did to itself (a fall names no one).
+     */
+    private void emitDamageDealt(String attackerId, float damage, boolean headshot, boolean killed) {
+        if (attackerId == null || attackerId.isEmpty()) return;
+        Node owner = getOwner();
+        if (owner instanceof Controllable c && c.getCharacterInfo() != null
+                && attackerId.equals(c.getCharacterInfo().characterId)) return;
+        Node busNode = getNodeOrNull("/root/EventBus");
+        if (busNode instanceof EventBus bus) bus.damageDealt.emit(attackerId, damage, headshot, killed);
     }
 
     /**

@@ -162,6 +162,7 @@ public class GameManager extends Node {
     @Override
     public void _exitTree() {
         IconRegistry.clear();
+        com.openworld.util.RayExclusions.clear();
         WaypointStore.clearAll();   // I5 — hygiene + clean restart (Vector3 values, but clear anyway)
     }
 
@@ -427,6 +428,17 @@ public class GameManager extends Node {
                     (float) pos.getX() + GD.randfRange(-4.0f, 4.0f),
                     (float) pos.getY(),
                     (float) pos.getZ() + GD.randfRange(-4.0f, 4.0f));
+        }
+        // No marker: beside the host's own player, which by construction stands somewhere playable
+        // (PLAN.md P0 0.5 — DebugWorld had no PlayerSpawn, and its origin is the sea between two
+        // islands, so every joiner was dropped into the water far from the host).
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (p == null || !GD.isInstanceValid(p) || !p.isInsideTree() || !p.isLocalOwnedPlayer()) continue;
+            Vector3 pos = p.getGlobalPosition();
+            double a = GD.randfRange(0.0f, (float) (Math.PI * 2.0));
+            double r = GD.randfRange(3.0f, 5.0f);
+            return new Vector3((float) (pos.getX() + Math.cos(a) * r), (float) pos.getY() + 1f,
+                    (float) (pos.getZ() + Math.sin(a) * r));
         }
         return new Vector3(
                 GD.randfRange(-12.0f, 18.0f),

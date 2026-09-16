@@ -1,0 +1,15 @@
+{
+  "note": "THE weapon list (PLAN.md 2.8 item 7). Every weapon scene in the game is one row; the tools, the probes and AimDebugHost's bench read this instead of keeping their own lists. `archetype` is the GRIP ARCHETYPE by NAME (item 8) and must equal the scene's `weapon_archetype`; the index is derived at load (weapon.GripArchetype, append-only in blender/tools/weapon_archetypes.json). Per-model size data stays in blender/tools/weapon_models.json, keyed by these ids. `bench` = offered by AimDebugHost's shooting bench. Held to all of that by WeaponCatalogTest.",
+  "weapons": [
+    {"id": "Fist",  "scene": "res://src/main/resources/com/openworld/weapon/Fist.tscn",  "archetype": "fist",      "bench": false},
+    {"id": "AR4",   "scene": "res://src/main/resources/com/openworld/weapon/AR4.tscn",   "archetype": "rifle",     "bench": true},
+    {"id": "AR212", "scene": "res://src/main/resources/com/openworld/weapon/AR212.tscn", "archetype": "rifle",     "bench": true},
+    {"id": "SG1",   "scene": "res://src/main/resources/com/openworld/weapon/SG1.tscn",   "archetype": "rifle",     "bench": true},
+    {"id": "SR3",   "scene": "res://src/main/resources/com/openworld/weapon/SR3.tscn",   "archetype": "sniper",    "bench": true},
+    {"id": "PI52",  "scene": "res://src/main/resources/com/openworld/weapon/PI52.tscn",  "archetype": "pistol",    "bench": true},
+    {"id": "ATL4",  "scene": "res://src/main/resources/com/openworld/weapon/ATL4.tscn",  "archetype": "launcher",  "bench": true},
+    {"id": "T1",    "scene": "res://src/main/resources/com/openworld/weapon/T1.tscn",    "archetype": "throwable", "bench": true},
+    {"id": "MW1",   "scene": "res://src/main/resources/com/openworld/weapon/MW1.tscn",   "archetype": "melee",     "bench": true},
+    {"id": "MW2",   "scene": "res://src/main/resources/com/openworld/weapon/MW2.tscn",   "archetype": "melee",     "bench": true}
+  ]
+}

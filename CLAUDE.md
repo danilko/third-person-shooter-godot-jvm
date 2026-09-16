@@ -472,7 +472,7 @@ ArtDeck now falls through, same as any other gap in authored ground — see
 > written; `SwimState` and the buoyancy spring had been complete since I1.
 >
 > **The world edge is a LOGIC WALL, not an invisible collider** — `world.WorldBounds`, baked from a
-> `bounds_<id>` marker. Soft inward push inside `softMargin`, hard position clamp past the edge with
+> `bounds_<id>` marker. A warning band inside `warnMargin` (no physics), hard position clamp past the edge with
 > only the OUTWARD velocity component cancelled (so swimming home is unresisted), and a `floorY`
 > kill-Z that puts a body back at `PlayerSpawn`. A collider would also stop bullets, ragdolls and
 > vehicles, would give a body sliding along it no "leaving the area" moment, and — the deciding one —
@@ -482,7 +482,28 @@ ArtDeck now falls through, same as any other gap in authored ground — see
 > tightest heading and 498 m at the median, over 1 km only on the diagonals. Both extremes were
 > walk-tested: the wall AT the world square read as a fence 700 m offshore, and a floor out at
 > the ±3800 m budget read as 2.0 km of empty ocean. 3.5 km is not available — the land's own
-> bounding box is 3.72 × 3.94 km, because the offshore airport reaches y = −1976 m. The *accurate*
+> bounding box is 3.72 × 3.94 km, because the offshore airport reaches y = −1976 m.
+> **ONE physical rule, the hard wall; the band only WARNS** (2026-09-16, PLAN.md P0 0.3 then 0.6).
+> User-reported as "an invisible collision block on DebugWorld's loop_p005 corner": `confine` used to
+> cancel the outward velocity whenever ANY correction was non-zero, so the soft band's INNER edge was
+> a wall with no shape for debug drawing to show (a player stalled at z -363.8, a driven car at
+> -356.8). 0.3 made the band a nudge; 0.6 (user decision: "remove the soft push entirely, only warn")
+> DELETED it — `softMargin`/`pushSpeed` and the RigidBody3D velocity bias are gone, because a physical
+> push nobody can see is indistinguishable from a bug. Past `halfExtent` the position is clamped and
+> only the outward velocity cancelled; nothing inside the wall is ever moved. `warnMargin` (80 m;
+> DebugWorld 40) raises `EventBus.leavingArea(distanceToWall)` / `returnedToArea` on the EDGE for each
+> locally-owned player, and `ui.AreaWarning` (self-gated, not in `BASE_LAYOUT`) shows "LEAVING THE
+> AREA" with the distance and a red vignette deepening toward the wall. Local per peer, no message.
+> `WorldBounds.showDebugVolume` (on in DebugWorld; DebugHarness **Shift+F2** toggles it) draws the wall
+> red and the band's inner edge yellow; `debugLog` prints each hard correction (throttled per body)
+> and the warning edges. `WorldBounds.get()` + `distanceToWall(pos)` are the one owner of "how far is
+> the edge". `tools/godot/check_world_envelope.gd` asserts every Road Kit station + 18 m of paving
+> clears the warning band. Gate **`tools/godot/probe_world_bounds.gd`** 16/16: a Player, an
+> engine-driven RigidBody3D and a swept CharacterBody3D keep their FULL speed right up to the wall and
+> are turned back at it, `leaving_area` fires once (for the player only) and `returned_to_area` once
+> on walking back, and the HUD warning shows and hides; `-- --control` (a velocity cancel in the band)
+> fails 5. `HandlingTest.tscn`'s three wall cases unchanged.
+> The *accurate*
 per-district ground is PLATEAU terrain: originally imported via `extract_plateau.py --dem`
 (CityGML `dem:TINRelief`) → `plateau_import.import_terrain`, which built a real sloped ground mesh
 (visual + collision) and draped roads onto it — districts extracted without `--dem` have no
@@ -1471,15 +1492,27 @@ is `1 / fire_rate`, and nothing reloads while the magazine still has rounds.
 
 ### Spread formula (FirearmItem)
 
+**One owner: engine-free `weapon.Accuracy`** (PLAN.md 2.8 item 3, `AccuracyTest` 10 cases). The live
+cone, the host's N1 floor (`minimum`), the crosshair fraction and bloom decay/add all come from it, so
+none of them can drift from the shot.
+
 ```
-totalSpreadDeg = (spread + currentBloom + speed_m_s × 0.03) × stanceMultiplier
+coneDeg = (spread + bloom + movementPenalty(horizontalSpeed, maxSpeed)) × posture × (aimed ? 1 : hipfire)
+movementPenalty = 0                                       below standingSpeedFraction × maxSpeed (0.34, CS)
+                = 0.03 × maxSpeed × (v − thr)/(max − thr)  ramping to the full term at max speed
+                = 0.03 × v                                 at or past max (a slide, a fall)
 ```
 
-Stance multipliers: UPRIGHT 1.0×, CROUCH 0.7×, CRAWL 0.5×, airborne 2.0×.
-The multiplier applies to the **entire** expression — crouching reduces both the base
-accuracy penalty and the movement penalty proportionally.
+Posture multipliers: UPRIGHT 1.0×, CROUCH 0.7×, CRAWL 0.5×, SWIM 1.8×, AIRBORNE 2.0×, applied to the
+**entire** expression. `maxSpeed` is `Character.maxMoveSpeed()` — the stance's sprint speed × the combat
+speed factor × a raised scope's `moveSpeedFactor` — so a scoped slowdown lowers the threshold with it.
+Speed is HORIZONTAL: a body standing on a slope carries floor-snap vertical velocity that is not
+movement. `hipfireSpreadMultiplier` (FirearmItem, default 1; SR3 8) widens only the LIVE cone — the host
+floor cannot see the client's aim state. The threshold is `FirearmItem.standingSpeedFraction`.
 
-Bloom accumulation: `currentBloom += bloomPerShot` on each shot; decays at `bloomDecaySpeed`
+Bloom accumulation: `currentBloom += bloomPerShot` on each shot, **added AFTER the shot resolves**
+(it is what this shot does to the next one; added first, it put every weapon's per-shot bloom on its
+own first round — W31); decays at `bloomDecaySpeed`
 deg/s every physics frame. Key relationship: if `bloomDecaySpeed < bloomPerShot × fireRate`
 bloom accumulates during sustained fire; if greater, each shot clears before the next (semi-auto).
 
@@ -1545,6 +1578,9 @@ the bullet still converges exactly on the crosshair, so aiming is unchanged.
 
 Details that matter:
 
+- **A SCOPED shot is one leg, from the scope** (W31, user decision). A raised scope
+  (`Character.isScopeRaised()`) is behind the shooter's own eye, so the reason for the second leg is
+  gone; `FirearmItem.useMuzzleTrace` is false and the shot is the camera ray itself.
 - **The hug-the-wall bypass is closed.** `resolveShotOrigin` first traces the shooter's chest → its
   own muzzle; if *that* is blocked the barrel has clipped through geometry and the shot origin falls
   back to the chest, so the wall is still hit. Without it, pressing against cover puts the muzzle on
@@ -1707,6 +1743,36 @@ saw and the damage applied could disagree.
   rocket loses that rocket.
   `resolveSightPoint` and `trace` live on `WeaponItem` for that reason: a firearm and a melee weapon
   must not come to disagree about where an attack is aimed or what may block it.
+
+### Co-op in DebugWorld — the client's limiter and the joiner's spawn (PLAN.md P0 0.5, 2026-09-16)
+
+User: "co-op stopped working in debug world". Two defects, both reproduced on the REAL scene and each
+with a control:
+- **The client rate-limited the HOST.** `onPacketReceived`'s token bucket (70/s, burst 60) is a guard
+  against a flooding CLIENT, but it ran on every peer, so a client throttled the authoritative stream
+  it joined. The host's frame count grows with the world: once both DebugWorld zones stream (~20
+  characters) every snapshot splits into several MTU frames (`snapshot_batch_split`), and the client
+  dropped **~20 packets a second** (400 in 30 s) — snapshots, spawns and damage alike. The limiter is
+  now host-side only (`amServer`). The test hosts never streamed enough characters to cross it.
+- **A joiner spawned in the sea.** DebugWorld had no `PlayerSpawn` marker, so
+  `GameManager.jitteredSpawnPosition` fell back to a box around the world origin, which in DebugWorld
+  is the water gap between the islands (the client appeared at y −0.7, 250 m from the host). DebugWorld
+  has a `PlayerSpawn` now, and the fallback with no marker is 3–5 m beside the host's own player (which
+  stands somewhere playable by construction), with the origin box only as the last resort.
+- Also: `WeaponProgress` threw "previously freed instance" for the frames between a client freeing its
+  pre-placed Player and the HUD re-wiring (guarded), and `DebugHarness`'s auto-walk dragged the first
+  registered Player, which on a client is the host's puppet (now the locally owned one).
+
+`DebugHarness` gained headless co-op flags: `-- --net=host|join` (F6/F7 two seconds after ready),
+`--net-diag` (`NetworkManager.NET_DEBUG_VEHICLES`, the per-peer character/vehicle dump every 2 s) and
+`--hold-action=<action>` (holds a real input action from 6 s, a walk rather than the auto-walk drag).
+Gate **`tools/net/run_net_debugworld.sh`** 15/15: phase *walk* (both players hold a movement action —
+no drops, no JVM exception, the joiner at `PlayerSpawn` on the ground, each walk seen on the other peer)
+and phase *tour* (the client auto-walks both zones — the host streams `debug_a` + `debug_b`, no drops).
+Controls: the limiter back on the client → *tour* 400 drops; no marker and no host-relative fallback →
+the joiner 247 m away at y −0.7. Trap: a `SceneTree` `--script` that `change_scene_to_file`s DebugWorld
+and presses F6/F7 through `push_input` hosted and "connected" but no ENet event ever arrived on either
+side (not explained); run the scene as the main scene with the harness flags instead.
 
 ### Hit detection, damage, and impact VFX
 
@@ -3884,7 +3950,9 @@ Gates: `probe_weapon_scale` (1.124 m, 0.0% out, instanced at identity, muzzle on
 pocket **0.000 m**, support grip **0.012 m**, gun on the aim line) and `probe_weapon_holster` (poke
 **0.000 m**, the only weapon with no hitbox contact at all) all PASS, on both bodies.
 
-**`weapon.SniperItem` is the type, and a new `WeaponType` VALUE would have been the wrong way to get
+**Superseded by W32: `SniperItem` is folded into `FirearmItem` + a `ScopeConfig`.** The argument
+against a new `WeaponType` value below still stands; the subclass itself turned out to be only data.
+**`weapon.SniperItem` WAS the type, and a new `WeaponType` VALUE would have been the wrong way to get
 one** (user-asked). `WeaponType` is a coarse behaviour category — RANGED / THROWN / MELEE — and the
 code tests it with `== WeaponType.MELEE` / `== RANGED` in `AICharacter` and in `Character`'s combat
 entry, so a fourth value would make every one of those tests silently miss a sniper rifle. A sniper
@@ -3928,6 +3996,287 @@ CHARACTER's bone table, not the weapon, so the fix if it matters is a per-bone
 `MeshConfig.boneHitMultipliers` entry (arms ≤ 0.66), never a lower weapon damage — lowering the
 damage would take the torso one-shot away with it. 5 + 20 rounds, and it auto-reloads on empty like
 every other magazine weapon (see "Auto-reload on empty").
+
+### W29 — THE SCOPE IS A DERIVED VIEW, NOT A SECOND COPY OF THE PREFERENCE (2026-09-16, PLAN.md 2.7 piece 1)
+
+**Decided by the user: a scoped shot is FIRST PERSON, and both view modes converge on it** — a TPS
+player scoping sees exactly what an FPS player sees. That is the industry default (CS, PUBG), it
+means there is only ONE scoped view to build and gate, and it avoids the disagreement W7/W21 spent
+two rounds closing: a zoomed third person puts the reticle and the bore in different places. The
+codebase already had the hard part — W5's filtered bone-mounted FPS rig and
+`Character.refreshHeadVisibility`'s derived "is the camera behind THIS character's eyes", which a
+scope answers yes to.
+
+**The trap the decision creates is W6's, and it is the whole of this change.** The obvious
+implementation writes `Character.isFpsMode` when the scope goes up and writes it back when it comes
+down. That cannot survive an interruption BETWEEN the two writes — a death, a weapon switch, a
+dropped gun, a car door — and the player is left stuck in first person with no way out. So:
+
+- **`UserCommand.wantScope`** is the raw intent (the aim button HELD), deliberately not `wantCombat`,
+  which is also set by firing, by the aim-stay timer, and **unconditionally in first person** — a
+  scoped rifle merely carried in FPS would otherwise be permanently scoped.
+- **`WeaponController.scopedNow()`** decides whether that intent means anything: the button, no
+  weapon transition in flight, and a held weapon that declares a scope at all.
+  **`Character.isScoped()`** adds the two conditions the weapon cannot see — dead, or in a seat.
+  Nothing is latched, so every way out of the scope is a CONSEQUENCE: the button released, the draw
+  animation of a switch, a weapon with no scope, no weapon, no pulse, a carrier.
+- **`Character.isFirstPersonView()` (`isFpsMode || isScoped()`) is the one question both rigs ask.**
+  `isFpsMode` stays the player's PREFERENCE and is never written by the scope, so releasing the
+  button returns the player to exactly the view they chose, with no second write to get wrong.
+  `TPSCameraController` and `FPSCameraController` read it in place of the preference, and
+  `refreshHeadVisibility` takes one more condition rather than a fourth latch.
+
+**A weapon has no scope unless it declares one.** `WeaponItem.scopedFovDegrees()` returns 0 by
+default and **0 IS "no scope"** — one fact, one owner, no separate flag to disagree with it;
+`scopeZoomSeconds()` is its transition. `SniperItem` supplies both (`scopedFov` 20°, ~3.75× against
+the ~75° hip FOV — the AWP's scope; `scopeZoomTime` 0.12 s). **The camera owns the view and the
+weapon owns the data**, the same split W13 makes for the weapon's own animation and W27 for its
+kick: `TPSCameraController.setCameraFov` stays the SINGLE writer of the shared `ActiveCamera`'s FOV
+and simply has a new highest-priority source. Only the TRANSITION is edge-driven (a tween is a
+one-shot), from `_physicsProcess`, which is the node that gets a frame in every mode.
+
+**The scoped eye admits NO bone motion.** `FPSCameraController` scales its filtered deviation to 0
+while scoped and keeps the slow baseline: through a 3.75× optic the leftover bob that reads as "a
+walk" unscoped reads as an unusable picture, and this rig sits inside a loop (bone → camera → aim
+target → `ShoulderAimModifier` → bone) whose gain rises with the zoom — W8.3 is what that looks like
+when it gets away. W11's cockpit mount took the same decision for the same reason: a view you AIM
+from comes off a steady point.
+
+**The optic is drawn, not authored.** `ui.ScopeOverlay` (a `Control` in `HUDManager.tscn`) draws the
+black surround as an **annulus of quads** — a filled polygon cannot have a hole — plus the glass rim,
+a mil-dot reticle and a centre dot, scaling to any resolution. A full-screen overlay rather than a
+`SubViewport` scope is exactly what the first-person decision buys: the camera is already behind the
+eye and already zoomed, so the glass shows what it renders and a render-to-texture scope would draw
+the world a second time for the same picture. It is **self-gated** (it polls `scopedNow()` like
+`WeaponProgress` polls the reload timer) and so is **not** in `HUDManager`'s `BASE_LAYOUT` table: a
+scope is not a SITUATION — it comes and goes on the aim button and on every interruption — so the
+table could only hold a stale answer. `Crosshair` hides itself on the same condition, for the same
+reason (`HUDManager.refreshCrosshair` is edge-driven off the combat state, which is not an edge
+that sees this).
+
+Gate **`tools/godot/probe_sniper_scope.gd`**, 25/25, six cases: TPS → scope → release (camera on the
+FPS rig and back, FOV **75.0 → 20.04 → 74.93** against a declared 20, head hidden and back, optic
+shown and gone, `is_fps_mode` FALSE throughout); FPS → scope → release (first person throughout,
+preference still TRUE, FOV back to its combat value); AR4 as the control (aiming moves the FOV to the
+ordinary combat 59.0 and scopes nothing); and **three interruptions with the aim button still HELD** —
+a weapon switch, sitting in a carrier, and death — each of which must leave the camera on the TPS
+boom with the preference intact. `-- --control` reproduces the refused preference-writing
+implementation: cases 1–3 still pass, and it **fails exactly the six interruption checks**, which is
+the argument for the derivation stated as a measurement.
+
+Two probe notes. The rig a frame is drawn from is **measured, not asked** — `ActiveCamera` is
+compared with the TPS boom's `Proxy` and the FPS rig's `Pivot`, ~3 m apart, so there is no ambiguity.
+And **the FOV baseline has to be taken after the camera has settled**: the aim-stay timer holds
+combat for 0.5 s past the button and the combat/movement tween is another 0.5 s, so a short settle
+reads the ordinary combat FOV and calls it a scope that did not zoom back (it cost two false
+failures before the settle was lengthened). The optic itself was verified by rendering it on a real
+display and looking at it — headless has no renderer, so a probe can only assert that it is on
+screen.
+
+**SR3's bolt and icon (2.7 pieces 6-7, 2026-09-16).** The bolt handle was island 3 of the one SR3 mesh
+(36 verts at the receiver, 5 cm out to the right); it is its own `Bolt` object in `SR3.blend` now (transforms
+applied, so `build_weapon.py` still accepts it) and `Model/Bolt` in the scene. `fire_animation = "bolt_cycle"`
+on a `WeaponAnimator` AnimationPlayer (W13 — plays on the owner and every puppet) lifts it 60° about the bore,
+draws it back 4 cm, runs it home and lowers it inside 0.9 s of the 1.46 s cycle. The throw is 4 cm, not an
+AWP's ~10: with only the handle split out (no bolt body), a longer throw floats it over the stock wrist —
+measured by rendering both poses. Gate `tools/godot/probe_sniper_bolt.gd` (60.0°, 0.039 m, home before the
+next shot; `--control` no motion). The icon `assets/ui/SR3.png` is rendered from the model by
+`blender/tools/render_weapon_icon.py` into AR4.png's white-silhouette frame.
+
+### W30 — THE SCOPE DRIFTS, A HELD BREATH STEADIES IT, AND HOLDING TOO LONG COSTS MORE (2026-09-16, PLAN.md 2.7 piece 2)
+
+**The drift is an OFFSET on the view, the same kind of thing as recoil.** `ControlRotation` gained
+`swayPitch`/`swayYaw`, added by both rigs beside `recoilPitch`/`recoilYaw` and, like them, never
+written into `yaw`/`pitch` — the mouse intent. So the player never fights the drift through the
+mouse, letting go of the scope leaves the aim exactly where they put it, and because the offset
+moves the camera it moves the `AimRay` that hangs off it: **the shot goes where the scope's centre
+is**. A drift drawn over a still aim would be a picture that lies about the bullet.
+
+**Engine-free `camera.ScopeSway` owns the rules** (unit-tested, `ScopeSwayTest` 11 cases):
+- **Shape:** two incommensurate sines per axis — a slow figure-eight with a faster, smaller wander on
+  top, so it cannot be timed by counting. Peak yaw is the weapon's amplitude, peak pitch 70% of it.
+- **A LEVEL eased toward a target, never switched** (`FOLLOW_RATE` 5/s): 0 unscoped, 1 scoped,
+  `HELD_LEVEL` 0.1 holding, `WINDED_LEVEL` 1.8 winded. The scope coming up starts the drift from rest
+  and going down lets it settle, so nothing steps.
+- **Breath is a 0..1 reserve.** Holding spends it over `holdSeconds`; running out winds the shooter
+  until it is back to `WINDED_CLEARS_AT` (0.5), otherwise it refills over `recoverSeconds`. Winded is
+  WORSE than never holding, which is what makes the breath a resource rather than a key you keep down.
+- **A hold needs a fresh PRESS.** The key kept down through a winded spell does not silently start a
+  second hold the moment it ends, and a key already down when the scope comes up is not a press.
+  (That second case is `observeInput`: the at-rest ticks are skipped, and they must still record the
+  key, or the first scoped tick reads a held Shift as a new press.)
+
+**Who owns what.** The weapon says how far it wanders (`WeaponItem.scopeSwayDegrees()`, 0 = does not
+sway; `SniperItem.scopeSway` 0.5 deg — 2.5% of a 20 deg picture). The breath is the BODY's
+(`Character.breathHoldSeconds` 4.0, `breathRecoverSeconds` 5.0, and the `ScopeSway` state) — the
+lungs are not the rifle's. So is the steadiness, a multiplier from the stance (upright 1.0, crouch
+0.6, crawl 0.35, airborne or swimming 2.0; the same ordering as `FirearmItem`'s stance spread with
+prone further apart). `Character.tickScopeSway` is called by `TPSCameraController._physicsProcess`
+beside the recoil decay, because that node gets a frame in every mode and the Character's own
+`_physicsProcess` does not (the driver's seat switches it off). Nothing is latched: every way out of
+the scope eases the level to 0. An unscoped body at rest returns before the steadiness read, which is
+an engine call (`isOnFloor`) not worth paying on every AI rig every frame.
+
+**SR3 ships with `scopeSway = 0`** (W31, user decision: a still, CS-style scope; 0.5 deg read as an idle
+bob that moved the shot). The mechanism stays opt-in per weapon, and its gate sets 0.5 on the pair.
+
+**Input:** `UserCommand.holdBreath` from a new `hold_breath` action, bound to Shift. That is the
+stealth-walk key too, which is CoD's binding and harmless: a shooter steadying a scope is not running.
+It is its own action so it can be rebound. No HUD for the breath yet — CoD and PUBG signal it with
+audio, and a breath sound is the natural next addition.
+
+**THE GATE IS PAIRED, because the drift is a wave.** Measured one window after another, "the drift was
+smaller while the breath was held" compares two different stretches of the same wave, and a quiet
+stretch reads as a working breath. `tools/godot/probe_scope_sway.gd` drives TWO Players from the same
+`Input` on the same frames, both scoping on the same frame, so their phase clocks are identical. They
+differ in one thing: A cannot hold its breath (`breath_hold_seconds` ~0 winds it for one tick and it
+recovers the next). Every breath assertion is a ratio B/A over the same frames, so the wave cancels.
+The first window, where neither holds, must read 1.00, which checks that the pairing is real. The
+drift is read off the CAMERA against a rest direction recorded before scoping (both in first person,
+so the rig does not change), never off the helper's numbers. **17/17:**
+- open peak yaw 0.491 / pitch 0.333 against 0.50 / 0.35, pair ratio **1.000**;
+- the aim target on the view line (0.0000 deg) AND on the wall 40 m out, **0.353 m** off the rest
+  line. The first alone is a tautology of `AimTarget` hanging off the camera;
+- held B/A **0.102**, breath 0.81 -> 0.31;
+- winded at **4.02 s** (declared 4.0), then B/A **1.793**;
+- no second hold with the key still down, a fresh press holds;
+- both views back on rest (0.0000 deg) after letting go of aim.
+
+`-- --control` (both rifles `scope_sway = 0`) fails 5.
+
+Unchanged: `probe_sniper_scope` 25/25, `probe_fps_camera`, `probe_self_hit`, `probe_vehicle_views`,
+`probe_driveby_aim`, `probe_recoil_kick`, `probe_auto_reload` PASS; AimDebugAuto 40/40; `World.tscn`
+0 errors; `./gradlew test` green.
+
+### W31 — A SNIPER SHOT GOES WHERE THE SCOPE IS; THE BOLT AND THE RELOAD LEAVE THE EYE (2026-09-16, user-reported)
+
+"Hit the enemy but it seems not hit, it dies later, or needs several shots — distance?" Measured with a
+new gate, **`tools/godot/probe_sniper_hits.gd`**: still AI at 30/60/120/260 m, the level scope line on
+the head, chest or belly, on the body or 0.40 m beside it, one shot each through real Input. Before:
+**12 of 24** on-body shots registered, several on the WRONG bone (scope on the head -> 112.5, on the
+chest -> 75, beside the head -> 600). Two causes, separated by controls:
+
+- **Bloom was added BEFORE the shot** (`FirearmItem.useWeapon`), so each round carried its own
+  per-shot bloom. SR3's is 0.6 deg, so every "0.005 deg" shot left a **0.605 deg** cone, ~0.6 m of
+  scatter at 120 m. AR4's is 0.05 deg, which is why no other gun showed it. It is added after
+  `fireShot()` now. Control (bloom first, everything else fixed): **4/24**.
+- **The muzzle leg at long range.** With bloom fixed and the two-stage trace kept for scoped shots:
+  **22/24**, both misses at 260 m landing a bone low. A scoped shot is now ONE leg from the scope
+  (`FirearmItem.useMuzzleTrace` refuses while `Character.isScopeRaised()`; user decision, CS/PUBG).
+  The eye is inside the head, so cover still blocks it, and the host re-runs its chest-to-origin cover
+  test on the reported eye.
+
+After both: **24/24 on the right bone, 12/12 beside the body clean misses**, stable across runs. The
+gate zeroes SR3's base spread so a scope line on a bone boundary is not a coin toss on the 1 cm cone at
+260 m, and leaves bloom as shipped so the bloom defect would still fail it. "Dies much later by itself"
+was not reproduced separately: a shot whose damage lands on no bone, or on a leg, reads exactly like it.
+
+**The scope is still** (`SniperItem.scopeSway` ships 0; W30's mechanism is opt-in).
+
+**The bolt and the reload leave the eye, and aim held brings it back** (PLAN.md 2.7 piece 4, user
+decision: CS AWP with resume-zoom, the balance lever for a one-shot rifle). Two derived facts now,
+because two different things ask:
+- **raised** — `WeaponController.scopeRaisedNow()` / `Character.isScopeRaised()`: aim held on a scoped
+  weapon, no switch, alive, on foot. The FIRST-PERSON VIEW and the SHOT ORIGIN follow it. A TPS player
+  stays behind the eye through the cycle instead of flicking to the boom and back each shot. The shot
+  that starts the cycle is still a scoped one, which matters because `onWeaponFire` starts the fire
+  timer BEFORE `useWeapon` resolves the shot.
+- **scoped** — `scopedNow()` / `isScoped()`: raised, and not (a weapon that `unscopesToCycle()` with
+  its fire timer or reload timer running). The ZOOM, the OPTIC and the hidden crosshair follow it.
+
+The fire timer IS the bolt cycle (a bolt action is `auto = false` + `fireRate`) and the reload timer
+IS the reload, so there is no re-scope bookkeeping. `SniperItem.unscopeToCycle` (default true) is the
+per-weapon switch. The timer is also started by a pickup's equip block and the draw settle, so the zoom
+waits those out too. That is the overloading PLAN.md 2.8 names.
+
+`ScopeOverlay` and `Crosshair` now ask `Character.isScoped()` (the answer the camera and the head use),
+not the weapon controller, which does not know the body died or sat down.
+
+Gates: `probe_sniper_hits` 24/24 + 12/12. `probe_sniper_scope` gains the bolt/reload case: zoom and
+optic drop on the shot with the view still first person, back at 20 deg after the 1.46 s bolt and
+after the reload, third person if aim is let go mid-cycle; control `unscope_to_cycle = false` stays
+zoomed. Also PASS: `probe_scope_sway` 17/17, `probe_self_hit`, `probe_auto_reload`,
+`probe_recoil_kick`, `probe_fps_camera`, `probe_vehicle_views`, `probe_driveby_aim`, `probe_melee`,
+`probe_weapon_fit`, `tools/net/run_net_shot_test.sh`, AimDebugAuto 40/40, `./gradlew test`,
+`World.tscn` 0 errors.
+
+### W32 — ONE ACCURACY OWNER, A SCOPE BY COMPOSITION, SCOPED MOVEMENT, AND A CONFIRMED HIT MARKER (2026-09-16, PLAN.md 2.8 items 3, 4, 9, 10)
+
+The study behind W31 found every remaining miss was a MOVING or JUST-STOPPED shot: the scope did not
+slow the player (7.98 m/s), the cone grew 0.03°/m/s from zero with no standing dead zone, and the body
+slid ~0.5 s after the key was released. Four changes, each on the owner that the architecture review
+asked for first.
+
+- **`weapon.Accuracy` (item 3)** — see "Spread formula". The standing threshold is the CS rule (fully
+  accurate below 34% of max speed), expressed as a FRACTION so a scoped slowdown lowers it too.
+- **`weapon.ScopeConfig` (item 4)** — a read-only Resource on `FirearmItem.scope` (fov, zoomSeconds,
+  sway, unscopeToCycle, moveSpeedFactor, stopAccelerationFactor). `WeaponItem.scopeConfig()` replaces
+  the four base-class hooks that returned 0/false, so any firearm with a config is scoped and
+  `SniperItem` is DELETED: SR3 is a `FirearmItem` with `hipfire_spread_multiplier = 8` and an embedded
+  config. `WeaponController.heldScope()` is the one reader (a config with fov 0 is no scope); the
+  camera, the sway and `scopedNow` read through it. Probes that tuned the old exports now set
+  `gun.get("scope").set(...)` — the config is a SHARED sub-resource, so a probe that changes it changes
+  every SR3.
+- **Scoped movement (item 4)** — `MovementController` multiplies the target speed by
+  `Character.scopeMoveSpeedFactor()` and, with no wish direction, the acceleration by
+  `scopeStopAccelerationFactor()`, every frame (the scope comes and goes without a movement-state
+  change). SR3 ships **0.4** (CS: AWP scoped 100 u/s = 40% of the 250 u/s knife speed; this game's
+  weapons do not slow the runner) and **3.0** (the counter-strafe stop: ~0.1 s to accurate instead of
+  ~0.5 s). Both numbers were the user's call and are recorded on the config for them to retune.
+- **Hit marker (item 9)** — `EventBus.damageDealt(attackerId, damage, headshot, killed)`, emitted by
+  `Health.applyDamage` where damage is APPLIED, and re-emitted on a client from `MSG_DAMAGE_BROADCAST`,
+  which now carries the attacker id and a headshot/killed flag byte. So the marker is CONFIRMED, never
+  predicted. The attacker id is threaded `WeaponItem.resolveAttackerId()` → `ImpactManager.processHit`
+  → `Health.takeDamage` (new overloads; the old ones pass ""). Explosions still pass no id (no marker
+  for a rocket kill yet). `ui.HitMarker` (self-gated, not in `BASE_LAYOUT`) draws an X at screen centre,
+  red and held twice as long on a kill, larger on a headshot, with a generated 45 ms tick (no asset).
+
+- **`weapon.WeaponState` (item 2)** — `fireTimer` meant four things (fire interval, draw settle, pickup
+  equip block, merge-pickup block) and the scope keyed off all of them. `startFireLock(seconds, reason)`
+  is now its only writer, `state()` resolves SWITCHING > RELOADING > the lock's reason > IDLE
+  (`WeaponStateTest`), and `scopedNow` drops the zoom only for CYCLING or RELOADING — a draw settle no
+  longer blinks the scope. `weaponStateNow()` is the registered readout.
+
+- **`WeaponStats` (item 1)** — every weapon's tuning (spread, bloom, reload/switch/fire rates, auto, magazine
+  size, reserve max, recoil, damage, the W27 kick, range, pellets, hipfire, standing threshold) lives in
+  `weapon/stats/<id>.tres`, generated from each weapon's effective values (field defaults + constructor +
+  scene lines) so nothing changed. `WeaponItem.setStats` copies it onto the fields, which are `@Visible`
+  now: registered, so probes still read and nudge them, but no longer stored in the scene. Live STATE
+  (`magazine`, `reserve`) stays on the scene.
+- **`WeaponController` split (item 5)** — `WeaponSockets` (hand/holster/stow placement),
+  `WeaponInventorySync` (MSG_INVENTORY build + reconcile) and `RemoteWeaponCues` (a puppet's replayed
+  fire/reload cosmetics) are plain-Java collaborators now, 1592 → 1311 lines, behaviour unchanged (net
+  shot/melee/launch gates green). The fire/reload/switch state machine stays: it is the controller's job.
+- **Stateless traces (item 6)** — `WeaponItem.trace` is an `intersect_ray` with the AimRay's mask, flags
+  and exclusions, and no longer moves the ray node (or the `AimTarget` under it). `RayCast3D` cannot list
+  its exceptions, so `util.RayExclusions` is the one place they are added/removed (every former
+  `aimRay.addException` site) and read back; it is cleared from `GameManager._exitTree`.
+- **One weapon catalog (item 7)** — `weapon/weapon_catalog.json` is THE list (id, scene, archetype,
+  bench). `AimDebugHost`'s bench, `probe_weapon_fit` / `probe_weapon_holster` and
+  `pose_weapon_hold.py` read it; `weapon_archetypes.json` lost `weapon_assignments` and every
+  `holds.*.weapons` (a hold covers the catalog rows of its archetype).
+- **Archetype by name (item 8)** — scenes store `weapon_archetype = "rifle"`; `WeaponItem.weaponPoseIndex()`
+  derives the blend index from `weapon.GripArchetype` (still append-only; an unknown name warns once and
+  poses as a pistol). `WeaponCatalogTest` (4) holds all of it together: the enum mirrors
+  `weapon_archetypes.json`, every catalog scene exists and stores its archetype by name, no weapon scene
+  is missing from the catalog, and `weapon_models.json` / the holds name only catalog weapons.
+
+`probe_weapon_fit.gd -- --stance=swim` (A2.5) builds a 3.5 m pool under the stands: every body swims and
+every held weapon sits on the aim line (0.0° on all six); the stock is not mounted while swimming, by design.
+
+**Gates.** `AccuracyTest` 10/10, `WeaponStateTest` 2/2, `WeaponCatalogTest` 4/4; `probe_sniper_scope.gd` asserts the named
+CYCLING/RELOADING states and that the 5-frame draw settle keeps the zoom. `tools/godot/probe_hit_marker.gd` 6/6 (a hit shows it, a miss and
+another attacker's damage do not, a kill is flagged). `tools/net/run_net_shot_test.sh` gained
+`hit_confirmed_local` (the client's hits are confirmed by the host; an observer gets none).
+**`tools/godot/probe_sniper_live.gd` is now a gate (item 10)**: every stationary and just-stopped HEAD
+and CHEST shot on the aimed bone (48/48), limbs ≥ 90% (69/72), scoped move speed **3.20 m/s**, a moving
+scoped cone **0.101°** (20× base), hitboxes on the drawn body (0.000 m); `-- --control` (threshold 0, no scoped slowdown, the ordinary stop) fails 3 — stopped chest shots 3/6, limbs 63/72, speed 8.00. Three probe defects it had to
+lose first, each of which read as a game bug: the moving case fired on the first frame of acceleration
+(0.21 m/s), the run-ups walked the player ~180 m sideways so later shots met the target's own arm in
+front of its chest, and a teleport back left the camera rigs settling for a second. **Limbs are held to
+90%, not 100%, on purpose:** a 3 cm-radius arm capsule at 260 m against the cone's own 1.1 cm radius
+plus ~1 cm of steering error is a genuine graze (the capsules were measured colliding where drawn, hit
+centroids within 2 cm) — the old 90/90 was a lucky seed.
 
 ## Godot-JVM Specifics
 

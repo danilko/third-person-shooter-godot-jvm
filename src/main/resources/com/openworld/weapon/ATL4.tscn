@@ -1,5 +1,6 @@
 [gd_scene format=3 uid="uid://bf5k6xj310cia"]
 
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/ATL4.tres" id="90_stats"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/ProjectileItem.java" id="1_pi"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/ATL4Projectile.tscn" id="2_proj"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="3_muzzle"]
@@ -22,27 +23,16 @@ size = Vector3(0.4, 0.4, 1.2)
 
 [node name="ATL4" type="Node3D" unique_id=200200001]
 script = ExtResource("1_pi")
+stats = ExtResource("90_stats")
 projectile_scene = ExtResource("2_proj")
 weapon_id = "ATL4"
 weapon_name = "ATL-4"
-weapon_pose_index = 2
+weapon_archetype = "launcher"
 hold_socket = "SocketLauncher"
 holster_point = "HolsterPoint"
 holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
-reload_speed = 2.5
-switch_speed = 2.2
-fire_rate = 1.0
-auto = false
 magazine = 1
-magazine_size = 1
 reserve = 3
-reserve_max = 3
-recoil = 3.0
-kick_back = 0.060
-kick_pitch = 5.0
-kick_spring = 10.0
-kick_damping = 1.0
-damage = 0.0
 require_interact = true
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=200200007]

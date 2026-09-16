@@ -6,6 +6,7 @@ import com.openworld.net.NetworkManager;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.*;
 import godot.api.Object;
 import godot.core.Vector3;
@@ -43,7 +44,7 @@ public class FirearmItem extends WeaponItem {
   private float currentBloom = 0f;
   /** Pellets per shot. 1 = single bullet (default). Set > 1 for shotguns — each
    *  pellet samples the spread cone independently; audio/bloom/recoil fire once. */
-  @Export public int pelletCount = 1;
+  @Visible public int pelletCount = 1;
 
   /**
    * Two-stage ("2-way") hit resolution. When true (the default) a bullet is traced from the weapon's
@@ -58,16 +59,51 @@ public class FirearmItem extends WeaponItem {
 
   private StanceName currentStance = StanceName.UPRIGHT;
 
-  // Added to spread per m/s of horizontal+vertical speed before the stance multiplier,
-  // so crouching/crawling reduces the movement penalty the same way it reduces base spread.
-  private static final float MOVEMENT_SPREAD_PER_MPS = 0.03f;
+  /**
+   * This weapon's scope, or null (PLAN.md 2.8 item 4). A {@link ScopeConfig} makes any firearm a scoped
+   * one — SR3 is a plain FirearmItem with a scope and a hipfire multiplier; there is no sniper subclass.
+   */
+  @Export public ScopeConfig scope;
 
-  private static final float CROUCH_SPREAD_MULT = 0.7f;
-  private static final float CRAWL_SPREAD_MULT  = 0.5f;
-  private static final float JUMP_SPREAD_MULT   = 2.0f;
-  // Treading water is unstable — surface shooting is deliberately less accurate than on land
-  // (GTA/PUBG). Explicit so it no longer relies on the incidental !isOnFloor() airborne branch.
-  private static final float SWIM_SPREAD_MULT   = 1.8f;
+  public ScopeConfig getScope() { return scope; }
+  public void setScope(ScopeConfig v) { scope = v; }
+
+  @Override
+  public ScopeConfig scopeConfig() { return scope; }
+
+  /**
+   * How much wider the cone is when the holder is NOT aiming (the CS AWP rule — pinpoint through the
+   * scope, near-useless from the hip). 1 disables it. Only the LIVE cone widens: the host's N1 floor
+   * ({@link #minimumSpreadDeg}) cannot see the client's aim state, and a floor that grew with it would
+   * refuse an honest scoped shot.
+   */
+  @Visible public float hipfireSpreadMultiplier = 1.0f;
+
+  public float getHipfireSpreadMultiplier() { return hipfireSpreadMultiplier; }
+  public void setHipfireSpreadMultiplier(float v) { hipfireSpreadMultiplier = v; }
+
+  /**
+   * Below this fraction of the holder's max speed, movement costs no accuracy (CS: 0.34). See
+   * {@link Accuracy#movementPenalty}.
+   */
+  @Visible public float standingSpeedFraction = (float) Accuracy.DEFAULT_STANDING_FRACTION;
+
+  public float getStandingSpeedFraction() { return standingSpeedFraction; }
+  public void setStandingSpeedFraction(float v) { standingSpeedFraction = v; }
+
+  @Override
+  protected void applyStats(WeaponStats s) {
+	super.applyStats(s);
+	pelletCount = s.pelletCount;
+	hipfireSpreadMultiplier = s.hipfireSpreadMultiplier;
+	standingSpeedFraction = s.standingSpeedFraction;
+  }
+
+  /** This weapon's accuracy numbers, for {@link Accuracy}. */
+  public Accuracy.Tuning accuracyTuning() {
+	return new Accuracy.Tuning(spread, bloomPerShot, bloomDecaySpeed, bloomMax, standingSpeedFraction,
+		hipfireSpreadMultiplier);
+  }
 
   /**
    * Discovers weapon-local VFX nodes from the weapon scene. Called once on _ready();
@@ -88,7 +124,7 @@ public class FirearmItem extends WeaponItem {
   @Register
   @Override
   public void _physicsProcess(double delta) {
-	currentBloom = Math.max(0f, currentBloom - bloomDecaySpeed * (float) delta);
+	currentBloom = (float) Accuracy.decayBloom(currentBloom, accuracyTuning(), delta);
 	if (fallbackTracerAtMs > 0 && Time.INSTANCE.getTicksMsec() >= fallbackTracerAtMs) {
 	  fallbackTracerAtMs = 0;
 	  drawAimTracer();
@@ -105,8 +141,13 @@ public class FirearmItem extends WeaponItem {
 	decrementMagazine();
 	playFireCue();
 	applyRecoil();
-	currentBloom = Math.min(currentBloom + bloomPerShot, bloomMax);
 	fireShot();
+	// Bloom is what THIS shot does to the NEXT one, so it is added after the shot has resolved. It used
+	// to be added first, which put every weapon's per-shot bloom on its own first round: harmless on
+	// AR4 (0.05 deg) and ruinous on SR3, whose 0.6 deg bloom meant every "pinpoint" shot left a 0.605
+	// deg cone — ~0.6 m of scatter at 120 m, so a scope on the head hit the torso, the legs or nothing
+	// (measured, tools/godot/probe_sniper_hits.gd).
+	currentBloom = (float) Accuracy.bloomAfterShot(currentBloom, accuracyTuning());
 	postGunshotStimulus();
   }
 
@@ -231,43 +272,54 @@ public class FirearmItem extends WeaponItem {
 	return WeaponType.RANGED;
   }
 
+  /** The live cone, degrees — {@link Accuracy#cone}, the one owner. */
   @Override
   public float getCurrentSpreadDeg() {
 	if (owningCharacter == null) return 0f;
-	float speed = (float) owningCharacter.getVelocity().length();
-	return (spread + currentBloom + speed * MOVEMENT_SPREAD_PER_MPS) * stanceMultiplier(owningCharacter);
+	Vector3 v = owningCharacter.getVelocity();
+	double horizontal = Math.hypot(v.getX(), v.getZ());
+	double maxSpeed = owningCharacter instanceof Character c ? c.maxMoveSpeed() : 0.0;
+	return (float) Accuracy.cone(accuracyTuning(), currentBloom, horizontal, maxSpeed, posture(), aimed());
   }
 
   /**
-   * The narrowest cone this weapon can have in its holder's current stance: base spread × the stance
-   * multiplier, with no movement, no bloom and no airborne penalty (PLAN.md N1). The host validates a
-   * client's reported cone against THIS rather than {@link #getCurrentSpreadDeg()}: a host puppet is
-   * never simulated onto the floor, so the live estimate carries the airborne ×2 and would refuse an
-   * honest crouched shot, while bloom — the one term that only widens — never exists on the host copy.
+   * The narrowest cone this weapon can have in its holder's current stance (PLAN.md N1) — the floor the
+   * host validates a client's reported cone against. See {@link Accuracy#minimum}.
    */
   public float minimumSpreadDeg() {
-	if (currentStance == StanceName.SWIM) return spread * SWIM_SPREAD_MULT;
-	return switch (currentStance) {
-	  case CROUCH -> spread * CROUCH_SPREAD_MULT;
-	  case CRAWL  -> spread * CRAWL_SPREAD_MULT;
-	  default     -> spread;
-	};
+	return (float) Accuracy.minimum(accuracyTuning(), stancePosture());
   }
-
-  /** Reference movement speed (m/s ≈ sprint) defining the top of the crosshair spread envelope. */
-  private static final float CROSSHAIR_REF_SPEED = 6.0f;
 
   @Override
   public float getCrosshairFraction() {
-	// Worst realistic on-ground spread for THIS weapon: full bloom + reference movement, upright. The
-	// current spread is shown as a fraction of this, so every weapon shares one fixed crosshair pixel
-	// range (no per-weapon tuning) and a wide-cone weapon (shotgun) caps at the top instead of running
-	// off-screen — while movement/bloom still move the reticle visibly across the range. Airborne /
-	// jumping spread exceeds this envelope and simply clamps to 1 (max openness — you're least accurate).
-	float worst = spread + bloomMax + CROSSHAIR_REF_SPEED * MOVEMENT_SPREAD_PER_MPS;
-	if (worst <= 0f) return 0f;
-	float frac = getCurrentSpreadDeg() / worst;
-	return frac < 0f ? 0f : (frac > 1f ? 1f : frac);
+	return (float) Accuracy.crosshairFraction(accuracyTuning(), getCurrentSpreadDeg());
+  }
+
+  /** How the holder is supported now: its stance, or AIRBORNE when off the floor (a swimmer is SWIM). */
+  private Accuracy.Posture posture() {
+	Accuracy.Posture p = stancePosture();
+	if (p != Accuracy.Posture.SWIM && owningCharacter != null && !owningCharacter.isOnFloor()) {
+	  return Accuracy.Posture.AIRBORNE;
+	}
+	return p;
+  }
+
+  private Accuracy.Posture stancePosture() {
+	return switch (currentStance) {
+	  case CROUCH -> Accuracy.Posture.CROUCH;
+	  case CRAWL  -> Accuracy.Posture.CRAWL;
+	  case SWIM   -> Accuracy.Posture.SWIM;
+	  default     -> Accuracy.Posture.UPRIGHT;
+	};
+  }
+
+  /**
+   * Whether the holder is looking down the sights: {@code Character.combat}, the flag the aim modifiers,
+   * the crosshair and the stances read. A weapon held by something that is not a Character (a test
+   * stand, a mounted gun) counts as aimed — the hipfire penalty is a player-facing trade.
+   */
+  private boolean aimed() {
+	return !(owningCharacter instanceof Character c) || c.isCombat();
   }
 
   @Override
@@ -345,6 +397,7 @@ public class FirearmItem extends WeaponItem {
 	// the same pellets against authoritative positions. The origin reported is the muzzle, so the host
 	// re-runs the very same cover test rather than a camera-origin one.
 	if (client) sendShotToHost(origin, aim, spreadDeg, shotSeq);
+	lastShotOrigin = origin; lastShotAim = aim; lastShotCone = spreadDeg;
 	lastShotPelletHits = resolvePellets(ray, origin, aim, spreadDeg, shotSeq, shooterId(), range, !client, true);
 	// The host's own shooters (host player, AI): every client sees them only as puppets, so send what
 	// the pull hit to all of them (N1b).
@@ -367,6 +420,16 @@ public class FirearmItem extends WeaponItem {
    * host's resolution of the same pull; not gameplay state.
    */
   public java.util.List<String> lastShotPelletHits = java.util.List.of();
+
+  /** {@link #lastShotPelletHits} plus the last shot's origin, aim and cone, for probes. */
+  @Register
+  public String lastShotReport() {
+	return "hits=" + lastShotPelletHits + " origin=" + lastShotOrigin + " aim=" + lastShotAim + " cone=" + lastShotCone;
+  }
+
+  private Vector3 lastShotOrigin = Vector3.Companion.getZERO();
+  private Vector3 lastShotAim = Vector3.Companion.getZERO();
+  private float lastShotCone = 0f;
 
   /** Digest of the pellet DIRECTIONS of that pull — equal on client and host when both regenerated the
    *  same cone from the same seed, whatever the hitboxes were doing. Diagnostic, like the hits. */
@@ -406,7 +469,7 @@ public class FirearmItem extends WeaponItem {
 		HitInfo info = new HitInfo(hit.node, hit.point, hit.normal);
 		if (applyDamage) {
 		  im.processHit(info, damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
-						resolveAttackerPosition());
+						resolveAttackerPosition(), resolveAttackerId());
 		} else {
 		  im.processVisualHit(info);
 		}
@@ -427,9 +490,17 @@ public class FirearmItem extends WeaponItem {
    * a seated occupant's gun (and a vehicle's own mounted weapon) sits inside/against the carrier's
    * collision, where a muzzle-origin trace would be blocked by the vehicle itself — and a passenger
    * shooting from a car is not the cover exploit this guards against.
+   *
+   * <p><b>A SCOPED shot leaves the scope, not the muzzle</b> (user decision, 2026-09-16 — CS/PUBG). The
+   * two legs exist because a third-person camera is not where the gun is; a scoped view is behind the
+   * shooter's own eye (W29), so that reason is gone, and the leg from a gun ~1 m ahead of and below the
+   * eye only adds a line the reticle does not show. The eye is inside the shooter's head, so a wall the
+   * shooter hides behind still blocks the shot; the host re-runs its chest-to-origin cover test on the
+   * reported eye exactly as it does on a muzzle.
    */
   private boolean useMuzzleTrace() {
-	return muzzleTrace && owningCharacter instanceof Character c && c.currentVehicleNode == null;
+	return muzzleTrace && owningCharacter instanceof Character c && c.currentVehicleNode == null
+		&& !c.isScopeRaised();
   }
 
 
@@ -541,18 +612,6 @@ public class FirearmItem extends WeaponItem {
    */
   private RayCast3D getEffectiveAimRay() {
 	return weaponController != null ? weaponController.getAimRay() : null;
-  }
-
-  private float stanceMultiplier(CharacterBody3D character) {
-	// SWIM is checked before the airborne branch: a swimmer floats off the floor, so the
-	// !isOnFloor() check would otherwise mislabel it as airborne. Treading water has its own value.
-	if (currentStance == StanceName.SWIM) return SWIM_SPREAD_MULT;
-	if (!character.isOnFloor()) return JUMP_SPREAD_MULT;
-	return switch (currentStance) {
-	  case CROUCH -> CROUCH_SPREAD_MULT;
-	  case CRAWL  -> CRAWL_SPREAD_MULT;
-	  default     -> 1.0f;
-	};
   }
 
   private Marker3D weaponMuzzle() {

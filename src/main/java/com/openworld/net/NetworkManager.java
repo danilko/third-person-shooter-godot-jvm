@@ -783,7 +783,12 @@ public class NetworkManager extends Node {
                 return;
             }
 
-            TokenBucket bucket = rateLimiters.get(senderPeerId);
+            // Host-side only (PLAN.md P0 0.5): the limiter guards the authority against a flooding
+            // CLIENT. A client rate-limiting the host it chose to join throttles the authoritative
+            // stream itself, and the host's frame count grows with the world — DebugWorld's ~20
+            // characters split every snapshot into enough MTU-sized frames to pass the 70/s refill,
+            // and the client silently dropped ~20 packets a second (snapshots, spawns, damage).
+            TokenBucket bucket = amServer ? rateLimiters.get(senderPeerId) : null;
             if (bucket != null && !bucket.tryConsume()) {
                 com.openworld.net.NetStats.increment("drop_rate_limited");
                 GD.print("NetworkManager: rate limit exceeded for peer " + senderPeerId + " — dropping packet");
@@ -1246,6 +1251,16 @@ public class NetworkManager extends Node {
 
         Health health = findHealth(victimNode);
         if (health != null) health.hit.emit(cast.damage());
+
+        // 2.8 item 9: the host confirmed a hit — the attacker's peer draws the marker from this, never from
+        // its own prediction. Every peer re-emits; ui.HitMarker filters to its local player.
+        if (!cast.attackerCharacterId().isEmpty()
+                && !cast.attackerCharacterId().equals(cast.victimCharacterId())) {
+            Node bus0 = getNodeOrNull("/root/EventBus");
+            if (bus0 instanceof com.openworld.game.EventBus bus) {
+                bus.damageDealt.emit(cast.attackerCharacterId(), cast.damage(), cast.headshot(), cast.killed());
+            }
+        }
 
         // Drive this peer's HUD damage-direction indicator: emit characterDamagedFrom with the attacker
         // world position the host included. HUDManager filters to the local player, so this is only
@@ -2130,7 +2145,8 @@ public class NetworkManager extends Node {
 
     private boolean isValidDamageBroadcast(NetMessageCodec.DecodedDamageBroadcast cast) {
         return isValidIdentifier(cast.victimCharacterId())
-                && isFiniteDouble(cast.damage()) && cast.damage() >= 0;
+                && isFiniteDouble(cast.damage()) && cast.damage() >= 0
+                && isBoundedString(cast.attackerCharacterId());
     }
 
 
@@ -2412,9 +2428,9 @@ public class NetworkManager extends Node {
      * broadcast site.
      */
     public void broadcastDamage(String victimCharacterId, float damage, boolean hasSource,
-            godot.core.Vector3 source) {
+            godot.core.Vector3 source, String attackerCharacterId, boolean headshot, boolean killed) {
         broadcastMessage(NetMessageCodec.encodeDamageBroadcast(MSG_DAMAGE_BROADCAST, victimCharacterId,
-                damage, hasSource, source), null);
+                damage, hasSource, source, attackerCharacterId, headshot, killed), null);
     }
 
 
