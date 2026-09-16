@@ -1,0 +1,71 @@
+[gd_scene format=3 uid="uid://c8sr3wqn0pj21"]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/SniperItem.java" id="1_sr3"]
+[ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="2_sr3fire"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="2_muzzle"]
+[ext_resource type="AudioStream" uid="uid://c333cb6cupk6h" path="res://assets/audio/Rifle_reload.wav" id="3_sr3reload"]
+[ext_resource type="PackedScene" path="res://assets/weapons/SR3.glb" id="3_sr3model"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sr3_body"]
+size = Vector3(0.08, 0.1863, 1.124)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sr3_pickup"]
+size = Vector3(0.5, 0.5, 1.35)
+
+[node name="SR3" type="Node3D" unique_id=300500001]
+script = ExtResource("1_sr3")
+weapon_id = "SR3"
+weapon_name = "SR-3"
+weapon_pose_index = 9
+hold_socket = "SocketRifle"
+holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
+hipfire_spread_multiplier = 8.0
+spread = 0.005
+bloom_per_shot = 0.6
+bloom_decay_speed = 0.8
+bloom_max = 1.8
+reload_speed = 0.33
+switch_speed = 1.6
+fire_rate = 0.9
+auto = false
+magazine = 5
+magazine_size = 5
+reserve = 20
+reserve_max = 20
+recoil = 3.5
+kick_back = 0.045
+kick_pitch = 5.0
+kick_spring = 16.0
+kick_damping = 1.0
+damage = 80.0
+fire_audio = ExtResource("2_sr3fire")
+reload_audio = ExtResource("3_sr3reload")
+require_interact = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=300500002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0142, 0.0367, -0.2559)
+shape = SubResource("BoxShape3D_sr3_body")
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=300500003]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=300500004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0142, 0.0367, -0.2559)
+shape = SubResource("BoxShape3D_sr3_pickup")
+
+[node name="SupportPoint" type="Marker3D" parent="." unique_id=300500005]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0016, 0.035, -0.24)
+
+[node name="StockPoint" type="Marker3D" parent="." unique_id=300500006]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0016, 0.0059, 0.3061)
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=300500007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0016, 0.0656, -0.8179)
+
+[node name="MuzzleVFX" parent="Muzzle" unique_id=300500008 instance=ExtResource("2_muzzle")]
+
+[node name="Model" parent="." unique_id=300500009 instance=ExtResource("3_sr3model")]
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

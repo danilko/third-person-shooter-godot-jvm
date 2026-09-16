@@ -54,6 +54,12 @@
       "name": "throwable",
       "base": "pistol",
       "exists": false
+    },
+    {
+      "index": 9,
+      "name": "sniper",
+      "base": "rifle",
+      "exists": false
     }
   ],
   "clip_families": {
@@ -63,6 +69,7 @@
   },
   "weapon_assignments": {
     "ATL4": 2,
+    "SR3": 9,
     "MW1": 4,
     "MW2": 4,
     "Fist": 5,
@@ -86,6 +93,36 @@
         "placement": "placed",
         "placed_model": "AR4",
         "note": "adopted from the artist's placed AR4 (2026-09-15): SocketRifle, the StockPoint anchor and AR4's SupportPoint were derived from it (pose_weapon_hold.py adopt --placed AR4 --apply)"
+      },
+      "hold": {
+        "grip": [
+          -0.12,
+          -0.22,
+          0.22
+        ],
+        "muzzle_down": 35,
+        "muzzle_across": 55,
+        "collarbones": 10,
+        "elbow_flare": 20,
+        "support_flare": 10,
+        "curl": 1
+      }
+    },
+    "sniper": {
+      "socket": "SocketRifle",
+      "reference": "SR3",
+      "weapons": [
+        "SR3"
+      ],
+      "mount": "StockPoint",
+      "support": true,
+      "aim_clip": "upright_aim_sniper-loop",
+      "hold_clip": "upright_hold_sniper-loop",
+      "note": "A sniper's grip IS a rifle grip, so it shares SocketRifle and the StockPoint mount -- what earns it its own archetype is the AIM POSE (a scoped shooter's head goes down to the scope and the support hand goes further out), and a pose is what weaponPoseIndex selects. The clips ship as copies of the rifle's, so the render is unchanged until they are authored; the solve args are the rifle's for the same reason.",
+      "aim": {
+        "placement": "placed",
+        "placed_model": "AR4",
+        "note": "inherited from the rifle row (W25); re-solve or adopt with a placed SR3 when the scoped pose is authored"
       },
       "hold": {
         "grip": [

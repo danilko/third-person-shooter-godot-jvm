@@ -203,6 +203,10 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         if (weaponController != null) weaponController.clearActiveSlot();
     }
 
+    /** A thrown-out stack clears its slot (above) rather than reloading into itself. */
+    @Override
+    public boolean autoReloadsOnEmpty() { return false; }
+
     /**
      * Only create a world pickup when there are grenades to package.
      * (Manual drop of a 0-count slot is a no-op.)

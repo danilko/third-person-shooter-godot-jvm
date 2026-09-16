@@ -37,7 +37,7 @@ extends SceneTree
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 ## Every archetype's weapons (blender/tools/weapon_archetypes.json `holds`): rifles mount a StockPoint, the
 ## launcher a ShoulderRestPoint, the pistol mounts nothing and only has a support grip.
-const WEAPONS := ["AR4", "AR212", "SG1", "PI52", "ATL4"]
+const WEAPONS := ["AR4", "AR212", "SG1", "SR3", "PI52", "ATL4"]
 const WEAPON_DIR := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 
 ## The shoulder pocket relative to `upperarm_r`, in `clavicle_r`'s orthonormalised global basis.
@@ -74,7 +74,7 @@ var support_misses: Array[float] = []
 ## Support-hand grip tolerance in the aim pose, per weapon. The rifles' SupportPoints sit where this body's
 ## 0.416 m arm reaches (the rear of the handguard); SG1's pump is further than that arm reaches with the
 ## stock shouldered (PLAN.md A2.4), so its number is a regression guard on the known shortfall, not a fit.
-var support_limit := {"AR4": 0.05, "AR212": 0.05, "SG1": 0.05, "PI52": 0.05, "ATL4": 0.05}
+var support_limit := {"AR4": 0.05, "AR212": 0.05, "SG1": 0.05, "SR3": 0.05, "PI52": 0.05, "ATL4": 0.05}
 
 func _check(label: String, ok: bool, detail: String) -> void:
 	if not ok:

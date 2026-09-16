@@ -17,7 +17,7 @@ extends SceneTree
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 # Must match blender/tools/... weapon_archetypes.json / VehicleConfig-side table.
 const ARCHETYPES := ["pistol", "rifle", "launcher", "dual_pistol", "melee",
-					 "fist", "shield", "shield_melee", "throwable"]
+					 "fist", "shield", "shield_melee", "throwable", "sniper"]
 ## A pose that resolved to nothing sits at the rest pose; two archetypes copied from the same base
 ## are legitimately identical, so what is asserted is "not rest", not "all distinct".
 const REST_TOLERANCE := 0.02
@@ -102,7 +102,7 @@ func _initialize() -> void:
 	# The clusters are the authored hold poses: pistol (and the six placeholders copied from it),
 	# rifle (a patrol carry, CLAUDE.md W24) and launcher (its own carry, W25). A count other than EXPECTED_CLUSTERS is either a new authored pose (raise it
 	# deliberately) or an index that resolved to nothing.
-	const EXPECTED_CLUSTERS := 3
+	const EXPECTED_CLUSTERS := 3   # sniper (9) ships as a copy of the rifle pose, so it joins that cluster
 	if distinct.size() != EXPECTED_CLUSTERS:
 		print("  FAIL  expected %d clusters (pistol family, rifle, launcher); a different count is an" % EXPECTED_CLUSTERS)
 		print("        index that resolved to nothing, or a newly authored pose -- raise the number deliberately.")

@@ -519,6 +519,33 @@ public class WeaponItem extends Pickup implements WeaponAction {
   public void onMagazineEmpty() {}
 
   /**
+   * Whether the shot that empties the magazine should START THE RELOAD BY ITSELF — the default in
+   * every modern shooter (CS, PUBG, COD): a player who has just fired their last round should not
+   * have to press a dead trigger to discover it, and on a slow weapon (a bolt rifle, a launcher)
+   * that discovery costs a whole reload's worth of time.
+   *
+   * <p><b>It cannot loop, by construction.</b> The worry is a weapon that is empty AND dry
+   * re-triggering a reload for ever, so the reload itself is the gate rather than the caller:
+   * {@code WeaponController.onWeaponReload} returns immediately when the reserve is 0 or a reload is
+   * already running, so this hook can fire as often as it likes and a dry weapon does nothing at
+   * all. There is no timer, no retry and no state to get stuck in — the only thing that can start a
+   * reload is ammo actually being available.
+   */
+  @Export public boolean autoReloadOnEmpty = true;
+
+  public void setAutoReloadOnEmpty(boolean v) { autoReloadOnEmpty = v; }
+
+  public boolean isAutoReloadOnEmpty() { return autoReloadOnEmpty; }
+
+  /**
+   * The derived answer the controller asks. Named as a question so godot-jvm does not merge it into
+   * the exported property above (the {@code resolveX()}/{@code deferFireEvent()} idiom): an
+   * infinite-ammo weapon has no magazine to fill, and {@code ThrowableItem} overrides it to false
+   * because an emptied grenade stack CLEARS ITS SLOT ({@link #onMagazineEmpty}) instead of reloading.
+   */
+  public boolean autoReloadsOnEmpty() { return autoReloadOnEmpty && !isInfiniteAmmo; }
+
+  /**
    * Cosmetic remote replay on non-authority peers (puppets), invoked by
    * WeaponController.playRemoteFireCue when the snapshot's fireSeq counter advances.
    * Default no-op; FirearmItem replays muzzle/tracer, throwable/projectile weapons spawn a

@@ -42,7 +42,16 @@ body (W18) would then need a different one of.
 The weapon says where its grip is (the origin). The character says where a hand holds a grip of
 that CLASS — `SocketRifle`, `SocketPistol`, `SocketLauncher`, `SocketMelee`, `SocketFist` under
 `WeaponAttachment`, and a weapon names its own in `holdSocket`. So a new rifle needs **no character
-edit at all**. The per-weapon fit that genuinely differs lives on the weapon:
+edit at all**.
+
+**An archetype is a POSE, not a socket.** `weaponPoseIndex` picks the upper-body clip set
+(`weapon_archetypes.json`, the index list is APPEND-ONLY), and two archetypes may share one socket
+when the hand holds them the same way — `sniper` (index 9) shares `SocketRifle` and the `StockPoint`
+mount with `rifle` and differs only in its authored aim pose. Adding one is: an index row, a `holds`
+row, three placeholder clips through `character_anim_naming.json` (copies of the nearest real pose, so
+the render is unchanged until they are authored) wired into all four weapon-index blendspaces in BOTH
+bodies, and `probe_weapon_archetypes.gd`'s sweep extended — an index with no blend point is SILENT,
+which is why that probe counts pose clusters rather than trusting the table. The per-weapon fit that genuinely differs lives on the weapon:
 
 * `SupportPoint` — where the off hand GRIPS (`SupportHandIKModifier` puts the hand's knuckle line, 0.75 of
   the way from wrist to middle knuckle, on it and keeps the hand's authored orientation). Put it on the
@@ -63,6 +72,29 @@ edit at all**. The per-weapon fit that genuinely differs lives on the weapon:
 * `GripPoint` — **not needed by a conforming weapon, and none of ours has one.** It is the escape
   hatch for an asset whose origin cannot be moved; `probe_weapon_sockets.gd` fails a shipped weapon
   that carries one.
+
+---
+
+## Where it hangs when it is holstered
+
+A holstered weapon puts its **`holsterPoint`** on the socket, or its grip if it declares none — and
+the two facts belong to different owners (W28):
+
+* **the SLING is the character's.** How the strap crosses this body's back is one fact shared by
+  every long weapon, so it lives in the socket, and the socket is SOLVED in the body's frame by
+  `tools/godot/solve_holster_sockets.gd` (22° from vertical, gun flat against the back, the pair
+  separated in depth) — never nudged by eye, because its authored transform is in a BONE's frame.
+  The right hip is the mirror of the left.
+* **the HANG POINT is the weapon's**, and only when the weapon's own proportions need it: `ATL4`'s
+  grip is 0.397 m from the rear of its tube, so slung by the grip the tube stood above the
+  character's crown. It declares a `HolsterPoint` 0.20 m behind the grip. No other weapon needs one.
+* **a weapon's holster list is a fact about its SIZE, not its slot.** `MW2` (a 0.81 m axe) occupies
+  the MELEE slot and hangs on the BACK slings: a hip socket cannot hold it in any pose (by the grip
+  its head reaches the ankle, by mid-haft it reaches the character's head).
+
+The gate is `tools/godot/probe_weapon_holster.gd`: it holsters each weapon the game's way and
+measures the poke into the character's own hitbox bones, clearance from the head and the measured
+crown, ground clearance, and — for a whole loadout — that no two holstered weapons occupy each other.
 
 ---
 
