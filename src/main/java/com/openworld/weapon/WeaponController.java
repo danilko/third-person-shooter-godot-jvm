@@ -89,6 +89,10 @@ public class WeaponController extends Node {
   // Rolling reload counter (u8), same pattern as fireSeq — remote peers play the reload animation
   // when it changes, so a reloading character is visibly reloading on every screen (a tactical tell).
   private int reloadSeq = 0;
+  // How many reloads this controller has STARTED. Distinct from reloadSeq, which is the replicated
+  // u8 a puppet overwrites from the wire; this one only ever counts local starts, which is what an
+  // auto-reload check needs (the empty-and-dry case must not advance it — WeaponItem.autoReloadsOnEmpty).
+  private int reloadStarts = 0;
   // Trigger-pull counter for this controller's hitscan shots (PLAN.md N1): seeds the deterministic
   // spread and orders MSG_SHOT on the host. Monotonic, never wrapped in practice (u32 on the wire).
   // Unlike fireSeq it is not replicated: only the owner fires, and the host tracks the last accepted
@@ -634,8 +638,15 @@ public class WeaponController extends Node {
     // WeaponItem.deferFireEvent (a knife charges on the press and swings on the release, so a bump
     // here would send the cue early by the whole charge time).
     if (!w.deferFireEvent()) reportFireEvent(0);
-    // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
-    if (!w.isInfiniteAmmo && w.getMagazine() == 0) w.onMagazineEmpty();
+    if (!w.isInfiniteAmmo && w.getMagazine() == 0) {
+      // The shot that empties the magazine starts the reload itself (WeaponItem.autoReloadsOnEmpty).
+      // Before the weapon's own onMagazineEmpty hook, because a throwable's hook CLEARS THE SLOT --
+      // after it, `w` would no longer be the current weapon and this would reload whatever replaced
+      // it. Loop-safe: onWeaponReload below is a no-op with an empty reserve or a running reload.
+      if (w.autoReloadsOnEmpty()) onWeaponReload();
+      // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
+      w.onMagazineEmpty();
+    }
   }
 
   /**
@@ -649,6 +660,19 @@ public class WeaponController extends Node {
     AnimationController ac = animation();
     if (ac != null) ac.onWeaponKick(w.kickBack, w.kickPitch, w.kickSpring, w.kickDamping);
   }
+
+  /**
+   * Whether a reload is running right now. Question-named (not {@code isX}) so godot-jvm does not
+   * merge it into a getter-only registered property, and {@code @Register}ed because a headless check
+   * cannot otherwise see the reload timer — see tools/godot/probe_auto_reload.gd.
+   */
+  @Register
+  public boolean reloadingNow() { return isWeaponReloading(); }
+
+  /** How many reloads this controller has STARTED — the counter that must NOT advance when the
+   *  weapon is empty and the reserve is dry (the auto-reload loop check). */
+  @Register
+  public int reloadsStarted() { return reloadStarts; }
 
   /** Why a press might not fire right now — the fire gate's timers, for headless checks. */
   public String fireGateReport() {
@@ -849,6 +873,7 @@ public class WeaponController extends Node {
     // replays the reload animation (a visible "reloading, can't fire yet" tell). u8 — only change
     // detection matters, and the new value persists across snapshots so a dropped frame is harmless.
     reloadSeq = (reloadSeq + 1) & 0xFF;
+    reloadStarts++;
   }
 
   @Register

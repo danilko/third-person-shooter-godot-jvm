@@ -164,7 +164,7 @@ public class AimDebugHost extends Node3D {
     // ── Shooting bench (PLAN.md 0.2 follow-up) ───────────────────────────────────────────────
     /** Weapons the bench can put in an AI's hands, cycled with [ and ]. */
     private static final String[] BENCH_WEAPONS = {
-        "AR4", "AR212", "SG1", "PI52", "ATL4", "T1", "MW1", "MW2",
+        "AR4", "AR212", "SG1", "SR3", "PI52", "ATL4", "T1", "MW1", "MW2",
     };
     private static final String WEAPON_DIR = "res://src/main/resources/com/openworld/weapon/";
     private int benchWeaponIndex = 0;

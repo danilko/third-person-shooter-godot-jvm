@@ -299,6 +299,9 @@ animation = &"upright_aim_pistol"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_y2cl2"]
 animation = &"upright_aim_rifle"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_aim_sniper"]
+animation = &"upright_aim_sniper"
+
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wa02"]
 animation = &"upright_aim_launcher"
 
@@ -322,7 +325,7 @@ animation = &"upright_aim_throwable"
 
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_dnye5"]
 min_space = 0.0
-max_space = 8.0
+max_space = 9.0
 blend_point_0/node = SubResource("AnimationNodeAnimation_j83q5")
 blend_point_0/pos = 0.0
 blend_point_0/name = &"0"
@@ -350,10 +353,13 @@ blend_point_7/name = &"7"
 blend_point_8/node = SubResource("AnimationNodeAnimation_wa08")
 blend_point_8/pos = 8.0
 blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_aim_sniper")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
 
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_aimtorso"]
 min_space = 0.0
-max_space = 8.0
+max_space = 9.0
 blend_point_0/node = SubResource("AnimationNodeAnimation_j83q5")
 blend_point_0/pos = 0.0
 blend_point_0/name = &"0"
@@ -381,6 +387,9 @@ blend_point_7/name = &"7"
 blend_point_8/node = SubResource("AnimationNodeAnimation_wa08")
 blend_point_8/pos = 8.0
 blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_aim_sniper")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
 
 [sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_torso"]
 filter_enabled = true
@@ -399,6 +408,9 @@ animation = &"weapon_switch_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_3a6f8"]
 animation = &"weapon_switch_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_switch_sniper"]
+animation = &"weapon_switch_sniper"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wc02"]
 animation = &"weapon_switch_launcher"
@@ -423,7 +435,7 @@ animation = &"weapon_switch_throwable"
 
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_rx6xa"]
 min_space = 0.0
-max_space = 8.0
+max_space = 9.0
 blend_point_0/node = SubResource("AnimationNodeAnimation_3f5w5")
 blend_point_0/pos = 0.0
 blend_point_0/name = &"0"
@@ -451,6 +463,9 @@ blend_point_7/name = &"7"
 blend_point_8/node = SubResource("AnimationNodeAnimation_wc08")
 blend_point_8/pos = 8.0
 blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_switch_sniper")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
 
 [sub_resource type="AnimationNodeTimeScale" id="AnimationNodeTimeScale_k6rnc"]
 
@@ -461,6 +476,9 @@ animation = &"upright_hold_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_d6yvc"]
 animation = &"upright_hold_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hold_sniper"]
+animation = &"upright_hold_sniper"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wh02"]
 animation = &"upright_hold_launcher"
@@ -485,7 +503,7 @@ animation = &"upright_hold_throwable"
 
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_3qk6j"]
 min_space = 0.0
-max_space = 8.0
+max_space = 9.0
 blend_point_0/node = SubResource("AnimationNodeAnimation_dnye5")
 blend_point_0/pos = 0.0
 blend_point_0/name = &"0"
@@ -513,6 +531,9 @@ blend_point_7/name = &"7"
 blend_point_8/node = SubResource("AnimationNodeAnimation_wh08")
 blend_point_8/pos = 8.0
 blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_hold_sniper")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_atk0"]
 animation = &"attack_stab_mw1"
@@ -956,10 +977,10 @@ bone_name = "spine_03"
 bone_idx = 4
 
 [node name="LongWeaponHolsterMaker1" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster" unique_id=1877044898]
-transform = Transform3D(-4.3711335e-08, -0.999999, -4.3711346e-08, 0, -4.3711346e-08, 0.999999, -0.9999988, 4.3711346e-08, 1.9106836e-15, -0.1271503, 0.09970403, -0.1533116)
+transform = Transform3D(-0.003453496, -0.93014973, -0.36716345, -0.059720363, -0.3663188, 0.9285711, -0.9982092, 0.025133764, -0.054283574, -0.1259681, 0.101543844, -0.15756755)
 
 [node name="LongWeaponHolsterMaker2" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster" unique_id=114048120]
-transform = Transform3D(-4.3711335e-08, -0.99999917, -4.3711346e-08, 0, -4.3711353e-08, 0.99999905, -0.99999875, 4.3711353e-08, 1.9106836e-15, 0.035987217, 0.1013487, -0.17137177)
+transform = Transform3D(-0.0031179385, -0.930246, -0.36692324, -0.06154547, -0.36605108, 0.9285574, -0.9980997, 0.025477523, -0.056110866, -0.026519721, 0.058098912, -0.27548704)
 
 [node name="LongWeaponHolsterMaker3" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster" unique_id=2003106262]
 transform = Transform3D(-0.49999967, 0, -0.8660248, 0, 0.9999993, 0, 0.86602473, 0, -0.4999997, 0.018791702, 0.015606344, -0.12510711)
@@ -976,7 +997,7 @@ bone_idx = 2
 transform = Transform3D(-0.939691, 0.29619762, -0.17100993, 0, 0.49999908, 0.8660248, 0.34201956, 0.8137963, -0.46984592, 0.177, 0.034, 0.022)
 
 [node name="ShortWeaponHolsterMaker2" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster" unique_id=672016789]
-transform = Transform3D(0.116921015, -0.97164595, -0.20550087, -0.99166024, -0.1029329, -0.07752721, 0.054176293, 0.2128518, -0.9755812, -0.1395323, 0.05886489, -0.0059244037)
+transform = Transform3D(-0.94964564, -0.2772074, 0.1460334, -0.011467308, 0.4965188, 0.86794907, -0.3131106, 0.82256997, -0.47469702, -0.18997324, 0.03189856, 0.027952582)
 
 [node name="ShortWeaponHolsterMaker3" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster" unique_id=1542776367]
 transform = Transform3D(0.072784126, -0.9973422, -0.0029266924, -0.17661624, -0.015776724, 0.98415256, -0.9815823, -0.07111427, -0.17729557, 0.09934403, -0.020959735, -0.053164423)

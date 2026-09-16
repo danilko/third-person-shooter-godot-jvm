@@ -1403,6 +1403,40 @@ the firearm/projectile only and **missing from `ThrowableItem`**, which let a he
 spawn multiple grenades back-to-back (the double-throw bug). `MeleeItem` keeps its own
 timer-based model (overrides `stopUseWeapon()` to a no-op).
 
+### Auto-reload on empty — and why it cannot loop (2026-09-16, user-asked)
+
+The shot that empties the magazine STARTS THE RELOAD ITSELF, which is the default in every modern
+shooter (CS, PUBG, COD): a player who has just fired their last round should not have to press a dead
+trigger to find out, and on a slow weapon — a bolt rifle, a launcher — that discovery costs a whole
+reload. `WeaponController.onWeaponFire` calls `onWeaponReload()` when `magazine == 0` and the weapon
+answers `WeaponItem.autoReloadsOnEmpty()`.
+
+**The infinite-reload worry is answered structurally, not with a flag.** `onWeaponReload` already
+returns immediately when `getReserve() == 0` or a reload is already running, so the GATE IS THE
+RELOAD, not the caller: a weapon that is empty AND dry does nothing however often the hook fires.
+There is no timer, no retry and no state to get stuck in — the only thing that can start a reload is
+ammo actually being there. The pre-existing dry-PRESS path (pressing fire on an empty magazine
+reloads) is unchanged and is the fallback for a reserve that arrives later, from a pickup.
+
+Two ordering rules, both load-bearing:
+- **The auto-reload runs BEFORE the weapon's own `onMagazineEmpty()` hook**, because a throwable's
+  hook CLEARS THE SLOT — after it, `w` is no longer the current weapon and the reload would refill
+  whatever replaced it.
+- **`ThrowableItem.autoReloadsOnEmpty()` is false.** An emptied grenade stack clears its slot by
+  design (so another throwable type can be picked up without an interact-to-swap); reloading into
+  itself instead would strand the slot. `isInfiniteAmmo` weapons (fist, melee) are excluded by the
+  same derived reader, so the flag is only ever asked of a weapon that has a magazine.
+
+`WeaponItem.autoReloadOnEmpty` (`@Export`, default **true**) turns it off per weapon, and with it off
+manual reloading is untouched. Gate: **`tools/godot/probe_auto_reload.gd`** — SR3's last round starts
+a reload with no further input and the ammo moves; with a dry reserve nothing starts through 3 s of
+idle AND twenty more trigger presses (the loop check), then a press after the reserve is refilled
+reloads; the flag off is the control; and a throwable never auto-reloads.
+`WeaponController.reloadingNow()` / `reloadsStarted()` are the two registered readouts it needs —
+question-named so godot-jvm does not merge them into getter-only properties, and `reloadsStarted` is
+a LOCAL count of reloads begun, deliberately not the replicated `reloadSeq` (which a puppet
+overwrites from the wire).
+
 ### Spread formula (FirearmItem)
 
 ```
@@ -3715,6 +3749,145 @@ Gate `tools/godot/probe_recoil_kick.gd` **14/14** (AR4, a 6-shot burst: hand pea
 `probe_weapon_{sockets,scale,world_body,archetypes}`, `probe_character_variant`, `probe_fps_camera`,
 `probe_vehicle_views`, `probe_driveby_aim` PASS; AimDebugAuto 40/40; `World.tscn` 0 errors;
 `./gradlew test` green.
+
+### W28 — THE SLING IS THE CHARACTER'S, THE HANG POINT IS THE WEAPON'S (2026-09-16, PLAN.md A4)
+
+W20 moved every model's ORIGIN onto its grip and replaced the per-weapon markers on the character
+with one socket per grip archetype. `WeaponController.reparentWeapon` asks the weapon how it sits
+(`WeaponItem.alignmentFor(holstered)`), so a HOLSTERED weapon started putting its GRIP on the
+back/hip socket where it used to put its old arbitrary origin — and the holster sockets, authored
+against those origins, were never re-checked. Measured (`tools/godot/probe_weapon_holster.gd`, the
+gate written first): the back sockets hang a long gun **straight down** (86 deg from vertical), so on
+a 1.49 m body with 0.43 m of back between shoulder and hip, both ends leave the torso — AR4's butt
+CORNER 0.133 m from `head_2` (beside the ear), ATL4's tube **1.460 m, above the 1.435 m crown**, SG1's
+muzzle at 0.378 m, below `calf_l`. Worse, **two holstered long guns occupied each other**: the pair
+is 0.163 m apart laterally while a slung gun's tall axis (0.18-0.29 m) lies ACROSS the back, so they
+overlapped by **0.153 m**. And the right-hip socket was authored pointing nearly FORWARD (75 deg from
+vertical), which drove a holstered knife into the hip: **17.3%** of its volume inside the spine and
+thigh bones.
+
+**Which owner fixes what is the whole of A4.** PLAN.md said to prefer a per-weapon `holsterPoint`
+over touching the shared sockets, and that is right for a FIT — but "how the strap crosses this
+character's back" is one fact shared by every long weapon, and writing it into four weapons would be
+four copies of it. So:
+
+- **The SLING is the character's**, solved in the body's frame by
+  **`tools/godot/solve_holster_sockets.gd`** and applied to both `CharacterVisuals_*.tscn`: 22 deg
+  from vertical (muzzle down-left, butt up-right), the gun FLAT against the back (its local X out of
+  the back), the pair separated in **DEPTH** (0.20 m and 0.32 m behind the spine) because laterally
+  they cannot be. The right hip is now defined as the **MIRROR** of the left (a conjugation by a
+  body-frame reflection, which keeps the frame right-handed and only decides which face looks
+  outward); the left hip measured clean as authored and is the reference. A socket is never nudged by
+  eye — its authored transform is in a BONE's frame and says nothing legible about where the weapon
+  ends up.
+- **The HANG POINT is the weapon's.** `ATL4`'s grip is 0.397 m from the rear of its tube, so even
+  slung it stood above the crown: it gets `holsterPoint = "HolsterPoint"` 0.20 m behind the grip
+  (1.460 -> 1.295 m). That is what the escape hatch is for.
+- **A 0.81 m axe is a LONG weapon, whatever slot it occupies.** `MW2`'s hip list could not hold it in
+  any pose — by the grip its head reached 0.154 m off the ground, by mid-haft the head was inside the
+  character's own head (0.112 m from `head_2`, 20% buried). Its `holsterSockets` are the two solved
+  back slings now (its MELEE slot is unchanged); with both taken by primaries it falls back to the
+  documented stow-hidden, which is what GTA does with a weapon it has no visible slot for.
+
+Measured after, every weapon on its socket: poke into the character's own hitbox bones
+**0.165 -> 0.002-0.032 m** (0-2.7% of the weapon's volume, which is a weapon RESTING on the back),
+nothing above the crown, nothing below 0.30 m, and **0.000 m** between any two weapons of a loadout.
+
+**How it is measured, and the two traps.** The poke test is a shape query against the character's own
+`PhysicalBone3D` bones (layer 4 — the bodies a bullet hits, so they track the live pose), plus a grid
+of points inside the weapon's own collision box; weapon-vs-weapon uses a temporary `StaticBody3D`
+proxy on an unused layer so the engine's own OBB test answers it. The crown is **measured** off the
+skinned `head` mesh every run (1.435 m; hair and headphones reach 1.458/1.469 and are deliberately not
+the line — W25 already accepted a held launcher inside the headphone cup), because a written constant
+would be silently wrong on a second body. And **a `.tscn` `Transform3D` literal's 9 basis floats are
+ROWS, not the three axis vectors**: printing `basis.x/y/z` in order transposed it, the position stayed
+exactly right, and the rifle came out lying HORIZONTALLY across the back (89 deg from vertical instead
+of 22). The solver serializes with `var_to_str` now, which is the engine's own form.
+
+Gate `tools/godot/probe_weapon_holster.gd` **PASS on both bodies** (7 weapons alone + two loadouts:
+two slings and both hips, then the axe on the second sling). `LongWeaponHolsterMaker3/4` and
+`ShortWeaponHolsterMaker3/4` are left as authored and unsolved — with two PRIMARY, one SECONDARY and
+one MELEE slot nothing can reach them, and a weapon there hangs horizontally by its grip (~0.6 m out
+to the left). Solve them as third/fourth poses the day a loadout needs them.
+
+### SR3 — a sniper rifle (2026-09-16, user-asked; the sniper mechanic itself is later)
+
+`assets/weapons/SR3.blend` was raw art: one mesh, ~7.24 units long down **+X**, bolt handle toward
+−Y. Normalised in place to the standard (`blender/WEAPON_AUTHORING.md`) — scaled to metres, turned so
+the muzzle is **+Y** in Blender, origin moved onto the grip, every transform applied, meshes in a
+collection named `SR3`. **The user replaced the model once mid-session** (a Remington 700-pattern gun
+became an AWP/L96-pattern one: thumbhole stock, heavy barrel, muzzle brake, 908 verts), and that is
+the useful record: re-deriving took one measurement pass, because everything downstream is derived
+from the model rather than hand-tuned.
+
+**The reference follows the MODEL, and the model's own proportions pick it.** The shipped one is an
+**Accuracy International AWP / L96A1 (24 in barrel, muzzle brake), 1.124 m** — trigger-to-butt
+measures 2.281 raw units, which is **0.354 m** at that scale against the AWP's 0.356 m length of
+pull, where the earlier 1.003 m Remington reference would have made it 0.316 m. So the size is a fact
+about the weapon, not a proportion knob. At 1.124 m it is the longest weapon in the game (75% of this
+1.49 m character's height, which is what an AWP looks like on a small shooter) and the tightest fit on
+the W28 back sling: slung, its muzzle corner sits **0.284 m** off the ground against the gate's 0.25 m
+limit, and its butt corner 1.395 m under the 1.488 m crown.
+
+**A THUMBHOLE STOCK PUTS THE FIST CLOSER TO THE TRIGGER than the standard's rule of thumb.** The
+"origin is the centre of the firing fist" rule is a *position*, and the usual ~6 cm behind the trigger
+comes from an AR-style pistol grip; here the hand wraps the column in front of the hole with the thumb
+through it, which measures **4 cm** behind the trigger and level with the hole's centre. Placing it at
+6 cm would have put the origin inside the hole. Measured after: grip->rear **0.306 m** (AR4 0.281,
+SG1 0.272, and an AWP's long stock is why it is the largest).
+
+It is a plain `FirearmItem` of the **rifle** grip archetype, so it needed no character edit: `Muzzle`
+on the bore tip of the brake, `SupportPoint` 0.24 m ahead of the grip (where this body's 0.416 m arm
+reaches), `StockPoint` on the butt pad — all three read off the conformed mesh's own cross-sections,
+never off the render. Stats are sniper-shaped and provisional: bolt/semi (`auto = false`,
+`fire_rate 0.9`), `damage 110` (a torso hit kills a 100 HP target, a leg does not), `spread 0.005`
+with heavy bloom, 5+20 rounds, a 3.0 s reload, and a hard W27 kick (0.045 m / 5.0 deg). **No scope, no
+zoom, no sway** — that is the mechanic still to come, and no icon asset exists yet (SG1, ATL4, MW1,
+MW2 and T1 already ship without one). Registered in `weapon_models.json`, `weapon_archetypes.json`
+(`holds.rifle.weapons`), `AimDebugHost.BENCH_WEAPONS`, `probe_weapon_fit`, `probe_weapon_holster`, the
+weapon library and `DebugWorld.tscn`'s pickup row.
+
+Gates: `probe_weapon_scale` (1.124 m, 0.0% out, instanced at identity, muzzle on −Z, collider rules),
+`probe_weapon_sockets` (no `GripPoint` — the origin IS the grip), `probe_weapon_fit` (stock on the
+pocket **0.000 m**, support grip **0.012 m**, gun on the aim line) and `probe_weapon_holster` (poke
+**0.000 m**, the only weapon with no hitbox contact at all) all PASS, on both bodies.
+
+**`weapon.SniperItem` is the type, and a new `WeaponType` VALUE would have been the wrong way to get
+one** (user-asked). `WeaponType` is a coarse behaviour category — RANGED / THROWN / MELEE — and the
+code tests it with `== WeaponType.MELEE` / `== RANGED` in `AICharacter` and in `Character`'s combat
+entry, so a fourth value would make every one of those tests silently miss a sniper rifle. A sniper
+IS ranged; what differs is behaviour, and behaviour is a subclass — the split the weapon set already
+makes (`ProjectileItem`, `ThrowableItem`, `MeleeItem`, `KnifeItem`, `AxeItem` are all classes).
+
+What the class owns today is the **CS:GO AWP rule**: `hipfireSpreadMultiplier` (8.0) multiplies the
+cone while the holder is not in combat, so the rifle is pinpoint through the sights and near-useless
+from the hip — which is what makes a one-shot weapon fair. Only `getCurrentSpreadDeg` widens:
+`minimumSpreadDeg` is the FLOOR the host validates a client's reported cone against (N1), and a floor
+that grew with the hipfire multiplier would refuse an honest scoped shot from a client whose aim state
+the host has not seen yet. **Widening a cone is always safe there; narrowing never is.** The scope
+itself (an ADS FOV plus an overlay or a render-to-texture scope), hold-breath sway and the bolt-cycle
+view punch are NOT stubbed as fields — a field nothing reads is a field that is wrong the day
+something reads it.
+
+**The aim POSE is a grip archetype, and index 9 is `sniper`** (user-asked). A scoped shooter's head
+comes down to the scope and the support hand goes further out, which is a pose, and a pose is exactly
+what `weaponPoseIndex` selects (W12). So: `weapon_archetypes.json` gains index **9** (the list is
+APPEND-ONLY — an index is stored in every weapon `.tscn`, so inserting in the middle silently re-poses
+existing weapons), a `holds.sniper` row, and three clips minted by the one-owner placeholder mechanism
+in `character_anim_naming.json` — `upright_aim_sniper`, `upright_hold_sniper`, `weapon_switch_sniper`,
+copies of the rifle's, **wired** into all four weapon-index blendspaces (`WeaponAim`,
+`WeaponAimTorso`, `WeaponHold`, `WeaponChangeAnimation`, `max_space` 8 → 9) in BOTH bodies. It shares
+`SocketRifle` and the `StockPoint` mount because a sniper's grip IS a rifle grip — W20's rule is one
+socket per grip CLASS, and the fit gate proves this hand works (stock 0.000 m, support grip 0.012 m).
+Because the clips are copies, the render is unchanged until they are authored: 90 clips (was 87),
+tree_refs 67 (was 64), orphans still 23, and `probe_weapon_archetypes` sweeps 10 indices and still
+finds **3** hand-pose clusters, with sniper landing in the rifle one. Authoring the scoped pose is a
+pose edit on an existing action — no rename, no scene change, no code.
+
+**Ammo and damage are the user's numbers:** `damage 80` (AWP-like; against 100 HP that is NOT a
+one-shot torso kill — a headshot at ×4 always is, and 110 would make the body lethal if that is the
+feel wanted), 5 + 20 rounds, and it auto-reloads on empty like every other magazine weapon (see
+"Auto-reload on empty").
 
 ## Godot-JVM Specifics
 
