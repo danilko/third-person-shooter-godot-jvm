@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -97,5 +99,94 @@ class WeaponCatalogTest {
         Matcher h = Pattern.compile("\n    \"([a-z_]+)\": \\{").matcher(arch.substring(holds));
         while (h.find()) assertNotNull(GripArchetype.fromKey(h.group(1)), "holds row " + h.group(1));
         assertTrue(!arch.contains("weapon_assignments"), "weapon_assignments is derived from the catalog now");
+    }
+
+    private static int iconSpec(String text, String key) {
+        Matcher m = Pattern.compile("\"icon\"\\s*:\\s*\\{.*?\"" + key + "\"\\s*:\\s*(\\d+)", Pattern.DOTALL).matcher(text);
+        assertTrue(m.find(), "icon." + key);
+        return Integer.parseInt(m.group(1));
+    }
+
+    /** A weapon's declared length: weapon_models.json `length_m`, or a primitive's `size` z. 0 if unknown. */
+    private static double declaredLength(String models, String id) {
+        Matcher m = Pattern.compile("\"id\":\\s*\"" + id + "\",\\s*\"length_m\":\\s*([0-9.]+)").matcher(models);
+        if (m.find()) return Double.parseDouble(m.group(1));
+        Matcher p = Pattern.compile("\"" + id + "\":\\s*\\{\\s*\"size\":\\s*\\[[0-9.]+,\\s*[0-9.]+,\\s*([0-9.]+)\\]").matcher(models);
+        return p.find() ? Double.parseDouble(p.group(1)) : 0;
+    }
+
+    /**
+     * Every weapon with a model or a primitive has a generated icon (blender/tools/render_weapon_icons.py) that
+     * its scene uses, at the catalog's frame size, white, centred, inside the padding, and at the catalog's
+     * scale: with `scale` "uniform" each silhouette is as wide as its weapon's declared length x pixels_per_metre.
+     */
+    @Test
+    void everyIconIsInTheFrameWhiteCentredAndFitted() throws IOException {
+        String cat = Files.readString(CATALOG);
+        int w = iconSpec(cat, "width"), h = iconSpec(cat, "height"), pad = iconSpec(cat, "padding");
+        boolean uniform = cat.matches("(?s).*\"scale\"\\s*:\\s*\"uniform\".*");
+        int ppm = uniform ? iconSpec(cat, "pixels_per_metre") : 0;
+        String models = Files.readString(MODELS);
+        for (Row r : catalog()) {
+            boolean modelled = Files.exists(ROOT.resolve("assets/weapons/" + r.id() + ".blend"))
+                    || declaredLength(models, r.id()) > 0;
+            if (!modelled) continue;
+            Path png = ROOT.resolve("assets/ui/weapons/" + r.id() + ".png");
+            assertTrue(Files.exists(png), r.id() + ": no icon, run render_weapon_icons.py");
+            assertTrue(Files.readString(ROOT.resolve(r.scene())).contains("path=\"res://assets/ui/weapons/" + r.id() + ".png\""),
+                    r.id() + ": the scene does not use its generated icon");
+            BufferedImage img = ImageIO.read(png.toFile());
+            assertEquals(w, img.getWidth(), r.id() + " width");
+            assertEquals(h, img.getHeight(), r.id() + " height");
+            int minX = w, minY = h, maxX = -1, maxY = -1;
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int argb = img.getRGB(x, y);
+                    int a = argb >>> 24;
+                    if (a < 128) continue;
+                    assertEquals(0xFFFFFF, argb & 0xFFFFFF, r.id() + ": opaque pixel is not white at " + x + "," + y);
+                    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+                    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+                }
+            }
+            assertTrue(maxX >= 0, r.id() + ": empty icon");
+            assertTrue(minX >= pad - 1 && minY >= pad - 1 && maxX <= w - pad && maxY <= h - pad, r.id() + ": content enters the padding");
+            assertTrue(Math.abs((minX + maxX) - (w - 1)) <= 2 && Math.abs((minY + maxY) - (h - 1)) <= 2,
+                    r.id() + ": not centred (" + minX + ".." + maxX + ", " + minY + ".." + maxY + ")");
+            if (uniform) {
+                // One scale for every weapon: the silhouette is as wide as the weapon is long at pixels_per_metre.
+                double length = declaredLength(models, r.id());
+                if (length > 0) {
+                    int want = (int) Math.round(length * ppm);
+                    assertTrue(Math.abs((maxX - minX + 1) - want) <= 3,
+                            r.id() + ": " + (maxX - minX + 1) + " px wide, " + length + " m at " + ppm + " px/m is " + want);
+                }
+            } else {
+                boolean fitsX = minX <= pad + 1 && maxX >= w - pad - 2;
+                boolean fitsY = minY <= pad + 1 && maxY >= h - pad - 2;
+                assertTrue(fitsX || fitsY, r.id() + ": not fitted to the frame");
+            }
+        }
+    }
+
+    /**
+     * An id is a KEY (file names, catalog rows, the inventory manifest, stack merging) and stays plain — "AR4",
+     * "PI52". The NAME a player reads is the id with a hyphen between the letters and the number — "AR-4",
+     * "PI-52" — the way real designations are written (AK-47, M4A1-S) and the way CS keeps `weapon_ak47` apart
+     * from its display string. Fist, which has no designation, is exempt.
+     */
+    @Test
+    void idsArePlainAndDisplayNamesAreHyphenated() throws IOException {
+        for (Row r : catalog()) {
+            if (r.id().equals("Fist")) continue;
+            String text = Files.readString(ROOT.resolve(r.scene()));
+            Matcher id = Pattern.compile("\nweapon_id = \"([^\"]*)\"").matcher(text);
+            Matcher name = Pattern.compile("\nweapon_name = \"([^\"]*)\"").matcher(text);
+            assertTrue(id.find(), r.id() + ": no weapon_id");
+            assertEquals(r.id(), id.group(1), r.scene() + ": weapon_id must equal the catalog id");
+            assertTrue(r.id().matches("[A-Z]+[0-9]+"), r.id() + ": an id is letters then digits, no punctuation");
+            assertTrue(name.find(), r.id() + ": no weapon_name");
+            assertEquals(r.id().replaceFirst("^([A-Z]+)([0-9]+)$", "$1-$2"), name.group(1), r.id() + ": display name");
+        }
     }
 }

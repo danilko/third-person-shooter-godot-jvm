@@ -89,6 +89,21 @@ def verify_and_export(w):
     out = os.path.join(OUT_DIR, wid + ".glb")
     bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_yup=True,
                               export_apply=True, export_animations=False)
+    # 4. every material carries a colour across glTF. Blender exports a base colour only from the ACTIVE
+    # output's Principled BSDF as a constant or an image; a material whose exported output is anything else
+    # (SR3 shipped with a second, Cycles-only Material Output fed by a Diffuse BSDF) arrives in Godot as
+    # plain white, with no warning on either side.
+    import struct
+    data = open(out, "rb").read()
+    gltf = json.loads(data[20:20 + struct.unpack("<I", data[12:16])[0]])
+    blank = [m.get("name", "?") for m in gltf.get("materials", [])
+             if "baseColorFactor" not in m.get("pbrMetallicRoughness", {})
+             and "baseColorTexture" not in m.get("pbrMetallicRoughness", {})]
+    if blank:
+        fail(wid, f"material(s) {blank} exported with NO base colour, so they render white in Godot. Give each "
+                  f"one a single Material Output (target All) fed by a Principled BSDF whose Base Color is a "
+                  f"constant or an image texture, then re-export.")
+
     print(f"[build_weapon] {wid}: {got:.3f} m (declared {want:.3f}), grip->rear {rear:.3f} m, "
           f"wrote {os.path.basename(out)} ({os.path.getsize(out)} bytes)")
 
