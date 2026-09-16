@@ -100,6 +100,10 @@ public class NetShotTestHost extends Node3D {
 
         buildGround();
         if (getTree().getFirstNodeInGroup("impact_manager") == null) addChild(new ImpactManager());
+        if (getNodeOrNull("/root/EventBus") instanceof com.openworld.game.EventBus bus) {
+            bus.damageDealt.connectUnsafe(godot.core.MethodCallable.createUnsafe(this, "onDamageDealt"),
+                    godot.api.Object.ConnectFlags.DEFAULT);
+        }
 
         if (host) {
             spawnTarget();
@@ -292,6 +296,20 @@ public class NetShotTestHost extends Node3D {
 
     private boolean finished;
 
+    private int hitConfirmedLocal = 0;
+
+    /** 2.8 item 9: count host-confirmed hits credited to this peer's own player (the hit marker's input). */
+    @Register
+    public void onDamageDealt(String attackerId, float damage, boolean headshot, boolean killed) {
+        for (com.openworld.character.Player p : com.openworld.game.PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p) && p.isLocalOwnedPlayer() && p.characterInfo != null
+                    && attackerId.equals(p.characterInfo.characterId)) {
+                hitConfirmedLocal++;
+                return;
+            }
+        }
+    }
+
     private void finish(String why) {
         if (finished) return;
         finished = true;
@@ -307,6 +325,7 @@ public class NetShotTestHost extends Node3D {
             sb.append(String.format(" target_damage=%.1f", targetHpStart - targetHealth.getCurrentHealth()));
         }
         if (!host) sb.append(" pulls=").append(pullsDone);
+        sb.append(" hit_confirmed_local=").append(hitConfirmedLocal);
         GD.print(sb.toString());
         getTree().quit();
     }

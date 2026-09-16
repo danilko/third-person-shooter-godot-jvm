@@ -31,7 +31,16 @@ extends SceneTree
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const WEAPON_DIR := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 ## Every weapon that declares holster sockets: the four long guns (back) and the three short (hip).
-const WEAPONS := ["AR4", "AR212", "SG1", "SR3", "ATL4", "PI52", "MW1", "MW2"]
+## Everything that holsters: the catalog minus the fist and the throwable (PLAN.md 2.8 item 7).
+var WEAPONS: Array = _catalog_weapons()
+
+static func _catalog_weapons() -> Array:
+	var cat: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://src/main/resources/com/openworld/weapon/weapon_catalog.json"))
+	var out := []
+	for row in cat["weapons"]:
+		if not (row["archetype"] in ["fist", "throwable"]):
+			out.append(row["id"])
+	return out
 
 ## A holstered weapon rests AGAINST the body, so some hitbox contact is expected. These are the
 ## limits for "inside it": POKE_DEPTH is the deepest overlap `collide_shape` may report against the

@@ -374,13 +374,16 @@ public final class NetMessageCodec {
     // floats are still present (zero) to keep the layout fixed.
 
     public static PackedByteArray encodeDamageBroadcast(int msgType, String victimCharacterId, float damage,
-            boolean hasSource, Vector3 source) {
+            boolean hasSource, Vector3 source, String attackerCharacterId, boolean headshot, boolean killed) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(victimCharacterId);
         buf.putFloat(damage);
         buf.put8(hasSource ? 1 : 0);
         putVector3(buf, hasSource && source != null ? source : Vector3.Companion.getZERO());
+        // 2.8 item 9: who dealt it, so that player's peer can draw a confirmed hit marker.
+        buf.putUtf8String(attackerCharacterId == null ? "" : attackerCharacterId);
+        buf.put8((headshot ? 1 : 0) | (killed ? 2 : 0));
         return buf.getDataArray();
     }
 
@@ -390,11 +393,15 @@ public final class NetMessageCodec {
         float damage = buf.getFloat();
         boolean hasSource = buf.getU8() != 0;
         Vector3 source = getVector3(buf);
-        return new DecodedDamageBroadcast(victimCharacterId, damage, hasSource, source);
+        String attacker = buf.getUtf8String();
+        int flags = buf.getU8();
+        return new DecodedDamageBroadcast(victimCharacterId, damage, hasSource, source, attacker,
+                (flags & 1) != 0, (flags & 2) != 0);
     }
 
     /** Carrier for a decoded MSG_DAMAGE_BROADCAST body — the cosmetic "you got hit" cue (+ attacker source) for non-authority peers. */
-    public record DecodedDamageBroadcast(String victimCharacterId, float damage, boolean hasSource, Vector3 source) { }
+    public record DecodedDamageBroadcast(String victimCharacterId, float damage, boolean hasSource, Vector3 source,
+            String attackerCharacterId, boolean headshot, boolean killed) { }
 
     // ── MSG_SHOT (client → host, host-resolved bullets) ───────────────────────
     //

@@ -215,4 +215,24 @@ public class EventBus extends Node {
     public final Signal2<CharacterInfo, Vector3> characterDamagedFrom =
             new Signal2<>(this, new StringName("character_damaged_from"));
 
+
+    /**
+     * Emitted by {@code WorldBounds} when a locally-owned player ENTERS the warning band inside the
+     * world's wall (an edge, not per frame). Payload: metres to the wall at that moment. No physics
+     * rides on it: the band only warns (PLAN.md P0 0.6). {@code ui.AreaWarning} shows it.
+     */
+    public final Signal1<Float> leavingArea = new Signal1<>(this, new StringName("leaving_area"));
+
+    /** Emitted by {@code WorldBounds} when that player leaves the warning band back inward. */
+    public final Signal0 returnedToArea = new Signal0(this, new StringName("returned_to_area"));
+
+
+    /**
+     * Damage was applied and someone is to credit for it (PLAN.md 2.8 item 9 — the hit marker). Emitted by
+     * {@code Health.applyDamage} on the peer that applies damage, and re-emitted on a client from the host's
+     * {@code MSG_DAMAGE_BROADCAST}, so a hit at range is confirmed by the authority, never predicted.
+     * Payload: attackerCharacterId, damage, headshot, killed. {@code ui.HitMarker} filters to the local player.
+     */
+    public final Signal4<String, Float, Boolean, Boolean> damageDealt =
+            new Signal4<>(this, new StringName("damage_dealt"));
 }

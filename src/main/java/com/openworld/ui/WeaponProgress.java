@@ -72,7 +72,9 @@ public class WeaponProgress extends TextureProgressBar {
   @Register
   @Override
   public void _process(double delta) {
-    if (weaponController == null) { setVisible(false); return; }
+    // A networked client frees its pre-placed Player on connect, before HUDManager re-wires to the
+    // spawned body: a freed controller must read as "none", not throw every frame until then.
+    if (weaponController == null || !godot.global.GD.isInstanceValid(weaponController)) { setVisible(false); return; }
     double sp = weaponController.getSwitchProgress();
     double rp = weaponController.getReloadProgress();
     boolean switching = sp >= 0.0;

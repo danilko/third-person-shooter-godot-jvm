@@ -204,9 +204,16 @@ public class MovementController extends Node {
     double newX, newZ;
     if (onFloor || swimming) {
       // Grounded: accelerate toward the target speed·dir with the usual smoothing.
-      double targetX = speed * normDir.getX();
-      double targetZ = speed * normDir.getZ();
-      double t = Math.min(1.0, acceleration * delta);
+      // A raised scope slows the holder and stops them sooner (PLAN.md 2.8 item 4, CS's scoped AWP and
+      // counter-strafe): the factors are the held weapon's ScopeConfig, asked through the body, and are 1
+      // with no scope up. Applied here, per frame, because the scope comes and goes without a movement-state
+      // change. "Stopping" = no wish direction.
+      double scopeSpeed = self != null ? self.scopeMoveSpeedFactor() : 1.0;
+      boolean stopping = normDir.lengthSquared() < 0.0001;
+      double accel = stopping && self != null ? acceleration * self.scopeStopAccelerationFactor() : acceleration;
+      double targetX = speed * scopeSpeed * normDir.getX();
+      double targetZ = speed * scopeSpeed * normDir.getZ();
+      double t = Math.min(1.0, accel * delta);
       newX = GD.lerp(curVel.getX(), targetX, t);
       newZ = GD.lerp(curVel.getZ(), targetZ, t);
     } else {
@@ -448,6 +455,9 @@ public class MovementController extends Node {
     speed = movementState.getMovementSpeed() * combatSpeedFactor;
     acceleration = movementState.getAcceleration() * combatAccelerationFactor;
   }
+
+  /** The combat state's speed factor now, for {@code Character.maxMoveSpeed}. */
+  public double combatSpeedFactorNow() { return combatSpeedFactor; }
 
   @Register
   public void onSetCombatState(CombatState combatState) {

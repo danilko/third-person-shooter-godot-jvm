@@ -181,6 +181,15 @@ public class PlayerController extends Controller {
             cmd.wantCombat = aimOrFire || (body.isCombat() && !aimStayTimer.isStopped());
         }
 
+        // The SCOPE reads the aim button itself, not wantCombat. In first person wantCombat is
+        // unconditionally true above, so a scoped rifle simply carried in FPS would be permanently
+        // scoped; and the aim-stay timer would hold the scope up for a beat after release. Whether
+        // this intent means anything is decided by the held weapon (WeaponController.isScoped).
+        cmd.wantScope = inp.isActionPressed("aim", false);
+        // Hold breath shares Shift with the stealth-walk modifier by default (CoD's binding): a
+        // shooter steadying a scope is not running anyway. A separate action so it can be rebound.
+        cmd.holdBreath = inp.isActionPressed("hold_breath", false);
+
         // ── Aim target (spine IK look point — converges on the crosshair target) ──
         // AimTarget drives SpineAimModifier (and is replicated as the puppet's look point).
         // It is set to the ACTUAL world point the crosshair is on — the AimRay's collision

@@ -63,6 +63,12 @@ ARMATURE = "Godot_Chan_Stealth"
 ARCHETYPES = os.path.join(ROOT, "blender/tools/weapon_archetypes.json")
 MODELS = os.path.join(ROOT, "blender/tools/weapon_models.json")
 HOLDS = json.load(open(ARCHETYPES))["holds"]
+CATALOG = json.load(open(os.path.join(ROOT, "src/main/resources/com/openworld/weapon/weapon_catalog.json")))["weapons"]
+
+
+def hold_weapons(hold_name):
+    """The weapons a hold covers: every catalog row with that archetype (PLAN.md 2.8 item 7 — one list)."""
+    return [w["id"] for w in CATALOG if w["archetype"] == hold_name]
 # Hair is left out: its strands are open cards, "inside" means nothing there, and a gun through a strand of
 # hair is not what reads as a defect.
 BODY_MESHES = ["armor", "head", "backpack", "headphones"]
@@ -222,7 +228,7 @@ class Rig:
     def __init__(self, hold_name="rifle", visuals=VISUALS):
         self.hold_name = hold_name
         self.hold = HOLDS[hold_name]
-        self.weapons = list(self.hold["weapons"])
+        self.weapons = hold_weapons(hold_name)
         self.reference = self.hold["reference"]
         self.socket = socket_of(self.hold["socket"], visuals)
         self.anchors = mount_anchors(visuals)
@@ -809,7 +815,7 @@ def render(rig, pose, out_dir, weapons=("AR4",), tag="pose"):
     weapons_added = {o.name for o in set(bpy.data.objects) - before}
     if "--show-placed" in sys.argv:
         weapons_added |= {o.name for o in before}
-    known = {w for h in HOLDS.values() for w in h["weapons"]}
+    known = {w for h in HOLDS for w in hold_weapons(h)}
     for o in bpy.data.objects:
         if o.name == "Icosphere" or (o.name.split(".")[0] in known and o.name not in weapons_added):
             o.hide_render = True

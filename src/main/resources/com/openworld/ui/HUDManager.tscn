@@ -12,6 +12,9 @@
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/MinimapController.java" id="9_mini"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/WorldMapManager.java" id="10_wmap"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/GpsArrow.java" id="11_gps"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/ScopeOverlay.java" id="12_scope"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/AreaWarning.java" id="13_areawarn"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/HitMarker.java" id="14_hitmark"]
 
 [node name="HUDManager" type="CanvasLayer" unique_id=828289775]
 script = ExtResource("1_fuvei")
@@ -29,6 +32,27 @@ visible = false
 [node name="WeaponProgress" parent="." unique_id=840000001 instance=ExtResource("8_wprog")]
 
 [node name="Crosshair" parent="." unique_id=938896149 instance=ExtResource("5_0rj32")]
+
+[node name="ScopeOverlay" type="Control" parent="." unique_id=850000004]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+mouse_filter = 2
+script = ExtResource("12_scope")
+
+[node name="AreaWarning" type="Control" parent="." unique_id=850000005]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+mouse_filter = 2
+script = ExtResource("13_areawarn")
+
+[node name="HitMarker" type="Control" parent="." unique_id=850000006]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+mouse_filter = 2
+script = ExtResource("14_hitmark")
 
 [node name="WeaponSlotsUI" parent="." unique_id=620000002 instance=ExtResource("6_wsbar")]
 offset_left = 32.0

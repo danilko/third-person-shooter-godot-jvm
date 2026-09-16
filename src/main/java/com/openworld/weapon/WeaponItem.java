@@ -5,6 +5,7 @@ import com.openworld.item.Pickup;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.AnimationPlayer;
 import godot.api.AudioStreamPlayer3D;
 import godot.api.AudioStreamWAV;
@@ -49,9 +50,33 @@ public class WeaponItem extends Pickup implements WeaponAction {
   // explicit slot switch, matching how players expect ranged/melee pickups to behave.
   @Export public boolean autoEquipOnPickup = false;
 
-  // Index into the AnimationTree weapon blend nodes (WeaponAim, WeaponHold, WeaponChangeAnimation).
-  // Decoupled from slot so the same animation pose is used regardless of which slot holds the weapon.
-  @Export public int weaponPoseIndex = 0;
+  /**
+   * The grip archetype by NAME ({@link GripArchetype}, PLAN.md 2.8 item 8) — "pistol", "rifle", "sniper", ...
+   * The AnimationTree blend index is DERIVED ({@link #weaponPoseIndex()}), so no scene stores a bare number
+   * whose meaning depends on a list's order. Decoupled from slot: the same pose whichever slot holds it.
+   */
+  @Export public String weaponArchetype = "pistol";
+
+  public String getWeaponArchetype() { return weaponArchetype; }
+  public void setWeaponArchetype(String v) { weaponArchetype = v; }
+
+  /**
+   * Blend position on WeaponAim / WeaponHold / WeaponChangeAnimation for {@link #weaponArchetype}. An unknown
+   * name is an authoring error: it is reported once and falls back to the pistol pose rather than to a blend
+   * position with nothing at it (which leaves the branch silent and the skeleton at rest — W12).
+   */
+  @Register
+  public int weaponPoseIndex() {
+    GripArchetype a = GripArchetype.fromKey(weaponArchetype);
+    if (a != null) return a.index();
+    if (!warnedArchetype) {
+      warnedArchetype = true;
+      godot.global.GD.INSTANCE.printErr("WeaponItem " + weaponId + ": unknown weapon_archetype '" + weaponArchetype + "' — using pistol");
+    }
+    return GripArchetype.PISTOL.index();
+  }
+
+  private boolean warnedArchetype = false;
 
   // Icon shown in the kill feed and radial menu. Set in the inspector per weapon scene.
   @Export public Texture2D weaponIcon = null;
@@ -147,27 +172,51 @@ public class WeaponItem extends Pickup implements WeaponAction {
   // The first socket with no other weapon in it is used. Empty array = hide when inactive.
   @Export public PackedStringArray holsterSockets = new PackedStringArray();
 
-  @Export public float spread = 0.0f;
+  /**
+   * This weapon's tuning table ({@link WeaponStats}, PLAN.md 2.8 item 1). Assigning it copies every value onto
+   * the fields below, which are {@code @Visible} rather than exported: registered (so a probe or a debug tool
+   * can still read or nudge one live) but no longer stored in the weapon scene, so the .tres is the one place
+   * a weapon is balanced. A weapon with no stats keeps its field initialisers (and its constructor's values).
+   */
+  @Export public WeaponStats stats;
+
+  public WeaponStats getStats() { return stats; }
+
+  public void setStats(WeaponStats v) {
+    stats = v;
+    if (v != null) applyStats(v);
+  }
+
+  /** Copy {@code s} onto this weapon's tuning fields. Subclasses copy their own rows and call super. */
+  protected void applyStats(WeaponStats s) {
+    spread = s.spread; bloomPerShot = s.bloomPerShot; bloomDecaySpeed = s.bloomDecaySpeed; bloomMax = s.bloomMax;
+    reloadSpeed = s.reloadSpeed; switchSpeed = s.switchSpeed; fireRate = s.fireRate; auto = s.auto;
+    magazineSize = s.magazineSize; reserveMax = s.reserveMax; recoil = s.recoil; damage = s.damage;
+    kickBack = s.kickBack; kickPitch = s.kickPitch; kickSpring = s.kickSpring; kickDamping = s.kickDamping;
+    weaponRange = s.weaponRange;
+  }
+
+  @Visible public float spread = 0.0f;
   // Inaccuracy added per shot; decays at bloomDecaySpeed when not firing.
   // Set bloomDecaySpeed lower than (bloomPerShot × fireRate) for bloom to
   // accumulate during full-auto. Set it higher for semi-auto tap-fire weapons
   // where each shot clears before the next.
-  @Export public float bloomPerShot    = 0.0f;
-  @Export public float bloomDecaySpeed = 1.0f;
-  @Export public float bloomMax        = 0.25f;
-  @Export public float reloadSpeed = 0.8f;
+  @Visible public float bloomPerShot    = 0.0f;
+  @Visible public float bloomDecaySpeed = 1.0f;
+  @Visible public float bloomMax        = 0.25f;
+  @Visible public float reloadSpeed = 0.8f;
   // switchSpeed is a rate: deploy time = 1/switchSpeed. 2.2 ⇒ ~0.45 s deploy (CS/PUBG-snappy); the
   // post-deploy fire lockout is a small fixed constant (WeaponController.DRAW_SETTLE_SECONDS), not a
   // second full 1/switchSpeed, so total switch ≈ deploy time.
-  @Export public float switchSpeed = 2.2f;
-  @Export public float fireRate = 8.0f;
-  @Export public boolean auto = true;
+  @Visible public float switchSpeed = 2.2f;
+  @Visible public float fireRate = 8.0f;
+  @Visible public boolean auto = true;
   @Export public int magazine = 40;
-  @Export public int magazineSize = 40;
+  @Visible public int magazineSize = 40;
   @Export public int reserve = 40;
-  @Export public int reserveMax = 40;
-  @Export public float recoil = 0.8f;
-  @Export public float damage = 25.0f;
+  @Visible public int reserveMax = 40;
+  @Visible public float recoil = 0.8f;
+  @Visible public float damage = 25.0f;
 
   // ── The VISIBLE weapon kick (PLAN.md A3, character.WeaponRecoilModifier) ────────────────────
   // Separate from `recoil` above, which is the CAMERA kick (the aim), and from fireAnimation, which
@@ -178,19 +227,19 @@ public class WeaponItem extends Pickup implements WeaponAction {
   // a fist, a knife and a thrown grenade, and makes an unauthored firearm visible rather than
   // silently inheriting a rifle's feel.
   /** Push-back along the bore per shot, metres. */
-  @Export public float kickBack = 0.0f;
+  @Visible public float kickBack = 0.0f;
   /** Muzzle rise per shot, degrees. No yaw term: a yaw kick would fight WeaponItem.pointsAtAim (W21). */
-  @Export public float kickPitch = 0.0f;
+  @Visible public float kickPitch = 0.0f;
   /** The return spring's angular frequency, 1/s. Lower = a heavier gun that settles slower. */
-  @Export public float kickSpring = 22.0f;
+  @Visible public float kickSpring = 22.0f;
   /** The return spring's damping ratio. 1 = critically damped; below 1 overshoots. */
-  @Export public float kickDamping = 1.0f;
+  @Visible public float kickDamping = 1.0f;
 
   // Effective engagement distance in metres. AI uses this (via AICharacter.getEffectiveAttackRange)
   // to cap how far it will try to fight with this weapon — e.g. a melee AI closes to arm's
   // reach instead of standing at AIBehaviorConfig.attackRange and swinging at empty air.
   // MeleeItem overrides getEffectiveRange() to return its opening swing's reach, so the two stay in sync.
-  @Export public float weaponRange = 50.0f;
+  @Visible public float weaponRange = 50.0f;
   @Export public AudioStreamWAV fireAudio;
   @Export public AudioStreamWAV reloadAudio;
 
@@ -222,6 +271,14 @@ public class WeaponItem extends Pickup implements WeaponAction {
   protected String resolveAttackerName() {
     if (owningCharacter instanceof Character c && c.characterInfo != null) return c.characterInfo.displayName;
     return owningCharacter != null ? owningCharacter.getName().toString() : "";
+  }
+
+  /** The attacker's characterId, for the hit marker's "was that me" (PLAN.md 2.8 item 9). "" when unknown. */
+  protected String resolveAttackerId() {
+    if (owningCharacter instanceof Character c && c.characterInfo != null && c.characterInfo.characterId != null) {
+      return c.characterInfo.characterId;
+    }
+    return "";
   }
 
   /** Attacker faction string for faction/friendly-fire checks. */
@@ -371,31 +428,32 @@ public class WeaponItem extends Pickup implements WeaponAction {
   }
 
   /**
-   * Casts the character's AimRay from an arbitrary world origin/direction and restores it afterwards
-   * — the same borrow-the-ray idiom {@code FirearmItem.resolveServerShot} uses, so a trace keeps the ray's
-   * collision mask and its self-exceptions (own body + ragdoll bones) with no extra query setup.
+   * Traces from an arbitrary world origin along {@code dir} with the AimRay's SETTINGS — its collision mask,
+   * body/area flags and self-exceptions — as a stateless space query (PLAN.md 2.8 item 6). It used to borrow
+   * the ray node itself (move it, force an update, put it back), which moved the {@code AimTarget} hanging off
+   * it for the duration and would leave both displaced if anything in between threw. The exceptions come from
+   * {@code util.RayExclusions}, the one owner that also adds them to the node.
    */
   protected TraceHit trace(RayCast3D ray, Vector3 origin, Vector3 dir, float range) {
-    // Both saved values are LOCAL, so putting them back is exact — restoring a global position
-    // instead would re-derive the local one through the parent transform and drift a little every
-    // shot.
-    Vector3 savedPos    = ray.getPosition();
-    Vector3 savedTarget = ray.getTargetPosition();
-
-    ray.setGlobalPosition(origin);
-    ray.setTargetPosition(ray.toLocal(origin.plus(dir.times(range))));
-    ray.forceRaycastUpdate();
-
-    TraceHit hit = null;
-    if (ray.isColliding()
-        && ray.getCollisionPoint().minus(origin).length() > MUZZLE_MIN_DISTANCE) {
-      hit = new TraceHit((ray.getCollider() instanceof Node n) ? n : null,
-                         ray.getCollisionPoint(), ray.getCollisionNormal());
+    if (ray == null || !ray.isInsideTree() || ray.getWorld3d() == null) return null;
+    godot.api.PhysicsDirectSpaceState3D space = ray.getWorld3d().getDirectSpaceState();
+    if (space == null) return null;
+    godot.core.VariantArray<godot.core.RID> exclude = com.openworld.util.RayExclusions.of(ray);
+    if (ray.getExcludeParentBody() && ray.getParent() instanceof godot.api.CollisionObject3D parent) {
+      exclude.add(parent.getRid());
     }
-
-    ray.setTargetPosition(savedTarget);
-    ray.setPosition(savedPos);
-    return hit;
+    godot.api.PhysicsRayQueryParameters3D q = godot.api.PhysicsRayQueryParameters3D.Companion.create(
+        origin, origin.plus(dir.times(range)), ray.getCollisionMask(), exclude);
+    q.setCollideWithBodies(ray.isCollideWithBodiesEnabled());
+    q.setCollideWithAreas(ray.isCollideWithAreasEnabled());
+    q.setHitFromInside(ray.isHitFromInsideEnabled());
+    q.setHitBackFaces(ray.isHitBackFacesEnabled());
+    godot.core.Dictionary<java.lang.Object, java.lang.Object> hit = space.intersectRay(q);
+    if (hit.isEmpty()) return null;
+    if (!(hit.get("position") instanceof Vector3 point)) return null;
+    if (point.minus(origin).length() <= MUZZLE_MIN_DISTANCE) return null;
+    Vector3 normal = hit.get("normal") instanceof Vector3 n ? n : Vector3.Companion.getZERO();
+    return new TraceHit(hit.get("collider") instanceof Node nd ? nd : null, point, normal);
   }
 
   /** Current holder (set by WeaponController.setup), or null while in the world — used for the late-join pickup baseline. */
@@ -460,6 +518,16 @@ public class WeaponItem extends Pickup implements WeaponAction {
    * point before it fires. False for melee, which resolves from the chest (W16).
    */
   protected boolean launchesTowardAim() { return false; }
+
+  /**
+   * This weapon's scope, or null for a weapon with none (PLAN.md 2.8 item 4). A composed {@link ScopeConfig}
+   * rather than four base-class hooks returning 0/false: any firearm that references one is scoped, with
+   * no subclass. A config whose {@code fov} is 0 counts as no scope.
+   *
+   * <p>Named as a question-ish reader, not {@code getScope}, so godot-jvm cannot merge it into a
+   * getter-only registered property (CLAUDE.md, "A Java field and its JavaBean accessors are ONE property").
+   */
+  public ScopeConfig scopeConfig() { return null; }
 
   /**
    * Whether the aim modifiers should aim this weapon's BORE (its -Z) rather than the chest

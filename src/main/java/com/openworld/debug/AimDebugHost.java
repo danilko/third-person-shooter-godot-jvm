@@ -162,10 +162,23 @@ public class AimDebugHost extends Node3D {
     private boolean firing;
 
     // ── Shooting bench (PLAN.md 0.2 follow-up) ───────────────────────────────────────────────
-    /** Weapons the bench can put in an AI's hands, cycled with [ and ]. */
-    private static final String[] BENCH_WEAPONS = {
-        "AR4", "AR212", "SG1", "SR3", "PI52", "ATL4", "T1", "MW1", "MW2",
-    };
+    /** Weapons the bench can put in an AI's hands, cycled with [ and ]: the catalog's `bench` rows (2.8 item 7). */
+    private static final String[] BENCH_WEAPONS = benchWeapons();
+
+    private static String[] benchWeapons() {
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        String path = "res://src/main/resources/com/openworld/weapon/weapon_catalog.json";
+        if (godot.api.FileAccess.fileExists(path)
+                && godot.api.JSON.parseString(godot.api.FileAccess.getFileAsString(path)) instanceof godot.core.Dictionary<?, ?> d
+                && d.get("weapons") instanceof godot.core.VariantArray<?> rows) {
+            for (Object r : rows) {
+                if (r instanceof godot.core.Dictionary<?, ?> row && Boolean.TRUE.equals(row.get("bench"))
+                        && row.get("id") instanceof String id) ids.add(id);
+            }
+        }
+        if (ids.isEmpty()) ids.add("AR4");
+        return ids.toArray(new String[0]);
+    }
     private static final String WEAPON_DIR = "res://src/main/resources/com/openworld/weapon/";
     private int benchWeaponIndex = 0;
     private WeaponItem benchItem;             // the weapon the mannequin was armed with

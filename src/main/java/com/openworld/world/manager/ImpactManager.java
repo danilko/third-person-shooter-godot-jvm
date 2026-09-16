@@ -65,6 +65,14 @@ public class ImpactManager extends Node {
                            String weaponName, Texture2D weaponIcon,
                            String attackerName, String attackerFaction,
                            godot.core.Vector3 attackerPos) {
+        processHit(info, damage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos, "");
+    }
+
+    /** @param attackerId the attacker's characterId, for the hit marker ({@code EventBus.damageDealt}). */
+    public void processHit(HitInfo info, float damage,
+                           String weaponName, Texture2D weaponIcon,
+                           String attackerName, String attackerFaction,
+                           godot.core.Vector3 attackerPos, String attackerId) {
         // Walk the parent chain once to resolve surface type, health owner, and
         // character — previously done by three independent traversals per hit.
         HitContext ctx = resolveHitContext(info.hitNode);
@@ -83,7 +91,8 @@ public class ImpactManager extends Node {
             // vehicle counterpart of the character bone-multiplier model.
             if (ctx.wheel != null) bodyDamage = ctx.wheel.applyTireDamage(damage);
             Health health = (Health) ctx.healthOwner.getNode(new NodePath("Health"));
-            health.takeDamage(info.hitNode, bodyDamage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos);
+            health.takeDamage(info.hitNode, bodyDamage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos,
+                    attackerId);
         }
 
         if (ctx.character != null && info.hitNormal != null) {

@@ -80,8 +80,8 @@ public class WeaponController extends Node {
       WeaponSlotType.CONSUMABLE,  // slot 6 — consumable         (key 6)
   };
 
-  private WeaponItem[] weapons;
-  private int activeSlotIndex  = 0;
+  WeaponItem[] weapons;
+  int activeSlotIndex  = 0;
   private int pendingSlotIndex = 0;
   // Rolling shot counter (u8) replicated in each snapshot — remote peers play the fire cue when it
   // changes (fire-as-state). On a puppet this is set from the wire via setReplicatedFireSeq.
@@ -103,7 +103,7 @@ public class WeaponController extends Node {
   // physics body, so this is no longer the CollisionObject-reparent restriction it was built for —
   // what it still buys is that an equip resolves OUT of the body_entered signal that requested it,
   // which is what the same-frame merge/displacement guards below are written against.
-  private final List<WeaponItem> pendingEquips = new ArrayList<>();
+  final List<WeaponItem> pendingEquips = new ArrayList<>();
   // Items already equipped during the current _process pass — see the race-guard
   // comment in equipWeapon(). Cleared at the start of each pass that has work to do.
   private final Set<WeaponItem> equippedThisPass = new HashSet<>();
@@ -132,13 +132,20 @@ public class WeaponController extends Node {
   // The slot is captured at queue time — it is nulled before _process drains the queue,
   // and the replicated drop event (Phase E) is keyed by slot on the receiving peers.
   private record PendingDrop(WeaponItem item, int slot) { }
-  private final List<PendingDrop> pendingDrops  = new ArrayList<>();
+  final List<PendingDrop> pendingDrops  = new ArrayList<>();
   // True when pendingDrops was populated by dropAllWeapons() (death); false for a
   // manual single-weapon drop. Controls which physics parameters are used.
   private boolean isDeathDrop = false;
 
   // Populated in _ready() from socketPaths: node name → Marker3D node.
-  private final Map<String, Node> socketMap = new HashMap<>();
+  /** Where a carried weapon hangs (hand, holster, stow) — PLAN.md 2.8 item 5. */
+  final WeaponSockets sockets = new WeaponSockets(this);
+  /** MSG_INVENTORY build + reconcile — PLAN.md 2.8 item 5. */
+  final WeaponInventorySync inventorySync = new WeaponInventorySync(this);
+  /** A puppet's replayed fire/reload cosmetics — PLAN.md 2.8 item 5. */
+  final RemoteWeaponCues remoteCues = new RemoteWeaponCues(this);
+
+  final Map<String, Node> socketMap = new HashMap<>();
 
   /**
    * Where a weapon with no hold/holster socket is parked while carried — the weapon attachment
@@ -149,7 +156,7 @@ public class WeaponController extends Node {
    * has no body now (see {@code item.PickupBody}), so there is nothing left to confuse and the item
    * can simply go where it belongs.
    */
-  private Node stowNode;
+  Node stowNode;
 
   private RayCast3D aimRay;
   private RayCast3D originalAimRay;
@@ -212,6 +219,10 @@ public class WeaponController extends Node {
     return weapons[slotIndex];
   }
 
+  /** The held weapon's live cone in degrees, for probes (question-named so godot-jvm registers a method). */
+  @Register
+  public double spreadNowDeg() { return getCurrentSpreadDeg(); }
+
   public float getCurrentSpreadDeg() {
     WeaponItem w = getCurrentWeaponItem();
     return w != null ? w.getCurrentSpreadDeg() : 0f;
@@ -226,20 +237,106 @@ public class WeaponController extends Node {
   /** The active AimRay for all character-owned weapons. May be the vehicle ray when overridden. */
   public RayCast3D getAimRay() { return aimRay; }
 
+  // ── Scope (PLAN.md 2.7 piece 1) ───────────────────────────────────────────
+
+  /**
+   * Raw intent from this tick's {@code UserCommand.wantScope} — the aim button held, nothing more.
+   * Written by {@code Character.applyInput}, so an AI, a puppet and a replay all go through the same
+   * door as the player.
+   */
+  private boolean scopeRequested = false;
+
+  /** @see #scopeRequested */
+  public void setScopeRequested(boolean requested) { scopeRequested = requested; }
+
+  /**
+   * Whether the held weapon's scope is UP this frame — the one fact the camera, the head, the
+   * crosshair and the overlay all read.
+   *
+   * <p><b>It is DERIVED, never latched, and that is the whole design.</b> The obvious implementation
+   * — writing {@code Character.isFpsMode} when the scope goes up and writing it back when it comes
+   * down — cannot survive an interruption: a death, a weapon switch, a dropped gun or a car door
+   * between the two writes leaves the player stuck in first person with no way back. Deriving it
+   * means every one of those is a CONSEQUENCE rather than a call site somebody has to remember, the
+   * same shape W5/W6 gave {@code Character.refreshHeadVisibility}. Here that is:
+   *
+   * <ul>
+   *   <li>the button released — {@link #scopeRequested} goes false on the next tick;</li>
+   *   <li>a weapon switch — {@link #isWeaponTransitioning()} is true for the whole draw, and the new
+   *       weapon then answers for itself;</li>
+   *   <li>a drop, a holster, an emptied throwable — {@link #getCurrentWeaponItem()} is a weapon with
+   *       no scope, or none at all;</li>
+   *   <li>death and riding a carrier — {@code Character.isScoped()}, which is what everything
+   *       outside this node actually asks.</li>
+   * </ul>
+   *
+   * <p>Named {@code scopedNow} rather than {@code isScoped} for the reason {@code reloadingNow} is:
+   * godot-jvm merges a registered {@code isX()} into a getter-only property {@code x}, and this is a
+   * method the gate ({@code tools/godot/probe_sniper_scope.gd}) has to CALL.
+   */
+  @Register
+  public boolean scopedNow() {
+    if (!scopeRaisedNow()) return false;
+    // A bolt gun leaves the eye to cycle and to reload, and comes back by itself while aim is still
+    // held (CS's AWP with resume-zoom; PLAN.md 2.7 piece 4, user decision 2026-09-16). Derived like
+    // everything else here: the fire timer IS the bolt cycle (a bolt action is `auto = false` +
+    // `fireRate`, see CLAUDE.md), the reload timer IS the reload, so there is no re-scope bookkeeping
+    // to get wrong and an interrupted cycle cannot strand the scope down.
+    // Only a real CYCLE or RELOAD drops the zoom (2.8 item 2): a draw settle or a pickup block does not.
+    ScopeConfig sc = heldScope();
+    WeaponState st = state();
+    return !(sc != null && sc.unscopeToCycle && (st == WeaponState.CYCLING || st == WeaponState.RELOADING));
+  }
+
+  /**
+   * Whether the scope is RAISED — aim held on a scoped weapon, no switch in flight — whether or not it is
+   * zoomed this frame. {@link #scopedNow()} is this minus the bolt cycle and the reload.
+   *
+   * <p>Two facts because two different things ask. The VIEW (first person) and the SHOT (leaves the
+   * scope, {@code FirearmItem.useMuzzleTrace}) follow the raised scope: a third-person player cycling a
+   * bolt stays behind the eye instead of flicking to the boom and back on every shot, and the shot that
+   * starts the cycle — the fire timer is started before the weapon resolves it — is still a scoped one.
+   * The ZOOM, the optic and the hidden crosshair follow {@link #scopedNow()}.
+   */
+  @Register
+  public boolean scopeRaisedNow() {
+    if (!scopeRequested) return false;
+    if (isWeaponTransitioning()) return false;
+    return heldScope() != null;
+  }
+
+  /** The held weapon's scope, or null when nothing scoped is held (a config with fov 0 is no scope). */
+  public ScopeConfig heldScope() {
+    WeaponItem w = getCurrentWeaponItem();
+    ScopeConfig sc = w != null ? w.scopeConfig() : null;
+    return sc != null && sc.fov > 0f ? sc : null;
+  }
+
+  /** The held weapon's scoped FOV in degrees, or 0 when nothing scoped is held. */
+  public double scopedFovDegrees() {
+    ScopeConfig sc = heldScope();
+    return sc != null ? sc.fov : 0.0;
+  }
+
+  /** The held weapon's scoped drift in degrees, or 0 when nothing (or nothing that sways) is held. */
+  public double scopeSwayDegrees() {
+    ScopeConfig sc = heldScope();
+    return sc != null ? sc.sway : 0.0;
+  }
+
+  /** The held weapon's zoom time in seconds; a sane default when nothing is held. */
+  public double scopeZoomSeconds() {
+    ScopeConfig sc = heldScope();
+    return sc != null ? sc.zoomSeconds : 0.12;
+  }
+
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @Register
   @Override
   public void _process(double delta) {
     // N3: the rest of a replicated burst, one cue per remembered shot at the weapon's own rhythm.
-    if (pendingRemoteCues > 0) {
-      remoteCueCountdown -= delta;
-      if (remoteCueCountdown <= 0.0) {
-        pendingRemoteCues--;
-        remoteCueCountdown = remoteCueGap();
-        playRemoteFireCue();
-      }
-    }
+    remoteCues.tick(delta);
     // Process equips first (deferred from Area3D body_entered signals)
     if (!pendingEquips.isEmpty()) {
       equippedThisPass.clear();
@@ -318,7 +415,7 @@ public class WeaponController extends Node {
     // For CharacterVisuals characters the attachment lives inside the visuals sub-scene, so
     // getNodeOrNull returns null here — postInitFromVisuals() re-discovers correctly later.
     discoverPrePlacedWeapons(getOwner(), weaponAttachmentPath);
-    showWeapon(activeSlotIndex);
+    sockets.showWeapon(activeSlotIndex);
 
     emitInitialAmmoState();
 
@@ -366,12 +463,12 @@ public class WeaponController extends Node {
 
     // Discover weapons pre-placed in the weapon attachment node.
     discoverPrePlacedWeapons(visualsRoot, config.weaponAttachmentPath);
-    showWeapon(activeSlotIndex);
+    sockets.showWeapon(activeSlotIndex);
 
     // Sync animation tree to the initial weapon pose (no transition fires on first discovery).
     WeaponItem initial = weapons[activeSlotIndex];
     if (initial != null && animationController != null) {
-      animationController.onWeaponEquip(initial.weaponPoseIndex);
+      animationController.onWeaponEquip(initial.weaponPoseIndex());
     }
 
     emitInitialAmmoState();
@@ -528,24 +625,21 @@ public class WeaponController extends Node {
     if (willBeActive) {
       boolean wasArmed = isArmed();
       activeSlotIndex = targetSlot;
-      moveWeaponToHand(item);
+      sockets.moveWeaponToHand(item);
       // Block accidental fire on pickup: the fire button may already be held from the
       // previous weapon. Use the switch-speed delay (same as a manual slot switch) so the
       // player must release and re-press fire before the newly equipped weapon can fire.
-      if (fireTimer.getTimeLeft() <= 0) {
-        fireTimer.setWaitTime(1.0 / item.getSwitchSpeed());
-        fireTimer.start();
-      }
+      if (fireTimer.getTimeLeft() <= 0) startFireLock(1.0 / item.getSwitchSpeed(), WeaponState.SETTLING);
       if (item.getReloadAudio() != null) {
         weaponAudio.setStream(item.getReloadAudio());
         weaponAudio.play();
       }
-      if (animationController != null) animationController.onWeaponEquip(item.weaponPoseIndex);
+      if (animationController != null) animationController.onWeaponEquip(item.weaponPoseIndex());
       ammoChanged.emit(item.getMagazine(), item.getReserve());
       if (wasArmed != isArmed()) emitArmedStateChanged(isArmed());
     } else {
       // Weapon goes into an inactive slot — mount at its holster socket.
-      moveWeaponToHolster(item);
+      sockets.moveWeaponToHolster(item);
       WeaponItem active = getCurrentWeaponItem();
       ammoChanged.emit(active != null ? active.getMagazine() : 0,
                        active != null ? active.getReserve()  : 0);
@@ -624,8 +718,7 @@ public class WeaponController extends Node {
     w.playMotion(w.fireAnimation);
     kickWeapon(w);
 
-    fireTimer.setWaitTime(w.fireInterval());
-    fireTimer.start();
+    startFireLock(w.fireInterval(), WeaponState.CYCLING);
     bufferedFireUntilMs = 0;
 
     w.useWeapon();
@@ -655,7 +748,7 @@ public class WeaponController extends Node {
    * as {@code playMotion(fireAnimation)} -- the owner's fire and a puppet's cue -- because both are
    * cosmetics that every peer must see. A weapon with no authored kick costs one branch.
    */
-  private void kickWeapon(WeaponItem w) {
+  void kickWeapon(WeaponItem w) {
     if (w.kickBack == 0.0f && w.kickPitch == 0.0f) return;
     AnimationController ac = animation();
     if (ac != null) ac.onWeaponKick(w.kickBack, w.kickPitch, w.kickSpring, w.kickDamping);
@@ -695,89 +788,16 @@ public class WeaponController extends Node {
   /** Mirrors the replicated reload counter onto a puppet so the host re-broadcasts the correct value. */
   public void setReplicatedReloadSeq(int seq) { reloadSeq = seq & 0xFF; }
 
-  /**
-   * Network replay hook — plays the reload cosmetics (animation + audio) without running the reload
-   * timer or refilling the magazine (ammo arrives via the replicated activeMagazine). Lets every
-   * peer see a character is reloading. No-op when there's no active weapon (e.g. fist/diverged slot).
-   */
-  public void playRemoteReloadCue() {
-    WeaponItem w = getCurrentWeaponItem();
-    if (w == null || !isArmed()) return;
-    w.playMotion(w.reloadAnimation);
-    if (w.getReloadAudio() != null) {
-      weaponAudio.setStream(w.getReloadAudio());
-      weaponAudio.play();
-    }
-    if (animationController != null) animationController.onWeaponReload();
-  }
+  // ── Remote (puppet) cues — see RemoteWeaponCues (PLAN.md 2.8 item 5) ──────
 
-  // One-shot guard for the cue-divergence diagnostic below — the cue fires per shot (up to
-  // ~10/s under sustained fire), so an unguarded print would flood the console.
-  private boolean loggedCueNoFirearm = false;
+  public void playRemoteReloadCue() { remoteCues.playRemoteReloadCue(); }
 
-  /** N3: remote cues still to play from the last replicated counter change, and the time to the next one. */
-  private int pendingRemoteCues = 0;
-  private double remoteCueCountdown = 0.0;
+  /** See {@link RemoteWeaponCues#playRemoteFireCues}. */
+  public void playRemoteFireCues(int count) { remoteCues.playRemoteFireCues(count); }
 
-  /**
-   * Network replay: the owner fired {@code count} times since the last snapshot this puppet saw
-   * ({@code net.FireCuePolicy} reads that off the wrapping counter). The first cue plays now and the rest at the
-   * weapon's own fire interval, so a burst a dropped snapshot collapsed is still heard as a burst. A melee weapon
-   * replays only its latest swing: a swing restarts the one before it, and the step that rides the snapshot is
-   * the latest one.
-   */
-  public void playRemoteFireCues(int count) {
-    if (count <= 0) return;
-    if (getCurrentWeaponItem() instanceof MeleeItem) count = 1;
-    playRemoteFireCue();
-    if (count > 1) {
-      NetStats.increment("fire_cue_burst_replayed");
-      pendingRemoteCues = Math.min(com.openworld.net.FireCuePolicy.MAX_CUES - 1, pendingRemoteCues + count - 1);
-      remoteCueCountdown = remoteCueGap();
-    }
-  }
-
-  /** Seconds between replayed cues: the held weapon's fire interval, kept between two frames and 0.12 s. */
-  private double remoteCueGap() {
-    WeaponItem w = getCurrentWeaponItem();
-    double gap = w != null ? w.fireInterval() : 0.1;
-    return Math.max(0.033, Math.min(0.12, gap));
-  }
-
-  /** Network replay hook — plays the firing cosmetics (flash/audio + tracer) without consuming ammo or running hitscan. */
+  /** Network replay hook — plays the firing cosmetics without consuming ammo or running hitscan. */
   @Register
-  public void playRemoteFireCue() {
-    // G4-2 (puppet fire-gate): never render a shot before the weapon is up. Mirror the owner's own
-    // onWeaponFire gate — suppress while the holster→draw transition runs OR through the draw-settle
-    // fireTimer that onWeaponTransitionComplete starts. A cue inside that window is the
-    // fire-precedes-draw race (rare once G4-1 aligns the switch). The owner self-gates its real fire
-    // on the same condition, so nothing authoritative is lost.
-    if (isWeaponTransitioning() || fireTimer.getTimeLeft() > 0) {
-      NetStats.increment("fire_cue_predraw_suppressed");
-      return;
-    }
-    WeaponItem w = getCurrentWeaponItem();
-    if (w != null && isArmed()) {
-      w.playMotion(w.fireAnimation);   // the weapon's own moving parts, on the remote peer too
-      kickWeapon(w);                   // and the visible arm kick (A3) -- cosmetic, so a puppet runs it too
-      // Polymorphic cosmetic replay: firearms draw muzzle/tracer, throwable/projectile
-      // weapons spawn a non-damaging projectile so the grenade/rocket arc + explosion is
-      // seen on every peer (damage stays authority-side). Default no-op for the fist.
-      w.playRemoteFireCue();
-      return;
-    }
-    // The authority fired (its fireSeq advanced) but this puppet has no real active weapon to
-    // render it — the puppet's inventory/slot diverged from the owner's (the "host does not do
-    // any fire" symptom). Round 11 N1: count + log once so the divergence is visible; the
-    // MSG_INVENTORY sweep is what actually heals it.
-    com.openworld.net.NetStats.increment("cue_no_weapon");
-    if (!loggedCueNoFirearm) {
-      loggedCueNoFirearm = true;
-      GD.print("WeaponController: remote fire cue on '" + getOwner().getName()
-          + "' landed on empty/fist slot " + activeSlotIndex
-          + " — puppet inventory diverged (MSG_INVENTORY will reconcile)");
-    }
-  }
+  public void playRemoteFireCue() { remoteCues.playRemoteFireCue(); }
 
   @Register
   public void onWeaponNotFire() {
@@ -906,10 +926,10 @@ public class WeaponController extends Node {
     if (isWeaponTransitioning()) return false;
     if (slotIndex < 0 || slotIndex >= weapons.length) return false;
     if (weapons[slotIndex] == null) return false;
-    if (slotIndex == activeSlotIndex) { showWeapon(activeSlotIndex); return false; }
+    if (slotIndex == activeSlotIndex) { sockets.showWeapon(activeSlotIndex); return false; }
 
     pendingSlotIndex = slotIndex;
-    showWeapon(activeSlotIndex);   // keep the OLD weapon up through the holster phase
+    sockets.showWeapon(activeSlotIndex);   // keep the OLD weapon up through the holster phase
     transitionTimer.setWaitTime(1.0 / weapons[pendingSlotIndex].getSwitchSpeed());
     transitionTimer.start();
     return true;
@@ -931,7 +951,7 @@ public class WeaponController extends Node {
   public void onWeaponTransitionComplete() {
     boolean wasArmed = isArmed();
     activeSlotIndex = pendingSlotIndex;
-    showWeapon(activeSlotIndex);
+    sockets.showWeapon(activeSlotIndex);
     WeaponItem next = weapons[activeSlotIndex];
     if (next != null) {
       // Lock firing through the draw-settle (mirrors the pickup-equip lockout in
@@ -941,9 +961,8 @@ public class WeaponController extends Node {
       // a projectile/rocket spawned from that transient muzzle position can fire into the
       // ground or the shooter's own body and detonate on self. Fixed brief settle (not a full
       // 1/switchSpeed) so the switch feels snappy — the deploy (transitionTimer) is the switch cost.
-      fireTimer.setWaitTime(DRAW_SETTLE_SECONDS);
-      fireTimer.start();
-      animationController.onWeaponEquip(next.weaponPoseIndex);
+      startFireLock(DRAW_SETTLE_SECONDS, WeaponState.SETTLING);
+      animationController.onWeaponEquip(next.weaponPoseIndex());
       ammoChanged.emit(next.getMagazine(), next.getReserve());
     }
     if (wasArmed != isArmed()) emitArmedStateChanged(isArmed());
@@ -1032,10 +1051,7 @@ public class WeaponController extends Node {
    * into an accidental throw when the player holds the fire button.
    */
   public void resetFireTimerForEquip(WeaponItem item) {
-    if (fireTimer.getTimeLeft() <= 0) {
-      fireTimer.setWaitTime(1.0 / item.getSwitchSpeed());
-      fireTimer.start();
-    }
+    if (fireTimer.getTimeLeft() <= 0) startFireLock(1.0 / item.getSwitchSpeed(), WeaponState.SETTLING);
   }
 
   /**
@@ -1076,6 +1092,29 @@ public class WeaponController extends Node {
     activateFirstAvailableSlot();
   }
   public boolean isWeaponReloading()        { return reloadTimer.getTimeLeft() > 0; }
+
+  /** Why {@link #fireTimer} is running now — see {@link WeaponState}. */
+  private WeaponState fireLockReason = WeaponState.CYCLING;
+
+  /** Start the fire lock for {@code seconds}, naming why. The only writer of {@code fireTimer}. */
+  private void startFireLock(double seconds, WeaponState reason) {
+    fireLockReason = reason;
+    fireTimer.setWaitTime(seconds);
+    fireTimer.start();
+  }
+
+  /** The fire lock is running (any reason) — the collaborators' view of {@code fireTimer}. */
+  boolean fireLocked() { return fireTimer != null && fireTimer.getTimeLeft() > 0; }
+
+  /** What the held weapon is busy with (2.8 item 2). */
+  public WeaponState state() {
+    return WeaponState.resolve(isWeaponTransitioning(), isWeaponReloading(),
+        fireTimer != null && fireTimer.getTimeLeft() > 0, fireLockReason);
+  }
+
+  /** {@link #state()} by name, for probes. */
+  @Register
+  public String weaponStateNow() { return state().name(); }
   public boolean isWeaponTransitioning()    { return transitionTimer.getTimeLeft() > 0; }
 
   /** 0..1 progress of an in-flight weapon switch (deploy phase), or -1 when not switching. For the HUD progress ring. */
@@ -1147,80 +1186,9 @@ public class WeaponController extends Node {
     originalAimRay = null;
   }
 
-  private void injectCharacterRefs(WeaponItem item) {
+  void injectCharacterRefs(WeaponItem item) {
     CharacterBody3D character = getOwner() instanceof CharacterBody3D c ? c : null;
     item.setup(this, character, weaponAudio);
-  }
-
-  private void showWeapon(int slotIndex) {
-    for (int i = 0; i < weapons.length; i++) {
-      if (weapons[i] == null) continue;
-      if (i == slotIndex) moveWeaponToHand(weapons[i]);
-      else moveWeaponToHolster(weapons[i]);
-    }
-  }
-
-  /** Returns the Marker3D registered under {@code socketName}, or null if not found. */
-  private Node resolveSocket(String socketName) {
-    return (socketName == null || socketName.isEmpty()) ? null : socketMap.get(socketName);
-  }
-
-  /** Reparents {@code item} to its holdSocket Marker3D and shows it. An item with no holdSocket
-   *  (a throwable) is stowed on the character, hidden — see {@link #stowWeapon}. */
-  private void moveWeaponToHand(WeaponItem item) {
-    Node target = resolveSocket(item.holdSocket);
-    if (target != null) {
-      reparentWeapon(item, target, false);
-      item.show();
-    } else {
-      stowWeapon(item);
-    }
-  }
-
-  /** Reparents {@code item} to the first free socket in its holsterSockets list and shows it.
-   *  A socket is considered free when it has no children or already holds this weapon.
-   *  An item with no free holster socket is stowed on the character, hidden. */
-  private void moveWeaponToHolster(WeaponItem item) {
-    for (String socketName : item.holsterSockets) {
-      Node target = resolveSocket(socketName);
-      if (target == null) continue;
-      if (target.getChildCount() > 0 && !target.getChild(0).equals(item)) continue;
-      reparentWeapon(item, target, true);
-      item.show();
-      return;
-    }
-    stowWeapon(item);
-  }
-
-  /**
-   * Park a carried weapon that has no socket to show it at: hidden, on the character's weapon
-   * attachment. It must GO somewhere — leaving it in the world scene is what the old frozen-body
-   * workaround did, and a throwable carried that way sat invisible at wherever it was collected,
-   * with a stale transform that nothing dared read.
-   */
-  private void stowWeapon(WeaponItem item) {
-    item.hide();
-    if (stowNode != null && GD.isInstanceValid(stowNode) && !stowNode.equals(item.getParent())) {
-      item.reparent(stowNode, false);
-      item.setTransform(new godot.core.Transform3D());
-    }
-  }
-
-  /**
-   * Reparents {@code item} to {@code target} and aligns it. Skips the reparent if {@code item} is
-   * already a child of {@code target}, to avoid re-triggering {@code _ready}.
-   *
-   * <p>The alignment is the WEAPON's to state ({@code WeaponItem.alignmentFor}): a weapon that
-   * declares a {@code GripPoint} puts THAT point on the socket, and one that declares none keeps
-   * the historical zeroed transform, which puts its ORIGIN there. Zeroing unconditionally is what
-   * forced a per-weapon marker onto the character rig for every weapon in the game — see
-   * {@code WeaponItem.gripPoint} for why that is the wrong way round.
-   */
-  private void reparentWeapon(WeaponItem item, Node target, boolean holstered) {
-    Node current = item.getParent();
-    if (current != null && current.equals(target)) return;
-    item.reparent(target, false);
-    item.setTransform(item.alignmentFor(holstered));
   }
 
   // Manual drop: throw forward at chest height (1.3 m gives clearance when crouching/crawling).
@@ -1297,180 +1265,16 @@ public class WeaponController extends Node {
     return true;
   }
 
-  // ── Inventory state reconciliation (Round 11 N2 — MSG_INVENTORY) ──────────
-  //
-  // The event-replicated inventory (MSG_PICKUP_TAKEN / MSG_WEAPON_DROPPED) can diverge
-  // permanently from a single missed/raced event, and some inventory was never
-  // event-replicated at all (AI rifles equipped at runtime via requestEquip). The host
-  // periodically broadcasts each character's authoritative slot manifest; this pair
-  // builds it (host side) and reconciles toward it (receiver side).
+  // ── Inventory state reconciliation (Round 11 N2 — MSG_INVENTORY) — see WeaponInventorySync ──
 
-  /** Maximum pickupId length the wire accepts (NetworkManager.MAX_STRING_LENGTH) — oversized path-derived loadout ids are sent as "" (receiver keeps its local id). */
-  private static final int MAX_WIRE_ID_LENGTH = 64;
-
-  /** Host side: snapshot of every occupied slot (slot 0/fist excluded — permanent scene furniture). */
+  /** Host side: snapshot of every occupied slot. See {@link WeaponInventorySync#buildInventoryEntries}. */
   public List<com.openworld.net.NetMessageCodec.InventorySlotEntry> buildInventoryEntries() {
-    List<com.openworld.net.NetMessageCodec.InventorySlotEntry> entries = new ArrayList<>();
-    for (int slot = 1; slot < weapons.length; slot++) {
-      WeaponItem w = weapons[slot];
-      if (w == null) continue;
-      String scenePath = w.getSceneFilePath();
-      String pickupId = (w.pickupId != null && !w.pickupId.isEmpty() && w.pickupId.length() <= MAX_WIRE_ID_LENGTH)
-          ? w.pickupId : "";
-      entries.add(new com.openworld.net.NetMessageCodec.InventorySlotEntry(slot,
-          w.weaponId != null ? w.weaponId : "",
-          scenePath != null ? scenePath : "",
-          pickupId, w.getMagazine(), w.getReserve()));
-    }
-    return entries;
+    return inventorySync.buildInventoryEntries();
   }
 
-  /**
-   * Receiver side: reconcile this character's slots toward the host's manifest.
-   *
-   * <p>{@code addOnly} is true for the body this peer OWNS: its inventory is driven by its
-   * own input plus the reliable event echoes, and overwriting it from a (lag-stale) manifest
-   * would re-create the Round 10.2 echo feedback loop — so for owned bodies we only converge
-   * pickupId on a matching slot, never remove items, touch ammo, or resurrect a slot the owner
-   * emptied (the throwable-restock fix — see the loop body). Non-owned puppets reconcile fully:
-   * match per slot by
-   * weaponId, converge ammo + pickupId on match, equip from the manifest on mismatch
-   * (preferring the matching local world pickup over instantiating a duplicate), and discard
-   * local extras WITHOUT dropping them to the world (a reconcile drop would spawn orphan,
-   * unsynced pickups).
-   *
-   * <p>Skipped entirely while local equips/drops are still queued — the manifest was built
-   * before them and would fight their outcome; the next sweep (~300 ms) reconciles cleanly.
-   */
+  /** Receiver side: reconcile toward the host's manifest. See {@link WeaponInventorySync#applyReplicatedInventory}. */
   public void applyReplicatedInventory(List<com.openworld.net.NetMessageCodec.InventorySlotEntry> entries, boolean addOnly) {
-    if (!pendingEquips.isEmpty() || !pendingDrops.isEmpty()) {
-      com.openworld.net.NetStats.increment("inventory_apply_deferred");
-      return;
-    }
-    Map<Integer, com.openworld.net.NetMessageCodec.InventorySlotEntry> bySlot = new HashMap<>();
-    for (com.openworld.net.NetMessageCodec.InventorySlotEntry e : entries) bySlot.put(e.slot(), e);
-
-    for (int slot = 1; slot < weapons.length; slot++) {
-      com.openworld.net.NetMessageCodec.InventorySlotEntry entry = bySlot.get(slot);
-      WeaponItem local = weapons[slot];
-
-      if (entry == null) {
-        if (local != null && !addOnly) {
-          com.openworld.net.NetStats.increment("inventory_reconciled_remove");
-          discardSlotItem(slot);
-        }
-        continue;
-      }
-
-      if (local != null) {
-        if (manifestMatches(local, entry)) {
-          if (!addOnly) {
-            local.setMagazine(entry.magazine());
-            local.setReserve(entry.reserve());
-            notifyAmmoChange(local);
-          }
-          if (!entry.pickupId().isEmpty()) local.pickupId = entry.pickupId();
-          continue;
-        }
-        if (addOnly) continue;   // owned body: never displace what the owner is holding
-        com.openworld.net.NetStats.increment("inventory_reconciled_replace");
-        discardSlotItem(slot);
-      }
-
-      // Reached only when the slot is locally empty but the manifest lists an item.
-      // For an OWNED body, do NOT resurrect it: an owned body's slot presence is driven by
-      // its own input and the RELIABLE, ordered grant/drop events — never by a lag-stale
-      // manifest. This was the throwable-restock bug: a client throws its last grenade and
-      // clears the slot, but the host's copy hasn't caught the throw (consumption rides no
-      // reliable event, and the active-magazine snapshot can't carry the same-frame
-      // slot-clear), so its manifest still lists the stack and the next sweep re-instantiated
-      // it. The owner's inventory is restored on (re)join by baseline spawns + pickups, not by
-      // this path; AI inventory is non-owned (full reconcile), so its runtime rifle still heals.
-      if (addOnly) {
-        com.openworld.net.NetStats.increment("inventory_owned_no_resurrect");
-        continue;
-      }
-      equipReconciled(slot, entry);
-    }
-  }
-
-  /** Same item identity? weaponId is the designed key; scenePath is the fallback for items with no id set. */
-  private boolean manifestMatches(WeaponItem local, com.openworld.net.NetMessageCodec.InventorySlotEntry entry) {
-    String localId = local.weaponId != null ? local.weaponId : "";
-    if (!localId.isEmpty() || !entry.weaponId().isEmpty()) return localId.equals(entry.weaponId());
-    String localScene = local.getSceneFilePath();
-    return localScene != null && localScene.equals(entry.scenePath());
-  }
-
-  /**
-   * Removes a slot's item during reconciliation — clears refs and frees it, never returns
-   * it to the world (the manifest says the authority doesn't have it; a world drop here
-   * would create an orphan pickup no other peer knows about).
-   */
-  private void discardSlotItem(int slot) {
-    WeaponItem item = weapons[slot];
-    if (item == null) return;
-    boolean wasActive = slot == activeSlotIndex;
-    weapons[slot] = null;
-    item.setup(null, null, null);
-    item.hide();
-    item.queueFree();
-    if (wasActive) activateFirstAvailableSlot();
-  }
-
-  /**
-   * Materialises a manifest entry into {@code slot}: prefer adopting the matching local
-   * world pickup by the manifest's pickupId (kills the ghost-pickup case when healing a
-   * lost grant echo), else instantiate the validated weapon scene — the same
-   * add-to-tree-then-equip shape DebugHarness.equipDebugRifle uses. Runs at idle time
-   * (NetworkManager._process), where the item's world body can be taken away and rebuilt.
-   */
-  private void equipReconciled(int slot, com.openworld.net.NetMessageCodec.InventorySlotEntry entry) {
-    WeaponItem item = findWorldPickupById(entry.pickupId());
-    if (item == null) item = instantiateWeaponScene(entry.scenePath());
-    if (item == null) {
-      com.openworld.net.NetStats.increment("inventory_equip_failed");
-      GD.print("WeaponController: inventory reconcile could not materialise '" + entry.weaponId()
-          + "' (scene '" + entry.scenePath() + "') for slot " + slot + " on '" + getOwner().getName() + "'");
-      return;
-    }
-    if (!entry.pickupId().isEmpty()) item.pickupId = entry.pickupId();
-    item.setMagazine(entry.magazine());
-    item.setReserve(entry.reserve());
-    item.onPickedUp();
-    injectCharacterRefs(item);
-    weapons[slot] = item;
-    if (slot == activeSlotIndex) {
-      moveWeaponToHand(item);
-      if (animationController != null) animationController.onWeaponEquip(item.weaponPoseIndex);
-      ammoChanged.emit(item.getMagazine(), item.getReserve());
-    } else {
-      moveWeaponToHolster(item);
-    }
-    com.openworld.net.NetStats.increment("inventory_reconciled_equip");
-  }
-
-  /** Resolves a manifest pickupId to an un-taken WeaponItem in the world "pickups" group, or null. */
-  private WeaponItem findWorldPickupById(String pickupId) {
-    if (pickupId == null || pickupId.isEmpty() || getTree() == null) return null;
-    for (Node node : getTree().getNodesInGroup(new StringName(com.openworld.item.Pickup.PICKUPS_GROUP))) {
-      if (node instanceof WeaponItem w && pickupId.equals(w.pickupId) && !w.isTaken()) return w;
-    }
-    return null;
-  }
-
-  /** Loads + instantiates a manifest weapon scene into the current scene tree (must be in-tree before socket reparenting). Path already validated by NetworkManager.isValidInventory. */
-  private WeaponItem instantiateWeaponScene(String scenePath) {
-    if (scenePath == null || scenePath.isEmpty()) return null;
-    java.lang.Object loaded = GD.load(scenePath);
-    if (!(loaded instanceof PackedScene scene)) return null;
-    Node instance = scene.instantiate();
-    if (!(instance instanceof WeaponItem item)) {
-      instance.queueFree();
-      return null;
-    }
-    getTree().getCurrentScene().addChild(item);
-    return item;
+    inventorySync.applyReplicatedInventory(entries, addOnly);
   }
 
   /**
@@ -1492,7 +1296,7 @@ public class WeaponController extends Node {
   }
 
   // After a drop, fall back to fist (slot 0) which is always available.
-  private void activateFirstAvailableSlot() {
+  void activateFirstAvailableSlot() {
     for (int i = 0; i < weapons.length; i++) {
       if (weapons[i] != null) { onSetWeapon(i); return; }
     }

@@ -1,10 +1,22 @@
 [gd_scene format=3 uid="uid://c8sr3wqn0pj21"]
 
-[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/SniperItem.java" id="1_sr3"]
+[ext_resource type="Texture2D" path="res://assets/ui/SR3.png" id="6_sr3icon"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/SR3.tres" id="90_stats"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FirearmItem.java" id="1_sr3"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/ScopeConfig.java" id="5_sr3scope"]
 [ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="2_sr3fire"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="2_muzzle"]
 [ext_resource type="AudioStream" uid="uid://c333cb6cupk6h" path="res://assets/audio/Rifle_reload.wav" id="3_sr3reload"]
 [ext_resource type="PackedScene" path="res://assets/weapons/SR3.glb" id="3_sr3model"]
+
+[sub_resource type="Resource" id="Resource_sr3scope"]
+script = ExtResource("5_sr3scope")
+fov = 20.0
+zoom_seconds = 0.12
+sway = 0.0
+unscope_to_cycle = true
+move_speed_factor = 0.4
+stop_acceleration_factor = 3.0
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_sr3_body"]
 size = Vector3(0.08, 0.1863, 1.124)
@@ -12,32 +24,42 @@ size = Vector3(0.08, 0.1863, 1.124)
 [sub_resource type="BoxShape3D" id="BoxShape3D_sr3_pickup"]
 size = Vector3(0.5, 0.5, 1.35)
 
+[sub_resource type="Animation" id="Animation_sr3bolt"]
+resource_name = "bolt_cycle"
+length = 0.9
+tracks/0/type = "position_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Model/Bolt")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, 0, 0.3, 1, 0, 0, 0, 0.32, 1, 0.0105925, 0.000926727, 0, 0.34, 1, 0.0208632, 0.00367875, 0, 0.36, 1, 0.0305, 0.00817245, 0, 0.38, 1, 0.03921, 0.0142713, 0, 0.4, 1, 0.0467287, 0.02179, 0, 0.42, 1, 0.0528275, 0.0305, 0, 0.58, 1, 0.0528275, 0.0305, 0.04, 0.72, 1, 0.0528275, 0.0305, 0, 0.74, 1, 0.0467287, 0.02179, 0, 0.76, 1, 0.03921, 0.0142713, 0, 0.78, 1, 0.0305, 0.00817245, 0, 0.8, 1, 0.0208632, 0.00367875, 0, 0.82, 1, 0.0105925, 0.000926727, 0, 0.84, 1, 0, 0, 0, 0.9, 1, 0, 0, 0)
+tracks/1/type = "rotation_3d"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Model/Bolt")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = PackedFloat32Array(0, 1, 0, 0, 0, 1, 0.3, 1, 0, 0, 0, 1, 0.32, 1, 0, 0, 0.0871557, 0.996195, 0.34, 1, 0, 0, 0.173648, 0.984808, 0.36, 1, 0, 0, 0.258819, 0.965926, 0.38, 1, 0, 0, 0.34202, 0.939693, 0.4, 1, 0, 0, 0.422618, 0.906308, 0.42, 1, 0, 0, 0.5, 0.866025, 0.58, 1, 0, 0, 0.5, 0.866025, 0.72, 1, 0, 0, 0.5, 0.866025, 0.74, 1, 0, 0, 0.422618, 0.906308, 0.76, 1, 0, 0, 0.34202, 0.939693, 0.78, 1, 0, 0, 0.258819, 0.965926, 0.8, 1, 0, 0, 0.173648, 0.984808, 0.82, 1, 0, 0, 0.0871557, 0.996195, 0.84, 1, 0, 0, 0, 1, 0.9, 1, 0, 0, 0, 1)
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_sr3bolt"]
+_data = {
+&"bolt_cycle": SubResource("Animation_sr3bolt")
+}
+
 [node name="SR3" type="Node3D" unique_id=300500001]
 script = ExtResource("1_sr3")
+stats = ExtResource("90_stats")
 weapon_id = "SR3"
 weapon_name = "SR-3"
-weapon_pose_index = 9
+weapon_archetype = "sniper"
+fire_animation = "bolt_cycle"
+weapon_icon = ExtResource("6_sr3icon")
 hold_socket = "SocketRifle"
 holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
-hipfire_spread_multiplier = 8.0
-spread = 0.005
-bloom_per_shot = 0.6
-bloom_decay_speed = 0.8
-bloom_max = 1.8
-reload_speed = 0.33
-switch_speed = 1.6
-fire_rate = 0.685
-auto = false
+scope = SubResource("Resource_sr3scope")
 magazine = 5
-magazine_size = 5
 reserve = 20
-reserve_max = 20
-recoil = 3.5
-kick_back = 0.045
-kick_pitch = 5.0
-kick_spring = 16.0
-kick_damping = 1.0
-damage = 150.0
 fire_audio = ExtResource("2_sr3fire")
 reload_audio = ExtResource("3_sr3reload")
 require_interact = true
@@ -69,3 +91,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0016, 0.0656, -0.8179)
 
 [connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
 [connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]
+
+[node name="WeaponAnimator" type="AnimationPlayer" parent="." unique_id=300500099]
+libraries = {
+&"": SubResource("AnimationLibrary_sr3bolt")
+}

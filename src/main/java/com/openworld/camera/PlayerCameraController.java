@@ -89,7 +89,9 @@ public class PlayerCameraController extends TPSCameraController {
     // Deferred from _ready() (see comment there) — idempotent, cheap to repeat.
     Input.setMouseMode(Input.MouseMode.CAPTURED);
 
-    boolean isFps = character != null && character.isFpsMode;
+    // The DERIVED view, not the preference: there is no boom to hang a shoulder offset on while
+    // scoped either, so the swap key is refused for the same reason it is refused in FPS.
+    boolean isFps = character != null && character.isFirstPersonView();
 
     if (Input.isActionJustPressed("shoulder", false) && !isFps) {
       changeShoulderDirection();

@@ -37,7 +37,17 @@ extends SceneTree
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 ## Every archetype's weapons (blender/tools/weapon_archetypes.json `holds`): rifles mount a StockPoint, the
 ## launcher a ShoulderRestPoint, the pistol mounts nothing and only has a support grip.
-const WEAPONS := ["AR4", "AR212", "SG1", "SR3", "PI52", "ATL4"]
+## The weapons with a hold row, off the one catalog (PLAN.md 2.8 item 7).
+var WEAPONS: Array = _catalog_weapons(func(row, holds): return holds.has(row["archetype"]))
+
+static func _catalog_weapons(keep: Callable) -> Array:
+	var cat: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://src/main/resources/com/openworld/weapon/weapon_catalog.json"))
+	var holds: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://blender/tools/weapon_archetypes.json"))["holds"]
+	var out := []
+	for row in cat["weapons"]:
+		if keep.call(row, holds):
+			out.append(row["id"])
+	return out
 const WEAPON_DIR := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 
 ## The shoulder pocket relative to `upperarm_r`, in `clavicle_r`'s orthonormalised global basis.
@@ -63,9 +73,10 @@ var chest_reference := false
 var stock_weight := -1.0
 ## `-- --torso-layer=off` turns off Stance.weapon_torso_layer on Upright (the A2.3 control).
 var torso_layer_off := false
-## `-- --stance=crouch|crawl` holds that stance's input for the whole case (A2.5). Crawl does not mount the
+## `-- --stance=crouch|crawl|swim` holds (swim: builds a pool instead) that stance's input for the whole case (A2.5). Crawl does not mount the
 ## stock (Stance.stock_mount_enabled is off), so its stock/support lines are reported, not asserted.
 var stance := "upright"
+const SWIM_ORDINAL := 4   # movement.character.StanceName.SWIM
 ## `-- --torso-layer-on=Crouch` turns Stance.weapon_torso_layer ON for another stance (an A2.5 experiment).
 var torso_layer_on := ""
 
@@ -195,6 +206,18 @@ func _initialize() -> void:
 	var world := Node3D.new()
 	root.add_child(world)
 	_floor(world)
+	if stance == "swim":
+		# A pool over the whole row of stands: 3.5 m deep, so every body swims (A2.5 swim case).
+		var water: Area3D = load("res://src/main/java/com/openworld/world/WaterVolume.java").new()
+		water.collision_layer = 0
+		water.collision_mask = 2
+		var wcs := CollisionShape3D.new()
+		var wbox := BoxShape3D.new()
+		wbox.size = Vector3(200, 6, 60)
+		wcs.shape = wbox
+		water.add_child(wcs)
+		world.add_child(water)
+		water.global_position = Vector3(20, 0, 0)   # top at y 3, floor at y 0
 	await _tick(3)
 
 	var x := 0.0
@@ -222,7 +245,7 @@ func _initialize() -> void:
 			var st_node: Node = p.get_node_or_null("Stances/%s" % torso_layer_on)
 			if st_node != null:
 				st_node.set("weapon_torso_layer", true)
-		if stance != "upright":
+		if stance != "upright" and stance != "swim":
 			Input.action_press(stance)
 		var stock_mod: Node = sk.get_node_or_null("StockMountIKModifier")
 		if stock_mod != null and stock_weight >= 0.0:
@@ -271,7 +294,10 @@ func _initialize() -> void:
 			_check("pocket offset matches the mesh", live.distance_to(pocket_offset) < POCKET_DRIFT_TOLERANCE,
 				"drift %.3f m" % live.distance_to(pocket_offset))
 
-		if mount_name == "StockPoint":
+		if stance == "swim":
+			_check("%s swim: the body is swimming" % weapon_id, int(p.get("stance_ordinal")) == SWIM_ORDINAL,
+				"stance ordinal %d (SWIM = %d)" % [int(p.get("stance_ordinal")), SWIM_ORDINAL])
+		if mount_name == "StockPoint" and stance != "swim":
 			_check("%s hold: stock below the shoulder" % weapon_id, s_hold.y < joint.y,
 				"stock %+.3f m vs the joint" % (s_hold.y - joint.y))
 
@@ -316,9 +342,9 @@ func _initialize() -> void:
 		if stock_mod != null:
 			print("  aim : stock mount weight %.2f  hand moved %.3f m  shortfall %.3f m"
 				% [stock_mod.call("current_weight"), stock_mod.call("last_hand_move"), stock_mod.call("last_shortfall")])
-		var mounts: bool = stance != "crawl"
+		var mounts: bool = stance != "crawl" and stance != "swim"
 		if not mounts:
-			print("  (crawl: the stock is not mounted by design; stock and support reported above, not asserted)")
+			print("  (%s: the stock is not mounted by design; stock and support reported above, not asserted)" % stance)
 		_check("%s aim: gun on the aim line" % weapon_id, absf(gun_yaw) < GUN_ON_AIM_DEG,
 			"gun yaw %+.1f deg (tolerance %.0f)" % [gun_yaw, GUN_ON_AIM_DEG])
 		if mounts and sp != null and support_limit.has(weapon_id):
@@ -328,7 +354,7 @@ func _initialize() -> void:
 			_check("%s aim: %s on its anchor" % [weapon_id, mount_name], s_aim.distance_to(pocket) < STOCK_TOLERANCE,
 				"%.3f m off (tolerance %.2f)" % [s_aim.distance_to(pocket), STOCK_TOLERANCE])
 		Input.action_release("aim")
-		if stance != "upright":
+		if stance != "upright" and stance != "swim":
 			Input.action_release(stance)
 		p.queue_free()
 		await _tick(5)

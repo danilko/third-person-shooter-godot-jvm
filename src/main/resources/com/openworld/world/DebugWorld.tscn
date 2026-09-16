@@ -535,6 +535,9 @@ font_size = 60
 
 [node name="WorldSystems" parent="." unique_id=201400001 instance=ExtResource("22_wsys")]
 
+[node name="PlayerSpawn" type="Node3D" parent="." unique_id=1369023946]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -251.4, 16, -2)
+
 [node name="Characters" type="Node" parent="." unique_id=1369023945]
 
 [node name="Player" parent="Characters" unique_id=131388266 instance=ExtResource("2_lj72b")]
@@ -566,6 +569,8 @@ surface_material_override/0 = SubResource("ShaderMaterial_water")
 [node name="WorldBounds" type="Node3D" parent="." unique_id=1900737644]
 script = ExtResource("2_bounds")
 half_extent = 432.0
+warn_margin = 40.0
+show_debug_volume = true
 floor_y = -100.0
 
 [node name="Zones" type="Node" parent="." unique_id=2113872921]

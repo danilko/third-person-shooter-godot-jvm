@@ -83,6 +83,12 @@ public class TPSCameraController extends Node3D {
 
   private Tween tween;
 
+  /** Last scope state the FOV tween was started for — the edge detector, not a second owner. */
+  private boolean scopeApplied = false;
+
+  /** True while the FOV currently on screen came from a scope, so zooming back out uses its pace. */
+  private boolean scopeZooming = false;
+
   @Register
   @Override
   public void _ready() {
@@ -182,12 +188,16 @@ public class TPSCameraController extends Node3D {
     controlRotation.recoilPitch = GD.lerp(controlRotation.recoilPitch, 0.0, recoilRecoverySpeed * delta);
     controlRotation.recoilYaw   = GD.lerp(controlRotation.recoilYaw,   0.0, recoilRecoverySpeed * delta);
 
+    // The scope's drift is the same kind of thing as recoil — an offset on the view that never touches
+    // the mouse intent — so it is advanced here, beside the recoil decay, and added the same way.
+    if (character != null) character.tickScopeSway(delta);
+
     Vector3 yawRot = yawNode.getRotationDegrees();
-    yawRot.setY(controlRotation.yaw + controlRotation.recoilYaw);
+    yawRot.setY(controlRotation.yaw + controlRotation.recoilYaw + controlRotation.swayYaw);
     yawNode.setRotationDegrees(yawRot);
 
     Vector3 pitchRot = pitchNode.getRotationDegrees();
-    pitchRot.setX(GD.clamp(controlRotation.pitch + controlRotation.recoilPitch,
+    pitchRot.setX(GD.clamp(controlRotation.pitch + controlRotation.recoilPitch + controlRotation.swayPitch,
                            controlRotation.pitchMin, controlRotation.pitchMax));
     pitchNode.setRotationDegrees(pitchRot);
 
@@ -201,9 +211,19 @@ public class TPSCameraController extends Node3D {
     // on screen, and `AimTarget` hangs off it, so writing it moves the very node
     // `Character.applySeatedAimTarget` is placing in world space each frame. See the longer note in
     // FPSCameraController._physicsProcess — there the same seam is an outright feedback loop.
-    if (activeCamera != null && (character == null || !character.isFpsMode)
+    if (activeCamera != null && (character == null || !character.isFirstPersonView())
             && (character == null || !character.carrierOwnsView())) {
         activeCamera.setGlobalTransform(proxyNode.getGlobalTransform());
+    }
+
+    // The scope's FOV rides the same one owner as every other FOV here (setCameraFov). Only the
+    // TRANSITION is edge-driven: a tween is a one-shot, so it is started when the derived scope
+    // state changes and never per frame. This node processes in every mode and is the base class of
+    // both the player's rig and the AI's, so an AI that never scopes simply never sees an edge.
+    boolean scopedNow = character != null && character.isScoped();
+    if (scopedNow != scopeApplied) {
+      scopeApplied = scopedNow;
+      setCameraFov();
     }
 
     // Head visibility is DERIVED from the live view, every frame, rather than latched at the
@@ -251,9 +271,27 @@ public class TPSCameraController extends Node3D {
     }
 
     double targetFov = combat ? cameraFov : movementFov;
+    double duration  = fovTweenDuration;
+
+    // A scope overrides every other FOV source while it is up, and supplies its own (short)
+    // transition in BOTH directions — the weapon is the DATA and this method stays the single writer
+    // of the camera's FOV. `scopeApplied` is the state the edge in _physicsProcess just committed,
+    // not a live read, so zooming out is driven from here too rather than from a second place.
+    if (character != null && character.weaponController != null) {
+      double scopedFov = character.weaponController.scopedFovDegrees();
+      if (scopeApplied && scopedFov > 0.0) {
+        targetFov = scopedFov;
+        duration  = character.weaponController.scopeZoomSeconds();
+      } else if (scopeZooming) {
+        // Coming back out: the same short time, so the scope does not leave a half-second of
+        // slow zoom behind it (fovTweenDuration is the combat/sprint FOV's pace, not a scope's).
+        duration = character.weaponController.scopeZoomSeconds();
+      }
+    }
+    scopeZooming = scopeApplied;
 
     tween = createTween();
-    tween.tweenProperty(activeCamera, "fov", targetFov, fovTweenDuration)
+    tween.tweenProperty(activeCamera, "fov", targetFov, duration)
          .setTrans(Tween.TransitionType.SINE)
          .setEase(Tween.EaseType.OUT);
   }

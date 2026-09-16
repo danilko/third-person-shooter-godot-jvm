@@ -1,5 +1,5 @@
 {
-  "note": "weaponPoseIndex -> grip archetype. APPEND-ONLY: an index is stored in every weapon .tscn, so inserting in the middle silently re-poses existing weapons.",
+  "note": "weaponPoseIndex -> grip archetype. APPEND-ONLY: the index is the blend-point position in the AnimationTree, and weapon.GripArchetype mirrors this list (WeaponCatalogTest). Scenes store the NAME (`weapon_archetype`), never the index (2.8 item 8).",
   "archetypes": [
     {
       "index": 0,
@@ -67,24 +67,11 @@
     "upright_hold_%s-loop": "hold pose, non-combat",
     "weapon_switch_%s": "draw one-shot"
   },
-  "weapon_assignments": {
-    "ATL4": 2,
-    "SR3": 9,
-    "MW1": 4,
-    "MW2": 4,
-    "Fist": 5,
-    "T1": 8
-  },
-  "holds_note": "How each grip archetype HOLDS its weapon, read by blender/tools/pose_weapon_hold.py (authoring) and tools/godot/probe_weapon_fit.gd (the gate). The model is the CS / Left 4 Dead / GTA one: the weapon hangs from the firing hand at ONE socket per archetype, ONE upper-body clip set per archetype supplies the class of hold, the aim modifiers point the bore, and IK fits each WEAPON: `mount` puts a marker on the weapon at a body anchor (StockMountIKModifier: a butt pad in the shoulder pocket, a launcher tube on the shoulder), `support` puts the off hand's grip on the weapon's SupportPoint (SupportHandIKModifier). A new weapon of an existing archetype is markers only; a new archetype is one row here, one socket, one clip pair and a solve. `aim`/`hold` are the solve arguments the shipped clips were written with (CLAUDE.md W24/W25).",
+  "holds_note": "How each grip archetype HOLDS its weapon, read by blender/tools/pose_weapon_hold.py (authoring) and tools/godot/probe_weapon_fit.gd (the gate). The model is the CS / Left 4 Dead / GTA one: the weapon hangs from the firing hand at ONE socket per archetype, ONE upper-body clip set per archetype supplies the class of hold, the aim modifiers point the bore, and IK fits each WEAPON: `mount` puts a marker on the weapon at a body anchor (StockMountIKModifier: a butt pad in the shoulder pocket, a launcher tube on the shoulder), `support` puts the off hand's grip on the weapon's SupportPoint (SupportHandIKModifier). A new weapon of an existing archetype is markers only; a new archetype is one row here, one socket, one clip pair and a solve. `aim`/`hold` are the solve arguments the shipped clips were written with (CLAUDE.md W24/W25). Which WEAPONS a hold covers is not listed here: it is every src/main/resources/com/openworld/weapon/weapon_catalog.json row with that archetype (PLAN.md 2.8 item 7).",
   "holds": {
     "rifle": {
       "socket": "SocketRifle",
       "reference": "AR4",
-      "weapons": [
-        "AR4",
-        "AR212",
-        "SG1"
-      ],
       "mount": "StockPoint",
       "support": true,
       "aim_clip": "upright_aim_rifle-loop",
@@ -111,9 +98,6 @@
     "sniper": {
       "socket": "SocketRifle",
       "reference": "SR3",
-      "weapons": [
-        "SR3"
-      ],
       "mount": "StockPoint",
       "support": true,
       "aim_clip": "upright_aim_sniper-loop",
@@ -141,9 +125,6 @@
     "pistol": {
       "socket": "SocketPistol",
       "reference": "PI52",
-      "weapons": [
-        "PI52"
-      ],
       "mount": null,
       "support": true,
       "aim_clip": "upright_aim_pistol-loop",
@@ -159,9 +140,6 @@
     "launcher": {
       "socket": "SocketLauncher",
       "reference": "ATL4",
-      "weapons": [
-        "ATL4"
-      ],
       "mount": "ShoulderRestPoint",
       "support": true,
       "aim_clip": "upright_aim_launcher-loop",

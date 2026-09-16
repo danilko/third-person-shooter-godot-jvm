@@ -37,7 +37,7 @@ public class Player extends Character {
     @Override
     public void _ready() {
         super._ready();
-        aimRay.addException(this);
+        com.openworld.util.RayExclusions.add(aimRay, this);
         // Register with the player registry so AI LOD can find the nearest player in
         // O(playerCount) instead of scanning the whole "characters" group (PLAN.md Part D).
         PlayerRegistry.register(this);

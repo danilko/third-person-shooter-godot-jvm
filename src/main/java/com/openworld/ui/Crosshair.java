@@ -155,6 +155,21 @@ public class Crosshair extends Control {
     @Register
     @Override
     public void _process(double delta) {
+        // A SCOPE replaces the reticle: the optic's own crosshair is drawn by ScopeOverlay, and two
+        // reticles on one screen is worse than either. Self-gated here rather than pushed from
+        // HUDManager.refreshCrosshair, which is edge-driven off the combat state — the scope comes
+        // and goes on the aim button and on every interruption that ends it, which is not an edge
+        // that handler sees. Node visibility is free for this node to own: it is deliberately not in
+        // HUDManager's BASE_LAYOUT table (only showCrosshair is pushed in).
+        boolean scoped = aimCharacter != null
+                ? aimCharacter.isScoped()
+                : weaponController != null && weaponController.scopedNow();
+        if (scoped) {
+            if (isVisible()) setVisible(false);
+            return;
+        }
+        if (!isVisible()) setVisible(true);
+
         // Self-managed spread: map the weapon-normalized accuracy fraction (0..1) to a fixed pixel
         // range. Normalizing per weapon keeps one reticle scale for every gun (no per-weapon tuning),
         // caps the maximum opening (no off-screen), and still reflects movement/bloom/stance within
