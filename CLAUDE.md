@@ -4080,8 +4080,41 @@ on a `WeaponAnimator` AnimationPlayer (W13 — plays on the owner and every pupp
 draws it back 4 cm, runs it home and lowers it inside 0.9 s of the 1.46 s cycle. The throw is 4 cm, not an
 AWP's ~10: with only the handle split out (no bolt body), a longer throw floats it over the stock wrist —
 measured by rendering both poses. Gate `tools/godot/probe_sniper_bolt.gd` (60.0°, 0.039 m, home before the
-next shot; `--control` no motion). The icon `assets/ui/SR3.png` is rendered from the model by
-`blender/tools/render_weapon_icon.py` into AR4.png's white-silhouette frame.
+next shot; `--control` no motion).
+
+**Weapon icons are GENERATED, one PNG per weapon, FITTED, barrel LEFT (2026-09-16, user decisions).**
+`blender/tools/render_weapon_icons.py` renders every catalog weapon with a model (or a primitive, reported as a
+PLACEHOLDER rectangle — ATL4, T1, MW2 today) to `assets/ui/weapons/<id>.png`, and the weapon scenes use those.
+The spec is `weapon_catalog.json` `icon` (one owner for the tool and the test): an orthographic view of the
+weapon's LEFT side with no tilt, so the barrel points LEFT (`side`/`muzzle`; the image is mirrored only if the
+two disagree), flat white on transparent (the UI tints it), rendered at 4x and box-filtered, centred in a
+**384x128** frame and FITTED to it with 6 px padding (`scale` "fit"). Fit, not true relative size, is the HUD
+convention — kill feeds, weapon wheels and slot bars all size icons for legibility at ~20-44 px, and true
+scale is for size-as-gameplay inventory grids; at one 330 px/m scale a grenade was ~10x8 px in the radial
+slot. `scale` "uniform" + `pixels_per_metre` remain in the tool. The frame is 3:1 because the largest slot is
+the radial menu's 133x44 and a TextureRect keeps aspect. Per-weapon files, not a sheet; the generated
+`review/sheet.png` (.gdignore'd) is the contact sheet. `WeaponCatalogTest` asserts each icon: frame size,
+white, centred, inside the padding, fitted (or, uniform, as wide as length x px/m), used by its scene. Try
+variants: `-- --scale=uniform --side=right --muzzle=right --width=512 --out=<dir>`.
+
+**The weapon menus label each icon with its NAME, CS-style** — a small outlined label pinned to the icon's
+bottom-right: `WeaponIcon/WeaponName` in `RadiaMenuItem.tscn` (the radial menu's item; 11 pt, the ammo and key
+labels moved up into the old centred-name row) and `Icon/NameLabel` in `WeaponSlotItem.tscn` (9 pt; the slot
+icon grew 28 -> 36 px tall). `WeaponRadiaMenuItem.tscn` is an unused copy of the radial item and was kept in
+step. Checked on screen (a Vulkan screenshot of all eight radial items and five slot rows), not headless.
+
+**Weapon ids are plain, display names hyphenated.** `weapon_id` is a KEY — file names, catalog rows, the
+inventory manifest, throwable stack merging — so it stays letters+digits (`AR4`, `PI52`); `weapon_name`, what
+the kill feed and slots show, is the same with a hyphen (`AR-4`, `PI-52`), the way real designations are
+written and the way CS separates `weapon_ak47` from the "AK-47" it displays. `WeaponCatalogTest` enforces
+id == catalog id and name == hyphenated id. Two were out of line and are fixed: MW1's scene declared id `MK1`
+(display `MK-1`) and T1 displayed "T1 Grenade".
+
+**SR3 rendered WHITE in Godot — two Material Output nodes (2026-09-16, user-reported).** Every SR3 material
+had an EEVEE-target output (Principled, right colour) and a Cycles-target output (Diffuse BSDF); the glTF
+export carried no `baseColorFactor` for any of them, so Godot drew them white. Fixed in `SR3.blend` (one
+output, target All, Principled only), and `build_weapon.py` now REFUSES an export in which any material has
+neither a base colour factor nor a texture (control: the old .blend fails with the five names).
 
 ### W30 — THE SCOPE DRIFTS, A HELD BREATH STEADIES IT, AND HOLDING TOO LONG COSTS MORE (2026-09-16, PLAN.md 2.7 piece 2)
 

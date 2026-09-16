@@ -18,6 +18,7 @@ import godot.core.NodePath;
  *   HBoxContainer (this)
  *     KeyLabel   (Label)       — "[1]", "[Q]", etc.
  *     Icon       (TextureRect) — weapon icon; hidden when slot is empty
+ *       NameLabel (Label)      — the weapon's name, small, pinned to the icon's bottom-right (CS-style)
  *     AmmoLabel  (Label)       — "30/90" or "--"
  *
  * Call update() each time weapon state changes.
@@ -31,6 +32,7 @@ public class WeaponSlotItem extends HBoxContainer {
 
     @Export public NodePath keyLabelPath  = new NodePath("KeyLabel");
     @Export public NodePath iconPath      = new NodePath("Icon");
+    @Export public NodePath nameLabelPath = new NodePath("Icon/NameLabel");
     @Export public NodePath ammoLabelPath = new NodePath("AmmoLabel");
 
     @Register
@@ -56,6 +58,9 @@ public class WeaponSlotItem extends HBoxContainer {
             tr.setTexture(item != null ? item.weaponIcon : null);
             tr.setVisible(item != null && item.weaponIcon != null);
         }
+
+        Node nn = getNodeOrNull(nameLabelPath);
+        if (nn instanceof Label l) l.setText(item != null ? item.getDisplayName() : "");
 
         Node an = getNodeOrNull(ammoLabelPath);
         if (an instanceof Label l) {

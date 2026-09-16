@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://bmchhca28jgat"]
 
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/WeaponSlotItem.java" id="1_wsitem"]
-[ext_resource type="Texture2D" uid="uid://dilbj38px75ln" path="res://assets/ui/AR212.png" id="2_lv2qv"]
+[ext_resource type="Texture2D" uid="uid://3x8fhw7r6b24" path="res://assets/ui/weapons/AR212.png" id="2_lv2qv"]
 
 [node name="WeaponSlotItem" type="HBoxContainer" unique_id=1859615224]
 offset_right = 180.0
@@ -18,11 +18,33 @@ text = "[?]"
 horizontal_alignment = 1
 
 [node name="Icon" type="TextureRect" parent="." unique_id=725825584]
-custom_minimum_size = Vector2(28, 28)
+custom_minimum_size = Vector2(0, 36)
 layout_mode = 2
 texture = ExtResource("2_lv2qv")
 expand_mode = 3
 stretch_mode = 4
+
+[node name="NameLabel" type="Label" parent="Icon" unique_id=725825585]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -70.0
+offset_top = -11.0
+offset_right = 2.0
+offset_bottom = 3.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.92, 0.92, 0.92, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.9)
+theme_override_constants/outline_size = 3
+theme_override_font_sizes/font_size = 9
+text = "AR-212"
+horizontal_alignment = 2
+vertical_alignment = 2
 
 [node name="AmmoLabel" type="Label" parent="." unique_id=1528213651]
 layout_mode = 2

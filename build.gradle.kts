@@ -23,6 +23,10 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // WeaponCatalogTest reads these files directly; declare them so a changed icon or table reruns it.
+    inputs.dir("assets/ui/weapons").withPropertyName("weaponIcons").optional()
+    inputs.files("blender/tools/weapon_archetypes.json", "blender/tools/weapon_models.json")
+        .withPropertyName("weaponTables")
 }
 
 godot {

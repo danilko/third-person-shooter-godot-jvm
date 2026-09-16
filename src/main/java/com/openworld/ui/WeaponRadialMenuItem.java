@@ -19,7 +19,8 @@ public class WeaponRadialMenuItem extends Control {
    */
   @Export public NodePath axisPath      = new NodePath("Axis");
   @Export public NodePath weaponIconPath = new NodePath("Axis/WeaponIcon");
-  @Export public NodePath weaponNamePath = new NodePath("Axis/WeaponName");
+  /** The weapon's name, a small label pinned to the icon's bottom-right corner (CS-style). */
+  @Export public NodePath weaponNamePath = new NodePath("Axis/WeaponIcon/WeaponName");
   @Export public NodePath magazinePath   = new NodePath("Axis/Magazine");
   @Export public NodePath reservePath    = new NodePath("Axis/Reserve");
   @Export public NodePath keyLabelPath    = new NodePath("Axis/KeyLabel");
