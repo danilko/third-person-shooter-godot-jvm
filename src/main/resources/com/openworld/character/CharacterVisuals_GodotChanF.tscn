@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://drlj8lilg3fnd" path="res://src/main/java/com/openworld/character/ShoulderAimModifier.java" id="5_shoulder"]
 [ext_resource type="Script" uid="uid://b0k50kireg5qy" path="res://src/main/java/com/openworld/character/SupportHandIKModifier.java" id="6_supportik"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/character/StockMountIKModifier.java" id="7_stockmount"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/WeaponRecoilModifier.java" id="8_recoil"]
 
 [sub_resource type="Resource" id="Resource_meshcfg"]
 script = ExtResource("2_mc")
@@ -1244,7 +1245,10 @@ script = ExtResource("7_stockmount")
 mount_markers = Array[String](["StockPoint", "ShoulderRestPoint"])
 mount_offsets = Array[Vector3]([Vector3(-0.0221, -0.0284, 0.0775), Vector3(0.0582, 0.0246, -0.0002)])
 
-[node name="SupportHandIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="16" unique_id=178617705]
+[node name="WeaponRecoilModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="16" unique_id=178617707]
+script = ExtResource("8_recoil")
+
+[node name="SupportHandIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="17" unique_id=178617705]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0

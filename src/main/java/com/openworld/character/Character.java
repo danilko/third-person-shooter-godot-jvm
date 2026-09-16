@@ -443,6 +443,11 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
                             instanceof StockMountIKModifier smm) {
                 ac.stockMountModifier = smm;
             }
+            if (!meshConfig.recoilModifierPath.isEmpty()
+                    && visualsInstance.getNodeOrNull(meshConfig.recoilModifierPath)
+                            instanceof WeaponRecoilModifier wrm) {
+                ac.recoilModifier = wrm;
+            }
         }
 
         // ── WeaponController ──────────────────────────────────────────────

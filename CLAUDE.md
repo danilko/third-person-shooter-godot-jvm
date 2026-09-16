@@ -180,6 +180,8 @@ a local one, and the two cancelling 180° Y flips are gone from `Character.tscn`
 the pitch downstream. See the W3 section under "Animation" for the whole change and its
 measurements.
 
+Recoil here is the AIM layer only — the VISIBLE weapon kick is a separate spring on the firing arm
+(`character.WeaponRecoilModifier`, W27), and the weapon's own moving parts are a third layer.
 Recoil is stored as `recoilPitch / recoilYaw` on `CameraController` and decays via
 `GD.lerp(…, 0, recoilRecoverySpeed * delta)` each frame — fully separate from the
 mouse-intent `pitch/yaw` so recovery never fights aim. `recoilPitch` is **added** per shot
@@ -3650,6 +3652,69 @@ Gates: `probe_switch_spin` and `probe_crawl_balance` PASS; `probe_weapon_fit` PA
 `probe_support_hand_ik`, `probe_weapon_{archetypes,sockets,world_body}`, `probe_character_variant`, `probe_melee`,
 `probe_self_hit`, `probe_fps_camera`, `probe_vehicle_views`, `probe_driveby_aim`; AimDebugAuto 40/40;
 `check_character_anim` PASS on both bodies; `World.tscn` 0 errors; `./gradlew test` green.
+
+### W27 — THE WEAPON KICK IS A SPRING ON THE FIRING ARM, AND IT IS A DIFFERENT LAYER FROM THE AIM (2026-09-15, PLAN.md A3)
+
+Recoil is three layers and only the middle one was missing. **The aim** — the camera kick and the
+spread bloom — has always existed (`Character.applyRecoil` -> `ControlRotation.recoilPitch/Yaw`,
+`FirearmItem`'s bloom), is owner-only and is correctly not replicated. **Large discrete motion** — a
+pump, a bolt, a launcher rocking the shoulder — is animation, on the weapon's own `AnimationPlayer`
+(`WeaponItem.fireAnimation`, W13). Between them sits the **visible weapon kick**, which nothing did:
+the gun sat perfectly still in the hands while the camera jumped.
+
+**It is code, not a clip, and the reason is full auto.** A per-shot animation restarted every 0.1 s
+plays its first frames forever and can never settle; a spring takes any number of impulses at any
+spacing and always comes back to rest. `character.WeaponRecoilModifier` is two scalar springs —
+push-back (m) along the bore and muzzle pitch (deg) — each taking a STEP per shot, because a shot IS
+instantaneous, with the spring as the return. The firing hand is rotated about the SHOULDER JOINT by
+the pitch (a shouldered rifle pivots at the butt pad, a few centimetres from that joint), translated
+back along the bore, and `TwoBoneIK` swings the arm after it; the hand keeps the kick's rotation, so
+the gun turns with it instead of sliding through the grip.
+
+**IK is not a recoil source — it is what keeps the hands on the gun while the kick moves it.** The
+modifier sits between `StockMountIKModifier` (which decides where the gun sits) and
+`SupportHandIKModifier` (which puts the off hand where the gun ENDS UP) in the skeleton's children,
+so the support hand follows the kick for free: both read the weapon through `HeldWeaponPose`, which
+composes it onto the firing hand's pose as this pass sees it. Measured: the off hand's grip miss
+never left 0.022 m through a burst.
+
+**Pitch only, with no yaw term, and that is a hard constraint rather than a simplification.** The
+horizontal half of recoil is already the camera's (`FirearmItem.applyRecoil` randomises a yaw kick on
+`ControlRotation`). A yaw kick HERE would turn the bore off the aim line in the one axis
+`WeaponItem.pointsAtAim` gates firing on (W21, 15 deg of yaw), so a burst would start eating its own
+trigger presses — the gate asserts 0.26 deg of yaw drift and that every press still fired.
+
+**The numbers are per weapon** (`WeaponItem.kickBack`/`kickPitch`/`kickSpring`/`kickDamping`, and the
+spring is part of how heavy a gun feels): AR4 0.020 m / 2.5 deg / 22 / 1.0, AR212 0.018 / 2.2 / 24,
+SG1 0.050 / 6.0 / 14, PI52 0.012 / 3.0 / 26, ATL4 0.060 / 5.0 / 10. They are **zero by default**, so a
+weapon that authors no kick does not kick — the right answer for a fist, a knife and a thrown
+grenade, and it makes an unauthored firearm visible rather than silently inheriting a rifle's feel.
+`WeaponController` delivers the impulse at the two sites W13 already uses for the weapon's own moving
+parts — `onWeaponFire` on the owner and `playRemoteFireCue` on a puppet — so **a remote peer sees the
+kick with no new message**, and an AI kicks because it fires through the same path.
+
+**MEASURING IT NEEDED TWO CORRECTIONS, AND BOTH WERE THE PROBE AGREEING WITH SOMETHING THAT WAS
+ALREADY TRUE.** (1) *The clip moves the hand by itself* — the aim pose breathes 0.0028 m, so "the hand
+moved 5 mm" is evidence of nothing; every case measures a quiet window of the same length first and
+the kick has to beat it by 3x. (2) *The muzzle rises whether or not this layer exists*: the camera
+recoil lifts the aim point and the aim modifiers follow it, so with the kick switched off the world
+-frame muzzle still rose **+1.27 deg (AR4) / +2.17 deg (SG1)** and the whole arm still moved 0.008–0.011
+m. Measured **against the aim line** the camera layer cancels — both the gun and the target move with
+it — and the control reads **+0.00 deg** on both weapons. That is the number the gate asserts, and the
+hand-displacement threshold is 0.020 m rather than "more than nothing" for the same reason.
+
+"Back to rest" is likewise asked of the SPRING, not of the hand: the hand never returns to an exact
+position because the clip has carried on, so rest is `< 1 mm / < 0.05 deg` on the modifier's own state
+and the hand only has to come back inside the clip's own wobble.
+
+Gate `tools/godot/probe_recoil_kick.gd` **14/14** (AR4, a 6-shot burst: hand peak 0.0320 m, bore
++2.72 deg off the aim, one kick per shot, spring at 0.00000 m after 0.75 s; SG1, one shot: 0.0665 m and
++5.68 deg, settled). `-- --control` sets `weight = 0` and fails 4. Everything else unchanged:
+`probe_self_hit` worst 12.7 deg with 0 presses lost, `probe_weapon_fit` PASS (default, female, crouch),
+`probe_support_hand_ik`, `probe_melee`, `probe_switch_spin`, `probe_crawl_balance`,
+`probe_weapon_{sockets,scale,world_body,archetypes}`, `probe_character_variant`, `probe_fps_camera`,
+`probe_vehicle_views`, `probe_driveby_aim` PASS; AimDebugAuto 40/40; `World.tscn` 0 errors;
+`./gradlew test` green.
 
 ## Godot-JVM Specifics
 
