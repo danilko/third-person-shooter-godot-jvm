@@ -1437,6 +1437,38 @@ question-named so godot-jvm does not merge them into getter-only properties, and
 a LOCAL count of reloads begun, deliberately not the replicated `reloadSeq` (which a puppet
 overwrites from the wire).
 
+### A BOLT ACTION IS THE FIRE RATE, NOT A RELOAD (2026-09-16, user-asked)
+
+The question was whether a bolt cycle is a new behaviour or the reload path overloaded. It is
+**neither** — it is what `auto = false` plus `fireRate` already do: `isSemiAutoReady()` gives exactly
+one shot per trigger pull (the trigger must be released before the next), and
+`fireTimer.setWaitTime(w.fireInterval())` — `1 / fireRate` — is the hard cooldown in between. So a
+bolt gun is DATA: SR3 ships `auto = false`, `fire_rate = 0.685` (**1.46 s**, the CS:GO AWP's cycle),
+measured at 1.467 s by the gate.
+
+**Overloading the reload path would have been wrong in five concrete ways**, each of which is a system
+that already means something else:
+- `onWeaponReload` → `onReloadComplete` MOVES AMMO from the reserve into the magazine. A bolt cycle
+  must not, so reuse would need a "don't actually reload" flag — one function with two meanings, the
+  defect this file's W-series keeps closing.
+- `reloadSeq` is replicated as state and drives `playRemoteReloadCue` on every puppet, so every peer
+  would play a reload animation AND the reload audio once per shot.
+- `isWeaponReloading()` feeds the HUD's `WeaponProgress` ring, which would read "reloading" (amber)
+  after every shot.
+- the reload timer already blocks firing, so the lockout would exist twice, with two owners and two
+  durations to keep in step.
+- an interrupted reload and an interrupted bolt cycle are different things, and a shared timer cannot
+  be cancelled for one without cancelling the other.
+
+What a bolt gun still wants is **cosmetic and per-view**, and each piece has an existing owner:
+the weapon's own moving parts (`WeaponItem.fireAnimation` on its own `AnimationPlayer` — W13, exactly
+"a shotgun pump, a bolt, a revolver cylinder"; SR3's model has no separate bolt object yet, so this is
+authoring, not code), a character-side bolt one-shot if the arm should visibly work it (the `Attack`
+one-shot's shape, W16), and the unscope/re-scope around the cycle (the scope work, PLAN.md 2.7).
+
+Gate: `tools/godot/probe_auto_reload.gd` case 5 asserts BOTH halves — the interval between two shots
+is `1 / fire_rate`, and nothing reloads while the magazine still has rounds.
+
 ### Spread formula (FirearmItem)
 
 ```
@@ -3884,10 +3916,18 @@ tree_refs 67 (was 64), orphans still 23, and `probe_weapon_archetypes` sweeps 10
 finds **3** hand-pose clusters, with sniper landing in the rifle one. Authoring the scoped pose is a
 pose edit on an existing action — no rename, no scene change, no code.
 
-**Ammo and damage are the user's numbers:** `damage 80` (AWP-like; against 100 HP that is NOT a
-one-shot torso kill — a headshot at ×4 always is, and 110 would make the body lethal if that is the
-feel wanted), 5 + 20 rounds, and it auto-reloads on empty like every other magazine weapon (see
-"Auto-reload on empty").
+**`damage 150` is the CS ONE-SHOT BODY feel, and the number comes from the bone table, not from
+taste** (user decision, 2026-09-16). `Health.getBuiltInMultiplier` against a 100 HP character gives
+upper torso (`spine_03`, clavicles) ×1.0, **mid and lower torso (`spine_02`, `spine_01`, `pelvis`)
+×0.75**, arms ×0.75, legs ×0.5, head ×4.0 — so "any torso hit kills" is decided by the WORST torso
+multiplier: `100 / 0.75 = 133.3` is the floor, and 150 clears it with the same margin CS's AWP has
+(112.5 at the worst torso against its 115 chest). Result: upper torso 150, mid/lower torso 112.5,
+legs 75 (survivable, as in CS), head 600. **The one thing that does not match CS: arms share the
+mid-torso ×0.75**, so an arm hit kills here where CS leaves 15 HP. That is a fact about the
+CHARACTER's bone table, not the weapon, so the fix if it matters is a per-bone
+`MeshConfig.boneHitMultipliers` entry (arms ≤ 0.66), never a lower weapon damage — lowering the
+damage would take the torso one-shot away with it. 5 + 20 rounds, and it auto-reloads on empty like
+every other magazine weapon (see "Auto-reload on empty").
 
 ## Godot-JVM Specifics
 
