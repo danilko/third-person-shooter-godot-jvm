@@ -618,6 +618,7 @@ public class WeaponController extends Node {
     // The weapon's OWN moving parts (pump, bolt, cylinder) -- see WeaponItem.weaponAnimatorPath.
     // Placed after every gate, so a shot that was suppressed moves nothing.
     w.playMotion(w.fireAnimation);
+    kickWeapon(w);
 
     fireTimer.setWaitTime(w.fireInterval());
     fireTimer.start();
@@ -635,6 +636,18 @@ public class WeaponController extends Node {
     if (!w.deferFireEvent()) reportFireEvent(0);
     // After the last throw, let the weapon clear its own slot (ThrowableItem auto-empties)
     if (!w.isInfiniteAmmo && w.getMagazine() == 0) w.onMagazineEmpty();
+  }
+
+  /**
+   * The visible weapon kick for one shot (PLAN.md A3): the weapon's own spring data handed to the
+   * character's {@link com.openworld.character.WeaponRecoilModifier}. Called from the same two sites
+   * as {@code playMotion(fireAnimation)} -- the owner's fire and a puppet's cue -- because both are
+   * cosmetics that every peer must see. A weapon with no authored kick costs one branch.
+   */
+  private void kickWeapon(WeaponItem w) {
+    if (w.kickBack == 0.0f && w.kickPitch == 0.0f) return;
+    AnimationController ac = animation();
+    if (ac != null) ac.onWeaponKick(w.kickBack, w.kickPitch, w.kickSpring, w.kickDamping);
   }
 
   /** Why a press might not fire right now — the fire gate's timers, for headless checks. */
@@ -722,6 +735,7 @@ public class WeaponController extends Node {
     WeaponItem w = getCurrentWeaponItem();
     if (w != null && isArmed()) {
       w.playMotion(w.fireAnimation);   // the weapon's own moving parts, on the remote peer too
+      kickWeapon(w);                   // and the visible arm kick (A3) -- cosmetic, so a puppet runs it too
       // Polymorphic cosmetic replay: firearms draw muzzle/tracer, throwable/projectile
       // weapons spawn a non-damaging projectile so the grenade/rocket arc + explosion is
       // seen on every peer (damage stays authority-side). Default no-op for the fist.

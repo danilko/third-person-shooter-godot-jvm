@@ -41,6 +41,11 @@ public class MeshConfig extends Resource {
     public NodePath stockMountModifierPath = new NodePath(
             "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/StockMountIKModifier");
 
+    /** The per-shot weapon kick — see {@link WeaponRecoilModifier}. Empty = this body does not kick. */
+    @Export
+    public NodePath recoilModifierPath = new NodePath(
+            "MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponRecoilModifier");
+
 
     @Export
     public NodePath fpsCameraMarkerPath = new NodePath(

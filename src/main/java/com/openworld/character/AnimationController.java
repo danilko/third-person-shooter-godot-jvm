@@ -41,6 +41,10 @@ public class AnimationController extends Node {
   @Export
   public StockMountIKModifier stockMountModifier;
 
+  /** The per-shot weapon kick — see {@link WeaponRecoilModifier}. */
+  @Export
+  public WeaponRecoilModifier recoilModifier;
+
   @Export
   public double animationBlendDuration = 0.25;
 
@@ -311,6 +315,18 @@ public class AnimationController extends Node {
     animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
     animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
     updateAimModifiers();
+  }
+
+  /**
+   * One shot's visible weapon kick (PLAN.md A3). Called by {@code WeaponController} at the two sites
+   * W13 uses for the weapon's own moving parts — {@code onWeaponFire} on the owner and
+   * {@code playRemoteFireCue} on a puppet — so a remote peer sees the same kick with no new message.
+   * A weapon that authors no kick passes zeros and nothing happens.
+   */
+  @Register
+  public void onWeaponKick(double back, double pitchDeg, double spring, double damping) {
+    if (recoilModifier == null || (back == 0.0 && pitchDeg == 0.0)) return;
+    recoilModifier.kick(back, pitchDeg, spring, damping);
   }
 
   private void updateAimModifiers() {

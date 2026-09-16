@@ -169,6 +169,23 @@ public class WeaponItem extends Pickup implements WeaponAction {
   @Export public float recoil = 0.8f;
   @Export public float damage = 25.0f;
 
+  // ── The VISIBLE weapon kick (PLAN.md A3, character.WeaponRecoilModifier) ────────────────────
+  // Separate from `recoil` above, which is the CAMERA kick (the aim), and from fireAnimation, which
+  // is the weapon's own moving parts. These four are the spring the firing arm takes per shot: a
+  // step of kickBack/kickPitch, returned by a spring of angular frequency kickSpring (settle ≈
+  // 4/kickSpring seconds) and ratio kickDamping (1 = critically damped, no bounce). They are ZERO by
+  // default, so a weapon that has not authored a kick does not kick — which is the right answer for
+  // a fist, a knife and a thrown grenade, and makes an unauthored firearm visible rather than
+  // silently inheriting a rifle's feel.
+  /** Push-back along the bore per shot, metres. */
+  @Export public float kickBack = 0.0f;
+  /** Muzzle rise per shot, degrees. No yaw term: a yaw kick would fight WeaponItem.pointsAtAim (W21). */
+  @Export public float kickPitch = 0.0f;
+  /** The return spring's angular frequency, 1/s. Lower = a heavier gun that settles slower. */
+  @Export public float kickSpring = 22.0f;
+  /** The return spring's damping ratio. 1 = critically damped; below 1 overshoots. */
+  @Export public float kickDamping = 1.0f;
+
   // Effective engagement distance in metres. AI uses this (via AICharacter.getEffectiveAttackRange)
   // to cap how far it will try to fight with this weapon — e.g. a melee AI closes to arm's
   // reach instead of standing at AIBehaviorConfig.attackRange and swinging at empty air.
@@ -561,6 +578,18 @@ public class WeaponItem extends Pickup implements WeaponAction {
 
   public float getRecoil() { return recoil; }
   public void setRecoil(float recoil) { this.recoil = recoil; }
+
+  public float getKickBack() { return kickBack; }
+  public void setKickBack(float kickBack) { this.kickBack = kickBack; }
+
+  public float getKickPitch() { return kickPitch; }
+  public void setKickPitch(float kickPitch) { this.kickPitch = kickPitch; }
+
+  public float getKickSpring() { return kickSpring; }
+  public void setKickSpring(float kickSpring) { this.kickSpring = kickSpring; }
+
+  public float getKickDamping() { return kickDamping; }
+  public void setKickDamping(float kickDamping) { this.kickDamping = kickDamping; }
 
   /** Effective engagement distance in metres — MeleeItem returns its opening swing's reach. */
   public float getEffectiveRange() { return weaponRange; }
