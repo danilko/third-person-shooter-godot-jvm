@@ -258,9 +258,9 @@ public class WeaponController extends Node {
    * for the same reason: it is a choice, and nothing can derive it. It cannot strand the view, because every way the
    * scope could end is still checked every tick and CLEARS it rather than hiding it: {@link #applyScopeZoom} drops it
    * when the held weapon has no scope or a switch is in flight, and {@code Character.tickScopeSway} drops it in a
-   * seat or when dead — so leaving the car or picking the rifle back up never re-raises an old scope. It deliberately
-   * survives the bolt cycle and the reload (the zoom drops, the scope stays raised and comes back by itself), and
-   * releasing the aim button, which is a different input.
+   * seat or when dead — so leaving the car or picking the rifle back up never re-raises an old scope, and
+   * {@link #onWeaponReload} ends it (CS). It deliberately survives the bolt cycle (the zoom drops, the scope stays
+   * raised and comes back by itself) and releasing the aim button, which is a different input.
    */
   private boolean scopeLatched = false;
 
@@ -273,6 +273,12 @@ public class WeaponController extends Node {
   /** Whether the toggle is holding the scope up — for the input layer (combat stays on) and the gate. */
   @Register
   public boolean scopeLatchedNow() { return scopeLatched; }
+
+  /** End the scope outright, held or toggled: the toggle is cleared and a held aim button ignored until released. */
+  private void endScope() {
+    cancelScopeLatch();
+    if (scopeRequested) holdSuppressed = true;
+  }
 
   /** End a toggled scope (seat, death). The hold path needs nothing: the button is simply read again. */
   public void cancelScopeLatch() {
@@ -991,6 +997,10 @@ public class WeaponController extends Node {
       weaponAudio.play();
     }
     reloadTimer.start();
+    // A reload ENDS the scope, CS's AWP (user decision 2026-09-16): the toggle is cleared and a held aim button is
+    // ignored until it is released, so after the reload the player scopes again on purpose. The same line covers the
+    // auto-reload after the last round, which starts here too. (The bolt cycle is different: it only drops the zoom.)
+    endScope();
     if (animationController != null) animationController.onWeaponReload();
     // Reload-as-state: bump the rolling counter that rides the snapshot stream so every remote peer
     // replays the reload animation (a visible "reloading, can't fire yet" tell). u8 — only change

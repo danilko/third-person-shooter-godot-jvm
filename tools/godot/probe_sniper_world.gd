@@ -139,7 +139,10 @@ func _initialize() -> void:
 	current_scene = world
 	p = world.get_node("Characters/Player") as CharacterBody3D
 	await _tick(240)
+	# Raise the max AND refill: setting max_health alone leaves the player at 100, and the zone AI shot it dead
+	# mid-run, after which every "shot" read as NO SHOT with the view frozen (a probe artefact, not a hit bug).
 	p.get_node("Health").set("max_health", 1.0e9)
+	p.get_node("Health").call("reset_full")
 
 	gun = (load(SNR1) as PackedScene).instantiate() as Node3D
 	world.add_child(gun)
