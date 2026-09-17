@@ -9,7 +9,7 @@ extends SceneTree
 ## one-shot still swings it up from the holster -- so the spine chases a bore pointing down or backwards. An AI is in
 ## combat while it switches; a player usually is not, which is why the player looked fine.
 ##
-## A character is armed with PI52 and AR4 through real pickups, held in combat (`aim` through Input), switched pistol
+## A character is armed with PIS1 and ASR1 through real pickups, held in combat (`aim` through Input), switched pistol
 ## -> rifle -> pistol -> rifle, and each frame of each switch window the CHEST (spine_03's own +X, flattened, against
 ## MeshRoot's right) and the BORE (the held weapon's -Z, flattened, against MeshRoot's forward) are sampled.
 ## Asserted: the chest never swings more than CHEST_SWING_LIMIT from where it rests aiming, and its total travel
@@ -79,7 +79,7 @@ func _initialize() -> void:
 	p.position = Vector3(0, 1.2, 0)
 	await _tick(40)
 	var guns := {}
-	for id in ["PI52", "AR4"]:
+	for id in ["PIS1", "ASR1"]:
 		var g: Node3D = (load(WEAPON_DIR % id) as PackedScene).instantiate() as Node3D
 		world.add_child(g)
 		g.global_position = p.global_position + Vector3(0, 0.3, 0)
@@ -101,11 +101,11 @@ func _initialize() -> void:
 	sk.add_child(chest)
 	chest.bone_name = "spine_03"
 
-	wc.call("on_set_weapon", slots["PI52"])
+	wc.call("on_set_weapon", slots["PIS1"])
 	Input.action_press("aim")
 	await _tick(90)
 
-	for step in ["AR4", "PI52", "AR4"]:
+	for step in ["ASR1", "PIS1", "ASR1"]:
 		await _tick(30)
 		var rest_chest := _yaw_about_up(chest.global_transform.basis.x, mesh_root.global_transform.basis.x)
 		wc.call("on_set_weapon", slots[step])

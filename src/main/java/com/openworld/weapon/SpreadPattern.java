@@ -6,7 +6,7 @@ package com.openworld.weapon;
  *
  * <p>Spread used to be sampled from the engine's global RNG ({@code GD.randf}), so a pellet could not
  * be reproduced anywhere else, and a networked client had to send the host one post-spread ray PER
- * PELLET (eight reliable messages per SG1 pull). With a seed both sides derive the same cone, so the
+ * PELLET (eight reliable messages per SHG1 pull). With a seed both sides derive the same cone, so the
  * client sends the pre-spread aim, the half-angle and the seed once, and the host regenerates every
  * pellet itself — and can refuse a cone narrower than the weapon allows.
  *

@@ -4132,18 +4132,76 @@ HUD): one card per slot, no overlaps, all on screen, pointing at every card sele
 function AND a real mouse-motion event, keys match the slot bar, the dead zone holds, all 42 wheel and slot-bar
 texts are 10 pt with an outline, and a plain Label anywhere gets the theme outline.
 
-**Weapon ids are plain, display names hyphenated.** `weapon_id` is a KEY — file names, catalog rows, the
-inventory manifest, throwable stack merging — so it stays letters+digits (`AR4`, `PI52`); `weapon_name`, what
-the kill feed and slots show, is the same with a hyphen (`AR-4`, `PI-52`), the way real designations are
-written and the way CS separates `weapon_ak47` from the "AK-47" it displays. `WeaponCatalogTest` enforces
-id == catalog id and name == hyphenated id. Two were out of line and are fixed: MW1's scene declared id `MK1`
-(display `MK-1`) and T1 displayed "T1 Grenade".
+**Weapon names: a 3-letter TYPE code + a series number (2026-09-16, user decision).** The code says what the
+item IS: two words -> first two letters of the first + first letter of the second (SNiper Rifle = SNR, SHot
+Gun = SHG, ASsault Rifle = ASR, MElee Weapon = MEW, FRag Grenade = FRG); one word -> its first three letters
+(PIStol = PIS); three or more words -> initials (Anti-Tank Launcher = ATL). The number is a SERIES within the
+type starting at 1 — never a real-world model number (those are exactly the designations that carry trademark
+and association risk). `weapon_id`, file names, catalog rows and `.blend` collection names use the plain id
+(`SNR1`); `weapon_name`, what players read, is hyphenated (`SNR-1`), the way CS separates `weapon_ak47` from the
+"AK-47" it displays. `WeaponCatalogTest` enforces id == catalog id, id = letters+digits, name = hyphenated id.
+
+| old | new | weapon |  | old | new | weapon |
+|---|---|---|---|---|---|---|
+| AR4 | **ASR1** | AK-pattern rifle |  | ATL4 | **ATL1** | launcher tube |
+| AR212 | **ASR2** | AR-pattern carbine |  | T1 | **FRG1** | frag grenade |
+| SG1 | **SHG1** | pump shotgun |  | MW1 (id was `MK1`) | **MEW1** | knife / bayonet |
+| SR3 | **SNR1** | bolt sniper rifle |  | MW2 | **MEW2** | axe |
+| PI52 | **PIS1** | pistol |  | (new) | **REV1** | revolver (hand cannon) |
+| (new) | **SMG1** | submachine gun |  | | | |
+
+Renamed everywhere live: scenes, stats, models (`.blend` collections/objects, re-exported `.glb`), icons,
+projectile scenes and the class (`T1Projectile` -> `FRG1Projectile`, `ATL4Projectile.tscn` -> `ATL1Projectile.tscn`),
+the catalog, `weapon_models.json`/`weapon_archetypes.json`, tools, probes, tests, README/CREDITS and the
+weapon/aim authoring guides. **Sections of this file written before the rename keep the old ids** as the record
+of what was built then, the district->zone precedent. Deliberately NOT renamed: the four melee attack CLIPS
+(`attack_stab_mw1`, `attack_slash_mw1`, `attack_swing_mw2`, `attack_chop_mw2`) — renaming them means
+re-exporting both character animation `.blend`s — and "T1" in the island/road planning tools, where it is a road tier.
 
 **SR3 rendered WHITE in Godot — two Material Output nodes (2026-09-16, user-reported).** Every SR3 material
 had an EEVEE-target output (Principled, right colour) and a Cycles-target output (Diffuse BSDF); the glTF
 export carried no `baseColorFactor` for any of them, so Godot drew them white. Fixed in `SR3.blend` (one
 output, target All, Principled only), and `build_weapon.py` now REFUSES an export in which any material has
 neither a base colour factor nor a texture (control: the old .blend fails with the five names).
+
+**REV-1 and SMG-1 (2026-09-16, user-asked).** Two raw Quaternius models (`Revolver_3`, `SubmachineGun_3`) were
+normalised the way ASR-1 was: transforms applied, scaled to a reference length, muzzle turned to +Y, origin on the
+firing fist (placed on a grid render), one output node per material. **SMG, not SUG:** written "sub-machine gun" it
+is three words, so the initials rule gives SMG, which is also the abbreviation players already read (CS's buy-menu
+category). A revolver gets its own type code (REV, one word) and shares the **pistol** grip archetype, the way SNR and
+ASR both hold like a rifle.
+- **REV1**: a Smith & Wesson Model 500 with an 8 3/8 in barrel, **0.381 m**, grip to rear 0.041 m. `Muzzle` (0, 0.085,
+  −0.338); `SupportPoint` is PIS1's, the cupped support hand. Stats: a "hand cannon", 6 + 24 rounds, semi-auto at
+  2 shots/s, damage 70 (two body hits, one head hit), recoil 3.0, a hard kick (0.03 m / 10°), bloom 0.9 per shot,
+  2.5 s reload. Secondary slot, hip holster.
+- **SMG1**: a B&T MP9 with the stock extended, **0.523 m**, grip to rear 0.244 m, rifle archetype. `StockPoint`
+  (0, 0.0445, 0.244) on the rod stock's butt pad, `SupportPoint` (0, −0.01, −0.194) on the vertical foregrip, and
+  `Muzzle` (0, 0.0615, −0.279). Stats modelled on the MP9's role: 14 shots/s full auto, 30 + 90 rounds, damage 14,
+  low recoil (0.6), a 2.1 s reload, a fast 2.8 switch and `standing_speed_fraction` 0.5, so it stays accurate while
+  moving more than a rifle does. Primary slot, back sling.
+
+Measured: `probe_weapon_scale` (0.0% out on both), `probe_weapon_fit` on both bodies and crouched (REV1: gun on
+the line, support grip 0.000 m; SMG1: stock on the anchor 0.000 m, grip 0.001 m, hand moved 0.039 m) and
+`probe_weapon_holster` on both bodies (REV1 on the hip, 0.4% poke; SMG1 on the back sling, 3.1%). Also passing:
+`probe_weapon_{sockets,world_body,archetypes}`, `probe_self_hit`, `probe_recoil_kick` and `./gradlew test`. Both
+are in the catalog, the weapon library, the icon set and DebugWorld's pickup row.
+
+**ASR-1's model was replaced (2026-09-16, user request: closer in style to ASR-2).** The AKMS with a folding
+stock became a fixed-stock AKM (`AssaultRifle_5` from the same Quaternius pack), normalised the way SR3 was.
+It was 5.422 raw units along +X, so it was scaled ×0.16230 to the AKM's **0.88 m**, turned so the muzzle is
++Y, and moved so the origin sits at the centre of the firing hand on the slanted pistol grip (raw x 0.02,
+z 0.09, placed on a 0.1-unit grid render). Its materials had the same two Material Output nodes and were
+fixed the same way; the new build check caught it. The grip-to-rear distance is now **0.263 m** (was 0.281
+on the AKMS). Markers were read off ray casts through the mesh:
+- `Muzzle` (0, 0.0826, −0.617)
+- `StockPoint` (0, 0.020, 0.256): the pad is 1.3 cm lower and 2.5 cm shorter than the AKMS's
+- `SupportPoint` unchanged: the magazine and the start of the handguard sit where the old model's did, to within 2 cm
+
+The collider is the mesh's bounding box. The adopted rifle pose was built on the old stock, so the stock IK
+now moves the hand **0.028 m** (ASR-2's is 0.026). Stock and support grip are 0.000 m off. Gates:
+`probe_weapon_{scale,sockets,fit (both bodies, crouch),holster,world_body,archetypes}`, `probe_self_hit`,
+`probe_recoil_kick`, `probe_switch_spin`, `probe_support_hand_ik`, `probe_character_variant` and
+`./gradlew test` pass. The icon and `WeaponLibrary.blend` were regenerated.
 
 ### W30 — THE SCOPE DRIFTS, A HELD BREATH STEADIES IT, AND HOLDING TOO LONG COSTS MORE (2026-09-16, PLAN.md 2.7 piece 2)
 

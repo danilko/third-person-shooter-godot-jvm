@@ -31,7 +31,7 @@ import godot.global.GD;
  * Run as two processes of {@code NetMeleeTest.tscn} ({@code tools/net/run_net_melee_test.sh}):
  *
  * <p>The HOST spawns a still target (an AICharacter driven by a {@link ScriptedInputController}). The CLIENT
- * walks onto the scene's MW1 knife (the host-arbitrated pickup), stands in reach of the target and taps fire
+ * walks onto the scene's MEW1 knife (the host-arbitrated pickup), stands in reach of the target and taps fire
  * through the {@code Input} singleton, so the shipped {@code PlayerController → WeaponController → KnifeItem}
  * path runs: each tap is a stab the client PREDICTS (impact, hitstop) and the host RESOLVES from the
  * swing's inputs ({@code MSG_MELEE}). Then it sends what a forged client would: damage requests naming an

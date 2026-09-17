@@ -40,7 +40,7 @@ def check(label, ok, detail):
 pulls = int(cs.get("pulls", 0))
 check("client pulled the trigger", pulls >= 10, f"pulls={pulls}")
 check("ONE message per pull (not per pellet)", pulls > 0 and int(cs.get("shot_sent", -1)) == pulls + 10,
-      f"shot_sent={cs.get('shot_sent')} ({pulls} pulls + 10 forged; SG1 has 8 pellets)")
+      f"shot_sent={cs.get('shot_sent')} ({pulls} pulls + 10 forged; SHG1 has 8 pellets)")
 resolved_honest = [k for k in shots(host, "host resolved") if k < pulls]
 check("every honest pull accepted by the host", pulls > 0 and len(resolved_honest) == pulls,
       f"{len(resolved_honest)} of {pulls} resolved")

@@ -32,7 +32,7 @@ import com.openworld.item.Pickup;
  * Single-use throwables (e.g. a one-shot signal flare):
  *   Set magazineSize = 1 in the inspector.
  *
- * Scene setup (e.g. T1.tscn):
+ * Scene setup (e.g. FRG1.tscn):
  *   Node3D + ThrowableItem script
  *     CollisionShape3D   (the WORLD body's shape — lent to the PickupBody built at drop time;
  *                         the layer/mask live on that body, not here)
@@ -42,7 +42,7 @@ import com.openworld.item.Pickup;
  *                PickupArea.body_exited  → on_body_exited
  *
  * Configure magazine=1, magazineSize=6 (or 1 for single-use), reserve=0, reserveMax=0.
- * Set projectileScene to the projectile scene (e.g. T1Projectile.tscn); explosion
+ * Set projectileScene to the projectile scene (e.g. FRG1Projectile.tscn); explosion
  * parameters live in the projectile scene itself, not here.
  */
 @Script(className = "ThrowableItem")
@@ -53,7 +53,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         auto = false;
     }
 
-    /** Physics scene to instantiate on each throw (e.g. T1Projectile.tscn). */
+    /** Physics scene to instantiate on each throw (e.g. FRG1Projectile.tscn). */
     @Export public PackedScene projectileScene;
 
     /** Speed of the thrown projectile in m/s. */
@@ -132,7 +132,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
      * NOT gated on facing the aim (W21's {@code pointsAtAim}). That gate compares the HELD ITEM's model forward
      * with the aim, which is a gun barrel's direction and nothing a grenade in the hand has: its forward is
      * wherever the hold pose leaves it, so the gate never opened and no grenade could be thrown at all —
-     * found by the N4 launch check (fire pressed with a ready T1, nothing launched, single-player included).
+     * found by the N4 launch check (fire pressed with a ready FRG1, nothing launched, single-player included).
      * And the gate's reason does not apply: a throw's direction is body → aim point ({@link #resolveAimDir}),
      * it leaves in front of the chest, and it ignores collisions with its thrower.
      */
@@ -268,7 +268,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
 
         // Inject attacker identity before the node enters the tree.
         // Explosion parameters are scene-configured inside the projectile scene itself.
-        if (projectile instanceof T1Projectile gp) {
+        if (projectile instanceof FRG1Projectile gp) {
             gp.cosmetic = cosmetic;
             gp.attackerId = attackerId();
             if (!cosmetic) {

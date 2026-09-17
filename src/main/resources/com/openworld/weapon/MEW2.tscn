@@ -1,0 +1,71 @@
+[gd_scene format=3 uid="uid://dmk2axe000002"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/weapons/MEW2.png" id="91_icon"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/MEW2.tres" id="90_stats"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/MeleeAttackStep.java" id="step_script"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/AxeItem.java" id="1_axeitem"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mw2_body"]
+size = Vector3(0.087, 0.175, 0.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mw2_pickup"]
+size = Vector3(0.5, 0.5, 0.9)
+
+[sub_resource type="BoxMesh" id="BoxMesh_mw2_visual"]
+size = Vector3(0.087, 0.175, 0.8)
+
+[sub_resource type="Resource" id="MeleeAttackStep_MW2_0"]
+script = ExtResource("step_script")
+animation = "attack_swing_mw2"
+damage = 60.0
+range = 2.2
+radius = 0.4
+windup = 0.14
+active = 0.07
+recovery = 0.35
+hitstop = 0.06
+camera_kick = 1.8
+
+[sub_resource type="Resource" id="MeleeAttackStep_MW2_1"]
+script = ExtResource("step_script")
+animation = "attack_chop_mw2"
+damage = 120.0
+range = 2.5
+radius = 0.5
+windup = 0.22
+active = 0.08
+recovery = 0.55
+hitstop = 0.1
+camera_kick = 3.0
+
+[node name="MEW2" type="Node3D" unique_id=300300001]
+script = ExtResource("1_axeitem")
+stats = ExtResource("90_stats")
+attack_steps = Array[ExtResource("step_script")]([SubResource("MeleeAttackStep_MW2_0"), SubResource("MeleeAttackStep_MW2_1")])
+weapon_id = "MEW2"
+weapon_name = "MEW-2"
+slot_type = 2
+weapon_archetype = "melee"
+weapon_icon = ExtResource("91_icon")
+hold_socket = "SocketMelee"
+holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2")
+require_interact = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=300300002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.3)
+shape = SubResource("BoxShape3D_mw2_body")
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=300300003]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="PickupArea" unique_id=300300004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.3)
+shape = SubResource("BoxShape3D_mw2_pickup")
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=300300006]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.3)
+mesh = SubResource("BoxMesh_mw2_visual")
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

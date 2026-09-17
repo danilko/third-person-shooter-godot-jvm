@@ -51,7 +51,7 @@ def weapon_objects(wid):
     sx, sy, sz = prim["size"]            # Godot axes: x right, y up, z back
     cx, cy, cz = prim["center"]
     # Godot (x, y, z) -> Blender (x, -z, y); the weapon's length (Godot z) is Blender y.
-    if wid == "ATL4":
+    if wid == "ATL1":
         bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=sx / 2, depth=sz, location=(cx, -cz, cy),
                                             rotation=(math.pi / 2, 0, 0))
     else:

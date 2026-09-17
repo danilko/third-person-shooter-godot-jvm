@@ -78,9 +78,9 @@ import godot.api.OS;
  * F1  — teleportToNextZone(): jumps the local player to the next registered
  *       ZoneMarker (cycles through every district at world scale), so testing
  *       across districts doesn't require walking/driving the whole map.
- * F2  — dropWeaponHere(): spawns an AR4 pickup at the player's feet — the companion to F1
+ * F2  — dropWeaponHere(): spawns an ASR1 pickup at the player's feet — the companion to F1
  *       for testing weapon pickup flow in whichever district you've just teleported to.
- * Every AI spawned by either binding is equipped with an AR4 rifle (see
+ * Every AI spawned by either binding is equipped with an ASR1 rifle (see
  * equipDebugRifle) so it fights at range instead of relying on its bare fists.
  *
  * Delete this class once F1's real debug console (PLAN.md Pre-F1 prerequisite)
@@ -92,7 +92,7 @@ public class DebugHarness extends Node {
     private static final String AI_SCENE_PATH =
             "res://src/main/resources/com/openworld/character/AICharacter.tscn";
     private static final String RIFLE_SCENE_PATH =
-            "res://src/main/resources/com/openworld/weapon/AR4.tscn";
+            "res://src/main/resources/com/openworld/weapon/ASR1.tscn";
     private static final String VEHICLE_SCENE_PATH =
             "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn";
     private static final StringName CHARACTERS_GROUP = new StringName("characters");
@@ -283,7 +283,7 @@ public class DebugHarness extends Node {
 
     /**
      * Drops `count` fresh AICharacter instances of the given faction into the Characters
-     * container, each equipped with an AR4 rifle (see {@link #equipDebugRifle}) so they
+     * container, each equipped with an ASR1 rifle (see {@link #equipDebugRifle}) so they
      * fight at range instead of standing around with only their fists.
      */
     private void spawnTestAI(int count, String faction, String displayPrefix) {
@@ -323,7 +323,7 @@ public class DebugHarness extends Node {
     }
 
     /**
-     * Loads a fresh AR4 rifle instance, drops it into `container` (a WeaponItem must
+     * Loads a fresh ASR1 rifle instance, drops it into `container` (a WeaponItem must
      * already be inside the tree before WeaponController can reparent it onto the
      * character), and queues it for equip — same deferred path WeaponPickup uses
      * (WeaponController.requestEquip → equipWeapon in the next idle frame), so the
@@ -677,7 +677,7 @@ public class DebugHarness extends Node {
     }
 
     /**
-     * F2 — drops an AR4 pickup at the local player's feet: the companion to F1's teleport for
+     * F2 — drops an ASR1 pickup at the local player's feet: the companion to F1's teleport for
      * testing weapon pickup flow in whichever district you've just jumped to. Same instantiate
      * pattern as {@link #equipDebugRifle} but left as a free-standing world pickup (no
      * {@code requestEquip} call) rather than equipped onto a character.
@@ -705,7 +705,7 @@ public class DebugHarness extends Node {
 
         container.addChild(rifle);
         rifle.setGlobalPosition(player.getGlobalPosition());
-        GD.print("DebugHarness: dropped AR4 pickup at " + player.getGlobalPosition());
+        GD.print("DebugHarness: dropped ASR1 pickup at " + player.getGlobalPosition());
     }
 
     /**

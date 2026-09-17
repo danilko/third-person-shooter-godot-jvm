@@ -63,8 +63,8 @@ There is a per-folder copy of this list in `assets/terrain3d/textures/asset_lice
 
 | Asset | Path | Source | Licence |
 |---|---|---|---|
-| Weapon models (AR4, AR212, PI52, SG1, MW1) | `assets/weapons/` | [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius, re-scaled and re-origined here | CC0 1.0 (no attribution required; credited as thanks) |
-| Weapon models (ATL4, MW2, T1) | `assets/weapons/` | Primitive shapes built by this project | Project (MIT) |
+| Weapon models (ASR1, ASR2, PIS1, REV1, SHG1, SMG1, MEW1) | `assets/weapons/` | [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius, re-scaled and re-origined here | CC0 1.0 (no attribution required; credited as thanks) |
+| Weapon models (ATL1, MEW2, FRG1) | `assets/weapons/` | Primitive shapes built by this project | Project (MIT) |
 | Prototype grid textures | `addons/kenney_prototype_textures/` | [Kenney Prototype Textures](https://godotengine.org/asset-library/asset/781), Kenney (packaged by Calinou) | CC0 1.0 |
 | Character model "Godot-chan", textures and animations | `assets/merged_animation*.blend/.glb`, `assets/textures/`, `assets/merged_animation*_*.png/.jpg` | Johnny Rouddro, [Godot Third Person Shooter](https://godotengine.org/asset-library/asset/716) (Asset Library #716) | MIT |
 | Weapon sound effects | `assets/audio/Pistol_fire.wav`, `Pistol_reload.wav`, `Rifle_fire.wav`, `Rifle_reload.wav` | Johnny Rouddro, [Godot Third Person Shooter](https://godotengine.org/asset-library/asset/716) (Asset Library #716) | MIT |

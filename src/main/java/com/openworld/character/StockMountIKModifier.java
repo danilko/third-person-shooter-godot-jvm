@@ -28,7 +28,7 @@ import godot.core.Vector3;
  * W20 put every long gun's GRIP on the palm and left the stock wherever the arm pose happens to put
  * it. A1 measured where that is: laterally exact, but 17-19 cm BEHIND the pocket, because the aim clip
  * holds the hand ~0.2 m in front of the shoulder joint where a shouldered stock needs ~0.38 m. That is
- * a fact about the WEAPON (grip-to-butt differs per gun: AR4 0.281, AR212 0.259, SG1 0.265), so one
+ * a fact about the WEAPON (grip-to-butt differs per gun: ASR1 0.281, ASR2 0.259, SHG1 0.265), so one
  * authored pose cannot be right for all of them -- the same argument that made the off hand an IK
  * target ({@link SupportHandIKModifier}, W14). The clip supplies the class of hold; this puts each
  * gun's own stock where a stock goes.

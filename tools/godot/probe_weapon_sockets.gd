@@ -21,7 +21,7 @@ extends SceneTree
 ## `set("freeze", true)`. A held weapon is a plain Node3D now (see item/PickupBody.java), so there
 ## is nothing to freeze and the error is 0.
 
-const AR4  := "res://src/main/resources/com/openworld/weapon/AR4.tscn"
+const ASR1  := "res://src/main/resources/com/openworld/weapon/ASR1.tscn"
 const SCENES := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 const TABLE := "res://blender/tools/weapon_models.json"
 
@@ -64,8 +64,8 @@ func _initialize() -> void:
 		w.free()
 
 	# 1. The escape hatch still works: a weapon that declares a GripPoint lands that POINT on the
-	#    socket. No shipped weapon needs one, so the probe gives an AR4 one at runtime.
-	var launcher: Node3D = (load(AR4) as PackedScene).instantiate() as Node3D
+	#    socket. No shipped weapon needs one, so the probe gives an ASR1 one at runtime.
+	var launcher: Node3D = (load(ASR1) as PackedScene).instantiate() as Node3D
 	var gp := Marker3D.new()
 	gp.name = "GripPoint"
 	gp.position = Vector3(0.0, -0.055, 0.1133)
@@ -94,7 +94,7 @@ func _initialize() -> void:
 		"origin %.3f m from socket (the grip offset's length)" % origin_moved)
 
 	# 2. A weapon that declares none keeps the historical behaviour exactly: origin on the socket.
-	var rifle: Node3D = (load(AR4) as PackedScene).instantiate() as Node3D
+	var rifle: Node3D = (load(ASR1) as PackedScene).instantiate() as Node3D
 	socket.add_child(rifle)
 	rifle.call("on_picked_up")
 	rifle.show()

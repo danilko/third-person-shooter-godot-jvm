@@ -30,7 +30,7 @@ extends SceneTree
 ## (max quaternion component delta, the unit the 2026-09-14 snapshot used, and the angle in degrees).
 
 const DEFAULT_VISUALS := "res://src/main/resources/com/openworld/character/CharacterVisuals_GodotChan.tscn"
-const WEAPONS := ["AR4", "AR212", "SG1"]
+const WEAPONS := ["ASR1", "ASR2", "SHG1"]
 const WEAPON_DIR := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 const POCKET_IN_CLAVICLE := Vector3(-0.0280, -0.0419, 0.0880)
 const SAMPLES := 12

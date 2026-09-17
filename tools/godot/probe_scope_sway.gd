@@ -6,7 +6,7 @@ extends SceneTree
 ##       --path . --script tools/godot/probe_scope_sway.gd
 ##   ... -- --control      # both rifles declare no sway: every drift check must fail
 ##
-## SR3 SHIPS WITH NO SWAY (a still, CS-style scope); this gate sets scope_sway = 0.5 on the pair to
+## SNR1 SHIPS WITH NO SWAY (a still, CS-style scope); this gate sets scope_sway = 0.5 on the pair to
 ## keep the mechanism honest for a weapon that opts in.
 ##
 ## THE MEASUREMENT IS PAIRED. The drift is a function of a phase clock, so "the drift was smaller
@@ -151,15 +151,15 @@ func _initialize() -> void:
 	_box(world, Vector3(200, 60, 1), Vector3(0, 10, -40))
 	await _tick(3)
 
-	var ra: Array = await _armed(world, "SR3", Vector3(0, 1.2, 0))
-	var rb: Array = await _armed(world, "SR3", Vector3(12, 1.2, 0))
+	var ra: Array = await _armed(world, "SNR1", Vector3(0, 1.2, 0))
+	var rb: Array = await _armed(world, "SNR1", Vector3(12, 1.2, 0))
 	if ra.is_empty() or rb.is_empty():
 		print("FAIL (could not arm the pair)")
 		quit(1)
 		return
 	var a: Node3D = ra[0]
 	var b: Node3D = rb[0]
-	# SR3 ships with a still scope (scope_sway 0, user decision 2026-09-16), so the MECHANISM is gated
+	# SNR1 ships with a still scope (scope_sway 0, user decision 2026-09-16), so the MECHANISM is gated
 	# on a rifle given the drift it was built for.
 	var amp := 0.5
 	ra[1].get("scope").set("sway", 0.0 if control else amp)
@@ -171,7 +171,7 @@ func _initialize() -> void:
 	a.set("breath_hold_seconds", 0.0001)
 	a.set("breath_recover_seconds", 0.0001)
 	var hold_s := float(b.get("breath_hold_seconds"))
-	print("  SR3 scope_sway %.2f deg; B holds %.1f s, recovers %.1f s" % [
+	print("  SNR1 scope_sway %.2f deg; B holds %.1f s, recovers %.1f s" % [
 		amp, hold_s, float(b.get("breath_recover_seconds"))])
 
 	a.set("is_fps_mode", true)

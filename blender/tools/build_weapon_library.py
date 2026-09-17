@@ -9,7 +9,7 @@ WHY ONE FILE
 A weapon modelled alone in its own .blend has nothing to be wrong against: it can be the right
 length and still have its origin in the wrong place, a stock too long for the character, or a
 pistol the size of a rifle's receiver. That is exactly what happened here — every model's origin sat
-wherever a centring offset left it (SG1's on the receiver, 0.48 m from the butt), and nobody could
+wherever a centring offset left it (SHG1's on the receiver, 0.48 m from the butt), and nobody could
 see it because nobody ever put two weapons side by side. Studios keep a "zoo"/line-up file for this.
 
 WHAT IS IN IT, AND WHY IT IS LINKED
@@ -22,7 +22,7 @@ WHAT IS IN IT, AND WHY IT IS LINKED
 * under each weapon, a REFERENCE BAR: the real weapon's overall length, rear-aligned with the model,
   with a tick at the real length of pull (trigger to butt) where the table gives one. A model whose
   muzzle overshoots the bar, or whose trigger is nowhere near the tick, is out of proportion.
-* the primitive-only weapons (ATL4, MW2, T1) as boxes at their table size and centre.
+* the primitive-only weapons (ATL1, MEW2, FRG1) as boxes at their table size and centre.
 * the character (linked from `assets/merged_animation.blend`) and a 1.49 m height stick beside it,
   plus a metre rule with 10 cm ticks.
 

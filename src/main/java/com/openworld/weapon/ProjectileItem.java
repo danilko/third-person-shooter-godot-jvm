@@ -18,7 +18,7 @@ import com.openworld.world.manager.ExplosionManager;
  * RocketProjectile at spawn time. All blast logic (VFX + damage) is handled by
  * ExplosionManager — this class only spawns the projectile and plays weapon feedback.
  *
- * Scene setup (e.g. ATL4.tscn):
+ * Scene setup (e.g. ATL1.tscn):
  *   Node3D + ProjectileItem script
  *     CollisionShape3D   (the WORLD body's shape — lent to the PickupBody built at drop time;
  *                         the layer/mask live on that body, not here)

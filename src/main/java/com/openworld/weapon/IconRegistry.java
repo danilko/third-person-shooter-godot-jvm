@@ -10,7 +10,7 @@ import com.openworld.carrier.vehicle.Vehicle;
  * Process-global key → UI icon lookup, shared by every networked feed.
  *
  * Networked feeds (kill feed via {@code MSG_ELIMINATION}, pickup toasts) carry only a
- * short String key — the damage-source / display name (a weapon name like {@code "AR4"},
+ * short String key — the damage-source / display name (a weapon name like {@code "ASR1"},
  * a vehicle source like {@code "Vehicle"}). Textures never cross the wire. Each peer
  * registers its own {@code key → icon} locally in {@code _ready()} (weapons via
  * {@link WeaponItem}, vehicles via {@code Vehicle}), so by the time an event arrives the

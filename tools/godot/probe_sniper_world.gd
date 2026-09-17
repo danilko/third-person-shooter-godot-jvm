@@ -1,5 +1,5 @@
 extends SceneTree
-## Scoped SR3 STANDING shots in DebugWorld itself (PLAN.md P0 0.4). The flat-arena studies
+## Scoped SNR1 STANDING shots in DebugWorld itself (PLAN.md P0 0.4). The flat-arena studies
 ## (probe_sniper_hits / probe_sniper_live) could not reproduce "standing still, first shot at a still
 ## enemy does not hit", so this runs on the real scene: Terrain3D, the streamed road pieces, zone AI,
 ## pickups, the real pre-placed Player.
@@ -24,7 +24,7 @@ extends SceneTree
 
 const WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
 const AI := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
-const SR3 := "res://src/main/resources/com/openworld/weapon/SR3.tscn"
+const SNR1 := "res://src/main/resources/com/openworld/weapon/SNR1.tscn"
 const SENS := 0.07
 const AIM_MASK := 29
 
@@ -141,7 +141,7 @@ func _initialize() -> void:
 	await _tick(240)
 	p.get_node("Health").set("max_health", 1.0e9)
 
-	gun = (load(SR3) as PackedScene).instantiate() as Node3D
+	gun = (load(SNR1) as PackedScene).instantiate() as Node3D
 	world.add_child(gun)
 	gun.global_position = p.global_position + Vector3(0, 0.3, 0)
 	await _tick(40)
@@ -151,7 +151,7 @@ func _initialize() -> void:
 			break
 		wc.call("on_set_weapon", slot)
 		await _tick(40)
-	print("SR3 held: %s" % String(gun.get_parent().name).begins_with("Socket"))
+	print("SNR1 held: %s" % String(gun.get_parent().name).begins_with("Socket"))
 	cam_ctrl = p.get_node("TPSCameraController")
 	var stats := {"total": 0, "ok": 0, "blocked": 0, "occluded": 0, "wrong": 0, "true_miss": 0}
 	for o in origins:

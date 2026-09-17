@@ -1,5 +1,5 @@
 extends SceneTree
-## Does a scoped SR3 shot land on the bone under the scope's centre, at every range?
+## Does a scoped SNR1 shot land on the bone under the scope's centre, at every range?
 ## (user report 2026-09-16: "hit the enemy but it seems not hit ... or needs several shots ... distance?")
 ##
 ##   stdbuf -oL /data/danilko/bin/Godot_v4.7.2-stable_linux.x86_64 --headless --fixed-fps 60 \
@@ -18,7 +18,7 @@ extends SceneTree
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const AI     := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
-const SR3    := "res://src/main/resources/com/openworld/weapon/SR3.tscn"
+const SNR1    := "res://src/main/resources/com/openworld/weapon/SNR1.tscn"
 const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.java"
 
 var world: Node3D
@@ -45,7 +45,7 @@ func _find(n: Node, nm: String) -> Node:
 var log_hits: Array = []
 var shot_index := 0
 
-## Damage SR3 (150) does to the bone the scope is on, per Health's built-in table; -1 = not checked.
+## Damage SNR1 (150) does to the bone the scope is on, per Health's built-in table; -1 = not checked.
 func _expected(bone: String) -> float:
 	var b := bone.replace("Physical Bone ", "")
 	if b.begins_with("head") or b.begins_with("neck"):
@@ -126,7 +126,7 @@ func _initialize() -> void:
 	world.add_child(p)
 	p.position = Vector3(0, 1.2, 0)
 	await _tick(40)
-	var gun: Node3D = (load(SR3) as PackedScene).instantiate() as Node3D
+	var gun: Node3D = (load(SNR1) as PackedScene).instantiate() as Node3D
 	world.add_child(gun)
 	gun.global_position = p.global_position + Vector3(0, 0.3, 0)
 	await _tick(30)
@@ -136,7 +136,7 @@ func _initialize() -> void:
 			break
 		wc.call("on_set_weapon", slot)
 		await _tick(40)
-	# Base spread 0, so a scope line on a bone's edge is not a coin toss on SR3's 0.005 deg cone (~1 cm
+	# Base spread 0, so a scope line on a bone's edge is not a coin toss on SNR1's 0.005 deg cone (~1 cm
 	# at 260 m; the cone itself is SpreadPatternTest's). Bloom is left AS SHIPPED on purpose: the defect
 	# this gate caught was the 0.6 deg per-shot bloom landing on the shot that caused it, and that would
 	# still scatter every shot here.

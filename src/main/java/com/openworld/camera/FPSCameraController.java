@@ -213,7 +213,7 @@ public class FPSCameraController extends Node3D {
         if (len > maxBoneOffset && len > 1e-6) dev = dev.times((float) (maxBoneOffset / len));
 
         // A SCOPED eye admits NONE of it. Through an optic the leftover bob is magnified by the
-        // scope's own zoom (3.75x on SR3), so the fraction that reads as "a walk" unscoped reads as
+        // scope's own zoom (3.75x on SNR1), so the fraction that reads as "a walk" unscoped reads as
         // an unusable picture scoped; and the loop this rig sits in — bone -> camera -> aim target ->
         // ShoulderAimModifier -> bone — has that much more gain the further the view is zoomed. W11
         // took the same decision for the cockpit view and for the same reason: a view you AIM from

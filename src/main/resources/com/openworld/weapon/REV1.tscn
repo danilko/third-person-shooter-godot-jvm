@@ -1,0 +1,56 @@
+[gd_scene format=3]
+
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/REV1.tres" id="90_stats"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FirearmItem.java" id="1_rev1"]
+[ext_resource type="Texture2D" path="res://assets/ui/weapons/REV1.png" id="2_rev1"]
+[ext_resource type="AudioStream" uid="uid://c0v8ncowcuy0l" path="res://assets/audio/Pistol_fire.wav" id="3_rev1"]
+[ext_resource type="AudioStream" uid="uid://b11jauobcpulr" path="res://assets/audio/Pistol_reload.wav" id="4_rev1"]
+[ext_resource type="PackedScene" path="res://assets/weapons/REV1.glb" id="5_rev1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="6_muzzle"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(0.08, 0.1886, 0.381)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_area"]
+size = Vector3(0.5, 0.5, 0.581)
+
+[node name="REV1" type="Node3D" unique_id=358619101]
+script = ExtResource("1_rev1")
+stats = ExtResource("90_stats")
+weapon_id = "REV1"
+weapon_name = "REV-1"
+weapon_archetype = "pistol"
+slot_type = 1
+weapon_icon = ExtResource("2_rev1")
+hold_socket = "SocketPistol"
+holster_sockets = PackedStringArray("ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2", "ShortWeaponHolsterMaker3", "ShortWeaponHolsterMaker4")
+magazine = 6
+reserve = 24
+fire_audio = ExtResource("3_rev1")
+reload_audio = ExtResource("4_rev1")
+require_interact = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=358619102]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0338, -0.1496)
+shape = SubResource("BoxShape3D_body")
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=358619103]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=358619104]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0338, -0.1496)
+shape = SubResource("BoxShape3D_area")
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=358619105]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.085, -0.338)
+
+[node name="MuzzleVFX" parent="Muzzle" unique_id=358619106 instance=ExtResource("6_muzzle")]
+
+[node name="SupportPoint" type="Marker3D" parent="." unique_id=358619107]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.01053, -0.04734, 0.01932)
+
+[node name="Model" parent="." unique_id=358619108 instance=ExtResource("5_rev1")]
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

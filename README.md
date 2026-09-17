@@ -373,11 +373,11 @@ addon (mesh-first road pieces + lane connectivity export). Requires Blender **4.
 | Key | Slot | Type | Example |
 |:---:|:----:|:-----|:--------|
 | `0` | 0 | Fist (permanent, always available) | — |
-| `1` | 1 | Primary weapon A | Assault Rifle (AR4 / AR212) |
-| `2` | 2 | Primary weapon B | Shotgun (SG1) / Rocket Launcher (ATL4) |
-| `3` | 3 | Secondary (sidearm) | Pistol (PI52) |
+| `1` | 1 | Primary weapon A | Assault Rifle (ASR1 / ASR2) |
+| `2` | 2 | Primary weapon B | Shotgun (SHG1) / Rocket Launcher (ATL1) |
+| `3` | 3 | Secondary (sidearm) | Pistol (PIS1) |
 | `4` | 4 | Melee | Knife |
-| `5` | 5 | Throwable | Grenade (T1) |
+| `5` | 5 | Throwable | Grenade (FRG1) |
 | `6` | 6 | Consumable | — |
 
 ### On Vehicle
@@ -420,7 +420,7 @@ without it, for a "clean" run).
 | `F11` | Spawns 1 additional `"player"`-faction AI ally into the world (more allies, e.g. for escort/squad testing). |
 | `F12` | Places a debug world zone near the player that streams in a small enemy group on approach (zone-streaming walk-test). |
 
-Every AI spawned via `F10`/`F11` is auto-equipped with an AR4 rifle so it fights at
+Every AI spawned via `F10`/`F11` is auto-equipped with an ASR1 rifle so it fights at
 range instead of relying on bare fists.
 
 ---

@@ -12,8 +12,8 @@ extends SceneTree
 ## weapon that is empty AND dry does nothing however often the hook fires.
 ##
 ## This probe is that argument, measured. Four cases, each able to fail for one reason:
-##   1. SR3 with reserve      -- the 5th shot starts a reload with NO further input; ammo moves.
-##   2. SR3 with a dry reserve -- the magazine empties and `reloadsStarted()` never advances again,
+##   1. SNR1 with reserve      -- the 5th shot starts a reload with NO further input; ammo moves.
+##   2. SNR1 with a dry reserve -- the magazine empties and `reloadsStarted()` never advances again,
 ##      through a long idle AND through twenty more trigger presses (the loop check).
 ##   3. autoReloadOnEmpty off  -- no reload starts by itself, and the pre-existing dry-PRESS path
 ##      still starts one, so the flag turns the feature off without breaking manual reloading.
@@ -31,7 +31,7 @@ extends SceneTree
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const WEAPON_DIR := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 ## Shots are pressed through the real Input singleton, so PlayerController -> WeaponController is the
-## path under test. SR3 is semi-auto, so every shot needs its own press.
+## path under test. SNR1 is semi-auto, so every shot needs its own press.
 const PRESS_FRAMES := 3
 const RELEASE_FRAMES := 9
 ## Frames to sit still after a case's last shot: long enough for a started reload to finish.
@@ -151,8 +151,8 @@ func _initialize() -> void:
 
 	# ── 1. the last round starts the reload by itself ─────────────────────────────────────────
 	print("")
-	print("=== SR3, reserve 20: the shot that empties the magazine reloads ===")
-	var a: Array = await _armed(world, "SR3", Vector3(x, 1.2, 0))
+	print("=== SNR1, reserve 20: the shot that empties the magazine reloads ===")
+	var a: Array = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
 	x += 8.0
 	if not a.is_empty():
 		var p: Node3D = a[0]
@@ -175,8 +175,8 @@ func _initialize() -> void:
 
 	# ── 2. the loop check: empty AND dry ─────────────────────────────────────────────────────
 	print("")
-	print("=== SR3, reserve 0: an empty, dry weapon must sit still ===")
-	a = await _armed(world, "SR3", Vector3(x, 1.2, 0))
+	print("=== SNR1, reserve 0: an empty, dry weapon must sit still ===")
+	a = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
 	x += 8.0
 	if not a.is_empty():
 		var p: Node3D = a[0]
@@ -209,8 +209,8 @@ func _initialize() -> void:
 
 	# ── 3. the control: the flag turns it off without breaking manual reloads ────────────────
 	print("")
-	print("=== SR3 with autoReloadOnEmpty = false (the control) ===")
-	a = await _armed(world, "SR3", Vector3(x, 1.2, 0))
+	print("=== SNR1 with autoReloadOnEmpty = false (the control) ===")
+	a = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
 	x += 8.0
 	if not a.is_empty():
 		var p: Node3D = a[0]
@@ -230,8 +230,8 @@ func _initialize() -> void:
 
 	# ── 4. a throwable clears its slot instead ───────────────────────────────────────────────
 	print("")
-	print("=== T1 (throwable): the last grenade clears the slot, it does not reload ===")
-	a = await _armed(world, "T1", Vector3(x, 1.2, 0))
+	print("=== FRG1 (throwable): the last grenade clears the slot, it does not reload ===")
+	a = await _armed(world, "FRG1", Vector3(x, 1.2, 0))
 	if not a.is_empty():
 		var p: Node3D = a[0]
 		var gun: Node3D = a[1]
@@ -240,7 +240,7 @@ func _initialize() -> void:
 		# stowed on WeaponAttachment active or not -- the parent cannot say which, so ask for the slot.
 		wc.call("on_set_weapon", 5)
 		await _tick(60)
-		# Give it a reserve it could reload FROM, or the case proves nothing: T1 ships with 0 and any
+		# Give it a reserve it could reload FROM, or the case proves nothing: FRG1 ships with 0 and any
 		# rule at all would look correct. With a reserve, a throwable that auto-reloaded would refill
 		# itself and keep the slot instead of clearing it.
 		gun.set("reserve", 3)
@@ -268,8 +268,8 @@ func _initialize() -> void:
 	# the HUD ring. So the assertion is BOTH halves: the cadence is 1/fire_rate, and nothing reloads
 	# while the magazine still has rounds.
 	print("")
-	print("=== SR3 at its shipped rate: the bolt cycle is the fire timer, not a reload ===")
-	a = await _armed(world, "SR3", Vector3(x + 8.0, 1.2, 0), false)
+	print("=== SNR1 at its shipped rate: the bolt cycle is the fire timer, not a reload ===")
+	a = await _armed(world, "SNR1", Vector3(x + 8.0, 1.2, 0), false)
 	if not a.is_empty():
 		var p: Node3D = a[0]
 		var gun: Node3D = a[1]

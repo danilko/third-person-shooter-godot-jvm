@@ -5,13 +5,13 @@ extends SceneTree
 ##   stdbuf -oL /data/danilko/bin/Godot_v4.7.2-stable_linux.x86_64 --headless --fixed-fps 60 \
 ##       --path . --script tools/godot/probe_hit_marker.gd
 ##
-## A real Player with SR3 (through a pickup), a HitMarker bound to it, an AI 40 m out. The view is steered
+## A real Player with SNR1 (through a pickup), a HitMarker bound to it, an AI 40 m out. The view is steered
 ## onto the drawn chest (probe_sniper_live idiom) and fire is pressed through Input. Co-op is gated in
 ## tools/net/run_net_shot_test.sh (hit_confirmed_local).
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const AI     := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
-const SR3    := "res://src/main/resources/com/openworld/weapon/SR3.tscn"
+const SNR1    := "res://src/main/resources/com/openworld/weapon/SNR1.tscn"
 const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.java"
 const MARKER := "res://src/main/java/com/openworld/ui/HitMarker.java"
 const SENS := 0.07
@@ -76,7 +76,7 @@ func _initialize() -> void:
 	world.add_child(p)
 	p.position = Vector3(0, 1.2, 0)
 	await _tick(40)
-	var gun: Node3D = (load(SR3) as PackedScene).instantiate() as Node3D
+	var gun: Node3D = (load(SNR1) as PackedScene).instantiate() as Node3D
 	world.add_child(gun)
 	gun.global_position = p.global_position + Vector3(0, 0.3, 0)
 	await _tick(30)
@@ -137,7 +137,7 @@ func _initialize() -> void:
 	await _tick(2)
 	_check("another attacker's damage shows nothing", int(marker.call("markers_shown")) == n1, "")
 
-	# 4. a kill: a second, 100 HP target in the same spot (SR3's chest is 150)
+	# 4. a kill: a second, 100 HP target in the same spot (SNR1's chest is 150)
 	t.queue_free()
 	await _tick(5)
 	var t2: Node3D = (load(AI) as PackedScene).instantiate() as Node3D

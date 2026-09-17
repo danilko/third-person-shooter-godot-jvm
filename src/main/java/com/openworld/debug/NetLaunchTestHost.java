@@ -31,7 +31,7 @@ import godot.global.GD;
 /**
  * Three-instance headless check for PLAN.md N4 — projectiles flown by the host ({@code tools/net/run_net_launch_test.sh}).
  *
- * <p>The HOST spawns a still target and a backstop. The CLIENT collects the scene's ATL4 launcher and T1 grenades,
+ * <p>The HOST spawns a still target and a backstop. The CLIENT collects the scene's ATL1 launcher and FRG1 grenades,
  * fires 3 rockets and throws 2 grenades at the target through the {@code Input} singleton — each a cosmetic
  * copy it predicts plus ONE {@code MSG_LAUNCH} the host validates and flies — then sends forged launches. An
  * OBSERVER watches from the side and sees every launch only as its puppet's fire cue. Every peer must draw
@@ -43,8 +43,8 @@ public class NetLaunchTestHost extends Node3D {
     private static final int PORT = 7795;
     private static final String TARGET_ID = "netlaunch-target";
     private static final String AI_SCENE = "res://src/main/resources/com/openworld/character/AICharacter.tscn";
-    private static final Vector3 ATL4_AT = new Vector3(0, 1.0, 6);
-    private static final Vector3 T1_AT = new Vector3(4, 1.0, 6);
+    private static final Vector3 ATL1_AT = new Vector3(0, 1.0, 6);
+    private static final Vector3 FRG1_AT = new Vector3(4, 1.0, 6);
     private static final Vector3 TARGET_AT = new Vector3(0, 0.1, -12);
     private static final Vector3 FIRE_FROM = new Vector3(0, 0.1, 0);
     private static final int ROCKETS = 3;
@@ -179,8 +179,8 @@ public class NetLaunchTestHost extends Node3D {
             if (w instanceof ProjectileItem) launcherSlot = i;
             if (w instanceof ThrowableItem) grenadeSlot = i;
         }
-        if (launcherSlot < 0) { if (me.getGlobalPosition().distanceTo(ATL4_AT) > 0.6) me.setGlobalPosition(ATL4_AT); return; }
-        if (grenadeSlot < 0) { if (me.getGlobalPosition().distanceTo(T1_AT) > 0.6) me.setGlobalPosition(T1_AT); return; }
+        if (launcherSlot < 0) { if (me.getGlobalPosition().distanceTo(ATL1_AT) > 0.6) me.setGlobalPosition(ATL1_AT); return; }
+        if (grenadeSlot < 0) { if (me.getGlobalPosition().distanceTo(FRG1_AT) > 0.6) me.setGlobalPosition(FRG1_AT); return; }
         if (nextAt < 0) {
             if (players() < 3) return;   // both observers (the host has no player) must be watching first
             nextAt = clock + 2.0;

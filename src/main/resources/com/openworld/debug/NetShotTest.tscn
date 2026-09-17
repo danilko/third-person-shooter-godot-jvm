@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://src/main/java/com/openworld/debug/NetShotTestHost.java" id="1_nst"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/SG1.tscn" id="2_sg1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/SHG1.tscn" id="2_sg1"]
 
 [node name="NetShotTest" type="Node3D"]
 script = ExtResource("1_nst")
@@ -13,5 +13,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 
 [node name="Pickups" type="Node" parent="."]
 
-[node name="SG1" parent="Pickups" instance=ExtResource("2_sg1")]
+[node name="SHG1" parent="Pickups" instance=ExtResource("2_sg1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 6)

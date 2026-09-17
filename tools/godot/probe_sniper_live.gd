@@ -1,5 +1,5 @@
 extends SceneTree
-## GATE (PLAN.md 2.8 item 10; was a study): scoped SR3 accuracy against a LIVE AI -- animating, its distance LOD running --
+## GATE (PLAN.md 2.8 item 10; was a study): scoped SNR1 accuracy against a LIVE AI -- animating, its distance LOD running --
 ## aimed the way a player aims: injected mouse motion steers the view onto the DRAWN bone
 ## (BoneAttachment3D x the hitbox's body_offset), then one shot through real Input.
 ## (user report 2026-09-16, after W31: "aim at a still enemy, first shot does not hit, the second does")
@@ -20,12 +20,12 @@ extends SceneTree
 ##
 ## History — result 2026-09-16 before items 3/4 (the study): hitboxes match the drawn body to 0.000 m at every LOD tier; every
 ## STATIONARY shot lands on the aimed bone, 90/90; every miss is a MOVING (7.98 m/s, the scope does not
-## slow the player) or JUST-STOPPED (2.74 m/s, 10 frames after release) shot -- SR3's cone grows
+## slow the player) or JUST-STOPPED (2.74 m/s, 10 frames after release) shot -- SNR1's cone grows
 ## 0.03 deg per m/s.
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const AI     := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
-const SR3    := "res://src/main/resources/com/openworld/weapon/SR3.tscn"
+const SNR1    := "res://src/main/resources/com/openworld/weapon/SNR1.tscn"
 const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.java"
 const SENS := 0.07
 
@@ -106,7 +106,7 @@ func _initialize() -> void:
 	world.add_child(p)
 	p.position = Vector3(0, 1.2, 0)
 	await _tick(40)
-	gun = (load(SR3) as PackedScene).instantiate() as Node3D
+	gun = (load(SNR1) as PackedScene).instantiate() as Node3D
 	world.add_child(gun)
 	gun.global_position = p.global_position + Vector3(0, 0.3, 0)
 	await _tick(30)
