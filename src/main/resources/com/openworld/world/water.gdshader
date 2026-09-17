@@ -33,20 +33,30 @@ uniform vec2 caustics_scale = vec2(0.5);
 #endif
 
 group_uniforms Wave;
-uniform sampler2D wave_texture;
+uniform sampler2D wave_texture : filter_linear_mipmap_anisotropic, repeat_enable;
 #if !USE_UNSHADED
-uniform sampler2D wave_normal_texture;
+uniform sampler2D wave_normal_texture : filter_linear_mipmap_anisotropic, repeat_enable;
 #endif
 uniform float wave_softness : hint_range(0.0, 10.0, 0.1) = 3.0;
 uniform vec2 wave_scale = vec2(0.2);
 uniform vec2 wave_layer_scale = vec2(1.5);
 uniform float wave_highlight : hint_range(0.0, 1.0, 0.05) = 0.5;
 
+// Distance LOD (2026-09-16): the wave textures tile every few metres in world space, and read at one fixed mip
+// level they alias into a grid of repeated pixel squares far away. Past `detail_fade_start` a second layer at
+// `far_scale_ratio` x the UV scale (much bigger features) fades in, fully by `detail_fade_end`; fragment samples
+// use automatic mipmaps + anisotropic filtering, and the normal map flattens toward `far_normal_strength`.
+group_uniforms Wave.Distance;
+uniform float detail_fade_start = 40.0;
+uniform float detail_fade_end = 320.0;
+uniform float far_scale_ratio : hint_range(0.01, 1.0, 0.01) = 0.125;
+uniform float far_normal_strength : hint_range(0.0, 1.0, 0.01) = 0.35;
+
 group_uniforms Wave.Motion;
 uniform vec2 wave_velocity = vec2(0.02);
 
 group_uniforms Foam;
-uniform sampler2D foam_texture;
+uniform sampler2D foam_texture : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float edge_foam_depth_size = 1.0;
 uniform float wave_foam_amount : hint_range(0.0, 1.0, 0.01) = 0.8;
 uniform float foam_start : hint_range(0.0, 1.0, 0.05) = 0.15;
@@ -99,6 +109,22 @@ vec4 sample_world_dpos(vec2 screen_uv, mat4 inv_proj_mat, mat4 inv_view_mat){
 	return world_dpos;
 }
 
+// Fragment sampling: automatic mip selection biased by `bias`, near layer blended into a larger far layer.
+vec4 sample_wave_scaled(sampler2D tex, vec2 uv, vec2 velocity, float bias, float scale){
+	vec2 base_uv = uv * wave_scale * scale;
+	vec2 wave_uv1 = (base_uv * wave_layer_scale) + (TIME * -velocity * scale);
+	float wave1 = texture(tex, wave_uv1, bias).r;
+	vec2 wave_uv2 = base_uv + (TIME * velocity * scale);
+	return texture(tex, wave_uv2 - (wave1 * 0.1), bias);
+}
+
+vec4 sample_wave_distance(sampler2D tex, vec2 uv, vec2 velocity, float bias, float far_t){
+	vec4 near_s = sample_wave_scaled(tex, uv, velocity, bias, 1.0);
+	if (far_t <= 0.0) return near_s;
+	vec4 far_s = sample_wave_scaled(tex, uv, velocity, bias, far_scale_ratio);
+	return mix(near_s, far_s, far_t);
+}
+
 vec4 sample_wave(sampler2D tex, vec2 uv, vec2 velocity, float lod){
 	vec2 base_uv = uv * wave_scale;
 	vec2 wave_uv1 = (base_uv * wave_layer_scale) + (TIME * -velocity);
@@ -120,7 +146,9 @@ void vertex(){
 }
 
 void fragment() {
-	float wave = sample_wave(wave_texture, world_pos.xz, wave_velocity, wave_softness).r;
+	float view_dist = length(world_pos - CAMERA_POSITION_WORLD);
+	float far_t = smoothstep(detail_fade_start, detail_fade_end, view_dist);
+	float wave = sample_wave_distance(wave_texture, world_pos.xz, wave_velocity, wave_softness, far_t).r;
 	wave = smoothstep(0.0,1.0,wave);
 	
 	vec2 screen_uv = SCREEN_UV;
@@ -160,7 +188,8 @@ void fragment() {
 	float wave_foam = wave;
 	float foam = max(edge_foam_depth, wave_foam * wave_foam_amount);
 	
-	float foam_shape = 1.0 - texture(foam_texture, world_pos.xz* 0.5).r;
+	float foam_shape = 1.0 - mix(texture(foam_texture, world_pos.xz * 0.5).r,
+			texture(foam_texture, world_pos.xz * 0.5 * far_scale_ratio).r, far_t);
 	foam = clamp((foam - foam_start) / (foam_end - foam_start), 0.0, 1.0);
 	foam = clamp((foam - foam_shape) / (1.0 - foam_shape), 0.0, 1.0);
 	foam = pow(foam, foam_exponent);
@@ -177,8 +206,8 @@ void fragment() {
 	color = mix(color, foam_color.rgb, foam);
 	
 	#if !USE_UNSHADED
-	vec3 wave_normal_map = sample_wave(wave_normal_texture, world_pos.xz, wave_velocity, wave_softness).rgb;
-	NORMAL_MAP = wave_normal_map;
+	vec3 wave_normal_map = sample_wave_distance(wave_normal_texture, world_pos.xz, wave_velocity, wave_softness, far_t).rgb;
+	NORMAL_MAP = mix(wave_normal_map, vec3(0.5, 0.5, 1.0), far_t * (1.0 - far_normal_strength));
 	#endif
 	
 	ROUGHNESS = mix(surface_roughness, foam_roughness, foam);
