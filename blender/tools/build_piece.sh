@@ -43,11 +43,19 @@ mkdir -p "$ABS_DIR"
 
 STEM="$NAME"
 BLEND="$WORLD_SOURCE/pieces/$STEM.blend"
-[ -f "$BLEND" ] || { echo "ERROR: $BLEND does not exist"; exit 1; }
-echo "── 1/4 bake-only — using existing $BLEND"
-# attempt the LOD_LOW bake and let export_world.py's "nothing to export" skip it cleanly for
-# any district that has no STREET_LOD_LOW content.
-HAS_LOD_LOW=true
+# GLTF_READY=1 (PLAN.md 3.1 B11): the piece's glTF is ALREADY at res://…/pieces/<stem>.gltf -- a Road Kit piece,
+# written by `roadkit_cli.py gltf` with no Blender -- so there is no .blend to export and nothing but the bake to run.
+if [[ "${GLTF_READY:-0}" == "1" ]]; then
+  [ -f "$ABS_DIR/$STEM.gltf" ] || { echo "ERROR: GLTF_READY=1 but $ABS_DIR/$STEM.gltf does not exist"; exit 1; }
+  echo "── 1/4 bake-only — using the written res://$RES_DIR/$STEM.gltf (no Blender)"
+  HAS_LOD_LOW=false
+else
+  [ -f "$BLEND" ] || { echo "ERROR: $BLEND does not exist"; exit 1; }
+  echo "── 1/4 bake-only — using existing $BLEND"
+  # attempt the LOD_LOW bake and let export_world.py's "nothing to export" skip it cleanly for
+  # any district that has no STREET_LOD_LOW content.
+  HAS_LOD_LOW=true
+fi
 
 # bake_one <gltf-export-args...> <gltf-relpath> <tscn-relpath> — export (with the given extra
 # export_world.py args) then bake via a throwaway WorldBaker host scene. Reads the outer-scope
@@ -57,6 +65,7 @@ HAS_LOD_LOW=true
 # throwaway host scene to before this existed for every piece that has no sidecar yet.
 bake_one() {
   local gltf_rel="$1" tscn_rel="$2"; shift 2
+  if [[ "${GLTF_READY:-0}" != "1" ]]; then
   echo "   export -> res://$gltf_rel"
   local export_log="/tmp/export_$$.log"
   CLEANUP_FILES+=("$export_log")
@@ -67,6 +76,7 @@ bake_one() {
       echo "   (skipped — collection missing/empty)"; return 1
     fi
     cat "$export_log"; return 1
+  fi
   fi
   $GODOT --headless --path "$REPO" --import >/dev/null 2>&1 || true
   local bake_tscn="$REPO/$RES_DIR/_bake_$$_${RANDOM}.tscn"

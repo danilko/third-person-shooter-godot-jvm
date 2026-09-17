@@ -2,8 +2,8 @@
 """roadkit_cli.py -- the road kit's SOLVER as a plain-python3 service for the Godot editor plugin.
 
 PLAN.md 3.1 option B: roads are AUTHORED in Godot (`addons/road_kit/`), the kit's data model, gate,
-junction solve and lane export run HERE with no Blender, and Blender is only the headless mesh sweep
-(`roadkit_build_mesh.py`). Everything this imports already ran under plain python3 -- it is what
+junction solve, lane export AND (since B11) the mesh sweep and the piece glTF run HERE with no Blender
+(`gltf`: `point_mesh` + `point_gltf`). Everything this imports already ran under plain python3 -- it is what
 `check_roads.sh` stage 1 tests -- so this file adds no logic, only a door.
 
 Every command reads a `.roads.json` record (the kit's own schema, `point_model.network_to_dict`, in
@@ -53,6 +53,8 @@ import point_record_ops as ro     # noqa: E402
 import point_flow as pf           # noqa: E402
 import point_digest as pdg        # noqa: E402
 import point_mesh as pmsh         # noqa: E402
+import point_gltf as pgl          # noqa: E402
+import point_kit as pk            # noqa: E402
 
 
 def _findings(net):
@@ -278,6 +280,23 @@ def _bands(net, grid):
             "ms": round((time.time() - t0) * 1000.0, 1)}
 
 
+def _mesh_by_material(net, grid):
+    """B11: what Build will sweep, for the editor to SHOW -- every visible triangle of the whole network from the
+    same `point_mesh.build` the piece glTF is written from (collision proxies left out), grouped by material
+    name, Godot axes, flat `[x, y, z, ...]` rounded to the millimetre."""
+    import time
+    t0 = time.time()
+    by_mat, tris = {}, 0
+    for name, mats in pmsh.build(net, grid).items():
+        if pmsh.SUFFIX_COL in name:
+            continue
+        for mat, ts in mats.items():
+            flat = by_mat.setdefault(mat, [])
+            flat += [round(c, 3) for t in ts for p in t for c in pe.godot(p)]
+            tris += len(ts)
+    return {"materials": by_mat, "tris": tris, "ms": round((time.time() - t0) * 1000.0, 1)}
+
+
 def cmd_mesh(a):
     """B10.7 SPIKE: the whole network's meshes from the pure-Python sweep (`point_mesh`), Godot axes, the
     network's frame: `{"objects": {name: {material: [x,y,z, ...] (whole triangles)}}, "ms", "tris"}`.
@@ -293,6 +312,41 @@ def cmd_mesh(a):
             out[name][mat] = [round(c, 4) for t in ts for p in t for c in pe.godot(p)]
             tris += len(ts)
     return {"objects": out, "tris": tris, "ms": round((time.time() - t0) * 1000.0, 1)}
+
+
+def cmd_gltf(a):
+    """B11: the road build without Blender. Cuts the network by zone (`point_zones`, the same cut `pieces` writes
+    the lanekits by), sweeps each piece in pure Python (`point_mesh`, styles and profile assets from
+    `road_kit.json`) and writes `<out_dir>/<piece>.gltf` (`point_gltf`) -- the file `build_piece.sh` bakes.
+    `--only` names the pieces to write (the dirty ones); a red gate writes nothing."""
+    import time
+    t0 = time.time()
+    net = pm.load_network(a.record)
+    zones = pz.load_zones(a.zones) if a.zones and os.path.exists(a.zones) else []
+    # `--gated`: the caller ran the gate on this record already (`build_roads_piece.sh` runs `pieces` first, which
+    # refuses a red one) -- it is most of this command's time, and the same answer twice.
+    gate = {"errors": 0, "warnings": 0, "findings": []} if a.gated else _findings(net)
+    if gate["errors"]:
+        gate.update({"written": False, "pieces": []})
+        return gate
+    part = pz.partition(net, zones)
+    grid = pg.load_ground(a.ground) if a.ground else None
+    kit = pk.load()
+    solved = ped.solve_all(net, grid)
+    only = {n for n in a.only.split(",") if n}
+    report, pieces = {}, []
+    for zone in sorted(part.pieces()):
+        piece = pz.piece_name(a.prefix, zone)
+        if only and piece not in only:
+            continue
+        objs = pmsh.build(net, grid, part if zones else None, zone, kit, report, solved)
+        path = os.path.join(a.out_dir, piece + ".gltf")
+        row = dict(pgl.write(objs, kit, path), zone=zone, piece=piece, gltf=path)
+        pieces.append(row)
+    gate.update({"written": True, "pieces": pieces, "kit_stale": kit.stale(), "kit": kit.path,
+                 "missing_style": sorted(set(tuple(m) for m in report.get("missing_style", []))),
+                 "ms": round((time.time() - t0) * 1000.0, 1)})
+    return gate
 
 
 def cmd_ramp(a):
@@ -346,13 +400,16 @@ def cmd_live(a):
     """THE EDITOR'S LIVE REFRESH, in one process: `centrelines` (with `--zones`), `bands` (with
     `--draft`) and `facings`, each over its own fresh read of the record. Without `--cross` the
     cross-zone successor edges are skipped -- they need the gate and a full lane export, seconds on a
-    real network, which is what froze the editor on every pause of a drag. `junctions` names every pad:
+    real network, which is what froze the editor on every pause of a drag. `--mesh` (B11, sent once a drag is
+    RELEASED) adds the full swept mesh Build will write (`_mesh_by_material`). `junctions` names every pad:
     its centre (Godot axes) and its mouths, for the viewport's junction labels."""
     import time
     t0 = time.time()
     out = {"centrelines": _centrelines(pm.load_network(a.record), a.step, a.zones, cross=a.cross)}
     if a.draft:
         out["bands"] = _bands(pm.load_network(a.record), None)
+    if a.mesh:
+        out["mesh"] = _mesh_by_material(pm.load_network(a.record), pg.load_ground(a.ground) if a.ground else None)
     net = pm.load_network(a.record)
     out["facings"] = {u: pe.godot(v) for u, v in ro.facings(net).items()}
     out["junctions"] = [{"uids": list(c), "centre": pe.godot(
@@ -386,10 +443,14 @@ def main(argv=None):
     s = sub.add_parser("live"); s.add_argument("record")
     s.add_argument("--step", type=float, default=None); s.add_argument("--zones", default="")
     s.add_argument("--draft", action="store_true"); s.add_argument("--cross", action="store_true")
+    s.add_argument("--mesh", action="store_true"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_live)
     s = sub.add_parser("corridors"); s.add_argument("record"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_corridors)
     s = sub.add_parser("mesh"); s.add_argument("record"); s.add_argument("--ground", default=""); s.set_defaults(fn=cmd_mesh)
+    s = sub.add_parser("gltf"); s.add_argument("record"); s.add_argument("zones"); s.add_argument("out_dir")
+    s.add_argument("prefix"); s.add_argument("--ground", default=""); s.add_argument("--only", default="")
+    s.add_argument("--gated", action="store_true"); s.set_defaults(fn=cmd_gltf)
     s = sub.add_parser("bands"); s.add_argument("record"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_bands)
     s = sub.add_parser("lanekit"); s.add_argument("record"); s.add_argument("out")

@@ -77,20 +77,57 @@ static func pick_centreline(net: Node3D, camera: Camera3D, screen: Vector2, runs
 			var b := Vector3(pts[i + 1][0], pts[i + 1][1], pts[i + 1][2])
 			var wa := to_world * a
 			var wb := to_world * b
-			if camera.is_position_behind(wa) or camera.is_position_behind(wb):
+			var vis := visible_part(camera, wa, wb)
+			if vis.is_empty():
 				continue
-			var sa := camera.unproject_position(wa)
-			var sb := camera.unproject_position(wb)
+			var va: Vector3 = wa.lerp(wb, vis[0])
+			var vb: Vector3 = wa.lerp(wb, vis[1])
+			var sa := camera.unproject_position(va)
+			var sb := camera.unproject_position(vb)
 			var seg := sb - sa
 			var t := 0.0 if seg.length_squared() < 1e-9 else clampf((screen - sa).dot(seg) / seg.length_squared(), 0.0, 1.0)
 			var d := (sa + seg * t).distance_to(screen)
 			if d < best_d:
 				best_d = d
-				best = {"road": run["road"], "uids": run.get("uids", []), "at": a.lerp(b, t)}
+				var s := lerpf(vis[0], vis[1], world_param(camera, va, vb, t))
+				best = {"road": run["road"], "uids": run.get("uids", []), "at": a.lerp(b, s)}
 	if best.is_empty():
 		return best
 	best["span"] = span_at(net, best["uids"], best["at"])
 	return best
+
+## How far in front of the camera a WORLD point is, along its view axis (1 for an orthogonal camera, whose
+## projection does not divide by it).
+static func view_depth(camera: Camera3D, w: Vector3) -> float:
+	if camera.projection == Camera3D.PROJECTION_ORTHOGONAL:
+		return 1.0
+	return -camera.global_transform.basis.z.dot(w - camera.global_transform.origin)
+
+## The part of the WORLD segment `wa`-`wb` in front of the camera's near plane, as `[s0, s1]` parameters
+## along it, or [] when none is. A road passing beside and behind a close camera is still on screen
+## where it is in front of it: skipping every segment with an end behind the camera left a zoomed-in
+## artist unable to click the road right under the view (the editor self-test's close framing).
+static func visible_part(camera: Camera3D, wa: Vector3, wb: Vector3) -> Array:
+	if camera.projection == Camera3D.PROJECTION_ORTHOGONAL:
+		return [0.0, 1.0]
+	var lim := camera.near * 1.01
+	var da := view_depth(camera, wa)
+	var db := view_depth(camera, wb)
+	if da < lim and db < lim:
+		return []
+	if da >= lim and db >= lim:
+		return [0.0, 1.0]
+	var s := (lim - da) / (db - da)
+	return [s, 1.0] if da < lim else [0.0, s]
+
+## The world parameter along `va`-`vb` (both in front of the camera) of the point a fraction `t` of the way
+## along their SCREEN segment. Perspective does not preserve ratios: screen t maps to world s by
+## s = t·da / (t·da + (1 − t)·db), so the far half of a segment covers fewer pixels.
+static func world_param(camera: Camera3D, va: Vector3, vb: Vector3, t: float) -> float:
+	var da := view_depth(camera, va)
+	var db := view_depth(camera, vb)
+	var den := t * da + (1.0 - t) * db
+	return t if absf(den) < 1e-9 else t * da / den
 
 ## The two consecutive stations of a run (`uids`, chain order) whose stretch holds `at` (network frame): the
 ## pair whose segment `at` projects onto closest, in plan view.

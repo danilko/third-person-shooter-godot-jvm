@@ -799,7 +799,12 @@ func _refresh(net: Node, cross: bool = true) -> void:
 func _request_live(net: Node, cross: bool, text: String) -> void:
 	var id := net.get_instance_id()
 	var markers := Zones.markers_in(get_editor_interface().get_edited_scene_root())
-	var req := {"id": id, "text": text, "draft": draft_surface != null and draft_surface.button_pressed,
+	var draft: bool = draft_surface != null and draft_surface.button_pressed
+	# B11: once the mouse is up the draft is the FULL mesh Build will write; while it is held, the fast bands.
+	var ground := Ground.sidecar_path(str(net.record_path))
+	var req := {"id": id, "text": text, "draft": draft,
+			"mesh": draft and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT),
+			"ground": ProjectSettings.globalize_path(ground) if FileAccess.file_exists(ground) else "",
 			"zones": Zones.zones_record(net, markers) if not markers.is_empty() else {}}
 	_live_sent[id] = text
 	_live["fast"]["next"][id] = req.merged({"slot": "fast"})
@@ -836,7 +841,13 @@ func _live_work(req: Dictionary) -> void:
 			args.append("--cross")
 		elif req["draft"]:
 			args.append("--draft")
+			if req["mesh"]:
+				args.append("--mesh")
+				if req["ground"] != "":
+					args += ["--ground", req["ground"]]
 		r = Service.run("live", base + ".roads.json", args)
+		if r.has("mesh"):
+			r["mesh_arrays"] = OverlayScript.prepare_mesh(r["mesh"])
 	_live_done.call_deferred(req, r)
 
 func _live_done(req: Dictionary, r: Dictionary) -> void:
@@ -862,7 +873,9 @@ func _apply_live(net: Node, req: Dictionary, r: Dictionary) -> void:
 		return
 	_live_last[id] = {"text": req["text"], "centrelines": r["centrelines"]}
 	var ov = _draw_centrelines(net, r["centrelines"], req["text"])
-	if req["draft"] and r.has("bands"):
+	if req["draft"] and r.has("mesh_arrays"):
+		ov.full_mesh(r["mesh_arrays"], OverlayScript.materials_from(Preview.find(get_editor_interface().get_edited_scene_root())))
+	elif req["draft"] and r.has("bands"):
 		ov.draft(r["bands"], OverlayScript.materials_from(Preview.find(get_editor_interface().get_edited_scene_root())))
 	else:
 		ov.clear_draft()
@@ -1312,6 +1325,13 @@ func _selftest_run(scene_path: String, record_res: String, backups: Dictionary) 
 				mats.append(mat.resource_name if mat != null else "<default>")
 		print("[selftest] draft surface: ", draft != null, " materials ", mats)
 		ok = _check(draft != null and not mats.has("<default>"), "draft surface wears the kit's materials") and ok
+		# B11: with the mouse up the draft is the FULL mesh Build writes -- kerbs and barriers too, not the bands.
+		var tris := 0
+		if draft != null:
+			for si in draft.mesh.get_surface_count():
+				tris += draft.mesh.surface_get_array_len(si) / 3
+		ok = _check(mats.has("M_Barrier") and mats.has("M_Concrete") and tris > 10000,
+				"after a release the draft is the full mesh Build writes (%d tris, %s)" % [tris, mats]) and ok
 	return ok
 
 ## B10.4 in the real editor: drag the junction's ROTATE handle through the gizmo plugin with the viewport's
@@ -1446,14 +1466,21 @@ func _centreline_on_screen(net: Node3D, cam: Camera3D):
 	var screen := Rect2(Vector2.ZERO, cam.get_viewport().get_visible_rect().size).grow(-40.0)
 	var stations: Array = net.all_points().filter(func(p): return not cam.is_position_behind(p.global_position)) \
 			.map(func(p): return cam.unproject_position(p.global_position))
+	# Along each segment's visible part, not only at its samples: a camera framed a few metres from a mouth
+	# sees one or two 4 m samples at most, and the stretch between them is what is under the cursor.
 	for run in (ov.runs_drawn if ov != null else []):
-		for q in run["points"]:
-			var w: Vector3 = net.global_transform * Vector3(q[0], q[1], q[2])
-			if cam.is_position_behind(w):
+		var pts: Array = run["points"]
+		for i in pts.size() - 1:
+			var wa: Vector3 = net.global_transform * Vector3(pts[i][0], pts[i][1], pts[i][2])
+			var wb: Vector3 = net.global_transform * Vector3(pts[i + 1][0], pts[i + 1][1], pts[i + 1][2])
+			var vis: Array = Tool.visible_part(cam, wa, wb)
+			if vis.is_empty():
 				continue
-			var sp := cam.unproject_position(w)
-			if screen.has_point(sp) and stations.all(func(st): return st.distance_to(sp) > 40.0):
-				return w
+			for k in 9:
+				var w := wa.lerp(wb, lerpf(vis[0], vis[1], (k + 0.5) / 9.0))
+				var sp := cam.unproject_position(w)
+				if screen.has_point(sp) and stations.all(func(st): return st.distance_to(sp) > 40.0):
+					return w
 	return null
 
 ## B10.8: what a drag costs the EDITOR per live tick -- serialising the record and sending it to the worker.

@@ -47,6 +47,21 @@ public class UserCommand {
      */
     public boolean holdBreath;
 
+    /** No scope zoom request this tick. */
+    public static final int SCOPE_ZOOM_NONE = 0;
+    /** Step the scope one level closer (wheel up). */
+    public static final int SCOPE_ZOOM_IN = 1;
+    /** Step the scope one level out (wheel down). */
+    public static final int SCOPE_ZOOM_OUT = -1;
+    /** Cycle to the next level, wrapping (middle mouse — CS's AWP right click, minus the unscope step). */
+    public static final int SCOPE_ZOOM_CYCLE = 2;
+
+    /**
+     * A one-tick EDGE: which way to change the scope's zoom level ({@code SCOPE_ZOOM_*}). Meaningless
+     * unless a scope is raised; {@code WeaponController.applyScopeZoom} decides.
+     */
+    public int scopeZoom;
+
     // ── Weapon actions ────────────────────────────────────────────────────────
     public boolean fire;
     public boolean reload;
@@ -101,6 +116,7 @@ public class UserCommand {
         wantCombat        = false;
         wantScope         = false;
         holdBreath        = false;
+        scopeZoom         = SCOPE_ZOOM_NONE;
         fire              = false;
         reload            = false;
         drop              = false;
@@ -132,6 +148,7 @@ public class UserCommand {
         c.wantCombat      = wantCombat;
         c.wantScope       = wantScope;
         c.holdBreath      = holdBreath;
+        c.scopeZoom       = scopeZoom;
         c.fire            = fire;
         c.reload          = reload;
         c.drop            = drop;

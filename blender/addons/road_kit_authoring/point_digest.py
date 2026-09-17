@@ -32,14 +32,15 @@ except ImportError:
     import point_export as pe                                                # noqa: E402
     import point_zones as pz                                                 # noqa: E402
 
-#: The modules whose source decides what a piece LOOKS like once its numbers are fixed.
-BUILDER_SOURCES = ("point_build.py", "point_nodes.py", "point_style.py", "point_solve.py", "point_edges.py",
-                   "point_export.py", "point_zones.py", "point_profile.py", os.path.join("..", "..", "lib", "kit_common.py"),
+#: The modules whose source decides what a piece LOOKS like once its numbers are fixed -- since B11 the pure-Python
+#: build (`point_mesh` sweeps, `point_gltf` writes, `point_kit` resolves styles), not `point_build`'s node groups.
+BUILDER_SOURCES = ("point_mesh.py", "point_gltf.py", "point_kit.py", "point_style.py", "point_solve.py",
+                   "point_edges.py", "point_export.py", "point_zones.py", "point_profile.py",
                    os.path.join("..", "..", "lib", "lane_profile.py"), os.path.join("..", "..", "lib", "road_support.py"),
-                   os.path.join("..", "..", "tools", "roadkit_build_mesh.py"))
+                   os.path.join("..", "..", "tools", "roadkit_cli.py"))
 
-#: Binary inputs hashed by size and modification time (they are large): the profile assets and materials.
-BUILDER_ASSETS = (os.path.join("..", "..", "..", "assets", "world_source", "kit", "road_kit.blend"),)
+#: The kit as the build reads it: its materials and profile sections (`road_kit.json`, written from road_kit.blend).
+BUILDER_ASSETS = (os.path.join("..", "..", "..", "assets", "world_source", "kit", "road_kit.json"),)
 
 
 def _canon(v):
@@ -66,8 +67,9 @@ def builder_salt():
     for rel in BUILDER_ASSETS:
         path = os.path.normpath(os.path.join(HERE, rel))
         if os.path.exists(path):
-            st = os.stat(path)
-            h.update(("%s:%d:%d" % (rel, st.st_size, int(st.st_mtime))).encode())
+            h.update(rel.encode())
+            with open(path, "rb") as fh:
+                h.update(fh.read())
     return h.hexdigest()
 
 

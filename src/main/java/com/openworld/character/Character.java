@@ -693,7 +693,10 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         // ── Scope intent ───────────────────────────────────────────────────
         // Before the seated early return, so a passenger's release is heard too. What the intent is
         // ALLOWED to mean is derived (isScoped below), never latched here.
-        if (weaponController != null) weaponController.setScopeRequested(input.wantScope);
+        if (weaponController != null) {
+            weaponController.setScopeRequested(input.wantScope);
+            weaponController.applyScopeZoom(input.scopeZoom);
+        }
         holdBreathRequested = input.holdBreath;
 
         // ── Seated passenger (multi-seat) ──────────────────────────────────

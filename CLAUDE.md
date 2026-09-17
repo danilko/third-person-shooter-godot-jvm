@@ -4085,11 +4085,79 @@ screen.
 **SR3's bolt and icon (2.7 pieces 6-7, 2026-09-16).** The bolt handle was island 3 of the one SR3 mesh
 (36 verts at the receiver, 5 cm out to the right); it is its own `Bolt` object in `SR3.blend` now (transforms
 applied, so `build_weapon.py` still accepts it) and `Model/Bolt` in the scene. `fire_animation = "bolt_cycle"`
-on a `WeaponAnimator` AnimationPlayer (W13 — plays on the owner and every puppet) lifts it 60° about the bore,
+(since W33: `bolt_work`, authored in the .blend, see below) (W13 — plays on the owner and every puppet) lifts it 60° about the bore,
 draws it back 4 cm, runs it home and lowers it inside 0.9 s of the 1.46 s cycle. The throw is 4 cm, not an
 AWP's ~10: with only the handle split out (no bolt body), a longer throw floats it over the stock wrist —
 measured by rendering both poses. Gate `tools/godot/probe_sniper_bolt.gd` (60.0°, 0.039 m, home before the
-next shot; `--control` no motion).
+next shot; `--control` no motion) — replaced by `probe_weapon_motion.gd` in W33.
+
+### W33 — PART MOTION IS AUTHORED IN BLENDER; A SCOPE HAS ZOOM LEVELS; SNR1'S GRIP SITS LOWER (2026-09-16, user-asked)
+
+**A weapon's moving parts are Blender actions on their own pivots.** SNR1's bolt used to be keyed in
+`SNR1.tscn`, and because the part's origin was the weapon's grip, every key of a 60° lift about the bore
+carried a hand-computed compensating translation. Now each part's origin IS its pivot (build rule: a part
+not named `<id>` may carry its pivot as location; rotation 0 / scale 1), its motion is one action on an NLA
+track, and the glTF import puts the clips on the model's own `AnimationPlayer`.
+`WeaponItem.weaponAnimatorPath` now defaults to `Model/AnimationPlayer`, and `SNR1.tscn`'s `WeaponAnimator` is
+gone. A per-shot index was also considered in CODE (a tween adding 60° a shot): rejected, because it is a new
+mechanism for one weapon where W13's clip path already exists, and a 6-fold symmetric cylinder can use a plain
+0 → 60° clip that restarts invisibly. The artist-facing rules are in `blender/WEAPON_AUTHORING.md` "Moving
+parts". Five traps, each hit here and each now refused by `build_weapon.py`:
+- **Godot strips a `loop`/`cycle` prefix or suffix from an imported clip name and loops it**, so
+  `bolt_cycle` arrived as a looping `bolt`. The glTF was right and the scene named nothing. Renamed `bolt_work`;
+  the build refuses a hinted name AND a clip the scene's `fire_animation`/`reload_animation` names that is
+  missing from the export (`playMotion` is silent about it).
+- **Keys on fractional frames are cut short**: glTF samples at the scene rate, and a 0.16 s cylinder key
+  (frame 10.6) stopped at 58.8°. Weapon `.blend`s run at 60 fps with keys on whole frames.
+- **NLA strip extrapolation `Nothing` resets the animated channels to 0 outside the strip**, so the part
+  exported at the weapon origin. Use `Hold` (the first key is rest); the build reads the rest at frame 0.
+- **`Hold` after the end leaves the file reading the LAST key** (the cylinder at −60°) if saved past the clip,
+  which the transform check then refuses. The build reads the rest at frame 0.
+- **Blender 5.2 actions are layered**: `action.fcurves` is gone, and a script that shifts keys through it
+  silently changes nothing.
+
+REV1: the split `CYLINDER` is `Cylinder` now, its two stray loose vertices (a leftover edge 5 cm behind it) are
+removed, its origin is on its axis (6-fold symmetric: 0.15 mm mean error under 60°), and `cylinder_index` turns
+it one chamber counter-clockwise seen from behind (a S&W) over frames 2–10, well inside the 0.5 s interval.
+`pose_weapon_hold.py render` puts parts at rest before placing a weapon (a part otherwise follows the body clip's
+frame) and gained `--closeup` (the firing hand from four sides, ~35 cm).
+Gate **`tools/godot/probe_weapon_motion.gd`**: SNR1 lifts 60.0°, the knob rises 0.042 m, draws back 0.039 m and
+is home by 1.46 s. REV1 turns 60.0° per shot for two shots, +Z (CCW from behind), with 0.00000 m of axis drift,
+settled before the next shot. `--control` (no clips): nothing moves.
+
+**A scope has two zoom levels, CS's AWP.** `ScopeConfig.closeFov` (0 = one level; SNR1 7.5, CS's second zoom
+in vertical degrees against a ~74 hip view; its first level stays 20, which is tighter than CS's ~31). The
+scope comes up at `fov`; **middle mouse** (`scope_zoom`) cycles, **wheel up/down** (`scope_zoom_in` /
+`scope_zoom_out`) step and clamp. `UserCommand.scopeZoom` is a one-tick edge (`SCOPE_ZOOM_*`),
+`WeaponController.applyScopeZoom` owns `scopeZoomLevel`: the one remembered piece of scope state, since a
+level is a choice nothing can derive. It resets to 0 on every tick the scope is not RAISED (release, switch,
+drop, seat, death). The bolt cycle and the reload keep the scope raised, so the zoom comes back at the level
+it left (CS resume-zoom). `scopedFovDegrees()` returns the level's FOV, and `TPSCameraController` re-tweens
+when the scoped FOV changes, not only on the scoped edge. **Look input scales with the zoom**
+(`TPSCameraController.scopedSensitivityRatio`, CS's `zoom_sensitivity_ratio`, default 1, 0 = off): while a
+scope is raised, mouse deltas × `min(1, ratio × camera fov / unscoped fov)`, read off the live camera FOV so
+it follows the tween and the bolt's un-zoom. **This also slows the FIRST level** (100 px: 7.00° raw → 2.55°
+at 20°), which is CS's behaviour and a change from before; without it the 7.5° level turns 1 px into ~6 screen
+px. Gate `probe_sniper_scope.gd` gained the zoom case: first level on raise, middle mouse to 7.51 and back,
+wheel in/out clamp, 100 px = 7.000° raw (the control, ratio 0) / 2.545° / 0.955° (ratio 0.375 = the FOV ratio),
+the bolt drops the closer level and it comes back at 7.50, release resets to the first level, and middle mouse
+does nothing unscoped. Probe trap: `ScopeConfig` is a SHARED sub-resource, and the bolt case's
+`unscope_to_cycle = false` control leaked into every later SNR1 until it was restored.
+
+**SNR1's grip sits 2 cm lower on the gun: the model moved UP in its .blend** (every mesh +0.02 m in Blender Z,
+the bolt pivot 0.061 → 0.081, and every `SNR1.tscn` marker/collider +0.02 in Y). "Move the grip" and "move the
+weapon up in Blender" are the same change, and the standard says to make it in the model, not with a
+`GripPoint`. The thumbhole stock is thin, so the fist centred on the hole put the stock's lower edge through the
+palm and the fingers through the stock. Close-ups swept +0 / +1.5 / +2.5 cm: at +2 the fingers wrap the grip's
+underside with the trigger finger in the guard. Hand vertices inside the gun went 299 → 116, levelling off past
++2 (108 at +3). The non-closed low-poly meshes make those counts approximate, and ASR1 measures 323 at +0.
+`grip_to_rear_m` is unchanged (a vertical move). In game the stock mount IK re-seats the butt pad on the pocket,
+so the gun stays where it was and the HAND drops: the IK now moves the hand 0.026 m (ASR2's figure).
+`probe_weapon_fit` PASS on both bodies and crouched (stock 0.000 m, support grip 0.012 m), `probe_weapon_holster`
+PASS on both (slung muzzle corner 0.276 m off the ground, limit 0.25), and these pass too:
+`probe_weapon_{scale,sockets,world_body,motion}`, `probe_sniper_{scope,hits,live}`, `probe_scope_sway`,
+`probe_recoil_kick`, `probe_self_hit`, `probe_auto_reload`, `probe_support_hand_ik`, `probe_fps_camera` and
+`./gradlew test`. Icons are byte-identical (fitted), and `WeaponLibrary.blend` was rebuilt.
 
 **Weapon icons are GENERATED, one PNG per weapon, FITTED, barrel LEFT (2026-09-16, user decisions).**
 `blender/tools/render_weapon_icons.py` renders every catalog weapon with a model (or a primitive, reported as a
@@ -4443,7 +4511,7 @@ centroids within 2 cm) — the old 90/90 was a lucky seed.
 
 ---
 
-## Road Kit — option B: author in Godot, solve in python3, mesh in Blender (2026-09-13)
+## Road Kit — option B: author in Godot, solve and mesh in python3 (2026-09-13; no Blender since B11, 2026-09-16)
 
 Supersedes road-generator, which is now removed (PLAN.md 3.1; see the section below). The Blender road kit's
 solver was kept and its authoring moved into the Godot editor, where zones, Terrain3D and building
@@ -4453,7 +4521,7 @@ scenes live. **Three owners, one contract (`.roads.json`, the kit's `point_model
 |---|---|---|
 | authoring | `addons/road_kit/` (GDScript editor plugin) | `RoadKitNetwork` → `RoadKitRoad` → `RoadKitPoint` nodes; a road's CHILD ORDER is its chain; links by uid; the dock's gestures (`road_kit_gestures.gd`, pure functions, headless-testable); overlay of the solver's resolved centrelines; undo = restore the record |
 | rules | `blender/tools/roadkit_cli.py` (plain python3) | `validate`, `setback`, `centrelines`, `lanekit`, `ramp` over the record, using the kit's existing pure modules — no Blender |
-| meshes | `blender/tools/roadkit_build_mesh.py` (headless Blender) | `load_record` + `point_build`, then `build_piece.sh` export/bake; `build_roads_piece.sh <record> <Piece>` runs all three steps (17 s on the sample) |
+| meshes | `blender/tools/roadkit_cli.py gltf` (plain python3, B11) | `point_mesh` sweeps, `point_gltf` writes the piece `.gltf`, then `GLTF_READY=1 build_piece.sh` bakes it (WorldBaker, NavBaker); `build_roads_piece.sh <record> <Piece>` runs every step. Until B11 this was headless Blender (`roadkit_build_mesh.py` + `point_build`, deleted) |
 
 Rules that came with it, each measured:
 - **The field table is GENERATED** into `road_kit_fields.gd` (`blender/tools/gen_roadkit_godot_fields.py`,
@@ -4524,7 +4592,7 @@ the lerp read 0.1 m everywhere. Now the dock's Build (and `tools/godot/write_roa
 samples Terrain3D on a 2 m grid over the network's footprint + 60 m (`road_kit_ground.gd`, network
 frame, kit axes, float32 `<stem>.ground.bin` + `<stem>.ground.json`; 424×180 in 58 ms), and
 `point_ground.GroundGrid` — bilinear, a NaN cell or the outside is a MISS (None), never 0 — is passed
-as `build_network(ground=)` (`rka.point_build(ground_path=)`, `roadkit_build_mesh.py --ground`,
+as `build_network(ground=)` (`rka.point_build(ground_path=)`, then `roadkit_build_mesh.py --ground`; since B11 `point_mesh.build(ground=)` / `roadkit_cli.py gltf --ground`,
 `build_roads_piece.sh`'s 4th argument). The road's own heights are NOT re-draped: the support is
 derived from the gap, which is the point. Rules:
 - **The kit sweeps no embankment.** `road_support` sizes a FILL toe and nothing builds it, so a road
@@ -4851,8 +4919,8 @@ its runs' carrier samples and values, edge runs, marking runs, pads (ring, fan, 
 (`point_build`, `point_nodes`, `point_solve`, `point_edges`, `kit_common`, …) and `road_kit.blend`'s size
 and mtime, so a builder change dirties everything. `roadkit_cli.py pieces` reports a `digest` per piece
 (now with `--ground`, the same ground the mesh build uses); `build_roads_piece.sh` with `DIRTY_ONLY=1`
-skips a piece whose digest equals the one in `<stem>.build.json` and whose scene exists, runs Blender only
-on the dirty ones (`roadkit_build_mesh.py --only`) — and not at all when none is — and writes a piece's
+skips a piece whose digest equals the one in `<stem>.build.json` and whose scene exists, builds only
+the dirty ones (`roadkit_cli.py gltf --only`; Blender's `--only` until B11) — and nothing at all when none is — and writes a piece's
 digest into the manifest only after it has BAKED, so a failed bake stays dirty. The manifest belongs to the
 committed pieces; commit it with them. Dock: **Build Piece (changed zones)** is the default, **Rebuild All
 Pieces** forces it, and a build that rebuilt something on a stamped network says to press Stamp Terrain.
@@ -4884,7 +4952,7 @@ lane sample. `roadkit_cli.py mesh` hands the result to Godot (`gltf_tris.py` is 
   Measured after: kerb 492/492 triangles and deck 556/556 equal to the Python sweep, volumes equal (deck
   2355.2 vs 2355.9 m³). DebugRoads and RoadKitZones pieces rebuilt (the digest salt caught the builder
   change and dirtied every piece by itself).
-- **Not ported, so NOT yet a replacement:** profile ASSETS (artist-modelled sections from `road_kit.blend`
+- **Not ported at the time (all ported in B11, below):** profile ASSETS (artist-modelled sections from `road_kit.blend`
   — neither sample network uses one), style slots (material by name), vertex normals (Blender's glTF
   carries NORMAL; neither carries UVs, the kit's materials are world-position procedural), the `-colonly`
   road/walk/`-noped` collision split, and the piece SCENE (today glTF → `WorldBaker` → `NavBaker`).
@@ -4967,11 +5035,101 @@ is fenced and the other not; it now steps at the corner's middle. Found with two
   lengthwise one at a lateral offset (`--along --lat`): every collider a vertical ray passes through, top
   first. It is what showed the wedge (10.61 → 11.61 m over 4.25 m), which no visual shows.
 
-Still open, found by the same probe (PLAN.md 3.1 B12): **DebugRoads' west pad is steep and folded.** Its
-three mouths sit at 10.46 / 12.97 / 11.02 m with two stop lines ~9 m apart, and the single-apex fan
-(`pad_triangles`) concentrates that into turn paths up to 40.5% grade. The dense IDW field is still 22%. A car
-crossing at 37 m/s leaves the pad at up to 5 m/s. Two separate causes: layout (a pad grade the gate does not
-check) and tessellation (a fan roughly doubles the field's own grade).
+**A SLOPED PAD IS A GRID OVER A THIN PLATE CLAMPED TO ITS ROADS (B12, 2026-09-16).** Found by the same
+probe: DebugRoads' west T has mouths at 10.46 / 12.97 / 11.02 m, and two of its stop lines have cap corners
+6 m apart with 1.95 m between them. `point_solve.PadField` is now the ONE owner of a pad's height, and
+`pad_triangles` builds a sloped pad as `grid_pad_triangles` (the ring cut by a world-aligned 1.5 m grid,
+Sutherland-Hodgman plus ear-clip per edge cell, watertight by area) instead of a one-apex fan. A pad whose
+mouths are level and whose roads are level keeps its fan, its triangle count and its digest. The field is the
+minimum-curvature surface (squared second differences in x, y and the cross term). Each approach band,
+`PAD_APPROACH` 4 m along its road, is fixed to that road's plane: its height at the stop line, rising at
+`Mouth.grade` (`mouth_grade`, the run's own end tangent). It is solved in pure Python by conjugate gradients on
+a 2 m grid, started from IDW, in 0.07 s on the west T. It is linear in the mouth heights, like IDW.
+- **Measure a pad ROAD TO ROAD, never on the pad alone.** The first attempt was a membrane (harmonic,
+  fixed at the caps). On the pad it looked better than IDW, 17.9% steepest and 5.9% grade change per 2 m.
+  In a car it was worse: it met the `loop` stop line climbing 18% against a +4% road, and `link_R1` at
+  20 m/s launched there, where the old fan had not. `point_solve.turn_grades` now follows each movement
+  `PAD_GRADE_APPROACH` (10 m) along both roads. Drive profile of the straight `link` → `loop` outer lane
+  (crest per 2 m / steepest): old fan 9.3 / 21.2%, IDW 9.9 / 16.3%, membrane 13.2 / 17.3%, thin plate
+  8.4 / 12.6%. Worst movement: 41.5 / 17.5 / 18.0 / 12.8%.
+- **`pad_grade` (WARN)**: the steepest movement past `PAD_GRADE_MAX` (8%, the kit's hill-road grade),
+  naming the two stop lines and the floor no surface can go below (end-to-end rise over plan length). On
+  the west T: 18.3% on the left turn from the `loop` head to its tail, whose floor is 15.7% (1.95 m over
+  12.4 m). That is layout.
+- **The rest was layout, and DebugRoads' west T was re-graded (user decision).** On the new surface
+  `probe_road_launch.gd -- --lane=link_R1 --speed=S` still rose 3.65 m/s at 25 m/s and 4.50 at 30. At
+  35 m/s the launches were 20-50 m PAST the pad, on `loop` itself, which fell from −2% to −18% within 11 m of
+  its head station: B12's original "a car leaves the pad at 5 m/s" was that crest. `loop`'s head mouth
+  `p_ffcedf9d` went 11.02 → 12.2 m, and its next two stations 10.63 → 11.5 and 8.06 → 10.8, so the 4 m
+  descent runs over 106 m (fill up to 2.8 m, re-stamped). Pad steepest 18.3 → 10.4%, `loop` worst grade
+  change per sample 7.2 → 1.6%. `link_R1 +0`: 0 on-road launches at 20/25/30/35 m/s, worst rise 1.62-2.29
+  m/s. `pad_grade` still WARNs at 10.4%: `link` (10.46) to `loop`'s tail (12.97) is 6.9% at best. At 30 m/s
+  the car also runs wide on a `loop` curve ~250 m on and bounces on terrain, which is unrelated.
+- **After a pad change on a stamped network, stamp again.** The terrain was stamped from the old surface,
+  and at 20 m/s a rear wheel hit Terrain3D standing 0.18 m proud of the new pad.
+- **Terrain3D `get_height` a hair inside a cell edge returns the FAR vertex's height**: (-150.0006, 72.0)
+  read 11.09, the (-152, 72) vertex, where (-150, 72) is 10.97. The 1.5 m pad grid shares a vertex with
+  the 2 m terrain grid every 6 m, which turned that into 6 false "proud" pad vertices in
+  `probe_road_stamp.gd`. The probe queries pad vertices on a 1 cm grid now.
+- `blender/tools/measure_pad_grades.py <record>` prints the built pad, its field, IDW and the old fan side
+  by side, with the floor.
+- Not changed: `seed_district_roads.pad_lifts` still predicts burial with `_idw_z` over stand-in mouths (no
+  ring exists yet). Both rules are linear in the mouth heights, so its uniform lift is still exact in kind.
+
+**THE ROAD BUILD HAS NO BLENDER (B11, 2026-09-16).** B10.7's five missing pieces are ported, the Build runs them,
+and the Blender road build is deleted. `build_roads_piece.sh`: (1) `roadkit_cli.py pieces` (gate, zone cut, lanekits,
+digests), (2) `roadkit_cli.py gltf --gated --only <dirty>` writes `src/.../world/pieces/<piece>.gltf`, (3)
+`GLTF_READY=1 build_piece.sh <piece>` bakes it (WorldBaker + lanekit Path3Ds, NavBaker, `.scn`) with no `.blend`.
+DebugRoads end to end **28 s**, of which the mesh write is **0.4 s** — the rest is the Godot bake.
+- **The kit is DATA** (`point_kit.py`): `blender/tools/export_road_kit_data.py` reads `road_kit.blend` into
+  `assets/world_source/kit/road_kit.json` — every material as the glTF entry Blender's exporter produced
+  (`export_world.py`'s base-colour flattening restated: M_ConcreteTile's checker is its mean, 0.815/0.795/0.755) and
+  every `ROAD_KIT` profile's points — plus the `.blend`'s sha1, which `point_kit.self_test` checks, so an edited kit
+  with a stale JSON fails the gate. `build_road_kit.py` runs the export at the end of every kit build. Styles resolve
+  as `point_style.resolve` did (one slot table, `point_style.SLOTS`): a name the kit lacks falls back to the layer
+  default and is reported (`missing_style`, printed by the build).
+- **A profile asset is swept in the Z-up curve frame**: section +X is `cross(N, T)` (the curve's left), +Y the Z-up
+  normal `N` (perpendicular to the tangent), mirrored for the right flank, open (no caps), origin on
+  `point_build.ASSET_Z_ATTR`'s line. Derived from `GN_PointProfile`'s measured correction, then measured: triangle
+  counts equal to Blender's on every asset layer (granite kerb 300/300, parapet 816/816, jersey 1400/1400), p95
+  0.000 m. **The Blender road build had never swept one from a Godot record**: `roadkit_build_mesh.py` never linked
+  the kit, so every named asset resolved to "missing" and the report line was filtered out of the build output.
+- **`-colonly` proxies** are `point_mesh._collision` (`point_build.collision_name`'s rule): one road proxy (the
+  `__surface`/pad/gore, every material), one walk proxy (the run's edge objects), `-noped` from `ped_access`.
+  Godot's importer still makes the `StaticBody3D`s from the name. Navmesh vertex counts and collision shape counts
+  of the rebuilt pieces equal the Blender-built ones (RoadKitZones west 32/18, RoadKitSample 32/28).
+- **Normals are auto-smooth at 30°, computed** (`point_gltf.indexed`), not matched: Blender's export shaded smooth
+  across hard edges and carried inverted normals (88 on one DebugRoads deck). Gate: none inverted, none past the
+  angle (worst 28.6°). Quads split on the SHORTER diagonal (`point_mesh._strip`): areas now equal Blender's to
+  0.1 m² (they differed by up to 0.7% on the ramps), at p95 0.003 m.
+- **The pieces no longer carry the station Empties** (`east_p000` Node3Ds with the record in their extras): nothing
+  read them, and the record is the one copy. 38 nodes fewer on RoadKitSample (235 -> 197).
+- **Parity before retirement**, Blender references built from the same records with the kit linked, `--assert`
+  green on all four: DebugRoads (both zones, with ground) every layer and both proxy kinds p95 0.000 m except the
+  known barrier per-face step, lane surface max 0.9 mm over 2 214 samples; RoadKitZones west+east and RoadKitSample
+  p95 ≤ 0.003 m, lane surface max 8.4 mm over 6 046 samples; `RoadKitStyled.roads.json` (the sample with material
+  slots, three profile assets and one missing name) every layer p95 0.000–0.003 m, the 13 materials identical.
+- **The editor shows the full mesh on release**: `roadkit_cli.py live --mesh [--ground]` returns
+  `point_mesh.build`'s visible triangles by material; the plugin requests it only when the mouse is up (a drag still
+  gets the fast bands), prepares the arrays on the worker thread (`OverlayScript.prepare_mesh`, re-wound for Godot's
+  clockwise front face) and uploads them as the draft (`full_mesh`), in the base meshes' materials. DebugRoads
+  18 280 triangles in 0.34 s of CLI.
+- **Retired:** `blender/tools/roadkit_build_mesh.py`, `build_roadkit_sample_piece.py` and the piece `.blend`s they
+  wrote (`Roads_DebugRoads_*`, `Roads_RoadKitZones_*`, `RoadKitSample`). `point_build`/`point_nodes` stay for
+  `build_island_base.py` only. The digest salt is now the Python builder's sources and `road_kit.json`'s bytes.
+- Gates: `point_kit.py`, `point_gltf.py` self-tests and **`blender/tools/check_roadkit_build.py`** (in
+  `check_roads.sh`, now PASS=40): DebugRoads and RoadKitZones rebuilt into a temp dir must equal the committed
+  glTFs under `roadkit_mesh_parity --built --assert` (control: one station of `east` moved 3 m in the record →
+  `edges/M_Concrete p95 1.584`, FAIL), and RoadKitStyled's styles, assets and normals build. Runtime, on the
+  rebuilt pieces: `probe_road_zones` 12/12, `probe_road_ground` 201/201, `probe_road_stamp` PASS,
+  `probe_traffic_spawn` 6/6, `probe_road_launch` 0 launches over 6 cases, `probe_road_traffic --scene=roadkit`
+  50 cars / 0 stuck; editor self-test PASS including "after a release the draft is the full mesh".
+- **Also fixed on the way: a close camera could not click a road** (`road_kit_tool.gd`). `pick_centreline` skipped
+  every segment with an end behind the camera, so framed a few metres from a mouth (F) nothing was clickable, which
+  is what failed the editor self-test on a clean HEAD. Segments are clipped to the near plane (`visible_part`), and
+  the click's screen fraction is mapped back to the segment perspective-correctly (`world_param`): the insert point
+  had been up to 0.585 m from the cursor on a close view. Gate `test_roadkit_tool.gd` "close camera" (controls: the
+  old skip → no pick; a linear lerp → 0.585 m).
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 

@@ -121,8 +121,17 @@ public class WeaponItem extends Pickup implements WeaponAction {
    * character is doing something else entirely. What the character and the weapon share is the
    * EVENT, not the animation: {@code WeaponController} plays both from the same fire/reload moment,
    * on the authority AND on a puppet, so a remote peer sees the pump cycle too.
+   *
+   * <p><b>The clips are authored in the weapon's .blend</b>, not keyed in the scene: each moving part is
+   * its own object with its ORIGIN ON ITS PIVOT, its motion an action on an NLA track, and the glTF
+   * import puts them on the model's own {@code AnimationPlayer} — which is where this points by default.
+   * A part keyed in Godot has its origin on the weapon's grip, so a rotation about its real axis has to
+   * be written as a rotation AND a compensating translation per key (SNR1's bolt was, until
+   * 2026-09-16); with the pivot as the origin a lift is one rotation curve, editable against the model.
+   * {@code blender/tools/build_weapon.py} refuses an export missing a clip the scene names, because
+   * {@link #playMotion} is silent about it.
    */
-  @Export public NodePath weaponAnimatorPath = new NodePath("WeaponAnimator");
+  @Export public NodePath weaponAnimatorPath = new NodePath("Model/AnimationPlayer");
 
   /** Clip on {@link #weaponAnimatorPath} to play per shot. Empty = this weapon has no moving parts. */
   @Export public String fireAnimation = "";

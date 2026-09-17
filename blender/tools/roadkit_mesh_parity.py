@@ -105,15 +105,27 @@ def height_below(g, x, z, y_hint):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("record"); ap.add_argument("gltf", nargs="+"); ap.add_argument("--ground", default="")
+    ap.add_argument("--built", nargs="*", default=[],
+                    help="B11: compare these glTFs written by point_gltf (collision proxies included) instead of "
+                         "sweeping in memory")
+    ap.add_argument("--lanekit-dir", default="", help="where <gltf stem>.lanekit.json lives (default: the pieces dir)")
     ap.add_argument("--assert", dest="check", action="store_true",
                     help="exit 1 unless the two builds agree (the thresholds below)")
     a = ap.parse_args()
     t0 = time.time()
     net = pm.load_network(a.record)
     ground = pg.load_ground(a.ground) if a.ground else None
-    py = pmsh.build(net, ground)
+    if a.built:
+        py = {}
+        for path in a.built:
+            for o, mats in gltf_tris.load(path).items():
+                for m, tris in mats.items():
+                    py.setdefault(o, {}).setdefault(m, []).extend(tris)
+    else:
+        py = pmsh.build(net, ground)
+        py = {o: {(m or "-"): [tuple(pe.godot(p) for p in t) for t in tris] for m, tris in mats.items()}
+              for o, mats in py.items()}
     ms = (time.time() - t0) * 1000.0
-    py = {o: {m: [tuple(pe.godot(p) for p in t) for t in tris] for m, tris in mats.items()} for o, mats in py.items()}
     bl = {}
     for path in a.gltf:
         for o, mats in gltf_tris.load(path).items():
@@ -122,8 +134,12 @@ def main():
     rows = []
     fam = {}
     for o in sorted(set(py) | set(bl)):
-        if o.endswith("-colonly") or "-colonly" in o:
+        if ("-colonly" in o) and not a.built:
             continue
+        # A proxy's triangles are compared whatever material Blender left on them: it has no look.
+        if "-colonly" in o:
+            py[o] = {"-": [t for ts in py.get(o, {}).values() for t in ts]}
+            bl[o] = {"-": [t for ts in bl.get(o, {}).values() for t in ts]}
         for m in sorted(set(py.get(o, {})) | set(bl.get(o, {}))):
             P, B = py.get(o, {}).get(m, []), bl.get(o, {}).get(m, [])
             row = {"obj": o, "mat": m, "tris_b": len(B), "tris_p": len(P),
@@ -135,7 +151,7 @@ def main():
                 row.update({"p2b_p95": round(pct(pb, .95), 3), "p2b_max": round(max(pb), 3),
                             "b2p_p95": round(pct(bp, .95), 3), "b2p_max": round(max(bp), 3)})
             rows.append(row)
-            kind = o.split("__")[-1].split("_")[0] + "/" + m
+            kind = ("colonly/" + o.rsplit("_", 1)[-1].split("-")[0]) if "-colonly" in o else (o.split("__")[-1].split("_")[0] + "/" + m)
             f = fam.setdefault(kind, {"n": 0, "missing_p": 0, "missing_b": 0, "p2b_p95": 0.0, "b2p_p95": 0.0, "area_b": 0.0, "area_p": 0.0})
             f["n"] += 1; f["area_b"] += row["area_b"]; f["area_p"] += row["area_p"]
             if not P: f["missing_p"] += 1
@@ -155,7 +171,8 @@ def main():
     deltas, miss = [], 0
     for path in a.gltf:
         stem = os.path.splitext(os.path.basename(path))[0]
-        lk = os.path.join(os.path.dirname(HERE), "..", "assets", "world_source", "pieces", stem + ".lanekit.json")
+        lk = os.path.join(a.lanekit_dir or os.path.join(os.path.dirname(HERE), "..", "assets", "world_source", "pieces"),
+                          stem + ".lanekit.json")
         if not os.path.exists(lk):
             continue
         for lane in json.load(open(lk))["lanes"]:
@@ -170,7 +187,7 @@ def main():
                     else:
                         deltas.append(abs(hb - hp))
     print("\nroad surface under %d lane samples: |dy| p95 %.4f max %.4f, %d on only one build" % (len(deltas), pct(deltas, .95), max(deltas) if deltas else 0, miss))
-    print("python sweep: %.0f ms" % ms)
+    print("python %s: %.0f ms" % ("glTF read" if a.built else "sweep", ms))
     print(json.dumps({"python_ms": round(ms), "lane_samples": len(deltas), "lane_dy_p95": round(pct(deltas, .95), 4),
                       "lane_dy_max": round(max(deltas) if deltas else 0, 4), "lane_one_sided": miss,
                       "layers": {k: {kk: (round(vv, 3) if isinstance(vv, float) else vv) for kk, vv in f.items()} for k, f in fam.items()}}))

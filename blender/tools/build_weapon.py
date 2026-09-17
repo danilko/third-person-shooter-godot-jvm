@@ -13,9 +13,19 @@ THE STANDARD
   * -Z is the muzzle/blade direction, +Y up (Godot axes; Blender +Y forward, +Z up)
   * the ORIGIN is the GRIP — the centre of the firing hand's fist on the grip
   * every object has location 0 / rotation 0 / scale 1, and lives in ONE collection named <id>
+  * EXCEPT a MOVING PART (a bolt, a cylinder, a pump — any mesh not named <id>): its origin is its
+    PIVOT, so its location is that pivot; rotation 0 / scale 1 still. Its motion is a Blender ACTION on
+    an NLA track (never the active action), exported as a glTF animation that Godot imports into the
+    model's own `AnimationPlayer` — the weapon scene plays it by name (`fire_animation`,
+    `reload_animation`, W13). Keys are sampled at the scene rate, so the .blend runs at 60 fps.
 
 WHAT IS ASSERTED, AND WHY EACH ONE EXISTS
   * applied transforms — a surviving transform is something compensating for a model that is wrong;
+    a part's LOCATION is its pivot, which is not compensation — its rotation and scale still are;
+  * the clips — `WeaponItem.playMotion` is silent about a clip that does not exist (every weapon calls it
+    on every shot), so a renamed action would stop a bolt from moving with nothing said anywhere. Each
+    clip the weapon's scene names must be in the export, and an active action is refused (it exports
+    twice and makes the rest pose a frame of the clip — the character pipeline's trap);
   * the collection — `WeaponLibrary.blend` links the weapon by that name, so a weapon outside it is
     silently missing from the library everyone cross-checks sizes in;
   * `length_m` — the size is a fact from the reference, not a free parameter;
@@ -25,12 +35,13 @@ WHAT IS ASSERTED, AND WHY EACH ONE EXISTS
     socket per weapon to hide it. Measuring the distance from the origin to the rearmost point is
     what catches an origin that has walked off the grip again.
 """
-import bpy, json, math, os, sys
+import bpy, json, math, os, re, sys
 from mathutils import Vector
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TABLE = os.path.join(ROOT, "blender", "tools", "weapon_models.json")
 OUT_DIR = os.path.join(ROOT, "assets", "weapons")
+CATALOG = os.path.join(ROOT, "src", "main", "resources", "com", "openworld", "weapon", "weapon_catalog.json")
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 wanted = set(a for a in argv if not a.startswith("--"))
@@ -51,20 +62,47 @@ def verify_and_export(w):
     if not os.path.exists(path):
         fail(wid, f"no {path}")
     bpy.ops.wm.open_mainfile(filepath=path)
+    # Read the REST pose: before any clip starts. A clip that ends away from rest (a cylinder indexed one
+    # chamber) would otherwise be read at its last frame if the file was saved past it.
+    bpy.context.scene.frame_set(0)
     objs = [o for o in bpy.context.scene.objects if o.type == 'MESH']
     if not objs:
         fail(wid, f"{path} has no mesh")
 
-    # 1. nothing is compensating: every transform is applied
+    # 1. nothing is compensating: every transform is applied (a moving part keeps its pivot as location)
     for o in objs:
-        if (o.location.length > APPLIED_TOL
+        part = o.name != wid
+        if ((not part and o.location.length > APPLIED_TOL)
                 or max(abs(a) for a in o.rotation_euler) > APPLIED_TOL
                 or max(abs(s - 1.0) for s in o.scale) > APPLIED_TOL):
             fail(wid, f"{o.name!r} still carries a transform "
                       f"(loc {tuple(round(v, 4) for v in o.location)}, "
                       f"rot {tuple(round(math.degrees(v), 2) for v in o.rotation_euler)}, "
                       f"scale {tuple(round(v, 4) for v in o.scale)}). "
-                      f"Apply it (Object > Apply > All Transforms) — the model IS the weapon.")
+                      f"Apply it (Object > Apply > All Transforms) — the model IS the weapon"
+                      + (" (a moving part may keep only its pivot as a location)." if part else "."))
+        if o.animation_data and o.animation_data.action is not None:
+            fail(wid, f"{o.name!r} has an ACTIVE action {o.animation_data.action.name!r}. Push it down to an NLA "
+                      f"track and clear the active action: an active action exports twice and its current "
+                      f"frame becomes the part's rest pose.")
+        for t in (o.animation_data.nla_tracks if o.animation_data else []):
+            for st in t.strips:
+                if st.extrapolation == 'NOTHING':
+                    fail(wid, f"{o.name!r} clip {st.name!r} has extrapolation NOTHING: outside the strip Blender "
+                              f"resets the animated channels to 0, so the part exports at the weapon's origin "
+                              f"instead of its pivot. Set the strip's Extrapolation to Hold.")
+    clips = sorted({s.action.name for o in objs if o.animation_data
+                    for t in o.animation_data.nla_tracks for s in t.strips if s.action})
+    # Godot's scene importer reads a `loop`/`cycle` prefix or suffix (`-` or `_`) as a LOOP hint: it loops the
+    # clip AND strips the word, so `bolt_cycle` arrived as a looping `bolt` and the scene's name matched nothing.
+    hinted = [c for c in clips if re.search(r'(^(loop|cycle)[-_])|([-_](loop|cycle)$)', c, re.I)]
+    if hinted:
+        fail(wid, f"clip(s) {hinted} start or end with loop/cycle: Godot's importer loops them and strips the word, "
+                  f"so the scene's fire_animation/reload_animation would name nothing. A per-shot part motion "
+                  f"plays once — rename the action (e.g. bolt_work).")
+    if clips and bpy.context.scene.render.fps < 60:
+        fail(wid, f"scene runs at {bpy.context.scene.render.fps} fps; clips {clips} are sampled at the scene rate, "
+                  f"which is too coarse for a 0.1 s part motion. Set Output > Frame Rate to 60.")
 
     # 2. it is filed where the library looks for it
     col = bpy.data.collections.get(wid)
@@ -88,7 +126,8 @@ def verify_and_export(w):
 
     out = os.path.join(OUT_DIR, wid + ".glb")
     bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_yup=True,
-                              export_apply=True, export_animations=False)
+                              export_apply=True, export_animations=bool(clips),
+                              export_animation_mode='ACTIONS')
     # 4. every material carries a colour across glTF. Blender exports a base colour only from the ACTIVE
     # output's Principled BSDF as a constant or an image; a material whose exported output is anything else
     # (SNR1 shipped with a second, Cycles-only Material Output fed by a Diffuse BSDF) arrives in Godot as
@@ -104,8 +143,20 @@ def verify_and_export(w):
                   f"one a single Material Output (target All) fed by a Principled BSDF whose Base Color is a "
                   f"constant or an image texture, then re-export.")
 
+    # 5. every clip the weapon's scene plays is in the export
+    exported = sorted(a.get("name", "?") for a in gltf.get("animations", []))
+    scene_rel = next((r["scene"] for r in json.load(open(CATALOG))["weapons"] if r["id"] == wid), None)
+    played = []
+    if scene_rel:
+        text = open(os.path.join(ROOT, scene_rel.replace("res://", ""))).read()
+        played = [c for c in re.findall(r'^(?:fire|reload)_animation = "([^"]*)"', text, re.M) if c]
+    missing = [c for c in played if c not in exported]
+    if missing:
+        fail(wid, f"{scene_rel} plays {missing} but the export carries {exported or 'no clips'} — the part would "
+                  f"never move, silently. Name the action after the clip (one NLA track per clip).")
+
     print(f"[build_weapon] {wid}: {got:.3f} m (declared {want:.3f}), grip->rear {rear:.3f} m, "
-          f"wrote {os.path.basename(out)} ({os.path.getsize(out)} bytes)")
+          f"clips {exported or '-'}, wrote {os.path.basename(out)} ({os.path.getsize(out)} bytes)")
 
 
 rows = [w for w in cfg["weapons"] if not wanted or w["id"] in wanted]

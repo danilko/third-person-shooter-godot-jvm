@@ -714,6 +714,22 @@ def check_pads(net, out):
                         "from the crossing, or turn it out of that path" % (
                             {"L": "left", "R": "right", "S": "straight", "U": "U-turn"}.get(t["turn"], t["turn"]),
                             t["from"], t["to"], where)))
+        # B12: the pad surface is the membrane over its stop lines, the least-steep surface there is,
+        # so what is still steep is LAYOUT -- two stop lines too close for the height between them.
+        # One finding per pad, on its steepest movement, with the floor no surface can go below.
+        grades = psolve.turn_grades(j)
+        if grades:
+            t, steep, change, length, dz = max(grades, key=lambda g: g[1])
+            if steep > psolve.PAD_GRADE_MAX:
+                out(Finding("pad_grade", WARN, t["to"] if dz > 0 else t["from"],
+                            "the pad is %.1f %% steep on the %s movement from %s to %s (grade change %.1f %% "
+                            "per %.0f m; the limit is %.0f %%) -- %.2f m of height over a %.1f m path is "
+                            "%.1f %% at best, so move one of those stop lines toward the other's height, "
+                            "or further from it" % (
+                                steep * 100, {"L": "left", "R": "right", "S": "straight", "U": "U-turn"}.get(
+                                    t["turn"], t["turn"]), t["from"], t["to"], change * 100,
+                                psolve.PAD_GRADE_WINDOW, psolve.PAD_GRADE_MAX * 100, abs(dz), length,
+                                100 * abs(dz) / max(length, 1e-6))))
 
 
 # ------------------------------------------------------------------------------- the gate

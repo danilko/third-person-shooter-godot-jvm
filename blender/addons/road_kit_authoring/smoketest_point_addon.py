@@ -30,7 +30,7 @@ def main():
     addon_utils.enable(NAME, default_set=False, persistent=False)
 
     # The HEADLESS PIPELINE's operators -- what the island seeder, the builds and
-    # `roadkit_build_mesh.py` drive (B9, PLAN.md 3.1: authoring is the Godot plugin's).
+    # `build_island_base.py` drives (B9, PLAN.md 3.1: authoring is the Godot plugin's; B11: so is the road build).
     for attr in ("RKA_OT_point_build", "RKA_OT_point_clear", "RKA_OT_auto_setback",
                  "RKA_OT_make_intersection", "RKA_OT_export_lanekit", "RKA_OT_new_road",
                  "RKA_OT_extend_road", "RKA_OT_connect_selected", "RKA_OT_save_record",

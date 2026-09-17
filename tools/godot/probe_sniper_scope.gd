@@ -128,6 +128,24 @@ func _overlay(p: Node3D) -> Node:
 	ov.call("wire_character", p)
 	return ov
 
+func _press(action: String) -> void:
+	Input.action_press(action)
+	await _tick(2)
+	Input.action_release(action)
+	await _tick(SETTLE)
+
+## Degrees the view turns for 100 px of horizontal mouse, fed to the player's own camera controller.
+func _look_yaw(p: Node3D, cam_ctl: Node) -> float:
+	var cam: Node3D = _find(p, "ActiveCamera") as Node3D
+	await _tick(5)
+	var f0 := -cam.global_transform.basis.z
+	var ev := InputEventMouseMotion.new()
+	ev.relative = Vector2(100, 0)
+	cam_ctl.call("_input", ev)
+	await _tick(10)
+	var f1 := -cam.global_transform.basis.z
+	return absf(rad_to_deg(Vector2(f0.x, f0.z).angle_to(Vector2(f1.x, f1.z))))
+
 func _aim_down(p: Node3D, control_latch: bool) -> void:
 	Input.action_press("aim")
 	if control_latch:
@@ -333,8 +351,72 @@ func _initialize() -> void:
 		await _tick(20)
 		_check("control: unscope_to_cycle = false stays zoomed", bool(p.call("scoped_now")) and absf(_fov(p) - 20.0) < 1.0,
 			"scoped %s fov %.1f" % [p.call("scoped_now"), _fov(p)])
+		# The ScopeConfig is a SHARED sub-resource: every SNR1 after this one would inherit the control.
+		gun.get("scope").set("unscope_to_cycle", true)
 		await _aim_up(p, false)
 		ov.queue_free()
+		p.queue_free()
+		await _tick(5)
+
+	print("")
+	print("=== SNR1: two zoom levels (CS AWP) — middle mouse cycles, the wheel steps, look input scales ===")
+	a = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
+	x += 12.0
+	if not a.is_empty():
+		var p: Node3D = a[0]
+		var gun: Node3D = a[1]
+		var wc: Node = a[2]
+		var far := float(gun.get("scope").get("fov"))
+		var near := float(gun.get("scope").get("close_fov"))
+		var cycle := 1.0 / float(gun.get("fire_rate"))
+		_check("SNR1 declares a second level", near > 0.0 and near < far, "fov %.1f, close_fov %.1f" % [far, near])
+		await _tick(90)
+		await _aim_down(p, false)
+		_check("the scope comes up at the FIRST level", int(wc.call("scope_zoom_level_now")) == 0 and absf(_fov(p) - far) < 0.5,
+			"level %d fov %.2f" % [wc.call("scope_zoom_level_now"), _fov(p)])
+		await _press("scope_zoom")
+		_check("middle mouse: the closer level", int(wc.call("scope_zoom_level_now")) == 1 and absf(_fov(p) - near) < 0.5,
+			"level %d fov %.2f" % [wc.call("scope_zoom_level_now"), _fov(p)])
+		await _press("scope_zoom")
+		_check("middle mouse again: back to the first", absf(_fov(p) - far) < 0.5, "fov %.2f" % _fov(p))
+		await _press("scope_zoom_in")
+		await _press("scope_zoom_in")
+		_check("wheel up twice: closer, and it stops there", absf(_fov(p) - near) < 0.5, "fov %.2f" % _fov(p))
+
+		# Look input scales with the zoom: a mouse delta turns the view by (raw x fov / unscoped fov).
+		var cam_ctl: Node = p.get_node("TPSCameraController")
+		var yaw_near := await _look_yaw(p, cam_ctl)
+		await _press("scope_zoom_out")
+		await _press("scope_zoom_out")
+		_check("wheel down twice: back out, and it stops there", absf(_fov(p) - far) < 0.5, "fov %.2f" % _fov(p))
+		var yaw_far := await _look_yaw(p, cam_ctl)
+		cam_ctl.set("scoped_sensitivity_ratio", 0.0)
+		var yaw_raw := await _look_yaw(p, cam_ctl)
+		cam_ctl.set("scoped_sensitivity_ratio", 1.0)
+		print("  100 px of mouse: raw %.3f deg, first level %.3f, closer level %.3f" % [yaw_raw, yaw_far, yaw_near])
+		_check("control: ratio 0 is the raw sensitivity", absf(yaw_raw - 7.0) < 0.2, "%.3f deg (100 px x 0.07)" % yaw_raw)
+		_check("the first level turns slower than raw", yaw_far < yaw_raw * 0.6, "%.3f of %.3f deg" % [yaw_far, yaw_raw])
+		_check("the closer level scales by the FOV ratio", absf(yaw_near / yaw_far - near / far) < 0.03,
+			"%.3f, fov ratio %.3f" % [yaw_near / yaw_far, near / far])
+
+		# Resume-zoom: the bolt drops the zoom and it comes back at the level it left.
+		await _press("scope_zoom")
+		Input.action_press("fire")
+		await _tick(3)
+		Input.action_release("fire")
+		await _tick(20)
+		_check("the bolt still drops the zoom at the closer level", not bool(p.call("scoped_now")) and _fov(p) > 40.0,
+			"scoped %s fov %.1f" % [p.call("scoped_now"), _fov(p)])
+		await _tick(int(cycle * 60.0) + 20)
+		_check("... and it comes back at the CLOSER level", bool(p.call("scoped_now")) and absf(_fov(p) - near) < 0.5,
+			"scoped %s fov %.2f" % [p.call("scoped_now"), _fov(p)])
+		await _aim_up(p, false)
+		await _aim_down(p, false)
+		_check("releasing aim resets: the next scope is the first level", absf(_fov(p) - far) < 0.5,
+			"level %d fov %.2f" % [wc.call("scope_zoom_level_now"), _fov(p)])
+		await _aim_up(p, false)
+		await _press("scope_zoom")
+		_check("unscoped, middle mouse does nothing", int(wc.call("scope_zoom_level_now")) == 0, "level %d" % wc.call("scope_zoom_level_now"))
 		p.queue_free()
 		await _tick(5)
 

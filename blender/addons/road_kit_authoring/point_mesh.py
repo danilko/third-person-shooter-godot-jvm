@@ -1,17 +1,16 @@
-"""point_mesh.py -- the road sweep in PURE PYTHON (PLAN.md 3.1 B10.7, a measured SPIKE).
+"""point_mesh.py -- THE ROAD SWEEP, in pure Python: the road build has no Blender (PLAN.md 3.1 B10.7 spike, B11).
 
-The question being measured: is Blender still needed to turn a solved network into meshes? Everything
-`point_build` hands Geometry Nodes is already Python's -- every carrier polyline and its per-sample
-attributes (`point_solve`), every edge run (`point_edges`), every pad and gore triangle, every marking
-chain. What GN adds is the SWEEP: offset a curve, lay a flat or extruded section across it, instance a box
-at spacing. This module does exactly that, from the same inputs and the same layer table (`point_build`'s
-`surface_spec` / `edge_spec` / `mark_spec`, restated as data here because those tables build node groups),
-so the result can be compared with the baked pieces layer by layer (`tools/roadkit_mesh_parity.py`).
+Everything `point_build` handed Geometry Nodes was already Python's -- every carrier polyline and its per-sample
+attributes (`point_solve`), every edge run (`point_edges`), every pad and gore triangle, every marking chain. What
+GN added was the SWEEP: offset a curve, lay a flat or extruded section across it, sweep an artist's profile, stand
+a box at spacing. This module does exactly that, from the same inputs and the same layer table (`point_build`'s
+`surface_spec` / `edge_spec` / `mark_spec`, restated as data), and B11 measured it against the Blender build on
+every sample network, styled included, before the Blender road build was retired (CLAUDE.md "B11").
 
-Output: `{object_name: {material_name: [(a, b, c), ...]}}` in the KIT frame, object names exactly as
-`point_build` names them (`<run>__surface`, `<run>__edges_<side>_<n>`, `<run>__marks_w`, `JCT_*__pad`,
-`JCT_*__edges_c<n>`, `GORE_*__gore`), materials by the default style (no profile assets, no style slots --
-the spike's stated scope).
+Output: `{object_name: {material_name: [(a, b, c), ...]}}` in the KIT frame, object names exactly as `point_build`
+named them (`<run>__surface`, `<run>__edges_<side>_<n>`, `<run>__marks_w`, `JCT_*__pad`, `JCT_*__edges_c<n>`,
+`GORE_*__gore`, and the `<base>-road|walk[-noped]-colonly` proxies), materials by name from each road's STYLE
+(`point_kit`, over `road_kit.json`), profile assets swept at their own size (`sweep_profile`). `point_gltf` writes it.
 
 TWO THINGS IT DOES DIFFERENTLY, ON PURPOSE, because the spike found them wrong in the Blender build:
 an extruded layer (deck, kerb, barrier) is a CLOSED prism -- top, a down-facing bottom and side walls on
@@ -28,25 +27,37 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "lib"))
 
 try:
-    from . import point_model as pm, point_solve as ps, point_edges as ped
+    from . import point_model as pm, point_solve as ps, point_edges as ped, point_kit as pk
 except ImportError:
     import point_model as pm                                                 # noqa: E402
     import point_solve as ps                                                 # noqa: E402
     import point_edges as ped                                                # noqa: E402
+    import point_kit as pk                                                   # noqa: E402
 
 #: Default-style material per layer, as `kit_common.MATS` names them (what the baked pieces carry).
-MAT = {"asphalt": "M_Asphalt", "concrete": "M_Concrete", "footway": "M_ConcreteTile", "median": "M_Median",
-       "barrier": "M_Barrier", "line_w": "M_LineW", "line_y": "M_LineY"}
+MAT = pk.DEFAULT_MATERIAL
 
-#: `point_build.surface_spec` as data: (layer, kind, material, offset_attr, z, z_attr, width_attr, thickness_attr).
-SURFACE = (("Carriageway", "band", "asphalt", "rka_shift", 0.0, "", "rka_halfw", ""),
+#: `point_build.surface_spec` as data: (layer, kind, style slot, offset_attr, z, z_attr, width_attr, thickness_attr).
+SURFACE = (("Carriageway", "band", "surface", "rka_shift", 0.0, "", "rka_halfw", ""),
            ("Median", "band", "median", "", ps.PAINT_Z_BIAS, "rka_med_z", "rka_med_h", ""),
-           ("Deck", "deck", "concrete", "rka_deck_c", ps.DECK_Z_BIAS, "", "rka_deck_w", "rka_deck_h"))
+           ("Deck", "deck", "deck", "rka_deck_c", ps.DECK_Z_BIAS, "", "rka_deck_w", "rka_deck_h"))
 #: `point_build.edge_spec`.
-EDGE = (("Curb", "deck", "concrete", "rka_curb_ol", 0.0, "rka_curb_hl", "rka_curb_tl", "rka_curb_hl"),
+EDGE = (("Curb", "deck", "kerb", "rka_curb_ol", 0.0, "rka_curb_hl", "rka_curb_tl", "rka_curb_hl"),
         ("Sidewalk", "band", "footway", "rka_walk_cl", 0.0, "rka_walk_zl", "rka_walk_hl", ""),
         ("Barrier", "deck", "barrier", "rka_wall_c", 0.0, "rka_wall_z", "rka_wall_hw", "rka_wall_h"))
 PILLAR_MIN_HEIGHT = 0.5
+
+#: `point_build.ASSET_REQUIRE` / `ASSET_Z_ATTR`: what must be non-zero on a carrier for a slot's PROFILE ASSET to
+#: build, and the line its section's origin stands on (a kerb and a barrier are anchored by their FOOT).
+ASSET_REQUIRE = {"kerb": "rka_curb_hl", "footway": "rka_walk_hl", "barrier": "rka_wall_h", "median": "rka_med_h"}
+ASSET_Z_ATTR = {"kerb": "", "footway": "rka_walk_zl", "barrier": "rka_wall_foot", "median": "rka_med_z", "surface": ""}
+
+#: `point_build.SUFFIX_COL` / `NO_PED_SUFFIX` and the two proxy kinds.
+SUFFIX_COL = "-colonly"
+NO_PED_SUFFIX = "-noped"
+COL_ROAD, COL_WALK = "road", "walk"
+#: A collision proxy's triangles are filed under this material key: a proxy has no look.
+NO_MATERIAL = ""
 
 
 def _norm(v):
@@ -102,10 +113,15 @@ def _band_rails(curve, widths):
 
 
 def _strip(left, right, flip=False):
+    """Two triangles per quad, split along its SHORTER diagonal: on a warped quad (a taper, a bank change) the long
+    diagonal folds the surface up to a metre off the rails' own line, and it is the split Blender makes too."""
     tris = []
     for i in range(len(left) - 1):
         a, b, c, d = left[i], right[i], right[i + 1], left[i + 1]
-        tris += [(a, c, b), (a, d, c)] if not flip else [(a, b, c), (a, c, d)]
+        if math.dist(a, c) <= math.dist(b, d):
+            tris += [(a, c, b), (a, d, c)] if not flip else [(a, b, c), (a, c, d)]
+        else:
+            tris += [(a, d, b), (b, d, c)] if not flip else [(a, b, d), (b, c, d)]
     return tris
 
 
@@ -201,49 +217,161 @@ def pillars(pts, values, lats):
 
 
 def _add(objs, name, mat, tris):
+    """File `tris` under object `name`, material NAME `mat`."""
     if tris:
-        objs.setdefault(name, {}).setdefault(MAT[mat], []).extend(tris)
+        objs.setdefault(name, {}).setdefault(mat, []).extend(tris)
 
 
-def build(net, ground=None):
-    """Every object `point_build.build_network` emits (default style), as triangles. Same solve."""
-    solves, jsolves, gsolves, bands = ped.solve_all(net, ground)
+def sweep_profile(pts, values, profile, flip, offset_attr, z, z_attr, require_attr, lats=None):
+    """`GN_PointProfile` over one carrier: the artist's section swept at its OWN size, not scaled by a design width.
+
+    The section is drawn in its XY plane, +X outward and +Y up, origin at the line the road hands it. Along the
+    offset curve (the same offset stage as a parametric layer: along the carrier's stored lateral, and straight up)
+    the section's +X is the curve's LEFT, `cross(N, T)`, and its +Y is the curve's Z-up normal `N` (perpendicular to
+    the tangent -- `Set Curve Normal` 'Z Up' then `Curve to Mesh`, with `_PROFILE_FIX`'s half turn). `flip` mirrors
+    the section for the right-hand flank. Open sections sweep open (no caps, `Fill Caps` off). Each face is wound
+    so its normal leaves the section on the left of the direction the points were drawn -- outward for the kit's
+    sections, which are all drawn around their solid clockwise."""
+    if require_attr and not any(abs(float(v.get(require_attr, 0.0))) > 1e-6 for v in values):
+        return []
+    lats = lats or [_lateral(t) for t in poly_tangents(pts)]
+    curve = _offset_curve(pts, lats, values, offset_attr, z, z_attr)
+    tans = poly_tangents(curve)
+    frames = []
+    for t in tans:
+        up = _norm((-t[2] * t[0], -t[2] * t[1], 1.0 - t[2] * t[2]))
+        left = _norm((up[1] * t[2] - up[2] * t[1], up[2] * t[0] - up[0] * t[2], up[0] * t[1] - up[1] * t[0]))
+        frames.append((left, up))
+    sgn = -1.0 if flip else 1.0
+    out = []
+    for sp in profile.get("splines", ()):
+        sec = [(float(x), float(y)) for x, y in sp.get("points", ())]
+        if sp.get("cyclic") and len(sec) > 2:
+            sec = sec + sec[:1]
+        rings = [[(c[0] + left[0] * sgn * x + up[0] * y, c[1] + left[1] * sgn * x + up[1] * y,
+                   c[2] + left[2] * sgn * x + up[2] * y) for x, y in sec]
+                 for c, (left, up) in zip(curve, frames)]
+        for j in range(len(sec) - 1):
+            dx, dy = sec[j + 1][0] - sec[j][0], sec[j + 1][1] - sec[j][1]
+            for i in range(len(curve) - 1):
+                left, up = frames[i]
+                ox, oy = -dy, dx
+                outward = tuple(left[k] * sgn * ox + up[k] * oy for k in range(3))
+                a, b, c, d = rings[i][j], rings[i][j + 1], rings[i + 1][j + 1], rings[i + 1][j]
+                out += [_orient((a, b, c), outward), _orient((a, c, d), outward)]
+    return out
+
+
+def _layer(objs, name, style, slot, kind, offset_attr, z, z_attr, width_attr, thickness_attr, pts, values,
+           lats=None, flip=False):
+    """One layer, the way `point_build._styled` builds it: the slot's PROFILE ASSET when the road names one (its
+    material off the asset), else the parametric band/deck in the slot's material."""
+    asset = style.asset(slot) if style is not None else None
+    if asset is not None:
+        mat = asset.get("material") or style.material(slot)
+        require = ASSET_REQUIRE.get(slot, "") or width_attr
+        _add(objs, name, mat, sweep_profile(pts, values, asset, flip, offset_attr, z,
+                                            ASSET_Z_ATTR.get(slot, z_attr), require, lats))
+        return
+    mat = style.material(slot) if style is not None else MAT[pk.SLOT_DEFAULT[slot]]
+    _add(objs, name, mat, sweep(pts, values, kind, offset_attr, z, z_attr, width_attr, thickness_attr, lats))
+
+
+def collision_name(base, kind, ped_access):
+    """`point_build.collision_name`: `<base>-<kind>[-noped]-colonly`."""
+    return "%s-%s%s%s" % (base, kind, "" if ped_access else NO_PED_SUFFIX, SUFFIX_COL)
+
+
+def _collision(objs, surface_names, edge_names, name, ped_access):
+    """`point_build.build_collision`: one proxy for what a car drives on, one for the kerb and footway -- never one
+    merged, so the navmesh and the impact resolver can tell them apart. Every material of the objects, as one
+    material-less mesh."""
+    for names, kind, ped in ((surface_names, COL_ROAD, False), (edge_names, COL_WALK, ped_access)):
+        tris = [t for n in names for ts in objs.get(n, {}).values() for t in ts]
+        _add(objs, collision_name(name + "_" + kind, kind, ped), NO_MATERIAL, tris)
+
+
+def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=None):
+    """Every object `point_build.build_network` emits, as triangles: `{object: {material name: [tri]}}`, the KIT
+    frame, collision proxies included (material `NO_MATERIAL`). Same solve, same cut (`part` + `zone` emit one
+    piece of a zoned network, the WHOLE network still solved), same styles (`kit`, default `point_kit.load()`).
+    `report`, a dict, collects `missing_style` rows. `solved`, `point_edges.solve_all(net, ground)` already run,
+    saves re-solving the network for every piece of it."""
+    kit = kit if kit is not None else pk.load()
+    solves, jsolves, gsolves, bands = solved if solved is not None else ped.solve_all(net, ground)
+    styles = {n: pk.resolve(r, kit) for n, r in net.roads.items()}
     objs = {}
     by_road = {}
     for s in solves:
         by_road.setdefault(s.road.name, []).append(s)
+
+    def mine_run(s):
+        return part is None or part.run_zone(s.uids) == zone
+
     for road_name, runs in by_road.items():
+        if not any(mine_run(s) for s in runs):
+            continue
+        style = styles.get(road_name)
+        if report is not None:
+            for slot, kind, missing in style.missing():
+                report.setdefault("missing_style", []).append((road_name, slot, kind, missing))
+        med_slot = "mark_y" if getattr(style.road, "median_style", None) == pm.MED_PAINT else "median"
         for i, s in enumerate(runs):
+            if not mine_run(s):
+                continue
             name = road_name if len(runs) == 1 else "%s_%d" % (road_name, i)
             pts, values = ps.carrier_points(s)
             lats = [_lateral(t) for t in poly_tangents(pts)]
-            for layer, kind, mat, oa, z, za, wa, ta in SURFACE:
-                _add(objs, name + "__surface", mat, sweep(pts, values, kind, oa, z, za, wa, ta, lats))
+            surf = name + "__surface"
+            for layer, kind, slot, oa, z, za, wa, ta in SURFACE:
+                _layer(objs, surf, style, med_slot if slot == "median" else slot, kind, oa, z, za, wa, ta,
+                       pts, values, lats)
             if any(float(v.get("rka_pillar_param", 0.0)) > 0.0 for v in values):
-                _add(objs, name + "__surface", "concrete", pillars(pts, values, lats))
+                _add(objs, surf, style.material("deck"), pillars(pts, values, lats))
+            edge_names = []
             for sfx, epts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
-                _edge_run(objs, "%s__edges_%s" % (name, sfx), epts, walk, kerb, wall, sgn)
+                edge_names.append("%s__edges_%s" % (name, sfx))
+                _edge_run(objs, edge_names[-1], epts, walk, kerb, wall, sgn, style)
             for yellow in (False, True):
                 for r in (r for r in ps.solve_marks(s) if r.yellow is yellow):
                     vals = [{"rka_mark_w": ps.MARK_WIDTH / 2.0}] * len(r.points)
-                    _add(objs, "%s__marks_%s" % (name, "y" if yellow else "w"), "line_y" if yellow else "line_w",
+                    _add(objs, "%s__marks_%s" % (name, "y" if yellow else "w"),
+                         style.material("mark_y" if yellow else "mark_w"),
                          sweep(list(r.points), vals, "band", "", ps.PAINT_Z_BIAS, "", "rka_mark_w", ""))
+            _collision(objs, [surf], edge_names, name, bool(s.road.ped_access))
     for j in jsolves:
+        if part is not None and part.pad_zone(j.uids) != zone:
+            continue
         name = "JCT_" + j.uids[0][:8]
-        _add(objs, name + "__pad", "asphalt", _face_up([t for t in j.fan if abs(_up(t)) > 1e-9]))
+        road = net.road_of(j.uids[0])
+        style = styles.get(road.name) if road is not None else pk.resolve(object(), kit)
+        _add(objs, name + "__pad", style.material("surface"), _face_up([t for t in j.fan if abs(_up(t)) > 1e-9]))
+        edge_names = []
         for sfx, epts, walk, kerb, wall, sgn in ped.junction_edge_runs(j):
-            _edge_run(objs, "%s__edges_%s" % (name, sfx), epts, walk, kerb, wall, sgn)
+            edge_names.append("%s__edges_%s" % (name, sfx))
+            _edge_run(objs, edge_names[-1], epts, walk, kerb, wall, sgn, style)
+        _collision(objs, [name + "__pad"], edge_names, name, True)
     for g in gsolves:
+        if part is not None and part.gore_zone(g.ramp_uid) != zone:
+            continue
         name = "GORE_" + g.ramp_uid[:8]
-        _add(objs, name + "__gore", "asphalt", _face_up([t for t in g.tris if abs(_up(t)) >= 1e-3]))
+        road = net.road_of(g.ramp_uid)
+        style = styles.get(road.name) if road is not None else pk.resolve(object(), kit)
+        tris = _face_up([t for t in g.tris if abs(_up(t)) >= 1e-3])
+        if not tris:
+            continue
+        _add(objs, name + "__gore", style.material("surface"), tris)
+        edge_names = []
         for sfx, epts, walk, kerb, wall, sgn in ped.gore_edge_runs(g):
-            _edge_run(objs, "%s__edges_%s" % (name, sfx), epts, walk, kerb, wall, sgn)
+            edge_names.append("%s__edges_%s" % (name, sfx))
+            _edge_run(objs, edge_names[-1], epts, walk, kerb, wall, sgn, style)
+        _collision(objs, [name + "__gore"], edge_names, name, g.ped_access)
     return objs
 
 
-def _edge_run(objs, name, pts, walk, kerb, wall, sgn):
+def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None):
     """`point_build.build_edge_run` without Blender: the same per-vertex values (`edge_run_values`, restated
-    here because `point_build` imports bpy), the same three layers."""
+    here because `point_build` imports bpy), the same three layers, each styled."""
     half_t = ps.BARRIER_THICKNESS * 0.5
     values = []
     for k in range(len(kerb)):
@@ -251,10 +379,10 @@ def _edge_run(objs, name, pts, walk, kerb, wall, sgn):
         values.append({"rka_curb_ol": 0.0, "rka_curb_hl": h, "rka_curb_tl": h * ps.KERB_THICKNESS,
                        "rka_walk_cl": sgn * w, "rka_walk_hl": w, "rka_walk_zl": h, "rka_wall_h": wl,
                        "rka_wall_hw": half_t if wl > 0.0 else 0.0, "rka_wall_c": sgn * (2.0 * w + half_t),
-                       "rka_wall_z": h + wl})
+                       "rka_wall_z": h + wl, "rka_wall_foot": h})
     pts = [tuple(p) for p in pts]
-    for layer, kind, mat, oa, z, za, wa, ta in EDGE:
-        _add(objs, name, mat, sweep(pts, values, kind, oa, z, za, wa, ta))
+    for layer, kind, slot, oa, z, za, wa, ta in EDGE:
+        _layer(objs, name, style, slot, kind, oa, z, za, wa, ta, pts, values, flip=(sgn < 0.0))
 
 
 def self_test():

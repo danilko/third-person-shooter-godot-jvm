@@ -189,6 +189,11 @@ public class PlayerController extends Controller {
         // Hold breath shares Shift with the stealth-walk modifier by default (CoD's binding): a
         // shooter steadying a scope is not running anyway. A separate action so it can be rebound.
         cmd.holdBreath = inp.isActionPressed("hold_breath", false);
+        // Zoom level: middle mouse cycles, the wheel steps. Edges, so a held button does not spin through
+        // the levels; what they mean (nothing, unless a multi-level scope is raised) is decided downstream.
+        if (inp.isActionJustPressed("scope_zoom", false))          cmd.scopeZoom = UserCommand.SCOPE_ZOOM_CYCLE;
+        else if (inp.isActionJustPressed("scope_zoom_in", false))  cmd.scopeZoom = UserCommand.SCOPE_ZOOM_IN;
+        else if (inp.isActionJustPressed("scope_zoom_out", false)) cmd.scopeZoom = UserCommand.SCOPE_ZOOM_OUT;
 
         // ── Aim target (spine IK look point — converges on the crosshair target) ──
         // AimTarget drives SpineAimModifier (and is replicated as the puppet's look point).

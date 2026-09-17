@@ -1,7 +1,7 @@
 # Road Kit (Godot editor plugin)
 
-Roads are authored here, solved by `blender/tools/roadkit_cli.py` (plain python3) and meshed by headless
-Blender (`blender/tools/build_roads_piece.sh`). The `.roads.json` record next to the network is the source
+Roads are authored here, and solved AND meshed by `blender/tools/roadkit_cli.py` (plain python3 — there is no
+Blender in the road build since B11; `blender/tools/build_roads_piece.sh` runs it and the Godot bake). The `.roads.json` record next to the network is the source
 of truth; the `RoadKitNetwork → RoadKitRoad → RoadKitPoint` nodes are its editable view. Design of record:
 `CLAUDE.md` "Road Kit — option B". Editor tooling only — nothing here runs in the game.
 
@@ -68,12 +68,18 @@ of truth; the `RoadKitNetwork → RoadKitRoad → RoadKitPoint` nodes are its ed
    since their last build (nothing changed: a few seconds, no Blender); **Rebuild All Pieces** forces every
    one. It samples the Terrain3D ground (stations and a 2 m grid under the whole network, so
    bridges and piers stand on the real ground), writes `<network>.zones.json` from the markers, runs the
-   whole build on a thread (python3 lanes → Blender meshes → export + bake, ~30 s for DebugRoads) and
+   whole build on a thread (python3 lanes → python3 meshes (`.gltf`) → WorldBaker + navmesh, ~30 s for
+   DebugRoads, almost all of it the Godot bake) and
    wires each built piece into its ZoneMarker's `Zone` in one undo step. Save the scene afterwards.
-   **Draft Surface** (on by default) draws the solver's tarmac, pads, gores, footways and kerb lines on
-   every refresh — exactly what Build will sweep, so a junction's pad, setbacks and fillets show while you
-   tweak. It wears the kit's own materials, taken off the built pieces (Preview Pieces); before any build
-   it is the engine's default grey.
+   **Draft Surface** (on by default) draws what Build will write. WHILE YOU DRAG it is the fast outline —
+   the solver's tarmac, pads, gores, footways and kerb lines; the moment you RELEASE it is the full mesh
+   Build sweeps (kerbs, barriers, decks, piers, markings, profile assets), from the same code that writes the
+   piece. It wears the kit's own materials, taken off the built pieces (Preview Pieces); a material no built
+   piece carries yet is the engine's default grey.
+   **Styles**: a road's `*_mat` fields name a kit material and its `*_asset` fields a profile section in
+   `assets/world_source/kit/road_kit.blend`; the build reads that file as `road_kit.json`
+   (`blender/tools/export_road_kit_data.py`, which `build_road_kit.py` runs). A name the kit lacks builds
+   the default and Build says so.
 6. **Preview Pieces** — tick it to see the BUILT roads (tarmac, kerbs, piers) placed exactly where
    `ZoneManager` will stream them. It is never saved and refreshes itself after each Build.
 7. **Stamp Terrain** writes the roads into the Terrain3D height field (cut and fill, derived from the
@@ -102,6 +108,7 @@ $G --headless --path . --script tools/godot/stamp_roadkit_terrain.gd -- $W Debug
 python3 blender/tools/roadkit_cli.py flow assets/world_source/pieces/DebugRoads.roads.json
 ```
 
-Gate: `blender/tools/check_roads.sh` runs the kit's tests and every plugin test under `tools/godot/`
+Gate: `blender/tools/check_roads.sh` runs the kit's tests, `check_roadkit_build.py` (the committed pieces are
+the build of their records; styles and profile assets build) and every plugin test under `tools/godot/`
 (`test_roadkit_*`, `probe_road_ground`, `probe_road_stamp`); the runtime probes `probe_road_zones.gd` and
 `probe_traffic_spawn.gd` run with `--fixed-fps 60`.
