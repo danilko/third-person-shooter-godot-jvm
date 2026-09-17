@@ -261,7 +261,7 @@ func _initialize() -> void:
 		await _tick(5)
 
 	print("")
-	print("=== SNR1: the bolt and the reload leave the scope; aim still held brings it back (piece 4) ===")
+	print("=== SNR1: the bolt leaves the scope and aim still held brings it back; a reload ENDS it (CS) ===")
 	a = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
 	x += 12.0
 	if not a.is_empty():
@@ -303,15 +303,21 @@ func _initialize() -> void:
 			wc.call("reloading_now"), p.call("scoped_now"), _rig(p), _fov(p)])
 		_check("a reload started", int(wc.call("reloads_started")) > reloads0, "reloads %d" % wc.call("reloads_started"))
 		_check("... named RELOADING", str(wc.call("weapon_state_now")) == "RELOADING", str(wc.call("weapon_state_now")))
-		_check("the reload drops the zoom, first person kept", not bool(p.call("scoped_now")) and _rig(p) == "FPS",
-			"scoped %s rig %s" % [p.call("scoped_now"), _rig(p)])
+		_check("the reload ENDS the scope (CS), back on the boom", not bool(p.call("scoped_now"))
+			and not bool(wc.call("scope_raised_now")) and _rig(p) == "TPS",
+			"scoped %s raised %s rig %s" % [p.call("scoped_now"), wc.call("scope_raised_now"), _rig(p)])
 		var waited := 0
 		while bool(wc.call("reloading_now")) and waited < 600:
 			await physics_frame
 			waited += 1
 		await _tick(20)
-		_check("the scope comes back after the reload", bool(p.call("scoped_now")) and absf(_fov(p) - 20.0) < 1.0,
-			"scoped %s fov %.1f after %.2f s of reload" % [p.call("scoped_now"), _fov(p), waited / 60.0])
+		_check("... and it stays down after the reload with aim still held", not bool(p.call("scoped_now")),
+			"scoped %s after %.2f s of reload" % [p.call("scoped_now"), waited / 60.0])
+		Input.action_release("aim")
+		await _tick(5)
+		await _aim_down(p, false)
+		_check("pressing aim again scopes", bool(p.call("scoped_now")) and absf(_fov(p) - 20.0) < 1.0,
+			"scoped %s fov %.1f" % [p.call("scoped_now"), _fov(p)])
 
 		# 2.8 item 2: the draw SETTLE is not a cycle — switching back to the rifle with aim held, the zoom
 		# returns on the frame the draw ends and stays up through the settle (it used to drop with it).
@@ -426,22 +432,34 @@ func _initialize() -> void:
 		await _tick(int(cycle * 60.0) + 20)
 		_check("... and the toggled scope comes back at the CLOSER level", bool(p.call("scoped_now")) and absf(_fov(p) - near) < 0.5,
 			"scoped %s fov %.2f" % [p.call("scoped_now"), _fov(p)])
-		Input.action_press("reload")
-		await _tick(3)
-		Input.action_release("reload")
-		var waited := 0
-		while bool(wc.call("reloading_now")) and waited < 600:
-			await physics_frame
-			waited += 1
-		await _tick(20)
-		_check("... and after a reload", waited > 10 and bool(p.call("scoped_now")) and absf(_fov(p) - near) < 0.5,
-			"scoped %s fov %.2f after %.2f s of reload" % [p.call("scoped_now"), _fov(p), waited / 60.0])
-
 		await _press("scope_zoom")
 		await _tick(RELEASE_SETTLE)
 		_check("third press: OFF, back on the boom, FOV restored", not bool(p.call("scoped_now")) and not bool(wc.call("scope_latched_now"))
 			and _rig(p) == "TPS" and absf(_fov(p) - fov0) < 1.0,
 			"scoped %s rig %s fov %.2f (was %.2f)" % [p.call("scoped_now"), _rig(p), _fov(p), fov0])
+
+		# A reload ENDS a toggled scope (CS) and it does not come back afterwards.
+		await _press("scope_zoom_in")
+		await _press("scope_zoom_in")
+		Input.action_press("reload")
+		await _tick(3)
+		Input.action_release("reload")
+		await _tick(10)
+		_check("a reload ENDS the toggled scope", bool(wc.call("reloading_now")) and not bool(p.call("scoped_now"))
+			and not bool(wc.call("scope_latched_now")) and _rig(p) == "TPS",
+			"reloading %s scoped %s latched %s rig %s" % [wc.call("reloading_now"), p.call("scoped_now"), wc.call("scope_latched_now"), _rig(p)])
+		var waited := 0
+		while bool(wc.call("reloading_now")) and waited < 600:
+			await physics_frame
+			waited += 1
+		await _tick(30)
+		_check("... and it stays down after the reload", not bool(p.call("scoped_now")) and int(wc.call("scope_zoom_level_now")) == 0,
+			"scoped %s level %d after %.2f s of reload" % [p.call("scoped_now"), wc.call("scope_zoom_level_now"), waited / 60.0])
+		await _press("scope_zoom_in")
+		_check("... and scoping again starts at the first level", bool(p.call("scoped_now")) and absf(_fov(p) - far) < 0.5,
+			"scoped %s fov %.2f" % [p.call("scoped_now"), _fov(p)])
+		await _press("scope_zoom_out")
+		await _tick(RELEASE_SETTLE)
 
 		# Mixed with the hold: holding aim then middle mouse latches the NEXT level, so letting go keeps it.
 		Input.action_press("aim")

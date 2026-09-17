@@ -4150,24 +4150,28 @@ decision:
 How the three references differ: CS's AWP right click cycles zoom1 → zoom2 → off and stays put. The bolt drops the
 zoom and `resume_zoom` brings it back; a reload or a switch ends it. Left 4 Dead's snipers zoom on a middle-mouse
 TOGGLE, because M2 is the shove. GTA V's sniper is HOLD to aim, with the wheel zooming continuously and a hold/toggle
-option in settings. Here a toggled scope comes back after the bolt AND the reload (the user asked that it never exit
-by itself, which is one step past CS). **The toggle is state that has to be remembered**
+option in settings. Here, as in CS, a toggled scope comes back after the bolt, and **a reload ENDS the scope, held or
+toggled** (user decision, which reversed the first version where it resumed). `WeaponController.onWeaponReload` calls
+`endScope()`: it clears the toggle and ignores a held aim button until it is released, so the player re-scopes on
+purpose. That also covers the auto-reload after the last round. **The toggle is state that has to be remembered**
 (`WeaponController.scopeLatched`, plus `holdSuppressed`), so every end is a CLEAR, not a hide. A switch, a drop or an
 unscoped weapon clears it in `applyScopeZoom`. A seat or death clears it in `Character.tickScopeSway`, which the
 camera calls every frame in every mode, because `applyInput` does not run in the driver's seat. Otherwise the scope
 would pop back up on leaving the car or re-drawing the rifle. `PlayerController` counts a latched scope as aiming, so
 combat stays on (the body faces the aim), and the aim-stay beat starts on the tick the toggle ends. `UserCommand.scopeZoom`
 is a one-tick edge (`SCOPE_ZOOM_IN/OUT/CYCLE`). `scopeZoomLevel` resets whenever the scope is not raised. The bolt
-cycle and the reload keep the scope RAISED (only the zoom drops), so it resumes at its level. `scopedFovDegrees()`
+cycle keeps the scope RAISED (only the zoom drops), so it resumes at its level; a reload does not. `scopedFovDegrees()`
 returns the level's FOV, and `TPSCameraController` re-tweens when that changes.
 **Look input scales with the zoom** (`TPSCameraController.scopedSensitivityRatio`, CS's `zoom_sensitivity_ratio`,
 default 1, 0 = off): mouse deltas × `min(1, ratio × camera fov / unscoped fov)` while raised, read off the live FOV.
 This also slows the FIRST level (100 px: 7.00° raw → 2.55° at 20°). Without it the 7.5° level turns 1 px into
 ~6 screen px.
-Gate `probe_sniper_scope.gd`, 77 checks: middle click scopes at level 1 with nothing held and stays up 3 s in combat;
+Gate `probe_sniper_scope.gd`, 80 checks: middle click scopes at level 1 with nothing held and stays up 3 s in combat;
 click → closer; wheel up clamps; wheel down → first → OFF (back on the boom, FOV restored); wheel down while off
 does nothing; wheel up from off scopes; the look scale (raw 7.000° control / 2.545° / 0.955°, ratio 0.375 = the FOV
-ratio); the bolt and a reload each drop the zoom and it resumes at the closer level; the third click is off; hold +
+ratio); the bolt drops the zoom and it resumes at the closer level; the third click is off; a reload ends a
+toggled scope and it stays down after, re-scoping starts at level 1; a reload ends a HELD scope too (back on the boom),
+it stays down with aim still held, and pressing aim again scopes; hold +
 click latches and survives letting go; with aim held the off step wins until aim is pressed again. The switch, seat
 and death interruptions run for the HELD scope and again for the TOGGLED one. For the toggle the switch and the seat
 are then undone, and the scope must stay down, with the latch cleared rather than hidden. `-- --control` still fails
@@ -4404,7 +4408,8 @@ was not reproduced separately: a shot whose damage lands on no bone, or on a leg
 **The scope is still** (`SniperItem.scopeSway` ships 0; W30's mechanism is opt-in).
 
 **The bolt and the reload leave the eye, and aim held brings it back** (PLAN.md 2.7 piece 4, user
-decision: CS AWP with resume-zoom, the balance lever for a one-shot rifle). Two derived facts now,
+decision: CS AWP with resume-zoom, the balance lever for a one-shot rifle; since W33 a reload ENDS the scope
+instead, and only the bolt resumes). Two derived facts now,
 because two different things ask:
 - **raised** — `WeaponController.scopeRaisedNow()` / `Character.isScopeRaised()`: aim held on a scoped
   weapon, no switch, alive, on foot. The FIRST-PERSON VIEW and the SHOT ORIGIN follow it. A TPS player
