@@ -1228,6 +1228,13 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * zero, so a death, a switch or a car door settles the view the same way letting go of aim does.
      */
     public void tickScopeSway(double delta) {
+        // A TOGGLED scope ends in a seat or at death — cleared here, not merely hidden by isScopeRaised(), or it
+        // would come back up the moment the body left the car. Here because the camera calls this every frame in
+        // every mode, while applyInput does not run in the driver's seat.
+        if (weaponController != null && (currentVehicleNode != null || !isAlive())
+                && weaponController.scopeLatchedNow()) {
+            weaponController.cancelScopeLatch();
+        }
         boolean scoped = isScoped();
         // Every AI rig calls this every frame and none of them ever scopes: at rest there is nothing to
         // advance, and the steadiness below is an engine call (isOnFloor) not worth paying per AI.

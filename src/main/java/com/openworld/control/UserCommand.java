@@ -49,11 +49,11 @@ public class UserCommand {
 
     /** No scope zoom request this tick. */
     public static final int SCOPE_ZOOM_NONE = 0;
-    /** Step the scope one level closer (wheel up). */
+    /** Wheel up: off -> first level -> closer level (stops there), latched with no button held. */
     public static final int SCOPE_ZOOM_IN = 1;
-    /** Step the scope one level out (wheel down). */
+    /** Wheel down: closer level -> first level -> off. */
     public static final int SCOPE_ZOOM_OUT = -1;
-    /** Cycle to the next level, wrapping (middle mouse — CS's AWP right click, minus the unscope step). */
+    /** Toggle: off -> first level -> closer level -> off, latched with no button held (middle mouse — CS's AWP right click). */
     public static final int SCOPE_ZOOM_CYCLE = 2;
 
     /**

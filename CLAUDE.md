@@ -4137,23 +4137,41 @@ game camera first**: `tools/godot/shot_fps_part.gd -- --weapon=<id> --part=Model
 the part's size on screen and pixels moved per frame and saves the frames. Under ~2 px a frame or ~20 px across,
 it reads as still.
 
-**A scope has two zoom levels, CS's AWP.** `ScopeConfig.closeFov` (0 = one level; SNR1 7.5, CS's second zoom
-in vertical degrees against a ~74 hip view; its first level stays 20, which is tighter than CS's ~31). The
-scope comes up at `fov`; **middle mouse** (`scope_zoom`) cycles, **wheel up/down** (`scope_zoom_in` /
-`scope_zoom_out`) step and clamp. `UserCommand.scopeZoom` is a one-tick edge (`SCOPE_ZOOM_*`),
-`WeaponController.applyScopeZoom` owns `scopeZoomLevel`: the one remembered piece of scope state, since a
-level is a choice nothing can derive. It resets to 0 on every tick the scope is not RAISED (release, switch,
-drop, seat, death). The bolt cycle and the reload keep the scope raised, so the zoom comes back at the level
-it left (CS resume-zoom). `scopedFovDegrees()` returns the level's FOV, and `TPSCameraController` re-tweens
-when the scoped FOV changes, not only on the scoped edge. **Look input scales with the zoom**
-(`TPSCameraController.scopedSensitivityRatio`, CS's `zoom_sensitivity_ratio`, default 1, 0 = off): while a
-scope is raised, mouse deltas × `min(1, ratio × camera fov / unscoped fov)`, read off the live camera FOV so
-it follows the tween and the bolt's un-zoom. **This also slows the FIRST level** (100 px: 7.00° raw → 2.55°
-at 20°), which is CS's behaviour and a change from before; without it the 7.5° level turns 1 px into ~6 screen
-px. Gate `probe_sniper_scope.gd` gained the zoom case: first level on raise, middle mouse to 7.51 and back,
-wheel in/out clamp, 100 px = 7.000° raw (the control, ratio 0) / 2.545° / 0.955° (ratio 0.375 = the FOV ratio),
-the bolt drops the closer level and it comes back at 7.50, release resets to the first level, and middle mouse
-does nothing unscoped. Probe trap: `ScopeConfig` is a SHARED sub-resource, and the bolt case's
+**A scope has two zoom levels, and the wheel or middle click TOGGLES it with nothing held (CS AWP / Left 4 Dead),
+beside the held right-click scope (GTA).** `ScopeConfig.closeFov` (0 = one level; SNR1 7.5, CS's second zoom in
+vertical degrees against a ~74 hip view; the first level stays 20, tighter than CS's ~31). The controls, by user
+decision:
+- **wheel up** (`scope_zoom_in`) steps IN from off: off → first → closer, stopping at the closer level;
+- **wheel down** (`scope_zoom_out`) steps OUT: closer → first → off;
+- **middle click** (`scope_zoom`) cycles first → closer → off, CS's AWP right click;
+- **right-click hold** (`aim`) is still a scope for as long as it is held. Toggling while holding latches the next
+  level, so letting go keeps it, and a toggle step to OFF while aim is still held wins until aim is released.
+
+How the three references differ: CS's AWP right click cycles zoom1 → zoom2 → off and stays put. The bolt drops the
+zoom and `resume_zoom` brings it back; a reload or a switch ends it. Left 4 Dead's snipers zoom on a middle-mouse
+TOGGLE, because M2 is the shove. GTA V's sniper is HOLD to aim, with the wheel zooming continuously and a hold/toggle
+option in settings. Here a toggled scope comes back after the bolt AND the reload (the user asked that it never exit
+by itself, which is one step past CS). **The toggle is state that has to be remembered**
+(`WeaponController.scopeLatched`, plus `holdSuppressed`), so every end is a CLEAR, not a hide. A switch, a drop or an
+unscoped weapon clears it in `applyScopeZoom`. A seat or death clears it in `Character.tickScopeSway`, which the
+camera calls every frame in every mode, because `applyInput` does not run in the driver's seat. Otherwise the scope
+would pop back up on leaving the car or re-drawing the rifle. `PlayerController` counts a latched scope as aiming, so
+combat stays on (the body faces the aim), and the aim-stay beat starts on the tick the toggle ends. `UserCommand.scopeZoom`
+is a one-tick edge (`SCOPE_ZOOM_IN/OUT/CYCLE`). `scopeZoomLevel` resets whenever the scope is not raised. The bolt
+cycle and the reload keep the scope RAISED (only the zoom drops), so it resumes at its level. `scopedFovDegrees()`
+returns the level's FOV, and `TPSCameraController` re-tweens when that changes.
+**Look input scales with the zoom** (`TPSCameraController.scopedSensitivityRatio`, CS's `zoom_sensitivity_ratio`,
+default 1, 0 = off): mouse deltas × `min(1, ratio × camera fov / unscoped fov)` while raised, read off the live FOV.
+This also slows the FIRST level (100 px: 7.00° raw → 2.55° at 20°). Without it the 7.5° level turns 1 px into
+~6 screen px.
+Gate `probe_sniper_scope.gd`, 77 checks: middle click scopes at level 1 with nothing held and stays up 3 s in combat;
+click → closer; wheel up clamps; wheel down → first → OFF (back on the boom, FOV restored); wheel down while off
+does nothing; wheel up from off scopes; the look scale (raw 7.000° control / 2.545° / 0.955°, ratio 0.375 = the FOV
+ratio); the bolt and a reload each drop the zoom and it resumes at the closer level; the third click is off; hold +
+click latches and survives letting go; with aim held the off step wins until aim is pressed again. The switch, seat
+and death interruptions run for the HELD scope and again for the TOGGLED one. For the toggle the switch and the seat
+are then undone, and the scope must stay down, with the latch cleared rather than hidden. `-- --control` still fails
+exactly the 6 held-scope interruption checks. Probe trap: `ScopeConfig` is a SHARED sub-resource, and the bolt case's
 `unscope_to_cycle = false` control leaked into every later SNR1 until it was restored.
 
 **The "sinking" hand the user still saw was the SUPPORT hand**, found only with real-renderer screenshots
