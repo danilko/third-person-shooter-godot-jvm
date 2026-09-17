@@ -4097,11 +4097,31 @@ the radial menu's 133x44 and a TextureRect keeps aspect. Per-weapon files, not a
 white, centred, inside the padding, fitted (or, uniform, as wide as length x px/m), used by its scene. Try
 variants: `-- --scale=uniform --side=right --muzzle=right --width=512 --out=<dir>`.
 
-**The weapon menus label each icon with its NAME, CS-style** — a small outlined label pinned to the icon's
-bottom-right: `WeaponIcon/WeaponName` in `RadiaMenuItem.tscn` (the radial menu's item; 11 pt, the ammo and key
-labels moved up into the old centred-name row) and `Icon/NameLabel` in `WeaponSlotItem.tscn` (9 pt; the slot
-icon grew 28 -> 36 px tall). `WeaponRadiaMenuItem.tscn` is an unused copy of the radial item and was kept in
-step. Checked on screen (a Vulkan screenshot of all eight radial items and five slot rows), not headless.
+**The weapon wheel is UPRIGHT CARDS, selected by ANGLE (2026-09-16, user-asked).** `WeaponRadialMenu` places one
+`WeaponRadialCard.tscn` per slot on a `ringRadiusX` x `ringRadiusY` ellipse (260x180 canvas units; slot 0 at the
+top, clockwise), each card a 150x84 panel: the icon, its name pinned to the icon's bottom-right (CS-style), the
+slot key on the left and the ammo on the right beneath, a `Highlight` panel for the selection. It replaced
+textured pie wedges rotated into place with per-wedge click masks: a slot's content is rectangular, the wedges
+squeezed it toward the centre, and the masks left dead spots. Selection is the pointer's ANGLE from the centre
+past `deadZone` (48), each slot owning 360/N degrees — independent of the drawn shapes, which is the
+weapon-wheel convention and what a stick would use too; opening warps the mouse to the centre and highlights the
+weapon in hand, moving selects (and switches, as the wedge hover did), a click or releasing the key closes.
+The wedge scene `RadiaMenuItem.tscn`, its unused copy and the wedge textures (`radial_menu*.png`, the click mask)
+are deleted. The wheel used to label every slot one key too high (`weapon_slot_(N+1)`); the card now uses
+WeaponSlotsUI's rule (slot 0 = `weapon_unequip`, slot N = `weapon_slot_N`).
+
+**Text: one outline for the whole game, one size for the weapon menus.** `ui/game_theme.tres` is the project
+theme (`gui/theme/custom`): a dark outline (size 3, black 85%) on every text-bearing control type — Label,
+RichTextLabel, buttons, fields, lists, progress bars — in the HUD, menus and nameplate SubViewports alike; the
+existing LabelSettings already carry their own outlines, and `AreaWarning`, the one hand-drawn string, calls
+`drawStringOutline` first. `ui/weapon_menu_theme.tres` (10 pt for Label and RichTextLabel) is set on the wheel card
+and the slot-bar row, replacing per-node size and outline overrides: 10 pt in the 1152x648 canvas is ~11 px on a
+Steam Deck and ~17 px at 1080p, just above Valve's ~9 px readability floor. The slot icon is 36 px tall, and
+WeaponSlotsUI moved up 56 px in HUDManager so its taller column clears the health box. Gate
+**`tools/godot/probe_weapon_wheel.gd`** (runs with a display; `-- --shot=<png>` saves the open wheel and the closed
+HUD): one card per slot, no overlaps, all on screen, pointing at every card selects its slot through the angle
+function AND a real mouse-motion event, keys match the slot bar, the dead zone holds, all 42 wheel and slot-bar
+texts are 10 pt with an outline, and a plain Label anywhere gets the theme outline.
 
 **Weapon ids are plain, display names hyphenated.** `weapon_id` is a KEY — file names, catalog rows, the
 inventory manifest, throwable stack merging — so it stays letters+digits (`AR4`, `PI52`); `weapon_name`, what
