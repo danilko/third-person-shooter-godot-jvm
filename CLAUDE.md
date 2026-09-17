@@ -462,6 +462,15 @@ ArtDeck now falls through, same as any other gap in authored ground — see
 > `blender/tools/check_island_water.py` is that layer's gate (sea-below-land, continuity, the beach
 > step, cliff/quay classification, and the markers).
 >
+> **The water shader fades its detail with distance** (2026-09-16, user-reported "repeated small squares far
+> away"). `world/water.gdshader` samples 256 px seamless noise in WORLD space (a tile every 5 m in DebugWorld,
+> 40 m in World; foam every 2 m) and read the waves at one fixed mip level, so far water aliased into a speckled
+> grid of repeated pixel squares — measured on a Vulkan screenshot, not guessed. Now fragment samples use
+> automatic mipmaps with anisotropic filtering, a second layer at `far_scale_ratio` (0.125 = 8x bigger features)
+> fades in between `detail_fade_start` and `detail_fade_end` (40-320 m from the camera), the foam shape does
+> the same, and the normal map flattens toward `far_normal_strength` far out. Near water is unchanged
+> (before/after screenshots compared). Vertex displacement still uses the fixed LOD (no derivatives there).
+>
 > **All water is ONE swim volume** (`water_sea`, baked to a `WaterVolume`), and one box can cover
 > the sea, the bay and the lagoon because the land is above every part of it: a box whose TOP is the
 > water line cannot touch a character standing on land. `Character` decides wade-vs-swim from the
