@@ -4117,13 +4117,25 @@ parts". Five traps, each hit here and each now refused by `build_weapon.py`:
   silently changes nothing.
 
 REV1: the split `CYLINDER` is `Cylinder` now, its two stray loose vertices (a leftover edge 5 cm behind it) are
-removed, its origin is on its axis (6-fold symmetric: 0.15 mm mean error under 60°), and `cylinder_index` turns
-it one chamber counter-clockwise seen from behind (a S&W) over frames 2–10, well inside the 0.5 s interval.
+removed, and its origin is on its axis (6-fold symmetric: 0.15 mm mean error under 60°). **A per-shot turn was
+built and then REMOVED (user decision), because it could not be seen.** A 60° `cylinder_index` over frames 2–10
+landed entirely under the muzzle flash and the 10° kick. Re-timed to 0.1–0.4 s it read only in 3x crops. From
+the player's own FIRST-PERSON camera (`tools/godot/shot_fps_part.gd`, 1920x1080, aim held) the cylinder is
+70–90 px across. It is seen from behind, where its rear face is a featureless hexagon, and a rim point moves
+1–9 px a frame while the whole gun kicks. That matches industry practice: shooters with a separate first-person
+viewmodel animate such parts there, and third-person world models mostly skip them. Here the character's own
+body is the first-person view, and sound (a cylinder click) sells a revolver shot better. The split object and
+its pivot stay, at no runtime cost, because a swing-out reload needs exactly that. Also keep the lesson: a
+Blender session left open on the OLD `REV1.blend` saved over the authored file (22:27, back to `CYLINDER` on
+the grip, no action) while the exported glb stayed correct. Close or revert a weapon `.blend` in Blender before
+a tool rewrites it.
 `pose_weapon_hold.py render` puts parts at rest before placing a weapon (a part otherwise follows the body clip's
 frame) and gained `--closeup` (the firing hand from four sides, ~35 cm).
 Gate **`tools/godot/probe_weapon_motion.gd`**: SNR1 lifts 60.0°, the knob rises 0.042 m, draws back 0.039 m and
-is home by 1.46 s. REV1 turns 60.0° per shot for two shots, +Z (CCW from behind), with 0.00000 m of axis drift,
-settled before the next shot. `--control` (no clips): nothing moves.
+is home by 1.46 s. `--control` (no clip): nothing moves. **Is a part motion worth shipping? Measure it from the
+game camera first**: `tools/godot/shot_fps_part.gd -- --weapon=<id> --part=Model/<Part>` (needs a display) prints
+the part's size on screen and pixels moved per frame and saves the frames. Under ~2 px a frame or ~20 px across,
+it reads as still.
 
 **A scope has two zoom levels, CS's AWP.** `ScopeConfig.closeFov` (0 = one level; SNR1 7.5, CS's second zoom
 in vertical degrees against a ~74 hip view; its first level stays 20, which is tighter than CS's ~31). The
@@ -4143,6 +4155,18 @@ wheel in/out clamp, 100 px = 7.000° raw (the control, ratio 0) / 2.545° / 0.95
 the bolt drops the closer level and it comes back at 7.50, release resets to the first level, and middle mouse
 does nothing unscoped. Probe trap: `ScopeConfig` is a SHARED sub-resource, and the bolt case's
 `unscope_to_cycle = false` control leaked into every later SNR1 until it was restored.
+
+**The "sinking" hand the user still saw was the SUPPORT hand**, found only with real-renderer screenshots
+(`tools/godot/shot_weapon_hold.gd`, run WITH a display: a real Player armed through the pickup path, a camera
+riding the weapon in its own frame, hold and aim poses plus frames of a part clip). SNR1's `SupportPoint` sat
+**2.0 cm inside** the forend (y 0.055 against an underside at 0.035), so the left hand closed through the stock.
+ASR1, ASR2 and SHG1 sit 3.4–5.1 cm UNDER theirs. It is 3.5 cm under now (y 0.0), and the grip miss went
+0.012 → 0.010 m. No probe could see it, because they all measure the hand against the MARKER, never against the
+mesh, so `build_weapon.py` now refuses a `support_grip: "under"` weapon (ASR1, ASR2, SHG1, SNR1 in
+`weapon_models.json`) whose marker is not 2.5–6 cm below the gun's underside (control: y 0.055 → "−0.020 m",
+exit 1). SMG1 (vertical foregrip) and the pistols are not "under" grips and are not checked. Lowering the
+rifle's arm POSE was considered and rejected: the gun hangs from the hand, so a lower pose moves both together
+and changes nothing between them.
 
 **SNR1's grip sits 2 cm lower on the gun: the model moved UP in its .blend** (every mesh +0.02 m in Blender Z,
 the bolt pivot 0.061 → 0.081, and every `SNR1.tscn` marker/collider +0.02 in Y). "Move the grip" and "move the

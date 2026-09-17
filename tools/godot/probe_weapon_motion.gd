@@ -11,10 +11,11 @@ extends SceneTree
 ##
 ##   SNR1  `bolt_work`: the handle lifts ~60 deg about the bore, the knob rises, the bolt draws back ~4 cm, and it
 ##         is home inside the 1.46 s fire interval.
-##   REV1  `cylinder_index`: two shots, each turns the cylinder one chamber (60 deg) about its own axis,
-##         counter-clockwise seen from behind (a S&W), without the axis moving, settled inside the 0.5 s interval.
 ##
-## `--control` clears fire_animation on both weapons: nothing may move.
+## REV1's per-shot cylinder turn was built, measured from the player's own FPS camera and REMOVED (CLAUDE.md W33):
+## invisible in play. Add a case here when a part motion is worth shipping.
+##
+## `--control` clears fire_animation: nothing may move.
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const WEAPON := "res://src/main/resources/com/openworld/weapon/%s.tscn"
@@ -102,48 +103,6 @@ func _bolt(world: Node3D) -> void:
 	(r[0] as Node).queue_free()
 	await _tick(5)
 
-func _cylinder(world: Node3D) -> void:
-	print("REV1 cylinder_index")
-	var r := await _armed(world, "REV1", Vector3(10, 1.2, 0))
-	var gun: Node3D = r[1]
-	var cyl: Node3D = gun.get_node_or_null("Model/Cylinder")
-	_check("the cylinder is its own node", cyl != null, "Model/Cylinder" if cyl else "missing")
-	if cyl == null:
-		return
-	var rest := cyl.transform
-	_check("its origin is on the cylinder axis, not the grip", rest.origin.length() > 0.05,
-		"rest origin (%.4f, %.4f, %.4f)" % [rest.origin.x, rest.origin.y, rest.origin.z])
-	Input.action_press("aim")
-	await _tick(60)
-	for shot in range(2):
-		var mag0 := int(gun.get("magazine"))
-		await _shoot()
-		var max_angle := 0.0
-		var signed_at_max := 0.0
-		var drift := 0.0
-		var frames := int(0.5 * 60) - 2
-		for f in range(frames):
-			await physics_frame
-			var m := _rel(cyl, rest)
-			if m[0] > max_angle:
-				max_angle = m[0]
-				signed_at_max = m[1]
-			drift = maxf(drift, (m[2] as Vector3).length())
-		var settled := _rel(cyl, rest)
-		await physics_frame
-		var after := _rel(cyl, rest)
-		_check("shot %d fired" % (shot + 1), int(gun.get("magazine")) == mag0 - 1, "mag %d -> %d" % [mag0, int(gun.get("magazine"))])
-		if control:
-			_check("control: no clip, the cylinder does not turn", max_angle < 0.5, "%.1f deg" % max_angle)
-			continue
-		_check("shot %d turns it one chamber (60 deg)" % (shot + 1), absf(max_angle - 60.0) < 2.0, "%.1f deg" % max_angle)
-		_check("shot %d: counter-clockwise seen from behind (+Z)" % (shot + 1), signed_at_max > 0.0, "%+.1f deg about +Z" % signed_at_max)
-		_check("shot %d: the axis does not move" % (shot + 1), drift < 0.001, "%.5f m" % drift)
-		_check("shot %d: settled before the next shot" % (shot + 1), absf(after[0] - settled[0]) < 0.05,
-			"%.2f -> %.2f deg" % [settled[0], after[0]])
-		await _tick(4)
-	Input.action_release("aim")
-
 func _initialize() -> void:
 	control = "--control" in OS.get_cmdline_user_args()
 	var world := Node3D.new()
@@ -157,6 +116,5 @@ func _initialize() -> void:
 	world.add_child(floor)
 	floor.position = Vector3(0, -1, 0)
 	await _bolt(world)
-	await _cylinder(world)
 	print("PASS (0 failures)" if fails == 0 else "FAIL (%d failures)" % fails)
 	quit(1 if fails > 0 else 0)

@@ -29,6 +29,8 @@ WHAT IS ASSERTED, AND WHY EACH ONE EXISTS
   * the collection — `WeaponLibrary.blend` links the weapon by that name, so a weapon outside it is
     silently missing from the library everyone cross-checks sizes in;
   * `length_m` — the size is a fact from the reference, not a free parameter;
+  * `support_grip: "under"` — the SupportPoint is 2.5-6 cm BELOW the gun's underside, where a hand closing
+    under a handguard puts its grip point; inside the gun buries the hand, and no probe sees it;
   * `grip_to_rear_m` — the origin really is the grip. The first standard only ASSERTED origin=grip
     and nothing measured it: every raw model's origin had in fact been left wherever a centring
     offset put it (SHG1's sat on the receiver, 0.48 m from the butt), and the character carried one
@@ -49,7 +51,8 @@ cfg = json.load(open(TABLE))
 
 LENGTH_TOL = 0.005      # 0.5% of the declared length
 GRIP_TOL = 0.01         # 1 cm: the origin may not drift further than this off the grip
-APPLIED_TOL = 1e-5      # location/rotation ~0 and scale ~1, i.e. "everything is applied"
+APPLIED_TOL = 1e-5
+SUPPORT_UNDER_MIN, SUPPORT_UNDER_MAX = 0.025, 0.06      # location/rotation ~0 and scale ~1, i.e. "everything is applied"
 
 
 def fail(wid, msg):
@@ -146,7 +149,7 @@ def verify_and_export(w):
     # 5. every clip the weapon's scene plays is in the export
     exported = sorted(a.get("name", "?") for a in gltf.get("animations", []))
     scene_rel = next((r["scene"] for r in json.load(open(CATALOG))["weapons"] if r["id"] == wid), None)
-    played = []
+    played, text = [], ""
     if scene_rel:
         text = open(os.path.join(ROOT, scene_rel.replace("res://", ""))).read()
         played = [c for c in re.findall(r'^(?:fire|reload)_animation = "([^"]*)"', text, re.M) if c]
@@ -155,8 +158,40 @@ def verify_and_export(w):
         fail(wid, f"{scene_rel} plays {missing} but the export carries {exported or 'no clips'} — the part would "
                   f"never move, silently. Name the action after the clip (one NLA track per clip).")
 
+    # 6. a support hand that closes UNDER a handguard/pump has its grip point below the gun, not inside it.
+    # SupportHandIKModifier puts the hand's grip (75% of the way to middle_01) on SupportPoint, so a point inside
+    # the forend buries the hand in it — SNR1 shipped with its point 2 cm inside, and every probe passed because
+    # they measure the hand against the MARKER. The shipped long guns sit 3.4-4.6 cm under.
+    support = ""
+    if w.get("support_grip") == "under":
+        m = scene_rel and re.search(r'\[node name="SupportPoint"[^\n]*\]\ntransform = Transform3D\((?:[-\d.e]+, ){9}'
+                                    r'([-\d.e]+), ([-\d.e]+), ([-\d.e]+)\)', text)
+        if not m:
+            fail(wid, f"table says support_grip 'under' but {scene_rel} has no SupportPoint marker")
+        gx, gy, gz = map(float, m.groups())
+        px, py, pz = gx, -gz, gy                                   # Godot weapon frame -> Blender
+        from mathutils.bvhtree import BVHTree
+        verts, polys = [], []
+        for o in objs:
+            b = len(verts)
+            verts += [o.matrix_world @ v.co for v in o.data.vertices]
+            polys += [[b + i for i in p.vertices] for p in o.data.polygons]
+        bvh = BVHTree.FromPolygons(verts, polys)
+        bottom = None
+        for dy in (0.0, 0.01, -0.01, 0.02, -0.02, 0.03, -0.03):   # nearest station along the bore with a surface
+            hit = bvh.ray_cast(Vector((px, py + dy, -1.0)), Vector((0, 0, 1)), 3.0)[0]
+            if hit is not None:
+                bottom = hit.z
+                break
+        clearance = None if bottom is None else bottom - pz
+        if clearance is None or not (SUPPORT_UNDER_MIN <= clearance <= SUPPORT_UNDER_MAX):
+            fail(wid, f"SupportPoint is {'over no surface' if clearance is None else f'{clearance:+.3f} m under the gun'}; "
+                      f"a hand closing under a handguard needs it {SUPPORT_UNDER_MIN:.3f}-{SUPPORT_UNDER_MAX:.3f} m below the "
+                      f"underside (negative = inside the gun, the hand is buried). Move the marker in {scene_rel}.")
+        support = f", SupportPoint {clearance:.3f} m under the gun"
+
     print(f"[build_weapon] {wid}: {got:.3f} m (declared {want:.3f}), grip->rear {rear:.3f} m, "
-          f"clips {exported or '-'}, wrote {os.path.basename(out)} ({os.path.getsize(out)} bytes)")
+          f"clips {exported or '-'}{support}, wrote {os.path.basename(out)} ({os.path.getsize(out)} bytes)")
 
 
 rows = [w for w in cfg["weapons"] if not wanted or w["id"] in wanted]

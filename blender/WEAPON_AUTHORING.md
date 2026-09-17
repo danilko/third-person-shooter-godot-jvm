@@ -172,12 +172,20 @@ origin is its pivot, so a lift is one rotation curve, eased by eye against the m
    strips the word, so `bolt_cycle` arrived as a looping `bolt`.
 6. In the weapon scene set `fire_animation` / `reload_animation` to the clip. The clips land on the
    model's own `AnimationPlayer`, which is `weaponAnimatorPath`'s default (`Model/AnimationPlayer`).
-7. Fit the clip inside the weapon's fire interval (`1 / fire_rate`), and extend
+7. **Make it readable**: hold the part still through the muzzle flash and the kick (~0.1 s), then move it
+   over a few tenths of a second. A 0.13 s turn under the flash looks like nothing moved. Check it in the
+   real renderer: `godot --path . --script tools/godot/shot_weapon_hold.gd -- --weapons=<id> --out=<dir>`
+   for close-ups, and `shot_fps_part.gd` for what the player actually sees (both need a display).
+8. Fit the clip inside the weapon's fire interval (`1 / fire_rate`), and extend
    `tools/godot/probe_weapon_motion.gd`.
 
-A **rotationally symmetric part can index without unwinding**. A 6-chamber cylinder turns 0 → 60°
-per shot and restarts at 0 on the next shot, which is the same picture. REV1's cylinder measures
-0.15 mm mean error under a 60° turn.
+**Is it worth it? Measure from the game camera before authoring more.** REV1's per-shot cylinder
+turn was built and removed: from the player's own first-person camera the cylinder is 70–90 px, seen from
+behind (a featureless face), moving a few px a frame under the flash and the kick. Nobody sees that. Spend
+part animation where the part is big, slow, or tells the player something: SNR1's bolt (you cannot fire
+yet), a reload. For fast small parts, a sound does the job.
+`godot --path . --script tools/godot/shot_fps_part.gd -- --weapon=<id> --part=Model/<Part>` prints the
+on-screen size and pixels per frame (needs a display).
 
 ---
 
@@ -204,6 +212,10 @@ While held, neither is in the physics world — the item is a plain `Node3D` and
 * **a mesh outside the `<id>` collection** — it would be missing from the library.
 * **a length that has drifted** more than 0.5% from `length_m`.
 * **an origin that has left the grip** — `grip_to_rear_m` off by more than 1 cm.
+* **a `SupportPoint` inside the gun**: for a row with `support_grip: "under"` (a hand closing under a
+  handguard or pump), the marker must be 2.5–6 cm BELOW the underside. The marker is the hand's grip point,
+  so on the gun's centre line it buries the hand. Every probe measures the hand against the marker, so
+  only this check can see it.
 * **a moving part with a rotation or scale**, an **active action**, a strip with **Nothing**
   extrapolation, a scene under 60 fps, a clip named with a `loop`/`cycle` hint — and **a clip the
   weapon scene names that is not in the export** (`WeaponItem.playMotion` is silent about it).
