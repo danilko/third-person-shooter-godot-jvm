@@ -1128,16 +1128,27 @@ public class GameManager extends Node {
     // mirrors of mission state.
 
     private void applyMissionStarted(String missionId, java.util.List<String> args) {
+        // The mission's faction table rides as a resource path (MissionManager.factionTablePath).
+        com.openworld.character.FactionManager factions = getFactionManager();
+        String tablePath = arg(args, 1);
+        if (factions != null) {
+            factions.applyMissionTable(!tablePath.isEmpty()
+                    && GD.load(tablePath) instanceof com.openworld.character.FactionTable t ? t : null);
+        }
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.missionStarted.emit(missionId, arg(args, 0));
     }
 
     private void applyMissionCompleted(String missionId, java.util.List<String> args) {
+        com.openworld.character.FactionManager factions = getFactionManager();
+        if (factions != null) factions.applyMissionTable(null);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.missionCompleted.emit(missionId, arg(args, 0), arg(args, 1));
     }
 
     private void applyMissionFailed(String missionId, java.util.List<String> args) {
+        com.openworld.character.FactionManager factions = getFactionManager();
+        if (factions != null) factions.applyMissionTable(null);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.missionFailed.emit(missionId, arg(args, 0));
     }

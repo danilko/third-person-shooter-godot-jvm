@@ -88,6 +88,14 @@ public class CruiseState implements VehicleAIState {
         // any chained lane end, and stay slow while the connector actually bends (L/R).
         if (ctrl.approachingJunction() || ctrl.onTurnConnector())
             cmd.motor = Math.min(cmd.motor, ctrl.cruiseThrottle * ctrl.junctionThrottleScale);
+        // Corner speed: never faster than the bends ahead allow. Off the throttle across the first metre per
+        // second over, on the brakes past that (PLAN.md 3.2d -- the easing above is a fraction, not a speed).
+        float corner = ctrl.cornerSpeedLimit(delta);
+        float speed = ctrl.currentSpeed();
+        if (speed > corner) {
+            cmd.motor *= Math.max(0f, 1f - (speed - corner));
+            cmd.brake = speed > corner + 1f;
+        }
         return this;
     }
 }

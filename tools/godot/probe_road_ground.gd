@@ -5,7 +5,7 @@ extends SceneTree
 ##   godot --headless --path . --script tools/godot/probe_road_ground.gd [-- <scene.tscn>]
 ##
 ## Loads the scene (DebugWorld by default) for its Terrain3D, instances every ZoneMarker's road piece
-## where `Zone.placeGeometry` puts it, and walks every lane every 4 m. Each sample is classified by
+## where `Zone.placeGeometry` puts it (and a network's resident `Roads_<network>` piece at the network), and walks every lane every 4 m. Each sample is classified by
 ## what the kit's `road_support` would call it against the terrain actually under it:
 ##   delta = lane height - terrain height;  PIER > FILL_MAX (4.0 m) >= FILL > 0.40 m >= at grade
 ## and then asked a physical question of the baked meshes (`<road>__surface`, where the GN stack
@@ -61,6 +61,20 @@ func _initialize() -> void:
 		var xf: Transform3D = z.get("geometry_world_transform") if z.get("geometry_world_placed") else (m as Node3D).global_transform
 		root.add_child(inst)
 		inst.global_transform = xf
+		pieces.append(inst)
+	# A network with no zones builds ONE resident piece, `Roads_<network>`, authored in the network's frame
+	# (road_kit_preview.gd's rule): place it at the network.
+	var placed := pieces.map(func(p): return str(p.name))
+	for net in world.find_children("*", "Node3D", true, false):
+		if not str(net.get("record_path")).ends_with(".roads.json"):
+			continue
+		var resident := "res://src/main/resources/com/openworld/world/pieces/Roads_%s.tscn" % net.name
+		if not ResourceLoader.exists(resident) or placed.has("Probe_resident_" + str(net.name)):
+			continue
+		var inst: Node3D = (load(resident) as PackedScene).instantiate()
+		inst.name = "Probe_resident_" + str(net.name)
+		root.add_child(inst)
+		inst.global_transform = (net as Node3D).global_transform
 		pieces.append(inst)
 	await process_frame
 	print("  pieces: ", pieces.map(func(p): return str(p.name)))

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="FactionTable" format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/FactionTable.java" id="1_ft"]
+
+[resource]
+script = ExtResource("1_ft")
+relationships = Dictionary[String, String]({
+"civilian>*": "NEUTRAL",
+"police>player": "NEUTRAL",
+"police>gang_a": "HOSTILE",
+"police>gang_b": "HOSTILE",
+"gang_a>gang_b": "HOSTILE",
+"player>gang_a": "HOSTILE",
+"player>gang_b": "HOSTILE",
+"player>enemy": "HOSTILE"
+})

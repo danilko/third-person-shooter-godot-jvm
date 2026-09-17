@@ -419,11 +419,19 @@ public class WeaponItem extends Pickup implements WeaponAction {
     }
     ray.forceRaycastUpdate();
     Vector3 origin = ray.getGlobalPosition();
-    if (ray.isColliding()
-        && ray.getCollisionPoint().minus(origin).length() > SIGHT_MIN_DISTANCE) {
-      return ray.getCollisionPoint();
+    Vector3 far = ray.toGlobal(ray.getTargetPosition());
+    boolean hit = ray.isColliding() && ray.getCollisionPoint().minus(origin).length() > SIGHT_MIN_DISTANCE;
+    Vector3 end = hit ? ray.getCollisionPoint() : far;
+    // The RayCast3D is one long Jolt query and can step over a small hitbox far away (util.RayWindows):
+    // the sight point would land on the ground BEHIND the target, and a muzzle leg converging there
+    // passes beside it. Ask the bodies near the line again with short rays.
+    Vector3 toFar = far.minus(origin);
+    double len = toFar.length();
+    if (len > 1e-3) {
+      TraceHit near = nearerSmallShape(ray, origin, toFar.div(len), (float) end.minus(origin).length(), null);
+      if (near != null && near.point.minus(origin).length() > SIGHT_MIN_DISTANCE) return near.point;
     }
-    return ray.toGlobal(ray.getTargetPosition());
+    return end;
   }
 
   /** Immutable result of one trace — read after the borrowed RayCast3D has been put back. */
@@ -447,12 +455,20 @@ public class WeaponItem extends Pickup implements WeaponAction {
     if (ray == null || !ray.isInsideTree() || ray.getWorld3d() == null) return null;
     godot.api.PhysicsDirectSpaceState3D space = ray.getWorld3d().getDirectSpaceState();
     if (space == null) return null;
+    TraceHit hit = query(space, ray, origin, origin, origin.plus(dir.times(range)));
+    float reached = hit != null ? (float) hit.point.minus(origin).length() : range;
+    return nearerSmallShape(ray, origin, dir, reached, hit);
+  }
+
+  /** One ray query from {@code from} to {@code to} with the AimRay's settings; distances measured from {@code origin}. */
+  private static TraceHit query(godot.api.PhysicsDirectSpaceState3D space, RayCast3D ray, Vector3 origin,
+                                Vector3 from, Vector3 to) {
     godot.core.VariantArray<godot.core.RID> exclude = com.openworld.util.RayExclusions.of(ray);
     if (ray.getExcludeParentBody() && ray.getParent() instanceof godot.api.CollisionObject3D parent) {
       exclude.add(parent.getRid());
     }
     godot.api.PhysicsRayQueryParameters3D q = godot.api.PhysicsRayQueryParameters3D.Companion.create(
-        origin, origin.plus(dir.times(range)), ray.getCollisionMask(), exclude);
+        from, to, ray.getCollisionMask(), exclude);
     q.setCollideWithBodies(ray.isCollideWithBodiesEnabled());
     q.setCollideWithAreas(ray.isCollideWithAreasEnabled());
     q.setHitFromInside(ray.isHitFromInsideEnabled());
@@ -463,6 +479,57 @@ public class WeaponItem extends Pickup implements WeaponAction {
     if (point.minus(origin).length() <= MUZZLE_MIN_DISTANCE) return null;
     Vector3 normal = hit.get("normal") instanceof Vector3 n ? n : Vector3.Companion.getZERO();
     return new TraceHit(hit.get("collider") instanceof Node nd ? nd : null, point, normal);
+  }
+
+  /** The precise small-shape pass below; registered only so a probe can switch it off as its control
+   *  ({@code probe_sniper_world.gd -- --control}). Always on in play. */
+  @Visible public boolean smallShapeWindows = true;
+
+  /** Grid cells this far either side of a ray are searched for bodies: REACH plus a quarter second of a
+   *  fast vehicle between two grid updates. */
+  private static final float WINDOW_SEARCH_RADIUS = (float) com.openworld.util.RayWindows.REACH + 12f;
+
+  /**
+   * The nearest hit on a small shape the long query from {@code origin} may have stepped over before
+   * {@code reached}, else {@code best}. Jolt's ray-vs-capsule test fails when the ray starts far from a
+   * small capsule — a 5.6 cm thigh hitbox from ~230 m — so every character or vehicle standing near the
+   * line is asked again with a short ray that starts a few metres before it ({@code util.RayWindows} has
+   * the measurement and the window rule). Bodies come from {@code SpatialEntityGrid}, or the "characters"
+   * group where the AutoLoad is absent.
+   */
+  private TraceHit nearerSmallShape(RayCast3D ray, Vector3 origin, Vector3 dir, float reached, TraceHit best) {
+    if (!smallShapeWindows || reached <= com.openworld.util.RayWindows.SAFE_START) return best;
+    godot.api.PhysicsDirectSpaceState3D space = ray.getWorld3d() != null ? ray.getWorld3d().getDirectSpaceState() : null;
+    if (space == null) return best;
+    java.util.Collection<Node> bodies = new java.util.LinkedHashSet<>();
+    var grid = com.openworld.world.SpatialEntityGrid.get();
+    if (grid != null) {
+      grid.querySegment(origin, origin.plus(dir.times(reached)), WINDOW_SEARCH_RADIUS, bodies);
+    } else if (isInsideTree()) {
+      for (Object o : getTree().getNodesInGroup(new godot.core.StringName("characters"))) {
+        if (o instanceof Node n) bodies.add(n);
+      }
+    }
+    java.util.List<double[]> roots = new java.util.ArrayList<>();
+    for (Node n : bodies) {
+      if (n == owningCharacter || !(n instanceof Node3D n3) || !godot.global.GD.INSTANCE.isInstanceValid(n3)
+          || !n3.isInsideTree()) continue;
+      Vector3 p = n3.getGlobalPosition();
+      roots.add(new double[] {p.getX(), p.getY(), p.getZ()});
+    }
+    if (roots.isEmpty()) return best;
+    double bestDist = best != null ? best.point.minus(origin).length() : reached;
+    for (double[] w : com.openworld.util.RayWindows.windows(
+        new double[] {origin.getX(), origin.getY(), origin.getZ()},
+        new double[] {dir.getX(), dir.getY(), dir.getZ()}, reached, roots)) {
+      if (w[0] >= bestDist) break;
+      TraceHit h = query(space, ray, origin, origin.plus(dir.times(w[0])), origin.plus(dir.times(Math.min(w[1], bestDist))));
+      if (h != null) {
+        double d = h.point.minus(origin).length();
+        if (d < bestDist) { best = h; bestDist = d; }
+      }
+    }
+    return best;
   }
 
   /** Current holder (set by WeaponController.setup), or null while in the world — used for the late-join pickup baseline. */

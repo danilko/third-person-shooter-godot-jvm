@@ -11,7 +11,7 @@ import godot.core.Dictionary;
  * (DefaultFactions.tres).
  *
  * <p>Storage is a flat {@code String → String} dictionary keyed by {@code "factionA>factionB"}
- * (see {@link #key}); values are one of {@link #FRIENDLY}/{@link #NEUTRAL}/{@link #HOSTILE}/
+ * (a {@code "factionA>*"} row applies to every other faction — see {@link FactionRules}); values are one of {@link #FRIENDLY}/{@link #NEUTRAL}/{@link #HOSTILE}/
  * {@link #DESPISE}. A flat string dictionary (rather than a nested one) is both the inspector-friendly
  * shape and the one the godot-jvm registration scanner handles — same shape the codebase
  * already uses elsewhere (e.g. {@code MeshConfig.boneHitMultipliers}). Pairs are written in both
@@ -25,27 +25,36 @@ import godot.core.Dictionary;
 @Script(className = "FactionTable")
 public class FactionTable extends Resource {
 
-    public static final String FRIENDLY = "FRIENDLY";
-    public static final String NEUTRAL  = "NEUTRAL";
-    public static final String HOSTILE  = "HOSTILE";
-    public static final String DESPISE  = "DESPISE";
+    public static final String FRIENDLY = FactionRules.FRIENDLY;
+    public static final String NEUTRAL  = FactionRules.NEUTRAL;
+    public static final String HOSTILE  = FactionRules.HOSTILE;
+    public static final String DESPISE  = FactionRules.DESPISE;
 
     /** "factionA>factionB" → relationship string. Editable in the inspector. */
     @Export
     public Dictionary<String, String> relationships = new Dictionary<>(String.class, String.class);
 
-    /** Composite key for an ordered faction pair. */
     private static String key(String a, String b) {
-        return a + ">" + b;
+        return FactionRules.key(a, b);
     }
 
-    /** Configured relationship for the ordered pair (a, b), checking the reverse too; null if unset. */
+    /**
+     * One stored row by its {@code "a>b"} key, or null. Asks {@code containsKey} first: a godot-jvm
+     * {@code Dictionary.get} on a missing key is not guaranteed to be null (an untyped one returns
+     * {@code kotlin.Unit}, which would read as a relationship named "kotlin.Unit").
+     */
+    public String row(String key) {
+        if (key == null || !relationships.containsKey(key)) return null;
+        Object v = relationships.get(key);
+        return v != null ? v.toString() : null;
+    }
+
+    /**
+     * Configured relationship between a and b — exact pair either direction, then a wildcard row
+     * ({@code "civilian>*"}); null if the table is silent. The rule is {@link FactionRules#resolve}.
+     */
     public String relationship(String a, String b) {
-        if (a == null || b == null) return null;
-        Object direct = relationships.get(key(a, b));
-        if (direct != null) return direct.toString();
-        Object reverse = relationships.get(key(b, a));
-        return reverse != null ? reverse.toString() : null;
+        return FactionRules.resolve(a, b, this::row);
     }
 
     /**

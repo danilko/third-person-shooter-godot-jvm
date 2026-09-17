@@ -105,6 +105,33 @@ public class SpatialEntityGrid extends Node {
     }
 
     /**
+     * Collect (without clearing {@code out}) every registered node whose cell overlaps a {@code radius}
+     * band around the XZ segment {@code a -> b}: the bodies that may stand near a long ray. A cell-level
+     * superset, like {@link #queryRadius}; callers distance-test the results against live positions.
+     */
+    public void querySegment(Vector3 a, Vector3 b, float radius, java.util.Collection<Node> out) {
+        double dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        int steps = Math.max(1, (int) Math.ceil(len / (cellSize * 0.5)));
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        for (int i = 0; i <= steps; i++) {
+            double x = a.getX() + dx * i / steps, z = a.getZ() + dz * i / steps;
+            long minCx = (long) Math.floor((x - radius) / cellSize);
+            long maxCx = (long) Math.floor((x + radius) / cellSize);
+            long minCz = (long) Math.floor((z - radius) / cellSize);
+            long maxCz = (long) Math.floor((z + radius) / cellSize);
+            for (long cx = minCx; cx <= maxCx; cx++) {
+                for (long cz = minCz; cz <= maxCz; cz++) {
+                    long key = (cx << 32) | (cz & 0xFFFFFFFFL);
+                    if (!seen.add(key)) continue;
+                    List<Node> bucket = cells.get(key);
+                    if (bucket != null) out.addAll(bucket);
+                }
+            }
+        }
+    }
+
+    /**
      * Collect every registered node whose cell overlaps the {@code radius} circle around
      * {@code center} into {@code out} (cleared first). This is a cell-level (not exact-distance)
      * filter — callers still distance-test individual results — so it returns a small superset of

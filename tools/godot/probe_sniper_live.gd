@@ -14,7 +14,8 @@ extends SceneTree
 ##
 ## Asserted (2.8 items 3/4/10): every stationary (held, quick, fps) and JUST-STOPPED (10 frames after
 ## release — the scoped stop and the standing threshold) HEAD and CHEST shot lands on the aimed bone, and
-## at least 90% of the limb shots (a 3 cm capsule at 260 m can be grazed by the 1.1 cm cone radius); a
+## every limb / edge shot too (it was held to 90% as "a 3 cm capsule at 260 m can be grazed" -- the 3 misses in
+## 72 were Jolt stepping over a small far capsule, fixed 2026-09-17, CLAUDE.md "A long ray steps over"); a
 ## MOVING scoped shot's cone is wide by design (> 5x the base) and the scoped speed is ScopeConfig's
 ## move_speed_factor x the unscoped max (0.4 x 8 = 3.2 m/s, +-0.3); and hitboxes match the drawn body.
 ##
@@ -246,8 +247,8 @@ func _initialize() -> void:
 	for key in totals:
 		print("  SUMMARY %-18s %d / %d" % [key, totals[key][0], totals[key][1]])
 	print("")
-	# Head and chest must always land. A limb is a 3 cm-radius capsule: at 260 m the cone's own 1.1 cm radius
-	# plus ~1 cm of residual steering error can graze it, so limbs (and the head-edge probe) are held to 90%.
+	# Every stationary / stopped shot must land. Limbs were held to 90% as "grazes" until 2026-09-17: the misses
+	# were a long Jolt ray stepping over a small far capsule (WeaponItem.nearerSmallShape), 69/72 -> 72/72.
 	var limb_ok := 0
 	var limb_n := 0
 	for variant in ["idle", "hostile"]:
@@ -258,7 +259,7 @@ func _initialize() -> void:
 			var l := "%s/%s" % [variant, scen]
 			limb_ok += totals[l][0] - totals[k][0]
 			limb_n += totals[l][1] - totals[k][1]
-	check.call("stationary + stopped limb / edge shots >= 90%", limb_ok >= 0.9 * limb_n, "%d / %d" % [limb_ok, limb_n])
+	check.call("stationary + stopped limb / edge shots all land", limb_ok == limb_n, "%d / %d" % [limb_ok, limb_n])
 	var mean_speed := 0.0
 	var min_spread := 1e9
 	for v in moving_speeds:

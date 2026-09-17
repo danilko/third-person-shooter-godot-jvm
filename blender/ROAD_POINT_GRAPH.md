@@ -2399,7 +2399,7 @@ why they were there.
   the centroid against a distance along the arm. Once those stopped being the same number, a mouth
   that was already exactly right still reported as moved — a settled solve reading as a drifting one.
 
-**Still open: `Auto Setback` is not idempotent, and its docstring says it is.** Pressing it a second
+**Was open until 2026-09-17: `Auto Setback` was not idempotent, though its docstring said it was.** **CLOSED 2026-09-17** — the distance is solved from the arms alone at a fixed search start, the centre is the least-squares crossing of the mouths' axis lines, and the passes repeat to a fixed point; a second press moves nothing. See CLAUDE.md "`Auto Setback` IS IDEMPOTENT NOW". What it was: Pressing it a second
 time on the island moved 17 of 35 mouths by up to 30 m, and a fourth press by 58 — a monotonic
 runaway, because `recommended_tail_length` only ever searches UPWARD from the widest mouth it is
 given while the mouths themselves move the centroid it measures from. The fixes above bound it

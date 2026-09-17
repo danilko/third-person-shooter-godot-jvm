@@ -69,6 +69,12 @@ public class VehicleProbeHelper extends Node {
         if (v instanceof Vehicle car && car.getOccupant() != null) car.tryExit();
     }
 
+    /** Seat any character (a Player included) — what a probe needs to drive a trigger volume. */
+    @Register
+    public void seatCharacter(Node v, Node c) {
+        if (v instanceof Vehicle car && c instanceof Character ch) car.tryEnter(ch);
+    }
+
     /** The single-player carjack a player's Enter key runs. */
     @Register
     public void carjack(Node v, Node player) {

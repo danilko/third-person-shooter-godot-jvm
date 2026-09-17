@@ -2,6 +2,11 @@ extends SceneTree
 ## PLAN.md 0.4 -- ambient cars must spawn where, and facing the way, they can keep driving.
 ##
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_traffic_spawn.gd
+##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_traffic_spawn.gd -- --world=island
+##
+## --world=debugworld (default) is the two-zone DebugRoads network; --world=island is World.tscn's
+## IslandRoads with the 14 traffic zones `tools/island_traffic_zones.py` derives from its lane
+## entries (PLAN.md 3.4).
 ##
 ## Runs the real DebugWorld (zone `debug_a`, whose route `debug_a` is the zone id its Road Kit lanes
 ## carry -- PLAN.md 3.1 B6) with the Player held alive and follows every streamed car from spawn to
@@ -26,7 +31,10 @@ extends SceneTree
 ## with no reach filter, failed this at 9 of 22); and at the end no car has sat
 ## without moving for more than MAX_IDLE_S.
 
-const WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
+const WORLDS := {
+	"debugworld": "res://src/main/resources/com/openworld/world/DebugWorld.tscn",
+	"island": "res://src/main/resources/com/openworld/world/World.tscn",
+}
 const STREAMED := "streamed_vehicle"
 const SECONDS := 240
 const MIN_DRIVE_M := 160.0
@@ -36,6 +44,8 @@ const MAX_IDLE_S := 15.0          # past ZoneManager.vehicleStallTimeout (12 s)
 
 var cars := {}      # instance id -> state
 var done: Array = []
+var left_range := 0     # reclaims that were legitimately out of range, exempt from MIN_DRIVE_M
+var reclaim_radius := 0.0
 var gaps: Array = []
 var facing_errors: Array = []
 var lane_counts := {}
@@ -64,7 +74,14 @@ func _lane_at(p: Vector3) -> Dictionary:
 		if path == null or path.curve == null:
 			continue
 		var c: Curve3D = path.curve
+		# A lane whose exported Curve3D carries two COINCIDENT control points has a zero-length
+		# first baked segment, and `get_closest_offset` then returns NaN — `sample_baked(NaN)`
+		# errors and the attribution is silently wrong. The rule that produced them is fixed
+		# (`point_solve.TURN_LEG_MIN`), but every piece baked before that still has them: on the
+		# island 5 of 218 lanes, all turn connectors. Skip, never guess.
 		var off := c.get_closest_offset(path.to_local(p))
+		if not is_finite(off):
+			continue
 		var at := path.to_global(c.sample_baked(off))
 		var d := at.distance_to(p)
 		if d < best["dist"]:
@@ -73,11 +90,40 @@ func _lane_at(p: Vector3) -> Dictionary:
 			best = {"name": str(lane.name), "dist": d, "dir": Vector3(dir.x, 0, dir.z)}
 	return best
 
+## The widest unload radius among the zones that actually spawn traffic. It is BOTH the reclaim
+## radius and (x 0.9) the spawn gate, so it is what separates "this car was reclaimed for leaving
+## range" from "this car could not drive" -- read off the scene rather than written down here, since
+## every world sizes its own zones (DebugWorld 500 m, the island 1400).
+func _traffic_reclaim_radius() -> float:
+	var r := 0.0
+	for n in world.find_children("*", "Node3D", true, false):
+		var sc = n.get_script()
+		if sc == null or not str(sc.resource_path).ends_with("ZoneMarker.java"):
+			continue
+		var z = n.get("zone")
+		if z == null:
+			continue
+		var vs = z.get("vehicle_spawn_configs")
+		if vs != null and vs.size() > 0:
+			r = maxf(r, float(z.get("unload_radius")))
+	return r
+
 func _initialize() -> void:
-	var w: Node = (load(WORLD) as PackedScene).instantiate()
+	var which := "debugworld"
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--world="):
+			which = a.substr(8)
+	if not WORLDS.has(which):
+		print("unknown --world=%s (want one of %s)" % [which, WORLDS.keys()])
+		quit(2)
+		return
+	print("--- traffic spawn probe on '%s'" % which)
+	var w: Node = (load(WORLDS[which]) as PackedScene).instantiate()
 	root.add_child(w)
 	current_scene = w   # ZoneManager and LaneGraph both resolve the world through current_scene
 	world = w
+	reclaim_radius = _traffic_reclaim_radius()
+	print("  traffic reclaim radius %.0f m" % reclaim_radius)
 	var player: Node3D = w.get_node("Characters/Player")
 	var health: Node = player.get_node("Health")
 	health.set("max_health", 1000000.0)
@@ -117,9 +163,21 @@ func _initialize() -> void:
 		for id in cars.keys():
 			var c: Dictionary = cars[id]
 			if not is_instance_valid(c["node"]) or not (c["node"] as Node).is_inside_tree():
+				# A car reclaimed for LEAVING RANGE has not failed to drive -- it drove out of the
+				# zone. On a long arterial the spawn gate sets cars down up to 0.9 x unload from the
+				# player, so one heading away legitimately covers only the remaining tenth. The
+				# MIN_DRIVE_M check below is about a car that stopped driving while still in range.
+				var gone: float = Vector2(c["last"].x - player.global_position.x,
+						c["last"].z - player.global_position.z).length()
+				var out_of_range: bool = gone > reclaim_radius * 0.95
 				if not c["early"]:
-					done.append({"dist": c["dist"], "secs": (f - c["spawn"]) / 60.0})
-				print("  car gone after %5.1f s, drove %6.1f m" % [(f - c["spawn"]) / 60.0, c["dist"]])
+					if out_of_range:
+						left_range += 1
+					else:
+						done.append({"dist": c["dist"], "secs": (f - c["spawn"]) / 60.0})
+				print("  car gone after %5.1f s, drove %6.1f m%s"
+						% [(f - c["spawn"]) / 60.0, c["dist"],
+						"  [%.0f m out — left range]" % gone if out_of_range else ""])
 				cars.erase(id)
 
 	var idle_max := 0.0
@@ -137,8 +195,8 @@ func _initialize() -> void:
 			short += 1
 	var min_gap: float = gaps.min() if not gaps.is_empty() else INF
 	var worst_facing: float = facing_errors.max() if not facing_errors.is_empty() else 0.0
-	print("--- %d cars spawned after lanes published, %d reclaimed, %d alive at end"
-			% [gaps.size(), done.size(), cars.size()])
+	print("--- %d cars spawned after lanes published, %d reclaimed in range, %d left range, %d alive at end"
+			% [gaps.size(), done.size(), left_range, cars.size()])
 	_check("cars spawned", gaps.size() > 0, "%d" % gaps.size())
 	_check("spawn clearance", min_gap >= CLEARANCE_M, "nearest other car at spawn %.1f m" % min_gap)
 	_check("spawned facing its lane", worst_facing <= FACING_TOL_DEG,
@@ -152,7 +210,8 @@ func _initialize() -> void:
 	_check("spawns rotate across lanes", lane_counts.size() >= 3 and top * 2 <= gaps.size(),
 			"%d lanes used, busiest %s took %d of %d" % [lane_counts.size(), top_name, top, gaps.size()])
 	_check("no car reclaimed on its spawn lane", short == 0,
-			"%d of %d drove < %.0f m" % [short, done.size(), MIN_DRIVE_M])
+			"%d of %d in-range reclaims drove < %.0f m (%d left range, exempt)"
+			% [short, done.size(), MIN_DRIVE_M, left_range])
 	_check("no car left standing", idle_max <= MAX_IDLE_S, "longest idle %.1f s" % idle_max)
 	print("RESULT: %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(1 if fails else 0)

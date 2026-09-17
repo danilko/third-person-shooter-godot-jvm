@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MissionInfo" format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/game/mission/MissionInfo.java" id="1_mi"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/character/GangA_vs_Police.tres" id="2_ft"]
+
+[resource]
+script = ExtResource("1_mi")
+mission_id = "gang_a_vs_police"
+player_factions = Array[String](["player", "police"])
+objective_type = "ELIMINATE_ALL"
+possible_outcome_variants = Array[String](["ELIMINATED"])
+faction_table = ExtResource("2_ft")

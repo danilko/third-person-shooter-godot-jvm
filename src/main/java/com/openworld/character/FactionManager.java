@@ -7,6 +7,8 @@ import godot.annotation.Script;
 import godot.api.Node;
 import godot.global.GD;
 
+import java.util.Map;
+
 /**
  * Runtime faction relationship authority — registered as an AutoLoad singleton named
  * "FactionManager" (PLAN.md Part D / D3). Implements the long-promised "FactionRegistry lookup"
@@ -33,49 +35,98 @@ public class FactionManager extends Node {
     private static final String DEFAULT_TABLE_PATH =
             "res://src/main/resources/com/openworld/character/DefaultFactions.tres";
 
+    /** The LIVE table every hostility question reads: a private copy of the active layer, plus runtime flips. */
     private FactionTable table;
+    /**
+     * Only the flips {@link #setRelationship} made on top of the active layer, keyed {@code "a>b"}.
+     * The live table cannot answer "what did PLAY change" — it is a copy of a shipped/authored
+     * {@code .tres} with the flips written into it — and that is the only half a save may carry (I7):
+     * a slot that froze the shipped defaults would silently win over an edited preset on every later
+     * launch. Cleared by {@link #rebuildLiveTable}, which is the documented "a layer change discards
+     * runtime flips" rule, stated once.
+     */
+    private final java.util.LinkedHashMap<String, String> runtimeFlips = new java.util.LinkedHashMap<>();
+    /** Layer set by the nearest region (I4), or null for the shipped defaults. */
+    private FactionTable regionTable;
+    /** Layer set by the active mission (F2), or null. While set it wins over the region's. */
+    private FactionTable missionTable;
 
     @Register
     @Override
     public void _ready() {
-        loadDefaultTable();
+        rebuildLiveTable();
         // Route Faction.areHostile() through this manager. Done last so a half-built manager is
         // never the registry.
         Faction.setRegistry(this);
     }
 
     /**
-     * Load a fresh, private copy of the shipped relationship table. The on-disk resource is
-     * {@code duplicate(true)}'d so later {@link #setRelationship} edits stay on this manager's copy
-     * and never write back to the engine-cached {@code .tres} (which would leak a betrayal into the
-     * next mission/launch). Missing-preset case leaves {@code table} null → the inherent default rule.
+     * Rebuild the live table from the highest layer present — mission, then region, then the shipped
+     * {@code DefaultFactions.tres}. The chosen resource is {@code duplicate(true)}'d so later
+     * {@link #setRelationship} edits stay on this manager's copy and never write back to the
+     * engine-cached {@code .tres} (which would leak a betrayal into the next mission/launch). A layer
+     * change therefore DISCARDS runtime flips, which is the per-mission scope the flips want.
+     * Missing-preset case leaves {@code table} null → the inherent default rule.
      */
-    private void loadDefaultTable() {
-        Object loaded = GD.load(DEFAULT_TABLE_PATH);
-        if (loaded instanceof FactionTable t) {
-            table = (FactionTable) t.duplicate(true);
-        } else {
-            table = null;
-            GD.printErr("[FactionManager] could not load " + DEFAULT_TABLE_PATH
-                    + " — using inherent default faction rules only");
+    private void rebuildLiveTable() {
+        FactionTable source = missionTable != null ? missionTable : regionTable;
+        if (source == null) {
+            Object loaded = GD.load(DEFAULT_TABLE_PATH);
+            if (loaded instanceof FactionTable t) {
+                source = t;
+            } else {
+                GD.printErr("[FactionManager] could not load " + DEFAULT_TABLE_PATH
+                        + " — using inherent default faction rules only");
+            }
         }
+        table = source != null ? (FactionTable) source.duplicate(true) : null;
+        runtimeFlips.clear();
     }
 
-    /** Restore the shipped defaults, discarding all runtime flips. Call on full restart / mission scope reset. */
+    /** Restore the shipped defaults, discarding all runtime flips AND both layers. Call on full restart. */
+    @Register
     public void reset() {
-        loadDefaultTable();
+        regionTable = null;
+        missionTable = null;
+        rebuildLiveTable();
     }
 
     /**
-     * Install a region's faction relationships (PLAN.md I4 {@code RegionConfig.factionTable}). Like
-     * {@link #loadDefaultTable}, the table is <b>duplicated</b> so runtime flips (betrayals) never write
-     * back into the authored {@code .tres}. A null argument restores the shipped defaults (a region with
-     * no custom rules), so leaving / entering a plain region cleanly reverts to baseline. Local per-peer
-     * (the same zone loads on every peer); runtime {@link #setRelationship} flips still replicate as before.
+     * Install a region's faction relationships (PLAN.md I4 {@code RegionConfig.factionTable}). A null
+     * argument restores the shipped defaults (a region with no custom rules), so leaving / entering a
+     * plain region cleanly reverts to baseline. While a mission table is active the region layer is
+     * remembered but does not replace it. Local per-peer (the same zone loads on every peer); runtime
+     * {@link #setRelationship} flips still replicate as before.
      */
+    @Register
     public void applyTable(FactionTable region) {
-        if (region != null) table = (FactionTable) region.duplicate(true);
-        else loadDefaultTable();
+        regionTable = region;
+        if (missionTable == null) rebuildLiveTable();
+    }
+
+    /**
+     * Install the active mission's relationships (PLAN.md F2, {@code MissionInfo.factionTable}); null
+     * ends the mission layer and falls back to the region's table or the defaults. Called by
+     * {@code MissionManager} on start / complete / fail on the host, and by the mirrored mission world
+     * events on a client.
+     */
+    @Register
+    public void applyMissionTable(FactionTable mission) {
+        if (mission == null && missionTable == null) return;
+        missionTable = mission;
+        rebuildLiveTable();
+    }
+
+    /** Which layer the live table came from: "mission", "region" or "default" (probe/debug readout). */
+    @Register
+    public String activeLayerNow() {
+        return missionTable != null ? "mission" : regionTable != null ? "region" : "default";
+    }
+
+    /** {@link #areHostile} for GDScript probes. */
+    @Register
+    public boolean hostileNow(String a, String b) {
+        return areHostile(a, b);
     }
 
     @Register
@@ -88,21 +139,12 @@ public class FactionManager extends Node {
     }
 
     /**
-     * The single hostility rule. NEUTRAL is never hostile (a faction named "neutral" stays out of
-     * all fights); then an explicit table entry wins (HOSTILE/DESPISE → hostile, FRIENDLY/NEUTRAL →
-     * not); finally, any unconfigured pair defaults to "same faction allied, different factions
-     * hostile" — which reproduces the previous behaviour for the stock PLAYER/ENEMY/NEUTRAL set.
+     * The hostility decision, over the live table. The rule itself — NEUTRAL never hostile, exact pair,
+     * wildcard row, same-allied/different-hostile default — is {@link FactionRules#areHostile}.
      */
     public boolean areHostile(String a, String b) {
-        if (a == null || b == null) return false;
-        if (Faction.NEUTRAL.equals(a) || Faction.NEUTRAL.equals(b)) return false;
-        if (table != null) {
-            String rel = table.relationship(a, b);
-            if (rel != null) {
-                return FactionTable.HOSTILE.equals(rel) || FactionTable.DESPISE.equals(rel);
-            }
-        }
-        return !a.equals(b);
+        FactionTable t = table;
+        return FactionRules.areHostile(a, b, t != null ? t::row : k -> null);
     }
 
     /**
@@ -114,6 +156,7 @@ public class FactionManager extends Node {
     public void setRelationship(String a, String b, String rel) {
         if (table == null) table = new FactionTable();
         table.setRelationship(a, b, rel);
+        runtimeFlips.put(FactionRules.key(a, b), rel);
         Node netNode = getNodeOrNull("/root/NetworkManager");
         if (netNode instanceof NetworkManager net && net.isNetworked() && net.isServer()) {
             net.broadcastWorldEvent(GameManager.WORLD_EVENT_FACTION_RELATIONSHIP, a, 0f,
@@ -121,8 +164,35 @@ public class FactionManager extends Node {
         }
     }
 
+    /**
+     * {@link #setRelationship} for probes and the debug console. Deliberately NOT {@code @Register}
+     * on {@code setRelationship} itself: godot-jvm merges a JavaBean accessor with its field into one
+     * property (CLAUDE.md "Known Quirks"), and a registered {@code setX} with no matching getter is
+     * the shape whose generated registrar does not compile.
+     */
+    @Register
+    public void flipRelationship(String a, String b, String rel) {
+        setRelationship(a, b, rel);
+    }
+
     /** All active relationship flips as {factionA, factionB, relationship} triples — for the late-join net baseline. */
     public java.util.List<String[]> getActiveRelationships() {
         return table != null ? table.entries() : java.util.List.of();
+    }
+
+    /**
+     * Only what RUNTIME changed — {@link #setRelationship} calls that are still live, as
+     * {factionA, factionB, relationship} triples. This is what a save carries (I7); the rest of the
+     * live table belongs to the shipped/authored preset and is loaded fresh every launch.
+     */
+    public java.util.List<String[]> getRuntimeOverrides() {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (Map.Entry<String, String> e : runtimeFlips.entrySet()) {
+            int split = e.getKey().indexOf('>');
+            if (split <= 0) continue;
+            out.add(new String[] { e.getKey().substring(0, split), e.getKey().substring(split + 1),
+                    e.getValue() });
+        }
+        return out;
     }
 }

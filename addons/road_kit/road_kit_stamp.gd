@@ -33,7 +33,9 @@ const Service := preload("res://addons/road_kit/road_kit_service.gd")
 const SCHEMA_VER := 1
 ## The ground under a paved surface sits this far below it. The island uses 0.30 m against a 12 m mesh
 ## grid; Terrain3D's 2 m grid follows the road closely enough for the terrain to show only as a hairline.
-const CLEARANCE := 0.05
+## 0.10 m since 2026-09-17 (user: "let road always be 0.1 m above ground"): 0.05 left the terrain's
+## bilinear triangles a few cm under the lane on a cross-fall, so a 2 m cell could still poke through.
+const CLEARANCE := 0.10
 ## Flat shelf past the PAVED edge. A band's half-width is the carriageway (`band_corridors` reads it off
 ## the paved outline), so the shelf must carry a footway (4 m on a T2) plus one 2 m terrain cell --
 ## the island's "the verge is one ground cell" rule: no terrain triangle spanning the road may have a

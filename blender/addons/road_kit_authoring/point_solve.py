@@ -193,6 +193,17 @@ def arc_handle(chord, d0, d1):
 #: arc and a line (`turn_shape`).
 TURN_ARC_MIN_DEG = 20.0
 
+#: The shortest straight lead/tail a turn path may carry, in METRES. Below it the leg is not
+#: there at all: the arc starts at the mouth. A leg of 1e-5 m still rounded to `k = 1`, so the
+#: shape emitted two samples that distance apart AND a `break` between them, and
+#: `curve_points` then put two coincident control points on the exported `Curve3D` -- whose
+#: zero-length first baked segment makes `Curve3D.get_closest_offset` return NaN. Nothing in
+#: the game asks a lane that question (a car walks its own arc length), but every probe that
+#: attributes a position to a lane does, and a NaN there is a silently wrong measurement:
+#: measured on the island, 5 of 218 lanes (all connectors, chords 0.0000-0.0001 m).
+#: A bound on a LENGTH belongs in metres, never in the parameter it is a fraction of.
+TURN_LEG_MIN = 0.05
+
 
 def turn_shape(p0, d0, p1, d1, n=CONNECTOR_SAMPLES):
     """`(points, breaks)` -- a turn path's PLAN-VIEW shape, the one owner of it. `breaks` are the
@@ -233,7 +244,7 @@ def turn_shape(p0, d0, p1, d1, n=CONNECTOR_SAMPLES):
             parts = [(lead, "lead"), (arc, "arc"), (tail, "tail")]
             walked = 0.0
             for length, kind in parts:
-                k = max(1, int(round(n * length / total))) if length > 1e-6 else 0
+                k = max(1, int(round(n * length / total))) if length > TURN_LEG_MIN else 0
                 for i in range(1 if pts else 0, k + 1):
                     u = i / float(k) if k else 0.0
                     if kind == "lead":
@@ -2620,7 +2631,7 @@ def corner_setback(mouths):
     return worst
 
 
-def solved_setback(mouths, kerb_radius, start=0.0, margin=2.0):
+def solved_setback(mouths, kerb_radius, start=None, margin=2.0):
     """The stop-line distance a pad of these arms needs, in metres. ONE OWNER.
 
     Two constraints, and the answer is whichever binds: `recommended_tail_length` grows the tail
@@ -2638,7 +2649,17 @@ def solved_setback(mouths, kerb_radius, start=0.0, margin=2.0):
     number.
 
     `mouths` needs only the attributes `Mouth` and any planned stand-in share: `uid`, `bearing`,
-    `half_in`/`half_out`, `walk_in`/`walk_out`, `lane_width`, `lanes_in`/`lanes_out`."""
+    `half_in`/`half_out`, `walk_in`/`walk_out`, `lane_width`, `lanes_in`/`lanes_out`.
+
+    `start` IS PART OF THE ANSWER, so leave it alone (W17). `recommended_tail_length` grows
+    geometrically from it and its overshoot is not monotone in the tail, so a different start is a
+    different number: DebugRoads' east pad solves 42.4 m from 5, 57.9 from 12, 50.7 from 30. Two
+    defects came from treating it as a floor. The default was `0.0`, and `0 x growth` never grows,
+    so every caller that took the default -- the seeder -- got the corner term alone and the turn
+    search never ran (the 3-arm west T: 19.2 m where the turns ask 20.3). And `auto_setback` passed
+    the widest mouth it already had, so a press moved the mouths, the next press started from where
+    they now were, and the pad ran away (DebugRoads: 52, 34, 43, 84, 69 m per press). `None` is the
+    search's own canonical start (12 m, the historical default), the same for every caller."""
     if not mouths:
         return 0.0
     # THE SEARCH NEEDS ARMS WHOSE CAPS CAN MOVE. `solve_junction`'s arms pin `tail_pos` at the
@@ -2659,7 +2680,89 @@ def solved_setback(mouths, kerb_radius, start=0.0, margin=2.0):
     return max(tail, corner_setback(mouths) + margin)
 
 
-def auto_setback(net, uids, margin=2.0):
+#: How close two successive solves of one clique must come before `auto_setback` calls it settled,
+#: in metres, and how many passes it may take to get there. An AUTO mouth's axis is the chord
+#: through its chain neighbours, one of which is the opposite mouth across the pad, so moving one
+#: mouth turns the other's axis a little; the passes contract fast (DebugRoads settles in 3).
+SETBACK_SETTLE_TOL = 1e-5
+SETBACK_MAX_PASSES = 32
+
+
+def axis_crossing(mouths):
+    """The point nearest every mouth's AXIS LINE, least squares, in XY -- or None when the lines
+    are too close to parallel to meet anywhere meaningful.
+
+    The pad's centre as `auto_setback` needs it. The mouths' CENTROID moves whenever a mouth
+    slides along its road, which is exactly what a setback does; a line does not. Minimises
+    `sum |(I - d d^T)(c - p_i)|^2`, which is the familiar crossing when the axes are concurrent
+    and a compromise when they are not (DebugRoads' east pad: four arms whose axes pass up to 23 m
+    from their centroid)."""
+    a11 = a12 = a22 = b1 = b2 = 0.0
+    for m in mouths:
+        dx, dy = m.out_dir[0], m.out_dir[1]
+        p11, p12, p22 = 1.0 - dx * dx, -dx * dy, 1.0 - dy * dy
+        px, py = m.pos[0], m.pos[1]
+        a11 += p11; a12 += p12; a22 += p22
+        b1 += p11 * px + p12 * py
+        b2 += p12 * px + p22 * py
+    det = a11 * a22 - a12 * a12
+    # det = sum over pairs of sin^2(angle between them); below ~5 deg for a pair it is noise.
+    if det < 0.01:
+        return None
+    return ((a22 * b1 - a12 * b2) / det, (a11 * b2 - a12 * b1) / det)
+
+
+def _setback_pass(net, uids, margin, clamped):
+    """One placement of a clique's unlocked mouths. Returns the largest distance any mouth moved."""
+    try:
+        from . import point_validate as pv
+    except ImportError:
+        import point_validate as pv                                          # noqa: E402
+    j = solve_junction(net, uids)
+    if j is None:
+        return 0.0
+    c = axis_crossing(j.mouths) or (j.centre[0], j.centre[1])
+    tail = solved_setback(j.mouths, j.kerb_radius, margin=margin)
+    worst = 0.0
+    for m in j.mouths:
+        pt = net.points[m.uid]
+        pt.setback_solved = float(tail)
+        if pt.setback_locked:
+            continue
+        # A MOUTH SLIDES ALONG ITS OWN ROAD. IT DOES NOT MOVE SIDEWAYS OFF IT.
+        #
+        # `centre + out_dir * tail` would put every mouth on a ray from the pad centre, which is on
+        # none of the roads: on a 5-arm pad the centroid sits 12 m off the crossing, and a mouth set
+        # back from there lands metres to the SIDE of its own centreline (port_road left its pad
+        # 40 deg off its alignment, 3.5 deg from Chuo-dori's arm). So the centre is projected onto
+        # this mouth's own axis first, and the mouth sits `tail` along its road from there.
+        foot = (c[0] - m.pos[0]) * m.out_dir[0] + (c[1] - m.pos[1]) * m.out_dir[1]
+        ax, ay = m.pos[0] + m.out_dir[0] * foot, m.pos[1] + m.out_dir[1] * foot
+        along = tail
+        # ...AND NEVER OVER THE STATION BEYOND IT. Sliding a mouth past its carriageway neighbour
+        # reverses the road's first span, which turns an AUTO axis round and sends the next pass
+        # the other way. Stop `MIN_MOUTH_CLEAR` short, which is the span the gate asks for, and say
+        # so: the remedy is the gate's (delete the station, or lock the mouth).
+        _od, _fwd, seg = mouth_axis(net, m.uid)
+        if seg is not None and seg in net.points:
+            q = net.points[seg].pos
+            reach = (q[0] - ax) * m.out_dir[0] + (q[1] - ay) * m.out_dir[1] - pv.MIN_MOUTH_CLEAR
+            if along > reach:
+                along = max(reach, 0.0)
+                if clamped is not None:
+                    clamped[m.uid] = (tail, along, seg)
+            elif clamped is not None:
+                clamped.pop(m.uid, None)
+        want = (ax + m.out_dir[0] * along, ay + m.out_dir[1] * along, m.pos[2])
+        d = _len2((want[0] - m.pos[0], want[1] - m.pos[1]))
+        if d < 1e-4:
+            continue
+        pt.pos = want
+        worst = max(worst, d)
+    return worst
+
+
+def auto_setback(net, uids, margin=2.0, clamped=None):
     """Move a clique's UNLOCKED mouths out to a solved stop-line distance. Whole-clique,
     idempotent, non-destructive.
 
@@ -2673,53 +2776,38 @@ def auto_setback(net, uids, margin=2.0):
     measures every turn against the WHOLE pad polygon. Drag one mouth in isolation and the
     neighbouring fillet silently stops being tangent.
 
-    Returns `[(uid, old_distance, new_distance)]` for the mouths it moved. A LOCKED mouth is never
-    touched -- and `setback_locked` is an explicit toggle, never inferred from "the artist dragged
-    it", or one accidental nudge would opt a mouth out of every future solve invisibly."""
+    IDEMPOTENT BY CONSTRUCTION, which it only claimed to be until W17 (2026-09-17). A second press
+    on DebugRoads moved 6 mouths by 34 m, a fourth by 84, and a fifth turned an AUTO arm round.
+    Three inputs moved with the mouths, and each is now one that does not:
+    - the distance came from `solved_setback(start=<widest mouth>)`, so a press fed the next;
+      it is solved from the ARMS alone now (see `solved_setback`'s `start`), which means an
+      unlocked mouth further out than the solve comes IN -- the override is `setback_locked`;
+    - the centre was the mouths' centroid, which a setback moves; it is `axis_crossing` now;
+    - an AUTO mouth's axis reads the opposite mouth across the pad, so the passes are repeated to a
+      fixed point (`SETBACK_SETTLE_TOL`).
+
+    Returns `[(uid, old_distance, new_distance)]` for the mouths it moved, distances along the
+    mouth's own axis from the pad crossing. A LOCKED mouth is never touched -- and `setback_locked`
+    is an explicit toggle, never inferred from "the artist dragged it", or one accidental nudge
+    would opt a mouth out of every future solve invisibly. `clamped`, when given a dict, receives
+    `{uid: (solved, placed, station)}` for every mouth the solve would have pushed within the
+    gate's `MIN_MOUTH_CLEAR` of (or past) the next station along its road."""
     j = solve_junction(net, uids)
     if j is None:
         return []
-    cx, cy = j.centre[0], j.centre[1]
-    # The distance itself is `solved_setback`'s -- shared with the seeder, which has to know it
-    # before these mouths exist. `start` is the widest mouth we already have, so the search only
-    # ever grows a pad.
-    start = max(_len2((m.pos[0] - cx, m.pos[1] - cy)) for m in j.mouths)
-    tail = solved_setback(j.mouths, j.kerb_radius, start=start, margin=margin)
+    start = {u: tuple(net.points[u].pos) for u in uids if u in net.points}
+    for _ in range(SETBACK_MAX_PASSES):
+        if _setback_pass(net, uids, margin, clamped) < SETBACK_SETTLE_TOL:
+            break
+    after = solve_junction(net, uids)
+    c = axis_crossing(after.mouths) or (after.centre[0], after.centre[1])
     moved = []
-    for m in j.mouths:
-        old = _len2((m.pos[0] - cx, m.pos[1] - cy))
-        pt = net.points[m.uid]
-        pt.setback_solved = float(tail)
-        if pt.setback_locked:
+    for m in after.mouths:
+        old = start.get(m.uid)
+        if old is None or _len2((old[0] - m.pos[0], old[1] - m.pos[1])) < 1e-4:
             continue
-        # A MOUTH SLIDES ALONG ITS OWN ROAD. IT DOES NOT MOVE SIDEWAYS OFF IT.
-        #
-        # `centre + out_dir * tail` puts every mouth on a ray from the pad CENTROID, and the
-        # centroid is not on any of the roads: on a 5-arm pad it sits 12 m off the crossing, so a
-        # mouth set back from there lands metres to the SIDE of its own centreline. The next
-        # station along is still where the road is, so the road's own first span comes out at a
-        # bogus angle -- measured on the island's port junction, port_road's approach left the pad
-        # on a bearing 40 deg from its own alignment, ending up 3.5 deg from Chuo-dori's arm: two
-        # carriageways leaving on top of each other, with the pavement drawn as a 90 m spike. It
-        # was invisible for as long as every pad was a symmetric X, where the centroid IS the
-        # crossing.
-        #
-        # So the centre is projected onto this mouth's own axis first. The mouth then sits `tail`
-        # along its road from the point of that road nearest the pad centre, which is the same
-        # place `seed_district_roads` measures from, and it can never leave the centreline. The
-        # distance to the centroid comes out `hypot(tail, offset)` -- never less than `tail`, so
-        # every corner still clears.
-        foot = (cx - m.pos[0]) * m.out_dir[0] + (cy - m.pos[1]) * m.out_dir[1]
-        ax, ay = m.pos[0] + m.out_dir[0] * foot, m.pos[1] + m.out_dir[1] * foot
-        want = (ax + m.out_dir[0] * tail, ay + m.out_dir[1] * tail, m.pos[2])
-        # THE NO-MOVE TEST IS ON THE POSITION, not on a distance. `old` is measured to the
-        # centroid and `tail` along the arm, and once those stopped being the same number a mouth
-        # that was already exactly right still reported as moved -- which is how a settled solve
-        # reads as a drifting one.
-        if _len2((want[0] - m.pos[0], want[1] - m.pos[1])) < 1e-4:
-            continue
-        pt.pos = want
-        moved.append((m.uid, old, tail))
+        dist = lambda p: (p[0] - c[0]) * m.out_dir[0] + (p[1] - c[1]) * m.out_dir[1]  # noqa: E731
+        moved.append((m.uid, dist(old), dist(m.pos)))
     return moved
 
 
@@ -2930,6 +3018,91 @@ def self_test():
     assert net.points[lock_uid].pos == before[lock_uid]
     again = auto_setback(net, cliques[0])
     assert not again, again
+    ok += 1
+
+    # ---- W17: a SECOND press moves nothing, even where the arms do not meet at one point --------
+    # A crossing whose two roads each bend through it: four AUTO mouths whose axes pass metres from
+    # their centroid, so the centroid, the mouths and the axes are one coupled system.
+    def bent(near_b=None):
+        n = pm.NetworkData()
+        ra = n.add_road(pm.RoadData("bent_a", pm.PointData(lanes_fwd=2, lanes_bwd=2, lane_width=3.5)))
+        rb = n.add_road(pm.RoadData("bent_b", pm.PointData(lanes_fwd=1, lanes_bwd=1, lane_width=3.5)))
+        chains = []
+        for road, pts in ((ra, ((-160.0, -20.0), (-70.0, -9.0), (-13.0, 0.0), (14.0, 3.0),
+                                (80.0, 22.0), (170.0, 40.0))),
+                          (rb, ((-30.0, -150.0), (-12.0, -60.0) if near_b is None else near_b,
+                                (-4.0, -14.0), (6.0, 13.0), (30.0, 70.0), (50.0, 160.0)))):
+            ch = [n.add_station(road, (x, y, 0.0), has_ground_z=True,
+                                role=(pm.INTERSECTION if i in (2, 3) else pm.SEGMENT))
+                  for i, (x, y) in enumerate(pts)]
+            for a, b in zip(ch, ch[1:]):
+                if not (a.role == pm.INTERSECTION and b.role == pm.INTERSECTION):
+                    n.link(a.uid, b.uid, pm.LINK_SEGMENT)
+            chains.append(ch)
+        arms = [chains[0][2].uid, chains[0][3].uid, chains[1][2].uid, chains[1][3].uid]
+        for i, x in enumerate(arms):
+            for y in arms[i + 1:]:
+                n.link(x, y, pm.LINK_JUNCTION)
+        return n, arms, chains
+
+    def old_press(n, arms, margin=2.0):
+        """CONTROL: the pre-W17 pass -- the widest mouth from the centroid as the search start."""
+        jj = solve_junction(n, arms)
+        cx, cy = jj.centre[0], jj.centre[1]
+        st = max(_len2((m.pos[0] - cx, m.pos[1] - cy)) for m in jj.mouths)
+        tl = solved_setback(jj.mouths, jj.kerb_radius, start=st, margin=margin)
+        worst = 0.0
+        for m in jj.mouths:
+            f = (cx - m.pos[0]) * m.out_dir[0] + (cy - m.pos[1]) * m.out_dir[1]
+            w = (m.pos[0] + m.out_dir[0] * (f + tl), m.pos[1] + m.out_dir[1] * (f + tl), m.pos[2])
+            worst = max(worst, _len2((w[0] - m.pos[0], w[1] - m.pos[1])))
+            n.points[m.uid].pos = w
+        return worst
+
+    ctl, carms, _c = bent()
+    offs = []
+    jj = solve_junction(ctl, carms)
+    for m in jj.mouths:
+        f = (jj.centre[0] - m.pos[0]) * m.out_dir[0] + (jj.centre[1] - m.pos[1]) * m.out_dir[1]
+        offs.append(_len2((m.pos[0] + m.out_dir[0] * f - jj.centre[0],
+                           m.pos[1] + m.out_dir[1] * f - jj.centre[1])))
+    assert max(offs) > 1.0, ("the case must be non-concurrent to mean anything", offs)
+    old_press(ctl, carms)
+    # measured: 1.79, 0.99, 0.68, 0.52 m on successive presses -- each adds ~offset^2 / 2d, unbounded
+    assert old_press(ctl, carms) > 0.5, "CONTROL: the old pass should still move on a second press"
+
+    bn, barms, _c = bent()
+    assert auto_setback(bn, barms), "the first press has work to do"
+    placed = {u: bn.points[u].pos for u in barms}
+    for _press in range(3):
+        again = auto_setback(bn, barms)
+        assert not again, ("press %d moved mouths" % (_press + 2), again)
+    assert all(bn.points[u].pos == placed[u] for u in barms)
+    # ONE OWNER: the seeder asks `solved_setback` with no start and must get the same number.
+    jb = solve_junction(bn, barms)
+    assert abs(solved_setback(jb.mouths, jb.kerb_radius) - bn.points[barms[0]].setback_solved) < 1e-9
+    # ...and the default start really searches the turns (0 x growth never grew).
+    probe = [_PadArm(m.uid, m.bearing, m.half_in, m.half_out, lane_width=m.lane_width,
+                     lanes=max(m.lanes_in, 1), lanes_out=max(m.lanes_out, 1), traffic_side='LEFT')
+             for m in jb.mouths]
+    assert solved_setback(jb.mouths, jb.kerb_radius) >= ik.recommended_tail_length(probe, jb.kerb_radius) - 1e-9
+
+    # A station just beyond where the solve wants a mouth: the mouth stops MIN_MOUTH_CLEAR short
+    # of it instead of walking over it, and the caller is told.
+    try:
+        from . import point_validate as _pv
+    except ImportError:
+        import point_validate as _pv
+    cn, carms2, cch = bent(near_b=(-5.5, -22.0))
+    clamped = {}
+    auto_setback(cn, carms2, clamped=clamped)
+    mouth, beyond = cch[1][2].uid, cch[1][1].uid
+    assert mouth in clamped and clamped[mouth][2] == beyond, clamped
+    gap = _len2((cn.points[beyond].pos[0] - cn.points[mouth].pos[0],
+                 cn.points[beyond].pos[1] - cn.points[mouth].pos[1]))
+    # measured along the axis, so the straight-line span the gate reads is never shorter
+    assert _pv.MIN_MOUTH_CLEAR - 1e-6 <= gap < _pv.MIN_MOUTH_CLEAR + 0.5, gap
+    assert not auto_setback(cn, carms2), "a clamped clique is settled too"
     ok += 1
 
     # ---- a ring road is one run and wraps --------------------------------------------------
@@ -3185,6 +3358,29 @@ def self_test():
     print("OK: one dash clock per run -- every boundary breaks on the same grid (%d run(s))"
           % checked)
     ok += 1
+
+    # ---- a turn path never emits a leg shorter than TURN_LEG_MIN -----------------------------
+    # A lead of ~0 (the arc starts AT the mouth, which is every corner whose approach leg is the
+    # shorter one) used to round to one sample and one `break`, so the exported Curve3D got two
+    # coincident control points and `get_closest_offset` on it returned NaN. Swept across the
+    # approach offset so the lead passes through zero rather than being aimed at it.
+    for k in range(0, 41):
+        off = k * 0.5                      # 0 .. 20 m of extra approach before the corner
+        p0 = (-30.0 - off, 0.0, 0.0)
+        pts, breaks = turn_shape(p0, (1.0, 0.0), (0.0, 30.0, 0.0), (0.0, 1.0))
+        gaps = [math.dist(a[:2], b[:2]) for a, b in zip(pts, pts[1:])]
+        assert not gaps or min(gaps) > 1e-3, (off, min(gaps))
+        chords = [math.dist(pts[i][:2], pts[j][:2]) for i, j in zip(breaks, breaks[1:])]
+        assert all(c > 1e-3 for c in chords), (off, chords)
+        assert len(breaks) == len(set(breaks))
+    # the control: the old rule (a 1e-6 m floor) emits a coincident pair the moment the lead is
+    # smaller than TURN_LEG_MIN but bigger than 1e-6.
+    p0 = (-30.0 - 1e-5, 0.0, 0.0)
+    pts, breaks = turn_shape(p0, (1.0, 0.0), (0.0, 30.0, 0.0), (0.0, 1.0))
+    assert math.dist(pts[0][:2], pts[1][:2]) > 1e-3, "TURN_LEG_MIN is not being applied"
+    ok += 1
+    print("OK: no turn-path leg under TURN_LEG_MIN (%.2f m) -- no coincident control points"
+          % TURN_LEG_MIN)
 
     print("point_solve.py: %d checks PASS" % ok)
     return True

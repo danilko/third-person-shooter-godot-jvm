@@ -50,6 +50,14 @@ public class MissionInfo extends Resource {
     @Export
     public VariantArray<String> possibleOutcomeVariants = new VariantArray<>(String.class);
 
+    /**
+     * Faction relationships while this mission runs (PLAN.md F2) — e.g. {@code GangA_vs_Police.tres}.
+     * Null keeps whatever the region / defaults say. Applied by {@code MissionManager.startMission} as
+     * {@code FactionManager}'s mission layer and removed when the mission completes or fails, so a
+     * mission's table (and any betrayal flipped on top of it) never outlives the mission.
+     */
+    @Export public com.openworld.character.FactionTable factionTable = null;
+
     /** True when a co-player may join this mission on the opposing faction (PvP-as-variant). */
     @Export public boolean opposingFactionJoinable = false;
 }

@@ -80,6 +80,14 @@ public class VehicleAIController extends Controller {
     /** Throttle multiplier while approaching a junction or riding a non-straight turn connector. */
     @Export public float junctionThrottleScale = 0.45f;
 
+    /** Sideways acceleration (m/s²) the car allows itself in a corner: it will not enter a bend of radius
+     *  {@code R} faster than {@code sqrt(cornerLateralAccel·R)}. 0 = off (the old throttle-only easing).
+     *  4 m/s² is a calm driver — an 18 m touge hairpin at 8.5 m/s, a 40 m corner at 12.6 m/s (PLAN.md 3.2d). */
+    @Export public float cornerLateralAccel = 4.0f;
+
+    /** The deceleration (m/s²) the corner governor plans with: how early it starts braking for a bend. */
+    @Export public float cornerBrakeDecel = 4.0f;
+
     private static final double END_THRESHOLD = 3.0;   // m from the lane end = "arrived"
 
     private Vehicle   vehicleBody;
@@ -256,6 +264,55 @@ public class VehicleAIController extends Controller {
                 && VehicleRoute.END_CHAIN.equals(route.getEndBehavior())
                 && (turn == null || turn.isEmpty())
                 && routeProgress >= route.total() - junctionSlowdown;
+    }
+
+    // ── Corner speed (PLAN.md 3.2d) ──────────────────────────────────────────────
+
+    private static final double CORNER_SAMPLE = 8.0;     // m between the lane points a bend is measured from
+    private static final double CORNER_REPLAN = 0.1;     // s between re-plans (a scan of the baked lane each)
+    private double cornerPlanAge = Double.MAX_VALUE;
+    private float  cornerLimit = Float.MAX_VALUE;
+
+    /**
+     * The fastest this car may be going NOW and still take every bend on the lane ahead at
+     * {@link #cornerLateralAccel}, braking at {@link #cornerBrakeDecel} to reach each one:
+     * {@code min over bends ahead of sqrt(a·R + 2·b·d)}, with {@code R} the XZ circumradius of three lane points
+     * {@link #CORNER_SAMPLE} apart and {@code d} the distance to it. {@link Float#MAX_VALUE} when off or unrouted.
+     *
+     * <p>THE THROTTLE EASING NEVER KNEW HOW FAST A BEND COULD BE TAKEN. {@link CruiseState} cut throttle by
+     * the steer angle and a heading difference 5 m past the look-ahead, which is a fraction of the throttle,
+     * not a speed: uphill on the shrine touge at full throttle a car held 13 m/s into 18 m hairpins (9.4 m/s²
+     * sideways), ran 1.6 m wide and left the road at 15 m/s. It also never braked, so downhill it could only
+     * coast into them. Re-planned every {@link #CORNER_REPLAN} s: each lane point is a scan of the baked lane.
+     */
+    public float cornerSpeedLimit(double delta) {
+        if (route == null || cornerLateralAccel <= 0f) return Float.MAX_VALUE;
+        cornerPlanAge += delta;
+        if (cornerPlanAge < CORNER_REPLAN) return cornerLimit;
+        cornerPlanAge = 0.0;
+        float v = currentSpeed();
+        double horizon = Math.min(90.0, v * v / (2.0 * Math.max(0.5, cornerBrakeDecel)) + 2.0 * CORNER_SAMPLE);
+        int n = (int) Math.ceil(horizon / CORNER_SAMPLE) + 2;
+        double limit2 = Double.MAX_VALUE;
+        Vector3 a = route.pointAtLength(routeProgress - CORNER_SAMPLE);
+        Vector3 b = route.pointAtLength(routeProgress);
+        for (int k = 1; k <= n; k++) {
+            Vector3 c = route.pointAtLength(routeProgress + k * CORNER_SAMPLE);
+            double abx = b.getX() - a.getX(), abz = b.getZ() - a.getZ();
+            double acx = c.getX() - a.getX(), acz = c.getZ() - a.getZ();
+            double cross = abx * acz - abz * acx;
+            if (Math.abs(cross) > 1e-6) {
+                double ab = Math.hypot(abx, abz), ac = Math.hypot(acx, acz);
+                double bc = Math.hypot(c.getX() - b.getX(), c.getZ() - b.getZ());
+                double r = ab * bc * ac / (2.0 * Math.abs(cross));
+                double d = Math.max(0.0, (k - 2) * CORNER_SAMPLE);   // b is the bend's middle point
+                limit2 = Math.min(limit2, cornerLateralAccel * r + 2.0 * cornerBrakeDecel * d);
+            }
+            a = b;
+            b = c;
+        }
+        cornerLimit = limit2 == Double.MAX_VALUE ? Float.MAX_VALUE : (float) Math.sqrt(limit2);
+        return cornerLimit;
     }
 
     /** Horizontal (XZ) speed of the body in m/s — drives the speed-proportional look-ahead. */

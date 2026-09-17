@@ -43,7 +43,15 @@ func _lane_at(pos: Vector3) -> String:
 	for l in lanes:
 		var path: Path3D = l["path"]
 		var c: Curve3D = path.curve
-		var at := path.to_global(c.sample_baked(c.get_closest_offset(path.to_local(pos))))
+		# A lane whose exported Curve3D carries two COINCIDENT control points has a zero-length
+		# first baked segment, and `get_closest_offset` then returns NaN — `sample_baked(NaN)`
+		# errors and the attribution is silently wrong. The rule that produced them is fixed
+		# (`point_solve.TURN_LEG_MIN`), but every piece baked before that still has them: on the
+		# island 5 of 218 lanes, all turn connectors. Skip, never guess.
+		var off := c.get_closest_offset(path.to_local(pos))
+		if not is_finite(off):
+			continue
+		var at := path.to_global(c.sample_baked(off))
 		var d := Vector2(at.x - pos.x, at.z - pos.z).length()
 		if d < bd:
 			bd = d

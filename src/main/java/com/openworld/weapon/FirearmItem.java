@@ -424,7 +424,10 @@ public class FirearmItem extends WeaponItem {
   /** {@link #lastShotPelletHits} plus the last shot's origin, aim and cone, for probes. */
   @Register
   public String lastShotReport() {
-	return "hits=" + lastShotPelletHits + " origin=" + lastShotOrigin + " aim=" + lastShotAim + " cone=" + lastShotCone;
+	StringBuilder ends = new StringBuilder();
+	for (var r : lastShotPellets) ends.append(r.end());
+	return "hits=" + lastShotPelletHits + " origin=" + lastShotOrigin + " aim=" + lastShotAim + " cone=" + lastShotCone
+		+ " ends=" + ends;
   }
 
   private Vector3 lastShotOrigin = Vector3.Companion.getZERO();

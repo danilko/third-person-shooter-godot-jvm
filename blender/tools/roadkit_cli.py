@@ -71,16 +71,20 @@ def cmd_validate(a):
 
 def cmd_setback(a):
     net = pm.load_network(a.record)
-    moved = []
+    moved, clamped = [], {}
     for uids in net.junction_cliques():
-        for uid, old, new in ps.auto_setback(net, uids, a.margin):
+        for uid, old, new in ps.auto_setback(net, uids, a.margin, clamped=clamped):
             moved.append({"uid": uid, "old": old, "new": new})
     pm.save_network(net, a.record)
     # Every mouth's solved distance and position, moved or not, so the plugin can write back the
     # derived `setback_solved` too -- it is shown on the point and must not go stale.
     mouths = {u: {"pos": list(net.points[u].pos), "setback_solved": net.points[u].setback_solved}
               for c in net.junction_cliques() for u in c}
-    return {"moved": moved, "mouths": mouths, "cliques": len(net.junction_cliques())}
+    # A mouth the solve wanted further out than the station beyond it allows (W17): it stopped
+    # `MIN_MOUTH_CLEAR` short. The remedy is the gate's -- delete that station, or lock the mouth.
+    held = [{"uid": u, "solved": s, "placed": p, "station": st}
+            for u, (s, p, st) in sorted(clamped.items())]
+    return {"moved": moved, "clamped": held, "mouths": mouths, "cliques": len(net.junction_cliques())}
 
 
 def cmd_centrelines(a):

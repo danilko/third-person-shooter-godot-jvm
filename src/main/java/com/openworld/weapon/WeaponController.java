@@ -177,6 +177,10 @@ public class WeaponController extends Node {
    * agreeing with the reliable MSG_WEAPON_SWITCH event so the two never fight). Owner-only state: a
    * puppet never transitions, so this just returns its snapped activeSlotIndex.
    */
+  /** The slot in hand (the transition's TARGET while switching) — registered readout for probes. */
+  @Register
+  public int activeSlotNow() { return getReplicatedActiveSlot(); }
+
   public int getReplicatedActiveSlot() { return isWeaponTransitioning() ? pendingSlotIndex : activeSlotIndex; }
 
   /** True when a real weapon (slot > 0) is active. False when fist is active. */
