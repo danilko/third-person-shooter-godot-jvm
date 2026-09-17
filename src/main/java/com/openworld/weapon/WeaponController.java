@@ -312,10 +312,43 @@ public class WeaponController extends Node {
     return sc != null && sc.fov > 0f ? sc : null;
   }
 
-  /** The held weapon's scoped FOV in degrees, or 0 when nothing scoped is held. */
+  /**
+   * Which zoom level the raised scope is on: 0 = {@code ScopeConfig.fov}, 1 = {@code closeFov}.
+   *
+   * <p>The one piece of scope state that IS remembered, because a level is a choice the player made and
+   * nothing can derive it. It cannot strand anything: it only means something while the scope is
+   * raised, and every tick the scope is NOT raised puts it back to 0 — so releasing aim, a switch, a
+   * drop or a seat all bring the next scope up at the first level. The bolt cycle and the reload keep
+   * the scope RAISED (only the zoom drops), so the scope comes back at the level it left, CS's
+   * resume-zoom.
+   */
+  private int scopeZoomLevel = 0;
+
+  /**
+   * Apply this tick's zoom request ({@code UserCommand.SCOPE_ZOOM_*}). Called every tick from
+   * {@code Character.applyInput}, after {@link #setScopeRequested}, which is also what resets the level.
+   */
+  public void applyScopeZoom(int request) {
+    ScopeConfig sc = scopeRaisedNow() ? heldScope() : null;
+    if (sc == null) { scopeZoomLevel = 0; return; }
+    int levels = sc.closeFov > 0f ? 2 : 1;
+    switch (request) {
+      case com.openworld.control.UserCommand.SCOPE_ZOOM_IN    -> scopeZoomLevel = Math.min(levels - 1, scopeZoomLevel + 1);
+      case com.openworld.control.UserCommand.SCOPE_ZOOM_OUT   -> scopeZoomLevel = Math.max(0, scopeZoomLevel - 1);
+      case com.openworld.control.UserCommand.SCOPE_ZOOM_CYCLE -> scopeZoomLevel = (scopeZoomLevel + 1) % levels;
+      default -> scopeZoomLevel = Math.min(scopeZoomLevel, levels - 1);
+    }
+  }
+
+  /** The raised scope's zoom level (0 or 1) — for the gate; {@link #scopedFovDegrees} is what the camera reads. */
+  @Register
+  public int scopeZoomLevelNow() { return scopeZoomLevel; }
+
+  /** The held weapon's scoped FOV at the current zoom level, in degrees, or 0 when nothing scoped is held. */
   public double scopedFovDegrees() {
     ScopeConfig sc = heldScope();
-    return sc != null ? sc.fov : 0.0;
+    if (sc == null) return 0.0;
+    return scopeZoomLevel > 0 && sc.closeFov > 0f ? sc.closeFov : sc.fov;
   }
 
   /** The held weapon's scoped drift in degrees, or 0 when nothing (or nothing that sways) is held. */

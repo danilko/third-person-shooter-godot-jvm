@@ -4,7 +4,7 @@ PLAN.md 3.1 B9 (2026-09-14).
 Authoring moved to the Godot editor (`addons/road_kit/`), whose record gestures live in pure
 `point_record_ops.py`. What stays here is what a Blender tool still calls: the island seeder
 (`seed_district_roads.py`: New Road, Extend Road, Connect, Make Intersection), the builds
-(`build_island_base.py`, `roadkit_build_mesh.py`: Auto Setback, Load/Save Record, Export Lanekit, Link
+(`build_island_base.py`: Auto Setback, Load/Save Record, Export Lanekit, Link
 Road Kit) and the helpers `point_build` uses (`sync_facings`, `recentre_all_junctions`). The panels,
 the viewport overlay, the flow-preview drawing and the live rebuild are deleted; the interactive
 repair and ramp operators (Insert/Merge/Split/Tidy/Renumber/Repair/Make Ramp/Branch Ramp/...) are

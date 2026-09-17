@@ -3,7 +3,7 @@ bl_info = {
     "author": "third-person-shooter",
     "version": (0, 3, 0),
     "blender": (4, 0, 0),
-    "location": "headless: blender/tools/roadkit_build_mesh.py (authoring is the Godot Road Kit plugin)",
+    "location": "headless: blender/tools/build_island_base.py (roads are authored in, and built by, the Godot Road Kit plugin)",
     "description": "Point/port road authoring: an Empty per road station, carrying its own "
                     "cross-section and its own typed links.",
     "category": "Object",

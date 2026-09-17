@@ -240,6 +240,65 @@ func draft(data: Dictionary, materials: Dictionary = {}) -> Dictionary:
 	add_child(mi)
 	return {"tris": tarmac.size() / 9, "walk_tris": walk.size() / 9, "kerb_lines": data.get("kerbs", []).size(), "materials": found}
 
+## B11: the FULL MESH -- every visible triangle Build will write, from `roadkit_cli.py live --mesh`, prepared off the
+## main thread by `prepare_mesh`. Replaces the band draft once a drag is released: kerbs, footways, barriers, decks,
+## piers, markings and profile assets, each wearing the kit's material of that name from the base meshes
+## (`materials_from`; a name no built piece carries yet leaves the engine default). Same node, same lift, never saved.
+## Returns `{"tris", "surfaces", "materials"}`.
+func full_mesh(prepared: Dictionary, materials: Dictionary = {}) -> Dictionary:
+	clear_draft()
+	var mi := MeshInstance3D.new()
+	mi.name = DRAFT_NAME
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var am := ArrayMesh.new()
+	var found := 0
+	var tris := 0
+	for mat_name in prepared.keys():
+		var arr: Array = prepared[mat_name]
+		if (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).is_empty():
+			continue
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+		tris += (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
+		var m = materials.get(mat_name)
+		if m != null:
+			am.surface_set_material(am.get_surface_count() - 1, m)
+			found += 1
+	mi.mesh = am
+	add_child(mi)
+	return {"tris": tris, "surfaces": am.get_surface_count(), "materials": found}
+
+## Worker-thread half of `full_mesh`: the CLI's `{"materials": {name: flat}}` as surface arrays, lifted and with flat
+## face normals, so the main thread only uploads. Godot's front face is clockwise seen from the front, the glTF
+## convention is counter-clockwise: each triangle is re-wound as it is copied, exactly what the importer does.
+static func prepare_mesh(data: Dictionary) -> Dictionary:
+	var out := {}
+	var mats: Dictionary = data.get("materials", {})
+	for mat_name in mats.keys():
+		var flat := PackedFloat32Array(mats[mat_name])
+		var n := flat.size() / 9
+		var verts := PackedVector3Array()
+		var normals := PackedVector3Array()
+		verts.resize(n * 3)
+		normals.resize(n * 3)
+		for t in n:
+			var b := 9 * t
+			var a := Vector3(flat[b], flat[b + 1] + DRAFT_LIFT, flat[b + 2])
+			var c1 := Vector3(flat[b + 3], flat[b + 4] + DRAFT_LIFT, flat[b + 5])
+			var c2 := Vector3(flat[b + 6], flat[b + 7] + DRAFT_LIFT, flat[b + 8])
+			var nrm := (c1 - a).cross(c2 - a).normalized()
+			verts[3 * t] = a
+			verts[3 * t + 1] = c2
+			verts[3 * t + 2] = c1
+			normals[3 * t] = nrm
+			normals[3 * t + 1] = nrm
+			normals[3 * t + 2] = nrm
+		var arr := []
+		arr.resize(Mesh.ARRAY_MAX)
+		arr[Mesh.ARRAY_VERTEX] = verts
+		arr[Mesh.ARRAY_NORMAL] = normals
+		out[str(mat_name)] = arr
+	return out
+
 func clear_draft() -> void:
 	var old := get_node_or_null(DRAFT_NAME)
 	if old != null:

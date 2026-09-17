@@ -811,6 +811,15 @@ def render(rig, pose, out_dir, weapons=("ASR1",), tag="pose"):
         col = [c for c in bpy.data.collections if c.name.split(".")[0] == w][-1]
         bpy.context.scene.collection.children.link(col)
         for o in col.all_objects:
+            # A moving part (bolt, cylinder) is driven by its clip at THIS scene's frame, which is the body
+            # clip's, so it would render mid-cycle: put it at its rest (each clip's first key) and drop the clip.
+            if o.animation_data:
+                for t in o.animation_data.nla_tracks:
+                    for st in t.strips:
+                        for fc in (st.action.fcurves if st.action and hasattr(st.action, "fcurves") else []):
+                            if fc.keyframe_points:
+                                getattr(o, fc.data_path)[fc.array_index] = fc.keyframe_points[0].co[1]
+                o.animation_data_clear()
             o.matrix_world = G @ o.matrix_world
     weapons_added = {o.name for o in set(bpy.data.objects) - before}
     if "--show-placed" in sys.argv:
@@ -832,6 +841,10 @@ def render(rig, pose, out_dir, weapons=("ASR1",), tag="pose"):
     scene.camera = cam
     # frame the upper body and the gun: halfway between the chest and the gun's grip, a little up
     chest = arm.matrix_world @ ((M["spine_03"].translation + rig.gun(M).translation) * 0.5 + Vector((0, 0, 0.08)))
+    closeup = "--closeup" in sys.argv   # the firing hand on the grip, ~35 cm away
+    if closeup:
+        chest = arm.matrix_world @ rig.gun(M).translation
+        tag += "_hand"
     views = {
         # body-frame offsets from the chest: +x right, +y up, +z BEHIND
         "front": Vector((-0.25, 0.1, -1.2)),
@@ -841,12 +854,15 @@ def render(rig, pose, out_dir, weapons=("ASR1",), tag="pose"):
         "threequarter": Vector((0.85, 0.3, -0.85)),
         "tps": Vector((0.55, 0.3, 1.0)),
     }
+    if closeup:
+        views = {"outside": Vector((0.35, 0.03, -0.02)), "inside": Vector((-0.35, 0.03, -0.02)),
+                 "below": Vector((0.12, -0.30, -0.12)), "above": Vector((0.10, 0.32, 0.06))}
     for name, off in views.items():
         cam.location = chest + from_body(off)
         target = chest + (from_body(Vector((0.1, 0.0, -1.0))) if name == "tps" else Vector())
         direction = target - cam.location
         cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-        cam_data.lens = 40
+        cam_data.lens = 40 if not closeup else 50
         scene.render.filepath = os.path.join(out_dir, "%s_%s.png" % (tag, name))
         bpy.ops.render.render(write_still=True)
     names = " ".join(os.path.join(out_dir, "%s_%s.png" % (tag, n)) for n in views)

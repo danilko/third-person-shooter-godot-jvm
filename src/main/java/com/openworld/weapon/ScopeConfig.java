@@ -17,8 +17,16 @@ import godot.api.Resource;
 @Script(className = "ScopeConfig")
 public class ScopeConfig extends Resource {
 
-    /** Camera FOV while scoped, degrees. 0 turns the scope off. 20 against ~75 is ~3.75x, the AWP's. */
+    /** Camera FOV while scoped, degrees. 0 turns the scope off. 20 against ~75 is ~3.75x. */
     @Export public float fov = 20.0f;
+
+    /**
+     * The SECOND zoom level's FOV, degrees — CS's AWP has two (FOV 40 then 10 horizontal at 4:3, i.e.
+     * ~31 and 7.5 vertical against a ~74 hip view). The scope always comes up at {@link #fov}; middle
+     * mouse cycles to this and back, the wheel steps in and out ({@code WeaponController.applyScopeZoom}).
+     * 0 = a one-level scope.
+     */
+    @Export public float closeFov = 0.0f;
 
     /** Seconds to zoom in, and back out. Short: a scope that lags the button reads as input lag. */
     @Export public float zoomSeconds = 0.12f;
@@ -45,6 +53,8 @@ public class ScopeConfig extends Resource {
 
     public float getFov() { return fov; }
     public void setFov(float v) { fov = v; }
+    public float getCloseFov() { return closeFov; }
+    public void setCloseFov(float v) { closeFov = v; }
     public float getZoomSeconds() { return zoomSeconds; }
     public void setZoomSeconds(float v) { zoomSeconds = v; }
     public float getSway() { return sway; }

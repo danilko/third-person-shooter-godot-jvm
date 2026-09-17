@@ -137,6 +137,10 @@ def build():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=OUT)
     print("build_road_kit: %d profile(s), %d material(s) -> %s" % (len(made), len(mats), OUT))
+    # B11: the road build reads the kit as DATA (`road_kit.json`), so it is rewritten with every kit build.
+    sys.path.insert(0, HERE)
+    import export_road_kit_data
+    export_road_kit_data.export()
     for o in made:
         xs = [v[0] for v in o.bound_box]
         ys = [v[1] for v in o.bound_box]

@@ -23,7 +23,7 @@ character — has to scale, rotate or move it.
 | **forward** | **−Z** is the muzzle / blade (Blender: **+Y**) | the character mesh is −Z forward |
 | **up** | **+Y** (Blender: **+Z**) | Godot convention; exported with `export_yup=True` |
 | **origin** | the **grip**: the centre of the firing hand's fist on it — pistol grip, stock wrist, knife handle | the character has ONE socket per grip archetype; the origin is what lands on it |
-| **transforms** | location 0 / rotation 0 / scale 1 on every object | a surviving transform is something compensating for a wrong model |
+| **transforms** | location 0 / rotation 0 / scale 1 on every object — except a **moving part**, whose location is its **pivot** | a surviving transform is something compensating for a wrong model |
 | **collection** | all meshes in one collection named `<id>` | the library links the weapon by that name |
 
 **On the arcade question.** The world is deliberately not 1:1 (road lanes are 4.5 m, because a car
@@ -150,6 +150,37 @@ library draws it where the game does.
 
 ---
 
+## Moving parts (a bolt, a cylinder, a pump)
+
+**Animate them in the weapon's `.blend`, not in the Godot scene.** A part keyed in Godot has its
+origin on the weapon's grip, so a rotation about its real axis must be written as a rotation AND a
+compensating translation on every key (SNR1's bolt was, until 2026-09-16). In Blender the part's
+origin is its pivot, so a lift is one rotation curve, eased by eye against the model and the hand.
+
+1. **Split the part** into its own object (any name except `<id>`) in the `<id>` collection. Remove
+   stray loose vertices the split leaves behind.
+2. **Put its origin on its pivot**: 3D cursor on the axis → *Set Origin ▸ Origin to 3D Cursor*. Its
+   location is now the pivot; rotation 0 and scale 1 still.
+3. **Scene at 60 fps** (Output ▸ Frame Rate). glTF samples at the scene rate, so keys belong on whole
+   frames: a key at a fractional frame is cut short (the cylinder stopped 1.2° short, and every next
+   shot jumped that 1.2°).
+4. **One action per clip, on an NLA track, with no active action** (*Push Down*). The first key is the
+   rest pose. **Extrapolation: Hold**. With *Nothing*, Blender resets the animated channels to 0
+   outside the strip, and the part exports at the weapon's origin instead of its pivot.
+5. **Name the clip for what the part does** (`bolt_work`, `cylinder_index`), and **never start or end
+   it with `loop` or `cycle`**. Godot's importer reads those as a loop hint: it loops the clip and
+   strips the word, so `bolt_cycle` arrived as a looping `bolt`.
+6. In the weapon scene set `fire_animation` / `reload_animation` to the clip. The clips land on the
+   model's own `AnimationPlayer`, which is `weaponAnimatorPath`'s default (`Model/AnimationPlayer`).
+7. Fit the clip inside the weapon's fire interval (`1 / fire_rate`), and extend
+   `tools/godot/probe_weapon_motion.gd`.
+
+A **rotationally symmetric part can index without unwinding**. A 6-chamber cylinder turns 0 → 60°
+per shot and restarts at 0 on the next shot, which is the same picture. REV1's cylinder measures
+0.15 mm mean error under a 60° turn.
+
+---
+
 ## Colliders
 
 A weapon has **two** and they are not the same shape:
@@ -173,10 +204,17 @@ While held, neither is in the physics world — the item is a plain `Node3D` and
 * **a mesh outside the `<id>` collection** — it would be missing from the library.
 * **a length that has drifted** more than 0.5% from `length_m`.
 * **an origin that has left the grip** — `grip_to_rear_m` off by more than 1 cm.
+* **a moving part with a rotation or scale**, an **active action**, a strip with **Nothing**
+  extrapolation, a scene under 60 fps, a clip named with a `loop`/`cycle` hint — and **a clip the
+  weapon scene names that is not in the export** (`WeaponItem.playMotion` is silent about it).
 
 All exit non-zero.
 
 ## What the gates assert
+
+`probe_weapon_motion.gd`: every shot moves each part by its clip, about its own pivot, and it is back
+at rest (or at a symmetric equivalent) before the next shot is allowed; `--control` clears the clips
+and nothing moves.
 
 `probe_weapon_scale.gd` (reads the same JSON): the length within 2%, **the model instance transform
 is identity**, the `Muzzle` is on −Z, colliders sane. `probe_weapon_sockets.gd`: **no shipped weapon

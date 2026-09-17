@@ -101,8 +101,9 @@ public class PlayerCameraController extends TPSCameraController {
       if (character != null) character.setCameraMode(!character.isFpsMode);
     }
 
-    double dy = pendingYaw;
-    double dp = pendingPitch;
+    double scale = lookSensitivityScale();
+    double dy = pendingYaw * scale;
+    double dp = pendingPitch * scale;
     pendingYaw   = 0;
     pendingPitch = 0;
     return new Vector2((float) dy, (float) dp);

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # build_roads_piece.sh <record.roads.json> <PieceName> [<zones.json>|""] [<ground.json>] -- road option B's whole build
-# (PLAN.md 3.1).
+# (PLAN.md 3.1). NO BLENDER since B11:
 #
-#   1. python3 roadkit_cli.py pieces    -> pieces/<Piece>.lanekit.json   (lane graph, no Blender)
-#   2. blender roadkit_build_mesh.py    -> pieces/<Piece>.blend          (the meshes -- Blender's only job)
-#   3. build_piece.sh <Piece>           -> world/pieces/<Piece>.tscn/.scn (export, WorldBaker, navmesh)
+#   1. python3 roadkit_cli.py pieces    -> pieces/<Piece>.lanekit.json   (the gate, the zone cut, the lane graph)
+#   2. python3 roadkit_cli.py gltf      -> world/pieces/<Piece>.gltf     (the meshes: `point_mesh` + `point_gltf`,
+#                                          styles and profile assets from assets/world_source/kit/road_kit.json)
+#   3. GLTF_READY=1 build_piece.sh      -> world/pieces/<Piece>.tscn/.scn (WorldBaker, navmesh, binary scene)
 #
 # With a zones file (B6, written by the Godot plugin from the scene's ZoneMarkers) <PieceName> is a
 # PREFIX and the network is cut into one piece per zone -- `<PieceName>_<zone>`, plus `<PieceName>`
@@ -85,19 +86,33 @@ if [ "${#NAMES[@]}" -eq 0 ]; then
 fi
 
 if [ "${#NAMES[@]}" -gt 0 ]; then
-  echo "── 2/3 meshes (blender, headless)${GROUND:+, over the sampled ground}: ${NAMES[*]}"
-  "$BLENDER" --background --python-exit-code 1 --python "$BP/tools/roadkit_build_mesh.py" -- \
-      --record "$RECORD" --zones "${ZONES:-}" --prefix "$PIECE" --out-dir "$PIECES" --ground "${GROUND:-}" \
-      --only "$(IFS=,; echo "${NAMES[*]}")" 2>&1 \
-    | grep -E "^==|Error|refused|ground grid|terrain below" | grep -v OCIO || true
+  echo "── 2/3 meshes (python3, no Blender)${GROUND:+, over the sampled ground}: ${NAMES[*]}"
+  GLTF_TABLE="$(mktemp)"
+  python3 "$BP/tools/roadkit_cli.py" gltf "$RECORD" "${ZONES:-}" "$REPO/$RES_DIR" "$PIECE" --ground "${GROUND:-}" \
+      --only "$(IFS=,; echo "${NAMES[*]}")" --gated > "$GLTF_TABLE"
+  python3 - "$GLTF_TABLE" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+if not d.get("written"):
+    sys.exit("ERROR: the mesh build wrote nothing: %s" % d.get("error", "the gate refused it"))
+for p in d["pieces"]:
+    print("   %-32s %3d objects %7d tris, normals worst %.1f deg, %d inverted"
+          % (p["piece"], p["objects"], p["triangles"], p["worst_normal_deg"], p["inverted_normals"]))
+for road, slot, kind, name in d.get("missing_style", []):
+    print("   WARNING: road %s names %s %r for its %s slot and the kit has none -- built with the default" % (road, kind, name, slot))
+if d.get("kit_stale"):
+    print("   WARNING: road_kit.blend changed since road_kit.json was written -- run blender/tools/export_road_kit_data.py")
+print("   %.0f ms" % d["ms"])
+PY
+  rm -f "$GLTF_TABLE"
   for n in "${NAMES[@]}"; do
-    [ -f "$PIECES/$n.blend" ] || { echo "ERROR: mesh build produced no $n.blend"; exit 1; }
+    [ -f "$REPO/$RES_DIR/$n.gltf" ] || { echo "ERROR: mesh build produced no $n.gltf"; exit 1; }
   done
 fi
 
 for n in "${NAMES[@]}"; do
-  echo "── 3/3 export + bake $n"
-  NO_SOLO=1 "$BP/tools/build_piece.sh" "$n"
+  echo "── 3/3 bake $n"
+  GLTF_READY=1 NO_SOLO=1 "$BP/tools/build_piece.sh" "$n"
   # Record what this piece now IS, only once it has baked -- a failed bake leaves it dirty.
   python3 - "$TABLE" "$MANIFEST" "$n" <<'PY'
 import json, os, sys

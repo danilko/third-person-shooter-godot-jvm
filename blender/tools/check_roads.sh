@@ -43,7 +43,8 @@ for f in "$BP"/lib/road_points.py "$BP"/lib/lane_movements.py "$BP"/lib/lane_pro
          "$BP"/lib/road_support.py \
          "$ADDON"/point_model.py "$ADDON"/point_profile.py "$ADDON"/point_solve.py \
          "$ADDON"/point_edges.py "$ADDON"/point_validate.py "$ADDON"/point_export.py \
-         "$ADDON"/point_style.py "$ADDON"/point_zones.py "$ADDON"/point_ground.py "$ADDON"/point_record_ops.py "$ADDON"/point_digest.py "$ADDON"/point_mesh.py; do
+         "$ADDON"/point_style.py "$ADDON"/point_zones.py "$ADDON"/point_ground.py "$ADDON"/point_record_ops.py "$ADDON"/point_digest.py "$ADDON"/point_mesh.py \
+         "$ADDON"/point_kit.py "$ADDON"/point_gltf.py; do
   [ -f "$f" ] && run "$(basename "$f")" python3 "$f"
 done
 
@@ -91,11 +92,9 @@ if [ "$QUICK" -eq 0 ]; then
   run "test_roadkit_zones" gd tools/godot/test_roadkit_zones.gd -- "$GT/z.json"
   run "test_roadkit_preview" gd tools/godot/test_roadkit_preview.gd
   run "test_roadkit_draft (B10.1 draft surface = the build)" gd tools/godot/test_roadkit_draft.gd
-  # B10.7: while two builders exist they must agree -- the pure-Python sweep against the baked DebugRoads pieces.
-  PC="$ROOT/src/main/resources/com/openworld/world/pieces"
-  run "roadkit_mesh_parity (point_mesh == the Blender build, DebugRoads)" python3 "$BP/tools/roadkit_mesh_parity.py" \
-      "$ROOT/assets/world_source/pieces/DebugRoads.roads.json" "$PC/Roads_DebugRoads_debug_a.gltf" "$PC/Roads_DebugRoads_debug_b.gltf" \
-      --ground "$ROOT/assets/world_source/pieces/DebugRoads.ground.json" --assert
+  # B11: the road build has no Blender. The committed pieces must BE the build of their records (DebugRoads and
+  # RoadKitZones rebuilt and compared, collision proxies included), and styles + profile assets must build.
+  run "check_roadkit_build (committed pieces == the build; styles and profile assets)" python3 "$BP/tools/check_roadkit_build.py"
   run "probe_road_ground (DebugWorld supports on the ground)" gd tools/godot/probe_road_ground.gd
   run "probe_road_stamp (DebugWorld terrain carries the roads)" gd tools/godot/probe_road_stamp.gd
   # Inside the REAL editor, where a non-@tool JVM script is a placeholder (`plugin.gd _selftest`): the

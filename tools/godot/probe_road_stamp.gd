@@ -138,7 +138,12 @@ func _initialize() -> void:
 						fill_miss = "%s (%.1f, %.1f, %.1f) %.2f m over the stamped ground" % [lane["name"], w.x, w.y, w.z, w.y - h]
 				fill_ok_natural += 1 if delta <= AT_GRADE_TOL else 0
 	for v in pad_verts:
-		var h: float = terrain.data.get_height(v)
+		# Queried on a 1 cm grid: a pad vertex placed through the piece's transform lands a fraction of a
+		# millimetre off an exact terrain vertex, and Terrain3D's `get_height` a hair inside a cell edge
+		# returns the FAR vertex's height (measured: (-150.0006, 72.0) read 11.09, the (-152, 72) vertex,
+		# where (-150, 72) is 10.97 and (-150.1, 71.9) 10.98). B12's 1.5 m pad grid shares a vertex with the
+		# 2 m terrain grid every 6 m, which is what turned that into 6 false "proud" pad vertices.
+		var h: float = terrain.data.get_height(Vector3(snappedf(v.x, 0.01), v.y, snappedf(v.z, 0.01)))
 		if not is_nan(h) and h - v.y > PAD_PROUD_TOL:
 			proud_pad += 1
 			if h - v.y > worst:

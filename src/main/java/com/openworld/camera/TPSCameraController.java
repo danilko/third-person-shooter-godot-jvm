@@ -89,6 +89,18 @@ public class TPSCameraController extends Node3D {
   /** True while the FOV currently on screen came from a scope, so zooming back out uses its pace. */
   private boolean scopeZooming = false;
 
+  /** The scope FOV the last tween was started for, so a zoom-LEVEL change re-tweens too. */
+  private double scopeFovApplied = 0.0;
+
+  /**
+   * CS's {@code zoom_sensitivity_ratio}: while a scope is raised, look input is scaled by the scoped FOV
+   * over the unscoped one, so a pixel of mouse moves the picture the same distance on screen at every
+   * zoom level. Without it the 7.5 deg level turns 1 px into ~6 screen px. 1 = CS's default, 0 = off
+   * (the raw sensitivity at every zoom).
+   */
+  @Export
+  public double scopedSensitivityRatio = 1.0;
+
   @Register
   @Override
   public void _ready() {
@@ -221,8 +233,11 @@ public class TPSCameraController extends Node3D {
     // state changes and never per frame. This node processes in every mode and is the base class of
     // both the player's rig and the AI's, so an AI that never scopes simply never sees an edge.
     boolean scopedNow = character != null && character.isScoped();
-    if (scopedNow != scopeApplied) {
+    double scopeFov = scopedNow && character.weaponController != null
+            ? character.weaponController.scopedFovDegrees() : 0.0;
+    if (scopedNow != scopeApplied || scopeFov != scopeFovApplied) {
       scopeApplied = scopedNow;
+      scopeFovApplied = scopeFov;
       setCameraFov();
     }
 
@@ -233,6 +248,20 @@ public class TPSCameraController extends Node3D {
     // whose _physicsProcess the driver seat switches off -- so it is the one place that always
     // gets a frame. refreshHeadVisibility() only touches the meshes when the answer changes.
     if (character != null) character.refreshHeadVisibility();
+  }
+
+  /**
+   * The multiplier for this tick's look input — see {@link #scopedSensitivityRatio}. It reads the FOV
+   * actually on screen, so it follows the zoom tween, and the bolt cycle's un-zoom, with no edge logic
+   * of its own; 1 whenever no scope is raised.
+   */
+  protected double lookSensitivityScale() {
+    if (scopedSensitivityRatio <= 0.0 || character == null || activeCamera == null || !character.isScopeRaised()) {
+      return 1.0;
+    }
+    double unscoped = combat ? cameraFov : movementFov;
+    if (unscoped <= 0.0) return 1.0;
+    return Math.min(1.0, scopedSensitivityRatio * activeCamera.getFov() / unscoped);
   }
 
   /** Adds a per-shot kick (degrees) that decays back to zero at recoilRecoverySpeed. */

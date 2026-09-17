@@ -643,7 +643,7 @@ class Mouth(object):
 
     __slots__ = ("uid", "point", "road", "pos", "out_dir", "bearing", "lanes_in", "lanes_out",
                  "lane_width", "half_in", "half_out", "profile", "arm", "fwd_leaves", "normal",
-                 "walk_in", "walk_out", "kerb_in", "kerb_out", "wall_h", "cap")
+                 "walk_in", "walk_out", "kerb_in", "kerb_out", "wall_h", "cap", "grade")
 
     def __init__(self, uid, point, road, pos, out_dir, lanes_in, lanes_out, lane_width,
                  half_in, half_out, profile, fwd_leaves=True, normal=(0.0, 1.0, 0.0),
@@ -673,6 +673,9 @@ class Mouth(object):
         self.kerb_in, self.kerb_out = kerb_in, kerb_out
         self.wall_h = wall_h
         self.arm = None
+        #: The road's grade at the stop line, rising away from the pad (`mouth_grade`) -- what the pad
+        #: surface is clamped to, so it continues the carriageway instead of kinking against it.
+        self.grade = 0.0
         #: The stop line kerb to kerb, world XY: `(−s end, +s end)`. What the pad's height is pinned to
         #: (`_idw_z`), because the road's end cross-section is flat along it.
         p_pos = half_out if fwd_leaves else half_in
@@ -848,21 +851,26 @@ def ear_clip(poly, eps=1e-12):
     return out
 
 
-def pad_triangles(boundary, mouths, centroid):
-    """`(apex, triangles, star_ok, worst)` -- the pad's surface, always watertight.
+def pad_triangles(boundary, mouths, centroid, field=None):
+    """`(apex, triangles, star_ok, worst)` -- the pad's surface, always watertight, as a `PadSurface`.
 
     ONE OWNER of how a pad is tessellated, so `point_build` sweeps exactly what the gate measured
-    and the preview draws. `star_ok` is kept and reported, but it is ADVISORY now: it says the
-    apex had to move, not that the build failed."""
+    and the preview draws. A FLAT pad (a constant `field`, or none) is a fan -- exact for a plane. A
+    SLOPED one is `grid_pad_triangles` over its `PadField` (B12): a fan is linear from one apex, so it
+    creases every ridge of the height field into the path a car drives. `star_ok` is kept and
+    reported, but it is ADVISORY: it says the apex had to move, not that the build failed."""
     flat = [(p[0], p[1]) for p in boundary]
+    zfn = field.z if field is not None else (lambda xy: _idw_z(mouths, xy))
     origin, ok, worst = fan_origin(flat, (centroid[0], centroid[1]))
-    apex = (origin[0], origin[1], _idw_z(mouths, origin))
-    if ok:
+    apex = (origin[0], origin[1], zfn(origin))
+    if field is not None and field.constant is None:
+        tris = grid_pad_triangles(flat, field)
+    elif ok:
         tris = [(apex, boundary[i], boundary[(i + 1) % len(boundary)])
                 for i in range(len(boundary))]
     else:
         tris = [(boundary[i], boundary[j], boundary[k]) for i, j, k in ear_clip(flat)]
-    return apex, tris, ok, worst
+    return apex, PadSurface(tris, field), ok, worst
 
 
 def _idw_z(mouths, xy, power=2.0):
@@ -888,6 +896,325 @@ def _idw_z(mouths, xy, power=2.0):
         num += w * m.pos[2]
         den += w
     return num / den if den else 0.0
+
+
+#: B12 -- a SLOPED pad is a grid over a MINIMUM-CURVATURE surface, not a fan over IDW. Measured on
+#: DebugRoads' west T (mouths 10.46 / 12.97 / 11.02 m, two cap corners 6 m apart), along every legal
+#: movement INCLUDING the approach roads either side (what a car drives; the pad alone hides the
+#: stop-line handover, which is where the first attempt went wrong):
+#:
+#:     surface                                   straight crest/2 m   steepest   worst movement crest
+#:     one-apex fan over IDW (before)                  9.3 %            21.2 %        41.5 %
+#:     IDW itself                                      9.9 %            16.3 %        17.5 %
+#:     membrane (harmonic, fixed at the caps)         13.2 %            17.3 %        18.0 %
+#:     thin plate clamped to each road's grade         8.4 %            12.6 %        12.8 %
+#:
+#: A fan creases the field along every spoke. IDW is flat at each stop line, which hands over to a
+#: flat road well and to a graded one with a kink, and steep in between. A membrane minimises grade
+#: but meets each stop line at whatever slope it likes: it climbed 18 % in the last metre before a
+#: +4 % road, and a car at 20 m/s left the ground there. The THIN PLATE minimises the change of grade
+#: (bending energy) and is CLAMPED -- height AND grade -- to each approach road, so the pad continues
+#: every road it joins and spends the height difference as gently as the ring allows. It is linear in
+#: the mouth heights, as IDW was.
+#: The mesh cell: the surface follows the field at its vertices.
+PAD_GRID_STEP = 1.5
+#: The solve cell. Measured on the west T: 1.0 m (958 unknowns, 1.1 s) and 2.0 m (235, 0.07 s) give
+#: the same surface to within 1 % of grade, so 2.0 m.
+PAD_FIELD_STEP = 2.0
+#: How far along each approach road the clamp reaches: two solve cells, so at least two node rows
+#: carry the road's grade and the plate meets it with a matching slope, not just a matching height.
+PAD_APPROACH = 4.0
+#: Mouths whose heights agree this closely, on roads this level, make a PLANE, which the fan already
+#: represents exactly -- so a flat pad keeps its fan, its triangle count and its digest.
+PAD_FLAT_TOL = 1e-4
+#: A point this close to a mouth's cap segment IS on the stop line, and takes the road's height
+#: exactly (the ring's cap vertices and the grid lines' crossings of the cap are all computed on it).
+PAD_CAP_SNAP = 1e-3
+
+
+def mouth_grade(net, uid):
+    """The grade of a junction mouth's road at its stop line, rising AWAY from the pad -- read off the
+    run's own end tangent (`road_points.chain_tangents` over `point_profile.stations`, the same
+    stations `solve_road` sweeps), so the pad is clamped to the slope the carriageway actually has."""
+    road = net.road_of(uid)
+    if road is None:
+        return 0.0
+    for uids in road_runs(net, road):
+        if len(uids) < 2 or uid not in (uids[0], uids[-1]):
+            continue
+        points = [net.resolved(u) for u in uids]
+        tans = rp.chain_tangents(pp.stations(points, False, end_axes=pp.run_end_axes(net, points)))
+        first = uids[0] == uid
+        t = tans[0][1] if first else tans[-1][0]
+        h = math.hypot(t[0], t[1])
+        if h < 1e-9:
+            return 0.0
+        return t[2] / h if first else -t[2] / h
+    return 0.0
+
+
+class PadField(object):
+    """ONE OWNER of a pad's height: `z(xy)`. A constant for a flat pad on level roads; otherwise the
+    thin plate over the pad ring, solved once per pad on a `PAD_FIELD_STEP` grid aligned to world
+    multiples of the step (so a mouth nudged 10 cm does not move every node) and read back bilinearly.
+
+    The plate minimises the squared second differences (x, y and the cross term) over every stencil
+    that lies inside the pad plus the approach bands; each approach band is fixed to its road's plane
+    (height at the stop line, `Mouth.grade` away from it). Pure Python, by conjugate gradients on the
+    normal equations, started from IDW.
+
+    `seed_district_roads.pad_lifts` still predicts a pad's burial with `_idw_z` over stand-in mouths:
+    it runs before a ring exists. Both rules are linear in the mouth heights, so its uniform lift stays
+    exact in kind; only the burial it measures is IDW's."""
+
+    __slots__ = ("mouths", "constant", "step", "nodes", "iterations", "residual")
+
+    def __init__(self, flat_ring, mouths, step=PAD_FIELD_STEP, tol=1e-6, max_iterations=3000):
+        self.mouths = list(mouths)
+        self.step = float(step)
+        self.nodes = {}
+        self.iterations, self.residual = 0, 0.0
+        zs = [m.pos[2] for m in self.mouths]
+        level = all(abs(getattr(m, "grade", 0.0)) <= PAD_FLAT_TOL for m in self.mouths)
+        self.constant = zs[0] if zs and level and max(zs) - min(zs) <= PAD_FLAT_TOL else None
+        if self.constant is not None:
+            return
+        st = self.step
+        bands = []
+        for m in self.mouths:
+            cap = getattr(m, "cap", None)
+            if cap:
+                half = math.hypot(cap[1][0] - cap[0][0], cap[1][1] - cap[0][1]) / 2.0
+                bands.append((m, half))
+        xs = [p[0] for p in flat_ring] + [m.pos[0] for m, _h in bands]
+        ys = [p[1] for p in flat_ring] + [m.pos[1] for m, _h in bands]
+        reach = PAD_APPROACH + st
+        i0, i1 = int(math.floor((min(xs) - reach) / st)), int(math.ceil((max(xs) + reach) / st))
+        k0, k1 = int(math.floor((min(ys) - reach) / st)), int(math.ceil((max(ys) + reach) / st))
+        fixed, free = {}, []
+        for i in range(i0, i1 + 1):
+            for k in range(k0, k1 + 1):
+                p = (i * st, k * st)
+                best = None
+                for m, half in bands:
+                    dx, dy = p[0] - m.pos[0], p[1] - m.pos[1]
+                    out = dx * m.out_dir[0] + dy * m.out_dir[1]       # metres along the road, away
+                    lat = abs(dx * m.normal[0] + dy * m.normal[1])
+                    if 0.0 <= out <= PAD_APPROACH and lat <= half + 0.5 * st and (best is None or out < best[0]):
+                        best = (out, m.pos[2] + getattr(m, "grade", 0.0) * out)
+                if best is not None:
+                    fixed[(i, k)] = best[1]
+                elif _point_in_ring(p, flat_ring):
+                    free.append((i, k))
+        index = {key: n for n, key in enumerate(free)}
+        dom = set(fixed) | set(free)
+        rows = []                                          # (cols, weights, rhs)
+        diag = math.sqrt(0.5)
+        for (i, k) in dom:
+            stencils = []
+            for a, b in (((i - 1, k), (i + 1, k)), ((i, k - 1), (i, k + 1))):
+                if a in dom and b in dom:
+                    stencils.append(((a, 1.0), ((i, k), -2.0), (b, 1.0)))
+            cross = ((i + 1, k + 1), (i - 1, k - 1), (i + 1, k - 1), (i - 1, k + 1))
+            if all(c in dom for c in cross):
+                stencils.append(tuple(zip(cross, (diag, diag, -diag, -diag))))
+            for sten in stencils:
+                cols, ws, rhs = [], [], 0.0
+                for key, w in sten:
+                    if key in index:
+                        cols.append(index[key])
+                        ws.append(w)
+                    else:
+                        rhs -= w * fixed[key]
+                if cols:
+                    rows.append((cols, ws, rhs))
+        x = [_idw_z(self.mouths, (key[0] * st, key[1] * st)) for key in free]
+        if rows and free:
+            x, self.iterations, self.residual = _cgls(rows, x, tol, max_iterations)
+        z = dict(fixed)
+        for key, n in index.items():
+            z[key] = x[n]
+        self.nodes = z
+
+    def z(self, xy):
+        if self.constant is not None:
+            return self.constant
+        for m in self.mouths:
+            cap = getattr(m, "cap", None)
+            if cap and _seg_dist2(xy, cap[0], cap[1]) <= PAD_CAP_SNAP * PAD_CAP_SNAP:
+                return m.pos[2]
+        st = self.step
+        u, v = xy[0] / st, xy[1] / st
+        i, k = int(math.floor(u)), int(math.floor(v))
+        fu, fv = u - i, v - k
+        num = den = 0.0
+        for key, w in (((i, k), (1 - fu) * (1 - fv)), ((i + 1, k), fu * (1 - fv)),
+                       ((i, k + 1), (1 - fu) * fv), ((i + 1, k + 1), fu * fv)):
+            zk = self.nodes.get(key)
+            if zk is not None and w > 0.0:
+                num += w * zk
+                den += w
+        # A sliver of pad in a cell with no pad node (a kerb corner clipping it): fall back to the
+        # nodes' own starting rule rather than inventing a height.
+        return num / den if den > 1e-9 else _idw_z(self.mouths, xy)
+
+
+def _cgls(rows, x, tol, max_iterations):
+    """`(x, iterations, residual)` -- least squares `min |A x - b|` by conjugate gradients on the
+    normal equations, `rows` being `A` as `(cols, weights, b)`. `residual` is the final `|A^T r|`."""
+    n = len(x)
+
+    def mul(v):
+        return [sum(w * v[c] for c, w in zip(cols, ws)) for cols, ws, _b in rows]
+
+    def mul_t(y):
+        out = [0.0] * n
+        for (cols, ws, _b), yi in zip(rows, y):
+            for c, w in zip(cols, ws):
+                out[c] += w * yi
+        return out
+
+    r = [row[2] - ax for row, ax in zip(rows, mul(x))]
+    s = mul_t(r)
+    p = list(s)
+    gamma = sum(v * v for v in s)
+    it = 0
+    while it < max_iterations and math.sqrt(gamma) > tol:
+        q = mul(p)
+        qq = sum(v * v for v in q)
+        if qq < 1e-30:
+            break
+        alpha = gamma / qq
+        x = [xi + alpha * pi for xi, pi in zip(x, p)]
+        r = [ri - alpha * qi for ri, qi in zip(r, q)]
+        s = mul_t(r)
+        gn = sum(v * v for v in s)
+        p = [si + (gn / gamma) * pi for si, pi in zip(s, p)]
+        gamma = gn
+        it += 1
+    return x, it, math.sqrt(gamma)
+
+
+class PadSurface(list):
+    """A pad's triangles -- a plain list to every consumer -- plus a cell index so `pad_z` does not
+    scan a grid pad's few thousand triangles per sample, and the `PadField` it was built from, the
+    height rule for a point just off the triangles."""
+
+    INDEX_STEP = 4.0
+
+    def __init__(self, tris, field=None):
+        list.__init__(self, tris)
+        self.field = field
+        self.index = {}
+        st = self.INDEX_STEP
+        for n, (a, b, c) in enumerate(self):
+            for i in range(int(math.floor((min(a[0], b[0], c[0]) - 1e-6) / st)),
+                           int(math.floor((max(a[0], b[0], c[0]) + 1e-6) / st)) + 1):
+                for k in range(int(math.floor((min(a[1], b[1], c[1]) - 1e-6) / st)),
+                               int(math.floor((max(a[1], b[1], c[1]) + 1e-6) / st)) + 1):
+                    self.index.setdefault((i, k), []).append(n)
+
+    def candidates(self, xy):
+        key = (int(math.floor(xy[0] / self.INDEX_STEP)), int(math.floor(xy[1] / self.INDEX_STEP)))
+        return [self[n] for n in self.index.get(key, ())]
+
+
+def _clip_to_cell(poly, x0, y0, x1, y1):
+    """Sutherland-Hodgman: `poly` (CCW) clipped to the axis-aligned cell. A concave ring can come
+    back with zero-width bridges along a cell edge; `_clean_ring` removes them."""
+    def clip(pts, inside, cross):
+        out = []
+        n = len(pts)
+        for idx in range(n):
+            cur, prev = pts[idx], pts[idx - 1]
+            if inside(cur):
+                if not inside(prev):
+                    out.append(cross(prev, cur))
+                out.append(cur)
+            elif inside(prev):
+                out.append(cross(prev, cur))
+        return out
+
+    def at_x(x):
+        return lambda a, b: (x, a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]))
+
+    def at_y(y):
+        return lambda a, b: (a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]), y)
+
+    pts = list(poly)
+    for inside, cross in ((lambda p: p[0] >= x0, at_x(x0)), (lambda p: p[0] <= x1, at_x(x1)),
+                          (lambda p: p[1] >= y0, at_y(y0)), (lambda p: p[1] <= y1, at_y(y1))):
+        if not pts:
+            break
+        pts = clip(pts, inside, cross)
+    return pts
+
+
+def _clean_ring(pts, eps=1e-9):
+    """Drop repeated and collinear vertices until none is left -- which also folds away the
+    back-and-forth bridges a concave clip leaves along a cell edge."""
+    pts = list(pts)
+    changed = True
+    while changed and len(pts) >= 3:
+        changed = False
+        for i in range(len(pts)):
+            a, b, c = pts[i - 1], pts[i], pts[(i + 1) % len(pts)]
+            if _len2(_sub2(a, b)) < 1e-9 or abs(_cross2(_sub2(b, a), _sub2(c, b))) < eps:
+                pts.pop(i)
+                changed = True
+                break
+    return pts if len(pts) >= 3 else []
+
+
+def _ring_area(pts):
+    return 0.5 * sum(pts[i - 1][0] * pts[i][1] - pts[i][0] * pts[i - 1][1] for i in range(len(pts)))
+
+
+def grid_pad_triangles(flat_ring, field, step=PAD_GRID_STEP):
+    """`[(a, b, c)]` -- the ring cut by a world-aligned `step` grid, every vertex at `field.z`.
+
+    A cell no ring edge touches is either whole pad (two triangles) or none; a cell a ring edge
+    crosses is clipped to the ring and ear-clipped. Shared cell edges get identical crossing points
+    (the same ring edge against the same grid line), so the surface is watertight -- and asserted so,
+    as area, by the self-test."""
+    xs = [p[0] for p in flat_ring]
+    ys = [p[1] for p in flat_ring]
+    i0, i1 = int(math.floor(min(xs) / step)), int(math.floor(max(xs) / step))
+    k0, k1 = int(math.floor(min(ys) / step)), int(math.floor(max(ys) / step))
+    touched = set()
+    n = len(flat_ring)
+    for e in range(n):
+        a, b = flat_ring[e], flat_ring[(e + 1) % n]
+        for i in range(int(math.floor(min(a[0], b[0]) / step)), int(math.floor(max(a[0], b[0]) / step)) + 1):
+            for k in range(int(math.floor(min(a[1], b[1]) / step)), int(math.floor(max(a[1], b[1]) / step)) + 1):
+                touched.add((i, k))
+    zc = {}
+
+    def lift(p):
+        key = (p[0], p[1])
+        if key not in zc:
+            zc[key] = field.z(key)
+        return (p[0], p[1], zc[key])
+
+    tris = []
+    for i in range(i0, i1 + 1):
+        for k in range(k0, k1 + 1):
+            x0, y0, x1, y1 = i * step, k * step, (i + 1) * step, (k + 1) * step
+            if (i, k) not in touched:
+                if not _point_in_ring(((x0 + x1) / 2.0, (y0 + y1) / 2.0), flat_ring):
+                    continue
+                q = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+                tris.append((lift(q[0]), lift(q[1]), lift(q[2])))
+                tris.append((lift(q[0]), lift(q[2]), lift(q[3])))
+                continue
+            piece = _clean_ring(_clip_to_cell(flat_ring, x0, y0, x1, y1))
+            if len(piece) < 3 or abs(_ring_area(piece)) < 1e-9:
+                continue
+            if _ring_area(piece) < 0:
+                piece.reverse()
+            for a, b, c in ear_clip(piece):
+                tris.append((lift(piece[a]), lift(piece[b]), lift(piece[c])))
+    return tris
 
 
 class _PadArm(ik.Arm):
@@ -1092,9 +1419,11 @@ def build_mouth(net, uid, ground_fn=None):
     elevated = (float(pt.pos[2]) - float(pt.ground_z)) >= BARRIER_MIN_DELTA
     wall_h = (float(getattr(road, "barrier_height", 0.0))
               if road is not None and (not road.ped_access or elevated) else 0.0)
-    return Mouth(uid, pt, road, tuple(float(c) for c in pt.pos), out_dir,
-                 lanes_in, lanes_out, float(pt.lane_width), half_in, half_out, prof,
-                 fwd_leaves, normal, walk_in, walk_out, kerb_in, kerb_out, wall_h)
+    m = Mouth(uid, pt, road, tuple(float(c) for c in pt.pos), out_dir,
+              lanes_in, lanes_out, float(pt.lane_width), half_in, half_out, prof,
+              fwd_leaves, normal, walk_in, walk_out, kerb_in, kerb_out, wall_h)
+    m.grade = mouth_grade(net, uid)
+    return m
 
 
 class Corner(object):
@@ -1132,7 +1461,7 @@ def _cap_points(m, tail_length=1.0):
             ik.vadd(ik.vscale(perp, m.arm.out_width()), c))
 
 
-def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None):
+def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None, field=None):
     """`[Corner]` -- one per real corner of the pad. A through-pair contributes none, because the
     road runs straight on through and its own edge run already owns that stretch. `ring` (the pad's
     own, local) supplies each corner's SOLVED radius -- grown by `contain_turns` -- so the kerb
@@ -1160,7 +1489,8 @@ def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None):
         flat = _round_ring(list(seg), segments)
         if len(flat) < 2:
             continue
-        pts = [(x + cx, y + cy, _idw_z(mouths, (x + cx, y + cy))) for (x, y) in flat]
+        zfn = field.z if field is not None else (lambda xy: _idw_z(mouths, xy))
+        pts = [(x + cx, y + cy, zfn((x + cx, y + cy))) for (x, y) in flat]
         n = max(1, len(pts) - 1)
         walk, kerb, wall = [], [], []
         for i in range(len(pts)):
@@ -1311,7 +1641,8 @@ def turns_off_pad(j, clearance=TURN_CLEARANCE):
 def pad_z(fan, xy):
     """The pad SURFACE's height at `xy` -- off its own triangles, which is what is built, drawn and
     driven on. None outside every triangle."""
-    for a, b, c in fan:
+    cands = fan.candidates(xy) if hasattr(fan, "candidates") else fan
+    for a, b, c in cands:
         d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1])
         if abs(d) < 1e-12:
             continue
@@ -1321,6 +1652,63 @@ def pad_z(fan, xy):
         if l1 >= -1e-7 and l2 >= -1e-7 and l3 >= -1e-7:
             return l1 * a[2] + l2 * b[2] + l3 * c[2]
     return None
+
+
+#: The steepest grade a turn path may take across a pad before the gate says so (a WARN): a pad
+#: steeper than the steepest ROAD the kit lays (`island_v3_terrain`'s 8 % hill grade) is a layout
+#: fact -- two stop lines too close for the height between them -- that no surface can smooth away.
+PAD_GRADE_MAX = 0.08
+#: `turn_grades`' averaging window: a grade is read over a car's wheelbase, so a crease reads as a
+#: grade CHANGE per window rather than as a spike on one 0.5 m step.
+PAD_GRADE_WINDOW = 2.0
+
+
+#: How far along each approach road `turn_grades` follows a movement: the stop-line HANDOVER is where
+#: a pad that is smooth inside can still throw a car, so a movement is measured road to road.
+PAD_GRADE_APPROACH = 10.0
+
+
+def turn_grades(j, step=0.5, window=PAD_GRADE_WINDOW, zfn=None, approach=PAD_GRADE_APPROACH):
+    """`[(turn, steepest, worst_change, length, dz)]` -- every legal movement over the pad, road to road.
+
+    The path's XY is resampled every `step` and its height read off the pad's own triangles (`pad_z`,
+    or `zfn` to measure another rule), with `approach` metres of each road's plane (`Mouth.grade`)
+    before and after; grades are averaged over `window`. `steepest` is the worst |grade|,
+    `worst_change` the worst difference between two grades one window apart -- a crest or a sag,
+    across the stop lines too -- `length` the path's plan length on the pad and `dz` its end-to-end
+    rise, so `|dz| / length` is the least grade any surface can give that movement."""
+    zfn = zfn or (lambda xy: pad_z(j.fan, xy))
+    per = max(1, int(round(window / step)))
+    by_uid = {m.uid: m for m in j.mouths}
+    out = []
+    for t in j.turns:
+        pts = t["points"]
+        if not t["ok"] or len(pts) < 3:
+            continue
+        dense = []
+        for a, b in zip(pts, pts[1:]):
+            h = math.hypot(b[0] - a[0], b[1] - a[1])
+            k = max(1, int(h / step))
+            dense.extend((a[0] + (b[0] - a[0]) * u / k, a[1] + (b[1] - a[1]) * u / k) for u in range(k))
+        dense.append((pts[-1][0], pts[-1][1]))
+        zs = [zfn(q) for q in dense]
+        n_road = int(round(approach / step))
+        m_in, m_out = by_uid.get(t["from"]), by_uid.get(t["to"])
+        # `(plan distance from the previous entry, height)`, road -> pad -> road.
+        prof = [(step, m_in.pos[2] + m_in.grade * step * k) for k in range(n_road, 0, -1)] if m_in else []
+        prof.append((step, zs[0]))
+        prof.extend((math.hypot(dense[i][0] - dense[i - 1][0], dense[i][1] - dense[i - 1][1]), zs[i])
+                    for i in range(1, len(dense)))
+        if m_out:
+            prof.extend((step, m_out.pos[2] + m_out.grade * step * k) for k in range(1, n_road + 1))
+        grades = [(prof[i][1] - prof[i - 1][1]) / prof[i][0] for i in range(1, len(prof))
+                  if prof[i][0] > 1e-6 and prof[i][1] is not None and prof[i - 1][1] is not None]
+        avg = [sum(grades[i:i + per]) / per for i in range(0, len(grades) - per + 1)]
+        steep = max((abs(g) for g in avg), default=0.0)
+        change = max((abs(avg[i] - avg[i - per]) for i in range(per, len(avg))), default=0.0)
+        length = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
+        out.append((t, steep, change, length, pts[-1][2] - pts[0][2]))
+    return out
 
 
 def turn_path(p0, d0, p1, d1, fan, mouths, n=CONNECTOR_SAMPLES):
@@ -1340,7 +1728,10 @@ def turn_path(p0, d0, p1, d1, fan, mouths, n=CONNECTOR_SAMPLES):
             out.append(p)
             continue
         z = pad_z(fan, p)
-        out.append((p[0], p[1], z if z is not None else _idw_z(mouths, p)))
+        if z is None:
+            field = getattr(fan, "field", None)
+            z = field.z(p) if field is not None else _idw_z(mouths, p)
+        out.append((p[0], p[1], z))
     return out, breaks
 
 
@@ -1378,12 +1769,13 @@ def solve_junction(net, uids, segments=8, ground_fn=None, contain=True):
     caps = [_cap_points(m) for m in mouths]
     if contain:
         ring, _grown = contain_turns(ring, turn_xy, caps, segments)
-    flat = _round_ring(ring, segments)
-    boundary = [(x + cx, y + cy, _idw_z(mouths, (x + cx, y + cy))) for (x, y) in flat]
+    flat = [(x + cx, y + cy) for (x, y) in _round_ring(ring, segments)]
+    field = PadField(flat, mouths)
+    boundary = [(x, y, field.z((x, y))) for (x, y) in flat]
 
-    apex, fan, star_ok, star_worst = pad_triangles(boundary, mouths, (cx, cy))
+    apex, fan, star_ok, star_worst = pad_triangles(boundary, mouths, (cx, cy), field)
     turns = build_turns(mouths, fan=fan)
-    corners = junction_corners(mouths, kerb_radius, cx, cy, segments, ring=ring)
+    corners = junction_corners(mouths, kerb_radius, cx, cy, segments, ring=ring, field=field)
     return JunctionSolve(list(uids), centre, mouths, boundary, fan, turns, kerb_radius,
                          star_ok, star_worst, fan_apex=apex, corners=corners)
 
@@ -2425,8 +2817,44 @@ def self_test():
     assert max(zs) - min(zs) > 1.0, (min(zs), max(zs))
     for m in jg.mouths:
         assert abs(_idw_z(jg.mouths, (m.pos[0], m.pos[1])) - m.pos[2]) < 1e-6
+    # B12: a sloped pad is a GRID over the thin plate -- watertight, exact on every stop line, and
+    # smoother than the fan it replaced. CONTROL: the fan over the same ring and field.
+    assert jg.fan.field.constant is None and len(jg.fan) > 4 * len(jg.boundary), len(jg.fan)
+    flat_g = [(p[0], p[1]) for p in jg.boundary]
+    area_tris = sum(abs(_ring_area([a[:2], b[:2], c[:2]])) for a, b, c in jg.fan)
+    assert abs(area_tris - abs(_ring_area(flat_g))) < 1e-6 * abs(_ring_area(flat_g)), "the grid pad is watertight"
+    assert jg.fan.field.residual < 1e-3, jg.fan.field.residual
+    for m in jg.mouths:
+        for tri in jg.fan:
+            for v in tri:
+                if _seg_dist2(v, m.cap[0], m.cap[1]) < 1e-8:
+                    assert abs(v[2] - m.pos[2]) < 1e-9, "a pad vertex on a stop line is at the road's height"
+    fan_ctrl = [(jg.fan_apex, jg.boundary[i], jg.boundary[(i + 1) % len(jg.boundary)])
+                for i in range(len(jg.boundary))]
+    # On the pad alone (`approach=0`) the fan's creases are what differ; road to road, the handover too.
+    grid_change = max(g[2] for g in turn_grades(jg, approach=0.0))
+    fan_change = max(g[2] for g in turn_grades(jg, zfn=lambda xy: pad_z(fan_ctrl, xy), approach=0.0))
+    assert grid_change < 0.6 * fan_change, "CONTROL: the grid pad creases less (%.3f vs fan %.3f)" % (
+        grid_change, fan_change)
+    assert (max(g[2] for g in turn_grades(jg)) <
+            max(g[2] for g in turn_grades(jg, zfn=lambda xy: pad_z(fan_ctrl, xy)))), "and road to road"
     for u in cliques[0]:
         net.points[u].pos = tuple(net.points[u].pos[:2]) + (0.0,)
+    jf = solve_junction(net, cliques[0])
+    assert jf.fan.field.constant is not None and len(jf.fan) == len(jf.boundary), "a flat pad keeps its fan"
+    assert not [g for g in turn_grades(jf) if g[1] > 1e-9], "a flat pad has no grade"
+    # Level mouths on GRADED roads are not a plane: the pad is clamped to each road's grade at its stop
+    # line, and `turn_grades` measures the handover, road to road.
+    graded = [PadField([(p[0], p[1]) for p in jf.boundary], jf.mouths)]
+    for m in jf.mouths:
+        m.grade = 0.05
+    graded.append(PadField([(p[0], p[1]) for p in jf.boundary], jf.mouths))
+    assert graded[0].constant is not None and graded[1].constant is None, "a graded approach tilts the pad"
+    for m in jf.mouths:
+        m.grade = 0.0
+    print("OK: a sloped pad is a watertight grid over its thin plate (%d tris; grade change per %.0f m "
+          "%.1f %% vs the fan's %.1f %%), a flat pad keeps its fan" % (
+              len(jg.fan), PAD_GRADE_WINDOW, grid_change * 100, fan_change * 100))
     ok += 1
 
     # ---- movements: straight-ahead EXISTS (same_arm is the same MOUTH, not the same road) ----

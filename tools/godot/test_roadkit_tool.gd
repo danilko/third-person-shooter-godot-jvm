@@ -143,6 +143,35 @@ func _initialize() -> void:
 	var jct: Dictionary = tool.click(ctx, cam.unproject_position(other_end.global_position))
 	check(jct["changed"] and Gestures.junction_members(ends[1]).has(other_end), "CONNECT: points of different roads make a junction")
 
+	# ── a CLOSE camera: the segment under the view has one end behind it ──
+	ctx["runs"] = _runs(net)
+	var crun: Dictionary = {}
+	for r in ctx["runs"]:
+		if (r["points"] as Array).size() >= 4:
+			crun = r
+			break
+	var cp: Array = crun["points"]
+	var ci := cp.size() / 2
+	var ca: Vector3 = net.global_transform * Vector3(cp[ci][0], cp[ci][1], cp[ci][2])
+	var cb: Vector3 = net.global_transform * Vector3(cp[ci + 1][0], cp[ci + 1][1], cp[ci + 1][2])
+	var cmid := ca.lerp(cb, 0.5)
+	var ahead := Vector3(cb.x - ca.x, 0, cb.z - ca.z).normalized()
+	var close := Camera3D.new()
+	root.add_child(close)
+	await process_frame
+	close.global_transform = Transform3D(Basis.looking_at((cb - (cmid + Vector3.UP * 1.5)).normalized(), Vector3.UP), cmid + Vector3.UP * 1.5)
+	var q := cmid.lerp(cb, 0.7)
+	var qs := close.unproject_position(q)
+	var cpick: Dictionary = Tool.pick_centreline(net, close, qs, ctx["runs"])
+	var at_w: Vector3 = net.global_transform * cpick.get("at", Vector3.INF) if not cpick.is_empty() else Vector3.INF
+	check(close.is_position_behind(ca) and not close.is_position_behind(cb), "close camera: the segment runs from behind the view to in front of it",
+			"%.1f m / %.1f m deep" % [Tool.view_depth(close, ca), Tool.view_depth(close, cb)])
+	check(not cpick.is_empty() and str(cpick["road"]) == str(crun["road"]) and at_w.distance_to(q) < 0.05,
+			"close camera: a click on its visible part picks the road, at the point under the cursor",
+			"road %s, at %.3f m from the click's point" % [cpick.get("road", "-"), at_w.distance_to(q)])
+	close.free()
+	cam.make_current()
+
 	# ── DRAW on Terrain3D (DebugWorld) ──
 	var world: Node = (load(WORLD) as PackedScene).instantiate()
 	root.add_child(world)
