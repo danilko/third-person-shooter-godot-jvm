@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/WeaponRadialMenu.java" id="1_q6lnr"]
 [ext_resource type="Shader" path="res://src/main/resources/com/openworld/character/RadialMenuBlur.gdshader" id="2_2v5xc"]
 [ext_resource type="Texture2D" uid="uid://cojrr0xkfleny" path="res://assets/ui/white.png" id="3_bs8y5"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/RadiaMenuItem.tscn" id="4_iu8gn"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/WeaponRadialCard.tscn" id="4_iu8gn"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_wev4p"]
 shader = ExtResource("2_2v5xc")
@@ -88,9 +88,8 @@ offset_bottom = 20.0
 grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(0.8, 0.8)
-
-[node name="0" parent="Panel/Circle" unique_id=703522310 instance=ExtResource("4_iu8gn")]
-layout_mode = 1
+pivot_offset = Vector2(20, 20)
+mouse_filter = 2
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1806817277]
 libraries/ = SubResource("AnimationLibrary_radial")

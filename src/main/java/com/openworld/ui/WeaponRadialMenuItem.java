@@ -5,149 +5,92 @@ import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.*;
+import godot.core.Color;
 import godot.core.NodePath;
 
+/**
+ * One UPRIGHT card in the weapon wheel (WeaponRadialCard.tscn): the weapon's icon with its name pinned to the
+ * icon's bottom-right (CS-style), the slot key on the left and the ammo on the right underneath.
+ *
+ * <p>A card is pure display. Which slot is selected is decided by {@link WeaponRadialMenu} from the pointer's
+ * ANGLE around the menu centre, not by hovering the card, so the cards' shape and the gaps between them leave no
+ * dead zones — the reason the wheel moved from textured wedges with click masks to cards (2026-09-16). Text size
+ * and outline come from the themes (weapon_menu_theme.tres, 10 pt; game_theme.tres, the outline), not per node.
+ */
 @Script(className = "WeaponRadialMenuItem")
 public class WeaponRadialMenuItem extends Control {
 
-  @Export public int      index        = 0;
+  /** Slot index this card shows; set by WeaponRadialMenu when it builds the wheel. */
+  @Export public int index = 0;
 
-  /**
-   * Control node positioned at the button's visual centre inside the item.
-   * Its rotation is set to -item.rotation in _ready() so all children face
-   * up in screen space while staying at the button's world position.
-   */
-  @Export public NodePath axisPath      = new NodePath("Axis");
-  @Export public NodePath weaponIconPath = new NodePath("Axis/WeaponIcon");
-  /** The weapon's name, a small label pinned to the icon's bottom-right corner (CS-style). */
-  @Export public NodePath weaponNamePath = new NodePath("Axis/WeaponIcon/WeaponName");
-  @Export public NodePath magazinePath   = new NodePath("Axis/Magazine");
-  @Export public NodePath reservePath    = new NodePath("Axis/Reserve");
-  @Export public NodePath keyLabelPath    = new NodePath("Axis/KeyLabel");
+  @Export public NodePath weaponIconPath = new NodePath("Icon");
+  @Export public NodePath weaponNamePath = new NodePath("Icon/Name");
+  @Export public NodePath ammoPath       = new NodePath("Ammo");
+  @Export public NodePath keyLabelPath   = new NodePath("Key");
+  @Export public NodePath highlightPath  = new NodePath("Highlight");
 
-    private String[] keyTexts = new String[0];
+  private static final Color FILLED = new Color(1f, 1f, 1f, 1f);
+  private static final Color EMPTY  = new Color(1f, 1f, 1f, 0.45f);
 
-  private WeaponRadialMenu radialMenu;
+  private String keyText = "";
 
   @Register
   @Override
   public void _ready() {
-      resolveKeyTexts();
-
-    radialMenu = findRadialMenu();
-    index = deriveSiblingIndex();
-    counterRotateContent();
-
+    keyText = slotKeyText(index);
   }
 
   /**
-   * Counter-rotates the Axis Control by -item.rotation so its children
-   * always face up in screen space. Axis must be positioned at the button's
-   * visual centre in the scene so the rotation happens around that point.
+   * The key bound to slot {@code slot}, the same rule WeaponSlotsUI uses: slot 0 (the fist) is
+   * {@code weapon_unequip}, slot N is {@code weapon_slot_N}. (The wedge wheel used weapon_slot_(N+1), so every
+   * slot was labelled one key too high.)
    */
-  private void counterRotateContent() {
-    Node axisNode = getNodeOrNull(axisPath);
-    if (axisNode instanceof Control axis) {
-      axis.setRotation(-getRotation());
-    }
+  static String slotKeyText(int slot) {
+    return slot == 0 ? resolveKeyText("weapon_unequip", "0") : resolveKeyText("weapon_slot_" + slot, String.valueOf(slot));
   }
 
-  /** Counts how many WeaponRadialMenuItem siblings appear before this node. */
-  private int deriveSiblingIndex() {
-    Node parent = getParent();
-    if (parent == null) return index;
-    int count = 0;
-    for (int i = 0; i < parent.getChildCount(); i++) {
-      Node child = parent.getChild(i);
-      if (child == this) return count;
-      if (child instanceof WeaponRadialMenuItem) count++;
-    }
-    return index;
-  }
-
-  /** Called by WeaponRadialMenu when the menu opens to sync all weapon info for this slot. */
-  public void refresh() {
-    WeaponRadialMenu rm = getRadialMenu();
-    if (rm == null) return;
-
-    WeaponItem weapon = rm.getWeaponItem(index);
-
+  /** Sync this card with its slot (called by WeaponRadialMenu when the wheel opens). */
+  public void refresh(WeaponItem weapon) {
+    if (keyText.isEmpty()) keyText = slotKeyText(index);
     Node iconNode = getNodeOrNull(weaponIconPath);
     if (iconNode instanceof TextureRect tr) {
       tr.setTexture(weapon != null ? weapon.weaponIcon : null);
-      tr.setVisible(weapon != null && weapon.weaponIcon != null);
     }
-
-    setNodeText(getNodeOrNull(weaponNamePath), weapon != null ? weapon.getDisplayName() : "");
-    setNodeText(getNodeOrNull(magazinePath),   weapon != null ? String.valueOf(weapon.getMagazine()) : "--");
-    setNodeText(getNodeOrNull(reservePath),    weapon != null ? String.valueOf(weapon.getReserve()) : "--");
-    String keyText = (index < keyTexts.length) ? keyTexts[index] : String.valueOf(index + 1);
-    setNodeText(getNodeOrNull(keyLabelPath), String.format("[%s]", weapon != null ? keyText : "?"));
+    setText(weaponNamePath, weapon != null ? weapon.getDisplayName() : "");
+    setText(ammoPath, weapon == null ? "--"
+        : weapon.isInfiniteAmmo ? "" : weapon.getMagazine() + "/" + weapon.getReserve());
+    setText(keyLabelPath, "[" + keyText + "]");
+    setModulate(weapon != null ? FILLED : EMPTY);
   }
 
-    private void resolveKeyTexts() {
-        WeaponRadialMenu rm = findRadialMenu();
-        int count = (rm != null && rm.getCharacter() != null && rm.getCharacter().weaponController != null)
-                ? rm.getCharacter().weaponController.getSlotCount() : 8;
-        keyTexts = new String[count];
-        for (int i = 0; i < count; i++) {
-            keyTexts[i] = resolveKeyText("weapon_slot_" + (i + 1), String.valueOf(i + 1));
-        }
-    }
+  /** Show or hide the selection highlight. */
+  public void setHighlighted(boolean on) {
+    if (getNodeOrNull(highlightPath) instanceof CanvasItem h) h.setVisible(on);
+  }
 
-    private String resolveKeyText(String action, String fallback) {
-        try {
-            for (InputEvent ev : InputMap.INSTANCE.actionGetEvents(action)) {
-                if (ev instanceof InputEventKey iek) {
-                    String text = iek.asTextPhysicalKeycode();
-                    return text.isEmpty() ? fallback : text;
-                }
-            }
-        } catch (Exception ignored) {
-            // Action not registered yet — happens in editor headless runs.
-        }
-        return fallback;
-    }
-
+  /** True while highlighted — the on-screen check reads it. */
   @Register
-  public void onClicked() {
-    WeaponRadialMenu rm = getRadialMenu();
-    if (rm == null || rm.getCharacter() == null) return;
-    rm.getCharacter().setWeapon(index);
-    rm.hideRadialMenu();
+  public boolean highlightedNow() {
+    return getNodeOrNull(highlightPath) instanceof CanvasItem h && h.isVisible();
   }
 
-  /**
-   * Hovering switches to this slot's weapon live (preview) but does NOT close the menu — the menu
-   * stays open until the player clicks ({@link #onClicked}) or releases the radial-menu key
-   * (handled in {@link WeaponRadialMenu#_input}). The Button's {@code texture_hover} provides the
-   * visual highlight.
-   */
-  @Register
-  public void onHover() {
-    WeaponRadialMenu rm = getRadialMenu();
-    if (rm == null || rm.getCharacter() == null) return;
-    rm.getCharacter().setWeapon(index);
+  private void setText(NodePath path, String text) {
+    Node n = getNodeOrNull(path);
+    if (n instanceof Label l) l.setText(text);
+    else if (n instanceof RichTextLabel rtl) rtl.setText(text);
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
-
-  private WeaponRadialMenu getRadialMenu() {
-    if (radialMenu == null) radialMenu = findRadialMenu();
-    return radialMenu;
-  }
-
-  private WeaponRadialMenu findRadialMenu() {
-    Node node = getParent();
-    while (node != null) {
-      if (node instanceof WeaponRadialMenu rm) return rm;
-      node = node.getParent();
+  private static String resolveKeyText(String action, String fallback) {
+    try {
+      for (InputEvent ev : InputMap.INSTANCE.actionGetEvents(action)) {
+        if (ev instanceof InputEventKey iek) {
+          String text = iek.asTextPhysicalKeycode();
+          return text.isEmpty() ? fallback : text;
+        }
+      }
+    } catch (Exception ignored) {
+      // Action not registered yet — happens in editor headless runs.
     }
-    return null;
-  }
-
-  private static void setNodeText(Node node, String text) {
-    if (node instanceof Label l) l.setText(text);
-    else if (node instanceof RichTextLabel rtl) rtl.setText(text);
+    return fallback;
   }
 }
