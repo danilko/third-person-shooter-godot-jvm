@@ -150,6 +150,17 @@ public class EventBus extends Node {
             new Signal2<>(this, new StringName("mission_failed"));
 
     /**
+     * Emitted by {@code MissionDirector.triggerBeat} (PLAN.md F1) — a named story beat fired by a
+     * {@code ZoneTrigger} (F3), by mission logic, or from the debug console. Payload: beatId.
+     *
+     * <p>The director itself runs whatever Java beat handler is registered under that id; this signal
+     * is the seam for everything that only wants to LISTEN (dialogue, HUD, audio cues), so a beat never
+     * has to know who is watching it.
+     */
+    public final Signal1<String> missionBeatTriggered =
+            new Signal1<>(this, new StringName("mission_beat_triggered"));
+
+    /**
      * Emitted by Character once after _ready() completes (deferred, mirrors
      * playerSpawned). Fires for every character — player and AI alike — so
      * GameManager and HUDManager can build characterId-keyed registries instead

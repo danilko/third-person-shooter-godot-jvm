@@ -21,8 +21,10 @@ const NetworkScript := preload("res://addons/road_kit/road_kit_network.gd")
 const STEP := 4.0
 const AT_GRADE_TOL := 0.40
 const FILL_MAX := 4.0
-const PROUD_TOL := 0.05
-const PAD_PROUD_TOL := 0.15
+## Ground is never above a lane (the stamp leaves `Stamp.CLEARANCE`, 0.10 m, under it; the 2 m grid's
+## interpolation spends part of that), nor more than 0.05 m above a pad mesh vertex.
+const PROUD_TOL := 0.0
+const PAD_PROUD_TOL := 0.05
 
 var fails := 0
 
@@ -99,7 +101,10 @@ func _initialize() -> void:
 		while d <= curve.get_baked_length():
 			var w: Vector3 = lane["xf"] * curve.sample_baked(d)
 			d += STEP
-			var h: float = terrain.data.get_height(w)
+			# On the 1 cm grid, as the pad vertices below and for the same reason: a lane sample a few mm off an exact
+			# terrain vertex reads the FAR vertex, which on the 10% touge is 0.20 m up the grade (measured: two samples
+			# "0.07/0.09 m proud" read 0.097/0.100 m UNDER the lane once snapped, PLAN.md 3.2d).
+			var h: float = terrain.data.get_height(Vector3(snappedf(w.x, 0.01), w.y, snappedf(w.z, 0.01)))
 			var g: float = nat.call(w)
 			if is_nan(h) or is_nan(g):
 				continue
@@ -163,7 +168,10 @@ func _initialize() -> void:
 		for i in int(hs["nx"]):
 			var k := Vector3(float(hs["origin"][0]) + i * float(hs["step"]), float(hs["origin"][1]) + j * float(hs["step"]), 0.0)
 			var w: Vector3 = to_world * Ground.Frame.to_godot(k)
-			var h: float = terrain.data.get_height(w)
+			# On the 1 cm grid, as the pad vertices below and for the same reason: a lane sample a few mm off an exact
+			# terrain vertex reads the FAR vertex, which on the 10% touge is 0.20 m up the grade (measured: two samples
+			# "0.07/0.09 m proud" read 0.097/0.100 m UNDER the lane once snapped, PLAN.md 3.2d).
+			var h: float = terrain.data.get_height(Vector3(snappedf(w.x, 0.01), w.y, snappedf(w.z, 0.01)))
 			var g: float = nat.call(w)
 			if is_nan(h) or is_nan(g):
 				continue
@@ -182,7 +190,10 @@ func _initialize() -> void:
 		for i in range(0, int(hs["nx"]), 3):
 			var k := Vector3(float(hs["origin"][0]) + i * float(hs["step"]), float(hs["origin"][1]) + j * float(hs["step"]), 0.0)
 			var w: Vector3 = to_world * Ground.Frame.to_godot(k)
-			var h: float = terrain.data.get_height(w)
+			# On the 1 cm grid, as the pad vertices below and for the same reason: a lane sample a few mm off an exact
+			# terrain vertex reads the FAR vertex, which on the 10% touge is 0.20 m up the grade (measured: two samples
+			# "0.07/0.09 m proud" read 0.097/0.100 m UNDER the lane once snapped, PLAN.md 3.2d).
+			var h: float = terrain.data.get_height(Vector3(snappedf(w.x, 0.01), w.y, snappedf(w.z, 0.01)))
 			var g: float = nat.call(w)
 			if not is_nan(h) and not is_nan(g):
 				worst_back = maxf(worst_back, absf(h - g))

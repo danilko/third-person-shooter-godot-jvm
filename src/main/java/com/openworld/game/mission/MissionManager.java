@@ -102,7 +102,12 @@ public class MissionManager extends Node {
         activeMission = info;
         active = info != null;
         remainingByFaction.clear();
-        if (info == null) return;
+        if (info == null) {
+            applyMissionFactions(null);
+            return;
+        }
+        // Before counting: the objective's "hostile" factions are the ones THIS mission's table makes hostile.
+        applyMissionFactions(info.factionTable);
 
         if (MissionObjectiveType.ELIMINATE_ALL.equals(info.objectiveType)) {
             countHostilesByFaction(info);
@@ -116,7 +121,8 @@ public class MissionManager extends Node {
             bus.missionStarted.emit(info.missionId, info.objectiveType);
         }
         broadcastWorldEvent(GameManager.WORLD_EVENT_MISSION_STARTED, info.missionId,
-                java.util.List.of(info.objectiveType == null ? "" : info.objectiveType));
+                java.util.List.of(info.objectiveType == null ? "" : info.objectiveType,
+                        factionTablePath(info)));
     }
 
     /** Marks the active mission complete and emits EventBus.missionCompleted. */
@@ -124,6 +130,7 @@ public class MissionManager extends Node {
         if (!active || activeMission == null) return;
         String missionId = activeMission.missionId;
         active = false;
+        applyMissionFactions(null);
         GD.print("MissionManager: '" + missionId + "' complete — winner=" + winningFaction
                 + " variant=" + outcomeVariant);
         Node busNode = getNodeOrNull("/root/EventBus");
@@ -140,6 +147,7 @@ public class MissionManager extends Node {
         if (!active || activeMission == null) return;
         String missionId = activeMission.missionId;
         active = false;
+        applyMissionFactions(null);
         GD.print("MissionManager: '" + missionId + "' failed — " + reason);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) {
@@ -155,8 +163,46 @@ public class MissionManager extends Node {
         if (netNode instanceof NetworkManager net) net.broadcastWorldEvent(eventType, missionId, 0f, args);
     }
 
+    /** Push (or clear, with null) the mission layer of {@code FactionManager}. */
+    private void applyMissionFactions(com.openworld.character.FactionTable table) {
+        Node fmNode = getNodeOrNull("/root/FactionManager");
+        if (fmNode instanceof com.openworld.character.FactionManager fm) fm.applyMissionTable(table);
+    }
+
+    /**
+     * The mission table's resource path for the client mirror, "" when there is none. A table built in
+     * code has no path and cannot be mirrored; hostility is only ever decided on the host (AI targeting),
+     * so a client missing it loses nothing today.
+     */
+    private static String factionTablePath(MissionInfo info) {
+        if (info.factionTable == null) return "";
+        String path = info.factionTable.getPath();
+        return path == null || path.contains("::") ? "" : path;   // a sub-resource ("x.tres::id") has no loadable path
+    }
+
+    /** Start a mission from a {@code MissionInfo} {@code .tres} path (probe/debug entry point). */
+    @Register
+    public boolean startMissionFromPath(String path) {
+        if (!(GD.load(path) instanceof MissionInfo info)) return false;
+        startMission(info);
+        return true;
+    }
+
+    /** {@link #completeMission} for GDScript probes. */
+    @Register
+    public void completeMissionNow(String winningFaction, String outcomeVariant) {
+        completeMission(winningFaction, outcomeVariant);
+    }
+
     public MissionInfo getActiveMission() { return activeMission; }
     public boolean isActive() { return active; }
+
+    /** Probe/console readouts. Question-named so godot-jvm does not read them as bean accessors. */
+    @Register
+    public boolean missionActiveNow() { return active; }
+
+    @Register
+    public String activeMissionIdNow() { return active && activeMission != null ? activeMission.missionId : ""; }
 
     // ── EventBus listener ─────────────────────────────────────────────────────
 

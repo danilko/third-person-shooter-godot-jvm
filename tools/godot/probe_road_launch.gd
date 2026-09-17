@@ -3,6 +3,9 @@ extends SceneTree
 ##
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_road_launch.gd
 ##       (the gate: GATE_CASES)   or   -- --lane=link_R1 --speed=35 --offset=-3 --seconds=15   (one case)
+##       -- --world=res://src/main/resources/com/openworld/world/World.tscn --lane=shrine_touge_F0 ...   (another scene)
+##       -- ... --corner-accel=0   (a single case drives with the traffic brain's own corner governor unless told
+##       otherwise; GATE_CASES turn it off, because they exist to reach the parapets at speed)
 ##
 ## Runs the real DebugWorld with its two streamed Road Kit pieces, puts one Vehicle.tscn on a named lane
 ## with LaneDriveProbeController (the ordinary traffic brain, aimable by name, blind to other cars,
@@ -91,7 +94,7 @@ func _trace(f: int, vy: float, dv: float, ln: String, lat: float, p: Vector3) ->
 	print(line)
 	return causes
 
-func _spawn(lane_name: String, speed: float, offset: float) -> bool:
+func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float = -1.0) -> bool:
 	var lane := _lane(lane_name)
 	if lane == null:
 		return false
@@ -109,6 +112,8 @@ func _spawn(lane_name: String, speed: float, offset: float) -> bool:
 	ctrl.set("junction_throttle_scale", 1.0)
 	ctrl.set("turn_slowdown", 0.3)
 	ctrl.set("lateral_offset", offset)
+	if corner_accel >= 0.0:
+		ctrl.set("corner_lateral_accel", corner_accel)
 	car.add_child(ctrl)
 	world.add_child(car)
 	car.global_position = at + Vector3(0, 0.8, 0) + dir.cross(Vector3.UP) * offset
@@ -127,7 +132,7 @@ const GATE_CASES := [
 ]
 
 func _initialize() -> void:
-	world = (load(WORLD) as PackedScene).instantiate()
+	world = (load(_arg("world", WORLD)) as PackedScene).instantiate()
 	root.add_child(world)
 	current_scene = world
 	var player: Node3D = world.get_node("Characters/Player")
@@ -135,11 +140,12 @@ func _initialize() -> void:
 	player.global_position = PARK
 	var cases: Array = GATE_CASES
 	if _arg("lane", "") != "":
-		cases = [[_arg("lane", ""), float(_arg("speed", "35")), float(_arg("offset", "0")), float(_arg("seconds", "15"))]]
+		cases = [[_arg("lane", ""), float(_arg("speed", "35")), float(_arg("offset", "0")), float(_arg("seconds", "15")),
+				float(_arg("corner-accel", "-1"))]]
 	var total := 0
 	var failed := []
 	for c in cases:
-		var n: int = await _case(c[0], c[1], c[2], c[3])
+		var n: int = await _case(c[0], c[1], c[2], c[3], c[4] if c.size() > 4 else 0.0)
 		if n < 0:
 			print("RESULT: FAIL (lane %s never streamed in)" % c[0])
 			quit(2)
@@ -151,14 +157,15 @@ func _initialize() -> void:
 	print("RESULT: %s" % ["PASS" if total == 0 else "FAIL"])
 	quit(0 if total == 0 else 1)
 
-func _case(lane_name: String, speed: float, offset: float, seconds: float) -> int:
+func _case(lane_name: String, speed: float, offset: float, seconds: float, corner_accel: float) -> int:
 	var waited := 0
 	while _lane(lane_name) == null and waited < 60 * 30:
 		await physics_frame
 		waited += 1
-	if not _spawn(lane_name, speed, offset):
+	if not _spawn(lane_name, speed, offset, corner_accel):
 		return -1
-	print("probe: %s at %.0f m/s, offset %.1f m, streamed after %.1f s" % [lane_name, speed, offset, waited / 60.0])
+	print("probe: %s at %.0f m/s, offset %.1f m, corner governor %s, streamed after %.1f s" % [lane_name, speed, offset,
+			str(ctrl.get("corner_lateral_accel")) + " m/s2", waited / 60.0])
 
 	var prev_vy := 0.0
 	var launches := 0
@@ -228,13 +235,13 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float) -> in
 					by_cause[k] = int(by_cause.get(k, 0)) + 1
 			else:
 				off_road_launches += 1
-			print("  %s t=%.2f  vy rose %.2f m/s in %.2f s  speed %.1f  lane %s  %.2f m right of it  from: %s"
+			print("  %s t=%.2f  vy rose %.2f m/s in %.2f s  speed %.1f  lane %s  %.2f m right of it  at (%.0f, %.0f, %.0f)  from: %s"
 					% ["LAUNCH" if on_road else "off-road bounce", f / 60.0, rise, WINDOW / 60.0,
-					car.linear_velocity.length(), ln, lat, ", ".join(why.keys())])
+					car.linear_velocity.length(), ln, lat, p.x, p.y, p.z, ", ".join(why.keys())])
 		if f > 60 and (p.y < -30.0 or (is_finite(lat) and absf(lat) > 25.0)):
 			respawns += 1
 			print("  t=%.1f car off the network (y %.1f, lane '%s', %.1f m right of it) -- respawning" % [f / 60.0, p.y, ln, lat])
-			if respawns > 2 or not _spawn(lane_name, speed, offset):
+			if respawns > 2 or not _spawn(lane_name, speed, offset, corner_accel):
 				break
 			prev_vy = 0.0
 			hist.clear()

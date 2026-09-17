@@ -1,13 +1,13 @@
 # World rebuild — island v3 from the ground up
 
-> **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — `W17` is decided with Terrain3D step 4 (item 3.1: dropped if the road addon is retired); `W7`+`W11` are 3.3, `W8` is 3.4, `W6` is 3.5, Step 3 is 3.6 — re-scoped onto the Godot-authored Road Kit (road-generator was removed 2026-09-13), not built in Blender. This file stays as design, measurements and history.
+> **Open work from this document now lives in `PLAN.md`'s Work queue (the one prioritized plan, 2026-09-13)** — `W17` is closed (2026-09-17); `W7`+`W11` are 3.3, `W8` is 3.4, `W6` is 3.5, Step 3 is 3.6 — re-scoped onto the Godot-authored Road Kit (road-generator was removed 2026-09-13), not built in Blender. This file stays as design, measurements and history.
 
 **Status: STEP 1 DONE, STEP 2 ALL BUT DONE — the whole island's ground and roads are playable
 in-game as one BASE piece (2026-08-29), walk-tested 2026-08-30, and since then the sea has a FLOOR,
 a BEACH and a SWIM VOLUME, the bay has a BRIDGE, the world has an edge, the spur has a mountain
 road, lanes are arcade-wide, the network is JOINED where it meets, and the streets have a KERB AND
 A PAVEMENT (2026-09-04).** `W1`–`W5`, `W9`, `W10`, `W12`, `W14`–`W16` and `W18`–`W20`, `W22` are closed;
-`W6`–`W8`, `W11` and `W17` stand. Written 2026-08-28, picked up 2026-08-29. **Everything still open is in one
+`W6`–`W8` and `W11` stand (`W17` closed 2026-09-17). Written 2026-08-28, picked up 2026-08-29. **Everything still open is in one
 place — ["Open items — the follow-up register"](#open-items--the-follow-up-register).**
 `check_island_ground.py` reads **12 of 12**, and the world is **4032 m / 8×8 districts**
 (`island_v3_geom.SCALE = 2.0`) with the gate still green. What step 1 took — and the one finding
@@ -1406,7 +1406,7 @@ them controls.
 
 
 
-**`W17` — `Auto Setback` is not idempotent, and its docstring says it is.** Pressing it a second
+**`W17` — `Auto Setback` is not idempotent, and its docstring says it is.** **CLOSED 2026-09-17** — the distance is solved from the arms alone at a fixed search start, the centre is the least-squares crossing of the mouths' axis lines, and the passes repeat to a fixed point; a second press moves nothing. See CLAUDE.md "`Auto Setback` IS IDEMPOTENT NOW". What it was: Pressing it a second
 time on the island moved 17 of 35 mouths by up to 30 m, and a fourth press by 58: a monotonic
 runaway, because `recommended_tail_length` only ever searches UPWARD from the widest mouth it is
 handed, while the mouths themselves move the centroid it measures from — and the AUTO facings are
@@ -1600,7 +1600,7 @@ Also:
     python3 tools/island_v3_reach.py                   # W2's gate: reach %, and WHERE the gaps are
 
 **Pick up the work at ["Open items"](#open-items--the-follow-up-register).** `W1`–`W5`, `W9`, `W10`,
-`W12`–`W16`, `W18`–`W23` are closed; `W11` and `W17` are found and open, and
+`W12`–`W23` are closed (`W17` on 2026-09-17); `W11` is found and open, and
 `W6`–`W8` are planned.
 `W7` (the local street grid) is the one that moves the reach number, and `island_v3_reach.py` says
 exactly where to put the streets.

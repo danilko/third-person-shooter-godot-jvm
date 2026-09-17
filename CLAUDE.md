@@ -111,8 +111,8 @@ src/test/java/com/openworld/net/   # headless unit tests for the engine-free net
 ```
 
 > AutoLoads (`project.godot`): `EventBus`, `GameManager` (`game`), `MissionManager`
-> (`game.mission`), `NetworkManager` (`net`), `PlayerRegistry` (`game`), `SpatialEntityGrid`
-> (`world`), `FactionManager` (`character`), `ZoneManager` (`world`),
+> (`game.mission`), `MissionDirector` (`game.mission`), `NetworkManager` (`net`), `PlayerRegistry`
+> (`game`), `SpatialEntityGrid` (`world`), `FactionManager` (`character`), `ZoneManager` (`world`),
 > `StimulusManager` (`world`).
 
 ---
@@ -253,6 +253,282 @@ Use these setters, **not** a raw `characterInfo.faction = …` write, so the cha
 Part F). Behaviours that *react* to factions (a bystander fleeing when a fight erupts, corner
 detection that triggers a swap) are AI-perception features not built yet — they'll land with Part E2
 `StimulusManager` / the AI FSM.
+
+#### Presets, wildcard rows and the mission layer (F2, 2026-09-17)
+
+- **The rule has one engine-free owner: `character.FactionRules`** (`FactionRulesTest`, 7 cases).
+  `FactionManager.areHostile` and `FactionTable.relationship` both call it. The order is: `neutral`
+  is never hostile, then an exact pair (either direction), then a **wildcard row**, then the default.
+- **Wildcard row.** `"civilian>*"` (or `"*>civilian"`) means "toward every OTHER faction". It is how
+  a preset says "civilians are neutral to everyone" without listing each faction and going stale when
+  one is added. It never applies to a faction and itself. If both sides carry wildcards that disagree,
+  the LESS hostile one wins, so a civilian stays out of a hostile-to-all faction's fight.
+  `FactionTable.row` checks `containsKey` before `get`, because godot-jvm's `Dictionary.get` on a
+  missing key is not guaranteed to return null.
+- **Presets** in `character/`, beside `DefaultFactions.tres`:
+  - `OpenWorldFactions.tres`: player, police, gang_a, gang_b, civilian. Civilians are neutral to all,
+    police are neutral to the player and hostile to both gangs.
+  - `GangA_vs_Police.tres`: gang_a DESPISES police, the player sides with police, gang_b sits it out
+    (`gang_b>*` NEUTRAL).
+  - `Faction` gained `POLICE`/`GANG_A`/`GANG_B`/`CIVILIAN` constants and nameplate colours.
+- **Three layers, one live table.** The live table is a `duplicate(true)` of the highest layer
+  present: mission (`applyMissionTable`), then region (`applyTable`, from `RegionConfig`), then
+  `DefaultFactions.tres`. A region change while a mission runs is remembered but does not replace the
+  mission's table.
+  - Rebuilding the table discards runtime flips. That is the per-mission scope the flips want.
+  - `reset()` clears both layers.
+- **Missions.** `MissionInfo.factionTable` (`@Export`, nullable) is applied by
+  `MissionManager.startMission` BEFORE the ELIMINATE_ALL count and removed on complete and on fail.
+  - Clients get it as a resource path in `WORLD_EVENT_MISSION_STARTED`'s second argument
+    (`GameManager.applyMissionStarted`). A table built in code or embedded as a sub-resource has no
+    loadable path and is not mirrored. That loses nothing today: hostility is only decided on the host.
+  - Worked example: `game/mission/GangA_vs_Police_Mission.tres`.
+  - `MissionManager.startMissionFromPath` / `completeMissionNow` and `FactionManager.activeLayerNow` /
+    `hostileNow` are registered for probes. So is `AICharacter.targetIdNow`.
+- **Gate `tools/godot/probe_faction_presets.gd`** (21/21, stable over 3 runs). It uses real AI that
+  stand still and think, plus a Player.
+  - Control, shipped defaults: the policeman targets the nearest body, the civilian.
+  - `OpenWorldFactions` as the region layer: police target a gang, and nobody targets or is targeted
+    by the civilian.
+  - The mission layer: police and gang_a target each other, gang_b and the civilian are left out, and
+    a region change does not replace the layer.
+  - Armed with ASR1s through real pickups, police and gang_a damage each other and nobody else.
+  - Completing the mission restores the defaults.
+  - Probe trap: with `MovementController` off, a target 90° to the side stays past the aim reach and
+    W21's fire gate holds every shot. The policeman targeted gang_a for 20 s with a full magazine.
+
+---
+
+### The story layer — MissionDirector (`com.openworld.game.mission`, AutoLoad, F1, 2026-09-17)
+
+The one owner of story logic, beside `MissionManager`, which keeps objective TRACKING. The split is
+the whole design: **"may this mission run" is campaign state; "is it won yet" is not.** Four jobs.
+
+- **NamedCharacterRegistry** — `characterId → live AICharacter`. **Registration has ONE owner,
+  `AICharacter._ready()`**, gated on `@Export storyCharacter`; `ZoneManager.spawnNamed` sets that flag
+  before `addChild` so a streamed `NamedCharacterConfig` and a hand-placed story AI take the identical
+  path. **The flag exists because the ID cannot answer the question** — an ambient AI's id is a random
+  UUID and a named one's is authored, and those are the same type of string. A second body claiming a
+  live id is refused and reported (which boss you commanded must not depend on streaming order); one
+  replacing a FREED node is the ordinary zone reload. `_exitTree` drops the entry, so the map is
+  authoritative about "is the boss loaded right now" with no tree scan.
+- **`commandCharacter(id, ScriptCommand)`.** `ScriptCommand` is a `Resource` whose every field is a
+  command with an explicit **do-nothing sentinel** (`targetState = ""`, `move = false`,
+  `invincible = KEEP`), never a mirror of the AI's state — so a partly-filled order cannot quietly
+  reset the rest of the body. `move` is a separate flag from `moveTo` because **(0,0,0) is a legal
+  destination** (it is the spec's own verify case), so "is the vector set" is not derivable.
+  `assignSquad` is code-set rather than exported: a `.tres` cannot hold a node.
+- **`triggerBeat(beatId)`** — runs the Java handler registered under that id (beats are methods, not a
+  scripting language) and emits `EventBus.missionBeatTriggered` either way, so a beat with no logic yet
+  is still an event dialogue/HUD can hang off. `ZoneTrigger` (F3) is the caller that is still missing.
+- **The mission-output graph.** A completion folds `(missionId, outcomeVariant)` into an accumulated
+  set and re-evaluates an append-only unlock table. **Idempotent on variant** (a replay adds no branch,
+  so the tree is bounded by `missions × variants`, not by replay count), **sticky** (a branch once open
+  never closes), and unique items granted exactly once via `grantUniqueOnce`'s membership check.
+  **Ordinary rewards have no code here on purpose** — there is nothing to gate, and a field nothing
+  reads is wrong the day something reads it. It listens to **`EventBus.missionCompleted`**, which fires
+  on *every* peer (a client gets it mirrored by `GameManager.applyMissionCompleted`), so every peer's
+  graph advances with no new message — and the idempotency is what makes that safe.
+
+**Commands are host-side, and that needs no gate:** only the host runs an `AIController`; a client's
+copy of the same body is a puppet, so `commandCharacter` returns false there and the motion it causes
+on the host replicates the ordinary way. A beat script may therefore run on both peers without knowing
+which it is.
+
+**`ScriptedMoveState` — an order is not a mood.** Nothing in the world cancels it: not sight of an
+enemy, not being shot, not gunfire. The autonomous states are the opposite by design, and mixing the
+two gives a cutscene walk a passing civilian can derail. The director cancels it (`releaseCharacter`,
+or the next command). **A NavAgent off the navmesh does not go silent — it lies:** with no navigation
+map under the body it reports `isNavigationFinished() == false` forever and hands back the body's own
+position, one tick stale, so the steering vector points exactly BACKWARD along its own travel and
+feeds itself — measured on the bare probe stand, the AI ran from 20 m off the origin to **110 m in
+30 s**. The agent is believed only while its next point is a real step ahead (`NAV_MIN_STEP` 0.5 m);
+otherwise the destination answers. Arrival is likewise asked of the DESTINATION, never of
+`isNavigationFinished()` alone — an arrival that is a lie fires the next beat in the wrong place.
+
+**Invulnerability is one flag in one place**, `Health.invulnerable`, checked at the top of
+`applyDamage` — the single site every source funnels through (bullet, blast, fall, a relayed client
+request), so it can never mean "immune to some damage". `@Visible`, not `@Export`: live mission state,
+not something a scene authors. Not replicated — the host is the only peer that applies damage.
+`releaseCharacter` clears it with the order, so a beat cannot leave someone immortal.
+
+**A mission vehicle is not ambient traffic** (the `TERRAIN3D_TRANSITION.md` note, now enforced).
+`registerMissionEntity(key, node, failOnLoss)` is the declaration; `ZoneManager` asks
+`isMissionProtected` in ONE place — before the reclaim, not inside each of the seven reclaim reasons —
+and `freeTrafficCar` leaves a protected car and its driver exactly as they are, dropping only the
+pairing. From there the MISSION owns them: registering an entity is taking responsibility for it.
+Losing one registered `failOnLoss` calls **`MissionManager.failMission`** — the mission system's rule,
+never the streamer's. Loss is detected as a FREED node rather than a `Health.died` connection, because
+a wreck replaced by a wreck scene emits nothing a mission could hear.
+
+**The debug console** (`debug.DebugConsole`, **backtick** via `DebugHarness`) is F1's stated
+prerequisite: iterating a beat in one session instead of one restart per edit. Built in code like
+`PerfDebugOverlay`, so no scene wiring; opening it sets `inputBlocked` on every registered local player
+and frees the mouse (otherwise typing "state" walks the player and shoots). Its command table is
+hand-written, not reflective — a typo in a reflective console is a silent no-op — and everything it
+drives is already a `@Register`ed method, the same surface a probe uses, so it can never reach further
+into the game than the gates can. `named / move / state / invincible / release / beat / mission
+start|complete|fail / unlock / close`.
+
+**Gate `tools/godot/probe_mission_director.gd`** (34/34; `-- --control` turns the boss's
+`story_character` flag off and fails 11). Real AI bodies on a bare stand, with a **Player in the scene
+because an AICharacter with no player within 80 m is LOD-FROZEN and never thinks** — it is also the
+hostile the scripted walk must ignore. Cases: the registry (an ambient AI is not in it; a duplicate id
+refused; a freed body leaves it), the spec's own verify (`command_move_to` origin → SCRIPTED_MOVE,
+20.44 m → **1.20 m in 6.8 s**), the order held for the whole walk past a hostile, an invincible boss
+taking **0 hits from a 1e6-damage kill** and dying the moment it is released, beats, the graph (locked
+→ wrong variant does not open it → the declared one does → replay adds no branch → sticky), the
+director refusing to start a locked mission and starting it once unlocked, a mission entity freed
+failing the ACTIVE mission by name, and the console reaching the director. **Not covered, on purpose:**
+`ZoneManager`'s half of the vehicle rule needs a streamed zone with live traffic
+(`probe_traffic_spawn.gd`'s stand), so what this asserts is the ANSWER the streamer reads.
+
+### The caller the story layer was missing — `world.ZoneTrigger` (F3, 2026-09-17)
+
+F1 built `triggerBeat` and nothing in the world called it. `ZoneTrigger` is an `Area3D` an artist
+drops in a scene: the right body enters, it fires one beat, and **that is the whole of it** — mission
+start zones, objective markers, ambush triggers and cutscene entries are all the same volume with a
+different beat id. What the beat DOES stays a Java handler registered by id on the director, so a
+trigger can never become a second place story logic lives; a beat with no handler still emits
+`EventBus.missionBeatTriggered`, so an authored volume is useful to dialogue and HUD before any Java
+exists for it.
+
+- **"Has this already fired" is the DIRECTOR's answer, not a flag on the node.** `oneShot` asks
+  `MissionDirector.beatFireCount(beatId)`, and that is load-bearing rather than tidy: a trigger
+  authored inside a streamed zone's geometry is **freed and re-instanced every time the player walks
+  away and back**, so a local flag re-arms the ambush on every pass with nothing to see. The
+  director's fired-beat log is campaign state and outlives the node — and `resetCampaign()` re-arms
+  every trigger with it, which is the same answer for the same reason. `campaignOneShot` is the
+  control knob (`@Visible`, always on) that puts the local flag back, and the gate measures it.
+- **The mask is not authored.** `_ready` states `CHARACTER | VEHICLE` itself. A seated occupant is on
+  collision layer **0** (`CharacterDriveState.enter`), so without the VEHICLE half a player who
+  DRIVES to the mission marker trips nothing — and an area whose mask silently excludes the thing it
+  watches for looks exactly like a trigger that was never wired. A carrier hands the trigger whichever
+  seated occupant qualifies. `carrierAware` is that half's control knob.
+- **Every peer fires its own.** The volume is symmetric — a client's copy fires as the client's copy
+  of the body arrives — which is the director's own rule that a beat script runs on both peers without
+  knowing which it is. A beat whose EFFECT is host-authoritative is gated inside its handler, exactly
+  as `commandCharacter` already is. A `hostOnly` flag on the volume would move that decision into the
+  scene, away from the only thing that knows the answer.
+- **Gates that need no code**, each one export and each one a real authoring case:
+  `requiredMissionId` (an ambush does not fire before its mission), `requiresBeat` (objective markers
+  in sequence — otherwise marker 2 fires as you walk past it on the way to marker 1), and
+  `requiredCharacterId` (the escortee's drop-off, not the player's). `showDebugVolume` draws the box
+  or sphere (armed yellow, spent green), off by default — unlike a zone marker there are many.
+- **The escort order the verify needed did not exist.** `commandCharacter` could enter `ESCORT` but
+  not say WHOM to escort, so `ScriptCommand.escortTarget` (a live node, therefore code-set like
+  `assignSquad`) and `MissionDirector.commandEscortPlayer(id)` are new. The target is resolved through
+  `PlayerRegistry` rather than passed in, because a beat fires from a volume that knows nothing about
+  which player tripped it and in co-op "the player" is whichever one is there.
+
+**Gate `tools/godot/probe_zone_trigger.gd`** (16/16; `-- --control` turns both knobs off and fails
+exactly 2). The spec's own verify is case 1 and is a REAL walk — the player's own `PlayerController`
+reading the `forward` action — into the volume, which fires the beat, whose listener orders the boss
+to escort; the rest teleport, which crosses the boundary the same way. Also: an ambient AI does not
+trip a player trigger, a re-streamed trigger node stays silent for a spent beat, the three gates each
+refuse and then admit, a player who DRIVES in trips it (mask 18), and a trigger with no beat id is
+inert. **What is NOT asserted, on purpose: metres walked while escorting.** The escort MOTION is
+`EscortState`'s and is nav-driven, and this bare stand has no `NavigationRegion3D`, where a NavAgent
+reports "not finished" forever and hands back the body's own position — so the gate asserts the ORDER
+the trigger delivered (the state, and who is being escorted).
+
+**Probe trap, and it is the shared-sub-resource rule from the other side:** a `.tscn`-embedded
+`CharacterInfo` is SHARED by every instantiation, and `Character._ready` only privatizes one whose id
+is still **empty** — so a probe that stamps the scene's own resource *renames every AI it spawned
+before*. Spawning `ambient_01` silently renamed the boss, and the case keyed on `requiredCharacterId`
+failed with "not boss_01" while the registry (keyed by the string handed in at registration) still
+said the boss was loaded. Both this probe and `probe_mission_director.gd` now build a fresh
+`CharacterInfo` per body, which is the codebase's own "own identity in code, not the scene" rule.
+
+### The campaign save — `game.SaveSystem` (I7, AutoLoad, 2026-09-17)
+
+One JSON document per slot under `user://saves/`, written and read with Godot's own `FileAccess`.
+It carries the campaign graph, the faction flips, which mission was running, and each player's
+position / facing / health / slot manifest. **Which pieces are in it is the whole design**, and four
+rules decide it:
+
+- **Progress is saved; AUTHORING is not.** `MissionDirector.declareUnlock` rows say which variants
+  open which mission — that is content, re-declared by the same Java every launch. A saved copy would
+  be a second owner that goes stale the day the campaign is edited, with the stale copy winning. What
+  is saved is only what the player's play produced: the achieved `(missionId, variant)` set, the
+  completed missions, the sticky `unlocked` set, the granted unique items.
+- **The fired-beat log is campaign state, not a debug counter.** F3's `ZoneTrigger` decides "has this
+  already fired" by asking `MissionDirector.beatFireCount`, precisely so a trigger inside a streamed
+  zone cannot re-arm when the zone reloads. A save that left the log out would re-arm **every
+  one-shot trigger in the world** on load — the ambush you already sprang, waiting for you again —
+  with nothing on screen to say why. `SaveSystem.saveFiredBeats` (`@Visible`, always on) is the
+  control knob the gate measures that with, and it is 3 of the probe's checks.
+- **An interrupted mission RESTARTS; it does not resume mid-flight.** AI bodies are not saved (a
+  streamed world respawns its crowds), so a restored "3 of 7 left" counter would be counted against a
+  fresh crowd of 7 — a number that is simply untrue. The slot records the mission's id and its `.tres`
+  path and `loadSlot` starts it again **through the director**, so the unlock predicate still decides
+  whether it may run and a save cannot smuggle a locked mission back in. That is also what GTA does
+  with a save taken during a mission. A mission built in code or embedded as a sub-resource has no
+  loadable path (the limit `MissionManager` already documents for its client mirror), so it is
+  recorded by id and reported as unresumable rather than half-restored.
+- **Only what RUNTIME changed is saved of the factions.** `getActiveRelationships()` — the late-join
+  net baseline — returns the whole live table, which is a copy of the shipped/authored `.tres` with
+  the flips written into it, so saving that would freeze the shipped defaults into the slot and let an
+  old save silently win over an edited preset. `FactionManager.runtimeFlips` records exactly the
+  `setRelationship` calls that are still live (cleared by `rebuildLiveTable`, which IS the documented
+  "a layer change discards runtime flips" rule) and `getRuntimeOverrides()` is what the slot carries.
+  The region and mission LAYERS are not saved either: each is re-applied when its region streams in or
+  its mission restarts.
+- **The host's save is canonical and needs NO new message.** `saveSlot` refuses on a client
+  (`save_refused_client`). A load on the host reaches every client through seams that already exist:
+  the faction flips ride `FactionManager.setRelationship`'s world event, the mission restart rides
+  `WORLD_EVENT_MISSION_STARTED`, and inventory converges through the periodic `MSG_INVENTORY`
+  manifest. An RPC here would be a second way to say what the wire already says.
+
+**The player key is the id that is stable ACROSS LAUNCHES, and that is not the same field in both
+cases.** A remote player's `characterId` IS their `PersistentPlayerId` (`GameManager.onPeerIdentified`
+makes it so on first join), while a locally-owned body carries a per-launch UUID — so the local body
+is keyed by `PersistentPlayerId.getOrCreate()`, the id this install would identify as if it were the
+client. One rule, both cases, and the key survives a host/client role swap. A record whose body is not
+live yet is **held** (`pendingPlayerCount()`) and applied as that body appears, so loading before or
+during a scene coming up works, and a client that joins after the load still gets its own record.
+
+**Nothing new was written to read or apply state.** Inventory is `WeaponController.buildInventoryEntries`
+/ `applyReplicatedInventory(entries, addOnly=false)` — the N2 manifest path, with `addOnly` false
+because the owned-body guard exists to stop a *lag-stale* manifest fighting live input, and a document
+read off disk has nothing to race. Health is `Health.applyReplicatedHealth`, which is already the "set
+the number, fire no damage event" path; a save taken while dead is not resurrected into a corpse (a
+non-positive value is left alone). `MissionDirector.restoreCampaign` is a REPLACE, then
+`reevaluateUnlocks()`, so a requirement declared by this launch's code that the restored achievements
+already satisfy opens with everything else.
+
+**Autosave** (`autosaveEnabled`, slot 0) fires on `EventBus.missionBeatTriggered` and
+`missionCompleted` — the F3 hook I7 asked for, now that a beat has a caller. The debug console gained
+`save [slot]` / `load [slot]`.
+
+**Registration shapes that had to be worked around**, all the same quirk: godot-jvm merges a JavaBean
+accessor with its field into one property, so a registered `setX` with no getter does not compile and
+a registered `getX` with no setter registers READ_ONLY. The probe needed four things GDScript could
+not reach, and each is a question-named reader or a differently-named action beside the original:
+`FactionManager.flipRelationship` (beside `setRelationship`), `Health.healthNow` (beside
+`getCurrentHealth`), `WeaponController.activeSlotNow` (beside `getReplicatedActiveSlot`) and
+`MissionManager.missionActiveNow` / `activeMissionIdNow` (beside `isActive`). `FactionManager.reset`
+and `Health.applyReplicatedHealth` are not accessor-shaped and were annotated in place.
+
+**Gate `tools/godot/probe_save_system.gd`** (36/36; `-- --control` turns `saveFiredBeats` off and
+fails exactly 3). Its method is the spec's own verify, and the middle step is the part that matters:
+reach a state, save, **LOSE that state in the same session** (the stand-in for quitting), load, and
+find it back — a probe that only saves and loads cannot tell a working restore from a state that never
+went away. Cases: the graph (a declared unlock, an achieved variant, a granted unique item), a faction
+flip, a real ASR1 taken through the ordinary pickup path with a hand-set magazine, position and
+health; the file itself (schema, the four blocks, one player); everything wiped; everything restored,
+onto the SAME weapon node rather than a duplicate; a real one-shot `ZoneTrigger` dropped on the player
+after the load staying silent; the running mission recorded with a loadable path and restarted; and a
+missing slot refused rather than half-applied. **The faction flip has to DIFFER from the shipped
+default or it is unobservable** — two different factions are hostile by the inherent rule, so a flip
+to HOSTILE proves nothing and the case uses FRIENDLY (it cost one false pass first).
+
+**Not covered, on purpose:** the client refusal and the co-op mirror need two processes
+(`tools/net/run_net_*.sh`'s shape), so what this asserts is the ANSWER each seam reads. World entity
+state — which AI are dead, which pickups are gone, where the traffic is — is **not** saved at all, and
+that is the boundary the mission-restart rule above is drawn around.
+
+---
 
 ---
 
@@ -554,6 +830,8 @@ route-finished churn = broken junction wiring).
 turns at full cruise speed and fly off. Phase 2 (JunctionArbiter FCFS grant sets + timed signals
 keyed on the baked `approach`/`turn`) and Phase 3 (highway ring + ramps + `speedLimit`) are next —
 see PLAN.md "Roads & Traffic v2".
+Since 3.2d cars also hold a CORNER SPEED, `sqrt(cornerLateralAccel·R)` braked for ahead of every bend on the
+lane (`VehicleAIController.cornerSpeedLimit`, 4 m/s²; see "The touge, driven and fixed").
 
 **Known noise:** instancing `Vehicle.tscn` from code logs a `CharacterInfo` ClassCastException
 (the scene-embedded sub-resource's JVM script binds late, so the setter receives a plain
@@ -1039,10 +1317,34 @@ placed each mouth on a ray from the pad CENTROID, which is on none of the roads:
 crossing on a symmetric X (which is why it was invisible), **12 m** off it on a 5-arm pad, enough
 to leave one approach 40° from its own alignment and 3.54° from the next arm — two carriageways
 leaving on top of each other. The centre is projected onto each mouth's own axis first, so a mouth
-can only slide along its road. **Still open (`W17`): `Auto Setback` is not idempotent** — pressing
-it twice moved 17 of 35 mouths by up to 30 m and a fourth press by 58, because
-`recommended_tail_length` only searches upward from the widest mouth while the mouths move the
-centroid it measures from. The build presses it once; do not press it twice by hand.
+can only slide along its road.
+
+**`Auto Setback` IS IDEMPOTENT NOW, AND THE DISTANCE COMES FROM THE ARMS ALONE** (2026-09-17,
+`W17` closed). It moved 17 of 35 island mouths on a second press, and on DebugRoads 52, 34, 43, 84
+and 69 m on five presses, the fifth turning an AUTO arm round. Three inputs moved with the mouths:
+- **The search start.** `recommended_tail_length` grows ×1.3 from `start`, and its overshoot is not
+  monotone, so the start is part of the answer (DebugRoads' east pad: 42.4 m from 5, 57.9 from 12,
+  50.7 from 30). `auto_setback` passed the widest mouth, so each press fed the next. And
+  `solved_setback`'s default was `start=0.0`, and `0 × 1.3` never grows, so the seeder only ever got the
+  corner term and never ran the turn search. The default is `None` now, the search's own 12 m, for
+  every caller. **Consequence: an unlocked mouth further out than the solve comes IN**
+  (RoadKitSample's provisional 14 m mouths go to 12). The override is `setback_locked`, which the
+  setback handle and a mouth drag already set.
+- **The centre.** The mouths' centroid moves when a mouth slides. `point_solve.axis_crossing` is the
+  least-squares point nearest every mouth's axis LINE, which a slide along that line does not move.
+- **An AUTO axis is a chord through the opposite mouth across the pad**, so the passes repeat to a
+  fixed point (`SETBACK_SETTLE_TOL` 1e-5 m; DebugRoads settles in 3 passes).
+
+A mouth is never slid over the station beyond it: it stops `point_validate.MIN_MOUTH_CLEAR` (10 m)
+short along its axis. `auto_setback(clamped=)`, the CLI's `clamped` list and the dock message name it,
+with the gate's remedy (delete the station or lock the mouth). Measured: DebugRoads settles on press 1
+(58.6 m) and moves 0 on presses 2–4, and RoadKitSample the same (2.0 m, then 0). `point_solve`
+self-test (21) builds a crossing whose two roads bend through it, with four AUTO mouths whose axes
+pass metres from their centroid. On it, presses 2–4 move nothing, the seeder's number equals the
+solved one, and a station 22 m out holds its mouth 10 m short. Controls: HEAD's `auto_setback` fails
+"press 2 moved mouths", and the old single pass drifts 1.79, 0.99, 0.68 m on successive presses.
+DebugRoads' committed record was not re-pressed: its authored east pad is still the shallow 4-arm one
+that a press grows to 58 m.
 
 **A GESTURE THAT HANDS OUT A `JUNCTION` LINK OWES THE WHOLE PAD** (2026-09-04,
 `ROAD_POINT_GRAPH.md` §8q, `WORLD_REBUILD_PLAN.md` `W19`). A pad is three facts written together —
@@ -1607,6 +1909,51 @@ Details that matter:
   far side of a wall is pulled back to the chest exactly as a local shot would be.
 - Shotguns resolve the sight leg + origin **once** per trigger pull and only re-sample the cone per
   pellet.
+
+### A long ray steps over a small, far hitbox: short windows near each body (PLAN.md P0 0.4, 2026-09-17)
+
+User report: "standing, a still enemy, the first scoped shot does not hit". The cause is in the physics engine,
+not the aim. **Jolt's ray test against a small capsule fails when the ray STARTS far from it.** A ray aimed
+exactly at a capsule's centre reports nothing once the radius is under about **2.4e-4 × the start distance**.
+`tools/godot/probe_ray_capsule.gd` measures it on bare capsules:
+- a thigh-sized capsule from 250 m: 28 misses in 400 rays;
+- the same from 5 m: 0;
+- from 5 m with the ray carried 500 m PAST it: 0.
+
+So the start distance matters, not the ray length. A float32 discriminant cancelling in the analytic
+ray-capsule solve fits every case. For this character's hitboxes the unsafe distance starts at 60 m (hand_l,
+r 1.4 cm), 127 m (hand_r), 200 m (arms, feet), 232 m (thighs, r 5.6 cm) and 540 m (spine_03).
+
+In DebugWorld (`probe_sniper_world.gd`, thigh at 250 m, still target, player standing) the probe's scope
+line hit the thigh, while the shot's own report ended on Terrain3D **490 m out**. The bullet had gone
+straight through the hitbox. A per-frame monitor measured the physics server's bone transform equal to the
+node's (≤ 4 mm), and a ray at the drawn thigh centre hit NOTHING on ~8% of frames.
+
+**The fix is the Source/CS split** (`WeaponItem.trace` → `nearerSmallShape`):
+- The long query still answers the WORLD.
+- Every character or vehicle near the line is then asked again with a short ray that starts a few metres
+  before it. Engine-free `util.RayWindows` (+ `RayWindowsTest`) decides the windows:
+  - only bodies whose root is within `REACH` 3.5 m of the line, between `SAFE_START` 20 m and what the long
+    ray reached;
+  - each window runs `LEAD` 4.5 m either side of the root, so it never starts more than 8 m from its shape
+    (safe for r > 6 mm);
+  - overlapping windows coalesce only up to 12 m, so a crowd does not become one long query again.
+- The bodies come from `SpatialEntityGrid.querySegment` (new; cells along the segment's XZ, radius REACH
+  + 12 m for grid staleness), or the "characters" group where the AutoLoad is absent. A seated occupant is
+  covered by the vehicle's own window.
+- `resolveSightPoint` runs the same pass on the RayCast3D's result. Otherwise the sight point landed on the
+  ground BEHIND the target, and a third-person muzzle leg converging there passes beside it.
+
+Both the local shot and the host's `resolveServerShot` go through `trace`, and the queries honour the AimRay's
+mask and exclusions. No cost is added under 20 m. `WeaponItem.smallShapeWindows` (`@Visible`, always on)
+exists only for the control.
+
+Gate `probe_sniper_world.gd -- --from=-150,60 --only-dirs=67.5,90 --dists=250 --bones=thigh_l --repeat=20`:
+**40/40**; `--control` 3 true misses (earlier runs of the unfixed code: 5/40, 6/36). The probe gained
+`--repeat`, `--only-dirs`, `--bones`, `--monitor=N` (a per-frame ray at the drawn bone with the server
+transform) and `--verbose`. A miss prints the shot's `last_shot_report` (now with pellet end points) and a
+retrace of it. **If the engine is upgraded, rerun `probe_ray_capsule.gd`**: 0 misses on its far cases
+means Jolt was fixed and this pass could go.
 
 ### Networked shots — one seeded message per pull (PLAN.md N1, 2026-09-13)
 
@@ -4504,14 +4851,13 @@ CYCLING/RELOADING states and that the 5-frame draw settle keeps the zoom. `tools
 another attacker's damage do not, a kill is flagged). `tools/net/run_net_shot_test.sh` gained
 `hit_confirmed_local` (the client's hits are confirmed by the host; an observer gets none).
 **`tools/godot/probe_sniper_live.gd` is now a gate (item 10)**: every stationary and just-stopped HEAD
-and CHEST shot on the aimed bone (48/48), limbs ≥ 90% (69/72), scoped move speed **3.20 m/s**, a moving
+and CHEST shot on the aimed bone (48/48), every limb/edge shot (72/72; was held to 90% at 69/72), scoped move speed **3.20 m/s**, a moving
 scoped cone **0.101°** (20× base), hitboxes on the drawn body (0.000 m); `-- --control` (threshold 0, no scoped slowdown, the ordinary stop) fails 3 — stopped chest shots 3/6, limbs 63/72, speed 8.00. Three probe defects it had to
 lose first, each of which read as a game bug: the moving case fired on the first frame of acceleration
 (0.21 m/s), the run-ups walked the player ~180 m sideways so later shots met the target's own arm in
-front of its chest, and a teleport back left the camera rigs settling for a second. **Limbs are held to
-90%, not 100%, on purpose:** a 3 cm-radius arm capsule at 260 m against the cone's own 1.1 cm radius
-plus ~1 cm of steering error is a genuine graze (the capsules were measured colliding where drawn, hit
-centroids within 2 cm) — the old 90/90 was a lucky seed.
+front of its chest, and a teleport back left the camera rigs settling for a second. **Limbs were held to
+90% as "a genuine graze" — wrong:** the 3 misses were Jolt stepping over a small far capsule (see "A long ray
+steps over a small, far hitbox", 2026-09-17), and since that fix the gate asserts all 72.
 
 ## Godot-JVM Specifics
 
@@ -5049,7 +5395,7 @@ user-reported: "dragging freezes the editor", "delete like a Godot node", "every
   leaving `link_p000` + `loop_p000` a 2-arm pad; the committed version had that mouth 74° off its pad
   centre because `loop_p009` jogged 25 m north. Rebuilt as a T — loop's tail and `link` the through road,
   loop's head the stem — dropping that station, mouths on their approach lines, AUTO facings, one
-  `auto_setback` (a second pass grew it, W17): 0 errors, no finding on the pad, 0 of 465 nearby lane samples
+  `auto_setback` (before W17 was closed, a second pass grew it): 0 errors, no finding on the pad, 0 of 465 nearby lane samples
   off paving. The tail mouth is `loop_p009_jct` now.
 - Gates: `test_roadkit_native_delete.gd` (in `check_roads.sh`), and the editor self-test's new steps — SELECT
   click pass-through, a Scene-dock delete + Ctrl+Z, a record changed on disk reloaded both ways, the junction
@@ -5202,6 +5548,166 @@ station is draped 0.10 m onto the sampled Terrain3D ground (they sat up to 1.44 
 ambient cars spawned at junction-1 mouths fell out of the world within 3 s, after it none did in 240 s). The terrain keeps the
 road-generator flattening baked into its height map; the Road Kit's own corridor stamp is B7.
 
+**The island's arterials are a Road Kit network in `World.tscn` now** (2026-09-17). Before this,
+World.tscn had Terrain3D and NO roads: the 12 arterials existed only in the Blender `Island_base.blend`
+bake.
+- **Porting.**
+  - `IslandRoads.roads.json` (12 roads, 233 stations, 9 junctions) was read out of `Island_base.blend`
+    once, with `point_model.read_network` + `save_network` (what `rka.save_record` does). It was not
+    re-seeded, so every setback, fillet and pad lift the seeder solved is kept.
+  - The `IslandRoads` network node sits at **Y +0.60**, because `island_to_terrain3d.py` moved sea
+    level to Y = 0. The median station-vs-terrain difference is 0.00 m.
+  - Station `ground_z` was then re-sampled from Terrain3D (`write_roadkit_ground.gd`).
+- **Streaming.** One always-loaded `ZoneMarker` `IslandZone` (`zone_id` "island", box 4608 m, load
+  6000 / unload 9000, `geometry_world_placed` at the network's transform) streams
+  `Roads_IslandRoads_island`. That piece was built with the matching `IslandRoads.zones.json`, so a
+  later dock Build produces the same piece name and needs no rewiring. `NAV_HALF=2016` for the navmesh.
+  - `ZoneManager`'s approach log now prints only when the distance moves 10 m, because an island-wide
+    zone is always "near".
+- **Measured.**
+  - Validate: 0 errors, 2 `mouth_angle` warnings. Flow: 209 lanes, 0 broken, 0 misjoined, 1 unreached
+    (`nishi_dori_1_R0`). The 13 open ends are arterials that really end.
+  - `island_v3_reach.py --record` (new flag): **70.8%**, the same as the plan's network.
+  - The roads were stamped into World's Terrain3D. `probe_road_stamp.gd -- World.tscn IslandRoads`:
+    no ground proud of any lane or pad, stamping again changes 0 vertices, restore is exact, and 590 of
+    602 FILL samples are carried.
+  - `probe_road_ground.gd -- World.tscn` (now also places a network's resident piece): 2783 of 2833
+    PIER samples have a foot on the terrain.
+  - World.tscn boots with 0 errors and the zone loads.
+- **Two findings from the port, both closed the same day (next section):** the bay bridges stood over a
+  −88 m seabed (columns up to 113 m), and the shrine touge rode piers up to 27 m because its switchback was
+  fitted to the Python field's slope.
+
+**The seabed is −24 m, the plateau has a 1:3 east face, and the shrine touge climbs in two phases**
+(2026-09-17, user decisions). All three are edits to World's Terrain3D data plus the island record, made by
+repo tools so they can be re-run and reviewed.
+- **Seabed.** `tools/godot/set_world_depths.gd`'s `TERRAIN_FLOOR` is the seabed now: −24 m, where it was a
+  −190 m guard. A dredged harbour depth (Tokyo Bay's inner bay averages ~15 m; berths and channels run
+  ~15–24 m), and the Python island's own floor. 3.26 M texels raised, from as deep as −138 m. The shelf above
+  the floor is untouched. `shape_terrain.gd`'s `HARBOUR_MAX_DEPTH` is 24 to agree.
+- **The first mountain's east face** (`tools/island_widen_first_mountain.py`).
+  - The shrine plateau (~281 m, centre plan (−1250, 770)) fell east at ~62% on average, and up to 200% on
+    the ridges `shape_terrain.gd` laid over it. It now falls at 1:3 from its own measured edge, easing onto
+    the 0.6 m city floor. The toe moved ~400 m east, to x ≈ −130.
+  - Only the east sector is touched (−35°…0° full, 25° fade), never the sea, and west of a safety line
+    before chuo_dori.
+  - Ridges are cut only on the plateau's own face. Cutting the massif's foot (north of east) steepened what
+    was left: 2989 new >100% cells.
+  - It REFUSES a second run. A soft blend is not idempotent, and the check reads the full-strength cells.
+    Two defects surfaced through that guard: the face started above the edge threshold it is measured with,
+    and the mask used the smoothed edge instead of the raw one. Either way the edit moved its own reference.
+  - I/O: `tools/godot/dump_height_grid.gd` / `apply_height_grid.gd` write a float32 grid into a Terrain3D
+    data dir; read-back is within 1 mm.
+- **Arterials re-routed onto the new toe** (`tools/island_shrine_touge.py`, same uids so links survive).
+  - nishi_dori now leaves rinkai_dori at 71°. A first route ran out at 15°, almost along rinkai, and the kit
+    correctly solved that shallow crossing to a **102 m** setback. Every centreline sample, and 22 m either
+    side, is on ground ≤ 0.48 m.
+  - yamate_dori's and nogyo_michi's west ends lost their short first spans.
+  - A chuo_dori station 10 m past the chuo × yamate mouth was dropped: that junction now solves 1.5 m wider
+    (`station_crowds_mouth`).
+  - `roadkit_cli.py setback` re-solved all 9 junctions. It moves every unlocked mouth (W17), so other
+    junctions shifted a few metres; rinkai × nishi went 26.5 → 23.8 m.
+- **The touge, two phases, both ≤ 10%** (user: watch the driving in two stages).
+  - **Phase 1, `shrine_touge`:** from the nishi/nogyo junction, a 40 m level lead-in, then up the widened
+    face to a level stop on the plateau. The stop ARCS (45 m radius) round to face the massif, so phase 2 leaves
+    straight. Aimed at the plateau centre instead, the hand-off was a 120° bend over a 10 m span, and its inner
+    lane had ground 0.17 m proud of it. 2.98 km, 3 hairpins (18 m radius), z 1 → 276 m.
+  - **Phase 2, `shrine_touge_2`:** starts ON phase 1's last station (a joint: two coincident points, a
+    SEGMENT link). It runs level north along the plateau to the massif's foot, switchbacks up the massif's
+    south face, and ends at a stop by the 793 m summit. 5.28 km, 6 hairpins, z 276 → 752 m. The summit end was
+    a dead end; since 3.2d it is a turnaround loop (below).
+  - Alignments come from `island_v3_terrain.hill_road` on the dumped heights, smoothed (20 m phase 1, 40 m
+    phase 2) so the walk does not chase ridge noise. Phase 2 is confined to a south-face band, with "on
+    land" asked of the RAW ground 120 m out: the smoothed field blurred the NW sea cliff into 250 m of land.
+  - `hill_road`/`switchback` gained `lookahead` (default 0, existing callers unchanged). A walk in a bounded
+    band otherwise turns only once its next step leaves the band, and its hairpin is then itself outside and
+    ends the road.
+  - Profile = `bench_profile`, then fixed stations, then the DOWNWARD cone, then the upward one. Raise-only
+    lifted the level lead-in 12 m off its pad (a 21–27% `pad_grade`).
+  - The fixed stop stations are counted BACK FROM THE END. Taken as "any station near the arrival point",
+    it caught a switchback leg 76 m below the summit and lifted all of phase 2 ~50 m off its mountain.
+  - Phase 1's walk grade steps down from 10% until the whole road fits, level lead-in included (it had
+    come out 36.7%).
+- **The mountain carries its road** (`island_shrine_touge.sculpt`). The kit puts a road more than 4 m over
+  its ground on PIERS and the stamp never fills under one, so the ground is shaped to the touge first:
+  - within road + verge (14 m) it is the road less 0.10 m;
+  - a fill batter (1:1.5) or cut batter (1:1) runs only as wide as the fill or cut at the road's own
+    centreline (it daylights), then blends back over 8 m;
+  - the sea is never filled; the nearest segment decides.
+  - Two wrong versions came first. An unbounded batter "filled" every slope steeper than itself (+633 m
+    over a cliff). A batter capped at a height stood 300%+ walls.
+  - Result: raised ≤ 63.5 m, lowered ≤ 89 m (rock-cut benches on the ~120% massif face); both roads 0.07–0.15 m
+    above the ground on every centreline sample.
+- **Measured on the rebuilt island** (pipeline order matters: restore the stamp → sculpt → setback → sample
+  the ground → build → stamp; with a stamp record present, sampling reads the OLD sidecar):
+  - validate 0 errors (2 `mouth_angle` WARNs, as before); flow 210 lanes, 0 broken, 0 misjoined, 1 unreached
+    (`nishi_dori_1_R0`, as before);
+  - reach **70.8% → 80.7%** (the massif is served now);
+  - `probe_road_stamp -- World.tscn IslandRoads` 6/7: no ground above any lane or pad (highest 0.069 m UNDER a
+    lane), idempotent, exact restore. FILL 360/363: the 3 misses are hama_dori's bridge abutments, where the
+    lane stands at ~3.9 m, just under `FILL_MAX` (the island had these before);
+  - `probe_road_ground -- World.tscn` PASS: 2408/2408 bridge samples have a column foot on the −24 m seabed,
+    and both touge phases are all at grade (1494 + 2650 samples, 0 fill, 0 pier);
+  - World.tscn boots with 0 errors.
+- **Driving it, first build** (`probe_road_launch.gd -- --world=…World.tscn --lane=shrine_touge_F0|shrine_touge_2_F0
+  --speed=11`; the probe gained `--world=` and prints each launch's position): phase 1 had 9 launches and a worst
+  lateral of 5.8 m, phase 2 had 4 and ran off the summit dead end, and at 15 m/s the car left the road. Fixed in 3.2d:
+- **The touge, driven and fixed (PLAN.md 3.2d, 2026-09-17).** Measured first, along the kit's own resampled
+  centreline (plan radius over ±6 m, vertical K), which showed that most launches were not where the plan had
+  guessed:
+  - **Two "grade breaks" were unrounded PLAN corners**: the level lead-in meets the walk at 110° in one station
+    (swept at R 18 m), and the walk top meets the plateau ramp at 100° (R **7.7 m**). `fillet` rounds every corner
+    nobody drew with a circular arc (40 m, or what the spans leave; sharpest corner served first; collinear
+    vertices merged so a straight run counts as one span).
+  - **The hairpins were built at 11–14 m, not 18.** `island_v3_terrain.stations` drops the later of two marks
+    closer than 10 m, and an even mark landing just before an arc point dropped every other point of the arc
+    (chord 9.3 m). `stations(vertices_first=True)` keeps every vertex (default off, so the seeder and
+    `bench_depth` are unchanged). The touge's stations are also 20 m apart now, not 70, so the kit can follow a
+    vertical curve.
+  - **A hairpin arc is not tangent to its own legs.** The walk picks its next heading at the moment it turns,
+    so measured 50° into an arc and 32–36° out of it, and Douglas-Peucker had dropped the arc's start point.
+    The start is protected, the arc's two boundary points are filleted like any corner, and a vertex that
+    cannot be rounded to 18 m is dropped (walk wobble on ridge noise), except beside a hairpin. Result: every
+    non-hairpin corner ≥ 23 m, hairpins 12.7–17 m (the worst had been 7.0).
+  - **Vertical curves**: `vertical_curves` is the profile's 80 m moving average over arc length. That IS a
+    parabolic vertical curve (K = 8 m/% on a 10% break), and it cannot break the grade limit, because the average's
+    slope is the average of the slopes. `P2_LEAD` (45 m) keeps the phase joint level through it.
+  - **Summit turnaround**: `summit_loop` adds road `shrine_touge_loop`, a level teardrop joined to the stem
+    by a 3-arm junction (the kit refuses a 2-arm pad). Its axis and reach are searched (±60°, 70/90/110 m) for
+    the flattest summit: straight on, the loop hung 54 m over a slope; chosen −55° / 70 m, ground within 16.6 m.
+    A car drives up, round and back down both phases.
+  - **The traffic brain had no corner speed.** `CruiseState` cut throttle by a fraction and never braked, so
+    uphill at full throttle it held 13 m/s into 18 m hairpins (9.4 m/s² sideways). `VehicleAIController
+    .cornerSpeedLimit` is `min over the bends ahead of sqrt(a·R + 2·b·d)`: R is the XZ circumradius of lane
+    points 8 m apart, out to the braking distance, re-planned every 0.1 s. `CruiseState` lifts off across
+    the first 1 m/s over that limit and brakes past it. `cornerLateralAccel` 4 m/s² (0 = off), `cornerBrakeDecel`
+    4 m/s². It is ON for all traffic. `probe_road_launch.gd --corner-accel=` sets it; `GATE_CASES` pass 0, since
+    they exist to reach DebugWorld's parapets at 35 m/s.
+  - **The generator's input is rebuilt, not stored**: `tools/island_touge_presculpt.sh` (terrain at a389d61,
+    seabed clamp, widening) reproduces the pre-sculpt grid byte for byte. Generator + setback on it reproduces the
+    record to 0.06 mm. The terrain was swapped as a DELTA over the restored natural ground
+    (`nat + sculpt(new) − sculpt(old)`, 115 151 vertices), so nothing else in the window moved. The arterial
+    re-route runs only once (`REROUTED_MARK`).
+  - **Measured.** At 11 m/s phase 1 goes from 9 launches to **0** (worst rise 2.48 m/s, lateral 1.1 m). Phase 2
+    goes from 4 plus the dead end to **0**, driven up, round the loop and down both phases, 14.6 km. At 15 m/s both
+    phases have 0.
+    Controls on the new road with the governor off: 3 launches at 11 m/s, and 6 plus 5 off-road at 15 m/s.
+    Geometry and governor are both needed.
+  - Gates: validate 0 errors (3 `mouth_angle` WARNs, one new at a loop mouth); flow 218 lanes, 0 broken/misjoined,
+    1 unreached (as before), open ends 13 → 12; reach 80.8%; `probe_road_stamp -- World.tscn IslandRoads` 6/7
+    (only the 3 pre-existing hama_dori FILL samples); `probe_road_ground -- World.tscn` PASS; DebugWorld
+    `probe_road_stamp` 7/7, launch `GATE_CASES` 0; `probe_traffic_spawn` 6/6, `probe_road_traffic` roadkit and
+    debugworld 0 stuck, `probe_dead_driver`, `probe_road_zones` 12/12; World boots with 0 errors; `./gradlew test`.
+  - **Probe trap, fixed**: `probe_road_stamp` now also queries LANE samples on the 1 cm grid, the pads' rule. Two
+    samples a few mm off an exact terrain vertex read the far vertex, 0.20 m up the 10% grade, which looked like
+    "0.09 m proud"; snapped, they are 0.097/0.100 m UNDER the lane.
+- **Stamp clearance is 0.10 m** (`road_kit_stamp.gd CLEARANCE`, was 0.05; user: "the road always 0.1 m above
+  ground"). `probe_road_stamp.gd` now asserts ground is never above a lane (tolerance 0, was 0.05) and at most
+  0.05 m above a pad vertex (was 0.15). DebugWorld re-stamped: 7/7, highest ground 0.078 m UNDER a lane.
+- **City ground was already flat** (measured, so no edit): 73% of land under 40 m is exactly 0.60 m, the
+  4–16 m bands are flat terraces, and only 0.013 km² of low land deviates more than 0.15 m from its 5×5
+  median, nearly all at mountain toes.
+
 The seam into traffic is unchanged in shape: every lane is a `PathLaneRoute` over a native
 `Curve3D`. `PathLaneRoute.sourcePath` (an externally owned `Path3D`) outlived the bridge it was
 added for; it costs one branch and nothing uses it today. Rules from the road-generator week that
@@ -5248,9 +5754,106 @@ still hold:
   `EventBus.missionFailed`, the pattern `Door` already uses), never `ZoneManager`'s — that would put
   reclaim policy and mission policy in two places.
 
+### Ambient traffic on the island — the zones are DERIVED from the lane entries (2026-09-17, PLAN.md 3.4)
+
+`World.tscn` had exactly one `ZoneMarker` (`IslandZone`, which streams the road piece) and no traffic
+at all: cars appeared only through `DebugHarness` F4. What was missing is a set of markers carrying a
+`VehicleSpawnConfig` — and **where those go is a fact about the lane graph, not a matter of taste.**
+`ZoneManager.placementOn` only ever sets a car down in the first few queue slots of a lane, so every
+spawn point in the world is a lane **entry**; on a Road Kit network entries cluster at junctions and
+road ends, because that is where lanes begin. So the markers ARE those clusters.
+
+**`tools/island_traffic_zones.py`** derives them from the piece's `.lanekit.json`: 94 spawnable lane
+entries → **14 clusters** by single-linkage at 250 m (single linkage, not a greedy "cover the most"
+pass, which is order-dependent — a lane reordering in the record would then move markers that nothing
+about the road changed). Each cluster becomes a geometry-less `Zone` + `ZoneMarker` whose
+`VehicleSpawnConfig.route_name` is the lanes' own `zone_id` (`"island"`), which is
+`ZoneManager.spawnLanes`' **zone-id pass** — so a marker offers exactly that network's lanes whose
+entry is within its `unload_radius`, with no per-zone route naming to keep in step.
+
+**The radii are measured, not chosen.** `spawnTrafficCar`'s player gate is `unload_radius × 0.9` from
+a lane ENTRY, so a player driving mid-arterial sees traffic only if that covers the worst distance
+from any point ON a lane to the nearest cluster. The tool measures it (**945 m** over 1852 samples,
+on `hama_dori_2`) and **refuses** radii that do not, naming the number that would pass — a quiet
+stretch of road is a measurement, not a tuning preference. Shipped: `load 1000`, `unload 1400`
+(gate 1260 m), 3 cars per zone; ~2.3 zones loaded at a typical point on the network, 8 gaps in 1852
+samples at `load 900` and 0 at 1000.
+
+The generated block is identified by NAME (`Zone_traffic_*`, `VehicleSpawn_traffic`, the
+`TrafficZones` node), never by a `;` comment — a comment does not survive the editor re-saving the
+scene, and the next run would then duplicate the block instead of replacing it. The tool is
+idempotent and takes `--check` for CI.
+
+**Gate: `tools/godot/probe_traffic_spawn.gd -- --world=island`** (the probe gained `--world=`;
+`debugworld` is still the default and unchanged). 6/6 over 240 s: 29 cars spawned across 15 lanes,
+spawn clearance 10.5 m, worst facing 3°, longest idle 0.1 s, one car drove **2.5 km**. Control —
+`World.tscn` without the block — fails 2 (0 cars, 0 lanes).
+
+One rule came out of running it on a big world: **a reclaim past `0.95 × unload_radius` is "left
+range" and is exempt from the `MIN_DRIVE_M` check.** The gate exists to catch a car that cannot
+drive; on a 1.4 km zone the 0.9 gate legitimately sets a car down with only the last tenth of the
+radius ahead of it, so an out-of-range reclaim after 130 m is the design working, not a defect. The
+probe reads the reclaim radius off the scene (the widest `unload_radius` among markers that actually
+spawn traffic) rather than carrying a per-world constant.
+
+**A TURN PATH'S ZERO-LENGTH LEG MADE FIVE LANES UN-QUERYABLE** (found by that gate). A lead or tail
+of 1e-5 m — every corner whose approach leg is the shorter one, so the arc starts at the mouth —
+still rounded to `k = 1` in `point_solve.turn_shape`, emitting two samples that distance apart AND a
+`break` between them; `point_export.curve_points` then put two **coincident control points** on the
+exported `Curve3D`, whose zero-length first baked segment makes `Curve3D.get_closest_offset` return
+**NaN**. Nothing in the game asks a lane that question (a car walks its own arc length), which is why
+it survived — but every probe that attributes a position to a lane does, and `sample_baked(NaN)`
+errors and then measures the wrong lane, silently. Measured on the island: **5 of 218 lanes**, all
+turn connectors, first chord 0.0000–0.0001 m. `point_solve.TURN_LEG_MIN` (**0.05 m**) is the floor —
+a bound on a LENGTH belongs in metres, never in the parameter it is a fraction of — swept in the
+`point_solve.py` self-test across an approach offset so the lead passes *through* zero rather than
+being aimed at it, with the old 1e-6 floor as the control. The three lane-scanning probes
+(`probe_traffic_spawn`, `probe_road_zones`, `probe_road_traffic`) also **skip** a non-finite offset
+rather than guess, because every piece baked before this still carries the duplicates until its next
+zoned build.
+
 ---
 
+## Building kits — a downloaded kit, Japanese types, one scene per type (2026-09-17)
+
+`assets/world_source/buildings/README.md` is the how-to (kits in `assets/world_source/kits/<kit>/`, the type
+table and `BuildingLibrary.blend` in `assets/world_source/buildings/`); `tools/building_kit/build_buildings.sh` rebuilds and gates it all
+(9 s). The first kit is Quaternius' Downtown City MegaKit (Standard, CC0, credited).
+- **Three owners.** `<kit>/kit.json` is the kit's facts, written by hand: licence, the MEASURED module (2 m) and
+  storey (3 m), `module_scale`, category rules and facade ROWS (which pieces make one storey of one side).
+  `building_types.json` is the Japanese types in modules and rows. `tools/building_kit/layout_buildings.py`
+  (pure python, `--self-test`) derives placements, collision boxes and doors. `tools/godot/build_building_scenes.gd`
+  only writes what the layout says.
+- **The model is the size (W19's rule).** `normalize_kit.py` bakes `module_scale` 0.91 into every piece's vertices
+  (`source/` -> `pieces/<category>/`, `.gdignore` on source). The module becomes the ken 1.82 m, a storey 2.73 m,
+  a banded storey 3.64 m and a door 0.91 × 2.00 m. A piece instance never carries a scale. `--check` fails on stale pieces.
+- **A building is ONE merged mesh**, one surface per material (OfficeMid: 1109 pieces -> 9 surfaces), plus box
+  collision split round each door, `Door_<side>_<module>` markers and a `building` meta. Front +Z, origin at the
+  footprint centre on the ground (BLENDER_CONVENTIONS.md "Asset"). Only the ground storey is enterable.
+- **Materials are the kit's `materials/MI_*.tres`**, written once and then hand-owned, never overwritten.
+- **Trap: the Standard glTF's COLOR_0 is a wear MASK, not a colour.** Godot's importer turns on
+  `vertex_color_use_as_albedo` for every material on a piece that has it (81 pieces). That rendered MetalConcrete
+  near-black and put red blotches on the example buildings. The build writes the `.tres` with it off.
+  `MI_Trim_MetalConcrete` is hand-tinted light grey for Japanese panel facades.
+- **Blender: one `.blend` per KIT plus one library VIEW.** `<kit>/<kit>.blend` (`blender/tools/build_building_kit_blend.py`)
+  puts each piece in a collection whose `instance_offset` is its grid spot, keeps textures external (3 MB) and one
+  copy of each material. `buildings/BuildingLibrary.blend` (`build_building_library.py`, like WeaponLibrary)
+  assembles every type from the same layout, with 3511 LINKED instances. PLACEHOLDER: pieces still come from
+  `source/`, so kit `.blend` edits are not exported yet (PLAN.md 3.6b step 1). The glTF importer PACKS images
+  unless `import_pack_images=False` (85 MB -> 3 MB).
+- Gate **`tools/godot/probe_buildings.gd`** 59/59 over 10 scenes: size, every surface on a kit material, roof at
+  the wall top, ground slab, the character's own capsule (r 0.35, h 1.75) fits every door and a ray walks in,
+  and the same capsule and ray are blocked at a solid module of that side. Control: a 0.55 m door opening fails
+  the capsule check on both Konbini doors while the ray still passes (so the capsule is the load-bearing check).
+  `tools/godot/shot_buildings.gd` renders every type with a 1.49 m stand-in (needs a display). Judge the look
+  there: no probe can tell a Boston facade from a Tokyo one.
+
 ## Known Quirks / Gotchas
+
+- **A long Jolt ray misses a small shape it starts far from** (radius < ~2.4e-4 × start distance: a 5.6 cm
+  thigh hitbox from ~230 m). Never trust one long `intersect_ray`/`RayCast3D` to find a hitbox at range —
+  weapons go through `WeaponItem.trace`, which re-asks the bodies near the line with short windows
+  (`util.RayWindows`); see "A long ray steps over a small, far hitbox".
 
 - **A scene-exported node reference can be a DIFFERENT JVM object than the one Godot bound the
   script to.** `@Export CharacterBody3D player` serialized as `node_paths=PackedStringArray("player")`

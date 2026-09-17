@@ -22,6 +22,13 @@ public final class Faction {
     public static final String ENEMY   = "enemy";
     public static final String NEUTRAL = "neutral";
 
+    // The open-world cast (PLAN.md F2, OpenWorldFactions.tres). Plain strings like the three above:
+    // a faction needs no constant to work, these exist so spawners and presets spell them one way.
+    public static final String POLICE   = "police";
+    public static final String GANG_A   = "gang_a";
+    public static final String GANG_B   = "gang_b";
+    public static final String CIVILIAN = "civilian";
+
     /** Set by FactionManager._ready(); null only when no faction system is loaded (engine-free tests). */
     private static FactionManager registry;
 
@@ -50,6 +57,9 @@ public final class Faction {
     public static Color color(String faction) {
         if (PLAYER.equals(faction))  return new Color(0.45f, 0.78f, 1.00f, 1f); // cyan-blue
         if (ENEMY.equals(faction))   return new Color(1.00f, 0.35f, 0.35f, 1f); // red
+        if (POLICE.equals(faction))  return new Color(1.00f, 0.82f, 0.30f, 1f); // amber
+        if (GANG_A.equals(faction))  return new Color(0.90f, 0.40f, 0.90f, 1f); // magenta
+        if (GANG_B.equals(faction))  return new Color(0.45f, 0.90f, 0.45f, 1f); // green
         return                              new Color(0.85f, 0.85f, 0.85f, 1f); // neutral grey
     }
 }

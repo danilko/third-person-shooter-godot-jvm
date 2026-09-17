@@ -30,6 +30,21 @@
 [ext_resource type="Texture2D" uid="uid://2r8ylu6rg5dp" path="res://addons/sky_3d/assets/thirdparty/textures/moon/MoonMap.png" id="sky_6_v8wrf"]
 [ext_resource type="Texture2D" uid="uid://djpfuyxkryegn" path="res://addons/sky_3d/assets/textures/noise.jpg" id="sky_7_d0ed4"]
 [ext_resource type="Texture2D" uid="uid://bm7dot7t7u1q4" path="res://addons/sky_3d/assets/thirdparty/textures/milkyway/StarField.jpg" id="sky_8_humls"]
+[ext_resource type="Script" uid="uid://bw60dstm6flrq" path="res://addons/road_kit/road_kit_network.gd" id="rk_net"]
+[ext_resource type="Script" uid="uid://dd6fa8v7fiv47" path="res://src/main/java/com/openworld/world/ZoneMarker.java" id="3_zmark"]
+[ext_resource type="Script" uid="uid://oxf3ybti5sgy" path="res://src/main/java/com/openworld/world/Zone.java" id="3_zone"]
+
+[ext_resource type="Script" uid="uid://4hm6pt3jr6fb" path="res://src/main/java/com/openworld/world/VehicleSpawnConfig.java" id="gen_1"]
+
+[sub_resource type="Resource" id="Zone_island"]
+script = ExtResource("3_zone")
+zone_id = "island"
+size = Vector3(4608, 600, 4608)
+load_radius = 6000.0
+unload_radius = 9000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
 cell_size = 0.5
@@ -249,6 +264,124 @@ tonemap_white = 6.0
 
 [sub_resource type="CameraAttributesPractical" id="sky_CameraAttributesPractical_d0ed4"]
 
+[sub_resource type="Resource" id="VehicleSpawn_traffic"]
+script = ExtResource("gen_1")
+count = 3
+cruise_throttle = 0.4
+route_name = "island"
+
+[sub_resource type="Resource" id="Zone_traffic_00"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_00"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_01"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_01"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_02"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_02"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_03"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_03"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_04"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_04"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_05"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_05"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_06"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_06"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_07"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_07"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_08"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_08"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_09"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_09"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_10"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_10"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_11"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_11"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_12"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_12"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
+[sub_resource type="Resource" id="Zone_traffic_13"]
+script = ExtResource("3_zone")
+zone_id = "island_traffic_13"
+size = Vector3(60.0, 10, 60.0)
+load_radius = 1000.0
+unload_radius = 1400.0
+vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
+
 [node name="World" type="Node3D" unique_id=822990337]
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=689824235]
@@ -315,6 +448,15 @@ vehicle_config = SubResource("Resource_71gat")
 
 [node name="DebugHarness" type="Node" parent="." unique_id=210000001]
 script = ExtResource("21_dbgh")
+
+[node name="IslandZone" type="Node3D" parent="." unique_id=910011021]
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_island")
+
+[node name="IslandRoads" type="Node3D" parent="." unique_id=910011020]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+script = ExtResource("rk_net")
+record_path = "res://assets/world_source/pieces/IslandRoads.roads.json"
 
 [node name="Pickups" type="Node" parent="." unique_id=1303406953]
 
@@ -390,5 +532,91 @@ script = ExtResource("sky_3")
 dome_path = NodePath("../SkyDome")
 current_time = 12.09463999999705
 day = 4
+
+[node name="TrafficZones" type="Node" parent="." unique_id=910012000]
+
+[node name="Traffic00" type="Node3D" parent="TrafficZones" unique_id=910012001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.312, 0.600, -615.357)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_00")
+show_debug_volume = false
+
+[node name="Traffic01" type="Node3D" parent="TrafficZones" unique_id=910012002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1411.474, 0.600, 202.863)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_01")
+show_debug_volume = false
+
+[node name="Traffic02" type="Node3D" parent="TrafficZones" unique_id=910012003]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1566.652, 0.600, -396.938)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_02")
+show_debug_volume = false
+
+[node name="Traffic03" type="Node3D" parent="TrafficZones" unique_id=910012004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -199.531, 4.553, 1112.390)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_03")
+show_debug_volume = false
+
+[node name="Traffic04" type="Node3D" parent="TrafficZones" unique_id=910012005]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -47.119, 0.600, 198.136)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_04")
+show_debug_volume = false
+
+[node name="Traffic05" type="Node3D" parent="TrafficZones" unique_id=910012006]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -856.135, 0.600, 324.342)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_05")
+show_debug_volume = false
+
+[node name="Traffic06" type="Node3D" parent="TrafficZones" unique_id=910012007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1550.676, 0.600, -794.952)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_06")
+show_debug_volume = false
+
+[node name="Traffic07" type="Node3D" parent="TrafficZones" unique_id=910012008]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1590.597, 0.600, 275.800)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_07")
+show_debug_volume = false
+
+[node name="Traffic08" type="Node3D" parent="TrafficZones" unique_id=910012009]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -579.904, 4.600, 1709.674)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_08")
+show_debug_volume = false
+
+[node name="Traffic09" type="Node3D" parent="TrafficZones" unique_id=910012010]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -698.152, 751.615, -1455.494)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_09")
+show_debug_volume = false
+
+[node name="Traffic10" type="Node3D" parent="TrafficZones" unique_id=910012011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1111.280, 275.600, -813.213)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_10")
+show_debug_volume = false
+
+[node name="Traffic11" type="Node3D" parent="TrafficZones" unique_id=910012012]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 144.736, 4.600, 1603.684)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_11")
+show_debug_volume = false
+
+[node name="Traffic12" type="Node3D" parent="TrafficZones" unique_id=910012013]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 632.683, 0.600, -1805.367)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_12")
+show_debug_volume = false
+
+[node name="Traffic13" type="Node3D" parent="TrafficZones" unique_id=910012014]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1397.772, 8.600, 1690.429)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_traffic_13")
+show_debug_volume = false
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

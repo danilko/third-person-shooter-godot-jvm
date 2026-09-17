@@ -104,6 +104,41 @@ func _line(from: Vector3, to: Vector3, skip: Node) -> Array:
 		out.append([str((who as Node).get_path()) if who is Node else str(who), from.distance_to(hit["position"]), who])
 	return out
 
+func _vec(report: String, key: String) -> Vector3:
+	var i := report.find(key + "=(")
+	var j := report.find(")", i)
+	var parts := report.substr(i + key.length() + 2, j - i - key.length() - 2).split(",")
+	return Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
+
+## Re-trace the shot exactly as reported (origin, aim) and say what it met, and how close the scope line
+## (the probe's own pre-press line) and the shot pass above the terrain collider on the way.
+func _explain_shot(report: String, d: float, t: Node, line: Array) -> void:
+	var o := _vec(report, "origin")
+	var a := _vec(report, "aim").normalized()
+	var hits := _line(o, o + a * (d + 30.0), p)
+	for e in hits:
+		print("      shot retrace: %s at %.3f m" % [(e[0] as String).replace("/root/DebugWorld/", ""), e[1]])
+	var terrain: Node = world.find_child("Terrain3D", true, false)
+	if terrain == null:
+		return
+	var data: Object = terrain.get("data")
+	var worst := 1e9
+	var worst_at := 0.0
+	var s := 2.0
+	while s < d - 3.0:
+		var q := o + a * s
+		var h: float = data.call("get_height", q)
+		if not is_nan(h) and q.y - h < worst:
+			worst = q.y - h
+			worst_at = s
+		s += 0.25
+	print("      shot line clearance over Terrain3D height: min %.3f m at %.1f m" % [worst, worst_at])
+
+## Perpendicular distance from `pt` to the ray (o, dir).
+func _ray_gap(o: Vector3, dir: Vector3, pt: Vector3) -> float:
+	var v := pt - o
+	return (v - dir * v.dot(dir)).length()
+
 func _steer_to(target: Callable, frames: int) -> float:
 	var err := 99.0
 	for i in range(frames):
@@ -133,6 +168,11 @@ func _initialize() -> void:
 	for s in _arg("dists", "100,175,250").split(","):
 		dists.append(float(s))
 	var live := _arg("live", "false") == "true"
+	var repeat := int(_arg("repeat", "1"))
+	var only := []
+	for s2 in _arg("only-dirs", "").split(",", false):
+		only.append(float(s2))
+	var bones := _arg("bones", "head_2,spine_03,thigh_l").split(",")
 
 	world = (load(WORLD) as PackedScene).instantiate() as Node3D
 	root.add_child(world)
@@ -142,9 +182,12 @@ func _initialize() -> void:
 	# Raise the max AND refill: setting max_health alone leaves the player at 100, and the zone AI shot it dead
 	# mid-run, after which every "shot" read as NO SHOT with the view frozen (a probe artefact, not a hit bug).
 	p.get_node("Health").set("max_health", 1.0e9)
-	p.get_node("Health").call("reset_full")
+	p.get_node("Health").call("heal", 1.0e9)  # heal is registered; reset_full is not
 
 	gun = (load(SNR1) as PackedScene).instantiate() as Node3D
+	# --control: the trace without the precise small-shape pass (WeaponItem.nearerSmallShape), i.e. one long
+	# Jolt query, which steps over a thigh hitbox from ~230 m (util.RayWindows).
+	gun.set("small_shape_windows", _arg("control", "false") != "true")
 	world.add_child(gun)
 	gun.global_position = p.global_position + Vector3(0, 0.3, 0)
 	await _tick(40)
@@ -168,17 +211,20 @@ func _initialize() -> void:
 			p.velocity = Vector3.ZERO
 			await _tick(90)
 		print("\n=== origin %s at %s on_floor %s" % [o, p.global_position, p.is_on_floor()])
-		await _shoot_from(p.global_position, ndirs, dists, max_targets, live, wc, stats)
+		for r in range(repeat):
+			await _shoot_from(p.global_position, ndirs, dists, max_targets, live, wc, stats, only, bones)
 	print("\nSUMMARY %d / %d shots on the aimed bone, %d occluded by a drawn collider first on the scope line, %d TRUE misses (the target first on the line, no damage), %d on the wrong bone; %d spots skipped (chest not visible)" % [
 		stats["ok"], stats["total"], stats["occluded"], stats["true_miss"], stats["wrong"], stats["blocked"]])
 	var clean: bool = stats["true_miss"] == 0 and stats["wrong"] == 0 and stats["ok"] > 0
 	print("PASS" if clean else "FAIL")
 	quit(0 if clean else 1)
 
-func _shoot_from(origin: Vector3, ndirs: int, dists: Array, max_targets: int, live: bool, wc: Node, stats: Dictionary) -> void:
+func _shoot_from(origin: Vector3, ndirs: int, dists: Array, max_targets: int, live: bool, wc: Node, stats: Dictionary, only: Array, bones: PackedStringArray) -> void:
 	var shot_here := 0
 	for di in range(ndirs):
 		var ang := TAU * di / ndirs
+		if not only.is_empty() and not only.any(func(o): return absf(o - rad_to_deg(ang)) < 0.6):
+			continue
 		for d in dists:
 			if shot_here >= max_targets:
 				return
@@ -221,11 +267,16 @@ func _shoot_from(origin: Vector3, ndirs: int, dists: Array, max_targets: int, li
 			Input.action_press("aim")
 			await _tick(30)
 			print("\n--- dir %.0f deg %.0f m: target on ground %.2f, LOD %s" % [rad_to_deg(ang), d, gy, t.call("lod_level_now")])
-			for target in [["head_2", 600.0], ["spine_03", 150.0], ["thigh_l", 75.0]]:
+			var dmg := {"head_2": 600.0, "spine_03": 150.0, "thigh_l": 75.0}
+			for bone in bones:
+				var target := [bone, dmg[bone]]
 				var att: BoneAttachment3D = pairs[target[0]][0]
 				var hb: PhysicalBone3D = pairs[target[0]][1]
 				var aim_at := func() -> Vector3:
 					return _drawn(att, hb)
+				# `target v` is the body's STORED velocity (each hit adds 7.5 m/s and nothing with movement off clears
+				# it); the body does not move, which `drift` shows (0.00 m over every shot, 2026-09-17).
+				var pos0: Vector3 = t.global_position
 				var err: float = await _steer_to(aim_at, 90)
 				await _tick(20)
 				var cam := _cam()
@@ -239,10 +290,35 @@ func _shoot_from(origin: Vector3, ndirs: int, dists: Array, max_targets: int, li
 				var n0 := hits.size()
 				gun.set("magazine", 5)
 				var mag0 := int(gun.get("magazine"))
+				var mon := int(_arg("monitor", "0"))
+				if mon > 0:
+					var miss_frames := []
+					var worst_srv := 0.0
+					for f in range(mon):
+						await physics_frame
+						var c0 := _cam()
+						var aim_pt: Vector3 = _drawn(att, hb)
+						var dir := (aim_pt - c0.global_position).normalized()
+						var rq := PhysicsRayQueryParameters3D.create(c0.global_position, aim_pt + dir * 2.0, AIM_MASK, [p.get_rid()])
+						var hh := _space().intersect_ray(rq)
+						var srv: Transform3D = PhysicsServer3D.body_get_state(hb.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM)
+						var dsrv: float = srv.origin.distance_to(hb.global_position)
+						worst_srv = maxf(worst_srv, dsrv)
+						if hh.is_empty() or hh["collider"] != hb:
+							miss_frames.append("%d:%s(srv %.2f m)" % [f, (hh["collider"] as Node).name if not hh.is_empty() else "none", dsrv])
+					print("      monitor %d frames: ray to drawn thigh misses the hitbox on %d %s; worst server-vs-node %.3f m" % [
+						mon, miss_frames.size(), str(miss_frames.slice(0, 12)), worst_srv])
+				var hb_off0: float = hb.global_position.distance_to(_drawn(att, hb))
+				var miss0: float = _ray_gap(cam.global_position, fwd, hb.global_position)
 				Input.action_press("fire")
-				await _tick(2)
+				await _tick(1)
+				var hb_off1: float = hb.global_position.distance_to(_drawn(att, hb))
+				var miss1: float = _ray_gap(_cam().global_position, -_cam().global_transform.basis.z, hb.global_position)
+				await _tick(1)
 				Input.action_release("fire")
 				await _tick(6)
+				var report: String = str(gun.call("last_shot_report"))
+				var drift: float = t.global_position.distance_to(pos0)
 				var got: Array = hits.slice(n0)
 				var fired := int(gun.get("magazine")) < mag0
 				var verdict := "MISS" if fired else "NO SHOT"
@@ -259,8 +335,13 @@ func _shoot_from(origin: Vector3, ndirs: int, dists: Array, max_targets: int, li
 				else:
 					stats["true_miss"] += 1
 				stats["total"] += 1
-				print("  %-9s err %.4f  speed %.3f floor %s  spread %.4f  target v %.2f  first: %s -> %s" % [
-					target[0], err, speed, floor, spread, t_vel, first, verdict])
+				print("  %-9s err %.4f  speed %.3f floor %s  spread %.4f  target v %.2f drift %.2f m  first: %s -> %s" % [
+					target[0], err, speed, floor, spread, t_vel, drift, first, verdict])
+				if verdict != "ok" or _arg("verbose", "false") == "true":
+					print("      hitbox-vs-drawn %.3f m -> %.3f m; scope line to hitbox centre %.3f m -> %.3f m; shot %s" % [
+						hb_off0, hb_off1, miss0, miss1, report])
+				if verdict != "ok":
+					_explain_shot(report, d, t, line)
 				if verdict != "ok":
 					for e in line:
 						print("      line: %s at %.2f m (drawn %s)" % [e[0], e[1], _has_visual(e[2] as Node)])

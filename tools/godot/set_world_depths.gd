@@ -17,13 +17,19 @@ extends SceneTree
 ## Java default of -64 m while the sea floor is at -138.2 m — every deep-water position in the
 ## world was already past the kill line.
 ##
-## The terrain clamp is a GUARD, not a reshape: it raises anything below TERRAIN_FLOOR and leaves
-## every other texel alone, so sculpting deeper than the envelope can no longer break the rule
-## silently.
+## The terrain clamp raises anything below TERRAIN_FLOOR and leaves every other texel alone, so
+## sculpting deeper than the envelope can no longer break the rule silently.
+##
+## **TERRAIN_FLOOR IS THE SEABED (2026-09-17, user decision: -24 m).** It was -190, a guard only, and
+## the sculpt and `shape_terrain.gd`'s harbour deepening had left the bay at -88 m, which put the Road
+## Kit's bridge columns at up to 113 m. -24 m is a dredged harbour depth (Tokyo Bay's inner bay averages
+## ~15 m, container berths and channels ~15-24 m) and the Python island's own floor. Anything deeper is
+## raised to it, so the sea floor is flat at -24 wherever the sculpt went below; the shelf above it is
+## untouched, so beaches and quays keep their shape. `shape_terrain.gd`'s HARBOUR_MAX_DEPTH agrees.
 ##
 
 const DATA_DIR := "res://assets/terrain3d/island"
-const TERRAIN_FLOOR := -190.0    # deepest the ground may go
+const TERRAIN_FLOOR := -24.0     # the seabed: deepest the ground may go
 const WATER_BOTTOM := -200.0     # water box bottom — 10 m below the terrain floor
 
 var _terrain: Variant

@@ -64,6 +64,7 @@ There is a per-folder copy of this list in `assets/terrain3d/textures/asset_lice
 | Asset | Path | Source | Licence |
 |---|---|---|---|
 | Weapon models (ASR1, ASR2, PIS1, REV1, SHG1, SMG1, MEW1) | `assets/weapons/` | [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius, re-scaled and re-origined here | CC0 1.0 (no attribution required; credited as thanks) |
+| Building kit: modular pieces, textures and 3 example buildings | `assets/world_source/kits/quaternius_downtown_city/`; the buildings generated from it in `src/main/resources/com/openworld/world/buildings/` | [Downtown City MegaKit](https://quaternius.com/packs/downtowncitymegakit.html) (Standard package) by Quaternius, re-scaled to a Japanese 1.82 m module, re-organised, and assembled into Japanese building types here | CC0 1.0 (no attribution required; credited as thanks) |
 | Weapon models (ATL1, MEW2, FRG1) | `assets/weapons/` | Primitive shapes built by this project | Project (MIT) |
 | Prototype grid textures | `addons/kenney_prototype_textures/` | [Kenney Prototype Textures](https://godotengine.org/asset-library/asset/781), Kenney (packaged by Calinou) | CC0 1.0 |
 | Character model "Godot-chan", textures and animations | `assets/merged_animation*.blend/.glb`, `assets/textures/`, `assets/merged_animation*_*.png/.jpg` | Johnny Rouddro, [Godot Third Person Shooter](https://godotengine.org/asset-library/asset/716) (Asset Library #716) | MIT |
@@ -84,6 +85,25 @@ through the [G-Spatial Information Center](https://www.geospatial.jp/ckan/datase
 - **In this repo:** only the extracted, filtered and reprojected JSON. The raw CityGML/OBJ source
   downloads are not committed.
 - **More detail:** `assets/world_source/plateau/ATTRIBUTION.md`.
+- **Assets derived from it** (kept as a deliberate exception to the project's CC0/MIT/public-domain rule for
+  map data, 2026-09-17), each under the same licence and credit line:
+
+  | Asset | What it is |
+  |---|---|
+  | `assets/world_source/plateau/data/*.json` | Extracted precincts (building, road and bridge geometry), used as layout references |
+  | `assets/world_source/buildings/PLATEAU_HanedaTerminal.blend` | Haneda Airport terminal landmark model |
+  | `assets/world_source/buildings/PLATEAU_RainbowBridge.blend` | Rainbow Bridge landmark model |
+  | `assets/world_source/buildings/PLATEAU_TokyoTower.blend` | Tokyo Tower landmark model |
+  | `assets/world_source/buildings/plateau_reference/_pilot/` | Pilot building extraction (reference only) |
+
+  Anything baked from these (a piece `.tscn`/`.scn` containing their geometry) carries the same credit.
+
+**Okinawa Main Island and Tokyo (design references, no data).** The planned island's shape, bay and
+harbour are modelled on Okinawa Main Island at reduced scale, and its offshore airport and elevated
+city loop on Tokyo's (PLAN.md 3.8). They are drawn by hand from general knowledge and public imagery
+viewed as reference. No map, elevation or road DATA from these places is imported, so no data licence
+applies. If any is imported later, it must come from a CC0/MIT/public-domain source, or be credited
+here like PLATEAU above.
 
 ## AI tool use
 

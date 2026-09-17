@@ -2,6 +2,7 @@
 """island_v3_reach.py -- HOW MUCH OF THE ISLAND CAN YOU ACTUALLY DRIVE TO?
 
     python3 tools/island_v3_reach.py            # self-tests + the reach table, pure Python
+    python3 tools/island_v3_reach.py --record assets/world_source/pieces/IslandRoads.roads.json
 
 THE GATE FOR `W2` (WORLD_REBUILD_PLAN.md "The network is 19% shorter than the plan"). Step 1 gave
 the island real terrain and four arterials were rerouted off the relief to stay grade-legal. That
@@ -184,7 +185,24 @@ def report_value(roads, radius=RADIUS, sample=SAMPLE):
     return 100.0 * served / max(1, total)
 
 
+def record_roads(path):
+    """A Road Kit record's roads as `(name, [(x, y), ...])` polylines in chain order, in the kit's plan
+    frame -- the island plan's own frame, so a record seeded from the plan scores on the same land.
+
+    A junction's pad is not a road here: each road stops at its mouth, which is within a pad's width of
+    the crossing and so well inside `RADIUS`."""
+    import json
+    rec = json.load(open(path))
+    pos = {p["uid"]: p["pos"] for p in rec["points"]}
+    return [(r["name"], [(pos[u][0], pos[u][1]) for u in r.get("points", []) if u in pos])
+            for r in rec["roads"]]
+
+
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--record", default="", help="score a Road Kit .roads.json instead of the plan's network")
+    a = ap.parse_args()
     _selftest()
     print()
-    report()
+    report(record_roads(a.record) if a.record else None)

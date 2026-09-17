@@ -109,6 +109,9 @@ public class DebugHarness extends Node {
     /** F3 route/junction 3D debug-draw — lazily constructed, toggled by visibility. */
     private RouteDebugOverlay routeOverlay;
 
+    /** Backtick command line — lazily constructed, toggled open/closed. */
+    private DebugConsole console;
+
     @Register
     @Override
     public void _input(InputEvent event) {
@@ -147,10 +150,25 @@ public class DebugHarness extends Node {
             if (iek.isShiftPressed()) togglePerfOverlay(); else toggleRouteOverlay();
         } else if (iek.getKeycode() == Key.F1) {
             teleportToNextZone();
+        } else if (iek.getKeycode() == Key.QUOTELEFT) {
+            toggleConsole();
         } else if (iek.getKeycode() == Key.F2) {
             // Shift+F2 = toggle the world edge's debug planes (wall red, warning band yellow).
             if (iek.isShiftPressed()) toggleBoundsVolume(); else dropWeaponHere();
         }
+    }
+
+    /**
+     * Backtick — the in-game command line (PLAN.md 4.2 / F1). Lazily built like the perf overlay, so
+     * it needs no scene wiring and is there in every scene that has a harness. It is what makes a
+     * story beat iterable inside one session: {@code move boss_01 0 0 0} instead of a recompile.
+     */
+    private void toggleConsole() {
+        if (console == null || !GD.isInstanceValid(console)) {
+            console = new DebugConsole();
+            addChild(console);
+        }
+        console.toggle();
     }
 
     /** Shift+F2 — show/hide {@code WorldBounds}' wall and warning-band planes (PLAN.md P0 0.6). */

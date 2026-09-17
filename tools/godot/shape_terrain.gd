@@ -40,7 +40,7 @@ const HARBOURS := [
 	{"pos": Vector2(-392.0, 1265.0), "radius": 300.0},   # PORTSPUR
 ]
 const HARBOUR_DEEPEN := 3.4      # multiplier on existing depth inside the radius
-const HARBOUR_MAX_DEPTH := 26.0  # ...clamped, so it stays above the sea floor
+const HARBOUR_MAX_DEPTH := 24.0  # ...clamped to the seabed (set_world_depths.gd TERRAIN_FLOOR)
 
 var _terrain: Variant
 var _dir: String

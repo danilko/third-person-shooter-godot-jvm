@@ -772,7 +772,12 @@ func _on_setback() -> void:
 	ur.add_do_method(net, "from_record", net.to_record())
 	ur.add_undo_method(net, "from_record", before)
 	ur.commit_action(false)
-	_say({"ok": true, "message": "auto setback: %d mouth(s) moved over %d junction(s)" % [r["moved"].size(), r["cliques"]]})
+	var msg := "auto setback: %d mouth(s) moved over %d junction(s)" % [r["moved"].size(), r["cliques"]]
+	var held: Array = r.get("clamped", [])
+	if not held.is_empty():
+		msg += "; %d held short of the next station (delete it, or lock the mouth): %s" % [
+			held.size(), ", ".join(held.map(func(h): return "%s %.1f of %.1f m" % [h["uid"], h["placed"], h["solved"]]))]
+	_say({"ok": true, "message": msg})
 	_refresh(net)
 
 func _on_refresh() -> void:

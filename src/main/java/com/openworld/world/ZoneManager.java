@@ -140,6 +140,17 @@ public class ZoneManager extends Node {
 	private long lastSceneInstanceId = 0;
 	/** The loaded zone whose RegionConfig is currently applied globally (I4) — null = baseline / no region. */
 	private ZoneMarker activeRegionMarker = null;
+
+	/** zoneId -> the distance its last approach line printed (debug log only). */
+	private final Map<String, Float> approachLogged = new HashMap<>();
+	private static final float APPROACH_LOG_STEP = 10f;
+
+	private boolean movedSinceApproachLog(String zoneId, float dist) {
+		Float last = approachLogged.get(zoneId);
+		if (last != null && Math.abs(last - dist) < APPROACH_LOG_STEP) return false;
+		approachLogged.put(zoneId, dist);
+		return true;
+	}
 	// The scene environment as authored, captured the first time a region overrides it, so leaving every
 	// region restores the original look instead of leaving the last region's lighting/fog stuck.
 	private boolean envBaselineCaptured = false;
@@ -223,6 +234,7 @@ public class ZoneManager extends Node {
 		for (StreamTask t : tasks.values()) freePendingChildren(t);
 		tasks.clear();
 		replaceOnNextLoad.clear();
+		approachLogged.clear();
 		for (LoadedZone lz : loaded.values()) {
 			if (lz.geometryInstance != null && GD.isInstanceValid(lz.geometryInstance))
 				lz.geometryInstance.queueFree();
@@ -417,8 +429,11 @@ public class ZoneManager extends Node {
 				loadsThisTick++;
 			} else if (isLoaded && dist > marker.zone.unloadRadius) {
 				beginUnload(marker);
-			} else if (debugLog && dist < marker.zone.unloadRadius * 1.2f) {
-				// Approach feedback (only for zones the player is near, so far zones stay quiet).
+			} else if (debugLog && dist < marker.zone.unloadRadius * 1.2f
+					&& movedSinceApproachLog(marker.zone.zoneId, dist)) {
+				// Approach feedback (only for zones the player is near, so far zones stay quiet), and
+				// only when the distance has changed: an island-wide zone is "near" everywhere, and
+				// printed its distance every tick for a player standing still.
 				GD.print("ZoneManager: zone '" + marker.zone.zoneId + "' nearestPlayer="
 						+ String.format("%.1f", dist) + "m  [load<" + marker.zone.loadRadius
 						+ " unload>" + marker.zone.unloadRadius + "]  "
@@ -662,6 +677,17 @@ public class ZoneManager extends Node {
 						&& v.hasDefeatedDriver()
 						&& v.getLinearVelocity().length() < ABANDONED_SPEED
 						&& nearestPlayerDistXZ(v.getGlobalPosition()) > stallReclaimMinDist;
+				// A mission's own vehicle is not disposable traffic (PLAN.md 4.2): the rule has ONE
+				// owner, MissionDirector's protected set, rather than a clause inside each reclaim
+				// reason above — a "steal THAT car" mission is often given an ordinary ambient car,
+				// and reclaiming it would break the mission silently while every reason still read
+				// as correct. Untracked here so the zone stops maintaining it at all.
+				if (!dead && missionProtected(v)) {
+					if (debugLog) GD.print("ZoneManager: mission vehicle released from traffic in '"
+							+ marker.zone.zoneId + "'");
+					it.remove();
+					continue;
+				}
 				if (dead || fin || fell || far || unrouted || stalled || abandoned) {
 					// "finished" reclaims should be ~0 away from map edges once lanes chain through
 					// junctions (roads-v2 Phase 1) — a steady stream of them means broken wiring.
@@ -1050,6 +1076,9 @@ public class ZoneManager extends Node {
 		info.faction = nc.faction;
 		ai.characterInfo = info;
 		if (nc.behaviorConfig != null) ai.behaviorConfig = nc.behaviorConfig;
+		// Set BEFORE addChild: the body registers itself with MissionDirector in its own _ready()
+		// (PLAN.md F1), so an editor-placed story AI and a streamed one take the identical path.
+		ai.storyCharacter = !nc.characterId.isEmpty();
 
 		container.addChild(ai);
 		ai.activateForSpawn(center.plus(nc.offset));
@@ -1367,6 +1396,14 @@ public class ZoneManager extends Node {
 	 * driver is still freed. Safe if either node is already invalid.
 	 */
 	private void freeTrafficCar(LoadedZone lz, Vehicle v, NetworkManager net) {
+		// A mission's own vehicle outlives the zone that happened to spawn it (PLAN.md 4.2): the
+		// pairing is dropped so nothing keeps maintaining it, and the car AND its driver are left
+		// exactly as they are. From here the MISSION owns them — registering an entity is taking
+		// responsibility for it, and MissionDirector cannot know when a mission's car may be freed.
+		if (GD.isInstanceValid(v) && missionProtected(v)) {
+			lz.driverOf.remove(v);
+			return;
+		}
 		AICharacter driver = lz.driverOf.remove(v);
 		boolean vValid = GD.isInstanceValid(v);
 		// Unseat the driver from its car first, so neither node dangles when freed: a seated occupant
@@ -1384,6 +1421,12 @@ public class ZoneManager extends Node {
 		if (net != null && v.getCharacterInfo() != null) net.announceDespawn(v.getCharacterInfo().characterId);
 		silenceWeaponAudio(v);
 		v.queueFree();
+	}
+
+	/** True when the director has claimed this node for the active mission (absent director → false). */
+	private static boolean missionProtected(Node node) {
+		com.openworld.game.mission.MissionDirector d = com.openworld.game.mission.MissionDirector.get();
+		return d != null && d.isMissionProtected(node);
 	}
 
 	/** m/s under which a car with a defeated driver counts as having come to rest (see {@code abandoned}). */

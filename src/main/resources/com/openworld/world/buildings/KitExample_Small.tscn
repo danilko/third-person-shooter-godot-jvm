@@ -1,0 +1,29 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/KitExample_Small_mesh.res" id="1_hpr8j"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/KitExample_Small_collision.res" id="2_jc3xo"]
+
+[node name="KitExample_Small" type="Node3D" unique_id=1119036410]
+metadata/building = {
+"aabb": [Vector3(-5.6693006, 2.8171577e-05, -6.6139), Vector3(11.3386, 15.493631, 13.227767)],
+"collision": "trimesh",
+"doors": [],
+"example": true,
+"footprint_m": [11.3386, 13.2278],
+"height_m": 15.4937,
+"id": "KitExample_Small",
+"kit": "quaternius_downtown_city",
+"piece_count": 1,
+"solid_probes": [],
+"use": "kit example (re-scaled only)",
+"wall_top_m": 15.4937
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=87987195]
+mesh = ExtResource("1_hpr8j")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=392164967]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=38506838]
+shape = ExtResource("2_jc3xo")

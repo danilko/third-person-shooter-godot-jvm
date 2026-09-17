@@ -20,6 +20,7 @@ import com.openworld.ai.character.FleeState;
 import com.openworld.ai.character.RefillAmmoState;
 import com.openworld.camera.AICameraController;
 import com.openworld.control.CharacterController;
+import com.openworld.game.mission.MissionDirector;
 import com.openworld.control.Controller;
 import com.openworld.control.UserCommand;
 import com.openworld.game.PlayerRegistry;
@@ -84,6 +85,18 @@ public class AICharacter extends Character {
      */
     @Export public NodePath squadPath = new NodePath();
 
+    /**
+     * True when this AI is a <b>story character</b> — one a mission addresses by
+     * {@code characterInfo.characterId} through {@code MissionDirector} (PLAN.md F1). Ticked in the
+     * editor for a hand-placed named AI; set by {@code ZoneManager} before {@code addChild} for one
+     * spawned from a {@link com.openworld.world.NamedCharacterConfig}.
+     *
+     * <p>The flag exists because the ID alone cannot answer the question: an ambient AI's id is a
+     * random UUID and a named one's is authored, and those are the same type of string. Registration
+     * itself has ONE owner either way — {@code _ready()} below — so neither path can forget it.
+     */
+    @Export public boolean storyCharacter = false;
+
     /** Runtime squad — shared group awareness (E3). Null = solo. Accessed via {@link #activeSquad()}. */
     private AISquad squad;
 
@@ -129,6 +142,22 @@ public class AICharacter extends Character {
     /** {@link #getLodLevel()} ordinal (0 ACTIVE, 1 PASSIVE, 2 FROZEN) for headless checks. */
     @Register
     public int lodLevelNow() { return lodLevel.ordinal(); }
+
+    /** The current target's characterId, "" when there is none — the faction probe's readout (PLAN.md F2). */
+    @Register
+    public String targetIdNow() {
+        Character t = currentTarget;
+        return t != null && godot.global.GD.isInstanceValid(t) && t.characterInfo != null && t.characterInfo.characterId != null
+                ? t.characterInfo.characterId : "";
+    }
+
+    /** The escort target's characterId, "" when there is none — the F3 probe's readout. */
+    @Register
+    public String escortTargetIdNow() {
+        Character t = escortTarget;
+        return t != null && godot.global.GD.isInstanceValid(t) && t.characterInfo != null && t.characterInfo.characterId != null
+                ? t.characterInfo.characterId : "";
+    }
 
     /** Back-compat shorthand: kept so existing FROZEN-only callers keep working. */
     public boolean isLodFrozen() { return lodLevel == AILodLevel.FROZEN; }
@@ -217,12 +246,23 @@ public class AICharacter extends Character {
         }
 
         if (controller instanceof AIController aiCtrl) aiCtrl.start();
+
+        // Story AI announce themselves to the director (F1). Registration is here, in the body's own
+        // _ready(), so an editor-placed named AI and a zone-spawned one take the identical path.
+        if (storyCharacter) {
+            MissionDirector director = MissionDirector.get();
+            if (director != null) director.registerNamedCharacter(this);
+        }
     }
 
     @Register
     @Override
     public void _exitTree() {
         if (squad != null && godot.global.GD.isInstanceValid(squad)) squad.unregister(this);
+        if (storyCharacter) {
+            MissionDirector director = MissionDirector.get();
+            if (director != null) director.unregisterNamedCharacter(this);
+        }
         super._exitTree();
     }
 
@@ -364,6 +404,11 @@ public class AICharacter extends Character {
 
     public CharacterController getCharacterController() {
         return (controller instanceof CharacterController c) ? c : null;
+    }
+
+    /** This body's AI brain, or null on a puppet (a client's copy runs a {@code NetworkController}). */
+    public AIController aiController() {
+        return (controller instanceof AIController c) ? c : null;
     }
 
     // ── Sensing / target discovery ────────────────────────────────────────────

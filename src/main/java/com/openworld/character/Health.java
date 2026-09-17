@@ -5,6 +5,7 @@ import com.openworld.net.NetworkManager;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.Node;
 import godot.api.PhysicalBone3D;
 import godot.api.Texture2D;
@@ -33,6 +34,18 @@ public class Health extends Node {
     public MeshConfig meshConfig;
 
     private float currentHealth;
+
+    /**
+     * Scripted invulnerability (PLAN.md F1 — {@code ScriptCommand.invincible}): while true, damage is
+     * dropped here and NOWHERE else, so every source — a bullet, a blast, a fall, a relayed client
+     * request — is covered by one rule and the flag can never mean "immune to some damage".
+     *
+     * <p>{@code @Visible} rather than {@code @Export}: it is live mission state a director sets and
+     * clears, never something a scene authors on. It is deliberately NOT replicated — the host is the
+     * only peer that applies damage, so the host's copy is the only one the rule has to hold on.
+     */
+    @Visible
+    public boolean invulnerable = false;
 
     /**
      * Discrete "took a hit" event carrying the damage amount. Fires ONLY on authority-side
@@ -147,6 +160,7 @@ public class Health extends Node {
 
     private void applyDamage(float damage, boolean headshot, String weaponName, Texture2D weaponIcon,
                              String attackerName, String attackerFaction, Vector3 attackerPos, String attackerId) {
+        if (invulnerable) return;
         currentHealth = Math.max(0.0f, currentHealth - damage);
         hit.emit(damage);
         emitCharacterHealthChanged();
@@ -275,6 +289,7 @@ public class Health extends Node {
      * authority-side events (Phase 5's broadcastDamage cue path); re-deriving them from
      * a continuously-replicated number would double-fire them once that lands.
      */
+    @Register
     public void applyReplicatedHealth(float health) {
         float clamped = Math.max(0.0f, Math.min(maxHealth, health));
         if (clamped == currentHealth) return;
@@ -283,6 +298,17 @@ public class Health extends Node {
     }
 
     public float getCurrentHealth() {
+        return currentHealth;
+    }
+
+    /**
+     * Current health for probes and the debug console. A separate registered reader rather than
+     * {@code @Register} on {@code getCurrentHealth}: that name is a JavaBean getter for the private
+     * {@code currentHealth} field, and a registered getter with no setter registers READ_ONLY (see
+     * CLAUDE.md "Known Quirks").
+     */
+    @Register
+    public float healthNow() {
         return currentHealth;
     }
 

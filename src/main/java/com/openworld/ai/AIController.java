@@ -98,6 +98,8 @@ public class AIController extends Controller {
         escortTargetUnderAttack = false;
         fleeStartPosition = null;
         intendedAttackStance = StanceName.UPRIGHT;
+        scriptedDestination = null;
+        scriptedArrived = false;
         transitionTo(initialState());
     }
 
@@ -110,6 +112,43 @@ public class AIController extends Controller {
         if (threatPos != null) lastKnownTargetPosition = new Vector3(threatPos);
         transitionTo(FleeState.INSTANCE);
     }
+
+    /**
+     * Force the FSM into any state (PLAN.md F1 — {@code MissionDirector.commandCharacter}). Nothing
+     * else is reset: a scripted order says only what it says, and the caller decides the rest.
+     */
+    public void forceState(AIState state) {
+        if (state != null && state != currentState) transitionTo(state);
+    }
+
+    /** The FSM state this controller is in — a director reads it back to see its order took. */
+    public AIState getCurrentState() { return currentState; }
+
+    // ── Scripted order (F1) ───────────────────────────────────────────────────
+
+    private Vector3 scriptedDestination = null;
+    private boolean scriptedArrived     = false;
+
+    /**
+     * Where {@code ScriptedMoveState} is walking to, or null when no order is standing. Held here
+     * rather than on the state because states are stateless singletons shared by every AI.
+     */
+    public Vector3 getScriptedDestination() { return scriptedDestination; }
+
+    /** Issue (or re-issue) a walk order and enter {@code ScriptedMoveState}. */
+    public void setScriptedDestination(Vector3 dest) {
+        scriptedDestination = dest != null ? new Vector3(dest) : null;
+        scriptedArrived = false;
+    }
+
+    /** Drop the standing order. {@code ScriptedMoveState} falls back to Patrol on its next tick. */
+    public void clearScriptedDestination() {
+        scriptedDestination = null;
+        scriptedArrived = false;
+    }
+
+    public boolean hasScriptedArrived()            { return scriptedArrived; }
+    public void    setScriptedArrived(boolean v)   { scriptedArrived = v; }
 
     // ── Memory / timers ───────────────────────────────────────────────────────
     // (moved from AICharacter — these are "what the AI remembers", not body capability)

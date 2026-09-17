@@ -655,7 +655,7 @@ def _hairpin(px, py, heading, uphill, radius, points):
 
 
 def switchback(height, start, target_z, grade, leg=260.0, step=20.0,
-               inside=None, max_length=12000.0, radius=HAIRPIN_RADIUS, heading=None):
+               inside=None, max_length=12000.0, radius=HAIRPIN_RADIUS, heading=None, lookahead=0.0):
     """A grade-legal alignment from `start` up to `target_z`. Returns the polyline.
 
     This is the answer WORLD_REBUILD_PLAN.md `W2` names -- "the grade limit is on the road, not on
@@ -663,6 +663,11 @@ def switchback(height, start, target_z, grade, leg=260.0, step=20.0,
     field at exactly `grade` (see `climb_direction`), turns a hairpin every `leg` metres or
     whenever the next step would leave `inside`, and stops when it reaches `target_z`, runs out of
     room, or exceeds `max_length`.
+
+    `lookahead` (metres, default 0) asks `inside` that far PAST the next step. A hairpin swings up to
+    its radius beyond the point where it starts, so a walk that turns only when its next step leaves a
+    bounded region draws a turn that is itself outside and ends the road there -- pass `radius` or a
+    little more when `inside` is a band the road must switchback within (`island_shrine_touge.py`).
 
     IT IS NOT A SEARCH, and that is deliberate. A grid A* over the terrain cannot express this
     problem: on a 92% flank the legal headings lie within about 5 degrees of the contour and a grid
@@ -700,7 +705,7 @@ def switchback(height, start, target_z, grade, leg=260.0, step=20.0,
             d = last
         last = d
         nx, ny = x + d[0] * step, y + d[1] * step
-        blocked = (inside is not None and not inside(nx, ny))
+        blocked = (inside is not None and not inside(nx + d[0] * lookahead, ny + d[1] * lookahead))
         if blocked or run >= leg:
             gx, gy = gradient(height, x, y)
             m = math.hypot(gx, gy) or 1.0
@@ -742,7 +747,7 @@ def alignment_grade(height, pts):
 
 
 def hill_road(height, start, target_z, limit, leg=500.0, step=20.0, inside=None,
-              radius=HAIRPIN_RADIUS, tries=10, heading=None):
+              radius=HAIRPIN_RADIUS, tries=10, heading=None, lookahead=0.0):
     """A switchback alignment whose OVERALL ground grade is inside `limit`, not just its legs.
 
     THE HAIRPINS ARE PART OF THE CLIMB, and forgetting that is what makes a generated mountain road
@@ -771,7 +776,7 @@ def hill_road(height, start, target_z, limit, leg=500.0, step=20.0, inside=None,
     for _ in range(tries):
         g = 0.5 * (lo + hi)
         pts, arcs = switchback(height, start, target_z, g, leg=leg, step=step, inside=inside,
-                               radius=radius, heading=heading)
+                               radius=radius, heading=heading, lookahead=lookahead)
         climb, length, avg = alignment_grade(height, pts)
         reached = height(*pts[-1]) >= target_z - 1.0
         if reached and avg <= limit:
@@ -905,7 +910,7 @@ STATION_SPACING = 70.0
 STATION_MIN_SPAN = 10.0
 
 
-def stations(pts, spacing=STATION_SPACING, keep=STATION_MIN_SPAN):
+def stations(pts, spacing=STATION_SPACING, keep=STATION_MIN_SPAN, vertices_first=False):
     """Where a road's stations go: evenly by arc length, AND on every authored vertex.
 
     THE ONE OWNER, shared with `seed_district_roads.resample`. `bench_depth` below predicts the
@@ -917,6 +922,12 @@ def stations(pts, spacing=STATION_SPACING, keep=STATION_MIN_SPAN):
     shrine road's hairpins are 38 m arcs and the even spacing is 70 m, so an even-only rule cuts
     every corner. Anything within `keep` of its neighbour is dropped -- a vertex 30 cm from an even
     station is the same station, not a second one.
+
+    `vertices_first` (default off, so the seeder and `bench_depth` are unchanged) keeps EVERY vertex and
+    drops only an even mark within `keep` of one. Without it the later of two close marks goes, whichever
+    it is, and on the shrine touge that was every other point of each 18 m hairpin arc (an even mark
+    landing just before an arc vertex): the kit then swept the turn through 60 deg steps and built it at
+    an 11-14 m radius (`island_shrine_touge.py`, PLAN.md 3.2d). The caller owns the vertex spacing.
     """
     cum, acc = [0.0], 0.0
     for a, b in zip(pts, pts[1:]):
@@ -941,6 +952,12 @@ def stations(pts, spacing=STATION_SPACING, keep=STATION_MIN_SPAN):
     # they differ in the last bit often enough. `set` then keeps both, the "never drop the ends"
     # rule keeps the second, and the road ends with two stations 1e-13 m apart: `station_coincident`,
     # "a zero-length taper", which refuses the build outright.
+    if vertices_first:
+        verts = sorted({round(c, 6) for c in cum})
+        even = [round(total * k / n, 6) for k in range(1, n)]
+        keep_even = [s for s in even
+                     if min(abs(s - v) for v in verts) >= keep]
+        return [at(s) for s in sorted(set(verts) | set(keep_even))]
     marks = sorted({round(total * k / n, 6) for k in range(n + 1)} | {round(c, 6) for c in cum})
     out, last = [], None
     for k, s in enumerate(marks):
