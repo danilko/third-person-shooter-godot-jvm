@@ -23,12 +23,12 @@ extends SceneTree
 ## shooting a dropped grenade stopped finding its Detonatable. That check is structural rather than
 ## a real bullet -- see its own comment for why a space query is misleading here.
 ##
-## T1 is the weapon under test because it is the one that auto-collects (every other weapon sets
+## FRG1 is the weapon under test because it is the one that auto-collects (every other weapon sets
 ## `require_interact`, which needs a key press), and it is also the socketless case: it has no
 ## hold_socket, so it exercises the stow path that used to leave it in the world scene.
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
-const T1     := "res://src/main/resources/com/openworld/weapon/T1.tscn"
+const FRG1     := "res://src/main/resources/com/openworld/weapon/FRG1.tscn"
 const THROWABLE_SLOT := 5
 
 var fails := 0
@@ -116,7 +116,7 @@ func _initialize() -> void:
 	# ── 1. In the world: the item rides a body, and the body is what falls ───────────────────
 	print("")
 	print("=== 1. world state -- the item rides a PickupBody ===")
-	var item: Node3D = (load(T1) as PackedScene).instantiate() as Node3D
+	var item: Node3D = (load(FRG1) as PackedScene).instantiate() as Node3D
 	world.add_child(item)
 	item.global_position = Vector3(8, 4, 0)
 	await _tick(4)

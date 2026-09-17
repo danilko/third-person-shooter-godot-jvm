@@ -1438,7 +1438,7 @@ public class NetworkManager extends Node {
     /**
      * The volume a reported shot origin must lie in, around the host copy's body. Not the host copy's
      * MUZZLE: a puppet does not animate the owner's pose — measured on the two-instance check, a
-     * standing client firing from the shoulder had its host copy holding the same SG1 at the hip,
+     * standing client firing from the shoulder had its host copy holding the same SHG1 at the hip,
      * 1.17 m away, on every shot — so a muzzle check refused every honest shot. The body position is
      * replicated state; the muzzle is cosmetic. Horizontal: shoulder offset + a long gun's barrel.
      * Vertical: prone muzzle to a raised aim over a standing head.

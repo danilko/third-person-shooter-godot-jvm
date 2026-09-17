@@ -3,7 +3,7 @@ extends SceneTree
 ##
 ##   godot --headless --path . --script tools/godot/probe_self_hit.gd
 ##
-## Drives a real Player: picks an AR4 up, holds `aim`, then for each yaw offset injects one mouse
+## Drives a real Player: picks an ASR1 up, holds `aim`, then for each yaw offset injects one mouse
 ## motion through the camera controller's own `_input` (the path a real mouse takes) and presses
 ## `fire`. At the instant each shot is fired (`ammo_changed` is emitted synchronously inside the
 ## fire path) it records the angle between the gun's own forward (-Z) and the line from the gun to
@@ -17,7 +17,7 @@ extends SceneTree
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.java"
-const AR4    := "res://src/main/resources/com/openworld/weapon/AR4.tscn"
+const ASR1    := "res://src/main/resources/com/openworld/weapon/ASR1.tscn"
 const YAW_SENS := 0.07                  # TPSCameraController.yawSensitivity, degrees per pixel
 const MAX_GUN_OFF_AIM_DEG := 15.0
 
@@ -80,7 +80,7 @@ func _initialize() -> void:
 	var cam: Node = player.get_node("TPSCameraController")
 	player.get_node("Health").connect("hit", func(d): self_hits.append(d))
 
-	gun = (load(AR4) as PackedScene).instantiate() as Node3D
+	gun = (load(ASR1) as PackedScene).instantiate() as Node3D
 	world.add_child(gun)
 	gun.global_position = Vector3(6, 1, 0)
 	await _tick(3)
@@ -92,7 +92,7 @@ func _initialize() -> void:
 		if String(gun.get_parent().name).begins_with("Socket"):
 			break
 	if not String(gun.get_parent().name).begins_with("Socket"):
-		print("FAIL: AR4 never reached a hand socket (parent %s)" % gun.get_parent().name)
+		print("FAIL: ASR1 never reached a hand socket (parent %s)" % gun.get_parent().name)
 		quit(1)
 		return
 	wc.connect("ammo_changed", _on_shot)

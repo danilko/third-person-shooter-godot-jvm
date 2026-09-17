@@ -61,7 +61,7 @@ public class FirearmItem extends WeaponItem {
 
   /**
    * This weapon's scope, or null (PLAN.md 2.8 item 4). A {@link ScopeConfig} makes any firearm a scoped
-   * one — SR3 is a plain FirearmItem with a scope and a hipfire multiplier; there is no sniper subclass.
+   * one — SNR1 is a plain FirearmItem with a scope and a hipfire multiplier; there is no sniper subclass.
    */
   @Export public ScopeConfig scope;
 
@@ -144,7 +144,7 @@ public class FirearmItem extends WeaponItem {
 	fireShot();
 	// Bloom is what THIS shot does to the NEXT one, so it is added after the shot has resolved. It used
 	// to be added first, which put every weapon's per-shot bloom on its own first round: harmless on
-	// AR4 (0.05 deg) and ruinous on SR3, whose 0.6 deg bloom meant every "pinpoint" shot left a 0.605
+	// ASR1 (0.05 deg) and ruinous on SNR1, whose 0.6 deg bloom meant every "pinpoint" shot left a 0.605
 	// deg cone — ~0.6 m of scatter at 120 m, so a scope on the head hit the torso, the legs or nothing
 	// (measured, tools/godot/probe_sniper_hits.gd).
 	currentBloom = (float) Accuracy.bloomAfterShot(currentBloom, accuracyTuning());
@@ -369,7 +369,7 @@ public class FirearmItem extends WeaponItem {
    * once, then derive every pellet from a seed ({@link SpreadPattern}). A networked client predicts the
    * cosmetics and sends the host ONE message carrying exactly those inputs; the host regenerates the
    * same pellets from them ({@link #resolveServerShot}). It used to send one post-spread ray per pellet —
-   * eight reliable messages per SG1 pull, sharing channel 0 with damage, pickups and spawns.
+   * eight reliable messages per SHG1 pull, sharing channel 0 with damage, pickups and spawns.
    */
   private void fireShot() {
 	RayCast3D ray = getEffectiveAimRay();

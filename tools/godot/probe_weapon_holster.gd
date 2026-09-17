@@ -50,7 +50,7 @@ const POKE_FRACTION := 0.10
 ## A weapon may not reach into the head. head_2 is the skull bone; a skull is ~0.09 m in radius here.
 const HEAD_CLEARANCE := 0.10
 ## Nor may any part of it rise past the top of the head -- unmistakably wrong however the rest of it
-## hangs, and the vertical back sling put ATL4's tube 2.5 cm above it. The crown is MEASURED off the
+## hangs, and the vertical back sling put ATL1's tube 2.5 cm above it. The crown is MEASURED off the
 ## skinned `head` mesh every run (1.435 m on GodotChan, against head_2's bone at 1.357 and hair and
 ## headphones reaching 1.458/1.469), because a second body (W18) would make a written constant
 ## silently wrong. Hair and headphones are deliberately not the line: W25 already accepted a held
@@ -72,7 +72,7 @@ const PAIR_OVERLAP := 0.03
 ## SECOND socket of each pair is reached, and the only thing that can see two holstered weapons
 ## occupying the same space. The second is the axe, which is a long weapon (0.81 m) and rides the
 ## back sling, so it takes the second sling when one long gun is carried.
-const LOADOUTS := [["AR4", "SG1", "PI52", "MW1"], ["AR4", "MW2", "PI52"]]
+const LOADOUTS := [["ASR1", "SHG1", "PIS1", "MEW1"], ["ASR1", "MEW2", "PIS1"]]
 
 var visuals_path := ""
 var fails := 0

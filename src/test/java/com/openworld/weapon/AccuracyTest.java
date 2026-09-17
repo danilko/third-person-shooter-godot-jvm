@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 class AccuracyTest {
 
     private static final double EPS = 1e-9;
-    /** SR3-like: tiny base cone, big bloom, hipfire x8. */
+    /** SNR1-like: tiny base cone, big bloom, hipfire x8. */
     private static final Tuning SNIPER = new Tuning(0.005, 0.6, 0.5, 0.6, 0.34, 8.0);
     private static final Tuning RIFLE = new Tuning(0.01, 0.05, 0.3, 0.25, 0.34, 1.0);
 

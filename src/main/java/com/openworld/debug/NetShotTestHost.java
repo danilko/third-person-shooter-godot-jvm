@@ -38,7 +38,7 @@ import java.util.List;
  * </pre>
  *
  * <p>The HOST spawns a static target (an AICharacter whose brain is a {@link ScriptedInputController},
- * so it stands still) and a backstop wall; the joining client's body gets an SG1 from
+ * so it stands still) and a backstop wall; the joining client's body gets an SHG1 from
  * the scene's pickup, which the client's body walks onto — the host-arbitrated pickup request is
  * the real path (a host-side {@code requestEquip} onto an OWNED body is refused by the client's
  * inventory reconciliation, {@code inventory_owned_no_resurrect}).
@@ -57,7 +57,7 @@ public class NetShotTestHost extends Node3D {
     private static final String TARGET_ID = "netshot-target";
     private static final String PLAYER_SCENE = "res://src/main/resources/com/openworld/character/Player.tscn";
     private static final String AI_SCENE = "res://src/main/resources/com/openworld/character/AICharacter.tscn";
-    /** Where NetShotTest.tscn places the SG1 pickup — the client walks its body onto it. */
+    /** Where NetShotTest.tscn places the SHG1 pickup — the client walks its body onto it. */
     private static final Vector3 PICKUP_AT = new Vector3(0, 1.0, 6);
     private static final int PULLS = 10;
     private static final double TIMEOUT_S = 110.0;
@@ -225,7 +225,7 @@ public class NetShotTestHost extends Node3D {
             if (wc.getWeaponItem(i) instanceof FirearmItem f && f.pelletCount > 1) { sg = f; sgSlot = i; }
         }
         if (sg == null) {
-            // Collect the scene's SG1 the way a player does: stand on it. The owning client moves its own
+            // Collect the scene's SHG1 the way a player does: stand on it. The owning client moves its own
             // body (the host follows the snapshot), and the pickup request is host-arbitrated.
             if (me.getGlobalPosition().distanceTo(PICKUP_AT) > 0.6) me.setGlobalPosition(PICKUP_AT);
             return;
@@ -254,7 +254,7 @@ public class NetShotTestHost extends Node3D {
             Input.INSTANCE.actionPress(new StringName("fire"), 1.0f);
             releaseInFrames = 3;
             pullsDone++;
-            nextPullAt = clock + Math.max(0.9, sg.fireInterval() * 1.5);   // SG1 fires once a second
+            nextPullAt = clock + Math.max(0.9, sg.fireInterval() * 1.5);   // SHG1 fires once a second
         }
         if (pullsDone >= PULLS && doneAt < 0) doneAt = clock;
         if (doneAt >= 0) forgeStep(me, sgSlot, target);

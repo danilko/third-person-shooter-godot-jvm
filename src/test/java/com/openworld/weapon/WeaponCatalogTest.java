@@ -170,8 +170,8 @@ class WeaponCatalogTest {
     }
 
     /**
-     * An id is a KEY (file names, catalog rows, the inventory manifest, stack merging) and stays plain — "AR4",
-     * "PI52". The NAME a player reads is the id with a hyphen between the letters and the number — "AR-4",
+     * An id is a KEY (file names, catalog rows, the inventory manifest, stack merging) and stays plain — "ASR1",
+     * "PIS1". The NAME a player reads is the id with a hyphen between the letters and the number — "AR-4",
      * "PI-52" — the way real designations are written (AK-47, M4A1-S) and the way CS keeps `weapon_ak47` apart
      * from its display string. Fist, which has no designation, is exempt.
      */

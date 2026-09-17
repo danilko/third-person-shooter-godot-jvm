@@ -10,7 +10,7 @@ extends SceneTree
 ## wheel's cards and the slot bar draws at 10 pt with a dark outline.
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const HUD := "res://src/main/resources/com/openworld/ui/HUDManager.tscn"
-const WEAPONS := ["AR4", "SR3", "PI52", "MW1", "T1"]
+const WEAPONS := ["ASR1", "SNR1", "PIS1", "MEW1", "FRG1"]
 var fails := 0
 
 func _check(label: String, ok: bool, detail: String) -> void:

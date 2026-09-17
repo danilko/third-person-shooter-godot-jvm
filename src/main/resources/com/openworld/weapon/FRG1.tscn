@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://bk5bkbssdlaa4"]
+
+[ext_resource type="Texture2D" path="res://assets/ui/weapons/FRG1.png" id="91_icon"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/FRG1.tres" id="90_stats"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/ThrowableItem.java" id="1_ti"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/FRG1Projectile.tscn" id="2_proj"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2wpi7"]
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_grenade"]
+size = Vector3(0.064, 0.064, 0.09)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ifxot"]
+size = Vector3(0.064, 0.064, 0.09)
+
+[node name="FRG1" type="Node3D" unique_id=507572094]
+world_body_continuous_cd = true
+script = ExtResource("1_ti")
+stats = ExtResource("90_stats")
+weapon_archetype = "throwable"
+weapon_icon = ExtResource("91_icon")
+projectile_scene = ExtResource("2_proj")
+explosion_radius = 10.0
+weapon_id = "FRG1"
+weapon_name = "FRG-1"
+slot_type = 3
+magazine = 1
+reserve = 0
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=1787117722]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=158100437]
+shape = SubResource("BoxShape3D_2wpi7")
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=851682241]
+mesh = SubResource("BoxMesh_grenade")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1793833142]
+shape = SubResource("BoxShape3D_ifxot")
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

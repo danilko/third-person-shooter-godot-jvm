@@ -18,7 +18,7 @@ extends SceneTree
 ##      weapon's `scopedFov` and returns, the head hides and comes back, the overlay shows and hides,
 ##      and `is_fps_mode` is FALSE at every step -- the preference was not written.
 ##   2. FPS -> scope -> release. First person throughout, `is_fps_mode` still TRUE at every step.
-##   3. A non-scoped weapon (AR4). Holding aim does not scope, does not move the camera, does not
+##   3. A non-scoped weapon (ASR1). Holding aim does not scope, does not move the camera, does not
 ##      change the FOV. The control for every measurement above.
 ##   4-6. INTERRUPTIONS, each with the aim button STILL HELD: a weapon switch, sitting in a carrier,
 ##      and death. Each must leave the camera on the TPS boom with the preference intact. A latched
@@ -39,7 +39,7 @@ const OVERLAY := "res://src/main/java/com/openworld/ui/ScopeOverlay.java"
 ## Killing goes through Health, which is not registered; this is the probe helper that reaches it.
 const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
 
-## Scoping is a tween of the weapon's own scopeZoomTime (0.12 s on SR3) plus the rig handover.
+## Scoping is a tween of the weapon's own scopeZoomTime (0.12 s on SNR1) plus the rig handover.
 const SETTLE := 30
 ## Coming back OUT is slower to measure than going in, and for a reason that is not the scope: the
 ## aim-stay timer holds combat for 0.5 s after the button (so the camera does not snap out of the
@@ -149,8 +149,8 @@ func _initialize() -> void:
 	var x := 0.0
 
 	print("")
-	print("=== SR3, from THIRD person: scoping is first person and the preference is untouched ===")
-	var a: Array = await _armed(world, "SR3", Vector3(x, 1.2, 0))
+	print("=== SNR1, from THIRD person: scoping is first person and the preference is untouched ===")
+	var a: Array = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
 	x += 12.0
 	if not a.is_empty():
 		var p: Node3D = a[0]
@@ -192,8 +192,8 @@ func _initialize() -> void:
 		await _tick(5)
 
 	print("")
-	print("=== SR3, from FIRST person: scoping changes the FOV and nothing else ===")
-	a = await _armed(world, "SR3", Vector3(x, 1.2, 0))
+	print("=== SNR1, from FIRST person: scoping changes the FOV and nothing else ===")
+	a = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
 	x += 12.0
 	if not a.is_empty():
 		var p: Node3D = a[0]
@@ -218,8 +218,8 @@ func _initialize() -> void:
 		await _tick(5)
 
 	print("")
-	print("=== AR4, the control: a weapon with no scope does not scope ===")
-	a = await _armed(world, "AR4", Vector3(x, 1.2, 0))
+	print("=== ASR1, the control: a weapon with no scope does not scope ===")
+	a = await _armed(world, "ASR1", Vector3(x, 1.2, 0))
 	x += 12.0
 	if not a.is_empty():
 		var p: Node3D = a[0]
@@ -232,9 +232,9 @@ func _initialize() -> void:
 		print("  aiming: rig %s  fov %.1f (idle %.1f)  scoped %s" % [_rig(p), aimed_fov, fov0, wc.call("scoped_now")])
 		_check("an unscoped weapon does not scope", not bool(wc.call("scoped_now")), "scopedNow()")
 		_check("the camera stayed on the boom", _rig(p) == "TPS", "rig %s" % _rig(p))
-		# Aiming an AR4 moves the FOV -- that is the ordinary combat framing, and it is NOT a scope.
+		# Aiming an ASR1 moves the FOV -- that is the ordinary combat framing, and it is NOT a scope.
 		_check("the FOV is nowhere near a scope", aimed_fov > 40.0,
-			"fov %.2f while aiming; SR3's scope is 20" % aimed_fov)
+			"fov %.2f while aiming; SNR1's scope is 20" % aimed_fov)
 		await _aim_up(p, false)
 		_check("the ordinary aim FOV returns as before", absf(_fov(p) - fov0) < 1.0,
 			"fov %.2f, idle was %.2f" % [_fov(p), fov0])
@@ -242,8 +242,8 @@ func _initialize() -> void:
 		await _tick(5)
 
 	print("")
-	print("=== SR3: the bolt and the reload leave the scope; aim still held brings it back (piece 4) ===")
-	a = await _armed(world, "SR3", Vector3(x, 1.2, 0))
+	print("=== SNR1: the bolt and the reload leave the scope; aim still held brings it back (piece 4) ===")
+	a = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
 	x += 12.0
 	if not a.is_empty():
 		var p: Node3D = a[0]
@@ -359,7 +359,7 @@ func _initialize() -> void:
 func _interruption(world: Node3D, at: Vector3, what: String, interrupt: Callable) -> void:
 	print("")
 	print("=== interrupted by %s, with the aim button still HELD ===" % what)
-	var a: Array = await _armed(world, "SR3", at)
+	var a: Array = await _armed(world, "SNR1", at)
 	if a.is_empty():
 		return
 	var p: Node3D = a[0]

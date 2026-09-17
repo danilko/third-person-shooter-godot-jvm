@@ -151,7 +151,7 @@ the angle between the barrel and the target.
 | head follows | 0.94 | 0.94 | 0.93 |
 | gun off aim (up / down) | 1.5° / 5.9° | 1.5° / 6.0° | 1.5° / 6.1° |
 
-and the workbench mannequin (AI rig, upright, holding an AR4, ball 8 m ahead): body facing the ball
+and the workbench mannequin (AI rig, upright, holding an ASR1, ball 8 m ahead): body facing the ball
 to **0.0°**, chest **5.7°**, head **26°**, gun **3.3°**.
 
 A **gun-off-aim** above 12° fails the gate. Note it is a *cosmetic* bound: the bullet is traced from
@@ -163,7 +163,7 @@ Two things to know before you trust a gun reading:
 - **It is the HELD weapon's muzzle**, from `WeaponController.getCurrentWeaponItem()`. A depth-first
   hunt for any `Muzzle` finds a stowed gun in another marker instead — that read 91.6° on a body
   whose chest was 4.6° off. When the body holds something with no muzzle (slot 0 is the **fist**),
-  it falls back to the rifle parked in `MarkerAR4`, which is the authored AR4 hold offset and hangs
+  it falls back to the rifle parked in `MarkerAR4`, which is the authored ASR1 hold offset and hangs
   off the same `hand_r` attachment, so it is still a fair measurement.
 - **Let a weapon switch finish before reading.** Mid-transition the same mannequin measured 63.0°
   and settled to 3.3°.

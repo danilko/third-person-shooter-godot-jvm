@@ -32,7 +32,7 @@ public class SpawnConfig extends Resource {
 
     /** Weapon scene each AI is equipped with on spawn. */
     @Export public String weaponScenePath =
-            "res://src/main/resources/com/openworld/weapon/AR4.tscn";
+            "res://src/main/resources/com/openworld/weapon/ASR1.tscn";
 
     public SpawnConfig() { super(); }
 }

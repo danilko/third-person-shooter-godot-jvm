@@ -32,8 +32,8 @@ extends SceneTree
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const AI     := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
 const IMPACT := "res://src/main/java/com/openworld/world/manager/ImpactManager.java"
-const MW1    := "res://src/main/resources/com/openworld/weapon/MW1.tscn"
-const MW2    := "res://src/main/resources/com/openworld/weapon/MW2.tscn"
+const MEW1    := "res://src/main/resources/com/openworld/weapon/MEW1.tscn"
+const MEW2    := "res://src/main/resources/com/openworld/weapon/MEW2.tscn"
 const FIST   := "res://src/main/resources/com/openworld/weapon/Fist.tscn"
 const MELEE_SLOT := 4
 const COMBO_RESET_FRAMES := 60     # > comboResetSeconds (0.6 s) at 60 Hz
@@ -189,7 +189,7 @@ func _initialize() -> void:
 	var inputs := {}
 	for i in range(clip_node.get_input_count()):
 		inputs[clip_node.get_input_name(i)] = true
-	for scene in [FIST, MW1, MW2]:
+	for scene in [FIST, MEW1, MEW2]:
 		var w: Node = (load(scene) as PackedScene).instantiate()
 		for s in w.get("attack_steps"):
 			var a: String = s.get("animation")
@@ -306,7 +306,7 @@ func _initialize() -> void:
 	# ── 7. knife: tap stabs, hold slashes ──────────────────────────────────────────────────────
 	print("")
 	print("=== 7. knife -- tap stabs, hold slashes ===")
-	var knife := await _swap_melee(MW1)             # the fist holds slot 0, so the MELEE slot is free
+	var knife := await _swap_melee(MEW1)             # the fist holds slot 0, so the MELEE slot is free
 	var kn_t := _target(Vector3(0, 0, -1.2))
 	await _tick(COMBO_RESET_FRAMES)
 	var k1 := await _press(2, 50)                   # tap
@@ -327,7 +327,7 @@ func _initialize() -> void:
 	# ── 8. axe: light first, big second ────────────────────────────────────────────────────────
 	print("")
 	print("=== 8. axe -- light first, big second ===")
-	var axe := await _swap_melee(MW2)
+	var axe := await _swap_melee(MEW2)
 	var axe_t := _target(Vector3(0, 0, -1.2))
 	await _tick(COMBO_RESET_FRAMES)
 	var a1 := await _press(2, 50)
@@ -370,7 +370,7 @@ func _initialize() -> void:
 	await _tick(2)
 	attacker.global_position = ai_pos
 
-	var ai_axe: Node3D = (load(MW2) as PackedScene).instantiate() as Node3D
+	var ai_axe: Node3D = (load(MEW2) as PackedScene).instantiate() as Node3D
 	world.add_child(ai_axe)
 	ai_axe.global_position = attacker.global_position + Vector3(3, 1, 0)
 	await _tick(3)

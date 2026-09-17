@@ -1,5 +1,5 @@
 extends SceneTree
-## SR3's bolt works on every shot (PLAN.md 2.7 piece 6): the handle is its own node (`Model/Bolt`, split out of
+## SNR1's bolt works on every shot (PLAN.md 2.7 piece 6): the handle is its own node (`Model/Bolt`, split out of
 ## the model), and `fire_animation = "bolt_cycle"` plays on the weapon's own AnimationPlayer (W13) — lift about
 ## the bore, draw back 4 cm, run home, lower — inside the 1.46 s fire interval, back at rest before the next shot.
 ##
@@ -10,7 +10,7 @@ extends SceneTree
 ## clears fire_animation: the bolt must not move.
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
-const SR3 := "res://src/main/resources/com/openworld/weapon/SR3.tscn"
+const SNR1 := "res://src/main/resources/com/openworld/weapon/SNR1.tscn"
 var fails := 0
 
 func _check(label: String, ok: bool, detail: String) -> void:
@@ -38,7 +38,7 @@ func _initialize() -> void:
 	world.add_child(p)
 	p.position = Vector3(0, 1.2, 0)
 	await _tick(40)
-	var gun: Node3D = (load(SR3) as PackedScene).instantiate()
+	var gun: Node3D = (load(SNR1) as PackedScene).instantiate()
 	world.add_child(gun)
 	gun.global_position = p.global_position + Vector3(0, 0.3, 0)
 	await _tick(30)

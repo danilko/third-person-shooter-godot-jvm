@@ -21,7 +21,7 @@ WHAT IS ASSERTED, AND WHY EACH ONE EXISTS
   * `length_m` — the size is a fact from the reference, not a free parameter;
   * `grip_to_rear_m` — the origin really is the grip. The first standard only ASSERTED origin=grip
     and nothing measured it: every raw model's origin had in fact been left wherever a centring
-    offset put it (SG1's sat on the receiver, 0.48 m from the butt), and the character carried one
+    offset put it (SHG1's sat on the receiver, 0.48 m from the butt), and the character carried one
     socket per weapon to hide it. Measuring the distance from the origin to the rearmost point is
     what catches an origin that has walked off the grip again.
 """
@@ -91,7 +91,7 @@ def verify_and_export(w):
                               export_apply=True, export_animations=False)
     # 4. every material carries a colour across glTF. Blender exports a base colour only from the ACTIVE
     # output's Principled BSDF as a constant or an image; a material whose exported output is anything else
-    # (SR3 shipped with a second, Cycles-only Material Output fed by a Diffuse BSDF) arrives in Godot as
+    # (SNR1 shipped with a second, Cycles-only Material Output fed by a Diffuse BSDF) arrives in Godot as
     # plain white, with no warning on either side.
     import struct
     data = open(out, "rb").read()

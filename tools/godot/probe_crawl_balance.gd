@@ -1,7 +1,7 @@
 extends SceneTree
 ## Is the prone (crawl) upper body balanced -- no constant lean to one side, no side-to-side sway while moving?
 ##
-##   godot --headless --fixed-fps 60 --path . --script tools/godot/probe_crawl_balance.gd [-- --weapon=AR4] [-- --no-aim]
+##   godot --headless --fixed-fps 60 --path . --script tools/godot/probe_crawl_balance.gd [-- --weapon=ASR1] [-- --no-aim]
 ##
 ## User report (2026-09-15): in crawl the character always leans LEFT and rocks left/right whenever it moves, where
 ## upright and crouch hold steady. A Player armed through a real pickup is put in each stance and each case below,
@@ -24,7 +24,7 @@ const KNEE_ASYM_LIMIT := 0.05       # idle: (left knee + right knee) lateral off
 const HIP_SWAY_LIMIT := 10.0        # moving: hip yaw peak-to-peak
 
 var fails := 0
-var weapon := "AR4"
+var weapon := "ASR1"
 var aim := true
 ## `-- --dump=res://...json` writes the FINAL in-game pose (every bone through a BoneAttachment3D, i.e. after the aim
 ## and IK modifiers, in skeleton space) and the gun, for chosen frames of each case, so

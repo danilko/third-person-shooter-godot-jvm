@@ -25,8 +25,8 @@ const WEAPON_DIR := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 
 ## weapon, frames of held fire, shots that should come out of it, its authored kick.
 const CASES := [
-	{"id": "AR4", "fire_frames": 48, "min_shots": 6},   # full auto, 10 rps: the stacking case
-	{"id": "SG1", "fire_frames": 10, "min_shots": 1},   # one heavy shot, the slowest settle
+	{"id": "ASR1", "fire_frames": 48, "min_shots": 6},   # full auto, 10 rps: the stacking case
+	{"id": "SHG1", "fire_frames": 10, "min_shots": 1},   # one heavy shot, the slowest settle
 ]
 
 const QUIET_FRAMES := 60
@@ -35,7 +35,7 @@ const SETTLE_BACK := 0.001         # m — the plan's "< 1 mm"
 const SETTLE_PITCH := 0.05         # deg
 ## The hand has to move at least this far. 2 cm, not "more than nothing": the camera recoil lifts the
 ## aim point and the aim modifiers swing the whole arm after it, which alone moves the hand 0.008 m
-## (AR4) to 0.011 m (SG1) -- measured with `--control`. Anything under that is not evidence of a kick.
+## (ASR1) to 0.011 m (SHG1) -- measured with `--control`. Anything under that is not evidence of a kick.
 const MIN_KICK_M := 0.020
 const MIN_RISE_DEG := 1.0
 const WOBBLE_MULTIPLE := 3.0       # ... and clear the clip's own motion by this much

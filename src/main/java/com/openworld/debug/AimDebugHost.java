@@ -176,7 +176,7 @@ public class AimDebugHost extends Node3D {
                         && row.get("id") instanceof String id) ids.add(id);
             }
         }
-        if (ids.isEmpty()) ids.add("AR4");
+        if (ids.isEmpty()) ids.add("ASR1");
         return ids.toArray(new String[0]);
     }
     private static final String WEAPON_DIR = "res://src/main/resources/com/openworld/weapon/";
@@ -327,7 +327,7 @@ public class AimDebugHost extends Node3D {
             GD.INSTANCE.print("[AimDebug] armStand: no SocketRifle -- gun angle stays unmeasured");
             return;
         }
-        Object res = GD.INSTANCE.load("res://src/main/resources/com/openworld/weapon/AR4.tscn");
+        Object res = GD.INSTANCE.load("res://src/main/resources/com/openworld/weapon/ASR1.tscn");
         if (!(res instanceof PackedScene ps)) return;
         Node gun = ps.instantiate();
         if (gun != null) marker.addChild(gun);
@@ -414,7 +414,7 @@ public class AimDebugHost extends Node3D {
         }
         // NOT armed here. armStandOn() early-returns when the body already has a Muzzle, and a
         // body's own WeaponController equips over the opening frames -- arming during _ready wins
-        // that race and leaves a DANGLING AR4 in the marker's rest transform rather than a held
+        // that race and leaves a DANGLING ASR1 in the marker's rest transform rather than a held
         // one. Measured: gun 91.6 deg off the ball that way, against 1.5-6.0 for a real equip.
         // So it is retried every frame from workbenchStep and only ever fires if nothing equips.
     }
@@ -501,7 +501,7 @@ public class AimDebugHost extends Node3D {
         // marker back every frame. Measured: gun 91.6 deg off the ball with the command alone.
         driveMannequinAim();
 
-        // The bench arms the mannequin for real (armBenchMannequin), so the measuring-only AR4
+        // The bench arms the mannequin for real (armBenchMannequin), so the measuring-only ASR1
         // armStandNode parents onto a socket is not used here -- it would dangle a second gun on
         // any body holding a weapon with no Muzzle (a knife, a grenade).
         syncBenchSlot();
@@ -1866,7 +1866,7 @@ public class AimDebugHost extends Node3D {
      * <p><b>It reads {@code n/a} today because this stand is unarmed.</b>
      * CharacterVisuals_GodotChan instances only {@code Fist} under WeaponAttachment (a MeleeItem,
      * which has no {@code Muzzle}); the firearms are added elsewhere. Arming the stand -- instance
-     * AR4 under {@code SocketRifle} and equip it through WeaponController -- is what turns this into
+     * ASR1 under {@code SocketRifle} and equip it through WeaponController -- is what turns this into
      * a real assertion, and is the thing to do BEFORE authoring any per-stance aim clip, since the
      * gun angle is the only number that says whether such a clip is needed. See AIM_PLAN.md W4.
      */
@@ -1887,7 +1887,7 @@ public class AimDebugHost extends Node3D {
             // else: holding something with no muzzle (fist, knife) -- fall through
         }
         // Fallback: the rifle armStand() parks in SocketRifle. That socket IS the authored hold
-        // offset for an AR4 and hangs off the hand_r BoneAttachment3D, so a gun sitting in it is
+        // offset for an ASR1 and hangs off the hand_r BoneAttachment3D, so a gun sitting in it is
         // exactly where a held one would be -- which is what makes it a fair thing to measure
         // while the body happens to be holding a fist (slot 0). Deterministic, unlike a
         // depth-first hunt for any "Muzzle" in the subtree.

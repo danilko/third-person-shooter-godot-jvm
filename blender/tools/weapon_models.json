@@ -12,42 +12,56 @@
   },
   "weapons": [
     {
-      "id": "AR4",
+      "id": "ASR1",
       "length_m": 0.88,
-      "grip_to_rear_m": 0.281,
-      "reference": {"based_on": "AKMS (AKM, side-folding stock extended)", "overall_m": 0.88, "barrel_m": 0.415, "length_of_pull_m": 0.34},
+      "grip_to_rear_m": 0.263,
+      "reference": {"based_on": "AKM (fixed stock)", "overall_m": 0.88, "barrel_m": 0.415, "length_of_pull_m": 0.33},
       "real": "AK-pattern assault rifle"
     },
     {
-      "id": "AR212",
+      "id": "ASR2",
       "length_m": 0.84,
       "grip_to_rear_m": 0.259,
       "reference": {"based_on": "M4 carbine (stock extended)", "overall_m": 0.838, "barrel_m": 0.368, "length_of_pull_m": 0.33},
       "real": "AR-15-pattern carbine"
     },
     {
-      "id": "SG1",
+      "id": "SHG1",
       "length_m": 0.98,
       "grip_to_rear_m": 0.272,
       "reference": {"based_on": "Remington 870, 18.5 in barrel", "overall_m": 0.98, "barrel_m": 0.47, "length_of_pull_m": 0.356},
       "real": "pump-action shotgun"
     },
     {
-      "id": "SR3",
+      "id": "SNR1",
       "length_m": 1.124,
       "grip_to_rear_m": 0.306,
       "reference": {"based_on": "Accuracy International AWP / L96A1 (24 in barrel, muzzle brake)", "overall_m": 1.124, "barrel_m": 0.61, "length_of_pull_m": 0.356},
       "real": "bolt-action sniper rifle (thumbhole stock, scoped)"
     },
     {
-      "id": "PI52",
+      "id": "PIS1",
       "length_m": 0.22,
       "grip_to_rear_m": 0.041,
       "reference": {"based_on": "Beretta 92FS / M9", "overall_m": 0.217, "barrel_m": 0.125, "height_m": 0.137},
       "real": "full-size service pistol"
     },
     {
-      "id": "MW1",
+      "id": "REV1",
+      "length_m": 0.381,
+      "grip_to_rear_m": 0.041,
+      "reference": {"based_on": "Smith & Wesson Model 500 (8 3/8 in barrel)", "overall_m": 0.381, "barrel_m": 0.213, "height_m": 0.165},
+      "real": "large-frame magnum revolver (hand cannon, 6 rounds)"
+    },
+    {
+      "id": "SMG1",
+      "length_m": 0.523,
+      "grip_to_rear_m": 0.244,
+      "reference": {"based_on": "B&T MP9 (stock extended, vertical foregrip)", "overall_m": 0.523, "barrel_m": 0.13, "length_folded_m": 0.303},
+      "real": "compact 9 mm submachine gun"
+    },
+    {
+      "id": "MEW1",
       "length_m": 0.3,
       "grip_to_rear_m": 0.068,
       "reference": {"based_on": "USMC KA-BAR fighting knife", "overall_m": 0.302, "blade_m": 0.178},
@@ -56,19 +70,19 @@
   ],
   "primitives": {
     "note": "These weapons have no mesh asset — their look is a primitive mesh authored in the .tscn. They take the same metre, forward and origin-on-grip rules, applied to the primitive: `size` is the primitive in Godot axes (x, y, z) and `center` is where its middle sits relative to the grip.",
-    "ATL4": {
+    "ATL1": {
       "size": [0.09, 0.09, 1.02],
       "center": [0.0, 0.055, -0.1133],
       "reference": {"based_on": "AT4 disposable launcher", "overall_m": 1.016, "calibre_m": 0.084},
       "real": "shoulder-fired launcher tube"
     },
-    "MW2": {
+    "MEW2": {
       "size": [0.087, 0.175, 0.8],
       "center": [0.0, 0.0, -0.3],
       "reference": {"based_on": "felling axe, 32 in haft", "overall_m": 0.81},
       "real": "felling axe"
     },
-    "T1": {
+    "FRG1": {
       "size": [0.064, 0.064, 0.09],
       "center": [0.0, 0.0, 0.0],
       "reference": {"based_on": "M67 fragmentation grenade", "overall_m": 0.089, "diameter_m": 0.064},

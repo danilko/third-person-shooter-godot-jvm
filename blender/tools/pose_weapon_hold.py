@@ -12,8 +12,8 @@ support hand, clips, the solve arguments the shipped clips were written with). E
     $B body-anchor R U F | skin-anchor | remove-object NAME... --save
     blender -b assets/merged_animation_f.blend ... -- copy-from assets/merged_animation.blend --save
 
-What shipped (2026-09-15): rifle aim ADOPTED from the artist's placed AR4 (clip untouched); rifle hold, launcher
-aim and hold SOLVED from their rows; pistol clips kept, PI52's SupportPoint adopted from them.
+What shipped (2026-09-15): rifle aim ADOPTED from the artist's placed ASR1 (clip untouched); rifle hold, launcher
+aim and hold SOLVED from their rows; pistol clips kept, PIS1's SupportPoint adopted from them.
 
 NOT idempotent where a gesture is relative: the shoulder shrug and the head gestures apply to the clip they start
 from, so a second rifle-style solve over a solved clip shrugs again. The launcher row (no shrug, head kept) is
@@ -783,7 +783,7 @@ def write_pose(action, old, new, frame_ref):
     print("  wrote %s: %s" % (action.name, ", ".join(changed)))
 
 
-def render(rig, pose, out_dir, weapons=("AR4",), tag="pose"):
+def render(rig, pose, out_dir, weapons=("ASR1",), tag="pose"):
     """Workbench renders of the posed body holding the gun(s): front, side, top, three-quarter, and the
     over-the-shoulder view the game's TPS camera has. Never saved: call after any --save."""
     os.makedirs(out_dir, exist_ok=True)

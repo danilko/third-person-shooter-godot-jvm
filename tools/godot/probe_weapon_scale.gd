@@ -24,7 +24,7 @@ const TABLE := "res://blender/tools/weapon_models.json"
 const SCENES := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 ## Fraction of the declared length a measurement may be out by. Tight: this is a bake, not a guess.
 const LENGTH_TOL := 0.02
-## A world pickup rests on a heightfield; a collider thinner than this sinks through it. MW1 shipped
+## A world pickup rests on a heightfield; a collider thinner than this sinks through it. MEW1 shipped
 ## a 0.04 m box and fell to y = -59 in World.tscn for exactly that reason (W15/W16).
 const MIN_COLLIDER := 0.05
 

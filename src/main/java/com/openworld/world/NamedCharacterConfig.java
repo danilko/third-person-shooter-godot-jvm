@@ -34,7 +34,7 @@ public class NamedCharacterConfig extends Resource {
 
     /** Weapon scene equipped on spawn. */
     @Export public String weaponScenePath =
-            "res://src/main/resources/com/openworld/weapon/AR4.tscn";
+            "res://src/main/resources/com/openworld/weapon/ASR1.tscn";
 
     /** Spawn offset relative to the zone marker's world position. */
     @Export public Vector3 offset = new Vector3();

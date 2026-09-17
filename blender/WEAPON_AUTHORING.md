@@ -57,7 +57,7 @@ which is why that probe counts pose clusters rather than trusting the table. The
   the way from wrist to middle knuckle, on it and keeps the hand's authored orientation). Put it on the
   handguard / pump centre line **where the character's arm reaches with the stock shouldered**: GodotChan's
   arm (shoulder to wrist) is 0.416 m, which reaches about 0.23–0.25 m ahead of the pistol grip — the rear
-  of a rifle handguard (AR4 z −0.25, AR212 −0.23) and the rear edge of a pump (SG1 −0.30, still 4 cm
+  of a rifle handguard (ASR1 z −0.25, ASR2 −0.23) and the rear edge of a pump (SHG1 −0.30, still 4 cm
   short). `probe_weapon_fit.gd` asserts it per weapon. (Before 2026-09-14 this was the WRIST position.)
 * A MOUNT marker, if the archetype mounts (`weapon_archetypes.json` `holds`): `StockPoint` at the butt-pad centre for
   a shouldered long gun, `ShoulderRestPoint` on the underside of a launcher tube where it rests on the shoulder.
@@ -85,10 +85,10 @@ the two facts belong to different owners (W28):
   `tools/godot/solve_holster_sockets.gd` (22° from vertical, gun flat against the back, the pair
   separated in depth) — never nudged by eye, because its authored transform is in a BONE's frame.
   The right hip is the mirror of the left.
-* **the HANG POINT is the weapon's**, and only when the weapon's own proportions need it: `ATL4`'s
+* **the HANG POINT is the weapon's**, and only when the weapon's own proportions need it: `ATL1`'s
   grip is 0.397 m from the rear of its tube, so slung by the grip the tube stood above the
   character's crown. It declares a `HolsterPoint` 0.20 m behind the grip. No other weapon needs one.
-* **a weapon's holster list is a fact about its SIZE, not its slot.** `MW2` (a 0.81 m axe) occupies
+* **a weapon's holster list is a fact about its SIZE, not its slot.** `MEW2` (a 0.81 m axe) occupies
   the MELEE slot and hangs on the BACK slings: a hip socket cannot hold it in any pose (by the grip
   its head reaches the ankle, by mid-haft it reaches the character's head).
 
@@ -100,7 +100,7 @@ crown, ground clearance, and — for a whole loadout — that no two holstered w
 
 ## Finding the grip, and why the library exists
 
-Every weapon here once had its origin wherever a centring offset left it — SG1's sat on the
+Every weapon here once had its origin wherever a centring offset left it — SHG1's sat on the
 receiver, 0.48 m from the butt, and the character carried a separate socket per weapon to hide it.
 The table *said* "origin = grip"; nothing measured it, and no-one had ever put two weapons side by
 side. That is what the library is for.
@@ -155,7 +155,7 @@ library draws it where the game does.
 A weapon has **two** and they are not the same shape:
 
 * **the body collider** (direct `CollisionShape3D`) — what the world pickup rests on. The model's
-  bounding box, centred on the model, with **no axis thinner than 0.05 m** (we use 0.08). MW1 shipped
+  bounding box, centred on the model, with **no axis thinner than 0.05 m** (we use 0.08). MEW1 shipped
   a 0.04 m box and fell to y = −59 in `World.tscn`. A pickup's collider is not its silhouette.
 * **the `PickupArea` shape** — a *detection volume*, deliberately generous (≥ 0.5 m per axis).
 
@@ -168,7 +168,7 @@ While held, neither is in the physics world — the item is a plain `Node3D` and
 
 `build_weapon.py` will not export a model that has stopped conforming, and names the rule:
 
-* **an un-applied transform** — `'AR4' still carries a transform (… scale (1.5, 1.5, 1.5)). Apply it
+* **an un-applied transform** — `'ASR1' still carries a transform (… scale (1.5, 1.5, 1.5)). Apply it
   (Object > Apply > All Transforms) — the model IS the weapon.`
 * **a mesh outside the `<id>` collection** — it would be missing from the library.
 * **a length that has drifted** more than 0.5% from `length_m`.
