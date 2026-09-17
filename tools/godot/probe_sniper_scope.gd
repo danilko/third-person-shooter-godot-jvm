@@ -93,6 +93,7 @@ func _armed(world: Node3D, weapon_id: String, at: Vector3) -> Array:
 		if String(gun.get_parent().name).begins_with("Socket"):
 			break
 		wc.call("on_set_weapon", slot)
+		_last_slot = slot
 		await _tick(40)
 	if not String(gun.get_parent().name).begins_with("Socket"):
 		_check("%s reached the hand" % weapon_id, false, "parent %s" % gun.get_parent().name)
@@ -359,7 +360,7 @@ func _initialize() -> void:
 		await _tick(5)
 
 	print("")
-	print("=== SNR1: two zoom levels (CS AWP) — middle mouse cycles, the wheel steps, look input scales ===")
+	print("=== SNR1: middle mouse is a latched toggle (CS AWP / L4D): first level -> closer -> off, no button held ===")
 	a = await _armed(world, "SNR1", Vector3(x, 1.2, 0))
 	x += 12.0
 	if not a.is_empty():
@@ -371,24 +372,39 @@ func _initialize() -> void:
 		var cycle := 1.0 / float(gun.get("fire_rate"))
 		_check("SNR1 declares a second level", near > 0.0 and near < far, "fov %.1f, close_fov %.1f" % [far, near])
 		await _tick(90)
-		await _aim_down(p, false)
-		_check("the scope comes up at the FIRST level", int(wc.call("scope_zoom_level_now")) == 0 and absf(_fov(p) - far) < 0.5,
-			"level %d fov %.2f" % [wc.call("scope_zoom_level_now"), _fov(p)])
+		var fov0 := _fov(p)
 		await _press("scope_zoom")
-		_check("middle mouse: the closer level", int(wc.call("scope_zoom_level_now")) == 1 and absf(_fov(p) - near) < 0.5,
-			"level %d fov %.2f" % [wc.call("scope_zoom_level_now"), _fov(p)])
+		_check("middle mouse: scoped at the FIRST level with no button held",
+			bool(p.call("scoped_now")) and bool(wc.call("scope_latched_now")) and absf(_fov(p) - far) < 0.5 and _rig(p) == "FPS",
+			"scoped %s latched %s fov %.2f rig %s" % [p.call("scoped_now"), wc.call("scope_latched_now"), _fov(p), _rig(p)])
+		await _tick(180)
+		_check("... and it stays up by itself (3 s, nothing held)", bool(p.call("scoped_now")) and absf(_fov(p) - far) < 0.5,
+			"scoped %s fov %.2f" % [p.call("scoped_now"), _fov(p)])
+		_check("... in combat, so the body keeps facing the aim", bool(p.get("combat")), "combat %s" % p.get("combat"))
 		await _press("scope_zoom")
-		_check("middle mouse again: back to the first", absf(_fov(p) - far) < 0.5, "fov %.2f" % _fov(p))
+		_check("middle mouse again: the closer level", int(wc.call("scope_zoom_level_now")) == 1 and absf(_fov(p) - near) < 0.5,
+			"level %d fov %.2f" % [wc.call("scope_zoom_level_now"), _fov(p)])
 		await _press("scope_zoom_in")
+		_check("wheel up at the closer level: it stops there", absf(_fov(p) - near) < 0.5, "fov %.2f" % _fov(p))
+		await _press("scope_zoom_out")
+		_check("wheel down: the first level", absf(_fov(p) - far) < 0.5 and bool(p.call("scoped_now")), "fov %.2f" % _fov(p))
+		await _press("scope_zoom_out")
+		await _tick(RELEASE_SETTLE)
+		_check("wheel down again: OFF, back on the boom", not bool(p.call("scoped_now")) and _rig(p) == "TPS"
+			and absf(_fov(p) - fov0) < 1.0, "scoped %s rig %s fov %.2f" % [p.call("scoped_now"), _rig(p), _fov(p)])
+		await _press("scope_zoom_out")
+		_check("wheel down while off: nothing", not bool(p.call("scoped_now")), "scoped %s" % p.call("scoped_now"))
 		await _press("scope_zoom_in")
-		_check("wheel up twice: closer, and it stops there", absf(_fov(p) - near) < 0.5, "fov %.2f" % _fov(p))
+		_check("wheel up from off: scoped at the first level, nothing held", bool(p.call("scoped_now"))
+			and bool(wc.call("scope_latched_now")) and absf(_fov(p) - far) < 0.5,
+			"scoped %s latched %s fov %.2f" % [p.call("scoped_now"), wc.call("scope_latched_now"), _fov(p)])
+		await _press("scope_zoom_in")
+		_check("wheel up again: the closer level", absf(_fov(p) - near) < 0.5, "fov %.2f" % _fov(p))
 
 		# Look input scales with the zoom: a mouse delta turns the view by (raw x fov / unscoped fov).
 		var cam_ctl: Node = p.get_node("TPSCameraController")
 		var yaw_near := await _look_yaw(p, cam_ctl)
 		await _press("scope_zoom_out")
-		await _press("scope_zoom_out")
-		_check("wheel down twice: back out, and it stops there", absf(_fov(p) - far) < 0.5, "fov %.2f" % _fov(p))
 		var yaw_far := await _look_yaw(p, cam_ctl)
 		cam_ctl.set("scoped_sensitivity_ratio", 0.0)
 		var yaw_raw := await _look_yaw(p, cam_ctl)
@@ -399,24 +415,57 @@ func _initialize() -> void:
 		_check("the closer level scales by the FOV ratio", absf(yaw_near / yaw_far - near / far) < 0.03,
 			"%.3f, fov ratio %.3f" % [yaw_near / yaw_far, near / far])
 
-		# Resume-zoom: the bolt drops the zoom and it comes back at the level it left.
-		await _press("scope_zoom")
+		# The bolt and the reload drop the ZOOM, never the toggled scope: it comes back at its level, nothing held.
+		await _press("scope_zoom_in")
 		Input.action_press("fire")
 		await _tick(3)
 		Input.action_release("fire")
 		await _tick(20)
-		_check("the bolt still drops the zoom at the closer level", not bool(p.call("scoped_now")) and _fov(p) > 40.0,
-			"scoped %s fov %.1f" % [p.call("scoped_now"), _fov(p)])
+		_check("the bolt drops the zoom", not bool(p.call("scoped_now")) and _fov(p) > 40.0 and _rig(p) == "FPS",
+			"scoped %s fov %.1f rig %s" % [p.call("scoped_now"), _fov(p), _rig(p)])
 		await _tick(int(cycle * 60.0) + 20)
-		_check("... and it comes back at the CLOSER level", bool(p.call("scoped_now")) and absf(_fov(p) - near) < 0.5,
+		_check("... and the toggled scope comes back at the CLOSER level", bool(p.call("scoped_now")) and absf(_fov(p) - near) < 0.5,
 			"scoped %s fov %.2f" % [p.call("scoped_now"), _fov(p)])
-		await _aim_up(p, false)
-		await _aim_down(p, false)
-		_check("releasing aim resets: the next scope is the first level", absf(_fov(p) - far) < 0.5,
-			"level %d fov %.2f" % [wc.call("scope_zoom_level_now"), _fov(p)])
-		await _aim_up(p, false)
+		Input.action_press("reload")
+		await _tick(3)
+		Input.action_release("reload")
+		var waited := 0
+		while bool(wc.call("reloading_now")) and waited < 600:
+			await physics_frame
+			waited += 1
+		await _tick(20)
+		_check("... and after a reload", waited > 10 and bool(p.call("scoped_now")) and absf(_fov(p) - near) < 0.5,
+			"scoped %s fov %.2f after %.2f s of reload" % [p.call("scoped_now"), _fov(p), waited / 60.0])
+
 		await _press("scope_zoom")
-		_check("unscoped, middle mouse does nothing", int(wc.call("scope_zoom_level_now")) == 0, "level %d" % wc.call("scope_zoom_level_now"))
+		await _tick(RELEASE_SETTLE)
+		_check("third press: OFF, back on the boom, FOV restored", not bool(p.call("scoped_now")) and not bool(wc.call("scope_latched_now"))
+			and _rig(p) == "TPS" and absf(_fov(p) - fov0) < 1.0,
+			"scoped %s rig %s fov %.2f (was %.2f)" % [p.call("scoped_now"), _rig(p), _fov(p), fov0])
+
+		# Mixed with the hold: holding aim then middle mouse latches the NEXT level, so letting go keeps it.
+		Input.action_press("aim")
+		await _tick(SETTLE)
+		await _press("scope_zoom")
+		Input.action_release("aim")
+		await _tick(60)
+		_check("hold aim + middle mouse: latched at the closer level, kept after letting go of aim",
+			bool(p.call("scoped_now")) and absf(_fov(p) - near) < 0.5,
+			"scoped %s fov %.2f" % [p.call("scoped_now"), _fov(p)])
+		# ... and with aim HELD, the step to off still turns it off.
+		Input.action_press("aim")
+		await _tick(10)
+		await _press("scope_zoom")
+		await _tick(10)
+		_check("with aim still held, the toggle's OFF step wins", not bool(p.call("scoped_now")), "scoped %s" % p.call("scoped_now"))
+		Input.action_release("aim")
+		await _tick(10)
+		Input.action_press("aim")
+		await _tick(SETTLE)
+		_check("... until aim is pressed again: an ordinary held scope", bool(p.call("scoped_now")) and not bool(wc.call("scope_latched_now"))
+			and absf(_fov(p) - far) < 0.5, "scoped %s latched %s fov %.2f" % [p.call("scoped_now"), wc.call("scope_latched_now"), _fov(p)])
+		await _aim_up(p, false)
+		_check("releasing a HELD scope still ends it", not bool(p.call("scoped_now")), "scoped %s" % p.call("scoped_now"))
 		p.queue_free()
 		await _tick(5)
 
@@ -431,6 +480,19 @@ func _initialize() -> void:
 	root.add_child(helper)
 	await _interruption(world, Vector3(x, 1.2, 0), "death",
 		func(p: Node3D, wc: Node) -> void: helper.call("kill", p))
+	x += 12.0
+	# The same interruptions of a TOGGLED scope (middle mouse, nothing held). A latch that were only hidden, not
+	# cleared, would come back when the interruption ends — so each case also undoes it and checks the scope stays down.
+	await _interruption(world, Vector3(x, 1.2, 0), "a weapon switch (toggled scope)",
+		func(p: Node3D, wc: Node) -> void: wc.call("on_set_weapon", 0), true,
+		func(p: Node3D, wc: Node) -> void: wc.call("on_set_weapon", _snr1_slot))
+	x += 12.0
+	await _interruption(world, Vector3(x, 1.2, 0), "sitting in a carrier (toggled scope)",
+		func(p: Node3D, wc: Node) -> void: p.set("current_vehicle_node", p), true,
+		func(p: Node3D, wc: Node) -> void: p.set("current_vehicle_node", null))
+	x += 12.0
+	await _interruption(world, Vector3(x, 1.2, 0), "death (toggled scope)",
+		func(p: Node3D, wc: Node) -> void: helper.call("kill", p), true)
 
 	print("")
 	print("PASS (0 failures)" if fails == 0 else "FAIL (%d failures)" % fails)
@@ -438,16 +500,23 @@ func _initialize() -> void:
 
 ## Scope, then interrupt with the button still held, and assert the scope ended and the preference
 ## is intact. This is the whole reason the state is derived rather than latched.
-func _interruption(world: Node3D, at: Vector3, what: String, interrupt: Callable) -> void:
+var _snr1_slot := -1
+var _last_slot := -1
+
+func _interruption(world: Node3D, at: Vector3, what: String, interrupt: Callable, toggled := false, undo := Callable()) -> void:
 	print("")
-	print("=== interrupted by %s, with the aim button still HELD ===" % what)
+	print("=== interrupted by %s%s ===" % [what, "" if toggled else ", with the aim button still HELD"])
 	var a: Array = await _armed(world, "SNR1", at)
 	if a.is_empty():
 		return
 	var p: Node3D = a[0]
 	var wc: Node = a[2]
 	await _tick(20)
-	await _aim_down(p, control)
+	_snr1_slot = _last_slot
+	if toggled:
+		await _press("scope_zoom")
+	else:
+		await _aim_down(p, control)
 	if not bool(p.call("scoped_now")):
 		_check("scoped before the interruption", false, "the scope never came up")
 		p.queue_free()
@@ -463,6 +532,12 @@ func _interruption(world: Node3D, at: Vector3, what: String, interrupt: Callable
 	_check("the camera is not stranded in first person", _rig(p) == "TPS", "rig %s" % _rig(p))
 	_check("the preference is intact", not bool(p.get("is_fps_mode")),
 		"is_fps_mode = %s" % p.get("is_fps_mode"))
+	if undo.is_valid():
+		undo.call(p, wc)
+		await _tick(SETTLE * 4)
+		_check("after the interruption ends, the scope stays DOWN", not bool(p.call("scoped_now"))
+			and not bool(wc.call("scope_latched_now")) and _rig(p) == "TPS",
+			"scoped %s latched %s rig %s" % [p.call("scoped_now"), wc.call("scope_latched_now"), _rig(p)])
 	Input.action_release("aim")
 	p.queue_free()
 	await _tick(5)

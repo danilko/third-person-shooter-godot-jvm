@@ -55,6 +55,8 @@ public class PlayerController extends Controller {
     // ── Cached body references (re-resolved when body type changes) ───────────
     private Player     cachedPlayer;
     private Timer      cachedAimStayTimer;
+    /** Last tick's toggled-scope state, so the aim-stay beat starts on the tick the toggle ends. */
+    private boolean wasScopeLatched = false;
     private Vehicle     cachedVehicle;
 
     // ── Stance / movement input mode (false = HOLD, true = TOGGLE) ────────────
@@ -168,16 +170,22 @@ public class PlayerController extends Controller {
         if (isFps) {
             cmd.wantCombat = true;
         } else {
+            // A toggled scope (middle mouse) is aiming with no button held: combat stays on for it, so the body
+            // faces the aim and the gun stays up, and the aim-stay beat starts when the toggle ends.
+            boolean scopeLatched = body.weaponController != null && body.weaponController.scopeLatchedNow();
             boolean aimOrFire = inp.isActionPressed("aim", false)
-                             || inp.isActionPressed("fire", false);
+                             || inp.isActionPressed("fire", false)
+                             || scopeLatched;
 
             Timer aimStayTimer = cachedAimStayTimer;
             if (aimOrFire) {
                 aimStayTimer.stop();
             } else if (body.isCombat() && (inp.isActionJustReleased("aim", false)
-                                        || inp.isActionJustReleased("fire", false))) {
+                                        || inp.isActionJustReleased("fire", false)
+                                        || wasScopeLatched)) {
                 aimStayTimer.start();
             }
+            wasScopeLatched = scopeLatched;
             cmd.wantCombat = aimOrFire || (body.isCombat() && !aimStayTimer.isStopped());
         }
 
@@ -189,7 +197,8 @@ public class PlayerController extends Controller {
         // Hold breath shares Shift with the stealth-walk modifier by default (CoD's binding): a
         // shooter steadying a scope is not running anyway. A separate action so it can be rebound.
         cmd.holdBreath = inp.isActionPressed("hold_breath", false);
-        // Zoom level: middle mouse cycles, the wheel steps. Edges, so a held button does not spin through
+        // The scope toggle (latched, CS/L4D): wheel up steps in from off, wheel down steps out to off, and the middle
+        // click cycles first -> closer -> off. Edges, so a held button does not spin through
         // the levels; what they mean (nothing, unless a multi-level scope is raised) is decided downstream.
         if (inp.isActionJustPressed("scope_zoom", false))          cmd.scopeZoom = UserCommand.SCOPE_ZOOM_CYCLE;
         else if (inp.isActionJustPressed("scope_zoom_in", false))  cmd.scopeZoom = UserCommand.SCOPE_ZOOM_IN;

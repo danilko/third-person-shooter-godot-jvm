@@ -247,7 +247,38 @@ public class WeaponController extends Node {
   private boolean scopeRequested = false;
 
   /** @see #scopeRequested */
-  public void setScopeRequested(boolean requested) { scopeRequested = requested; }
+  public void setScopeRequested(boolean requested) {
+    if (!requested) holdSuppressed = false;   // the button is up: the next press is a fresh hold
+    scopeRequested = requested;
+  }
+
+  /**
+   * The scope was raised by the TOGGLE (middle mouse, {@code SCOPE_ZOOM_CYCLE}) and stays up with no button held —
+   * CS's AWP and Left 4 Dead's sniper zoom. A second piece of remembered scope state beside {@link #scopeZoomLevel},
+   * for the same reason: it is a choice, and nothing can derive it. It cannot strand the view, because every way the
+   * scope could end is still checked every tick and CLEARS it rather than hiding it: {@link #applyScopeZoom} drops it
+   * when the held weapon has no scope or a switch is in flight, and {@code Character.tickScopeSway} drops it in a
+   * seat or when dead — so leaving the car or picking the rifle back up never re-raises an old scope. It deliberately
+   * survives the bolt cycle and the reload (the zoom drops, the scope stays raised and comes back by itself), and
+   * releasing the aim button, which is a different input.
+   */
+  private boolean scopeLatched = false;
+
+  /**
+   * The toggle cycled the scope OFF while the aim button was still held: ignore that hold until the button is
+   * released, or the "off" step would be a no-op for a player who happens to be holding aim.
+   */
+  private boolean holdSuppressed = false;
+
+  /** Whether the toggle is holding the scope up — for the input layer (combat stays on) and the gate. */
+  @Register
+  public boolean scopeLatchedNow() { return scopeLatched; }
+
+  /** End a toggled scope (seat, death). The hold path needs nothing: the button is simply read again. */
+  public void cancelScopeLatch() {
+    scopeLatched = false;
+    scopeZoomLevel = 0;
+  }
 
   /**
    * Whether the held weapon's scope is UP this frame — the one fact the camera, the head, the
@@ -300,7 +331,7 @@ public class WeaponController extends Node {
    */
   @Register
   public boolean scopeRaisedNow() {
-    if (!scopeRequested) return false;
+    if (!(scopeLatched || (scopeRequested && !holdSuppressed))) return false;
     if (isWeaponTransitioning()) return false;
     return heldScope() != null;
   }
@@ -329,15 +360,54 @@ public class WeaponController extends Node {
    * {@code Character.applyInput}, after {@link #setScopeRequested}, which is also what resets the level.
    */
   public void applyScopeZoom(int request) {
-    ScopeConfig sc = scopeRaisedNow() ? heldScope() : null;
-    if (sc == null) { scopeZoomLevel = 0; return; }
-    int levels = sc.closeFov > 0f ? 2 : 1;
-    switch (request) {
-      case com.openworld.control.UserCommand.SCOPE_ZOOM_IN    -> scopeZoomLevel = Math.min(levels - 1, scopeZoomLevel + 1);
-      case com.openworld.control.UserCommand.SCOPE_ZOOM_OUT   -> scopeZoomLevel = Math.max(0, scopeZoomLevel - 1);
-      case com.openworld.control.UserCommand.SCOPE_ZOOM_CYCLE -> scopeZoomLevel = (scopeZoomLevel + 1) % levels;
-      default -> scopeZoomLevel = Math.min(scopeZoomLevel, levels - 1);
+    ScopeConfig sc = heldScope();
+    if (sc == null || isWeaponTransitioning()) {       // a switch, a drop, an unscoped weapon: the toggle ends too
+      cancelScopeLatch();
+      return;
     }
+    int levels = sc.closeFov > 0f ? 2 : 1;
+    boolean raised = scopeRaisedNow();
+    switch (request) {
+      // Middle mouse, CS's AWP right click: off -> first level -> closer level -> off. The toggle LATCHES the scope,
+      // so it stays up with no button held; from a held scope it latches at the next level, so letting go of aim
+      // does not throw away the zoom the player just chose.
+      case com.openworld.control.UserCommand.SCOPE_ZOOM_CYCLE -> {
+        if (!raised) {
+          scopeLatched = true;
+          scopeZoomLevel = 0;
+        } else if (scopeZoomLevel < levels - 1) {
+          scopeLatched = true;
+          scopeZoomLevel++;
+        } else {
+          scopeLatched = false;
+          scopeZoomLevel = 0;
+          if (scopeRequested) holdSuppressed = true;
+        }
+      }
+      // The WHEEL is the same toggle split into two directions (user decision, 2026-09-16): up steps IN —
+      // off -> first level -> closer level, stopping there — and down steps OUT — closer -> first -> off. Latched
+      // like the click, so a scope scrolled up stays up with nothing held.
+      case com.openworld.control.UserCommand.SCOPE_ZOOM_IN -> {
+        if (!raised) {
+          scopeLatched = true;
+          scopeZoomLevel = 0;
+        } else if (scopeZoomLevel < levels - 1) {
+          scopeLatched = true;
+          scopeZoomLevel++;
+        }
+      }
+      case com.openworld.control.UserCommand.SCOPE_ZOOM_OUT -> {
+        if (raised && scopeZoomLevel > 0) {
+          scopeZoomLevel--;
+        } else if (raised) {
+          scopeLatched = false;
+          if (scopeRequested) holdSuppressed = true;
+        }
+      }
+      default -> { }
+    }
+    if (!scopeRaisedNow()) scopeZoomLevel = 0;
+    else scopeZoomLevel = Math.min(scopeZoomLevel, levels - 1);
   }
 
   /** The raised scope's zoom level (0 or 1) — for the gate; {@link #scopedFovDegrees} is what the camera reads. */
