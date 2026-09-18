@@ -4,6 +4,7 @@ import com.openworld.character.Player;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.game.SaveSystem;
 import com.openworld.game.mission.MissionDirector;
+import com.openworld.game.mission.RaceDirector;
 import com.openworld.game.mission.MissionManager;
 import godot.annotation.Register;
 import godot.annotation.Script;
@@ -149,6 +150,7 @@ public class DebugConsole extends CanvasLayer {
                 print("mission complete <faction> <variant>   complete the active mission");
                 print("mission fail <reason>                  fail the active mission");
                 print("unlock <missionId> [requiredKey]       declare / query an unlock predicate");
+                print("race [add <characterId>]              race status, or enrol a racer");
                 print("save [slot]                            write the campaign save (default 1)");
                 print("load [slot]                            restore it (default 1)");
                 print("close                                  close the console");
@@ -200,6 +202,15 @@ public class DebugConsole extends CanvasLayer {
                 int slot = a.length >= 2 ? (int) f(a[1]) : 1;
                 print(saves.loadSlot(slot) ? "loaded slot " + slot
                         : "refused: " + saves.lastSaveMessage());
+            }
+            case "race" -> {
+                RaceDirector race = RaceDirector.get();
+                if (race == null) { print("no RaceDirector"); return; }
+                if (a.length >= 3 && "add".equals(a[1])) {
+                    race.addRacer(a[2]);
+                    print("enrolled " + a[2]);
+                }
+                print(race.statusLine());
             }
             case "unlock" -> {
                 need(a, 2);

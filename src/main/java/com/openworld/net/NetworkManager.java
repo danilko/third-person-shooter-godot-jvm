@@ -2450,6 +2450,18 @@ public class NetworkManager extends Node {
         broadcastMessage(NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT, eventType, key, value, args), null);
     }
 
+    /**
+     * Host → ONE peer: the same world event as {@link #broadcastWorldEvent}, addressed. Every
+     * late-join baseline is built from this rather than from a bespoke message, so a joining peer
+     * runs exactly the receiving path a live event already exercises (see
+     * {@link #sendBaselineBreakables}, {@link #sendBaselineRace}).
+     */
+    public void sendWorldEventTo(int targetPeerId, int eventType, String key, float value,
+                                 java.util.List<String> args) {
+        if (!isServer() || !isNetworked()) return;
+        sendMessage(targetPeerId, NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT, eventType, key, value, args));
+    }
+
     // ── Spawn/despawn replication (Phase 7 — folds in G3) ─────────────────────
     //
     // Replaces MultiplayerSpawner: the server announces every character it
@@ -2510,6 +2522,17 @@ public class NetworkManager extends Node {
                         java.util.List.of()));
             }
         }
+    }
+
+    /**
+     * Server → one peer: the state of a race already in progress (R2). Delegates to
+     * {@code RaceDirector}, which replays its own start + per-racer progress events — the race's
+     * roster and rules live there, and a second encoding of them here would be a second owner.
+     */
+    public void sendBaselineRace(int targetPeerId) {
+        if (!isServer()) return;
+        com.openworld.game.mission.RaceDirector race = com.openworld.game.mission.RaceDirector.get();
+        if (race != null) race.sendBaselineTo(targetPeerId);
     }
 
     /** Server → all: announce a character's removal (queueFree on receipt). */

@@ -27,11 +27,15 @@ import com.openworld.net.session.PlayerSession;
  *   [autoload]
  *   MissionManager="*res://src/main/java/com/openworld/game/mission/MissionManager.java"
  *
- * Only ELIMINATE_ALL has real tracking today: at startMission() the manager counts
- * living "characters" group members per hostile faction (any faction not listed in
- * MissionInfo.playerFactions), then listens to EventBus.characterEliminated and
- * decrements per victim faction. When every tracked faction reaches zero the
- * mission completes in favour of the first playerFaction.
+ * ELIMINATE_ALL is tracked here and RACE by RaceDirector (R2); the rest are schema only.
+ *
+ * ELIMINATE_ALL: at startMission() the manager counts living "characters" group members per hostile
+ * faction (any faction not listed in MissionInfo.playerFactions), then listens to
+ * EventBus.characterEliminated and decrements per victim faction. When every tracked faction reaches
+ * zero the mission completes in favour of the first playerFaction.
+ *
+ * RACE: startMission() hands the MissionInfo to the RaceDirector AutoLoad, which owns the
+ * checkpoints, the clock and the placings and calls completeMission()/failMission() back here.
  *
  * Gating which mission may start (the unlock-graph) is MissionDirector's job (F1).
  * This class — and the debug harness — call startMission() directly.
@@ -102,6 +106,10 @@ public class MissionManager extends Node {
         activeMission = info;
         active = info != null;
         remainingByFaction.clear();
+        // A race belongs to the mission that started it: starting anything else ends it, and
+        // startMission(null) is how a caller clears the slot.
+        RaceDirector previous = RaceDirector.get();
+        if (previous != null) previous.endRace();
         if (info == null) {
             applyMissionFactions(null);
             return;
@@ -111,6 +119,14 @@ public class MissionManager extends Node {
 
         if (MissionObjectiveType.ELIMINATE_ALL.equals(info.objectiveType)) {
             countHostilesByFaction(info);
+        } else if (MissionObjectiveType.RACE.equals(info.objectiveType)) {
+            // A race carries live per-racer state and a clock, which no counter-shaped objective has,
+            // so RaceDirector tracks it and hands the answer back through completeMission/failMission
+            // exactly as the ELIMINATE_ALL counter below does (R2).
+            RaceDirector race = RaceDirector.get();
+            if (race == null) GD.printErr("MissionManager: RACE mission '" + info.missionId
+                    + "' but no RaceDirector autoload");
+            else race.startRace(info);
         }
 
         GD.print("MissionManager: started '" + info.missionId + "' (" + info.objectiveType

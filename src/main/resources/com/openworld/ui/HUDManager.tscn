@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/ScopeOverlay.java" id="12_scope"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/AreaWarning.java" id="13_areawarn"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/HitMarker.java" id="14_hitmark"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/RaceHUD.java" id="15_racehud"]
 
 [node name="HUDManager" type="CanvasLayer" unique_id=828289775]
 script = ExtResource("1_fuvei")
@@ -53,6 +54,13 @@ anchor_bottom = 1.0
 visible = false
 mouse_filter = 2
 script = ExtResource("14_hitmark")
+
+[node name="RaceHUD" type="Control" parent="." unique_id=850000007]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+mouse_filter = 2
+script = ExtResource("15_racehud")
 
 [node name="WeaponSlotsUI" parent="." unique_id=620000002 instance=ExtResource("6_wsbar")]
 offset_left = 32.0

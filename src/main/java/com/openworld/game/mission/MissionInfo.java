@@ -15,8 +15,9 @@ import com.openworld.world.manager.ImpactManager;
  * purposes (see DebugHarness). Handed to MissionManager.startMission().
  *
  * objectiveType is a plain String — use MissionObjectiveType constants
- * (ELIMINATE_ALL / HOLD_POINT / ESCORT / DELIVER) or a custom value for future
- * objective kinds. Only ELIMINATE_ALL has MissionManager logic today.
+ * (ELIMINATE_ALL / HOLD_POINT / ESCORT / DELIVER / RACE) or a custom value for future
+ * objective kinds. ELIMINATE_ALL is tracked by MissionManager itself; RACE is handed to
+ * RaceDirector (R2). The rest are schema only.
  *
  * Story-graph fields (possibleOutcomeVariants, opposingFactionJoinable) define the
  * outcome-variant schema MissionDirector (F1) will fold into the player's
@@ -35,8 +36,18 @@ public class MissionInfo extends Resource {
     /** Use MissionObjectiveType constants or a custom objective string. */
     @Export public String objectiveType = MissionObjectiveType.ELIMINATE_ALL;
 
-    /** Seconds before the mission auto-fails. 0 = no limit. */
+    /** Seconds before the mission auto-fails. 0 = no limit. On a RACE this is the time trial's clock. */
     @Export public float timeLimit = 0f;
+
+    /**
+     * RACE only (R2): which circuit of {@code RaceCheckpoint} gates this mission runs. Empty means
+     * "the circuit named after this mission", which is the case that needs no second name; setting
+     * it lets two missions (a sprint and a three-lap version) share one authored route.
+     */
+    @Export public String raceId = "";
+
+    /** RACE only: how many times the route is completed. 1 = a point-to-point sprint or one lap. */
+    @Export public int raceLaps = 1;
 
     /** When false, ImpactManager/Health should ignore damage between playerFactions members. */
     @Export public boolean allowFriendlyFire = false;

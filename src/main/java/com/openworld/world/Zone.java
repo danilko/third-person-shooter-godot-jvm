@@ -109,4 +109,14 @@ public class Zone extends Resource {
         if (geometryWorldPlaced) n3d.setGlobalTransform(geometryWorldTransform);
         else if (n3d.getParent() != marker) n3d.setGlobalPosition(marker.getGlobalPosition());
     }
+
+    /**
+     * The global frame {@link #placeGeometry} leaves a geometry root in, for a reader that needs the
+     * piece's placement without instancing it ({@code RoadMap} placing a lanekit sidecar): the world
+     * transform when {@link #geometryWorldPlaced}, else the marker's own (the root is its child at
+     * identity). Kept beside {@code placeGeometry} so the two cannot come to disagree.
+     */
+    public godot.core.Transform3D geometryFrame(Node3D marker) {
+        return geometryWorldPlaced ? geometryWorldTransform : marker.getGlobalTransform();
+    }
 }

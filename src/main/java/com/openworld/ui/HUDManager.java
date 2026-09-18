@@ -119,6 +119,7 @@ public class HUDManager extends CanvasLayer {
   private ScopeOverlay    scopeOverlay;  // 2.7 — self-gated sniper optic
   private AreaWarning     areaWarning;   // P0 0.6 — self-gated world-edge warning
   private HitMarker       hitMarker;     // 2.8 item 9 — confirmed-hit marker
+  private RaceHUD         raceHud;       // R2 — self-gated race clock / placing / boost
   private MinimapController minimap;     // I5 — always-on radar
   private WorldMapManager   worldMap;    // I5 — toggled full map
   private GpsArrow          gpsArrow;    // I5 — world-space waypoint arrow
@@ -236,7 +237,8 @@ public class HUDManager extends CanvasLayer {
 	  if (name.equals("Feed") || name.equals("StatusFeed") || name.equals("Crosshair")
 		  || name.equals("WeaponRadialMenu") || name.equals("WeaponProgress")
 		  || name.equals("ScopeOverlay") || name.equals("AreaWarning") || name.equals("HitMarker")
-		  || name.equals("Minimap") || name.equals("WorldMap") || name.equals("GpsArrow")) continue;
+		  || name.equals("Minimap") || name.equals("WorldMap") || name.equals("GpsArrow")
+		  || name.equals("RaceHUD")) continue;
 	  widgets.put(name, c);
 	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
 	  if (c instanceof DamageIndicator di) damageIndicator = di;
@@ -254,6 +256,9 @@ public class HUDManager extends CanvasLayer {
 	// AreaWarning: the world edge's warning band (WorldBounds), event-driven and self-gated.
 	if (getNodeOrNull("AreaWarning") instanceof AreaWarning aw) areaWarning = aw;
 	if (getNodeOrNull("HitMarker") instanceof HitMarker hm) hitMarker = hm;
+	// RaceHUD: a race is orthogonal to the ON_FOOT/VEHICLE situations (you can finish one on foot),
+	// so it polls RaceDirector rather than being table-managed — the WeaponProgress idiom.
+	if (getNodeOrNull("RaceHUD") instanceof RaceHUD rh) raceHud = rh;
 	// I5 navigation widgets — always-on / self-toggled, not table-managed (like WeaponProgress).
 	Node mm = getNodeOrNull("Minimap");
 	if (mm instanceof MinimapController m) minimap = m;
@@ -440,6 +445,7 @@ public class HUDManager extends CanvasLayer {
 	  if (minimap != null)  minimap.wirePlayer(p);
 	  if (worldMap != null) worldMap.wirePlayer(p);
 	  if (gpsArrow != null) gpsArrow.wirePlayer(p);
+	  if (raceHud != null)  raceHud.wireCharacter(p);
 	}
   }
 

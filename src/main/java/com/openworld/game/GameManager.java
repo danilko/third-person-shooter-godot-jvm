@@ -164,6 +164,7 @@ public class GameManager extends Node {
         IconRegistry.clear();
         com.openworld.util.RayExclusions.clear();
         WaypointStore.clearAll();   // I5 — hygiene + clean restart (Vector3 values, but clear anyway)
+        com.openworld.world.RoadMap.clear();   // 4.7 — the road network + cached GPS routes
     }
 
     // ── State transitions ─────────────────────────────────────────────────────
@@ -357,6 +358,7 @@ public class GameManager extends Node {
                 // Runtime faction-relationship flips (per-character factions ride sendBaselineSpawns).
                 net.sendBaselineFactionRelationships(peerId);
                 net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
+                net.sendBaselineRace(peerId);   // a race already in progress (R2)
             }
             return;
         }
@@ -374,6 +376,7 @@ public class GameManager extends Node {
             net.sendBaselineVehicleOccupancy(peerId);   // occupied vehicles after spawns (N3)
             net.sendBaselineFactionRelationships(peerId);   // runtime relationship flips (D3)
             net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
+            net.sendBaselineRace(peerId);   // a race already in progress (R2)
         }
         spawnPlayerBody(peerId, persistentPlayerId);
     }
@@ -446,7 +449,9 @@ public class GameManager extends Node {
                 GD.randfRange(-12.0f, 8.0f));
     }
 
-    private Character findCharacterById(String characterId) {
+    /** The live character with this id, or null. Public: several systems (RaceDirector) resolve a
+     *  racer/target by the id the net layer already keys everything on. */
+    public Character findCharacterById(String characterId) {
         if (getTree() == null) return null;
         for (Node node : getTree().getNodesInGroup(CHARACTERS_GROUP)) {
             if (node instanceof Character c && c.characterInfo != null
@@ -1101,6 +1106,19 @@ public class GameManager extends Node {
     /** Destructible state change (I2) — key = breakableId, value = 1 broken / 0 intact. Host Breakable broadcasts; clients re-apply cosmetically. */
     public static final int WORLD_EVENT_BREAKABLE = 8;
 
+    /**
+     * Race started (R2) — key = raceId, value = countdown seconds still to run, args = [missionId,
+     * laps, then one {@code characterId} and one {@code "0"/"1"} human flag per enrolled racer].
+     * The roster rides in the event because a client cannot re-derive which AI the host enrolled.
+     */
+    public static final int WORLD_EVENT_RACE_START = 9;
+
+    /** Race checkpoint granted (R2) — key = characterId, value = elapsed, args = [raceId, nextIndex, lap]. The RESULT, not the delta, so a dropped grant is healed by the next one. */
+    public static final int WORLD_EVENT_RACE_CHECKPOINT = 10;
+
+    /** Racer finished (R2) — key = characterId, value = finish time, args = [raceId, place]. The race ENDING needs no event: it is the mission completing/failing, which already replicates. */
+    public static final int WORLD_EVENT_RACE_FINISH = 11;
+
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         switch (eventType) {
@@ -1112,6 +1130,9 @@ public class GameManager extends Node {
             case WORLD_EVENT_FACTION_RELATIONSHIP -> applyFactionRelationship(key, args);
             case WORLD_EVENT_FACTION_SWAP -> applyCharacterFaction(key, args);
             case WORLD_EVENT_BREAKABLE -> applyBreakableState(key, value);
+            case WORLD_EVENT_RACE_START -> applyRaceStart(key, value, args);
+            case WORLD_EVENT_RACE_CHECKPOINT -> applyRaceCheckpoint(key, value, args);
+            case WORLD_EVENT_RACE_FINISH -> applyRaceFinish(key, value, args);
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }
@@ -1188,6 +1209,27 @@ public class GameManager extends Node {
         com.openworld.world.Breakable b = findBreakableById(breakableId);
         if (b == null) return;
         if (value >= 0.5f) b.breakNow(false); else b.restore(false);
+    }
+
+    // Race mirrors (R2). A client applies what the host adjudicated and never decides anything
+    // itself — RaceDirector.onCheckpointTouched returns immediately off the host.
+
+    // The PAYLOAD's shape is the race's own fact, so RaceDirector both builds and parses it (its
+    // startArgs/applyRemoteStart sit next to each other); these are pure routing.
+
+    private void applyRaceStart(String raceId, float countdown, java.util.List<String> args) {
+        com.openworld.game.mission.RaceDirector race = com.openworld.game.mission.RaceDirector.get();
+        if (race != null) race.applyRemoteStart(raceId, countdown, args);
+    }
+
+    private void applyRaceCheckpoint(String characterId, float elapsed, java.util.List<String> args) {
+        com.openworld.game.mission.RaceDirector race = com.openworld.game.mission.RaceDirector.get();
+        if (race != null) race.applyRemoteCheckpoint(characterId, elapsed, args);
+    }
+
+    private void applyRaceFinish(String characterId, float finishTime, java.util.List<String> args) {
+        com.openworld.game.mission.RaceDirector race = com.openworld.game.mission.RaceDirector.get();
+        if (race != null) race.applyRemoteFinish(characterId, finishTime, args);
     }
 
     private com.openworld.world.Breakable findBreakableById(String breakableId) {
