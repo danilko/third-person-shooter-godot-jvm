@@ -23,7 +23,7 @@ WHAT IS IN IT, AND WHY IT IS LINKED
   with a tick at the real length of pull (trigger to butt) where the table gives one. A model whose
   muzzle overshoots the bar, or whose trigger is nowhere near the tick, is out of proportion.
 * the primitive-only weapons (ATL1, MEW2, FRG1) as boxes at their table size and centre.
-* the character (linked from `assets/merged_animation.blend`) and a 1.49 m height stick beside it,
+* the character (linked from `assets/characters/godot_chan/merged_animation.blend`) and a 1.49 m height stick beside it,
   plus a metre rule with 10 cm ticks.
 
 It is a VIEW: nothing in the game reads it, and `build_weapon.py` never exports it. Re-run this
@@ -35,7 +35,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 TABLE = os.path.join(ROOT, "blender", "tools", "weapon_models.json")
 WEAPONS = os.path.join(ROOT, "assets", "weapons")
 OUT = os.path.join(WEAPONS, "WeaponLibrary.blend")
-CHARACTER = os.path.join(ROOT, "assets", "merged_animation.blend")
+CHARACTER = os.path.join(ROOT, "assets", "characters", "godot_chan", "merged_animation.blend")
 CHARACTER_COLLECTION = "Collection"
 CHARACTER_HEIGHT = 1.49     # GodotChan, crown of the head (measured in Godot, rest pose)
 

@@ -112,7 +112,7 @@ below the view at the up end, which is what a walk-test would show as "crawl sti
 off its own hips, and a spine look-at provably cannot repair that — the modifier overwrites
 `spine_03` only, so its result stays a function of a prone `spine_02` (solving a corrected
 `spine_03` into the clip changed the render by exactly zero). That needs a prone aim set: an
-aim-offset blendspace in `assets/merged_animation.blend` plus an AnimationTree branch.
+aim-offset blendspace in `assets/characters/godot_chan/merged_animation.blend` plus an AnimationTree branch.
 `aim_pistol_crawl-loop` is the natural starting point — **which is the reason not to delete the
 orphan aim clips.**
 
@@ -133,7 +133,7 @@ than wired. No authored data is left without a consumer.
 
 ### The crouch aim CLIP needed no fix, and should NOT be deleted (asked during this session)
 
-`assets/merged_animation.blend` does carry `aim_pistol_crouch-loop`, `aim_pistol_crawl-loop` and
+`assets/characters/godot_chan/merged_animation.blend` does carry `aim_pistol_crouch-loop`, `aim_pistol_crawl-loop` and
 their rifle siblings, and they are real stance poses (crouch: pelvis 0.486 vs upright 0.767, knee
 bent 98.7° vs 14.7°). But `WeaponBlend` is a **filtered** `Blend2` that takes only clavicles, arms,
 hands and fingers from the aim branch — and over those **38 filtered bones the crouch and crawl
@@ -160,7 +160,7 @@ Two things came out of that dead end and are worth keeping:
 
 ## W4 — Aiming in stances whose body must not move — **CLOSED 2026-09-08** (crawl measured; drive/swim wired, unmeasured)
 
-**Question:** can `assets/merged_animation.blend` be re-organised so crouch / crawl / swim aim
+**Question:** can `assets/characters/godot_chan/merged_animation.blend` be re-organised so crouch / crawl / swim aim
 pistol+rifle work correctly? **Answer: the blend alone cannot do it, and the half it can do is
 smaller than it looks. Measure before authoring anything.**
 

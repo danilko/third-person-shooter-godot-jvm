@@ -11,7 +11,7 @@
 # "Build Intersection" (or F9 redo on the last run) with BOTH "Export .glb" and "Export
 # .lanekit.json" pointed at the same pair this script expects by default:
 #   Export .glb          -> src/main/resources/com/openworld/world/pieces/District_intersectiondemo.glb
-#   Export .lanekit.json -> assets/world_source/kit/intersection_prototype.4way.lanekit.json
+#   Export .lanekit.json -> assets/world_source/kits/road_kit/intersection_prototype.4way.lanekit.json
 # (matching what tools/build_intersection_prototype.py's first-time run already writes) -- then
 # run this script to get it into Godot.
 #

@@ -40,7 +40,7 @@ import struct
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-GLB = os.path.join(ROOT, "assets", "merged_animation.glb")
+GLB = os.path.join(ROOT, "assets", "characters", "godot_chan", "merged_animation.glb")
 if len(sys.argv) > 1:                      # optional: check some other export (e.g. a backup)
     GLB = sys.argv[1]
 TSCN = os.path.join(ROOT, "src", "main", "resources", "com", "openworld",

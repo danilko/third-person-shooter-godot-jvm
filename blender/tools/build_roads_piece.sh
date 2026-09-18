@@ -4,7 +4,7 @@
 #
 #   1. python3 roadkit_cli.py pieces    -> pieces/<Piece>.lanekit.json   (the gate, the zone cut, the lane graph)
 #   2. python3 roadkit_cli.py gltf      -> world/pieces/<Piece>.gltf     (the meshes: `point_mesh` + `point_gltf`,
-#                                          styles and profile assets from assets/world_source/kit/road_kit.json)
+#                                          styles and profile assets from assets/world_source/kits/road_kit/road_kit.json)
 #   3. GLTF_READY=1 build_piece.sh      -> world/pieces/<Piece>.tscn/.scn (WorldBaker, navmesh, binary scene)
 #
 # With a zones file (B6, written by the Godot plugin from the scene's ZoneMarkers) <PieceName> is a

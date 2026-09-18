@@ -1,8 +1,8 @@
 """Export the character rig + animations to the .glb the game actually loads.
 
-    blender -b assets/merged_animation.blend --python blender/tools/export_character.py
+    blender -b assets/characters/godot_chan/merged_animation.blend --python blender/tools/export_character.py
 
-`assets/merged_animation.tscn` instances `assets/merged_animation.glb`, NOT the .blend — so a
+`assets/characters/godot_chan/merged_animation.tscn` instances `assets/characters/godot_chan/merged_animation.glb`, NOT the .blend — so a
 .blend edit is invisible to the game until this runs. Settings below are the ones the shipped
 .glb was produced with; changing them changes every clip at once, so change them deliberately.
 

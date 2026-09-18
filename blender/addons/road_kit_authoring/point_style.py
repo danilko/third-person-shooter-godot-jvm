@@ -9,7 +9,7 @@ kerb": a shape and a material together.
 THE MODEL. A road declares a NAME per slot (`RoadData.kerb_mat`, `RoadData.kerb_asset`, ...), blank
 meaning the layer's default -- and a default is a material LINKED FROM THE ASSET KIT
 (`kit_common.mat`, since 2026-09-05), not one the builder invents. So an artist restyles the world
-by opening `assets/world_source/kit/road_kit.blend`, and this file's job stays what it was: turning
+by opening `assets/world_source/kits/road_kit/road_kit.blend`, and this file's job stays what it was: turning
 an authored NAME into a datablock. Two rules fall out of that and both matter:
 
   * A NAME THAT RESOLVES TO NOTHING FALLS BACK, and says so. A missing material builds a black

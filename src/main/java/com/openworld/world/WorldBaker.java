@@ -198,7 +198,7 @@ public class WorldBaker extends Node {
      * The baked scene REFERENCES the file, so editing a .tres restyles every piece with no rebake; only adding
      * or removing a name needs one (and the Road Kit digest salts this directory for that reason).
      */
-    public static final String MATERIAL_LIBRARY_DIR = "res://assets/world_source/kit/materials/";
+    public static final String MATERIAL_LIBRARY_DIR = "res://assets/world_source/kits/road_kit/materials/";
 
     private static int applyMaterialLibrary(Node node, String dir) {
         int n = 0;

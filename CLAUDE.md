@@ -1062,7 +1062,7 @@ Three things landed together; the doc is the design of record and its §7 is wha
   owns the curve, GN only sweeps); paint is lifted `PAINT_Z_BIAS` and is deliberately **not** in
   the collision proxies.
 - **A profile asset replaces a layer's parametric band with a swept section the artist modelled**
-  (`GN_PointProfile`, `point_style`, `assets/world_source/kit/road_kit.blend` via
+  (`GN_PointProfile`, `point_style`, `assets/world_source/kits/road_kit/road_kit.blend` via
   `tools/build_road_kit.py`, library-linked). SWEPT, never tiled — rigid pieces round a 9 m corner
   sit ~12.7° apart and open a real ~7.8 cm gap at every joint, which is what retired the previous
   model's asset style; tiling is for lamp posts, and that is `GN_PointAssets`. Three measured
@@ -1613,7 +1613,7 @@ own `M_Concrete` (built by that same function, in that file), so a district link
 got the kit's concrete on the kerb and a locally-created one on the deck beside it. Identical, and
 two materials in the exported scene. **The kit file is the material library now** —
 `blender/tools/build_road_kit.py` writes every `MATS`/`TILED_MATS` entry into
-`assets/world_source/kit/road_kit.blend` with a **fake user** (a `.blend` drops any zero-user
+`assets/world_source/kits/road_kit/road_kit.blend` with a **fake user** (a `.blend` drops any zero-user
 datablock on save, so without the flag the kit shipped only the 3 of 25 its sections happened to
 use). `mat()` is still the ONE resolver and grew one lookup, not a second registry: a datablock of
 that name already in the file wins (`bpy.data.materials.get` prefers a LOCAL one over a linked one
@@ -1624,7 +1624,7 @@ and a linked material *is* writable from Python in a background process, so the 
 flattening below is unaffected. `point_build.material()`/`MATERIAL_KEYS` and `point_style.resolve`
 are **untouched**: the addon had one default-material lookup and still has one; adding a second
 there would have been the very defect this closes. Measured on `Island_base`: the same 11
-materials with the same user counts, every one now `lib=//../kit/road_kit.blend`, all 11 baked
+materials with the same user counts, every one now `lib=//../kits/road_kit/road_kit.blend`, all 11 baked
 with an `albedo_color`, `check_roads.sh` PASS=18.
 
 **A PROCEDURAL BASE COLOUR CANNOT CROSS glTF, AND IT LEAVES NO TRACE WHEN IT FAILS**
@@ -2663,9 +2663,9 @@ end of this section for what was ruled out, so the next attempt does not re-trea
 
 ### Export pipeline
 
-Source of truth is `assets/merged_animation.blend`, exported by
-`blender/tools/export_character.py` to `assets/merged_animation.glb`, which
-`assets/merged_animation.tscn` instances and `CharacterVisuals_GodotChan.tscn` drives.
+Source of truth is `assets/characters/godot_chan/merged_animation.blend`, exported by
+`blender/tools/export_character.py` to `assets/characters/godot_chan/merged_animation.glb`, which
+`assets/characters/godot_chan/merged_animation.tscn` instances and `CharacterVisuals_GodotChan.tscn` drives.
 **The glTF animation name is the ACTION name**, and Godot's importer strips a trailing `-loop`
 (that suffix is what sets loop mode) — action `crouch_idle-loop` arrives as `crouch_idle`. Two traps
 that both shipped: an action that is both the *active* action and stashed exports **twice**, merged
@@ -3263,7 +3263,7 @@ forward, and the worst residual left for spine + collarbones is **68.3 deg again
 
 **THE DRIVE CLIPS ARE NAMED AND THE DRIVE RING IS WIRED — the placeholder is in the data, not in
 prose.** `DriveCarrier`'s blendspace played `crouch_idle_deep` at all five points, so the stance had no clip
-of its own to author and nothing in the file said one was wanted. `assets/merged_animation.blend`
+of its own to author and nothing in the file said one was wanted. `assets/characters/godot_chan/merged_animation.blend`
 now carries the drive set, named on the same pattern as every other stance
 (`<pose>_idle-loop`, `aim_<weapon>_<stance>-loop`):
 
@@ -3890,8 +3890,8 @@ them.
 **The swap unit already existed:** `Character.characterVisuals` is one exported `PackedScene`, and
 the `MeshConfig` embedded in that scene rewires every dependent path (mesh root, sockets, modifiers,
 stance colliders, bone multipliers). So the scaffold is
-`CharacterVisuals_GodotChanF.tscn` → `assets/merged_animation_f.tscn` → `assets/merged_animation_f.glb`,
-built from `assets/merged_animation_f.blend`.
+`CharacterVisuals_GodotChanF.tscn` → `assets/characters/godot_chan/merged_animation_f.tscn` → `assets/characters/godot_chan/merged_animation_f.glb`,
+built from `assets/characters/godot_chan/merged_animation_f.blend`.
 
 **Identical clip NAMES are what make it free.** All the Java addresses clips by name
 (`playMeleeAttack("attack_chop_mw2")`, `parameters/<Stance>MovementBlend/blend_position`), so a second
@@ -4055,7 +4055,7 @@ nothing reads it and nothing exports it. It is what would have shown every defec
 
 **Legacy removed:** the raw source art (`assets/{AssaultRifle_4,AssaultRifle2_1,Pistol_5,Shotgun_1,
 Bayonet}.glb`), `build_weapon.py --init` and its `source_convention`/`grip_offset`,
-`assets/ui/AssaultRifle_5.blend` (a 5.4 m icon-render leftover) and `assets/merged_animation_bak.blend`.
+`assets/ui/AssaultRifle_5.blend` (a 5.4 m icon-render leftover) and `assets/characters/godot_chan/merged_animation_bak.blend`.
 Weapon scenes instance their model as a node named `Model`.
 
 ### W21 — THE GUN FACES ITS SHOT BEFORE IT FIRES (2026-09-13, PLAN.md 0.2)
@@ -4156,7 +4156,7 @@ exports a scratch copy to `assets/_study/`, re-points uid-stripped copies of `me
 visuals scene at it (a copied `uid=` wins over the path and silently loads the SHIPPED clip), runs `--import`,
 then `probe_pose_clip.gd` (the clip on a bare `AnimationPlayer`, tree and modifiers off, so
 `get_bone_global_pose` IS the final pose) and `probe_weapon_fit.gd`, and deletes the folder (`KEEP=1` keeps it).
-`probe_pose_clip.gd -- --compare=res://assets/merged_animation.tscn --all` diffs every clip against the shipped
+`probe_pose_clip.gd -- --compare=res://assets/characters/godot_chan/merged_animation.tscn --all` diffs every clip against the shipped
 export. The user's saved `upright_aim_rifle` (17:26:44) was the 2026-09-14 snapshot exactly; its clip truth is a
 **40.1° blade = 5.2° spine + 34.8° collarbones with the gun 33.2° right of the aim** (the rig showed 27.9°
 because `WeaponBlend` drops the spine twist). Trap: a "spine share" from the clavicle ORIGINS read 32° — they
@@ -5706,7 +5706,7 @@ digests), (2) `roadkit_cli.py gltf --gated --only <dirty>` writes `src/.../world
 `GLTF_READY=1 build_piece.sh <piece>` bakes it (WorldBaker + lanekit Path3Ds, NavBaker, `.scn`) with no `.blend`.
 DebugRoads end to end **28 s**, of which the mesh write is **0.4 s** — the rest is the Godot bake.
 - **The kit is DATA** (`point_kit.py`): `blender/tools/export_road_kit_data.py` reads `road_kit.blend` into
-  `assets/world_source/kit/road_kit.json` — every material as the glTF entry Blender's exporter produced
+  `assets/world_source/kits/road_kit/road_kit.json` — every material as the glTF entry Blender's exporter produced
   (`export_world.py`'s base-colour flattening restated: M_ConcreteTile's checker is its mean, 0.815/0.795/0.755) and
   every `ROAD_KIT` profile's points — plus the `.blend`'s sha1, which `point_kit.self_test` checks, so an edited kit
   with a stale JSON fails the gate. `build_road_kit.py` runs the export at the end of every kit build. Styles resolve
@@ -5790,7 +5790,7 @@ byte-identical to before), and `point_mesh.pillars` stands that mesh at every pl
 
 **A road's texture is a material library, resolved by NAME at bake (PLAN.md 3.6c, 2026-09-17).** glTF carries
 the kit's procedural materials only as a flat base colour and the swept mesh has no UVs, so the textured look
-lives in Godot: `assets/world_source/kit/materials/<M_name>.tres` — `M_Asphalt` (`T_Concrete_Asphalt`),
+lives in Godot: `assets/world_source/kits/road_kit/materials/<M_name>.tres` — `M_Asphalt` (`T_Concrete_Asphalt`),
 `M_ConcreteTile` / `M_Concrete` / `M_Barrier` (`T_Concrete`, tinted), with the kit's ORM + normal maps, all
 **world-space triplanar** at the Quaternius tile (3 m x `module_scale` 0.91 = **2.73 m**, measured off the kit's
 own `Street_*` UVs). `WorldBaker.applyMaterialLibrary` (every bake, after conversion) replaces any mesh surface
@@ -5803,7 +5803,7 @@ The decals and props are the next paragraph.
 
 **Road decals and street furniture are PLACED by the Road Kit, from facts the build already owns (PLAN.md 3.6c,
 2026-09-17).** `blender/addons/road_kit_authoring/point_furniture.py` (pure python, self-tested) runs inside
-`roadkit_cli.py gltf`; `assets/world_source/kit/furniture.json` is its table (which kit piece, lift, scale, `collide`,
+`roadkit_cli.py gltf`; `assets/world_source/kits/road_kit/furniture.json` is its table (which kit piece, lift, scale, `collide`,
 `exclude_roads` globs, and every spacing).
 - **At each junction arm, on the APPROACH road** (the Japanese order a driver meets them): a turn arrow on each arriving
   lane 14 m back, chosen from the turns of that lane's connectors (S, L, R, S+L, S+R; L+R and all three get none);
@@ -6122,6 +6122,25 @@ rather than guess, because every piece baked before this still carries the dupli
 zoned build.
 
 ---
+
+## `assets/` is organised by domain; every modular kit is under `world_source/kits/` (PLAN.md 3.9, 2026-09-17)
+
+```
+assets/characters/godot_chan/   the character: merged_animation{,_f}.{blend,glb,tscn} + extracted textures, textures/
+assets/weapons/                 catalog, per-weapon .blend, WeaponLibrary.blend
+assets/world_source/kits/       one folder per kit SOURCE (a licence + module boundary):
+    quaternius_downtown_city/     the CC0 download (buildings, road textures, decals, props)
+    road_kit/                     ours: road_kit.{blend,json}, materials/M_*.tres, furniture.json
+assets/world_source/buildings/  building types, BuildingLibrary.blend, PLATEAU landmark blends
+assets/world_source/pieces/     road records + sidecars (*.roads.json, lanekits, ground, zones, build manifests)
+```
+The move was one path map (`tools/reorg_assets.py`: `git mv` with each `.import` beside its source, so every
+uid survives, then a text rewrite). A `.blend`'s relative library links are binary and were re-pointed with
+`tools/relink_blends.py` (WeaponLibrary → the character, Island_base / Island_base_manual_modified / RoadKitGodot
+→ road_kit.blend). Rebuilt road pieces came out with byte-identical glTFs; only the `.tscn`/`.scn` material paths
+changed. `pieces/` was deliberately NOT renamed to `roads/`: `build_piece.sh`, the probes and the zone wiring all
+expect it (~35 files) and nothing but the name would improve. Trap met on the way: the island piece must be built
+with **`NAV_HALF=2016`**, or its navmesh silently bakes only the default ±252 m.
 
 ## Building kits — a downloaded kit, Japanese types, one scene per type (2026-09-17)
 

@@ -270,7 +270,7 @@ lateral gap between kerb and footway. That exact bug is on the record (round 2, 
 
 A `ROAD_KIT` collection of profile curve objects (`RKA_PROFILE_kerb_std`, `…_kerb_granite`,
 `…_wall_jersey`, `…_gutter_v`), built by a new `tools/build_road_kit.py` in the existing
-`build_curb_kit.py` idiom and **library-linked** from `assets/world_source/kit/road_kit.blend`
+`build_curb_kit.py` idiom and **library-linked** from `assets/world_source/kits/road_kit/road_kit.blend`
 (`paths.KIT_BLEND` is already there). Linked, so editing that one file restyles every kerb in the
 world — which is the "modify shape/materials more easily" ask in its strongest form.
 
@@ -315,7 +315,7 @@ point_build.build_marks → one `<road>__marks_<slot>` polyline per run
 
 > **Closed twice.** The merge below shipped in §7 (one registry, `kit_common.MATS`). On
 > **2026-09-05** the registry itself moved out of Python: `kit_common.mat()` now **links** every
-> `M_*` datablock from `assets/world_source/kit/road_kit.blend` — the same kit file that already
+> `M_*` datablock from `assets/world_source/kits/road_kit/road_kit.blend` — the same kit file that already
 > held the profile sections — instead of get-or-creating a copy in whichever `.blend` is building.
 > See §8 "Materials come from the asset kit".
 
@@ -584,7 +584,7 @@ because something was measured rather than assumed — those are the entries wor
 
 ### New surface
 
-`point_style.py` (the slot resolver), `tools/build_road_kit.py` → `assets/world_source/kit/
+`point_style.py` (the slot resolver), `tools/build_road_kit.py` → `assets/world_source/kits/road_kit/
 road_kit.blend` (six profile sections), `GN_PointProfile`, two operators (`rka.recentre_junctions`,
 `rka.link_road_kit`), two gate checks (`path_deviation`, `style_missing`), one preview mode enum,
 and one `Road ▸ Style` panel box. Twelve `ROAD_FIELDS` entries, one `POINT_FIELDS` removal, two
@@ -786,7 +786,7 @@ one; it left the *look of the world* defined in a Python table, get-or-**created
   of one fact, again.
 
 **The kit file is the material library.** `blender/tools/build_road_kit.py` now writes every
-`kit_common.MATS` / `TILED_MATS` entry into `assets/world_source/kit/road_kit.blend` with a
+`kit_common.MATS` / `TILED_MATS` entry into `assets/world_source/kits/road_kit/road_kit.blend` with a
 **fake user** — which is the whole mechanism: a `.blend` drops any zero-user datablock on save, and
 the kit holds six cross-sections, not a scene, so without the flag it shipped exactly the handful
 of materials its sections happened to carry (measured: 3 of 25).
@@ -808,7 +808,7 @@ A linked material **is** writable from Python in a background process (measured)
 
 **Measured on `Island_base`, before and after:** the same 11 materials with the same user counts
 (asphalt 64, concrete 88, concrete-tile 79, median 44, line-w 22, barrier 6, …), every one of them
-now `lib=//../kit/road_kit.blend` instead of local — so the look is byte-for-byte the decision it
+now `lib=//../kits/road_kit/road_kit.blend` instead of local — so the look is byte-for-byte the decision it
 was, sourced from a file an artist can open. The baked `.tscn` carries all 11 with an
 `albedo_color`, including the procedural `M_ConcreteTile` (the flattening at the seam still runs)
 and `M_Water`'s alpha. `check_roads.sh` PASS=18.

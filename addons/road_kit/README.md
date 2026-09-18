@@ -77,7 +77,7 @@ of truth; the `RoadKitNetwork → RoadKitRoad → RoadKitPoint` nodes are its ed
    piece. It wears the kit's own materials, taken off the built pieces (Preview Pieces); a material no built
    piece carries yet is the engine's default grey.
    **Styles**: a road's `*_mat` fields name a kit material and its `*_asset` fields a profile section in
-   `assets/world_source/kit/road_kit.blend`; the build reads that file as `road_kit.json`
+   `assets/world_source/kits/road_kit/road_kit.blend`; the build reads that file as `road_kit.json`
    (`blender/tools/export_road_kit_data.py`, which `build_road_kit.py` runs). A name the kit lacks builds
    the default and Build says so.
 6. **Preview Pieces** — tick it to see the BUILT roads (tarmac, kerbs, piers) placed exactly where

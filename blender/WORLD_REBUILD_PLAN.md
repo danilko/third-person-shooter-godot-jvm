@@ -68,7 +68,7 @@ Known gap, deliberately not wired: **a profile asset's own width does not reach 
 |---|---|
 | `blender/tools/check_island_ground.py` | **the gate for step 1** — per-arterial ground coverage, worst step, grade, gap coordinates |
 | `blender/tools/seed_district_roads.py` | clips `island_v3_geom.ARTERIALS` to a district, resamples to stations, authors them **through the addon's own operators**; `--links N` adds local streets |
-| `blender/tools/build_road_kit.py` | rebuilds `assets/world_source/kit/road_kit.blend` (6 profile sections) |
+| `blender/tools/build_road_kit.py` | rebuilds `assets/world_source/kits/road_kit/road_kit.blend` (6 profile sections) |
 | `blender/tools/build_piece.sh` | export + bake + navmesh + `.scn` for one piece |
 | `blender/tools/check_roads.sh` | the road-kit gate, 18 checks |
 
