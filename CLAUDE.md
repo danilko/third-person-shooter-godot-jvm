@@ -5799,7 +5799,39 @@ piece with no rebake, while adding or removing a name needs one — `point_diges
 for that reason, so the next `DIRTY_ONLY` build rebakes everything. The names keep `resource_name`, so the editor
 draft (`materials_from`) wears them too. Markings (`M_LineW/Y`) and `M_Median` stay flat. Gate:
 `tools/godot/shot_road_surface.gd -- <out> [--piece=] [--flat]` (needs a display; `--flat` is the control).
-Still to do: the `T_Street_Decals` markings and props (PLAN.md 3.6c).
+The decals and props are the next paragraph.
+
+**Road decals and street furniture are PLACED by the Road Kit, from facts the build already owns (PLAN.md 3.6c,
+2026-09-17).** `blender/addons/road_kit_authoring/point_furniture.py` (pure python, self-tested) runs inside
+`roadkit_cli.py gltf`; `assets/world_source/kit/furniture.json` is its table (which kit piece, lift, scale, `collide`,
+`exclude_roads` globs, and every spacing).
+- **At each junction arm, on the APPROACH road** (the Japanese order a driver meets them): a turn arrow on each arriving
+  lane 14 m back, chosen from the turns of that lane's connectors (S, L, R, S+L, S+R; L+R and all three get none);
+  a stop line 7 m back across the ARRIVING lanes only; a zebra 1-5 m back across the whole carriageway, 45 cm bars and
+  gaps with no side bars. The lanes come from the lanekits `pieces` wrote in step 1, ALL of the network's, because a
+  mouth's connectors stream with the pad's piece.
+- **Along the kerbs:** a drain in the gutter every 20 m, a planter (collides) on a footway at least 3 m wide every
+  30 m, and bollards (collide) round every junction corner that has a footway. Manholes every 90 m per through lane,
+  at a phase hashed from the lane id, so an unchanged record rebuilds byte-identically. Nothing where a barrier
+  stands, or where a ground grid says the lane is more than 2 m up (a bridge). Planters and manholes skip
+  `shrine_touge*`.
+- **The arrows are the kit's decals; the stop line and zebra are PAINT** (triangles in the road's `mark_w`
+  material, object `FURN__marks_w`), because the kit's crosswalk has side bars and it has no stop line.
+- **Kit pieces leave as `mmesh_<asset>` glTF nodes** carrying `asset_path` in their extras (`point_gltf.marker_node`,
+  piece -Z along `fwd`). `WorldBaker.buildMultiMeshes` already collapses those into one MultiMesh per asset;
+  `withKitMaterials` now gives each a DUPLICATED mesh wearing `<kit>/materials/<name>.tres` (the imported material
+  turns on vertex-colour-as-albedo from the kit's COLOR_0 wear mask, the buildings' trap). `MI_StreetDecals.tres`
+  (alpha scissor) and `MI_Dirt.tres` were added, and their textures set to the 3D import (mipmaps, VRAM) the other
+  kit textures already had. Collision is one `FURN_props-prop-colonly` proxy of oriented boxes.
+- **The digest** salts `point_furniture.py`, the table and every piece it names, and hashes each lane's successor turns
+  into the lane's own piece (an arrow depends on a connector in another piece).
+- Measured: DebugRoads (no footways) 159 placements, 7 crossings, 14 stop lines; the island 4659 (1059 planters,
+  417 bollards, 2435 drains, 682 manholes, 66 arrows, 36 crossings, 68 stop lines). Picture gate
+  `tools/godot/shot_road_furniture.gd` (needs a display; frames `--per` instances of every MultiMesh from behind
+  along its own forward). Two traps: a MultiMesh reads identity transforms under `--headless` (the dummy renderer),
+  and an unfocused window saves the SAME frame every shot unless `RenderingServer.force_draw()` runs first.
+- Not done: lane lines and the centre line still run through the zebra (Japan stops them at the crossing), and the
+  Japanese-only marks (止まれ, the diamond, speed numbers) belong to our own `jp_street` kit (3.6b step 4).
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 

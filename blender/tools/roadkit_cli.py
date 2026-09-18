@@ -55,6 +55,7 @@ import point_digest as pdg        # noqa: E402
 import point_mesh as pmsh         # noqa: E402
 import point_gltf as pgl          # noqa: E402
 import point_kit as pk            # noqa: E402
+import point_furniture as pfu     # noqa: E402
 
 
 def _findings(net):
@@ -339,17 +340,50 @@ def cmd_gltf(a):
     solved = ped.solve_all(net, grid)
     only = {n for n in a.only.split(",") if n}
     report, pieces = {}, []
+    # PLAN.md 3.6c: decals and street furniture. The lane-based marks read the lanekits `pieces` wrote (step 1 of
+    # build_roads_piece.sh) -- ALL of this network's, because a mouth's connectors stream with the pad's piece.
+    table = None if a.no_furniture else pfu.load()
+    lanekit_dir = a.lanekits or os.path.dirname(os.path.abspath(a.record))
+    lanes_doc, missing_lanekits = {"lanes": [], "junctions": []}, []
+    if table is not None:
+        for zone in sorted(part.pieces()):
+            lk = os.path.join(lanekit_dir, pz.piece_name(a.prefix, zone) + ".lanekit.json")
+            if not os.path.exists(lk):
+                missing_lanekits.append(lk)
+                continue
+            with open(lk) as fh:
+                d = json.load(fh)
+            lanes_doc["lanes"] += d.get("lanes", [])
+            lanes_doc["junctions"] += d.get("junctions", [])
+    styles = {n: pk.resolve(r, kit) for n, r in net.roads.items()}
+    default_mark = pk.resolve(object(), kit).material("mark_w")
+
+    def mark_mat(lane):
+        st = styles.get(lane.get("road_name"))
+        return st.material("mark_w") if st is not None else default_mark
+
     for zone in sorted(part.pieces()):
         piece = pz.piece_name(a.prefix, zone)
         if only and piece not in only:
             continue
         objs = pmsh.build(net, grid, part if zones else None, zone, kit, report, solved)
+        fur = pfu.place(table, solved, lanes_doc,
+                        (lambda l, z=zone: l.get("zone_id", pz.RESIDENT) == z) if zones else (lambda l: True),
+                        (lambda s, z=zone: part.run_zone(s.uids) == z) if zones else (lambda s: True),
+                        (lambda j, z=zone: part.pad_zone(j.uids) == z) if zones else (lambda j: True),
+                        mark_mat, grid)
+        for mat, tris in fur.paint.items():
+            objs.setdefault(pfu.PAINT_OBJECT, {}).setdefault(mat, []).extend(tris)
+        if fur.collision:
+            objs.setdefault(pfu.COLLISION_OBJECT, {}).setdefault(pfu.NO_MATERIAL, []).extend(fur.collision)
         path = os.path.join(a.out_dir, piece + ".gltf")
-        row = dict(pgl.write(objs, kit, path), zone=zone, piece=piece, gltf=path)
+        row = dict(pgl.write(objs, kit, path, markers=fur.placements), zone=zone, piece=piece, gltf=path,
+                   furniture=dict(sorted(fur.counts.items())))
         pieces.append(row)
     gate.update({"written": True, "pieces": pieces, "kit_stale": kit.stale(), "kit": kit.path,
                  "missing_style": sorted(set(tuple(m) for m in report.get("missing_style", []))),
                  "pier_overhang": sorted(set(tuple(m) for m in report.get("pier_overhang", []))),
+                 "missing_lanekits": missing_lanekits,
                  "ms": round((time.time() - t0) * 1000.0, 1)})
     return gate
 
@@ -455,7 +489,8 @@ def main(argv=None):
     s = sub.add_parser("mesh"); s.add_argument("record"); s.add_argument("--ground", default=""); s.set_defaults(fn=cmd_mesh)
     s = sub.add_parser("gltf"); s.add_argument("record"); s.add_argument("zones"); s.add_argument("out_dir")
     s.add_argument("prefix"); s.add_argument("--ground", default=""); s.add_argument("--only", default="")
-    s.add_argument("--gated", action="store_true"); s.set_defaults(fn=cmd_gltf)
+    s.add_argument("--gated", action="store_true"); s.add_argument("--lanekits", default="")
+    s.add_argument("--no-furniture", action="store_true"); s.set_defaults(fn=cmd_gltf)
     s = sub.add_parser("bands"); s.add_argument("record"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_bands)
     s = sub.add_parser("lanekit"); s.add_argument("record"); s.add_argument("out")
