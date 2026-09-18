@@ -15,7 +15,8 @@ import godot.global.GD;
  * The vehicle/occupant calls a headless GDScript probe needs and Godot cannot reach: seating, killing
  * and carjacking are plain Java on {@link Vehicle} and {@link Health}, not registered methods, and
  * registering them there for a test would add engine-visible surface to gameplay classes. A probe
- * instances this node and asks it instead. Used by {@code tools/godot/probe_dead_driver.gd} (PLAN.md 0.2).
+ * instances this node and asks it instead. Used by {@code tools/godot/probe_dead_driver.gd} (PLAN.md 0.2),
+ * {@code probe_zone_trigger.gd} (F3) and {@code probe_race.gd} (R2).
  */
 @Script(className = "VehicleProbeHelper")
 public class VehicleProbeHelper extends Node {
@@ -79,5 +80,39 @@ public class VehicleProbeHelper extends Node {
     @Register
     public void carjack(Node v, Node player) {
         if (v instanceof Vehicle car && player instanceof Character p) car.requestCarjack(p);
+    }
+
+    /**
+     * Attach the shipped ambient-traffic brain to {@code v}, optionally as a race entrant (R2).
+     * {@code Vehicle.attachController} is plain Java — this is the same call {@code ZoneManager} makes
+     * when it spawns a traffic car.
+     */
+    @Register
+    public void attachTrafficBrain(Node v, boolean racing) {
+        if (!(v instanceof Vehicle car)) return;
+        com.openworld.ai.vehicle.VehicleAIController brain = new com.openworld.ai.vehicle.VehicleAIController();
+        brain.racing = racing;
+        car.attachController(brain);
+    }
+
+    /**
+     * Flip an EXISTING brain's {@code racing} flag. Re-attaching a brain would lose its junction
+     * membership (the arbiter registers a car on {@code body_entered}), so a probe measuring the
+     * racing exception has to change the flag on the controller already in the junction.
+     */
+    @Register
+    public void setRacing(Node v, boolean racing) {
+        if (v instanceof Vehicle car
+                && car.getController() instanceof com.openworld.ai.vehicle.VehicleAIController brain) {
+            brain.racing = racing;
+        }
+    }
+
+    /** Is this car's traffic brain currently yielding to a junction holder? Question-named readout. */
+    @Register
+    public boolean yieldingNow(Node v) {
+        return v instanceof Vehicle car
+                && car.getController() instanceof com.openworld.ai.vehicle.VehicleAIController brain
+                && brain.shouldYield();
     }
 }

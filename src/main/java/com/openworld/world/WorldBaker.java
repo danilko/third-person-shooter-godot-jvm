@@ -51,7 +51,8 @@ import java.util.Set;
  * {@code zone_}; {@code zone_<id>}/{@code region_<id>} → {@link ZoneMarker} + {@link Zone}
  * (+ {@link RegionConfig}); {@code water_<id>} → {@link WaterVolume} in group {@code "water"};
  * {@code bounds_<id>} → {@link WorldBounds} (the logic wall);
- * {@code intersection_<id>} → {@link IntersectionZone}. Everything else (meshes, {@code -col} collision)
+ * {@code intersection_<id>} → {@link IntersectionZone};
+ * {@code race_<raceId>_<idx>} → {@link RaceCheckpoint} (a race route, R2). Everything else (meshes, {@code -col} collision)
  * is kept untouched. Parameters come from Blender custom properties (node metadata) with defaults.
  *
  * <p>The output is the <i>augmented source tree</i>: geometry/hierarchy kept as-is, gameplay nodes added,
@@ -200,6 +201,7 @@ public class WorldBaker extends Node {
         List<Node3D> waters = new ArrayList<>();
         List<Node3D> boundsMarkers = new ArrayList<>();
         List<Node3D> junctions = new ArrayList<>();
+        List<Node3D> raceGates = new ArrayList<>();
         List<Node3D> instances = new ArrayList<>();
         List<Node3D> mmeshes = new ArrayList<>();
         for (Node3D n : all) {
@@ -213,6 +215,7 @@ public class WorldBaker extends Node {
             else if (name.startsWith("water_"))        waters.add(n);
             else if (name.startsWith("bounds_"))       boundsMarkers.add(n);
             else if (name.startsWith("intersection_")) junctions.add(n);
+            else if (name.startsWith("race_"))         raceGates.add(n);
         }
 
         // Zones first (spawns attach to the nearest one).
@@ -225,6 +228,7 @@ public class WorldBaker extends Node {
         for (Node3D w : waters)    buildWater(root, w);
         for (Node3D b : boundsMarkers) buildBounds(root, b);
         for (Node3D j : junctions) buildJunction(root, j);
+        for (Node3D g : raceGates) buildRaceCheckpoint(root, g);
 
         int instanceCount = 0;
         for (Node3D in : instances) {
@@ -241,6 +245,7 @@ public class WorldBaker extends Node {
         for (Node3D n : waters)    freeEmpty(n);
         for (Node3D n : boundsMarkers) freeEmpty(n);
         for (Node3D n : junctions) freeEmpty(n);
+        for (Node3D n : raceGates) freeEmpty(n);
         for (Node3D n : instances) freeEmpty(n);   // proxy geometry under the marker goes with it
         for (Node3D n : mmeshes)   freeEmpty(n);
 
@@ -656,6 +661,38 @@ public class WorldBaker extends Node {
         bounds.setWarnMargin(metaFloat(empty, "warn_margin", 80f));
         root.addChild(bounds);
         bounds.setGlobalPosition(empty.getGlobalPosition());
+    }
+
+    /**
+     * {@code race_<raceId>_<idx>} → a {@link com.openworld.world.RaceCheckpoint} gate (R2). The index
+     * is the trailing number, the same {@code <name>_<n>} convention {@code lane_}/{@code spawn_}
+     * already use, so a route is authored by numbering empties along the racing line and nothing
+     * else. {@code radius}/{@code height} metas size the gate; the defaults suit a two-lane street.
+     */
+    private static void buildRaceCheckpoint(Node root, Node3D empty) {
+        String name = empty.getName().toString();
+        String id = routeOf(name);
+        int index = trailingIndex(name);
+        if (index < 0) {
+            GD.printErr("WorldBaker: race marker '" + name + "' has no trailing _<index> — skipped");
+            return;
+        }
+        RaceCheckpoint cp = new RaceCheckpoint();
+        cp.setName(new StringName("RaceCheckpoint_" + id + "_" + index));
+        cp.raceId = id;
+        cp.checkpointIndex = index;
+        cp.markerRadius = metaFloat(empty, "radius", 9f);
+        cp.markerHeight = metaFloat(empty, "height", 12f);
+        root.addChild(cp);
+        cp.setGlobalPosition(empty.getGlobalPosition());
+    }
+
+    /** The trailing {@code _<n>} of a marker name, or -1. */
+    private static int trailingIndex(String name) {
+        int u = name.lastIndexOf('_');
+        if (u < 0 || u + 1 >= name.length()) return -1;
+        String tail = name.substring(u + 1);
+        return isInt(tail) ? Integer.parseInt(tail) : -1;
     }
 
     private static void buildJunction(Node root, Node3D empty) {

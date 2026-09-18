@@ -47,8 +47,23 @@ public class WorldMapManager extends Control {
     @Export public Color selfColor = new Color(1f, 1f, 1f, 1f);
     @Export public float blipRadius = 4f;
 
+    /** Road colour, and the thinnest a lane is drawn (px) however far out the view is. */
+    @Export public Color roadColor = RoadOverlay.ROAD;
+    @Export public float roadMinWidthPx = 1.5f;
+    /** GPS route line width (px). */
+    @Export public float routeWidthPx = 4f;
+    /** Mouse-wheel zoom limits (metres centre-to-edge) and step. */
+    @Export public float minRangeMeters = 60f;
+    @Export public float maxRangeMeters = 6000f;
+    @Export public float zoomStep = 1.25f;
+
     private Player player;
     private boolean open = false;
+    private int lanesDrawn = 0;
+
+    /** Lanes drawn on the last frame the map was open (probe readout). */
+    @Register
+    public int roadLanesDrawnNow() { return lanesDrawn; }
 
     public void wirePlayer(Player p) { player = p; }
 
@@ -77,6 +92,10 @@ public class WorldMapManager extends Control {
                 if (world != null) player.setWaypoint(world);
             } else if (mb.getButtonIndex() == godot.core.MouseButton.RIGHT) {
                 player.clearWaypoint();   // right-click clears the destination
+            } else if (mb.getButtonIndex() == godot.core.MouseButton.WHEEL_UP) {
+                rangeMeters = Math.max(minRangeMeters, rangeMeters / zoomStep);
+            } else if (mb.getButtonIndex() == godot.core.MouseButton.WHEEL_DOWN) {
+                rangeMeters = Math.min(maxRangeMeters, rangeMeters * zoomStep);
             }
         }
     }
@@ -127,6 +146,17 @@ public class WorldMapManager extends Control {
                 Vector2 c = worldToScreen(m.getGlobalPosition(), origin, center, scale);
                 drawCircle(c, m.zone.loadRadius * scale, regionColor, false, 1f, true);
             }
+        }
+
+        // Roads and this player's GPS route over them (4.7).
+        com.openworld.world.RoadGraph roads = com.openworld.world.RoadMap.graph();
+        lanesDrawn = RoadOverlay.drawRoads(this, roads, origin, center, scale,
+                size.getX() * 0.5 / scale, size.getY() * 0.5 / scale, 0f, roadMinWidthPx, roadColor);
+        Vector3 wp = player.getWaypoint();
+        if (wp != null && player.characterInfo != null) {
+            RoadOverlay.drawRoute(this, com.openworld.world.RoadMap.routeFor(
+                    player.characterInfo.characterId, origin, wp), wp, origin, center, scale, 0f,
+                    routeWidthPx, player.getNameplateColor());
         }
 
         SpatialEntityGrid grid = SpatialEntityGrid.get();

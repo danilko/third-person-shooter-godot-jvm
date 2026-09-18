@@ -85,19 +85,22 @@ src/main/java/com/openworld/
                   #   ThrowableItem, ProjectileItem, RocketProjectile, T1Projectile, Detonatable,
                   #   IconRegistry
   world/          # world types: HitInfo, HittableBody, SurfaceType, SpatialEntityGrid (AutoLoad),
-                  #   WaterVolume (swim/float Area3D), WorldBounds (the logic wall)
+                  #   WaterVolume (swim/float Area3D), WorldBounds (the logic wall),
+                  #   ZoneTrigger (fires one story beat, F3), RaceCheckpoint (a race gate, R2)
     manager/      #   world-level singleton systems: Impact/Particle/Decal/Explosion/BulletTracer
   item/           # Pickup (Node3D item base) + PickupBody (the RigidBody3D it rides in the
                   #   world — W15), AmmoRefill station
   carrier/vehicle/ # Vehicle, VehicleWheel, VehicleConfig, VehicleWeaponMode
   game/           # EventBus (AutoLoad signals), GameManager (PLAYING/PAUSED/GAME_OVER FSM),
                   #   PlayerRegistry (AutoLoad — live Player list for AI LOD)
-    mission/      #   MissionInfo, MissionManager, MissionObjectiveType
+    mission/      #   MissionInfo, MissionManager, MissionObjectiveType, MissionDirector
+                  #   (story, F1), ScriptCommand, RaceDirector (R2 street races)
   net/            # NetworkManager (AutoLoad RPC), NetMessageCodec, NetworkController,
                   #   VehicleNetworkController, snapshot interpolators, policies, NetStats, Vec3/Quat
     session/      #   PlayerSession, PersistentPlayerId
   ui/             # CharacterHUD, Crosshair, HUDManager, PauseMenu, RadialMenu, Feed,
-                  #   Nameplate (generic billboard, any NameplateTarget), WeaponSlotsUI/Item, …
+                  #   Nameplate (generic billboard, any NameplateTarget), WeaponSlotsUI/Item,
+                  #   ScopeOverlay, HitMarker, AreaWarning, GpsArrow, RaceHUD (all self-gated), …
   util/           # ObjectPool, generic helpers
   debug/          # DebugHarness (temporary test-spawn harness); headless test stands —
                   #   DriveTestHost (vehicle physics soak, fixed timeline) and
@@ -111,9 +114,9 @@ src/test/java/com/openworld/net/   # headless unit tests for the engine-free net
 ```
 
 > AutoLoads (`project.godot`): `EventBus`, `GameManager` (`game`), `MissionManager`
-> (`game.mission`), `MissionDirector` (`game.mission`), `NetworkManager` (`net`), `PlayerRegistry`
-> (`game`), `SpatialEntityGrid` (`world`), `FactionManager` (`character`), `ZoneManager` (`world`),
-> `StimulusManager` (`world`).
+> (`game.mission`), `MissionDirector` (`game.mission`), `RaceDirector` (`game.mission`), `SaveSystem`
+> (`game`), `NetworkManager` (`net`), `PlayerRegistry` (`game`), `SpatialEntityGrid` (`world`),
+> `FactionManager` (`character`), `ZoneManager` (`world`), `StimulusManager` (`world`).
 
 ---
 
@@ -527,6 +530,130 @@ to HOSTILE proves nothing and the case uses FRIENDLY (it cost one false pass fir
 (`tools/net/run_net_*.sh`'s shape), so what this asserts is the ANSWER each seam reads. World entity
 state — which AI are dead, which pickups are gone, where the traffic is — is **not** saved at all, and
 that is the boundary the mission-restart rule above is drawn around.
+
+### Street races — `game.mission.RaceDirector` + `world.RaceCheckpoint` (R2, AutoLoad, 2026-09-17)
+
+GTA SA/VC-style checkpoint races over the existing road network, and the **first objective type
+beyond ELIMINATE_ALL with real logic**. `MissionObjectiveType.RACE` had been schema only since C1.
+
+**Where it sits is the F1 split, applied again.** "May this mission run" is `MissionDirector`'s;
+"is it won yet" is `MissionManager`'s — and a race is the second kind, so `MissionManager.startMission`
+hands a `RACE` mission to `RaceDirector` and the director hands the answer back through
+`completeMission` / `failMission`, exactly as the ELIMINATE_ALL counter does. It is a separate class
+rather than another branch in `MissionManager` because a race carries live per-racer state (progress,
+laps, placings, a clock) and a per-frame tick that no counter-shaped objective has.
+
+- **The route is checkpoints in index order, and they register themselves.** `RaceCheckpoint` calls
+  `registerCheckpoint` in `_ready` and `unregisterCheckpoint` in `_exitTree` — the
+  `Character`↔`SpatialEntityGrid` idiom — keyed by `raceId`, so a circuit authored inside a streamed
+  zone assembles and disassembles itself with no tree scan, and a world holds as many circuits as it
+  has names. Two gates claiming one index is refused and reported (`MissionDirector`'s duplicate-id
+  rule, same reason: which gate is #2 must not depend on streaming order).
+- **A checkpoint reports; it does not adjudicate.** It tells the director "this body touched index N"
+  and nothing else. **Only the racer's OWN next index counts** — so driving back through a gate you
+  already took is not progress and cutting the course cannot skip one — and that rule lives in one
+  place because it is the same rule for every gate in the world. `orderedCheckpoints` is the control
+  knob (`@Visible`, always on) that puts the naive "any untaken gate counts" implementation back, and
+  the gate measures the difference rather than asserting it in prose.
+- **The racer is the CHARACTER, never the vehicle**, keyed by `characterId` — the id the whole net
+  layer already uses. A racer who wrecks their car, steals another and drives on is the same racer;
+  one who bails out and runs the last 50 m finishes on foot, which is what GTA does and what falls
+  out of keying on the driver. A carrier hands the gate **every** seated occupant, because who is
+  enrolled is the director's answer and a passenger who is a racer has as much claim to the gate they
+  were carried through as the driver.
+- **The mask is not authored**: `CHARACTER | VEHICLE`, stated by the node, for `ZoneTrigger`'s reason
+  — a seated occupant is on collision layer **0** (`CharacterDriveState.enter`), so a gate watching
+  only CHARACTER is invisible to every car in the race, which looks exactly like a gate that was never
+  wired. Likewise a gate with no authored `CollisionShape3D` states a default cylinder: an `Area3D`
+  with no shape detects nothing and says nothing about it.
+- **Enrolment needs no authoring.** Every live `Player` races (in co-op that is the whole session,
+  the only default a mission cannot get wrong); AI racers and anyone else come from `addRacer`, which
+  works mid-race so a late joiner is not a special case.
+- **The MISSION ends when every HUMAN has finished**, not when the first one does — a co-op partner
+  two corners behind would otherwise be cut off mid-race. The variant is `WON` if any human took place
+  1, else `FINISHED`. AI racers keep their places and can end nothing: the mission is the players'.
+  `MissionInfo.timeLimit` — declared since C1 and never implemented — is the time trial's clock here,
+  and running it out calls `failMission`. Only the host may fail on the clock: two peers failing one
+  mission is two events for one fact.
+- **`endRace` FREEZES rather than wipes.** The placings, the clock and the roster stay readable until
+  the next `startRace`, because the moment a race ends is exactly when the results are wanted — by the
+  finish panel, by a beat that reads who won, and by a probe. Only `raceActiveNow()` changes.
+- **Standings** are checkpoints cleared, then distance to the next gate, recomputed at 4 Hz. Cheap and
+  exact enough for a HUD list; the only authoritative place is a FINISHED one, fixed when it is set.
+- **A race that cannot be finished is refused, loudly.** Fewer than two gates under that `raceId` and
+  `startRace` says so and does not start: a race silently running with no route is a mission the
+  player can never complete, and the cause (a mis-typed name, or a zone that has not streamed) is
+  invisible from the HUD.
+
+**Authoring costs one field and one marker prefix.** `MissionInfo.raceId` (empty = the circuit named
+after the mission — the case that needs no second name) and `raceLaps`; `WorldBaker` bakes
+`race_<raceId>_<idx>` empties into gates, the same `<name>_<n>` convention `lane_`/`spawn_` already
+use, with `radius`/`height` metas. **Shift+F4** on `DebugHarness` drops a four-gate circuit around the
+nearest player and starts a one-lap RACE mission over it — through `MissionManager.startMission`, so
+it exercises the shipped path rather than a shortcut.
+
+**AI racers are the shipped traffic brain plus ONE behavioural exception.**
+`VehicleAIController.racing` makes `shouldYield()` false: a race runs on a closed course, and
+first-come-first-served right of way at every junction is exactly what makes an AI racer finish last.
+Everything else a racer wants — a higher `cruiseThrottle`/`cruiseSpeed`, a bolder `cornerLateralAccel`
+(3.2d's corner-speed governor) — is already an exported number, so a racer is TUNING plus that one
+flag rather than a second controller.
+
+**The HUD polls, and a race is not a SITUATION.** `ui.RaceHUD` (countdown, clock, position, lap and
+checkpoint count, and the boost meter `Vehicle.getBoostFraction()` has exposed since the vehicle
+overhaul with no gauge) is self-gated like `WeaponProgress`/`ScopeOverlay` and deliberately **not** in
+`HUDManager`'s `BASE_LAYOUT`: a race is orthogonal to ON_FOOT/VEHICLE — you can finish one on foot —
+so the table could only hold a stale answer. **A race therefore needs no `EventBus` signal of its
+own**: the HUD polls, and the one event anything else cares about is the mission completing, which
+already exists. `ui.GpsArrow` points at the racer's next checkpoint while a race runs and at the
+player's own waypoint otherwise — DERIVED, never latched, because a race that WROTE the waypoint would
+clobber the destination the player set before it and not give it back (W29's rule for the view
+preference, applied to the waypoint).
+
+**Replication is three constants and no new message.** `WORLD_EVENT_RACE_START` (key = raceId,
+value = the countdown still to run, args = missionId, laps, then a `characterId` + `"0"/"1"` human
+flag per racer — the ROSTER rides in the event because a client cannot re-derive which AI the host
+enrolled), `_CHECKPOINT` (the RESULT — nextIndex and lap — not a delta, so a dropped grant is healed
+by the next one) and `_FINISH`. **The race ENDING needs no event of its own**: it is the mission
+completing or failing, which already replicates, and `RaceDirector` listens to those two signals on
+every peer. Only the host grants a checkpoint (`onCheckpointTouched` returns immediately off the host)
+and only the host decides a finish. Late join replays the start plus each racer's progress as *the
+same events* a live race sends (`NetworkManager.sendBaselineRace` → `sendWorldEventTo`, new, and now
+the shape every baseline can use), so a joiner runs the path a live event already exercises.
+**The payload's shape has one owner**: `RaceDirector.startArgs` builds it and
+`RaceDirector.applyRemoteStart` parses it, next to each other on purpose — an off-by-one between a
+builder here and a parser in `GameManager` shows up as "the client thinks the AI is a human and waits
+for it to finish", with nothing on either peer to say so. `GameManager`'s three `applyRace*` are pure
+routing.
+
+**Gate `tools/godot/probe_race.gd`** (42/42; `-- --control` turns `orderedCheckpoints` off and fails
+exactly 4, with no cascade — each later case restarts the race, and the knob's only effect is whether
+an out-of-order touch counts). Real Player, Vehicle and AICharacter bodies against the real AutoLoads,
+started the shipped way (a `MissionInfo` written as a `.tres` and handed to
+`MissionManager.startMissionFromPath`), never by calling `startRace`. Cases: a mission naming a
+circuit that is not there does not start a race; the countdown holds the clock AND refuses a gate
+cleared during it; the ordering rule (out of order, in order, and back through the one just taken);
+the GPS target and the self-gated HUD; the lap closing into a finish and the mission completing as
+`WON`, with the results still readable afterwards; two laps of the same four gates; the time trial
+failing the mission; a **car** carrying the racer clearing a gate (mask 18); an AI racer enrolled
+mid-race and scored by the same rules; standings; the `racing` exception measured on two real cars in
+a real `IntersectionZone` (ambient yields, the SAME brain with the flag on does not); the co-op mirror
+(the host's own wire payload fed back through `applyRemoteEventCsv` rebuilds its roster, and a
+mirrored checkpoint/finish lands); and a duplicate index refused / a freed gate leaving the route.
+
+**Not covered, on purpose:** the AI racer's LANE-FOLLOWING — a bare stand has no road network, and
+driving a lane is `probe_road_traffic`'s and `probe_traffic_spawn`'s gate, not this one's; and the
+two-process co-op run (`tools/net/run_net_*.sh`'s shape), for which what is asserted is the ANSWER each
+seam reads. Race state is also **not saved** (I7's boundary): an interrupted race restarts with its
+mission, which is the rule a fresh crowd already forced on every other objective.
+
+**Probe traps.** The junction arbiter registers a car on `body_entered` and skips one with no
+`VehicleAIController`, so a brain attached AFTER the car is already inside the volume is never
+registered and reads as "not yielding" for the wrong reason; and re-attaching a brain to flip `racing`
+loses that membership the same way (`VehicleProbeHelper.setRacing` flips the flag on the brain already
+in the junction). Two helpers were added there rather than registering `attachController`/`shouldYield`
+on the gameplay classes: a probe-support node exists precisely so a test does not add engine-visible
+surface to `Vehicle` and `VehicleAIController`.
 
 ---
 
@@ -2401,6 +2528,54 @@ re-emits `characterDamagedFrom` in `handleDamageBroadcastMessage`. The per-hit b
 anyway), so it is now the one place the hit cue + direction are sent.
 
 ---
+
+### Roads on the map, and a GPS route along them (`world.RoadMap` / `world.RoadGraph`, PLAN.md 4.7, 2026-09-17)
+
+The minimap and the full map draw the road network, and the GPS arrow follows a ROUTE along the lanes
+instead of pointing at the waypoint as the crow flies.
+
+- **The network is read from the lanekit sidecars, never from the scene.** The `Lane` nodes a zone
+  instances exist only while that zone is streamed, so a route to a waypoint in an unloaded zone would
+  have nothing to walk (and `LaneGraph` is built from exactly those nodes). `RoadMap.graph()` takes every
+  `ZoneMarker` whose zone streams `.../pieces/<stem>.tscn`, reads `res://assets/world_source/pieces/<stem>
+  .lanekit.json` (the convention `build_piece.sh` already uses), and places it with
+  `Zone.geometryFrame(marker)` — new, beside `placeGeometry`, so a sidecar lands where its piece does.
+  No second road record. Rebuilt when the scene or the set of road zones changes; 16 ms for DebugRoads,
+  55 ms for the island (218 lanes, 2.4 MB). The sidecars are in `export_presets.cfg`'s include filter,
+  since `assets/` is otherwise not exported.
+- **`util.MiniJson`** reads them in plain Java: through Godot's `JSON` every number is a bridge call, and
+  a unit test could not run it at all.
+- **`RoadGraph` is engine-free** and the successor rule is the runtime's (`LaneGraph.successorsOf`): the
+  authored `next` list, else every lane starting within `JUNCTION_RADIUS` of the end minus the direct
+  reverse. So a route only makes movements a car could make. Dijkstra over lanes (cost = metres to a
+  lane's START) plus `inner_lane`/`outer_lane` lane changes at `LANE_CHANGE_COST` 15 m — without the
+  lateral edge a left turn owned by the other lane is unreachable. Start and goal are projections; both
+  take every lane within `CANDIDATE_SLACK` 10 m of the nearest, so a player on a two-way street is not
+  sent to the end of the wrong carriageway to turn round. The start is snapped in 3D (a body on a
+  bridge), the goal in plan (a map click carries the player's height).
+- **Re-routing is GTA's "recalculating"**, never a per-frame search: per character, on a new waypoint, a
+  rebuilt network, or the body more than `OFF_ROUTE_METERS` 25 m from the route (at most once per
+  `REROUTE_SECONDS` 1 s).
+- **`RoadMap.gpsTarget` is the arrow's one rule:** the route's point `LOOKAHEAD_METERS` 30 m past the
+  body's place on it (which leads a body that is off the road ONTO it first), and straight at the
+  waypoint within `DIRECT_METERS` 40 m, past the route's end, or with no route. A race still points at
+  the next checkpoint directly. `GpsArrow.followRoads` (`@Visible`, on) is the control knob.
+- **Drawing is one owner, `ui.RoadOverlay`**, shared by `MinimapController` (clipped to its disc in Java)
+  and `WorldMapManager`: each lane a polyline as wide as the lane (never under 1.5 px), Douglas-Peucker
+  simplified at 0.5 m and culled by bounds, handed over in ONE bridge call (the `PackedVector2Array`
+  `Collection` constructor); the route on top in the player's colour, then a thin line from where it
+  leaves the road to the waypoint. The full map now zooms with the wheel (60 m .. 6 km centre-to-edge).
+
+Gates: **`RoadGraphTest`** (6, on the real sidecars — a route across DebugRoads' junction into the other
+zone's lanes, ending on the nearest lane; 500 random island pairs, every route legal and every
+BFS-reachable goal routed) and **`tools/godot/probe_gps_route.gd`** (13/13 on DebugWorld, 12/12 with
+`-- --world=island`): the real HUD, the waypoint set by opening the map with `map`, zooming with the
+wheel and left-clicking; roads drawn on both maps; the route a legal chain (checked independently from
+the same sidecars) that crosses `link -> connector -> spur` and ends on the lane nearest the click; the
+arrow's target on the route 30 m ahead; off the road it points at the road (57 deg off the straight
+bearing); straight at the waypoint within 40 m; right-click clears. `-- --control` (`follow_roads` off)
+fails exactly 2. Not covered: the co-op half (a teammate's waypoint is drawn but routed only for the
+local player, by design — each peer routes for itself).
 
 ## MovementController flags (Player vs AICharacter)
 
@@ -5885,6 +6060,9 @@ table and `BuildingLibrary.blend` in `assets/world_source/buildings/`); `tools/b
   requirement`). Use `set(k, v)`. It broke every runtime faction flip, and a joining client dropped the
   faction baseline as "malformed" (found by `tools/net/run_net_shot_test.sh`; `FactionTable` fixed).
   `NetworkManager`'s malformed-packet log now names the tag and the top stack frames — it named neither.
+- **A fully-qualified annotation is silently NOT registered**: `@godot.annotation.Visible public boolean x`
+  compiles and produces no property at all (GDScript `set` does nothing, `get` returns null). Import the
+  annotation and write `@Visible`. Found by `probe_gps_route.gd`'s control reading as a pass.
 - **Do not export a nested/raw generic `Dictionary` from a `@Script` class** (e.g.
   `@Export Dictionary<String, Dictionary>`). The godot-jvm `classGraphSymbolsProcess`
   registration scanner chokes on the raw nested type parameter and dies with `Java heap space` /

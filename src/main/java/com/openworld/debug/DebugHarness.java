@@ -14,6 +14,7 @@ import com.openworld.net.NetworkManager;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.ai.vehicle.VehicleAIController;
 import com.openworld.carrier.vehicle.Vehicle;
+import com.openworld.world.RaceCheckpoint;
 import com.openworld.world.SpawnConfig;
 import com.openworld.world.VehicleRoute;
 import com.openworld.world.Zone;
@@ -143,7 +144,10 @@ public class DebugHarness extends Node {
         } else if (iek.getKeycode() == Key.F8) {
             postDebugGunshot();
         } else if (iek.getKeycode() == Key.F4) {
-            if (canSpawnLocally()) spawnOnAllRoutes();
+            // Shift+F4 = drop a debug race circuit in front of the player and start it;
+            // plain F4 = spawn ambient traffic on every route.
+            if (iek.isShiftPressed()) startDebugRace();
+            else if (canSpawnLocally()) spawnOnAllRoutes();
         } else if (iek.getKeycode() == Key.F5) {
             if (iek.isShiftPressed()) reloadNearestZone(); else bakeWorld();
         } else if (iek.getKeycode() == Key.F3) {
@@ -298,6 +302,59 @@ public class DebugHarness extends Node {
         GD.print("DebugHarness: starting debug mission '" + info.missionId + "' (F9)");
         manager.startMission(info);
     }
+
+    /**
+     * Shift+F4 — the R2 verify's "author a 4-checkpoint loop in the test town and start it", without
+     * authoring anything: four {@link RaceCheckpoint} gates in a square around the nearest player,
+     * then a one-lap RACE mission over them. The gates are ordinary nodes, so what this exercises is
+     * the shipped path ({@code MissionManager.startMission} → {@code RaceDirector}), not a shortcut.
+     */
+    private void startDebugRace() {
+        Node managerNode = getNodeOrNull("/root/MissionManager");
+        if (!(managerNode instanceof MissionManager manager)) {
+            GD.print("DebugHarness: MissionManager autoload not found");
+            return;
+        }
+        Node3D anchor = null;
+        for (com.openworld.character.Player p : PlayerRegistry.getPlayers()) {
+            if (p != null && GD.isInstanceValid(p)) { anchor = p; break; }
+        }
+        if (anchor == null) { GD.print("DebugHarness: no player to build a race around"); return; }
+        Node parent = getParent() == null ? this : getParent();
+        Vector3 at = anchor.getGlobalPosition();
+
+        // Clear a previous debug circuit so a second press does not stack gates on top of the first.
+        if (getTree() != null) {
+            for (Node n : getTree().getNodesInGroup(new StringName(RaceCheckpoint.GROUP))) {
+                if (n instanceof RaceCheckpoint cp && DEBUG_RACE_ID.equals(cp.raceId)) cp.queueFree();
+            }
+        }
+        float r = 60f;
+        Vector3[] offsets = {
+                new Vector3(0f, 0f, -r), new Vector3(r, 0f, -r),
+                new Vector3(r, 0f, r),   new Vector3(0f, 0f, r) };
+        for (int i = 0; i < offsets.length; i++) {
+            RaceCheckpoint cp = new RaceCheckpoint();
+            cp.setName(new StringName("DebugRaceCheckpoint_" + i));
+            cp.raceId = DEBUG_RACE_ID;
+            cp.checkpointIndex = i;
+            parent.addChild(cp);
+            cp.setGlobalPosition(at.plus(offsets[i]));
+        }
+
+        MissionInfo info = new MissionInfo();
+        info.missionId = "debug_race";
+        info.objectiveType = MissionObjectiveType.RACE;
+        info.raceId = DEBUG_RACE_ID;
+        info.raceLaps = 1;
+        info.playerFactions.add(Faction.PLAYER);
+        info.possibleOutcomeVariants.add("WON");
+        info.possibleOutcomeVariants.add("FINISHED");
+        GD.print("DebugHarness: starting debug race (Shift+F4) — 4 gates, 1 lap");
+        manager.startMission(info);
+    }
+
+    private static final String DEBUG_RACE_ID = "debug_race";
 
     /**
      * Drops `count` fresh AICharacter instances of the given faction into the Characters

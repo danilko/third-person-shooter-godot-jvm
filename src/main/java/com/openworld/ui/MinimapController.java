@@ -49,7 +49,18 @@ public class MinimapController extends Control {
     /** Zone/region outline colour. */
     @Export public Color regionColor = new Color(0.4f, 0.8f, 1f, 0.5f);
 
+    /** Road colour, and the thinnest a lane is drawn (px) however far out the view is. */
+    @Export public Color roadColor = RoadOverlay.ROAD;
+    @Export public float roadMinWidthPx = 1.5f;
+    /** GPS route line width (px). */
+    @Export public float routeWidthPx = 3f;
+
     private Character player;
+    private int lanesDrawn = 0;
+
+    /** Lanes drawn on the last frame (probe readout). */
+    @Register
+    public int roadLanesDrawnNow() { return lanesDrawn; }
 
     /** Bind to the local player (called by HUDManager.wirePlayer). */
     public void wirePlayer(Player p) { player = p; }
@@ -80,6 +91,18 @@ public class MinimapController extends Control {
 
         if (player == null || !godot.global.GD.isInstanceValid(player)) return;
         Vector3 origin = player.getGlobalPosition();
+
+        // Roads (4.7) — the whole network from the lanekit sidecars, clipped to the disc — and the
+        // local player's GPS route over them.
+        com.openworld.world.RoadGraph roads = com.openworld.world.RoadMap.graph();
+        lanesDrawn = RoadOverlay.drawRoads(this, roads, origin, center, scale, rangeMeters, rangeMeters,
+                radiusPx, roadMinWidthPx, roadColor);
+        if (player instanceof Player pl && pl.characterInfo != null && pl.getWaypoint() != null) {
+            com.openworld.world.RoadGraph.Route route = com.openworld.world.RoadMap.routeFor(
+                    pl.characterInfo.characterId, origin, pl.getWaypoint());
+            RoadOverlay.drawRoute(this, route, pl.getWaypoint(), origin, center, scale, radiusPx,
+                    routeWidthPx, pl.getNameplateColor());
+        }
 
         // Region outlines (zone load rings) within view.
         ZoneManager wzm = ZoneManager.get();

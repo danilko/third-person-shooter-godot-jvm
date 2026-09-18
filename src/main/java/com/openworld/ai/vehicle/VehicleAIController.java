@@ -88,6 +88,14 @@ public class VehicleAIController extends Controller {
     /** The deceleration (m/s²) the corner governor plans with: how early it starts braking for a bend. */
     @Export public float cornerBrakeDecel = 4.0f;
 
+    /**
+     * This car is a race entrant (R2): it does not yield at junctions (see {@link #shouldYield}).
+     * Everything else a racer wants — a higher {@link #cruiseThrottle} / {@link #cruiseSpeed}, a
+     * bolder {@link #cornerLateralAccel} — is already an exported number, so a racer is TUNING plus
+     * this one behavioural exception rather than a second controller.
+     */
+    @Export public boolean racing = false;
+
     private static final double END_THRESHOLD = 3.0;   // m from the lane end = "arrived"
 
     private Vehicle   vehicleBody;
@@ -340,9 +348,14 @@ public class VehicleAIController extends Controller {
     public void enterIntersection(IntersectionZone z) { currentIntersection = z; }
     public void exitIntersection(IntersectionZone z) { if (currentIntersection == z) currentIntersection = null; }
 
-    /** True when we are in a junction another vehicle currently holds — yield (brake) until clear. */
+    /**
+     * True when we are in a junction another vehicle currently holds — yield (brake) until clear.
+     * A {@link #racing} car never yields: a race runs on a closed course, and first-come-first-served
+     * right of way at every junction is exactly the thing that makes an AI racer finish last.
+     */
     public boolean shouldYield() {
-        return currentIntersection != null && vehicleBody != null && currentIntersection.blocks(vehicleBody);
+        return !racing && currentIntersection != null && vehicleBody != null
+                && currentIntersection.blocks(vehicleBody);
     }
 
     // ── Body / hardware resolution ───────────────────────────────────────────────
