@@ -28,6 +28,17 @@ barrier). That is the natural way round -- `GN_PointProfile` applies the measure
 profile-to-world correction, so what you draw is what you get. Give it a material; the addon reads
 it off the asset, because `Curve to Mesh` drops it. Name it `RKA_PROFILE_<slot>_<variant>`.
 
+PIER ASSETS (PLAN.md 3.5). A `RKA_PIER_<variant>` MESH in the same collection is a column a road
+names in `RoadData.pillar_asset`; the road build (`point_mesh.pillars`) stands one wherever the
+solve puts a column, in place of the plain box. Model it Z-up with its **origin at the top centre**
+-- the soffit, where it meets the deck -- **+Y along the road, +X across it**, at its REAL size
+(a pier owns its size, like a profile: it is never scaled to the deck). Everything above the
+object's `rka_stretch_z` custom property (metres, <= 0) is RIGID -- the cap, the bearings; every
+vertex below it STRETCHES linearly so the pier's lowest point lands on the ground, however tall the
+column has to be. Model the shaft ~10 m long; the length is only a reference. Any number of
+materials; each face keeps its own. `add_piers()` (re)makes only the `RKA_PIER_*` objects this
+script ships, so it can be run on a hand-edited kit without touching anything else.
+
 The file is LIBRARY-LINKED into a district (`Author > Style > Link Road Kit`), so editing one
 section here restyles every road in the world that names it.
 """
@@ -126,6 +137,90 @@ SECTIONS = (
 )
 
 
+PIER_PREFIX = "RKA_PIER_"
+#: Reference shaft length: the shipped piers are modelled down to this depth; the build stretches them.
+PIER_REF_DEPTH = 10.0
+
+
+def _prism_y(bm, outline_xz, y_half):
+    """An XZ outline extruded along Y (+-y_half): a cap or a crossbeam."""
+    import bmesh  # noqa: F401
+    front = [bm.verts.new((x, -y_half, z)) for x, z in outline_xz]
+    back = [bm.verts.new((x, y_half, z)) for x, z in outline_xz]
+    bm.faces.new(front[::-1])
+    bm.faces.new(back)
+    n = len(outline_xz)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((front[i], front[j], back[j], back[i]))
+
+
+def _prism_z(bm, outline_xy, z_top, z_bottom):
+    """An XY outline extruded down Z: a column."""
+    top = [bm.verts.new((x, y, z_top)) for x, y in outline_xy]
+    bot = [bm.verts.new((x, y, z_bottom)) for x, y in outline_xy]
+    bm.faces.new(top)
+    bm.faces.new(bot[::-1])
+    n = len(outline_xy)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((top[i], bot[i], bot[j], top[j]))
+
+
+def _circle(cx, cy, r, n=20):
+    import math
+    return [(cx + r * math.cos(2 * math.pi * k / n), cy + r * math.sin(2 * math.pi * k / n)) for k in range(n)]
+
+
+def _rect(hx, hy):
+    return [(-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy)]
+
+
+#: `(variant, stretch_z, [parts])`. A part is `("cap", outline_xz, y_half)` or `("col", outline_xy, z_top)`
+#: (a column runs from z_top down to -PIER_REF_DEPTH). Real-world sizes, Shuto viaduct practice.
+PIERS = (
+    # A plain round column, the whole of it stretching.
+    ("round", 0.0, [("col", _circle(0.0, 0.0, 0.9), 0.0)]),
+    # The Shuto expressway T-pier: a tapered 12 m cap on one rectangular column.
+    ("hammerhead", -1.8, [("cap", [(-6.0, 0.0), (6.0, 0.0), (6.0, -0.7), (1.6, -1.8), (-1.6, -1.8), (-6.0, -0.7)], 1.2),
+                          ("col", _rect(1.3, 1.0), -1.2)]),
+    # A portal bent for a wide deck: a crossbeam on two round columns.
+    ("portal", -1.5, [("cap", [(-8.0, 0.0), (8.0, 0.0), (8.0, -1.5), (-8.0, -1.5)], 1.0),
+                      ("col", _circle(-5.5, 0.0, 0.8), -1.0), ("col", _circle(5.5, 0.0, 0.8), -1.0)]),
+)
+
+
+def add_piers(coll=None, matkey="concrete"):
+    """(Re)make the shipped `RKA_PIER_*` objects in the `ROAD_KIT` collection, leaving everything else alone."""
+    import bmesh
+    coll = coll or bpy.data.collections.get(COLLECTION)
+    made = []
+    for variant, stretch_z, parts in PIERS:
+        name = PIER_PREFIX + variant
+        old = bpy.data.objects.get(name)
+        if old is not None:
+            me_old = old.data
+            bpy.data.objects.remove(old, do_unlink=True)
+            if me_old is not None and me_old.users == 0:
+                bpy.data.meshes.remove(me_old)
+        bm = bmesh.new()
+        for kind, outline, arg in parts:
+            if kind == "cap":
+                _prism_y(bm, outline, arg)
+            else:
+                _prism_z(bm, outline, arg, -PIER_REF_DEPTH)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        me = bpy.data.meshes.new(name)
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(kc.mat(matkey))
+        o = bpy.data.objects.new(name, me)
+        o["rka_stretch_z"] = float(stretch_z)
+        coll.objects.link(o)
+        made.append(o)
+    return made
+
+
 def build():
     _wipe()
     mats = build_materials()
@@ -134,6 +229,7 @@ def build():
     made = []
     for name, matkey, pts in SECTIONS:
         made.append(profile(PREFIX + name, pts, matkey, coll))
+    add_piers(coll)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=OUT)
     print("build_road_kit: %d profile(s), %d material(s) -> %s" % (len(made), len(mats), OUT))
@@ -149,4 +245,14 @@ def build():
 
 
 if __name__ == "__main__":
-    build()
+    if "--add-piers" in sys.argv:
+        # Additive: open the kit, (re)make only the shipped piers, save, re-export the JSON. Hand edits survive.
+        bpy.ops.wm.open_mainfile(filepath=OUT)
+        kc.USE_MATERIAL_LIBRARY = False
+        add_piers()
+        bpy.ops.wm.save_as_mainfile(filepath=OUT)
+        sys.path.insert(0, HERE)
+        import export_road_kit_data
+        export_road_kit_data.export()
+    else:
+        build()

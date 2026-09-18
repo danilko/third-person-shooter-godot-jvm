@@ -349,6 +349,7 @@ def cmd_gltf(a):
         pieces.append(row)
     gate.update({"written": True, "pieces": pieces, "kit_stale": kit.stale(), "kit": kit.path,
                  "missing_style": sorted(set(tuple(m) for m in report.get("missing_style", []))),
+                 "pier_overhang": sorted(set(tuple(m) for m in report.get("pier_overhang", []))),
                  "ms": round((time.time() - t0) * 1000.0, 1)})
     return gate
 

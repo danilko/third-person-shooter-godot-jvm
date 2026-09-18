@@ -100,6 +100,8 @@ for p in d["pieces"]:
           % (p["piece"], p["objects"], p["triangles"], p["worst_normal_deg"], p["inverted_normals"]))
 for road, slot, kind, name in d.get("missing_style", []):
     print("   WARNING: road %s names %s %r for its %s slot and the kit has none -- built with the default" % (road, kind, name, slot))
+for run, pier, over in d.get("pier_overhang", []):
+    print("   WARNING: %s's pier %s reaches %.2f m past the deck edge -- pick a narrower pier" % (run, pier, over))
 if d.get("kit_stale"):
     print("   WARNING: road_kit.blend changed since road_kit.json was written -- run blender/tools/export_road_kit_data.py")
 print("   %.0f ms" % d["ms"])

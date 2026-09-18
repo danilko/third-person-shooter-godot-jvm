@@ -11,6 +11,7 @@ import godot.api.Curve3D;
 import godot.api.FileAccess;
 import godot.api.JSON;
 import godot.api.Marker3D;
+import godot.api.Material;
 import godot.api.Mesh;
 import godot.api.MeshInstance3D;
 import godot.api.MultiMesh;
@@ -19,6 +20,7 @@ import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.PackedScene;
 import godot.api.Path3D;
+import godot.api.ResourceLoader;
 import godot.api.ResourceSaver;
 import godot.core.Dictionary;
 import godot.core.Error;
@@ -143,6 +145,8 @@ public class WorldBaker extends Node {
         Set<Node> instanceRoots = new HashSet<>();
         int[] counts = convert(root, kitDir, instanceRoots);
         stripEagerLodLow(root);
+        int swapped = applyMaterialLibrary(root, MATERIAL_LIBRARY_DIR);
+        if (swapped > 0) GD.print("WorldBaker: " + swapped + " surfaces took a material from " + MATERIAL_LIBRARY_DIR);
 
         int pathLaneCount = (lanekitPath != null && !lanekitPath.isBlank())
                 ? loadLaneKitSidecar(root, lanekitPath) : 0;
@@ -184,6 +188,34 @@ public class WorldBaker extends Node {
             marker.removeDebugVisuals();
         }
         for (Node child : node.getChildren()) stripEagerLodLow(child);
+    }
+
+    /**
+     * The material library (PLAN.md 3.6c): a surface whose material is NAMED like a file in this directory
+     * ({@code M_Asphalt} -> {@code M_Asphalt.tres}) takes that file instead. glTF can only carry a flat base
+     * colour for the kit's procedural materials, and the swept road mesh has no UVs, so the textured look lives
+     * here as world-space triplanar materials, resolved by NAME at bake — the one lookup, the buildings' rule.
+     * The baked scene REFERENCES the file, so editing a .tres restyles every piece with no rebake; only adding
+     * or removing a name needs one (and the Road Kit digest salts this directory for that reason).
+     */
+    public static final String MATERIAL_LIBRARY_DIR = "res://assets/world_source/kit/materials/";
+
+    private static int applyMaterialLibrary(Node node, String dir) {
+        int n = 0;
+        if (node instanceof MeshInstance3D mi && mi.getMesh() != null) {
+            Mesh mesh = mi.getMesh();
+            for (int s = 0; s < mesh.getSurfaceCount(); s++) {
+                Material m = mesh.surfaceGetMaterial(s);
+                if (m == null) continue;
+                String name = m.getName();
+                if (name == null || name.isEmpty()) continue;
+                String path = dir + name + ".tres";
+                if (!ResourceLoader.exists(path)) continue;
+                if (GD.load(path) instanceof Material lib) { mesh.surfaceSetMaterial(s, lib); n++; }
+            }
+        }
+        for (Node child : node.getChildren()) n += applyMaterialLibrary(child, dir);
+        return n;
     }
 
     // ── Conversion ──────────────────────────────────────────────────────────────

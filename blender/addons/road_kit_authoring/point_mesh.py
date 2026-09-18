@@ -188,9 +188,10 @@ def _box(c, w, h):
     return [(v[a], v[b], v[cc]) for a, b, cc in f]
 
 
-def pillars(pts, values, lats):
-    """`GN_PointPillars`: resample the deck-centre curve every `rka_sp_pillar` metres and stand a
-    `rka_pillar_w` box of height `rka_pillar_h` under the soffit wherever the solve said PIER."""
+def pier_placements(pts, values, lats):
+    """`GN_PointPillars`' placement: resample the deck-centre curve every `rka_sp_pillar` metres and keep every
+    sample the solve said PIER. `[(top, height, box width, forward, deck half-width)]`, `top` the soffit point, the
+    column running `height` straight down from it to the ground, `forward` the horizontal travel direction there."""
     curve = _offset_curve(pts, lats, values, "rka_deck_c", 0.0, "")
     acc = [0.0]
     for i in range(len(curve) - 1):
@@ -211,9 +212,77 @@ def pillars(pts, values, lats):
         if lerp("rka_pillar_param") <= 0.5 or lerp("rka_pillar_h") < PILLAR_MIN_HEIGHT:
             continue
         p = tuple(curve[j][i] + (curve[j + 1][i] - curve[j][i]) * u for i in range(3))
-        top = (p[0], p[1], p[2] - lerp("rka_deck_h"))
-        out += _box(top, lerp("rka_pillar_w") or 1.4, lerp("rka_pillar_h"))
+        fwd = _norm((curve[j + 1][0] - curve[j][0], curve[j + 1][1] - curve[j][1], 0.0))
+        out.append(((p[0], p[1], p[2] - lerp("rka_deck_h")), lerp("rka_pillar_h"), lerp("rka_pillar_w") or 1.4,
+                    fwd, lerp("rka_deck_w")))
     return out
+
+
+#: A pier whose shaft would be shorter than this is squashed WHOLE (cap included) rather than given a negative shaft.
+PIER_MIN_SHAFT = 0.3
+
+
+def pier_extent(pier):
+    """`(lowest z, half-width across the road)` of a pier asset, in its own frame."""
+    zs, xs = [], []
+    for ts in pier.get("tris", {}).values():
+        for t in ts:
+            zs += [t[2], t[5], t[8]]
+            xs += [abs(t[0]), abs(t[3]), abs(t[6])]
+    return (min(zs) if zs else 0.0), (max(xs) if xs else 0.0)
+
+
+def place_pier(pier, top, height, fwd, zb=None, ground=None):
+    """One pier asset stood at `top` (the soffit), facing `fwd`, its lowest point `height` below: every vertex above
+    `stretch_z` rigid, every one below stretched linearly so the lowest lands on the ground. `{material: [tri]}`.
+
+    With `ground` (`ground(x, y)` -> z or None, the solve's own sampler) each shaft vertex stretches to the ground
+    under ITS OWN position, not the centreline's: a portal's side columns stand 5.5 m off the road's line, and over a
+    sloping seabed one stretched to the centreline's ground stopped 5 m short (measured, `probe_road_ground`)."""
+    if zb is None:
+        zb = pier_extent(pier)[0]
+    sz = min(0.0, float(pier.get("stretch_z", 0.0)))
+    right = (fwd[1], -fwd[0], 0.0)
+    if zb < sz and height + sz >= PIER_MIN_SHAFT:
+        def zmap(z, wx, wy):
+            if z >= sz:
+                return z
+            foot = -height
+            if ground is not None:
+                g = ground(wx, wy)
+                if g is not None:
+                    foot = min(g - top[2], sz - PIER_MIN_SHAFT)
+            return sz + (z - sz) * (foot - sz) / (zb - sz)
+    else:
+        k = height / -zb if zb < 0.0 else 1.0
+        zmap = lambda z, wx, wy: z * k
+    out = {}
+    for mat, ts in pier.get("tris", {}).items():
+        dst = out.setdefault(mat, [])
+        for t in ts:
+            tri = []
+            for i in (0, 3, 6):
+                x, y, z = t[i], t[i + 1], t[i + 2]
+                wx, wy = top[0] + right[0] * x + fwd[0] * y, top[1] + right[1] * x + fwd[1] * y
+                tri.append((wx, wy, top[2] + zmap(z, wx, wy)))
+            dst.append(tuple(tri))
+    return out
+
+
+def pillars(pts, values, lats, pier=None, ground=None):
+    """`GN_PointPillars`: a column at every pier placement -- the road's PIER ASSET when it names one, else a
+    `rka_pillar_w` box. `({material or None: [tri]}, worst overhang)`: the box is filed under None (the caller's deck
+    material), and `worst overhang` is how far the asset reaches past the deck edge (metres, 0 when it does not)."""
+    out, over = {}, 0.0
+    zb, half = pier_extent(pier) if pier is not None else (0.0, 0.0)
+    for top, h, w, fwd, deck_half in pier_placements(pts, values, lats):
+        if pier is None:
+            out.setdefault(None, []).extend(_box(top, w, h))
+            continue
+        for mat, ts in place_pier(pier, top, h, fwd, zb, ground).items():
+            out.setdefault(mat, []).extend(ts)
+        over = max(over, half - deck_half)
+    return out, over
 
 
 def _add(objs, name, mat, tris):
@@ -327,7 +396,11 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 _layer(objs, surf, style, med_slot if slot == "median" else slot, kind, oa, z, za, wa, ta,
                        pts, values, lats)
             if any(float(v.get("rka_pillar_param", 0.0)) > 0.0 for v in values):
-                _add(objs, surf, style.material("deck"), pillars(pts, values, lats))
+                cols, over = pillars(pts, values, lats, style.pier(), ground)
+                for mat, tris in cols.items():
+                    _add(objs, surf, style.material("deck") if mat is None else mat, tris)
+                if over > 0.0 and report is not None:
+                    report.setdefault("pier_overhang", []).append((name, style.pier()["name"], round(over, 2)))
             edge_names = []
             for sfx, epts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
                 edge_names.append("%s__edges_%s" % (name, sfx))
@@ -403,7 +476,28 @@ def self_test():
     assert abs(up - 120.0) < 1e-6 and abs(down - 120.0) < 1e-6, (up, down)
     assert min(p[2] for t in deck for p in t) == 4.0 and max(p[2] for t in deck for p in t) == 5.0
     print("OK: an extruded layer is a CLOSED prism (top 120 m2 up, bottom 120 m2 down)")
-    return 2
+    # A pier: the cap rigid, the shaft's foot exactly `height` below the soffit, turned onto the road's heading.
+    cap_z = -1.0
+    pier = {"stretch_z": cap_z, "tris": {"M_Concrete": [[-3.0, -0.5, 0.0, 3.0, -0.5, 0.0, 3.0, 0.5, cap_z],
+                                                          [-0.4, 0.0, cap_z, 0.4, 0.0, cap_z, 0.0, 0.3, -10.0]]}}
+    fwd = _norm((1.0, 1.0, 0.0))
+    placed = place_pier(pier, (100.0, 50.0, 20.0), 25.0, fwd)["M_Concrete"]
+    zs = sorted(p[2] for t in placed for p in t)
+    assert abs(zs[0] - (20.0 - 25.0)) < 1e-9 and abs(zs[-1] - 20.0) < 1e-9, zs
+    assert sum(1 for z in zs if abs(z - (20.0 + cap_z)) < 1e-9) == 3, "the cap must not stretch"
+    cap = placed[0]
+    across = _norm(_sub(cap[1], cap[0]))
+    assert abs(across[0] * fwd[0] + across[1] * fwd[1]) < 1e-9 and abs(math.dist(cap[0], cap[1]) - 6.0) < 1e-9
+    # Over ground falling across the road (x), the shaft vertex at local x = +0.4 reaches the ground under ITSELF.
+    slope = lambda x, y: -5.0 - 0.5 * x
+    sloped = place_pier(pier, (0.0, 0.0, 20.0), 25.0, (0.0, 1.0, 0.0), ground=slope)["M_Concrete"]
+    feet = [p for t in sloped for p in t if p[2] < 20.0 + cap_z - 1e-6]
+    assert feet and all(abs(p[2] - slope(p[0], p[1])) < 1e-9 for p in feet), feet
+    print("OK: with a ground sampler each shaft vertex stretches to the ground under itself")
+    short = place_pier(pier, (0.0, 0.0, 5.0), 0.8, (0.0, 1.0, 0.0))["M_Concrete"]
+    assert abs(min(p[2] for t in short for p in t) - 4.2) < 1e-9, "a short pier squashes whole, foot on the ground"
+    print("OK: a pier asset keeps its cap, stretches its shaft to the ground and turns onto the road")
+    return 3
 
 
 if __name__ == "__main__":

@@ -2560,11 +2560,10 @@ instead of pointing at the waypoint as the crow flies.
   body's place on it (which leads a body that is off the road ONTO it first), and straight at the
   waypoint within `DIRECT_METERS` 40 m, past the route's end, or with no route. A race still points at
   the next checkpoint directly. `GpsArrow.followRoads` (`@Visible`, on) is the control knob.
-- **Drawing is one owner, `ui.RoadOverlay`**, shared by `MinimapController` (clipped to its disc in Java)
-  and `WorldMapManager`: each lane a polyline as wide as the lane (never under 1.5 px), Douglas-Peucker
-  simplified at 0.5 m and culled by bounds, handed over in ONE bridge call (the `PackedVector2Array`
-  `Collection` constructor); the route on top in the player's colour, then a thin line from where it
-  leaves the road to the waypoint. The full map now zooms with the wheel (60 m .. 6 km centre-to-edge).
+- **Drawing is one owner, `ui.RoadOverlay`**, shared by `MinimapController` and `WorldMapManager`. The
+  roads are the BAKED picture (4.7b, below) drawn as one textured polygon; the route is drawn on top in the
+  player's colour, simplified at 0.5 m (`Route.drawXZ`, cached), then a thin line from where it leaves the
+  road to the waypoint.
 
 Gates: **`RoadGraphTest`** (6, on the real sidecars — a route across DebugRoads' junction into the other
 zone's lanes, ending on the nearest lane; 500 random island pairs, every route legal and every
@@ -2576,6 +2575,63 @@ arrow's target on the route 30 m ahead; off the road it points at the road (57 d
 bearing); straight at the waypoint within 40 m; right-click clears. `-- --control` (`follow_roads` off)
 fails exactly 2. Not covered: the co-op half (a teammate's waypoint is drawn but routed only for the
 local player, by design — each peer routes for itself).
+
+### The road map is BAKED — nothing about the roads is derived per frame (PLAN.md 4.7b, 2026-09-17)
+
+The user asked for the GTA model: a pre-rendered map, a pre-built path graph, and only the route drawn live.
+Before this the minimap redrew all 218 island lane polylines every frame (each a list of `Vector2`s and a
+bridge call), and every snap measured every lane.
+- **`tools/godot/bake_road_map.gd`** (`-- --world=debugworld|island`, `-- --check` writes nothing and exits 1
+  on a stale bake) writes `src/main/resources/com/openworld/world/roadmap/<Scene>.roadmap.bin` and `.res`.
+  Re-run it after a road build, a zone move or a `WorldBounds` change.
+- **The picture (`world.RoadRaster`, engine-free)** covers the map square to the `WorldBounds` wall (without
+  a wall, the roads plus 100 m). It is a power-of-two `FORMAT_LA8` image, alpha = road, finest 0.5 m/px and
+  at most 4096 px: the island is 4096 px at 1.05 m/px, DebugWorld 2048 px at 0.42 m/px.
+  - It paints ROADS, not lanes: each lane is swept at its width and the result is CLOSED by `GAP_FILL`
+    2.5 m (grown, then shrunk back with a chamfer distance transform). So the 3 m median of a divided road
+    fills in and the outer edges stay put. Without the closing every arterial read as two parallel lines.
+  - Mips are the MAX of each 2x2 block, so a 20 m road is still at least a pixel on the whole-island view,
+    where an averaged mip chain fades it out.
+  - It is saved as a compressed `Image` resource (`ResourceSaver.FLAG_COMPRESS`): island 574 KB, loads in
+    ~19 ms with the mips as written. A `PortableCompressedTexture2D` also saved, but headless cannot read a
+    texture back to verify it, and a PNG import would regenerate AVERAGED mips.
+- **The graph file (`world.RoadMapBake`)** holds the lanes already in world space with their AUTHORED ids.
+  `RoadGraph.finish` resolves successors on load by the live rule, so a bake cannot carry a different rule.
+  Island 1.0 MB, loads in 12 ms (live: 393 ms parse and index + 87 ms paint).
+- **The lookup (`world.RoadIndex`)**: a 32 m cell grid over the whole square, sea included. For each cell,
+  with centre c and half-diagonal h: `U = min d(c, lane) + h`, and the cell lists every lane with
+  `d(c) <= U + h + CANDIDATE_SLACK`.
+  - `RoadGraph.snaps` over the cell list is exactly a full scan for a plan snap. For a 3D snap it is exact
+    whenever the nearest found is `<= U`; otherwise it scans, which only happens for a body far above every
+    road.
+  - A map click 600 m offshore is one array read plus a few lanes; the island's largest cell holds fewer
+    than half the network.
+- **A stale bake is never drawn.** The bake's signature covers every sidecar's path, placement frame and md5,
+  plus the square. On a mismatch `RoadMap` builds live with the same code, prints the reason once, and
+  `RoadMap.source()` reads `"live"`. The GPS probe asserts `"bake"`.
+- **The full map is the GTA pause map.** It opens FITTED to the whole world (the square), the wheel zooms
+  about the cursor, a left drag (past `dragThresholdPx`) pans, a left CLICK (press and release without a
+  drag) sets the waypoint, and a right click clears it.
+  - Blips are limited to `blipRangeMeters` (400) around the player.
+  - The zone load rings are off on both maps (`showZoneRings`): with 14 island traffic zones of 1 km they
+    covered the map.
+  - Probe readouts: `world_to_screen_now` / `screen_to_world_now` / `road_map_drawn_now` on the map;
+    `road_map_source_now` / `road_coverage_now` on the minimap.
+- Gates: **`RoadMapBakeTest`** (3):
+  - the index agrees with a full scan at 4000 random island points, plan and 3D;
+  - every lane sample is on a fully painted pixel, nothing is painted 60 m from a road, the chuo_dori median
+    is painted, and 1.5 px past its outer edge is not;
+  - a bake read back routes exactly like the live graph on 150 random pairs.
+
+  **`probe_gps_route.gd`**, now 18/18 on DebugWorld and 17/17 on the island. New: the source is the bake,
+  the picture is road under the route's ends and empty off the road, the map opens fitted with both wall
+  corners on screen, the wheel zoom moves the point under the cursor 0.00 m, and a drag pans without
+  dropping a waypoint. `-- --control` still fails exactly 2.
+
+  `tools/godot/shot_road_map.gd` (needs a display) saves the minimap, the fitted map and a zoomed map.
+- **Limit:** a junction pad is not in the lane data, so a pad's interior gap wider than 5 m can show as a
+  small hole (one on DebugRoads' east junction). The fix is painting pads from the record, not a bigger
+  `GAP_FILL`, which would start merging a ramp into its mainline.
 
 ## MovementController flags (Player vs AICharacter)
 
@@ -5698,6 +5754,52 @@ DebugRoads end to end **28 s**, of which the mesh write is **0.4 s** — the res
   the click's screen fraction is mapped back to the segment perspective-correctly (`world_param`): the insert point
   had been up to 0.585 m from the cursor on a close view. Gate `test_roadkit_tool.gd` "close camera" (controls: the
   old skip → no pick; a linear lerp → 0.585 m).
+
+**A PIER IS A MODELLED ASSET: RIGID CAP, STRETCHED SHAFT (PLAN.md 3.5, 2026-09-17, user decision: a modelled
+asset slot, not a procedural enum).** A road names `RoadData.pillar_asset` (blank = the plain `rka_pillar_w` box,
+byte-identical to before), and `point_mesh.pillars` stands that mesh at every placement the solve already makes
+(`pier_placements`: the deck-centre curve resampled every `rka_sp_pillar`, kept where `rka_pillar_param`).
+- **The asset** is a `RKA_PIER_<variant>` MESH in `road_kit.blend`'s `ROAD_KIT` collection: Z-up, origin at the TOP
+  centre (the soffit), +Y along the road, +X across, at its REAL size (never scaled to the deck, like a profile).
+  Its `rka_stretch_z` custom property splits it: every vertex above is rigid (cap, crossbeam), every vertex below
+  stretches linearly so the lowest point lands exactly `rka_pillar_h` under the soffit, i.e. on the ground. A pier
+  shorter than its cap + `PIER_MIN_SHAFT` (0.3 m) is squashed whole instead. **Each shaft vertex stretches to the
+  ground under ITSELF** (the build's ground grid, `place_pier(ground=)`), not under the centreline: stretched to the
+  centreline's ground, the portal's side columns (5.5 m off the road's line) stopped 5.09 m over the sloping seabed
+  at hama_dori (`probe_road_ground.gd -- World.tscn`, 3 columns); now 0. Any number of materials, each face its
+  own. `export_road_kit_data.py` writes each as `piers[name] = {stretch_z, tris: {material: [9 floats]}}` into
+  `road_kit.json` (rotation/scale applied, location not, so a pier can stand anywhere in the kit file).
+- **Shipped placeholders** (`build_road_kit.py PIERS`; `-- --add-piers` re-makes only these in the existing kit file,
+  so hand edits survive): `round` (r 0.9 m column), `hammerhead` (the Shuto T-pier: 12 m tapered cap on a 2.6 x 2.0 m
+  column, `stretch_z` -1.8), `portal` (a 16 m crossbeam on two round columns, -1.5). Model a real one in the kit
+  file, then run `export_road_kit_data.py`.
+- **Wired:** DebugRoads' `link` and `east` (9 m deck half-width) stand `hammerhead`; the island's two sea crossings
+  `hama_dori` and `kuko_dori` (29 m decks, columns 3-48 m) stand `portal`.
+- A name the kit lacks falls back to the box and is reported (`missing_style` row `(road, "pillar", "asset",
+  name)`); a pier reaching past the deck edge is reported as `pier_overhang` (the build prints both).
+- Gates: `point_kit.py` (resolve + missing), `point_mesh.py` self-test (cap rigid, foot exactly `height` down,
+  turned onto the heading, short pier squashed whole), `check_roadkit_build.py` on `RoadKitStyled` (demo_hwy's
+  hammerhead: a whole number of the pier's triangles and the full 12.4 m; the 16 m portal on a 7 m ramp deck is the
+  only overhang; control: blank demo_hwy's pier -> 2 FAIL). On the rebuilt DebugRoads pieces
+  `probe_road_ground.gd` 201/201 column feet on the terrain, `probe_road_zones.gd` 12/12, `probe_road_launch.gd`
+  0 launches; on the island `probe_road_ground.gd -- World.tscn` 2408/2408 and 0 short columns,
+  `probe_traffic_spawn --world=island` PASS, `check_roads.sh` PASS=40. Rebuilding the island piece also landed
+  3.4b's fix in its lanekit (28 connectors lose a duplicate control point), so the island road map was re-baked. The Blender road build (`point_build`, island base only) does NOT read `pillar_asset`.
+- **Still art, not code:** real pier models, and the named hero bridge (Rainbow Bridge), which is authored
+  content fitted to a road with `pillar_skip` on its stations.
+
+**A road's texture is a material library, resolved by NAME at bake (PLAN.md 3.6c, 2026-09-17).** glTF carries
+the kit's procedural materials only as a flat base colour and the swept mesh has no UVs, so the textured look
+lives in Godot: `assets/world_source/kit/materials/<M_name>.tres` — `M_Asphalt` (`T_Concrete_Asphalt`),
+`M_ConcreteTile` / `M_Concrete` / `M_Barrier` (`T_Concrete`, tinted), with the kit's ORM + normal maps, all
+**world-space triplanar** at the Quaternius tile (3 m x `module_scale` 0.91 = **2.73 m**, measured off the kit's
+own `Street_*` UVs). `WorldBaker.applyMaterialLibrary` (every bake, after conversion) replaces any mesh surface
+whose material is named like a file there; the baked scene REFERENCES the `.tres`, so editing one restyles every
+piece with no rebake, while adding or removing a name needs one — `point_digest.builder_salt` hashes the directory
+for that reason, so the next `DIRTY_ONLY` build rebakes everything. The names keep `resource_name`, so the editor
+draft (`materials_from`) wears them too. Markings (`M_LineW/Y`) and `M_Median` stay flat. Gate:
+`tools/godot/shot_road_surface.gd -- <out> [--piece=] [--flat]` (needs a display; `--flat` is the control).
+Still to do: the `T_Street_Decals` markings and props (PLAN.md 3.6c).
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 

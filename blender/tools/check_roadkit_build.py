@@ -16,6 +16,9 @@ Two questions, each answered by building again into a temp dir with `roadkit_cli
      reported and nothing else is; each named material is on the object it styles; each asset's layer is its
      section swept -- two triangles per section segment per carrier span, in the asset's own material, standing
      as tall as the section; no vertex normal is inverted or further than the smoothing angle from its face.
+     PIER ASSETS (PLAN.md 3.5): demo_hwy stands the hammerhead at every column (a whole number of the pier's
+     triangles, in its own material, the full column height), demo_ramp_b's 16 m portal is reported as reaching
+     past its 7 m deck, and demo_spur's missing pier name is reported.
 """
 import json
 import os
@@ -65,8 +68,12 @@ def styled(tmp):
     record = os.path.join(PIECES, "RoadKitStyled.roads.json")
     d = cli("gltf", record, "", tmp, "RoadKitStyled")
     check(d.get("written") and len(d["pieces"]) == 1, "RoadKitStyled builds")
-    check([tuple(m) for m in d["missing_style"]] == [("demo_cross", "footway", "material", "M_DoesNotExist")],
-          "exactly the missing material name is reported", str(d["missing_style"]))
+    check([tuple(m) for m in d["missing_style"]] == [("demo_cross", "footway", "material", "M_DoesNotExist"),
+                                                     ("demo_spur", "pillar", "asset", "RKA_PIER_DoesNotExist")],
+          "exactly the missing material and pier names are reported", str(d["missing_style"]))
+    over = [tuple(m) for m in d.get("pier_overhang", [])]
+    check([m[:2] for m in over] == [("demo_ramp_b", "RKA_PIER_portal")] and abs(over[0][2] - 4.5) < 0.05,
+          "only the portal on the 7 m ramp deck is reported as overhanging (4.5 m)", str(over))
     piece = d["pieces"][0]
     check(piece["inverted_normals"] == 0 and piece["worst_normal_deg"] <= pgl.SMOOTH_ANGLE_DEG + 1e-6,
           "no normal inverted, none past the smoothing angle",
@@ -78,6 +85,14 @@ def styled(tmp):
                      ("demo_ramp__surface", "M_Dirt"), ("demo_cross_0__edges_left_0", "M_ConcreteTile")):
         check(mat in objs.get(obj, {}), "%s wears %s" % (obj, mat), str(sorted(objs.get(obj, {}))))
     kit = pk.load()
+    pier = kit.pier("RKA_PIER_hammerhead")
+    per = sum(len(ts) for ts in pier["tris"].values())
+    cols = objs.get("demo_hwy__surface", {}).get("M_Concrete", [])
+    zs = [p[1] for t in cols for p in t]                                     # glTF is Y-up
+    check(cols and len(cols) % per == 0 and len(cols) // per >= 10,
+          "demo_hwy__surface stands the hammerhead pier (%d tris, %d per pier)" % (len(cols), per))
+    check(zs and max(zs) - min(zs) >= 12.4 - 1e-3, "the hammerhead reaches from the soffit to the ground",
+          "%.2f m" % ((max(zs) - min(zs)) if zs else 0.0))
     for obj, asset in (("demo_main_0__edges_left_0", "RKA_PROFILE_kerb_granite"),
                        ("demo_hwy__edges_left_0", "RKA_PROFILE_wall_jersey"),
                        ("demo_ramp__edges_left_0", "RKA_PROFILE_wall_parapet"),

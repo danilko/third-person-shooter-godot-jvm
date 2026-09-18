@@ -42,6 +42,9 @@ BUILDER_SOURCES = ("point_mesh.py", "point_gltf.py", "point_kit.py", "point_styl
 #: The kit as the build reads it: its materials and profile sections (`road_kit.json`, written from road_kit.blend).
 BUILDER_ASSETS = (os.path.join("..", "..", "..", "assets", "world_source", "kit", "road_kit.json"),)
 
+#: The Godot material library the bake resolves road materials from by name (WorldBaker.MATERIAL_LIBRARY_DIR).
+MATERIAL_LIBRARY = os.path.join("..", "..", "..", "assets", "world_source", "kit", "materials")
+
 
 def _canon(v):
     """JSON-ready, floats rounded to 0.1 mm, so the same solve always hashes the same."""
@@ -70,6 +73,15 @@ def builder_salt():
             h.update(rel.encode())
             with open(path, "rb") as fh:
                 h.update(fh.read())
+    # The bake's material library (WorldBaker.MATERIAL_LIBRARY_DIR, PLAN.md 3.6c): which names it covers
+    # decides what a baked piece references, so adding or removing a file must rebake.
+    lib = os.path.normpath(os.path.join(HERE, MATERIAL_LIBRARY))
+    if os.path.isdir(lib):
+        for name in sorted(os.listdir(lib)):
+            if name.endswith(".tres"):
+                h.update(name.encode())
+                with open(os.path.join(lib, name), "rb") as fh:
+                    h.update(fh.read())
     return h.hexdigest()
 
 

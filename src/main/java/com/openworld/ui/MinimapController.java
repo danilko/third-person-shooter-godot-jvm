@@ -12,6 +12,7 @@ import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.Camera3D;
+import godot.api.CanvasItem;
 import godot.api.Control;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -49,18 +50,29 @@ public class MinimapController extends Control {
     /** Zone/region outline colour. */
     @Export public Color regionColor = new Color(0.4f, 0.8f, 1f, 0.5f);
 
-    /** Road colour, and the thinnest a lane is drawn (px) however far out the view is. */
+    /** Road colour (the baked road picture is tinted with it). */
     @Export public Color roadColor = RoadOverlay.ROAD;
-    @Export public float roadMinWidthPx = 1.5f;
     /** GPS route line width (px). */
     @Export public float routeWidthPx = 3f;
+    /** Draw each zone's load ring (a streaming debug aid; GTA's radar has none). */
+    @Export public boolean showZoneRings = false;
 
     private Character player;
-    private int lanesDrawn = 0;
+    private boolean mapDrawn = false;
 
-    /** Lanes drawn on the last frame (probe readout). */
+    /** Whether the baked road picture was drawn on the last frame (probe readout). */
     @Register
-    public int roadLanesDrawnNow() { return lanesDrawn; }
+    public boolean roadMapDrawnNow() { return mapDrawn; }
+
+    /** "bake" or "live" — where the road map came from (probe readout, see RoadMap.source). */
+    @Register
+    public String roadMapSourceNow() { return com.openworld.world.RoadMap.source(); }
+
+    /** Road coverage 0..1 of the road picture at a world point (probe readout). */
+    @Register
+    public double roadCoverageNow(Vector3 world) {
+        return com.openworld.world.RoadMap.coverageAt(world.getX(), world.getZ());
+    }
 
     /** Bind to the local player (called by HUDManager.wirePlayer). */
     public void wirePlayer(Player p) { player = p; }
@@ -69,6 +81,8 @@ public class MinimapController extends Control {
     @Override
     public void _ready() {
         setMouseFilter(Control.MouseFilter.IGNORE);
+        // The road picture carries max-filtered mips; sample them when zoomed out.
+        setTextureFilter(CanvasItem.TextureFilter.LINEAR_WITH_MIPMAPS);
     }
 
     @Register
@@ -92,11 +106,9 @@ public class MinimapController extends Control {
         if (player == null || !godot.global.GD.isInstanceValid(player)) return;
         Vector3 origin = player.getGlobalPosition();
 
-        // Roads (4.7) — the whole network from the lanekit sidecars, clipped to the disc — and the
-        // local player's GPS route over them.
-        com.openworld.world.RoadGraph roads = com.openworld.world.RoadMap.graph();
-        lanesDrawn = RoadOverlay.drawRoads(this, roads, origin, center, scale, rangeMeters, rangeMeters,
-                radiusPx, roadMinWidthPx, roadColor);
+        // Roads (4.7b) — the baked picture of the whole map, one textured disc — and the local
+        // player's GPS route over them.
+        mapDrawn = RoadOverlay.drawMap(this, origin, center, scale, 0f, 0f, radiusPx, roadColor);
         if (player instanceof Player pl && pl.characterInfo != null && pl.getWaypoint() != null) {
             com.openworld.world.RoadGraph.Route route = com.openworld.world.RoadMap.routeFor(
                     pl.characterInfo.characterId, origin, pl.getWaypoint());
@@ -105,7 +117,7 @@ public class MinimapController extends Control {
         }
 
         // Region outlines (zone load rings) within view.
-        ZoneManager wzm = ZoneManager.get();
+        ZoneManager wzm = showZoneRings ? ZoneManager.get() : null;
         if (wzm != null) {
             for (ZoneMarker m : wzm.getMarkers()) {
                 if (m == null || !godot.global.GD.isInstanceValid(m) || m.zone == null) continue;

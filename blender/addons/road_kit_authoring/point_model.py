@@ -201,6 +201,9 @@ ROAD_FIELDS = (
     ("kerb_asset",    's', ""),
     ("footway_asset", 's', ""),
     ("barrier_asset", 's', ""),
+    #: A PIER ASSET (`RKA_PIER_*` in the kit, PLAN.md 3.5) stood wherever the solve puts a column, in place of the
+    #: plain box. Blank = the box. Its cap is rigid and its shaft stretches to the ground (`point_mesh.pillars`).
+    ("pillar_asset",  's', ""),
     #: Paint the lane markings at all. Off for a road whose surface is a placeholder, and off for
     #: every LOD-low bake -- stripes at 300 m are a triangle budget with nothing to show for it.
     ("markings", 'b', True),

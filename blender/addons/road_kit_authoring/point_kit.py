@@ -8,7 +8,9 @@ from `road_kit.blend` by `tools/export_road_kit_data.py`, which `build_road_kit.
     (`DEFAULT_MATERIAL`, `kit_common.MATS`' names) and a name the kit does not have FALLS BACK and is reported
     (`Style.missing`), exactly as `point_style.resolve` does;
   * a profile asset is the section's own points (`Kit.profile`), swept at its authored size by `point_mesh`, and
-    its material is the one the asset carries.
+    its material is the one the asset carries;
+  * a PIER asset (`RoadData.pillar_asset`, `Kit.pier`) is a mesh with a rigid cap and a shaft that stretches to the
+    ground (PLAN.md 3.5); a name the kit lacks falls back to the box and is reported as `("pillar", "asset", name)`.
 
 One declaration of the slots: `point_style.SLOTS`, imported, so the two resolvers cannot disagree about which
 field is which slot.
@@ -37,11 +39,12 @@ SLOT_DEFAULT = {slot: key for slot, _m, _a, key in pst.SLOTS}
 class Kit(object):
     """The kit's materials (glTF material entries by name) and profile sections (by object name)."""
 
-    __slots__ = ("materials", "profiles", "blend_sha1", "path")
+    __slots__ = ("materials", "profiles", "piers", "blend_sha1", "path")
 
-    def __init__(self, materials=None, profiles=None, blend_sha1="", path=""):
+    def __init__(self, materials=None, profiles=None, blend_sha1="", path="", piers=None):
         self.materials = dict(materials or {})
         self.profiles = dict(profiles or {})
+        self.piers = dict(piers or {})
         self.blend_sha1 = blend_sha1
         self.path = path
 
@@ -58,6 +61,9 @@ class Kit(object):
     def profile(self, name):
         return self.profiles.get(name)
 
+    def pier(self, name):
+        return self.piers.get(name)
+
     def stale(self):
         """True when `road_kit.blend` is not the file the JSON was read from -- the kit was edited and
         `export_road_kit_data.py` (or `build_road_kit.py`) has not been run since."""
@@ -73,16 +79,21 @@ def load(path=KIT_JSON):
         return Kit(path=path or "")
     with open(path) as fh:
         d = json.load(fh)
-    return Kit(d.get("materials"), d.get("profiles"), d.get("blend_sha1", ""), path)
+    return Kit(d.get("materials"), d.get("profiles"), d.get("blend_sha1", ""), path, d.get("piers"))
 
 
 class Style(object):
     """One road's resolved look: a material NAME per slot, a profile per asset slot, and what was missing."""
 
-    __slots__ = ("road", "_mats", "_assets", "_missing")
+    __slots__ = ("road", "_mats", "_assets", "_missing", "_pier")
 
-    def __init__(self, road, mats, assets, missing):
+    def __init__(self, road, mats, assets, missing, pier=None):
         self.road, self._mats, self._assets, self._missing = road, mats, assets, missing
+        self._pier = pier
+
+    def pier(self):
+        """`{"name", "stretch_z", "tris"}` or None -- None stands the plain box."""
+        return self._pier
 
     def material(self, slot):
         return self._mats.get(slot)
@@ -113,7 +124,15 @@ def resolve(road, kit):
                 missing.append((slot, "asset", aname))
             else:
                 assets[slot] = dict(prof, name=aname)
-    return Style(road, mats, assets, missing)
+    pier = None
+    pname = (getattr(road, "pillar_asset", "") or "").strip()
+    if pname:
+        entry = kit.pier(pname)
+        if entry is None:
+            missing.append(("pillar", "asset", pname))
+        else:
+            pier = dict(entry, name=pname)
+    return Style(road, mats, assets, missing, pier)
 
 
 def self_test():
@@ -122,17 +141,26 @@ def self_test():
     kit = Kit({"M_Asphalt": {}, "M_Brick": {}}, {"RKA_PROFILE_kerb_std": {"material": "M_Concrete", "splines": []}})
     r = Road()
     r.surface_mat, r.kerb_asset, r.footway_mat, r.barrier_asset = "M_Brick", "RKA_PROFILE_kerb_std", "M_Nope", "X"
+    r.pillar_asset = ""
     s = resolve(r, kit)
     assert s.material("surface") == "M_Brick" and s.material("footway") == "M_ConcreteTile", s._mats
     assert s.material("median") == "M_Median" and s.asset("kerb")["name"] == "RKA_PROFILE_kerb_std"
     assert sorted(s.missing()) == [("barrier", "asset", "X"), ("footway", "material", "M_Nope")], s.missing()
-    print("OK: a named slot resolves, a blank one takes its default, a missing one falls back and is reported")
+    assert s.pier() is None
+    kit.piers["RKA_PIER_t"] = {"stretch_z": -1.0, "tris": {}}
+    r.pillar_asset = "RKA_PIER_t"
+    assert resolve(r, kit).pier()["name"] == "RKA_PIER_t"
+    r.pillar_asset = "RKA_PIER_nope"
+    assert ("pillar", "asset", "RKA_PIER_nope") in resolve(r, kit).missing() and resolve(r, kit).pier() is None
+    print("OK: a named slot resolves, a blank one takes its default, a missing one falls back and is reported "
+          "(piers too)")
     real = load()
     assert real.materials, "no kit JSON at %s -- run tools/export_road_kit_data.py" % KIT_JSON
     assert all(v in real.materials for v in DEFAULT_MATERIAL.values()), "the kit lacks a default material"
     assert not real.stale(), "road_kit.json is stale: road_kit.blend changed -- run tools/export_road_kit_data.py"
-    print("OK: road_kit.json carries every default material and matches road_kit.blend (%d materials, %d profiles)"
-          % (len(real.materials), len(real.profiles)))
+    assert real.piers, "road_kit.json has no RKA_PIER_* -- run build_road_kit.py --add-piers"
+    print("OK: road_kit.json carries every default material and matches road_kit.blend (%d materials, %d profiles, "
+          "%d piers)" % (len(real.materials), len(real.profiles), len(real.piers)))
     return 2
 
 
