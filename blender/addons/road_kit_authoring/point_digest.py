@@ -126,7 +126,9 @@ def piece_digests(net, zones, ground=None):
         z = part.gore_zone(g.ramp_uid)
         if z in per:
             per[z]["gores"].append({"ramp": g.ramp_uid, "tris": g.tris, "edges": ped.gore_edge_runs(g)})
-    turns = {l["id"]: l.get("turn", "") for l in doc.get("lanes", ())}
+    # a successor's turn picks the arrow, and a straight connector's END places the far-side signal (PLAN.md 3.6c)
+    turns = {l["id"]: [l.get("turn", ""), [round(float(x), 3) for x in (l.get("points") or [[0, 0, 0]])[-1]]]
+             for l in doc.get("lanes", ())}
     out = {}
     for z, content in per.items():
         sub = pz.split_doc(doc, z) if zones else doc

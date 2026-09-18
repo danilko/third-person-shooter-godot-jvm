@@ -1564,7 +1564,9 @@ public class ZoneManager extends Node {
 	 * The lanes an ambient car for {@code routeName} may spawn on, best first. Three lookup strategies,
 	 * in order: (1) exact node-name match; (2) <b>zone-id equality</b> — every {@link PathLaneRoute}
 	 * whose {@link PathLaneRoute#zoneId} equals {@code routeName} exactly (the property-based zone tag
-	 * {@code lib/lane_kit.py}'s combiner stamps on every lane); (3) otherwise {@code routeName} is a
+	 * {@code lib/lane_kit.py}'s combiner stamps on every lane), or — when {@code routeName} ends in
+	 * {@code _} — STARTS with it: a network cut into a grid of zones ({@code island_<gx>_<gz>},
+	 * PLAN.md 3.10) is one route to traffic, {@code "island_"}, however many pieces it streams as; (3) otherwise {@code routeName} is a
 	 * <b>prefix</b> (e.g. {@code "art_"}, {@code "Lane_"} for the removed road-generator's lanes). Strategies (2)/(3)
 	 * collect the plain lanes (never a turn connector — a car set down mid-junction lands inside the
 	 * box) whose entry lies within {@code maxDist} of the zone, filtered by {@link #spawnableByReach}.
@@ -1573,6 +1575,11 @@ public class ZoneManager extends Node {
 	 * <p>All lookups go through the {@link #routes} registry (never a scene-tree walk). The zone-id
 	 * pass is a full scan of {@link #routes} — fine at authoring-time lane counts.
 	 */
+	static boolean zoneMatches(String routeName, String zoneId) {
+		if (zoneId == null) return false;
+		return routeName.endsWith("_") ? zoneId.startsWith(routeName) : routeName.equals(zoneId);
+	}
+
 	private List<Lane> spawnLanes(String routeName, Vector3 center, float maxDist) {
 		if (routeName == null || routeName.isEmpty()) return List.of();
 		Lane exact = routeByName(routeName);
@@ -1580,7 +1587,7 @@ public class ZoneManager extends Node {
 
 		List<Lane> zoneMatches = new ArrayList<>();
 		for (Lane r : routes.values()) {
-			if (r instanceof PathLaneRoute p && routeName.equals(p.zoneId)
+			if (r instanceof PathLaneRoute p && zoneMatches(routeName, p.zoneId)
 					&& isSpawnCandidate(r, center, maxDist)) {
 				zoneMatches.add(r);
 			}

@@ -28,6 +28,11 @@ public class FRG1Projectile extends RigidBody3D implements Detonatable, Cosmetic
     @Export public float explosionMaxDamage = 80f;
     @Export public float explosionPushForce = 15f;
 
+    /** The blast effect this explosive draws (a scene under assets/vfx/explosion/effects/; null = the manager's). */
+    @Export public godot.api.PackedScene explosionVfx;
+    /** Extra size multiplier on the blast effect; at 1 its shockwave ends exactly at the damage radius (ExplosionManager.playBlast). */
+    @Export public float explosionVfxScale = 1.0f;
+
     // Injected by ThrowableItem at throw-time
     public String    attackerName      = "";
     public String    attackerFaction   = "";
@@ -80,7 +85,7 @@ public class FRG1Projectile extends RigidBody3D implements Detonatable, Cosmetic
         if (m instanceof ExplosionManager mgr) {
             mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
                                  explosionPushForce, attackerName, attackerFaction,
-                                 weaponDisplayName, weaponIcon, null);
+                                 weaponDisplayName, weaponIcon, null, explosionVfx, explosionVfxScale);
         }
         broadcastDetonation(getGlobalPosition());
         exploded = true;
@@ -122,7 +127,7 @@ public class FRG1Projectile extends RigidBody3D implements Detonatable, Cosmetic
     private void explodeVisual(Vector3 point) {
         exploded = true;
         Node m = getTree().getFirstNodeInGroup("explosion_manager");
-        if (m instanceof ExplosionManager mgr) mgr.spawnExplosion(point);
+        if (m instanceof ExplosionManager mgr) mgr.playBlast(point, explosionVfx, explosionRadius, explosionVfxScale);
         queueFree();
     }
 

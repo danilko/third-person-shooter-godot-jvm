@@ -69,6 +69,11 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     /** Push force applied to bodies in the blast when the world pickup is shot. */
     @Export public float explosionPushForce = 15f;
 
+    /** The blast effect this explosive draws (a scene under assets/vfx/explosion/effects/; null = the manager's). */
+    @Export public godot.api.PackedScene explosionVfx;
+    /** Extra size multiplier on the blast effect; at 1 its shockwave ends exactly at the damage radius (ExplosionManager.playBlast). */
+    @Export public float explosionVfxScale = 1.0f;
+
     // ── Pickup override — stack merging ───────────────────────────────────────
 
     /**
@@ -232,7 +237,8 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
                                  explosionRadius    * scale,
                                  explosionMaxDamage * scale,
                                  explosionPushForce * scale,
-                                 "", "", getDisplayName(), weaponIcon, null);
+                                 "", "", getDisplayName(), weaponIcon, null,
+                                 explosionVfx, explosionVfxScale);   // sized from the (stack-scaled) radius
         }
         queueFree();
     }

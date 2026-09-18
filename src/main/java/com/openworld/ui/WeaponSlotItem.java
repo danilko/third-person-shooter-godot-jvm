@@ -10,6 +10,7 @@ import godot.api.Node;
 import godot.api.TextureRect;
 import godot.core.Color;
 import godot.core.NodePath;
+import godot.core.StringName;
 
 /**
  * One weapon slot row inside WeaponSlotsUI.
@@ -26,9 +27,7 @@ import godot.core.NodePath;
 @Script(className = "WeaponSlotItem")
 public class WeaponSlotItem extends HBoxContainer {
 
-    private static final Color COLOR_ACTIVE   = new Color(1.0f, 1.0f, 1.0f, 1.0f);
-    private static final Color COLOR_INACTIVE = new Color(0.6f, 0.6f, 0.6f, 0.8f);
-    private static final Color COLOR_EMPTY    = new Color(0.4f, 0.4f, 0.4f, 0.5f);
+    private boolean active;
 
     @Export public NodePath keyLabelPath  = new NodePath("KeyLabel");
     @Export public NodePath iconPath      = new NodePath("Icon");
@@ -39,6 +38,20 @@ public class WeaponSlotItem extends HBoxContainer {
     @Override
     public void _ready() {
         // Node paths are resolved lazily in update(); nothing to initialize here.
+    }
+
+    /** The ▶ selection marker before the active row. */
+    @Register
+    @Override
+    public void _draw() {
+        if (!active) return;
+        float cy = 12f, t = 6f;          // on the icon's line (the top 24 px of the row; the name sits under it)
+        godot.core.PackedVector2Array tri = new godot.core.PackedVector2Array();
+        // in the panel's 22 px left gutter (WeaponSlotsUI)
+        tri.append(new godot.core.Vector2(-15f, cy - t));
+        tri.append(new godot.core.Vector2(-15f + t * 1.6f, cy));
+        tri.append(new godot.core.Vector2(-15f, cy + t));
+        drawColoredPolygon(tri, HudPalette.TEXT);
     }
 
     /**
@@ -55,8 +68,9 @@ public class WeaponSlotItem extends HBoxContainer {
 
         Node in = getNodeOrNull(iconPath);
         if (in instanceof TextureRect tr) {
-            tr.setTexture(item != null ? item.weaponIcon : null);
-            tr.setVisible(item != null && item.weaponIcon != null);
+            // cropped to the silhouette and drawn in a fixed-height box: every weapon at one height (IconFit).
+            // The box stays even with no icon (the fist), so every row is the same height.
+            tr.setTexture(item != null ? IconFit.cropped(item.weaponIcon) : null);
         }
 
         Node nn = getNodeOrNull(nameLabelPath);
@@ -67,14 +81,20 @@ public class WeaponSlotItem extends HBoxContainer {
             if (item == null) {
                 l.setText("--");
             } else {
-                String ammo = item.getMagazine() + "/" + item.getReserve();
-                l.setText(item.weaponIcon == null ? item.getDisplayName() + "  " + ammo : ammo);
+                String ammo = WeaponHUD.showsAmmo(item) ? item.getMagazine() + "/" + item.getReserve() : "";
+                l.setText(ammo);                // the name is already under the icon (NameLabel)
             }
         }
 
-        Color color = (item == null) ? COLOR_EMPTY
-                    : isActive       ? COLOR_ACTIVE
-                    :                  COLOR_INACTIVE;
-        setModulate(color);
+        setVisible(item != null);          // only owned slots are listed
+        // selection by SHAPE and brightness (HudPalette): a white ▶ before the active row, which is full white;
+        // the other rows are 70% white. Every row keeps white text with the theme's thin outline.
+        active = isActive && item != null;
+        for (NodePath path : new NodePath[] {keyLabelPath, nameLabelPath, ammoLabelPath}) {
+            if (getNodeOrNull(path) instanceof Label l) l.removeThemeColorOverride(new StringName("font_color"));
+        }
+        if (getNodeOrNull(iconPath) instanceof TextureRect tr) tr.setSelfModulate(HudPalette.TEXT);
+        setModulate(active ? HudPalette.TEXT : HudPalette.TEXT_DIM);
+        queueRedraw();
     }
 }

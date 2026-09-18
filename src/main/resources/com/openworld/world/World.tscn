@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dqwuawoi168xj" path="res://src/main/java/com/openworld/world/WorldBounds.java" id="2_bounds"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/openworld/character/Player.tscn" id="2_lj72b"]
-[ext_resource type="Shader" uid="uid://laorin813p4s" path="res://src/main/resources/com/openworld/world/water.gdshader" id="2_water"]
+[ext_resource type="Shader" uid="uid://dw5oumf7uirea" path="res://assets/vfx/water/water_toon.gdshader" id="2_water"]
 [ext_resource type="Script" uid="uid://daa4dg13rxg3x" path="res://src/main/java/com/openworld/item/AmmoRefill.java" id="3_m0gj3"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
 [ext_resource type="Curve" uid="uid://cofnaffaigrhj" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="7_71gat"]
@@ -35,16 +35,6 @@
 [ext_resource type="Script" uid="uid://oxf3ybti5sgy" path="res://src/main/java/com/openworld/world/Zone.java" id="3_zone"]
 
 [ext_resource type="Script" uid="uid://4hm6pt3jr6fb" path="res://src/main/java/com/openworld/world/VehicleSpawnConfig.java" id="gen_1"]
-
-[sub_resource type="Resource" id="Zone_island"]
-script = ExtResource("3_zone")
-zone_id = "island"
-size = Vector3(4608, 600, 4608)
-load_radius = 6000.0
-unload_radius = 9000.0
-geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island.tscn"
-geometry_world_placed = true
-geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
 cell_size = 0.5
@@ -178,7 +168,7 @@ metadata/_custom_type_script = "uid://cuac11don07ow"
 shader = ExtResource("sky_4_v8wrf")
 shader_parameter/sky_visible = true
 shader_parameter/color_correction = Vector2(0, 1)
-shader_parameter/ground_color = Color(0.3, 0.3, 0.3, 1)
+shader_parameter/ground_color = Color(0.75, 0.85, 0.95, 1)
 shader_parameter/horizon_offset = 0.0
 shader_parameter/atm_darkness = 0.5
 shader_parameter/atm_sun_intensity = 18.0
@@ -264,11 +254,321 @@ tonemap_white = 6.0
 
 [sub_resource type="CameraAttributesPractical" id="sky_CameraAttributesPractical_d0ed4"]
 
+[sub_resource type="Resource" id="Zone_road_5_0"]
+script = ExtResource("3_zone")
+zone_id = "island_5_0"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_5_0.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_1_1"]
+script = ExtResource("3_zone")
+zone_id = "island_1_1"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_1_1.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_2_1"]
+script = ExtResource("3_zone")
+zone_id = "island_2_1"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_2_1.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_3_1"]
+script = ExtResource("3_zone")
+zone_id = "island_3_1"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_3_1.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_6_1"]
+script = ExtResource("3_zone")
+zone_id = "island_6_1"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_6_1.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_2_2"]
+script = ExtResource("3_zone")
+zone_id = "island_2_2"
+size = Vector3(504, 600, 504)
+load_radius = 750.0
+unload_radius = 1050.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_2_2.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_3_2"]
+script = ExtResource("3_zone")
+zone_id = "island_3_2"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_3_2.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_4_2"]
+script = ExtResource("3_zone")
+zone_id = "island_4_2"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_4_2.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_5_2"]
+script = ExtResource("3_zone")
+zone_id = "island_5_2"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_5_2.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_6_2"]
+script = ExtResource("3_zone")
+zone_id = "island_6_2"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_6_2.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_7_2"]
+script = ExtResource("3_zone")
+zone_id = "island_7_2"
+size = Vector3(504, 600, 504)
+load_radius = 800.0
+unload_radius = 1100.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_7_2.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_2_3"]
+script = ExtResource("3_zone")
+zone_id = "island_2_3"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_2_3.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_3_3"]
+script = ExtResource("3_zone")
+zone_id = "island_3_3"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_3_3.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_4_3"]
+script = ExtResource("3_zone")
+zone_id = "island_4_3"
+size = Vector3(504, 600, 504)
+load_radius = 900.0
+unload_radius = 1200.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_4_3.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_5_3"]
+script = ExtResource("3_zone")
+zone_id = "island_5_3"
+size = Vector3(504, 600, 504)
+load_radius = 1000.0
+unload_radius = 1300.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_5_3.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_7_3"]
+script = ExtResource("3_zone")
+zone_id = "island_7_3"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_7_3.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_0_4"]
+script = ExtResource("3_zone")
+zone_id = "island_0_4"
+size = Vector3(504, 600, 504)
+load_radius = 1450.0
+unload_radius = 1750.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_0_4.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_1_4"]
+script = ExtResource("3_zone")
+zone_id = "island_1_4"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_1_4.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_2_4"]
+script = ExtResource("3_zone")
+zone_id = "island_2_4"
+size = Vector3(504, 600, 504)
+load_radius = 950.0
+unload_radius = 1250.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_2_4.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_3_4"]
+script = ExtResource("3_zone")
+zone_id = "island_3_4"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_3_4.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_4_4"]
+script = ExtResource("3_zone")
+zone_id = "island_4_4"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_4_4.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_5_4"]
+script = ExtResource("3_zone")
+zone_id = "island_5_4"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_5_4.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_6_4"]
+script = ExtResource("3_zone")
+zone_id = "island_6_4"
+size = Vector3(504, 600, 504)
+load_radius = 900.0
+unload_radius = 1200.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_6_4.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_7_4"]
+script = ExtResource("3_zone")
+zone_id = "island_7_4"
+size = Vector3(504, 600, 504)
+load_radius = 800.0
+unload_radius = 1100.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_7_4.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_3_5"]
+script = ExtResource("3_zone")
+zone_id = "island_3_5"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_3_5.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_4_5"]
+script = ExtResource("3_zone")
+zone_id = "island_4_5"
+size = Vector3(504, 600, 504)
+load_radius = 750.0
+unload_radius = 1050.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_4_5.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_5_5"]
+script = ExtResource("3_zone")
+zone_id = "island_5_5"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_5_5.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_3_6"]
+script = ExtResource("3_zone")
+zone_id = "island_3_6"
+size = Vector3(504, 600, 504)
+load_radius = 850.0
+unload_radius = 1150.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_3_6.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_7_6"]
+script = ExtResource("3_zone")
+zone_id = "island_7_6"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_7_6.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_2_7"]
+script = ExtResource("3_zone")
+zone_id = "island_2_7"
+size = Vector3(504, 600, 504)
+load_radius = 1150.0
+unload_radius = 1450.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_2_7.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
+[sub_resource type="Resource" id="Zone_road_7_7"]
+script = ExtResource("3_zone")
+zone_id = "island_7_7"
+size = Vector3(504, 600, 504)
+load_radius = 700.0
+unload_radius = 1000.0
+geometry_path = "res://src/main/resources/com/openworld/world/pieces/Roads_IslandRoads_island_7_7.tscn"
+geometry_world_placed = true
+geometry_world_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+
 [sub_resource type="Resource" id="VehicleSpawn_traffic"]
 script = ExtResource("gen_1")
 count = 3
 cruise_throttle = 0.4
-route_name = "island"
+route_name = "island_"
 
 [sub_resource type="Resource" id="Zone_traffic_00"]
 script = ExtResource("3_zone")
@@ -358,30 +658,6 @@ load_radius = 1000.0
 unload_radius = 1400.0
 vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
 
-[sub_resource type="Resource" id="Zone_traffic_11"]
-script = ExtResource("3_zone")
-zone_id = "island_traffic_11"
-size = Vector3(60.0, 10, 60.0)
-load_radius = 1000.0
-unload_radius = 1400.0
-vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
-
-[sub_resource type="Resource" id="Zone_traffic_12"]
-script = ExtResource("3_zone")
-zone_id = "island_traffic_12"
-size = Vector3(60.0, 10, 60.0)
-load_radius = 1000.0
-unload_radius = 1400.0
-vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
-
-[sub_resource type="Resource" id="Zone_traffic_13"]
-script = ExtResource("3_zone")
-zone_id = "island_traffic_13"
-size = Vector3(60.0, 10, 60.0)
-load_radius = 1000.0
-unload_radius = 1400.0
-vehicle_spawn_configs = Array[ExtResource("gen_1")]([SubResource("VehicleSpawn_traffic")])
-
 [node name="World" type="Node3D" unique_id=822990337]
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=689824235]
@@ -400,6 +676,7 @@ metadata/_edit_lock_ = true
 [node name="WaterVolume" type="Area3D" parent="." unique_id=444181368]
 collision_mask = 2
 script = ExtResource("25_water")
+far_ocean_extent = 100000.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="WaterVolume" unique_id=1413016071]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -100, 0)
@@ -448,10 +725,6 @@ vehicle_config = SubResource("Resource_71gat")
 
 [node name="DebugHarness" type="Node" parent="." unique_id=210000001]
 script = ExtResource("21_dbgh")
-
-[node name="IslandZone" type="Node3D" parent="." unique_id=910011021]
-script = ExtResource("3_zmark")
-zone = SubResource("Zone_island")
 
 [node name="IslandRoads" type="Node3D" parent="." unique_id=910011020]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
@@ -518,6 +791,7 @@ directional_shadow_max_distance = 256.0
 
 [node name="SkyDome" type="Node" parent="Sky3D" unique_id=1303134867]
 script = ExtResource("sky_4")
+ground_color = Color(0.75, 0.85, 0.95, 1)
 sun_azimuth = -3.222709
 sun_altitude = -0.6768709
 moon_azimuth = -1.9416319
@@ -532,6 +806,194 @@ script = ExtResource("sky_3")
 dome_path = NodePath("../SkyDome")
 current_time = 12.09463999999705
 day = 4
+
+[node name="RoadZones" type="Node" parent="." unique_id=910013000]
+
+[node name="Road_5_0" type="Node3D" parent="RoadZones" unique_id=910013001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 0.600, -1764.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_5_0")
+show_debug_volume = false
+
+[node name="Road_1_1" type="Node3D" parent="RoadZones" unique_id=910013002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260.000, 0.600, -1260.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_1_1")
+show_debug_volume = false
+
+[node name="Road_2_1" type="Node3D" parent="RoadZones" unique_id=910013003]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 0.600, -1260.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_2_1")
+show_debug_volume = false
+
+[node name="Road_3_1" type="Node3D" parent="RoadZones" unique_id=910013004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 0.600, -1260.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_3_1")
+show_debug_volume = false
+
+[node name="Road_6_1" type="Node3D" parent="RoadZones" unique_id=910013005]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 0.600, -1260.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_6_1")
+show_debug_volume = false
+
+[node name="Road_2_2" type="Node3D" parent="RoadZones" unique_id=910013006]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 0.600, -756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_2_2")
+show_debug_volume = false
+
+[node name="Road_3_2" type="Node3D" parent="RoadZones" unique_id=910013007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 0.600, -756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_3_2")
+show_debug_volume = false
+
+[node name="Road_4_2" type="Node3D" parent="RoadZones" unique_id=910013008]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 0.600, -756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_4_2")
+show_debug_volume = false
+
+[node name="Road_5_2" type="Node3D" parent="RoadZones" unique_id=910013009]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 0.600, -756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_5_2")
+show_debug_volume = false
+
+[node name="Road_6_2" type="Node3D" parent="RoadZones" unique_id=910013010]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 0.600, -756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_6_2")
+show_debug_volume = false
+
+[node name="Road_7_2" type="Node3D" parent="RoadZones" unique_id=910013011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1764.000, 0.600, -756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_7_2")
+show_debug_volume = false
+
+[node name="Road_2_3" type="Node3D" parent="RoadZones" unique_id=910013012]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 0.600, -252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_2_3")
+show_debug_volume = false
+
+[node name="Road_3_3" type="Node3D" parent="RoadZones" unique_id=910013013]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 0.600, -252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_3_3")
+show_debug_volume = false
+
+[node name="Road_4_3" type="Node3D" parent="RoadZones" unique_id=910013014]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 0.600, -252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_4_3")
+show_debug_volume = false
+
+[node name="Road_5_3" type="Node3D" parent="RoadZones" unique_id=910013015]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 0.600, -252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_5_3")
+show_debug_volume = false
+
+[node name="Road_7_3" type="Node3D" parent="RoadZones" unique_id=910013016]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1764.000, 0.600, -252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_7_3")
+show_debug_volume = false
+
+[node name="Road_0_4" type="Node3D" parent="RoadZones" unique_id=910013017]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1764.000, 0.600, 252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_0_4")
+show_debug_volume = false
+
+[node name="Road_1_4" type="Node3D" parent="RoadZones" unique_id=910013018]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260.000, 0.600, 252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_1_4")
+show_debug_volume = false
+
+[node name="Road_2_4" type="Node3D" parent="RoadZones" unique_id=910013019]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 0.600, 252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_2_4")
+show_debug_volume = false
+
+[node name="Road_3_4" type="Node3D" parent="RoadZones" unique_id=910013020]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 0.600, 252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_3_4")
+show_debug_volume = false
+
+[node name="Road_4_4" type="Node3D" parent="RoadZones" unique_id=910013021]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 0.600, 252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_4_4")
+show_debug_volume = false
+
+[node name="Road_5_4" type="Node3D" parent="RoadZones" unique_id=910013022]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 0.600, 252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_5_4")
+show_debug_volume = false
+
+[node name="Road_6_4" type="Node3D" parent="RoadZones" unique_id=910013023]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260.000, 0.600, 252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_6_4")
+show_debug_volume = false
+
+[node name="Road_7_4" type="Node3D" parent="RoadZones" unique_id=910013024]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1764.000, 0.600, 252.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_7_4")
+show_debug_volume = false
+
+[node name="Road_3_5" type="Node3D" parent="RoadZones" unique_id=910013025]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 0.600, 756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_3_5")
+show_debug_volume = false
+
+[node name="Road_4_5" type="Node3D" parent="RoadZones" unique_id=910013026]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252.000, 0.600, 756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_4_5")
+show_debug_volume = false
+
+[node name="Road_5_5" type="Node3D" parent="RoadZones" unique_id=910013027]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756.000, 0.600, 756.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_5_5")
+show_debug_volume = false
+
+[node name="Road_3_6" type="Node3D" parent="RoadZones" unique_id=910013028]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.000, 0.600, 1260.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_3_6")
+show_debug_volume = false
+
+[node name="Road_7_6" type="Node3D" parent="RoadZones" unique_id=910013029]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1764.000, 0.600, 1260.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_7_6")
+show_debug_volume = false
+
+[node name="Road_2_7" type="Node3D" parent="RoadZones" unique_id=910013030]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756.000, 0.600, 1764.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_2_7")
+show_debug_volume = false
+
+[node name="Road_7_7" type="Node3D" parent="RoadZones" unique_id=910013031]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1764.000, 0.600, 1764.000)
+script = ExtResource("3_zmark")
+zone = SubResource("Zone_road_7_7")
+show_debug_volume = false
 
 [node name="TrafficZones" type="Node" parent="." unique_id=910012000]
 
@@ -572,51 +1034,33 @@ zone = SubResource("Zone_traffic_05")
 show_debug_volume = false
 
 [node name="Traffic06" type="Node3D" parent="TrafficZones" unique_id=910012007]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1550.676, 0.600, -794.952)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -698.152, 751.615, -1455.494)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_06")
 show_debug_volume = false
 
 [node name="Traffic07" type="Node3D" parent="TrafficZones" unique_id=910012008]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1590.597, 0.600, 275.800)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 144.736, 4.600, 1603.684)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_07")
 show_debug_volume = false
 
 [node name="Traffic08" type="Node3D" parent="TrafficZones" unique_id=910012009]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -579.904, 4.600, 1709.674)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 632.683, 0.600, -1805.367)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_08")
 show_debug_volume = false
 
 [node name="Traffic09" type="Node3D" parent="TrafficZones" unique_id=910012010]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -698.152, 751.615, -1455.494)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1397.772, 8.600, 1690.429)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_09")
 show_debug_volume = false
 
 [node name="Traffic10" type="Node3D" parent="TrafficZones" unique_id=910012011]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1111.280, 275.600, -813.213)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1613.879, 0.600, -670.801)
 script = ExtResource("3_zmark")
 zone = SubResource("Zone_traffic_10")
-show_debug_volume = false
-
-[node name="Traffic11" type="Node3D" parent="TrafficZones" unique_id=910012012]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 144.736, 4.600, 1603.684)
-script = ExtResource("3_zmark")
-zone = SubResource("Zone_traffic_11")
-show_debug_volume = false
-
-[node name="Traffic12" type="Node3D" parent="TrafficZones" unique_id=910012013]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 632.683, 0.600, -1805.367)
-script = ExtResource("3_zmark")
-zone = SubResource("Zone_traffic_12")
-show_debug_volume = false
-
-[node name="Traffic13" type="Node3D" parent="TrafficZones" unique_id=910012014]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1397.772, 8.600, 1690.429)
-script = ExtResource("3_zmark")
-zone = SubResource("Zone_traffic_13")
 show_debug_volume = false
 
 [connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

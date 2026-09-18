@@ -66,10 +66,24 @@
     },
     {
       "id": "MEW1",
-      "length_m": 0.3,
-      "grip_to_rear_m": 0.068,
-      "reference": {"based_on": "USMC KA-BAR fighting knife", "overall_m": 0.302, "blade_m": 0.178},
-      "real": "fighting knife / bayonet"
+      "length_m": 0.297,
+      "grip_to_rear_m": 0.059,
+      "reference": {"based_on": "generic combat knife", "overall_m": 0.297, "blade_m": 0.175},
+      "real": "combat knife, from the CC0 Free Melee Weapons Pack (3DModelsCC0), conformed by blender/tools/import_melee_pack.py"
+    },
+    {
+      "id": "FRG1",
+      "length_m": 0.112,
+      "grip_to_rear_m": 0.045,
+      "reference": {"based_on": "generic cylindrical hand grenade", "overall_m": 0.112, "diameter_m": 0.056},
+      "real": "hand grenade (PLACEHOLDER model from make_placeholder_models.py, for an artist to replace; origin = body centre, fuze forward)"
+    },
+    {
+      "id": "MEW2",
+      "length_m": 0.81,
+      "grip_to_rear_m": 0.1,
+      "reference": {"based_on": "generic pick-head fire axe", "overall_m": 0.81},
+      "real": "fire axe, from the CC0 Free Melee Weapons Pack (3DModelsCC0), conformed by blender/tools/import_melee_pack.py; scaled 1.35x from the pack's 0.60 m to a full-size 0.81 m axe"
     }
   ],
   "primitives": {
@@ -79,18 +93,54 @@
       "center": [0.0, 0.055, -0.1133],
       "reference": {"based_on": "AT4 disposable launcher", "overall_m": 1.016, "calibre_m": 0.084},
       "real": "shoulder-fired launcher tube"
+    }
+  },
+  "projectiles": {
+    "note": "What a weapon FIRES, not what the hand holds: same standard (metres, forward = Blender +Y = Godot -Z, transforms applied, one collection named after the id), but the origin is the projectile's centre, where it detonates, so grip_to_rear_m is the origin-to-tail distance. Not catalog weapons, so they live here rather than in `weapons`.",
+    "ATL1_Rocket": {
+      "length_m": 0.46,
+      "grip_to_rear_m": 0.23,
+      "reference": {"based_on": "generic 84 mm shoulder-launched rocket", "overall_m": 0.46, "calibre_m": 0.084},
+      "real": "the ATL1 launcher's rocket (PLACEHOLDER model from make_placeholder_models.py, for an artist to replace)"
+    }
+  },
+  "equipment": {
+    "note": "Held equipment with a model but no game item yet (the shield, and the melee weapons MEW3-MEW7). Same standard as `weapons`: forward = the side facing the threat (a blade's tip, an axe's head), edge down, origin = the grip, length_m = overall length along forward, grip_to_rear_m = origin to the rearmost point.",
+    "SHI1": {
+      "length_m": 0.116,
+      "grip_to_rear_m": 0.016,
+      "reference": {"based_on": "generic hand-held ballistic shield with a viewport", "width_m": 0.5, "height_m": 0.9, "viewport_m": [0.25, 0.1]},
+      "real": "ballistic shield (PLACEHOLDER model from make_placeholder_models.py, for an artist to replace; not an in-game item yet)"
     },
-    "MEW2": {
-      "size": [0.087, 0.175, 0.8],
-      "center": [0.0, 0.0, -0.3],
-      "reference": {"based_on": "felling axe, 32 in haft", "overall_m": 0.81},
-      "real": "felling axe"
+    "MEW3": {
+      "length_m": 0.607,
+      "grip_to_rear_m": 0.1,
+      "reference": {"based_on": "generic 24-inch crowbar", "overall_m": 0.607},
+      "real": "crowbar, from the CC0 Free Melee Weapons Pack (3DModelsCC0), conformed by blender/tools/import_melee_pack.py; not an in-game item yet"
     },
-    "FRG1": {
-      "size": [0.064, 0.064, 0.09],
-      "center": [0.0, 0.0, 0.0],
-      "reference": {"based_on": "M67 fragmentation grenade", "overall_m": 0.089, "diameter_m": 0.064},
-      "real": "hand grenade"
+    "MEW4": {
+      "length_m": 1.181,
+      "grip_to_rear_m": 0.225,
+      "reference": {"based_on": "generic D-handle garden spade", "overall_m": 1.181},
+      "real": "spade (hand on the shaft under the D-grip), from the CC0 Free Melee Weapons Pack (3DModelsCC0), conformed by blender/tools/import_melee_pack.py; not an in-game item yet"
+    },
+    "MEW5": {
+      "length_m": 0.225,
+      "grip_to_rear_m": 0.042,
+      "reference": {"based_on": "generic double-edged dagger", "overall_m": 0.225},
+      "real": "dagger, from the CC0 Free Melee Weapons Pack (3DModelsCC0), conformed by blender/tools/import_melee_pack.py; not an in-game item yet"
+    },
+    "MEW6": {
+      "length_m": 1.079,
+      "grip_to_rear_m": 0.205,
+      "reference": {"based_on": "generic Japanese long sword", "overall_m": 1.079},
+      "real": "katana (hand just behind the guard), from the CC0 Free Melee Weapons Pack (3DModelsCC0), conformed by blender/tools/import_melee_pack.py; not an in-game item yet"
+    },
+    "MEW7": {
+      "length_m": 0.515,
+      "grip_to_rear_m": 0.058,
+      "reference": {"based_on": "generic machete", "overall_m": 0.515},
+      "real": "machete, from the CC0 Free Melee Weapons Pack (3DModelsCC0), conformed by blender/tools/import_melee_pack.py; not an in-game item yet"
     }
   }
 }

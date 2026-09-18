@@ -1,15 +1,20 @@
 {
  "asset": {
-  "generator": "Khronos glTF Blender I/O v4.3.47",
+  "generator": "Khronos glTF Blender I/O v5.2.40",
   "version": "2.0",
   "extras": {
-   "normalized_by": "tools/building_kit/normalize_kit.py",
+   "exported_by": "blender/tools/export_building_kit.py",
    "module_scale": 0.91
   }
  },
  "scene": 0,
  "scenes": [
   {
+   "extras": {
+    "bk_kit": "quaternius_downtown_city",
+    "bk_module_scale": 0.91,
+    "bk_status": "OWNER: this file is the source of the kit's pieces. Edit a piece in its collection (origin = the piece's own origin + the collection's instance_offset), then run tools/building_kit/build_buildings.sh, which exports pieces/ with blender/tools/export_building_kit.py. A moved or resized piece is refused unless ACCEPT_BOUNDS=1."
+   },
    "name": "Scene",
    "nodes": [
     0
@@ -134,14 +139,14 @@
    "componentType": 5126,
    "count": 8,
    "max": [
-    0.91,
-    3.64,
-    1.1933208355685564e-07
+    0.9100000262260437,
+    3.640000104904175,
+    1.193320855463753e-07
    ],
    "min": [
-    -0.91,
-    0.0,
-    3.977736010796207e-08
+    -0.9100000262260437,
+    0,
+    3.977736184879177e-08
    ],
    "type": "VEC3"
   },
@@ -165,7 +170,7 @@
   },
   {
    "bufferView": 4,
-   "componentType": 5121,
+   "componentType": 5123,
    "count": 8,
    "normalized": true,
    "type": "VEC4"
@@ -188,14 +193,14 @@
    "componentType": 5126,
    "count": 8,
    "max": [
-    0.91,
-    3.640000433921814,
-    -0.18200008407235146
+    0.9100000262260437,
+    3.640000343322754,
+    -0.1820000857114792
    ],
    "min": [
-    -0.91,
-    0.0,
-    -0.18200008407235146
+    -0.9100000262260437,
+    0,
+    -0.1820000857114792
    ],
    "type": "VEC3"
   },
@@ -219,7 +224,7 @@
   },
   {
    "bufferView": 11,
-   "componentType": 5121,
+   "componentType": 5123,
    "count": 8,
    "normalized": true,
    "type": "VEC4"
@@ -265,50 +270,44 @@
   },
   {
    "buffer": 0,
-   "byteLength": 32,
+   "byteLength": 64,
    "byteOffset": 320,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 64,
-   "byteOffset": 352,
+   "byteOffset": 384,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 24,
-   "byteOffset": 416,
+   "byteOffset": 448,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 96,
-   "byteOffset": 440,
+   "byteOffset": 472,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 96,
-   "byteOffset": 536,
+   "byteOffset": 568,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 64,
-   "byteOffset": 632,
+   "byteOffset": 664,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 64,
-   "byteOffset": 696,
-   "target": 34962
-  },
-  {
-   "buffer": 0,
-   "byteLength": 32,
-   "byteOffset": 760,
+   "byteOffset": 728,
    "target": 34962
   },
   {
@@ -319,8 +318,14 @@
   },
   {
    "buffer": 0,
-   "byteLength": 24,
+   "byteLength": 64,
    "byteOffset": 856,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 24,
+   "byteOffset": 920,
    "target": 34963
   }
  ],
@@ -332,7 +337,7 @@
  ],
  "buffers": [
   {
-   "byteLength": 880,
+   "byteLength": 944,
    "uri": "Brick_Plain_4.bin"
   }
  ]

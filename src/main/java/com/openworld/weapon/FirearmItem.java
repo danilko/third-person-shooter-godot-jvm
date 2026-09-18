@@ -32,8 +32,6 @@ import com.openworld.net.NetStats;
 @Script(className = "FirearmItem")
 public class FirearmItem extends WeaponItem {
 
-  private GPUParticles3D muzzleFlashFx;
-  private AnimationPlayer muzzleFlashAnimPlayer;
 
   /** How far this shot is audible to AI (PLAN.md E2 — ~150 m urban, raise toward ~400 m for open terrain). */
   @Export public float gunshotHearingRadius = 150f;
@@ -105,21 +103,6 @@ public class FirearmItem extends WeaponItem {
 		hipfireSpreadMultiplier);
   }
 
-  /**
-   * Discovers weapon-local VFX nodes from the weapon scene. Called once on _ready();
-   * VFX live under Muzzle/MuzzleVFX and never change regardless of equip state.
-   */
-  @Register
-  @Override
-  public void _ready() {
-	super._ready();  // Pickup._ready — group + pickupId registration for replication
-	Node muzzle = getNodeOrNull("Muzzle");
-	Node vfx    = (muzzle != null) ? muzzle.getNodeOrNull("MuzzleVFX") : null;
-	if (vfx != null) {
-	  muzzleFlashFx         = (GPUParticles3D)  vfx.getNodeOrNull("MuzzleFlash");
-	  muzzleFlashAnimPlayer = (AnimationPlayer) vfx.getNodeOrNull("AnimationPlayer");
-	}
-  }
 
   @Register
   @Override
@@ -173,7 +156,7 @@ public class FirearmItem extends WeaponItem {
    */
   public void playFireCue() {
 	playFireAudio();
-	triggerMuzzleFlash();
+	playMuzzleFlash();
   }
 
   /** Visual length of a remote tracer when the peer has no local hit point — matches the no-collision fallback in {@link #spawnBulletTracer}. */
@@ -338,13 +321,6 @@ public class FirearmItem extends WeaponItem {
 	weaponAudio.play();
   }
 
-  private void triggerMuzzleFlash() {
-	if (muzzleFlashFx == null) return;
-	// VFX nodes are children of the weapon's Muzzle marker — position is automatic.
-	muzzleFlashFx.setSpeedScale(fireRate);
-	muzzleFlashAnimPlayer.setSpeedScale((float) GD.clamp(fireRate, 5, 10));
-	muzzleFlashAnimPlayer.play("MuzzleFlash");
-  }
 
   private void applyRecoil() {
 	if (!(owningCharacter instanceof Character c)) return;
@@ -540,7 +516,7 @@ public class FirearmItem extends WeaponItem {
 	RayCast3D ray = getEffectiveAimRay();
 	if (ray == null || aim.lengthSquared() < 1e-6f) return java.util.List.of();
 	Vector3 from = clearOriginOnHost(ray, origin);
-	float range = (float) Math.max(50.0, ray.getTargetPosition().length());
+	float range = serverShotRange();
 	// The host draws this pull's real tracers itself and marks the result as in, so the shooter's
 	// fireSeq cue on this puppet does not add its own aim tracer on top (N1b).
 	lastShotResultMs = Time.INSTANCE.getTicksMsec();
@@ -549,6 +525,12 @@ public class FirearmItem extends WeaponItem {
 	lastShotPelletHits = resolvePellets(ray, from, aim, spreadDeg, shotSeq, shooter, range, true, true);
 	queueResultForPeers(shotSeq, ownerPeerId, shooter, weaponSlot);
 	return lastShotPelletHits;
+  }
+
+  /** How far the host traces a client's pull ({@link #resolveServerShot}) — also how far lag compensation looks (N5). */
+  public float serverShotRange() {
+	RayCast3D ray = getEffectiveAimRay();
+	return ray == null ? 50f : (float) Math.max(50.0, ray.getTargetPosition().length());
   }
 
   /** Host: hand the last resolved pull's pellets to the NetworkManager for every peer but {@code exclude}. */

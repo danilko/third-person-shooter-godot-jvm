@@ -3,7 +3,7 @@ extends RefCounted
 ## Road Kit AUTHORING GESTURES (PLAN.md 3.1 B4) — the kit's Blender operators rebuilt as pure
 ## functions over RoadKitNetwork / RoadKitRoad / RoadKitPoint nodes. No editor API here, so every
 ## gesture runs (and is tested) headless; the plugin wraps each in an undo step that restores the
-## network's record. Rules are the kit's (`point_ops.py`), restated where cited:
+## network's record. Rules are the kit's (the Blender `point_ops.py` they were first written in is deleted; `point_record_ops.py` owns the record-level ones), restated where cited:
 ##   * a road's CHILD ORDER is its chain (FWD = increasing index), and names follow it;
 ##   * SEGMENT and JUNCTION links are symmetric, AUX is directed mainline -> ramp;
 ##   * a junction is a CLIQUE over JUNCTION links, every member typed INTERSECTION;

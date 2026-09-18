@@ -22,6 +22,19 @@ public class Health extends Node {
     @Export
     public float maxHealth = 100.0f;
 
+    /**
+     * How hard each KIND of damage hits this body, the GTA model: the target decides, so one weapon number
+     * can be right for a person and a car at once. A weapon hit (bullet, pellet, melee — anything through
+     * {@code ImpactManager.processHit}) is multiplied by {@link #hitDamageMultiplier}; a blast
+     * ({@code ExplosionManager}) by {@link #explosionDamageMultiplier}. Characters keep 1/1. A vehicle soaks
+     * gunfire and folds to a rocket ({@code Vehicle.tscn}: 0.4 / 2.5). Falls, drowning and collisions are
+     * neither and are not scaled.
+     */
+    @Export
+    public float hitDamageMultiplier = 1.0f;
+    @Export
+    public float explosionDamageMultiplier = 1.0f;
+
     /** Display name used in kill notifications. Falls back to the owner node name if empty. */
     @Export
     public String displayName = "";

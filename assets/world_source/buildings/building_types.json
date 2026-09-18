@@ -5,6 +5,7 @@
     "Front faces +Z, the origin is the footprint centre at ground level (BLENDER_CONVENTIONS.md, 'Asset').",
     "floors: storey groups from the ground up. front/back/sides name a row in the kit's kit.json. doors: {side: [module index from the side's left end seen from outside]}; omitted = the middle module of the front on the ground floor.",
     "ac_units: outdoor air-conditioner units hung on the named sides of the upper floors, every Nth module (a Japanese facade's most recognisable clutter). roof_units: that many on the roof.",
+    "attached: sides that stand against a neighbour; each is the kit's blank party_wall_row on every storey, with no door or AC unit. setback: {storeys, modules} -- the top storeys stand that many modules back from the front (the stepped top of a Japanese mid-rise, 道路斜線), leaving a terrace edged with the parapet piece. stair_house: a 塔屋 on the roof; default on for a flat roof over three storeys, false to omit. jp.height_m is the ROOFLINE and excludes it, as Japanese height rules do.",
     "examples: the kit's own pre-built buildings, re-scaled only. They are Boston/NYC, kept as filler and as a reference for the kit's look."
   ],
   "types": [
@@ -19,6 +20,8 @@
         {"count": 6, "front": "glass_floor", "sides": "tile_plain", "back": "residential_windows"}
       ],
       "parapet": "metal",
+      "attached": ["left", "right"],
+      "setback": {"storeys": 1, "modules": 1},
       "ac_units": {"sides": ["back"], "every": 2},
       "roof_units": 2
     },
@@ -59,6 +62,7 @@
         {"count": 5, "front": "residential_balcony", "sides": "tile_plain", "back": "residential_windows"}
       ],
       "parapet": "plain",
+      "setback": {"storeys": 1, "modules": 1},
       "ac_units": {"sides": ["back"], "every": 2}
     },
     {
@@ -86,6 +90,7 @@
         {"count": 8, "front": "curtain_wall", "sides": "metal_windows", "back": "curtain_wall"}
       ],
       "parapet": "metal",
+      "setback": {"storeys": 2, "modules": 1},
       "roof_units": 4
     },
     {

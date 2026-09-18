@@ -28,7 +28,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE)), "lib"))
 
 try:
     from . import point_model as pm, point_solve as ps, point_edges as ped, point_kit as pk
+    from . import point_furniture as pfu
 except ImportError:
+    import point_furniture as pfu                                            # noqa: E402
     import point_model as pm                                                 # noqa: E402
     import point_solve as ps                                                 # noqa: E402
     import point_edges as ped                                                # noqa: E402
@@ -360,12 +362,13 @@ def _collision(objs, surface_names, edge_names, name, ped_access):
         _add(objs, collision_name(name + "_" + kind, kind, ped), NO_MATERIAL, tris)
 
 
-def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=None):
+def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=None, clear=None):
     """Every object `point_build.build_network` emits, as triangles: `{object: {material name: [tri]}}`, the KIT
     frame, collision proxies included (material `NO_MATERIAL`). Same solve, same cut (`part` + `zone` emit one
     piece of a zoned network, the WHOLE network still solved), same styles (`kit`, default `point_kit.load()`).
     `report`, a dict, collects `missing_style` rows. `solved`, `point_edges.solve_all(net, ground)` already run,
-    saves re-solving the network for every piece of it."""
+    saves re-solving the network for every piece of it. `clear` (`point_furniture.clear_zones`) is where lane and
+    centre lines stop at a junction mouth -- the stop line and the zebra -- which only the lane graph knows."""
     kit = kit if kit is not None else pk.load()
     solves, jsolves, gsolves, bands = solved if solved is not None else ped.solve_all(net, ground)
     styles = {n: pk.resolve(r, kit) for n, r in net.roads.items()}
@@ -407,10 +410,11 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 _edge_run(objs, edge_names[-1], epts, walk, kerb, wall, sgn, style)
             for yellow in (False, True):
                 for r in (r for r in ps.solve_marks(s) if r.yellow is yellow):
-                    vals = [{"rka_mark_w": ps.MARK_WIDTH / 2.0}] * len(r.points)
-                    _add(objs, "%s__marks_%s" % (name, "y" if yellow else "w"),
-                         style.material("mark_y" if yellow else "mark_w"),
-                         sweep(list(r.points), vals, "band", "", ps.PAINT_Z_BIAS, "", "rka_mark_w", ""))
+                    for line in pfu.clip_outside(list(r.points), clear):
+                        vals = [{"rka_mark_w": ps.MARK_WIDTH / 2.0}] * len(line)
+                        _add(objs, "%s__marks_%s" % (name, "y" if yellow else "w"),
+                             style.material("mark_y" if yellow else "mark_w"),
+                             sweep(line, vals, "band", "", ps.PAINT_Z_BIAS, "", "rka_mark_w", ""))
             _collision(objs, [surf], edge_names, name, bool(s.road.ped_access))
     for j in jsolves:
         if part is not None and part.pad_zone(j.uids) != zone:

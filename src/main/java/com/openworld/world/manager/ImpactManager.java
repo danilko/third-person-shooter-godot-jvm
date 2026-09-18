@@ -91,6 +91,7 @@ public class ImpactManager extends Node {
             // vehicle counterpart of the character bone-multiplier model.
             if (ctx.wheel != null) bodyDamage = ctx.wheel.applyTireDamage(damage);
             Health health = (Health) ctx.healthOwner.getNode(new NodePath("Health"));
+            bodyDamage *= health.hitDamageMultiplier;   // a car soaks gunfire (Health's damage kinds)
             health.takeDamage(info.hitNode, bodyDamage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos,
                     attackerId);
         }

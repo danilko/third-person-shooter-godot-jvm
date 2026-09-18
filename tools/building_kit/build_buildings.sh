@@ -3,7 +3,8 @@
 #
 #     tools/building_kit/build_buildings.sh [--only=Id,Id]
 #
-# 1. normalize_kit.py   each kit's source/ -> pieces/ with kit.json's module_scale baked in (no-op when current)
+# 1. export_building_kit.py  each kit's .blend -> pieces/ + pieces.json (the .blend OWNS the pieces, PLAN.md
+#                       3.6b step 1; refuses a piece whose bounds moved unless ACCEPT_BOUNDS=1)
 # 2. godot --import     so new or changed pieces and textures are importable
 # 3. layout_buildings.py building_types.json -> piece placements, collision boxes, doors (self-tested first)
 # 4. build_building_scenes.gd -> world/buildings/<Id>.tscn + <Id>_mesh.res (merged, one surface per material)
@@ -16,8 +17,14 @@ GODOT="${GODOT:-/data/danilko/bin/Godot_v4.7.2-stable_linux.x86_64}"
 cd "$ROOT"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+BLENDER="${BLENDER:-blender}"
 for kit in assets/world_source/kits/*/kit.json; do
-    python3 tools/building_kit/normalize_kit.py "$(dirname "$kit")"
+    dir="$(dirname "$kit")"
+    blend="$dir/$(basename "$dir").blend"
+    [ -f "$blend" ] || continue          # a kit with no .blend yet (not a building kit, or not initialised)
+    "$BLENDER" -b "$blend" --python-exit-code 1 --python blender/tools/export_building_kit.py > "$TMP/export.log" 2>&1 \
+        || { grep -E "export_building_kit|Error" "$TMP/export.log"; exit 1; }
+    grep "\[export_building_kit\]" "$TMP/export.log"
 done
 timeout -k 5 900 "$GODOT" --headless --path . --import > "$TMP/import.log" 2>&1 || { tail -20 "$TMP/import.log"; exit 1; }
 python3 tools/building_kit/layout_buildings.py --self-test | tail -1

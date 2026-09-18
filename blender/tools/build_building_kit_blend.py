@@ -5,10 +5,10 @@
 Writes `assets/world_source/kits/<kit_id>/<kit_id>.blend` from the kit's normalised `pieces/` (module_scale
 already baked in, so the file is at game size).
 
-STATUS: PLACEHOLDER. Today `pieces/` is generated from `source/` by tools/building_kit/normalize_kit.py, so an
-edit made in this .blend is NOT exported and is lost when this script runs again. PLAN.md 3.6b step 1 flips the
-owner: the .blend becomes the source of the pieces and an export script writes `pieces/` from it. Until then use
-it to look, measure and try edits.
+STATUS: THE .BLEND OWNS THE PIECES (PLAN.md 3.6b step 1). This script runs ONCE per kit, right after
+`normalize_kit.py --init`; from then on `blender/tools/export_building_kit.py` writes `pieces/` from the .blend
+(`tools/building_kit/build_buildings.sh` runs it). It refuses to overwrite an existing kit .blend, because that
+would throw away every edit in it; `-- <kit> --force` rebuilds one from scratch on purpose.
 
 WHY ONE FILE PER KIT (not one per piece, not one for every kit)
 --------------------------------------------------------------
@@ -47,9 +47,14 @@ KIT_DIR = os.path.abspath(os.path.join(ROOT, argv[0]))
 KIT = json.load(open(os.path.join(KIT_DIR, "kit.json")))
 PIECES = json.load(open(os.path.join(KIT_DIR, "pieces.json")))
 OUT = os.path.join(KIT_DIR, KIT["id"] + ".blend")
+if os.path.exists(OUT) and "--force" not in argv:
+    raise SystemExit("build_building_kit_blend: %s exists and owns the kit's pieces; edit it and run "
+                     "export_building_kit.py (or pass --force to rebuild it from pieces/)" % OUT)
 GAP = 1.0
-STATUS = ("PLACEHOLDER: pieces/ is still generated from source/ by normalize_kit.py, so edits here are not "
-          "exported and are overwritten by build_building_kit_blend.py. PLAN.md 3.6b step 1 makes this file the owner.")
+STATUS = ("OWNER: this file is the source of the kit's pieces. Edit a piece in its collection (origin = the piece's "
+          "own origin + the collection's instance_offset), then run tools/building_kit/build_buildings.sh, which "
+          "exports pieces/ with blender/tools/export_building_kit.py. A moved or resized piece is refused unless "
+          "ACCEPT_BOUNDS=1.")
 
 
 def godot_to_blender(v):

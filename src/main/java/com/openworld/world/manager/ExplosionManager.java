@@ -2,73 +2,63 @@ package com.openworld.world.manager;
 
 import com.openworld.character.Character;
 import com.openworld.character.Health;
-import com.openworld.util.ObjectPool;
+import com.openworld.vfx.VfxEffect;
+import com.openworld.world.BlastFalloff;
 import com.openworld.world.StimulusManager;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.*;
 import godot.core.NodePath;
+import godot.core.PackedVector3Array;
 import godot.core.Vector3;
+import godot.global.GD;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * World-level explosion manager: AOE damage + multi-layer VFX (flash, fireball, smoke).
+ * World-level explosion manager: AOE damage + the blast VFX.
  *
  * Call triggerExplosion() from any projectile or vehicle — no intermediate scene node needed.
  *
- * Scene setup (Godot editor):
- *   ExplosionManager (Node + this script)
- *     FLASH/    ← Node; one GPUParticles3D template (one_shot=true, ~0.3 s lifetime)
- *     FIREBALL/ ← Node; one GPUParticles3D template (one_shot=true, ~1.5 s lifetime)
- *     SMOKE/    ← Node; one GPUParticles3D template (one_shot=true, ~7–8 s lifetime)
- *
- * _ready() auto-duplicates each template to poolSizePerLayer instances.
+ * The VFX is a Binbun3D explosion scene (CC0, {@code assets/vfx/explosion/effects/}, a {@link VfxEffect}).
+ * Each explosive names its own ({@code explosion_vfx} + {@code explosion_vfx_scale} on the rocket, the grenade and
+ * {@code VehicleConfig}), so the look follows its punch; one that names none gets {@link #explosionScene}.
+ * Every effect scene has its own pool of up to {@link #poolSize}, grown on first use (the default one is warmed
+ * in {@code _ready}); a blast plays the next idle instance or, if all are busy, the one that started longest ago,
+ * so a burst of rockets never drops a blast.
  * Discovery group: "explosion_manager".
  */
 @Script(className = "ExplosionManager")
 public class ExplosionManager extends Node {
 
-    @Export public int   poolSizePerLayer = 8;
-    @Export public float flashLifetime    = 0.3f;
-    @Export public float fireballLifetime = 1.5f;
-    @Export public float smokeLifetime    = 8.0f;
+    /** The blast effect for an explosive that names none: any scene under assets/vfx/explosion/effects/. */
+    @Export public PackedScene explosionScene;
+    @Export public int poolSize = 8;
+    /** Global multiplier on every blast's size (1 = each shockwave ends exactly at its damage radius). */
+    @Export public float vfxScale = 1.0f;
 
-    private static class ParticleEntry {
-        final GPUParticles3D particle;
-        double  age    = 0.0;
-        boolean active = false;
-        ParticleEntry(GPUParticles3D p) { this.particle = p; }
+    /** The fireball covers this share of the damage radius (the zone taking at least 25% of the maximum). */
+    static final float FIREBALL_SHARE = 0.5f;
+
+    private static final class Pool {
+        final List<VfxEffect> fx = new ArrayList<>();
+        int next = 0;
     }
-
-    private final List<ParticleEntry> flashEntries    = new ArrayList<>();
-    private final List<ParticleEntry> fireballEntries = new ArrayList<>();
-    private final List<ParticleEntry> smokeEntries    = new ArrayList<>();
-
-    private ObjectPool<ParticleEntry> flashPool;
-    private ObjectPool<ParticleEntry> fireballPool;
-    private ObjectPool<ParticleEntry> smokePool;
-
-    private int activeCount = 0;
+    private final Map<PackedScene, Pool> pools = new HashMap<>();
 
     @Register
     @Override
     public void _ready() {
         addToGroup("explosion_manager");
-        flashPool    = buildPool("FLASH",    flashEntries);
-        fireballPool = buildPool("FIREBALL", fireballEntries);
-        smokePool    = buildPool("SMOKE",    smokeEntries);
-    }
-
-    @Register
-    @Override
-    public void _process(double delta) {
-        if (activeCount == 0) return;
-        ageLayer(flashEntries,    flashPool,    flashLifetime,    delta);
-        ageLayer(fireballEntries, fireballPool, fireballLifetime, delta);
-        ageLayer(smokeEntries,    smokePool,    smokeLifetime,    delta);
+        if (explosionScene == null) return;
+        Pool p = pools.computeIfAbsent(explosionScene, k -> new Pool());
+        for (int i = 0; i < poolSize; i++) {
+            if (grow(explosionScene, p) == null) return;
+        }
     }
 
     /**
@@ -80,6 +70,15 @@ public class ExplosionManager extends Node {
                                  String attackerName, String attackerFaction,
                                  String weaponDisplayName, Texture2D weaponIcon,
                                  Node excludeNode) {
+        triggerExplosion(center, radius, maxDamage, pushForce, attackerName, attackerFaction,
+                         weaponDisplayName, weaponIcon, excludeNode, null, 1.0f);
+    }
+
+    /** As above, drawing {@code vfx} (null = {@link #explosionScene}) at {@code vfxScale}. */
+    public void triggerExplosion(Vector3 center, float radius, float maxDamage, float pushForce,
+                                 String attackerName, String attackerFaction,
+                                 String weaponDisplayName, Texture2D weaponIcon,
+                                 Node excludeNode, PackedScene vfx, float vfxScale) {
         for (Node node : getTree().getNodesInGroup("characters")) {
             if (node == excludeNode) continue;
             if (node instanceof Character c) {
@@ -90,7 +89,7 @@ public class ExplosionManager extends Node {
                                  attackerName, attackerFaction, weaponDisplayName, weaponIcon);
             }
         }
-        spawnExplosion(center);
+        playBlast(center, vfx, radius, vfxScale);
 
         // EXPLOSION stimulus so nearby AI investigate the blast (PLAN.md E2). triggerExplosion is the
         // authority blast path, so this fires once on the simulating peer. Audible well past the blast
@@ -105,12 +104,61 @@ public class ExplosionManager extends Node {
     /** Default audible range of an explosion to AI (m) when 3× the blast radius is smaller. */
     private static final float EXPLOSION_HEARING_RADIUS = 300f;
 
-    /** Spawn all three VFX layers at the given world position. */
+    /** Play the default blast effect at the given world position. */
+    @Register
     public void spawnExplosion(Vector3 center) {
+        playBlast(center, null, 0f, 1.0f);
+    }
+
+    /**
+     * Play {@code vfx} (null = {@link #explosionScene}) at {@code center}, sized to the blast from its damage radius
+     * and the effect's MEASURED reach at scale 1 ({@link VfxEffect#fireballRadius} / {@link VfxEffect#blastRadius},
+     * {@code tools/godot/measure_explosion_radii.gd}):
+     * <ul>
+     *   <li>the whole effect is scaled so the FIREBALL covers half the damage radius — the zone where a target
+     *       still takes at least a quarter of the maximum damage (quadratic falloff);</li>
+     *   <li>its shockwave layer ({@code Rings}) is scaled on its own on top of that, so the ring expands to exactly
+     *       the damage radius: the player sees where the blast stops hurting.</li>
+     * </ul>
+     * Times {@code multiplier} and {@link #vfxScale}. A radius of 0 or an unmeasured effect plays at the multiplier
+     * alone. The effect's particles are in local space, so node scale scales them (world-space particles ignore it).
+     * The cosmetic path every peer runs: one per blast, never two.
+     */
+    public void playBlast(Vector3 center, PackedScene vfx, float damageRadius, float multiplier) {
         com.openworld.net.NetStats.increment("explosion_vfx");   // N4: one per blast on every peer, never two
-        spawnLayer(flashPool,    center);
-        spawnLayer(fireballPool, center);
-        spawnLayer(smokePool,    center.plus(new Vector3(0f, 0.2f, 0f)));
+        PackedScene scene = vfx != null ? vfx : explosionScene;
+        if (scene == null) return;
+        Pool p = pools.computeIfAbsent(scene, k -> new Pool());
+        VfxEffect fx = null;
+        for (int i = 0; i < p.fx.size() && fx == null; i++) {
+            VfxEffect c = p.fx.get((p.next + i) % p.fx.size());
+            if (!c.playingNow()) { fx = c; p.next = (p.next + i + 1) % p.fx.size(); }
+        }
+        if (fx == null && p.fx.size() < poolSize) fx = grow(scene, p);
+        if (fx == null && !p.fx.isEmpty()) { fx = p.fx.get(p.next); p.next = (p.next + 1) % p.fx.size(); }
+        if (fx == null) return;
+        float s = vfxScale * multiplier;
+        float ring = 1f;
+        if (damageRadius > 0f && fx.fireballRadius > 0f) {
+            s *= FIREBALL_SHARE * damageRadius / fx.fireballRadius;
+            if (fx.blastRadius > 0f) ring = (damageRadius / fx.blastRadius) / (s / (vfxScale * multiplier));
+        }
+        fx.setScale(new Vector3(s, s, s));
+        if (fx.getNodeOrNull("Rings") instanceof Node3D rings) rings.setScale(new Vector3(ring, ring, ring));
+        fx.setGlobalPosition(center);
+        fx.play();
+    }
+
+
+    /** Pool one more instance of {@code scene}; null if its root is not a VfxEffect. */
+    private VfxEffect grow(PackedScene scene, Pool p) {
+        if (!(scene.instantiate() instanceof VfxEffect fx)) {
+            GD.pushWarning("ExplosionManager: " + scene.getPath() + "'s root is not a VfxEffect");
+            return null;
+        }
+        addChild(fx);
+        p.fx.add(fx);
+        return fx;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -118,12 +166,12 @@ public class ExplosionManager extends Node {
     private void applyToCharacter(Character c, Vector3 center, float radius, float maxDamage,
                                    float pushForce, String attackerName, String attackerFaction,
                                    String weaponDisplayName, Texture2D weaponIcon) {
-        float dist = (float) c.getGlobalPosition().distanceTo(center);
-        if (dist >= radius) return;
-        float t      = 1f - (dist / radius);
-        float damage = maxDamage * t * t;
+        double dist = distanceToBody(c, center);
+        float t = BlastFalloff.strength(radius, dist);
+        if (t <= 0f) return;
         Node h = c.getNodeOrNull(new NodePath("Health"));
         if (h instanceof Health health && !health.isDead()) {
+            float damage = BlastFalloff.damage(maxDamage, radius, dist) * health.explosionDamageMultiplier;
             // Blast center is the damage source for the HUD direction indicator.
             health.takeDamage(c, damage, weaponDisplayName, weaponIcon, attackerName, attackerFaction, center);
         }
@@ -136,50 +184,47 @@ public class ExplosionManager extends Node {
     private void applyToRigidBody(RigidBody3D rb, Vector3 center, float radius, float maxDamage,
                                    float pushForce, String attackerName, String attackerFaction,
                                    String weaponDisplayName, Texture2D weaponIcon) {
-        float dist = (float) rb.getGlobalPosition().distanceTo(center);
-        if (dist >= radius) return;
-        float t      = 1f - (dist / radius);
-        float damage = maxDamage * t * t;
+        double dist = distanceToBody(rb, center);
+        float t = BlastFalloff.strength(radius, dist);
+        if (t <= 0f) return;
         Node h = rb.getNodeOrNull(new NodePath("Health"));
         if (h instanceof Health health && !health.isDead()) {
+            float damage = BlastFalloff.damage(maxDamage, radius, dist) * health.explosionDamageMultiplier;
             health.takeDamage(rb, damage, weaponDisplayName, weaponIcon, attackerName, attackerFaction);
         }
         rb.applyCentralImpulse(rb.getGlobalPosition().minus(center).normalized().times(pushForce * t));
     }
 
-    private ObjectPool<ParticleEntry> buildPool(String containerName, List<ParticleEntry> entries) {
-        Node container = getNodeOrNull(containerName);
-        if (container == null || container.getChildCount() == 0) return null;
-        Node first = container.getChild(0);
-        if (!(first instanceof GPUParticles3D template)) return null;
-        template.setEmitting(false);
-        entries.add(new ParticleEntry(template));
-        for (int i = 1; i < poolSizePerLayer; i++) {
-            GPUParticles3D copy = (GPUParticles3D) template.duplicate(15);
-            container.addChild(copy);
-            entries.add(new ParticleEntry(copy));
+    /**
+     * Distance from the blast to the body's nearest SURFACE (0 inside it): the smallest distance to the box
+     * of any of its own collision shapes (a BoxShape3D's box, a convex hull's point bounds), each in that
+     * shape's frame. A body with neither falls back to its origin.
+     */
+    static double distanceToBody(Node3D body, Vector3 center) {
+        double best = Double.MAX_VALUE;
+        for (Node n : body.getChildren()) {
+            if (!(n instanceof CollisionShape3D cs) || cs.isDisabled() || cs.getShape() == null) continue;
+            Vector3 lo, hi;
+            if (cs.getShape() instanceof BoxShape3D box) {
+                Vector3 half = box.getSize().times(0.5);
+                lo = half.times(-1.0);
+                hi = half;
+            } else if (cs.getShape() instanceof ConvexPolygonShape3D hull && hull.getPoints().getSize() > 0) {
+                PackedVector3Array pts = hull.getPoints();
+                lo = pts.get(0);
+                hi = pts.get(0);
+                for (int i = 1; i < pts.getSize(); i++) {
+                    Vector3 v = pts.get(i);
+                    lo = new Vector3(Math.min(lo.getX(), v.getX()), Math.min(lo.getY(), v.getY()), Math.min(lo.getZ(), v.getZ()));
+                    hi = new Vector3(Math.max(hi.getX(), v.getX()), Math.max(hi.getY(), v.getY()), Math.max(hi.getZ(), v.getZ()));
+                }
+            } else {
+                continue;
+            }
+            Vector3 p = cs.getGlobalTransform().affineInverse().times(center);
+            best = Math.min(best, BlastFalloff.distanceToBox(p.getX(), p.getY(), p.getZ(),
+                    lo.getX(), lo.getY(), lo.getZ(), hi.getX(), hi.getY(), hi.getZ()));
         }
-        int[] idx = {0};
-        return new ObjectPool<>(entries.size(),
-                () -> entries.get(idx[0]++),
-                e -> { e.particle.setEmitting(false); e.age = 0.0; e.active = false; });
-    }
-
-    private void ageLayer(List<ParticleEntry> entries, ObjectPool<ParticleEntry> pool,
-                           float lifetime, double delta) {
-        if (pool == null) return;
-        for (ParticleEntry e : entries) {
-            if (!e.active) continue;
-            e.age += delta;
-            if (e.age >= lifetime) { activeCount--; pool.release(e); }
-        }
-    }
-
-    private void spawnLayer(ObjectPool<ParticleEntry> pool, Vector3 position) {
-        if (pool == null || pool.available() == 0) return;
-        ParticleEntry e = pool.acquire();
-        e.age = 0.0; e.active = true; activeCount++;
-        e.particle.setGlobalPosition(position);
-        e.particle.setEmitting(true);
+        return best != Double.MAX_VALUE ? best : body.getGlobalPosition().distanceTo(center);
     }
 }

@@ -16,9 +16,25 @@
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/AreaWarning.java" id="13_areawarn"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/HitMarker.java" id="14_hitmark"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/RaceHUD.java" id="15_racehud"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/WeaponHUD.tscn" id="16_whud"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/ui/UnderwaterOverlay.java" id="17_underwater"]
 
 [node name="HUDManager" type="CanvasLayer" unique_id=828289775]
 script = ExtResource("1_fuvei")
+
+[node name="UnderwaterOverlay" type="ColorRect" parent="." unique_id=850000008]
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("17_underwater")
+
+[node name="ScopeOverlay" type="Control" parent="." unique_id=850000004]
+anchor_right = 1.0
+anchor_bottom = 1.0
+visible = false
+mouse_filter = 2
+script = ExtResource("12_scope")
 
 [node name="FootHUD" parent="." unique_id=1962846644 instance=ExtResource("2_0rj32")]
 metadata/_edit_use_anchors_ = true
@@ -33,13 +49,6 @@ visible = false
 [node name="WeaponProgress" parent="." unique_id=840000001 instance=ExtResource("8_wprog")]
 
 [node name="Crosshair" parent="." unique_id=938896149 instance=ExtResource("5_0rj32")]
-
-[node name="ScopeOverlay" type="Control" parent="." unique_id=850000004]
-anchor_right = 1.0
-anchor_bottom = 1.0
-visible = false
-mouse_filter = 2
-script = ExtResource("12_scope")
 
 [node name="AreaWarning" type="Control" parent="." unique_id=850000005]
 anchor_right = 1.0
@@ -62,11 +71,19 @@ visible = false
 mouse_filter = 2
 script = ExtResource("15_racehud")
 
+[node name="WeaponHUD" parent="." unique_id=620000003 instance=ExtResource("16_whud")]
+
 [node name="WeaponSlotsUI" parent="." unique_id=620000002 instance=ExtResource("6_wsbar")]
-offset_left = 32.0
-offset_top = 302.0
-offset_right = -944.0
-offset_bottom = -148.0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -92.0
+offset_right = -20.0
+offset_bottom = -92.0
+grow_horizontal = 0
+grow_vertical = 0
 
 [node name="WeaponRadialMenu" parent="." unique_id=1303740167 instance=ExtResource("4_k520o")]
 metadata/_edit_use_anchors_ = true
@@ -74,12 +91,13 @@ metadata/_edit_use_anchors_ = true
 [node name="DamageIndicator" parent="." unique_id=730000001 instance=ExtResource("7_dmgind")]
 
 [node name="Minimap" type="Control" parent="." unique_id=850000001]
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -212.0
-offset_top = 24.0
-offset_right = -24.0
-offset_bottom = 212.0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -226.0
+offset_right = 170.0
+offset_bottom = -76.0
+grow_vertical = 0
 mouse_filter = 2
 clip_contents = true
 script = ExtResource("9_mini")

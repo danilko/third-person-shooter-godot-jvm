@@ -6,6 +6,8 @@ import com.openworld.game.SaveSystem;
 import com.openworld.game.mission.MissionDirector;
 import com.openworld.game.mission.RaceDirector;
 import com.openworld.game.mission.MissionManager;
+import com.openworld.weapon.WeaponCatalog;
+import com.openworld.weapon.WeaponItem;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.CanvasLayer;
@@ -151,8 +153,13 @@ public class DebugConsole extends CanvasLayer {
                 print("mission fail <reason>                  fail the active mission");
                 print("unlock <missionId> [requiredKey]       declare / query an unlock predicate");
                 print("race [add <characterId>]              race status, or enrol a racer");
+                print("weapons                                list every weapon id (weapon_catalog.json)");
+                print("give <id>                              put a weapon in your hands (the pickup path)");
+                print("drop <id>|all                          lay pickups in a row in front of you");
+                print("ammo                                   refill every weapon you carry");
                 print("save [slot]                            write the campaign save (default 1)");
                 print("load [slot]                            restore it (default 1)");
+                print("hud [0-3]                              debug HUD: off / FPS / perf + graph / + game state");
                 print("close                                  close the console");
             }
             case "close" -> close();
@@ -212,6 +219,15 @@ public class DebugConsole extends CanvasLayer {
                 }
                 print(race.statusLine());
             }
+            case "weapons" -> print("weapons: " + String.join(" ", WeaponCatalog.spawnableIds()));
+            case "give" -> give(a);
+            case "drop" -> drop(a);
+            case "ammo" -> ammo();
+            case "hud" -> {
+                if (!(getParent() instanceof DebugHarness h)) { print("no DebugHarness"); break; }
+                if (a.length >= 2) h.hud().setLevel(Integer.parseInt(a[1]));
+                print("hud level " + h.hud().levelNow());
+            }
             case "unlock" -> {
                 need(a, 2);
                 if (director == null) { print("no MissionDirector"); return; }
@@ -260,4 +276,89 @@ public class DebugConsole extends CanvasLayer {
     private static float f(String s) { return Float.parseFloat(s); }
 
     private static String orNone(String s) { return s == null || s.isEmpty() ? "(none)" : s; }
+
+    // ── Weapon spawning (the CS `give` / Unreal `summon` idiom, driven by the catalog) ─────────
+
+    /**
+     * Host or single player only: a weapon spawned here is a local node, and on a client nothing replicates it
+     * (a scene pickup's identity is its authored path), so it would exist on that peer alone.
+     */
+    private Player spawnPlayer() {
+        if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager net
+                && net.isNetworked() && !net.isServer()) {
+            print("weapon commands are host / single player only (a client's spawn would not replicate)");
+            return null;
+        }
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p) && p.isLocallyOwnedPlayer()) return p;
+        }
+        print("no local player");
+        return null;
+    }
+
+    private String weaponId(String[] a) {
+        if (a.length < 2) { print("usage: " + a[0] + " <id> — ids: " + String.join(" ", WeaponCatalog.spawnableIds())); return null; }
+        String id = WeaponCatalog.find(a[1]);
+        if (id == null) print("no weapon '" + a[1] + "' — ids: " + String.join(" ", WeaponCatalog.spawnableIds()));
+        return id;
+    }
+
+    private void give(String[] a) {
+        String id = weaponId(a);
+        Player p = id == null ? null : spawnPlayer();
+        if (p == null || p.weaponController == null) return;
+        WeaponItem item = WeaponCatalog.instantiate(id);
+        if (item == null) { print("could not load " + id); return; }
+        // the ordinary pickup path: in the tree first, then queued into the inventory
+        getTree().getCurrentScene().addChild(item);
+        item.setGlobalPosition(p.getGlobalPosition());
+        p.weaponController.requestEquip(item);
+        print("gave " + id);
+    }
+
+    private void drop(String[] a) {
+        java.util.List<String> ids;
+        if (a.length >= 2 && a[1].equalsIgnoreCase("all")) {
+            ids = WeaponCatalog.spawnableIds();
+        } else {
+            String id = weaponId(a);
+            if (id == null) return;
+            ids = java.util.List.of(id);
+        }
+        Player p = spawnPlayer();
+        if (p == null) return;
+        // a row across the player's view, 3 m ahead, dropped from 0.6 m so each falls onto whatever is there
+        Vector3 fwd = p.getNodeOrNull("ActiveCamera") instanceof godot.api.Node3D cam
+                ? cam.getGlobalBasis().getZ().times(-1.0) : p.getGlobalBasis().getZ().times(-1.0);
+        fwd = new Vector3(fwd.getX(), 0.0, fwd.getZ());
+        if (fwd.length() < 1e-3) fwd = new Vector3(0, 0, -1);
+        fwd = fwd.normalized();
+        Vector3 right = new Vector3(-fwd.getZ(), 0.0, fwd.getX());
+        double spacing = 0.9;
+        for (int i = 0; i < ids.size(); i++) {
+            WeaponItem item = WeaponCatalog.instantiate(ids.get(i));
+            if (item == null) continue;
+            double off = (i - (ids.size() - 1) / 2.0) * spacing;
+            getTree().getCurrentScene().addChild(item);   // wraps itself in a PickupBody and falls (W15)
+            item.setGlobalPosition(p.getGlobalPosition().plus(fwd.times(3.0)).plus(right.times(off))
+                    .plus(new Vector3(0, 0.6, 0)));
+        }
+        print("dropped " + String.join(" ", ids));
+    }
+
+    private void ammo() {
+        Player p = spawnPlayer();
+        if (p == null || p.weaponController == null) return;
+        int n = 0;
+        for (int i = 0; i < p.weaponController.slotCount(); i++) {
+            WeaponItem w = p.weaponController.getWeaponItem(i);
+            if (w == null) continue;
+            w.magazine = w.magazineSize;
+            w.reserve = w.reserveMax;
+            n++;
+        }
+        WeaponItem cur = p.weaponController.getCurrentWeaponItem();
+        if (cur != null) p.weaponController.ammoChanged.emit(cur.magazine, cur.reserve);   // the HUD's readout
+        print("refilled " + n + " weapon(s)");
+    }
 }

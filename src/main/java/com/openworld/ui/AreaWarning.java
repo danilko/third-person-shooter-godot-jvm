@@ -114,9 +114,9 @@ public class AreaWarning extends Control {
         float scale = h / 1080f;
         int fs = Math.max(10, Math.round(fontSize * scale));
         String line = "LEAVING THE AREA — turn back (" + Math.max(0L, Math.round(distance)) + " m)";
-        // Drawn text gets the same dark outline the game theme gives every Label (game_theme.tres).
+        // Drawn text gets the same thin outline the game theme gives every Label (HudPalette.OUTLINE).
         drawStringOutline(font, new Vector2(0f, h * 0.22f), line, HorizontalAlignment.CENTER, w, fs,
-                Math.max(2, Math.round(3 * scale)), new Color(0f, 0f, 0f, 0.85f));
+                Math.max(HudPalette.OUTLINE_PX, Math.round(HudPalette.OUTLINE_PX * scale)), HudPalette.OUTLINE);
         drawString(font, new Vector2(0f, h * 0.22f), line, HorizontalAlignment.CENTER, w, fs, textColor);
     }
 

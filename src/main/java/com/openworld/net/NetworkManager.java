@@ -184,6 +184,30 @@ public class NetworkManager extends Node {
 
     /** Sends an already-framed `[u8 msgType][...]` payload to one peer on its assigned channel/flags. No-op if not connected or the target is unknown. */
     public void sendMessage(int targetPeerId, PackedByteArray framedPayload) {
+        if (debugSendDelayMs > 0) {
+            delayedSends.add(new DelayedSend(nowMs() + debugSendDelayMs, targetPeerId, framedPayload));
+            return;
+        }
+        sendNow(targetPeerId, framedPayload);
+    }
+
+    /**
+     * Test-only latency (PLAN.md N5 gate): every outgoing message is held this many milliseconds, in
+     * order, before ENet sees it. 0 = off, which is the only value the game uses.
+     */
+    public int debugSendDelayMs = 0;
+    private record DelayedSend(int dueMs, int targetPeerId, PackedByteArray payload) { }
+    private final java.util.ArrayDeque<DelayedSend> delayedSends = new java.util.ArrayDeque<>();
+
+    private void flushDelayedSends() {
+        int now = nowMs();
+        while (!delayedSends.isEmpty() && now - delayedSends.peekFirst().dueMs() >= 0) {
+            DelayedSend d = delayedSends.pollFirst();
+            sendNow(d.targetPeerId(), d.payload());
+        }
+    }
+
+    private void sendNow(int targetPeerId, PackedByteArray framedPayload) {
         ENetPacketPeer target = amServer ? peersById.get(targetPeerId)
                 : (targetPeerId == SERVER_PEER_ID ? serverPeer : null);
         if (target == null) return;
@@ -251,6 +275,7 @@ public class NetworkManager extends Node {
     @Override
     public void _process(double delta) {
         if (connection == null) return;
+        if (!delayedSends.isEmpty()) flushDelayedSends();
         int now = nowMs();
         if (now - lastNetStatsDumpMs >= NETSTATS_DUMP_INTERVAL_MS) {
             lastNetStatsDumpMs = now;
@@ -470,6 +495,8 @@ public class NetworkManager extends Node {
     public void _physicsProcess(double delta) {
         if (!isNetworked() || !amServer) return;
         int now = nowMs();
+        // N5: the hitbox history, on the same clock and at the same moment snapshots are stamped with.
+        if (!peersById.isEmpty()) lagCompensator.record(getTree(), now);
         if (now - lastSnapshotBroadcastMs < REPLICATION_INTERVAL_MS) return;
         lastSnapshotBroadcastMs = now;
 
@@ -865,8 +892,39 @@ public class NetworkManager extends Node {
      */
     private void handleSnapshotBatchMessage(int senderPeerId, StreamPeerBuffer buf) {
         for (NetMessageCodec.DecodedSnapshot snap : NetMessageCodec.decodeSnapshotBatch(buf)) {
+            if (!amServer) noteHostTime(snap.senderTimeMs());
             applySnapshotEntry(senderPeerId, snap);
         }
+    }
+
+    // ── Lag compensation (PLAN.md N5) ─────────────────────────────────────────
+
+    /** Host: rewind a client's shot to the host time it saw. Off only for the N5 gate's control. */
+    public boolean lagCompensation = true;
+    private final LagCompensator lagCompensator = new LagCompensator();
+    /** Client: the newest host snapshot time, and this peer's clock when it arrived. */
+    private boolean haveHostTime;
+    private int newestHostTimeMs;
+    private int newestHostTimeLocalMs;
+
+    private void noteHostTime(int hostMs) {
+        if (haveHostTime && hostMs - newestHostTimeMs <= 0) return;
+        haveHostTime = true;
+        newestHostTimeMs = hostMs;
+        newestHostTimeLocalMs = nowMs();
+    }
+
+    /**
+     * Client: the host time its screen shows right now. A remote body is drawn at its newest snapshot
+     * dead-reckoned forward by the time since it arrived, capped like the interpolator's projection
+     * ({@link SnapshotInterpolator}), so that is the time this returns. 0 before any snapshot (the host
+     * then rewinds by its cap at most, and only for a view it can place in its own past).
+     */
+    public int hostViewTimeMs() {
+        if (!haveHostTime) return 0;
+        int projected = Math.min(nowMs() - newestHostTimeLocalMs,
+                (int) Math.round(SnapshotInterpolator.DEFAULT_MAX_PROJECTION_SECONDS * 1000.0));
+        return newestHostTimeMs + Math.max(0, projected);
     }
 
     /** Shared by {@link #handleSnapshotMessage} and {@link #handleSnapshotBatchMessage} — validate, locate, hand to NetworkController. */
@@ -1345,8 +1403,22 @@ public class NetworkManager extends Node {
             return;
         }
         com.openworld.net.NetStats.increment("shot_accepted");
-        java.util.List<String> hits = firearm.resolveServerShot(shot.origin(), shot.aim(), shot.spreadDeg(),
-                shot.shotSeq(), shot.shooterCharacterId(), shot.weaponSlot(), senderPeerId);
+        int now = nowMs();
+        int rewindMs = lagCompensation ? LagCompensation.rewindMs(now, shot.viewTimeMs(), LagCompensation.MAX_REWIND_MS) : 0;
+        LagCompensator.Rewind rewind = lagCompensator.rewind(shooter, shot.origin(), shot.aim(),
+                firearm.serverShotRange(), shot.spreadDeg(), now, rewindMs);
+        if (rewind.bodies > 0) com.openworld.net.NetStats.increment("shot_rewound");
+        java.util.List<String> hits;
+        try {
+            hits = firearm.resolveServerShot(shot.origin(), shot.aim(), shot.spreadDeg(),
+                    shot.shotSeq(), shot.shooterCharacterId(), shot.weaponSlot(), senderPeerId);
+        } finally {
+            rewind.restore();
+        }
+        if (debugShots) {
+            GD.print(String.format("[shot] host rewind #%d %d ms, %d bodies, shift %.2f m, chest %.2f m off the line",
+                    shot.shotSeq(), rewindMs, rewind.bodies, rewind.maxShiftM, rewind.nearestLineM));
+        }
         if (debugShots) {
             int hitCount = 0;
             for (String h : hits) if (!"-".equals(h)) hitCount++;
@@ -2304,6 +2376,9 @@ public class NetworkManager extends Node {
         lastAcceptedUpstream.clear();
         lastOwnedStateSendMsById.clear();
         com.openworld.weapon.ProjectileLedger.clear();   // N4: cosmetic copies belong to the session
+        lagCompensator.clear();
+        haveHostTime = false;
+        delayedSends.clear();
     }
 
     /**
@@ -2329,6 +2404,34 @@ public class NetworkManager extends Node {
     /** True once a raw ENet connection is active — i.e. this session is networked at all. */
     public boolean isNetworked() {
         return connection != null;
+    }
+
+    private long netLineAtMs = 0;
+
+    /**
+     * One-line network health for the debug HUD (the CS {@code net_graph} idea): role, peers, mean round trip and
+     * reliable-packet loss over the connected peers (ENet's own per-peer statistics), and in/out kbit/s since the
+     * previous call. Reading the byte counters RESETS them ({@code ENetConnection.popStatistic}); nothing else reads
+     * them. "offline" when the session is not networked.
+     */
+    public String debugNetLine() {
+        if (connection == null) return "net offline";
+        long now = System.currentTimeMillis();
+        double secs = netLineAtMs == 0 ? 0.0 : (now - netLineAtMs) / 1000.0;
+        netLineAtMs = now;
+        double sent = connection.popStatistic(godot.api.ENetConnection.HostStatistic.TOTAL_SENT_DATA);
+        double recv = connection.popStatistic(godot.api.ENetConnection.HostStatistic.TOTAL_RECEIVED_DATA);
+        double rtt = 0.0, loss = 0.0;
+        int n = 0;
+        for (ENetPacketPeer p : peersById.values()) {
+            if (p == null || p.getState() != ENetPacketPeer.PeerState.STATE_CONNECTED) continue;
+            rtt += p.getStatistic(ENetPacketPeer.PeerStatistic.ROUND_TRIP_TIME);
+            loss += p.getStatistic(ENetPacketPeer.PeerStatistic.PACKET_LOSS) / 65536.0;
+            n++;
+        }
+        return String.format("net %s  peers %d  rtt %.0fms  loss %.1f%%  in %.1f  out %.1f kbit/s",
+                amServer ? "host" : "client", n, n > 0 ? rtt / n : 0.0, n > 0 ? 100.0 * loss / n : 0.0,
+                secs > 0 ? recv * 8 / 1000.0 / secs : 0.0, secs > 0 ? sent * 8 / 1000.0 / secs : 0.0);
     }
 
     /** True when this peer is the authority (server/host). Single-player counts as authority. */
@@ -2392,8 +2495,9 @@ public class NetworkManager extends Node {
             float spreadDeg) {
         if (!isNetworked() || isServer()) return;
         com.openworld.net.NetStats.increment("shot_sent");
+        int view = hostViewTimeMs();
         sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeShot(MSG_SHOT, shooterCharacterId, weaponSlot, shotSeq,
-                origin, aim, spreadDeg));
+                origin, aim, spreadDeg, view));
     }
 
     // ── Damage authority + event broadcasts (Part G — Step 3) ────────────────
@@ -2521,6 +2625,15 @@ public class NetworkManager extends Node {
                         com.openworld.game.GameManager.WORLD_EVENT_BREAKABLE, b.breakableId, 1f,
                         java.util.List.of()));
             }
+        }
+    }
+
+    /** Server → one peer: every street pole knocked down and not back yet (PLAN.md 3.11), as the live events. */
+    public void sendBaselineBreakableProps(int targetPeerId) {
+        if (!isServer()) return;
+        for (String key : com.openworld.world.BreakableProps.brokenKeys()) {
+            sendWorldEventTo(targetPeerId, com.openworld.game.GameManager.WORLD_EVENT_PROP_BROKEN, key, 1f,
+                    java.util.List.of());
         }
     }
 

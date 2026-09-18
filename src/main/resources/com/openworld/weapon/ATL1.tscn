@@ -4,7 +4,7 @@
 [ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/ATL1.tres" id="90_stats"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/ProjectileItem.java" id="1_pi"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/ATL1Projectile.tscn" id="2_proj"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/MuzzleVFX.tscn" id="3_muzzle"]
+[ext_resource type="PackedScene" path="res://assets/vfx/muzzle_flash/effects/big_flash/big_flash_01.tscn" id="3_muzzle"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_atl4_body"]
 top_radius = 0.045
@@ -36,6 +36,8 @@ holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolste
 magazine = 1
 reserve = 3
 require_interact = true
+explosion_radius = 7.0
+explosion_max_damage = 320.0
 
 [node name="Body" type="MeshInstance3D" parent="." unique_id=200200007]
 transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, 0, 0.055, -0.1133)

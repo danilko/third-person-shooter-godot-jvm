@@ -1,85 +1,67 @@
 package com.openworld.ui;
 
-import com.openworld.character.Health;
 import com.openworld.carrier.vehicle.Vehicle;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
-import godot.api.*;
+import godot.api.Control;
+import godot.api.Label;
+import godot.api.Node3D;
 import godot.core.NodePath;
-import godot.global.GD;
 
 /**
- * In-vehicle HUD — shown by HUDManager when the player boards a vehicle.
+ * In-vehicle HUD, bottom-right where the weapon panel sits on foot: the speed, and beside it a small top-down
+ * damage diagram ({@link VehicleStatus}: body coloured by health, a square per wheel for its tire). No health
+ * NUMBER — the diagram's colours say how bad it is, and the car itself smokes and burns ({@code Vehicle}'s damage
+ * tiers). The player's own health stays under the minimap.
  *
- * Polls the vehicle node each _process frame (no signals needed — speed
- * changes continuously). HUDManager calls setVehicle() before activating
- * this HUD and passes null on exit.
- *
- * Scene layout (VehicleHUD.tscn):
- *   Speed panel  — bottom-centre, large km/h reading
- *   Health panel — bottom-left,   vehicle HP
+ * Polls the vehicle each frame (speed changes continuously); HUDManager calls {@link #setVehicle} on enter
+ * and passes null on exit.
  */
 @Script(className = "VehicleHUD")
 public class VehicleHUD extends Control {
 
-    @Export
-    public NodePath speedLabelPath = new NodePath("Speed/ColorRect/SpeedValue");
+    @Export public NodePath speedLabelPath = new NodePath("Speed/Value");
+    @Export public NodePath unitLabelPath = new NodePath("Speed/Unit");
+    /** Show mph instead of km/h. */
+    @Export public boolean imperial = false;
 
-    @Export
-    public NodePath healthLabelPath = new NodePath("Health/ColorRect/Health");
-
-    private RichTextLabel speedLabel;
-    private Label healthLabel;
+    private Label speedLabel;
+    private VehicleStatus status;
     private Vehicle vehicle;
+    private int shown = Integer.MIN_VALUE;
 
     @Register
     @Override
     public void _ready() {
-        Node s = getNodeOrNull(speedLabelPath);
-        if (s instanceof RichTextLabel l) { speedLabel = l;}
-        else {
-            GD.print("speedLabelPath not found or not text label" + s.getName());
-        }
-        Node h = getNodeOrNull(healthLabelPath);
-        if (h instanceof Label l) healthLabel = l;
+        if (getNodeOrNull(speedLabelPath) instanceof Label l) speedLabel = l;
+        if (getNodeOrNull(unitLabelPath) instanceof Label u) u.setText(imperial ? "mph" : "km/h");
+        if (getNodeOrNull("Speed/Status") instanceof VehicleStatus vs) status = vs;
     }
 
     @Register
     @Override
     public void _process(double delta) {
-        if (vehicle == null) return;
-
-        if (speedLabel != null) {
-
-            var speed = -vehicle.getGlobalBasis().getZ().dot(vehicle.getLinearVelocity());
-
-            // Car motor
-            var cfg = vehicle.getConfig();
-            var speedRatio = speed / cfg.maxSpeed;
-            var accelerationRatio = cfg.accelerationCurve != null
-                    ? cfg.accelerationCurve.sampleBaked((float) speedRatio)
-                    : Math.max(0.0, 1.0 - speedRatio);
-            var accelerationForce = accelerationRatio * cfg.acceleration;
-
-            speedLabel.setText(String.format("Speed: %4.1f m/s | %4.1f km/h | %4.1f mph\nMotoRatio: %.0f\nAccelForce: %.0f", speed, speed*3.6, speed*2.237, speedRatio * 100, accelerationForce));
-
-        }
-
-        if (healthLabel != null) {
-            Node healthNode = vehicle.getNodeOrNull("Health");
-            if (healthNode instanceof Health h) {
-                healthLabel.setText(String.valueOf((int) h.getCurrentHealth()));
-            }
+        if (vehicle == null || speedLabel == null) return;
+        var v = vehicle.getLinearVelocity();
+        double ms = Math.hypot(v.getX(), v.getZ());           // ground speed, sign-free (reversing reads positive)
+        int value = (int) Math.round(ms * (imperial ? 2.23694 : 3.6));
+        if (value != shown) {
+            shown = value;
+            speedLabel.setText(String.valueOf(value));
         }
     }
 
     /** Called by HUDManager when the player enters/exits a vehicle. */
     public void setVehicle(Node3D v) {
-        vehicle = (Vehicle) v;
-        if (v == null) {
-            if (speedLabel  != null) speedLabel.setText("---");
-            if (healthLabel != null) healthLabel.setText("---");
-        }
+        vehicle = v instanceof Vehicle car ? car : null;
+        shown = Integer.MIN_VALUE;
+        if (status != null) status.setVehicle(vehicle);
+        if (vehicle == null && speedLabel != null) speedLabel.setText("0");
     }
+
+    /** Readout for probes. */
+    @Register
+    public String speedTextNow() { return speedLabel != null ? speedLabel.getText() : ""; }
+
 }

@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/vehicle/VehicleWheel.tscn" id="6_wheel"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="7_cam"]
 [ext_resource type="Curve" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="8_grip"]
+[ext_resource type="PackedScene" path="res://assets/vfx/explosion/effects/burst/vfx_burst_explosion_01.tscn" id="fx_blast"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_moto"]
 friction = 0.0
@@ -25,6 +26,7 @@ tire_max_turn_degrees = 32.0
 upright_torque = 6000.0
 grounded_angular_damp = 3.0
 wreck_scene = ExtResource("5_wreck")
+explosion_vfx = ExtResource("fx_blast")
 
 [sub_resource type="BoxMesh" id="BoxMesh_moto"]
 size = Vector3(0.4, 0.6, 2.0)
@@ -48,6 +50,8 @@ vehicle_config = SubResource("Resource_moto_cfg")
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_h")
 max_health = 200.0
+hit_damage_multiplier = 0.4
+explosion_damage_multiplier = 2.5
 
 [node name="BodyMesh" type="Node3D" parent="."]
 

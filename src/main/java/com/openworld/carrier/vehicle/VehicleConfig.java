@@ -409,6 +409,11 @@ public class VehicleConfig extends Resource {
     /** Physics push force applied to bodies caught in the blast. */
     @Export public float explosionPushForce = 25f;
 
+    /** The blast effect the destroyed vehicle draws (a scene under assets/vfx/explosion/effects/; null = the manager's). */
+    @Export public godot.api.PackedScene explosionVfx;
+    /** Extra size multiplier on the blast effect; at 1 its shockwave ends exactly at the damage radius (ExplosionManager.playBlast). */
+    @Export public float explosionVfxScale = 1.0f;
+
     // ── Damage-tier VFX ───────────────────────────────────────────────────
 
     /** Health fraction below which the engine smokes (grey plume). */

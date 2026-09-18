@@ -195,6 +195,8 @@ def verify_and_export(w):
 
 
 rows = [w for w in cfg["weapons"] if not wanted or w["id"] in wanted]
+rows += [dict(v, id=k) for table in ("projectiles", "equipment") for k, v in cfg.get(table, {}).items()
+         if k != "note" and (not wanted or k in wanted)]
 for w in rows:
     verify_and_export(w)
 print(f"[build_weapon] exported {len(rows)} weapon(s)")

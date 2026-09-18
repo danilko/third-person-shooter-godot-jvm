@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://src/main/java/com/openworld/character/CharacterInfo.java" id="4_ci"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/vehicle/VehicleWreck.tscn" id="5_wreck"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/camera/VehicleCameraController.java" id="7_cam"]
+[ext_resource type="PackedScene" path="res://assets/vfx/explosion/effects/burst/vfx_burst_explosion_01.tscn" id="fx_blast"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_boat"]
 friction = 0.0
@@ -24,6 +25,7 @@ grounded_angular_damp = 2.5
 hull_half_width = 1.0
 hull_half_length = 2.0
 wreck_scene = ExtResource("5_wreck")
+explosion_vfx = ExtResource("fx_blast")
 
 [sub_resource type="BoxMesh" id="BoxMesh_boat"]
 size = Vector3(2.2, 0.8, 4.6)
@@ -47,6 +49,8 @@ vehicle_config = SubResource("Resource_boat_cfg")
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_h")
 max_health = 400.0
+hit_damage_multiplier = 0.4
+explosion_damage_multiplier = 2.5
 
 [node name="BodyMesh" type="Node3D" parent="."]
 

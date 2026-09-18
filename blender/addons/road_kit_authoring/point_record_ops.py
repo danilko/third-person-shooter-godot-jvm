@@ -159,6 +159,45 @@ def split_road(net, uids, name=""):
     return "%d point(s) -> %s" % (len(moving), dst.name), {"road": dst.name}
 
 
+def split_at_joint(net, uid, name=""):
+    """Cut a road in two AT a station, keeping the road continuous: the station becomes a JOINT --
+    itself the last point of its road, and an exact copy (new uid) the first point of a new road
+    holding the rest of the chain, the two SEGMENT-linked. That is the shape the seeder's corner
+    fillets already build (W15), so every downstream rule treats it as one road running on:
+    `point_export.wire_joints` hands the lanes over, and the zone cut may put the halves in
+    different pieces (PLAN.md 3.10 -- `tools/island_road_zones.py` cuts at a 504 m grid with it).
+
+    THE FACING IS FROZEN FIRST. A road end takes its own last chord as its axis, so on a curve the
+    two halves would cut their sections on different planes and open a gap; both halves get the
+    facing the unsplit chain gave the station (`chain_facings`), MANUAL, and so agree exactly.
+    Refused at a run end (that is already a joint or a mouth) and where an aux lane is open, since
+    a joint across a gore would cut the ramp's run from the lane it leaves."""
+    road = _road_of(net, uid)
+    chain = [u for u in road.points if u in net.points]
+    i = chain.index(uid)
+    if i == 0 or i == len(chain) - 1:
+        raise GestureError("%s is an end of %s -- nothing to split" % (uid, road.name))
+    p = net.points[uid]
+    prev, nxt = chain[i - 1], chain[i + 1]
+    if not (p.has_link(prev, pm.LINK_SEGMENT) and p.has_link(nxt, pm.LINK_SEGMENT)):
+        raise GestureError("%s is not inside a run of %s" % (uid, road.name))
+    rp_ = net.resolved(uid)
+    if rp_.aux_fwd or rp_.aux_bwd or p.targets(pm.LINK_AUX) or p.targets(pm.LINK_JUNCTION):
+        raise GestureError("%s carries a ramp or junction link -- split elsewhere" % uid)
+    if p.tangent_mode != pm.MANUAL or p.tangent is None:
+        p.tangent_mode, p.tangent = pm.MANUAL, pp.chain_facings(net)[uid]
+    q = p.copy()
+    q.uid = pm.new_uid()
+    q.links = []
+    net.add_point(q)
+    dst = _clone_road(net, road, _unique_road_name(net, name or (road.name + "__2")), chain[i + 1:])
+    dst.points.insert(0, q.uid)
+    net.unlink(uid, nxt)
+    net.link(q.uid, nxt, pm.LINK_SEGMENT)
+    net.link(uid, q.uid, pm.LINK_SEGMENT)
+    return "%s split at %s -> %s" % (road.name, uid, dst.name), {"road": dst.name, "joint": q.uid}
+
+
 def _clone_road(net, src, name, moving):
     kw = {n: getattr(src, n) for n, _k, _d in pm.ROAD_FIELDS if n != "name"}
     dst = pm.RoadData(name, src.base.copy(), (), **kw)
@@ -508,6 +547,49 @@ def self_test():
     net.link(extra_pts[0].uid, extra_pts[1].uid)
     tidy_roads(net)
     assert "a_2" in net.roads and net.roads["a_2"].points == [p.uid for p in extra_pts]
+    ok += 1
+
+    # split_at_joint: two roads meeting at coincident, SEGMENT-linked stations with ONE facing; the
+    # lanes run on through it with the same centreline, and an end or a mouth is refused.
+    try:
+        from . import point_export as pe
+    except ImportError:
+        import point_export as pe                                            # noqa: E402
+    net = pm.NetworkData()
+    a = pm.RoadData("a", pm.PointData(uid=""), ())
+    net.add_road(a)
+    prev = None
+    for i in range(7):
+        t = i * 0.35                                     # a curve, so the ends' chords disagree
+        p = net.add_station(a, (200.0 * math.sin(t), 200.0 * (1 - math.cos(t)), 0.0))
+        if prev is not None:
+            net.link(prev.uid, p.uid)
+        prev = p
+    before = pe.export_network(net)
+    mid = a.points[3]
+    face = pp.chain_facings(net)[mid]
+    msg, extra = split_at_joint(net, mid, "a__2")
+    q = net.points[extra["joint"]]
+    assert net.roads["a"].points[-1] == mid and net.roads["a__2"].points[0] == q.uid, msg
+    assert math.dist(q.pos, net.points[mid].pos) < 1e-5 and net.points[mid].has_link(q.uid, pm.LINK_SEGMENT)
+    assert math.dist(net.points[mid].tangent, face) < 1e-5 and math.dist(q.tangent, face) < 1e-5
+    assert q.tangent_mode == pm.MANUAL
+    after = pe.export_network(net)
+    for side in ("F", "R"):
+        old = [(u, v) for l in before["lanes"] if l["id"].startswith("a_%s" % side)
+               for u, v in zip(l["points"], l["points"][1:])]
+        new = [pt for l in after["lanes"] if l.get("road_name") in ("a", "a__2")
+               and l["id"].split("_")[-1].startswith(side) for pt in l["points"]]
+        assert new and old
+        for pt in new:
+            near = min(math.dist(pt, u) + math.dist(pt, v) - math.dist(u, v) for u, v in old)
+            assert near < 1e-3, ("joint moved a lane", side, pt, near)
+    for bad in (a.points[0], mid):
+        try:
+            split_at_joint(net, bad)
+            raise AssertionError("split at a road end accepted")
+        except GestureError:
+            pass
     ok += 1
 
     # renumber: an order the links contradict is put back.

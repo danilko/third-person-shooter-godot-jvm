@@ -69,8 +69,8 @@ import godot.api.OS;
  * Shift+F5 — reloadNearestZone(): hot-reloads the district the player is standing in, bypassing
  *       the resource cache — rebake with tools/build_piece.sh, press, see the change in place
  *       (plain F5 stays bakeWorld).
- * Shift+F3 — togglePerfOverlay(): engine perf-monitor HUD (FPS/draw calls/primitives/memory/
- *       orphans + streaming counters) — see PerfDebugOverlay.
+ * Shift+F3 — cycle the debug HUD (PerfDebugOverlay): FPS corner -> perf panel + frame-time graph ->
+ *       + live game state (player, weapon, aim, network) -> off. Console: `hud 0-3`.
  * F3  — toggleRouteOverlay(): 3D line-draw of every registered VehicleRoute (driven path, colored
  *       turn connectors, DESPAWN crosses) + IntersectionZone boxes — see RouteDebugOverlay.
  * F6  — NetworkManager.hostServer(DEBUG_PORT): starts an ENet server for LAN testing
@@ -199,17 +199,24 @@ public class DebugHarness extends Node {
      * {@code tools/build_piece.sh} rebake, re-streams the zone from disk (cache-bypassing) so the
      * change shows up without restarting the game. See {@link ZoneManager#reloadZone}.
      */
-    /** Shift+F3 — toggle the engine perf-monitor HUD. Lazily built (CanvasLayer renders from
-     * anywhere in the tree, so no scene wiring is needed — available in every DebugHarness scene). */
+    /**
+     * Shift+F3 — cycle the debug HUD: off → FPS corner → perf panel + frame graph → + game state → off
+     * ({@link PerfDebugOverlay}). Lazily built (a CanvasLayer renders from anywhere in the tree, so no scene wiring
+     * is needed — available in every DebugHarness scene); the first press shows the FPS corner.
+     */
     private void togglePerfOverlay() {
+        hud().cycle();
+        GD.print("DebugHarness: debug HUD level " + perfOverlay.levelNow());
+    }
+
+    /** The debug HUD, built on first use at level 0. Also the console's {@code hud} command. */
+    PerfDebugOverlay hud() {
         if (perfOverlay == null || !GD.isInstanceValid(perfOverlay)) {
             perfOverlay = new PerfDebugOverlay();
             addChild(perfOverlay);
-            GD.print("DebugHarness: perf overlay ON");
-            return;
+            perfOverlay.setLevel(0);
         }
-        perfOverlay.setVisible(!perfOverlay.isVisible());
-        GD.print("DebugHarness: perf overlay " + (perfOverlay.isVisible() ? "ON" : "OFF"));
+        return perfOverlay;
     }
 
     /** F3 — toggle the route/junction 3D debug-draw. Parented to this harness (a plain Node, so

@@ -1,33 +1,34 @@
 [gd_scene format=3 uid="uid://dtlryojg3n01y"]
 
 [ext_resource type="Script" path="res://src/main/java/com/openworld/ui/CharacterHUD.java" id="1_2lu2a"]
-[ext_resource type="FontFile" uid="uid://btgb34w8m7xgt" path="res://assets/ui/DSEG7ClassicMini-Bold.ttf" id="4_f5mbb"]
+[ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="2_font"]
+[ext_resource type="StyleBox" path="res://src/main/resources/com/openworld/ui/hud_panel.tres" id="hud_panel"]
 
-[sub_resource type="LabelSettings" id="LabelSettings_large"]
-font = ExtResource("4_f5mbb")
-font_size = 30
-outline_size = 8
-outline_color = Color(0.023529412, 0.46666667, 1, 1)
+[sub_resource type="LabelSettings" id="LabelSettings_value"]
+font = ExtResource("2_font")
+font_size = 16
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.55)
 
 [sub_resource type="LabelSettings" id="LabelSettings_small"]
-font = ExtResource("4_f5mbb")
-font_size = 20
-outline_size = 3
-outline_color = Color(0.023529412, 0.46666667, 1, 1)
+font = ExtResource("2_font")
+font_size = 11
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.55)
 
-[sub_resource type="StyleBoxFlat" id="StyleBox_oxbg"]
-bg_color = Color(0, 0.05, 0.1, 0.55)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
+[sub_resource type="StyleBoxFlat" id="StyleBox_barbg"]
+bg_color = Color(0, 0, 0, 0.45)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_oxfill"]
-bg_color = Color(0.2, 0.75, 1, 0.9)
-corner_radius_top_left = 3
-corner_radius_top_right = 3
-corner_radius_bottom_right = 3
-corner_radius_bottom_left = 3
+bg_color = Color(0.45, 0.8, 1, 0.95)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 [node name="FootHUD" type="Control" unique_id=1962846644]
 layout_mode = 3
@@ -36,115 +37,138 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 script = ExtResource("1_2lu2a")
+health_label_path = NodePath("Health/Value")
+health_bar_path = NodePath("Health/Bar")
 
 [node name="Health" type="Control" parent="." unique_id=974714568]
 layout_mode = 1
-anchor_left = 0.034722224
-anchor_top = -0.061728396
-anchor_right = 0.15625
-anchor_bottom = 0.061728396
-offset_left = -10.0
-offset_top = 560.0
-offset_right = 29.99968
-offset_bottom = 560.0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -40.0
+offset_right = 180.0
+offset_bottom = -20.0
+grow_vertical = 0
+mouse_filter = 2
 
-[node name="ColorRect" type="ColorRect" parent="Health" unique_id=1412301142]
+[node name="Background" type="Panel" parent="Health"]
+show_behind_parent = true
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -6.0
+offset_top = -4.0
+offset_right = 6.0
+offset_bottom = 4.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0.35235986, 0.64161503, 0.28235295)
+mouse_filter = 2
+theme_override_styles/panel = ExtResource("hud_panel")
 
-[node name="Health" type="Label" parent="Health/ColorRect" unique_id=536381731]
+[node name="Value" type="Label" parent="Health" unique_id=536381731]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
-offset_left = 10.0
-offset_top = -11.5
-offset_right = 50.0
-offset_bottom = 11.5
+offset_top = -10.0
+offset_right = 40.0
+offset_bottom = 10.0
 grow_vertical = 2
 text = "100"
-label_settings = SubResource("LabelSettings_large")
+label_settings = SubResource("LabelSettings_value")
+vertical_alignment = 1
 
-[node name="Slash" type="Label" parent="Health/ColorRect" unique_id=425496442]
+[node name="Bar" type="ProgressBar" parent="Health" unique_id=425496442]
 layout_mode = 1
-anchors_preset = 4
+anchors_preset = -1
 anchor_top = 0.5
+anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = 89.0
-offset_top = -19.0
-offset_right = 129.0
-offset_bottom = 19.0
+offset_left = 44.0
+offset_top = -3.0
+offset_bottom = 3.0
+grow_horizontal = 2
 grow_vertical = 2
-text = "/"
-label_settings = SubResource("LabelSettings_large")
-clip_text = true
-
-[node name="Total" type="Label" parent="Health/ColorRect" unique_id=959130993]
-layout_mode = 1
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 120.0
-offset_top = -5.0
-offset_right = 180.0
-offset_bottom = 25.0
-grow_vertical = 2
-text = "100"
-label_settings = SubResource("LabelSettings_small")
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBox_barbg")
+show_percentage = false
+value = 100.0
 
 [node name="Oxygen" type="Control" parent="." unique_id=771203945]
 visible = false
 layout_mode = 1
-anchor_left = 0.5
-anchor_top = 0.0
-anchor_right = 0.5
-anchor_bottom = 0.0
-offset_left = -110.0
-offset_top = 70.0
-offset_right = 110.0
-offset_bottom = 104.0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -68.0
+offset_right = 180.0
+offset_bottom = -52.0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="Background" type="Panel" parent="Oxygen"]
+show_behind_parent = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -6.0
+offset_top = -4.0
+offset_right = 6.0
+offset_bottom = 4.0
 grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = ExtResource("hud_panel")
 
 [node name="Air" type="Label" parent="Oxygen" unique_id=771203946]
 layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 16.0
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_top = -8.0
+offset_right = 40.0
+offset_bottom = 8.0
+grow_vertical = 2
 text = "AIR"
 label_settings = SubResource("LabelSettings_small")
-horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Bar" type="ProgressBar" parent="Oxygen" unique_id=771203947]
 layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
+anchors_preset = -1
+anchor_top = 0.5
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -14.0
+anchor_bottom = 0.5
+offset_left = 44.0
+offset_top = -2.0
+offset_bottom = 2.0
 grow_horizontal = 2
-grow_vertical = 0
-theme_override_styles/background = SubResource("StyleBox_oxbg")
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBox_barbg")
 theme_override_styles/fill = SubResource("StyleBox_oxfill")
 show_percentage = false
 value = 100.0
 
 [node name="InteractPrompt" type="Label" parent="." unique_id=500797350]
+visible = false
 layout_mode = 1
-anchors_preset = 7
+anchors_preset = 8
 anchor_left = 0.5
-anchor_top = 1.0
+anchor_top = 0.5
 anchor_right = 0.5
-anchor_bottom = 1.0
+anchor_bottom = 0.5
 offset_left = -200.0
-offset_top = -199.0
+offset_top = 60.0
 offset_right = 200.0
-offset_bottom = -169.0
+offset_bottom = 82.0
 grow_horizontal = 2
-grow_vertical = 0
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_value")
 horizontal_alignment = 1

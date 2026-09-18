@@ -69,6 +69,13 @@ public class VehicleWheel extends RayCast3D {
 
     public boolean isFlat() { return flat; }
 
+    /** 0..1 tire health for the HUD's damage diagram (1 = undamaged, 0 = flat). */
+    public float tireFraction() {
+        if (flat) return 0f;
+        if (cfg == null || cfg.tireMaxHealth <= 0f || tireHealth == Float.MAX_VALUE) return 1f;
+        return Math.max(0f, Math.min(1f, tireHealth / cfg.tireMaxHealth));
+    }
+
     /** Effective rolling radius — a flat rides on the rim. */
     private float effRadius() { return flat ? cfg.wheelRadius * cfg.flatRadiusScale : cfg.wheelRadius; }
 

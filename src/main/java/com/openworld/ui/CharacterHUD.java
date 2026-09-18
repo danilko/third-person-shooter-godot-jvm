@@ -11,9 +11,11 @@ import godot.core.NodePath;
 import godot.core.StringNames;
 import com.openworld.character.Health;
 import com.openworld.weapon.WeaponController;
+import godot.core.Color;
 
 /**
- * Per-character HUD: health label and interact prompt.
+ * Per-character HUD: the bottom-left health number + bar (under the minimap), the swim air bar above it,
+ * and the interact prompt just under the crosshair.
  *
  * Transient toasts (weapon pickups, mission events) and the kill feed are owned by
  * {@link HUDManager} and rendered through the shared {@link Feed} components, so this
@@ -23,9 +25,16 @@ import com.openworld.weapon.WeaponController;
 public class CharacterHUD extends Control {
 
   @Export
-  public NodePath healthLabelPath = new NodePath("Health/ColorRect/Health");
+  public NodePath healthLabelPath = new NodePath("Health/Value");
+
+  /** Thin health bar beside the number (bottom-left, under the minimap). */
+  @Export
+  public NodePath healthBarPath = new NodePath("Health/Bar");
 
   private Label healthLabel;
+  private ProgressBar healthBar;
+  private StyleBoxFlat healthFill;
+  private float maxHealth = 100f;
   private Label interactPromptLabel;
   /** Swim breath meter root (shown only while submerged) + its fill bar. Optional in the scene. */
   private Control oxygenRoot;
@@ -35,8 +44,13 @@ public class CharacterHUD extends Control {
   @Register
   @Override
   public void _ready() {
-    if (hasNode(healthLabelPath)) {
-      healthLabel = (Label) getNode(healthLabelPath);
+    if (getNodeOrNull(healthLabelPath) instanceof Label l) healthLabel = l;
+    if (getNodeOrNull(healthBarPath) instanceof ProgressBar b) {
+      healthBar = b;
+      healthFill = new StyleBoxFlat();          // this HUD's own fill, recoloured by health
+      healthFill.setCornerRadiusAll(2);
+      healthFill.setBgColor(HudPalette.TEXT);
+      healthBar.addThemeStyleboxOverride(new godot.core.StringName("fill"), healthFill);
     }
 
     Node promptNode = getNodeOrNull("InteractPrompt");
@@ -88,8 +102,20 @@ public class CharacterHUD extends Control {
   @Register
   public void onHealthChanged(float currentHealth) {
     if (healthLabel != null) {
-      healthLabel.setText(String.valueOf((int) currentHealth));
+      healthLabel.setText(String.valueOf((int) Math.ceil(Math.max(0f, currentHealth))));
     }
+    if (healthBar != null) {
+      healthBar.setValue(maxHealth > 0f ? 100.0 * Math.max(0f, currentHealth) / maxHealth : 0.0);
+      // white, amber under 50%, red under 25% (HudPalette); the number follows the bar
+      Color c = HudPalette.forFraction(maxHealth > 0f ? currentHealth / maxHealth : 0f);
+      if (healthFill != null) healthFill.setBgColor(c);
+      if (healthLabel != null) healthLabel.setModulate(c);
+    }
+  }
+
+  /** The bar's full value, from the wired player's Health (HUDManager.wirePlayer). */
+  public void setMaxHealth(float max) {
+    maxHealth = max > 0f ? max : 100f;
   }
 
   /** Receive EventBus.pickupInteractChanged — show/hide the "Press E to pick up" prompt. */

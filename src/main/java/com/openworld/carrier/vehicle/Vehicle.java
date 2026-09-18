@@ -7,6 +7,7 @@ import com.openworld.world.StimulusManager;
 import com.openworld.world.manager.ExplosionManager;
 import com.openworld.game.EventBus;
 import com.openworld.net.NetworkManager;
+import com.openworld.world.BreakableProps;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
@@ -239,7 +240,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // gracefully when a vehicle scene ships without them.
         Node dv = getNodeOrNull("DamageVfx");
         if (dv != null) {
-            if (dv.getNodeOrNull("Smoke") instanceof GPUParticles3D s) damageSmoke = s;
+            if (dv.getNodeOrNull("Smoke") instanceof com.openworld.vfx.SmokeVfx s) damageSmoke = s;
             if (dv.getNodeOrNull("Fire")  instanceof GPUParticles3D f) damageFire  = f;
         }
 
@@ -415,6 +416,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
         }
 
+        sweepStreetPoles(delta);
+
         // Drop a stale occupant pin BEFORE dereferencing it: under streamed traffic (PLAN.md I3c) a
         // seated AI driver can be freed/removed out from under us by a despawn race, and reading its
         // transform then throws `get_global_transform "!is_inside_tree"` → native use-after-free segfault.
@@ -461,6 +464,59 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             } else if (mode == VehicleWeaponMode.VEHICLE_WEAPON && vehicleWeaponController != null) {
                 if (cmd.fire) vehicleWeaponController.onWeaponFire();
                 else          vehicleWeaponController.onWeaponNotFire();
+            }
+        }
+    }
+
+    // ── Knock-down street poles (PLAN.md 3.11) ────────────────────────────────
+
+    /** Half the hull's footprint across / along (m), read off the body's own collision shape at first use. */
+    private double hullHalfWidth = -1.0, hullHalfLength = -1.0;
+    /** Last tick's position, for a puppet's velocity (a frozen body reports none). */
+    private Vector3 poleSweepLastPos;
+
+    /**
+     * Ask the street poles ahead whether this car knocks any down this step ({@link BreakableProps#sweepVehicle}),
+     * and keep the speed it leaves. Runs where the car is simulated (a client predicting its own car) and, on the
+     * host, for every car (a client's car is judged on the host copy, its velocity from its motion); only the
+     * simulating peer loses speed.
+     */
+    private void sweepStreetPoles(double delta) {
+        Vector3 pos = getGlobalPosition();
+        Vector3 last = poleSweepLastPos;
+        poleSweepLastPos = pos;
+        if (parked || delta <= 0.0) return;
+        boolean sim = isLocallySimulated();
+        Vector3 vel;
+        if (sim) {
+            vel = getLinearVelocity();
+        } else {
+            Node netNode = getNodeOrNull("/root/NetworkManager");
+            if (!(netNode instanceof NetworkManager net) || !net.isServer() || last == null) return;
+            vel = pos.minus(last).div(delta);
+        }
+        if (hullHalfWidth < 0.0) measureHull();
+        double keep = BreakableProps.sweepVehicle(pos, getGlobalBasis(), vel, hullHalfWidth, hullHalfLength,
+                getMass(), delta);
+        if (keep < 1.0 && sim) {
+            setLinearVelocity(getLinearVelocity().times(keep));
+            wakeUp();
+        }
+    }
+
+    private void measureHull() {
+        hullHalfWidth = 1.1;
+        hullHalfLength = 2.0;
+        for (Node c : getChildren()) {
+            if (c instanceof CollisionShape3D cs && cs.getShape() instanceof ConvexPolygonShape3D cp) {
+                double mx = 0.0, mz = 0.0;
+                for (Vector3 v : cp.getPoints().toVector3Array()) {
+                    Vector3 w = cs.getTransform().times(v);
+                    mx = Math.max(mx, Math.abs(w.getX()));
+                    mz = Math.max(mz, Math.abs(w.getZ()));
+                }
+                if (mx > 0.0 && mz > 0.0) { hullHalfWidth = mx + 0.1; hullHalfLength = mz; }
+                return;
             }
         }
     }
@@ -680,7 +736,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     private static final double DAMAGE_VFX_INTERVAL = 0.25;
     private double damageVfxTimer = 0.0;
-    private GPUParticles3D damageSmoke;
+    private com.openworld.vfx.SmokeVfx damageSmoke;
     private GPUParticles3D damageFire;
 
     @Register
@@ -699,7 +755,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 ? healthNode.getCurrentHealth() / healthNode.maxHealth : 1f;
         boolean smoke = frac > 0f && frac < cfg.damageSmokeFraction;
         boolean fire  = frac > 0f && frac < cfg.damageFireFraction;
-        if (damageSmoke != null && damageSmoke.isEmitting() != smoke) damageSmoke.setEmitting(smoke);
+        if (damageSmoke != null) damageSmoke.setEmitting(smoke);
         if (damageFire  != null && damageFire.isEmitting()  != fire)  damageFire.setEmitting(fire);
     }
 
@@ -1534,7 +1590,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             if (m instanceof ExplosionManager mgr) {
                 mgr.triggerExplosion(getGlobalPosition(), cfg.explosionRadius, cfg.explosionMaxDamage,
                                      cfg.explosionPushForce, attackerName, attackerFaction,
-                                     DAMAGE_SOURCE_EXPLOSION, cfg.vehicleIcon, this);
+                                     DAMAGE_SOURCE_EXPLOSION, cfg.vehicleIcon, this,
+                                     cfg.explosionVfx, cfg.explosionVfxScale);
             }
         }
         spawnWreckScene(cfg);
@@ -1562,7 +1619,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         VehicleConfig cfg = getConfig();
         if (cfg.explosionRadius > 0f) {
             Node m = getTree().getFirstNodeInGroup("explosion_manager");
-            if (m instanceof ExplosionManager mgr) mgr.spawnExplosion(getGlobalPosition());
+            if (m instanceof ExplosionManager mgr) mgr.playBlast(getGlobalPosition(), cfg.explosionVfx, cfg.explosionRadius, cfg.explosionVfxScale);
         }
         spawnWreckScene(cfg);
     }

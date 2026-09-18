@@ -25,7 +25,7 @@ import com.openworld.world.manager.ExplosionManager;
  *     PickupArea (Area3D)
  *       CollisionShape3D (detection sphere, layer 0 / mask character layer 2)
  *     Muzzle (Marker3D)
- *       MuzzleVFX (instance MuzzleVFX.tscn)
+ *       MuzzleVFX (a muzzle flash from assets/vfx/muzzle_flash/effects, MuzzleFlashVfx)
  *   projectile_scene → RocketProjectile.tscn
  *   auto = false (semi-auto), magazine = 1, reserve = 3
  */
@@ -47,22 +47,7 @@ public class ProjectileItem extends WeaponItem {
     /** Push force applied to bodies in the blast, injected into each spawned projectile. */
     @Export public float explosionPushForce = 20f;
 
-    private GPUParticles3D muzzleFlashFx;
-    private AnimationPlayer muzzleFlashAnimPlayer;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-    @Register
-    @Override
-    public void _ready() {
-        super._ready();  // Pickup._ready — group + pickupId registration for replication
-        Node muzzle = getNodeOrNull("Muzzle");
-        Node vfx    = (muzzle != null) ? muzzle.getNodeOrNull("MuzzleVFX") : null;
-        if (vfx != null) {
-            muzzleFlashFx         = (GPUParticles3D)  vfx.getNodeOrNull("MuzzleFlash");
-            muzzleFlashAnimPlayer = (AnimationPlayer) vfx.getNodeOrNull("AnimationPlayer");
-        }
-    }
 
     // ── WeaponAction ──────────────────────────────────────────────────────────
 
@@ -83,7 +68,7 @@ public class ProjectileItem extends WeaponItem {
         isWeaponFired = true;
         decrementMagazine();
         playFireAudio();
-        triggerMuzzleFlash();
+        playMuzzleFlash();
         applyRecoil();
         Vector3[] in = launchInputs();
         if (in == null) return;
@@ -105,7 +90,7 @@ public class ProjectileItem extends WeaponItem {
     @Override
     public void playRemoteFireCue() {
         playFireAudio();
-        triggerMuzzleFlash();
+        playMuzzleFlash();
         // N4: on the host this puppet's real rocket arrives as MSG_LAUNCH — a cue copy would be a second rocket.
         if (NetRole.host(this)) { com.openworld.net.NetStats.increment("launch_cue_host_skipped"); return; }
         Vector3[] in = launchInputs();
@@ -143,12 +128,6 @@ public class ProjectileItem extends WeaponItem {
         weaponAudio.play();
     }
 
-    private void triggerMuzzleFlash() {
-        if (muzzleFlashFx == null || muzzleFlashAnimPlayer == null) return;
-        muzzleFlashFx.setSpeedScale(fireRate);
-        muzzleFlashAnimPlayer.setSpeedScale(5f);
-        muzzleFlashAnimPlayer.play("MuzzleFlash");
-    }
 
     private void applyRecoil() {
         if (!(owningCharacter instanceof Character c)) return;

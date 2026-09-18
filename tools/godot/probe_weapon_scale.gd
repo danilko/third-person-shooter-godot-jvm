@@ -36,6 +36,8 @@ func _check(label: String, ok: bool, detail: String) -> void:
 	print("  %s  %-40s %s" % ["PASS" if ok else "FAIL", label, detail])
 
 func _visual(n: Node, root: Node3D, acc: AABB, got: Array) -> AABB:
+	if n.name == "MuzzleVFX":
+		return acc      # the muzzle flash effect (assets/vfx) is not the weapon
 	if n is MeshInstance3D and n.mesh != null:
 		var local := root.global_transform.affine_inverse() * (n as Node3D).global_transform
 		var a: AABB = local * (n.mesh as Mesh).get_aabb()

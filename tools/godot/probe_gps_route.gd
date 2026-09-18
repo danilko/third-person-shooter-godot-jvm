@@ -85,9 +85,12 @@ func _initialize() -> void:
 			if longest == "" or _len(id) > _len(longest):
 				longest = id
 		start = _at(longest, 0.5)
+		# The farthest lane the start can REACH: the inbound carriageway of a dead end (the island has
+		# six, PLAN.md 3.3b) is fed only by the dead end itself, so no route leads onto it.
+		var reach := _reachable(longest)
 		var far := ""
 		for id in lanes:
-			if _len(id) > 60 and (far == "" or _at(id, 0.5).distance_to(start) > _at(far, 0.5).distance_to(start)):
+			if id in reach and _len(id) > 60 and (far == "" or _at(id, 0.5).distance_to(start) > _at(far, 0.5).distance_to(start)):
 				far = id
 		goal = _at(far, 0.5)
 		print("  start on %s, goal on %s (%.0f m apart)" % [longest, far, start.distance_to(goal)])
@@ -244,8 +247,13 @@ func _mouse(button: int, pressed: bool, at: Vector2) -> void:
 	worldmap.call("_gui_input", ev)
 
 func _load_lanes(which: String) -> void:
-	var stems := ["Roads_DebugRoads_debug_a", "Roads_DebugRoads_debug_b"] if which == "debugworld" \
-		else ["Roads_IslandRoads_island"]
+	var stems := ["Roads_DebugRoads_debug_a", "Roads_DebugRoads_debug_b"]
+	if which != "debugworld":
+		# One lanekit per 504 m zone piece (PLAN.md 3.10).
+		stems = []
+		for f in DirAccess.get_files_at("res://assets/world_source/pieces"):
+			if f.begins_with("Roads_IslandRoads_island_") and f.ends_with(".lanekit.json"):
+				stems.append(f.trim_suffix(".lanekit.json"))
 	var dy := 0.0 if which == "debugworld" else 0.6      # the island network sits at Y +0.6
 	for stem in stems:
 		var doc = JSON.parse_string(FileAccess.get_file_as_string(
@@ -264,6 +272,17 @@ func _load_lanes(which: String) -> void:
 		for s in lanes[id]["side"]:
 			if lanes.has(s) and not (id in lanes[s]["side"]):
 				lanes[s]["side"].append(id)
+
+func _reachable(from: String) -> Dictionary:
+	var seen := {from: true}
+	var stack := [from]
+	while not stack.is_empty():
+		var id: String = stack.pop_back()
+		for n in Array(lanes[id]["next"]) + Array(lanes[id]["side"]):
+			if lanes.has(n) and not seen.has(n):
+				seen[n] = true
+				stack.append(n)
+	return seen
 
 func _len(id: String) -> float:
 	var pts: PackedVector3Array = lanes[id]["pts"]

@@ -174,6 +174,24 @@ public class WeaponItem extends Pickup implements WeaponAction {
     weaponAnimator.play(clip, -1.0, 1.0f, false);
   }
 
+  private com.openworld.vfx.MuzzleFlashVfx muzzleFlash;
+  private boolean muzzleFlashResolved = false;
+
+  /**
+   * Play this weapon's muzzle flash ({@code Muzzle/MuzzleVFX}, a {@link com.openworld.vfx.MuzzleFlashVfx}), if it
+   * has one. The flash is sped up to fit inside one shot interval, so full auto restarts a finished flash
+   * rather than cutting one short.
+   */
+  protected void playMuzzleFlash() {
+    if (!muzzleFlashResolved) {
+      muzzleFlashResolved = true;
+      if (getNodeOrNull("Muzzle/MuzzleVFX") instanceof com.openworld.vfx.MuzzleFlashVfx f) muzzleFlash = f;
+    }
+    if (muzzleFlash == null) return;
+    muzzleFlash.setSpeedScale((float) Math.max(1.0, muzzleFlash.mainLength() * fireRate));
+    muzzleFlash.play();
+  }
+
   @Export public String holdSocket = "";
 
   // Names of Marker3D sockets to try (in order) when parking this weapon in inventory.

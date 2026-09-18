@@ -67,9 +67,12 @@ public final class SnapshotInterpolator {
         this.maxYawRate = maxYawRate;
     }
 
+    /** Default forward-projection cap — also how far a client's view of the host clock runs past its newest snapshot (N5). */
+    public static final double DEFAULT_MAX_PROJECTION_SECONDS = 0.15;
+
     /** Default near-time tuning: project ≤150 ms during a gap, ~83 ms ease time constant, snap past 5 m. */
     public SnapshotInterpolator() {
-        this(0.15, 12.0, 5.0, 12.0);
+        this(DEFAULT_MAX_PROJECTION_SECONDS, 12.0, 5.0, 12.0);
     }
 
     /**

@@ -7,7 +7,7 @@
 [ext_resource type="PackedScene" path="res://assets/weapons/MEW1.glb" id="2_eltv3"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_mk1_body"]
-size = Vector3(0.08, 0.08, 0.3)
+size = Vector3(0.08, 0.08, 0.297)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_mk1_pickup"]
 size = Vector3(0.5, 0.5, 0.5)
@@ -50,7 +50,7 @@ holster_sockets = PackedStringArray("ShortWeaponHolsterMaker1", "ShortWeaponHols
 require_interact = true
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=300200002]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0056, -0.0816)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.0895)
 shape = SubResource("BoxShape3D_mk1_body")
 
 [node name="PickupArea" type="Area3D" parent="." unique_id=300200003]
@@ -58,7 +58,7 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape3D2" type="CollisionShape3D" parent="PickupArea" unique_id=1535295342]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0056, -0.0816)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.0895)
 shape = SubResource("BoxShape3D_mk1_pickup")
 
 [node name="Model" parent="." unique_id=1323068417 instance=ExtResource("2_eltv3")]

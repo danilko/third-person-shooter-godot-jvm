@@ -10,18 +10,24 @@ PLACED here, from facts the build already owns, never drawn by hand:
     driver meets them is arrow, stop line, crossing, junction (the Japanese layout);
   * every road run's kerb/footway edge runs (`point_edges.road_edge_runs`) -> drains in the gutter, planters on a
     footway wide enough to keep walking room;
-  * every junction corner (`point_edges.junction_edge_runs`) -> bollards on the corner's footway.
+  * every junction corner (`point_edges.junction_edge_runs`) -> bollards on the corner's footway;
+  * every signalised junction arm -> a Japanese mast-arm SIGNAL on the FAR side of the junction (Japan puts the
+    vehicle head beyond the crossing, over the arriving lanes, on the driver's left kerb -- keep-left), just past
+    the far arm's zebra (`_signals`);
+  * every road run -> street LAMPS on the kerbs, staggered side to side, or twin-arm lamps down a raised MEDIAN
+    wide enough to stand one (`_lamps`).
 
 Nothing is placed where a barrier stands (the road is elevated there, or has no pavement to walk on), nor over
 ground more than `max_above_ground` below the lane when a ground grid is given (a manhole on a bridge deck).
 
-The PROPS and the kit decals are the downloaded kit's own pieces (`assets/world_source/kits/road_kit/furniture.json` names
-them). They leave here as PLACEMENTS -- `{asset, path, pos, fwd, scale}` in the KIT frame -- which `point_gltf`
+The PROPS and the kit decals are the downloaded kits' own pieces (`assets/world_source/kits/road_kit/furniture.json`
+names them; an asset may name its own `kit`, the poles come from `quaternius_zombie_apocalypse`). They leave here as PLACEMENTS -- `{asset, path, pos, fwd, scale}` in the KIT frame -- which `point_gltf`
 writes as `mmesh_<asset>` nodes carrying `asset_path`, and `WorldBaker` collapses into one MultiMesh per asset.
 The stop line and the zebra are PAINT, triangles in the road's own `mark_w` material, because the Japanese
 marks are not in the CC0 kit (a zebra with no side bars, a stop line across the arriving lanes only); the kit's
 arrows are close enough to use. A piece that must be solid (`collide`) also gets an oriented box in the piece's
-`FURN_props-prop-colonly` proxy.
+`FURN_props-prop-colonly` proxy -- except a `breakable` pole (PLAN.md 3.11), whose marker carries its pole size, mass,
+break speed and respawn time instead, for the runtime `BreakableProps` node that owns its collider.
 
 Everything is DETERMINISTIC (no random phase): a manhole's phase along its lane is a hash of the lane id, so a
 rebuild of an unchanged record writes the same file, which is what the build digest relies on.
@@ -47,6 +53,10 @@ PAINT_OBJECT = "FURN__marks_w"
 COLLISION_OBJECT = "FURN_props-prop-colonly"
 #: `point_mesh.NO_MATERIAL` (restated: importing point_mesh here would be a cycle).
 NO_MATERIAL = ""
+#: How far a cleared zone reaches past the lines it clears, sideways (a centre line sits ON the arriving lanes'
+#: edge, and is 0.15 m wide) and past the mouth into the pad (a line ends at the run end, which is the mouth).
+CLEAR_MARGIN = 0.3
+CLEAR_PAST_MOUTH = 1.0
 #: Turn sets the kit has an arrow for. A left + right with no straight (a T's stem) and all three get none.
 ARROW_FOR = {frozenset("S"): "arrow_S", frozenset("L"): "arrow_L", frozenset("R"): "arrow_R",
              frozenset("SL"): "arrow_SL", frozenset("SR"): "arrow_SR"}
@@ -82,7 +92,7 @@ class Table(object):
         self.rules = doc["rules"]
         self.assets = {}
         for name, a in doc["assets"].items():
-            res = self.kit + a["piece"]
+            res = a.get("kit", self.kit) + a["piece"]
             fs = res_to_path(res)
             lo, hi = _piece_bounds(fs)
             self.assets[name] = dict(a, res=res, file=fs, lo=lo, hi=hi,
@@ -189,18 +199,44 @@ class Furniture(object):
     def put(self, table, asset, pos, fwd, road=None):
         a = table.assets.get(asset)
         if a is None or (road is not None and excluded(a, road)):
-            return
+            return False
         lift = float(a.get("lift", 0.0)) - a["lo"][1] * a["scale"][1]
         self.placements.append({"asset": asset, "path": a["res"], "pos": (pos[0], pos[1], pos[2] + lift),
                                 "fwd": fwd, "scale": list(a["scale"])})
+        if a.get("collide") or a.get("collide_pole"):
+            self.placements[-1]["solid"] = True
+        if a.get("collide_pole"):
+            self.placements[-1]["pole"] = True
         self.counts[asset] = self.counts.get(asset, 0) + 1
-        if a.get("collide"):
+        if a.get("collide_pole") and a.get("breakable"):
+            # a knock-down pole (PLAN.md 3.11) has no static box: its batch's BreakableProps node builds a collider
+            # per pole at runtime and takes it away when a car knocks the pole down
+            half, height = a["collide_pole"]
+            b = a["breakable"]
+            self.placements[-1]["breakable"] = {"pole_half": float(half), "pole_height": float(height),
+                                                "mass": float(b.get("mass", 250.0)),
+                                                "break_speed": float(b.get("break_speed", 5.0)),
+                                                "respawn": float(b.get("respawn", 60.0))}
+        elif a.get("collide_pole"):
+            # a pole's shaft only: a box of the whole footprint would stand a mast arm's reach across the road
+            half, height = a["collide_pole"]
+            self.collision += _box((pos[0], pos[1], pos[2]), fwd, half, half, height)
+        elif a.get("collide"):
             # the piece's plan footprint (its X across, its Z along -- forward is -Z), from its own bounds
             half_side = 0.5 * (a["hi"][0] - a["lo"][0]) * a["scale"][0]
             half_fwd = 0.5 * (a["hi"][2] - a["lo"][2]) * a["scale"][2]
             height = (a["hi"][1] - a["lo"][1]) * a["scale"][1]
             self.collision += _box((pos[0], pos[1], pos[2] + float(a.get("lift", 0.0))), fwd, half_fwd,
                                    half_side, height)
+        return True
+
+    def clear_of(self, pos, radius, poles_only=False):
+        """True when no SOLID placement (or, `poles_only`, no pole) already stands within `radius` m of `pos`."""
+        key = "pole" if poles_only else "solid"
+        for p in self.placements:
+            if p.get(key) and math.hypot(p["pos"][0] - pos[0], p["pos"][1] - pos[1]) < radius:
+                return False
+        return True
 
     def paint_tris(self, mat, tris):
         self.paint.setdefault(mat, []).extend(tris)
@@ -223,9 +259,11 @@ def _grounded(ground, p, limit):
     return g is None or p[2] - g <= limit
 
 
-def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
-    r = table.rules
-    lift = float(r["paint_lift"])
+def _arms(lanes, junctions):
+    """Every junction arm with arriving lanes, in the kit frame: `{fwd, left, anchor, ins, rows}`. `fwd` is the
+    travel direction into the junction, `anchor` the first arriving lane's stop-line end; each row is one lane at
+    the mouth as (lateral offset from the anchor, half width, a sampler of back-distance -> point). The ONE owner
+    of an arm's frame, shared by the marks placed here and the paint they keep clear (`clear_zones`)."""
     for j in junctions:
         for arm in j.get("arms", ()):
             ins = [lanes[i] for i in arm.get("in_lanes", ()) if i in lanes]
@@ -244,7 +282,6 @@ def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
                 continue
             left = _left(fwd)
             anchor = _lane_kit(ins[0])[-1]
-            # every lane at the mouth, as (lateral offset, half width, a sampler of back-distance -> point)
             rows = []
             for l, arriving in [(l, True) for l in ins] + [(l, False) for l in outs]:
                 pts = _lane_kit(l)
@@ -258,8 +295,118 @@ def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
                     return _at(pts, cum, cum[-1] - back if arriving else back)[0]
                 rows.append({"lane": l, "lat": lat, "half": 0.5 * float(l.get("lane_width", 3.5)),
                              "sample": sample, "length": cum[-1], "arriving": arriving})
-            if not rows:
-                continue
+            if rows:
+                yield {"fwd": fwd, "left": left, "anchor": anchor, "ins": ins, "rows": rows, "junction": j,
+                       "arm": arm}
+
+
+def _has_zebra(table, arm):
+    return all(row["length"] >= table.rules["crosswalk_back"][1] for row in arm["rows"])
+
+
+def _has_stop(table, row):
+    return row["arriving"] and row["length"] >= table.rules["stop_back"] + table.rules["stop_width"]
+
+
+def clear_zones(table, lanes_doc):
+    """Where lane and centre LINES must not be painted, as plan rectangles `(anchor, fwd, left, lat_lo, lat_hi,
+    back_lo, back_hi)` in the kit frame (PLAN.md 3.6c). The Japanese layout: a line on the arriving side, and the
+    centre line, ends at the STOP LINE's upstream edge; nothing is painted across the zebra; a departing lane's
+    line starts past it. Derived from the same arm frames and the same placement tests as the marks themselves,
+    so a line can only stop where a stop line or a zebra was actually painted."""
+    if table is None:
+        return []
+    r = table.rules
+    lanes = {l["id"]: l for l in lanes_doc.get("lanes", ())}
+    junctions = [j for _k, j in sorted((j["id"], j) for j in lanes_doc.get("junctions", ()))]
+    m = CLEAR_MARGIN
+    zones = []
+    for arm in _arms(lanes, junctions):
+        rows = arm["rows"]
+        base = (arm["anchor"], arm["fwd"], arm["left"])
+        if _has_zebra(table, arm):
+            zones.append(base + (min(w["lat"] - w["half"] for w in rows) - m,
+                                 max(w["lat"] + w["half"] for w in rows) + m, -CLEAR_PAST_MOUTH,
+                                 r["crosswalk_back"][1]))
+        arriving = [w for w in rows if _has_stop(table, w)]
+        if arriving:
+            zones.append(base + (min(w["lat"] - w["half"] for w in arriving) - m,
+                                 max(w["lat"] + w["half"] for w in arriving) + m, -CLEAR_PAST_MOUTH,
+                                 r["stop_back"] + r["stop_width"]))
+    return zones
+
+
+def _inside_interval(p, q, zone):
+    """The part [t0, t1] of segment p->q inside one zone (Liang-Barsky in the zone's own frame), or None."""
+    anchor, fwd, left, lo, hi, b0, b1 = zone
+    def lat(v):
+        return (v[0] - anchor[0]) * left[0] + (v[1] - anchor[1]) * left[1]
+    def back(v):
+        return -((v[0] - anchor[0]) * fwd[0] + (v[1] - anchor[1]) * fwd[1])
+    t0, t1 = 0.0, 1.0
+    for f, a, b in ((lat, lo, hi), (back, b0, b1)):
+        v0, v1 = f(p), f(q)
+        d = v1 - v0
+        if abs(d) < 1e-12:
+            if v0 < a or v0 > b:
+                return None
+            continue
+        ta, tb = (a - v0) / d, (b - v0) / d
+        if ta > tb:
+            ta, tb = tb, ta
+        t0, t1 = max(t0, ta), min(t1, tb)
+        if t0 >= t1:
+            return None
+    return t0, t1
+
+
+def clip_outside(pts, zones, min_length=0.05):
+    """A painted polyline with every part inside any zone removed: a list of the polylines left."""
+    if not zones:
+        return [list(pts)]
+
+    def lerp(p, q, t):
+        return tuple(p[k] + (q[k] - p[k]) * t for k in range(3))
+    out, cur = [], []
+    eps = 1e-9
+    for k in range(len(pts) - 1):
+        p, q = pts[k], pts[k + 1]
+        inside = sorted(iv for iv in (_inside_interval(p, q, z) for z in zones) if iv is not None)
+        keep, t = [], 0.0
+        for a, b in inside:
+            if a > t:
+                keep.append((t, a))
+            t = max(t, b)
+        if t < 1.0:
+            keep.append((t, 1.0))
+        if not keep or keep[0][0] > eps:
+            if cur:
+                out.append(cur)
+            cur = []
+        for n, (a, b) in enumerate(keep):
+            if n and cur:
+                out.append(cur)
+                cur = []
+            if not cur:
+                cur = [lerp(p, q, a)]
+            cur.append(lerp(p, q, b))
+        if keep and keep[-1][1] < 1.0 - eps and cur:
+            out.append(cur)
+            cur = []
+    if cur:
+        out.append(cur)
+    return [c for c in out if len(c) >= 2 and sum(_norm_len(c[i], c[i + 1]) for i in range(len(c) - 1)) >= min_length]
+
+
+def _norm_len(a, b):
+    return math.sqrt(sum((a[k] - b[k]) ** 2 for k in range(3)))
+
+
+def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
+    r = table.rules
+    lift = float(r["paint_lift"])
+    for arm in _arms(lanes, junctions):
+            fwd, left, anchor, ins, rows = arm["fwd"], arm["left"], arm["anchor"], arm["ins"], arm["rows"]
 
             def z_at(lat, back):
                 near = min(rows, key=lambda row: abs(row["lat"] - lat))
@@ -270,7 +417,7 @@ def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
 
             # ---- the zebra: across the whole carriageway, bars running along the road
             b0, b1 = r["crosswalk_back"]
-            if all(row["length"] >= b1 for row in rows) and mine(ins[0]):
+            if _has_zebra(table, arm) and mine(ins[0]):
                 lo = min(row["lat"] - row["half"] for row in rows) + r["crosswalk_margin"]
                 hi = max(row["lat"] + row["half"] for row in rows) - r["crosswalk_margin"]
                 bar, gap = r["crosswalk_bar"], r["crosswalk_gap"]
@@ -290,7 +437,7 @@ def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
                 if not row["arriving"] or not mine(row["lane"]):
                     continue
                 sb, sw = r["stop_back"], r["stop_width"]
-                if row["length"] >= sb + sw:
+                if _has_stop(table, row):
                     corners = []
                     for lat, back in ((row["lat"] - row["half"], sb + sw), (row["lat"] + row["half"], sb + sw),
                                       (row["lat"] + row["half"], sb), (row["lat"] - row["half"], sb)):
@@ -324,13 +471,13 @@ def _lane_props(fur, table, lanes, mine, ground):
                 fur.put(table, "manhole", p, d, l.get("road_name", ""))
 
 
-def _edge_samples(pts, walk, kerb, wall, spacing, clear):
+def _edge_samples(pts, walk, kerb, wall, spacing, clear, phase=None):
     """Stations along one edge run: (point, plan direction, walk half width, kerb height), skipping any whose
     segment carries a barrier or no kerb."""
     pts = [tuple(p) for p in pts]
     cum = _lengths(pts)
     out = []
-    for s in _stations(cum[-1], spacing, clear):
+    for s in _stations(cum[-1], spacing, clear, phase):
         p, d, i = _at(pts, cum, s)
         j = min(i + 1, len(pts) - 1)
         if max(float(wall[i]), float(wall[j])) > 0.0:
@@ -360,7 +507,10 @@ def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground):
                 half = 0.5 * (a["hi"][0] - a["lo"][0]) * a["scale"][0]
                 lat = _left(d)
                 off = sgn * (r["planter_kerb_gap"] + half)
-                fur.put(table, "planter", (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k), d, s.road.name)
+                pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
+                if fur.clear_of(pos, r.get("pole_clearance", 0.0) + 0.5 * (a["hi"][2] - a["lo"][2]) * a["scale"][2],
+                                poles_only=True):
+                    fur.put(table, "planter", pos, d, s.road.name)
     for j in jsolves:
         if not mine_pad(j):
             continue
@@ -370,7 +520,115 @@ def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground):
                     continue
                 lat = _left(d)
                 off = sgn * r["bollard_inset"]
-                fur.put(table, "bollard", (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k), d)
+                pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
+                if fur.clear_of(pos, r.get("pole_clearance", 0.0), poles_only=True):
+                    fur.put(table, "bollard", pos, d)
+
+
+def _signalised(table, junction):
+    """A junction carries signals when any mouth is authored `traffic_light`, or -- `signal_all_junctions` -- when
+    at least `signal_min_arms` of its arms have traffic arriving (a Japanese arterial crossing is signalised; a
+    two-arm bend or a dead-end loop is not)."""
+    arms = junction.get("arms", ())
+    if any(a.get("traffic_light") for a in arms):
+        return True
+    r = table.rules
+    return bool(r.get("signal_all_junctions")) and sum(1 for a in arms if a.get("in_lanes")) >= r["signal_min_arms"]
+
+
+def _signals(fur, table, lanes, junctions, mine, ground):
+    """One Japanese mast-arm signal per signalised arm, on the FAR side of the junction: the pole on the kerb
+    the arriving traffic keeps to (keep-left: its left), `signal_past_mouth` beyond the far mouth (past the far
+    arm's zebra), the arm reaching back over the arriving lanes and the heads facing them. Where the arm has a
+    straight-ahead movement the far point is where the kerb lane's STRAIGHT connector ends (the road it leads
+    into, however that road bends); with none (the stem of a T, a Y) the pole stands NEAR-side on
+    the arm's own kerb, just junction-side of its zebra."""
+    if "signal" not in table.assets:
+        return
+    r = table.rules
+    off = float(r["signal_kerb_offset"])
+    for arm in _arms(lanes, junctions):
+        if not _signalised(table, arm["junction"]):
+            continue
+        ins = [w for w in arm["rows"] if w["arriving"]]
+        outs = [w for w in arm["rows"] if not w["arriving"]]
+        # which side the kerb is on: the side of the arriving lanes AWAY from the departing ones
+        ksign = 1.0
+        if outs and sum(w["lat"] for w in ins) / len(ins) < sum(w["lat"] for w in outs) / len(outs):
+            ksign = -1.0
+        if ksign < 0.0:
+            # right-hand traffic: the piece's arm reaches right of forward, so it would stand over the verge
+            fur.counts["signal_skipped_right_hand"] = fur.counts.get("signal_skipped_right_hand", 0) + 1
+            continue
+        kerb = max(ins, key=lambda w: w["lat"])
+        lane = kerb["lane"]
+        if not mine(lane):
+            continue
+        conns = [lanes[n] for n in lane.get("next", ()) if n in lanes and lanes[n].get("kind") == "connector"]
+        straight = [c for c in conns if c.get("turn") == "S" and len(c.get("points", ())) >= 2]
+        if straight:
+            pts = _lane_kit(straight[0])
+            end = pts[-1]
+            d = _norm2(pts[-1][0] - pts[-2][0], pts[-1][1] - pts[-2][1])
+            if d == (0.0, 0.0):
+                continue
+            tgt = [lanes[n] for n in straight[0].get("next", ()) if n in lanes]
+            half = 0.5 * float(tgt[0].get("lane_width", 2.0 * kerb["half"])) if tgt else kerb["half"]
+            side = _left(d)
+            pos = (end[0] + d[0] * r["signal_past_mouth"] + side[0] * (half + off),
+                   end[1] + d[1] * r["signal_past_mouth"] + side[1] * (half + off), end[2])
+            fwd = d
+        else:
+            # no straight-ahead movement (the stem of a T, a Y): there is no far side to stand on, so the signal is
+            # NEAR-side -- on this arm's own kerb, just junction-side of its zebra, as Japan does where the far
+            # side is not visible or not there
+            fwd, left, anchor = arm["fwd"], arm["left"], arm["anchor"]
+            back = r["crosswalk_back"][0] - r["signal_near_inside"]
+            lat = kerb["lat"] + kerb["half"] + off
+            z = kerb["sample"](max(0.0, back))[2]
+            pos = (anchor[0] + left[0] * lat - fwd[0] * back, anchor[1] + left[1] * lat - fwd[1] * back, z)
+        if not _grounded(ground, pos, r["max_above_ground"]):
+            continue
+        fur.put(table, "signal", pos, fwd, lane.get("road_name", ""))
+
+
+def _lamps(fur, table, solves, bands, mine_run, ground):
+    """Street lighting. A run with a raised median wide enough (`median_lamp_min_half`) gets twin-arm lamps down
+    the median every `median_lamp_spacing`; the others get single lamps on both kerbs every `lamp_spacing`,
+    staggered half a spacing side to side, `lamp_inset` behind the kerb line, arm over the road. A lamp keeps
+    `pole_clearance` from any solid prop already standing (a signal pole, a planter)."""
+    r = table.rules
+    for s in solves:
+        if not mine_run(s) or len(s.samples) < 2:
+            continue
+        road = s.road.name
+        on_median = 0
+        if "lamp_twin" in table.assets:
+            pts = [tuple(sm.pos) for sm in s.samples]
+            cum = _lengths(pts)
+            for st in _stations(cum[-1], r["median_lamp_spacing"], r["lamp_end_clear"]):
+                p, d, i = _at(pts, cum, st)
+                j = min(i + 1, len(pts) - 1)
+                mh = min(s.values[i]["rka_med_h"], s.values[j]["rka_med_h"])
+                mz = min(s.values[i]["rka_med_z"], s.values[j]["rka_med_z"])
+                if mh < r["median_lamp_min_half"] or mz <= 0.0:
+                    continue
+                pos = (p[0], p[1], p[2] + mz)
+                if fur.clear_of(pos, r["pole_clearance"]) and fur.put(table, "lamp_twin", pos, d, road):
+                    on_median += 1
+        if (on_median and not r.get("lamp_kerb_with_median")) or "lamp" not in table.assets:
+            continue
+        for _sfx, pts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
+            spacing = r["lamp_spacing"]
+            for p, d, w, k in _edge_samples(pts, walk, kerb, wall, spacing, r["lamp_end_clear"],
+                                            0.5 * spacing if sgn > 0 else 0.0):
+                if k <= 0.0 or not _grounded(ground, p, r["max_above_ground"]):
+                    continue
+                lat = _left(d)
+                o = sgn * r["lamp_inset"]
+                pos = (p[0] + lat[0] * o, p[1] + lat[1] * o, p[2] + (k if w > 0.0 else 0.0))
+                if fur.clear_of(pos, r["pole_clearance"]):
+                    fur.put(table, "lamp", pos, (-sgn * lat[0], -sgn * lat[1]), road)
 
 
 def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, ground=None):
@@ -383,9 +641,13 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     solves, jsolves, _gsolves, bands = solved
     lanes = {l["id"]: l for l in lanes_doc.get("lanes", ())}
     junctions = {j["id"]: j for j in lanes_doc.get("junctions", ())}
-    _junction_marks(fur, table, lanes, [junctions[k] for k in sorted(junctions)], mine_lane, mark_mat)
+    ordered = [junctions[k] for k in sorted(junctions)]
+    _junction_marks(fur, table, lanes, ordered, mine_lane, mark_mat)
+    # the signals first: every later solid prop (planter, bollard, lamp) keeps clear of a pole already standing
+    _signals(fur, table, lanes, ordered, mine_lane, ground)
     _lane_props(fur, table, dict(sorted(lanes.items())), mine_lane, ground)
     _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground)
+    _lamps(fur, table, solves, bands, mine_run, ground)
     return fur
 
 
@@ -446,12 +708,92 @@ def self_test():
     # the stop line covers only the arriving side (y < 0)
     stop = [v for t in paint for v in t if v[0] < 50.0 - table.rules["crosswalk_back"][1] - 1e-6]
     assert stop and max(v[1] for v in stop) <= 1e-6
+    # PLAN.md 3.6c: lines stop at the stop line on the arriving side and never cross the zebra
+    zones = clear_zones(table, doc)
+    assert len(zones) == 2, zones
+    sb = table.rules["stop_back"] + table.rules["stop_width"]
+    zb = table.rules["crosswalk_back"][1]
+    # a lane line between the two arriving lanes (y -4.5) runs 0 -> 50: it must end at the stop line
+    kept = clip_outside([(0.0, -4.5, 0.0), (50.0, -4.5, 0.0)], zones)
+    assert len(kept) == 1 and abs(kept[0][-1][0] - (50.0 - sb)) < 1e-6, kept
+    # the centre line (y 0) also ends at the stop line (it lies on the arriving lanes' edge)
+    kept = clip_outside([(0.0, 0.0, 0.0), (50.0, 0.0, 0.0)], zones)
+    assert abs(kept[0][-1][0] - (50.0 - sb)) < 1e-6, kept
+    # a departing-side line (y +2.25, beyond the arriving lanes + margin) stops only at the zebra's far edge
+    kept = clip_outside([(0.0, 2.25, 0.0), (50.0, 2.25, 0.0)], zones)
+    assert abs(kept[0][-1][0] - (50.0 - zb)) < 1e-6, kept
+    # a line wholly inside a zone disappears; a dash straddling the edge is cut at it, keeping its heights
+    assert clip_outside([(46.0, -4.5, 1.0), (48.0, -4.5, 1.0)], zones) == []
+    kept = clip_outside([(40.0, -4.5, 0.0), (44.0, -4.5, 2.0)], zones)
+    assert len(kept) == 1 and abs(kept[0][-1][0] - (50.0 - sb)) < 1e-6 and 0.0 < kept[0][-1][2] < 2.0
+    # a line that passes through a zone comes back as two pieces; one far from any mouth is untouched
+    kept = clip_outside([(40.0, -4.5, 0.0), (60.0, -4.5, 0.0)], zones)
+    assert len(kept) == 2, kept
+    assert clip_outside([(0.0, -4.5, 0.0), (20.0, -4.5, 0.0)], zones) == [[(0.0, -4.5, 0.0), (20.0, -4.5, 0.0)]]
+    # the control: with no zones nothing is clipped
+    assert clip_outside([(0.0, 0.0, 0.0), (50.0, 0.0, 0.0)], []) == [[(0.0, 0.0, 0.0), (50.0, 0.0, 0.0)]]
     # an excluded road gets no manhole
     assert excluded({"exclude_roads": ["shrine_touge*"]}, "shrine_touge_2")
     assert not excluded({"exclude_roads": ["shrine_touge*"]}, "chuo_dori")
     # a lane that is not this piece's gets nothing
     none = place(table, ([], [], [], []), doc, lambda l: False, lambda s: False, lambda j: False, lambda l: "M_LineW")
     assert not none.placements and not none.paint
+    # a synthetic right-hand arm (the doc above) is refused, not mis-placed
+    sig = dict(doc, junctions=[{"id": "j1", "arms": [dict(doc["junctions"][0]["arms"][0], traffic_light=True)]}])
+    f = place(table, ([], [], [], []), sig, lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
+    assert f.counts.get("signal_skipped_right_hand") == 1 and not f.counts.get("signal"), f.counts
+    # keep-left: two lanes arriving +X on the LEFT (y > 0), one leaving on the right; the kerb lane is y 6.75
+    kl = [{"id": "k_F0", "kind": "through", "lane_width": 4.5, "points": [g((0, 2.25, 0)), g((50, 2.25, 0))],
+           "next": ["s0"]},
+          {"id": "k_F1", "kind": "through", "lane_width": 4.5, "points": [g((0, 6.75, 0)), g((50, 6.75, 0))],
+           "next": ["s1", "t1"]},
+          {"id": "k_R0", "kind": "through", "lane_width": 4.5, "points": [g((50, -2.25, 0)), g((0, -2.25, 0))],
+           "next": []},
+          {"id": "s1", "kind": "connector", "turn": "S", "points": [g((50, 6.75, 0)), g((80, 6.75, 0.5))],
+           "next": ["far_F1"]},
+          {"id": "t1", "kind": "connector", "turn": "L", "points": [g((50, 6.75, 0)), g((60, 20, 0))], "next": []},
+          {"id": "s0", "kind": "connector", "turn": "S", "points": [g((50, 2.25, 0)), g((80, 2.25, 0))], "next": []},
+          {"id": "far_F1", "kind": "through", "lane_width": 4.5, "points": [g((80, 6.75, 0.5)), g((120, 6.75, 0))],
+           "next": []}]
+    arms = [{"in_lanes": ["k_F0", "k_F1"], "out_lanes": ["k_R0"]}, {"in_lanes": ["x"]}, {"in_lanes": ["y"]}]
+    kd = {"lanes": kl, "junctions": [{"id": "j2", "arms": arms}]}
+    f = place(table, ([], [], [], []), kd, lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
+    sigs = [p for p in f.placements if p["asset"] == "signal"]
+    assert len(sigs) == 1, f.counts
+    want = (80.0 + table.rules["signal_past_mouth"], 6.75 + 2.25 + table.rules["signal_kerb_offset"], 0.5)
+    assert all(abs(sigs[0]["pos"][k] - want[k]) < 1e-6 for k in range(2)) and sigs[0]["fwd"] == (1.0, 0.0), sigs
+    # a breakable signal (PLAN.md 3.11) has NO static box; its marker carries what BreakableProps needs
+    assert not f.collision, len(f.collision)
+    b = sigs[0].get("breakable")
+    assert b and b["pole_half"] == table.assets["signal"]["collide_pole"][0] and b["mass"] > 0.0, sigs[0]
+    # the control: the same signal made unbreakable gets a box round the pole only, not the 5.5 m arm's footprint
+    solid = Table.__new__(Table)
+    solid.__dict__.update(table.__dict__)
+    solid.assets = dict(table.assets, signal={k: v for k, v in table.assets["signal"].items() if k != "breakable"})
+    f = place(solid, ([], [], [], []), kd, lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
+    assert not [p for p in f.placements if p.get("breakable")]
+    xs = [v[0] for t in f.collision for v in t]
+    assert xs and max(xs) - min(xs) < 0.5, xs and (min(xs), max(xs))
+    # not signalised when only two arms carry traffic and none is authored
+    kd2 = {"lanes": kl, "junctions": [{"id": "j2", "arms": arms[:2]}]}
+    f = place(table, ([], [], [], []), kd2, lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
+    assert not f.counts.get("signal"), f.counts
+    # the stem of a T (no straight movement): near-side, on the arm's own kerb just past its zebra
+    kl3 = [dict(l, next=["t1"]) if l["id"] == "k_F1" else l for l in kl if l["id"] not in ("s0", "s1")]
+    kl3 = [dict(l, next=[]) if l["id"] == "k_F0" else l for l in kl3]
+    f = place(table, ([], [], [], []), {"lanes": kl3, "junctions": [{"id": "j3", "arms": arms}]},
+              lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
+    sigs = [p for p in f.placements if p["asset"] == "signal"]
+    near = 50.0 - (table.rules["crosswalk_back"][0] - table.rules["signal_near_inside"])
+    assert len(sigs) == 1 and abs(sigs[0]["pos"][0] - near) < 1e-6, sigs
+    assert abs(sigs[0]["pos"][1] - (6.75 + 2.25 + table.rules["signal_kerb_offset"])) < 1e-6, sigs
+    row = Furniture()
+    for k in range(5):
+        pos = (k * table.rules["bollard_spacing"], 0.0, 0.0)
+        if row.clear_of(pos, table.rules["pole_clearance"], poles_only=True):
+            row.put(table, "bollard", pos, (1.0, 0.0))
+    assert row.counts.get("bollard") == 5, row.counts
+    assert not row.clear_of((0.5, 0.0, 0.0), table.rules["pole_clearance"])
     print("point_furniture self-test OK")
 
 

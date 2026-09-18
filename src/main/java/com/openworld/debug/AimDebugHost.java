@@ -166,20 +166,10 @@ public class AimDebugHost extends Node3D {
     private static final String[] BENCH_WEAPONS = benchWeapons();
 
     private static String[] benchWeapons() {
-        java.util.List<String> ids = new java.util.ArrayList<>();
-        String path = "res://src/main/resources/com/openworld/weapon/weapon_catalog.json";
-        if (godot.api.FileAccess.fileExists(path)
-                && godot.api.JSON.parseString(godot.api.FileAccess.getFileAsString(path)) instanceof godot.core.Dictionary<?, ?> d
-                && d.get("weapons") instanceof godot.core.VariantArray<?> rows) {
-            for (Object r : rows) {
-                if (r instanceof godot.core.Dictionary<?, ?> row && Boolean.TRUE.equals(row.get("bench"))
-                        && row.get("id") instanceof String id) ids.add(id);
-            }
-        }
+        java.util.List<String> ids = com.openworld.weapon.WeaponCatalog.benchIds();
         if (ids.isEmpty()) ids.add("ASR1");
         return ids.toArray(new String[0]);
     }
-    private static final String WEAPON_DIR = "res://src/main/resources/com/openworld/weapon/";
     private int benchWeaponIndex = 0;
     private WeaponItem benchItem;             // the weapon the mannequin was armed with
     private boolean benchSlotSynced;
@@ -679,12 +669,8 @@ public class AimDebugHost extends Node3D {
     /** Load one of {@link #BENCH_WEAPONS} and queue it into {@code body}'s inventory, as a pickup would. */
     private WeaponItem equipBenchWeapon(Node body) {
         if (!(body.getNodeOrNull(new NodePath("WeaponController")) instanceof WeaponController wc)) return null;
-        String path = WEAPON_DIR + BENCH_WEAPONS[benchWeaponIndex] + ".tscn";
-        if (!(GD.INSTANCE.load(path) instanceof PackedScene ps)
-                || !(ps.instantiate() instanceof WeaponItem item)) {
-            GD.INSTANCE.printErr("[AimDebug] bench: could not load a WeaponItem from " + path);
-            return null;
-        }
+        WeaponItem item = com.openworld.weapon.WeaponCatalog.instantiate(BENCH_WEAPONS[benchWeaponIndex]);
+        if (item == null) return null;
         // The same deferred path ZoneManager and DebugHarness use: the item must be in the tree
         // before WeaponController reparents it onto the body's socket.
         addChild(item);
