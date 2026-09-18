@@ -12,6 +12,10 @@ Writes `assets/world_source/kit/road_kit.json` next to the kit:
     `use_backface_culling`) and `alphaMode: BLEND` when the colour is not opaque;
   * `profiles` -- every `ROAD_KIT` section: its material and its splines' points in the section's own XY
     plane (+X outward, +Y up), the object's transform applied (`GN_PointProfile` reads the asset RELATIVE);
+  * `piers` -- every `RKA_PIER_*` MESH in `ROAD_KIT` (PLAN.md 3.5): its `stretch_z` (the object's
+    `rka_stretch_z`) and its triangles by material name, `[x,y,z]*3` flattened per triangle, in the object's own
+    frame (rotation and scale applied, location NOT -- the origin is the pier's top centre wherever the object
+    stands in the kit file);
   * `blend_sha1` -- the kit file this was read from, so `point_kit.load` can say when the JSON is stale.
 
 `build_road_kit.py` runs this at the end of every kit build, so the two cannot drift. The kit `.blend` stays the
@@ -75,6 +79,26 @@ def spline_points(sp, mw):
     return [[round((mw @ p)[0], 6), round((mw @ p)[1], 6)] for p in pts]
 
 
+PIER_PREFIX = "RKA_PIER_"
+
+
+def pier_entry(o):
+    """A pier mesh as data: `{"stretch_z", "tris": {material: [9 floats per triangle]}}`."""
+    me = o.data
+    me.calc_loop_triangles()
+    m3 = o.matrix_world.to_3x3()
+    names = [m.name if m is not None else "" for m in me.materials]
+    tris = {}
+    for lt in me.loop_triangles:
+        mat = names[lt.material_index] if lt.material_index < len(names) else ""
+        flat = []
+        for vi in lt.vertices:
+            c = m3 @ me.vertices[vi].co
+            flat += [round(c[0], 5), round(c[1], 5), round(c[2], 5)]
+        tris.setdefault(mat, []).append(flat)
+    return {"stretch_z": round(float(o.get("rka_stretch_z", 0.0)), 5), "tris": tris}
+
+
 def export(out=None):
     blend = bpy.data.filepath
     out = out or os.path.join(os.path.dirname(blend), "road_kit.json")
@@ -90,13 +114,20 @@ def export(out=None):
         profiles[o.name] = {"material": mat,
                             "splines": [{"cyclic": bool(sp.use_cyclic_u), "points": spline_points(sp, o.matrix_world)}
                                         for sp in o.data.splines]}
-    doc = {"blend_sha1": sha, "materials": dict(sorted(mats.items())), "profiles": dict(sorted(profiles.items()))}
+    piers = {}
+    for o in (coll.all_objects if coll else ()):
+        if o.type != 'MESH' or not o.name.startswith(PIER_PREFIX):
+            continue
+        piers[o.name] = pier_entry(o)
+    doc = {"blend_sha1": sha, "materials": dict(sorted(mats.items())), "profiles": dict(sorted(profiles.items())),
+           "piers": dict(sorted(piers.items()))}
     tmp = out + ".tmp"
     with open(tmp, "w") as fh:
         json.dump(doc, fh, indent=1)
         fh.write("\n")
     os.replace(tmp, out)
-    print("export_road_kit_data: %d material(s), %d profile(s) -> %s" % (len(mats), len(profiles), out))
+    print("export_road_kit_data: %d material(s), %d profile(s), %d pier(s) -> %s"
+          % (len(mats), len(profiles), len(piers), out))
     return out
 
 

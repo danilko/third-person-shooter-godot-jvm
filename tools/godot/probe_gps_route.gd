@@ -6,10 +6,13 @@ extends SceneTree
 ##   ... -- --control             GpsArrow.follow_roads off (the I5 straight-line arrow)
 ##
 ## Runs the real world with its real HUD. The waypoint is set the shipped way -- the map opened with
-## the `map` action, zoomed with the wheel, and left-clicked -- so every assertion is about what the
-## player's own click produced. Asserted:
-##   - the minimap and the opened world map draw road lanes (the network is read from the lanekit
-##     sidecars, so it is there whether or not a zone is streamed);
+## the `map` action and left-clicked -- so every assertion is about what the player's own click
+## produced. Asserted:
+##   - the road map comes from the committed BAKE (4.7b; tools/godot/bake_road_map.gd), not a live
+##     rebuild, and its picture is road under the route's ends and empty off the road;
+##   - the minimap and the opened world map draw the road picture; the map opens FITTED to the whole
+##     world; the wheel zooms about the cursor (the point under it stays put); a left drag pans and
+##     drops no waypoint;
 ##   - the route is a chain of LEGAL movements (each lane an authored `next` or a lane change of the
 ##     one before, read independently here from the same sidecars), it ends on the lane nearest the
 ##     waypoint, and it is longer than the straight line;
@@ -90,34 +93,64 @@ func _initialize() -> void:
 		print("  start on %s, goal on %s (%.0f m apart)" % [longest, far, start.distance_to(goal)])
 	_place(start)
 
-	# ── 1. the minimap draws roads ────────────────────────────────────────────────────────────
+	# ── 1. the baked road map, and the minimap draws it ──────────────────────────────────────
 	for i in 3:
 		await process_frame
-	var mm_drawn: int = minimap.call("road_lanes_drawn_now")
-	_check("minimap draws road lanes", mm_drawn > 0, "%d lanes" % mm_drawn)
+	var src: String = minimap.call("road_map_source_now")
+	_check("the road map is the committed bake, not a live rebuild", src == "bake", "source=%s" % src)
+	var cov_on := minf(minimap.call("road_coverage_now", start), minimap.call("road_coverage_now", goal))
+	var cov_off: float = minimap.call("road_coverage_now", _off_road_point(start, goal))
+	_check("the picture is road on the lanes and empty off them", cov_on > 0.99 and cov_off == 0.0,
+		"on %.2f, off %.2f" % [cov_on, cov_off])
+	_check("minimap draws the road picture", minimap.call("road_map_drawn_now"), "")
 
-	# ── 2. open the map, zoom out until the goal is on it, click it ───────────────────────────
+	# ── 2. open the map: fitted to the world; zoom about the cursor; drag pans; click ────────
 	_action("map")
 	for i in 3:
 		await process_frame
-	var map_drawn: int = worldmap.call("road_lanes_drawn_now")
-	_check("the opened world map draws road lanes", worldmap.visible and map_drawn > 0,
-		"visible=%s, %d lanes" % [worldmap.visible, map_drawn])
-	var need := Vector2(goal.x - start.x, goal.z - start.z).length() * 1.2
-	var zooms := 0
-	while float(worldmap.get("range_meters")) < need and zooms < 30:
-		_wheel(MOUSE_BUTTON_WHEEL_DOWN)
-		zooms += 1
-	var range_m: float = worldmap.get("range_meters")
-	_check("the wheel zooms the map out", zooms == 0 or range_m >= need,
-		"%d wheel steps -> range %.0f m" % [zooms, range_m])
-	var px := _to_screen(goal)
-	var click := InputEventMouseButton.new()
-	click.button_index = MOUSE_BUTTON_LEFT
-	click.pressed = true
-	click.position = px
-	worldmap.call("_gui_input", click)
-	var wp := _from_screen(px)       # what the map itself computes from that pixel
+	_check("the opened world map draws the road picture", worldmap.visible and worldmap.call("road_map_drawn_now"),
+		"visible=%s" % worldmap.visible)
+	var bounds := world.find_child("WorldBounds", true, false) as Node3D
+	var fitted := true
+	if bounds != null:
+		var he: float = bounds.get("half_extent")
+		var c := bounds.global_position
+		for corner in [Vector3(c.x - he, 0, c.z - he), Vector3(c.x + he, 0, c.z + he)]:
+			var sp: Vector2 = worldmap.call("world_to_screen_now", corner)
+			fitted = fitted and Rect2(Vector2.ZERO, worldmap.size).grow(1.0).has_point(sp)
+	_check("the map opens fitted to the whole world (both wall corners on screen)", fitted,
+		"range %.0f m" % float(worldmap.get("range_meters")))
+	var cursor := worldmap.size * 0.3
+	var under: Vector3 = worldmap.call("screen_to_world_now", cursor)
+	var r0: float = worldmap.get("range_meters")
+	_wheel(MOUSE_BUTTON_WHEEL_UP, cursor)
+	_wheel(MOUSE_BUTTON_WHEEL_UP, cursor)
+	var under2: Vector3 = worldmap.call("screen_to_world_now", cursor)
+	_check("the wheel zooms in about the cursor", float(worldmap.get("range_meters")) < r0
+		and Vector2(under.x - under2.x, under.z - under2.z).length() < 0.5,
+		"range %.0f -> %.0f m, point under the cursor moved %.2f m" % [r0, float(worldmap.get("range_meters")),
+		Vector2(under.x - under2.x, under.z - under2.z).length()])
+	var before_drag: Vector3 = worldmap.call("screen_to_world_now", worldmap.size * 0.5)
+	_mouse(MOUSE_BUTTON_LEFT, true, worldmap.size * 0.5)
+	for k in 5:
+		var mm := InputEventMouseMotion.new()
+		mm.position = worldmap.size * 0.5 + Vector2(20.0 * (k + 1), 0)
+		worldmap.call("_gui_input", mm)
+	_mouse(MOUSE_BUTTON_LEFT, false, worldmap.size * 0.5 + Vector2(100, 0))
+	var after_drag: Vector3 = worldmap.call("screen_to_world_now", worldmap.size * 0.5)
+	_check("a left drag pans the map and drops no waypoint",
+		after_drag.x < before_drag.x - 1.0 and gps.call("gps_target_now").distance_to(player.global_position) < 0.01,
+		"centre moved %.0f m west" % (before_drag.x - after_drag.x))
+	var px: Vector2 = worldmap.call("world_to_screen_now", goal)
+	if not Rect2(Vector2.ZERO, worldmap.size).has_point(px):      # zoomed or panned it off -- re-fit
+		_action("map")
+		await process_frame
+		_action("map")
+		await process_frame
+		px = worldmap.call("world_to_screen_now", goal)
+	_mouse(MOUSE_BUTTON_LEFT, true, px)
+	_mouse(MOUSE_BUTTON_LEFT, false, px)
+	var wp: Vector3 = worldmap.call("screen_to_world_now", px)       # what the map itself computes from that pixel
 	_action("map")                   # close it again
 	await process_frame
 
@@ -179,11 +212,7 @@ func _initialize() -> void:
 	# ── 7. a right-click clears it ───────────────────────────────────────────────────────────
 	_action("map")
 	await process_frame
-	var rc := InputEventMouseButton.new()
-	rc.button_index = MOUSE_BUTTON_RIGHT
-	rc.pressed = true
-	rc.position = px
-	worldmap.call("_gui_input", rc)
+	_mouse(MOUSE_BUTTON_RIGHT, true, px)
 	_action("map")
 	await process_frame
 	target = gps.call("gps_target_now")
@@ -204,25 +233,15 @@ func _action(name: String) -> void:
 	Input.parse_input_event(ev)
 	Input.flush_buffered_events()
 
-func _wheel(button: int) -> void:
+func _wheel(button: int, at: Vector2) -> void:
+	_mouse(button, true, at)
+
+func _mouse(button: int, pressed: bool, at: Vector2) -> void:
 	var ev := InputEventMouseButton.new()
 	ev.button_index = button
-	ev.pressed = true
+	ev.pressed = pressed
+	ev.position = at
 	worldmap.call("_gui_input", ev)
-
-## WorldMapManager's north-up mapping, centred on the player.
-func _scale() -> float:
-	var c: Vector2 = worldmap.size * 0.5
-	return (minf(c.x, c.y) - 10.0) / float(worldmap.get("range_meters"))
-
-func _to_screen(p: Vector3) -> Vector2:
-	var o := player.global_position
-	return worldmap.size * 0.5 + Vector2(p.x - o.x, p.z - o.z) * _scale()
-
-func _from_screen(px: Vector2) -> Vector3:
-	var o := player.global_position
-	var d := (px - worldmap.size * 0.5) / _scale()
-	return Vector3(o.x + d.x, o.y, o.z + d.y)
 
 func _load_lanes(which: String) -> void:
 	var stems := ["Roads_DebugRoads_debug_a", "Roads_DebugRoads_debug_b"] if which == "debugworld" \

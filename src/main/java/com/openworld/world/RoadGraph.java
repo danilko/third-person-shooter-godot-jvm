@@ -38,7 +38,7 @@ public final class RoadGraph {
     public static final double LANE_CHANGE_COST = 15.0;
     /** Lanes whose snap distance is within this of the nearest one are also start/goal candidates. */
     public static final double CANDIDATE_SLACK = 10.0;
-    /** Drawing tolerance: a lane's map polyline keeps a point only where it bends more than this. */
+    /** Drawing tolerance: the route's map polyline keeps a point only where it bends more than this. */
     public static final double DRAW_TOLERANCE = 0.5;
 
     /** One directional lane. Points are in WORLD space (the sidecar's frame already applied). */
@@ -55,7 +55,6 @@ public final class RoadGraph {
         final List<Lane> succ = new ArrayList<>();
         final List<Lane> pred = new ArrayList<>();
         final List<Lane> side = new ArrayList<>();
-        private double[] drawXZ;
         private double[] bounds;
 
         Lane(String id, double[] x, double[] y, double[] z, float width, String zoneId, String roadName,
@@ -74,12 +73,6 @@ public final class RoadGraph {
         public int pointCount() { return x.length; }
         public List<Lane> successors() { return Collections.unmodifiableList(succ); }
         public List<Lane> neighbours() { return Collections.unmodifiableList(side); }
-
-        /** {x0, z0, x1, z1, ...} simplified for the map (Douglas-Peucker in XZ). Cached. */
-        public double[] drawXZ() {
-            if (drawXZ == null) drawXZ = simplifyXZ(x, z, DRAW_TOLERANCE);
-            return drawXZ;
-        }
 
         /** {minX, minZ, maxX, maxZ} of the lane in plan. Cached. */
         public double[] boundsXZ() {
@@ -151,7 +144,22 @@ public final class RoadGraph {
             this.goalPoint = goalPoint;
         }
 
+        private double[] drawXZ;
+
         public int pointCount() { return points.length / 3; }
+
+        /** {x0, z0, x1, z1, ...} simplified for the map (Douglas-Peucker in XZ). Cached, so a map
+         *  redrawn every frame hands over the same few points instead of every lane sample. */
+        public double[] drawXZ() {
+            if (drawXZ == null) {
+                int n = pointCount();
+                double[] xs = new double[n], zs = new double[n];
+                for (int i = 0; i < n; i++) { xs[i] = points[3 * i]; zs[i] = points[3 * i + 2]; }
+                drawXZ = n < 2 ? new double[]{xs.length > 0 ? xs[0] : 0, zs.length > 0 ? zs[0] : 0}
+                        : simplifyXZ(xs, zs, DRAW_TOLERANCE);
+            }
+            return drawXZ;
+        }
 
         public List<String> laneIds() {
             List<String> out = new ArrayList<>();
@@ -226,6 +234,22 @@ public final class RoadGraph {
 
     private final Map<String, Lane> lanes = new LinkedHashMap<>();
     private boolean finished = false;
+    private RoadIndex index;
+
+    /** Attach a cell index (built for THIS graph) so {@link #snaps} looks up its candidate lanes in
+     *  constant time instead of measuring every lane. Null detaches it. */
+    public void setIndex(RoadIndex idx) { index = idx; }
+    public RoadIndex index() { return index; }
+
+    /** Add one lane as-is (the bake reader). Its successors are resolved by {@link #finish}, by the
+     *  same rule as a lane read from a sidecar. */
+    void addLane(String id, double[] x, double[] y, double[] z, float width, String zoneId, String roadName,
+                 List<String> nextIds, String innerId, String outerId) {
+        if (lanes.containsKey(id) || x.length < 2) return;
+        lanes.put(id, new Lane(id, x, y, z, width, zoneId, roadName, nextIds, innerId, outerId));
+        finished = false;
+        index = null;
+    }
 
     public Collection<Lane> lanes() { return Collections.unmodifiableCollection(lanes.values()); }
     public Lane lane(String id) { return lanes.get(id); }
@@ -272,6 +296,7 @@ public final class RoadGraph {
             added++;
         }
         finished = false;
+        index = null;
         return added;
     }
 
@@ -313,9 +338,27 @@ public final class RoadGraph {
     /** Every lane a position snaps to within {@link #CANDIDATE_SLACK} of the nearest, nearest first.
      *  {@code yWeight} 0 = plan distance only (a map click); 1 = full 3D (a body on a bridge). */
     public List<Snap> snaps(double px, double py, double pz, double yWeight) {
+        if (index != null) {
+            List<Lane> cand = index.candidates(px, pz);
+            if (cand != null && !cand.isEmpty()) {
+                List<Snap> out = collect(cand, px, py, pz, yWeight);
+                // Exact whenever the nearest found is within the cell's plan bound; a body far above
+                // the road (3D snap) can exceed it, and then only a full scan is exact.
+                if (yWeight == 0 || out.get(0).distance <= index.upperBound(px, pz)) return out;
+            }
+        }
+        return collect(lanes.values(), px, py, pz, yWeight);
+    }
+
+    /** {@link #snaps} measuring every lane — what the index must agree with. */
+    List<Snap> snapsBrute(double px, double py, double pz, double yWeight) {
+        return collect(lanes.values(), px, py, pz, yWeight);
+    }
+
+    private static List<Snap> collect(Collection<Lane> from, double px, double py, double pz, double yWeight) {
         List<Snap> all = new ArrayList<>();
         double bestD = Double.MAX_VALUE;
-        for (Lane l : lanes.values()) {
+        for (Lane l : from) {
             Snap s = snap(l, px, py, pz, yWeight);
             all.add(s);
             bestD = Math.min(bestD, s.distance);

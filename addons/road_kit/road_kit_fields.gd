@@ -77,5 +77,6 @@ const ROAD_FIELDS := [
 	["kerb_asset", "s", "", []],
 	["footway_asset", "s", "", []],
 	["barrier_asset", "s", "", []],
+	["pillar_asset", "s", "", []],
 	["markings", "b", true, []],
 ]
