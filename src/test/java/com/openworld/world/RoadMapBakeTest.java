@@ -24,9 +24,7 @@ class RoadMapBakeTest {
     @BeforeAll
     static void load() throws IOException {
         island = new RoadGraph();
-        island.addLanekit(MiniJson.parse(Files.readString(
-                Path.of("assets/world_source/pieces/Roads_IslandRoads_island.lanekit.json"))),
-                new double[]{1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0});
+        RoadGraphTest.addIsland(island);
         island.finish();
         long t0 = System.nanoTime();
         island.setIndex(RoadIndex.build(island, MIN, MIN, SIZE, RoadIndex.DEFAULT_CELL));
@@ -82,7 +80,14 @@ class RoadMapBakeTest {
             assertEquals(0, a[r * px + c], "paint 60 m from every road at " + x + ", " + z);
         }
         // A divided road is ONE road: the 3 m median between chuo_dori's carriageways is painted.
-        RoadGraph.Lane f = island.lane("chuo_dori_1_F0"), r = island.lane("chuo_dori_1_R0");
+        // The longest chuo_dori forward lane: its id depends on where the zone grid split the road.
+        RoadGraph.Lane f = null;
+        for (RoadGraph.Lane l : island.lanes()) {
+            if (l.id.startsWith("chuo_dori") && l.id.endsWith("_F0") && (f == null || l.length() > f.length())) f = l;
+        }
+        assertNotNull(f, "a chuo_dori lane");
+        String stem = f.id.substring(0, f.id.length() - 3);
+        RoadGraph.Lane r = island.lane(stem + "_R0");
         double[] mf = f.at(f.length() * 0.5);
         RoadGraph.Snap sr = RoadGraph.snap(r, mf[0], mf[1], mf[2], 0);
         assertTrue(sr.distance > f.width + 1, "a real median: " + sr.distance);
@@ -91,7 +96,7 @@ class RoadMapBakeTest {
         // ... while the outer edge stays put: 1.5 px past the outer lane's edge is off the road.
         double nx = (mf[0] - sr.point[0]) / sr.distance, nz = (mf[2] - sr.point[2]) / sr.distance;
         double ox = mf[0] + nx * (f.width * 0.5 + 1.5 * mpp), oz = mf[2] + nz * (f.width * 0.5 + 1.5 * mpp);
-        RoadGraph.Lane outer = island.lane("chuo_dori_1_F1");
+        RoadGraph.Lane outer = island.lane(stem + "_F1");
         if (outer != null) {
             double[] mo = outer.at(RoadGraph.snap(outer, mf[0], mf[1], mf[2], 0).offset);
             ox = mo[0] + nx * (outer.width * 0.5 + 1.5 * mpp);

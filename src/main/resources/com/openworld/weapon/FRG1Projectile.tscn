@@ -1,9 +1,8 @@
 [gd_scene format=3 uid="uid://cts4wlnxcbmac"]
 
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FRG1Projectile.java" id="1_grnd"]
-
-[sub_resource type="BoxMesh" id="BoxMesh_pjo81"]
-size = Vector3(0.064, 0.064, 0.09)
+[ext_resource type="PackedScene" path="res://assets/weapons/FRG1.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/vfx/explosion/effects/ground/vfx_ground_explosion_03.tscn" id="fx_blast"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_b4vtq"]
 size = Vector3(0.175, 0.145, 0.365)
@@ -13,10 +12,11 @@ collision_layer = 4
 continuous_cd = true
 script = ExtResource("1_grnd")
 fuse_time = 1.0
-explosion_radius = 15.0
+explosion_radius = 8.0
+explosion_max_damage = 220.0
+explosion_vfx = ExtResource("fx_blast")
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=129860154]
-mesh = SubResource("BoxMesh_pjo81")
+[node name="Model" parent="." unique_id=129860154 instance=ExtResource("2_model")]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1915487789]
 shape = SubResource("BoxShape3D_b4vtq")

@@ -92,7 +92,7 @@ public class RaceHUD extends Control {
             int n = (int) Math.ceil(race.raceCountdownLeft());
             String line = n > 0 ? String.valueOf(n) : "GO";
             drawStringOutline(font, new Vector2(0f, h * 0.42f), line, HorizontalAlignment.CENTER, w, fs,
-                    Math.max(3, Math.round(5 * scale)), new Color(0f, 0f, 0f, 0.85f));
+                    Math.max(HudPalette.OUTLINE_PX, Math.round(HudPalette.OUTLINE_PX * scale)), HudPalette.OUTLINE);
             drawString(font, new Vector2(0f, h * 0.42f), line, HorizontalAlignment.CENTER, w, fs, accentColor);
             return;
         }

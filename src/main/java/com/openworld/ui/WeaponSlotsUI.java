@@ -17,7 +17,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Persistent bottom-right weapon indicator (display only, no input).
+ * The inventory column, bottom-right above {@link WeaponHUD} (display only, no input). Always visible and quiet
+ * (PUBG / Valorant / Apex): the player can see what is on which key without pressing anything, which matters with
+ * six slots and a loadout that grows over an open-world session. It rests at {@link #idleAlpha}, comes up to full
+ * for {@link #showSeconds} when the inventory matters — a switch, or a slot gaining/losing a weapon — then settles
+ * back over {@link #fadeSeconds}. {@code idleAlpha = 0} is the CS behaviour (hidden until a switch). Only owned
+ * slots are listed, on the shared HUD panel background.
  *
  * Root is a PanelContainer whose size is fixed by scene anchors/offsets, so
  * the inner VBoxContainer and its WeaponSlotItem children always scale to fit
@@ -45,6 +50,13 @@ public class WeaponSlotsUI extends PanelContainer {
     @Export
     public PackedScene slotItemScene;
 
+    /** How long the column stays up after a switch or an inventory change. */
+    @Export public float showSeconds = 2.5f;
+    /** Fade-out time after that. */
+    @Export public float fadeSeconds = 0.4f;
+    /** How visible the column is at rest (0 = hidden until a switch, CS-style). */
+    @Export public float idleAlpha = 0.6f;
+
     /** Path to the VBoxContainer that holds slot rows. */
     @Export
     public NodePath slotsPath = new NodePath("Slots");
@@ -55,6 +67,8 @@ public class WeaponSlotsUI extends PanelContainer {
 
     private final List<WeaponSlotItem> slotItems = new ArrayList<>();
     private final String[]             keyTexts  = new String[SLOT_COUNT];
+    private final WeaponItem[]         shownItems = new WeaponItem[SLOT_COUNT];
+    private double                     showTimer = 0.0;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -63,8 +77,32 @@ public class WeaponSlotsUI extends PanelContainer {
     public void _ready() {
         // Display-only: never intercept mouse events regardless of screen coverage.
         setMouseFilter(Control.MouseFilter.IGNORE);
+        // the shared HUD panel (ui/hud_panel.tres), the same background as every other HUD panel
+        if (GD.load("res://src/main/resources/com/openworld/ui/hud_panel.tres") instanceof StyleBox sb) {
+            // the shared panel, with a left gutter for the ▶ selection marker (WeaponSlotItem._draw)
+            StyleBox own = (StyleBox) sb.duplicate();
+            own.setContentMargin(godot.core.Side.LEFT, 22.0f);
+            addThemeStyleboxOverride(new godot.core.StringName("panel"), own);
+        }
         resolveKeyTexts();
         buildSlots();
+        setModulate(new godot.core.Color(1, 1, 1, idleAlpha));
+    }
+
+    /** Show the column now, for {@link #showSeconds}. */
+    public void flash() { showTimer = showSeconds + fadeSeconds; }
+
+    /** 0..1: how visible the column is now (probes). */
+    @Register
+    public double shownNow() { return getModulate().getA(); }
+
+    @Register
+    @Override
+    public void _process(double delta) {
+        if (showTimer <= 0.0) return;
+        showTimer = Math.max(0.0, showTimer - delta);
+        double up = fadeSeconds > 0f ? Math.min(1.0, showTimer / fadeSeconds) : (showTimer > 0 ? 1.0 : 0.0);
+        setModulate(new godot.core.Color(1, 1, 1, idleAlpha + (1.0 - idleAlpha) * up));
     }
 
     // ── Wiring ────────────────────────────────────────────────────────────────
@@ -103,6 +141,7 @@ public class WeaponSlotsUI extends PanelContainer {
     public void onWeaponSwitched(int slotIndex) {
         activeSlot = slotIndex;
         updateHighlights();
+        flash();
     }
 
     // ── Slot construction ─────────────────────────────────────────────────────
@@ -145,6 +184,7 @@ public class WeaponSlotsUI extends PanelContainer {
                 if (instance != null) instance.queueFree();
                 continue;
             }
+            item.setAlignment(BoxContainer.AlignmentMode.END);
             slots.addChild(item);
             slotItems.add(item);
         }
@@ -157,10 +197,13 @@ public class WeaponSlotsUI extends PanelContainer {
         int active = weaponController.getWeapon();
         activeSlot = active;
 
+        boolean changed = false;
         for (int i = 0; i < slotItems.size(); i++) {
             WeaponItem weapon = weaponController.getWeaponItem(i);
             slotItems.get(i).update(weapon, i == active, keyTexts[i]);
+            if (shownItems[i] != weapon) { shownItems[i] = weapon; changed = true; }
         }
+        if (changed && character != null) flash();     // a pickup, a drop, a stack used up
     }
 
     private void updateHighlights() {

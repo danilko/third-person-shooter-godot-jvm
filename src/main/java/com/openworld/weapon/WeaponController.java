@@ -216,6 +216,9 @@ public class WeaponController extends Node {
     return n;
   }
 
+  /** Number of inventory slots (the debug console's {@code ammo} walks them). */
+  public int slotCount() { return weapons == null ? 0 : weapons.length; }
+
   public WeaponItem getWeaponItem(int slotIndex) {
     // weapons is allocated in _ready(); a reader can hit this before then (e.g. a sibling
     // Nameplate whose _ready runs first) — treat "not yet built" as empty.

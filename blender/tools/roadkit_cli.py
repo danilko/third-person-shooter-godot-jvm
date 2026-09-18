@@ -29,6 +29,7 @@ converts a preview; the record itself stays in the kit's frame, converted once b
 Exit code 0 unless the command itself failed (a red gate is a RESULT, reported in the JSON).
 """
 import argparse
+import math
 import json
 import os
 import sys
@@ -200,7 +201,8 @@ def cmd_corridors(a):
     bands = ped.solve_all(net, grid)[3]
     out = []
     kinds = {}
-    for line, _half, owner in ped.band_corridors(bands, owners=True):
+    for line, owner in _join_at_joints(net, [(list(line), str(owner))
+                                            for line, _h, owner in ped.band_corridors(bands, owners=True)]):
         pts = []
         for (x, y, z, half) in line:
             g = grid(x, y) if grid is not None else None
@@ -214,6 +216,40 @@ def cmd_corridors(a):
                  "cut_slope": rs.CUT_SLOPE, "fill_slope": rs.FILL_SLOPE, "fill_max": rs.FILL_MAX,
                  "cut_max": rs.CUT_MAX})
     return gate
+
+
+def _join_at_joints(net, lines, tol=0.05):
+    """`[(line, owner)]` with the corridors of two roads that meet at a JOINT (two coincident stations
+    of different roads, SEGMENT-linked -- `point_record_ops.split_at_joint`, the seeder's corner
+    fillets) joined into ONE line. A joint is one road running on, and the stamp represents each
+    corridor by its NEAREST segment: split into two corridors, a switchback's other leg stops being
+    the same road and starts capping the hillside between the legs as if it were a second road
+    (PLAN.md 3.10 measured it: the touge cut at its zone boundaries re-stamped 6088 vertices). The
+    owner of a joined line is its first part's."""
+    joints = []
+    for p in net.points.values():
+        for t in p.targets(pm.LINK_SEGMENT):
+            q = net.points.get(t)
+            if (q is not None and p.uid < q.uid and net.road_of(p.uid) is not net.road_of(q.uid)
+                    and math.dist(p.pos[:2], q.pos[:2]) < tol):
+                joints.append(p.pos)
+    lines = [(list(l), o) for l, o in lines]
+
+    def at(pt, j):
+        return math.hypot(pt[0] - j[0], pt[1] - j[1]) < tol and abs(pt[2] - j[2]) < 0.5
+
+    for j in joints:
+        ends = [i for i, (l, _o) in enumerate(lines) if l and (at(l[0], j) or at(l[-1], j))]
+        if len(ends) != 2 or lines[ends[0]][1] == lines[ends[1]][1]:
+            continue
+        (la, oa), (lb, _ob) = lines[ends[0]], lines[ends[1]]
+        if at(la[0], j):
+            la = la[::-1]
+        if not at(lb[0], j):
+            lb = lb[::-1]
+        lines[ends[0]] = (la + lb[1:], oa)
+        lines[ends[1]] = ([], "")
+    return [(l, o) for l, o in lines if l]
 
 
 def _left_offset(pts, dist):
@@ -362,11 +398,13 @@ def cmd_gltf(a):
         st = styles.get(lane.get("road_name"))
         return st.material("mark_w") if st is not None else default_mark
 
+    # the lines stop at the stop line and the zebra: the same arm frames the marks below are placed from
+    clear = pfu.clear_zones(table, lanes_doc)
     for zone in sorted(part.pieces()):
         piece = pz.piece_name(a.prefix, zone)
         if only and piece not in only:
             continue
-        objs = pmsh.build(net, grid, part if zones else None, zone, kit, report, solved)
+        objs = pmsh.build(net, grid, part if zones else None, zone, kit, report, solved, clear)
         fur = pfu.place(table, solved, lanes_doc,
                         (lambda l, z=zone: l.get("zone_id", pz.RESIDENT) == z) if zones else (lambda l: True),
                         (lambda s, z=zone: part.run_zone(s.uids) == z) if zones else (lambda s: True),

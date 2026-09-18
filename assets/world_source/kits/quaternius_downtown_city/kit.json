@@ -62,7 +62,8 @@
   ],
   "rows_notes": [
     "A ROW is one storey of one side: `pieces` cycle along the side's modules (2 m source pieces only), `band` stacks a 1 m piece on top (a 3 + 1 m storey), `door` replaces the module(s) a type puts a door on, `corner` stands at each end of the side, `rail` is laid at the storey's base on the outside.",
-    "door_opening is the walk-through hole of every `door` piece in SOURCE metres (half width, height), measured on the pieces' own triangles; collision leaves exactly that gap."
+    "door_opening is the walk-through hole of every `door` piece in SOURCE metres (half width, height), measured on the pieces' own triangles; collision leaves exactly that gap.",
+    "party_wall_row: the row an `attached` side uses on every storey (a blank party wall), `banded` for a storey whose open sides carry a band. stair_house: the row and footprint (modules) of the 塔屋 on a flat roof over three storeys."
   ],
   "rows": {
     "shopfront": {
@@ -181,5 +182,16 @@
   "door_opening": [
     0.5,
     2.2
-  ]
+  ],
+  "party_wall_row": {
+    "plain": "tile_plain",
+    "banded": "metal_banded"
+  },
+  "stair_house": {
+    "row": "metal_banded",
+    "modules": [
+      2,
+      2
+    ]
+  }
 }

@@ -121,6 +121,9 @@ def marker_node(m):
     node = {"name": "mmesh_" + m["asset"], "translation": godot(m["pos"]),
             "rotation": [0.0, round(math.sin(theta / 2.0), 6), 0.0, round(math.cos(theta / 2.0), 6)],
             "extras": {"asset_path": m["path"]}}
+    if m.get("breakable"):
+        # a knock-down pole (PLAN.md 3.11): flat keys, because Godot's importer keeps extras as one Dictionary meta
+        node["extras"].update({"break_" + k: v for k, v in sorted(m["breakable"].items())})
     if any(abs(c - 1.0) > 1e-9 for c in m["scale"]):
         node["scale"] = [float(c) for c in m["scale"]]
     return node

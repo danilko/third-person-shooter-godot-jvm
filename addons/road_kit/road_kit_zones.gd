@@ -46,6 +46,17 @@ static func sidecar_path(record_path: String) -> String:
 		base = base.get_basename()
 	return base + ".zones.json"
 
+## A zone that only spawns traffic: vehicle configs, no geometry, no AI. It takes no part in the road
+## cut. (A zone that streams a piece AND spawns traffic, like DebugWorld's `debug_a`, is a road zone.)
+static func is_traffic_only(zone) -> bool:
+	if str(zone.get("geometry_path")) != "":
+		return false
+	var vcs = zone.get("vehicle_spawn_configs")
+	var scs = zone.get("spawn_configs")
+	var ncs = zone.get("named_characters")
+	return vcs != null and vcs.size() > 0 and (scs == null or scs.size() == 0) \
+			and (ncs == null or ncs.size() == 0)
+
 ## `{"schema_ver", "zones": [...], "warnings": [...]}` — each marker's centre in the NETWORK's frame
 ## (the frame the record is written in) converted to the kit's axes, and the XZ footprint of
 ## `Zone.size` as kit `half = [x, y]`. A box is axis-aligned in the network frame, so a network turned
@@ -61,6 +72,11 @@ static func zones_record(net: Node3D, markers: Array) -> Dictionary:
 			warnings.append("%s has no Zone -- ignored" % m.name)
 			continue
 		var zid := str(zone.get("zone_id"))
+		if is_traffic_only(zone):
+			# A traffic zone (`tools/island_traffic_zones.py`) is a spawn source around a junction
+			# cluster, with a 60 m box: in the cut it would be the SMALLEST box holding those stations
+			# and take the island's pads away from their road cells. It owns no road.
+			continue
 		if zid == "":
 			warnings.append("%s's Zone has no zone_id -- ignored" % m.name)
 			continue

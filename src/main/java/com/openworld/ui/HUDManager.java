@@ -77,8 +77,9 @@ public class HUDManager extends CanvasLayer {
 
   // Widget node-name ids — must match the child node names in HUDManager.tscn.
   private static final String W_FOOT_HUD     = "FootHUD";       // player health + interact prompt
-  private static final String W_VEHICLE_HUD  = "VehicleHUD";    // speed + vehicle health
-  private static final String W_WEAPON_SLOTS = "WeaponSlotsUI"; // on-foot weapon inventory bar
+  private static final String W_VEHICLE_HUD  = "VehicleHUD";    // speedometer (bottom-right; no vehicle health)
+  private static final String W_WEAPON_HUD   = "WeaponHUD";     // held weapon + ammo (bottom-right)
+  private static final String W_WEAPON_SLOTS = "WeaponSlotsUI"; // inventory column, pops up on a switch
   private static final String W_DAMAGE_IND   = "DamageIndicator";
 
   /**
@@ -93,12 +94,14 @@ public class HUDManager extends CanvasLayer {
   private static final java.util.EnumMap<Situation, java.util.Set<String>> BASE_LAYOUT =
       new java.util.EnumMap<>(Situation.class);
   static {
+    // The bottom-right corner holds ONE panel at a time — the weapon on foot and for an armed passenger,
+    // the speedometer for a driver — so the two never overlap.
     BASE_LAYOUT.put(Situation.ON_FOOT,
-        java.util.Set.of(W_FOOT_HUD, W_WEAPON_SLOTS, W_DAMAGE_IND));
+        java.util.Set.of(W_FOOT_HUD, W_WEAPON_HUD, W_WEAPON_SLOTS, W_DAMAGE_IND));
     BASE_LAYOUT.put(Situation.VEHICLE_DRIVE,
         java.util.Set.of(W_FOOT_HUD, W_VEHICLE_HUD, W_DAMAGE_IND));
     BASE_LAYOUT.put(Situation.VEHICLE_PASSENGER_WEAPON,
-        java.util.Set.of(W_FOOT_HUD, W_VEHICLE_HUD, W_WEAPON_SLOTS, W_DAMAGE_IND));
+        java.util.Set.of(W_FOOT_HUD, W_WEAPON_HUD, W_WEAPON_SLOTS, W_DAMAGE_IND));
     BASE_LAYOUT.put(Situation.VEHICLE_MOUNTED_WEAPON,
         java.util.Set.of(W_FOOT_HUD, W_VEHICLE_HUD, W_DAMAGE_IND));
   }
@@ -114,6 +117,7 @@ public class HUDManager extends CanvasLayer {
   private Feed            feed;          // bottom-right kill feed
   private Feed            statusFeed;    // top-center transient toasts (pickups, mission events)
   private WeaponSlotsUI   weaponSlotsUI;
+  private WeaponHUD       weaponHud;
   private DamageIndicator damageIndicator;
   private WeaponProgress  weaponProgress;
   private ScopeOverlay    scopeOverlay;  // 2.7 — self-gated sniper optic
@@ -160,11 +164,15 @@ public class HUDManager extends CanvasLayer {
 	Node statusFeedNode = getNodeOrNull("StatusFeed");
 	if (statusFeedNode instanceof Feed sf) {
 	  statusFeed = sf;
-	  // StatusFeed instances the same Feed scene as the bottom-right kill feed, so move
-	  // its row container to the top-center here (avoids a fragile per-instance .tscn
-	  // override of an instanced sub-scene's child).
+	  // StatusFeed instances the same Feed scene as the top-right kill feed, so move its row
+	  // container to the top-LEFT here (avoids a fragile per-instance .tscn override of an
+	  // instanced sub-scene's child): pickups and mission toasts there, kills on the right,
+	  // the minimap and health bottom-left, the weapon or speedometer bottom-right.
 	  Node vbox = statusFeed.getNodeOrNull("VBoxContainer");
-	  if (vbox instanceof Control vb) vb.setPosition(new Vector2(460f, 24f), false);
+	  if (vbox instanceof Control vb) {
+		vb.setAnchorsPreset(Control.LayoutPreset.PRESET_TOP_LEFT, false);
+		vb.setPosition(new Vector2(20f, 20f), false);
+	  }
 	}
 
 	Node busNode = getNodeOrNull("/root/EventBus");
@@ -241,6 +249,7 @@ public class HUDManager extends CanvasLayer {
 		  || name.equals("RaceHUD")) continue;
 	  widgets.put(name, c);
 	  if (c instanceof WeaponSlotsUI ws) weaponSlotsUI = ws;
+	  if (c instanceof WeaponHUD wh) weaponHud = wh;
 	  if (c instanceof DamageIndicator di) damageIndicator = di;
 	}
 	// WeaponProgress self-hides when idle (polls the controller each frame), so it is not
@@ -307,13 +316,71 @@ public class HUDManager extends CanvasLayer {
 	for (Map.Entry<String, Control> e : widgets.entrySet()) {
 	  e.getValue().setVisible(resolveWidgetVisible(e.getKey(), situation));
 	}
+	applyDriverCorner(situation);
 	refreshCrosshair();
+  }
+
+  /**
+   * A car that allows drive-bys is PASSENGER_WEAPON for everyone in it, driver included. A PASSENGER gets the weapon
+   * panel and the inventory column. The DRIVER gets the vehicle cluster (speed + damage diagram) in the corner and,
+   * stacked above it, the compact weapon panel — always, rather than swapping on aim, so neither flickers; the
+   * inventory column stays hidden (switch with the weapon wheel). A runtime override still wins.
+   */
+  private static final float DRIVER_WEAPON_RAISE = 58f;   // the vehicle cluster's height + a gap
+  private float weaponHudTop = Float.NaN, weaponHudBottom;
+
+  private boolean isLocalDriver() {
+	if (currentSituation != Situation.VEHICLE_PASSENGER_WEAPON || currentVehicle == null
+		|| !GD.isInstanceValid(currentVehicle) || player == null) return false;
+	// compared by engine instance id: two Java wrappers of one node are not == (CLAUDE.md, stale wrappers)
+	Character driver = currentVehicle.getOccupant();
+	return driver != null && driver.getInstanceId() == player.getInstanceId();
+  }
+
+  private boolean raceActive = false;
+
+  /** Re-apply the layout when a race starts or ends (RaceDirector has no signal of its own; the HUD polls). */
+  @Register
+  @Override
+  public void _process(double delta) {
+	var rd = com.openworld.game.mission.RaceDirector.get();
+	boolean active = rd != null && GD.isInstanceValid(rd) && rd.raceActiveNow();
+	if (active != raceActive) {
+	  raceActive = active;
+	  applyContext(currentSituation);
+	}
+  }
+
+  private void applyDriverCorner(Situation situation) {
+	Control wh = widgets.get(W_WEAPON_HUD);
+	if (wh != null && Float.isNaN(weaponHudTop)) {
+	  weaponHudTop = (float) wh.getOffset(godot.core.Side.TOP);
+	  weaponHudBottom = (float) wh.getOffset(godot.core.Side.BOTTOM);
+	}
+	boolean driver = isLocalDriver();
+	if (wh != null) {
+	  float raise = driver ? DRIVER_WEAPON_RAISE : 0f;
+	  wh.setOffset(godot.core.Side.TOP, weaponHudTop - raise);
+	  wh.setOffset(godot.core.Side.BOTTOM, weaponHudBottom - raise);
+	}
+	if (!driver) return;
+	setUnlessOverridden(W_VEHICLE_HUD, true);
+	setUnlessOverridden(W_WEAPON_HUD, !raceActive);
+	setUnlessOverridden(W_WEAPON_SLOTS, false);
+  }
+
+  private void setUnlessOverridden(String id, boolean visible) {
+	Control w = widgets.get(id);
+	if (w != null && !widgetOverrides.containsKey(id)) w.setVisible(visible);
   }
 
   /** A widget is visible if a runtime override forces it; otherwise per the situation's BASE_LAYOUT set. */
   private boolean resolveWidgetVisible(String id, Situation situation) {
 	Boolean override = widgetOverrides.get(id);
 	if (override != null) return override;
+	// A race is a context, not a situation (you can finish one on foot): while one runs, the combat HUD steps
+	// aside for RaceHUD, as in GTA's races. Missions hide anything else through setWidgetEnabled.
+	if (raceActive && (id.equals(W_WEAPON_HUD) || id.equals(W_WEAPON_SLOTS))) return false;
 	java.util.Set<String> set = BASE_LAYOUT.get(situation);
 	return set != null && set.contains(id);
   }
@@ -420,6 +487,9 @@ public class HUDManager extends CanvasLayer {
 	if (weaponSlotsUI != null && newPlayer instanceof Character c) {
 	  weaponSlotsUI.wireCharacter(c);
 	}
+	if (weaponHud != null && newPlayer instanceof Character c) {
+	  weaponHud.wireCharacter(c);
+	}
 	if (damageIndicator != null && newPlayer instanceof Character c) {
 	  damageIndicator.setPlayer(c);
 	}
@@ -468,6 +538,10 @@ public class HUDManager extends CanvasLayer {
 	for (Node child : getChildren()) {
 	  if (child instanceof CharacterHUD hud) {
 		hud.setPlayerCharacterId(info.characterId);
+		if (c.getNodeOrNull("Health") instanceof Health h) {
+		  hud.setMaxHealth(h.maxHealth);
+		  hud.onHealthChanged(h.getCurrentHealth());
+		}
 		// C2 routing (onCharacterHealthChanged/onCharacterAmmoChanged) looks widgets
 		// up in characterHUDs by characterId — registerCharacterHUD existed but was
 		// never called from anywhere, so replicated health (applyReplicatedHealth
@@ -490,6 +564,7 @@ public class HUDManager extends CanvasLayer {
   public void onVehicleEntered(Node vehicle, CharacterInfo occupantInfo) {
 	if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
 	currentVehicle = vehicle instanceof Vehicle v ? v : null;
+	setVehicleNameplateVisible(currentVehicle, false);   // your own car carries no floating label
 	Node vhudNode = getNodeOrNull("VehicleHUD");
 	if (vhudNode instanceof VehicleHUD hud && vehicle instanceof Node3D v) {
 	  hud.setVehicle(v);
@@ -502,8 +577,17 @@ public class HUDManager extends CanvasLayer {
 	if (occupantInfo == null || !playerCharacterId.equals(occupantInfo.characterId)) return;
 	Node vhudNode = getNodeOrNull("VehicleHUD");
 	if (vhudNode instanceof VehicleHUD hud) hud.setVehicle(null);
+	setVehicleNameplateVisible(currentVehicle, true);
 	currentVehicle = null;
 	applyContext(Situation.ON_FOOT);
+  }
+
+  /**
+   * Hide the nameplate of the vehicle the local player is in, and give it back on the way out — the same rule
+   * {@code Character.applyNameplateVisibility} applies to the local player's own body. Local view only.
+   */
+  private static void setVehicleNameplateVisible(Vehicle v, boolean visible) {
+	if (v != null && GD.isInstanceValid(v) && v.getNodeOrNull("Nameplate") instanceof Node3D np) np.setVisible(visible);
   }
 
   // ── Signal relays — player → EventBus ─────────────────────────────────────

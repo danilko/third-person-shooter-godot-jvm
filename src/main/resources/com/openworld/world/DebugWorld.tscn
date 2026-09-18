@@ -3,7 +3,7 @@
 [ext_resource type="Texture2D" uid="uid://cjnj1vweebmy5" path="res://addons/kenney_prototype_textures/orange/texture_01.png" id="1_umubf"]
 [ext_resource type="Script" uid="uid://dqwuawoi168xj" path="res://src/main/java/com/openworld/world/WorldBounds.java" id="2_bounds"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/openworld/character/Player.tscn" id="2_lj72b"]
-[ext_resource type="Shader" uid="uid://laorin813p4s" path="res://src/main/resources/com/openworld/world/water.gdshader" id="2_water"]
+[ext_resource type="Shader" uid="uid://dw5oumf7uirea" path="res://assets/vfx/water/water_toon.gdshader" id="2_water"]
 [ext_resource type="Script" uid="uid://daa4dg13rxg3x" path="res://src/main/java/com/openworld/item/AmmoRefill.java" id="3_m0gj3"]
 [ext_resource type="Script" uid="uid://ctq8u5jyp6ijf" path="res://src/main/java/com/openworld/world/SpawnConfig.java" id="3_spawn"]
 [ext_resource type="Script" uid="uid://dd6fa8v7fiv47" path="res://src/main/java/com/openworld/world/ZoneMarker.java" id="3_zmark"]
@@ -251,7 +251,7 @@ spawn_configs = Array[ExtResource("3_spawn")]([SubResource("SpawnConfig_b")])
 shader = ExtResource("sky_4_v8wrf")
 shader_parameter/sky_visible = true
 shader_parameter/color_correction = Vector2(0, 1)
-shader_parameter/ground_color = Color(0.3, 0.3, 0.3, 1)
+shader_parameter/ground_color = Color(0.75, 0.85, 0.95, 1)
 shader_parameter/horizon_offset = 0.0
 shader_parameter/atm_darkness = 0.5
 shader_parameter/atm_sun_intensity = 18.0
@@ -562,6 +562,7 @@ script = ExtResource("21_dbgh")
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("25_water")
+far_ocean_extent = 100000.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="WaterVolume" unique_id=335976425]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -40, 0)
@@ -666,6 +667,7 @@ directional_shadow_max_distance = 256.0
 
 [node name="SkyDome" type="Node" parent="Sky3D" unique_id=787810982]
 script = ExtResource("sky_4")
+ground_color = Color(0.75, 0.85, 0.95, 1)
 sun_azimuth = -2.5170999
 sun_altitude = -0.82446045
 moon_azimuth = -1.7620178

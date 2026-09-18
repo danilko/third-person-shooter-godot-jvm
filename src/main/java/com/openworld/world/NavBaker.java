@@ -4,6 +4,8 @@ import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.CollisionObject3D;
+import godot.api.MeshInstance3D;
+import godot.api.Node3D;
 import godot.api.NavigationMesh;
 import godot.api.NavigationMeshSourceGeometryData3D;
 import godot.api.NavigationRegion3D;
@@ -86,6 +88,23 @@ public class NavBaker extends Node {
      */
     @Export public float navCellSize = 0f;
 
+    /**
+     * Clip to the piece's OWN CONTENT (every mesh's world AABB, grown by {@link #CONTENT_MARGIN} in
+     * XZ) instead of a box about its origin. For a road piece cut out of one network by zone
+     * (PLAN.md 3.10): it is placed in the NETWORK's frame, so its content sits wherever its cell is
+     * and a box about the origin would miss it entirely, and a run is cut at crossings, never at the
+     * cell edge, so the cell's own box would clip the end of a run that runs past it. Two pieces
+     * never share geometry (each run and pad is in exactly one), so their content boxes may overlap
+     * but their navmeshes meet only where the asphalt does, which the edge-connection margin joins.
+     */
+    @Export public boolean clipToContent = false;
+
+    public boolean getClipToContent() { return clipToContent; }
+
+    public void setClipToContent(boolean v) { clipToContent = v; }
+
+    private static final float CONTENT_MARGIN = 1f;
+
     public float getNavCellSize() { return navCellSize; }
 
     public void setNavCellSize(float v) { navCellSize = v; }
@@ -164,7 +183,7 @@ public class NavBaker extends Node {
 
     public void bake() {
         bakeScene(this, scenePath, clipHalfExtent > 0f ? clipHalfExtent : DISTRICT_HALF_EXTENT,
-                  navCellSize);
+                  navCellSize, clipToContent);
         if (quitWhenDone && getTree() != null) getTree().quit();
     }
 
@@ -174,6 +193,26 @@ public class NavBaker extends Node {
      * the same path. {@code host} must be in the tree (mirrors {@code WorldBaker.bakeScene}'s contract).
      */
     public static void bakeScene(Node host, String scenePath, float halfExtent, float cellSize) {
+        bakeScene(host, scenePath, halfExtent, cellSize, false);
+    }
+
+    /** The union of every {@link MeshInstance3D}'s world AABB under {@code root}, or null. */
+    private static godot.core.AABB contentBounds(Node root) {
+        godot.core.AABB[] acc = {null};
+        collectBounds(root, acc);
+        return acc[0];
+    }
+
+    private static void collectBounds(Node n, godot.core.AABB[] acc) {
+        if (n instanceof MeshInstance3D mi && mi.getMesh() != null) {
+            godot.core.AABB box = mi.getGlobalTransform().times(mi.getAabb());
+            acc[0] = acc[0] == null ? box : acc[0].merge(box);
+        }
+        for (Node c : n.getChildren()) collectBounds(c, acc);
+    }
+
+    public static void bakeScene(Node host, String scenePath, float halfExtent, float cellSize,
+                                 boolean clipToContent) {
         Object loaded = GD.load(scenePath);
         if (!(loaded instanceof PackedScene src)) {
             GD.printErr("NavBaker: could not load source scene '" + scenePath + "'");
@@ -195,14 +234,26 @@ public class NavBaker extends Node {
         navMesh.setAgentRadius(AGENT_RADIUS);
         navMesh.setAgentMaxClimb(AGENT_MAX_CLIMB);
         navMesh.setAgentMaxSlope(AGENT_MAX_SLOPE_DEG);
+        godot.core.AABB content = clipToContent ? contentBounds(root) : null;
+        float clipHalf = halfExtent - NAV_CLIP_INSET;
+        godot.core.AABB clip = new godot.core.AABB(
+                new godot.core.Vector3(-clipHalf, CLIP_Y_MIN, -clipHalf),
+                new godot.core.Vector3(2 * clipHalf, CLIP_Y_MAX - CLIP_Y_MIN, 2 * clipHalf));
+        float span = 2f * halfExtent;
+        if (content != null) {
+            godot.core.Vector3 p = content.getPosition(), sz = content.getSize();
+            clip = new godot.core.AABB(
+                    new godot.core.Vector3(p.getX() - CONTENT_MARGIN, CLIP_Y_MIN, p.getZ() - CONTENT_MARGIN),
+                    new godot.core.Vector3(sz.getX() + 2 * CONTENT_MARGIN, CLIP_Y_MAX - CLIP_Y_MIN,
+                                           sz.getZ() + 2 * CONTENT_MARGIN));
+            span = (float) Math.max(sz.getX(), sz.getZ()) + 2 * CONTENT_MARGIN;
+            clipHalf = span / 2f;
+        }
         float cs = cellSize > 0f ? cellSize
-                : Math.max(CELL_SIZE, (2f * halfExtent) / MAX_NAV_CELLS);
+                : Math.max(CELL_SIZE, span / MAX_NAV_CELLS);
         navMesh.setCellSize(cs);
         navMesh.setCellHeight(CELL_HEIGHT);
-        float clipHalf = halfExtent - NAV_CLIP_INSET;
-        navMesh.setFilterBakingAabb(new godot.core.AABB(
-                new godot.core.Vector3(-clipHalf, CLIP_Y_MIN, -clipHalf),
-                new godot.core.Vector3(2 * clipHalf, CLIP_Y_MAX - CLIP_Y_MIN, 2 * clipHalf)));
+        navMesh.setFilterBakingAabb(clip);
 
         // Two explicit steps (see class doc for why, not NavigationMeshGenerator.bake()): scan
         // root's whole subtree for STATIC_COLLIDERS geometry, then bake polygons from it.

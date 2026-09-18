@@ -39,6 +39,11 @@ public class RocketProjectile extends RigidBody3D implements Detonatable, Cosmet
     /** Radial push force; overridden at spawn. */
     @Export public float explosionPushForce = 20f;
 
+    /** The blast effect this explosive draws (a scene under assets/vfx/explosion/effects/; null = the manager's). */
+    @Export public godot.api.PackedScene explosionVfx;
+    /** Extra size multiplier on the blast effect; at 1 its shockwave ends exactly at the damage radius (ExplosionManager.playBlast). */
+    @Export public float explosionVfxScale = 1.0f;
+
     // Injected by ProjectileItem before the node enters the tree.
     public String    attackerName      = "";
     public String    attackerFaction   = "";
@@ -93,7 +98,7 @@ public class RocketProjectile extends RigidBody3D implements Detonatable, Cosmet
         if (m instanceof ExplosionManager mgr) {
             mgr.triggerExplosion(getGlobalPosition(), explosionRadius, explosionMaxDamage,
                                  explosionPushForce, attackerName, attackerFaction,
-                                 weaponDisplayName, weaponIcon, this);
+                                 weaponDisplayName, weaponIcon, this, explosionVfx, explosionVfxScale);
         }
         broadcastDetonation(getGlobalPosition());
         exploded = true;
@@ -135,7 +140,7 @@ public class RocketProjectile extends RigidBody3D implements Detonatable, Cosmet
     private void explodeVisual(Vector3 point) {
         exploded = true;
         Node m = getTree().getFirstNodeInGroup("explosion_manager");
-        if (m instanceof ExplosionManager mgr) mgr.spawnExplosion(point);
+        if (m instanceof ExplosionManager mgr) mgr.playBlast(point, explosionVfx, explosionRadius, explosionVfxScale);
         queueFree();
     }
 

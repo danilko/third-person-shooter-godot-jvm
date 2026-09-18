@@ -114,7 +114,7 @@ EOF
 #   NAV_HALF=756 blender/tools/build_piece.sh Island_base
 bake_nav() {
   local tscn_rel="$1"
-  echo "   navmesh -> res://$tscn_rel${NAV_HALF:+  (clip half-extent ${NAV_HALF} m)}"
+  echo "   navmesh -> res://$tscn_rel${NAV_HALF:+  (clip half-extent ${NAV_HALF} m)}${NAV_FIT:+  (clip to content)}"
   local nav_tscn="$REPO/$RES_DIR/_navbake_$$_${RANDOM}.tscn"
   CLEANUP_FILES+=("$nav_tscn" "$nav_tscn.import")
   {
@@ -129,6 +129,9 @@ EOF
     # then leaves the float property at its default -- the bake reported the district clip back
     # with no error at all, which is the worst way for a number not to arrive.
     [[ -n "${NAV_HALF:-}" ]] && printf 'clip_half_extent = %.1f\n' "$NAV_HALF"
+    # NAV_FIT=1: clip to the piece's own content instead (NavBaker.clipToContent) -- a road piece
+    # cut from one network by zone sits in the NETWORK's frame, wherever its cell is (PLAN.md 3.10).
+    [[ "${NAV_FIT:-}" == "1" ]] && echo 'clip_to_content = true'
     cat <<EOF
 bake_on_ready = true
 quit_when_done = true

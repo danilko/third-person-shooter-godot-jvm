@@ -25,7 +25,7 @@ The block it writes is identified by NAME (``Zone_traffic_*``, ``VehicleSpawn_tr
 ``TrafficZones`` node), never by a comment, so re-running it after an editor re-save replaces the
 previous block instead of duplicating it.
 
-    tools/island_traffic_zones.py assets/world_source/pieces/Roads_IslandRoads_island.lanekit.json \
+    tools/island_traffic_zones.py assets/world_source/pieces/Roads_IslandRoads_island_*.lanekit.json \
         src/main/resources/com/openworld/world/World.tscn
     tools/island_traffic_zones.py ... --check     # exit 1 if the scene is stale (CI)
 """
@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import sys
 from pathlib import Path
@@ -59,15 +60,40 @@ HOLDER = "TrafficZones"
 
 # ---------------------------------------------------------------------------- lanes -> clusters
 
-def spawn_entries(lanekit: dict) -> tuple[list[list[float]], list[list[list[float]]], str]:
-    """(entry point per spawnable lane, every spawnable lane's polyline, the shared zone_id)."""
-    lanes = [l for l in lanekit.get("lanes", []) if l.get("spawnable")]
+def spawn_entries(lanekits: list[dict]) -> tuple[list[list[float]], list[list[list[float]]], str]:
+    """(entry point per spawnable lane, every spawnable lane's polyline, the ROUTE they share).
+
+    One piece: the route is its lanes' zone_id. A network cut into a grid of zones (PLAN.md 3.10,
+    `island_road_zones.py`) streams as many pieces, one zone id each (`island_<gx>_<gz>`); the route
+    is then their common prefix up to its last `_` (`island_`), which `ZoneManager.spawnLanes`'
+    zone-id pass reads as "any zone whose id starts with this" -- one route over the whole network,
+    however it streams."""
+    every = [l for doc in lanekits for l in doc.get("lanes", [])]
+    kind = {l["id"]: l.get("kind", "") for l in every}
+    preds: dict[str, list[str]] = {}
+    for l in every:
+        for n in l.get("next", ()):
+            preds.setdefault(n, []).append(l["id"])
+    # A lane whose only predecessors are plain lanes starts at a JOINT, mid-road (a road split at a
+    # zone cell boundary, `island_road_zones.py`): it is not where traffic clusters, and counting it
+    # would scatter markers along every arterial. The clusters stay junctions and road ends.
+    lanes = [l for l in every if l.get("spawnable")
+             and not (preds.get(l["id"]) and all(kind.get(p) != "connector" for p in preds[l["id"]]))]
     if not lanes:
-        raise SystemExit("no spawnable lanes in the lanekit — nothing to build traffic zones from")
-    zone_ids = {l.get("zone_id", "") for l in lanes}
-    if len(zone_ids) != 1 or "" in zone_ids:
-        raise SystemExit(f"expected one non-empty zone_id across the lanes, got {sorted(zone_ids)}")
-    return [l["points"][0] for l in lanes], [l["points"] for l in lanes], zone_ids.pop()
+        raise SystemExit("no spawnable lanes in the lanekit(s) — nothing to build traffic zones from")
+    zone_ids = sorted({l.get("zone_id", "") for l in lanes})
+    if "" in zone_ids:
+        raise SystemExit("a spawnable lane has no zone_id")
+    if len(zone_ids) == 1:
+        route = zone_ids[0]
+    else:
+        common = os.path.commonprefix(zone_ids)
+        route = common[:common.rfind("_") + 1] if "_" in common else ""
+        if not route:
+            raise SystemExit(f"the lanes' zone ids share no '<prefix>_': {zone_ids[:5]}...")
+    # Coverage is measured over EVERY spawnable lane: a joint lane is still road a player drives.
+    return ([l["points"][0] for l in lanes],
+            [l["points"] for l in every if l.get("spawnable")], route)
 
 
 def cluster(points: list[list[float]], radius: float) -> list[tuple[float, float, float, int]]:
@@ -185,7 +211,7 @@ def build_block(centres, offset, args, route: str, zone_ext: str, marker_ext: st
                f'route_name = "{route}"\n\n')
     nodes.append(f'[node name="{HOLDER}" type="Node" parent="." unique_id={NODE_ID_BASE}]\n\n')
     for i, (x, y, z, n) in enumerate(centres):
-        zid = f"{route}_traffic_{i:02d}"
+        zid = f"{route.rstrip('_')}_traffic_{i:02d}"
         sub.append(f'[sub_resource type="Resource" id="{ZONE_PREFIX}{i:02d}"]\n'
                    f'script = ExtResource("{zone_ext}")\n'
                    f'zone_id = "{zid}"\n'
@@ -233,29 +259,44 @@ def patch(text: str, centres, offset, args, route: str) -> str:
     sub, nodes = build_block(centres, offset, args, route,
                              ids[ZONE_SCRIPT], ids[MARKER_SCRIPT], ids[VSPAWN_SCRIPT])
 
-    kept = [(h, b) for h, b in sections if not is_generated(h)]
+    return splice(sections, is_generated, sub, nodes, added_ext)
+
+
+def splice(sections, generated, sub, nodes, ext=()) -> str:
+    """The scene with every `generated` section replaced by `sub` / `nodes`, each put back WHERE ITS
+    PREVIOUS COPY WAS (else before the first node / first connection). Two tools own blocks in one
+    scene (this one and `island_road_zones.py`); inserting "before the first node" each time made
+    whichever ran last move in front of the other, so neither could ever read "up to date"."""
+    has_sub = any(generated(h) and h.startswith("[sub_resource") for h, _ in sections)
+    has_node = any(generated(h) and h.startswith("[node") for h, _ in sections)
     out, sub_done, nodes_done, ext_done = [], False, False, False
-    for header, body in kept:
-        if (added_ext and not ext_done and header
-                and not header.startswith(("[ext_resource", "[gd_scene"))):
-            out.extend(added_ext)
+    for header, body in sections:
+        if ext and not ext_done and header and not header.startswith(("[ext_resource", "[gd_scene")):
+            out.extend(ext)
             ext_done = True
-        if not sub_done and header.startswith("[node"):
+        if generated(header):
+            if header.startswith("[sub_resource") and not sub_done:
+                out.extend(sub)
+                sub_done = True
+            elif header.startswith("[node") and not nodes_done:
+                out.extend(nodes)
+                nodes_done = True
+            continue
+        if not sub_done and not has_sub and header.startswith("[node"):
             out.extend(sub)
             sub_done = True
-        if not nodes_done and header.startswith("[connection"):
+        if not nodes_done and not has_node and header.startswith("[connection"):
             out.extend(nodes)
             nodes_done = True
         out.append(body)
-    if not ext_done and added_ext:
-        out.extend(added_ext)
+    if ext and not ext_done:
+        out.extend(ext)
     if not sub_done:
         out.extend(sub)
     if not nodes_done:
         out.extend(nodes)
     # Sections are emitted with exactly one blank line between them.
-    joined = "".join(out)
-    return re.sub(r"\n{3,}(\[)", r"\n\n\1", joined)
+    return re.sub(r"\n{3,}(\[)", r"\n\n\1", "".join(out))
 
 
 # ---------------------------------------------------------------------------- main
@@ -263,7 +304,7 @@ def patch(text: str, centres, offset, args, route: str) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("lanekit", type=Path)
+    ap.add_argument("lanekit", type=Path, nargs="+", help="every piece lanekit of the network")
     ap.add_argument("scene", type=Path)
     ap.add_argument("--network", default="IslandRoads",
                     help="the scene node the lanekit's frame belongs to (default IslandRoads)")
@@ -276,8 +317,7 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="exit 1 if the scene would change")
     args = ap.parse_args()
 
-    lanekit = json.loads(args.lanekit.read_text())
-    entries, polylines, route = spawn_entries(lanekit)
+    entries, polylines, route = spawn_entries([json.loads(p.read_text()) for p in args.lanekit])
     centres = cluster(entries, args.cluster)
     worst, samples = worst_coverage(polylines, centres)
 

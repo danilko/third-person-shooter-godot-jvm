@@ -148,6 +148,16 @@ grip-to-butt ≈ 0.26–0.30 m (length of pull 0.33–0.36 m minus that).
 it under `primitives` with its `size` and the `center` of the primitive relative to the grip, so the
 library draws it where the game does.
 
+**What a weapon fires** (the launcher's rocket, `ATL1_Rocket`) follows the same metre / forward / applied-
+transform / collection rules, with its origin at the projectile's centre (where it detonates) instead of a
+grip. It goes in `weapon_models.json`'s `projectiles` table, not `weapons` (it is not a catalog weapon), and
+`build_weapon.py ATL1_Rocket` checks and exports it like any weapon; `ATL1Projectile.tscn` instances the `.glb`.
+The grenade (`FRG1`) is an ordinary weapon row: the same model is held and thrown (`FRG1.tscn`,
+`FRG1Projectile.tscn`), origin at the body centre, fuze forward. Both started as real-size placeholders from
+`blender/tools/make_placeholder_models.py` (a cylindrical grenade, an 84 mm rocket), as did the ballistic shield
+`SHI1` (`equipment` table: held gear with a model but no game item yet, origin on the handle); redesign them in their
+`.blend`, keep the size the table declares (or change the table on purpose), then re-run `build_weapon.py`.
+
 ---
 
 ## Moving parts (a bolt, a cylinder, a pump)

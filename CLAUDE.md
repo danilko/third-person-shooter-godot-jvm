@@ -101,6 +101,8 @@ src/main/java/com/openworld/
   ui/             # CharacterHUD, Crosshair, HUDManager, PauseMenu, RadialMenu, Feed,
                   #   Nameplate (generic billboard, any NameplateTarget), WeaponSlotsUI/Item,
                   #   ScopeOverlay, HitMarker, AreaWarning, GpsArrow, RaceHUD (all self-gated), …
+  vfx/            # Binbun3D effect controllers (Java ports of the packs' GDScript): VfxEffect (one-shot,
+                  #   plays "main"), MuzzleFlashVfx, SmokeVfx, VfxLight — assets in assets/vfx/
   util/           # ObjectPool, generic helpers
   debug/          # DebugHarness (temporary test-spawn harness); headless test stands —
                   #   DriveTestHost (vehicle physics soak, fixed timeline) and
@@ -371,7 +373,16 @@ and frees the mouse (otherwise typing "state" walks the player and shoots). Its 
 hand-written, not reflective — a typo in a reflective console is a silent no-op — and everything it
 drives is already a `@Register`ed method, the same surface a probe uses, so it can never reach further
 into the game than the gates can. `named / move / state / invincible / release / beat / mission
-start|complete|fail / unlock / close`.
+start|complete|fail / unlock / close`, and the weapon commands (the CS `give` / Unreal `summon` idiom, host or
+single player only): `weapons`, `give <id>` (straight into the inventory through `requestEquip`), `drop <id>|all`
+(a row of pickups 3 m ahead) and `ammo`. They read `weapon.WeaponCatalog`, the one runtime reader of
+`weapon_catalog.json` (the aim bench uses it too), so a new catalog weapon is spawnable with no other edit; the
+built-in fist is excluded. Gate `tools/godot/probe_debug_weapons.gd` 6/6. The debug HUD (`PerfDebugOverlay`, **Shift+F3** cycles, console
+`hud 0-3`) is levelled like CS's `net_graph`: 1 a corner FPS counter, 2 the engine monitors + JVM heap + streaming
++ a `FrameTimeGraph` (240 frames, 60/30 fps lines, avg / 1%-low / max), 3 adds the local player's live state
+(position, speed, stance, view, health, vehicle, weapon + ammo + `WeaponState` + spread, what the aim ray is on)
+and `NetworkManager.debugNetLine` (rtt, loss, kbit/s from ENet's own statistics). Gate
+`tools/godot/probe_debug_hud.gd` 10/10 (`-- --shot=<png>` with a display).
 
 **Gate `tools/godot/probe_mission_director.gd`** (34/34; `-- --control` turns the boss's
 `story_character` flag off and fails 11). Real AI bodies on a bare stand, with a **Player in the scene
@@ -866,13 +877,25 @@ ArtDeck now falls through, same as any other gap in authored ground — see
 > step, cliff/quay classification, and the markers).
 >
 > **The water shader fades its detail with distance** (2026-09-16, user-reported "repeated small squares far
-> away"). `world/water.gdshader` samples 256 px seamless noise in WORLD space (a tile every 5 m in DebugWorld,
+> away"). The water shader (now `assets/vfx/water/water_common.gdshaderinc`, Binbun3D CC0) samples 256 px seamless noise in WORLD space (a tile every 5 m in DebugWorld,
 > 40 m in World; foam every 2 m) and read the waves at one fixed mip level, so far water aliased into a speckled
 > grid of repeated pixel squares — measured on a Vulkan screenshot, not guessed. Now fragment samples use
 > automatic mipmaps with anisotropic filtering, a second layer at `far_scale_ratio` (0.125 = 8x bigger features)
 > fades in between `detail_fade_start` and `detail_fade_end` (40-320 m from the camera), the foam shape does
 > the same, and the normal map flattens toward `far_normal_strength` far out. Near water is unchanged
 > (before/after screenshots compared). Vertex displacement still uses the fixed LOD (no derivatives there).
+>
+> **The dark band under the horizon was the SKY, past the edge of a finite sea** (PLAN.md 3.7, 2026-09-18). Sky3D
+> paints every direction below 0° elevation as `ground_color × scatter` (a dark grey), and the sea box ends 8 km
+> out, so from any altitude its edge sits a few degrees under the horizontal line and the sky's "ground" filled
+> the gap: measured with `tools/godot/shot_horizon.gd` (needs a display; `--mark-sky-ground` paints that colour
+> magenta), the band turned magenta, 0.19/0.26/0.32 against a 0.78/0.86/0.92 sea, from 400 m and 1500 m. The fix
+> is an ocean that reaches the horizon, not a repainted sky: `WaterVolume.farOceanExtent` (100 km in both worlds,
+> the camera's far plane) lays four flat quads round the surface box in the same water material, no collision.
+> What is left is under 1° past 100 km (6 px at 1500 m), and **`SkyDome.ground_color`** (the owner: the Sky3D
+> script writes it into the material at startup, so editing the material's `shader_parameter/ground_color` alone
+> does nothing) is (0.75, 0.85, 0.95), measured to within 0.03 of the far sea. From 400 m nothing is left.
+> DebugWorld looks the same before and after: from altitude it renders as haze with no horizon line.
 >
 > **All water is ONE swim volume** (`water_sea`, baked to a `WaterVolume`), and one box can cover
 > the sea, the bay and the lagoon because the land is above every part of it: a box whose TOP is the
@@ -2131,6 +2154,36 @@ pellet count and hits and draw 8 tracers each with 0 fallbacks; the other drops 
 exactly one fallback per pull (the control). **Not exercised by the gate:** results for the HOST's own
 shooters (no host-side shooter in the harness) — same queue, exclusion -1.
 
+**Lag compensation for hitscan (PLAN.md N5, 2026-09-18).** A client draws a remote body at its newest host
+snapshot dead-reckoned forward (`SnapshotInterpolator`), so what it aims at is where the body was a round trip
+ago. The host now resolves a client's shot against THAT moment:
+- **`MSG_SHOT` carries `viewTimeMs`** (i32, the host's clock): the newest host snapshot's timestamp plus the time
+  since it arrived, capped like the interpolator's projection (`NetworkManager.hostViewTimeMs`,
+  `SnapshotInterpolator.DEFAULT_MAX_PROJECTION_SECONDS`).
+- **The host keeps ~1 s of every character's ROOT position** (`net.LagCompensator.record`, every physics tick
+  while a client is connected, in `NetworkManager._physicsProcess` at the moment and on the clock snapshots are
+  stamped with, so the view time and the history are one timeline). Engine-free `net.LagCompensation`
+  (`LagCompensationTest`, 6) owns the ring buffer, the wrap-safe age and `MAX_REWIND_MS` 200 (Source's
+  `sv_maxunlag` idea: the view time is the client's word, so the cap is all a forged one buys).
+- **Rewind = move the hitbox bones, trace, restore.** Every live body whose rewound chest is within 3 m (+ the
+  cone) of the shot line has each `PhysicalBone3D` (`Character.hitboxBones()`) shifted by root-then minus
+  root-now straight in `PhysicsServer3D`; `FirearmItem.resolveServerShot` runs; the bones go back. Nothing in the
+  scene tree moves. **The bones are KINEMATIC, and Jolt applies a kinematic body's new transform only at the next
+  step**, so a query in between still sees the old place (measured: every rewound shot went through the target to
+  the wall). Each moved bone is made STATIC for the trace, which Jolt moves at once, and given its mode back.
+- Position only, not pose or facing: within 200 ms a pose moves centimetres and a strafe a metre.
+- `NetworkManager.lagCompensation` (on) is the control knob; `debugSendDelayMs` holds every outgoing message
+  (test latency, 0 in the game). Counted `shot_rewound`; `debugShots` prints each rewind.
+
+Gate **`tools/net/run_net_lag_test.sh`** (`debug/NetLagTest.tscn`, `NetLagTestHost`; 80 ms held each way): a
+client taps an ASR1 through `Input` at a target walking 2.3–3 m/s side to side 15 m out, aiming from its real
+camera at the chest it DRAWS, only mid-sweep. Rewind **23/23** hits (median rewind 175 ms = the round trip);
+control (`--no-rewind`) **0/23**. Measured on the way: at the reported view time the host history matched where
+the client drew the target to 0.004–0.07 m. **Probe traps**, both of which read as a rewind defect: aiming from a
+guessed eye instead of the TPS camera put the line 0.3 m high; and a SPRINTING target does not agree with itself —
+the host AI's sprint leans `spine_03` 10–20 cm lower and further forward than the client's puppet of it, which at
+15 m decides hit or miss (PLAN.md 5.1b). `run_net_shot_test.sh` still passes (all checks).
+
 **Two game instances on one install share a `PersistentPlayerId`** (`user://player_id.cfg`), which is
 exactly how LAN co-op is tested on one PC. The host used to spawn the second instance's body with the
 FIRST peer's characterId — three bodies, one identity, and a client that could not tell which it owned
@@ -2299,6 +2352,57 @@ Damage multipliers are resolved by bone name in `Health.getDamageMultiplier()`:
 
 On death, `Health` emits to `EventBus.characterEliminated(attacker, victim, weapon, headshot)`.
 
+### Effects are Binbun3D packs driven from Java (`assets/vfx/`, `com.openworld.vfx`, 2026-09-18)
+
+Explosions, muzzle flashes, smoke and the sea shader come from four CC0 Binbun3D packs, re-organised into
+`assets/vfx/{explosion,muzzle_flash,smoke,water}/` with their GDScript rewritten in Java;
+`assets/vfx/README.md` is the record (who plays what, what changed from the packs), `LICENSE.txt` the licence.
+- **The caller decides when.** Nothing autoplays or loops: `ExplosionManager` pools `poolSize` instances of
+  `explosion_scene` (a `VfxEffect`) and `spawnExplosion` plays the next idle one, else the oldest;
+  `WeaponItem.playMuzzleFlash()` plays `Muzzle/MuzzleVFX` on each shot (owner and puppet), sped up to fit one
+  shot interval; `Vehicle` toggles `DamageVfx/Smoke` (`SmokeVfx`) from its damage tier.
+- **The packs' `@tool` root setters never ran in a game** (the children do not exist when the root's
+  properties load), so what renders is what the materials hold. Explosion and smoke roots were checked equal
+  to their materials and dropped. Muzzle variants SHARE `.tres` materials with different colours and animate
+  the glow's alpha on them, so `MuzzleFlashVfx` duplicates its materials per instance and writes its colours.
+- A flash points down −Z (the pack's +X was rotated into the scenes), so its instance carries no transform.
+- **A blast is sized from its damage radius, by MEASUREMENT** (2026-09-18). Each explosion scene stores
+  `blast_radius` (how far its shockwave, the `Rings` layer, clearly-visibly reaches at scale 1) and
+  `fireball_radius` (the `Core` layer), written by `tools/godot/measure_explosion_radii.gd` (display; `-- --check`
+  re-measures, 15% tolerance — the particles are random and a re-measure varies ~10%). `ExplosionManager.playBlast`
+  scales the effect so the fireball covers HALF the damage radius (the zone taking at least 25% of the maximum under
+  the quadratic falloff) and scales the `Rings` child on its own so the shockwave expands to exactly the damage
+  radius. `explosion_vfx_scale` on a source is now only an extra multiplier (1).
+  Two traps it took to get there: world-space particles IGNORE their node's scale (measured: a 3x-scaled blast
+  reached 2.42 -> 2.59 m), so every explosion layer is `local_coords = true` (an explosion does not move while it
+  plays) and now scales linearly (2.32 -> 7.78 m); and counting every non-transparent pixel overstated the
+  shockwave ~3x (a quad's near-zero-alpha corners), so the reach is the furthest pixel over an alpha x brightness
+  threshold. Gate: `probe_vfx.gd` (a 7 m blast draws a 3.5 m fireball and a 7 m shockwave; every effect measured);
+  pictures: `shot_vfx.gd` draws each shipped blast beside a red ring at its damage radius.
+- **The car's damage smoke is half size** (`Vehicle.tscn`, `DamageVfx/Smoke` scale 0.5). The pack's thin smoke is
+  6 m quads; trailing a moving car they piled into one flat grey sheet in front of the chase camera. The wreck keeps
+  the full-size plume.
+- Gates: `tools/godot/probe_vfx.gd` (headless, 33 checks), `tools/godot/shot_vfx.gd` (display, pictures).
+
+### Damage kinds: the target decides how hard a bullet or a blast hits it (2026-09-18)
+
+`Health.hitDamageMultiplier` (every weapon hit: bullet, pellet, melee, applied in `ImpactManager.processHit`) and
+`Health.explosionDamageMultiplier` (applied in `ExplosionManager`), the GTA model: one weapon number stays right
+for a person and a car at once. Characters 1/1; every vehicle scene (car, motorcycle, boat, plane) 0.4 / 2.5, so a
+car soaks gunfire and folds to a rocket. Blast distance is to the target's nearest SURFACE (its collision
+shapes' boxes, engine-free `world.BlastFalloff`, `BlastFalloffTest`), not its origin: a rocket on a 4 m car's
+bumper used to be a 2 m, 64%-damage hit. Tuning: ATL1 rocket 320 over 7 m (`ATL1.tscn`, injected into the
+rocket), FRG1 grenade 220 over 8 m (`FRG1Projectile.tscn`; `FRG1.tscn` for a shot pickup). Result: one rocket
+within ~1 m or one grenade under it destroys a 500 HP car, SNR1 needs 9 rounds (was 4), and people die within
+~3 m of a rocket / ~2.5 m of a grenade while one SNR1 round still kills. Each explosive also names its own blast
+VFX (`explosion_vfx` / `explosion_vfx_scale`, see `assets/vfx/README.md`). Gate
+**`tools/godot/probe_explosive_damage.gd`** 15/15 (`-- --control` puts the car back to 1/1 and fails the 8 car
+cases); it hits and blasts through `debug/VehicleProbeHelper.weaponHit` / `blast`. The grenade (a
+cylinder, 56 x 112 mm), the rocket (84 mm, 0.46 m) and a ballistic shield (SHI1, 0.50 x 0.90 m, not an
+in-game item yet) are real-size placeholder models (`blender/tools/make_placeholder_models.py`), in
+`weapon_models.json` (the `FRG1` row, `projectiles` for `ATL1_Rocket`, `equipment` for `SHI1`; `build_weapon.py`
+checks and exports all of them).
+
 ### Networked combat cosmetics — fire / reload / melee replay (puppets)
 
 Combat is replicated as **state, not events**: `WeaponController` carries two rolling u8 counters
@@ -2460,7 +2564,7 @@ Key signals (not exhaustive — see `EventBus.java` for the full set, which also
 | `enemy_killed` | (future use) | score: `int` |
 | `player_health_changed` | (future use) | currentHealth: `float` |
 | `ammo_picked_up` | (future use) | weapon index: `int` |
-| `character_eliminated` | `Health.takeDamage()` | `Signal7`: victimId, victimName, victimFaction, attackerName, attackerFaction, icon, headshot |
+| `character_eliminated` | `Health.takeDamage()` | `Signal7`: attackerName, attackerFaction, victimName, victimFaction, weaponName, weaponIcon, headshot |
 
 `GameManager` connects `playerDied → onPlayerDied()` in `_ready()`.
 The HUD (`HUDManager`/`CharacterHUD`) connects `characterEliminated` for the kill feed.
@@ -2471,22 +2575,49 @@ The HUD (`HUDManager`/`CharacterHUD`) connects `characterEliminated` for the kil
 
 `HUDManager` (CanvasLayer in `HUDManager.tscn`) owns the on-screen HUD. Two pieces worth knowing:
 
-### Situational widget visibility (declarative table + runtime overrides)
+### The layout: one panel per corner, one background, one palette (2026-09-18)
 
-Instead of scattered `show()/hide()`, visibility is driven by a `Situation` enum — `ON_FOOT`,
-`VEHICLE_DRIVE`, `VEHICLE_PASSENGER_WEAPON`, `VEHICLE_MOUNTED_WEAPON` (the in-vehicle case is derived
-from `Vehicle.getWeaponMode()` in `situationForVehicle`). A code table `BASE_LAYOUT`
-(`EnumMap<Situation, Set<String>>`) lists which **table-managed widgets** are visible per situation.
-Widgets are direct `Control` children discovered by **node name** in `_ready` (`FootHUD`, `VehicleHUD`,
-`WeaponSlotsUI`, `DamageIndicator`, future `Minimap`); `Feed`/`StatusFeed`/`Crosshair`/`WeaponRadialMenu`
-are intentionally excluded (feeds are always-on; the crosshair self-gates in `refreshCrosshair`; the
-radial menu is a self-managed input overlay). **Player health (`FootHUD`) is in every vehicle situation**
-so it stays visible while riding (the seated occupant is exposed). Add a widget = drop the node in
-`HUDManager.tscn` + add its name to the relevant `BASE_LAYOUT` sets — no new code.
-Runtime flexibility: `setWidgetEnabled(id, bool)` / `clearWidgetOverride(id)` (a `widgetOverrides` map
-that wins over the table) force a widget on/off regardless of situation (per-carrier/gameplay tweaks).
-The table is **code, not an exported `Dictionary`** — a nested generic `Dictionary` export crashes the
-godot-jvm registration scanner (see Known Quirks).
+GTA V's corners with CS2's information, and nothing overlaps (gate **`tools/godot/probe_hud_layout.gd`** 21/21;
+pictures `tools/godot/shot_hud.gd`, needs a display):
+
+| where | on foot | in a vehicle |
+|---|---|---|
+| bottom-left | `Minimap` (150 px) over `FootHUD` health number + bar (and the air bar while swimming) | same |
+| bottom-right | `WeaponHUD` (icon cropped to its silhouette and drawn at one common height, `ui.IconFit`; name; magazine large / reserve small; no count for fist or melee); `WeaponSlotsUI` above it is ALWAYS visible at `idle_alpha` 0.6 (PUBG / Valorant / Apex: six slots and a growing loadout should be readable at a glance) and comes up to full for 2.5 s on a switch or an inventory change; `idle_alpha = 0` is the CS behaviour | the DRIVER gets the vehicle cluster: speed (km/h; `imperial` for mph) beside `VehicleStatus`, a top-down damage diagram (body coloured by health, a square per wheel where the wheels really are: white, amber when the tire is damaged, red when flat, pulsing while sliding). No health NUMBER; the car smokes and burns as well. In a drive-by car the compact `WeaponHUD` stacks ABOVE the cluster (always, no swap on aim); the inventory column stays hidden (the weapon wheel shows the loadout). A PASSENGER with a gun gets the weapon panel and column. While a race runs (`RaceDirector.raceActiveNow`) the weapon HUD and column step aside for `RaceHUD`; missions hide anything via `setWidgetEnabled` |
+| top-right | kill feed (`Feed`) | same |
+| top-left | pickup / mission notices (`StatusFeed`) | same |
+| centre | crosshair, `WeaponProgress` ring, hit marker, damage direction, interact prompt just under the crosshair | same |
+
+- **One background**: `ui/hud_panel.tres`, the minimap's translucent black, behind every panel (a `Background`
+  Panel in each scene, `WeaponSlotsUI`'s panel style, and `FeedEntry._draw` for feed rows).
+- **One palette**: `ui.HudPalette`. Colour means state, never selection: white → amber (health under 50%, a
+  quarter magazine) → red (health under 25%, empty); red is reserved for danger. Selection is carried by SHAPE and
+  brightness: a white ▶ in the inventory panel's left gutter before the active row, which is full white while the
+  others are 70% — readable for colour-blind players. (An inverted white chip was tried first and dropped: the
+  outline around black text on white read as bold, smeared lettering.)
+- **One outline**: 2 px of 55% black at every size (`HudPalette.OUTLINE` / `OUTLINE_PX`, `ui/game_theme.tres`, every
+  HUD `LabelSettings`, the drawn race and area warnings). An outline's width is in pixels, so a constant size gives
+  big and small text the same thin edge; the old 3–5 px at 85% made large numbers look heavy.
+- **Draw order**: `UnderwaterOverlay` and `ScopeOverlay` are HUDManager's FIRST children, so every panel draws over
+  the scope's black surround and the water tint (the health bar was hidden under the scope before). The minimap
+  has a thin light rim (`rimColor`) so its translucent disc still reads over black.
+- **Underwater tint** (`ui.UnderwaterOverlay`) follows the camera ON SCREEN (`WaterVolume.isUnderwater` of the
+  viewport's camera): on foot, first person, a car's chase or cockpit view. It replaced a tint the Character drew
+  from its own tick and camera, which is off in a driver's seat, so a car driven into the sea left the screen clear.
+- **UI scale**: `display/window/stretch/scale = 0.8` over the canvas_items stretch — everything 20% smaller, still
+  scaling with the screen height (the weapon list's text is ~10 px on a Steam Deck, just over Valve's ~9 px floor).
+  One number for a future "UI scale" setting (`Window.content_scale_factor`).
+- Numbers are Aldrich (`assets/ui/Aldrich-Regular.ttf`); the DSEG7 seven-segment font is gone.
+- The local player's own vehicle nameplate is hidden while they are in it (`HUDManager.setVehicleNameplateVisible`,
+  the vehicle twin of `Character.applyNameplateVisibility`).
+
+The visibility machinery is unchanged: a `Situation` enum (`ON_FOOT`, `VEHICLE_DRIVE`, `VEHICLE_PASSENGER_WEAPON`,
+`VEHICLE_MOUNTED_WEAPON`, derived from `Vehicle.getWeaponMode()` in `situationForVehicle`) and a code table
+`BASE_LAYOUT` of table-managed widgets per situation (`FootHUD`, `WeaponHUD`, `VehicleHUD`, `WeaponSlotsUI`,
+`DamageIndicator`), with `setWidgetEnabled` / `clearWidgetOverride` runtime overrides that win over the table.
+Feeds, crosshair, radial menu, scope, area warning, hit marker, race HUD and the map widgets are self-managed. The
+table is **code, not an exported `Dictionary`** — a nested generic `Dictionary` export crashes the godot-jvm
+registration scanner (see Known Quirks).
 
 ### Weapon switch/reload progress ring (`WeaponProgress`)
 
@@ -4878,6 +5009,16 @@ the line, support grip 0.000 m; SMG1: stock on the anchor 0.000 m, grip 0.001 m,
 `probe_weapon_{sockets,world_body,archetypes}`, `probe_self_hit`, `probe_recoil_kick` and `./gradlew test`. Both
 are in the catalog, the weapon library, the icon set and DebugWorld's pickup row.
 
+**The melee models come from a CC0 pack (2026-09-18, user-asked).** MEW1 (combat knife, replacing the low-poly
+bayonet) and MEW2 (fire axe, replacing its primitive box, scaled 0.60 -> 0.81 m) plus five models that are not game
+items yet, MEW3 crowbar, MEW4 spade, MEW5 dagger, MEW6 katana, MEW7 machete (`weapon_models.json` `equipment`),
+all from the "Free CC0 Melee Weapons Pack" (3DModelsCC0, credited). `blender/tools/import_melee_pack.py` is the
+one-shot record of what was done to each (the pack itself was deleted after import): tip/head forward, edge
+DOWN, origin on the grip, textures baked to 1024 px in `assets/weapons/textures/` (`.gdignore`d: each `.glb`
+embeds its own), DirectX normal maps green-flipped, height maps dropped. Grips and edges were placed from
+per-slice measurements (the handle is the narrow uniform run, the edge the side that thins to ~0), then
+checked on a render. The ids follow the series rule; the original generic names live in each row's `real`.
+
 **ASR-1's model was replaced (2026-09-16, user request: closer in style to ASR-2).** The AKMS with a folding
 stock became a fixed-stock AKM (`AssaultRifle_5` from the same Quaternius pack), normalised the way SR3 was.
 It was 5.422 raw units along +X, so it was scaled ×0.16230 to the AKM's **0.88 m**, turned so the muzzle is
@@ -5739,8 +5880,9 @@ DebugRoads end to end **28 s**, of which the mesh write is **0.4 s** — the res
   clockwise front face) and uploads them as the draft (`full_mesh`), in the base meshes' materials. DebugRoads
   18 280 triangles in 0.34 s of CLI.
 - **Retired:** `blender/tools/roadkit_build_mesh.py`, `build_roadkit_sample_piece.py` and the piece `.blend`s they
-  wrote (`Roads_DebugRoads_*`, `Roads_RoadKitZones_*`, `RoadKitSample`). `point_build`/`point_nodes` stay for
-  `build_island_base.py` only. The digest salt is now the Python builder's sources and `road_kit.json`'s bytes.
+  wrote (`Roads_DebugRoads_*`, `Roads_RoadKitZones_*`, `RoadKitSample`). `point_build`/`point_nodes` stayed for
+  `build_island_base.py` until 2026-09-18, when both were deleted (PLAN.md 3.10, "The island's roads stream as a
+  504 m grid"). The digest salt is now the Python builder's sources and `road_kit.json`'s bytes.
 - Gates: `point_kit.py`, `point_gltf.py` self-tests and **`blender/tools/check_roadkit_build.py`** (in
   `check_roads.sh`, now PASS=40): DebugRoads and RoadKitZones rebuilt into a temp dir must equal the committed
   glTFs under `roadkit_mesh_parity --built --assert` (control: one station of `east` moved 3 m in the record →
@@ -5830,8 +5972,93 @@ The decals and props are the next paragraph.
   `tools/godot/shot_road_furniture.gd` (needs a display; frames `--per` instances of every MultiMesh from behind
   along its own forward). Two traps: a MultiMesh reads identity transforms under `--headless` (the dummy renderer),
   and an unfocused window saves the SAME frame every shot unless `RenderingServer.force_draw()` runs first.
-- Not done: lane lines and the centre line still run through the zebra (Japan stops them at the crossing), and the
-  Japanese-only marks (止まれ, the diamond, speed numbers) belong to our own `jp_street` kit (3.6b step 4).
+- **Lines stop at the stop line and the zebra (2026-09-18), the Japanese layout.** A lane line on the arriving side
+  and the centre line end at the stop line's upstream edge, nothing is painted across the zebra, and a departing
+  lane's line starts past it. `point_furniture.clear_zones` derives the keep-clear rectangles from the SAME arm
+  frames (`_arms`) and the same placement tests (`_has_zebra`, `_has_stop`) the marks are placed with, so a line
+  only stops where a stop line or zebra was actually painted; `point_mesh.build(clear=)` clips every mark polyline
+  against them (`clip_outside`, Liang-Barsky per segment, dashes cut at the edge, heights interpolated). Measured,
+  mark vertices inside a zone: DebugRoads 423 -> **0** (of ~7.4 k), island 438 -> **0** (of ~74 k); the control is
+  `clear=None`. The editor's draft (`roadkit_cli.py live --mesh`) has no lanekits and still draws lines through.
+- **Signals and street lighting (2026-09-18, user-asked).** Three pole pieces from Quaternius' CC0 Zombie Apocalypse
+  kit, made by `blender/tools/build_street_poles.py` (Blender, from `TrafficLight_2_Japan.blend` — the owner's
+  Japanese re-make of `TrafficLight_2` — and the download's `StreetLights.blend`):
+  - `TrafficLight_JP`: scaled ×1.099 so the vehicle head's lower edge is **4.7 m** (Japan: ≥ 4.5 m over a
+    carriageway; the download's was 4.28), the pedestrian head lifted to a **2.5 m** lower edge. 5.84 m pole,
+    5.5 m arm. Still carries the download's "E 12 St" name plate (atlas texture) — replace in the .blend.
+  - `StreetLight_JP`: shaft stretched (base, collar, arm, luminaire rigid) to a **10 m** luminaire, the usual
+    Japanese arterial mounting height (the download's 6.4 m is residential). `StreetLight_JP_Twin` mirrors the
+    arm for a raised median.
+  - Placement (`point_furniture._signals` / `_lamps`): a junction is signalised when any mouth is authored
+    `traffic_light` or (`signal_all_junctions`) ≥ `signal_min_arms` (3) arms carry arriving traffic. One signal
+    per arm on the **FAR side** (the Japanese position): 6 m past the end of the kerb lane's STRAIGHT connector,
+    1 m outside that lane's kerb edge, facing the approach, arm over the arriving lanes; with no straight movement
+    (a T stem, a Y) the pole is NEAR-side, on the arm's own kerb 0.5 m back from its mouth (junction-side of its zebra). The piece's arm reaches right of forward, so
+    a right-hand-traffic arm is refused and counted (`signal_skipped_right_hand`). Lamps: twin-arm down a raised
+    median ≥ 1.2 m wide every 36 m (then no kerb lamps), else kerb lamps every 36 m staggered side to side, 0.6 m
+    behind the kerb, never over a barrier or `max_above_ground`, none on `shrine_touge*`. Signals are placed
+    before every other solid prop, and planters, bollards and lamps keep `pole_clearance` (2 m) from a pole.
+    Collision is the SHAFT only (`collide_pole`), never the arm's footprint. An asset may name its own `kit`.
+  - The digest now hashes each successor connector's END point (it places the far-side signal).
+  - Measured: DebugRoads 7 signals (2 junctions), 56 lamps; `point_furniture.py` self-test covers keep-left
+    straight and T-stem placement, the right-hand refusal, the unsignalised 2-arm junction and the pole-only
+    collider. The signals are static props: no signal phase logic exists yet.
+- Not done: the Japanese-only marks (止まれ, the diamond, speed numbers) belong to our own `jp_street` kit
+  (3.6b step 4).
+
+**A car knocks a street pole down and keeps most of its speed; the pole comes back unseen (PLAN.md 3.11,
+2026-09-18, user: "like arcade/GTA").** GTA's shape: static until hit, a physics body only while falling, restored
+out of view.
+- **Data.** `furniture.json` gives `signal` (450 kg), `lamp` and `lamp_twin` (250 kg) a
+  `breakable {mass, break_speed 5, respawn 60}`. `point_furniture.put` then leaves the pole OUT of
+  `FURN_props-prop-colonly` (planters and bollards stay in it) and puts the pole size and those numbers on the
+  placement. `point_gltf.marker_node` writes them as flat `break_*` extras. Flat keys, because the importer
+  keeps extras as one Dictionary meta.
+- **Bake.** `WorldBaker.buildMultiMeshes` turns such an asset's batch into a `world.BreakableProps` (a
+  `MultiMeshInstance3D`, named `Breakable_<asset>`). The node also stores each pole's base and yaw
+  (`positions`/`yaws`), because a headless run reads a MultiMesh's transforms back as identity.
+  - Its `pieceId` is the baked scene's stem (`WorldBaker.bakingPieceId`), so a key is the same on every peer.
+  - Its runtime colliders are stripped before `pack()` (`removeRuntimeParts`, beside `stripEagerLodLow`). The
+    baker adds the node to a live tree, so `_ready` would otherwise pack them into the piece.
+- **Runtime.**
+  - `_ready` builds one `StaticBody3D` "Poles" (WORLD layer) with a box per shaft, so a slow car and a
+    walking character stop against it as before.
+  - `Vehicle._physicsProcess` → `sweepStreetPoles` → static `BreakableProps.sweepVehicle` runs BEFORE the
+    physics step. It checks, in the car's frame, every standing pole the car will reach this step
+    (`PropBreakRules.reachesPole`: hull ±1.1 × ±2.0 m, read off its own convex shape, grown by the pole radius
+    + 2 steps of travel + 0.35 m, ahead of the motion only). For each one at or above `breakSpeed`:
+    - the collider goes off NOW, so the contact never happens. Giving the speed back after a contact would be
+      a guess at what the solver took;
+    - the MultiMesh instance gets a zero basis;
+    - a `RigidBody3D` with the pole's own mesh falls (layer 0, mask WORLD, so it never stops a car; at most 12
+      alive worldwide), kicked with the car's lost momentum at bumper height;
+    - the car keeps `m_car / (m_car + m_pole)` of its velocity: 0.83 past a lamp, 0.73 past a signal.
+  - The engine-free rules are `world.PropBreakRules` (`PropBreakRulesTest`, 8).
+  - **The return** (`_process`, 2 Hz, only while a pole is down) needs all of these (`mayRestore`):
+    `respawnSeconds` have passed; no remote player is within `hideDistance` (80 m); this peer's camera does not
+    have the pole in its frustum within that distance; nothing stands within ~4 m (`SpatialEntityGrid`).
+- **Network: no new message.** `GameManager.WORLD_EVENT_PROP_BROKEN` (12): key `piece|asset|index`, value
+  1 down / 0 back, args = the car's velocity (for the cosmetic fall). The late-join baseline is
+  `NetworkManager.sendBaselineBreakableProps`.
+  - The host judges EVERY car, a client's car by its motion (a frozen puppet reports no velocity).
+  - A client PREDICTS for the car it simulates, or its own car would stop dead on a collider the host has
+    already removed. It leaves the return to the host, and returns only a prediction the host never confirmed.
+  - A zone that unloads forgets its broken poles: it reloads with them standing, which is out of view by
+    definition.
+- **Gate `tools/godot/probe_breakable_poles.gd`** (21/21, real DebugWorld lamps):
+  - 15 m/s: the lamp goes down, and a ray down the shaft then finds nothing (no static box left in the piece).
+    The car keeps **79 %** and drives on.
+  - 3 m/s: the lamp stands and the car stops 2.11 m short (its bumper).
+  - Aged past its respawn with a camera looking at it: it stays down. Camera turned away: back, solid, the
+    falling body gone.
+  - A replicated break, the baseline, junk keys and a replicated return, fed through `applyRemote` as a client
+    receives them.
+  - `-- --control` (`breaking_enabled` off) fails 7: the car stops dead 2.0 m short.
+  - Probe trap: holding a car's velocity INTO a contact is an infinite force that slides it round a thin pole,
+    and a slow car walks 1.5 m sideways on the crossfall over 22 m. The probe re-aims every tick and lets the car
+    coast the last metre.
+- **Not covered:** the two-process run (`tools/net/run_net_*.sh`'s shape). What is asserted is the ANSWER each
+  seam reads. Bollards, bins and trees are the same mechanism, but none is flagged breakable yet.
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 
@@ -5867,9 +6094,9 @@ bake.
   - The `IslandRoads` network node sits at **Y +0.60**, because `island_to_terrain3d.py` moved sea
     level to Y = 0. The median station-vs-terrain difference is 0.00 m.
   - Station `ground_z` was then re-sampled from Terrain3D (`write_roadkit_ground.gd`).
-- **Streaming.** One always-loaded `ZoneMarker` `IslandZone` (`zone_id` "island", box 4608 m, load
-  6000 / unload 9000, `geometry_world_placed` at the network's transform) streams
-  `Roads_IslandRoads_island`. That piece was built with the matching `IslandRoads.zones.json`, so a
+- **Streaming** (superseded 2026-09-18 by the 504 m grid, below). One always-loaded `ZoneMarker` `IslandZone`
+  (`zone_id` "island", box 4608 m, load 6000 / unload 9000, `geometry_world_placed` at the network's transform)
+  streamed `Roads_IslandRoads_island`. That piece was built with the matching `IslandRoads.zones.json`, so a
   later dock Build produces the same piece name and needs no rewiring. `NAV_HALF=2016` for the navmesh.
   - `ZoneManager`'s approach log now prints only when the distance moves 10 m, because an island-wide
     zone is always "near".
@@ -6121,6 +6348,88 @@ being aimed at it, with the old 1e-6 floor as the control. The three lane-scanni
 rather than guess, because every piece baked before this still carries the duplicates until its next
 zoned build.
 
+### The island's roads stream as a 504 m grid (PLAN.md 3.10, 2026-09-18)
+
+Before this the whole island network was ONE zone (`IslandZone`, a 4608 m box) streaming ONE piece. So
+every prop type was one island-wide MultiMesh that was never culled or unloaded (2435 drains, 1059 planters,
+508 lamps in single draws), and the navmesh needed a world-sized bake at ~2 m cells.
+**`tools/island_road_zones.py`** derives the zones instead (the `island_traffic_zones.py` idiom: derived,
+idempotent, blocks found by node name, `--check`, both checks in `check_roads.sh`):
+- **The grid** is the world square cut 8 x 8 (`island_v3_geom`: 504 m about the origin, the old district
+  size). Zone ids are `island_<gx>_<gz>` in GODOT axes (`gx` along +X, `gz` along +Z, so `island_0_0` is the
+  north-west cell). A cell becomes a zone only if the cut (`point_zones`, B6, unchanged) hands it something,
+  found as a fixed point: a cell that owns nothing is dropped and the cut re-run.
+- **The cut is still a RUN cut, so long runs had to be split.** A run goes junction to junction, never
+  mid-carriageway, and on the unsplit record the zones reached up to **1.76 km** from their cell centre (the
+  touge's phase 2 is one 5 km run). `--split` (an AUTHORED change to the record, review the diff) turns a
+  station near each cell boundary into a **joint** with the new
+  `point_record_ops.split_at_joint`: the station ends its road, an exact copy starts a new road
+  (`<road>__<n>`), and the two are SEGMENT-linked. That is the shape the seeder's corner fillets already
+  built, so `wire_joints` hands the lanes over. Rules:
+  - **The facing is frozen first.** Both halves take the unsplit chain's facing, MANUAL. A road end takes its
+    own last chord as its axis, so on a curve the halves would otherwise cut their sections on different
+    planes. The self-test's control (facing left free) moves the lane 1 cm.
+  - The joint is the station within one of the boundary with the smallest bend (`--max-bend` 15°), never a
+    mouth or a ramp. It is placed only if both pieces stay at least `--min-piece` (300 m) long. That same
+    rule makes a second run a no-op.
+- **Radii are measured.** `load = max(700, reach + 200)` where `reach` is the farthest station or mouth the
+  zone owns from its centre, rounded up to 50 m; `unload = load + 300`. A zone left with a stretch past its
+  load radius is refused (`zone_beyond_load`).
+- **Measured on the island.**
+  - 33 joints → 721 stations in 47 roads, cut into **31 zones**. 27 of them load at ≤ 900 m. The widest
+    is `island_0_4` (the touge, 1450 m): its hairpins leave no station a joint may take.
+  - Lanes 218 → 318. Connectors are unchanged (124), and every sample of the new lanes lies on an old one
+    within 0.1 mm (24 308 samples).
+  - Validate is unchanged (0 errors, the same 3 `mouth_angle`). Flow is identical: 0 broken, 0 misjoined,
+    the same 12 open ends and 1 unreached lane.
+- **Traffic follows a zone-id PREFIX.** `ZoneManager.spawnLanes`' zone-id pass matches `routeName` exactly,
+  or, when it ends in `_`, as a prefix (`zoneMatches`). So `route_name = "island_"` is one route over the
+  whole network, however it streams. `island_traffic_zones.py` takes every piece lanekit and routes by their
+  common prefix. It clusters only lane entries at junctions and road ends: a lane whose only predecessors
+  are plain lanes starts at a joint, and counting those scattered 35 markers along the arterials. Coverage is
+  still measured over every spawnable lane. 11 traffic zones; the worst lane sample is 933 m from a cluster
+  (gate 1260 m).
+- **A joint is one road to the terrain stamp too.** The stamp represents each corridor by its NEAREST
+  segment. Split into separate corridors, a switchback's other leg started capping the hillside between the
+  legs as if it were a second road: re-stamping the split touge changed **6088** vertices.
+  `roadkit_cli.py corridors` now joins corridors across every joint (`_join_at_joints`), and that took it
+  to 15. Those 15, in one region, are the pre-existing joints now judged as one road; World's terrain was
+  re-stamped once for them, and the stamp is idempotent again (0).
+- **Navmesh: `NavBaker.clipToContent`** (`build_piece.sh`'s `NAV_FIT=1`). A cut piece sits in the
+  NETWORK's frame, wherever its cell is, and its runs can pass the cell edge, so neither the origin box nor
+  the cell box fits. The clip is the piece's own mesh AABB + 1 m. Pieces share no geometry, so their
+  navmeshes meet only where the asphalt does. Every piece bakes at 0.5 m cells.
+- **The dock skips traffic-only markers** (`road_kit_zones.is_traffic_only`: vehicle configs, no geometry,
+  no AI). Their 60 m boxes would otherwise be the SMALLEST box around a junction and take its pad.
+- **Gate `tools/godot/probe_island_zones.gd`** (World.tscn, the real ZoneManager): the player is set down
+  at each of the 31 cell centres in a snake. PASS on all of these:
+  - every zone inside its load radius is loaded, and none past its unload radius;
+  - every piece sits at the network (Y +0.6);
+  - every lane starts where its lanekit says (0.0000 m);
+  - a successor dangles only into an unloaded zone;
+  - every lane within 150 m of the player is streamed.
+
+  Then a 30 m/s drive along the tour (43 648 frames, headless): p50 1.54 ms, p99 3.05 ms, worst 14.98 ms;
+  65 pieces entered, the worst frame in which one finished entering 7.07 ms. `-- --control` (load 150 m)
+  fails the coverage check. Also: `probe_traffic_spawn --world=island` 6/6 (24 cars on 11 lanes),
+  `probe_road_ground -- World.tscn` 2417/2417 PIER samples with a foot, `RoadGraphTest` / `RoadMapBakeTest`
+  on all 31 lanekits (`RoadGraphTest.addIsland`), the road map re-baked, `probe_gps_route --world=island`
+  17/17 (a 5.2 km route across the pieces). That probe now picks its goal among lanes the start can REACH:
+  with the lanes renamed by the split it had picked the inbound carriageway of the `kitahama_dori` dead end,
+  which only the dead end feeds (3.3b's missing turnarounds), and reported "no route".
+- **Probe finding, not from this change:** `probe_road_stamp -- World.tscn IslandRoads` reads 329/331
+  FILL samples carried, identically on the unsplit record. The misses are `kuko_dori`'s bridge abutment
+  (0.99 m over the stamped ground), the class the 3 `hama_dori` misses were before.
+- **The Blender half of the Road Kit is deleted** (user: "remove unused old blender plugin"). Removed:
+  - `point_ops`, `point_build`, `point_nodes`, `paths`, the addon registration, the four
+    `smoketest_point_*` and `legacy_graph/`;
+  - `build_island_base.py` (the pre-Terrain3D island bake) and `seed_district_roads.py` (the Blender
+    district seeder), their only consumers;
+  - `run_smoketests.sh`, and `check_roads.sh`'s Blender section.
+
+  `road_kit_authoring/` is now the pure-python rules and build (its README is the module map). The
+  `Island_base` piece files and its Blender check tools are data and history, and were left alone.
+
 ---
 
 ## `assets/` is organised by domain; every modular kit is under `world_source/kits/` (PLAN.md 3.9, 2026-09-17)
@@ -6130,6 +6439,8 @@ assets/characters/godot_chan/   the character: merged_animation{,_f}.{blend,glb,
 assets/weapons/                 catalog, per-weapon .blend, WeaponLibrary.blend
 assets/world_source/kits/       one folder per kit SOURCE (a licence + module boundary):
     quaternius_downtown_city/     the CC0 download (buildings, road textures, decals, props)
+    quaternius_zombie_apocalypse/ CC0: source/ (the download, .gdignore'd), TrafficLight_2_Japan.blend (the owner's
+                                  Japanese signal), pieces/props/ generated by build_street_poles.py
     road_kit/                     ours: road_kit.{blend,json}, materials/M_*.tres, furniture.json
 assets/world_source/buildings/  building types, BuildingLibrary.blend, PLATEAU landmark blends
 assets/world_source/pieces/     road records + sidecars (*.roads.json, lanekits, ground, zones, build manifests)
@@ -6140,7 +6451,8 @@ uid survives, then a text rewrite). A `.blend`'s relative library links are bina
 → road_kit.blend). Rebuilt road pieces came out with byte-identical glTFs; only the `.tscn`/`.scn` material paths
 changed. `pieces/` was deliberately NOT renamed to `roads/`: `build_piece.sh`, the probes and the zone wiring all
 expect it (~35 files) and nothing but the name would improve. Trap met on the way: the island piece must be built
-with **`NAV_HALF=2016`**, or its navmesh silently bakes only the default ±252 m.
+with **`NAV_FIT=1`** (each zone piece's navmesh clipped to its own content; it was `NAV_HALF=2016` while the
+island was one piece), or its navmesh silently bakes only the default ±252 m about the origin.
 
 ## Building kits — a downloaded kit, Japanese types, one scene per type (2026-09-17)
 
@@ -6152,9 +6464,34 @@ table and `BuildingLibrary.blend` in `assets/world_source/buildings/`); `tools/b
   `building_types.json` is the Japanese types in modules and rows. `tools/building_kit/layout_buildings.py`
   (pure python, `--self-test`) derives placements, collision boxes and doors. `tools/godot/build_building_scenes.gd`
   only writes what the layout says.
-- **The model is the size (W19's rule).** `normalize_kit.py` bakes `module_scale` 0.91 into every piece's vertices
-  (`source/` -> `pieces/<category>/`, `.gdignore` on source). The module becomes the ken 1.82 m, a storey 2.73 m,
-  a banded storey 3.64 m and a door 0.91 × 2.00 m. A piece instance never carries a scale. `--check` fails on stale pieces.
+- **The model is the size (W19's rule).** `normalize_kit.py --init` bakes `module_scale` 0.91 into every piece's
+  vertices ONCE, for a newly downloaded kit (`source/` -> `pieces/<category>/`, `.gdignore` on source). The module
+  becomes the ken 1.82 m, a storey 2.73 m, a banded storey 3.64 m and a door 0.91 × 2.00 m. A piece instance never
+  carries a scale.
+- **The kit `.blend` OWNS the pieces (3.6b step 1, 2026-09-18), the weapon precedent.** `blender/tools/export_building_kit.py`
+  writes `pieces/` + `pieces.json` from `<kit>/<kit>.blend` (each piece collection moved back by its
+  `instance_offset`, every UV map and colour attribute kept, textures referenced in `../../textures/`, never
+  copied), and `build_buildings.sh` runs it (2.4 s, idempotent: a second run writes 0 files). `pieces.json` is
+  measured by `normalize_kit.measure`, the one measure both tools use. **The bounds are the kit's contract with the
+  layout**: an export whose piece bounds move more than 1 mm from the committed `pieces.json` (or adds, removes or
+  re-categorises a piece) is REFUSED and writes nothing (it stages in a temp dir); `ACCEPT_BOUNDS=1` for a
+  deliberate change. Control: `Brick_Plain_3` moved 10 cm in the .blend -> refused, naming the 0.1000 m.
+  `normalize_kit.py --init` and `build_building_kit_blend.py` both refuse to overwrite an existing kit .blend
+  (`--force`). Measured on the switch-over: all 153 pieces' bounds within 0.1 mm of the downloaded ones, identical
+  attributes and materials, up to 12% more vertices where Blender splits on seams; `probe_buildings.gd` 59/59.
+- **Proportion rules (3.6b step 6, 2026-09-18)**, in `layout_buildings.py`, each refused when it cannot be honoured:
+  - `attached: [sides]` — a side against a neighbour is `kit.party_wall_row` (plain, or banded to match a banded
+    storey) all the way up; a door or AC unit there is refused. PencilBuilding: left + right.
+  - `setback: {storeys, modules}` — the top storeys stand that many modules back from the front (道路斜線), the strip
+    is a terrace slab at the setback level edged with the parapet piece, and collision follows (lower walls full
+    length to the terrace, upper walls set back, terrace floor and edge boxes). Under half the depth, and at least
+    one full storey below. PencilBuilding 1/1, Mansion 1/1, OfficeMid 2/1.
+  - `stair_house` (塔屋) — default on for a flat roof over three storeys: a `kit.stair_house` block (2×2 modules,
+    banded metal, door facing the roof) one module in from the back-left parapet. `jp.height_m` is checked against
+    the ROOFLINE (`roofline_m`), which excludes it, as Japanese height rules exclude a small roof structure;
+    `height_m` (the mesh) includes it. Roof units move clear of it and of the roof centre the probe looks at.
+  Not built, and why: a 2.9–3.0 m storey needs a 0.2–0.3 m spacer piece (step 4, `jp_street`); per-instance
+  variation needs step 2's material decision.
 - **A building is ONE merged mesh**, one surface per material (OfficeMid: 1109 pieces -> 9 surfaces), plus box
   collision split round each door, `Door_<side>_<module>` markers and a `building` meta. Front +Z, origin at the
   footprint centre on the ground (BLENDER_CONVENTIONS.md "Asset"). Only the ground storey is enterable.
@@ -6166,8 +6503,8 @@ table and `BuildingLibrary.blend` in `assets/world_source/buildings/`); `tools/b
 - **Blender: one `.blend` per KIT plus one library VIEW.** `<kit>/<kit>.blend` (`blender/tools/build_building_kit_blend.py`)
   puts each piece in a collection whose `instance_offset` is its grid spot, keeps textures external (3 MB) and one
   copy of each material. `buildings/BuildingLibrary.blend` (`build_building_library.py`, like WeaponLibrary)
-  assembles every type from the same layout, with 3511 LINKED instances. PLACEHOLDER: pieces still come from
-  `source/`, so kit `.blend` edits are not exported yet (PLAN.md 3.6b step 1). The glTF importer PACKS images
+  assembles every type from the same layout, with LINKED instances. The kit file is the owner (above); after an
+  edit there, `build_buildings.sh` then File > External Data > Reload in the library. The glTF importer PACKS images
   unless `import_pack_images=False` (85 MB -> 3 MB).
 - Gate **`tools/godot/probe_buildings.gd`** 59/59 over 10 scenes: size, every surface on a kit material, roof at
   the wall top, ground slab, the character's own capsule (r 0.35, h 1.75) fits every door and a ray walks in,

@@ -164,8 +164,6 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     private Label swimDebugLabel = null;
 
     /** Full-screen blue tint shown to the local player while the camera is submerged (PLAN.md I2 follow-up). */
-    private CanvasLayer underwaterLayer = null;
-    private ColorRect underwaterTint = null;
 
     // False for AI-controlled characters whose accuracy is managed by their own system.
     // public (not protected): read cross-package by weapon/movement/control collaborators.
@@ -561,6 +559,16 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         }
     }
 
+    /** This body's ragdoll hitbox bones — what a bullet hits (host lag compensation moves them, PLAN.md N5). */
+    public java.util.List<PhysicalBone3D> hitboxBones() {
+        java.util.List<PhysicalBone3D> out = new java.util.ArrayList<>();
+        if (physicalBoneSimulator == null) return out;
+        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            if (physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone) out.add(bone);
+        }
+        return out;
+    }
+
     /** Undo {@link #addAimExceptionsTo} — a carrier's ray must see the next body that stands there. */
     public void removeAimExceptionsFrom(RayCast3D ray) {
         if (ray == null) return;
@@ -825,10 +833,8 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         }
         if (mc != null) mc.setSwimming(swimming, waterSurfaceY);
         updateOxygen(sw, swimming, delta);
-        // Screen tint when the head (camera) drops below the water line — the water mesh is single-sided,
-        // so once you're under the surface there is no blue in the world to signal it; the overlay does.
-        updateUnderwaterOverlay(inWater && activeCamera != null
-                && activeCamera.getGlobalPosition().getY() < waterSurfaceY);
+        // The underwater screen tint is the HUD's (ui.UnderwaterOverlay): it follows the camera ON SCREEN, which
+        // this tick cannot — it is off in a driver's seat, and a car's camera is not this body's.
         if (debugSwim) updateSwimDebug(sw, waterDepth, swimming);
 
         // ── Weapon switch / unequip ────────────────────────────────────────
@@ -1065,26 +1071,6 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
             isOnFloor(),
             currentStanceName,
             swimming ? "  [SWIMMING]" : ""));
-    }
-
-    /**
-     * Shows/hides a full-screen blue tint while the local player is submerged. Lazily builds a
-     * CanvasLayer + full-rect ColorRect as a child of the body (same pattern as {@link #updateSwimDebug},
-     * so it renders to screen and frees with the body). No-op for AI / remote bodies.
-     */
-    private void updateUnderwaterOverlay(boolean submerged) {
-        if (!isLocallyOwnedPlayer()) return;
-        if (underwaterTint == null) {
-            if (!submerged) return; // don't build the overlay until it is first needed
-            underwaterLayer = new CanvasLayer();
-            addChild(underwaterLayer);
-            underwaterTint = new ColorRect();
-            underwaterTint.setColor(new Color(0.05, 0.32, 0.55, 0.45));
-            underwaterTint.setMouseFilter(Control.MouseFilter.IGNORE);
-            underwaterTint.setAnchorsPreset(Control.LayoutPreset.PRESET_FULL_RECT, false);
-            underwaterLayer.addChild(underwaterTint);
-        }
-        underwaterTint.setVisible(submerged);
     }
 
     private MovementController movementControllerRef;
@@ -1539,7 +1525,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     /** Public ownership check — for world volumes (e.g. {@code InteriorVolume}) that affect only the local player's experience. */
     public boolean isLocalOwnedPlayer() { return isLocallyOwnedPlayer(); }
 
-    private boolean isLocallyOwnedPlayer() {
+    public boolean isLocallyOwnedPlayer() {
         if (!(this instanceof Player)) return false;
         Node netNode = getNodeOrNull("/root/NetworkManager");
         if (!(netNode instanceof com.openworld.net.NetworkManager net) || !net.isNetworked()) return true;

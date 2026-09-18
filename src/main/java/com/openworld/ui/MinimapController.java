@@ -45,6 +45,8 @@ public class MinimapController extends Control {
     @Export public float blipRadius = 3f;
     /** Background disc colour. */
     @Export public Color backgroundColor = new Color(0f, 0f, 0f, 0.45f);
+    /** Rim around the disc. */
+    @Export public Color rimColor = new Color(1f, 1f, 1f, 0.35f);
     /** Local-player heading-triangle colour. */
     @Export public Color selfColor = new Color(1f, 1f, 1f, 1f);
     /** Zone/region outline colour. */
@@ -102,6 +104,8 @@ public class MinimapController extends Control {
         float scale = radiusPx / rangeMeters;   // px per metre
 
         drawCircle(center, radiusPx, backgroundColor, true, -1f, true);
+        // a thin light rim, so the disc still reads over black (the scope's surround, a night scene)
+        drawArc(center, radiusPx - 0.75f, 0f, (float) (Math.PI * 2), 64, rimColor, 1.5f, true);
 
         if (player == null || !godot.global.GD.isInstanceValid(player)) return;
         Vector3 origin = player.getGlobalPosition();

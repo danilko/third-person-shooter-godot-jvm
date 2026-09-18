@@ -24,6 +24,8 @@ import godot.api.ResourceLoader;
 import godot.api.ResourceSaver;
 import godot.core.Dictionary;
 import godot.core.Error;
+import godot.core.PackedFloat32Array;
+import godot.core.PackedVector3Array;
 import godot.core.StringName;
 import godot.core.Transform3D;
 import godot.core.VariantArray;
@@ -139,6 +141,8 @@ public class WorldBaker extends Node {
         Node root = src.instantiate();
         if (root == null) { GD.printErr("WorldBaker: source instantiate failed"); return; }
         host.addChild(root);   // in-tree → getGlobalTransform works during conversion
+        String stem = outPath.substring(outPath.lastIndexOf('/') + 1);
+        bakingPieceId = stem.contains(".") ? stem.substring(0, stem.lastIndexOf('.')) : stem;
 
         // Instance roots must be owned by the pack root but NOT have their internals re-owned, or pack()
         // inlines (flattens) the instance instead of recording an `instance=` reference.
@@ -187,6 +191,7 @@ public class WorldBaker extends Node {
             marker.removeLodLow();
             marker.removeDebugVisuals();
         }
+        if (node instanceof BreakableProps bp) bp.removeRuntimeParts();   // its colliders are built on load
         for (Node child : node.getChildren()) stripEagerLodLow(child);
     }
 
@@ -316,13 +321,51 @@ public class WorldBaker extends Node {
             mm.setMesh(mesh);
             mm.setInstanceCount(ms.size());
             for (int i = 0; i < ms.size(); i++) mm.setInstanceTransform(i, ms.get(i).getGlobalTransform());
-            MultiMeshInstance3D mmi = new MultiMeshInstance3D();
-            mmi.setName(new StringName("MM_" + assetStem(e.getKey())));
+            // a knock-down pole (PLAN.md 3.11): the batch is a BreakableProps node, which owns the poles' colliders
+            MultiMeshInstance3D mmi = hasMetaKey(ms.get(0), "break_mass")
+                    ? breakableBatch(ms, assetStem(e.getKey())) : new MultiMeshInstance3D();
+            mmi.setName(new StringName((mmi instanceof BreakableProps ? "Breakable_" : "MM_") + assetStem(e.getKey())));
             mmi.setMultimesh(mm);
             root.addChild(mmi);
             total += ms.size();
         }
         return total;
+    }
+
+    /**
+     * The piece being baked (the output scene's stem), set by {@link #bakeScene} — the first part of a
+     * {@link BreakableProps} replication key, which must be the same string on every peer.
+     */
+    private static String bakingPieceId = "";
+
+    /**
+     * A {@link BreakableProps} batch for one knock-down pole asset (PLAN.md 3.11), from its markers' extras
+     * ({@code break_pole_half}, {@code break_pole_height}, {@code break_mass}, {@code break_break_speed},
+     * {@code break_respawn}, written by {@code point_gltf.marker_node}). Each pole's base and yaw are stored beside
+     * the MultiMesh because a headless run cannot read a MultiMesh's transforms back.
+     */
+    private static BreakableProps breakableBatch(List<Node3D> ms, String asset) {
+        BreakableProps bp = new BreakableProps();
+        Node3D first = ms.get(0);
+        bp.pieceId = bakingPieceId;
+        bp.assetName = asset;
+        bp.poleHalfWidth = metaFloat(first, "break_pole_half", bp.poleHalfWidth);
+        bp.poleHeight = metaFloat(first, "break_pole_height", bp.poleHeight);
+        bp.mass = metaFloat(first, "break_mass", bp.mass);
+        bp.breakSpeed = metaFloat(first, "break_break_speed", bp.breakSpeed);
+        bp.respawnSeconds = metaFloat(first, "break_respawn", bp.respawnSeconds);
+        bp.instanceScale = first.getScale();
+        PackedVector3Array pos = new PackedVector3Array();
+        PackedFloat32Array yaw = new PackedFloat32Array();
+        for (Node3D m : ms) {
+            Transform3D t = m.getGlobalTransform();
+            pos.append(t.getOrigin());
+            Vector3 f = t.getBasis().getZ();
+            yaw.append((float) Math.atan2(f.getX(), f.getZ()));
+        }
+        bp.positions = pos;
+        bp.yaws = yaw;
+        return bp;
     }
 
     /**

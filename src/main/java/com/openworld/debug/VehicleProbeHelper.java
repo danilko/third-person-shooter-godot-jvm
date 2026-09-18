@@ -16,21 +16,48 @@ import godot.global.GD;
  * and carjacking are plain Java on {@link Vehicle} and {@link Health}, not registered methods, and
  * registering them there for a test would add engine-visible surface to gameplay classes. A probe
  * instances this node and asks it instead. Used by {@code tools/godot/probe_dead_driver.gd} (PLAN.md 0.2),
- * {@code probe_zone_trigger.gd} (F3) and {@code probe_race.gd} (R2).
+ * {@code probe_zone_trigger.gd} (F3), {@code probe_race.gd} (R2) and {@code probe_explosive_damage.gd}.
  */
 @Script(className = "VehicleProbeHelper")
 public class VehicleProbeHelper extends Node {
 
-    /** Seat {@code ai} at the wheel of {@code v} (the ZoneManager traffic path: the car keeps its brain). */
+    /** Seat {@code ai} (an AI, or a Player for a HUD shot) at the wheel of {@code v} (the ZoneManager traffic path: an AI car keeps its brain). */
     @Register
     public void seatDriver(Node v, Node ai) {
-        if (v instanceof Vehicle car && ai instanceof AICharacter a) car.tryEnter(a);
+        if (v instanceof Vehicle car && ai instanceof Character a) car.tryEnter(a);
     }
 
     /** Kill {@code c} outright through its own Health, the way a shot would. */
     @Register
     public void kill(Node c) {
         if (c != null && c.getNodeOrNull("Health") instanceof Health h) h.takeDamage(null, 1.0e6f, "probe");
+    }
+
+    /**
+     * One weapon hit of {@code damage} on {@code body}, through {@code ImpactManager.processHit} — the path
+     * every bullet, pellet and melee swing takes, so the target's {@code hitDamageMultiplier} applies.
+     * Used by {@code probe_explosive_damage.gd}.
+     */
+    @Register
+    public void weaponHit(Node impactManager, Node body, float damage) {
+        if (impactManager instanceof com.openworld.world.manager.ImpactManager im && body instanceof godot.api.Node3D b) {
+            im.processHit(new com.openworld.world.HitInfo(b, b.getGlobalPosition(), new godot.core.Vector3(0, 1, 0)),
+                    damage, "probe", null, "probe", "", null);
+        }
+    }
+
+    /** Flatten tire {@code index} of {@code v} (the HUD damage diagram's probe). */
+    @Register
+    public void flattenTire(Node v, int index) {
+        if (v instanceof Vehicle car && index >= 0 && index < car.getWheels().size()) car.getWheels().get(index).setFlat(true);
+    }
+
+    /** One blast through {@code ExplosionManager.triggerExplosion} (no push, so bodies stay put). */
+    @Register
+    public void blast(Node explosionManager, godot.core.Vector3 at, float radius, float maxDamage) {
+        if (explosionManager instanceof com.openworld.world.manager.ExplosionManager em) {
+            em.triggerExplosion(at, radius, maxDamage, 0f, "probe", "", "probe", null, null);
+        }
     }
 
     @Register

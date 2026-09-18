@@ -24,6 +24,19 @@ class RoadGraphTest {
         return MiniJson.parse(Files.readString(PIECES.resolve(stem + ".lanekit.json")));
     }
 
+    /** The island's network: one lanekit per 504 m zone piece (PLAN.md 3.10), in the network's frame. */
+    static void addIsland(RoadGraph g) throws IOException {
+        List<Path> files;
+        try (var s = Files.list(PIECES)) {
+            files = s.filter(f -> f.getFileName().toString().matches("Roads_IslandRoads_island_\\d+_\\d+\\.lanekit\\.json"))
+                    .sorted().toList();
+        }
+        assertFalse(files.isEmpty(), "no island piece lanekits");
+        for (Path f : files) {
+            g.addLanekit(MiniJson.parse(Files.readString(f)), new double[]{1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0});
+        }
+    }
+
     private static RoadGraph debugRoads() throws IOException {
         RoadGraph g = new RoadGraph();
         g.addLanekit(read("Roads_DebugRoads_debug_a"), null);
@@ -117,7 +130,7 @@ class RoadGraphTest {
     @Test
     void islandRoutesAreLegalAndFoundWheneverReachable() throws IOException {
         RoadGraph g = new RoadGraph();
-        g.addLanekit(read("Roads_IslandRoads_island"), new double[]{1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0});
+        addIsland(g);
         g.finish();
         List<RoadGraph.Lane> all = List.copyOf(g.lanes());
         Random rng = new Random(47);

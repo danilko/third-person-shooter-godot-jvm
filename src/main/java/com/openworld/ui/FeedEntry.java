@@ -4,7 +4,10 @@ import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.HBoxContainer;
+import godot.api.StyleBox;
 import godot.core.Color;
+import godot.core.Rect2;
+import godot.global.GD;
 
 /**
  * Base class for all feed rows managed by {@link Feed}.
@@ -26,15 +29,30 @@ public class FeedEntry extends HBoxContainer {
 
     private double timer = 0.0;
 
+    /** The shared HUD panel style (ui/hud_panel.tres), drawn behind the row so every feed matches the HUD. */
+    private static final String PANEL = "res://src/main/resources/com/openworld/ui/hud_panel.tres";
+    private StyleBox panel;
+    private godot.core.Vector2 drawnSize = new godot.core.Vector2();
+
     @Register
     @Override
     public void _ready() {
         timer = lifespan;
+        if (GD.load(PANEL) instanceof StyleBox sb) panel = sb;
+    }
+
+    @Register
+    @Override
+    public void _draw() {
+        if (panel == null) return;
+        // 6 px of margin either side so the text does not sit on the panel's edge
+        drawStyleBox(panel, new Rect2(-6.0, -1.0, getSize().getX() + 12.0, getSize().getY() + 2.0));
     }
 
     @Register
     @Override
     public void _process(double delta) {
+        if (panel != null && !getSize().equals(drawnSize)) { drawnSize = getSize(); queueRedraw(); }
         timer -= delta;
         if (timer <= 0.0) {
             queueFree();

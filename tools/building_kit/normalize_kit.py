@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
-"""normalize_kit.py -- turn a downloaded modular building kit into the pieces the game builds from.
+"""normalize_kit.py -- turn a NEWLY DOWNLOADED modular building kit into its first pieces (PLAN.md 3.6b step 1).
 
-    python3 tools/building_kit/normalize_kit.py assets/world_source/kits/<kit_id> [--check]
+    python3 tools/building_kit/normalize_kit.py assets/world_source/kits/<kit_id> --init [--force]
+    python3 tools/building_kit/normalize_kit.py assets/world_source/kits/<kit_id> --check   # read-only
+
+ONE-TIME: the raw art makes the pieces once, then `blender/tools/build_building_kit_blend.py` lays them into the
+kit's .blend, and from then on THE .BLEND OWNS THEM (`blender/tools/export_building_kit.py` writes `pieces/`, and
+`tools/building_kit/build_buildings.sh` runs that export, not this). The weapon precedent (W19/W20). `--init`
+refuses a kit that already has its .blend, because writing `pieces/` from `source/` would silently throw away every
+edit made in that file; `--force` is for rebuilding a kit from scratch on purpose.
 
 Reads `<kit>/kit.json` (authored: licence, source, module, `module_scale`, category rules) and every
 `<kit>/source/*.gltf`, and writes
@@ -42,6 +49,35 @@ def rotate(q, v):
     return [v[0] + w * tx + y * tz - z * ty, v[1] + w * ty + z * tx - x * tz, v[2] + w * tz + x * ty - y * tx]
 
 
+def measure(gltf):
+    """A piece's bounding box in its own frame, from every mesh node's TRS and its POSITION accessors' min/max
+    (rounded to 0.1 mm). The ONE measure of a piece: `pieces.json` is written with it here and by
+    `blender/tools/export_building_kit.py`, so a size cannot come out different depending on who wrote the piece."""
+    lo, hi = [1e18] * 3, [-1e18] * 3
+    for node in gltf.get("nodes", []):
+        if "matrix" in node:
+            raise SystemExit(f"node {node.get('name')} carries a matrix; export TRS instead")
+        if "mesh" in node:
+            t = node.get("translation", [0, 0, 0])
+            q = node.get("rotation", [0, 0, 0, 1])
+            ns = node.get("scale", [1, 1, 1])
+            for prim in gltf["meshes"][node["mesh"]]["primitives"]:
+                acc = gltf["accessors"][prim["attributes"]["POSITION"]]
+                for c in range(8):    # the box's corners, rotated: exact for axis turns, a bound otherwise
+                    p = [acc["max" if c >> i & 1 else "min"][i] for i in range(3)]
+                    p = rotate(q, [p[i] * ns[i] for i in range(3)])
+                    for i in range(3):
+                        lo[i] = min(lo[i], p[i] + t[i])
+                        hi[i] = max(hi[i], p[i] + t[i])
+    return [round(lo[i], 4) for i in range(3)], [round(hi[i], 4) for i in range(3)]
+
+
+def manifest_entry(name, cat, gltf, lo, hi):
+    return {"category": cat, "path": f"pieces/{cat}/{name}.gltf", "min": lo, "max": hi,
+            "size": [round(hi[i] - lo[i], 4) for i in range(3)],
+            "materials": [m["name"] for m in gltf.get("materials", [])]}
+
+
 def scale_gltf(gltf, blob, s, texture_rel):
     """Return (gltf, blob, size) with POSITION data and node translations scaled by `s`."""
     blob = bytearray(blob)
@@ -67,28 +103,16 @@ def scale_gltf(gltf, blob, s, texture_rel):
                 struct.pack_into("<fff", blob, off, x * s, y * s, z * s)
             acc["min"] = [v * s for v in acc["min"]]
             acc["max"] = [v * s for v in acc["max"]]
-    lo, hi = [1e18] * 3, [-1e18] * 3
     for node in gltf.get("nodes", []):
         # A uniform scale commutes with a node's rotation and scale, so only its translation needs it.
         if "matrix" in node:
             raise SystemExit(f"node {node.get('name')} carries a matrix; export TRS instead")
         if "translation" in node:
             node["translation"] = [v * s for v in node["translation"]]
-        if "mesh" in node:
-            t = node.get("translation", [0, 0, 0])
-            q = node.get("rotation", [0, 0, 0, 1])
-            ns = node.get("scale", [1, 1, 1])
-            for prim in gltf["meshes"][node["mesh"]]["primitives"]:
-                acc = gltf["accessors"][prim["attributes"]["POSITION"]]
-                for c in range(8):    # the box's corners, rotated: exact for axis turns, a bound otherwise
-                    p = [acc["max" if c >> i & 1 else "min"][i] for i in range(3)]
-                    p = rotate(q, [p[i] * ns[i] for i in range(3)])
-                    for i in range(3):
-                        lo[i] = min(lo[i], p[i] + t[i])
-                        hi[i] = max(hi[i], p[i] + t[i])
+    lo, hi = measure(gltf)
     for img in gltf.get("images", []):
         img["uri"] = texture_rel + "/" + os.path.basename(img["uri"])
-    return gltf, bytes(blob), [round(lo[i], 4) for i in range(3)], [round(hi[i], 4) for i in range(3)]
+    return gltf, bytes(blob), lo, hi
 
 
 def build(kit_dir):
@@ -117,11 +141,7 @@ def build(kit_dir):
         rel = os.path.join("pieces", cat)
         outputs[os.path.join(rel, name + ".gltf")] = (json.dumps(gltf, indent=1) + "\n").encode()
         outputs[os.path.join(rel, name + ".bin")] = blob
-        manifest["pieces"][name] = {
-            "category": cat, "path": f"{rel}/{name}.gltf",
-            "min": lo, "max": hi, "size": [round(hi[i] - lo[i], 4) for i in range(3)],
-            "materials": [m["name"] for m in gltf.get("materials", [])],
-        }
+        manifest["pieces"][name] = manifest_entry(name, cat, gltf, lo, hi)
     outputs["pieces.json"] = (json.dumps(manifest, indent=1) + "\n").encode()
     return outputs
 
@@ -130,7 +150,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("kit_dir")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--init", action="store_true")
+    ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
+    kit_id = json.load(open(os.path.join(a.kit_dir, "kit.json")))["id"]
+    owner = os.path.join(a.kit_dir, kit_id + ".blend")
+    if not a.check and not a.init:
+        raise SystemExit("normalize_kit: pass --init for a new kit (or --check). An existing kit's pieces come from "
+                         "its .blend: blender/tools/export_building_kit.py")
+    if a.init and os.path.exists(owner) and not a.force:
+        raise SystemExit(f"normalize_kit: {owner} exists and owns this kit's pieces; --init would overwrite its "
+                         "edits. Use export_building_kit.py, or --force to rebuild the kit from source/.")
     outputs = build(a.kit_dir)
     stale = []
     for rel, data in outputs.items():

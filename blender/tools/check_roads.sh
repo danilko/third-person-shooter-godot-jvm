@@ -9,7 +9,7 @@
 #
 # USAGE:
 #     blender/tools/check_roads.sh          # everything
-#     blender/tools/check_roads.sh --quick  # pure-Python only (no Blender, ~2 s)
+#     blender/tools/check_roads.sh --quick  # pure-Python only (no Godot)
 #
 # Exits non-zero if anything fails.
 set -u
@@ -18,7 +18,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BP="$(dirname "$HERE")"
 ROOT="$(dirname "$BP")"
 ADDON="$BP/addons/road_kit_authoring"
-BLENDER="${BLENDER:-blender}"
+
 QUICK=0
 [ "${1:-}" = "--quick" ] && QUICK=1
 
@@ -62,18 +62,15 @@ pe.write(net, '$TMP/testbed.lanekit.json')
       "$TMP/testbed.lanekit.json"
 rm -rf "$TMP"
 
-if [ "$QUICK" -eq 0 ]; then
-  echo
-  echo "== 3. headless Blender smoketests =="
-  for f in "$ADDON"/smoketest_point_*.py; do
-    # --python-exit-code BEFORE --python, or a crashing test exits 0. See run_smoketests.sh.
-    run "$(basename "$f" .py)" "$BLENDER" --background --python-exit-code 1 --python "$f"
-  done
-fi
-
 echo
-echo "== 4. the Godot plugin (option B): field table, record, gestures, zones, ground, preview =="
+echo "== 3. the Godot plugin (option B): field table, record, gestures, zones, ground, preview =="
 run "gen_roadkit_godot_fields.py --check" python3 "$BP/tools/gen_roadkit_godot_fields.py" --check
+# PLAN.md 3.10: World.tscn's road grid and traffic zones are derived; a stale one is a failure.
+run "island_road_zones.py --check" python3 "$ROOT/tools/island_road_zones.py" \
+    "$ROOT/assets/world_source/pieces/IslandRoads.roads.json" "$ROOT/src/main/resources/com/openworld/world/World.tscn" --check
+run "island_traffic_zones.py --check" python3 "$ROOT/tools/island_traffic_zones.py" \
+    "$ROOT"/assets/world_source/pieces/Roads_IslandRoads_island_*.lanekit.json \
+    "$ROOT/src/main/resources/com/openworld/world/World.tscn" --check
 if [ "$QUICK" -eq 0 ]; then
   source "$HERE/env.sh"
   # `timeout -k`: a GDScript error inside `_initialize` HANGS instead of exiting, and a hung Godot

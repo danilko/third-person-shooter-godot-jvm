@@ -406,6 +406,7 @@ public final class NetMessageCodec {
     // ── MSG_SHOT (client → host, host-resolved bullets) ───────────────────────
     //
     // [tag u8][shooterCharacterId utf8][weaponSlot u8][shotSeq u32][origin 3×float][aim 3×float][spreadDeg float]
+    // [viewTimeMs i32]
     //
     // ONE message per trigger pull (PLAN.md N1). The owning client predicts the cosmetic shot locally
     // but applies no damage; it sends the pull's INPUTS — the origin (muzzle), the PRE-spread aim, the
@@ -414,9 +415,13 @@ public final class NetMessageCodec {
     // did. The slot picks the host copy's weapon, whose damage and pellet count are used — never the
     // client's. Reliable on channel 1, so a lost shot neither vanishes nor head-of-line-blocks the
     // damage/pickup/spawn traffic on channel 0.
+    //
+    // viewTimeMs (PLAN.md N5): the HOST time the client was looking at when it fired — the newest host
+    // snapshot's timestamp plus how far it had been dead-reckoned. The host rewinds the hitboxes to it
+    // (LagCompensation), capped at MAX_REWIND_MS.
 
     public static PackedByteArray encodeShot(int msgType, String shooterCharacterId, int weaponSlot, long shotSeq,
-            Vector3 origin, Vector3 aim, float spreadDeg) {
+            Vector3 origin, Vector3 aim, float spreadDeg, int viewTimeMs) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(shooterCharacterId);
@@ -425,6 +430,7 @@ public final class NetMessageCodec {
         putVector3(buf, origin);
         putVector3(buf, aim);
         buf.putFloat(spreadDeg);
+        buf.put32(viewTimeMs);
         return buf.getDataArray();
     }
 
@@ -436,12 +442,13 @@ public final class NetMessageCodec {
         Vector3 origin = getVector3(buf);
         Vector3 aim = getVector3(buf);
         float spreadDeg = buf.getFloat();
-        return new DecodedShot(shooterCharacterId, weaponSlot, shotSeq, origin, aim, spreadDeg);
+        int viewTimeMs = buf.get32();
+        return new DecodedShot(shooterCharacterId, weaponSlot, shotSeq, origin, aim, spreadDeg, viewTimeMs);
     }
 
     /** Carrier for a decoded MSG_SHOT body — one host-resolved trigger pull. */
     public record DecodedShot(String shooterCharacterId, int weaponSlot, long shotSeq, Vector3 origin, Vector3 aim,
-            float spreadDeg) { }
+            float spreadDeg, int viewTimeMs) { }
 
     // ── MSG_SHOT_RESULT_BATCH (host → peers, cosmetic, unreliable) ────────────
     //
