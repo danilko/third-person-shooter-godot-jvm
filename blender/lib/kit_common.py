@@ -277,7 +277,7 @@ def get_tiled_mat(name, rgba1, rgba2, tile_size):
 # background export process (measured), so `export_world.py`'s base-colour flattening is
 # unaffected.
 _KIT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.realpath(__file__)))), "assets", "world_source", "kit")
+    os.path.realpath(__file__)))), "assets", "world_source", "kits", "road_kit")
 
 #: The one asset file every material is linked from. It also holds the road kit's profile
 #: sections (`ROAD_KIT`) — one kit file, one link, one resolver.

@@ -107,7 +107,7 @@ New scratch collection `ROAD_KIT_SRC` (if the addon needs one for in-progress ed
 to `export_world.py`'s drop-list alongside the existing `ROADS_SRC`.
 
 > **Naming collision avoided (2026-07-22):** there is a pre-existing, unrelated, actively-used
-> `assets/world_source/kit/build_roads.py` → `roads_kit.blend` (a cell-grid tile kit driven by
+> `assets/world_source/kits/road_kit/build_roads.py` → `roads_kit.blend` (a cell-grid tile kit driven by
 > `lib/road_network.py`, loaded via `kit_common.load_kits()` for backbone/arterial visuals in
 > `towns/build_world.py` / `towns/districts/build_district.py`). The new Tier-1 kit library in
 > this doc is named `kit/lane_kit.blend` (not `road_kit.blend`) to stay unambiguous —

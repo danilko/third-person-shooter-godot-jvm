@@ -3,7 +3,7 @@
 #
 #   tools/godot/study_character_pose.sh [<blend>] [-- <probe args>]
 #
-# Default blend: assets/merged_animation.blend. Steps: scratch copy of the blend -> export_character.py
+# Default blend: assets/characters/godot_chan/merged_animation.blend. Steps: scratch copy of the blend -> export_character.py
 # -> assets/_study/ copies of merged_animation.tscn and CharacterVisuals_GodotChan.tscn re-pointed at
 # the scratch export -> `godot --import` -> probe_pose_clip.gd (the clip on a bare AnimationPlayer, no
 # tree, no modifiers) -> probe_weapon_fit.gd (through today's rig) -> delete assets/_study/.
@@ -21,7 +21,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 source blender/tools/env.sh
 
-BLEND="assets/merged_animation.blend"
+BLEND="assets/characters/godot_chan/merged_animation.blend"
 if [[ $# -gt 0 && "$1" != "--" ]]; then BLEND="$1"; shift; fi
 [[ "${1:-}" == "--" ]] && shift
 PROBE_ARGS=("$@")
@@ -42,10 +42,10 @@ grep '\[export_character\] wrote' "$STUDY/export.log"
 
 # merged_animation.tscn -> points at the study glb; header uid and the glb ext_resource uid stripped.
 sed -e '1s/ uid="[^"]*"//' \
-    -e 's#\[ext_resource type="PackedScene" uid="[^"]*" path="res://assets/merged_animation.glb"#[ext_resource type="PackedScene" path="res://assets/_study/merged_animation_study.glb"#' \
-    assets/merged_animation.tscn > "$STUDY/merged_animation_study.tscn"
+    -e 's#\[ext_resource type="PackedScene" uid="[^"]*" path="res://assets/characters/godot_chan/merged_animation.glb"#[ext_resource type="PackedScene" path="res://assets/_study/merged_animation_study.glb"#' \
+    assets/characters/godot_chan/merged_animation.tscn > "$STUDY/merged_animation_study.tscn"
 sed -e '1s/ uid="[^"]*"//' \
-    -e 's#\[ext_resource type="PackedScene" uid="[^"]*" path="res://assets/merged_animation.tscn"#[ext_resource type="PackedScene" path="res://assets/_study/merged_animation_study.tscn"#' \
+    -e 's#\[ext_resource type="PackedScene" uid="[^"]*" path="res://assets/characters/godot_chan/merged_animation.tscn"#[ext_resource type="PackedScene" path="res://assets/_study/merged_animation_study.tscn"#' \
     "$VIS_SRC" > "$STUDY/CharacterVisuals_Study.tscn"
 grep -q '_study/merged_animation_study.glb' "$STUDY/merged_animation_study.tscn"
 grep -q '_study/merged_animation_study.tscn' "$STUDY/CharacterVisuals_Study.tscn"

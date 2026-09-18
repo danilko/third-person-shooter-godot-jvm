@@ -49,7 +49,7 @@ import bpy, os, sys
 
 HERE_CODE = os.path.dirname(os.path.abspath(__file__))       # blender/kit
 BLENDER_SRC = os.path.dirname(HERE_CODE)                      # blender
-HERE = os.path.join(os.path.dirname(BLENDER_SRC), "assets", "world_source", "kit")  # data out dir
+HERE = os.path.join(os.path.dirname(BLENDER_SRC), "assets", "world_source", "kits", "road_kit")  # data out dir
 sys.path.insert(0, os.path.join(BLENDER_SRC, "lib"))
 import kit_common as kc
 

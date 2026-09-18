@@ -40,7 +40,7 @@ public class PathLaneRouteTestHost extends Node3D {
     private static final String SRC = "res://src/main/resources/com/openworld/debug/EmptyBakeSource.tscn";
     private static final String OUT = "res://src/main/resources/com/openworld/debug/PathLaneRouteBaked.tscn";
     private static final String LANEKIT =
-            "/data/danilko/git/third-person-shooter/assets/world_source/kit/intersection_prototype.4way.lanekit.json";
+            "/data/danilko/git/third-person-shooter/assets/world_source/kits/road_kit/intersection_prototype.4way.lanekit.json";
     // Both lanes are ~24m; at the default cruiseSpeed (~11 m/s) that's traversed in ~2.5s. Both
     // lanes are genuine dead ends in this isolated fixture (their exit ports aren't wired to
     // anything yet -- see road_blender_godot.md item 6), so heading change is measured only

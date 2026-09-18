@@ -1,6 +1,6 @@
-"""Apply the character clip naming pass to assets/merged_animation.blend.
+"""Apply the character clip naming pass to assets/characters/godot_chan/merged_animation.blend.
 
-    blender -b assets/merged_animation.blend --python <this> -- <map.json>
+    blender -b assets/characters/godot_chan/merged_animation.blend --python <this> -- <map.json>
 
 Reads the SAME map the scene patcher reads, so the .blend and the AnimationTree cannot end up
 spelling a clip differently. Idempotent: a rename whose target already exists is skipped.

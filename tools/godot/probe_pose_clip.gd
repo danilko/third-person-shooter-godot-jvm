@@ -3,7 +3,7 @@ extends SceneTree
 ##
 ##   godot --headless --path . --script tools/godot/probe_pose_clip.gd -- \
 ##       [--visuals=res://...CharacterVisuals_X.tscn] [--clip=upright_aim_rifle] \
-##       [--compare=res://assets/merged_animation.tscn]
+##       [--compare=res://assets/characters/godot_chan/merged_animation.tscn]
 ##
 ## PLAN.md A2.0. `probe_weapon_fit.gd` measures a pose THROUGH the rig, and the rig changes what it
 ## shows: the WeaponBlend filter drops the clip's spine and head, and both aim modifiers add their own

@@ -14,7 +14,7 @@ What it is now:
 | `point_profile`, `point_solve`, `point_edges`, `point_validate`, `point_export` | the rules: cross-sections, carriers, pads, gores, kerbs, the gate, the `.lanekit.json` export (pure) |
 | `point_zones`, `point_ground` | the per-zone cut (B6) and the Terrain3D ground sidecar (B6b) (pure) |
 | `point_record_ops`, `point_flow` | the record gestures and the flow report the Godot dock calls through `blender/tools/roadkit_cli.py` (pure) |
-| `point_mesh`, `point_gltf`, `point_kit` | THE ROAD BUILD (B11, pure): the sweep (every layer, profile assets, `-colonly` proxies), the piece `.gltf` with auto-smooth normals, and the style slots / kit materials read from `assets/world_source/kit/road_kit.json` |
+| `point_mesh`, `point_gltf`, `point_kit` | THE ROAD BUILD (B11, pure): the sweep (every layer, profile assets, `-colonly` proxies), the piece `.gltf` with auto-smooth normals, and the style slots / kit materials read from `assets/world_source/kits/road_kit/road_kit.json` |
 | `point_build`, `point_nodes`, `point_style` | the Blender meshes (GN stacks) -- used only by the island build now (`build_island_base.py`); `point_style.SLOTS` is the one slot table both builds read |
 | `point_ops` | the operators a TOOL drives: New/Extend Road, Connect, Make Intersection (the island seeder), Auto Setback, Load/Save Record, Export Lanekit, Link Road Kit |
 

@@ -1,7 +1,7 @@
 """point_kit.py -- the asset kit and a road's STYLE, without Blender (PLAN.md 3.1 B11).
 
 `point_style` resolves a road's style slots to Blender datablocks. The road build without Blender needs the same
-answer as NAMES and DATA, so this is its pure-Python twin, over `assets/world_source/kit/road_kit.json` (written
+answer as NAMES and DATA, so this is its pure-Python twin, over `assets/world_source/kits/road_kit/road_kit.json` (written
 from `road_kit.blend` by `tools/export_road_kit_data.py`, which `build_road_kit.py` runs):
 
   * a material is a NAME that must exist in the kit; a slot left blank takes the layer's default
@@ -25,7 +25,7 @@ except ImportError:
     import point_style as pst                                                 # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-KIT_DIR = os.path.normpath(os.path.join(HERE, "..", "..", "..", "assets", "world_source", "kit"))
+KIT_DIR = os.path.normpath(os.path.join(HERE, "..", "..", "..", "assets", "world_source", "kits", "road_kit"))
 KIT_JSON = os.path.join(KIT_DIR, "road_kit.json")
 KIT_BLEND = os.path.join(KIT_DIR, "road_kit.blend")
 

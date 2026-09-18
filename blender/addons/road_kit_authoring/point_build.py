@@ -86,7 +86,7 @@ NO_PED_SUFFIX = "-noped"
 #: case it was built for.
 #:
 #: AND THE DATABLOCK ITSELF NOW COMES FROM `assets/` (2026-09-05). `kit_common.mat()` LINKS every
-#: material from `assets/world_source/kit/road_kit.blend` instead of creating a copy in whichever
+#: material from `assets/world_source/kits/road_kit/road_kit.blend` instead of creating a copy in whichever
 #: `.blend` is building, so the road's asphalt, the kerb SECTION's concrete and a building's
 #: concrete are one datablock authored in a file an artist can open. This module keeps exactly the
 #: one resolver it had -- `material(key)` -> `kc.mat(...)` -- because that is where the change

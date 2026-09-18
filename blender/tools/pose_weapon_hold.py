@@ -4,20 +4,20 @@ One row per archetype in blender/tools/weapon_archetypes.json `holds` (socket, r
 support hand, clips, the solve arguments the shipped clips were written with). Every command takes --hold <name>
 (default rifle); `--flag value` overrides a row argument.
 
-    B="blender -b assets/merged_animation.blend --python-exit-code 1 --python blender/tools/pose_weapon_hold.py --"
+    B="blender -b assets/characters/godot_chan/merged_animation.blend --python-exit-code 1 --python blender/tools/pose_weapon_hold.py --"
     $B measure    [--hold H] [--action CLIP] [--frame F] [--placed OBJ] [--render DIR] [--poke-detail]
     $B adopt      --hold H [--placed OBJ] --apply   # derive socket / mount anchor / SupportPoint from the pose
     $B solve-aim  --hold H [--write --save]         # placement: mount | eye_line (or a --placed model)
     $B solve-hold --hold H [--write --save]         # a carry: grip placed off the shoulder, muzzle down/across
     $B body-anchor R U F | skin-anchor | remove-object NAME... --save
-    blender -b assets/merged_animation_f.blend ... -- copy-from assets/merged_animation.blend --save
+    blender -b assets/characters/godot_chan/merged_animation_f.blend ... -- copy-from assets/characters/godot_chan/merged_animation.blend --save
 
 What shipped (2026-09-15): rifle aim ADOPTED from the artist's placed ASR1 (clip untouched); rifle hold, launcher
 aim and hold SOLVED from their rows; pistol clips kept, PIS1's SupportPoint adopted from them.
 
 NOT idempotent where a gesture is relative: the shoulder shrug and the head gestures apply to the clip they start
 from, so a second rifle-style solve over a solved clip shrugs again. The launcher row (no shrug, head kept) is
-idempotent. Pre-A2.4 copies: assets/merged_animation.pre-A24.blend / merged_animation_f.pre-A24.blend (local).
+idempotent. Pre-A2.4 copies: assets/characters/godot_chan/merged_animation.pre-A24.blend / merged_animation_f.pre-A24.blend (local).
 
 Why a script and not a hand edit. The rifle aim pose has to satisfy several GEOMETRIC facts at once --
 the bore on the body's forward line, the butt pad in the shoulder pocket, the right eye over the bore,

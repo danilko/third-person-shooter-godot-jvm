@@ -1,9 +1,9 @@
 """export_road_kit_data.py -- `road_kit.blend` AS DATA, for the road build that has no Blender (PLAN.md 3.1 B11).
 
-    blender --background --python-exit-code 1 assets/world_source/kit/road_kit.blend \
+    blender --background --python-exit-code 1 assets/world_source/kits/road_kit/road_kit.blend \
         --python blender/tools/export_road_kit_data.py
 
-Writes `assets/world_source/kit/road_kit.json` next to the kit:
+Writes `assets/world_source/kits/road_kit/road_kit.json` next to the kit:
 
   * `materials` -- every material, as the glTF `materials[]` entry `export_world.py` + Blender's glTF exporter
     produce for it: `pbrMetallicRoughness.baseColorFactor` (the Principled BSDF's Base Color when it is a

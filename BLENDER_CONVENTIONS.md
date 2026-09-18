@@ -639,7 +639,7 @@ geometry, so it streams for free and honours the seam contract above).
 - Confirm everyone runs compatible Blender + Godot versions: the standard Godot 4.7.2+ editor, with
   godot-jvm `1.0.0-rc1` as the in-project `addons/jvm/` add-on, and JDK 17+ — see `CLAUDE.md`.
 - Agree on import presets per asset class (static mesh vs. skeleton+animation —
-  `assets/merged_animation.blend` is the existing example of the latter) so
+  `assets/characters/godot_chan/merged_animation.blend` is the existing example of the latter) so
   re-imports stay reproducible across machines.
 
 ### `.blend` direct import vs. Blender → glTF — RECOMMENDED: glTF for world content
@@ -667,6 +667,6 @@ import preset already works — this decision is about world/kit geometry.)
 ## Source control for `.blend` files
 
 - `.blend` files are large binaries — the repo already carries
-  `assets/merged_animation.blend` and the weapon models under `assets/weapons/`. Decide
+  `assets/characters/godot_chan/merged_animation.blend` and the weapon models under `assets/weapons/`. Decide
   *before* volume grows: Git LFS, a separate asset repo, or committing only the
   exported/imported result and keeping `.blend` sources elsewhere.

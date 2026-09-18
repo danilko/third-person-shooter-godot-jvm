@@ -15,7 +15,7 @@ PLACED here, from facts the build already owns, never drawn by hand:
 Nothing is placed where a barrier stands (the road is elevated there, or has no pavement to walk on), nor over
 ground more than `max_above_ground` below the lane when a ground grid is given (a manhole on a bridge deck).
 
-The PROPS and the kit decals are the downloaded kit's own pieces (`assets/world_source/kit/furniture.json` names
+The PROPS and the kit decals are the downloaded kit's own pieces (`assets/world_source/kits/road_kit/furniture.json` names
 them). They leave here as PLACEMENTS -- `{asset, path, pos, fwd, scale}` in the KIT frame -- which `point_gltf`
 writes as `mmesh_<asset>` nodes carrying `asset_path`, and `WorldBaker` collapses into one MultiMesh per asset.
 The stop line and the zebra are PAINT, triangles in the road's own `mark_w` material, because the Japanese
@@ -34,7 +34,7 @@ import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
-TABLE_PATH = os.path.join(REPO, "assets", "world_source", "kit", "furniture.json")
+TABLE_PATH = os.path.join(REPO, "assets", "world_source", "kits", "road_kit", "furniture.json")
 
 try:
     from . import point_edges as ped, point_solve as ps

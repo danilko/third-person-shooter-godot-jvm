@@ -29,7 +29,7 @@ assumed, and both silent-wrong-answer failures if broken:
     field and ignores the written default entirely. Measured -- probing indices 0/1/2 via
     `default_value` returned the same asset all three times.
 
-WHY THE ASSETS ARE LINKED COLLECTIONS, NOT APPENDED OBJECTS. `assets/world_source/kit/*.blend`
+WHY THE ASSETS ARE LINKED COLLECTIONS, NOT APPENDED OBJECTS. `assets/world_source/kits/road_kit/*.blend`
 already organises every kit piece as a Collection (`Kit_Curb_JerseyBarrier_L2`,
 `Kit_Median_Island`, `Kit_Curb_StreetLamp_L1`, ...), often several objects each -- a visual mesh
 plus its `-colonly` collision proxy. Linking (not appending) keeps the kit blend the single

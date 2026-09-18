@@ -109,7 +109,7 @@ skeleton; you still do not need one per stance.
 
 ```bash
 # 1. export, then gate the export
-blender -b assets/merged_animation.blend --python blender/tools/export_character.py
+blender -b assets/characters/godot_chan/merged_animation.blend --python blender/tools/export_character.py
 python3 blender/tools/check_character_anim.py
 
 # 2. see it move -- interactive

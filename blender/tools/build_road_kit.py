@@ -2,7 +2,7 @@
 
     blender --background --python-exit-code 1 --python blender/tools/build_road_kit.py
 
-Writes `assets/world_source/kit/road_kit.blend`, which is TWO things and deliberately one file:
+Writes `assets/world_source/kits/road_kit/road_kit.blend`, which is TWO things and deliberately one file:
 
   * one `ROAD_KIT` collection of profile CURVES. A road names one of these in a style slot
     (`RoadData.kerb_asset`, ...) and `GN_PointProfile` sweeps it along the road's own edge, at
@@ -61,7 +61,7 @@ import kit_common as kc                                                      # n
 # into itself.
 kc.USE_MATERIAL_LIBRARY = False
 
-OUT = os.path.join(REPO, "assets", "world_source", "kit", "road_kit.blend")
+OUT = os.path.join(REPO, "assets", "world_source", "kits", "road_kit", "road_kit.blend")
 COLLECTION = "ROAD_KIT"
 PREFIX = "RKA_PROFILE_"
 

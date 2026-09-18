@@ -64,7 +64,7 @@ which is why that probe counts pose clusters rather than trusting the table. The
   `StockMountIKModifier` puts the first one the weapon declares on its body anchor while aiming; a pistol declares
   none.
 * **Fastest way to fit a weapon by eye** (W25): place its model in `merged_animation.blend` in the aim pose, pose the
-  hands round it, then `blender -b assets/merged_animation.blend --python blender/tools/pose_weapon_hold.py -- adopt
+  hands round it, then `blender -b assets/characters/godot_chan/merged_animation.blend --python blender/tools/pose_weapon_hold.py -- adopt
   --hold <archetype> --placed <ID> --apply` writes the socket, the mount anchor and the `SupportPoint` that
   reproduce it; `remove-object <ID> --save` takes the model out again.
 * `Muzzle` — the bore tip, exactly. It is the shot origin and the flash position; a muzzle floating
