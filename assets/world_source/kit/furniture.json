@@ -1,0 +1,48 @@
+{
+  "notes": [
+    "Street furniture and road decals the Road Kit places (PLAN.md 3.6c, point_furniture.py is the one reader).",
+    "`kit` is the downloaded kit the pieces come from; each asset is a normalised kit piece (metres, +Y up, forward -Z).",
+    "A piece is stood on its own lowest point (`lift` added on top), turned so its -Z runs along the road, and scaled by `scale` [x, y, z] in its own axes.",
+    "`collide` puts an oriented box of the piece's footprint into the piece's collision (a StaticBody3D after import).",
+    "Distances are metres; `back` distances are measured from the stop line (the lane's end at a junction mouth) back along the approach.",
+    "`exclude_roads` lists road-name globs an asset is never placed on (a planter or a manhole does not belong on a mountain pass).",
+    "Edit and rebuild: the Road Kit digest salts this file and every piece it names, so a change here rebuilds every road piece."
+  ],
+  "kit": "res://assets/world_source/kits/quaternius_downtown_city/",
+  "assets": {
+    "arrow_S":  {"piece": "pieces/decals/Decal_ArrowStraight.gltf",     "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
+    "arrow_L":  {"piece": "pieces/decals/Decal_ArrowTurnLeft.gltf",      "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
+    "arrow_R":  {"piece": "pieces/decals/Decal_ArrowTurnRight.gltf",     "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
+    "arrow_SL": {"piece": "pieces/decals/Decal_ArrowForwardLeft.gltf",   "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
+    "arrow_SR": {"piece": "pieces/decals/Decal_ArrowForwardRight.gltf",  "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
+    "manhole":  {"piece": "pieces/props/Prop_ManholeCover.gltf",         "lift": 0.0, "exclude_roads": ["shrine_touge*"]},
+    "drain":    {"piece": "pieces/props/Prop_Drain.gltf",                "lift": 0.0},
+    "planter":  {"piece": "pieces/props/Sidewalk_Planter.gltf",          "lift": 0.0, "collide": true,
+                "exclude_roads": ["shrine_touge*"]},
+    "bollard":  {"piece": "pieces/props/Prop_Bollard.gltf",              "lift": 0.0, "collide": true}
+  },
+  "rules": {
+    "crosswalk_back": [1.0, 5.0],
+    "crosswalk_bar": 0.45,
+    "crosswalk_gap": 0.45,
+    "crosswalk_margin": 0.3,
+    "stop_back": 7.0,
+    "stop_width": 0.45,
+    "arrow_back": 14.0,
+    "arrow_min_lane": 20.0,
+    "paint_lift": 0.015,
+    "manhole_spacing": 90.0,
+    "manhole_end_clear": 25.0,
+    "drain_spacing": 20.0,
+    "drain_inset": 0.35,
+    "drain_end_clear": 8.0,
+    "planter_spacing": 30.0,
+    "planter_min_footway": 3.0,
+    "planter_kerb_gap": 0.3,
+    "planter_end_clear": 12.0,
+    "bollard_spacing": 1.8,
+    "bollard_inset": 0.35,
+    "bollard_end_clear": 0.9,
+    "max_above_ground": 2.0
+  }
+}

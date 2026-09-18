@@ -37,7 +37,7 @@ except ImportError:
 BUILDER_SOURCES = ("point_mesh.py", "point_gltf.py", "point_kit.py", "point_style.py", "point_solve.py",
                    "point_edges.py", "point_export.py", "point_zones.py", "point_profile.py",
                    os.path.join("..", "..", "lib", "lane_profile.py"), os.path.join("..", "..", "lib", "road_support.py"),
-                   os.path.join("..", "..", "tools", "roadkit_cli.py"))
+                   os.path.join("..", "..", "tools", "roadkit_cli.py"), "point_furniture.py")
 
 #: The kit as the build reads it: its materials and profile sections (`road_kit.json`, written from road_kit.blend).
 BUILDER_ASSETS = (os.path.join("..", "..", "..", "assets", "world_source", "kit", "road_kit.json"),)
@@ -82,6 +82,17 @@ def builder_salt():
                 h.update(name.encode())
                 with open(os.path.join(lib, name), "rb") as fh:
                     h.update(fh.read())
+    # PLAN.md 3.6c: the furniture table and every kit piece it places (their bounds decide where a piece stands).
+    try:
+        from . import point_furniture as pfu
+    except ImportError:
+        import point_furniture as pfu                                        # noqa: E402
+    table = pfu.load()
+    for path in (table.files() if table is not None else ()):
+        if os.path.exists(path):
+            h.update(os.path.relpath(path, pfu.REPO).encode())
+            with open(path, "rb") as fh:
+                h.update(fh.read())
     return h.hexdigest()
 
 
@@ -115,11 +126,16 @@ def piece_digests(net, zones, ground=None):
         z = part.gore_zone(g.ramp_uid)
         if z in per:
             per[z]["gores"].append({"ramp": g.ramp_uid, "tris": g.tris, "edges": ped.gore_edge_runs(g)})
+    turns = {l["id"]: l.get("turn", "") for l in doc.get("lanes", ())}
     out = {}
     for z, content in per.items():
         sub = pz.split_doc(doc, z) if zones else doc
+        # a lane's turn arrow is chosen by its successors' turns, and a successor connector may stream with
+        # another piece (the pad's) -- so each lane's successor turns are part of THIS piece too (PLAN.md 3.6c)
+        succ = [[l["id"], sorted((n, turns.get(n, "")) for n in l.get("next", ()))] for l in sub.get("lanes", ())]
         body = {"salt": salt, "runs": content["runs"], "pads": content["pads"], "gores": content["gores"],
-                "roads": [roads[n] for n in sorted(content["roads"]) if n in roads], "lanekit": sub}
+                "roads": [roads[n] for n in sorted(content["roads"]) if n in roads], "lanekit": sub,
+                "successor_turns": succ}
         out[z] = hashlib.sha1(json.dumps(_canon(body), sort_keys=True).encode()).hexdigest()
     return out
 

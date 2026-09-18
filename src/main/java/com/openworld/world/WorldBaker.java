@@ -309,6 +309,7 @@ public class WorldBaker extends Node {
         for (Map.Entry<String, List<Node3D>> e : byAsset.entrySet()) {
             Mesh mesh = loadVisualMesh(e.getKey());
             if (mesh == null) { GD.printErr("WorldBaker: mmesh — no visual mesh in '" + e.getKey() + "'"); continue; }
+            mesh = withKitMaterials(mesh, e.getKey());
             List<Node3D> ms = e.getValue();
             MultiMesh mm = new MultiMesh();
             mm.setTransformFormat(MultiMesh.TransformFormat.TRANSFORM_3D);   // must precede instanceCount
@@ -322,6 +323,33 @@ public class WorldBaker extends Node {
             total += ms.size();
         }
         return total;
+    }
+
+    /**
+     * A kit piece's mesh with each surface wearing the KIT's own material file, resolved by NAME (PLAN.md 3.6c): the
+     * road material library first, then {@code <kit>/materials/<name>.tres} beside the piece's {@code pieces/} folder
+     * — the hand-owned {@code MI_*.tres} the building kit already uses. The imported glTF material is not good
+     * enough: the kit's COLOR_0 is a wear MASK, and Godot's importer turns on vertex-colour-as-albedo for it (the
+     * buildings' trap). The mesh is DUPLICATED first, so the imported resource is never edited and the baked scene
+     * carries its own copy (a few hundred vertices per asset).
+     */
+    private static Mesh withKitMaterials(Mesh mesh, String piecePath) {
+        int cut = piecePath.lastIndexOf("/pieces/");
+        String kitMaterials = cut < 0 ? "" : piecePath.substring(0, cut) + "/materials/";
+        Mesh copy = (Mesh) mesh.duplicate();
+        for (int s = 0; s < copy.getSurfaceCount(); s++) {
+            Material m = copy.surfaceGetMaterial(s);
+            if (m == null || m.getName() == null || m.getName().isEmpty()) continue;
+            for (String dir : new String[]{ MATERIAL_LIBRARY_DIR, kitMaterials }) {
+                if (dir.isEmpty()) continue;
+                String path = dir + m.getName() + ".tres";
+                if (ResourceLoader.exists(path) && GD.load(path) instanceof Material lib) {
+                    copy.surfaceSetMaterial(s, lib);
+                    break;
+                }
+            }
+        }
+        return copy;
     }
 
     /** Load a kit asset scene and return its first visual mesh resource (kit leaves are at origin). */

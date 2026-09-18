@@ -44,7 +44,7 @@ for f in "$BP"/lib/road_points.py "$BP"/lib/lane_movements.py "$BP"/lib/lane_pro
          "$ADDON"/point_model.py "$ADDON"/point_profile.py "$ADDON"/point_solve.py \
          "$ADDON"/point_edges.py "$ADDON"/point_validate.py "$ADDON"/point_export.py \
          "$ADDON"/point_style.py "$ADDON"/point_zones.py "$ADDON"/point_ground.py "$ADDON"/point_record_ops.py "$ADDON"/point_digest.py "$ADDON"/point_mesh.py \
-         "$ADDON"/point_kit.py "$ADDON"/point_gltf.py; do
+         "$ADDON"/point_kit.py "$ADDON"/point_gltf.py "$ADDON"/point_furniture.py; do
   [ -f "$f" ] && run "$(basename "$f")" python3 "$f"
 done
 

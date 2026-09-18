@@ -111,9 +111,25 @@ def normals_report(pos, nrm, idx, smooth_cos=_COS):
     return corners, worst, inverted, lim
 
 
-def write(objects, kit, path, node_order=None):
+def marker_node(m):
+    """A `point_furniture` placement as a glTF node: `mmesh_<asset>`, carrying the kit piece's res:// path in its
+    extras (Godot's importer keeps them as the node's `extras` meta, which `WorldBaker` reads to collapse every
+    marker of one asset into one MultiMesh). The piece's -Z (its forward) is turned onto the placement's `fwd`."""
+    fx, fy = m["fwd"]
+    # Godot's direction is (fx, 0, -fy); a yaw theta sends -Z to (-sin theta, 0, -cos theta)
+    theta = math.atan2(-fx, fy)
+    node = {"name": "mmesh_" + m["asset"], "translation": godot(m["pos"]),
+            "rotation": [0.0, round(math.sin(theta / 2.0), 6), 0.0, round(math.cos(theta / 2.0), 6)],
+            "extras": {"asset_path": m["path"]}}
+    if any(abs(c - 1.0) > 1e-9 for c in m["scale"]):
+        node["scale"] = [float(c) for c in m["scale"]]
+    return node
+
+
+def write(objects, kit, path, node_order=None, markers=()):
     """Write `objects` (`{name: {material name: [triangle]}}`, KIT frame) to `path` (`.gltf`) and its `.bin`.
-    Material name `""` is a primitive with no material (a collision proxy). Returns a summary dict."""
+    Material name `""` is a primitive with no material (a collision proxy). `markers` are `point_furniture`
+    placements, written as mesh-less `mmesh_` nodes after the meshes. Returns a summary dict."""
     names = sorted(objects, key=lambda n: (n.lower(), n)) if node_order is None else list(node_order)
     blob = bytearray()
     buffer_views, accessors, meshes, nodes, materials, mat_index = [], [], [], [], [], {}
@@ -160,6 +176,9 @@ def write(objects, kit, path, node_order=None):
         nodes.append({"name": name, "mesh": len(meshes)})
         meshes.append({"name": name, "primitives": prims})
         summary["objects"] += 1
+    for m in markers:
+        nodes.append(marker_node(m))
+    summary["markers"] = len(markers)
     while len(blob) % 4:
         blob.append(0)
     bin_name = os.path.splitext(os.path.basename(path))[0] + ".bin"
