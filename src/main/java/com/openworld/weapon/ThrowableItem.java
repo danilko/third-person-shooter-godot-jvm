@@ -4,6 +4,9 @@ import com.openworld.world.manager.ExplosionManager;
 import godot.annotation.Export;
 import godot.annotation.Script;
 import godot.api.*;
+import godot.global.GD;
+import godot.annotation.Register;
+import godot.core.Color;
 import godot.core.Vector3;
 import com.openworld.character.Character;
 import com.openworld.item.AmmoRefill;
@@ -55,12 +58,6 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
 
     /** Physics scene to instantiate on each throw (e.g. FRG1Projectile.tscn). */
     @Export public PackedScene projectileScene;
-
-    /** Speed of the thrown projectile in m/s. */
-    @Export public float throwSpeed = 12f;
-
-    /** Degrees above the aim direction to arc the throw trajectory. */
-    @Export public float arcAngleDeg = 25f;
 
     /** Explosion radius when the world pickup is shot (metres). */
     @Export public float explosionRadius    = 5f;
@@ -158,6 +155,29 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
             }
         }
         playThrowAudio();
+        playThrowAnimation();
+    }
+
+    /**
+     * The throwing arm (W35). The grenade leaves on the PRESS, so the clip is baked from the arm
+     * already cocked (the library's OverhandThrow from frame 6): the release lands ~80 ms after the
+     * press instead of after a quarter-second windup the grenade has already skipped. It rides the
+     * melee Attack one-shot, which is the arms-only layer a throw needs.
+     */
+    @godot.annotation.Export
+    public String throwAnimation = "attack_throw";
+    @godot.annotation.Export
+    public double throwAnimationSeconds = 0.8;
+
+    public String getThrowAnimation() { return throwAnimation; }
+    public void setThrowAnimation(String v) { throwAnimation = v; }
+    public double getThrowAnimationSeconds() { return throwAnimationSeconds; }
+    public void setThrowAnimationSeconds(double v) { throwAnimationSeconds = v; }
+
+    private void playThrowAnimation() {
+        if (weaponController == null) return;
+        com.openworld.character.AnimationController ac = weaponController.animation();
+        if (ac != null) ac.playMeleeAttack(throwAnimation, throwAnimationSeconds);
     }
 
     /**
@@ -169,6 +189,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     @Override
     public void playRemoteFireCue() {
         playThrowAudio();
+        playThrowAnimation();
         // N4: on the host this puppet's real grenade arrives as MSG_LAUNCH — a cue copy would be a second one.
         if (NetRole.host(this)) { com.openworld.net.NetStats.increment("launch_cue_host_skipped"); return; }
         Vector3[] in = launchInputs();
@@ -265,10 +286,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         if (projectileScene == null || owningCharacter == null || aimDir.lengthSquared() < 1e-6f) return;
         aimDir = aimDir.normalized();
 
-        // Arc: rotate upward around the axis perpendicular to aim and world-up
-        Vector3 right = aimDir.cross(Vector3.Companion.getUP()).normalized();
-        if (right.lengthSquared() < 0.001f) right = Vector3.Companion.getRIGHT();
-        Vector3 throwDir = aimDir.rotated(right, (float) Math.toRadians(arcAngleDeg)).normalized();
+        Vector3 velocity = throwVelocity(aimDir);
 
         Node projectile = projectileScene.instantiate();
 
@@ -289,12 +307,10 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         if (cosmetic) ProjectileLedger.register(attackerId(), projectile);
 
         if (projectile instanceof Node3D n3d) n3d.setGlobalPosition(spawnPos);
-        if (projectile instanceof RigidBody3D rb) {
-            rb.setLinearVelocity(throwDir.times(throwSpeed));
-            // Never let the thrown projectile collide with its own thrower — it spawns at the
-            // body centre (chest), so a mask that includes the character layer would otherwise
-            // bounce it off / detonate it against the thrower. Matches ProjectileItem's guard.
-            if (owningCharacter != null) rb.addCollisionExceptionWith(owningCharacter);
+        if (projectile instanceof FRG1Projectile gp) {
+            gp.launchVelocity = velocity;
+            // Never collide with the thrower: it spawns at the chest.
+            if (owningCharacter instanceof Character oc) gp.ignoreRid = oc.getRid();
         }
     }
 
@@ -305,6 +321,176 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
      * aimRay while puppets used the aim point, which diverged the throw arc between the thrower and
      * observers; deriving both from the one replicated quantity keeps the grenade consistent.
      */
+    /**
+     * The launch VELOCITY for an aim direction -- the one owner the real throw and the preview share:
+     * CS 1.6's rule ({@link ThrowArc}), harder and higher the higher you aim.
+     */
+    private Vector3 throwVelocity(Vector3 aimDir) {
+        Vector3 right = aimDir.cross(Vector3.Companion.getUP()).normalized();
+        if (right.lengthSquared() < 0.001f) right = Vector3.Companion.getRIGHT();
+        double elev = Math.toDegrees(Math.asin(Math.max(-1.0, Math.min(1.0, aimDir.getY()))));
+        ThrowArc.Throw t = ThrowArc.fromAim(elev);
+        return aimDir.rotated(right, (float) Math.toRadians(t.elevationDeg() - elev)).normalized().times(t.speed());
+    }
+
+    // ── Trajectory preview (W36, W38) ───────────────────────────────────────
+    //
+    // While the LOCAL player aims a throwable, the path it would fly is drawn, bounces included, with a
+    // disc where it goes off (Apex/Fortnite/PUBG; CS2 in practice). It is not a model of the flight but
+    // the flight itself: a GrenadeFlight stepped ahead from the same launch inputs and velocity the
+    // real throw uses. Red-orange when the fuse runs out before it touches anything (an air burst).
+    // Purely local and cosmetic: no message.
+
+    /** Draw the predicted arc while this throwable is aimed by the local player. */
+    @Export public boolean showTrajectory = true;
+    public boolean getShowTrajectory() { return showTrajectory; }
+    public void setShowTrajectory(boolean v) { showTrajectory = v; }
+
+    /** The preview steps at the physics rate, so it takes the grenade's own steps. */
+    private static final double PREVIEW_STEP = 1.0 / 60.0;
+    /** Width of the drawn arc and ring band, metres -- a ribbon, so it reads at a distance. */
+    private static final double PREVIEW_WIDTH = 0.04;
+    /** ...and at least this much per metre from the camera, so a far arc stays as thick on screen. */
+    private static final double PREVIEW_WIDTH_PER_M = 0.006;
+    private static final double PREVIEW_RING_RADIUS = 0.6;
+    /** Translucent blue; red-orange when the fuse runs out before the grenade lands. */
+    private static final Color PREVIEW_COLOR = new Color(0.2, 0.6, 1.0, 0.6);
+    private static final Color PREVIEW_BURST_COLOR = new Color(1.0, 0.35, 0.2, 0.6);
+    private MeshInstance3D previewLine;
+    private ImmediateMesh previewMesh;
+    private double previewFuse = -1.0;
+    /** Where the last drawn arc ends, and whether that is a landing (true) or an air burst. For probes. */
+    private Vector3 previewEnd = null;
+    private boolean previewLands = false;
+
+    @Register
+    public Vector3 previewEndNow() { return previewEnd != null ? previewEnd : new Vector3(); }
+    @Register
+    public boolean previewLandsNow() { return previewLands; }
+    @Register
+    public boolean previewShownNow() { return previewLine != null && previewLine.isVisible(); }
+
+    @Register
+    @Override
+    public void _process(double delta) {
+        super._process(delta);
+        updatePreview();
+    }
+
+    private boolean previewWanted() {
+        if (!showTrajectory || magazine <= 0 || weaponController == null) return false;
+        if (!(owningCharacter instanceof Character c) || !c.isLocallyOwnedPlayer() || !c.isCombat()) return false;
+        if (!c.isAlive() || c.currentVehicleNode != null) return false;
+        return weaponController.getCurrentWeaponItem() == this && !weaponController.isWeaponTransitioning();
+    }
+
+    private void updatePreview() {
+        if (!previewWanted()) {
+            if (previewLine != null) previewLine.setVisible(false);
+            return;
+        }
+        Vector3[] in = launchInputs();
+        if (in == null) return;
+        ensurePreview();
+        godot.core.VariantArray<godot.core.RID> exclude = new godot.core.VariantArray<>(godot.core.RID.class);
+        if (owningCharacter instanceof Character oc) exclude.add(oc.getRid());
+        // The SAME flight the grenade will fly (GrenadeFlight), bounces included, to the fuse or to rest:
+        // the disc marks where it goes off, which is where the damage is.
+        GrenadeFlight f = new GrenadeFlight(in[0], throwVelocity(in[1].normalized()), exclude);
+        PhysicsDirectSpaceState3D space = getWorld3d().getDirectSpaceState();
+        double g = FRG1Projectile.gravity();
+        java.util.ArrayList<Vector3> pts = new java.util.ArrayList<>();
+        pts.add(f.position);
+        double fuse = fuseSeconds();
+        for (double t = 0.0; t < fuse && !f.resting; t += PREVIEW_STEP) {
+            f.step(space, PREVIEW_STEP, g);
+            pts.add(f.position);
+        }
+        Vector3 p = f.position;
+        boolean landed = f.contacts > 0;
+        Vector3 normal = Vector3.Companion.getUP();
+        p = p.minus(new Vector3(0.0, GrenadeFlight.RADIUS, 0.0));   // the disc sits on the surface, not at the sphere's centre
+
+        // The arc as a RIBBON turned to face the camera (a line is one pixel wide at any distance).
+        Camera3D cam = getViewport().getCamera3d();
+        Vector3 eye = cam != null ? cam.getGlobalPosition() : pts.get(0).plus(new Vector3(0.0, 2.0, 0.0));
+        Color arc = landed ? PREVIEW_COLOR : PREVIEW_BURST_COLOR;
+        previewMesh.clearSurfaces();
+        previewMesh.surfaceBegin(Mesh.PrimitiveType.TRIANGLE_STRIP, null);
+        previewMesh.surfaceSetColor(arc);
+        for (int i = 0; i < pts.size(); i++) {
+            Vector3 here = pts.get(i);
+            Vector3 along = pts.get(Math.min(i + 1, pts.size() - 1)).minus(pts.get(Math.max(i - 1, 0)));
+            Vector3 side = along.cross(eye.minus(here));
+            if (side.lengthSquared() < 1e-9) side = Vector3.Companion.getRIGHT();
+            // Width grows with distance so the arc keeps about the same thickness on screen.
+            double w = Math.max(PREVIEW_WIDTH, here.distanceTo(eye) * PREVIEW_WIDTH_PER_M);
+            side = side.normalized().times(w * 0.5);
+            previewMesh.surfaceAddVertex(here.plus(side));
+            previewMesh.surfaceAddVertex(here.minus(side));
+        }
+        previewMesh.surfaceEnd();
+        // The landing marker: a translucent filled disc with a stronger rim, flat on what it lands on
+        // (a thin ring is edge-on from a third-person camera and all but vanishes).
+        Vector3 a = normal.cross(Math.abs(normal.getY()) < 0.9 ? Vector3.Companion.getUP() : Vector3.Companion.getRIGHT()).normalized();
+        Vector3 b = normal.cross(a).normalized();
+        Vector3 c0 = p.plus(normal.times(0.03));
+        double rim = Math.max(PREVIEW_WIDTH, c0.distanceTo(eye) * PREVIEW_WIDTH_PER_M);
+        previewMesh.surfaceBegin(Mesh.PrimitiveType.TRIANGLES, null);
+        previewMesh.surfaceSetColor(new Color(arc.getR(), arc.getG(), arc.getB(), arc.getA() * 0.45));
+        for (int i = 0; i < 32; i++) {
+            double a0 = i * Math.PI * 2.0 / 32.0, a1 = (i + 1) * Math.PI * 2.0 / 32.0;
+            previewMesh.surfaceAddVertex(c0);
+            previewMesh.surfaceAddVertex(c0.plus(a.times(Math.cos(a0) * PREVIEW_RING_RADIUS)).plus(b.times(Math.sin(a0) * PREVIEW_RING_RADIUS)));
+            previewMesh.surfaceAddVertex(c0.plus(a.times(Math.cos(a1) * PREVIEW_RING_RADIUS)).plus(b.times(Math.sin(a1) * PREVIEW_RING_RADIUS)));
+        }
+        previewMesh.surfaceEnd();
+        previewMesh.surfaceBegin(Mesh.PrimitiveType.TRIANGLE_STRIP, null);
+        previewMesh.surfaceSetColor(arc);
+        for (int i = 0; i <= 32; i++) {
+            double ang = i * Math.PI * 2.0 / 32.0;
+            Vector3 dir = a.times(Math.cos(ang)).plus(b.times(Math.sin(ang)));
+            previewMesh.surfaceAddVertex(c0.plus(dir.times(PREVIEW_RING_RADIUS + rim * 0.5)));
+            previewMesh.surfaceAddVertex(c0.plus(dir.times(PREVIEW_RING_RADIUS - rim * 0.5)));
+        }
+        previewMesh.surfaceEnd();
+        previewEnd = p;
+        previewLands = landed;
+        previewLine.setVisible(true);
+    }
+
+    /** The projectile's own fuse, read once off its scene (the one number the air-burst colour needs). */
+    private double fuseSeconds() {
+        if (previewFuse < 0.0) {
+            previewFuse = 3.0;
+            if (projectileScene != null) {
+                Node n = projectileScene.instantiate();
+                if (n instanceof FRG1Projectile gp) previewFuse = gp.fuseTime;
+                n.free();
+            }
+        }
+        return previewFuse;
+    }
+
+    private void ensurePreview() {
+        if (previewLine != null && GD.isInstanceValid(previewLine)) return;
+        previewMesh = new ImmediateMesh();
+        previewLine = new MeshInstance3D();
+        previewLine.setName("TrajectoryPreview");
+        previewLine.setMesh(previewMesh);
+        previewLine.setAsTopLevel(true);
+        previewLine.setCastShadowsSetting(GeometryInstance3D.ShadowCastingSetting.OFF);
+        StandardMaterial3D m = new StandardMaterial3D();
+        m.setShadingMode(BaseMaterial3D.ShadingMode.UNSHADED);
+        m.setFlag(BaseMaterial3D.Flags.ALBEDO_FROM_VERTEX_COLOR, true);
+        m.setTransparency(BaseMaterial3D.Transparency.ALPHA);
+        m.setFlag(BaseMaterial3D.Flags.DISABLE_DEPTH_TEST, true);
+        m.setCullMode(BaseMaterial3D.CullMode.DISABLED);   // the ribbon is seen from both sides
+        previewLine.setMaterialOverride(m);
+        addChild(previewLine);
+        previewLine.setGlobalTransform(new godot.core.Transform3D());
+    }
+
     private Vector3 resolveAimDir() {
         if (!(owningCharacter instanceof Character c)) return null;
         Vector3 from = owningCharacter.getGlobalPosition().plus(new Vector3(0f, 1.4f, 0f));

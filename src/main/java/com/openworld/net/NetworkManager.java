@@ -1309,6 +1309,7 @@ public class NetworkManager extends Node {
 
         Health health = findHealth(victimNode);
         if (health != null) health.hit.emit(cast.damage());
+        if (health != null && !cast.killed()) health.playHitReaction(cast.headshot());
 
         // 2.8 item 9: the host confirmed a hit — the attacker's peer draws the marker from this, never from
         // its own prediction. Every peer re-emits; ui.HitMarker filters to its local player.

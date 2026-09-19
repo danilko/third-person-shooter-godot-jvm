@@ -5231,6 +5231,173 @@ front of its chest, and a teleport back left the camera rigs settling for a seco
 90% as "a genuine graze" — wrong:** the 3 misses were Jolt stepping over a small far capsule (see "A long ray
 steps over a small, far hitbox", 2026-09-17), and since that fix the gate asserts all 72.
 
+### W34 — THE UNIVERSAL ANIMATION LIBRARY, RETARGETED BY A WORLD-SPACE DELTA (2026-09-18, user-asked)
+
+Quaternius' Universal Animation Library 1 + 2 (CC0, `assets/Universal Animation Library_1/`,
+`assets/Universal_Animation_Library_2/`, credited in `CREDITS.md`) is merged into both bodies' `.blend`
+and `.glb`: 81 new clips and 16 placeholders replaced, 90 -> 171 clips, `.glb` 13.5 -> 23.4 MB.
+`blender/tools/retarget_ual.py` is the tool and `blender/tools/ual_retarget.json` the table (`clips`:
+source -> new name; `replace`: an existing action -> a source clip or `A+B`, written INTO that action so
+the AnimationTree needs no edit). Re-running is idempotent; `--only a,b` rebuilds some. Then
+`export_character.py`, `godot --headless --import`, `check_character_anim.py` (both bodies).
+
+- **Why not a name copy.** The library is a UE-mannequin rig whose bone NAMES match Godot-chan's (bar
+  `root`/`Root`, `Head`/`head`, the `*_leaf` bones), but rolls and lengths do not. Both rigs rest in a
+  T-pose facing -Y (measured), so each bone takes the source's world rotation relative to its own rest:
+  `R_t = R_s @ R_s_rest^-1 @ R_t_rest`. Positions come down the TARGET's chain; the pelvis takes the
+  source pelvis scaled by the rest pelvis heights (0.839). Root is held at the pose it has in the clip
+  being replaced (else `upright_idle`), so a ring's Root baseline does not move.
+- **Auto-Rig Pro was not used.** Its Remap would do the same job interactively, but in headless Blender
+  5.2 it fails to register (draw-handler errors) and it is driven by scene/UI state, so it is not a
+  reproducible build step. Converting the rig to ARP/Rigify would rename the bones every modifier and
+  the Java address — the deform skeleton is already a game skeleton; keep it.
+- **Replaced:** `drive_idle` <- `Driving_Loop` (a real seated, hands-on-wheel pose); `attack_jab_fist` /
+  `attack_cross_fist` <- `Punch_Jab` / `Punch_Cross`; `attack_stab_mw1` <- `Punch_Cross` (a right-hand
+  thrust); `attack_slash_mw1` <- `Sword_Regular_A+…_A_Rec`; `attack_swing_mw2` <- `Sword_Regular_B+…_B_Rec`;
+  `attack_chop_mw2` <- `Sword_Attack`; `swim_idle`/`swim_back`/`swim_left`/`swim_right` <-
+  `Swim_Idle_Loop`, `swim_forward` <- `Swim_Fwd_Loop`. No crawl exists in the library (crawl stays
+  placeholder); `LayToIdle` arrives as `crawl_stand_up`.
+- **A clip the tree plays through an ARMS filter is baked arms-only** (`{"src", "arms_over"}` in the
+  table). The Attack one-shot takes `spine_03`, neck and the arms from its clip, but the shoulder-aim
+  modifier squares the chest to the aim during a swing, so what survives is the arms relative to a
+  square chest. Retargeted whole-body, a sword clip's arms were solved inside a torso twisted 60-90 deg
+  into the lunge, and on the game's square torso the axe swept BEHIND the body (user-reported, seen in
+  real-renderer shots). Now every bone but the clavicles-down holds `upright_idle`'s first frame and the
+  arms keep the source's WORLD directions: the swing arcs in front. The lunge and torso twist are lost;
+  getting them back means letting the aim modifier stand down during an Attack one-shot (code).
+- **Fist, melee and throwable all hold the FIST's guard** (user decisions, settled in W36): `Punch_Jab@0`,
+  arms-only. For melee and throwable the right WRIST alone is turned so the held handle stands up, 20 deg
+  forward (`fist_axis` in the table). The draw clips are that pose too (`weapon_switch_*` were pistol copies).
+  `Sword_Regular_B` is the SECOND hit of the library's combo -- it starts with the arm already raised --
+  so no one-off swing may use it; the axe's light swing is `Sword_Regular_A` + its recovery.
+  `probe_weapon_archetypes` expects **5** hand-pose clusters.
+- **Swim is two postures, and the gate says so.** Treading water is UPRIGHT (chest at the water line),
+  the stroke HORIZONTAL; one blendspace between them moved the gun centre 0.41 m. `check_character_anim`
+  now has `swim_tread` and `swim_stroke` rings (7 rings, bob 0.15 for a stroke). Swim is still unwired
+  (the stance borrows `Crawl`); wiring it is a Transition tread <-> stroke, the GTA shape.
+- **The seated eye moved**, so `Vehicle.tscn`'s `Seats/Seat0/CockpitCameraMount` is re-measured in the
+  seat, in combat (W11's rule): (0, 0.870, 0.057) -> **(0, 1.031, 0.367)**, `probe_vehicle_views` 0.006 m
+  from the driver's eye. `probe_cockpit_eye` (combat off) now reads DriveCarrier +1.028 up / +0.337 fwd.
+
+Gates: `check_character_anim` PASS on both bodies (171 clips, 104 orphans WARN), `probe_vehicle_views`,
+`probe_driveby_aim`, `probe_melee`, `probe_character_variant` PASS. Study renders: import the retargeted
+action in a scratch copy of the `.blend` and render with Workbench before wiring a clip.
+
+### W35 — HIT FLINCH, RAGDOLL DEATH, PASSENGER SEAT, GRENADE THROW, LEDGE CLIMB, AND THE MELEE GRIP (2026-09-18, user-asked)
+
+The W34 clips wired in. Tree edits are `tools/patch_tree_w35.py` (idempotent, both bodies). Gate
+**`tools/godot/probe_w35_anims.gd`** 13/13; `-- --control` (climbing off) fails exactly the 2 climb checks.
+
+- **Hit reaction = a torso flinch, never the arms.** `HitReact` is a OneShot filtered to `spine_01..03`,
+  `neck_01`, `head_2` near the end of the chain, fed by `HitReactClip` (`hit_chest` | `hit_head` on a
+  headshot). L4D plays gesture-layer flinches; CS plays none and punches the view. The arms stay with the
+  aim modifiers, because the shot leaves from the muzzle and a flinching arm would move it.
+  `Health.playHitReaction` runs where damage is applied and, from `handleDamageBroadcastMessage`, on every
+  other peer (no new message). A killing hit plays none. Skipped for a non-ACTIVE LOD AI.
+- **Death stays the ragdoll.** It already pushed the struck bone along the bullet (CS's model) and is
+  directional; a death clip falls one way whatever hit it. So `death_fall_back` is DROPPED
+  (`ual_retarget.json` `drop`). Two fixes: a blast pushed only LIVING bodies (`ExplosionManager`), and a
+  push with no struck bone fell through both branches of `CharacterRagdoll.applyHitImpulse`. Now a blast
+  kill is pushed too, shared across every bone and lifted 0.6: +0.76 m vs -0.09 m without.
+  Seated death is unchanged (the procedural slump over the new drive pose; `probe_dead_driver` passes).
+- **Passenger:** `StanceTransition` input `Passenger` -> `PassengerMovementBlend` (`sit_idle` x5).
+  `AnimationController.onSetStance` swaps `DriveCarrier` for it when the live body `isSeatedPassenger()`,
+  so aim limits and drive-by rules stay the DriveCarrier stance's. `check_character_anim` has a `passenger` ring.
+- **Throw:** `attack_throw` (`OverhandThrow@6:32`, arms-only) on `AttackClip`, played by
+  `ThrowableItem.useWeapon` and `playRemoteFireCue` (`throwAnimation`, `throwAnimationSeconds` 0.8). The
+  grenade leaves on the PRESS, so the clip starts with the arm cocked (the windup is frames 0-6, the
+  release ~8): the release lands ~80 ms after the press. FRG1 is now visible in the hand (`SocketThrowable`).
+- **Climb: REMOVED in W39** (user decision: CS keeps movement to walk / step / jump, and a climb added a
+  kinematic override of the body and an animation the network did not carry). `climb_up_1m` stays in the
+  clip library, unwired.
+- **The melee grip is the SOCKET's, derived from the hand** (user-reported: the axe poked forward out of
+  the fingers). A handle runs through the curled fingers, pinky knuckle -> index knuckle, and the edge
+  faces the knuckles. `SocketMelee` (and the new `SocketThrowable`) are that frame, computed from the
+  rest skeleton in `hand_r`'s space, not guessed: a 90-degree rotation about the old socket's X was tried
+  first and put the axe sideways. The library agrees: its own mannequin with a stick through the fist
+  holds `Sword_Idle`'s blade low and OUT TO THE SIDE, and the boxing guard stands it up over the shoulder.
+  So the models keep the W19/W20 convention, and whether a weapon stands up at rest is the HOLD POSE's
+  wrist, not the socket's.
+- **Found:** `GroundJump` was 4.0 m high (fixed in W36). And `probe_auto_reload`'s bolt cadence
+  (1.667 s vs 1.460) fails at HEAD too.
+
+### W36 — A 1 m JUMP, A 2.5 s FUSE WITH A TRAJECTORY PREVIEW, NO COLLAR IN FIRST PERSON, AND WEAPONS STOOD UP (2026-09-18, user-asked)
+
+- **Ground jump 4.0 m -> 1.0 m** (`GroundJump.tres` now overrides `jump_height = 1.0`, `apex_duration = 0.4`;
+  the 4 m was `JumpState`'s default, never overridden). About two-thirds of this 1.49 m body; GTA's is
+  ~1 m. `AirJump.tres` (2.5 m) is untouched. Measured rise 0.99 m.
+- **The grenade burst in the air because its fuse was 1.0 s** (`FRG1Projectile.tscn` overriding the
+  script's 3 s). At 12 m/s and 25 deg up from shoulder height it needs ~1.26 s to come down on flat
+  ground ~14 m out. 2.5 s at first, then **3.0 s** with W37's longer throws (CS ~1.6 s, GTA/PUBG 3-5 s).
+- **Trajectory preview** (`ThrowableItem`, `showTrajectory`): while the LOCAL player aims a throwable,
+  its path is drawn as a translucent blue RIBBON (camera-facing, 4 cm and at least 0.6 cm per metre from
+  the camera, so it keeps its on-screen thickness) ending in a filled 0.6 m disc where it goes off.
+  Red-orange if the fuse runs out before it touches anything. Since W38 the preview is the grenade's own
+  `GrenadeFlight` stepped ahead, bounces included. No message: it is a local drawing. Probe readouts
+  `preview_end_now` / `preview_lands_now` / `preview_shown_now`.
+- **The dark wedge at the bottom of the first-person view was the COLLAR**, part of the whole-body `armor`
+  mesh, so hiding the head meshes never removed it. `blender/tools/split_fps_neck.py` moves the faces
+  mostly driven by `neck_01`/`head` (511 faces) into `armor_neck` (same material, armature and weights),
+  listed in `head_mesh_paths`. Hiding the whole torso (arms only) was not needed. Scaling `neck_01` to
+  zero was rejected because the FPS camera mount hangs off that bone.
+- **Weapons stand up in the hand.** The grip is the socket, derived from the hand (W35). Where the weapon
+  POINTS at rest is the pose's wrist, so the fist's guard is used with only the right wrist turned
+  (`fist_axis`). In first person the axe now stands in view at the bottom right, and so does the grenade.
+- **Why the axe was invisible in first-person swings:** L4D/CS draw a separate VIEWMODEL, arms and weapon
+  authored for the camera, with their own FOV. This game's first person is the real body with the head
+  hidden (Arma/Tarkov style), so a whole-body swing leaves the view. Not built; the rest pose is now in view.
+- The ledge climb was kept here, then removed in W39.
+
+### W37 — THE GRENADE THROWS LIKE CS 1.6: HARDER AND HIGHER THE HIGHER YOU AIM (2026-09-18, user-asked)
+
+The fixed throw (12 m/s at aim + 25 deg, ~14 m) became CS 1.6's `CHEGrenade::ThrowGrenade`, owned by
+engine-free **`weapon.ThrowArc`** (`ThrowArcTest`, 5). The view pitch gets a 10 deg upward bias, compressed
+above the horizon and stretched below it, and the speed is `(90 - biasedPitch) * 6` u/s capped at 750 u/s,
+at 1 u = 2.54 cm. Level aim is a 10 deg lob at 15.2 m/s, and the 19.05 m/s cap is reached aiming ~30 deg up.
+`ThrowableItem.throwVelocity` is the one place the real throw and the preview get it from. The old fixed
+throw (`throwSpeed`, `arcAngleDeg`) and its `cs16Throw` switch were removed in W38. The host derives the same velocity from the aim MSG_LAUNCH already carries, so
+there is no wire change (`run_net_launch_test.sh` 22/22). CS's "add the runner's velocity" is deliberately
+left out, because a host's copy of a remote player does not carry that velocity exactly.
+- Measured (`probe_w35_anims.gd`, view pitch 0 / 20 / 40): **12.6 / 26.7 / 32.5 m**, each within 0.15 m of
+  its preview. The drag-free maximum is 38.4 m at 45 deg of elevation.
+- The fuse went 2.5 -> **3.0 s**: at a 40 deg aim the flight is ~2.8 s and 2.5 s burst it in the air.
+  A near-vertical lob still bursts, and the preview draws it red.
+- (Its first bounce was a rigid-body `PhysicsMaterial`; W38 replaced it with CS's own bounce rule.)
+- `VehicleProbeHelper.setViewPitch` lets a probe throw at a chosen angle.
+
+### W38 — THE GRENADE FLIES THE PREVIEW'S PATH: CS 1.6's BOUNCE, NOT RIGID-BODY PHYSICS (2026-09-18, user-reported)
+
+"The throw is sometimes in front of the arc, sometimes past it." Measured on DebugWorld
+(`tools/godot/probe_grenade_world.gd`, 8 directions x 2 pitches): the FIRST impact was within 0.26 m of the
+ring every time, but a rigid-body grenade (a 0.37 m box for a 112 mm grenade, bounce 0.45) then rolled
+**3-6 m** past it. A tumbling rigid body cannot be predicted. CS never used rigid bodies for grenades.
+- **`weapon.GrenadeFlight` is the ONE owner of how a grenade moves.** Each step: gravity, then a 6 cm sphere
+  swept along the motion on the world layer (`castMotion`), and on contact the velocity is bounced by
+  **`ThrowArc.bounce`**. That is CS 1.6's MOVETYPE_BOUNCE: overbounce 1.2 (restitution 0.2), a ground hit
+  keeps 0.8 of the speed, and it rests below 20 u/s. It is engine-free, in `ThrowArcTest` (8).
+- **The grenade is a KINEMATIC body** stepping that flight (`FRG1Projectile.launchVelocity` / `ignoreRid`
+  replace the rigid velocity and the collision exception). The preview steps a copy of the same flight to
+  the fuse or to rest, so the disc is the DETONATION point, bounces included. No drag anywhere (CS has none).
+  Collider: a 6 cm sphere (the box was ~3x the grenade).
+- **Removed:** `throwSpeed`, `arcAngleDeg`, `cs16Throw`, the ray-and-damping preview, the bounce
+  `PhysicsMaterial` and CCD on the projectile.
+- **Measured.** Flat stand: detonation **0.00 m** from the disc at view pitch 0 / 20 / 40 (15.2 / 34.1 /
+  39.9 m with the roll). DebugWorld: **15 of 16 within 0.5 m (median 0.06 m)**, worst 2.06 m. The launch
+  inputs agree to ~1e-7 m, so the worst case is chaos, not a mismatch: a long throw touching bumpy ground
+  10-18 times can cross the rest threshold on a different bump. It is inherent in multiplayer too, because the
+  host flies the real grenade from the float32 aim in MSG_LAUNCH. Gates: `probe_grenade_world.gd` (75%
+  within 0.5 m and none past 6 m), `probe_w35_anims.gd`, `run_net_launch_test.sh` 22/22,
+  `probe_explosive_damage.gd` PASS. `VehicleProbeHelper.setView(c, yaw, pitch)` aims a probe.
+
+### W39 — THE LEDGE CLIMB IS REMOVED (2026-09-18, user decision)
+
+For simpler movement and play, the CS model: walk, a free 0.35 m step (`stepHeight`), and a 1 m jump.
+Removed: `MovementController.tryClimb`/`tickClimb`/`climbingNow` and their exports, the climb branch in
+`Character`'s jump, `AnimationController.playClimb`, and the `Climb`/`ClimbScale`/`climb_up_1m` nodes in
+both visuals scenes (the chain ends `output <- HitReact` again; `tools/patch_tree_w35.py` no longer adds them).
+The `climb_up_1m` clip stays in the library, unwired. `probe_w35_anims.gd` 17/17. Its climb cases and
+`--control` went with the feature.
+
 ## Godot-JVM Specifics
 
 - **Annotations (godot-jvm `1.0.0-rc1` API — the older `@Register*` family is gone).** The plugin runs in the

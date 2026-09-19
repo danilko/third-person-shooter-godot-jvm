@@ -289,6 +289,19 @@ final class CharacterRagdoll {
             owner.setVelocity(owner.getVelocity().plus(dir.times(damage * ALIVE_HIT_VELOCITY_SCALE)));
         } else if (hitNode instanceof PhysicalBone3D bone) {
             bone.applyCentralImpulse(dir.times(damage * DEATH_BONE_IMPULSE_SCALE));
+        } else if (owner.physicalBoneSimulator != null) {
+            // No struck bone: a BLAST (ExplosionManager passes the character itself) or a vehicle
+            // strike. It used to fall into neither branch, so a body killed by an explosion dropped
+            // straight down. A blast pushes the whole body, so the impulse is shared across every bone.
+            int n = 0;
+            for (int i = 0; i < owner.physicalBoneSimulator.getChildCount(); i++) {
+                if (owner.physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D) n++;
+            }
+            if (n == 0) return;
+            Vector3 share = dir.times(damage * DEATH_BONE_IMPULSE_SCALE / n);
+            for (int i = 0; i < owner.physicalBoneSimulator.getChildCount(); i++) {
+                if (owner.physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D b) b.applyCentralImpulse(share);
+            }
         }
     }
 
