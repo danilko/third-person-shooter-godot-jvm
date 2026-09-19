@@ -61,6 +61,7 @@ func _initialize() -> void:
 		var h := Ground.lookup(natural, k.x, k.y)
 		return NAN if is_nan(h) else (to_world * Vector3(local.x, h, local.z)).y
 
+	var t0 := Time.get_ticks_msec()
 	# Lanes from the pieces, placed as Zone.placeGeometry places them.
 	var lanes := []
 	var pad_verts := []
@@ -82,6 +83,8 @@ func _initialize() -> void:
 					pad_verts.append(mxf * v)
 		inst.free()
 
+	print("  INFO  %d lanes, %d pad vertices loaded in %d ms" % [lanes.size(), pad_verts.size(), Time.get_ticks_msec() - t0])
+	t0 = Time.get_ticks_msec()
 	var proud := 0
 	var proud_pad := 0
 	var worst := -INF
@@ -154,7 +157,8 @@ func _initialize() -> void:
 			if h - v.y > worst:
 				worst = h - v.y
 				worst_at = "pad vertex (%.1f, %.1f, %.1f)" % [v.x, v.y, v.z]
-	print("  %d lane samples, %d pad vertices, %d FILL, %d clear PIER" % [n, pad_verts.size(), fill_n, pier_n])
+	print("  %d lane samples, %d pad vertices, %d FILL, %d clear PIER (%d ms)" % [n, pad_verts.size(), fill_n, pier_n, Time.get_ticks_msec() - t0])
+	t0 = Time.get_ticks_msec()
 	check(proud == 0 and proud_pad == 0, "no ground proud of a road (%.2f m lanes, %.2f m pad mesh)" % [PROUD_TOL, PAD_PROUD_TOL], "%d + %d, highest %.3f m at %s" % [proud, proud_pad, worst, worst_at])
 	check(fill_n > 0 and fill_ok == fill_n, "every FILL sample is carried (at grade, within %.2f m)" % AT_GRADE_TOL, "%d/%d %s" % [fill_ok, fill_n, fill_miss])
 	check(fill_ok_natural < fill_n, "CONTROL: the natural ground does not carry them", "%d/%d" % [fill_ok_natural, fill_n])
@@ -178,12 +182,15 @@ func _initialize() -> void:
 			var r := h - g
 			if r > 0.5:
 				raised[0 if r <= 4.0 else (1 if r <= 8.0 else (2 if r <= 16.0 else 3))] += 1
-	print("  INFO  raised vertices: <=4 m %d, 4-8 m %d, 8-16 m %d, >16 m %d" % raised)
+	print("  INFO  raised vertices: <=4 m %d, 4-8 m %d, 8-16 m %d, >16 m %d (%d ms)" % (raised + [Time.get_ticks_msec() - t0]))
+	t0 = Time.get_ticks_msec()
 
 	# 4 + 5: in memory only.
 	var corr := Service.run("corridors", net.record_path, ["--ground", ProjectSettings.globalize_path(Ground.sidecar_path(net.record_path))])
 	var again := Stamp.stamp(net, terrain, corr, record.get("corridors", []))
 	check(again["ok"] and again["changed"] == 0, "stamping again changes nothing", again["message"])
+	print("  INFO  corridors + re-stamp %d ms" % (Time.get_ticks_msec() - t0))
+	t0 = Time.get_ticks_msec()
 	var back := Stamp.stamp(net, terrain, {}, record.get("corridors", []), true)
 	var worst_back := 0.0
 	for j in range(0, int(hs["ny"]), 3):
@@ -201,17 +208,37 @@ func _initialize() -> void:
 	_done()
 
 ## The kit's support kind at the corridor point nearest `local` (network frame, Godot axes), or "PAD"
-## when that point is on a junction pad.
+## when that point is on a junction pad. Through a 32 m bucket index built once: a scan of every corridor
+## point per lane sample took the island (58 k points x 70 k samples) past 50 minutes.
+const KIND_CELL := 32.0
+var _kind_index := {}
+
 func _kind_near(record: Dictionary, local: Vector3) -> String:
+	if _kind_index.is_empty():
+		for c in record.get("corridors", []):
+			var pad := str(c.get("owner", "")).begins_with("JCT:")
+			for p in c["points"]:
+				var key := Vector2i(int(floor(float(p[0]) / KIND_CELL)), int(floor(float(p[2]) / KIND_CELL)))
+				if not _kind_index.has(key):
+					_kind_index[key] = []
+				_kind_index[key].append([float(p[0]), float(p[2]), "PAD" if pad else str(p[5])])
+	var cx := int(floor(local.x / KIND_CELL))
+	var cz := int(floor(local.z / KIND_CELL))
 	var best := INF
 	var kind := ""
-	for c in record.get("corridors", []):
-		for p in c["points"]:
-			var d := Vector2(p[0] - local.x, p[2] - local.z).length_squared()
-			if d < best:
-				best = d
-				kind = "PAD" if str(c.get("owner", "")).begins_with("JCT:") else str(p[5])
+	for r in range(1, 12):
+		for i in range(cx - r, cx + r + 1):
+			for j in range(cz - r, cz + r + 1):
+				for q in _kind_index.get(Vector2i(i, j), []):
+					var d: float = Vector2(q[0] - local.x, q[1] - local.z).length_squared()
+					if d < best:
+						best = d
+						kind = q[2]
+		# every cell within r of this one is searched: a nearer point cannot lie farther than (r - 1) cells out
+		if best < pow((r - 1) * KIND_CELL, 2) or (r == 11 and kind != ""):
+			break
 	return kind
+
 
 func _done() -> void:
 	print("RESULT: %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])

@@ -39,6 +39,10 @@ public final class CollisionLayers {
     public static final int PICKUP    =  4;  // layer 3
     public static final int HITBOX    =  8;  // layer 4
     public static final int VEHICLE   = 16;  // layer 5
+    /** Layer 6: a collision-only wall along a road barrier that only VEHICLE BODIES collide with (their mask), 3 m tall
+     *  so a hull pressed into a 1.15 m parapet at speed has no top edge to climb (the Road Kit's `-carwall` proxies,
+     *  set by `WorldBaker.applyCarWalls`). Nothing else sees it: not bullets, characters, wheel rays or the navmesh. */
+    public static final int CAR_WALL  = 32;  // layer 6
 
     // ── Layer numbers, 1-based (use with setCollisionLayerValue / setCollisionMaskValue) ──
     public static final int LAYER_WORLD     = 1;
@@ -46,4 +50,5 @@ public final class CollisionLayers {
     public static final int LAYER_PICKUP    = 3;
     public static final int LAYER_HITBOX    = 4;
     public static final int LAYER_VEHICLE   = 5;
+    public static final int LAYER_CAR_WALL  = 6;
 }

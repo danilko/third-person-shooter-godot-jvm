@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" path="res://assets/weapons/SHG1.glb" id="3_kvyhh"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_sg1_body"]
-size = Vector3(0.08, 0.1771, 0.98)
+size = Vector3(0.08, 0.1935, 0.98)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_sg1_pickup"]
 size = Vector3(0.5, 0.5, 1.18)
@@ -30,7 +30,7 @@ reload_audio = ExtResource("3_1rd4b")
 require_interact = true
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=300100002]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0048, -0.2185)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0258, -0.2215)
 shape = SubResource("BoxShape3D_sg1_body")
 
 [node name="PickupArea" type="Area3D" parent="." unique_id=300100003]
@@ -38,17 +38,17 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=300100004]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0048, -0.2185)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0258, -0.2215)
 shape = SubResource("BoxShape3D_sg1_pickup")
 
 [node name="SupportPoint" type="Marker3D" parent="." unique_id=939809191]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0116, -0.036, -0.30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.042, -0.29)
 
 [node name="StockPoint" type="Marker3D" parent="." unique_id=512880403]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, -0.037, 0.265)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0.2685)
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=300100005]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0497, -0.7085)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0532, -0.7115)
 
 [node name="MuzzleVFX" parent="Muzzle" unique_id=300100006 instance=ExtResource("2_muzzle")]
 

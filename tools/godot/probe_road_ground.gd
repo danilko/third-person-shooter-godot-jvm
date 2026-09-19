@@ -28,12 +28,20 @@ const FILL_MAX := 4.0
 const FOOT_TOL := 0.75
 ## How far along/across the road a foot may be from the sample it serves: half of PIER_SPACING (30 m)
 ## along, plus the deck's half width across.
-const PIER_REACH := 18.0
+## 18 m on DebugRoads (a 9 m half-deck); the island's widest deck is C1 with an aux block each side, ~39 m (19.5 m half),
+## which by the same rule is sqrt(15^2 + 19.5^2) = 24.6 m.
+const PIER_REACH := 25.0
 const FILL_REACH := 14.0
 const CELL := 6.0
 
 var terrain: Node
 var feet := {}          # cell key -> [Vector3] of mesh vertices that sit on the terrain
+var lane_cells := {}     # SPAN_CELL key -> [Vector3] lane samples (the roads a deck may span)
+const SPAN_CELL := 20.0
+const SPAN_DZ := 4.0
+## How far along a column-free span a pier sample may be from the road it spans: the span runs to the stations either
+## side of the 17 m clear zone (`island_roadgen.clear_piers`), measured on the island.
+const SPAN_REACH := 60.0
 var below := {}         # cell key -> [Vector3] of every vertex (for the "hanging" check)
 
 func _initialize() -> void:
@@ -78,8 +86,11 @@ func _initialize() -> void:
 		pieces.append(inst)
 	await process_frame
 	print("  pieces: ", pieces.map(func(p): return str(p.name)))
+	var t0 := Time.get_ticks_msec()
 	for p in pieces:
 		_index_meshes(p)
+	print("  INFO  indexed %d feet cells, %d cells in %d ms" % [feet.size(), below.size(), Time.get_ticks_msec() - t0])
+	t0 = Time.get_ticks_msec()
 
 	# A deck a LANDMARK STRUCTURE carries (the Rainbow Bridge: towers and cables, `pillar_skip` on its stations) has
 	# no Road Kit column by design: a sample inside such a structure's footprint counts as carried, and is reported.
@@ -90,9 +101,26 @@ func _initialize() -> void:
 			if c is Node3D and c.has_meta("building"):
 				carriers.append(c)
 	var carried := 0
+	var spanned := 0
+	var span_worst := 0.0
 	var rows := {}      # road -> {"grade", "fill", "pier", "pier_ok", "fill_ok", "worst"}
 	var fails := 0
 	var worst_pier := ""
+	# every lane sample, bucketed: a deck may span ANOTHER road with no column (`island_roadgen.clear_piers`: no pier
+	# stands within 17 m of a road more than 4 m below, so the span between the bracketing stations is column-free)
+	for p in pieces:
+		for path3d in p.find_children("*", "Path3D", true, false):
+			var cv: Curve3D = path3d.curve
+			if cv == null:
+				continue
+			var dd := 0.0
+			while dd <= cv.get_baked_length():
+				var q: Vector3 = path3d.global_transform * cv.sample_baked(dd)
+				dd += STEP
+				var kk := Vector2i(int(floor(q.x / SPAN_CELL)), int(floor(q.z / SPAN_CELL)))
+				if not lane_cells.has(kk):
+					lane_cells[kk] = []
+				lane_cells[kk].append(q)
 	for p in pieces:
 		for path3d in p.find_children("*", "Path3D", true, false):
 			var lane := str(path3d.get_parent().name)
@@ -119,6 +147,10 @@ func _initialize() -> void:
 					elif _carried(carriers, w):
 						r["pier_ok"] += 1
 						carried += 1
+					elif _over_road(w) <= SPAN_REACH:
+						r["pier_ok"] += 1
+						spanned += 1
+						span_worst = maxf(span_worst, _over_road(w))
 					else:
 						if worst_pier == "":
 							worst_pier = "%s at (%.1f, %.1f, %.1f), %.2f m over the terrain" % [lane, w.x, w.y, w.z, delta]
@@ -131,6 +163,7 @@ func _initialize() -> void:
 				elif absf(delta) <= AT_GRADE_TOL:
 					r["grade"] += 1
 			rows[road] = r
+	print("  INFO  lanes sampled in %d ms" % (Time.get_ticks_msec() - t0))
 	var total_pier := 0
 	var total_pier_ok := 0
 	var total_fill := 0
@@ -146,18 +179,44 @@ func _initialize() -> void:
 	print("  %s  the scene has a stretch over a gap (PIER samples)                 %d" % ["PASS" if ok1 else "FAIL", total_pier])
 	var ok2 := total_pier > 0 and total_pier_ok == total_pier
 	print("  INFO  PIER samples carried by a landmark structure (no Road Kit column by design): %d" % carried)
+	print("  INFO  PIER samples on a span over another road (clear_piers; no column by design): %d, farthest %.1f m from it" % [spanned, span_worst])
 	print("  %s  every PIER sample has a column foot on the terrain within %.0f m   %d/%d%s" % ["PASS" if ok2 else "FAIL", PIER_REACH, total_pier_ok, total_pier, "" if ok2 else "  first miss: " + worst_pier])
 	# FILL is reported, not asserted: the kit builds no embankment mesh (`road_support` sizes the toe,
 	# nothing sweeps it), so a road 0.4-4 m over the ground is carried by the TERRAIN -- B7's corridor
 	# stamp -- and this gate cannot see it yet.
 	var ok3 := true
 	print("  INFO  FILL samples (0.4-4 m over the ground; embankment is B7's terrain stamp) %d, toe on the terrain %d" % [total_fill, total_fill_ok])
-	var hanging := _hanging_feet()
+	var hanging := _hanging_feet(carriers)
 	var ok4: bool = hanging[0] == 0
 	print("  %s  no column stops short of the ground (bottom vertex > %.2f m over it) %d  %s" % ["PASS" if ok4 else "FAIL", FOOT_TOL, hanging[0], hanging[1]])
 	fails = int(not ok1) + int(not ok2) + int(not ok3) + int(not ok4)
 	print("RESULT: %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(1 if fails else 0)
+
+## A lane passes within 8 m of `v` (XZ), 0-3 m above it: `v` is the underside of that lane's deck.
+func _deck_soffit(v: Vector3) -> bool:
+	var k := Vector2i(int(floor(v.x / SPAN_CELL)), int(floor(v.z / SPAN_CELL)))
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for q in lane_cells.get(k + Vector2i(dx, dz), []):
+				if q.y >= v.y - 0.5 and q.y <= v.y + 3.0 and Vector2(q.x - v.x, q.z - v.z).length() <= 8.0:
+					return true
+	return false
+
+
+## Horizontal distance from `w` to the nearest lane sample more than `SPAN_DZ` below it (INF when none within
+## SPAN_REACH): the road a column-free span passes over.
+func _over_road(w: Vector3) -> float:
+	var k := Vector2i(int(floor(w.x / SPAN_CELL)), int(floor(w.z / SPAN_CELL)))
+	var n := int(ceil(SPAN_REACH / SPAN_CELL))
+	var best := INF
+	for dx in range(-n, n + 1):
+		for dz in range(-n, n + 1):
+			for q in lane_cells.get(k + Vector2i(dx, dz), []):
+				if q.y < w.y - SPAN_DZ:
+					best = minf(best, Vector2(q.x - w.x, q.z - w.z).length())
+	return best
+
 
 func _carried(carriers: Array, w: Vector3) -> bool:
 	for c in carriers:
@@ -232,10 +291,14 @@ func _abutment_near(w: Vector3, reach: float) -> bool:
 ## `[count, first]` -- columns whose lowest vertex is well above the terrain: for every XZ cell that
 ## holds a vertex more than 3 m below some other vertex of that cell (i.e. a column, not a flat deck),
 ## the cell's LOWEST vertex must sit on the ground.
-func _hanging_feet() -> Array:
+func _hanging_feet(carriers: Array = []) -> Array:
 	var count := 0
 	var first := ""
 	for k in below:
+		# two decks STACKED in one cell (the Rainbow Bridge's upper and lower roads) are not a column: inside a landmark
+		# structure's footprint the structure carries the decks
+		if not carriers.is_empty() and _carried(carriers, Vector3((k.x + 0.5) * CELL, 0.0, (k.y + 0.5) * CELL)):
+			continue
 		var lo := Vector4(0, INF, 0, 0)
 		var hi := -INF
 		for v in below[k]:
@@ -244,8 +307,14 @@ func _hanging_feet() -> Array:
 			hi = maxf(hi, v.y)
 		if hi - lo.y < 3.0:
 			continue
+		# a deck's SOFFIT is not a column's foot: two decks stacked in a cell (a JCT's loop ramp over the exit it
+		# crosses) have their lowest vertex just under a lane of the lower deck
+		if lo.y - lo.w > FOOT_TOL and _deck_soffit(Vector3(lo.x, lo.y, lo.z)):
+			continue
 		if lo.y - lo.w > FOOT_TOL:
 			count += 1
+			if OS.get_environment("PROBE_VERBOSE") != "":
+				print("    hanging (%.1f, %.1f, %.1f) %.2f m over the terrain" % [lo.x, lo.y, lo.z, lo.y - lo.w])
 			if first == "":
 				first = "first at (%.1f, %.1f, %.1f), %.2f m over the terrain" % [lo.x, lo.y, lo.z, lo.y - lo.w]
 	return [count, first]

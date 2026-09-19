@@ -135,6 +135,12 @@ public class VehicleAIController extends Controller {
      */
     public boolean advanceToNextRoute() {
         if (finished || route == null) return false;
+        if (route instanceof Node rn && !GD.isInstanceValid(rn)) {   // its piece unloaded (see gatherInput)
+            route = null;
+            streamEdge = true;
+            finished = true;
+            return false;
+        }
 
         Lane next = route.pickNextRoute();   // explicit override first
         if (next == null) {
@@ -204,6 +210,17 @@ public class VehicleAIController extends Controller {
         if (vehicleBody == null) return cmd;
 
         if (currentState == null) transitionTo(CruiseState.INSTANCE);
+
+        // The lane under the car was FREED: its road piece unloaded while the car was still on it (the car drove
+        // toward the streaming edge; since 3.10 road pieces stream nearer than traffic can reach). Every lane query
+        // would call into a freed node ("Cannot call a method on a previously freed instance", measured on the coast
+        // road drive), so the car stops here, finished at the stream edge, and the zone reclaims it as `stream-edge`.
+        if (route instanceof Node rn && !GD.isInstanceValid(rn)) {
+            route = null;
+            streamEdge = true;
+            finished = true;
+            return cmd;
+        }
 
         VehicleAIState next = currentState.update(vehicleBody, this, cmd, delta);
         if (next != currentState) transitionTo(next);

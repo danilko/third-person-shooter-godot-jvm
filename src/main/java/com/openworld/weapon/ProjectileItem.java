@@ -178,6 +178,7 @@ public class ProjectileItem extends WeaponItem {
             rp.explosionMaxDamage = explosionMaxDamage;
             rp.explosionPushForce = explosionPushForce;
             rp.attackerId         = attackerId();
+            rp.kind               = weaponId;
             if (!cosmetic) {
                 rp.attackerName       = resolveAttackerName();
                 rp.attackerFaction    = resolveAttackerFaction();
@@ -187,7 +188,7 @@ public class ProjectileItem extends WeaponItem {
         }
 
         getTree().getCurrentScene().addChild(projectile);
-        if (cosmetic) ProjectileLedger.register(attackerId(), projectile);
+        if (cosmetic) ProjectileLedger.register(attackerId(), weaponId, projectile);
 
         if (projectile instanceof Node3D n3d) {
             n3d.setGlobalPosition(spawnPos);

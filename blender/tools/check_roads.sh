@@ -73,7 +73,7 @@ run "island_road_zones.py --check" python3 "$ROOT/tools/island_road_zones.py" \
     "$ROOT/assets/world_source/pieces/IslandRoads.roads.json" "$ROOT/src/main/resources/com/openworld/world/World.tscn" --check
 run "island_traffic_zones.py --check" python3 "$ROOT/tools/island_traffic_zones.py" \
     "$ROOT"/assets/world_source/pieces/Roads_IslandRoads_island_*.lanekit.json \
-    "$ROOT/src/main/resources/com/openworld/world/World.tscn" --check
+    "$ROOT/src/main/resources/com/openworld/world/World.tscn" --load 1150 --unload 1550 --check   # tools/island_rebuild.sh's radii
 if [ "$QUICK" -eq 0 ]; then
   source "$HERE/env.sh"
   # `timeout -k`: a GDScript error inside `_initialize` HANGS instead of exiting, and a hung Godot

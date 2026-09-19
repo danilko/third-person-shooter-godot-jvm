@@ -65,6 +65,8 @@ public class UserCommand {
     // ── Weapon actions ────────────────────────────────────────────────────────
     public boolean fire;
     public boolean reload;
+    /** One-tick edge: the remote-charge detonator (REC1), set off whatever is held (GTA's sticky bomb). */
+    public boolean detonate;
     public boolean drop;
 
     // ── Body actions ──────────────────────────────────────────────────────────

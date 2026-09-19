@@ -101,7 +101,14 @@ static func natural_source(net: Node) -> Dictionary:
 
 ## The NATURAL ground height at a world position: the stamped network's sidecar where it covers, the
 ## terrain everywhere else. NAN where neither has data.
-static func natural_height(net: Node3D, terrain: Node, src: Dictionary, world: Vector3) -> float:
+static func natural_height(net: Node3D, terrain: Node, src: Dictionary, world: Vector3, reached: Dictionary = {}) -> float:
+	# `reached` (`stamp_reach`): only where the previous stamp could have changed the terrain is the sidecar the natural
+	# ground; everywhere else the terrain was never stamped and IS natural -- so a later edit to it (the seabed dredged
+	# to -24 m after the first stamp) reaches the sidecar instead of being overwritten by a stale value forever
+	if not src.is_empty() and not reached.is_empty():
+		var S = load("res://addons/road_kit/road_kit_stamp.gd")
+		if is_nan(S.height_at(reached, reached["params"], world.x, world.z, 0.0)):
+			return terrain.data.get_height(world)
 	if not src.is_empty():
 		var to_world := _world_xf(net)
 		var local := to_world.affine_inverse() * world
@@ -110,6 +117,19 @@ static func natural_height(net: Node3D, terrain: Node, src: Dictionary, world: V
 		if not is_nan(h):
 			return (to_world * Vector3(local.x, h, local.z)).y
 	return terrain.data.get_height(world)
+
+## Where the previous stamp could have changed the terrain: its recorded corridors indexed as the stamp indexes them
+## (`road_kit_stamp._index`), with `params` for `height_at`. `{}` when there is no stamp record.
+static func stamp_reach(net: Node, to_world: Transform3D) -> Dictionary:
+	var S = load("res://addons/road_kit/road_kit_stamp.gd")
+	var rec: Dictionary = S.read_record(net)
+	var prev: Array = rec.get("corridors", [])
+	if prev.is_empty():
+		return {}
+	var params := {"cut_slope": 1.0, "fill_slope": 1.5}
+	var idx: Dictionary = S._index(prev, to_world, params)
+	idx["params"] = params
+	return idx
 
 ## The network's footprint in the KIT frame (x, y), grown by `margin`: `Rect2(x0, y0, w, h)`.
 static func footprint(net: Node3D, margin: float = MARGIN) -> Rect2:
@@ -144,6 +164,7 @@ static func sample_grid(net: Node3D, terrain: Node, step: float = STEP, margin: 
 		return {"ok": false, "message": "%s is stamped into the terrain but its natural ground %s is missing -- restore it from version control; re-sampling would read the stamped roads as ground" % [net.name, sidecar_path(str(net.get("record_path")))]}
 	var to_world := _world_xf(net)
 	var from_world := to_world.affine_inverse()
+	var reached := stamp_reach(net, to_world) if not src.is_empty() else {}
 	var nx := int(ceil(rect.size.x / step)) + 1
 	var ny := int(ceil(rect.size.y / step)) + 1
 	var heights := PackedFloat32Array()
@@ -155,7 +176,7 @@ static func sample_grid(net: Node3D, terrain: Node, step: float = STEP, margin: 
 		for i in nx:
 			var kx := rect.position.x + i * step
 			var world: Vector3 = to_world * Frame.to_godot(Vector3(kx, ky, 0.0))
-			var h: float = natural_height(net, terrain, src, world)
+			var h: float = natural_height(net, terrain, src, world, reached)
 			if is_nan(h):
 				heights[j * nx + i] = NAN
 				misses += 1
