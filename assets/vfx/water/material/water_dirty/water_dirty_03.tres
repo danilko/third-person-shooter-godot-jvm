@@ -1,0 +1,36 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://j35ddty4k2p1"]
+
+[ext_resource type="Shader" uid="uid://tfq70i66wd11" path="res://assets/vfx/water/water.gdshader" id="1_n6mrn"]
+[ext_resource type="Texture2D" uid="uid://dvk43kpbif215" path="res://assets/vfx/water/texture/caustics/caustics_texture_02.tres" id="2_oiror"]
+[ext_resource type="Texture2D" uid="uid://cspm4gnf1ygm6" path="res://assets/vfx/water/texture/foam/foam_texture_03.tres" id="3_84rm7"]
+[ext_resource type="Texture2D" uid="uid://8ocufkumfbld" path="res://assets/vfx/water/texture/wave/wave_03/wave_normal_03.tres" id="4_os18h"]
+[ext_resource type="Texture2D" uid="uid://ban0efe0gbxeh" path="res://assets/vfx/water/texture/wave/wave_03/wave_texture_03.tres" id="5_eo3gs"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_n6mrn")
+shader_parameter/surface_color = Color(0.6227032, 0.6935645, 0.38272843, 1)
+shader_parameter/depth_color = Color(0.15879999, 0.24, 0.1008, 1)
+shader_parameter/foam_color = Color(1, 1, 1, 1)
+shader_parameter/depth_size = 4.0
+shader_parameter/surface_roughness = 0.0
+shader_parameter/foam_roughness = 0.999999977648
+shader_parameter/caustics_texture = ExtResource("2_oiror")
+shader_parameter/caustics_strength = 1.5
+shader_parameter/caustics_scale = Vector2(0.7, 0.7)
+shader_parameter/wave_texture = ExtResource("5_eo3gs")
+shader_parameter/wave_normal_texture = ExtResource("4_os18h")
+shader_parameter/wave_softness = 3.0000000447036
+shader_parameter/wave_scale = Vector2(0.15, 0.15)
+shader_parameter/wave_layer_scale = Vector2(1.1, 1.1)
+shader_parameter/wave_highlight = 0.10000000149012
+shader_parameter/wave_velocity = Vector2(0.02, 0.02)
+shader_parameter/foam_texture = ExtResource("3_84rm7")
+shader_parameter/edge_foam_depth_size = 0.5
+shader_parameter/wave_foam_amount = 0.38999999128272
+shader_parameter/foam_start = 0.0
+shader_parameter/foam_end = 1.0
+shader_parameter/foam_exponent = 1.0
+shader_parameter/refraction_amount = 0.5
+shader_parameter/refraction_exponent = 0.5
+shader_parameter/displacement_amount = 0.2

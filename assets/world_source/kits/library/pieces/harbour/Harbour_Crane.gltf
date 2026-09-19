@@ -1,0 +1,318 @@
+{
+ "asset": {
+  "generator": "Khronos glTF Blender I/O v5.2.40",
+  "version": "2.0",
+  "extras": {
+   "exported_by": "blender/tools/export_building_kit.py",
+   "module_scale": 1.0
+  }
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "name": "library",
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "extras": {
+    "edit_note": "Placeholder ship-to-shore crane: rails 30.48 m apart along Y (the sea is -Y), legs 17 m apart along X, portal clear 18 m, boom hinge 45 m, boom raised (nothing may overhang -Y past the seaside rail + 2 m: the quay line). Its COLLIDER is not its mesh: CRANE_BOXES in tools/building_kit/site_container_terminal.py (bogies, legs, portal beams, girders) -- update them with the model, or trucks will hit air / drive through legs. The probe checks the portal is open."
+   },
+   "mesh": 0,
+   "name": "Harbour_Crane"
+  }
+ ],
+ "materials": [
+  {
+   "doubleSided": true,
+   "name": "MI_PaintedMetalDark",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.1599999964237213,
+     0.17000000178813934,
+     0.18000000715255737,
+     1
+    ],
+    "metallicFactor": 0.4000000059604645,
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_CraneRed",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.7200000286102295,
+     0.14000000059604645,
+     0.10000000149011612,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_PaintWhite",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.949999988079071,
+     0.949999988079071,
+     0.9300000071525574,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_Steel",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.5726980566978455,
+     0.5820889472961426,
+     0.5955169796943665,
+     1
+    ],
+    "roughnessFactor": 0.699999988079071
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Harbour_Crane.001",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1
+     },
+     "indices": 2,
+     "material": 0
+    },
+    {
+     "attributes": {
+      "POSITION": 3,
+      "NORMAL": 4
+     },
+     "indices": 5,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 6,
+      "NORMAL": 7
+     },
+     "indices": 8,
+     "material": 2
+    },
+    {
+     "attributes": {
+      "POSITION": 9,
+      "NORMAL": 10
+     },
+     "indices": 11,
+     "material": 3
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 96,
+   "max": [
+    9.5,
+    1.2000000476837158,
+    16.739999771118164
+   ],
+   "min": [
+    -9.5,
+    0,
+    -16.739999771118164
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 96,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5123,
+   "count": 144,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5126,
+   "count": 324,
+   "max": [
+    9.300000190734863,
+    71,
+    16.040000915527344
+   ],
+   "min": [
+    -9.300000190734863,
+    1.2000000476837158,
+    -27.239999771118164
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5126,
+   "count": 324,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 5,
+   "componentType": 5123,
+   "count": 540,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 6,
+   "componentType": 5126,
+   "count": 72,
+   "max": [
+    4,
+    94.99397277832031,
+    17.684547424316406
+   ],
+   "min": [
+    -4,
+    44.97557067871094,
+    -23.239999771118164
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 7,
+   "componentType": 5126,
+   "count": 72,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 8,
+   "componentType": 5123,
+   "count": 108,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 9,
+   "componentType": 5126,
+   "count": 48,
+   "max": [
+    4.776406288146973,
+    95.0820083618164,
+    17.094209671020508
+   ],
+   "min": [
+    -4.776406288146973,
+    69.88753509521484,
+    -11.349235534667969
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 10,
+   "componentType": 5126,
+   "count": 48,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 11,
+   "componentType": 5123,
+   "count": 72,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteLength": 1152,
+   "byteOffset": 0,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 1152,
+   "byteOffset": 1152,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 2304,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 3888,
+   "byteOffset": 2592,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 3888,
+   "byteOffset": 6480,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 1080,
+   "byteOffset": 10368,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 864,
+   "byteOffset": 11448,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 864,
+   "byteOffset": 12312,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 216,
+   "byteOffset": 13176,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 576,
+   "byteOffset": 13392,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 576,
+   "byteOffset": 13968,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 144,
+   "byteOffset": 14544,
+   "target": 34963
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 14688,
+   "uri": "Harbour_Crane.bin"
+  }
+ ]
+}

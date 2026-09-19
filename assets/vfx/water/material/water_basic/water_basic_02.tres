@@ -1,0 +1,36 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://brsr8tevu1dgp"]
+
+[ext_resource type="Shader" uid="uid://tfq70i66wd11" path="res://assets/vfx/water/water.gdshader" id="1_h86dx"]
+[ext_resource type="Texture2D" uid="uid://bfsdnpssgtqbu" path="res://assets/vfx/water/texture/caustics/caustics_texture_01.tres" id="2_a3fxw"]
+[ext_resource type="Texture2D" uid="uid://bdrihrvweco0t" path="res://assets/vfx/water/texture/foam/foam_texture_02.tres" id="3_y2pru"]
+[ext_resource type="Texture2D" uid="uid://0nt1pqb6vaji" path="res://assets/vfx/water/texture/wave/wave_02/wave_normal_02.tres" id="4_osrxf"]
+[ext_resource type="Texture2D" uid="uid://dioh88aolasm" path="res://assets/vfx/water/texture/wave/wave_02/wave_texture_02.tres" id="5_bbdut"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_h86dx")
+shader_parameter/surface_color = Color(0.15495327, 0.9958816, 0.85692513, 1)
+shader_parameter/depth_color = Color(0.08920478, 0.155509, 0.50012237, 1)
+shader_parameter/foam_color = Color(1, 1, 1, 1)
+shader_parameter/depth_size = 12.0
+shader_parameter/surface_roughness = 1.0
+shader_parameter/foam_roughness = 0.999999977648
+shader_parameter/caustics_texture = ExtResource("2_a3fxw")
+shader_parameter/caustics_strength = 2.0
+shader_parameter/caustics_scale = Vector2(0.7, 0.7)
+shader_parameter/wave_texture = ExtResource("5_bbdut")
+shader_parameter/wave_normal_texture = ExtResource("4_osrxf")
+shader_parameter/wave_softness = 3.0000000447036
+shader_parameter/wave_scale = Vector2(0.2, 0.2)
+shader_parameter/wave_layer_scale = Vector2(0.5, 0.5)
+shader_parameter/wave_highlight = 0.80000001192096
+shader_parameter/wave_velocity = Vector2(0.02, 0.02)
+shader_parameter/foam_texture = ExtResource("3_y2pru")
+shader_parameter/edge_foam_depth_size = 0.5
+shader_parameter/wave_foam_amount = 0.2999999932944
+shader_parameter/foam_start = 0.0
+shader_parameter/foam_end = 1.0
+shader_parameter/foam_exponent = 1.0
+shader_parameter/refraction_amount = 0.5
+shader_parameter/refraction_exponent = 0.5
+shader_parameter/displacement_amount = 0.3

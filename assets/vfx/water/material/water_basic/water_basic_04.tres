@@ -1,0 +1,36 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://dysbcw7cxhjct"]
+
+[ext_resource type="Shader" uid="uid://tfq70i66wd11" path="res://assets/vfx/water/water.gdshader" id="1_itemn"]
+[ext_resource type="Texture2D" uid="uid://dvk43kpbif215" path="res://assets/vfx/water/texture/caustics/caustics_texture_02.tres" id="2_vopr6"]
+[ext_resource type="Texture2D" uid="uid://cspas3tj3fed" path="res://assets/vfx/water/texture/foam/foam_texture_04.tres" id="3_nt7yl"]
+[ext_resource type="Texture2D" uid="uid://dogcilin5v4v6" path="res://assets/vfx/water/texture/wave/wave_04/wave_normal_04.tres" id="4_ewb6c"]
+[ext_resource type="Texture2D" uid="uid://bqjqtsnip2wxp" path="res://assets/vfx/water/texture/wave/wave_04/wave_texture_04.tres" id="5_hji44"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_itemn")
+shader_parameter/surface_color = Color(0.106917, 0.99999994, 0.8565548, 1)
+shader_parameter/depth_color = Color(1.7808378e-06, 0.3573374, 0.40130544, 1)
+shader_parameter/foam_color = Color(1, 1, 1, 1)
+shader_parameter/depth_size = 8.0
+shader_parameter/surface_roughness = 0.999999977648
+shader_parameter/foam_roughness = 0.999999977648
+shader_parameter/caustics_texture = ExtResource("2_vopr6")
+shader_parameter/caustics_strength = 1.5
+shader_parameter/caustics_scale = Vector2(0.7, 0.7)
+shader_parameter/wave_texture = ExtResource("5_hji44")
+shader_parameter/wave_normal_texture = ExtResource("4_ewb6c")
+shader_parameter/wave_softness = 3.0000000447036
+shader_parameter/wave_scale = Vector2(0.2, 0.2)
+shader_parameter/wave_layer_scale = Vector2(1.1, 1.1)
+shader_parameter/wave_highlight = 0.40000000596048
+shader_parameter/wave_velocity = Vector2(0.02, 0.02)
+shader_parameter/foam_texture = ExtResource("3_nt7yl")
+shader_parameter/edge_foam_depth_size = 0.5
+shader_parameter/wave_foam_amount = 0.47999998927104
+shader_parameter/foam_start = 0.0
+shader_parameter/foam_end = 0.40000000596048
+shader_parameter/foam_exponent = 0.8
+shader_parameter/refraction_amount = 0.5
+shader_parameter/refraction_exponent = 0.5
+shader_parameter/displacement_amount = 0.2

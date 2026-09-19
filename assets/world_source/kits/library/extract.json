@@ -1,0 +1,473 @@
+{
+ "notes": [
+  "The record of every library piece that STARTED from a CC0 base mesh by elbolilloduro (https://elbolilloduro.itch.io/, models CC0 1.0). blender/tools/build_library.py --extract read these objects ONCE from the local downloads, joined them, resized them to a Japanese size, faced them along the kit convention (the side a person uses faces Blender -Y = Godot +Z) and gave every face a library palette material. None of the downloads' textures were kept. The downloads were then deleted; library.blend owns the pieces.",
+  "`fit` scales uniformly so the piece's size along `axis` (x, y, z in Blender after `rot_z`) becomes `size` metres; the sizes are Japanese ones (a shop gondola 1.4 m, a counter 1.0 m, a pump 2.2 m, a vending machine 1.83 m).",
+  "`mat` maps a source material name (lower-case substring) to a palette material; the first match wins, then `default`.",
+  "`base` is the height of the piece's lowest point above its origin (a wall-mounted basin hangs at 0.72 m).",
+  "`fit_box` [w, d, h] (Blender x, y, z after rot_z) re-frames a boxy piece NON-uniformly to a real Japanese size; build_library.py --reframe applies it to the piece already in library.blend (idempotent), because the downloads are gone.",
+  "`jp` is the Japan-likeness review: `ok` (reads as Japanese as it is), `reframed` (size fixed here), or `hand` (needs a modeller) with what to change. build_library.py writes it to the collection's `lib_review` property; the README table lists it."
+ ],
+ "sources": {
+  "6twelve": "elbolilloduro_6twelve/source/Models/6twelve.fbx",
+  "gas": "elbolilloduro_gas_station/source/Models/Gas_station_Props.fbx",
+  "metro": "elbolilloduro_metro_psx/source/Models/Metro.glb",
+  "burgerpiz": "elbolilloduro_burgerpiz/source/Models/BurgerPiz.glb",
+  "busstop": "elbolilloduro_bus_stop/source/Models/Props/Props.fbx"
+ },
+ "pieces": [
+  {
+   "name": "Shop_Gondola",
+   "cat": "interior",
+   "src": "6twelve",
+   "objects": [
+    "Shelf_03",
+    "Food"
+   ],
+   "fit": [
+    "z",
+    1.4
+   ],
+   "rot_z": 0,
+   "default": "MI_Goods",
+   "mat": {
+    "metal": "MI_PaintedMetal",
+    "prices": "MI_PaintedMetal"
+   },
+   "jp": {
+    "status": "ok",
+    "note": "A konbini gondola is 1.35-1.5 m high; 1.4 m here. Optional: a price-tag rail on each shelf lip."
+   }
+  },
+  {
+   "name": "Shop_GondolaShort",
+   "cat": "interior",
+   "src": "6twelve",
+   "objects": [
+    "Shelf_05",
+    "Food_03"
+   ],
+   "fit": [
+    "z",
+    1.4
+   ],
+   "rot_z": 0,
+   "default": "MI_Goods",
+   "mat": {
+    "metal": "MI_PaintedMetal",
+    "prices": "MI_PaintedMetal"
+   },
+   "jp": {
+    "status": "ok",
+    "note": "As Shop_Gondola."
+   }
+  },
+  {
+   "name": "Shop_Counter",
+   "cat": "interior",
+   "src": "6twelve",
+   "objects": [
+    "Mostrator"
+   ],
+   "fit": [
+    "z",
+    1.0
+   ],
+   "rot_z": 90,
+   "default": "MI_PaintedMetal",
+   "mat": {
+    "candys": "MI_Goods",
+    "toothbrushes": "MI_Goods"
+   },
+   "jp": {
+    "status": "hand",
+    "note": "A konbini counter carries a heated hot-snack case (ホットスナック) at the customer end and a cigarette wall behind the clerk; add both. Size (1.0 m high, 0.83 m deep) is right."
+   }
+  },
+  {
+   "name": "Shop_Register",
+   "cat": "interior",
+   "src": "6twelve",
+   "objects": [
+    "Cash_register",
+    "Monitor",
+    "Keyboard",
+    "Payment_Terminal"
+   ],
+   "fit": null,
+   "rot_z": 90,
+   "default": "MI_PlasticDark",
+   "jp": {
+    "status": "hand",
+    "note": "Japanese POS: a customer-facing screen, a coin/change machine (自動釣銭機) and an IC-card pad; today it is a plain Western register."
+   }
+  },
+  {
+   "name": "Shop_IceFreezer",
+   "cat": "interior",
+   "src": "6twelve",
+   "objects": [
+    "IceCream_Refrigerator",
+    "IceCream_Refrigerator_Door",
+    "IceCream_Refrigerator_Door_01"
+   ],
+   "fit": [
+    "z",
+    0.9
+   ],
+   "rot_z": 90,
+   "default": "MI_PlasticWhite",
+   "mat": {
+    "glass": "MI_GlassClear",
+    "metal": "MI_Steel",
+    "icecream": "MI_Goods"
+   },
+   "jp": {
+    "status": "ok",
+    "note": "The open chest freezer by the door is typical."
+   }
+  },
+  {
+   "name": "Shop_StockShelf",
+   "cat": "interior",
+   "src": "6twelve",
+   "objects": [
+    "Shelf_06"
+   ],
+   "fit": [
+    "z",
+    1.8
+   ],
+   "rot_z": 0,
+   "default": "MI_PaintedMetalDark",
+   "jp": {
+    "status": "ok",
+    "note": "Back-room steel shelf."
+   }
+  },
+  {
+   "name": "WC_Toilet",
+   "cat": "fixtures",
+   "src": "burgerpiz",
+   "objects": [
+    "Toilet.001",
+    "Toilet_T.001"
+   ],
+   "fit": [
+    "z",
+    0.8
+   ],
+   "rot_z": 90,
+   "default": "MI_PlasticWhite",
+   "jp": {
+    "status": "hand",
+    "note": "Add the washlet control panel (a small box on the right armrest or a wall remote); the bowl is fine."
+   }
+  },
+  {
+   "name": "WC_Basin",
+   "cat": "fixtures",
+   "src": "gas",
+   "objects": [
+    "Sanitary",
+    "Sanitary_001"
+   ],
+   "fit": null,
+   "rot_z": 0,
+   "base": 0.72,
+   "default": "MI_PlasticWhite",
+   "mat": {
+    "metal": "MI_Steel"
+   },
+   "jp": {
+    "status": "ok",
+    "note": ""
+   }
+  },
+  {
+   "name": "WC_Mirror",
+   "cat": "fixtures",
+   "src": "6twelve",
+   "objects": [
+    "Mirror"
+   ],
+   "fit": null,
+   "rot_z": 90,
+   "base": 1.1,
+   "default": "MI_Steel",
+   "jp": {
+    "status": "ok",
+    "note": ""
+   }
+  },
+  {
+   "name": "Rest_Table",
+   "cat": "interior",
+   "src": "burgerpiz",
+   "objects": [
+    "Table"
+   ],
+   "fit": [
+    "z",
+    0.72
+   ],
+   "rot_z": 0,
+   "default": "MI_Wood",
+   "mat": {
+    "metal": "MI_Steel"
+   },
+   "jp": {
+    "status": "ok",
+    "note": "0.72 m, a family-restaurant table."
+   }
+  },
+  {
+   "name": "Rest_Chair",
+   "cat": "interior",
+   "src": "burgerpiz",
+   "objects": [
+    "Chair"
+   ],
+   "fit": [
+    "z",
+    0.85
+   ],
+   "rot_z": 0,
+   "default": "MI_Wood",
+   "mat": {
+    "metal": "MI_Steel"
+   },
+   "jp": {
+    "status": "ok",
+    "note": ""
+   }
+  },
+  {
+   "name": "Rest_BoothSofa",
+   "cat": "interior",
+   "src": "burgerpiz",
+   "objects": [
+    "Armchair"
+   ],
+   "fit": [
+    "z",
+    1.1
+   ],
+   "rot_z": 0,
+   "default": "MI_FabricRed",
+   "jp": {
+    "status": "ok",
+    "note": "Booth seating as at a ファミレス; a call button (呼び出しボタン) on the table would help."
+   }
+  },
+  {
+   "name": "Shop_RegisterSmall",
+   "cat": "interior",
+   "src": "burgerpiz",
+   "objects": [
+    "Cash_register"
+   ],
+   "fit": null,
+   "rot_z": 0,
+   "default": "MI_PlasticDark",
+   "jp": {
+    "status": "ok",
+    "note": ""
+   }
+  },
+  {
+   "name": "Kitchen_Grill",
+   "cat": "kitchen",
+   "src": "burgerpiz",
+   "objects": [
+    "Grill.001"
+   ],
+   "fit": [
+    "z",
+    0.9
+   ],
+   "rot_z": 90,
+   "default": "MI_Steel",
+   "jp": {
+    "status": "ok",
+    "note": ""
+   }
+  },
+  {
+   "name": "Kitchen_Shelf",
+   "cat": "kitchen",
+   "src": "burgerpiz",
+   "objects": [
+    "Shelving.001"
+   ],
+   "fit": [
+    "z",
+    1.8
+   ],
+   "rot_z": 0,
+   "default": "MI_Steel",
+   "jp": {
+    "status": "ok",
+    "note": ""
+   }
+  },
+  {
+   "name": "Gas_Pump",
+   "cat": "gas",
+   "src": "gas",
+   "objects": [
+    "Fuel_pump"
+   ],
+   "fit": [
+    "z",
+    2.2
+   ],
+   "rot_z": 90,
+   "default": "MI_PaintedMetal",
+   "jp": {
+    "status": "hand",
+    "note": "American ground pump. Japanese stations use a slimmer ground unit with a large price panel and hoses on both faces, or, in the city, overhead units hanging from the canopy (懸垂式). Model one of each; the height (2.2 m) is kept."
+   }
+  },
+  {
+   "name": "Station_TicketGate",
+   "cat": "station",
+   "src": "metro",
+   "objects": [
+    "automatic_ticket_gate",
+    "automatic_ticket_gate_D"
+   ],
+   "fit": [
+    "z",
+    1.0
+   ],
+   "rot_z": 90,
+   "default": "MI_PaintedMetal",
+   "jp": {
+    "status": "hand",
+    "note": "Make it a JR/Suica gate: a slimmer body (~0.25 m), a lit IC-card pad on the top at the entry end, short flap doors, a direction light; the length 1.3 m is right."
+   }
+  },
+  {
+   "name": "Station_TicketMachine",
+   "cat": "station",
+   "src": "metro",
+   "objects": [
+    "ticket_machine"
+   ],
+   "fit": [
+    "z",
+    1.9
+   ],
+   "rot_z": 0,
+   "default": "MI_PaintedMetal",
+   "jp": {
+    "status": "reframed",
+    "note": "0.8 x 0.55 x 1.8 m (券売機). Still wants a touch screen face and the fare map board above the row."
+   },
+   "fit_box": [
+    0.8,
+    0.55,
+    1.8
+   ]
+  },
+  {
+   "name": "Station_VendingMachine",
+   "cat": "station",
+   "src": "metro",
+   "objects": [
+    "Vending_machine"
+   ],
+   "fit": [
+    "z",
+    1.83
+   ],
+   "rot_z": 0,
+   "default": "MI_PaintedMetal",
+   "jp": {
+    "status": "reframed",
+    "note": "1.0 x 0.72 x 1.83 m, the Japanese drink machine. Still wants its face: sample bottles behind glass in three rows, a button row, and the take-out slot at the bottom."
+   },
+   "fit_box": [
+    1.0,
+    0.72,
+    1.83
+   ]
+  },
+  {
+   "name": "Station_Bench",
+   "cat": "station",
+   "src": "metro",
+   "objects": [
+    "seats.001"
+   ],
+   "fit": [
+    "z",
+    0.85
+   ],
+   "rot_z": 90,
+   "default": "MI_PlasticDark",
+   "jp": {
+    "status": "ok",
+    "note": "Individual plastic seats on a frame, as on Japanese platforms."
+   }
+  },
+  {
+   "name": "Station_Bin",
+   "cat": "station",
+   "src": "metro",
+   "objects": [
+    "trash_can"
+   ],
+   "fit": [
+    "z",
+    1.0
+   ],
+   "rot_z": 0,
+   "default": "MI_PaintedMetal",
+   "jp": {
+    "status": "hand",
+    "note": "Japanese station bins are sorted: a row of three (燃えるゴミ, 缶・びん, ペットボトル) with shaped openings; replace the round Western bin."
+   }
+  },
+  {
+   "name": "BusStop_Shelter",
+   "cat": "street",
+   "src": "busstop",
+   "objects": [
+    "Bus_stop_01",
+    "Bus_stop_01_"
+   ],
+   "fit": [
+    "z",
+    2.6
+   ],
+   "rot_z": 0,
+   "default": "MI_PaintedMetal",
+   "mat": {
+    "glass": "MI_GlassClear"
+   },
+   "jp": {
+    "status": "ok",
+    "note": "A simple shelter reads fine; Japanese ones often have a timetable panel on the side wall."
+   }
+  },
+  {
+   "name": "BusStop_Sign",
+   "cat": "street",
+   "src": "busstop",
+   "objects": [
+    "Bus_stop_sign"
+   ],
+   "fit": [
+    "z",
+    2.5
+   ],
+   "rot_z": 0,
+   "default": "MI_PaintedMetal",
+   "jp": {
+    "status": "hand",
+    "note": "The Japanese bus stop sign is a round-top plate on a pole with a heavy round concrete base and a timetable box (バス停標識)."
+   }
+  }
+ ]
+}

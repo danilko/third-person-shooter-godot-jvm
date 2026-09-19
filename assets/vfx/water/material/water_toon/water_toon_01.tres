@@ -1,0 +1,36 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://3cx0o14ueaoy"]
+
+[ext_resource type="Shader" uid="uid://dw5oumf7uirea" path="res://assets/vfx/water/water_toon.gdshader" id="1_t6xgh"]
+[ext_resource type="Texture2D" uid="uid://difwql5juxq1u" path="res://assets/vfx/water/texture/foam/foam_texture_01.tres" id="2_pxeik"]
+[ext_resource type="Texture2D" uid="uid://u0xe4yijartw" path="res://assets/vfx/water/texture/wave/wave_01/wave_normal_01.tres" id="3_7onmf"]
+[ext_resource type="Texture2D" uid="uid://drge4dyqsl24g" path="res://assets/vfx/water/texture/wave/wave_01/wave_texture_01.tres" id="4_ucoq7"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_t6xgh")
+shader_parameter/surface_color = Color(0.2, 1, 0.8, 1)
+shader_parameter/depth_color = Color(0.08, 0.2, 0.4, 1)
+shader_parameter/foam_color = Color(1, 1, 1, 1)
+shader_parameter/depth_size = 12.0
+shader_parameter/surface_roughness = 0.05999999865888
+shader_parameter/foam_roughness = 0.999999977648
+shader_parameter/wave_texture = ExtResource("4_ucoq7")
+shader_parameter/wave_normal_texture = ExtResource("3_7onmf")
+shader_parameter/wave_softness = 3.0000000447036
+shader_parameter/wave_scale = Vector2(0.2, 0.2)
+shader_parameter/wave_layer_scale = Vector2(1.5, 1.5)
+shader_parameter/wave_highlight = 0.5
+shader_parameter/wave_velocity = Vector2(0.02, 0.02)
+shader_parameter/foam_texture = ExtResource("2_pxeik")
+shader_parameter/edge_foam_depth_size = 0.5
+shader_parameter/wave_foam_amount = 0.499999988824
+shader_parameter/foam_start = 0.0
+shader_parameter/foam_end = 1.0
+shader_parameter/foam_exponent = 0.2
+shader_parameter/refraction_amount = 0.5
+shader_parameter/refraction_exponent = 0.5
+shader_parameter/displacement_amount = 0.3
+shader_parameter/diffuse_steps = 12.0
+shader_parameter/diffuse_smoothness = 0.0
+shader_parameter/specular_steps = 12.0
+shader_parameter/specular_smoothness = 0.0

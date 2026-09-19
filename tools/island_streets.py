@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""island_streets.py -- the block streets and farm roads under the trunk grid (PLAN.md 3.13 step 4, 3.3).
+
+    python3 tools/island_streets.py <record>
+
+A REGION is a box and a road type (`point_presets`) with a set of north-south lines (x) and east-west lines (y). Each
+line becomes streets between the ROADS it meets: it is clipped to the stretch between its first and last crossing
+with an at-grade road inside the box, an existing road it crosses is CUT to land a junction there
+(`island_roadgen.cut_road`), and two new lines crossing make a four-way junction. So every street ends on a road and
+no dead end is made. A line is dropped (and said so) when any of its junctions would crowd an existing junction
+(`JUNCTION_CLEAR`), when two of its junctions are closer than `MIN_SPAN`, or when it crosses water.
+
+Regions (record frame: x east, y north):
+* `city` -- inside the trunk grid south of y 560 (north of it the C1 diamond's ramps come down), one street down the
+  middle of each trunk cell (block preset: 1 + 1, 2 m footways). Blocks are ~170 x 200 m: PLATEAU Tokyo's are
+  60-120 m, stretched like the lanes are (the arcade world).
+* `southwest` -- the residential lowland between rinkai_dori and the south-west coast (3.3's reach gap 2).
+* `farm` -- the north-east farmland north of nogyo_michi (the farm preset: 1 + 1 at 3.5 m, no kerb, no footway).
+
+Run on the record AFTER `island_trunk_grid.py` and BEFORE `island_expressway.py` (whose pier pass must see these
+streets): `tools/island_layout.py` runs the whole chain.
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from island_roadgen import *    # noqa: E402,F401,F403
+import point_model as pm        # noqa: E402
+
+MOUTH = 22.0
+SPACING = 80.0
+JUNCTION_CLEAR = 55.0     # a new junction no nearer an existing junction's centre than this
+MIN_SPAN = 75.0           # consecutive junctions on a new street at least this far apart
+REGIONS = (
+    # name, box (x0, y0, x1, y1), preset, x lines, y lines
+    ("city", (40.0, -250.0, 1540.0, 560.0), "block", (224.0, 562.0, 912.0, 1250.0), (110.0, 350.0, 540.0)),
+    ("sw", (-1560.0, -1150.0, -100.0, -280.0), "block", (-1300.0, -1050.0, -800.0, -550.0, -330.0), (-560.0, -800.0)),
+    ("farm", (850.0, 900.0, 1500.0, 1720.0), "farm", (960.0, 1200.0), (1100.0, 1350.0)),
+)
+NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "farm": ("hata_michi", "hata_yoko")}
+
+
+def _crossings(net, a, b, skip=()):
+    """[(t along a->b, road name, point)] where the segment a->b crosses an at-grade road's station polyline."""
+    out = []
+    for name, r in net.roads.items():
+        if name in skip:
+            continue
+        pts = [net.points[u].pos for u in r.points]
+        for p, q in zip(pts, pts[1:]):
+            if max(p[2], q[2]) > 3.0:                   # elevated: a street passes under it
+                continue
+            rx, ry = b[0] - a[0], b[1] - a[1]
+            sx, sy = q[0] - p[0], q[1] - p[1]
+            den = rx * sy - ry * sx
+            if abs(den) < 1e-9:
+                continue
+            t = ((p[0] - a[0]) * sy - (p[1] - a[1]) * sx) / den
+            u = ((p[0] - a[0]) * ry - (p[1] - a[1]) * rx) / den
+            if 0.0 <= t <= 1.0 and 0.0 <= u <= 1.0:
+                out.append((t, name, (a[0] + rx * t, a[1] + ry * t)))
+    return sorted(out)
+
+
+def junction_centres(net):
+    out = []
+    for comp in net.junction_cliques():
+        xs = [net.points[u].pos for u in comp]
+        out.append((sum(p[0] for p in xs) / len(xs), sum(p[1] for p in xs) / len(xs)))
+    return out
+
+
+def _obstacles(net):
+    """Points a new junction must keep JUNCTION_CLEAR from: every junction's centre, and every road END (a joint, a
+    mouth, a loop's arm) -- a road cannot be cut within a mouth's length of its end."""
+    pts = list(junction_centres(net))
+    for r in net.roads.values():
+        for u in (r.points[0], r.points[-1]):
+            if net.points[u].role == pm.SEGMENT:
+                pts.append(tuple(net.points[u].pos[:2]))
+    return pts
+
+
+def _line_ok(net, ground, obst, kind, v, box):
+    x0, y0, x1, y1 = box
+    a, b = ((v, y0), (v, y1)) if kind == "x" else ((x0, v), (x1, v))
+    cr = _crossings(net, a, b)
+    if not cr:
+        return None, "meets no road"
+    nodes = [(c[2], c[1]) for c in cr]
+    for p, _road in nodes:
+        if min((math.hypot(p[0] - c[0], p[1] - c[1]) for c in obst), default=1e9) < JUNCTION_CLEAR:
+            return None, "a junction at (%.0f, %.0f) crowds an existing one" % p
+    return nodes, None
+
+
+def _wet(ground, p, q):
+    for f in [k / 20.0 for k in range(1, 20)]:
+        g = ground.z(p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f)
+        if g is None or g < -0.3:
+            return True
+    return False
+
+
+def plan_region(net, ground, region):
+    """The lines of one region that survive, each as [(point, road name or None)] from its first to last crossing. A
+    line that fails is nudged up to 60 m either way before it is dropped."""
+    name, box, _preset, xs, ys = region
+    obst = _obstacles(net)
+    kept, why = [], []
+    for kind, vals in (("x", xs), ("y", ys)):
+        for v0 in vals:
+            tried = []
+            for dv in (0.0, 30.0, -30.0, 60.0, -60.0):
+                nodes, last = _line_ok(net, ground, obst, kind, v0 + dv, box)
+                if nodes:
+                    kept.append([kind, v0 + dv, nodes])
+                    break
+                tried.append("%+.0f: %s" % (dv, last))
+            else:
+                why.append("%s %s=%.0f dropped (%s)" % (name, kind, v0, "; ".join(tried)))
+    # crossings of two new lines: kept only where at least one of the two runs THROUGH the point (a crossing that is
+    # the end of both would be a two-armed pad, which the kit refuses); lines re-clipped until nothing changes
+    cross = {}
+    for i, L in enumerate(kept):
+        for j, M in enumerate(kept):
+            if L[0] == "x" and M[0] == "y":
+                cross[(i, j)] = (L[1], M[1])
+    alive = set(range(len(kept)))
+    active = set(cross)
+    while True:
+        ext = {}
+        for i in alive:
+            kind, v, nodes = kept[i]
+            ax = 1 if kind == "x" else 0
+            vals = [p[ax] for p, _r in nodes] + [cross[k][ax] for k in active if i in (k[0] if kind == "x" else k[1],)]
+            ext[i] = (min(vals), max(vals)) if vals else (0.0, 0.0)
+        changed = False
+        for k in list(active):
+            i, j = k
+            if i not in alive or j not in alive:
+                active.discard(k)
+                changed = True
+                continue
+            x, y = cross[k]
+            in_i, in_j = ext[i][0] - 1e-6 <= y <= ext[i][1] + 1e-6, ext[j][0] - 1e-6 <= x <= ext[j][1] + 1e-6
+            thru_i, thru_j = ext[i][0] + 1e-6 < y < ext[i][1] - 1e-6, ext[j][0] + 1e-6 < x < ext[j][1] - 1e-6
+            if not (in_i and in_j) or not (thru_i or thru_j):
+                active.discard(k)
+                changed = True
+        verdict = {}
+        for i in list(alive):
+            kind, v, nodes = kept[i]
+            n = len(nodes) + sum(1 for k in active if i == (k[0] if kind == "x" else k[1]))
+            ax = 1 if kind == "x" else 0
+            pts = sorted([pp[ax] for pp, _r in nodes] + [cross[k][ax] for k in active
+                                                       if i == (k[0] if kind == "x" else k[1])])
+            if n < 2:
+                verdict[i] = "meets one road and no other street"
+            elif any(b_ - a_ < MIN_SPAN for a_, b_ in zip(pts, pts[1:])):
+                verdict[i] = "two of its junctions are closer than %.0f m" % MIN_SPAN
+        if not verdict and not changed:
+            # water is judged only once everything else has settled: a partner dropped may shorten the line
+            for i in list(alive):
+                kind, v, _nodes = kept[i]
+                lo, hi = ext[i]
+                p = (v, lo) if kind == "x" else (lo, v)
+                q = (v, hi) if kind == "x" else (hi, v)
+                if _wet(ground, p, q):
+                    verdict[i] = "crosses water"
+                    break                       # one at a time: dropping it may clear another
+        for i, reason in verdict.items():
+            kind, v, _nodes = kept[i]
+            why.append("%s %s=%.0f dropped: %s" % (name, kind, v, reason))
+            alive.discard(i)
+            changed = True
+        if not changed:
+            break
+    out = []
+    for i in sorted(alive):
+        kind, v, nodes = kept[i]
+        nodes = list(nodes) + [(cross[k], None) for k in active if i == (k[0] if kind == "x" else k[1])]
+        ax = 1 if kind == "x" else 0
+        nodes.sort(key=lambda n: n[0][ax])
+        out.append((kind, v, nodes))
+    return out, why
+
+
+def build_region(net, ground, region):
+    lines, why = plan_region(net, ground, region)
+    rname, _box, preset, _xs, _ys = region
+    fixed = lines
+    junctions = {}
+
+    def add(c, u):
+        junctions.setdefault((round(c[0], 1), round(c[1], 1)), []).append(u)
+    cut = set()
+    for kind, v, nodes in fixed:
+        for p, road in nodes:
+            key = (round(p[0], 1), round(p[1], 1))
+            if road is not None and key not in cut:
+                ma, mb = cut_road(net, p, road.split("__")[0], MOUTH)
+                add(p, ma)
+                add(p, mb)
+                cut.add(key)
+    made = 0
+    for kind, v, nodes in fixed:
+        stem = NAMES[rname][0 if kind == "x" else 1]
+        base = "%s_%d" % (stem, int(round(abs(v))))
+        seg = 0
+        for (p, _r), (q, _s) in zip(nodes, nodes[1:]):
+            dx, dy = q[0] - p[0], q[1] - p[1]
+            L = math.hypot(dx, dy)
+            ux, uy = dx / L, dy / L
+            a = (p[0] + ux * MOUTH, p[1] + uy * MOUTH)
+            b = (q[0] - ux * MOUTH, q[1] - uy * MOUTH)
+            k = max(1, int(round((L - 2 * MOUTH) / SPACING)))
+            pts = [(a[0] + (b[0] - a[0]) * m / k, a[1] + (b[1] - a[1]) * m / k) for m in range(k + 1)]
+            pts = [(x, y, max(0.0, ground.z(x, y) or 0.0)) for x, y in pts]
+            seg += 1
+            r = chain_road(net, base if seg == 1 else "%s__%d" % (base, seg), pts, preset=preset)
+            add(p, r.points[0])
+            add(q, r.points[-1])
+            made += 1
+    for c, mouths in junctions.items():
+        make_junction(net, mouths, signal=(preset != "farm" and len(mouths) >= 4))
+    return made, len(junctions), why
+
+
+def build(net, ground):
+    report = []
+    for region in REGIONS:
+        made, nj, why = build_region(net, ground, region)
+        report.append((region[0], made, nj, why))
+    return report
+
+
+def main(argv):
+    if not argv:
+        raise SystemExit(__doc__)
+    path = argv[0]
+    net = pm.load_network(path)
+    if any(n.startswith(NAMES["city"][0] + "_") for n in net.roads):
+        raise SystemExit("island_streets: %s already has the streets" % path)
+    ground = Ground()
+    for name, made, nj, why in build(net, ground):
+        print("island_streets: %-5s %3d street(s), %3d junction(s)" % (name, made, nj))
+        for w in why:
+            print("    " + w)
+    sample_ground(net, ground, prefix="\0")
+    pm.save_network(net, path)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

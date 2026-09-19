@@ -1,0 +1,56 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://diwb3dd3lmt8j"]
+
+[ext_resource type="Shader" uid="uid://bqm1s0sca3srw" path="res://assets/vfx/smoke/shader/smoke.gdshader" id="1_o4fbb"]
+[ext_resource type="Texture2D" uid="uid://dvjinhg077gmr" path="res://assets/vfx/smoke/texture/noise/web_02.tres" id="2_ookwc"]
+[ext_resource type="Texture2D" path="res://assets/vfx/smoke/texture/noise/cellular_01.tres" id="noise_0"]
+[ext_resource type="Texture2D" path="res://assets/vfx/smoke/texture/noise/cellular_normal_02.tres" id="noise_1"]
+
+[sub_resource type="Gradient" id="Gradient_lgsoo"]
+interpolation_color_space = 1
+offsets = PackedFloat32Array(0, 0.4)
+colors = PackedColorArray(1, 1, 1, 1, 0, 0, 0, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_pj61t"]
+gradient = SubResource("Gradient_lgsoo")
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(0.5, 0)
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_o4fbb")
+shader_parameter/mask1_texture = ExtResource("2_ookwc")
+shader_parameter/mask1_scroll = Vector2(0, -0.2)
+shader_parameter/mask1_scale = Vector2(0.2, 0.2)
+shader_parameter/use_mask2 = true
+shader_parameter/mask2_texture = ExtResource("noise_0")
+shader_parameter/mask2_scroll = Vector2(0, -0.1)
+shader_parameter/mask2_scale = Vector2(0.5, 0.5)
+shader_parameter/mask2_strength = 0.76
+shader_parameter/mask2_blend_mode = 9
+shader_parameter/use_mask3 = true
+shader_parameter/mask3_texture = SubResource("GradientTexture2D_pj61t")
+shader_parameter/mask3_scroll = Vector2(0, 0)
+shader_parameter/mask3_scale = Vector2(1, 1)
+shader_parameter/mask3_strength = 0.999999977648
+shader_parameter/mask3_blend_mode = 2
+shader_parameter/primary_color = Color(0.35, 0.35, 0.35, 1)
+shader_parameter/secondary_color = Color(0.29411766, 0.29411766, 0.29411766, 1)
+shader_parameter/tertiary_color = Color(0.2, 0.2, 0.2, 1)
+shader_parameter/color_smoothness = 0.5
+shader_parameter/billboard = false
+shader_parameter/displacement_scale = 0.0
+shader_parameter/displacement_offset = 0.5
+shader_parameter/time_scale = 1.0
+shader_parameter/emission_strength = 1.0
+shader_parameter/proximity_fade = true
+shader_parameter/proximity_fade_distance = 1.0
+shader_parameter/edge_cutoff = Vector4(0, 0, 0, 0)
+shader_parameter/alpha_smoothness = 1.0
+shader_parameter/alpha_multiplier = 1.0
+shader_parameter/alpha_mode = 3
+shader_parameter/alpha_cutoff = 0.02
+shader_parameter/dither_cutoff = 1.0
+shader_parameter/normal_texture = ExtResource("noise_1")
+shader_parameter/normal_strength = 1.0
+shader_parameter/roughness = 0.0
