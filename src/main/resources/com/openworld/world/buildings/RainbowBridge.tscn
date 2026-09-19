@@ -1,0 +1,32 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/RainbowBridge_mesh.res" id="1_nh3c0"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/RainbowBridge_collision.res" id="2_eb4b6"]
+
+[node name="RainbowBridge" type="Node3D" unique_id=1642671875]
+metadata/building = {
+"aabb": [Vector3(-424.5, -30, -24), Vector3(849, 138.8, 48)],
+"collision": "trimesh",
+"doors": [],
+"example": true,
+"footprint_m": [849.0, 48.0],
+"height_m": 138.8,
+"id": "RainbowBridge",
+"kit": "library",
+"landmark": true,
+"piece_count": 1,
+"probe_xz": [287.5, 20.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "the Rainbow Bridge on the airport crossing: suspension structure only; its lower deck is the airport road (Road Kit, 24 m), its upper deck is reserved for the expressway spur (32 m); origin at the water line",
+"wall_top_m": 138.8
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1324655494]
+mesh = ExtResource("1_nh3c0")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=20739054]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1791776353]
+shape = ExtResource("2_eb4b6")
