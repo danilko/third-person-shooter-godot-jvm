@@ -1,7 +1,7 @@
 """Conform models from the CC0 "Free CC0 Guns & Explosives Pack" (3DModelsCC0,
 https://3dmodelscc0.itch.io/free-cc0-guns-explosives-pack) to the weapon standard, as assets/weapons/<id>.blend
-+ textures/. The pack sits at assets/weapons/free-cc0-melee-weapons-pack/ (the folder name is the download's;
-its license.txt names the guns pack). This file is the record of what was done to each model, like
++ textures/. To re-run, download the pack again into assets/weapons/free-cc0-melee-weapons-pack/ (the folder name is the
+download's); it was removed from the repo after import (2026-09-19) and is in git history before that. This file is the record of what was done to each model, like
 import_melee_pack.py.
 
     blender --background --factory-startup --python blender/tools/import_guns_pack.py -- [id ...]

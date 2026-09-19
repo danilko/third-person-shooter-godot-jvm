@@ -5478,6 +5478,21 @@ rule (3-letter type code + series). DebugWorld parks all three behind `VehicleRo
   bumper, crash health, bullets loosen one door, a loose door swinging to 70° under a kinematic (puppet) move, the
   mask reproducing a car, hips on the cushion (0.079 m) and the eye under the roof, the enter/exit door with its
   collider and the car staying still, the burnt wreck. `--control` (damage off) fails exactly the 7 damage checks.
+- **The box prototype is retired as a car** (user decision). `Vehicle.tscn` is now only the shared BASE the cars
+  inherit (seats, cameras, weapons, nameplate, net wiring): its placeholder body mesh and debug camera cube are
+  deleted (41 KB -> 10 KB), `WheelPlaceholder.tscn` is deleted, and nothing spawns it. The placed `VehicleRoot` in
+  World / DebugWorld / WorldMaster is an SPC-1 on its own config; DebugHarness spawns SPC-1; the network fallback
+  (`VehicleModels.DEFAULT`) is SPC-1; every test stand and probe that used the prototype drives SPC-1.
+  `VehicleWheel.tscn`'s cylinder and `VehicleWreck.tscn`'s boxes stay: the motorcycle, boat and airplane use them.
+- **Traffic draws from a pool**: `VehicleSpawnConfig.vehicleScenePath` empty (the default) = `VehicleModels
+  .trafficScene(faction)` — police drive POC-1, everyone else SPC-1 / PIT-1 (60/40), chosen on the host; clients get
+  the model index. An explicit path still forces one model.
+- **The collision hull is a GAME body**: `build_vehicle.py` raises its floor to `HULL_FLOOR` (0.32 m) and pulls points
+  past the body's width (the side mirrors) in to it. The visual sill height (0.18 m on SPC-1) hit a 0.15 m kerb at
+  35 m/s and climbed it (`probe_road_launch`, 4.3 m/s); with the game hull 0 launches, worst rise 0.74 m/s.
+  `probe_road_launch`'s edge cases now mean "outer WHEELS on the kerb line" for any track (the -3 m was written for
+  the prototype's +-1.1 m wheels). Its flat-out cases leave the road in the same 3 places with SPC-1 as with the
+  prototype (governor off by design).
 - **Two pre-existing defects the real cars exposed, both fixed:**
   - A character seated before it ever LANDED (traffic spawns a driver and seats it the same frame, in the air)
     kept `OnFloorBlend` at "airborne" for good — seating switches its physics off, so `isOnFloor()` never changed —

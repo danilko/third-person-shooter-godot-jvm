@@ -11,6 +11,10 @@ gdj/
 # ...except the Road Kit natural-ground sidecar (B6b/B7): once a network is stamped into Terrain3D it is
 # the ONLY record of the ground under the roads, so it must travel with the stamped terrain (LFS).
 !assets/world_source/pieces/*.ground.bin
+# ...and the buffers of every COMMITTED glTF: a .gltf names its .bin by uri, so without it a fresh clone
+# cannot import the kit pieces (build_building_scenes.gd) or the road pieces (check_roadkit_build.py). LFS.
+!assets/world_source/kits/*/pieces/**/*.bin
+!src/main/resources/com/openworld/world/pieces/*.bin
 *.blend1
 __pycache__/
 

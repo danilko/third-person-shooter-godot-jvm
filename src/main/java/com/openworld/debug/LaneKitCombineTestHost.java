@@ -23,8 +23,8 @@ import java.util.Set;
  * {@link PathLaneRoute} carries the {@code zoneId} its sidecar entry was tagged with — the
  * property-based zone tag {@code lib/lane_kit.py:combine_pieces} stamps on every lane, consumed
  * by {@link ZoneManager#registerRoute}/the new zone-id-equality path in its (private)
- * {@code findRoute}. Unlike {@link PathLaneRouteTestHost} (one hand-built junction, driving
- * behavior), this test is about the COMBINER pipeline: many pieces, one sidecar, one zone. Run
+ * {@code findRoute}. Unlike a single hand-built junction driving test,
+ * this test is about the COMBINER pipeline: many pieces, one sidecar, one zone. Run
  * with:
  *
  *   godot --headless res://src/main/resources/com/openworld/debug/LaneKitCombineTest.tscn

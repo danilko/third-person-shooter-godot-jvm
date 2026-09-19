@@ -17,7 +17,7 @@ aim and hold SOLVED from their rows; pistol clips kept, PIS1's SupportPoint adop
 
 NOT idempotent where a gesture is relative: the shoulder shrug and the head gestures apply to the clip they start
 from, so a second rifle-style solve over a solved clip shrugs again. The launcher row (no shrug, head kept) is
-idempotent. Pre-A2.4 copies: assets/characters/godot_chan/merged_animation.pre-A24.blend / merged_animation_f.pre-A24.blend (local).
+idempotent. Pre-A2.4 copies: merged_animation.pre-A24.blend / merged_animation_f.pre-A24.blend, in git history before 2026-09-19.
 
 Why a script and not a hand edit. The rifle aim pose has to satisfy several GEOMETRIC facts at once --
 the bore on the body's forward line, the butt pad in the shoulder pocket, the right eye over the bore,

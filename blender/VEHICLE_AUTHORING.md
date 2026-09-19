@@ -56,6 +56,10 @@ in `tools/build_vehicle_scenes.py`.
   A material named `car` is the BODY COLOUR: the game repaints it per car from its id (GTA's carcols idea; every
   peer picks the same). A car that must keep its colours (the police car) has `paint: ""` in TUNING.
 
+* **The collision hull is derived, and it is a GAME body**: the convex hull of the body (no wheels, no windscreen)
+  with its floor raised to 0.32 m and nothing wider than the body (mirrors pulled in). Kerbs are the wheels'
+  business; a hull down at the real sill height climbs them at speed.
+
 ## The two source layouts
 
 * **An artist's authoring layout** (SPC1): the file is the artist's, with their own object names
