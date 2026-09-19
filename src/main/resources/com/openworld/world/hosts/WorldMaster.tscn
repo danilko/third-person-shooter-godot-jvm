@@ -2,7 +2,7 @@
 
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/master/World_master.tscn" id="master"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
-[ext_resource type="PackedScene" uid="uid://c7aoav51c2882" path="res://src/main/resources/com/openworld/vehicle/Vehicle.tscn" id="vehicle"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/vehicle/SPC1.tscn" id="car_spc1"]
 [ext_resource type="PackedScene" uid="uid://dvq2be1wcewoe" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
 
 [sub_resource type="ProceduralSkyMaterial" id="skymat"]
@@ -38,5 +38,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -689.0247, 14, 756)
 [node name="Player" parent="Characters" unique_id=1831409965 instance=ExtResource("player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -689.0247, 14, 756)
 
-[node name="VehicleRoot" parent="." unique_id=1342995585 instance=ExtResource("vehicle")]
+[node name="VehicleRoot" parent="." unique_id=1342995585 instance=ExtResource("car_spc1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -663.9771, 14, 759)

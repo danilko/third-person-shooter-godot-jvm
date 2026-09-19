@@ -46,6 +46,15 @@ public class VehicleProbeHelper extends Node {
         }
     }
 
+    /** One weapon hit on {@code body} at world point {@code at} through {@code ImpactManager.processHit} (probe_component_car.gd). */
+    @Register
+    public void weaponHitAt(Node impactManager, Node body, godot.core.Vector3 at, float damage) {
+        if (impactManager instanceof com.openworld.world.manager.ImpactManager im && body instanceof godot.api.Node3D b) {
+            im.processHit(new com.openworld.world.HitInfo(b, at, new godot.core.Vector3(0, 1, 0)),
+                    damage, "probe", null, "probe", "", null);
+        }
+    }
+
     /** Flatten tire {@code index} of {@code v} (the HUD damage diagram's probe). */
     @Register
     public void flattenTire(Node v, int index) {

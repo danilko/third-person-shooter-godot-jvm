@@ -56,6 +56,18 @@ public class VehicleConfig extends Resource {
      */
     @Export public int suspensionSamples = 1;
 
+    /**
+     * How a wheel finds the ground: 0 = RAYS ({@link #suspensionSamples} rays spread fore/aft along the tyre - the
+     * shipped sensor), 1 = SPHERE (one sphere of the wheel's radius swept down the suspension travel, so the TYRE
+     * meets a kerb edge before the axle is over it), 2 = CYLINDER (the same sweep with the tyre's real shape: radius
+     * x {@link #tyreWidth}, axle-aligned, so it cannot reach past the tyre's sidewall onto a wall beside the car).
+     * Measured in the wheel-sensor review (tools/godot/bench_wheel_sensor.gd, VEHICLE_AUTHORING.md).
+     */
+    @Export public int wheelSensor = 0;
+
+    /** Tyre width (m) for the CYLINDER wheel sensor. */
+    @Export public float tyreWidth = 0.22f;
+
     /** Fore/aft half-spread (m) of the multi-sample probes along the wheel's rolling axis. */
     @Export public float suspensionSampleSpread = 0.15f;
 
@@ -418,6 +430,12 @@ public class VehicleConfig extends Resource {
 
     /** Health fraction below which the engine smokes (grey plume). */
     @Export public float damageSmokeFraction = 0.66f;
+
+    /**
+     * Health the car loses per m/s of crash (change of velocity) above {@code VehicleDamageRules.MIN_IMPACT_DV}, in
+     * a vehicle with a {@code DamageModel}. 0 = crashes do not hurt the car (the prototype's behaviour).
+     */
+    @Export public float crashHealthPerDv = 0f;
 
     /** Health fraction below which the engine burns (fire + heavy smoke). */
     @Export public float damageFireFraction = 0.33f;

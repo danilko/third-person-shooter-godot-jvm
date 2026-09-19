@@ -53,7 +53,7 @@ public class DriveTestHost extends Node3D {
         addChild(ground);
 
         Resource res = ResourceLoader.INSTANCE.load(
-                "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn", "",
+                "res://src/main/resources/com/openworld/vehicle/SPC1.tscn", "",
                 ResourceLoader.CacheMode.REUSE);
         if (!(res instanceof PackedScene packed)
                 || !(packed.instantiate() instanceof Vehicle v)) {

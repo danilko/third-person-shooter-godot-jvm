@@ -143,6 +143,8 @@ public class AnimationController extends Node {
   private final Map<String, NodePath> blendPathCache = new HashMap<>();
 
 
+  private boolean seatedLanded = false;
+
   @Register
   @Override
   public void _physicsProcess(double delta) {
@@ -150,13 +152,28 @@ public class AnimationController extends Node {
     // Skip for any non-ACTIVE LOD tier (PASSIVE or FROZEN): the AnimationTree JVM-bridge writes
     // are the most expensive per-AI work, so mid-range and distant AIs hold their last pose at
     // zero bridge cost (PLAN.md Part D / D2). Player/non-AI bodies are always ACTIVE.
+    // Sitting down lands the body, at EVERY LOD tier: the LOD gate below skips all tree writes, so a traffic driver
+    // beyond 80 m that was seated in the air would otherwise keep the airborne blend until the player drove up.
+    // One write on the edge, never per frame.
+    boolean seatedNow = liveBody() instanceof Character sc && sc.currentVehicleNode != null;
+    if (seatedNow && !seatedLanded) {
+      onFloorBlend = onFloorBlendTarget = 1.0;
+      animationTree.set("parameters/OnFloorBlend/blend_amount", 1.0f);
+    }
+    seatedLanded = seatedNow;
+
     AICharacter ai = lodBody();
     if (ai != null && ai.getLodLevel() != AILodLevel.ACTIVE) return;
 
     // Landing edge: a jump/fall OneShot plays its FULL clip once fired, so after touchdown the
     // multi-second jump/falling pose keeps blending on top of locomotion — the "still airborne while
     // already running" lag. Fade those OneShots out the moment we regain the floor so walk/run shows.
-    boolean onFloor = player.isOnFloor();
+    // A SEATED body is on the floor. Seating switches its physics off, so isOnFloor() keeps whatever the last
+    // move_and_slide said - and a body seated before it ever landed (traffic spawns a driver and seats it on the
+    // same frame, in the air) kept OnFloorBlend at "airborne" for good: the falling pose sat on top of the seated
+    // one, and the driver sat bolt upright with the head through the roof. Measured: seated 1-5 frames after
+    // spawning, pelvis 0.76 m over the seat (the rest pose); seated after landing, 0.45 m.
+    boolean onFloor = player.isOnFloor() || seatedNow;
     if (onFloor && !wasOnFloor) {
       long fadeOut = AnimationNodeOneShot.OneShotRequest.FADE_OUT.getValue();
       animationTree.set("parameters/GroundJump/request", fadeOut);

@@ -929,6 +929,7 @@ public final class NetMessageCodec {
     // Entry: [vehicleId utf8][senderTimeMs i32][pos 3f][orientation quat 4f]
     //        [linVel 3f][angVel 3f][steerAngle f][throttle f]
     //        [flags u8: bit0 handbrake, bit1 brake, bit2 slipping, bits3-6 flatMask][health f][fireSeq u8]
+    //        [partMask i32: 2 bits per body part, VehicleDamageRules.SLOTS order - states only rise, peers MAX-merge]
     //
     // A parallel entry shape to the character snapshot rather than a kind-byte inside it:
     // vehicles need the FULL orientation (they roll and pitch — the character entry's one
@@ -953,8 +954,8 @@ public final class NetMessageCodec {
     private static final int VEHICLE_FLAG_FLAT_SHIFT = 3;
     private static final int VEHICLE_FLAG_FLAT_MASK  = 0xF;
 
-    /** Fixed bytes per vehicle entry beyond the vehicleId text: u32 string length + i32 time + 13 floats + flags u8 + health float + fireSeq u8 — see putVehicleSnapshotEntry. */
-    public static final int VEHICLE_SNAPSHOT_ENTRY_FIXED_BYTES = 4 + 4 + 13 * 4 + 1 + 4 + 1;
+    /** Fixed bytes per vehicle entry beyond the vehicleId text: u32 string length + i32 time + 13 floats + flags u8 + health float + fireSeq u8 + partMask i32 — see putVehicleSnapshotEntry. */
+    public static final int VEHICLE_SNAPSHOT_ENTRY_FIXED_BYTES = 4 + 4 + 13 * 4 + 1 + 4 + 1 + 4;
 
     public static PackedByteArray encodeVehicleSnapshot(int msgType, DecodedVehicleSnapshot entry) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
@@ -1003,6 +1004,7 @@ public final class NetMessageCodec {
                 | ((e.flatMask() & VEHICLE_FLAG_FLAT_MASK) << VEHICLE_FLAG_FLAT_SHIFT));
         buf.putFloat(e.health());
         buf.put8(e.fireSeq() & 0xFF);
+        buf.put32(e.partMask());
     }
 
     private static DecodedVehicleSnapshot getVehicleSnapshotEntry(StreamPeerBuffer buf) {
@@ -1020,18 +1022,19 @@ public final class NetMessageCodec {
         int flags = buf.getU8();
         float health = buf.getFloat();
         int fireSeq = buf.getU8();
+        int partMask = buf.get32();
         return new DecodedVehicleSnapshot(vehicleId, senderTimeMs, position,
                 new Quaternion(qx, qy, qz, qw), linearVelocity, angularVelocity, steerAngle, throttle,
                 (flags & VEHICLE_FLAG_HANDBRAKE) != 0, (flags & VEHICLE_FLAG_BRAKE) != 0,
                 (flags & VEHICLE_FLAG_SLIPPING) != 0,
-                (flags >> VEHICLE_FLAG_FLAT_SHIFT) & VEHICLE_FLAG_FLAT_MASK, health, fireSeq);
+                (flags >> VEHICLE_FLAG_FLAT_SHIFT) & VEHICLE_FLAG_FLAT_MASK, health, fireSeq, partMask);
     }
 
     /** Carrier for one vehicle's replicated state — see the wire-layout comment above. */
     public record DecodedVehicleSnapshot(String vehicleId, int senderTimeMs, Vector3 position,
             Quaternion orientation, Vector3 linearVelocity, Vector3 angularVelocity,
             float steerAngle, float throttle, boolean handbrake, boolean brake, boolean slipping,
-            int flatMask, float health, int fireSeq) { }
+            int flatMask, float health, int fireSeq, int partMask) { }
 
     // ── MSG_VEHICLE_SEAT_REQUEST / MSG_VEHICLE_OCCUPANCY (Round 11 N3) ────────
     //
@@ -1101,7 +1104,9 @@ public final class NetMessageCodec {
 
     // ── MSG_VEHICLE_SPAWN (host → all, reliable — streamed ambient traffic, I3b) ──
     //
-    // [tag u8][vehicleId utf8][faction utf8][position 3×float][yaw float][ownerPeerId i32][ephemeral u8]
+    // [tag u8][vehicleId utf8][faction utf8][position 3×float][yaw float][ownerPeerId i32][ephemeral u8][model u8]
+    //
+    // `model` indexes VehicleModels.SCENES (bounded, append-only): which vehicle scene to instance.
     //
     // The counterpart of MSG_SPAWN for replicated vehicles. ownerPeerId is the host (for ambient
     // traffic and idle scene cars), so a client resolves isAuthorityFor=false and attaches a
@@ -1113,11 +1118,11 @@ public final class NetMessageCodec {
     // so the ghost-reconcile may free it on a snapshot-timeout (missed despawn cleanup). Scene-placed
     // / player-driven vehicles re-supplied via the late-join baseline are ephemeral=false: they are
     // NEVER reconcile-eligible, so a momentary snapshot gap (e.g. traffic-volume pressure) can never
-    // despawn a persistent car out from under a non-driving peer. The scene is the single bounded
-    // Vehicle.tscn (no wire path, same anti-arbitrary-resource rationale as MSG_SPAWN's sceneSelector).
+    // despawn a persistent car out from under a non-driving peer. The scene comes from the bounded
+    // VehicleModels list by index (no wire path, same anti-arbitrary-resource rationale as MSG_SPAWN's sceneSelector).
 
     public static PackedByteArray encodeVehicleSpawn(int msgType, String vehicleId, String faction,
-            Vector3 position, float yaw, int ownerPeerId, boolean ephemeral) {
+            Vector3 position, float yaw, int ownerPeerId, boolean ephemeral, int model) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(vehicleId);
@@ -1126,6 +1131,7 @@ public final class NetMessageCodec {
         buf.putFloat(yaw);
         buf.put32(ownerPeerId);
         buf.put8(ephemeral ? 1 : 0);
+        buf.put8(model & 0xFF);
         return buf.getDataArray();
     }
 
@@ -1137,12 +1143,13 @@ public final class NetMessageCodec {
         float yaw = buf.getFloat();
         int ownerPeerId = buf.get32();
         boolean ephemeral = buf.get8() != 0;
-        return new DecodedVehicleSpawn(vehicleId, faction, position, yaw, ownerPeerId, ephemeral);
+        int model = buf.getU8();
+        return new DecodedVehicleSpawn(vehicleId, faction, position, yaw, ownerPeerId, ephemeral, model);
     }
 
     /** Carrier for a decoded MSG_VEHICLE_SPAWN — matches GameManager.spawnReplicatedVehicle's reconstruction shape. */
     public record DecodedVehicleSpawn(String vehicleId, String faction, Vector3 position,
-            float yaw, int ownerPeerId, boolean ephemeral) { }
+            float yaw, int ownerPeerId, boolean ephemeral, int model) { }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 

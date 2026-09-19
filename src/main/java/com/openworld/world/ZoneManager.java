@@ -1411,7 +1411,10 @@ public class ZoneManager extends Node {
 	private Vehicle spawnVehicle(VehicleSpawnConfig vc, Node container, Placement at, int index,
 								 LoadedZone lz) {
 		Lane route = at.lane();
-		Object loaded = GD.load(vc.vehicleScenePath);
+		String scenePath = (vc.vehicleScenePath == null || vc.vehicleScenePath.isEmpty())
+				? com.openworld.carrier.vehicle.VehicleModels.trafficScene(vc.faction, GD.randf())
+				: vc.vehicleScenePath;
+		Object loaded = GD.load(scenePath);
 		if (!(loaded instanceof PackedScene scene)) return null;
 		Node inst = scene.instantiate();
 		if (!(inst instanceof Vehicle v)) { if (inst != null) inst.queueFree(); return null; }

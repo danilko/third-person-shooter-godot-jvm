@@ -5,6 +5,7 @@ import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.*;
+import godot.core.Transform3D;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -48,6 +49,12 @@ public class VehicleWheel extends RayCast3D {
     // ── Runtime state ─────────────────────────────────────────────────────────
 
     private Vehicle   vehicle;
+    /**
+     * Name of this wheel's mesh in the vehicle's imported model ({@code wheel_lf}, …). Empty = the scene's own
+     * placeholder cylinder. See {@link #adoptModelMesh}.
+     */
+    @Export public String modelMesh = "";
+
     private Node3D    wheelMesh;
     private GPUParticles3D skidMark;
 
@@ -59,6 +66,10 @@ public class VehicleWheel extends RayCast3D {
     private float lastCompression = 0f;
 
     public float getLastCompression() { return lastCompression; }
+
+    /** How fast the spring is moving (m/s, compression per second) - near 0 once the suspension has settled. */
+    private float compressionRate = 0f;
+    public float compressionRate() { return compressionRate; }
 
     // ── Damageable tire (shoot the TireHit collider → flat) ──────────────────
     // Per-wheel state lives HERE, never on the shared VehicleConfig resource — effective
@@ -122,11 +133,37 @@ public class VehicleWheel extends RayCast3D {
      * wheel rides over edges/cracks smoothly. Empty when suspensionSamples <= 1.
      */
     private final java.util.ArrayList<RayCast3D> extraProbes = new java.util.ArrayList<>();
+    /** The SPHERE sensor ({@code cfg.wheelSensor == 1}), else null. */
+    private ShapeCast3D sphereProbe;
+    private SphereShape3D sphereShape;
+    private CylinderShape3D cylinderShape;
+    private float lastFallLead = 0f;
 
     /** Aggregated ground contact for the current frame, populated by {@link #sampleGround()}. */
     private boolean groundHit;
     private Vector3 groundPoint;
     private Vector3 groundNormal;
+
+    /**
+     * Moves the model's wheel under this wheel's {@code Wheel} node (the one that spins, steers, follows the
+     * suspension and squashes when flat) and retires the placeholder cylinder. The model wheel's origin is its
+     * centre, so it sits at the node's origin; its basis undoes the node's (the placeholder cylinder is turned
+     * 90 degrees onto the axle), so the modelled wheel keeps its own orientation. The tyre's hit sphere takes the
+     * modelled radius. Called by {@link Vehicle#_ready} once the config is known.
+     */
+    public void adoptModelMesh(Node3D mesh, float radius) {
+        Node3D holder = (Node3D) getNode("Wheel");
+        Node parent = mesh.getParent();
+        if (parent != null) parent.removeChild(mesh);
+        holder.addChild(mesh);
+        mesh.setTransform(new Transform3D(holder.getTransform().getBasis().orthonormalized().inverse(), Vector3.Companion.getZERO()));
+        if (holder instanceof MeshInstance3D mi) mi.setMesh(null);
+        if (holder.getNodeOrNull("TireHit/TireHitShape") instanceof CollisionShape3D cs) {
+            SphereShape3D sphere = new SphereShape3D();
+            sphere.setRadius(radius + 0.02f);
+            cs.setShape(sphere);
+        }
+    }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -149,7 +186,31 @@ public class VehicleWheel extends RayCast3D {
         targetPosition.setY(-(cfg.restDistance + cfg.wheelRadius + cfg.overExtend));
         setTargetPosition(targetPosition);
 
-        buildExtraProbes();
+        if (cfg.wheelSensor == 1 || cfg.wheelSensor == 2) buildSphereProbe(); else buildExtraProbes();
+    }
+
+    private void buildSphereProbe() {
+        sphereProbe = new ShapeCast3D();
+        sphereProbe.setName(new godot.core.StringName("SuspensionSphere"));
+        sphereProbe.setEnabled(false);                    // updated on demand, like the extra rays
+        if (cfg.wheelSensor == 2) {
+            // the tyre itself: a cylinder on the axle. CylinderShape3D's axis is local Y, so the probe is turned 90
+            // degrees about Z (local Y -> the axle, world -X) and sweeps along its local -X, which is world DOWN.
+            cylinderShape = new CylinderShape3D();
+            cylinderShape.setRadius(cfg.wheelRadius);
+            cylinderShape.setHeight(cfg.tyreWidth);
+            sphereProbe.setShape(cylinderShape);
+            sphereProbe.setRotation(new Vector3(0f, 0f, (float) (Math.PI / 2)));
+        } else {
+            sphereShape = new SphereShape3D();
+            sphereShape.setRadius(cfg.wheelRadius);
+            sphereProbe.setShape(sphereShape);
+        }
+        sphereProbe.setMargin(0f);
+        sphereProbe.setMaxResults(1);
+        sphereProbe.setCollisionMask(getCollisionMask());
+        if (vehicle != null) sphereProbe.addException(vehicle);
+        addChild(sphereProbe);
     }
 
     /**
@@ -173,7 +234,7 @@ public class VehicleWheel extends RayCast3D {
 
             RayCast3D probe = new RayCast3D();
             probe.setName(new godot.core.StringName("SuspensionProbe" + i));
-            probe.setEnabled(true);
+            probe.setEnabled(false);          // cast on demand by sampleGround(): enabled, Godot would ALSO cast it every step
             probe.setCollisionMask(getCollisionMask());
             probe.setCollideWithAreas(isCollideWithAreasEnabled());
             probe.setCollideWithBodies(isCollideWithBodiesEnabled());
@@ -194,6 +255,25 @@ public class VehicleWheel extends RayCast3D {
      */
     private void sampleGround() {
         Vector3 origin = getGlobalPosition();
+        if (sphereProbe != null) {
+            // The sphere's centre travels from the mount down the suspension window; where it stops, the contact
+            // the ray model would report lies one radius further down - so springLen, compression, the mesh
+            // placement and every force below read exactly as they do for a ray.
+            float len = effRest() + cfg.overExtend + lastFallLead;
+            if (sphereShape != null && Math.abs(sphereShape.getRadius() - effRadius()) > 1e-4f) sphereShape.setRadius(effRadius());
+            if (cylinderShape != null && Math.abs(cylinderShape.getRadius() - effRadius()) > 1e-4f) cylinderShape.setRadius(effRadius());
+            sphereProbe.setTargetPosition(cylinderShape != null ? new Vector3(-len, 0f, 0f) : new Vector3(0f, -len, 0f));
+            sphereProbe.forceShapecastUpdate();
+            groundHit = sphereProbe.isColliding();
+            if (!groundHit) { groundPoint = null; groundNormal = null; return; }
+            Vector3 up = getGlobalBasis().getY().normalized();
+            double travel = sphereProbe.getClosestCollisionSafeFraction() * len;
+            groundPoint = origin.minus(up.times(travel + effRadius()));
+            Vector3 n = sphereProbe.getCollisionNormal(0);
+            // a kerb's FACE is not a ground normal: pushing along it would shove the car sideways off the edge
+            groundNormal = n.dot(up) > 0.5 ? n.normalized() : up;
+            return;
+        }
         groundHit = isColliding();
         groundPoint = groundHit ? getCollisionPoint() : null;
         Vector3 normalSum = groundHit ? getCollisionNormal() : null;
@@ -230,6 +310,7 @@ public class VehicleWheel extends RayCast3D {
         // clip). Target is set before the forced update so the lead applies this tick.
         float fallSpeed = (float) Math.max(0.0, -vehicle.getLinearVelocity().getY());
         float fallLead  = fallSpeed * physDelta * 2f;
+        lastFallLead = fallLead;
         Vector3 targetPosition = getTargetPosition();
         targetPosition.setY(-(effRest() + effRadius() + cfg.overExtend + fallLead));
         setTargetPosition(targetPosition);
@@ -242,7 +323,7 @@ public class VehicleWheel extends RayCast3D {
 
         // Aggregate the centre ray + any extra contact-patch probes into one contact.
         sampleGround();
-        if (!groundHit) { lastCompression = 0f; return; }
+        if (!groundHit) { lastCompression = 0f; compressionRate = 0f; return; }
 
         double  springLen   = getGlobalPosition().distanceTo(groundPoint) - effRadius();
         // A hit past the normal suspension window is only reachable via the fall lead:
@@ -250,6 +331,7 @@ public class VehicleWheel extends RayCast3D {
         // DOWN); the damping term below still pre-brakes the fall, upward only.
         boolean leadZoneHit = springLen > effRest() + cfg.overExtend;
         double  compression = leadZoneHit ? 0.0 : effRest() - springLen;
+        if (physDelta > 0f) compressionRate = (float) ((compression - lastCompression) / physDelta);
         lastCompression = (float) compression;
 
         // Mesh never dangles past the normal window while the lead ray reaches further.

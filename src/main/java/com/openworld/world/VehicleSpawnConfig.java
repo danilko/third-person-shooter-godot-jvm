@@ -25,9 +25,11 @@ public class VehicleSpawnConfig extends Resource {
     /** Number of vehicles to spawn for this group when the zone loads. */
     @Export public int count = 2;
 
-    /** Vehicle scene each body is instanced from. */
-    @Export public String vehicleScenePath =
-            "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn";
+    /**
+     * Vehicle scene each body is instanced from. Empty (the default) = the traffic pool for {@link #faction}
+     * ({@code VehicleModels.trafficScene}): police drive the police car, everyone else a mix of the coupe and pickup.
+     */
+    @Export public String vehicleScenePath = "";
 
     /** Cruise throttle fraction (0–1) applied while driving the route. */
     @Export public float cruiseThrottle = 0.4f;

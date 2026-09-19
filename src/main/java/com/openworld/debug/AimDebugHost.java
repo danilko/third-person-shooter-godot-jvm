@@ -127,7 +127,7 @@ public class AimDebugHost extends Node3D {
     public String aiScenePath = "res://src/main/resources/com/openworld/character/AICharacter.tscn";
 
     @Export
-    public String vehicleScenePath = "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn";
+    public String vehicleScenePath = "res://src/main/resources/com/openworld/vehicle/SPC1.tscn";
 
     /** Spawn a car and a pool so the DriveCarrier and Swim stances can be reached at all. */
     @Export

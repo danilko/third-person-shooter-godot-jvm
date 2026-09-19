@@ -417,7 +417,7 @@ public class HandlingTestHost extends Node3D {
         player.setGlobalPosition(new Vector3(-2f, (float) baselineY + 0.5f, CAR_Z));
 
         Object res = ResourceLoader.INSTANCE.load(
-                "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn", "",
+                "res://src/main/resources/com/openworld/vehicle/SPC1.tscn", "",
                 ResourceLoader.CacheMode.REUSE);
         if (!(res instanceof PackedScene packed) || !(packed.instantiate() instanceof Vehicle v)) {
             GD.printErr("HandlingTestHost: cannot load Vehicle.tscn");

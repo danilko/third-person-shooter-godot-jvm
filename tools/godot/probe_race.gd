@@ -19,7 +19,7 @@ extends SceneTree
 
 const PLAYER  := "res://src/main/resources/com/openworld/character/Player.tscn"
 const AI      := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
-const VEHICLE := "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn"
+const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 const CP      := "res://src/main/java/com/openworld/world/RaceCheckpoint.java"
 const INFO    := "res://src/main/java/com/openworld/character/CharacterInfo.java"
 const MINFO   := "res://src/main/java/com/openworld/game/mission/MissionInfo.java"

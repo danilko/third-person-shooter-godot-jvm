@@ -20,7 +20,7 @@ extends SceneTree
 ## what produced it: every body contact (collider, point, normal, impulse) and every wheel ray's hit.
 
 const WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
-const VEHICLE := "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn"
+const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 const CTRL := "res://src/main/java/com/openworld/debug/LaneDriveProbeController.java"
 const TRACE_DV := 0.6            # a tick gaining this much upward velocity is printed with its contacts
 const RISE_DV := 3.0             # a LAUNCH: vertical velocity rising this much within WINDOW ticks

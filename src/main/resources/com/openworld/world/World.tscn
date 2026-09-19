@@ -6,15 +6,12 @@
 [ext_resource type="Shader" uid="uid://dw5oumf7uirea" path="res://assets/vfx/water/water_toon.gdshader" id="2_water"]
 [ext_resource type="Script" uid="uid://daa4dg13rxg3x" path="res://src/main/java/com/openworld/item/AmmoRefill.java" id="3_m0gj3"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
-[ext_resource type="Curve" uid="uid://cofnaffaigrhj" path="res://src/main/resources/com/openworld/vehicle/VehicleWheelFrontGrip.tres" id="7_71gat"]
-[ext_resource type="Script" uid="uid://c0hajbuqnt5nk" path="res://src/main/java/com/openworld/carrier/vehicle/VehicleConfig.java" id="8_58hcv"]
-[ext_resource type="PackedScene" uid="uid://cvhwreck1a1b" path="res://src/main/resources/com/openworld/vehicle/VehicleWreck.tscn" id="9_560of"]
 [ext_resource type="Terrain3DAssets" uid="uid://cw1uwlgqh32wj" path="res://assets/terrain3d/terrain_assets.tres" id="9_t3dassets"]
 [ext_resource type="PackedScene" uid="uid://bb60nshfmm7so" path="res://src/main/resources/com/openworld/weapon/PIS1.tscn" id="12_ej8ck"]
 [ext_resource type="PackedScene" uid="uid://chmmjlji5vapb" path="res://src/main/resources/com/openworld/weapon/ASR2.tscn" id="13_ijvcp"]
 [ext_resource type="PackedScene" uid="uid://bk5bkbssdlaa4" path="res://src/main/resources/com/openworld/weapon/FRG1.tscn" id="17_imhx0"]
 [ext_resource type="PackedScene" uid="uid://bf5k6xj310cia" path="res://src/main/resources/com/openworld/weapon/ATL1.tscn" id="18_eg1nj"]
-[ext_resource type="PackedScene" uid="uid://c7aoav51c2882" path="res://src/main/resources/com/openworld/vehicle/Vehicle.tscn" id="19_imhx0"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/vehicle/SPC1.tscn" id="car_spc1"]
 [ext_resource type="PackedScene" uid="uid://biahtc64fjcgq" path="res://src/main/resources/com/openworld/weapon/SHG1.tscn" id="19_scyio"]
 [ext_resource type="PackedScene" uid="uid://dmk1knife0001" path="res://src/main/resources/com/openworld/weapon/MEW1.tscn" id="20_xp5wa"]
 [ext_resource type="Script" uid="uid://b12y61fejde6e" path="res://src/main/java/com/openworld/debug/DebugHarness.java" id="21_dbgh"]
@@ -156,14 +153,6 @@ size = Vector3(2, 0.1, 2)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hbo2n"]
 size = Vector3(2, 0.1, 2)
-
-[sub_resource type="Resource" id="Resource_71gat"]
-script = ExtResource("8_58hcv")
-suspension_samples = 3
-max_speed = 120.0
-acceleration_curve = ExtResource("7_71gat")
-wreck_scene = ExtResource("9_560of")
-metadata/_custom_type_script = "uid://cuac11don07ow"
 
 [sub_resource type="ShaderMaterial" id="sky_ShaderMaterial_v8wrf"]
 shader = ExtResource("sky_4_v8wrf")
@@ -908,9 +897,8 @@ font_size = 60
 transform = Transform3D(-4.3711392e-08, 0, -1.0000001, 0, 1, 0, 1.0000001, 0, -4.3711392e-08, -20, 5.8, 1180)
 head_mesh_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/eyes"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_001"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_002"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_003"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/head"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/headphones")])
 
-[node name="VehicleRoot" parent="." unique_id=500123202 instance=ExtResource("19_imhx0")]
+[node name="VehicleRoot" parent="." unique_id=500123202 instance=ExtResource("car_spc1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 6.2, 1184)
-vehicle_config = SubResource("Resource_71gat")
 
 [node name="DebugHarness" type="Node" parent="." unique_id=210000001]
 script = ExtResource("21_dbgh")

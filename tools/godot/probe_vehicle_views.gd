@@ -18,7 +18,7 @@ extends SceneTree
 ## player actually sees, and the whole class of bug here was a flag that disagreed with it.
 
 const PLAYER  := "res://src/main/resources/com/openworld/character/Player.tscn"
-const VEHICLE := "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn"
+const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 
 var fails := 0
 

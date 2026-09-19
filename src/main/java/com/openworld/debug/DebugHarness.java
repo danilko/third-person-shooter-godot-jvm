@@ -94,8 +94,7 @@ public class DebugHarness extends Node {
             "res://src/main/resources/com/openworld/character/AICharacter.tscn";
     private static final String RIFLE_SCENE_PATH =
             "res://src/main/resources/com/openworld/weapon/ASR1.tscn";
-    private static final String VEHICLE_SCENE_PATH =
-            "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn";
+    private static final String VEHICLE_SCENE_PATH = com.openworld.carrier.vehicle.VehicleModels.DEFAULT_SCENE;
     private static final StringName CHARACTERS_GROUP = new StringName("characters");
 
     private static final int DEBUG_PORT = 7777;

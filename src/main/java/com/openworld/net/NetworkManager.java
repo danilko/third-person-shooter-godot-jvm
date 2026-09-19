@@ -605,7 +605,7 @@ public class NetworkManager extends Node {
             entries.add(new NetMessageCodec.DecodedVehicleSnapshot(v.getCharacterInfo().characterId,
                     nowMs(), v.getGlobalPosition(), v.getGlobalBasis().getRotationQuaternion(),
                     v.getLinearVelocity(), v.getAngularVelocity(), steerAngle, throttle,
-                    handbrake, brake, slipping, flatMask, health.getCurrentHealth(), fireSeq));
+                    handbrake, brake, slipping, flatMask, health.getCurrentHealth(), fireSeq, v.getPartMask()));
         }
         broadcastVehicleBatchChunked(entries);
     }
@@ -1065,7 +1065,8 @@ public class NetworkManager extends Node {
                 // of STREAMED_GROUP in spawnReplicatedVehicle — so a persistent car is never left
                 // reconcile-eligible just because its snapshot beat its baseline.
                 gm.spawnReplicatedVehicle(new NetMessageCodec.DecodedVehicleSpawn(
-                        snap.vehicleId(), "neutral", snap.position(), 0f, SERVER_PEER_ID, true));
+                        snap.vehicleId(), "neutral", snap.position(), 0f, SERVER_PEER_ID, true,
+                        com.openworld.carrier.vehicle.VehicleModels.DEFAULT));
                 vehicle = findControllableById(snap.vehicleId()) instanceof com.openworld.carrier.vehicle.Vehicle lazy
                         ? lazy : null;
             }
@@ -1076,7 +1077,9 @@ public class NetworkManager extends Node {
         if (vehicle.isQueuedForDeletion()) return;
         if (isAuthorityFor(vehicle.getCharacterInfo())) {
             // Our own echo in the host batch: locomotion is ours; health is host-authoritative,
-            // so a driving CLIENT adopts it (mirrors applyOwnBodyDiscreteState).
+            // so a driving CLIENT adopts it (mirrors applyOwnBodyDiscreteState). Body parts merge both ways:
+            // the host may have shot a door loose that this peer's crashes never touched.
+            vehicle.applyReplicatedPartMask(snap.partMask());
             if (!isServer()) {
                 Health health = findHealth(vehicle);
                 if (health != null) health.applyReplicatedHealth(snap.health());
@@ -1095,7 +1098,7 @@ public class NetworkManager extends Node {
                 snap = new NetMessageCodec.DecodedVehicleSnapshot(snap.vehicleId(), snap.senderTimeMs(), pos,
                         snap.orientation(), snap.linearVelocity(), snap.angularVelocity(), snap.steerAngle(),
                         snap.throttle(), snap.handbrake(), snap.brake(), snap.slipping(),
-                        snap.flatMask(), snap.health(), snap.fireSeq());
+                        snap.flatMask(), snap.health(), snap.fireSeq(), snap.partMask());
             }
         }
         // Lazy puppet attach: scene-placed vehicles on a client have no join hook, so the
@@ -1143,7 +1146,7 @@ public class NetworkManager extends Node {
                         vehicle.getLinearVelocity(), vehicle.getAngularVelocity(),
                         vehicle.getCurrentSteerAngle(), vehicle.getCurrentThrottle(),
                         vehicle.isHandbraking(), vehicle.isBraking(), vehicle.isSlipping(),
-                        vehicle.getFlatMask(), healthValue, fireSeq)));
+                        vehicle.getFlatMask(), healthValue, fireSeq, vehicle.getPartMask())));
     }
 
     /** Client → host: ask the host to (un)seat a character (host-arbitrated enter/exit). No-op on host/single-player — they arbitrate directly. */
@@ -2717,7 +2720,7 @@ public class NetworkManager extends Node {
         boolean ephemeral = vehicle.isInGroup(STREAMED_VEHICLE_GROUP);
         return NetMessageCodec.encodeVehicleSpawn(MSG_VEHICLE_SPAWN, info.characterId, info.faction,
                 vehicle.getGlobalPosition(), (float) vehicle.getGlobalRotation().getY(), info.ownerPeerId,
-                ephemeral);
+                ephemeral, com.openworld.carrier.vehicle.VehicleModels.indexOf(vehicle.getSceneFilePath()));
     }
 
     private PackedByteArray encodeSpawnFor(Character character) {
