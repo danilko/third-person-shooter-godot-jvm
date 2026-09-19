@@ -57,6 +57,8 @@ public class RocketProjectile extends RigidBody3D implements Detonatable, Cosmet
 
     /** The attacker's character id — what a host detonation names, and what a cosmetic copy is filed under. */
     public String attackerId = "";
+    /** The weapon id that fired it: the ledger's kind (ProjectileLedger). */
+    public String kind = "";
 
     /** How long a cosmetic copy that detonated first waits for the host's point (PLAN.md N4). */
     private static final float HOST_WAIT_SECONDS = 0.5f;
@@ -148,7 +150,7 @@ public class RocketProjectile extends RigidBody3D implements Detonatable, Cosmet
     private void broadcastDetonation(Vector3 point) {
         Node netNode = getNodeOrNull("/root/NetworkManager");
         if (netNode instanceof com.openworld.net.NetworkManager net && net.isNetworked() && net.isServer()) {
-            net.broadcastDetonation(attackerId, point);
+            net.broadcastDetonation(attackerId, kind, GrenadeEffect.FRAG.ordinal(), point);
         }
     }
 

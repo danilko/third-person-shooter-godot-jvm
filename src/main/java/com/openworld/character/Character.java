@@ -763,6 +763,9 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
             dropWeapon.emit();
         }
 
+        // ── Remote-charge detonator (REC1) ────────────────────────────────
+        if (input.detonate) pressDetonator();
+
         // ── Jump (single ground jump only) ─────────────────────────────────
         // First stand up if crouched/crawling, otherwise launch a ground jump.
         // No jumping while swimming.
@@ -1524,6 +1527,29 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      */
     /** Public ownership check — for world volumes (e.g. {@code InteriorVolume}) that affect only the local player's experience. */
     public boolean isLocalOwnedPlayer() { return isLocallyOwnedPlayer(); }
+
+    /**
+     * Set off every remote charge this character has out (REC1). The host owns the real charges, so a client asks
+     * it (MSG_DETONATE_REQUEST); the host and single player set them off directly. Each charge's detonation reaches
+     * every peer as MSG_DETONATION.
+     */
+    @Register
+    public void pressDetonator() {
+        if (characterInfo == null || characterInfo.characterId == null || characterInfo.characterId.isEmpty()) return;
+        String id = characterInfo.characterId;
+        if (getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager net
+                && net.isNetworked() && !net.isServer()) {
+            net.sendDetonateRequest(id);
+        } else {
+            com.openworld.weapon.RemoteCharges.detonateAll(id);
+        }
+    }
+
+    /** How many remote charges this character has armed on this peer (probe readout). */
+    @Register
+    public int armedChargesNow() {
+        return characterInfo == null ? 0 : com.openworld.weapon.RemoteCharges.armedCount(characterInfo.characterId);
+    }
 
     public boolean isLocallyOwnedPlayer() {
         if (!(this instanceof Player)) return false;

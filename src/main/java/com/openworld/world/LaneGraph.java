@@ -38,6 +38,12 @@ public final class LaneGraph {
 
     private static LaneGraph instance;
 
+    /** Drop the cached graph: the set of lanes changed (a road piece streamed in or out -- `ZoneManager` registers and
+     *  unregisters every lane). A graph built once per SCENE held freed lanes as successors after their piece unloaded
+     *  and never saw a piece that streamed in later (measured on the coast road drive, PLAN.md 3.15: 1086 calls into a
+     *  freed lane). Rebuilt lazily on the next query. */
+    public static void invalidate() { instance = null; }
+
     private long sceneId = 0;
     private final Map<Lane, Integer> startJunction = new HashMap<>();
     private final Map<Lane, Integer> endJunction   = new HashMap<>();
@@ -101,7 +107,7 @@ public final class LaneGraph {
      *  subclasses), so the scene-tree walk needs a concrete Node to start from — every real
      *  {@code Lane} implementor is one, so this cast always succeeds in practice. */
     private static LaneGraph forScene(Lane anyLane) {
-        if (!(anyLane instanceof Node anyNode) || anyNode.getTree() == null) return null;
+        if (!(anyLane instanceof Node anyNode) || !GD.isInstanceValid(anyNode) || anyNode.getTree() == null) return null;
         Node scene = anyNode.getTree().getCurrentScene();
         if (scene == null) return null;
         long id = scene.getInstanceId();
@@ -116,7 +122,15 @@ public final class LaneGraph {
     private void build(Node scene) {
         startJunction.clear(); endJunction.clear(); outgoing.clear();
         List<Lane> lanes = new ArrayList<>();
-        collect(scene, lanes);
+        // the registry when there is one (a registry read, never a scene walk: a tree walk per streamed piece is the
+        // "periodic hitch" CLAUDE.md records); the walk only for a scene with no ZoneManager (test stands)
+        ZoneManager zm = ZoneManager.get();
+        if (zm != null) {
+            for (Lane l : zm.registeredLanes())
+                if (!(l instanceof Node n) || GD.isInstanceValid(n)) lanes.add(l);
+        } else {
+            collect(scene, lanes);
+        }
         List<Vector3> junctions = new ArrayList<>();   // representative position per junction id
         for (Lane lane : lanes) {
             Vector3 sp = lane.startPoint(), ep = lane.endPoint();

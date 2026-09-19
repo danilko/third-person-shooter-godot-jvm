@@ -343,15 +343,19 @@ public final class NetMessageCodec {
 
     // ── MSG_DETONATION (host → all, reliable channel 0) ───────────────────────
     //
-    // [tag u8][attackerCharacterId utf8][point 3×float]
+    // [tag u8][attackerCharacterId utf8][kind utf8][effect u8][point 3×float]
     //
     // PLAN.md N4: where the host's projectile exploded. Every peer's cosmetic copy of that attacker's oldest
-    // live projectile explodes THERE, so the blast players see is the blast that dealt the damage.
+    // live projectile OF THAT KIND (the weapon id) explodes THERE, so the blast players see is the blast that dealt
+    // the damage. effect = weapon.GrenadeEffect's ordinal (0 frag/rocket, 1 flash, 2 smoke, 3 remote): what a peer
+    // with no copy draws, and what a flash or smoke does on that peer.
 
-    public static PackedByteArray encodeDetonation(int msgType, String attackerCharacterId, Vector3 point) {
+    public static PackedByteArray encodeDetonation(int msgType, String attackerCharacterId, String kind, int effect, Vector3 point) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         buf.putUtf8String(attackerCharacterId);
+        buf.putUtf8String(kind == null ? "" : kind);
+        buf.put8(effect);
         putVector3(buf, point);
         return buf.getDataArray();
     }
@@ -359,11 +363,31 @@ public final class NetMessageCodec {
     /** Decodes the body following the tag byte. Caller must have already consumed it. */
     public static DecodedDetonation decodeDetonation(StreamPeerBuffer buf) {
         String attackerCharacterId = buf.getUtf8String();
+        String kind = buf.getUtf8String();
+        int effect = buf.getU8();
         Vector3 point = getVector3(buf);
-        return new DecodedDetonation(attackerCharacterId, point);
+        return new DecodedDetonation(attackerCharacterId, kind, effect, point);
     }
 
-    public record DecodedDetonation(String attackerCharacterId, Vector3 point) { }
+    public record DecodedDetonation(String attackerCharacterId, String kind, int effect, Vector3 point) { }
+
+    // ── MSG_DETONATE_REQUEST (client → host, reliable channel 1) ─────────────
+    //
+    // [tag u8][attackerCharacterId utf8]
+    //
+    // The owner pressed its detonator: the host sets off every remote charge that character has out
+    // (weapon.RemoteCharges), and each one's MSG_DETONATION reaches every peer the ordinary way.
+
+    public static PackedByteArray encodeDetonateRequest(int msgType, String attackerCharacterId) {
+        StreamPeerBuffer buf = new StreamPeerBuffer();
+        buf.put8(msgType);
+        buf.putUtf8String(attackerCharacterId);
+        return buf.getDataArray();
+    }
+
+    public static String decodeDetonateRequest(StreamPeerBuffer buf) {
+        return buf.getUtf8String();
+    }
 
     // ── MSG_DAMAGE_BROADCAST ──────────────────────────────────────────────────
     //

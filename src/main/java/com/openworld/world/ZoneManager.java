@@ -263,14 +263,19 @@ public class ZoneManager extends Node {
 
 	private final TreeMap<String, Lane> routes = new TreeMap<>();
 
+	/** Every registered lane (live view). `LaneGraph` builds from this instead of walking the scene tree. */
+	public java.util.Collection<Lane> registeredLanes() { return routes.values(); }
+
 	public void registerRoute(Lane route) {
 		if (route instanceof Node3D n) routes.put(n.getName().toString(), route);
+		LaneGraph.invalidate();
 	}
 
 	public void unregisterRoute(Lane route) {
 		if (!(route instanceof Node3D n)) return;
 		String name = n.getName().toString();
 		if (routes.get(name) == route) routes.remove(name);
+		LaneGraph.invalidate();
 	}
 
 	/** One-line streaming/traffic summary for the perf HUD ({@code PerfDebugOverlay}) — the

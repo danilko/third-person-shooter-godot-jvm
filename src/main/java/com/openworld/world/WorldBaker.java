@@ -149,6 +149,8 @@ public class WorldBaker extends Node {
         Set<Node> instanceRoots = new HashSet<>();
         int[] counts = convert(root, kitDir, instanceRoots);
         stripEagerLodLow(root);
+        int carWalls = applyCarWalls(root);
+        if (carWalls > 0) GD.print("WorldBaker: " + carWalls + " car wall(s) on the vehicle-only layer");
         int swapped = applyMaterialLibrary(root, MATERIAL_LIBRARY_DIR);
         if (swapped > 0) GD.print("WorldBaker: " + swapped + " surfaces took a material from " + MATERIAL_LIBRARY_DIR);
 
@@ -186,6 +188,20 @@ public class WorldBaker extends Node {
      * bakes (they never contain a {@code ZoneMarker}; those only come from the master's
      * {@code zone_}/{@code region_} markers).
      */
+    /** A Road Kit `-carwall` collision proxy (`point_mesh`: a 3 m wall on a barrier's line) goes on the vehicle-only
+     *  layer (`CollisionLayers.CAR_WALL`) and collides with nothing itself: only vehicle bodies, whose mask includes it,
+     *  meet it. Returns how many bodies were set. */
+    private static int applyCarWalls(Node node) {
+        int n = 0;
+        if (node instanceof godot.api.StaticBody3D sb && node.getName().toString().contains("-carwall")) {
+            sb.setCollisionLayer(com.openworld.util.CollisionLayers.CAR_WALL);
+            sb.setCollisionMask(0L);
+            n++;
+        }
+        for (Node child : node.getChildren()) n += applyCarWalls(child);
+        return n;
+    }
+
     private static void stripEagerLodLow(Node node) {
         if (node instanceof ZoneMarker marker) {
             marker.removeLodLow();

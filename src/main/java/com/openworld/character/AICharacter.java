@@ -341,6 +341,7 @@ public class AICharacter extends Character {
     @Register
     @Override
     public void _physicsProcess(double delta) {
+        if (blindTimer > 0.0) blindTimer = Math.max(0.0, blindTimer - delta);
         lodTimer -= delta;
         if (lodTimer <= 0.0) {
             lodTimer = 2.0;
@@ -606,6 +607,7 @@ public class AICharacter extends Character {
      */
     public boolean hasLineOfSight(double delta) {
         if (currentTarget == null || aimRay == null) return false;
+        if (isBlinded()) { cachedLoS = false; return false; }   // a flashbang: it sees nothing
 
         Node currentVehicle = currentTarget.currentVehicleNode;
         if (currentVehicle != cachedTargetVehicle) {
@@ -620,6 +622,7 @@ public class AICharacter extends Character {
 
         if (currentVehicle instanceof Node3D vehicleNode) {
             Vector3 cabin = vehicleNode.getGlobalPosition().plus(new Vector3(0f, 0.5f, 0f));
+            if (com.openworld.world.SmokeCloud.blocksSight(aimRay.getGlobalPosition(), cabin)) { cachedLoS = false; return false; }
             aimRay.setTargetPosition(aimRay.toLocal(cabin));
             aimRay.forceRaycastUpdate();
             cachedLoS = !aimRay.isColliding()
@@ -633,6 +636,8 @@ public class AICharacter extends Character {
         cachedVisibleBone = null;
         for (Node3D bone : cachedBoneNodes) {
             if (bone == null) continue;
+            // A smoke cloud (SMO1) hides a bone the way a wall does: the ray would sail through particles.
+            if (com.openworld.world.SmokeCloud.blocksSight(aimRay.getGlobalPosition(), bone.getGlobalPosition())) continue;
             aimRay.setTargetPosition(aimRay.toLocal(bone.getGlobalPosition()));
             aimRay.forceRaycastUpdate();
             if (aimRay.isColliding()
@@ -646,6 +651,24 @@ public class AICharacter extends Character {
         cachedLoS = false;
         return false;
     }
+
+    // ── Flashbang blindness (FLA1) ───────────────────────────────────────────
+
+    /** Seconds of blindness left; set by world.FlashBang on the peer that simulates this AI. */
+    private double blindTimer = 0.0;
+
+    /** Blind this AI for at least {@code seconds}: it cannot see a target (hasLineOfSight is false) until then. */
+    public void blind(double seconds) {
+        blindTimer = Math.max(blindTimer, seconds);
+        cachedLoS = false;
+        losCacheTimer = 0;
+    }
+
+    public boolean isBlinded() { return blindTimer > 0.0; }
+
+    /** Probe readout. */
+    @Register
+    public double blindNow() { return blindTimer; }
 
     // ── Aim hardware ──────────────────────────────────────────────────────────
 

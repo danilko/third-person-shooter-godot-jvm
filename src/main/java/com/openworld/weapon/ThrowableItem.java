@@ -59,6 +59,10 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     /** Physics scene to instantiate on each throw (e.g. FRG1Projectile.tscn). */
     @Export public PackedScene projectileScene;
 
+    /** Does a bullet set the world pickup off? False for a flashbang or smoke grenade: they carry no blast. */
+    @Export public boolean detonatesWhenShot = true;
+    public boolean getDetonatesWhenShot() { return detonatesWhenShot; }
+    public void setDetonatesWhenShot(boolean v) { detonatesWhenShot = v; }
     /** Explosion radius when the world pickup is shot (metres). */
     @Export public float explosionRadius    = 5f;
     /** Max damage at the epicentre when the world pickup is shot. */
@@ -250,7 +254,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
      */
     @Override
     public void detonate() {
-        if (equipped || !isInsideTree()) return;
+        if (equipped || !isInsideTree() || !detonatesWhenShot) return;
         Node m = getTree().getFirstNodeInGroup("explosion_manager");
         if (m instanceof ExplosionManager mgr) {
             float scale = Math.min(Math.max(magazine, 1), 4);
@@ -292,9 +296,10 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
 
         // Inject attacker identity before the node enters the tree.
         // Explosion parameters are scene-configured inside the projectile scene itself.
-        if (projectile instanceof FRG1Projectile gp) {
+        if (projectile instanceof GrenadeProjectile gp) {
             gp.cosmetic = cosmetic;
             gp.attackerId = attackerId();
+            gp.kind = weaponId;
             if (!cosmetic) {
                 gp.attackerName      = resolveAttackerName();
                 gp.attackerFaction   = resolveAttackerFaction();
@@ -304,10 +309,10 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         }
 
         getTree().getCurrentScene().addChild(projectile);
-        if (cosmetic) ProjectileLedger.register(attackerId(), projectile);
+        if (cosmetic) ProjectileLedger.register(attackerId(), weaponId, projectile);
 
         if (projectile instanceof Node3D n3d) n3d.setGlobalPosition(spawnPos);
-        if (projectile instanceof FRG1Projectile gp) {
+        if (projectile instanceof GrenadeProjectile gp) {
             gp.launchVelocity = velocity;
             // Never collide with the thrower: it spawns at the chest.
             if (owningCharacter instanceof Character oc) gp.ignoreRid = oc.getRid();
@@ -359,6 +364,7 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
     private MeshInstance3D previewLine;
     private ImmediateMesh previewMesh;
     private double previewFuse = -1.0;
+    private boolean previewSticks = false;
     /** Where the last drawn arc ends, and whether that is a landing (true) or an air burst. For probes. */
     private Vector3 previewEnd = null;
     private boolean previewLands = false;
@@ -398,13 +404,14 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
         // the disc marks where it goes off, which is where the damage is.
         GrenadeFlight f = new GrenadeFlight(in[0], throwVelocity(in[1].normalized()), exclude);
         PhysicsDirectSpaceState3D space = getWorld3d().getDirectSpaceState();
-        double g = FRG1Projectile.gravity();
+        double g = GrenadeProjectile.gravity();
         java.util.ArrayList<Vector3> pts = new java.util.ArrayList<>();
         pts.add(f.position);
         double fuse = fuseSeconds();
         for (double t = 0.0; t < fuse && !f.resting; t += PREVIEW_STEP) {
             f.step(space, PREVIEW_STEP, g);
             pts.add(f.position);
+            if (previewSticks && f.contacts > 0) break;       // a remote charge stops where it first touches
         }
         Vector3 p = f.position;
         boolean landed = f.contacts > 0;
@@ -465,7 +472,10 @@ public class ThrowableItem extends WeaponItem implements Detonatable {
             previewFuse = 3.0;
             if (projectileScene != null) {
                 Node n = projectileScene.instantiate();
-                if (n instanceof FRG1Projectile gp) previewFuse = gp.fuseTime;
+                if (n instanceof GrenadeProjectile gp) {
+                    previewSticks = gp.kindOfEffect() == GrenadeEffect.REMOTE;
+                    previewFuse = previewSticks ? 10.0 : gp.fuseTime;
+                }
                 n.free();
             }
         }

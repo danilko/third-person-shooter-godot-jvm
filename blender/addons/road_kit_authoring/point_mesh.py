@@ -58,6 +58,9 @@ ASSET_Z_ATTR = {"kerb": "", "footway": "rka_walk_zl", "barrier": "rka_wall_foot"
 SUFFIX_COL = "-colonly"
 NO_PED_SUFFIX = "-noped"
 COL_ROAD, COL_WALK = "road", "walk"
+#: A vehicle-only wall along a barrier (`_edge_run`); `WorldBaker.applyCarWalls` puts it on `CollisionLayers.CAR_WALL`.
+COL_CARWALL = "carwall"
+CAR_WALL_HEIGHT = 3.0
 #: A collision proxy's triangles are filed under this material key: a proxy has no look.
 NO_MATERIAL = ""
 
@@ -399,20 +402,48 @@ def place_pier(pier, top, height, fwd, zb=None, ground=None):
     return out
 
 
-def pillars(pts, values, lats, pier=None, ground=None):
+#: A column never stands on another road (PLAN.md 3.13): it keeps this far outside that road's paved edge, wherever that
+#: road runs more than `PIER_ROAD_DZ` below the deck. Decided per COLUMN by the build, which knows every paved band --
+#: switching columns off per station span (`island_roadgen.clear_piers`, retired) could only skip a whole span, and a
+#: taper span cannot be split, so C1 flew 120 m and a loop ramp 250 m over the city with no column at all.
+PIER_ROAD_CLEAR = 3.0
+PIER_ROAD_DZ = 4.0
+
+
+def pier_on_road(bands, own, top, fwd, half):
+    """Would a column at `top` (the soffit), `half` wide across `fwd`, stand on or beside another road's paved band
+    that runs more than `PIER_ROAD_DZ` below it? `own` names the bands that do not count (this road's)."""
+    rx, ry = fwd[1], -fwd[0]
+    reach = half + PIER_ROAD_CLEAR
+    n = max(1, int(math.ceil(2.0 * half / 2.0)))
+    probes = [(top[0] + rx * (-half + 2.0 * half * k / n), top[1] + ry * (-half + 2.0 * half * k / n)) for k in range(n + 1)]
+    for b in bands:
+        if b.owner in own or not b.bbox_hit(top[0], top[1], reach):
+            continue
+        for x, y in probes:
+            if ped._signed_depth(b.poly, x, y) > -PIER_ROAD_CLEAR and b.surface_z(x, y) < top[2] - PIER_ROAD_DZ:
+                return True
+    return False
+
+
+def pillars(pts, values, lats, pier=None, ground=None, blocked=None):
     """`GN_PointPillars`: a column at every pier placement -- the road's PIER ASSET when it names one, else a
-    `rka_pillar_w` box. `({material or None: [tri]}, worst overhang)`: the box is filed under None (the caller's deck
-    material), and `worst overhang` is how far the asset reaches past the deck edge (metres, 0 when it does not)."""
-    out, over = {}, 0.0
+    `rka_pillar_w` box. `({material or None: [tri]}, worst overhang, columns dropped)`: the box is filed under None (the
+    caller's deck material), and `worst overhang` is how far the asset reaches past the deck edge (metres, 0 when it
+    does not). `blocked(top, fwd, half)` -> True drops a column (one that would stand on another road)."""
+    out, over, dropped = {}, 0.0, 0
     zb, half = pier_extent(pier) if pier is not None else (0.0, 0.0)
     for top, h, w, fwd, deck_half in pier_placements(pts, values, lats):
+        if blocked is not None and blocked(top, fwd, half if pier is not None else w / 2.0):
+            dropped += 1
+            continue
         if pier is None:
             out.setdefault(None, []).extend(_box(top, w, h))
             continue
         for mat, ts in place_pier(pier, top, h, fwd, zb, ground).items():
             out.setdefault(mat, []).extend(ts)
         over = max(over, half - deck_half)
-    return out, over
+    return out, over, dropped
 
 
 def _add(objs, name, mat, tris):
@@ -535,7 +566,11 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 _add(objs, name + "__shed", SHED_LAMP_MATERIAL, sh["lamps"])
                 _add(objs, collision_name(name + "_shed", COL_ROAD, False), NO_MATERIAL, sh["concrete"])
             if any(float(v.get("rka_pillar_param", 0.0)) > 0.0 for v in values):
-                cols, over = pillars(pts, values, lats, style.pier(), ground)
+                own = {road_name}
+                cols, over, dropped = pillars(pts, values, lats, style.pier(), ground,
+                                              blocked=lambda top, fwd, half: pier_on_road(bands, own, top, fwd, half))
+                if dropped and report is not None:
+                    report.setdefault("pier_on_road", []).append((name, dropped))
                 for mat, tris in cols.items():
                     _add(objs, surf, style.material("deck") if mat is None else mat, tris)
                 if over > 0.0 and report is not None:
@@ -596,6 +631,14 @@ def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None):
     pts = [tuple(p) for p in pts]
     for layer, kind, slot, oa, z, za, wa, ta in EDGE:
         _layer(objs, name, style, slot, kind, oa, z, za, wa, ta, pts, values, flip=(sgn < 0.0))
+    # The CAR WALL: where a barrier stands, a collision-only wall on its line, `CAR_WALL_HEIGHT` tall from its foot, that
+    # only vehicle bodies collide with (`CollisionLayers.CAR_WALL`, set by the bake from the `-carwall` name). A car
+    # pressed into a 1.15 m parapet at speed caught the wall's top edge with its hull and was thrown up it (measured on
+    # the diamond's exit ramp, `probe_road_launch.gd`: a 7.7 m/s rise at 20 m/s, 2 m left of the lane).
+    cw = [{"rka_cw_c": v["rka_wall_c"], "rka_cw_hw": v["rka_wall_hw"], "rka_cw_z": v["rka_wall_foot"] + CAR_WALL_HEIGHT,
+           "rka_cw_t": CAR_WALL_HEIGHT if v["rka_wall_h"] > 0.0 else 0.0} for v in values]
+    _add(objs, collision_name(name + "_carwall", COL_CARWALL, False), NO_MATERIAL,
+         sweep(pts, cw, "deck", "rka_cw_c", 0.0, "rka_cw_z", "rka_cw_hw", "rka_cw_t"))
 
 
 def self_test():
@@ -659,9 +702,36 @@ def self_test():
     flip = sheds(pts, [dict(v, rka_shed=2.0 if v["rka_shed"] else 0.0) for v in vals],
                  [_lateral(t) for t in poly_tangents(pts)])
     assert max(p[1] for t in flip["concrete"] for p in t) == -min(ys)
+    # A column never stands on another road below: a street 10 m under the deck, 12 m wide along y, at x 100.
+    street = ped.Band("street", [(94.0, -200.0), (106.0, -200.0), (106.0, 200.0), (94.0, 200.0)],
+                      [(100.0, -200.0, 0.0), (100.0, 200.0, 0.0)])
+    level = ped.Band("level", [(94.0, -200.0), (106.0, -200.0), (106.0, 200.0), (94.0, 200.0)],
+                     [(100.0, -200.0, 8.0), (100.0, 200.0, 8.0)])
+    fwd = (1.0, 0.0, 0.0)
+    assert pier_on_road([street], {"deck"}, (100.0, 0.0, 10.0), fwd, 0.7)          # on it
+    assert pier_on_road([street], {"deck"}, (108.0, 0.0, 10.0), fwd, 0.7)          # 1.3 m past its edge
+    assert not pier_on_road([street], {"deck"}, (120.0, 0.0, 10.0), fwd, 0.7)      # 14 m clear
+    assert not pier_on_road([level], {"deck"}, (100.0, 0.0, 10.0), fwd, 0.7)       # 2 m below: not a road UNDER it
+    assert not pier_on_road([street], {"street"}, (100.0, 0.0, 10.0), fwd, 0.7)    # its own band
+    # a portal pier 16 m across, centred 12 m off the street, still reaches over it
+    assert pier_on_road([street], {"deck"}, (100.0, 12.0, 10.0), (0.0, 1.0, 0.0), 8.0)
+    # A barrier edge run carries a car wall on the same line, CAR_WALL_HEIGHT tall from the barrier's foot; none without.
+    objs = {}
+    run = [(0.0, 0.0, 5.0), (10.0, 0.0, 5.0), (20.0, 0.0, 5.0)]
+    _edge_run(objs, "E", run, [0.0] * 3, [0.15] * 3, [1.0] * 3, 1.0)
+    cw = objs.get(collision_name("E_carwall", COL_CARWALL, False), {}).get(NO_MATERIAL, [])
+    zs = [p[2] for t in cw for p in t]
+    ys = [p[1] for t in cw for p in t]
+    assert cw and abs(min(zs) - 5.15) < 1e-6 and abs(max(zs) - (5.15 + CAR_WALL_HEIGHT)) < 1e-6, (min(zs), max(zs))
+    assert abs(min(ys) - 0.0) < 1e-6 and abs(max(ys) - ps.BARRIER_THICKNESS) < 1e-6, (min(ys), max(ys))
+    objs = {}
+    _edge_run(objs, "F", run, [0.0] * 3, [0.15] * 3, [0.0] * 3, 1.0)
+    assert not objs.get(collision_name("F_carwall", COL_CARWALL, False), {}).get(NO_MATERIAL), "no barrier, no car wall"
+    print("OK: a barrier carries a %.0f m vehicle-only car wall on its line; no barrier, none" % CAR_WALL_HEIGHT)
+    print("OK: a column never stands on or within %.0f m of a road more than %.0f m below" % (PIER_ROAD_CLEAR, PIER_ROAD_DZ))
     print("OK: a rock shed: soffit %.1f m over the road, columns on the open side, wall + roof to the rock on the other"
           % ps.SHED_CLEAR)
-    return 4
+    return 6
 
 
 if __name__ == "__main__":

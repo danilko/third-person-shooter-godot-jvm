@@ -236,6 +236,7 @@ public class PlayerController extends Controller {
         // ── Weapon / body actions ─────────────────────────────────────────────
         cmd.fire    = inp.isActionPressed("fire", false);
         cmd.reload  = inp.isActionJustPressed("reload", false);
+        cmd.detonate = inp.isActionJustPressed("detonate", false);
         cmd.drop    = inp.isActionJustPressed("drop", false);
         cmd.jump    = inp.isActionJustPressed("jump", false);
 

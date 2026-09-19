@@ -115,6 +115,7 @@ public class NetworkManager extends Node {
     private static final int MSG_MELEE                  = 27; // N2  — client→host: a swing's inputs; the host runs the sweep
     private static final int MSG_LAUNCH                 = 28; // N4  — client→host: a rocket/grenade's inputs; the host flies it
     private static final int MSG_DETONATION             = 29; // N4  — host→all: where a host projectile exploded
+    private static final int MSG_DETONATE_REQUEST       = 30; // client→host: the owner pressed its remote-charge detonator
 
     /** WeaponController's slotTypes table has 7 entries (FIST/PRIMARY×2/SECONDARY/MELEE/THROWABLE/CONSUMABLE) — bounds isValidSnapshot's activeSlotIndex check. */
     private static final int WEAPON_SLOT_COUNT = 7;
@@ -175,7 +176,7 @@ public class NetworkManager extends Node {
             // pickups and spawns on channel 0, and vice versa. Ordered within the channel, which is
             // what lets the host treat a non-advancing shotSeq as a replay.
             // Swings share the shots' lane (N2): the same reliable, ordered stream of attack inputs.
-            case MSG_SHOT, MSG_MELEE, MSG_LAUNCH -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
+            case MSG_SHOT, MSG_MELEE, MSG_LAUNCH, MSG_DETONATE_REQUEST -> new ChannelSpec(1, ENetPacketPeer.FLAG_RELIABLE);
             // Shot results are cosmetic and superseded by the next pull: unreliable, own lane (N1b).
             case MSG_SHOT_RESULT_BATCH -> new ChannelSpec(3, 0L);
             default -> throw new IllegalArgumentException("No channel mapping for MSG_* tag " + msgType);
@@ -837,6 +838,7 @@ public class NetworkManager extends Node {
                 case MSG_MELEE -> handleMeleeMessage(senderPeerId, buf);
                 case MSG_LAUNCH -> handleLaunchMessage(senderPeerId, buf);
                 case MSG_DETONATION -> handleDetonationMessage(senderPeerId, buf);
+                case MSG_DETONATE_REQUEST -> handleDetonateRequestMessage(senderPeerId, buf);
                 case MSG_WORLD_EVENT -> handleWorldEventMessage(senderPeerId, buf);
                 case MSG_OWNERSHIP -> handleOwnershipMessage(senderPeerId, buf);
                 case MSG_PICKUP_REQUEST -> handlePickupRequestMessage(senderPeerId, buf);
@@ -1727,10 +1729,34 @@ public class NetworkManager extends Node {
     }
 
     /** Host → all: a host projectile exploded at {@code point} (N4). */
-    public void broadcastDetonation(String attackerCharacterId, Vector3 point) {
+    public void broadcastDetonation(String attackerCharacterId, String kind, int effect, Vector3 point) {
         if (!isNetworked() || !isServer() || attackerCharacterId == null || attackerCharacterId.isEmpty()) return;
         com.openworld.net.NetStats.increment("detonation_broadcast");
-        broadcastMessage(NetMessageCodec.encodeDetonation(MSG_DETONATION, attackerCharacterId, point), null);
+        broadcastMessage(NetMessageCodec.encodeDetonation(MSG_DETONATION, attackerCharacterId, kind, effect, point), null);
+    }
+
+    /** Client → host: the owner pressed its remote-charge detonator. */
+    public void sendDetonateRequest(String attackerCharacterId) {
+        if (!isNetworked() || isServer() || attackerCharacterId == null || attackerCharacterId.isEmpty()) return;
+        com.openworld.net.NetStats.increment("detonate_request_sent");
+        sendMessage(SERVER_PEER_ID, NetMessageCodec.encodeDetonateRequest(MSG_DETONATE_REQUEST, attackerCharacterId));
+    }
+
+    /**
+     * Host: a client pressed its detonator. Only the character's owner may set off its charges (counted
+     * {@code detonate_request_rejected_not_owner}); each charge that goes off is broadcast as MSG_DETONATION.
+     */
+    private void handleDetonateRequestMessage(int senderPeerId, StreamPeerBuffer buf) {
+        String id = NetMessageCodec.decodeDetonateRequest(buf);
+        if (!isValidIdentifier(id)) { dropInvalid("detonate", "MSG_DETONATE_REQUEST", senderPeerId); return; }
+        if (!isServer()) return;
+        Character c = findCharacterById(id);
+        if (c == null || c.characterInfo == null || c.characterInfo.ownerPeerId != senderPeerId) {
+            com.openworld.net.NetStats.increment("detonate_request_rejected_not_owner");
+            return;
+        }
+        com.openworld.net.NetStats.increment("detonate_request_accepted");
+        com.openworld.weapon.RemoteCharges.detonateAll(id);
     }
 
     /**
@@ -1747,15 +1773,13 @@ public class NetworkManager extends Node {
         if (isServer()) return;
         if (debugDropDetonations) { com.openworld.net.NetStats.increment("detonation_dropped_debug"); return; }
         com.openworld.net.NetStats.increment("detonation_received");
-        com.openworld.weapon.CosmeticProjectile copy = com.openworld.weapon.ProjectileLedger.takeOldest(d.attackerCharacterId());
+        com.openworld.weapon.CosmeticProjectile copy = com.openworld.weapon.ProjectileLedger.takeOldest(d.attackerCharacterId(), d.kind());
         if (copy != null) {
             copy.snapDetonate(d.point());
             return;
         }
         com.openworld.net.NetStats.increment("detonation_no_local_copy");
-        if (getTree().getFirstNodeInGroup("explosion_manager") instanceof com.openworld.world.manager.ExplosionManager mgr) {
-            mgr.spawnExplosion(d.point());
-        }
+        com.openworld.weapon.GrenadeProjectile.playEffectAt(this, com.openworld.weapon.GrenadeEffect.fromOrdinal(d.effect()), d.point());
     }
 
     private void forgetLaunchState(int peerId) {
@@ -2378,6 +2402,7 @@ public class NetworkManager extends Node {
         lastAcceptedUpstream.clear();
         lastOwnedStateSendMsById.clear();
         com.openworld.weapon.ProjectileLedger.clear();   // N4: cosmetic copies belong to the session
+        com.openworld.weapon.RemoteCharges.clear();
         lagCompensator.clear();
         haveHostTime = false;
         delayedSends.clear();
