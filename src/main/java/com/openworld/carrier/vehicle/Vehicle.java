@@ -477,22 +477,23 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     /**
      * Ask the street poles ahead whether this car knocks any down this step ({@link BreakableProps#sweepVehicle}),
-     * and keep the speed it leaves. Runs where the car is simulated (a client predicting its own car) and, on the
-     * host, for every car (a client's car is judged on the host copy, its velocity from its motion); only the
-     * simulating peer loses speed.
+     * and keep the speed it leaves. Runs on EVERY peer for every car, simulated or puppet (a puppet's velocity comes
+     * from its motion), so each peer knocks its own poles down with no message (PLAN.md 3.11b); only the peer that
+     * simulates the car loses speed, which the car's own snapshot then carries to the others.
      */
     private void sweepStreetPoles(double delta) {
         Vector3 pos = getGlobalPosition();
         Vector3 last = poleSweepLastPos;
         poleSweepLastPos = pos;
-        if (parked || delta <= 0.0) return;
-        boolean sim = isLocallySimulated();
+        if (delta <= 0.0) return;
+        // a frozen body is placed kinematically (the puppet mechanism) and reports no velocity: read its motion
+        boolean sim = isLocallySimulated() && !isFreezeEnabled();
+        if (sim && parked) return;
         Vector3 vel;
         if (sim) {
             vel = getLinearVelocity();
         } else {
-            Node netNode = getNodeOrNull("/root/NetworkManager");
-            if (!(netNode instanceof NetworkManager net) || !net.isServer() || last == null) return;
+            if (last == null) return;
             vel = pos.minus(last).div(delta);
         }
         if (hullHalfWidth < 0.0) measureHull();

@@ -41,6 +41,7 @@ const POINT_FIELDS := [
 	["pillar_spacing", "f", 30.0, []],
 	["pillar_skip", "b", false, []],
 	["pillar_offset", "f", 0.0, []],
+	["shed", "e", "NONE", ["NONE", "OPEN_LEFT", "OPEN_RIGHT"]],
 	["ground_z", "f", 0.0, []],
 	["has_ground_z", "b", false, []],
 	["tangent_mode", "e", "AUTO", ["AUTO", "SHARP", "MANUAL"]],
@@ -78,5 +79,6 @@ const ROAD_FIELDS := [
 	["footway_asset", "s", "", []],
 	["barrier_asset", "s", "", []],
 	["pillar_asset", "s", "", []],
+	["cut_batter", "f", 0.0, []],
 	["markings", "b", true, []],
 ]

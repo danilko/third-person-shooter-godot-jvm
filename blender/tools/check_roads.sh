@@ -43,7 +43,7 @@ for f in "$BP"/lib/road_points.py "$BP"/lib/lane_movements.py "$BP"/lib/lane_pro
          "$BP"/lib/road_support.py \
          "$ADDON"/point_model.py "$ADDON"/point_profile.py "$ADDON"/point_solve.py \
          "$ADDON"/point_edges.py "$ADDON"/point_validate.py "$ADDON"/point_export.py \
-         "$ADDON"/point_style.py "$ADDON"/point_zones.py "$ADDON"/point_ground.py "$ADDON"/point_record_ops.py "$ADDON"/point_digest.py "$ADDON"/point_mesh.py \
+         "$ADDON"/point_style.py "$ADDON"/point_zones.py "$ADDON"/point_ground.py "$ADDON"/point_record_ops.py "$ADDON"/point_presets.py "$ADDON"/point_digest.py "$ADDON"/point_mesh.py \
          "$ADDON"/point_kit.py "$ADDON"/point_gltf.py "$ADDON"/point_furniture.py; do
   [ -f "$f" ] && run "$(basename "$f")" python3 "$f"
 done
@@ -60,6 +60,9 @@ pe.write(net, '$TMP/testbed.lanekit.json')
 [ -f "$TMP/testbed.lanekit.json" ] && \
   run "check_lanekit_graph.py" python3 "$BP/tools/check_lanekit_graph.py" \
       "$TMP/testbed.lanekit.json"
+# PLAN.md 3.13 step 1: the diamond-interchange template, regenerated from the presets, must pass the gate and flow
+run "roadkit_interchange.py --check" python3 "$ROOT/tools/roadkit_interchange.py" "$TMP/interchange.roads.json" --check
+run "roadkit_interchange.py --kind loop --check" python3 "$ROOT/tools/roadkit_interchange.py" "$TMP/loop.roads.json" --kind loop --check
 rm -rf "$TMP"
 
 echo
@@ -89,6 +92,7 @@ if [ "$QUICK" -eq 0 ]; then
   run "test_roadkit_zones" gd tools/godot/test_roadkit_zones.gd -- "$GT/z.json"
   run "test_roadkit_preview" gd tools/godot/test_roadkit_preview.gd
   run "test_roadkit_draft (B10.1 draft surface = the build)" gd tools/godot/test_roadkit_draft.gd
+  run "test_roadkit_stamp_rules (3.15 steep cut face)" gd tools/godot/test_roadkit_stamp_rules.gd
   # B11: the road build has no Blender. The committed pieces must BE the build of their records (DebugRoads and
   # RoadKitZones rebuilt and compared, collision proxies included), and styles + profile assets must build.
   run "check_roadkit_build (committed pieces == the build; styles and profile assets)" python3 "$BP/tools/check_roadkit_build.py"

@@ -170,6 +170,12 @@ func _initialize() -> void:
 				var gone: float = Vector2(c["last"].x - player.global_position.x,
 						c["last"].z - player.global_position.z).length()
 				var out_of_range: bool = gone > reclaim_radius * 0.95
+				# A car whose lane's successors are in a road piece that is not streamed ran off the EDGE of the loaded
+				# road (road pieces stream nearer than traffic spawns), far out of sight: not a failure to drive either.
+				var zm := root.get_node_or_null("ZoneManager")
+				var why: String = str(zm.call("reclaim_reason_of", id)) if zm != null else ""
+				if why == "stream-edge":
+					out_of_range = true
 				if not c["early"]:
 					if out_of_range:
 						left_range += 1
@@ -177,7 +183,8 @@ func _initialize() -> void:
 						done.append({"dist": c["dist"], "secs": (f - c["spawn"]) / 60.0})
 				print("  car gone after %5.1f s, drove %6.1f m%s"
 						% [(f - c["spawn"]) / 60.0, c["dist"],
-						"  [%.0f m out — left range]" % gone if out_of_range else ""])
+						("  [%.0f m out — left range%s]" % [gone, ", stream edge" if why == "stream-edge" else ""])
+								if out_of_range else ("  [%s]" % why if why != "" else "")])
 				cars.erase(id)
 
 	var idle_max := 0.0

@@ -3,6 +3,7 @@
 #
 #     tools/building_kit/build_buildings.sh [--only=Id,Id]
 #
+# 0. build_library_palette.py --check  kits/library/palette.json -> materials/MI_*.tres (edit the json, not a .tres)
 # 1. export_building_kit.py  each kit's .blend -> pieces/ + pieces.json (the .blend OWNS the pieces, PLAN.md
 #                       3.6b step 1; refuses a piece whose bounds moved unless ACCEPT_BOUNDS=1)
 # 2. godot --import     so new or changed pieces and textures are importable
@@ -18,6 +19,8 @@ cd "$ROOT"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 BLENDER="${BLENDER:-blender}"
+# 0. the library palette owns every library material's look: a hand-edited .tres or texture is refused
+python3 tools/building_kit/build_library_palette.py --check | tail -1
 for kit in assets/world_source/kits/*/kit.json; do
     dir="$(dirname "$kit")"
     blend="$dir/$(basename "$dir").blend"

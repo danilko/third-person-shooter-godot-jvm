@@ -43,10 +43,11 @@ REPO = os.path.normpath(os.path.join(HERE, "..", "..", ".."))
 TABLE_PATH = os.path.join(REPO, "assets", "world_source", "kits", "road_kit", "furniture.json")
 
 try:
-    from . import point_edges as ped, point_solve as ps
+    from . import point_edges as ped, point_solve as ps, point_model as pm
 except ImportError:
     import point_edges as ped                                                # noqa: E402
     import point_solve as ps                                                 # noqa: E402
+    import point_model as pm                                                 # noqa: E402
 
 #: Object names this module adds to a piece.
 PAINT_OBJECT = "FURN__marks_w"
@@ -488,6 +489,21 @@ def _edge_samples(pts, walk, kerb, wall, spacing, clear, phase=None):
     return out
 
 
+def _barrier_samples(pts, wall, spacing, clear, phase=None):
+    """Stations along one edge run where it CARRIES a barrier (both ends of the segment): (point, plan direction,
+    barrier height)."""
+    pts = [tuple(p) for p in pts]
+    cum = _lengths(pts)
+    out = []
+    for s in _stations(cum[-1], spacing, clear, phase):
+        p, d, i = _at(pts, cum, s)
+        j = min(i + 1, len(pts) - 1)
+        h = min(float(wall[i]), float(wall[j]))
+        if h > 0.0:
+            out.append((p, d, h))
+    return out
+
+
 def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground):
     r = table.rules
     for s in solves:
@@ -596,7 +612,8 @@ def _lamps(fur, table, solves, bands, mine_run, ground):
     """Street lighting. A run with a raised median wide enough (`median_lamp_min_half`) gets twin-arm lamps down
     the median every `median_lamp_spacing`; the others get single lamps on both kerbs every `lamp_spacing`,
     staggered half a spacing side to side, `lamp_inset` behind the kerb line, arm over the road. A lamp keeps
-    `pole_clearance` from any solid prop already standing (a signal pole, a planter)."""
+    `pole_clearance` from any solid prop already standing (a signal pole, a planter). Where an edge carries a barrier
+    the lamp stands ON it instead, every `barrier_lamp_spacing` (0 = none)."""
     r = table.rules
     for s in solves:
         if not mine_run(s) or len(s.samples) < 2:
@@ -611,8 +628,14 @@ def _lamps(fur, table, solves, bands, mine_run, ground):
                 j = min(i + 1, len(pts) - 1)
                 mh = min(s.values[i]["rka_med_h"], s.values[j]["rka_med_h"])
                 mz = min(s.values[i]["rka_med_z"], s.values[j]["rka_med_z"])
-                if mh < r["median_lamp_min_half"] or mz <= 0.0:
+                # a WALL median (an expressway's divide) is narrow but carries its barrier: the lamp stands on the
+                # barrier's top (`point_mesh.median_wall`), which is where a Japanese expressway's median lamps are
+                wall = getattr(s.road, "median_style", None) == pm.MED_WALL
+                need = r.get("median_wall_lamp_min_half", 0.45) if wall else r["median_lamp_min_half"]
+                if mh < need or mz <= 0.0:
                     continue
+                if wall:
+                    mz += ps.MEDIAN_WALL_HEIGHT
                 pos = (p[0], p[1], p[2] + mz)
                 if fur.clear_of(pos, r["pole_clearance"]) and fur.put(table, "lamp_twin", pos, d, road):
                     on_median += 1
@@ -629,6 +652,47 @@ def _lamps(fur, table, solves, bands, mine_run, ground):
                 pos = (p[0] + lat[0] * o, p[1] + lat[1] * o, p[2] + (k if w > 0.0 else 0.0))
                 if fur.clear_of(pos, r["pole_clearance"]):
                     fur.put(table, "lamp", pos, (-sgn * lat[0], -sgn * lat[1]), road)
+            # ON THE BARRIER: where the edge carries one (an elevated deck, a ramp, a bridge) the kerb lamp above is
+            # skipped, and an expressway was unlit end to end. The lamp's base stands on the barrier's top, its arm
+            # over the road; staggered side to side like the kerb lamps (3.13, user: lamps "from side and middle").
+            spacing = r.get("barrier_lamp_spacing", 0.0)
+            if not spacing:
+                continue
+            for p, d, h in _barrier_samples(pts, wall, spacing, r["lamp_end_clear"],
+                                             0.5 * spacing if sgn > 0 else 0.0):
+                lat = _left(d)
+                o = sgn * r["barrier_lamp_inset"]
+                pos = (p[0] + lat[0] * o, p[1] + lat[1] * o, p[2] + h)
+                if fur.clear_of(pos, r["pole_clearance"]):
+                    fur.put(table, "lamp", pos, (-sgn * lat[0], -sgn * lat[1]), road)
+
+
+def _median_walls(fur, table, solves, mine_run):
+    """The kit's median panel (`median_wall`, a fence panel fitted to `point_solve.MEDIAN_WALL_HEIGHT`) tiled end to
+    end along every `WALL` median, on the island's top: the visible half of the median wall whose collider
+    `point_mesh.median_wall` builds. Spaced by the piece's OWN length, so the panels meet; at C1's 180 m corners
+    consecutive 1.56 m panels turn ~0.5 deg and the joints stay closed. Placed LAST and never solid, so it keeps no
+    lamp or pole away."""
+    a = table.assets.get("median_wall")
+    if a is None:
+        return
+    length = (a["hi"][2] - a["lo"][2]) * a["scale"][2]
+    r = table.rules
+    for s in solves:
+        if not mine_run(s) or len(s.samples) < 2 or getattr(s.road, "median_style", None) != pm.MED_WALL:
+            continue
+        pts = [tuple(sm.pos) for sm in s.samples]
+        cum = _lengths(pts)
+        n = int(cum[-1] // length)
+        start = (cum[-1] - n * length) / 2.0 + length / 2.0
+        for k in range(n):
+            p, d, i = _at(pts, cum, start + k * length)
+            j = min(i + 1, len(pts) - 1)
+            mh = min(s.values[i]["rka_med_h"], s.values[j]["rka_med_h"])
+            mz = min(s.values[i]["rka_med_z"], s.values[j]["rka_med_z"])
+            if mh < r.get("median_wall_min_half", 0.2) or mz <= 0.0:
+                continue
+            fur.put(table, "median_wall", (p[0], p[1], p[2] + mz), d, s.road.name)
 
 
 def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, ground=None):
@@ -648,6 +712,7 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     _lane_props(fur, table, dict(sorted(lanes.items())), mine_lane, ground)
     _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground)
     _lamps(fur, table, solves, bands, mine_run, ground)
+    _median_walls(fur, table, solves, mine_run)
     return fur
 
 

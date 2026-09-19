@@ -173,6 +173,134 @@ def sweep(pts, values, kind, offset_attr, z, z_attr, width_attr, thickness_attr,
     return top + bottom + walls
 
 
+#: A `WALL` median's barrier: this wide (clamped to the island), the road's `barrier_height` tall, on the island's top.
+MEDIAN_WALL_HALF = 0.3
+
+
+def median_wall(road, pts, values, lats):
+    """The barrier a `WALL` median stands (`point_solve`: "RAISED, and a barrier stands on it"). The solve had always
+    said so and nothing built it: an expressway's divide was a 0.16 m island a car drove straight over into the other
+    carriageway (3.13). A solid prism on the island's centre, `point_solve.MEDIAN_WALL_HEIGHT` tall, built as its own
+    `-noped-colonly` proxy: a car meets a continuous wall, and what it SEES is the kit's median panel, tiled along it
+    by `point_furniture._median_walls` (a fence panel's posts and rails are no collider to scrape at speed)."""
+    bh = ps.MEDIAN_WALL_HEIGHT
+    if getattr(road, "median_style", None) != pm.MED_WALL:
+        return []
+    mv = []
+    for v in values:
+        mh = float(v.get("rka_med_h", 0.0))
+        on = mh > 1e-6
+        mv.append({"rka_mw_z": float(v.get("rka_med_z", 0.0)) + bh if on else 0.0,
+                   "rka_mw_hw": min(MEDIAN_WALL_HALF, mh) if on else 0.0, "rka_mw_h": bh if on else 0.0})
+    return sweep(pts, mv, "deck", "", 0.0, "rka_mw_z", "rka_mw_hw", "rka_mw_h", lats)
+
+
+#: A rock shed's parts, past the deck outline (PLAN.md 3.15): the columns stand this far outboard on the open side, the
+#: wall this far on the closed side, and the roof reaches this far past the wall -- over the stamp's flat verge
+#: (`road_kit_stamp.VERGE`, 6 m past the paved edge) to the cut face, so no daylight shows between roof and rock.
+SHED_EDGE = 0.8
+SHED_BACK = 5.0
+SHED_COL = 0.8
+SHED_WALL_HALF = 0.3
+#: Lamps under the soffit: a warm panel every this many metres, in two rows over the lanes.
+SHED_LAMP_SPACING = 10.0
+SHED_LAMP_MATERIAL = "M_TunnelLamp"
+
+
+def _obox(c, fwd, half_len, half_wid, h):
+    """A box whose TOP centre is `c`, `half_len` along the horizontal `fwd`, `half_wid` across, `h` deep."""
+    lat = (-fwd[1], fwd[0], 0.0)
+    corners = []
+    for z in (c[2] - h, c[2]):
+        for sl, sw in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+            corners.append((c[0] + fwd[0] * half_len * sl + lat[0] * half_wid * sw,
+                            c[1] + fwd[1] * half_len * sl + lat[1] * half_wid * sw, z))
+    f = [(0, 2, 1), (0, 3, 2), (4, 5, 6), (4, 6, 7), (0, 1, 5), (0, 5, 4), (1, 2, 6), (1, 6, 5), (2, 3, 7), (2, 7, 6),
+         (3, 0, 4), (3, 4, 7)]
+    ctr = (c[0], c[1], c[2] - h / 2)
+    out = []
+    for a, b, cc in f:
+        t = (corners[a], corners[b], corners[cc])
+        m = tuple((t[0][k] + t[1][k] + t[2][k]) / 3 for k in range(3))
+        out.append(_orient(t, _sub(m, ctr)))
+    return out
+
+
+def _spans(values, key):
+    """`[(i0, i1, code)]`: maximal runs of samples whose `key` is one non-zero code, each carried on to the next sample
+    (a station's flag holds up to the next station, whose own sample is the first one without it)."""
+    out, i, n = [], 0, len(values)
+    while i < n:
+        code = int(round(float(values[i].get(key, 0.0))))
+        if code == 0:
+            i += 1
+            continue
+        j = i
+        while j + 1 < n and int(round(float(values[j + 1].get(key, 0.0)))) == code:
+            j += 1
+        out.append((i, min(j + 1, n - 1), code))
+        i = j + 1
+    return out
+
+
+def sheds(pts, values, lats):
+    """The rock sheds over one carrier (`rka_shed`, PLAN.md 3.15): `{"concrete": [tri], "lamps": [tri]}`, the concrete
+    also being the shed's collider. Per span: a ROOF slab from past the open-side columns to `SHED_BACK` past the
+    closed-side wall, its soffit `point_solve.SHED_CLEAR` over the road; a WALL along the closed side from the ground
+    to the soffit; a COLUMN every `SHED_COL_SPACING` on the open side; and two rows of lamp panels under the soffit."""
+    out = {"concrete": [], "lamps": []}
+    clear, roof = ps.SHED_CLEAR, ps.SHED_ROOF
+    for i0, i1, code in _spans(values, "rka_shed"):
+        if i1 <= i0:
+            continue
+        sp, sv, sl = pts[i0:i1 + 1], values[i0:i1 + 1], lats[i0:i1 + 1]
+        open_sign = 1.0 if code == 1 else -1.0          # +1: the columns on the LEFT (+lateral)
+        rv, wv, cols = [], [], []
+        for v in sv:
+            dc, dw = float(v.get("rka_deck_c", 0.0)), float(v.get("rka_deck_w", 0.0))
+            open_e = dc + open_sign * (dw + SHED_EDGE)
+            closed_e = dc - open_sign * (dw + SHED_EDGE)
+            far_open = open_e + open_sign * SHED_COL / 2
+            far_closed = closed_e - open_sign * SHED_BACK
+            rv.append({"c": (far_open + far_closed) / 2, "hw": abs(far_open - far_closed) / 2, "z": clear + roof,
+                       "t": roof})
+            wv.append({"c": closed_e, "hw": SHED_WALL_HALF, "z": clear, "t": clear + 0.5})
+            cols.append(open_e)
+        out["concrete"] += sweep(sp, rv, "deck", "c", 0.0, "z", "hw", "t", sl)
+        out["concrete"] += sweep(sp, wv, "deck", "c", 0.0, "z", "hw", "t", sl)
+        # the columns and the lamps, walked along the carrier by arc length
+        acc = [0.0]
+        for k in range(len(sp) - 1):
+            acc.append(acc[-1] + math.dist(sp[k][:2], sp[k + 1][:2]))
+        total = acc[-1]
+
+        def at(s):
+            k = 0
+            while k < len(acc) - 2 and acc[k + 1] < s:
+                k += 1
+            seg = acc[k + 1] - acc[k]
+            u = (s - acc[k]) / seg if seg > 1e-9 else 0.0
+            p = tuple(sp[k][q] + (sp[k + 1][q] - sp[k][q]) * u for q in range(3))
+            fwd = _norm((sp[k + 1][0] - sp[k][0], sp[k + 1][1] - sp[k][1], 0.0))
+            lat = (-fwd[1], fwd[0], 0.0)
+            return p, fwd, lat, k, u
+        n = max(1, int(round(total / ps.SHED_COL_SPACING)))
+        for m in range(n + 1):
+            p, fwd, lat, k, u = at(total * m / n)
+            off = cols[k] + (cols[k + 1] - cols[k]) * u
+            top = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + clear)
+            out["concrete"] += _obox(top, fwd, SHED_COL / 2, SHED_COL / 2, clear + 0.5)
+        n = int(total / SHED_LAMP_SPACING)
+        for m in range(n):
+            p, fwd, lat, k, u = at((m + 0.5) * total / n)
+            v = sv[k]
+            shift, half = float(v.get("rka_shift", 0.0)), float(v.get("rka_halfw", 0.0))
+            for off in (shift + half * 0.5, shift - half * 0.5):
+                top = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + clear)
+                out["lamps"] += _obox(top, fwd, 0.6, 0.18, 0.12)
+    return out
+
+
 def _orient(tri, out):
     """`tri` wound so its normal points along `out`."""
     a, b, c = tri
@@ -398,6 +526,14 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
             for layer, kind, slot, oa, z, za, wa, ta in SURFACE:
                 _layer(objs, surf, style, med_slot if slot == "median" else slot, kind, oa, z, za, wa, ta,
                        pts, values, lats)
+            # the median wall is a COLLIDER only: what is seen is the kit panel `point_furniture` tiles along it
+            _add(objs, collision_name(name + "_median", COL_ROAD, False), NO_MATERIAL,
+                 median_wall(style.road, pts, values, lats))
+            if any(float(v.get("rka_shed", 0.0)) > 0.0 for v in values):
+                sh = sheds(pts, values, lats)
+                _add(objs, name + "__shed", style.material("deck"), sh["concrete"])
+                _add(objs, name + "__shed", SHED_LAMP_MATERIAL, sh["lamps"])
+                _add(objs, collision_name(name + "_shed", COL_ROAD, False), NO_MATERIAL, sh["concrete"])
             if any(float(v.get("rka_pillar_param", 0.0)) > 0.0 for v in values):
                 cols, over = pillars(pts, values, lats, style.pier(), ground)
                 for mat, tris in cols.items():
@@ -501,7 +637,31 @@ def self_test():
     short = place_pier(pier, (0.0, 0.0, 5.0), 0.8, (0.0, 1.0, 0.0))["M_Concrete"]
     assert abs(min(p[2] for t in short for p in t) - 4.2) < 1e-9, "a short pier squashes whole, foot on the ground"
     print("OK: a pier asset keeps its cap, stretches its shaft to the ground and turns onto the road")
-    return 3
+    # A rock shed open on the LEFT over samples 1..3 of a road running +x: soffit SHED_CLEAR over the road, the columns
+    # on +y (the left of travel), the wall on -y, the roof reaching SHED_BACK past the wall, lamps under the soffit.
+    pts = [(10.0 * i, 0.0, 2.0) for i in range(6)]
+    vals = [{"rka_deck_c": 0.0, "rka_deck_w": 9.0, "rka_shift": 0.0, "rka_halfw": 9.0,
+             "rka_shed": 1.0 if 1 <= i <= 3 else 0.0} for i in range(6)]
+    sh = sheds(pts, vals, [_lateral(t) for t in poly_tangents(pts)])
+    cz = [p for t in sh["concrete"] for p in t]
+    xs = [p[0] for p in cz]
+    assert abs(min(xs) - 10.0) < 1.0 and abs(max(xs) - 40.0) < 1.0, (min(xs), max(xs))   # holds to the NEXT station
+    roof_under = sorted({round(p[2], 6) for p in cz})
+    assert 2.0 + ps.SHED_CLEAR in roof_under and max(roof_under) == 2.0 + ps.SHED_CLEAR + ps.SHED_ROOF, roof_under
+    ys = [p[1] for p in cz]
+    assert abs(max(ys) - (9.0 + SHED_EDGE + SHED_COL / 2)) < 1e-6, max(ys)
+    assert abs(min(ys) - (-(9.0 + SHED_EDGE) - SHED_BACK)) < 1e-6, min(ys)
+    cols = [p for t in sh["concrete"] for p in t if p[2] < 2.0 and p[1] > 0.0]
+    walls = [p for t in sh["concrete"] for p in t if p[2] < 2.0 and p[1] < 0.0]
+    assert cols and walls and all(abs(p[1] - (9.0 + SHED_EDGE)) <= SHED_COL / 2 + 1e-6 for p in cols)
+    lz = [p[2] for t in sh["lamps"] for p in t]
+    assert lz and max(lz) <= 2.0 + ps.SHED_CLEAR + 1e-6 and min(lz) > 2.0 + ps.SHED_CLEAR - 0.2
+    flip = sheds(pts, [dict(v, rka_shed=2.0 if v["rka_shed"] else 0.0) for v in vals],
+                 [_lateral(t) for t in poly_tangents(pts)])
+    assert max(p[1] for t in flip["concrete"] for p in t) == -min(ys)
+    print("OK: a rock shed: soffit %.1f m over the road, columns on the open side, wall + roof to the rock on the other"
+          % ps.SHED_CLEAR)
+    return 4
 
 
 if __name__ == "__main__":

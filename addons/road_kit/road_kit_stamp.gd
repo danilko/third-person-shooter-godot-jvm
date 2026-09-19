@@ -8,7 +8,8 @@ extends RefCounted
 ## `point_edges.band_corridors` the island carve reads, pads included), so the collider IS the visual.
 ##
 ##   inside the paved half-width + VERGE    ground = road surface - CLEARANCE
-##   outside it, by e metres                 cap   = that + e / CUT_SLOPE    (the cut batter)
+##   outside it, by e metres                 cap   = that + e / CUT_SLOPE    (the cut batter; on the uphill side of
+##                                                   a `cut_batter` road, that + e * cut_batter -- PLAN.md 3.15)
 ##                                           floor = that - e / FILL_SLOPE   (the fill batter)
 ##   new height = min(cap over every corridor, max(natural, floor over the corridors that may fill))
 ##
@@ -49,6 +50,10 @@ const BUCKET := 16.0
 ## Kinds of corridor point the ground may be raised to (`road_support.support_kind`). Not PIER or
 ## TUNNEL, and not UNKNOWN (no natural ground to judge from).
 const FILLABLE := ["NONE", "FILL", "CUT"]
+## A BENCH road's point (`cut_batter`, PLAN.md 3.15) fills over LAND only: where the natural ground is under
+## `LAND_Z` (the water line) the ground is left alone, so a coast road never pushes an embankment into the sea.
+const LAND_ONLY := "BENCH"
+const LAND_Z := 0.3
 ## Two corridors whose surfaces at one spot differ by more than this are a road passing UNDER another
 ## (the lower keeps its ground); by less, they are one paved area meeting itself -- a junction mouth, a
 ## ramp's gore -- and the NEAREST decides.
@@ -68,10 +73,16 @@ static func _index(corridors: Array, to_world: Transform3D, params: Dictionary) 
 			var b: Array = pts[i + 1]
 			var aw: Vector3 = to_world * Vector3(a[0], a[1], a[2])
 			var bw: Vector3 = to_world * Vector3(b[0], b[1], b[2])
-			var fa: bool = str(a[5]) in FILLABLE
-			var fb: bool = str(b[5]) in FILLABLE
+			# 0 never, 1 fill, 2 fill over land only
+			var fa: int = 1 if str(a[5]) in FILLABLE else (2 if str(a[5]) == LAND_ONLY else 0)
+			var fb: int = 1 if str(b[5]) in FILLABLE else (2 if str(b[5]) == LAND_ONLY else 0)
 			var reach := maxf(float(a[3]), float(b[3])) + VERGE + MAX_REACH
-			segs.append({"a": aw, "b": bw, "ha": float(a[3]), "hb": float(b[3]), "fa": fa, "fb": fb, "c": ci})
+			# The steep cut face (PLAN.md 3.15, `roadkit_cli._steep_side`): rise per metre across on the uphill side,
+			# signed by which side that is (Godot XZ cross product), 0 = the ordinary batter both sides.
+			var sa := float(a[6]) if a.size() > 6 and a[6] != null else 0.0
+			var sb := float(b[6]) if b.size() > 6 and b[6] != null else 0.0
+			segs.append({"a": aw, "b": bw, "ha": float(a[3]), "hb": float(b[3]), "fa": fa, "fb": fb, "c": ci,
+					"sa": sa, "sb": sb})
 			var lo := Vector2(minf(aw.x, bw.x) - reach, minf(aw.z, bw.z) - reach)
 			var hi := Vector2(maxf(aw.x, bw.x) + reach, maxf(aw.z, bw.z) + reach)
 			var r := Rect2(lo, hi - lo)
@@ -120,7 +131,15 @@ static func height_at(index: Dictionary, params: Dictionary, x: float, z: float,
 		if not per.has(c) or sd < per[c][0]:
 			# The fill decision follows the NEARER end: the kit decides support per sample, so the
 			# half of a segment beside a PIER sample is the bridge's and the other half is the fill's.
-			per[c] = [sd, lerpf(a.y, b.y, t) - CLEARANCE, s["fa"] if t < 0.5 else s["fb"]]
+			# The cut batter on this side: the steep face where this vertex is on the corridor's uphill side.
+			var steep: float = s["sa"] if t < 0.5 else s["sb"]
+			var rise := 1.0 / cut_slope
+			if steep != 0.0:
+				var side := dx * (z - a.z) - dz * (x - a.x)
+				if side * steep > 0.0:
+					rise = absf(steep)
+			var fk: int = s["fa"] if t < 0.5 else s["fb"]
+			per[c] = [sd, lerpf(a.y, b.y, t) - CLEARANCE, fk == 1 or (fk == 2 and natural >= LAND_Z), rise]
 	if per.is_empty():
 		return NAN
 	var near: Array = []
@@ -140,7 +159,7 @@ static func height_at(index: Dictionary, params: Dictionary, x: float, z: float,
 		return minf(cap, maxf(natural, near[1] if near[2] else -INF))
 	var cap_out := INF
 	for c in per:
-		cap_out = minf(cap_out, per[c][1] + maxf(0.0, per[c][0] - VERGE) / cut_slope)
+		cap_out = minf(cap_out, per[c][1] + maxf(0.0, per[c][0] - VERGE) * per[c][3])
 	# The fill batter runs on down until it meets the ground (`max(natural, floor)` stops it there) --
 	# NOT to a fixed toe: cutting it off at `FILL_MAX * FILL_SLOPE` left a vertical wall wherever the
 	# ground beside a filled road fell away further than that (measured: +20.81 m on DebugRoads). And

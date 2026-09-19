@@ -66,9 +66,13 @@ There is a per-folder copy of this list in `assets/terrain3d/textures/asset_lice
 | Asset | Path | Source | Licence |
 |---|---|---|---|
 | Character animations: 81 clips (locomotion, swim, sitting, punches, sword, interactions, hit reactions) plus the replaced `drive_idle`, `swim_*` and `attack_*` placeholders, retargeted onto Godot-chan | `assets/Universal Animation Library_1/`, `assets/Universal_Animation_Library_2/` (sources); retargeted into `assets/characters/godot_chan/merged_animation*.blend/.glb` by `blender/tools/retarget_ual.py` (table: `blender/tools/ual_retarget.json`) | Universal Animation Library and Universal Animation Library 2 by Quaternius ([viewer](https://quaternius.com/animviewer.html), the link given in the packs' README), retargeted and renamed here | CC0 1.0 (no attribution required; credited as thanks) |
-| Weapon models (ASR1, ASR2, PIS1, REV1, SHG1, SMG1) | `assets/weapons/` | [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius, re-scaled and re-origined here | CC0 1.0 (no attribution required; credited as thanks) |
+| Weapon models (ASR1, ASR2, PIS1, REV1, SHG1, SMG1, SNR1) | `assets/weapons/` | [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius, re-scaled and re-origined here | CC0 1.0 (no attribution required; credited as thanks) |
 | Building kit: modular pieces, textures and 3 example buildings | `assets/world_source/kits/quaternius_downtown_city/`; the buildings generated from it in `src/main/resources/com/openworld/world/buildings/` | [Downtown City MegaKit](https://quaternius.com/packs/downtowncitymegakit.html) (Standard package) by Quaternius, re-scaled to a Japanese 1.82 m module, re-organised, and assembled into Japanese building types here | CC0 1.0 (no attribution required; credited as thanks) |
-| Street poles: Japanese traffic signal, street lamp, twin-arm median lamp (`TrafficLight_JP`, `StreetLight_JP`, `StreetLight_JP_Twin`), and the rest of the download kept unused in `source/` | `assets/world_source/kits/quaternius_zombie_apocalypse/`; placed in the road pieces in `src/main/resources/com/openworld/world/pieces/` | [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html) (March 2024) by Quaternius. The signal is Quaternius' `TrafficLight_2`, modified into a Japanese signal by this project's author (`TrafficLight_2_Japan.blend`). `blender/tools/build_street_poles.py` then scales it to Japanese clearances, stretches the street lamp to a 10 m pole and builds the median lamp from it | CC0 1.0 (no attribution required; credited as thanks). The modifications are Project (MIT) |
+| Street poles: Japanese traffic signal, street lamp, twin-arm median lamp (`TrafficLight_JP`, `StreetLight_JP`, `StreetLight_JP_Twin`); yard pieces: shipping containers (20 ft and 40 ft, red and green), pallet, drum, traffic cone, plastic barrier, tyre stack (`pieces/yard/`); the rest of the download kept unused in `source/` | `assets/world_source/kits/quaternius_zombie_apocalypse/`; the poles placed in the road pieces in `src/main/resources/com/openworld/world/pieces/`, the yard pieces in the container terminal (`world/buildings/ContainerTerminal.tscn`) | [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html) (March 2024) by Quaternius. The signal is Quaternius' `TrafficLight_2`, modified into a Japanese signal by this project's author (`TrafficLight_2_Japan.blend`). `blender/tools/build_street_poles.py` then scales it to Japanese clearances, stretches the street lamp to a 10 m pole and builds the median lamp from it; `blender/tools/build_zombie_yard.py` fits the containers to ISO 668 sizes (the 40 ft box is the 20 ft model stretched) | CC0 1.0 (no attribution required; credited as thanks). The modifications are Project (MIT) |
+| Library base meshes: shop gondolas, counter, registers, ice freezer, stock shelf, washroom toilet/basin/mirror, restaurant table, chair and booth sofa, kitchen grill and shelf, fuel pump, ticket gate, ticket machine, vending machine, bench, bin, bus-stop shelter and sign (24 pieces; `lib_base_mesh` on each collection, the list in `extract.json`) | `assets/world_source/kits/library/library.blend` and its exported `pieces/`; placed in the buildings in `src/main/resources/com/openworld/world/buildings/` | Models from [6TWELVE](https://elbolilloduro.itch.io/6twelve), [Gas Station](https://elbolilloduro.itch.io/gas-station), [Metro](https://elbolilloduro.itch.io/metro), [BurgerPiz](https://elbolilloduro.itch.io/burgerpiz) and [Bus Stop](https://elbolilloduro.itch.io/bus-stop) by elbolilloduro: cut out, re-sized to Japanese sizes and RE-TEXTURED with this project's palette by `blender/tools/build_library.py`. **None of the packs' textures is used** (they include Textures.com and Pexels images that may not be redistributed); the downloads are not in the repo | Models CC0 1.0 (no attribution required; credited as thanks). The changes Project (MIT) |
+| Library pieces modelled here: fridge bay, coffee machine, fascia, washroom partition, gas canopy/column/island, platform module/ramp/fence/shelter, station name board, track, paving | `assets/world_source/kits/library/` | Built by this project (`blender/tools/library_procedural.py`) | Project (MIT) |
+| Library textures | `assets/world_source/kits/library/textures/` | [ambientCG](https://ambientcg.com) Tiles036, Tiles043, Metal009, Metal027, PaintedPlaster017, WoodFloor062, Fabric030, TactilePaving005, CorrugatedSteel005 (list and links in `textures/SOURCES.md`); `T_*.png` generated by `tools/building_kit/build_library_palette.py` | CC0 1.0 (ambientCG); generated ones Project (MIT) |
+| Landmark base models: Rainbow Bridge (structure only; its decks are Road Kit roads), Tokyo Tower, Tokyo Station (hollow domed halls), Osaka Castle keep, Haneda-style terminal (hollow departure hall and concourse) | `assets/world_source/kits/library/` (`TokyoStation`, `AirportTerminal` and the rest); scenes in `src/main/resources/com/openworld/world/buildings/` | Built by this project (`blender/tools/library_landmarks.py`), key dimensions measured from PLATEAU (see "Real-world data") or public record | Project (MIT) |
 | Weapon models (ATL1 launcher tube) | `assets/weapons/` | Primitive shapes built by this project | Project (MIT) |
 | Melee weapon models: combat knife (MEW1), fire axe (MEW2), crowbar (MEW3), spade (MEW4), dagger (MEW5), katana (MEW6), machete (MEW7), with their textures | `assets/weapons/MEW1..MEW7.blend/.glb`, `assets/weapons/textures/` | [Free CC0 Melee Weapons Pack](https://3dmodelscc0.itch.io/free-cc0-melee-weapons-pack) by 3DModelsCC0, re-oriented, re-origined on the grip, the fire axe re-scaled, textures reduced to 1024 px, by `blender/tools/import_melee_pack.py` | CC0 1.0 (no attribution required; credited as thanks) |
 | Grenade (FRG1), launcher rocket (ATL1_Rocket) and ballistic shield (SHI1) placeholder models | `assets/weapons/FRG1.blend`, `assets/weapons/ATL1_Rocket.blend`, `assets/weapons/SHI1.blend` | Built by this project (`blender/tools/make_placeholder_models.py`) at real-world sizes, for an artist to replace | Project (MIT) |
@@ -93,28 +97,21 @@ text is `assets/vfx/LICENSE.txt`.
 
 ## Real-world data
 
-**Project PLATEAU.** The building, road and bridge geometry under `assets/world_source/plateau/data/`
-was derived from [Project PLATEAU](https://www.mlit.go.jp/plateau/) 3D city model data. The data is
-published by Japan's Ministry of Land, Infrastructure, Transport and Tourism (MLIT) and distributed
-through the [G-Spatial Information Center](https://www.geospatial.jp/ckan/dataset/plateau).
+**Project PLATEAU (measurement reference only; no PLATEAU data or geometry is in the repo).** Every
+PLATEAU-derived file (the precinct extracts under `assets/world_source/plateau/`, the `PLATEAU_RainbowBridge` and
+`PLATEAU_HanedaTerminal` models, `RecycledBuildingKit.blend`, `plateau_reference/` and the archived 6 x 6 world)
+was deleted on 2026-09-18. What remains are our own models whose key dimensions were measured from
+[Project PLATEAU](https://www.mlit.go.jp/plateau/) 3D city model data (MLIT, CC BY 4.0), credited as thanks:
+"Sizes measured from Project PLATEAU (MLIT)". Git history keeps the deleted files.
 
-- **Licence:** CC BY 4.0, free for commercial use, with attribution required.
-- **Credit line:** "Data: Project PLATEAU (MLIT)".
-- **In this repo:** only the extracted, filtered and reprojected JSON. The raw CityGML/OBJ source
-  downloads are not committed.
-- **More detail:** `assets/world_source/plateau/ATTRIBUTION.md`.
-- **Assets derived from it** (kept as a deliberate exception to the project's CC0/MIT/public-domain rule for
-  map data, 2026-09-17), each under the same licence and credit line:
-
-  | Asset | What it is |
-  |---|---|
-  | `assets/world_source/plateau/data/*.json` | Extracted precincts (building, road and bridge geometry), used as layout references |
-  | `assets/world_source/buildings/PLATEAU_HanedaTerminal.blend` | Haneda Airport terminal landmark model |
-  | `assets/world_source/buildings/PLATEAU_RainbowBridge.blend` | Rainbow Bridge landmark model |
-  | `assets/world_source/buildings/PLATEAU_TokyoTower.blend` | Tokyo Tower landmark model |
-  | `assets/world_source/buildings/plateau_reference/_pilot/` | Pilot building extraction (reference only) |
-
-  Anything baked from these (a piece `.tscn`/`.scn` containing their geometry) carries the same credit.
+**What was measured.** The landmark base models in `assets/world_source/kits/library/` (`RainbowBridge`,
+`TokyoStation`, `OsakaCastle`, `AirportTerminal`: footprint rectangles, heights, the bridge's
+tower spacing and cable sag, written as numbers in `blender/tools/library_landmarks.py`) and the sizes of the Japanese building types in
+`assets/world_source/buildings/building_types.json` (konbini, family restaurant, small station building) are
+rounded from statistics that `tools/plateau2json/measure_building_types.py` computed locally from PLATEAU
+CityGML (Ota-ku 2023, Tama-shi and Higashiyamato-shi 2023): percentiles of footprint and height per building use.
+Only those few numbers are in the repo; no PLATEAU geometry or data file is. Credited as thanks: "Sizes
+measured from Project PLATEAU (MLIT)".
 
 **Okinawa Main Island and Tokyo (design references, no data).** The planned island's shape, bay and
 harbour are modelled on Okinawa Main Island at reduced scale, and its offshore airport and elevated

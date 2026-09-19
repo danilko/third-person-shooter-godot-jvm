@@ -81,6 +81,15 @@ func _initialize() -> void:
 	for p in pieces:
 		_index_meshes(p)
 
+	# A deck a LANDMARK STRUCTURE carries (the Rainbow Bridge: towers and cables, `pillar_skip` on its stations) has
+	# no Road Kit column by design: a sample inside such a structure's footprint counts as carried, and is reported.
+	var carriers := []
+	var lm := world.get_node_or_null("Landmarks")
+	if lm != null:
+		for c in lm.get_children():
+			if c is Node3D and c.has_meta("building"):
+				carriers.append(c)
+	var carried := 0
 	var rows := {}      # road -> {"grade", "fill", "pier", "pier_ok", "fill_ok", "worst"}
 	var fails := 0
 	var worst_pier := ""
@@ -107,6 +116,9 @@ func _initialize() -> void:
 					r["pier"] += 1
 					if _foot_near(w, PIER_REACH, 2.0) or _abutment_near(w, PIER_REACH):
 						r["pier_ok"] += 1
+					elif _carried(carriers, w):
+						r["pier_ok"] += 1
+						carried += 1
 					else:
 						if worst_pier == "":
 							worst_pier = "%s at (%.1f, %.1f, %.1f), %.2f m over the terrain" % [lane, w.x, w.y, w.z, delta]
@@ -133,6 +145,7 @@ func _initialize() -> void:
 	var ok1 := total_pier > 0
 	print("  %s  the scene has a stretch over a gap (PIER samples)                 %d" % ["PASS" if ok1 else "FAIL", total_pier])
 	var ok2 := total_pier > 0 and total_pier_ok == total_pier
+	print("  INFO  PIER samples carried by a landmark structure (no Road Kit column by design): %d" % carried)
 	print("  %s  every PIER sample has a column foot on the terrain within %.0f m   %d/%d%s" % ["PASS" if ok2 else "FAIL", PIER_REACH, total_pier_ok, total_pier, "" if ok2 else "  first miss: " + worst_pier])
 	# FILL is reported, not asserted: the kit builds no embankment mesh (`road_support` sizes the toe,
 	# nothing sweeps it), so a road 0.4-4 m over the ground is carried by the TERRAIN -- B7's corridor
@@ -145,6 +158,15 @@ func _initialize() -> void:
 	fails = int(not ok1) + int(not ok2) + int(not ok3) + int(not ok4)
 	print("RESULT: %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(1 if fails else 0)
+
+func _carried(carriers: Array, w: Vector3) -> bool:
+	for c in carriers:
+		var fp: Array = (c.get_meta("building") as Dictionary)["footprint_m"]
+		var l: Vector3 = (c as Node3D).global_transform.affine_inverse() * w
+		if absf(l.x) <= float(fp[0]) / 2.0 and absf(l.z) <= float(fp[1]) / 2.0:
+			return true
+	return false
+
 
 func _markers(n: Node) -> Array:
 	var out := []

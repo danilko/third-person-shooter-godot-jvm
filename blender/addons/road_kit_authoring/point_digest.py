@@ -37,6 +37,7 @@ except ImportError:
 BUILDER_SOURCES = ("point_mesh.py", "point_gltf.py", "point_kit.py", "point_style.py", "point_solve.py",
                    "point_edges.py", "point_export.py", "point_zones.py", "point_profile.py",
                    os.path.join("..", "..", "lib", "lane_profile.py"), os.path.join("..", "..", "lib", "road_support.py"),
+                   os.path.join("..", "..", "lib", "lane_movements.py"),
                    os.path.join("..", "..", "tools", "roadkit_cli.py"), "point_furniture.py")
 
 #: The kit as the build reads it: its materials and profile sections (`road_kit.json`, written from road_kit.blend).

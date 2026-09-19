@@ -333,6 +333,10 @@ def layout_type(t, root):
     out["setback_m"] = round(sbd, 4)
     out["storeys"] = [round(h, 4) for _, h in storeys]
 
+    out["hulls"] = []
+    place_props(t.get("props", []), out, root, (W, D))
+    check_doors_clear(out)
+
     jp = t.get("jp", {})
     for key, got, tol in (("frontage_m", W, m), ("depth_m", D, m), ("height_m", total, storey)):  # roofline
         if key in jp and abs(jp[key] - got) > tol:
@@ -341,17 +345,188 @@ def layout_type(t, root):
     return out
 
 
+# ── library pieces placed by name: props on a type, and composite sites ─────────────────────────────────────
+
+def lib_piece(ref, root):
+    """`kit:Piece` -> (res path, pieces.json entry). A bare name means the project's own `library` kit."""
+    kit_id, _, name = ref.rpartition(":")
+    kit_id = kit_id or "library"
+    kit_dir, _kit, pieces = load_kit(root, kit_id)
+    if name not in pieces["pieces"]:
+        raise SystemExit(f"piece {name} is not in kit {kit_id}")
+    res = "res://" + os.path.relpath(kit_dir, _project_root()).replace(os.sep, "/")
+    return res + "/" + pieces["pieces"][name]["path"], pieces["pieces"][name], name
+
+
+def rot_xz(yaw, x, z):
+    """A point turned `yaw` degrees about +Y (Godot's sense: 90 takes +Z to +X)."""
+    a = math.radians(yaw)
+    return (x * math.cos(a) + z * math.sin(a), -x * math.sin(a) + z * math.cos(a))
+
+
+def turned_box(lo, hi, yaw, pos):
+    """The axis-aligned box round a piece's bounds turned by `yaw` and moved to `pos`: (center, size)."""
+    xs, zs = [], []
+    for x in (lo[0], hi[0]):
+        for z in (lo[2], hi[2]):
+            rx, rz = rot_xz(yaw, x, z)
+            xs.append(rx)
+            zs.append(rz)
+    c = [pos[0] + (min(xs) + max(xs)) / 2, pos[1] + (lo[1] + hi[1]) / 2, pos[2] + (min(zs) + max(zs)) / 2]
+    sz = [max(xs) - min(xs), hi[1] - lo[1], max(zs) - min(zs)]
+    return [round(v, 5) for v in c], [round(v, 5) for v in sz]
+
+
+def place_props(props, out, root, footprint=None):
+    """Place library pieces: each prop is {piece, at: [x, z], y, yaw, collide, repeat: [n, dx, dz]}. `collide` is
+    `box` (the default: the piece's turned bounds), `hull` (a convex hull of its mesh: a ramp), `none`, or
+    {"boxes": [[cx, cy, cz, sx, sy, sz], ...]} -- boxes in the piece's OWN frame (Godot axes), turned and moved with it:
+    for a piece whose bounds are mostly air, like a gantry crane a truck drives under."""
+    for p in props:
+        path, entry, name = lib_piece(p["piece"], root)
+        n, dx, dz = (p.get("repeat") or [1, 0.0, 0.0])
+        for k in range(int(n)):
+            pos = [p["at"][0] + dx * k, float(p.get("y", 0.0)), p["at"][1] + dz * k]
+            yaw = float(p.get("yaw", 0.0))
+            if footprint and (abs(pos[0]) > footprint[0] / 2 + 0.5 or abs(pos[2]) > footprint[1] / 2 + 0.5):
+                raise SystemExit(f"{out['id']}: prop {name} at {pos} stands outside the footprint {footprint}")
+            out["pieces"].append({"piece": name, "path": path, "pos": [round(v, 5) for v in pos], "yaw": yaw})
+            kind = p.get("collide", "box")
+            if kind == "box":
+                c, sz = turned_box(entry["min"], entry["max"], yaw, pos)
+                out["boxes"].append({"center": c, "size": sz})
+            elif kind == "hull":
+                out.setdefault("hulls", []).append({"path": path, "pos": [round(v, 5) for v in pos], "yaw": yaw})
+            elif isinstance(kind, dict):
+                for b in kind.get("boxes", ()):
+                    lo = [b[0] - b[3] / 2, b[1] - b[4] / 2, b[2] - b[5] / 2]
+                    hi = [b[0] + b[3] / 2, b[1] + b[4] / 2, b[2] + b[5] / 2]
+                    c, sz = turned_box(lo, hi, yaw, pos)
+                    out["boxes"].append({"center": c, "size": sz})
+            elif kind != "none":
+                raise SystemExit(f"{out['id']}: prop {name}: collide must be box, hull, none or {{boxes}}")
+            if footprint is not None:
+                top = pos[1] + entry["max"][1]
+                out["props_top_m"] = round(max(out.get("props_top_m", 0.0), top), 4)
+
+
+def check_doors_clear(out):
+    """Every door keeps a corridor the character's capsule (r 0.35) can walk: nothing a prop added may stand in the
+    1.2 m just inside it, across its width, at knee and chest height."""
+    for d in out["doors"]:
+        o = d["outward"]
+        side = [-o[2], 0, o[0]]
+        for depth in (0.09, 0.6, 1.2):
+            for lat in (-0.3, 0.0, 0.3):
+                for y in (0.5, 1.2):
+                    p = [d["center"][0] - o[0] * depth + side[0] * lat, y,
+                         d["center"][2] - o[2] * depth + side[2] * lat]
+                    for bx in out["boxes"]:
+                        if all(abs(p[i] - bx["center"][i]) < bx["size"][i] / 2 - 1e-6 for i in range(3)):
+                            raise SystemExit(f"{out['id']}: {d['side']} door {d['module']} is blocked "
+                                             f"{depth} m in by the box at {bx['center']} size {bx['size']}")
+
+
+def layout_composite(c, built, root):
+    """A SITE: whole building types (`parts`, each turned and moved) plus library props on a paved apron, on one
+    footprint centred on the origin. Doors, walls and collision of every part come with it."""
+    W, D = c["footprint_m"]
+    out = {"id": c["id"], "kit": "library", "use": c.get("use", ""), "jp": c.get("jp", {}), "composite": True,
+           "footprint_m": [W, D], "pieces": [], "boxes": [], "hulls": [], "doors": [], "solid_probes": []}
+    rects = []
+    height = 0.0
+    for part in c.get("parts", []):
+        b = built.get(part["type"])
+        if b is None:
+            raise SystemExit(f"{c['id']}: part {part['type']} is not a building type")
+        yaw = float(part.get("yaw", 0.0))
+        ox, oz = part["at"]
+
+        def mv(p):
+            x, z = rot_xz(yaw, p[0], p[2])
+            return [round(x + ox, 5), p[1], round(z + oz, 5)]
+
+        def turn(v):
+            x, z = rot_xz(yaw, v[0], v[2])
+            return [round(x, 5), v[1], round(z, 5)]
+        for pc in b["pieces"]:
+            out["pieces"].append({**pc, "pos": mv(pc["pos"]), "yaw": (pc["yaw"] + yaw) % 360.0})
+        for bx in b["boxes"]:
+            sz = bx["size"]
+            sx, sz_ = (sz[2], sz[0]) if round(yaw) % 180 == 90 else (sz[0], sz[2])
+            out["boxes"].append({"center": mv(bx["center"]), "size": [round(sx, 5), sz[1], round(sz_, 5)]})
+        for h in b.get("hulls", []):
+            out["hulls"].append({**h, "pos": mv(h["pos"]), "yaw": (h["yaw"] + yaw) % 360.0})
+        for d in b["doors"]:
+            out["doors"].append({**d, "side": part["type"] + "_" + d["side"], "center": mv(d["center"]),
+                                 "outward": turn(d["outward"])})
+        for sp in b["solid_probes"]:
+            out["solid_probes"].append({**sp, "side": part["type"] + "_" + sp["side"], "center": mv(sp["center"]),
+                                        "outward": turn(sp["outward"])})
+        fw, fd = b["footprint_m"]
+        if round(yaw) % 180 == 90:
+            fw, fd = fd, fw
+        rects.append((ox - fw / 2, ox + fw / 2, oz - fd / 2, oz + fd / 2))
+        height = max(height, b["height_m"])
+    place_props(c.get("props", []), out, root, (W, D))
+    # the apron: paving tiles over the footprint, except under a part (whose own floor is there)
+    if c.get("apron"):
+        path, entry, name = lib_piece(c["apron"], root)
+        tw, td = entry["size"][0], entry["size"][2]
+        nx, nz = int(round(W / tw)), int(round(D / td))
+        for j in range(nz):
+            for i in range(nx):
+                x, z = -W / 2 + tw * (i + 0.5), -D / 2 + td * (j + 0.5)
+                if any(r[0] - 0.01 <= x <= r[1] + 0.01 and r[2] - 0.01 <= z <= r[3] + 0.01 for r in rects):
+                    continue
+                out["pieces"].append({"piece": name, "path": path, "pos": [round(x, 5), 0.0, round(z, 5)], "yaw": 0.0})
+    out["boxes"].append({"center": [0, -0.05, 0], "size": [round(W, 5), 0.1, round(D, 5)]})
+    px, pz = c.get("probe_xz", [0.3, 0.3])
+    tops = [bx["center"][1] + bx["size"][1] / 2 for bx in out["boxes"]
+            if abs(px - bx["center"][0]) <= bx["size"][0] / 2 and abs(pz - bx["center"][2]) <= bx["size"][2] / 2]
+    out["probe_xz"] = [px, pz]
+    # points that must stay OPEN (the capsule fits): under a crane's portal, a truck lane
+    out["clear_probes"] = [list(map(float, q)) for q in c.get("clear_probes", [])]
+    out["wall_top_m"] = round(max(tops), 4)
+    out["height_m"] = round(max(height, out.get("props_top_m", 0.0)), 4)
+    out["roofline_m"] = out["height_m"]
+    check_doors_clear(out)
+    return out
+
+
 def layout_example(e, root):
+    """One whole piece as a scene with a trimesh collider (a kit's own example building, a landmark). A landmark
+    whose halls are hollow may be furnished: `props` and `doors` are given in the PIECE's own frame (Godot axes) and
+    moved with it; the props need no colliders of their own (the trimesh is built from the merged mesh, props
+    included). A piece with doors keeps its authored origin height (its floor is at 0); otherwise it is lifted so its
+    lowest point is on the ground."""
     kit_dir, kit, pieces = load_kit(root, e["kit"])
     p = pieces["pieces"][e["piece"]]
     res = "res://" + os.path.relpath(kit_dir, _project_root()).replace(os.sep, "/")
     lo, hi = p["min"], p["max"]
-    pos = [-(lo[0] + hi[0]) / 2, -lo[1], -(lo[2] + hi[2]) / 2]
-    return {"id": e["id"], "kit": e["kit"], "use": "kit example (re-scaled only)", "example": True,
-            "pieces": [{"piece": e["piece"], "path": res + "/" + p["path"],
-                        "pos": [round(v, 5) for v in pos], "yaw": 0.0}],
-            "footprint_m": [p["size"][0], p["size"][2]], "height_m": p["size"][1], "wall_top_m": p["size"][1],
-            "boxes": [], "doors": [], "solid_probes": [], "collision": "trimesh"}
+    pos = [-(lo[0] + hi[0]) / 2, 0.0 if (e.get("doors") or e.get("keep_origin")) else -lo[1], -(lo[2] + hi[2]) / 2]
+    out = {"id": e["id"], "kit": e["kit"], "use": e.get("use", "kit example (re-scaled only)"), "example": True,
+           "landmark": bool(e.get("landmark", False)),
+           "pieces": [{"piece": e["piece"], "path": res + "/" + p["path"],
+                       "pos": [round(v, 5) for v in pos], "yaw": 0.0}],
+           "footprint_m": [p["size"][0], p["size"][2]], "height_m": p["size"][1], "wall_top_m": p["size"][1],
+           "boxes": [], "hulls": [], "doors": [], "solid_probes": [], "collision": "trimesh",
+           "trimesh_pieces": 1}
+    if "probe_xz" in e:
+        out["probe_xz"] = e["probe_xz"]
+    moved = []
+    for pr in e.get("props", []):
+        q = dict(pr)
+        q["at"] = [pr["at"][0] + pos[0], pr["at"][1] + pos[2]]
+        q["collide"] = "none"
+        moved.append(q)
+    place_props(moved, out, root)
+    for i, d in enumerate(e.get("doors", [])):
+        out["doors"].append({"side": d.get("name", "door"), "module": i,
+                             "center": [round(d["at"][0] + pos[0], 5), 0.0, round(d["at"][1] + pos[2], 5)],
+                             "outward": [d["outward"][0], 0, d["outward"][1]],
+                             "width": d["width"], "height": d["height"]})
+    return out
 
 
 def _project_root():
@@ -364,8 +539,14 @@ def layout_all(types_path):
     ids = [t["id"] for t in doc["types"]] + [e["id"] for e in doc.get("examples", [])]
     if len(ids) != len(set(ids)):
         raise SystemExit("building ids must be unique")
+    ids += [c["id"] for c in doc.get("composites", [])] + [c["id"] for c in doc.get("custom", [])]
+    if len(ids) != len(set(ids)):
+        raise SystemExit("building ids must be unique")
+    types = [layout_type(t, root) for t in doc["types"]]
+    built = {b["id"]: b for b in types}
+    comps = [layout_composite(c, built, root) for c in doc.get("composites", [])]
     return {"generated_by": "tools/building_kit/layout_buildings.py",
-            "buildings": [layout_type(t, root) for t in doc["types"]] +
+            "buildings": types + comps + [layout_example(e, root) for e in doc.get("custom", [])] +
                          [layout_example(e, root) for e in doc.get("examples", [])]}
 
 
@@ -449,6 +630,28 @@ def self_test():
         check(False, "a type whose height misses its declared metres is refused")
     except SystemExit as e:
         check("misses the declared" in str(e), "a type whose height misses its declared metres is refused")
+    # library props and composite sites (PLAN.md 3.12)
+    k = by["Konbini"]
+    check(any(p["path"].startswith("res://assets/world_source/kits/library/") for p in k["pieces"]),
+          "the konbini carries library props")
+    types = json.load(open(TYPES_PATH))["types"]
+    bad = json.loads(json.dumps(next(x for x in types if x["id"] == "Konbini")))
+    d0 = next(d for d in k["doors"] if d["side"] == "front")
+    bad["props"].append({"piece": "library:Shop_Gondola", "at": [d0["center"][0], d0["center"][2] - 1.0]})
+    try:
+        layout_type(bad, KITS_DIR)
+        check(False, "refused: a gondola in front of the door")
+    except SystemExit as e:
+        check("is blocked" in str(e), "refused: a gondola in front of the door")
+    g = by["GasStation"]
+    check(g.get("composite") and len(g["doors"]) == 1 and g["doors"][0]["side"].startswith("GasKiosk"),
+          "the gas station carries its kiosk's door")
+    check(abs(g["wall_top_m"] - 5.6) < 0.01, f"the gas station's probe spot is under the canopy top ({g['wall_top_m']})")
+    st = by["StationRural"]
+    check(len(st["hulls"]) == 2, "the station's two platform ramps collide as hulls, not boxes")
+    backs = [d for d in st["doors"] if d["side"].endswith("_back")]
+    check(backs and abs(backs[0]["center"][2] - 0.91) < 1e-3 and backs[0]["outward"][2] == -1,
+          f"the station building's back door faces the platform at z 0.91 ({backs[0]['center'] if backs else None})")
     print("RESULT", "PASS" if ok else "FAIL")
     return ok
 

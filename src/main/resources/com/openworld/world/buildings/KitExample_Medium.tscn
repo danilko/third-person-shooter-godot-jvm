@@ -3,7 +3,7 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/KitExample_Medium_mesh.res" id="1_mntm7"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/KitExample_Medium_collision.res" id="2_7xr2q"]
 
-[node name="KitExample_Medium" type="Node3D" unique_id=1295777594]
+[node name="KitExample_Medium" type="Node3D" unique_id=1334916080]
 metadata/building = {
 "aabb": [Vector3(-6.8503203, 4.961528e-05, -5.9403205), Vector3(13.700672, 22.75788, 11.880671)],
 "collision": "trimesh",
@@ -13,17 +13,19 @@ metadata/building = {
 "height_m": 22.7579,
 "id": "KitExample_Medium",
 "kit": "quaternius_downtown_city",
+"landmark": false,
 "piece_count": 1,
 "solid_probes": [],
+"trimesh_pieces": 1.0,
 "use": "kit example (re-scaled only)",
 "wall_top_m": 22.7579
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=16014495]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=460929302]
 mesh = ExtResource("1_mntm7")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1589879794]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=555890481]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1763069949]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1682373839]
 shape = ExtResource("2_7xr2q")

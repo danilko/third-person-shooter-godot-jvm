@@ -48,6 +48,7 @@ import point_export as pe         # noqa: E402
 import point_zones as pz          # noqa: E402
 import lane_profile as lp         # noqa: E402
 import point_edges as ped         # noqa: E402
+import point_presets as pr        # noqa: E402
 import point_ground as pg         # noqa: E402
 import road_support as rs         # noqa: E402
 import point_record_ops as ro     # noqa: E402
@@ -185,6 +186,35 @@ def cmd_pieces(a):
     return gate
 
 
+#: Where the uphill side of a `cut_batter` road is judged: the natural ground this far past its paved edge, either side
+#: (past the stamp's 6 m flat verge, where the cut face starts).
+STEEP_PROBE = 16.0
+
+
+def _steep_side(line, k, half, grid, batter):
+    """The steep cut face of corridor point `k` for the terrain stamp (PLAN.md 3.15): `+batter` or `-batter` naming the
+    UPHILL side in GODOT axes (the sign of `cross(travel, offset)` in the Godot XZ plane, which is the kit's sign
+    flipped: Godot z is -kit y), or 0 -- no `cut_batter`, no ground, or level either side. Derived, never authored:
+    a road cut into a cliff has one side that is the mountain."""
+    if batter <= 0.0 or grid is None or len(line) < 2:
+        return 0
+    a, b = line[max(0, k - 1)], line[min(len(line) - 1, k + 1)]
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    n = math.hypot(dx, dy)
+    if n < 1e-9:
+        return 0
+    lx, ly = -dy / n, dx / n                       # kit left of travel
+    r = half + STEEP_PROBE
+    x, y = line[k][0], line[k][1]
+    gl, gr = grid(x + lx * r, y + ly * r), grid(x - lx * r, y - ly * r)
+    if gl is None and gr is None:
+        return 0
+    gl = -1e9 if gl is None else gl
+    gr = -1e9 if gr is None else gr
+    kit_side = 1.0 if gl > gr else -1.0            # +1: the mountain is on the kit LEFT (cross(travel, off) > 0)
+    return round(-kit_side * batter, 4)
+
+
 def cmd_corridors(a):
     """B7: every built surface as a corridor the Godot terrain stamp deforms Terrain3D to -- the SAME
     corridors `point_build.road_corridors` hands the island's ground carve (`point_edges.band_corridors`,
@@ -201,16 +231,29 @@ def cmd_corridors(a):
     bands = ped.solve_all(net, grid)[3]
     out = []
     kinds = {}
+    steep_n = 0
     for line, owner in _join_at_joints(net, [(list(line), str(owner))
                                             for line, _h, owner in ped.band_corridors(bands, owners=True)]):
+        road = net.roads.get(owner)
+        batter = float(getattr(road, "cut_batter", 0.0) or 0.0) if road is not None else 0.0
         pts = []
-        for (x, y, z, half) in line:
+        for k, (x, y, z, half) in enumerate(line):
             g = grid(x, y) if grid is not None else None
             kind = rs.support_kind(z, g) if g is not None else "UNKNOWN"
+            if kind == rs.SUPPORT_TUNNEL and batter > 0.0:
+                # a BENCH road (PLAN.md 3.15) is cut into the hillside, not bored: however deep the cut at its
+                # centreline, its downhill half may need a metre of fill (the coast road's sea half over the sand) --
+                # over land only (`BENCH`)
+                kind = "BENCH"
+            elif batter > 0.0 and kind in (rs.SUPPORT_NONE, rs.SUPPORT_FILL, rs.SUPPORT_CUT):
+                kind = "BENCH"     # a bench road fills over LAND only: never an embankment into the sea (road_kit_stamp)
             kinds[kind] = kinds.get(kind, 0) + 1
             gx, gy, gz = pe.godot((x, y, z))
-            pts.append([gx, gy, gz, round(float(half), 4), None if g is None else round(float(g), 4), kind])
+            pts.append([gx, gy, gz, round(float(half), 4), None if g is None else round(float(g), 4), kind,
+                        _steep_side(line, k, half, grid, batter)])
+            steep_n += 1 if pts[-1][6] else 0
         out.append({"owner": str(owner), "points": pts})
+    gate["steep_points"] = steep_n
     gate.update({"corridors": out, "kinds": kinds, "ground": bool(grid),
                  # The batter rules, from their one owner, so the stamp copies no constant.
                  "cut_slope": rs.CUT_SLOPE, "fill_slope": rs.FILL_SLOPE, "fill_max": rs.FILL_MAX,
@@ -463,6 +506,14 @@ cmd_renumber = _record_op(lambda net, a: ro.renumber_roads(net))
 cmd_repair = _record_op(lambda net, a: ro.repair_links(net))
 cmd_tidy = _record_op(lambda net, a: ro.tidy_roads(net))
 cmd_cross_section = _record_op(lambda net, a: ro.apply_cross_section(net, a.src, _uids(a.uids), _uids(a.groups)))
+def _preset(net, a):
+    try:
+        return pr.apply_preset(net, a.road, a.preset)
+    except pr.PresetError as e:
+        raise ro.GestureError(str(e))
+
+
+cmd_preset = _record_op(_preset)
 cmd_branch_ramp = _record_op(lambda net, a: ro.branch_ramp(
     net, a.uid, a.name, a.lanes, a.carriageway, a.entrance, a.length, a.spread, a.drop))
 
@@ -549,6 +600,8 @@ def main(argv=None):
         s = sub.add_parser(n); s.add_argument("record"); s.set_defaults(fn=fn)
     s = sub.add_parser("cross_section"); s.add_argument("record"); s.add_argument("src")
     s.add_argument("uids"); s.add_argument("groups"); s.set_defaults(fn=cmd_cross_section)
+    s = sub.add_parser("preset"); s.add_argument("record"); s.add_argument("road")
+    s.add_argument("preset", choices=sorted(pr.PRESETS)); s.set_defaults(fn=cmd_preset)
     s = sub.add_parser("branch_ramp"); s.add_argument("record"); s.add_argument("uid")
     s.add_argument("--name", default=""); s.add_argument("--lanes", type=int, default=1)
     s.add_argument("--carriageway", default="FWD", choices=("FWD", "BWD"))

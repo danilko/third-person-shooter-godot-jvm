@@ -85,8 +85,14 @@ def turn_class(in_dir, out_dir, straight_tol_deg=STRAIGHT_TOL_DEG,
     return TURN_L if delta > 0.0 else TURN_R
 
 
-def allowed_turns(lane_index, lane_count, index_from=FROM_MEDIAN, traffic_side=LEFT):
+def allowed_turns(lane_index, lane_count, index_from=FROM_MEDIAN, traffic_side=LEFT, available=None):
     """The turns a vehicle in this lane may legally take.
+
+    `available` is the set of turns this approach can actually make at this junction (None = every turn). At a T
+    there is no straight ahead, so a middle lane restricted to S would lead nowhere and a car in it would be stranded
+    (`point_flow`'s `broken`). With no straight on offer the approach's lanes SPLIT between the two turns instead: the
+    kerb half takes the nearside turn, the median half the offside one (a 3-lane stem: two lanes left, one right,
+    the Japanese T). A lane whose turns are all missing takes whichever turn exists.
 
     Keep-left (this project): the KERB lane is the nearside, so it may turn left or go straight;
     the MEDIAN lane is the offside, so it may turn right or go straight; anything between may only
@@ -95,6 +101,19 @@ def allowed_turns(lane_index, lane_count, index_from=FROM_MEDIAN, traffic_side=L
 
     This is a road rule, not a preference: letting a median lane turn nearside sends a car across
     every lane beside it inside the junction box."""
+    legal = _lane_turns(lane_index, lane_count, index_from, traffic_side)
+    if available is None or legal & set(available) or lane_count <= 1:
+        return legal
+    avail = set(available) - {TURN_U}
+    nearside = TURN_L if traffic_side == LEFT else TURN_R
+    offside = TURN_R if traffic_side == LEFT else TURN_L
+    from_kerb = (lane_count - 1 - lane_index) if index_from == FROM_MEDIAN else lane_index
+    if TURN_S not in avail and nearside in avail and offside in avail:
+        return {nearside} if from_kerb < lane_count / 2.0 else {offside}
+    return avail
+
+
+def _lane_turns(lane_index, lane_count, index_from, traffic_side):
     if lane_count <= 0:
         return set()
     if lane_count == 1:
@@ -112,14 +131,23 @@ def allowed_turns(lane_index, lane_count, index_from=FROM_MEDIAN, traffic_side=L
     return {TURN_S}
 
 
-def target_lane(lane_index, in_count, out_count, index_from=FROM_MEDIAN):
+def target_lane(lane_index, in_count, out_count, index_from=FROM_MEDIAN, turn=None, traffic_side=LEFT):
     """Which lane of the exit arm a movement lands in -- distance from the kerb, preserved and
     CLAMPED to what the exit actually has.
 
     Clamping by index is the whole answer to mixed lane counts: a 3-lane approach feeding a 2-lane
-    exit puts its outermost lane into the exit's outermost lane rather than inventing a third."""
+    exit puts its outermost lane into the exit's outermost lane rather than inventing a third.
+
+    An OFFSIDE turn (a right turn, keep-left) preserves distance from the MEDIAN instead: a car turning right turns
+    into the lane nearest the centre line, as the road rule says, so a right turn from a 2-lane road into a 3-lane one
+    lands in the median lane rather than the middle one."""
     if out_count <= 0:
         return None
+    offside = TURN_R if traffic_side == LEFT else TURN_L
+    if turn == offside:
+        from_median = in_count - 1 - lane_index if index_from == FROM_KERB else lane_index
+        from_median = min(max(0, from_median), out_count - 1)
+        return from_median if index_from == FROM_MEDIAN else out_count - 1 - from_median
     if index_from == FROM_MEDIAN:
         from_kerb = max(0, in_count - 1 - lane_index)
     else:
@@ -133,7 +161,7 @@ def target_lane(lane_index, in_count, out_count, index_from=FROM_MEDIAN):
 def movement_verdict(in_dir, out_dir, lane_index, in_count, out_count,
                      same_arm=False, allow_cross=True, allow_uturn=False,
                      index_from=FROM_MEDIAN, traffic_side=LEFT,
-                     straight_tol_deg=STRAIGHT_TOL_DEG, max_turn_deg=None):
+                     straight_tol_deg=STRAIGHT_TOL_DEG, max_turn_deg=None, available=None):
     """THE single legality rule. Returns a `Verdict`.
 
     `same_arm` is the caller's own knowledge that the exit belongs to the arm the vehicle arrived
@@ -159,7 +187,7 @@ def movement_verdict(in_dir, out_dir, lane_index, in_count, out_count,
             return Verdict(False, "turn of %.0f deg exceeds the %.0f deg limit"
                            % (delta, max_turn_deg), turn)
     if turn != TURN_U:
-        legal = allowed_turns(lane_index, in_count, index_from, traffic_side)
+        legal = allowed_turns(lane_index, in_count, index_from, traffic_side, available)
         if turn not in legal:
             return Verdict(False, "lane %d of %d may only take %s"
                            % (lane_index, in_count, "/".join(sorted(legal))), turn)
@@ -168,7 +196,7 @@ def movement_verdict(in_dir, out_dir, lane_index, in_count, out_count,
         if turn in (crossing, TURN_U):
             return Verdict(False, "crossing the opposing stream is disallowed at this junction",
                            turn)
-    tgt = target_lane(lane_index, in_count, out_count, index_from)
+    tgt = target_lane(lane_index, in_count, out_count, index_from, turn, traffic_side)
     return Verdict(True, "ok", turn, from_lane=lane_index, to_lane=tgt)
 
 
@@ -212,6 +240,19 @@ def self_test():
     assert target_lane(0, 3, 2) == 0        # median      -> clamped to median
     assert target_lane(0, 2, 3) == 1        # 2 into 3: median lane keeps 1 from the kerb
     print("OK: target_lane preserves distance from the kerb and clamps to the exit")
+
+    # A T: no straight on offer, so the lanes split between the turns instead of stranding the middle one.
+    assert allowed_turns(1, 3, available={TURN_L, TURN_R}) == {TURN_L}
+    assert allowed_turns(0, 3, available={TURN_L, TURN_R}) == {TURN_R, TURN_S}
+    assert allowed_turns(2, 3, available={TURN_L, TURN_R}) == {TURN_L, TURN_S}
+    assert allowed_turns(1, 3, available={TURN_S, TURN_L}) == {TURN_S}
+    assert allowed_turns(0, 2, available={TURN_L}) == {TURN_L}
+    print("OK: a T splits a 3-lane stem 2 left / 1 right; a lane with no legal turn on offer takes what exists")
+    # A right turn lands in the median lane of a wider exit (the road rule), a left turn in the kerb lane.
+    assert target_lane(0, 2, 3, turn=TURN_R) == 0
+    assert target_lane(1, 2, 3, turn=TURN_L) == 2
+    assert target_lane(0, 3, 2, turn=TURN_R) == 0
+    print("OK: right turns keep distance from the median, left turns from the kerb")
 
     # Full verdicts.
     v = movement_verdict(E, N, lane_index=2, in_count=3, out_count=3)
