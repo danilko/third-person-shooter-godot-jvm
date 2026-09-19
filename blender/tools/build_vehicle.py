@@ -67,6 +67,7 @@ REQUIRED = ["chassis"]                   # every other damageable part is option
 SOURCE_LAYOUT = {"SPC1"}
 WHEELS = ["wheel_lf", "wheel_rf", "wheel_lb", "wheel_rb"]
 HULL_EXCLUDE = WHEELS + ["windscreen"]
+HULL_FLOOR = 0.32            # m above the ground: the hull's lowest points (a kerb is 0.15 m, plus compression and roll)
 
 # (outward direction of the part's exposed side, inward push there, noise amplitude) - metres
 CRUMPLE = {
@@ -378,11 +379,17 @@ def build(vid):
         a, b = box(world(parts[n]))
         wheels[n] = {"centre": godot((a + b) / 2), "radius": round((b.z - a.z) / 2, 4)}
 
+    # The collision hull is a GAME body, not the visual one (every driving game does this):
+    #  * its floor is raised to HULL_FLOOR, so kerbs and bumps are the WHEELS' business - a hull reaching down to the
+    #    real sill height (0.18 m on SPC1) struck a 0.15 m kerb at speed and climbed it (probe_road_launch, 4.3 m/s);
+    #  * nothing sticks out past the BODY's width: side mirrors made the hull's flanks slope, a ramp against a wall.
+    body_half = max(abs(p.x) for n, o in parts.items() if n not in HULL_EXCLUDE and not n.startswith("door_")
+                    for p in world(o))
     bm = bmesh.new()
     for n, o in parts.items():
         if n not in HULL_EXCLUDE:
             for p in world(o):
-                bm.verts.new(p)
+                bm.verts.new(Vector((max(-body_half, min(body_half, p.x)), p.y, max(p.z, HULL_FLOOR))))
     bmesh.ops.convex_hull(bm, input=list(bm.verts))
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
     bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(18), verts=list(bm.verts), edges=list(bm.edges))
