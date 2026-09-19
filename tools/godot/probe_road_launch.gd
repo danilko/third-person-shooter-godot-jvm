@@ -116,6 +116,12 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 	ctrl.set("cruise_throttle", 1.0)
 	ctrl.set("junction_throttle_scale", 1.0)
 	ctrl.set("turn_slowdown", 0.3)
+	# The edge cases mean "the car's OUTER WHEELS on the kerb line", and -3 m was that for the prototype's wheels at
+	# +-1.1 m. A narrower track needs the same wheels-on-the-kerb line, not the same number: at -3 m SPC-1 (wheels at
+	# +-0.82) was spawned 0.28 m further out, its body already in the kerb, and read that as launches and falls.
+	if absf(offset) >= 3.0:
+		var track_half := absf((car.get_node("Wheels/FL") as Node3D).position.x)
+		offset += signf(offset) * (track_half - PROTOTYPE_TRACK_HALF)
 	ctrl.set("lateral_offset", offset)
 	if corner_accel >= 0.0:
 		ctrl.set("corner_lateral_accel", corner_accel)
@@ -130,6 +136,8 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 ## The gate (PLAN.md 0.1): each case drives one lane at speed, some deliberately on the edge line where a
 ## parapet begins (`offset` -3 m on the bridge's `link` lanes -- the car's outer wheels on the kerb line).
 ## Control: the pieces built before `point_edges.step_walls` launch on both edge cases every lap.
+const PROTOTYPE_TRACK_HALF := 1.1     # the wheel track the edge offsets were written for
+
 const GATE_CASES := [
 	["link_F1", 35.0, -3.0, 6.0], ["link_R1", 35.0, -3.0, 6.0],
 	["link_F1", 35.0, 0.0, 8.0], ["link_R1", 35.0, 3.0, 6.0],
