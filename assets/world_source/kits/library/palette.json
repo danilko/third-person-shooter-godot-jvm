@@ -1,0 +1,275 @@
+{
+ "notes": "The library palette: ONE owner of every material's look (PLAN.md 3.6b step 2). tools/building_kit/build_library_palette.py writes materials/<name>.tres from this. `tex` names a texture set in textures/ (<set>_Color/_NormalGL/_Roughness/_Metalness.jpg, or a generated <set>.png); `albedo_tex: false` keeps only its normal and roughness under a flat colour (so a black powder-coat set can be painted white). `size_m` is how many metres one texture repeat covers (world-space triplanar). `blender` is the flat viewport colour the kit .blend shows.",
+ "materials": {
+  "MI_Plaster": {
+   "tex": "PaintedPlaster017",
+   "size_m": 2.0,
+   "color": [
+    0.96,
+    0.95,
+    0.92
+   ]
+  },
+  "MI_TileWhite": {
+   "tex": "Tiles036",
+   "size_m": 1.0
+  },
+  "MI_Terrazzo": {
+   "tex": "Tiles043",
+   "size_m": 1.2
+  },
+  "MI_Steel": {
+   "tex": "Metal009",
+   "size_m": 1.0,
+   "metallic": 1.0
+  },
+  "MI_PaintedMetal": {
+   "tex": "Metal027",
+   "albedo_tex": false,
+   "size_m": 1.0,
+   "color": [
+    0.9,
+    0.9,
+    0.89
+   ],
+   "metallic": 0.3
+  },
+  "MI_PaintedMetalDark": {
+   "tex": "Metal027",
+   "albedo_tex": false,
+   "size_m": 1.0,
+   "color": [
+    0.16,
+    0.17,
+    0.18
+   ],
+   "metallic": 0.4
+  },
+  "MI_Wood": {
+   "tex": "WoodFloor062",
+   "size_m": 1.5
+  },
+  "MI_Fabric": {
+   "tex": "Fabric030",
+   "size_m": 0.6
+  },
+  "MI_FabricRed": {
+   "tex": "Fabric030",
+   "albedo_tex": false,
+   "size_m": 0.6,
+   "color": [
+    0.45,
+    0.08,
+    0.07
+   ]
+  },
+  "MI_Tactile": {
+   "tex": "TactilePaving005",
+   "size_m": 0.6
+  },
+  "MI_Corrugated": {
+   "tex": "CorrugatedSteel005",
+   "size_m": 1.5,
+   "metallic": 0.6
+  },
+  "MI_ConcreteSmooth": {
+   "tex_path": "res://assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete",
+   "orm": true,
+   "size_m": 2.73,
+   "color": [
+    0.88,
+    0.87,
+    0.84
+   ]
+  },
+  "MI_AsphaltLot": {
+   "tex_path": "res://assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_Asphalt",
+   "albedo_only": true,
+   "size_m": 2.73
+  },
+  "MI_GlassClear": {
+   "color": [
+    0.55,
+    0.68,
+    0.72,
+    0.3
+   ],
+   "transparent": true,
+   "metallic": 0.2,
+   "roughness": 0.05
+  },
+  "MI_Light": {
+   "color": [
+    1.0,
+    1.0,
+    0.97
+   ],
+   "emission": [
+    1.0,
+    0.98,
+    0.94
+   ],
+   "emission_energy": 2.0
+  },
+  "MI_PlasticWhite": {
+   "color": [
+    0.93,
+    0.93,
+    0.91
+   ],
+   "roughness": 0.3
+  },
+  "MI_PlasticDark": {
+   "color": [
+    0.12,
+    0.12,
+    0.13
+   ],
+   "roughness": 0.6
+  },
+  "MI_PaintWhite": {
+   "color": [
+    0.95,
+    0.95,
+    0.93
+   ],
+   "roughness": 0.7
+  },
+  "MI_Goods": {
+   "tex": "T_Goods",
+   "size_m": 0.8,
+   "roughness": 0.5
+  },
+  "MI_FasciaKonbini": {
+   "tex": "T_FasciaKonbini",
+   "size_m": 3.64,
+   "roughness": 0.4
+  },
+  "MI_FasciaGas": {
+   "tex": "T_FasciaGas",
+   "size_m": 3.64,
+   "roughness": 0.4
+  },
+  "MI_Sign": {
+   "color": [
+    0.12,
+    0.3,
+    0.55
+   ],
+   "emission": [
+    0.1,
+    0.25,
+    0.5
+   ],
+   "emission_energy": 0.6
+  },
+  "MI_PaintYellow": {
+   "tex": "Metal027",
+   "albedo_tex": false,
+   "size_m": 1.0,
+   "color": [
+    0.95,
+    0.75,
+    0.1
+   ],
+   "metallic": 0.2
+  },
+  "MI_Ballast": {
+   "tex_path": "res://assets/world_source/kits/quaternius_downtown_city/textures/T_Dirt",
+   "orm": true,
+   "size_m": 1.5,
+   "color": [
+    0.55,
+    0.55,
+    0.55
+   ]
+  },
+  "MI_BrickRed": {
+   "color": [
+    0.58,
+    0.22,
+    0.15
+   ],
+   "roughness": 0.85
+  },
+  "MI_RoofSlate": {
+   "color": [
+    0.2,
+    0.22,
+    0.26
+   ],
+   "roughness": 0.7
+  },
+  "MI_RoofCopper": {
+   "color": [
+    0.36,
+    0.6,
+    0.53
+   ],
+   "roughness": 0.6,
+   "metallic": 0.3
+  },
+  "MI_Gold": {
+   "color": [
+    0.88,
+    0.68,
+    0.2
+   ],
+   "roughness": 0.35,
+   "metallic": 0.9
+  },
+  "MI_StoneWall": {
+   "color": [
+    0.58,
+    0.57,
+    0.53
+   ],
+   "roughness": 0.9
+  },
+  "MI_AviationOrange": {
+   "color": [
+    0.93,
+    0.33,
+    0.1
+   ],
+   "roughness": 0.6
+  },
+  "MI_BrickKit": {
+   "tex_path": "res://assets/world_source/kits/quaternius_downtown_city/textures/T_RedBrick",
+   "orm": true,
+   "size_m": 2.73
+  },
+  "MI_CraneRed": {
+   "color": [
+    0.72,
+    0.14,
+    0.1
+   ],
+   "roughness": 0.7
+  },
+  "MI_LacquerRed": {
+   "color": [
+    0.66,
+    0.13,
+    0.1
+   ],
+   "roughness": 0.8
+  },
+  "MI_RoofTileRed": {
+   "color": [
+    0.74,
+    0.33,
+    0.22
+   ],
+   "roughness": 0.8
+  },
+  "MI_Limestone": {
+   "color": [
+    0.86,
+    0.82,
+    0.7
+   ],
+   "roughness": 0.8
+  }
+ }
+}

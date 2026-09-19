@@ -1,0 +1,199 @@
+{
+ "about": "Quaternius Universal Animation Library 1+2 (CC0) retargeted onto Godot-chan by blender/tools/retarget_ual.py. 'clips' adds each source clip under a scheme name (character_anim_naming.json); 'replace' writes a source clip (or 'A+B', played one after the other) INTO an existing placeholder action, keeping its name, so the AnimationTree picks it up with no scene edit. A_TPose is skipped: the rig's own tpose is the reference. A replace value may be {src, arms_over}: only the arms (clavicles down) take the source, in WORLD directions, over the named action's first-frame pose -- for clips the tree plays through an arms filter. 'Clip@N' holds one frame as a static loop. 'Clip@A:B' takes frames A..B. A 'clips' value may also be {name, arms_over}. 'drop' removes a clip (death_fall_back: the ragdoll is the death, CLAUDE.md W35). 'fist_axis' [x,y,z] (armature space) turns only the right wrist so a held handle points that way: melee and throwable hold the FIST's guard with the weapon stood up, 20 deg forward (W36).",
+ "sources": {
+  "UAL1": "assets/Universal Animation Library_1/Unreal-Godot/UAL1_Standard.glb",
+  "UAL2": "assets/Universal_Animation_Library_2/Unreal-Godot/UAL2_Standard.glb"
+ },
+ "bone_map": {
+  "root": "Root",
+  "Head": "head"
+ },
+ "reference_root_clip": "upright_idle-loop",
+ "clips": {
+  "UAL1/Crouch_Fwd_Loop": "crouch_sneak_forward-loop",
+  "UAL1/Crouch_Idle_Loop": "crouch_sneak_idle-loop",
+  "UAL1/Dance_Loop": "upright_dance-loop",
+  "UAL1/Fixing_Kneeling": "kneel_fix",
+  "UAL1/Hit_Chest": "hit_chest",
+  "UAL1/Hit_Head": "hit_head",
+  "UAL1/Idle_Loop": "upright_idle_relaxed-loop",
+  "UAL1/Idle_Talking_Loop": "upright_talk-loop",
+  "UAL1/Idle_Torch_Loop": "upright_hold_torch-loop",
+  "UAL1/Interact": "interact",
+  "UAL1/Jog_Fwd_Loop": "upright_jog_forward-loop",
+  "UAL1/Jump_Land": "jump_land",
+  "UAL1/Jump_Loop": "jump_air-loop",
+  "UAL1/Jump_Start": "jump_start",
+  "UAL1/PickUp_Table": "pickup_table",
+  "UAL1/Pistol_Aim_Down": "upright_aim_pistol_down-loop",
+  "UAL1/Pistol_Aim_Neutral": "upright_aim_pistol_level-loop",
+  "UAL1/Pistol_Aim_Up": "upright_aim_pistol_up-loop",
+  "UAL1/Pistol_Idle_Loop": "upright_ready_pistol-loop",
+  "UAL1/Pistol_Reload": "reload_pistol",
+  "UAL1/Pistol_Shoot": "fire_pistol",
+  "UAL1/Punch_Cross": "punch_cross",
+  "UAL1/Punch_Jab": "punch_jab",
+  "UAL1/Push_Loop": "upright_push-loop",
+  "UAL1/Roll": "roll_forward",
+  "UAL1/Sitting_Enter": "sit_enter",
+  "UAL1/Sitting_Exit": "sit_exit",
+  "UAL1/Sitting_Idle_Loop": "sit_idle-loop",
+  "UAL1/Sitting_Talking_Loop": "sit_talk-loop",
+  "UAL1/Spell_Simple_Enter": "cast_enter",
+  "UAL1/Spell_Simple_Exit": "cast_exit",
+  "UAL1/Spell_Simple_Idle_Loop": "cast_idle-loop",
+  "UAL1/Spell_Simple_Shoot": "cast_shoot",
+  "UAL1/Sprint_Loop": "upright_sprint_forward-loop",
+  "UAL1/Sword_Attack": "sword_attack",
+  "UAL1/Sword_Idle": "upright_guard_sword-loop",
+  "UAL1/Walk_Formal_Loop": "upright_walk_formal-loop",
+  "UAL1/Walk_Loop": "upright_walk_casual-loop",
+  "UAL2/Chest_Open": "open_chest",
+  "UAL2/ClimbUp_1m": "climb_up_1m",
+  "UAL2/Consume": "consume",
+  "UAL2/Farm_Harvest": "farm_harvest",
+  "UAL2/Farm_PlantSeed": "farm_plant",
+  "UAL2/Farm_Watering": "farm_water",
+  "UAL2/Hit_Knockback": "hit_knockback",
+  "UAL2/Idle_FoldArms_Loop": "upright_idle_fold_arms-loop",
+  "UAL2/Idle_Lantern_Loop": "upright_hold_lantern-loop",
+  "UAL2/Idle_No_Loop": "upright_gesture_no-loop",
+  "UAL2/Idle_Rail_Call": "rail_call",
+  "UAL2/Idle_Rail_Loop": "upright_lean_rail-loop",
+  "UAL2/Idle_Shield_Break": "shield_break",
+  "UAL2/Idle_Shield_Loop": "upright_guard_shield-loop",
+  "UAL2/Idle_TalkingPhone_Loop": "upright_phone-loop",
+  "UAL2/LayToIdle": "crawl_stand_up",
+  "UAL2/Melee_Hook": "punch_hook",
+  "UAL2/Melee_Hook_Rec": "punch_hook_recover",
+  "UAL2/NinjaJump_Idle_Loop": "jump_ninja_air-loop",
+  "UAL2/NinjaJump_Land": "jump_ninja_land",
+  "UAL2/NinjaJump_Start": "jump_ninja_start",
+  "UAL2/OverhandThrow": "throw_overhand",
+  "UAL2/Shield_Dash": "shield_dash",
+  "UAL2/Shield_OneShot": "shield_bash",
+  "UAL2/Slide_Exit": "slide_exit",
+  "UAL2/Slide_Loop": "slide-loop",
+  "UAL2/Slide_Start": "slide_start",
+  "UAL2/Sword_Block": "sword_block",
+  "UAL2/Sword_Dash": "sword_dash",
+  "UAL2/Sword_Heavy_Combo": "sword_heavy_combo",
+  "UAL2/Sword_Regular_A": "sword_slash_a",
+  "UAL2/Sword_Regular_A_Rec": "sword_slash_a_recover",
+  "UAL2/Sword_Regular_B": "sword_slash_b",
+  "UAL2/Sword_Regular_B_Rec": "sword_slash_b_recover",
+  "UAL2/Sword_Regular_C": "sword_slash_c",
+  "UAL2/Sword_Regular_Combo": "sword_combo",
+  "UAL2/TreeChopping_Loop": "chop_tree-loop",
+  "UAL2/Walk_Carry_Loop": "upright_walk_carry-loop",
+  "UAL2/Yes": "gesture_yes",
+  "UAL2/Zombie_Idle_Loop": "zombie_idle-loop",
+  "UAL2/Zombie_Scratch": "zombie_attack",
+  "UAL2/Zombie_Walk_Fwd_Loop": "zombie_walk_forward-loop",
+  "UAL2/OverhandThrow@6:32": {
+   "name": "attack_throw",
+   "arms_over": "upright_idle-loop"
+  }
+ },
+ "replace": {
+  "drive_idle-loop": "UAL1/Driving_Loop",
+  "swim_idle-loop": "UAL1/Swim_Idle_Loop",
+  "swim_forward-loop": "UAL1/Swim_Fwd_Loop",
+  "attack_jab_fist": {
+   "src": "UAL1/Punch_Jab",
+   "arms_over": "upright_idle-loop"
+  },
+  "attack_cross_fist": {
+   "src": "UAL1/Punch_Cross",
+   "arms_over": "upright_idle-loop"
+  },
+  "attack_stab_mw1": {
+   "src": "UAL1/Punch_Cross",
+   "arms_over": "upright_idle-loop"
+  },
+  "attack_slash_mw1": {
+   "src": "UAL2/Sword_Regular_A+UAL2/Sword_Regular_A_Rec",
+   "arms_over": "upright_idle-loop"
+  },
+  "attack_swing_mw2": {
+   "src": "UAL2/Sword_Regular_A+UAL2/Sword_Regular_A_Rec",
+   "arms_over": "upright_idle-loop"
+  },
+  "attack_chop_mw2": {
+   "src": "UAL1/Sword_Attack",
+   "arms_over": "upright_idle-loop"
+  },
+  "swim_back-loop": "UAL1/Swim_Idle_Loop",
+  "swim_left-loop": "UAL1/Swim_Idle_Loop",
+  "swim_right-loop": "UAL1/Swim_Idle_Loop",
+  "upright_hold_fist-loop": {
+   "src": "UAL1/Punch_Jab@0",
+   "arms_over": "upright_idle-loop"
+  },
+  "upright_aim_fist-loop": {
+   "src": "UAL1/Punch_Jab@0",
+   "arms_over": "upright_idle-loop"
+  },
+  "upright_hold_melee-loop": {
+   "src": "UAL1/Punch_Jab@0",
+   "arms_over": "upright_idle-loop",
+   "fist_axis": [
+    0.0,
+    -0.342,
+    0.9397
+   ]
+  },
+  "upright_aim_melee-loop": {
+   "src": "UAL1/Punch_Jab@0",
+   "arms_over": "upright_idle-loop",
+   "fist_axis": [
+    0.0,
+    -0.342,
+    0.9397
+   ]
+  },
+  "weapon_switch_melee": {
+   "src": "UAL1/Punch_Jab@0~14",
+   "arms_over": "upright_idle-loop",
+   "fist_axis": [
+    0.0,
+    -0.342,
+    0.9397
+   ]
+  },
+  "weapon_switch_fist": {
+   "src": "UAL1/Punch_Jab@0~14",
+   "arms_over": "upright_idle-loop"
+  },
+  "upright_hold_throwable-loop": {
+   "src": "UAL1/Punch_Jab@0",
+   "arms_over": "upright_idle-loop",
+   "fist_axis": [
+    0.0,
+    -0.342,
+    0.9397
+   ]
+  },
+  "upright_aim_throwable-loop": {
+   "src": "UAL1/Punch_Jab@0",
+   "arms_over": "upright_idle-loop",
+   "fist_axis": [
+    0.0,
+    -0.342,
+    0.9397
+   ]
+  },
+  "weapon_switch_throwable": {
+   "src": "UAL1/Punch_Jab@0~14",
+   "arms_over": "upright_idle-loop",
+   "fist_axis": [
+    0.0,
+    -0.342,
+    0.9397
+   ]
+  }
+ },
+ "drop": [
+  "death_fall_back"
+ ]
+}

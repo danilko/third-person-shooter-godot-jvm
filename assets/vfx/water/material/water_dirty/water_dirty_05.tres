@@ -1,0 +1,36 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://b4yv7sigso32k"]
+
+[ext_resource type="Shader" uid="uid://tfq70i66wd11" path="res://assets/vfx/water/water.gdshader" id="1_vt5b4"]
+[ext_resource type="Texture2D" uid="uid://b5rlyseiwtmq6" path="res://assets/vfx/water/texture/foam/foam_texture_05.tres" id="2_jfd0f"]
+[ext_resource type="Texture2D" uid="uid://dva4bxe0jum5u" path="res://assets/vfx/water/texture/wave/wave_05/wave_normal_05.tres" id="3_ekneb"]
+[ext_resource type="Texture2D" uid="uid://cewlmqjx6he2t" path="res://assets/vfx/water/texture/wave/wave_05/wave_texture_05.tres" id="4_jkapi"]
+[ext_resource type="Texture2D" path="res://assets/vfx/water/texture/noise/cellular_01.tres" id="noise_0"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_vt5b4")
+shader_parameter/surface_color = Color(0.7323046, 0.924569, 0.7050765, 1)
+shader_parameter/depth_color = Color(0.2543769, 0.42672738, 0.40737543, 1)
+shader_parameter/foam_color = Color(1, 1, 1, 1)
+shader_parameter/depth_size = 4.0
+shader_parameter/surface_roughness = 0.56999998725936
+shader_parameter/foam_roughness = 0.999999977648
+shader_parameter/caustics_texture = ExtResource("noise_0")
+shader_parameter/caustics_strength = 2.0
+shader_parameter/caustics_scale = Vector2(0.7, 0.7)
+shader_parameter/wave_texture = ExtResource("4_jkapi")
+shader_parameter/wave_normal_texture = ExtResource("3_ekneb")
+shader_parameter/wave_softness = 4.20000006258504
+shader_parameter/wave_scale = Vector2(0.2, 0.2)
+shader_parameter/wave_layer_scale = Vector2(1.2, 1.2)
+shader_parameter/wave_highlight = 0.5
+shader_parameter/wave_velocity = Vector2(0.02, 0.02)
+shader_parameter/foam_texture = ExtResource("2_jfd0f")
+shader_parameter/edge_foam_depth_size = 0.5
+shader_parameter/wave_foam_amount = 0.86999998055376
+shader_parameter/foam_start = 0.0
+shader_parameter/foam_end = 0.7500000111759
+shader_parameter/foam_exponent = 1.0
+shader_parameter/refraction_amount = 0.5
+shader_parameter/refraction_exponent = 0.5
+shader_parameter/displacement_amount = 0.3

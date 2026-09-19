@@ -1,0 +1,36 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://c4s55451jwnlq"]
+
+[ext_resource type="Shader" uid="uid://tfq70i66wd11" path="res://assets/vfx/water/water.gdshader" id="1_m35i3"]
+[ext_resource type="Texture2D" uid="uid://bfsdnpssgtqbu" path="res://assets/vfx/water/texture/caustics/caustics_texture_01.tres" id="2_3qwk8"]
+[ext_resource type="Texture2D" uid="uid://difwql5juxq1u" path="res://assets/vfx/water/texture/foam/foam_texture_01.tres" id="3_gbbvq"]
+[ext_resource type="Texture2D" uid="uid://u0xe4yijartw" path="res://assets/vfx/water/texture/wave/wave_01/wave_normal_01.tres" id="4_qx1bt"]
+[ext_resource type="Texture2D" uid="uid://drge4dyqsl24g" path="res://assets/vfx/water/texture/wave/wave_01/wave_texture_01.tres" id="5_g1lo2"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_m35i3")
+shader_parameter/surface_color = Color(0.2, 1, 0.8, 1)
+shader_parameter/depth_color = Color(0.08, 0.2, 0.4, 1)
+shader_parameter/foam_color = Color(1, 1, 1, 1)
+shader_parameter/depth_size = 12.0
+shader_parameter/surface_roughness = 0.999999977648
+shader_parameter/foam_roughness = 0.999999977648
+shader_parameter/caustics_texture = ExtResource("2_3qwk8")
+shader_parameter/caustics_strength = 2.0
+shader_parameter/caustics_scale = Vector2(0.7, 0.7)
+shader_parameter/wave_texture = ExtResource("5_g1lo2")
+shader_parameter/wave_normal_texture = ExtResource("4_qx1bt")
+shader_parameter/wave_softness = 3.40000005066408
+shader_parameter/wave_scale = Vector2(0.2, 0.2)
+shader_parameter/wave_layer_scale = Vector2(1.5, 1.5)
+shader_parameter/wave_highlight = 0.5
+shader_parameter/wave_velocity = Vector2(0.02, 0.02)
+shader_parameter/foam_texture = ExtResource("3_gbbvq")
+shader_parameter/edge_foam_depth_size = 0.5
+shader_parameter/wave_foam_amount = 0.38999999128272
+shader_parameter/foam_start = 0.0
+shader_parameter/foam_end = 0.60000000894072
+shader_parameter/foam_exponent = 1.0
+shader_parameter/refraction_amount = 0.5
+shader_parameter/refraction_exponent = 0.5
+shader_parameter/displacement_amount = 0.3

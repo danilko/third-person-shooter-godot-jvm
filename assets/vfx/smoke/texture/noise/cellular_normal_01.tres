@@ -1,0 +1,18 @@
+[gd_resource type="NoiseTexture2D" format=3 uid="uid://bcie7sjv1pmxw"]
+
+[sub_resource type="Gradient" id="Gradient_boffr"]
+interpolation_color_space = 1
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_boffr"]
+noise_type = 2
+fractal_type = 0
+fractal_octaves = 1
+
+[resource]
+noise = SubResource("FastNoiseLite_boffr")
+color_ramp = SubResource("Gradient_boffr")
+seamless = true
+invert = true
+as_normal_map = true
+seamless_blend_skirt = 0.2
+bump_strength = 64.0

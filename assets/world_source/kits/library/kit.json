@@ -1,0 +1,16 @@
+{
+  "id": "library",
+  "title": "Japanese central library (our own): building parts, interiors, street and station props",
+  "author": "this project",
+  "licence": "CC0 1.0",
+  "notes": [
+    "The project's own central library of Japanese building parts, interior furniture and street props. Everything here is ours to edit and ship: procedural pieces are modelled by blender/tools/build_library.py, and a few pieces started from CC0 base meshes by elbolilloduro (itch.io) that were cut out, re-scaled to Japanese sizes and RE-TEXTURED with this kit's palette. Every such piece records its origin in its collection's `lib_base_mesh` property and in CREDITS.md.",
+    "NEVER import or commit an elbolilloduro download (or any other pack whose textures are not cleared) into the repo or reference it from game code. Those downloads mix CC0 models with Textures.com textures that may not be redistributed. A download is read ONCE, locally, by build_library.py --extract, and then deleted; .gitignore keeps `assets/world_source/kits/elbolilloduro*/` out of git.",
+    "library.blend OWNS the pieces (the building-kit rule, PLAN.md 3.6b step 1): edit a piece there and run tools/building_kit/build_buildings.sh. build_library.py --procedural rebuilds only the generated pieces in place; --extract needs the (deleted) downloads and refuses to run over an existing file without --force.",
+    "palette.json OWNS every material's look: tools/building_kit/build_library_palette.py writes materials/MI_*.tres and the generated textures from it. Materials are world-space triplanar, so any mesh wears them without its own UVs (which is what makes re-texturing a foreign base mesh cheap). textures/ holds AmbientCG CC0 sets (textures/SOURCES.md) and our generated PNGs.",
+    "Sizes are Japanese: the plan grid is the ken (1.82 m, the downtown kit's module after its 0.91 scale), and building sizes come from PLATEAU MEASUREMENTS (tools/plateau2json/measure_building_types.py; statistics only, no PLATEAU data in the repo)."
+  ],
+  "source_module_m": 1.82,
+  "source_storey_m": 2.73,
+  "module_scale": 1.0
+}

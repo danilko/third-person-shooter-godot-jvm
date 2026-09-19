@@ -1,0 +1,119 @@
+[gd_scene format=3 uid="uid://bbwuhxxuh3k05"]
+
+[ext_resource type="Material" uid="uid://b6wndai1i7dhj" path="res://assets/vfx/smoke/material/smoke/smoke_02.tres" id="1_3vtct"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/vfx/SmokeVfx.java" id="1_kl6mj"]
+[ext_resource type="Material" uid="uid://bm033h1x2csu1" path="res://assets/vfx/smoke/material/shadow_caster.tres" id="3_5y5v0"]
+
+[sub_resource type="Curve" id="Curve_kl6mj"]
+_data = [Vector2(0, 0.4), 0.0, 4.829702, 0, 0, Vector2(0.2, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), -1.8624723, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_5y5v0"]
+curve = SubResource("Curve_kl6mj")
+
+[sub_resource type="Gradient" id="Gradient_5y5v0"]
+colors = PackedColorArray(0, 0, 1, 1, 1, 0, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_g0dct"]
+gradient = SubResource("Gradient_5y5v0")
+
+[sub_resource type="Gradient" id="Gradient_g0dct"]
+offsets = PackedFloat32Array(0, 0.9508197)
+colors = PackedColorArray(1, 0, 0, 1, 1, 0, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_gjxn1"]
+gradient = SubResource("Gradient_g0dct")
+
+[sub_resource type="Curve" id="Curve_gjxn1"]
+_data = [Vector2(0, 0.29213488), 0.0, 1.3188686, 0, 0, Vector2(1, 1), 1.2132004, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_bu8y8"]
+curve = SubResource("Curve_gjxn1")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_bu8y8"]
+direction = Vector3(0, 1, 0)
+spread = 8.0
+initial_velocity_min = 3.5
+initial_velocity_max = 3.5
+gravity = Vector3(0, 0, 0)
+scale_min = 0.79999995
+scale_max = 1.1999999
+scale_curve = SubResource("CurveTexture_bu8y8")
+color_ramp = SubResource("GradientTexture1D_gjxn1")
+color_initial_ramp = SubResource("GradientTexture1D_g0dct")
+alpha_curve = SubResource("CurveTexture_5y5v0")
+
+[sub_resource type="QuadMesh" id="QuadMesh_wmb53"]
+size = Vector2(4, 4)
+subdivide_width = 16
+subdivide_depth = 16
+
+[sub_resource type="Curve" id="Curve_5y5v0"]
+_data = [Vector2(0, 0.4), 0.0, 4.829702, 0, 0, Vector2(0.3, 1), 0.0, 0.0, 0, 0, Vector2(0.9932432, 0.011235952), -2.5748465, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_wmb53"]
+curve = SubResource("Curve_5y5v0")
+
+[sub_resource type="Gradient" id="Gradient_gjxn1"]
+colors = PackedColorArray(0, 0, 1, 1, 1, 0, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_86df3"]
+gradient = SubResource("Gradient_gjxn1")
+
+[sub_resource type="Gradient" id="Gradient_bu8y8"]
+offsets = PackedFloat32Array(0, 0.2, 0.5, 0.8)
+colors = PackedColorArray(1, 0, 1, 1, 1, 0, 0.4666667, 1, 1, 0, 0.19999999, 1, 1, 0, 0, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_nray5"]
+gradient = SubResource("Gradient_bu8y8")
+
+[sub_resource type="Curve" id="Curve_wmb53"]
+_data = [Vector2(0, 0.29213488), 0.0, 1.3188686, 0, 0, Vector2(0.695946, 1), 0.0, 0.0, 0, 0, Vector2(1, 0), -8.106748, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_6j5jg"]
+curve = SubResource("Curve_wmb53")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_86df3"]
+direction = Vector3(0, 1, 0)
+spread = 8.0
+initial_velocity_min = 3.0
+initial_velocity_max = 4.0
+radial_velocity_min = -0.50002235
+radial_velocity_max = -2.2351742e-05
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_6j5jg")
+color_ramp = SubResource("GradientTexture1D_nray5")
+color_initial_ramp = SubResource("GradientTexture1D_86df3")
+alpha_curve = SubResource("CurveTexture_wmb53")
+
+[sub_resource type="SphereMesh" id="SphereMesh_nray5"]
+radius = 1.0
+height = 2.0
+radial_segments = 16
+rings = 8
+
+[node name="SmokeVFX_02" type="Node3D" unique_id=1533405155]
+script = ExtResource("1_kl6mj")
+
+[node name="Smoke" type="GPUParticles3D" parent="." unique_id=424352231]
+material_override = ExtResource("1_3vtct")
+cast_shadow = 2
+amount = 48
+lifetime = 2.0
+draw_order = 3
+transform_align = 1
+process_material = SubResource("ParticleProcessMaterial_bu8y8")
+draw_pass_1 = SubResource("QuadMesh_wmb53")
+
+[node name="ShadowCaster" type="GPUParticles3D" parent="." unique_id=140175788 groups=["ShadowCaster"]]
+material_override = ExtResource("3_5y5v0")
+transparency = 1.0
+amount = 24
+lifetime = 2.0
+draw_order = 3
+transform_align = 1
+process_material = SubResource("ParticleProcessMaterial_86df3")
+draw_pass_1 = SubResource("SphereMesh_nray5")
