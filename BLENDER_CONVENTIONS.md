@@ -150,11 +150,10 @@ The "instance, never copy" rule is now produced by the baker. Two levels of reus
    per placement → edit the referenced kit leaf, every placement updates. Composes recursively (a baked
    `Building.tscn` is just another instanceable `.tscn`).
 
-**Working examples (the building tier's starting template):** `assets/world_source/buildings/
-PLATEAU_TokyoTower.blend`/`PLATEAU_ShibuyaScramble.blend` (hand-modeled landmark placeholders,
-placed via `build_district.place_landmark()`) and `buildings/RecycledBuildingKit.blend` (55 real
-PLATEAU buildings recycled from already-extracted precinct data, one top-level collection per
-placeable asset — see `AUTHORING_GUIDE.md` §10) are the pattern to copy/extend by hand for any new
+**Working examples (the building tier's starting template):** since 2026-09-18 every building,
+landmarks included, comes from `assets/world_source/buildings/building_types.json` and the kits
+(`kits/library/library.blend` holds the landmark base models; the old `PLATEAU_*.blend` and
+RecycledBuildingKit.blend were deleted, see `AUTHORING_GUIDE.md` §10). Those are the pattern to copy/extend by hand for any new
 hand-crafted building (see `AUTHORING_GUIDE.md` §2's edit-channels table). A marker-based
 building assembled from staged kit leaves (`kit_common.instance_marker`, one `asset_path` marker per
 leaf, baked to `ext_resource`+`instance=` node references with zero inlined mesh data) is the same
@@ -296,7 +295,7 @@ pieces, not placeholder boxes:
 
 1. **Leaf kit** — the real `kit/build_*.py` library (walls/roads/props/highrise/infra), staged as
    `.glb` under `res://…/world/kit/`, each with a real `-colonly`/`-convcolonly` proxy.
-2. **Building** — `assets/world_source/buildings/PLATEAU_TokyoTower.blend`/`RecycledBuildingKit.blend`
+2. **Building** — `assets/world_source/buildings/building_types.json` + `kits/library/library.blend` (was `PLATEAU_TokyoTower.blend`, deleted 2026-09-18)
    (real geometry, individually hand-editable, placed via `build_district.place_landmark()`/
    `lib/recycled_buildings.py`) — the working building-tier template, see this file's "Nested
    instancing" section above and `AUTHORING_GUIDE.md` §10.

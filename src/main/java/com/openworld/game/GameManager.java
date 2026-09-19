@@ -360,7 +360,6 @@ public class GameManager extends Node {
                 net.sendBaselineFactionRelationships(peerId);
                 net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
                 net.sendBaselineRace(peerId);   // a race already in progress (R2)
-                net.sendBaselineBreakableProps(peerId);   // knocked-down street poles (3.11)
             }
             return;
         }
@@ -379,7 +378,6 @@ public class GameManager extends Node {
             net.sendBaselineFactionRelationships(peerId);   // runtime relationship flips (D3)
             net.sendBaselineBreakables(peerId);   // already-broken destructibles (I2)
             net.sendBaselineRace(peerId);   // a race already in progress (R2)
-            net.sendBaselineBreakableProps(peerId);   // knocked-down street poles (3.11)
         }
         spawnPlayerBody(peerId, persistentPlayerId);
     }
@@ -1122,8 +1120,8 @@ public class GameManager extends Node {
     /** Racer finished (R2) — key = characterId, value = finish time, args = [raceId, place]. The race ENDING needs no event: it is the mission completing/failing, which already replicates. */
     public static final int WORLD_EVENT_RACE_FINISH = 11;
 
-    /** A street pole knocked down (1) or back (0) (PLAN.md 3.11) — key = {@code piece|asset|index}, args = the car's velocity x, y, z (the cosmetic fall). Host BreakableProps broadcasts; clients apply. */
-    public static final int WORLD_EVENT_PROP_BROKEN = 12;
+    // 12 was WORLD_EVENT_PROP_BROKEN (street poles, 3.11); retired by 3.11b — a knocked-down pole is local to each
+    // peer and sends nothing. Do not reuse the number while an older build could still send it.
 
     /** Routes a decoded MSG_WORLD_EVENT to the owning system. Extend the switch as networked world state is added. */
     public void onWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
@@ -1139,7 +1137,6 @@ public class GameManager extends Node {
             case WORLD_EVENT_RACE_START -> applyRaceStart(key, value, args);
             case WORLD_EVENT_RACE_CHECKPOINT -> applyRaceCheckpoint(key, value, args);
             case WORLD_EVENT_RACE_FINISH -> applyRaceFinish(key, value, args);
-            case WORLD_EVENT_PROP_BROKEN -> com.openworld.world.BreakableProps.applyRemote(key, value, args);
             // case WORLD_EVENT_DOOR -> applyDoorState(key, value);
             default -> GD.print("GameManager: unhandled world event type " + eventType + " key=" + key);
         }

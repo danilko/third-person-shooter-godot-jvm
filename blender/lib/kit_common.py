@@ -3401,8 +3401,8 @@ def append_kit(here, blendname, coll_name):
 
 
 def place_landmark(coll, blend_path, collection_name, loc):
-    """Append a hand-modeled building-tier asset (its own top-level collection, e.g.
-    PLATEAU_TokyoTower.blend's "TokyoTower" collection) and place its objects at `loc` (world/
+    """Append a hand-modeled building-tier asset (its own top-level collection; the old example,
+    PLATEAU_TokyoTower.blend, was replaced 2026-09-18 by the library kit's `TokyoTower` piece) and place its objects at `loc` (world/
     local coordinates in the CALLER's own frame -- a district piece's post-recenter local origin,
     or build_world.py's grid-space-then-to_world() frame; this helper only translates by `loc`,
     it doesn't know or care which frame that is). Distinct from `append_kit` (which links a shared

@@ -42,6 +42,9 @@ var gizmo: EditorNode3DGizmoPlugin
 var ramp_lanes: SpinBox
 var ramp_carriageway: OptionButton
 var ramp_entrance: CheckBox
+var road_type: OptionButton
+## the road types `point_presets.PRESETS` defines (roadkit_cli.py `preset` refuses any other name)
+const ROAD_TYPES := ["expressway", "trunk", "block", "lane", "farm", "coast"]
 var cross_groups := {}
 ## The point the artist selected LAST -- the kit's "active" point (Apply Cross-Section's source).
 var active_point: Node
@@ -125,6 +128,17 @@ func _enter_tree() -> void:
 	rrow.add_child(ramp_entrance)
 	dock.add_child(rrow)
 	_button("Branch Ramp Here", _on_branch_ramp)
+	var trow := HBoxContainer.new()
+	road_type = OptionButton.new()
+	for t in ROAD_TYPES:
+		road_type.add_item(t)
+	road_type.tooltip_text = "expressway 2+2 no footway, on piers; trunk 3+3 raised median, 4 m footways; block 1+1 2 m footways; lane 1+1 painted edge only; farm 1+1 narrow (point_presets.py)"
+	trow.add_child(road_type)
+	var tb := Button.new()
+	tb.text = "Apply Road Type"
+	tb.pressed.connect(_on_road_type)
+	trow.add_child(tb)
+	dock.add_child(trow)
 	_button("Merge Points", func(): _selection_gesture("Merge Points", "merge", 2))
 	_button("Split To New Road", func(): _selection_gesture("Split To New Road", "split", 1))
 	_button("Select Junction", _on_select_junction)
@@ -994,6 +1008,23 @@ func _network_gesture(label: String, cmd: String) -> void:
 	var net := _network()
 	if net != null:
 		_record_gesture(label, net, cmd, [])
+
+func _on_road_type() -> void:
+	# the road of the selection: a selected road node, or the road a selected station belongs to
+	var road: Node = null
+	for n in get_editor_interface().get_selection().get_selected_nodes():
+		if Gestures.is_road(n):
+			road = n
+			break
+	if road == null:
+		var pts := _selected_points()
+		if not pts.is_empty():
+			road = pts[0].get_parent()
+	if road == null:
+		_say({"ok": false, "message": "Apply Road Type: select a road, or one of its stations"})
+		return
+	var t := road_type.get_item_text(road_type.selected)
+	_record_gesture("Road Type: " + t, Gestures.network_of(road), "preset", [str(road.name), t])
 
 func _on_branch_ramp() -> void:
 	var pts := _selected_points()

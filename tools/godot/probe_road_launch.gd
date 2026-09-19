@@ -6,6 +6,10 @@ extends SceneTree
 ##       -- --world=res://src/main/resources/com/openworld/world/World.tscn --lane=shrine_touge_F0 ...   (another scene)
 ##       -- ... --corner-accel=0   (a single case drives with the traffic brain's own corner governor unless told
 ##       otherwise; GATE_CASES turn it off, because they exist to reach the parapets at speed)
+##       -- ... --park=x,z   put the (disabled) streaming player over (x, z) instead of PARK
+##       -- ... --follow=1   keep the streaming player 400 m over the car, for a drive longer than one zone
+##       A FALL (the car metres below the lane it is on: through or over a wall, off a deck edge) counts like a launch;
+##       drive with --offset beside a barrier (e.g. +7 on a 2-lane ramp) to test a wall at speed.
 ##
 ## Runs the real DebugWorld with its two streamed Road Kit pieces, puts one Vehicle.tscn on a named lane
 ## with LaneDriveProbeController (the ordinary traffic brain, aimable by name, blind to other cars,
@@ -26,6 +30,7 @@ const ON_ROAD_M := 8.0          # a lane centre +-8 m is still carriageway/kerb/
 const PARK := Vector3(10, 400, 10)   # keeps both DebugRoads zones inside their load radius
 
 var world: Node
+var player: Node3D
 var car: RigidBody3D
 var ctrl: Node
 
@@ -135,9 +140,12 @@ func _initialize() -> void:
 	world = (load(_arg("world", WORLD)) as PackedScene).instantiate()
 	root.add_child(world)
 	current_scene = world
-	var player: Node3D = world.get_node("Characters/Player")
+	player = world.get_node("Characters/Player")
 	player.process_mode = Node.PROCESS_MODE_DISABLED
 	player.global_position = PARK
+	if _arg("park", "") != "":
+		var xz := _arg("park", "").split(",")
+		player.global_position = Vector3(float(xz[0]), 400.0, float(xz[1]))
 	var cases: Array = GATE_CASES
 	if _arg("lane", "") != "":
 		cases = [[_arg("lane", ""), float(_arg("speed", "35")), float(_arg("offset", "0")), float(_arg("seconds", "15")),
@@ -174,6 +182,7 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 	var by_cause := {}
 	var max_rise := 0.0
 	var respawns := 0
+	var falls := 0
 	var last_lane := ""
 	var dist := 0.0
 	var last_pos := car.global_position
@@ -186,6 +195,9 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 		if not is_instance_valid(car):
 			break
 		var p := car.global_position
+		if _arg("follow", "") != "":
+			# the streaming player rides 400 m over the car, so a long drive (the island's expressway) stays streamed
+			player.global_position = Vector3(p.x, 400.0, p.z)
 		dist += Vector2(p.x - last_pos.x, p.z - last_pos.z).length()
 		last_pos = p
 		var ln := str(ctrl.call("current_lane_name"))
@@ -238,6 +250,21 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 			print("  %s t=%.2f  vy rose %.2f m/s in %.2f s  speed %.1f  lane %s  %.2f m right of it  at (%.0f, %.0f, %.0f)  from: %s"
 					% ["LAUNCH" if on_road else "off-road bounce", f / 60.0, rise, WINDOW / 60.0,
 					car.linear_velocity.length(), ln, lat, p.x, p.y, p.z, ", ".join(why.keys())])
+		# A FALL: the car is metres below the lane it is on (through or over a wall, off a deck edge). On an elevated
+		# road that is the defect the wall test (--offset beside a barrier) exists to find.
+		if f > 60 and is_finite(lane_y) and p.y < lane_y - 3.0 and not (is_finite(lat) and absf(lat) > 25.0):
+			falls += 1
+			print("  FELL t=%.1f  %.1f m below lane %s, %.2f m right of it, at (%.0f, %.0f, %.0f), %.1f m/s" % [f / 60.0,
+					lane_y - p.y, ln, lat, p.x, p.y, p.z, car.linear_velocity.length()])
+			respawns += 1
+			if respawns > 2 or not _spawn(lane_name, speed, offset, corner_accel):
+				break
+			prev_vy = 0.0
+			hist.clear()
+			prev_lane = ""
+			last_lane = ""
+			last_pos = car.global_position
+			continue
 		if f > 60 and (p.y < -30.0 or (is_finite(lat) and absf(lat) > 25.0)):
 			respawns += 1
 			print("  t=%.1f car off the network (y %.1f, lane '%s', %.1f m right of it) -- respawning" % [f / 60.0, p.y, ln, lat])
@@ -251,8 +278,8 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 	if is_instance_valid(car):
 		car.queue_free()
 		car = null
-	print("--- %s at %.0f m/s, offset %+.1f m: drove %.0f m, %d launches on the road (vy +%.1f m/s within %.2f s), %d more off it, worst on-road rise %.2f m/s, worst lateral %.1f m, %d respawns"
-			% [lane_name, speed, offset, dist, launches, RISE_DV, WINDOW / 60.0, off_road_launches, max_rise, worst_lat, respawns])
+	print("--- %s at %.0f m/s, offset %+.1f m: drove %.0f m, %d launches on the road (vy +%.1f m/s within %.2f s), %d more off it, worst on-road rise %.2f m/s, worst lateral %.1f m, %d falls, %d respawns"
+			% [lane_name, speed, offset, dist, launches, RISE_DV, WINDOW / 60.0, off_road_launches, max_rise, worst_lat, falls, respawns])
 	for k in by_cause:
 		print("    %3d  %s" % [by_cause[k], k])
-	return launches
+	return launches + falls

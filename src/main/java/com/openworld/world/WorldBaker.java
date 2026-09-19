@@ -334,7 +334,7 @@ public class WorldBaker extends Node {
 
     /**
      * The piece being baked (the output scene's stem), set by {@link #bakeScene} — the first part of a
-     * {@link BreakableProps} replication key, which must be the same string on every peer.
+     * {@link BreakableProps} pole key (a stable name for probes and logs; since 3.11b nothing sends it).
      */
     private static String bakingPieceId = "";
 

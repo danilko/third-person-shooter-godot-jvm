@@ -90,7 +90,7 @@ lane-kit's output (`RKA_LANE_PREVIEW*`), not point-graph data.
 - `archive/dead_tools/island_v3_to_roadkit.py`.
 
 Kept in the tree: `island_v3{,_buildings,_full}.blend` (the plan), `assets/world_source/buildings/`
-(the harvest library — `RecycledBuildingKit.blend` is standalone, so it cost nothing),
+(the harvest library — `RecycledBuildingKit.blend` was standalone, so it cost nothing; deleted 2026-09-18),
 `assets/world_source/plateau/`, and `kit/road_kit.blend`.
 
 Live-tree changes: `World_master.tscn` is an **empty but valid** `Node3D` so both world hosts still

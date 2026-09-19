@@ -16,6 +16,12 @@ The road content here is older still: it was built by the **mesh-graph / lane-ki
 retired in the point/port-graph rewrite. Its operators (`rka.build_segment_from_curve`,
 `rka.build_intersection`) no longer exist.
 
+> **2026-09-18: `world_6x6/` was DELETED** (licence audit: its terrain and buildings were derived from PLATEAU, CC BY,
+> and nothing used it). The table below describes what it held; `git log -- archive/world_6x6` reaches every file.
+> The PLATEAU landmarks it placed were rebuilt as our own base models (`assets/world_source/kits/library/`,
+> `TokyoStation`, `AirportTerminal` and the rest), and `assets/world_source/plateau/`, `PLATEAU_*.blend`, `RecycledBuildingKit.blend` and
+> `plateau_reference/` were deleted with it. "Restoring" below now means checking the files out of history.
+
 ## What is here
 
 | path | was | size |
@@ -34,9 +40,8 @@ retired in the point/port-graph rewrite. Its operators (`rka.build_segment_from_
 ## What was deliberately KEPT in the tree
 
 - `assets/world_source/island_v3.blend` / `_buildings` / `_full` — **the plan**, still current.
-- `assets/world_source/buildings/` — `RecycledBuildingKit.blend` + manifest, the building library
-  to harvest from. It is standalone, so archiving the pieces did not cost it.
-- `assets/world_source/plateau/` — PLATEAU source data (122 MB).
+- `assets/world_source/buildings/` — `RecycledBuildingKit.blend` + manifest (deleted 2026-09-18).
+- `assets/world_source/plateau/` — PLATEAU source data (122 MB; deleted 2026-09-18).
 - `assets/world_source/kit/road_kit.blend` — the **current** profile-section kit.
 
 ## What changed in the live tree

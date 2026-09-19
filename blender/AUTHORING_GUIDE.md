@@ -70,8 +70,8 @@ a fixed `MANUAL`-only allowlist (`blender/lib/session_common.py`'s `EXCLUDE_COLL
 **PLATEAU import itself (`blender/lib/plateau_import.py`, `plateau/extract_plateau.py`) was removed too**
 — once the Rainbow Bridge overlay, Haneda airport, and the recycled-building-kit curator had each
 produced their output artifact (`pieces/Piece_2_3_b.blend`, the bridge,
-`buildings/PLATEAU_RainbowBridge.blend`, `buildings/PLATEAU_HanedaTerminal.blend`,
-`buildings/RecycledBuildingKit.blend` — all already committed), the generator scripts that made
+`buildings/PLATEAU_RainbowBridge.blend`, `buildings/PLATEAU_HanedaTerminal.blend`, and
+`buildings/RecycledBuildingKit.blend`, since deleted (2026-09-18, unused: the library kit and building types replace it)), the generator scripts that made
 them (`overlays/build_rainbow_bridge_overlay.py`, `blender/buildings/build_haneda_airport.py`,
 `blender/buildings/build_rainbow_bridge.py`, `blender/buildings/build_recycled_kit.py`) had done their one-time
 job too, same as the per-district generator — so they were removed along with the PLATEAU
@@ -947,12 +947,13 @@ Blender authoring forever.
   `navigation/3d/warnings/navmesh_edge_merge_errors`. Districts abut by design, so occasional
   seam-edge merges are expected background noise.
 
-## 10. Recycled building kit
+## 10. Recycled building kit (deleted 2026-09-18)
 
-`buildings/RecycledBuildingKit.blend` holds real PLATEAU buildings recycled as reusable assets —
-**one top-level collection per placeable asset**. Place one by name from `MANUAL` (or via
-`instance_`/`asset_path` markers); `buildings/PLATEAU_TokyoTower.blend`,
-`buildings/PLATEAU_HanedaTerminal.blend`, `buildings/PLATEAU_RainbowBridge.blend` are the same
+`buildings/RecycledBuildingKit.blend` (55 generic PLATEAU buildings, CC BY) was deleted by the licence audit: nothing
+used it, and generic buildings now come from the building types built from the kits (`buildings/README.md`,
+`kits/library/`). Git history keeps it. The landmark files `buildings/PLATEAU_TokyoTower.blend`,
+`buildings/PLATEAU_HanedaTerminal.blend` and `buildings/PLATEAU_RainbowBridge.blend` were deleted the same day and
+rebuilt as our own base models in `kits/library/` (see `buildings/README.md`); they were the same
 tier of already-produced landmark asset (placed via `kit_common.place_landmark` when they were
 built — the generator scripts that made them were removed once they'd done that one-time job,
 §2/§6). Streetwall/building solidity in

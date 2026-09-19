@@ -170,8 +170,47 @@ func _build(b: Dictionary) -> bool:
 		cs.position = Vector3(bx["center"][0], bx["center"][1], bx["center"][2])
 		body.add_child(cs)
 		cs.owner = root
+	var hi := 0
+	for h in b.get("hulls", []):
+		# a convex hull of a library piece (a ramp): its own mesh, placed as the layout says
+		var hpos: Array = h["pos"]
+		var hxf := Transform3D(Basis(Vector3.UP, deg_to_rad(float(h["yaw"]))), Vector3(hpos[0], hpos[1], hpos[2]))
+		var pts := PackedVector3Array()
+		for s in _surfaces(h["path"]):
+			var arr := (s[0] as Mesh).surface_get_arrays(s[1])
+			for v in arr[Mesh.ARRAY_VERTEX]:
+				pts.append(hxf * ((s[2] as Transform3D) * v))
+		var hull := ConvexPolygonShape3D.new()
+		hull.points = pts
+		var hs := CollisionShape3D.new()
+		hs.name = "Hull%d" % hi
+		hi += 1
+		hs.shape = hull
+		body.add_child(hs)
+		hs.owner = root
 	if b.get("collision", "") == "trimesh":
-		var tri := mesh.create_trimesh_shape()
+		# the collider is the building's own shell (the first `trimesh_pieces` placed pieces), never its cladding or
+		# furniture: a clad facade is ~100k visual vertices a physics server has no business testing
+		var n_col := int(b.get("trimesh_pieces", b["pieces"].size()))
+		var tri: Shape3D
+		if n_col >= b["pieces"].size():
+			tri = mesh.create_trimesh_shape()
+		else:
+			var faces := PackedVector3Array()
+			for pi in n_col:
+				var pp: Dictionary = b["pieces"][pi]
+				var ppos: Array = pp["pos"]
+				var pxf := Transform3D(Basis(Vector3.UP, deg_to_rad(float(pp["yaw"]))), Vector3(ppos[0], ppos[1], ppos[2]))
+				for sf in _surfaces(pp["path"]):
+					var fx: Transform3D = pxf * (sf[2] as Transform3D)
+					var st2 := SurfaceTool.new()
+					st2.append_from(sf[0], sf[1], fx)
+					var m2 := st2.commit()
+					for v in m2.get_faces():
+						faces.append(v)
+			var cps := ConcavePolygonShape3D.new()
+			cps.set_faces(faces)
+			tri = cps
 		var shape_path := "%s/%s_collision.res" % [OUT_DIR, id]
 		ResourceSaver.save(tri, shape_path, ResourceSaver.FLAG_COMPRESS)
 		var cs := CollisionShape3D.new()
@@ -194,6 +233,7 @@ func _build(b: Dictionary) -> bool:
 	var meta := b.duplicate(true)
 	meta.erase("pieces")
 	meta.erase("boxes")
+	meta.erase("hulls")
 	meta["piece_count"] = b["pieces"].size()
 	meta["aabb"] = [mesh.get_aabb().position, mesh.get_aabb().size]
 	root.set_meta("building", meta)

@@ -24,3 +24,12 @@ The Blender half of this package -- the Empties, the operators, the Geometry Nod
 was deleted on 2026-09-18 (PLAN.md 3.10): authoring moved to Godot at B9, the build at B11, and the
 island's ground is Terrain3D, so nothing ran it any more. git history has it.
 """
+
+
+def register():
+    """No Blender half any more: kept so a Blender whose preferences still enable this addon loads it silently
+    (without these, every Blender launch printed an AttributeError traceback)."""
+
+
+def unregister():
+    pass

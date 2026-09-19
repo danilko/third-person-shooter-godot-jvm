@@ -90,16 +90,25 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var space := inst.get_world_3d().direct_space_state
 	var o := inst.global_position
 	var top := float(meta["wall_top_m"])
-	var hit := _ray(space, o + Vector3(0.3, top + 10.0, 0.3), o + Vector3(0.3, -1.0, 0.3))
+	# a composite site names a clear spot to look at (a canopy, not a pump island); a building its centre
+	var pxz: Array = meta.get("probe_xz", [0.3, 0.3])
+	var px := float(pxz[0])
+	var pz := float(pxz[1])
+	var hit := _ray(space, o + Vector3(px, top + 10.0, pz), o + Vector3(px, -1.0, pz))
 	if example:
 		_check(not hit.is_empty() and hit.position.y > 0.5 * top, "%s roof hit at %s" % [id, hit.get("position")])
-		return
-	_check(not hit.is_empty() and absf(hit.position.y - top) < 0.05, "%s roof at %.2f (wall top %.2f)" % [id,
-		hit.position.y if not hit.is_empty() else -1.0, top])
-	hit = _ray(space, o + Vector3(0.3, 1.0, 0.3), o + Vector3(0.3, -1.0, 0.3))
+		if (meta["doors"] as Array).is_empty():
+			return   # a solid kit example; a landmark with hollow halls goes on to its floor and doors
+	else:
+		_check(not hit.is_empty() and absf(hit.position.y - top) < 0.05, "%s roof at %.2f (wall top %.2f)" % [id,
+			hit.position.y if not hit.is_empty() else -1.0, top])
+	hit = _ray(space, o + Vector3(px, 1.0, pz), o + Vector3(px, -1.0, pz))
 	_check(not hit.is_empty() and absf(hit.position.y) < 0.02, "%s ground slab at %.3f" % [id,
 		hit.position.y if not hit.is_empty() else -9.0])
 
+	for q in meta.get("clear_probes", []):
+		var at := o + Vector3(float(q[0]), 0.0, float(q[1]))
+		_check(not _capsule_hits(space, at), "%s open at (%.1f, %.1f): the capsule fits (a crane's portal)" % [id, q[0], q[1]])
 	for d in meta["doors"]:
 		var c := o + Vector3(d["center"][0], 0, d["center"][2])
 		var out := Vector3(d["outward"][0], 0, d["outward"][2])

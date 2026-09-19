@@ -12,7 +12,7 @@ assets/world_source/buildings/
   building_types.json          the building TYPES (kit-independent): footprint in modules, storeys, rows, doors
   BuildingLibrary.blend        VIEW: every type assembled from LINKED kit pieces (blender/tools/build_building_library.py)
   README.md                    this file
-  PLATEAU_*.blend, RecycledBuildingKit.*   older landmark / recycled buildings (CC BY, see CREDITS.md)
+  (landmarks are library pieces now: kits/library/ the landmark pieces; the PLATEAU files were deleted 2026-09-18)
 assets/world_source/kits/
   <kit_id>/                    one folder per kit = one licence and one module grid
     kit.json                   AUTHORED: licence, source, module, module_scale, category rules, facade rows
@@ -79,7 +79,57 @@ conditioner units on the facade. The type table is where that lives.
 | Apartment | アパート | 8 × 4 | 14.6 × 7.3 × 6.4 | 2 × 2.73 |
 | OfficeMid | 中規模オフィスビル | 12 × 8 | 21.8 × 14.6 × 34.6 | 9 × 3.64 |
 | Warehouse | 倉庫 | 20 × 12 | 36.4 × 21.8 × 8.2 | 2 × 3.64 |
+| Konbini (re-sized) | コンビニ | 10 × 6 | 18.2 × 10.9 × 4.6 | 1 × 3.64, full interior |
+| GasKiosk | 給油所の事務所・売店 | 5 × 3 | 9.1 × 5.5 × 4.6 | 1 × 3.64 |
+| StationBuilding | 駅舎 (小規模) | 7 × 4 | 12.7 × 7.3 × 4.6 | 1 × 3.64, ticket gates |
+| FamilyRestaurant | ファミリーレストラン | 11 × 16 | 20.0 × 29.1 × 5.5 | 1 × 3.64, booths, kitchen, WC |
 | KitExample_* | (the kit's own Boston/NYC buildings, re-scaled only) | | | |
+
+Composite SITES (`composites` in `building_types.json`: whole types + library props on a paved apron):
+
+| scene | 日本語 | site (m) | what |
+|---|---|---|---|
+| GasStation | ガソリンスタンド | 30.9 × 25.5 | canopy (4.7 m clear) on 3 columns, 3 islands, 6 pumps, the kiosk |
+| KonbiniLot | コンビニ (駐車場付き) | 21.8 × 21.8 | the konbini behind seven 2.5 × 5.0 m bays with wheel stops |
+| StationRural | 小さな地上駅 | 32.8 × 16.4 | station building, 21.8 m platform (0.94 m above rail) with end ramps, shelters, benches, name board, 1067 mm track |
+
+Sizes: PLATEAU MEASUREMENTS (`tools/plateau2json/measure_building_types.py`, statistics only, see CLAUDE.md), the
+ken grid, and stated design choices where PLATEAU has nothing (gas canopies).
+
+## Landmarks (the `custom` list: our own base models from `kits/library/`, managed like every building)
+
+`landmark: true` is only a tag (unique, placed once, labelled on the map). Where the downtown kit has the right wall,
+the outer layer IS kit modules (Tokyo Station's brick and windows, the airport's metal and glass); the core piece is
+the collider.
+
+| scene | what | size (m) |
+|---|---|---|
+| RainbowBridge | suspension structure only; the two decks are Road Kit roads (upper 52.5 m, lower 44.5 m, corridor 15 m either side) | 849 × 48 × 129 |
+| TokyoTower | splayed legs, orange/white bands, two decks, antenna | 95 × 95 × 334 |
+| TokyoStation | red-brick Marunouchi building; the two domed halls are hollow ticket-gate concourses | 320 × 30 × 36 |
+| OsakaCastle | stone bases, five tiers, copper roofs, gold top | 41 × 69 × 55 |
+| AirportTerminal | one compact terminal (GTA-style scale): hollow furnished hall and concourse, piers, drive, control tower | 242 × 170 × 47 |
+
+Runways: `Airport_Runway` (60 m section) and `Airport_RunwayEnd`, laid one or two per airport.
+
+## The library kit (`kits/library/`, ours) and pieces that still need a modeller
+
+Props are placed by name (`library:Shop_Counter`) from the project's own library (see its `kit.json`). 7 of the
+24 re-textured base meshes do not yet read as Japanese and are waiting for hand modelling (`extract.json` `jp`):
+
+| piece | what to change |
+|---|---|
+| Shop_Counter | add the heated hot-snack case and the cigarette wall behind the clerk |
+| Shop_Register | Japanese POS: customer screen, automatic change machine, IC-card pad |
+| WC_Toilet | the washlet control panel |
+| Gas_Pump | a Japanese ground unit with a big price panel, and an overhead (懸垂式) unit for city stations |
+| Station_TicketGate | a slim IC-card gate: lit card pad, short flaps, direction light |
+| Station_Bin | three sorted bins (燃えるゴミ / 缶・びん / ペットボトル) |
+| BusStop_Sign | a round-top plate on a pole with a heavy round concrete base and a timetable box |
+
+Edit a piece in `library.blend`, then `tools/building_kit/build_buildings.sh` (with `ACCEPT_BOUNDS=1` if its size
+changed). `Station_TicketMachine` and `Station_VendingMachine` were re-framed to Japanese sizes and still want
+their faces (fare board, drink samples).
 
 Each scene: front faces +Z, origin at the footprint centre on the ground. It holds one merged `Mesh`
 (one surface per material), a `Collision` StaticBody3D (a box per wall run, split round each door, plus the

@@ -46,10 +46,15 @@ static func sidecar_path(record_path: String) -> String:
 		base = base.get_basename()
 	return base + ".zones.json"
 
-## A zone that only spawns traffic: vehicle configs, no geometry, no AI. It takes no part in the road
-## cut. (A zone that streams a piece AND spawns traffic, like DebugWorld's `debug_a`, is a road zone.)
+## A zone that takes no part in the road cut: one that only spawns traffic (vehicle configs, no geometry, no
+## AI), or a SITE zone that streams a building scene (`tools/island_sites.py`). (A zone that streams a piece AND
+## spawns traffic, like DebugWorld's `debug_a`, is a road zone.)
 static func is_traffic_only(zone) -> bool:
-	if str(zone.get("geometry_path")) != "":
+	var geo := str(zone.get("geometry_path"))
+	# a SITE zone streams a building scene (tools/island_sites.py), not a road piece: its box must not claim roads
+	if geo.contains("/world/buildings/"):
+		return true
+	if geo != "":
 		return false
 	var vcs = zone.get("vehicle_spawn_configs")
 	var scs = zone.get("spawn_configs")

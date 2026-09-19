@@ -6204,28 +6204,42 @@ out of view.
   - **The return** (`_process`, 2 Hz, only while a pole is down) needs all of these (`mayRestore`):
     `respawnSeconds` have passed; no remote player is within `hideDistance` (80 m); this peer's camera does not
     have the pole in its frustum within that distance; nothing stands within ~4 m (`SpatialEntityGrid`).
-- **Network: no new message.** `GameManager.WORLD_EVENT_PROP_BROKEN` (12): key `piece|asset|index`, value
-  1 down / 0 back, args = the car's velocity (for the cosmetic fall). The late-join baseline is
-  `NetworkManager.sendBaselineBreakableProps`.
-  - The host judges EVERY car, a client's car by its motion (a frozen puppet reports no velocity).
-  - A client PREDICTS for the car it simulates, or its own car would stop dead on a collider the host has
-    already removed. It leaves the return to the host, and returns only a prediction the host never confirmed.
+- **Network: NOTHING, on purpose (PLAN.md 3.11b, user decision: cosmetic state costs no bandwidth).** Every peer
+  runs `sweepStreetPoles` for every car it sees move — a car it simulates (its velocity) or a puppet (its motion
+  per step; a FROZEN body is the puppet mechanism and reports no velocity, so frozen always reads motion, and a
+  park flag counts only while simulating) — knocks its own poles down and runs its own return rule. Only the
+  simulating peer takes the speed loss, which then reaches every peer in the car's own snapshot.
+  - Retired: `WORLD_EVENT_PROP_BROKEN` (number 12 is left unused, commented in `GameManager`),
+    `sendBaselineBreakableProps`, `BreakableProps.applyRemote`/`brokenKeys` and the predicted/confirmed bookkeeping.
+  - **Accepted divergence:** two peers can disagree about a pole for up to `respawnSeconds` (a puppet's
+    interpolated path can graze a pole the real car missed), and a late joiner sees every pole standing. The worst
+    visible case is a car stopping against a pole the other peer shows down, re-synced by the next vehicle
+    snapshot. If a walk-test ever shows that matters, the fallback is making a pole non-solid to puppet contacts,
+    or ONE unreliable rate-limited "pole down" hint from the simulating peer: no return event, no baseline.
+  - Same rule for future cosmetic breakables (bollards, bins, trees). `world.Breakable` (glass, walls) changes
+    line of sight and stays host-authoritative.
   - A zone that unloads forgets its broken poles: it reloads with them standing, which is out of view by
     definition.
-- **Gate `tools/godot/probe_breakable_poles.gd`** (21/21, real DebugWorld lamps):
+  - `NetStats` now counts `world_event_sent` (every world event goes through `broadcastWorldEvent` /
+    `sendWorldEventTo`, the two baselines that called `sendMessage` directly included) and `world_event_received`.
+- **Gate `tools/godot/probe_breakable_poles.gd`** (18/18, real DebugWorld lamps):
   - 15 m/s: the lamp goes down, and a ray down the shaft then finds nothing (no static box left in the piece).
     The car keeps **79 %** and drives on.
   - 3 m/s: the lamp stands and the car stops 2.11 m short (its bumper).
   - Aged past its respawn with a camera looking at it: it stays down. Camera turned away: back, solid, the
     falling body gone.
-  - A replicated break, the baseline, junk keys and a replicated return, fed through `applyRemote` as a client
-    receives them.
-  - `-- --control` (`breaking_enabled` off) fails 7: the car stops dead 2.0 m short.
+  - A frozen car moved kinematically (a puppet) at 15 m/s knocks a lamp down by itself, and its motion is not
+    touched.
+  - `-- --control` (`breaking_enabled` off) fails 8: the car stops dead 2.0 m short.
   - Probe trap: holding a car's velocity INTO a contact is an infinite force that slides it round a thin pole,
     and a slow car walks 1.5 m sideways on the crossfall over 22 m. The probe re-aims every tick and lets the car
     coast the last metre.
-- **Not covered:** the two-process run (`tools/net/run_net_*.sh`'s shape). What is asserted is the ANSWER each
-  seam reads. Bollards, bins and trees are the same mechanism, but none is flagged breakable yet.
+- **Gate `tools/net/run_net_pole_test.sh`** (7/7; `debug/NetPoleTest.tscn`, `NetPoleTestHost`): the host drives a
+  driverless car through one pole, the client takes the seat of another through the ordinary seat request and
+  drives it through a second pole; each car is a puppet on the other peer. Both poles go down on BOTH peers, the
+  side poles 6 m beside each path stand, and **0** world events are sent or received while the cars drive (2 are
+  sent at join: the faction baseline). Bollards, bins and trees are the same mechanism, but none is flagged
+  breakable yet.
 
 ## Ground is Terrain3D; road-generator was tried and REMOVED (2026-09-06 → 2026-09-13)
 
@@ -6679,6 +6693,327 @@ table and `BuildingLibrary.blend` in `assets/world_source/buildings/`); `tools/b
   the capsule check on both Konbini doors while the ray still passes (so the capsule is the load-bearing check).
   `tools/godot/shot_buildings.gd` renders every type with a 1.49 m stand-in (needs a display). Judge the look
   there: no probe can tell a Boston facade from a Tokyo one.
+
+## The project's own library kit, composite sites, and Japanese sizes from PLATEAU (PLAN.md 3.12, 2026-09-18)
+
+`assets/world_source/kits/library/` is the project's own central library of Japanese building parts, interior
+furniture and street/station props (CC0, ours). No `jp_` prefix anywhere: the whole game is Japanese.
+- **`library.blend` owns the pieces** (the building-kit rule). `blender/tools/build_library.py` built it:
+  `--procedural` (re)models `blender/tools/library_procedural.py`'s pieces in place (fridge bay, coffee machine,
+  fascia, WC partition, gas canopy/column/island, platform module/ramp/fence/shelter, name board, 1067 mm track,
+  apron, parking line and wheel stop); `--reframe` applies `extract.json`'s `fit_box` (a non-uniform resize to a real
+  Japanese size) and writes each piece's Japan-likeness review into its `lib_review` property; `--extract` was the
+  one-time cut of 24 base meshes from the elbolilloduro packs and refuses to run without the downloads.
+- **NEVER commit or import an elbolilloduro download** (or any pack whose page licenses only "the models"): their
+  textures mix Textures.com and Pexels images that may not be redistributed. The base meshes were cut out once,
+  resized, re-textured with our palette, credited (CREDITS.md), and the downloads deleted; `.gitignore` refuses
+  `kits/elbolilloduro*/`. Pexels/Unsplash are NOT CC0; ambientCG and Poly Haven are.
+- **`palette.json` owns every library material's look.** `tools/building_kit/build_library_palette.py` writes
+  `materials/MI_*.tres` (world-space triplanar, so a foreign mesh needs no UVs) and our generated textures
+  (`T_Goods`, two brand-neutral fascia bands); `--check` runs first in `build_buildings.sh`. ambientCG CC0 sets
+  are listed in `textures/SOURCES.md`. The toon/anime look the game is heading for (PLAN.md 6.x) will change these
+  to flat colours + a shared palette atlas; the palette file is where that change lands.
+- **Generic names** where the piece is not specific: `Shop_Counter`, `Shop_Register`, `Shop_Gondola`,
+  `Shop_FridgeDoor`, `Shop_IceFreezer`, `Fascia_Shop`; `Rest_*`, `Kitchen_*`, `WC_*`, `Gas_*`, `Station_*`,
+  `Platform_*`, `BusStop_*`.
+- **Japan review** (`extract.json` `jp`): 16 base meshes read as Japanese, 2 were re-framed to Japanese sizes
+  (ticket machine 0.8 x 0.55 x 1.8, vending machine 1.0 x 0.72 x 1.83), 7 need a modeller: counter (hot-snack case,
+  cigarette wall), register (Japanese POS), toilet (washlet panel), fuel pump (Japanese ground/overhead unit),
+  ticket gate (IC-card gate), bin (three sorted openings), bus-stop sign (round-top plate on a concrete base).
+  Listed in PLAN.md 3.12b and `assets/world_source/buildings/README.md`.
+
+**The layout grew props and composite sites** (`tools/building_kit/layout_buildings.py`):
+- a type's `props`: library pieces by name (`library:Shop_Counter`), `at` [x, z] in the footprint frame, `y`, `yaw`,
+  `repeat` [n, dx, dz], `collide` `box` (turned bounds, the default) / `hull` (a convex hull of the mesh, for a
+  ramp; `build_building_scenes.gd` makes a `ConvexPolygonShape3D`) / `none`.
+- `check_doors_clear`: nothing a prop adds may stand in the 1.2 m inside any door, across its width, at knee and
+  chest height (self-test control: a gondola moved in front of the konbini door is refused). The back side numbers
+  its modules from +X, so back door 0 is at the RIGHT end seen from the front.
+- `composites` in `building_types.json`: a SITE of whole building types (`parts`, turned and moved, with their
+  doors, walls and collision) plus props on a paved `apron` (tiles skipped under a part), on one footprint
+  centred on the origin. `probe_xz` names a clear spot for the roof/floor probe (a canopy, not a pump island);
+  `probe_buildings.gd` reads it.
+- New types: `GasKiosk`, `StationBuilding`, `FamilyRestaurant`; `Konbini` re-sized to 10 x 6 ken with a full
+  interior. Composites: `GasStation` (canopy on three columns over three islands, six pumps, the kiosk),
+  `KonbiniLot` (the konbini behind seven 2.5 x 5.0 m bays), `StationRural` (a one-platform country station: the
+  station building with ticket gates, a 21.8 m platform 0.94 m above the rail with a ramp at each end, shelters,
+  benches, a name board, 1067 mm track). Gate `probe_buildings.gd` **103/103** over 16 scenes; renders
+  `tools/godot/shot_buildings.gd`.
+
+**Sizes come from PLATEAU as MEASUREMENTS** (`tools/plateau2json/measure_building_types.py`, run locally on the raw
+CityGML outside the repo; only rounded numbers enter the repo; credited in CREDITS.md "Real-world data"):
+
+| class (use + size window) | Ota-ku 2023 | Tama + Higashiyamato 2023 |
+|---|---|---|
+| konbini (1-storey commercial 120-350 m2) | 11.0 x 18.4 m, 184 m2, 5.1 m | 11.3 x 18.8 m, 193 m2, 4.8 m |
+| family restaurant (1-storey commercial 350-900 m2) | 21.2 x 29.5 m, 6.0-7.5 m | 19.0 x 27.5 m |
+| small station building (1-2 storey transport 30-400 m2) | 7.4 x 13.4 m, 6.7 m | 6.9 x 12.6 m, 5.6 m |
+| shop + house, 2-3 storeys | 6.4 x 10.8 m, 3.7 m / storey | 7.1 x 10.9 m, 3.55 m / storey |
+| detached house, 2 storeys | 7.1 x 10.4 m, 7.4 m | 7.5 x 10.2 m, 7.5 m |
+
+(p50 short side x long side, area, height.) PLATEAU records use, not brand, so each class is a use + size window,
+and it does not record gas-station canopies (their sizes are design choices, stated in the type).
+
+**Landmarks are our own base models, and no PLATEAU data is left in the repo** (owner, 2026-09-18). In
+`library_landmarks.py` (numbers measured from PLATEAU or public record, written in the code, toon-flat palette):
+- `RainbowBridge`: towers 575 m apart, 127.8 m tops, 115 m side spans, cables sagging to 69 m. **Structure
+  only: its two decks are Road Kit roads** laid through a clear corridor |y| < 15 m (a 29 m T2 fits) at 52.5 m (upper)
+  and 44.5 m (lower), stations with `pillar_skip`; a vertex check confirms nothing of the structure is in the corridor.
+- `TokyoTower` (splayed legs, bands, decks, antenna; replaces `PLATEAU_TokyoTower.blend`, which was ours).
+- `TokyoStation`: 320 m red-brick block with its two domed halls HOLLOW, ticket-gate concourses furnished
+  from the library (gates, machines, benches), street and platform doors.
+- `OsakaCastle`: stone bases 40.6 x 69.3 m, five tiers, 55 m.
+- `AirportTerminal`: GTA-style scale (user: one terminal, one or two runways): a hollow 150 m departure
+  hall (check-in islands, benches, shop) and concourse, two piers, the elevated drive, a small control tower.
+  `Airport_Runway` (60 m section) and `Airport_RunwayEnd` lay the runways.
+- **Landmarks are managed as ordinary buildings** (user, 2026-09-18): they are the `custom` list in
+  `building_types.json` (a building made from ONE library piece plus `props` and `doors` in the piece's frame, through
+  `layout_example`), scenes `<Name>.tscn` beside the konbini, gated by the same probe; `landmark: true` is only a tag
+  (unique, placed once, labelled on the map). No `Landmark_` prefix. `shell()` builds their hollow rooms.
+- **Their outer layer uses the downtown kit's own wall modules where the kit has them** (user): Tokyo Station's main
+  block is clad with `Brick_Window_Square_Single` / `Brick_Plain_3` (three window storeys over six kit rows, 310- and
+  12-vertex modules: the ornate 623-vertex window took the station to 495k vertices, now 141k); the airport's hall
+  sides and concourse apron face with `Metal_Plain_3` / `Metal_Window_Half` / `Metal_FullWindow`. The airport's hall
+  FRONT stays clear library glass: the kit's glass carries a fake lit interior that would hide the real furnished
+  hall. The castle, bridge and tower have no kit equivalent and stay modelled. The collider is the core piece alone
+  (`trimesh_pieces: 1` -> `build_building_scenes.gd` builds a ConcavePolygonShape3D from those surfaces), never the
+  cladding or furniture.
+- Deleted: `assets/world_source/plateau/` (42 precincts), `PLATEAU_*.blend`, `RecycledBuildingKit.blend`,
+  `plateau_reference/`, `archive/world_6x6/`, `build_tokyo_tower.py`. Gate `probe_buildings.gd` **130/130**.
+
+**Licence audit** (`assets/LICENCE_AUDIT.md`): everything traced (`SNR1` is Quaternius 50 Low-poly Guns, CC0,
+owner-confirmed); every PLATEAU-derived file deleted after the landmarks were rebuilt (above).
+
+## Road types, the interchange templates, one sea bridge (PLAN.md 3.13 step 1, 3.8 steps 3-4, 2026-09-18)
+
+- **Road types are presets** (`blender/addons/road_kit_authoring/point_presets.py`, the one owner; self-test 9, in
+  `check_roads.sh`): `expressway` (2+2, wall median, no footway, barriers, `hammerhead` piers, 80 km/h,
+  `taper_factor` 0.5: the world is compressed, a visible authored choice), `trunk` (3+3, raised median, 4 m
+  footways, 60), `block` (1+1, 2 m footways, 30), `lane` (1+1, no footway or kerb, a painted 路側帯 edge, 30),
+  `farm` (1+1 at 3.5 m, no kerb, 40). `apply_preset` writes the road's fields, its base section and every INHERIT
+  station's lane counts; an OVERRIDE station keeps its own section and is reported. `roadkit_cli.py preset <record>
+  <road> <type>`; the Godot dock's **Apply Road Type** picker (road or station selected).
+- **Two interchange templates** (`tools/roadkit_interchange.py`, `--check` = gate 0 errors + flow 0 broken/misjoined/
+  unreached/orphans + every crossing >= 5.5 m surface to surface, measured on the BUILT mesh's upward-facing asphalt;
+  both in `check_roads.sh`):
+  - `InterchangeTemplate.roads.json`: a DIAMOND, expressway to street (the sketch's dark-blue exits): expressway at
+    10 m over a trunk road; keep-left, so eastbound ramps land on a signalised junction north of the overpass,
+    westbound south; the expressway split at the overpass. 56 lanes.
+  - `LoopJctTemplate.roads.json` (`--kind loop`): an EXPRESSWAY-TO-EXPRESSWAY junction, the Shibaura-JCT shape that
+    takes C1 onto the Rainbow Bridge (user): no ground junction; four ramps incl. the 270-degree loop that climbs over
+    its own entry (10.4 m) and over C1; the spur to the bridge as two one-way roads side by side climbing to 32 m.
+  - Rules they taught, each hit as a gate error first: an exit and an entrance on the SAME carriageway of one run
+    share an aux slot (`aux_slot_shared`) -- split the run (`split_at_joint`) or use the other carriageway; two ramps
+    on ONE station confuse which carriageway's slot each takes -- one ramp per station; a 2-lane aux lane needs 432 m
+    of taper at 80 km/h (hence the preset's 0.5); keep-left decides every merge (a ramp joins from the road's LEFT);
+    a JOINT needs coincident end stations AND a tangential approach, or its lanes land beside each other (`broken`).
+- **One sea bridge** (user, 3.8): `tools/island_remove_gulf_crossing.py` deleted `hama_dori__2/3/4` (the gulf span;
+  the harbour junction is three-arm, setback re-solved); `hama_dori` ends at the inlet's east shore (the future
+  military harbour's access). Pipeline re-run: zones 31 -> 29 pieces (stale `island_4_5`, `island_5_5` removed),
+  terrain re-stamp (2636 vertices back to natural ground), 12 traffic zones, road map re-baked; reach 80.8% -> 79.0%.
+- **The Rainbow Bridge is on the airport crossing** (`tools/island_rainbow_bridge.py`, `--check`): centre and heading
+  DERIVED from the record (the two shore stations of `kuko_dori`), `Landmarks/RainbowBridge` in World.tscn at the road
+  network's Y, `pillar_skip` on the 8 deck stations inside the span, and an alignment check over the lanekit lanes
+  (32 samples, every lane >= 4.5 m inside the corridor, height error 0.00 m). The model's two road levels are
+  parameters (`RB_ROAD_LOWER` 24 = the airport road, `RB_ROAD_UPPER` 32 = reserved for the expressway spur from the
+  loop JCT); towers and anchorages stand on the seabed (`RB_BASE_Z` -30); `keep_origin` keeps its scene origin at the
+  water line. `pillar_skip` holds from its station to the NEXT (`point_solve._bool_field`), so a station skips its
+  piers only when the whole span it starts is inside the structure; `probe_road_ground.gd` counts a PIER sample inside
+  a `Landmarks/*` building's footprint as carried by it (reported as its own INFO line, 802 on the island).
+- **The coast is zoned, and the beaches have a shelf** (`tools/island_coast.py`, PLAN.md 3.8 steps 1-2):
+  `island_coast.json` holds the coast types as rectangles (beach, cliff, industrial harbour, gulf, military harbour,
+  airport island, fishing port), written from the tool's table. Every coast used to drop from +0.5 m to the -24 m
+  seabed within one cell; `shelf` raises only sea cells whose nearest land is BEACH land (in a beach zone and under
+  3 m, so cliffs never qualify) to -0.3 m at the waterline -> -3 m 150 m out -> the seabed by 350 m (cosine). Quays
+  and cliffs keep their drop. The water shader colours by depth (turquoise + caustics over 12 m), so the shelf reads
+  as a lagoon with no shader change. Applied: 391 765 sea cells (1.57 km2).
+  - **The shelf never enters a hard zone** (cliff, harbours, gulf), and its target FADES to the -24 m seabed over
+    `HARD_FADE` (150 m) approaching any water it does not take, so it adds no underwater wall (steepest step it adds:
+    0.50 m per 2 m cell). The result is `max(h, faded target)` and the target depends on the land mask only, so the
+    shelf of a shelved grid is itself: `shelf` is idempotent (a fade toward `h` was not -- a second pass raised again).
+  - **`check <new> <orig>` asserts three things:** 95.5% of beach water (outside that fade) is under 2.5 m deep,
+    0 quay/cliff/harbour/land cells changed, and the added step is at most 1 m per cell. It is not a quay DEPTH test:
+    measured, 13% of harbour/gulf water within 20 m of a quay was SHALLOWER than 10 m before any shelf (the inlet's
+    sloping ends), so "unchanged" is the rule.
+  - **A stamped network's natural-ground sidecar must take the same edit** (`island_coast.py sidecar <orig> <new>`
+    re-runs the shelf on the NATURAL ground -- the terrain with the sidecar's values where it covers -- so a stamp-owned
+    fill toe in the sea gets the shelf too; then `stamp_roadkit_terrain.gd`), or a re-stamp or restore puts the old
+    seabed back under every stamped corridor (the probe measured 191 388 vertices "re-stamped", 23.3 m off on restore). The same holds for ANY terrain edit
+    under a stamped network.
+
+## The island's road layout is DERIVED: arterials in, expressway, trunk grid, streets and turnarounds out (PLAN.md 3.13 steps 2-5, 3.3, 3.3b, 2026-09-19)
+
+**Two layers, one command.** `IslandRoads.arterials.roads.json` is the INPUT (the arterials, the touge and the airport
+road as seeded and hand-fixed); `IslandRoads.roads.json` is the OUTPUT, made by **`tools/island_layout.py`**: trunk
+grid -> streets -> expressway -> turnarounds -> setback, then it asserts the gate (0 errors), a clean flow (0 broken /
+misjoined / unreached / orphaned / open ends) and every grade separation >= `roadkit_interchange.CLEARANCE` on the
+built surface. A hand edit to the OUTPUT is lost on the next run: edit the input, or the generator that owns the road.
+**`tools/island_rebuild.sh [--no-layout]`** runs the whole island after it: ground, zones (`--split`), build
+(`NAV_FIT=1 DIRTY_ONLY=1`), a prune of pieces whose zone is gone (every later step globs the lanekits), stamp, traffic
+zones, road map. Shared helpers: `tools/island_roadgen.py` (natural ground, filleted plans, a chain road, a station
+inserted into a chain, `cut_road` to land a junction on a ground road, `make_junction`, the pier pass).
+
+- **Expressway** (`tools/island_expressway.py`, roads `shuto_*`):
+  - **C1**, a rounded rectangle inside the arterial frame (x 150-1300, y 40-720 record frame), deck 11 m, cut into four
+    roads at joints (the JCT, both sides, the diamond's overpass) so no run carries two ramps on one aux slot.
+  - **The airport JCT** on C1's south side is the loop template (`roadkit_interchange.build_loop`) with three of its four
+    movements (the long flyover does not fit a compact ring). The **spur** is two one-way carriageways 8 m off one
+    centreline: south, east at y -396, tangent onto the Rainbow Bridge's UPPER deck at the north anchorage (32 m, the
+    bridge's `pillar_skip` span), south past it, and down onto the airport. The carriageways PART at the airport: each
+    meets the airport road at its own T, because a pad cannot take two parallel one-way arms 16 m apart (the setback
+    solver pushed such mouths 145 m out).
+  - **A diamond** on C1's north side down to `naka_hondori` (junctions at y 615 inside the ring and 815 outside), its
+    four ramps 260-380 m from the overpass, each a single cubic from its gore to its mouth.
+  - **3 m sound walls only where C1 is central to the city** (防音壁, `SOUND_WALL`, user): its south half
+    (`SOUND_WALL_ROADS`: the JCT road and the south-west road) faces downtown; the north half faces the farmland and
+    the mountains and keeps the preset's 1.1 m barrier for the view, as do the ramps, the spur and the bridge. The median wall stays 1.1 m whatever the side barriers are (`MEDIAN_WALL_HEIGHT`).
+  - **Every ramp is two lanes** (user: wider for racing): `RAMP_LANES`, and `make_ramp(..., lanes=2)` where a ramp
+    merges (the default is ONE lane, and a two-lane ramp into a one-lane slot left its second lane `broken`).
+  - Decks are DERIVED: the highest natural ground across the deck + `CLEAR` (11 m), a 4% grade cone. **No pier stands
+    on another road** (`island_roadgen.clear_piers`): wherever a deck passes within 17 m of a road more than 4 m below,
+    stations are inserted at the stretch's ends and the span between is `pillar_skip`; a taper span is never split
+    closer than `MARK_CLEAR / 2` to its ends (it is skipped whole instead). `taper_factor` 0.25 on every `shuto_*` road
+    (the compressed world; a ring's corners leave no 216 m straight), and no station within `MARK_CLEAR` (112 m) of a
+    ramp or joint station.
+  - **Not built, and why:** the sketch's OUTER ring closes over the 700 m massif and the touge; the Road Kit has no
+    tunnels. The coastal horseshoe that remains is not built either (the lowland is already framed by coastal arterials
+    and it needs a second JCT); the E-W link through the city likewise.
+- **Trunk grid** (`tools/island_trunk_grid.py`, `trunk` preset 3+3): `nishi_hondori` (x 400), `naka_hondori` (725),
+  `higashi_hondori` (1100) from rinkai_dori to nogyo_michi, `ekimae_dori` (y 250) from chuo_dori to hama_dori, and
+  `yamate_dori` upgraded. Every crossing a signalised junction; an existing road is CUT for one.
+- **Streets** (`tools/island_streets.py`): regions of N-S and E-W lines, each clipped to between its first and last
+  crossing, so every street ends on a road. City (block preset, one street down each trunk cell, south of y 560 where
+  the diamond ramps come down: they passed 3.1 m over two streets before), the south-west residential lowland (3.3's
+  reach gap 2) and the north-east farm grid (farm preset). A line is nudged up to 60 m before it is dropped; a crossing
+  of two new lines is kept only where one of them runs THROUGH it (never a two-armed pad); water is judged only once
+  the crossings have settled (a partner dropped in the same pass shortens a line).
+- **Turnarounds** (`tools/island_turnarounds.py`, 3.3b): every road end that joins nothing becomes a mouth of a 3-arm
+  junction with a teardrop loop (the summit loop, generalised), its axis and reach searched for flat land clear of
+  every other road; an end with no room is shortened a station at a time. 7 ends, `open_end` 15 -> 0.
+- **Measured:** gate 0 errors; flow 1811 lanes, 0 broken / misjoined / unreached / orphans / open ends; 31 grade
+  separations, tightest 7.7 m (the airport loop over the westbound exit).
+
+**Five kit defects this surfaced, fixed in the kit:**
+- **A T has no straight ahead** (`lane_movements.allowed_turns(available=)`): a middle lane restricted to S led
+  nowhere, `broken` at every T with a 3-lane stem (and at the harbour T the gulf removal left, 2 lanes since 3.8). With
+  no S on offer the approach splits kerb half -> nearside, median half -> offside.
+- **A right turn lands in the median lane** (`target_lane(turn=)`, the road rule; left turns keep the kerb lane).
+- **A lane beside a reached lane is reached** (`point_flow.flow_report`): a lane change (`inner_lane`/`outer_lane`)
+  reaches it, which is how an aux lane was already entered; a 3-lane trunk off a T is fed into two lanes.
+- **Lane-change edges come from EVERY station** (`point_export._adjacency`, widest first): a run with one carriageway's
+  aux block at one station and the other's at another has no station holding both, and the lane missing from the widest
+  got no edge.
+- **A `WALL` median builds its wall** (`point_mesh.median_wall`): `point_solve` had always
+  said "RAISED, and a barrier stands on it" and nothing built it -- the expressway's divide was a 0.16 m island. A 0.6 m
+  prism, `point_solve.MEDIAN_WALL_HEIGHT` (1.1 m) tall, as its own `<road>_median-road-noped-colonly` COLLIDER; what is
+  SEEN is the kit's median panel (user: Quaternius' `TrafficHighwayMidWall`, fitted to 1.1 m by `build_zombie_yard.py`)
+  tiled end to end by its own length (`point_furniture._median_walls`, furniture asset `median_wall`; 1028 panels on
+  the template's 1.6 km). A fence panel is no collider to scrape at speed, a continuous prism is.
+`point_digest` now salts `lib/lane_movements.py` too (it decides every connector).
+
+**Lamps on barriers** (`point_furniture._lamps`, user): where an edge carries a barrier (a deck, a ramp, a bridge
+parapet) the kerb lamp is skipped, so an expressway was unlit; now a single `lamp` (the base StreetLight, 10 m
+luminaire) stands ON the barrier every `barrier_lamp_spacing` (45 m), staggered. A WALL median takes the median lamp
+(`lamp_twin` slot, on the wall's top at `MEDIAN_WALL_HEIGHT`) when that asset exists (`median_wall_lamp_min_half`
+0.45); remove the slot (the user is replacing the twin with a simpler Japanese lamp) and the barrier lamps light the
+expressway from the sides.
+
+**Sites** (`tools/island_sites.py`, 3.8 steps 5 and 8), each STREAMED as a `SiteZones/<Name>` ZoneMarker whose Zone
+places the building scene in world space (`geometry_world_placed`; the dock's road cut skips a zone streaming a
+building, `road_kit_zones.is_traffic_only`):
+- `ContainerTerminal` (composite, `tools/building_kit/site_container_terminal.py`): 364 x 218 m on `Harbour_Apron`
+  slabs, four ship-to-shore cranes (30.48 m gauge, booms raised to 88 deg so nothing overhangs the quay), bollards,
+  light masts, ~800 stacked containers; its front laid on the industrial harbour's east quay, a line least-squares
+  fitted through 33 edge samples of the natural ground (worst 2.5 m off). 624 k vertices merged, so it streams (900 m).
+- `ShuriCastle` (`library_landmarks.shuri_castle`): the Seiden (29 x 17 m, red lacquer, two red-tile roof tiers, a
+  karahafu, gold dragon pillars) on a striped Una with the Hokuden, Nanden and Houshinmon, all on a 25 m Ryukyu-limestone
+  platform the hill slopes into. Sited by search: a ~140 m patch at 3-27 m, no road within 85 m, the massif behind:
+  (-580, -40), facing downtown.
+- **The yard pieces are Quaternius'** (Zombie Apocalypse kit, CC0, credited): `blender/tools/build_zombie_yard.py`
+  writes containers fitted to ISO 668 (the 40 ft box is the 20 ft model stretched; decimated to 25% of its faces --
+  ~800 in one terminal were 1.3 M vertices), pallet, drum, cone, plastic barrier and tyre stack into
+  `kits/quaternius_zombie_apocalypse/pieces/yard/` + its `pieces.json`, so a composite names
+  `quaternius_zombie_apocalypse:<Piece>`. **A third-party kit stays its own folder** (the licence and credit
+  boundary); the `.blend` files the tools build from are copied into its `blends/`, so the download (`source/`) can be
+  deleted. New library pieces: `Harbour_Crane/Bollard/Fender/LightMast/Apron`, `ShuriCastle`; palette `MI_CraneRed`,
+  `MI_LacquerRed`, `MI_RoofTileRed`, `MI_Limestone`.
+
+- **The crane's collider is BOXES, not its hull** (user: a character or car must pass under a crane). A composite prop
+  may say `collide: {"boxes": [[cx, cy, cz, sx, sy, sz], ...]}` in its own frame (`layout_buildings.place_props`), and
+  `site_container_terminal.CRANE_BOXES` / `MAST_BOXES` are the bogies, legs, sill and side beams and girders. A
+  composite also carries `clear_probes` (points that must stay open), and `probe_buildings.gd` fits the character's
+  capsule at each: one under every crane's portal. Control: the crane back on its bounding box fails all four.
+- **Generated pieces are safe to hand-edit** (`blender/tools/build_library.py`): each procedural or landmark piece
+  stores a fingerprint of its mesh and materials (`lib_generated`), and `--procedural` KEEPS a piece whose fingerprint
+  no longer matches ("KEPT Harbour_Bollard"); only `--force` / `--only=<Name>` regenerate. Every piece carries an
+  `edit_note` (what else assumes something about it), and the `.blend` a `README_artist` text from
+  `kits/library/ARTIST_NOTES.md`; the Zombie kit's owner blends have `kits/quaternius_zombie_apocalypse/blends/README.md`.
+
+**Headless streaming loads synchronously** (`ZoneManager.threadedLoadMode`, `-1` = auto). Under `--headless` the dummy
+renderer's mesh storage is not safe against meshes created on the loader thread while the main thread creates others:
+it logs "Attempting to initialize the wrong RID" / `mesh_add_surface: Parameter "m" is null`, then segfaults, and the
+island's larger pieces made two loads overlap often enough to crash `probe_island_zones.gd` most runs. Auto = threaded
+unless `DisplayServer.getName()` is `headless`; a real renderer queues cross-thread calls. `warmDependencies` loads a
+piece's non-scene dependencies on the main thread first (not enough alone: 1 of 3 runs still crashed). `ZM_TRACE=1`
+prints every streaming step. Cost, headless only: the worst frame of the island drive is 134 ms (a whole piece parsed
+in one frame); p99 5.6 ms.
+
+## The north-west coast road: a bench cut into the cliff, with rock sheds (PLAN.md 3.15, 2026-09-19)
+
+`kaigan_dori` closes the sketch's outer ring where the expressway cannot go: 4.0 km round the massif's north-west
+cliffs, from `kitahama_dori__3`'s end (a JOINT: the coast road continues it westward) to a new T at the
+`nishihama_dori__2` / `rinkai_dori` corner (the corner's fillet dropped; nishihama -> coast road is the through road).
+**User decisions:** a shelf CUT INTO THE CLIFF FOOT, never a viaduct or fill in the sea (the island stays compact);
+2 + 2 lanes; rock sheds (洞門 / ロックシェッド) first, one true tunnel later.
+
+- **The alignment is derived once, then authored** (`tools/island_coast_road.py derive <dump>`, the touge's shape):
+  from a Terrain3D height dump (`dump_height_grid.gd -- <out> -2304 -2304 1153 1153 4`) it walks the coast with the sea
+  on its left, `D_TARGET` 17 m inland of the water line (paved half 10 + the stamp's 6 m verge = the flat ends at the
+  cliff edge, the sea in view past the barrier), smooths, pushes back inland anything under `D_MIN` (a chord across a
+  cove cuts toward the water), and resamples at 30 m. Height: no higher than the ground at the band's SEA-side edge
+  (+0.3, at least `Z_MIN` 1 m, at most `Z_BENCH` 12 m) nor the ground under the centreline, lowered by a 5% cone, so the
+  road only ever CUTS. The first version held a 12 m bench everywhere, and the pictures (`tools/godot/shot_coast_road.gd`,
+  needs a display) showed why that is wrong here: this coast has a strip of sand at the cliff foot the whole way round,
+  so the road stood on a vertical rock wall 12 m over the beach (the stamp does not fill a cut deeper than `CUT_MAX`, and
+  filling it would push an embankment into the sea). It now runs at 1-3 m on the flat strip with the cliff cut beside it. Written to `assets/world_source/pieces/IslandCoastRoad.json` (stations with
+  z, shed spans), reviewed like the record. `add` puts it into a record, terrain-free; `island_layout.py` runs it first.
+  Measured: 4012 m, nearest the water 12.5 m (the paved edge stays on land), steepest 5.0%, four 300 m sheds.
+- **`coast` road type** (`point_presets`, and the dock's picker): 2 + 2 at 4.5 m, a painted median, 0.75 m shoulders, no
+  footway, barriers both sides (`ped_access` off), 60 km/h, `cut_batter` 10.
+- **`RoadData.cut_batter`** (new road field): the UPHILL side's cut face in metres of rise per metre across; 0 = the
+  stamp's ordinary 1:1 batter. A 1:1 face on a 150 m cliff would slice 150 m back into the mountain. Which side is
+  uphill is DERIVED per corridor point (`roadkit_cli._steep_side`: the natural ground `STEEP_PROBE` 16 m past each paved
+  edge) and handed to the stamp as a 7th corridor-point value, signed in GODOT axes (the kit's sign flipped: Godot z is
+  -kit y); `road_kit_stamp.height_at` uses it on that side only.
+- **`PointData.shed`** (new station enum, append-only: `NONE`/`OPEN_LEFT`/`OPEN_RIGHT`, which side is open against the
+  chain direction), held to the next station like `pillar_skip`, solved into `rka_shed`. `point_mesh.sheds` builds per
+  span: a roof slab whose soffit is `point_solve.SHED_CLEAR` (5.5 m) over the road, `SHED_ROOF` (1 m) thick, from past
+  the open-side columns to `SHED_BACK` (5 m) past the closed-side wall -- over the stamp's flat verge to the cut face, so
+  no daylight shows between roof and rock; the wall against the rock; a 0.8 m column every `SHED_COL_SPACING` (8 m) on
+  the open side; two rows of lamp panels under the soffit in `M_TunnelLamp` (sodium orange, emissive,
+  `road_kit/materials/M_TunnelLamp.tres`, applied by name at bake). The concrete is also its own
+  `<road>_shed-road-noped-colonly` collider.
+- **A bench road fills over LAND only** (corridor kind `BENCH`, `road_kit_stamp.LAND_ONLY`): the CLI reports every
+  point of a `cut_batter` road as `BENCH` (a centreline cut deeper than `CUT_MAX` would otherwise be `TUNNEL`, which
+  never fills, and the road's sea half stood 1-2 m over the sand on its own side face), and the stamp fills such a
+  point only where the natural ground is at or above the water line (`LAND_Z`). Measured on a terrain diff against a
+  dump taken before the road: the first stamp raised 67 sea cells by up to 28 m where the flat verge overhangs a cove;
+  with `BENCH`, 0 on the coast.
+- **A turnaround's verge must be on land too** (`island_turnarounds.SHORE`, 13 m round every probe point): the same
+  diff found `futo_dori_loop` (3.3b) on the quay with its verge over the harbour, 175 cells filled up to 28 m.
+  `futo_dori_loop` and `rinkai_dori_loop` moved.
+- Self-tests: `point_mesh.py` (the shed: soffit, columns on the open side, wall + roof to the rock, mirrored),
+  `point_presets.py` (coast passes the gate), `tools/godot/test_roadkit_stamp_rules.gd` (the steep face on the named side
+  only, and the control with none; in `check_roads.sh`).
+
+**A traffic car can run off the edge of the streamed road, and that has its own reclaim reason** (`stream-edge`). Since
+3.10 road pieces stream at 700-1450 m while traffic spawns up to 0.9 x 1550 m from a player, so a car heading away can
+reach a lane whose named successors are in a piece that is not loaded; `advanceToNextRoute` finds none and the car is
+`isFinished`, which read exactly like a dead end in the network. `VehicleAIController.finishedAtStreamEdge()` marks it
+(the lane NAMES successors and none resolve), `ZoneManager.cullFinishedVehicles` logs and records the reason
+(`reclaimReasonOf(instanceId)`, registered, the last 256), and `probe_traffic_spawn.gd` exempts only that reason, as it
+already exempted leaving range. Measured before: a car set down 640 m from the player vanished after 82 m at 720 m,
+just past a road piece's 700 m load radius.
 
 ## Known Quirks / Gotchas
 

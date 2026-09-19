@@ -10,6 +10,8 @@ import godot.api.NavigationRegion3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.PackedScene;
+import godot.api.DisplayServer;
+import godot.api.Resource;
 import godot.api.ResourceLoader;
 import godot.api.WorldEnvironment;
 import godot.core.Color;
@@ -582,6 +584,10 @@ public class ZoneManager extends Node {
 				Vehicle v = it.next();
 				boolean dead = !GD.isInstanceValid(v);
 				if (dead || (v.getController() instanceof VehicleAIController c && c.isFinished())) {
+					String why = dead ? "dead" : ((VehicleAIController) v.getController()).finishedAtStreamEdge()
+							? "stream-edge" : "route-finished";
+					if (!dead) noteReclaim(v, why);
+					if (debugLog) GD.print("ZoneManager: traffic reclaim (" + why + ")");
 					freeTrafficCar(lz, v, net);
 					it.remove();
 				}
@@ -605,6 +611,23 @@ public class ZoneManager extends Node {
 	/** Eval ticks between periodic traffic-status debug lines (~10 s at evalInterval 0.5). */
 	private static final int TRAFFIC_LOG_EVERY = 20;
 	private int trafficLogTick = 0;
+
+	/** The last few reclaim reasons by vehicle instance id, so a probe can tell a car that ran off the streamed road
+	 *  (`stream-edge`, invisible and expected) from one that failed to drive. Bounded. */
+	private final java.util.LinkedHashMap<Long, String> reclaimReasons = new java.util.LinkedHashMap<>() {
+		@Override protected boolean removeEldestEntry(Map.Entry<Long, String> e) { return size() > 256; }
+	};
+
+	private void noteReclaim(Vehicle v, String why) {
+		if (GD.isInstanceValid(v)) reclaimReasons.put(v.getInstanceId(), why);
+	}
+
+	/** Why the traffic car with this instance id was reclaimed ("" if it was not, or too long ago). */
+	@Register
+	public String reclaimReasonOf(long instanceId) {
+		String r = reclaimReasons.get(instanceId);
+		return r == null ? "" : r;
+	}
 
 	private void maintainTraffic() {
 		if (loaded.isEmpty()) return;
@@ -691,6 +714,8 @@ public class ZoneManager extends Node {
 				if (dead || fin || fell || far || unrouted || stalled || abandoned) {
 					// "finished" reclaims should be ~0 away from map edges once lanes chain through
 					// junctions (roads-v2 Phase 1) — a steady stream of them means broken wiring.
+					if (!dead) noteReclaim(v, dead ? "dead" : fin ? "route-finished" : fell ? "fell-out" : far ? "out-of-range"
+							: unrouted ? "unrouted" : stalled ? "stalled" : "abandoned");
 					if (debugLog) GD.print("ZoneManager: traffic reclaim in '" + marker.zone.zoneId
 							+ "' (" + (dead ? "dead" : fin ? "route-finished"
 									 : fell ? "fell-out" : far ? "out-of-range"
@@ -838,10 +863,15 @@ public class ZoneManager extends Node {
 		}
 	}
 
+	/** `ZM_TRACE=1` in the environment: print every streaming step (phase, zone, and each child entered or freed), so
+	 *  the last line before a native crash names the operation. Off by default; a diagnostic, not a log. */
+	private static final boolean TRACE = System.getenv("ZM_TRACE") != null;
+
 	/** Advance one task until it completes, yields the frame, or the budget runs out. */
 	private void stepTask(StreamTask t, long start, long budgetNanos) {
 		boolean cont = true;
 		while (cont && tasks.get(t.marker) == t && (System.nanoTime() - start) < budgetNanos) {
+			if (TRACE) GD.print("ZM_TRACE " + t.phase + " " + t.marker.zone.zoneId);
 			cont = switch (t.phase) {
 				case GEO_REQUEST     -> beginGeometry(t);
 				case GEO_WAIT        -> false;                 // worker thread owns it; poll next frame
@@ -879,6 +909,20 @@ public class ZoneManager extends Node {
 		// Hot-reload (reloadZone): REPLACE re-reads the file from disk AND refreshes the engine
 		// cache in place — plain REUSE would hand back the stale parse, IGNORE would leave the
 		// stale entry cached for the next plain load.
+		warmDependencies(path);
+		if (!threadedLoads()) {
+			// synchronous: see `threadedLoads` -- the headless renderer cannot take meshes from two threads at once
+			Object res = replaceOnNextLoad.remove(t.marker)
+					? ResourceLoader.load(path, "", ResourceLoader.CacheMode.REPLACE) : GD.load(path);
+			if (res instanceof PackedScene ps) {
+				zone.geometry = ps;
+				t.phase = Phase.GEO_INSTANTIATE;
+				return true;
+			}
+			GD.printErr("ZoneManager: load of '" + path + "' failed");
+			beginSpawnPhase(t);
+			return true;
+		}
 		Error err = replaceOnNextLoad.remove(t.marker)
 				? ResourceLoader.loadThreadedRequest(path, "", false, ResourceLoader.CacheMode.REPLACE)
 				: ResourceLoader.loadThreadedRequest(path);
@@ -890,6 +934,46 @@ public class ZoneManager extends Node {
 		t.threadedPath = path;
 		t.phase = Phase.GEO_WAIT;
 		return false;
+	}
+
+	/**
+	 * Parse a piece on an engine WORKER thread (the default in a game) or on the main thread. `-1` = auto: threaded
+	 * unless the rendering server is the headless DUMMY one. Measured (3.13): under `--headless` the dummy renderer's
+	 * mesh storage is not safe against meshes created on the loader thread while the main thread creates others (it
+	 * logs "Attempting to initialize the wrong RID" / `mesh_add_surface: Parameter "m" is null`, then segfaults), and
+	 * the island's larger street and expressway pieces made two loads overlap often enough to crash
+	 * `probe_island_zones.gd` most runs. A real renderer queues cross-thread calls; the probes run headless.
+	 * 0 = always synchronous, 1 = always threaded.
+	 */
+	@Export public int threadedLoadMode = -1;
+
+	private boolean threadedLoads() {
+		if (threadedLoadMode >= 0) return threadedLoadMode == 1;
+		return !"headless".equals(DisplayServer.INSTANCE.getName().toString());
+	}
+
+	/** Dependencies already loaded on the main thread, so a piece's threaded parse only ever finds them cached. */
+	private final java.util.Set<String> warmed = new java.util.HashSet<>();
+	private final List<Resource> warmHold = new ArrayList<>();
+
+	/**
+	 * Load a piece's SHARED dependencies -- kit materials, textures, JVM scripts -- on the MAIN thread before the piece
+	 * itself is parsed on a worker. Measured (3.13): the first threaded load of a piece bringing a dependency no piece
+	 * had loaded yet (the south-west streets' breakable lamps: `BreakableProps.java`, the Quaternius atlas material)
+	 * crashed the engine natively whenever the main thread was loading at the same time (a traffic car's scene) -- a
+	 * segfault with no script error, reproducible on `probe_island_zones.gd`. Dependencies are small and are held for
+	 * the session (`warmHold`), so each is loaded once and a worker never loads one first. Scenes are left to the worker.
+	 */
+	private void warmDependencies(String path) {
+		for (String dep : ResourceLoader.getDependencies(path)) {
+			String p = "";
+			for (String part : dep.split("::")) {                // "uid://..::Type::res://path" or "res://path::Type"
+				if (part.contains("://") && !part.startsWith("uid://")) { p = part; break; }
+			}
+			if (p.isEmpty() || p.endsWith(".tscn") || p.endsWith(".scn") || !warmed.add(p)) continue;
+			Resource r = GD.load(p);
+			if (r != null) warmHold.add(r);
+		}
 	}
 
 	/** GEO_WAIT: check on the worker-thread parse; cache + advance when it lands. */
@@ -941,6 +1025,7 @@ public class ZoneManager extends Node {
 			first = false;
 			Node child = t.pendingChildren.poll();
 			boolean navRegion = child instanceof NavigationRegion3D;
+			if (TRACE) GD.print("ZM_TRACE enter " + child.getName() + " " + child.getClass().getSimpleName());
 			t.geoRoot.addChild(child);
 			if (navRegion) return false;
 		}
@@ -1158,6 +1243,7 @@ public class ZoneManager extends Node {
 			first = false;
 			Node child = kids.get(i--);
 			if (!GD.isInstanceValid(child)) continue;
+			if (TRACE) GD.print("ZM_TRACE free " + child.getName() + " " + child.getClass().getSimpleName());
 			geo.removeChild(child);
 			child.queueFree();
 		}

@@ -80,6 +80,14 @@ MED_RAISED = 'RAISED'
 MED_WALL = 'WALL'
 MEDIAN_STYLES = (MED_NONE, MED_PAINT, MED_RAISED, MED_WALL)
 
+#: A ROCK SHED (洞門 / ロックシェッド, PLAN.md 3.15): a roof slab over the carriageway, a wall against the rock on the
+#: closed side and a row of columns on the open one. Which side is OPEN is said against the station's chain-FWD
+#: direction. Held from the station that declares it to the next, like `pillar_skip`. APPEND-ONLY.
+SHED_NONE = 'NONE'
+SHED_OPEN_LEFT = 'OPEN_LEFT'
+SHED_OPEN_RIGHT = 'OPEN_RIGHT'
+SHEDS = (SHED_NONE, SHED_OPEN_LEFT, SHED_OPEN_RIGHT)
+
 #: The four fields a station may change while still INHERITing the road's base profile -- "what
 #: actually varies along a road" (1.2a). Everything else is whole-profile INHERIT or OVERRIDE,
 #: deliberately one bit rather than a 30-field mask nobody can hold in their head.
@@ -128,6 +136,7 @@ POINT_FIELDS = (
     ("pillar_spacing", 'f',  30.0),
     ("pillar_skip",    'b',  False),
     ("pillar_offset",  'f',  0.0),
+    ("shed",           SHEDS, SHED_NONE),
     ("ground_z",       'f',  0.0),
     ("has_ground_z",   'b',  False),
 
@@ -204,6 +213,11 @@ ROAD_FIELDS = (
     #: A PIER ASSET (`RKA_PIER_*` in the kit, PLAN.md 3.5) stood wherever the solve puts a column, in place of the
     #: plain box. Blank = the box. Its cap is rigid and its shaft stretches to the ground (`point_mesh.pillars`).
     ("pillar_asset",  's', ""),
+    #: The UPHILL side's cut face, as metres of rise per metre across (PLAN.md 3.15). 0 = the terrain stamp's ordinary
+    #: 1:1 batter on both sides. A bench road cut into a cliff sets it steep (10 = near vertical): a 1:1 batter would
+    #: slice as far back into the mountain as the cut is deep. Which side is uphill is DERIVED, per corridor point,
+    #: from the natural ground (`roadkit_cli.py corridors`); the downhill side keeps the ordinary batter.
+    ("cut_batter",    'f', 0.0),
     #: Paint the lane markings at all. Off for a road whose surface is a placeholder, and off for
     #: every LOD-low bake -- stripes at 300 m are a triangle budget with nothing to show for it.
     ("markings", 'b', True),
@@ -376,7 +390,7 @@ def resolve_point(point, road):
     # Shape, structure sampling and junction state are per-station facts, not profile: a base
     # profile has no business overwriting where a corner is or what the terrain height was.
     for n in ("tangent_mode", "handle_in", "handle_out", "roll",
-              "ground_z", "has_ground_z", "pillar_skip", "pillar_offset",
+              "ground_z", "has_ground_z", "pillar_skip", "pillar_offset", "shed",
               "fillet_radius", "allow_cross", "allow_uturn", "traffic_light",
               "setback_solved", "setback_locked"):
         setattr(out, n, getattr(point, n))

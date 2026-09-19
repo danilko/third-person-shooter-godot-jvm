@@ -100,6 +100,20 @@ def flow_report(doc):
     for l in doc.get("lanes", ()):
         for n in l.get("next") or ():
             reached.add(n)
+    # A LANE BESIDE A REACHED LANE IS REACHED BY A LANE CHANGE. A turn lands in ONE lane of its exit (the kerb lane for
+    # a left turn, the median lane for a right one), so a 3-lane trunk leaving a T is fed into two of its lanes and the
+    # third is entered by changing lanes -- the `inner_lane` / `outer_lane` edges, the same way an aux lane is.
+    # The closure runs over the same carriageway only (those edges never cross the median).
+    todo = list(reached)
+    while todo:
+        l = lanes.get(todo.pop())
+        if l is None:
+            continue
+        for k in ("inner_lane", "outer_lane"):
+            n = l.get(k)
+            if n and n not in reached:
+                reached.add(n)
+                todo.append(n)
     broken, open_end, unreached, ramp_orphans, misjoined = [], [], [], [], []
     for lid, l in lanes.items():
         g = geo.get(lid)

@@ -549,21 +549,25 @@ def _adjacency(lanes, profiles):
     which is where every slot that exists at all is present."""
     if not profiles:
         return
-    widest = max(profiles, key=lambda p: len(p.slots))
+    # EVERY station, widest first -- not the widest alone. A run carrying one carriageway's aux block at one station
+    # and the other carriageway's at another (an entrance on the westbound side, an exit on the eastbound side of the
+    # same stretch) has no station holding both, and the lane missing from the widest one got no lane-change edge at
+    # all: an exit lane nothing can reach (3.13, the C1 loop JCT).
     by_slot = {l["_slot"]: l for l in lanes}
-    ids = [s.id for s in widest.slots if s.id in by_slot]
-    for i, sid in enumerate(ids):
-        lane = by_slot[sid]
-        # INBOARD is toward the divide (s = 0). The slot list runs -s -> +s, so for a FWD lane
-        # (on the +s side, F0 nearest the divide) the inboard neighbour is the LOWER entry, and
-        # for a REV lane (on -s, listed outermost-first) it is the HIGHER one. Getting this
-        # backwards would point every exit ramp's lane-change edge at the median.
-        lo = ids[i - 1] if i > 0 else None
-        hi = ids[i + 1] if i + 1 < len(ids) else None
-        inner, outer = (hi, lo) if lane["_dir"] == lp.REV else (lo, hi)
-        for a, b in (("inner_lane", inner), ("outer_lane", outer)):
-            if b is not None and by_slot[b]["_dir"] == lane["_dir"]:
-                lane[a] = by_slot[b]["id"]
+    for prof in sorted(profiles, key=lambda p: -len(p.slots)):
+        ids = [s.id for s in prof.slots if s.id in by_slot]
+        for i, sid in enumerate(ids):
+            lane = by_slot[sid]
+            # INBOARD is toward the divide (s = 0). The slot list runs -s -> +s, so for a FWD lane
+            # (on the +s side, F0 nearest the divide) the inboard neighbour is the LOWER entry, and
+            # for a REV lane (on -s, listed outermost-first) it is the HIGHER one. Getting this
+            # backwards would point every exit ramp's lane-change edge at the median.
+            lo = ids[i - 1] if i > 0 else None
+            hi = ids[i + 1] if i + 1 < len(ids) else None
+            inner, outer = (hi, lo) if lane["_dir"] == lp.REV else (lo, hi)
+            for a, b in (("inner_lane", inner), ("outer_lane", outer)):
+                if b is not None and by_slot[b]["_dir"] == lane["_dir"] and not lane.get(a):
+                    lane[a] = by_slot[b]["id"]
 
 
 # ------------------------------------------------------------------------------- junctions
@@ -637,6 +641,17 @@ def build_junctions(net, lanes_by_uid, all_lanes):
             for lane in approach:
                 d_in = _lane_dir(lane, True)
                 n_in = len([x for x in approach if x["_dir"] == lane["_dir"]])
+                # the turns this approach can make here at all: a T offers no straight, and the lane rule splits
+                # the approach between the turns that exist (`lane_movements.allowed_turns`)
+                avail = set()
+                for v in comp:
+                    o = _arm_lanes(lanes_by_uid, v, "out")
+                    if not o or v == u:
+                        continue
+                    t = lm.turn_class(d_in, _lane_dir(o[0], False))
+                    if t == lm.TURN_U or (t == lm.TURN_R and not res.allow_cross):
+                        continue
+                    avail.add(t)
                 for v in comp:
                     outs = _arm_lanes(lanes_by_uid, v, "out")
                     if not outs:
@@ -649,7 +664,7 @@ def build_junctions(net, lanes_by_uid, all_lanes):
                     verdict = lm.movement_verdict(
                         d_in, d_out, lane["lane_index"], n_in, len(outs),
                         same_arm=(u == v), allow_cross=bool(res.allow_cross),
-                        allow_uturn=bool(res.allow_uturn))
+                        allow_uturn=bool(res.allow_uturn), available=avail)
                     if not verdict.ok:
                         continue
                     target = next((o for o in outs

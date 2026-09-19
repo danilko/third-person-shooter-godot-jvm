@@ -75,6 +75,10 @@ BARRIER_MIN_DELTA = 2.0
 #: Barrier thickness, in metres. Not authored: it is a constructional constant, and the artist has
 #: no decision to make about it that the height does not already express.
 BARRIER_THICKNESS = 0.32
+#: A `WALL` median's barrier height: a Japanese expressway's central barrier, whatever the road's own side barriers are
+#: (C1's are 3 m sound walls). The collider (`point_mesh.median_wall`), the tiled panel on it (`point_furniture`, the
+#: kit piece fitted to this height) and a median lamp standing on it all read this one number.
+MEDIAN_WALL_HEIGHT = 1.1
 
 #: Support-kind codes, as a float attribute (GN has no enum). Order is `road_support.KINDS`.
 SUPPORT_CODE = {k: float(i) for i, k in enumerate(rs.KINDS)}
@@ -139,7 +143,17 @@ CARRIER_ATTRS = (
     # kit built kerbs, footways, walls, pads and gores, and not one lane line. This is the width of
     # the stripe on a `__marks` carrier, whose polyline IS the line.
     Attr("rka_mark_w",  "m", 0.0, "lane marking half-width"),
+    # A ROCK SHED over this sample (PLAN.md 3.15, `point_model.SHEDS`): 0 none, 1 open on the left (the columns there,
+    # the wall against the rock on the right), 2 open on the right. `point_mesh.sheds` builds it.
+    Attr("rka_shed",    "code", 0.0, "rock shed: 0 none, 1 open left, 2 open right"),
 )
+
+#: A rock shed's inside: the roof's SOFFIT stands this high over the carriageway (Japanese 建築限界 is 4.5 m; a shed
+#: leaves room for lamps under it), the roof is this thick, and its columns stand this far apart.
+SHED_CLEAR = 5.5
+SHED_ROOF = 1.0
+SHED_COL_SPACING = 8.0
+SHED_CODE = {pm.SHED_NONE: 0.0, pm.SHED_OPEN_LEFT: 1.0, pm.SHED_OPEN_RIGHT: 2.0}
 
 ATTR_NAMES = tuple(a.name for a in CARRIER_ATTRS)
 ATTR_DEFAULTS = {a.name: a.default for a in CARRIER_ATTRS}
@@ -584,6 +598,9 @@ def solve_road(net, road, uids=None, ground_fn=None):
         v["rka_pillar_param"] = 1.0 if (sp["kind"] == rs.SUPPORT_PIER
                                         and not _bool_field(points, sm, "pillar_skip")
                                         and sp["pier_height"] > 0.5) else 0.0
+
+        i_st = sm.at_station if sm.at_station is not None else sm.seg
+        v["rka_shed"] = SHED_CODE.get(getattr(points[i_st], "shed", pm.SHED_NONE), 0.0)
 
         # ---- the barrier. One rule, both cases: a road nobody may walk on is fenced along its
         # whole length, and a road they may walk on is fenced only where it is off the ground.

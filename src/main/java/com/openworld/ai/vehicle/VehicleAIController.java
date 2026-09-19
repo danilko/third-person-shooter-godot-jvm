@@ -106,6 +106,7 @@ public class VehicleAIController extends Controller {
     private Lane            route;
     private IntersectionZone currentIntersection;   // junction we're inside, if any (I3b right-of-way)
     private boolean finished = false;               // reached a dead-end lane → zone despawns this car
+    private boolean streamEdge = false;             // ... and that end is the edge of the streamed road
 
     private double  routeProgress = 0.0;            // arc length along the current lane (monotonic)
     private boolean progressInit  = false;
@@ -158,9 +159,16 @@ public class VehicleAIController extends Controller {
             if (back == null) back = LaneGraph.reverseOf(route);
             if (back != null) { setRoute(back); return true; }
         }
+        // A lane that NAMES successors none of which resolve ends at the edge of the streamed road: its next lanes are in
+        // a road piece that is not loaded. Not a dead end in the network, and the zone says so when it reclaims the car.
+        streamEdge = route instanceof com.openworld.world.PathLaneRoute p
+                && p.nextRoutes != null && !p.nextRoutes.isBlank();
         finished = true;   // END_DESPAWN, or no reverse lane authored
         return false;
     }
+
+    /** True when {@link #isFinished()} because the lane's successors are in an unstreamed road piece, not a dead end. */
+    public boolean finishedAtStreamEdge() { return finished && streamEdge; }
 
     /** True once this car reached a dead-end lane with no continuation — the zone reclaims it. */
     public boolean isFinished() { return finished; }

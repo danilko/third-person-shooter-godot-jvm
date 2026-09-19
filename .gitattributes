@@ -12,7 +12,6 @@
 # than repo-wide for .tscn/.json/.gltf/.bin so small hand-authored scenes (character/weapon/UI)
 # keep normal git diffing; these are machine-generated per bake and never hand-edited anyway.
 # (*.blend1 is gitignored entirely — never committed, no LFS rule needed for it.)
-assets/world_source/plateau/data/*.json filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/pieces/*.gltf filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/pieces/*.bin filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/pieces/*.tscn filter=lfs diff=lfs merge=lfs -text
@@ -54,6 +53,7 @@ assets/world_source/pieces/*.ground.bin filter=lfs diff=lfs merge=lfs -text
 # Git LFS — building kits (assets/world_source/kits/, see its README.md): the kit textures and binary glTF
 # buffers, and the merged building meshes/colliders generated from them. The .gltf/.json/.tres stay text.
 assets/world_source/kits/**/*.png filter=lfs diff=lfs merge=lfs -text
+assets/world_source/kits/**/*.jpg filter=lfs diff=lfs merge=lfs -text
 assets/world_source/kits/**/*.bin filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/buildings/*.res filter=lfs diff=lfs merge=lfs -text
 assets/world_source/reference/*.png filter=lfs diff=lfs merge=lfs -text

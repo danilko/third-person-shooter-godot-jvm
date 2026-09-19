@@ -1789,6 +1789,7 @@ public class NetworkManager extends Node {
             return;
         }
         if (isServer()) return;   // host owns world state; never accepts an inbound world event
+        com.openworld.net.NetStats.increment("world_event_received");
         GameManager manager = gameManager();
         if (manager != null) manager.onWorldEvent(event.eventType(), event.key(), event.value(), event.args());
     }
@@ -2552,6 +2553,7 @@ public class NetworkManager extends Node {
     /** Args overload — the trailing string list carries any textual payload an event needs (e.g. a mission's objectiveType/winningFaction/variant/reason). See {@link NetMessageCodec#encodeWorldEvent}. */
     public void broadcastWorldEvent(int eventType, String key, float value, java.util.List<String> args) {
         if (!isServer() || !isNetworked()) return;
+        com.openworld.net.NetStats.increment("world_event_sent");
         broadcastMessage(NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT, eventType, key, value, args), null);
     }
 
@@ -2564,6 +2566,7 @@ public class NetworkManager extends Node {
     public void sendWorldEventTo(int targetPeerId, int eventType, String key, float value,
                                  java.util.List<String> args) {
         if (!isServer() || !isNetworked()) return;
+        com.openworld.net.NetStats.increment("world_event_sent");
         sendMessage(targetPeerId, NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT, eventType, key, value, args));
     }
 
@@ -2606,9 +2609,8 @@ public class NetworkManager extends Node {
         Node fmNode = getNodeOrNull("/root/FactionManager");
         if (!(fmNode instanceof com.openworld.character.FactionManager fm)) return;
         for (String[] rel : fm.getActiveRelationships()) {
-            sendMessage(targetPeerId, NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT,
-                    com.openworld.game.GameManager.WORLD_EVENT_FACTION_RELATIONSHIP, rel[0], 0f,
-                    java.util.List.of(rel[1], rel[2])));
+            sendWorldEventTo(targetPeerId, com.openworld.game.GameManager.WORLD_EVENT_FACTION_RELATIONSHIP,
+                    rel[0], 0f, java.util.List.of(rel[1], rel[2]));
         }
     }
 
@@ -2622,19 +2624,9 @@ public class NetworkManager extends Node {
         for (Node node : getTree().getNodesInGroup(
                 new StringName(com.openworld.world.Breakable.BREAKABLE_GROUP))) {
             if (node instanceof com.openworld.world.Breakable b && b.isBroken()) {
-                sendMessage(targetPeerId, NetMessageCodec.encodeWorldEvent(MSG_WORLD_EVENT,
-                        com.openworld.game.GameManager.WORLD_EVENT_BREAKABLE, b.breakableId, 1f,
-                        java.util.List.of()));
+                sendWorldEventTo(targetPeerId, com.openworld.game.GameManager.WORLD_EVENT_BREAKABLE,
+                        b.breakableId, 1f, java.util.List.of());
             }
-        }
-    }
-
-    /** Server → one peer: every street pole knocked down and not back yet (PLAN.md 3.11), as the live events. */
-    public void sendBaselineBreakableProps(int targetPeerId) {
-        if (!isServer()) return;
-        for (String key : com.openworld.world.BreakableProps.brokenKeys()) {
-            sendWorldEventTo(targetPeerId, com.openworld.game.GameManager.WORLD_EVENT_PROP_BROKEN, key, 1f,
-                    java.util.List.of());
         }
     }
 
