@@ -1,0 +1,43 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/ui/weapons/SMO1.png" id="91_icon"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/SMO1.tres" id="90_stats"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/ThrowableItem.java" id="1_ti"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/SMO1Projectile.tscn" id="2_proj"]
+[ext_resource type="PackedScene" path="res://assets/weapons/SMO1.glb" id="5_model"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_area"]
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(0.065, 0.075, 0.151)
+
+[node name="SMO1" type="Node3D"]
+world_body_continuous_cd = true
+script = ExtResource("1_ti")
+stats = ExtResource("90_stats")
+weapon_archetype = "throwable"
+weapon_icon = ExtResource("91_icon")
+projectile_scene = ExtResource("2_proj")
+weapon_id = "SMO1"
+weapon_name = "SMO-1"
+slot_type = 3
+hold_socket = "SocketThrowable"
+magazine = 1
+reserve = 0
+detonates_when_shot = false
+
+[node name="PickupArea" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea"]
+shape = SubResource("BoxShape3D_area")
+
+[node name="Model" parent="." instance=ExtResource("5_model")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_body")
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

@@ -1,0 +1,92 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/AirportTerminal_mesh.res" id="1_pduc0"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/AirportTerminal_collision.res" id="2_k4ui6"]
+
+[node name="AirportTerminal" type="Node3D" unique_id=1047347213]
+metadata/building = {
+"aabb": [Vector3(-121, -0.1, -85), Vector3(242, 47.1, 170)],
+"collision": "trimesh",
+"doors": [{
+"center": [-45.0, 0.0, 65.0],
+"height": 3.5,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "departures",
+"width": 4.0
+}, {
+"center": [-15.0, 0.0, 65.0],
+"height": 3.5,
+"module": 1.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "departures",
+"width": 4.0
+}, {
+"center": [15.0, 0.0, 65.0],
+"height": 3.5,
+"module": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "departures",
+"width": 4.0
+}, {
+"center": [45.0, 0.0, 65.0],
+"height": 3.5,
+"module": 3.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "departures",
+"width": 4.0
+}, {
+"center": [-40.0, 0.0, 5.0],
+"height": 4.0,
+"module": 4.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "airside",
+"width": 8.0
+}, {
+"center": [40.0, 0.0, 5.0],
+"height": 4.0,
+"module": 5.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "airside",
+"width": 8.0
+}],
+"example": true,
+"footprint_m": [242.0, 170.0],
+"height_m": 47.1,
+"id": "AirportTerminal",
+"kit": "library",
+"landmark": true,
+"piece_count": 1048,
+"probe_xz": [0.3, 37.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "the island's airport terminal, GTA scale: a hollow furnished departure hall behind clear glass, its sides and the concourse's apron face clad with the downtown kit's metal and glass modules; runways from Airport_Runway / Airport_RunwayEnd",
+"wall_top_m": 47.1
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=791624991]
+mesh = ExtResource("1_pduc0")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=911808296]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1873773171]
+shape = ExtResource("2_k4ui6")
+
+[node name="Door_departures_0" type="Marker3D" parent="." unique_id=1470354930]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -45, 0, 65)
+
+[node name="Door_departures_1" type="Marker3D" parent="." unique_id=1985278200]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -15, 0, 65)
+
+[node name="Door_departures_2" type="Marker3D" parent="." unique_id=1897055468]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 15, 0, 65)
+
+[node name="Door_departures_3" type="Marker3D" parent="." unique_id=1991314319]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 45, 0, 65)
+
+[node name="Door_airside_4" type="Marker3D" parent="." unique_id=2142012143]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 5)
+
+[node name="Door_airside_5" type="Marker3D" parent="." unique_id=118361668]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 5)

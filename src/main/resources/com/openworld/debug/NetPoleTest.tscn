@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/debug/NetPoleTestHost.java" id="1_npt"]
+
+[node name="NetPoleTest" type="Node3D"]
+script = ExtResource("1_npt")
+
+[node name="Characters" type="Node" parent="."]
+
+[node name="PlayerSpawn" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 10)

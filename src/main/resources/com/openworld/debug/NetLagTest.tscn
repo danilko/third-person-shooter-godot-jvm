@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/debug/NetLagTestHost.java" id="1_nlt"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/ASR1.tscn" id="2_asr1"]
+
+[node name="NetLagTest" type="Node"]
+script = ExtResource("1_nlt")
+
+[node name="Characters" type="Node" parent="."]
+
+[node name="PlayerSpawn" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="Pickups" type="Node" parent="."]
+
+[node name="ASR1" parent="Pickups" instance=ExtResource("2_asr1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 6)
