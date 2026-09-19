@@ -118,6 +118,8 @@ public class VehicleNetworkController extends Controller {
         // Flat tires mirror the authority (visual squash + sag on the frozen puppet);
         // rides every snapshot, so late-join and drop-heal come for free.
         vehicle.applyReplicatedFlatMask(snap.flatMask());
+        // Body parts (dented / loose / off) MAX-merge: states only rise, so any report is safe to apply.
+        vehicle.applyReplicatedPartMask(snap.partMask());
 
         if (applyHealth) {
             Node healthNode = vehicle.getNodeOrNull(new godot.core.NodePath("Health"));

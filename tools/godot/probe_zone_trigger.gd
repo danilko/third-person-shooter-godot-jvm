@@ -14,7 +14,7 @@ extends SceneTree
 
 const AI      := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
 const PLAYER  := "res://src/main/resources/com/openworld/character/Player.tscn"
-const VEHICLE := "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn"
+const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 const TRIGGER := "res://src/main/java/com/openworld/world/ZoneTrigger.java"
 const HELPER  := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
 const INFO    := "res://src/main/java/com/openworld/character/CharacterInfo.java"

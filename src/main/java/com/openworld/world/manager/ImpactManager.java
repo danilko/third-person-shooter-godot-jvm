@@ -90,6 +90,9 @@ public class ImpactManager extends Node {
             // and only a reduced passthrough continues to the vehicle body Health. The
             // vehicle counterpart of the character bone-multiplier model.
             if (ctx.wheel != null) bodyDamage = ctx.wheel.applyTireDamage(damage);
+            // A body panel under the bullet dents / comes loose (GTA component damage); the car still takes the hit.
+            else if (ctx.healthOwner instanceof com.openworld.carrier.vehicle.Vehicle v && v.getDamageModel() != null)
+                v.getDamageModel().applyHit(info.hitPoint, damage);
             Health health = (Health) ctx.healthOwner.getNode(new NodePath("Health"));
             bodyDamage *= health.hitDamageMultiplier;   // a car soaks gunfire (Health's damage kinds)
             health.takeDamage(info.hitNode, bodyDamage, weaponName, weaponIcon, attackerName, attackerFaction, attackerPos,

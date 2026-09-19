@@ -103,6 +103,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     protected Controller             controller;
     protected Health                 healthNode;
+    private VehicleDamageModel       damageModel;
     /** Driver (seat 0) — kept as a field alias of seatOccupants[0] so the many driver-centric
      *  call sites (nameplate colour, carjack, weapon routing, AI eviction) stay unchanged. */
     protected Character              occupant;
@@ -205,6 +206,11 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 if (child instanceof VehicleWheel w) {
                     w.setup(cfg);
                     wheels.add(w);
+                    // A modelled car: the wheel's mesh lives in the imported model (wheel_lf, …) and moves under
+                    // the wheel so it spins, steers, squashes flat and follows the suspension like the placeholder.
+                    if (!w.modelMesh.isEmpty() && getNodeOrNull("Model/" + w.modelMesh) instanceof Node3D m) {
+                        w.adoptModelMesh(m, cfg.wheelRadius);
+                    }
                 }
             }
         } else if (requiresWheels()) {
@@ -246,6 +252,9 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
         Node wc = getNodeOrNull("WeaponController");
         if (wc instanceof WeaponController vwc) vehicleWeaponController = vwc;
+
+        // GTA-style component damage (VehicleDamageModel) - optional: the prototype has none.
+        if (getNodeOrNull("DamageModel") instanceof VehicleDamageModel dm) damageModel = dm;
 
         for (Node child : getChildren()) {
             if (child instanceof Controller c) { controller = c; break; }
@@ -404,7 +413,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 // (the dwell prevents sleep/wake flap at the threshold). AI traffic never
                 // parks mid-drive — CruiseState always emits motor ≠ 0 and a junction hold
                 // (BrakeState) emits brake = true, both of which fail isIdleInput().
-                if (idle && supported && speed < cfg.parkSpeedThreshold) {
+                if (idle && supported && speed < cfg.parkSpeedThreshold && suspensionSettled()) {
                     parkTimer += delta;
                     if (parkTimer >= cfg.parkDelaySeconds) {
                         parked = true;
@@ -892,16 +901,19 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             boolean brakeLock = lockSpeed < cfg.parkingLockSpeed
                     && Math.abs(cmd.motor) < 0.01f && (cmd.handbrake || cmd.brake);
             boolean parkLock = lockSpeed < cfg.parkSpeedThreshold
-                    && (parked || parkTimer > 0.0);
+                    && (parked || parkTimer > 0.0)
+                    && suspensionSettled();
             if (brakeLock || parkLock) {
                 state.setLinearVelocity(Vector3.Companion.getZERO());
                 state.setAngularVelocity(Vector3.Companion.getZERO());
             }
         }
 
+        int count = state.getContactCount();
+        if (damageModel != null) feedCrash(state, count);
+
         if (cfg.vehicleCollisionMinSpeed <= 0) return;
 
-        int count = state.getContactCount();
         java.util.HashSet<Character> currentContacts = new java.util.HashSet<>();
 
         for (int i = 0; i < count; i++) {
@@ -942,6 +954,60 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
         activeCollisions.clear();
         activeCollisions.addAll(currentContacts);
+    }
+
+    /**
+     * Hands this step's hard contacts to the damage model as ONE impact: the change of velocity they caused
+     * (|impulse| / mass, summed) at their impulse-weighted point. A contact pushing UP from below is the car resting
+     * or landing on the ground, not a crash, and is skipped - the wheels are rays, so the hull only touches the
+     * ground when something has gone wrong, and a hard landing is the suspension's business.
+     */
+    private void feedCrash(PhysicsDirectBodyState3D state, int count) {
+        double mass = Math.max(1.0, getMass());
+        double dv = 0.0;
+        Vector3 at = Vector3.Companion.getZERO();
+        Vector3 up = state.getTransform().getBasis().getColumn(1);
+        for (int i = 0; i < count; i++) {
+            Vector3 impulse = state.getContactImpulse(i);
+            double d = impulse.length() / mass;
+            if (d < 0.05 || state.getContactLocalNormal(i).dot(up) > 0.7) continue;
+            at = at.plus(state.getContactLocalPosition(i).times(d));
+            dv += d;
+        }
+        if (dv <= 0.0) return;
+        Vector3 world = at.div(dv);
+        damageModel.queueImpact(state.getTransform().affineInverse().times(world), dv);
+    }
+
+    /** Swings open (and shuts) the door beside {@code seatIndex}: every peer runs enter/exit, so no message. */
+    private void openDoorForSeat(int seatIndex) {
+        if (damageModel == null || seatIndex >= seatNodes.size()) return;
+        damageModel.openDoorFor(seatNodes.get(seatIndex).getPosition());
+    }
+
+    /** The GTA-style body-part model, or null for a vehicle without one. */
+    public VehicleDamageModel getDamageModel() { return damageModel; }
+
+    /** Body-part states (dented / loose / off), 2 bits per part — rides the vehicle snapshot. 0 without a damage model. */
+    public int getPartMask() { return damageModel != null ? damageModel.getMask() : 0; }
+
+    /** Snapshot apply path, every peer: MAX-merge — a part is as broken as the most broken report of it. */
+    public void applyReplicatedPartMask(int mask) {
+        if (damageModel != null && mask != 0) damageModel.applyReplicatedMask(mask);
+    }
+
+    /** Spring speed (m/s) below which a wheel counts as settled for the parking lock. */
+    private static final float SETTLED_SPRING_SPEED = 0.01f;   // the suspension settles with a ~1 s time constant: ~1 cm short
+
+    /**
+     * True once no spring is still moving. The parking lock zeroes the body's velocity below parkSpeedThreshold, and
+     * an overdamped suspension eases a car down onto its wheels far slower than that - so a car set down even 20 cm
+     * above its rest height was frozen where it was, hovering (measured: 0.32 m high, springs carrying a fifth of the
+     * weight). The lock is for slope CREEP, which only exists once the springs have settled.
+     */
+    private boolean suspensionSettled() {
+        for (VehicleWheel w : wheels) if (Math.abs(w.compressionRate()) > SETTLED_SPRING_SPEED) return false;
+        return true;
     }
 
     /** Audible range (m) of a vehicle crash to AI, and the min seconds between crash stimulus posts (E2). */
@@ -1389,6 +1455,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public void tryEnter(Character c, int seatIndex) {
         if (c == null || seatIndex < 0 || seatIndex >= seatOccupants.length) return;
         if (seatOccupants[seatIndex] != null) return;
+        openDoorForSeat(seatIndex);
         if (seatIndex != 0) {
             enterPassenger(c, seatIndex);
             return;
@@ -1490,6 +1557,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     public void tryExit(int seatIndex) {
         if (seatIndex < 0 || seatIndex >= seatOccupants.length) return;
         if (seatOccupants[seatIndex] == null) return;
+        openDoorForSeat(seatIndex);
         if (seatIndex != 0) {
             exitPassenger(seatIndex);
             return;
@@ -1631,6 +1699,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         Node wreck = cfg.wreckScene.instantiate();
         getTree().getCurrentScene().addChild(wreck);
         if (wreck instanceof Node3D w) w.setGlobalTransform(getGlobalTransform());
+        if (damageModel != null) {            // the panels blow off, and the wreck is this car burnt out
+            damageModel.blowOff();
+            damageModel.dressWreck(wreck);
+        }
         SceneTreeTimer t = getTree().createTimer(cfg.wreckDuration, true, false, false);
         t.connect(new StringName("timeout"),
                 MethodCallable.createUnsafe(wreck, "queue_free"));
@@ -1638,7 +1710,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
     // ── EntranceArea signals ──────────────────────────────────────────────────
 
-    private boolean isEmptyOfRiders() {
+    public boolean isEmptyOfRiders() {
         for (Character rider : seatOccupants) {
             if (rider != null) return false;
         }

@@ -282,7 +282,6 @@ public class GameManager extends Node {
 
     private static final String PLAYER_SCENE_PATH = "res://src/main/resources/com/openworld/character/Player.tscn";
     private static final String AI_SCENE_PATH = "res://src/main/resources/com/openworld/character/AICharacter.tscn";
-    private static final String VEHICLE_SCENE_PATH = "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn";
     private static final StringName CHARACTERS_GROUP = new StringName("characters");
 
     /** Server-side: a peer connected at the transport level. Real handling waits for identifyPeer. */
@@ -899,8 +898,8 @@ public class GameManager extends Node {
 
     /**
      * Client-side: instantiate a host-announced streamed traffic vehicle (I3b) — MSG_VEHICLE_SPAWN's
-     * receiving side. Mirrors {@link #spawnReplicatedCharacter}: the scene is the single bounded
-     * Vehicle.tscn (no wire path). We are never authority for it (ownerPeerId = host), so
+     * receiving side. Mirrors {@link #spawnReplicatedCharacter}: the scene is picked from the bounded
+     * {@code VehicleModels} list by the message's index (no wire path). We are never authority for it (ownerPeerId = host), so
      * {@code Vehicle.applyAuthorityState} attaches a {@code VehicleNetworkController} and freezes the
      * body; the existing MSG_VEHICLE_SNAPSHOT_BATCH then drives it. Tagged into {@code STREAMED_GROUP}
      * so a later late-join baseline / despawn treats it like the host's.
@@ -918,6 +917,15 @@ public class GameManager extends Node {
                 if (!spawn.ephemeral() && node instanceof Vehicle existing && existing.isInGroup(streamedGroup)) {
                     existing.removeFromGroup(streamedGroup);
                 }
+                // A snapshot can lazy-spawn a body before its spawn message, and a snapshot does not know the
+                // model - so that body is the prototype. When the spawn names another model, replace it.
+                String want = com.openworld.carrier.vehicle.VehicleModels.sceneOf(spawn.model());
+                if (node instanceof Vehicle existing && !want.equals(existing.getSceneFilePath())
+                        && existing.isEmptyOfRiders()) {
+                    existing.getParent().removeChild(existing);
+                    existing.queueFree();
+                    break;
+                }
                 return;
             }
         }
@@ -926,9 +934,10 @@ public class GameManager extends Node {
             GD.print("GameManager: Characters container not found — cannot spawn replicated vehicle " + spawn.vehicleId());
             return;
         }
-        Object loaded = GD.load(VEHICLE_SCENE_PATH);
+        String scenePath = com.openworld.carrier.vehicle.VehicleModels.sceneOf(spawn.model());
+        Object loaded = GD.load(scenePath);
         if (!(loaded instanceof PackedScene scene)) {
-            GD.print("GameManager: failed to load " + VEHICLE_SCENE_PATH);
+            GD.print("GameManager: failed to load " + scenePath);
             return;
         }
         Node instance = scene.instantiate();

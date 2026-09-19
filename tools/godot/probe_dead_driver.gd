@@ -15,7 +15,7 @@ extends SceneTree
 ## Control: brain kept, still driving at speed, driver alive. Ambient: reclaimed as abandoned, at rest.
 
 const WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
-const VEHICLE := "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn"
+const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 const AI := "res://src/main/resources/com/openworld/character/AICharacter.tscn"
 const CTRL := "res://src/main/java/com/openworld/debug/LaneDriveProbeController.java"
 const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"

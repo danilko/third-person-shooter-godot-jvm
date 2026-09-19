@@ -26,7 +26,7 @@ extends SceneTree
 ## .applySeatedAimTarget), so there is no second value left to disagree.
 
 const PLAYER  := "res://src/main/resources/com/openworld/character/Player.tscn"
-const VEHICLE := "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn"
+const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 
 # Vehicle.tscn: yaw_sensitivity, and VehicleConfig's authored sector/posture.
 const YAW_SENSITIVITY := 0.02

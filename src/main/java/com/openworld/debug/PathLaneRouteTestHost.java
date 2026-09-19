@@ -147,7 +147,7 @@ public class PathLaneRouteTestHost extends Node3D {
      *  gravity only, which is exactly the bug this ordering fixes). */
     private Vehicle spawnVehicle(String name, Vector3 pos, PathLaneRoute lane, boolean isTurn) {
         java.lang.Object res = ResourceLoader.INSTANCE.load(
-                "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn", "",
+                "res://src/main/resources/com/openworld/vehicle/SPC1.tscn", "",
                 ResourceLoader.CacheMode.REUSE);
         if (!(res instanceof PackedScene packed) || !(packed.instantiate() instanceof Vehicle v)) {
             GD.printErr("PLRTEST: cannot load Vehicle.tscn");
