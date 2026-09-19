@@ -11,8 +11,8 @@
 
 [sub_resource type="Resource" id="Resource_meshcfg"]
 script = ExtResource("2_mc")
-head_mesh_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/eyes"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_001"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_002"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_003"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/head"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/headphones")])
-socket_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketRifle"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketPistol"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketLauncher"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketMelee"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketFist"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker2"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker3"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker4"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker2"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker3"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker4")])
+head_mesh_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/eyes"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/armor_neck"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_001"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_002"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/hair_003"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/head"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/headphones")])
+socket_paths = Array[NodePath]([NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketRifle"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketPistol"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketLauncher"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketMelee"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketThrowable"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/SocketFist"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker2"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker3"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/BackHolster/LongWeaponHolsterMaker4"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker1"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker2"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker3"), NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker4")])
 stance_collider_paths = Dictionary[String, NodePath]({
 "Crawl": NodePath("StanceCollisions/Crawl"),
 "Crouch": NodePath("StanceCollisions/Crouch"),
@@ -221,6 +221,10 @@ input_3/name = "DriveCarrier"
 input_3/auto_advance = false
 input_3/break_loop_at_end = false
 input_3/reset = true
+input_4/name = "Passenger"
+input_4/auto_advance = false
+input_4/break_loop_at_end = false
+input_4/reset = true
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_k4e70"]
 animation = &"upright_idle"
@@ -578,12 +582,73 @@ input_5/name = "attack_cross_fist"
 input_5/auto_advance = false
 input_5/break_loop_at_end = false
 input_5/reset = true
+input_6/name = "attack_throw"
+input_6/auto_advance = false
+input_6/break_loop_at_end = false
+input_6/reset = true
 
 [sub_resource type="AnimationNodeTimeScale" id="AnimationNodeTimeScale_atk"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_atk"]
 filter_enabled = true
 filters = ["Godot_Chan_Stealth/Skeleton3D:clavicle_l", "Godot_Chan_Stealth/Skeleton3D:clavicle_r", "Godot_Chan_Stealth/Skeleton3D:hand_l", "Godot_Chan_Stealth/Skeleton3D:hand_r", "Godot_Chan_Stealth/Skeleton3D:head_2", "Godot_Chan_Stealth/Skeleton3D:index_01_l", "Godot_Chan_Stealth/Skeleton3D:index_01_r", "Godot_Chan_Stealth/Skeleton3D:index_02_l", "Godot_Chan_Stealth/Skeleton3D:index_02_r", "Godot_Chan_Stealth/Skeleton3D:index_03_l", "Godot_Chan_Stealth/Skeleton3D:index_03_r", "Godot_Chan_Stealth/Skeleton3D:lowerarm_l", "Godot_Chan_Stealth/Skeleton3D:lowerarm_r", "Godot_Chan_Stealth/Skeleton3D:middle_01_l", "Godot_Chan_Stealth/Skeleton3D:middle_01_r", "Godot_Chan_Stealth/Skeleton3D:middle_02_l", "Godot_Chan_Stealth/Skeleton3D:middle_02_r", "Godot_Chan_Stealth/Skeleton3D:middle_03_l", "Godot_Chan_Stealth/Skeleton3D:middle_03_r", "Godot_Chan_Stealth/Skeleton3D:neck_01", "Godot_Chan_Stealth/Skeleton3D:pinky_01_l", "Godot_Chan_Stealth/Skeleton3D:pinky_01_r", "Godot_Chan_Stealth/Skeleton3D:pinky_02_l", "Godot_Chan_Stealth/Skeleton3D:pinky_02_r", "Godot_Chan_Stealth/Skeleton3D:pinky_03_l", "Godot_Chan_Stealth/Skeleton3D:pinky_03_r", "Godot_Chan_Stealth/Skeleton3D:ring_01_l", "Godot_Chan_Stealth/Skeleton3D:ring_01_r", "Godot_Chan_Stealth/Skeleton3D:ring_02_l", "Godot_Chan_Stealth/Skeleton3D:ring_02_r", "Godot_Chan_Stealth/Skeleton3D:ring_03_l", "Godot_Chan_Stealth/Skeleton3D:ring_03_r", "Godot_Chan_Stealth/Skeleton3D:spine_03", "Godot_Chan_Stealth/Skeleton3D:thumb_01_l", "Godot_Chan_Stealth/Skeleton3D:thumb_01_r", "Godot_Chan_Stealth/Skeleton3D:thumb_02_l", "Godot_Chan_Stealth/Skeleton3D:thumb_02_r", "Godot_Chan_Stealth/Skeleton3D:thumb_03_l", "Godot_Chan_Stealth/Skeleton3D:thumb_03_r", "Godot_Chan_Stealth/Skeleton3D:upperarm_l", "Godot_Chan_Stealth/Skeleton3D:upperarm_r"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_psg0"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_psg1"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_psg2"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_psg3"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_psg4"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_psg"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_psg0")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_psg1")
+blend_point_1/pos = Vector2(0, 1)
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_psg2")
+blend_point_2/pos = Vector2(-1, 0)
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_psg3")
+blend_point_3/pos = Vector2(0, -1)
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_psg4")
+blend_point_4/pos = Vector2(1, 0)
+blend_point_4/name = &"4"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_atk6"]
+animation = &"attack_throw"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hrc"]
+animation = &"hit_chest"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hrh"]
+animation = &"hit_head"
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_hr"]
+input_0/name = "hit_chest"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = true
+input_1/name = "hit_head"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = true
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_hr"]
+filter_enabled = true
+filters = ["Godot_Chan_Stealth/Skeleton3D:spine_01", "Godot_Chan_Stealth/Skeleton3D:spine_02", "Godot_Chan_Stealth/Skeleton3D:spine_03", "Godot_Chan_Stealth/Skeleton3D:neck_01", "Godot_Chan_Stealth/Skeleton3D:head_2"]
+fadein_time = 0.05
+fadeout_time = 0.15
 
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jn40o"]
 nodes/output/position = Vector2(2740, 140)
@@ -663,7 +728,19 @@ nodes/WeaponChangeSeek/node = SubResource("AnimationNodeTimeSeek_k4e70")
 nodes/WeaponChangeSeek/position = Vector2(2020, 600)
 nodes/DriveCarrierMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_gapvf")
 nodes/DriveCarrierMovementBlend/position = Vector2(-320, 640)
-node_connections = [&"output", 0, &"NeckFront", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"WeaponAimTorso", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"WeaponAim", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
+nodes/PassengerMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_psg")
+nodes/PassengerMovementBlend/position = Vector2(-320, 800)
+nodes/attack_throw/node = SubResource("AnimationNodeAnimation_atk6")
+nodes/attack_throw/position = Vector2(1600, -1180)
+nodes/HitReact/node = SubResource("AnimationNodeOneShot_hr")
+nodes/HitReact/position = Vector2(2480, 140)
+nodes/HitReactClip/node = SubResource("AnimationNodeTransition_hr")
+nodes/HitReactClip/position = Vector2(2260, 360)
+nodes/hit_chest/node = SubResource("AnimationNodeAnimation_hrc")
+nodes/hit_chest/position = Vector2(2020, 340)
+nodes/hit_head/node = SubResource("AnimationNodeAnimation_hrh")
+nodes/hit_head/position = Vector2(2020, 460)
+node_connections = [&"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"WeaponAimTorso", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"WeaponAim", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gapvf"]
 radius = 0.048
@@ -790,6 +867,7 @@ parameters/WeaponChangeScale/scale = 1.0
 parameters/WeaponChangeAnimation/blend_position = 0.0
 parameters/WeaponChangeSeek/seek_request = -1.0
 parameters/DriveCarrierMovementBlend/blend_position = Vector2(0, 0)
+parameters/PassengerMovementBlend/blend_position = Vector2(0, 0)
 
 [node name="MeshRoot" type="Node3D" parent="." unique_id=1850647392]
 
@@ -915,7 +993,10 @@ transform = Transform3D(0.74569666, 0.6550852, 0.12166013, -0.01777947, 0.202093
 transform = Transform3D(0.82521909, 0.52192223, 0.21589106, 0.10821795, 0.22904845, -0.9673807, -0.55434722, 0.82166433, 0.13253367, -0.019617233, 0.069908433, 0.013880314)
 
 [node name="SocketMelee" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1900001003]
-transform = Transform3D(0.6613714, 0.69001216, 0.2940622, -0.053957373, 0.43480435, -0.8989074, -0.74811614, 0.57864416, 0.32479876, -0.01170855, 0.022783384, 0.027736973)
+transform = Transform3D(0.6613714, 0.29406217, -0.69001216, -0.053957373, -0.8989074, -0.43480432, -0.74811614, 0.32479873, -0.57864416, -0.01170855, 0.022783384, 0.027736973)
+
+[node name="SocketThrowable" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1900001004]
+transform = Transform3D(0.6613714, 0.29406217, -0.69001216, -0.053957373, -0.8989074, -0.43480432, -0.74811614, 0.32479873, -0.57864416, -0.01170855, 0.022783384, 0.027736973)
 
 [node name="SocketFist" type="Marker3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1900001001]
 

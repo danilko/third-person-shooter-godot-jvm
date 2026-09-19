@@ -175,10 +175,12 @@ public class ExplosionManager extends Node {
             // Blast center is the damage source for the HUD direction indicator.
             health.takeDamage(c, damage, weaponDisplayName, weaponIcon, attackerName, attackerFaction, center);
         }
-        if (c.isAlive()) {
-            Vector3 pushDir = c.getGlobalPosition().minus(center).normalized();
-            c.applyHitImpulse(c, pushDir, pushForce * t);
-        }
+        // Alive: a stagger. Dead (including killed by THIS blast -- takeDamage above ragdolls the body
+        // synchronously): the push goes into the ragdoll's bones, lifted a little so a blast throws
+        // a body rather than sliding it along the floor (W35).
+        Vector3 pushDir = c.getGlobalPosition().minus(center).normalized();
+        if (!c.isAlive()) pushDir = pushDir.plus(new Vector3(0.0, 0.6, 0.0)).normalized();
+        c.applyHitImpulse(c, pushDir, pushForce * t);
     }
 
     private void applyToRigidBody(RigidBody3D rb, Vector3 center, float radius, float maxDamage,

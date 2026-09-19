@@ -60,6 +60,29 @@ public class VehicleProbeHelper extends Node {
         }
     }
 
+    /** Set a character's view pitch in degrees (up positive) -- probe_w35_anims.gd throws at chosen angles. */
+    @Register
+    public void setViewPitch(Node c, double pitchDeg) {
+        if (c instanceof com.openworld.character.Character ch) ch.controlRotation.pitch = pitchDeg;
+    }
+
+    /** Set a character's view yaw and pitch in degrees (world; pitch up positive) -- probe_grenade_world.gd. */
+    @Register
+    public void setView(Node c, double yawDeg, double pitchDeg) {
+        if (c instanceof com.openworld.character.Character ch) {
+            ch.controlRotation.yaw = yawDeg;
+            ch.controlRotation.pitch = pitchDeg;
+        }
+    }
+
+    /** A blast WITH its push — probe_w35_anims.gd measures that a body it kills is thrown, not dropped. */
+    @Register
+    public void blastPush(Node explosionManager, godot.core.Vector3 at, float radius, float maxDamage, float push) {
+        if (explosionManager instanceof com.openworld.world.manager.ExplosionManager em) {
+            em.triggerExplosion(at, radius, maxDamage, push, "probe", "", "probe", null, null);
+        }
+    }
+
     @Register
     public boolean isAiDriven(Node v) {
         return v instanceof Vehicle car && car.isAiDriven();
@@ -101,6 +124,12 @@ public class VehicleProbeHelper extends Node {
     @Register
     public void seatCharacter(Node v, Node c) {
         if (v instanceof Vehicle car && c instanceof Character ch) car.tryEnter(ch);
+    }
+
+    /** Seat {@code c} as a PASSENGER in seat {@code seat} (>= 1) — probe_w35_anims.gd's passenger pose. */
+    @Register
+    public void seatPassenger(Node v, Node c, int seat) {
+        if (v instanceof Vehicle car && c instanceof Character ch) car.tryEnter(ch, seat);
     }
 
     /** The single-player carjack a player's Enter key runs. */

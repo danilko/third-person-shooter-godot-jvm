@@ -5,11 +5,13 @@ import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.*;
+import godot.core.RID;
 import godot.core.Vector3;
 
 /**
- * Physics projectile spawned by ThrowableItem. Bounces on world geometry via
- * RigidBody3D physics, then detonates after fuseTime seconds.
+ * The thrown grenade, spawned by ThrowableItem. It flies by {@link GrenadeFlight} -- CS 1.6's bounce,
+ * not rigid-body physics (W38) -- as a KINEMATIC body, so it follows exactly the path the trajectory
+ * preview drew, and detonates after fuseTime seconds.
  *
  * Explosion parameters are scene-configured in FRG1Projectile.tscn.
  * Attacker identity is injected by ThrowableItem at throw-time.
@@ -57,18 +59,45 @@ public class FRG1Projectile extends RigidBody3D implements Detonatable, Cosmetic
     private float hostWaitLeft = -1f;
     private boolean exploded = false;
 
+    /** The launch velocity, set by ThrowableItem before the grenade enters the tree. */
+    public Vector3 launchVelocity = new Vector3();
+    /** The thrower, whom the flight never collides with. */
+    public RID ignoreRid = null;
+    private GrenadeFlight flight;
+
     @Register
     @Override
     public void _ready() {
         fuseCountdown = fuseTime;
+        setFreezeMode(FreezeMode.KINEMATIC);
+        setFreezeEnabled(true);
     }
 
     @Register
     @Override
     public void _physicsProcess(double delta) {
         if (tickHostWait(delta) || detonated) return;
+        if (flight == null) {
+            godot.core.VariantArray<RID> ex = new godot.core.VariantArray<>(RID.class);
+            ex.add(getRid());
+            if (ignoreRid != null) ex.add(ignoreRid);
+            flight = new GrenadeFlight(getGlobalPosition(), launchVelocity, ex);
+        }
+        flight.step(getWorld3d().getDirectSpaceState(), delta, gravity());
+        setGlobalPosition(flight.position);
         fuseCountdown -= (float) delta;
         if (fuseCountdown <= 0f) detonate();
+    }
+
+    /** Surfaces touched so far, and whether it has stopped -- probe readouts. */
+    @Register
+    public int contactsNow() { return flight != null ? flight.contacts : 0; }
+    @Register
+    public boolean restingNow() { return flight != null && flight.resting; }
+
+    /** The project's gravity: the one number the flight and the preview both fall under. */
+    public static double gravity() {
+        return ((Number) ProjectSettings.getSetting("physics/3d/default_gravity", 9.8)).doubleValue();
     }
 
     @Override

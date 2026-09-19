@@ -176,6 +176,7 @@ public class Health extends Node {
         if (invulnerable) return;
         currentHealth = Math.max(0.0f, currentHealth - damage);
         hit.emit(damage);
+        if (currentHealth > 0) playHitReaction(headshot);
         emitCharacterHealthChanged();
         emitDamagedFrom(attackerPos);
         boolean killed = currentHealth <= 0;
@@ -241,6 +242,17 @@ public class Health extends Node {
      * Emit {@code EventBus.damageDealt} for the hit marker (PLAN.md 2.8 item 9) on the peer that applied the
      * damage. Skipped for an unknown attacker and for damage a body did to itself (a fall names no one).
      */
+    /**
+     * The flinch (W35), on the peer that applied the damage and -- through
+     * {@code NetworkManager.handleDamageBroadcastMessage} -- on every other peer. A killing hit
+     * plays none: the ragdoll takes over the body on the same frame.
+     */
+    public void playHitReaction(boolean headshot) {
+        Node owner = getOwner();
+        if (owner == null) return;
+        if (owner.getNodeOrNull("AnimationController") instanceof AnimationController ac) ac.playHitReaction(headshot);
+    }
+
     private void emitDamageDealt(String attackerId, float damage, boolean headshot, boolean killed) {
         if (attackerId == null || attackerId.isEmpty()) return;
         Node owner = getOwner();

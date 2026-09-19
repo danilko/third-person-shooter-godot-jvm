@@ -286,6 +286,33 @@ public class AnimationController extends Node {
     animationTree.set(ATTACK_SCALE, frozen ? 0f : attackScale);
   }
 
+  private static final String PASSENGER_KEY_FROM = "DriveCarrier";
+  private static final String PASSENGER_KEY = "Passenger";
+
+  /** The body this controller animates, re-resolved at runtime (the exported ref may be a stale wrapper). */
+  private Node liveBody() {
+    if (player == null) return null;
+    Node live = getNodeOrNull(player.getPath());
+    return live != null ? live : player;
+  }
+
+  // ── Hit reaction (W35) ────────────────────────────────────────────────────
+  //
+  // A flinch on the SPINE, NECK and HEAD only. L4D plays gesture-layer flinches; CS plays none and
+  // punches the view instead. The arms are left to the aim modifiers on purpose: a flinch that moved
+  // them would move the muzzle, and the shot leaves from the muzzle. Skipped for an AI the LOD has
+  // put out of the ACTIVE tier, like every other AnimationTree write.
+
+  /** Flinch: {@code hit_head} for a headshot, else {@code hit_chest}. */
+  @Register
+  public void playHitReaction(boolean headshot) {
+    if (animationTree == null) return;
+    AICharacter ai = lodBody();
+    if (ai != null && ai.getLodLevel() != AILodLevel.ACTIVE) return;
+    animationTree.set("parameters/HitReactClip/transition_request", headshot ? "hit_head" : "hit_chest");
+    animationTree.set("parameters/HitReact/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
+  }
+
   @Register
   public void onWeaponReload() {
     animationTree.set("parameters/Reload/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
@@ -300,6 +327,12 @@ public class AnimationController extends Node {
     swimming = "Swim".equals(stance.getName().toString());
     String key = stance.getAnimationStanceKey();
     if (key == null || key.isEmpty()) key = stance.getName().toString();
+    // A seated PASSENGER shares the driver's stance (and its aim limits and drive-by rules) but not
+    // its pose: hands on a wheel read wrong on anyone who is not driving (W35). The tree carries a
+    // "Passenger" ring for that; only the clip differs.
+    if (PASSENGER_KEY_FROM.equals(key) && liveBody() instanceof Character c && c.isSeatedPassenger()) {
+      key = PASSENGER_KEY;
+    }
 
     animationTree.set("parameters/StanceTransition/transition_request", key);
     this.currentStanceName = key;

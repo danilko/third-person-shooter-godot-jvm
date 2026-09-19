@@ -63,6 +63,7 @@ public class MovementController extends Node {
   @Export
   public double stepReach = 0.45;
 
+
   /**
    * The same body as {@link #player}, but the JVM instance Godot actually bound the script to.
    *
@@ -375,6 +376,7 @@ public class MovementController extends Node {
     }
     return true;
   }
+
 
   /** The cosine of the body's own `floor_max_angle` — one owner, so a steeper body steps steeper. */
   private double floorNormalMin() {

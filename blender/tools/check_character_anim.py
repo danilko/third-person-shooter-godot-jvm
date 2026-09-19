@@ -82,12 +82,24 @@ FAMILIES = {
     "drive": dict(
         clips=["drive_idle"],
         aim="drive_aim_pistol", bob=0.08, foot=0.30),
+    # A seated PASSENGER (W35): the DriveCarrier stance, but the tree plays this ring instead of the
+    # hands-on-wheel one. One clip, the same shape as drive.
+    "passenger": dict(
+        clips=["sit_idle"],
+        aim="drive_aim_pistol", bob=0.08, foot=0.30),
     # SWIM has no AnimationTree state yet -- the stance ships with animationStanceKey = "Crawl" and
-    # borrows that ring. These are placeholders so the ring EXISTS to be authored and is measured
-    # from the day it is; wiring a Swim blendspace is the change that makes them reachable.
-    "swim": dict(
-        clips=["swim_idle", "swim_forward", "swim_back", "swim_left", "swim_right"],
-        aim="swim_aim_pistol", bob=0.08, foot=0.30),
+    # borrows that ring. Since the Universal Animation Library retarget (retarget_ual.py) swim is TWO
+    # postures, and they are two rings on purpose: treading water is UPRIGHT (chest at the water
+    # line; idle and the slow back/left/right drift share it) and the stroke is HORIZONTAL. Blending
+    # one into the other across a blendspace moves the chest 0.4 m, which is a posture change, not a
+    # "knock" -- wiring Swim needs a Transition between a tread ring and a stroke clip (the GTA
+    # shape). A stroke also bobs the body more than a walk: 0.10-0.12 m measured, hence 0.15.
+    "swim_tread": dict(
+        clips=["swim_idle", "swim_back", "swim_left", "swim_right"],
+        aim="swim_aim_pistol", bob=0.15, foot=0.30),
+    "swim_stroke": dict(
+        clips=["swim_forward"],
+        aim="swim_aim_pistol", bob=0.15, foot=0.30),
 }
 
 ROOT_BASELINE_MAX = 0.06  # m, spread of per-clip MEAN Root.y inside one ring (good: <= 0.03)
