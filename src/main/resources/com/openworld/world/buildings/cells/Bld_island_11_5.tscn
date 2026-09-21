@@ -56,7 +56,16 @@ material = ExtResource("alleymat")
 transform_format = 1
 instance_count = 3
 mesh = SubResource("AlleyBox")
-buffer = PackedFloat32Array(0.0000, 0.0000, -34.0000, 762.3000, 0.0000, 0.6000, 0.0000, 0.3400, 3.2000, 0.0000, 0.0000, -651.2230, 0.0000, 0.0000, -34.0000, 762.3000, 0.0000, 0.6000, 0.0000, 0.3400, 3.2000, 0.0000, 0.0000, -697.2230, 0.0000, 0.0000, -34.0000, 762.3000, 0.0000, 0.6000, 0.0000, 0.3400, 3.2000, 0.0000, 0.0000, -743.2230)
+buffer = PackedFloat32Array(0.0000, 0.0000, -34.0000, 762.3000, 0.0000, 0.6000, 0.0000, 0.4900, 3.2000, 0.0000, 0.0000, -651.2230, 0.0000, 0.0000, -34.0000, 762.3000, 0.0000, 0.6000, 0.0000, 0.4900, 3.2000, 0.0000, 0.0000, -697.2230, 0.0000, 0.0000, -34.0000, 762.3000, 0.0000, 0.6000, 0.0000, 0.4900, 3.2000, 0.0000, 0.0000, -743.2230)
+
+[sub_resource type="BoxShape3D" id="AlleyShape0"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape1"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape2"]
+size = Vector3(3.200, 0.600, 34.000)
 
 [node name="Bld_island_11_5" type="Node3D"]
 
@@ -166,3 +175,18 @@ shape = SubResource("LotShape9")
 
 [node name="Alleys" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Alleys")
+
+[node name="AlleyCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Alley0" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, 762.300, 0.490, -651.223)
+shape = SubResource("AlleyShape0")
+
+[node name="Alley1" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, 762.300, 0.490, -697.223)
+shape = SubResource("AlleyShape1")
+
+[node name="Alley2" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.000000, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000000, 762.300, 0.490, -743.223)
+shape = SubResource("AlleyShape2")

@@ -116,7 +116,28 @@ material = ExtResource("alleymat")
 transform_format = 1
 instance_count = 7
 mesh = SubResource("AlleyBox")
-buffer = PackedFloat32Array(0.9544, 0.0000, -32.4527, -1529.0020, 0.0000, 0.6000, 0.0000, 0.3400, 3.0544, 0.0000, 10.1402, 547.5520, 0.7073, 0.0000, -33.1591, -1540.4820, 0.0000, 0.6000, 0.0000, 0.3400, 3.1209, 0.0000, 7.5147, 504.4250, -1.8241, 0.0000, 27.9353, -1515.6010, 0.0000, 0.6000, 0.0000, 0.3400, -2.6292, 0.0000, -19.3809, 696.9620, -1.8719, 0.0000, 27.5762, -1542.3500, 0.0000, 0.6000, 0.0000, 0.3400, -2.5954, 0.0000, -19.8886, 659.9230, -1.6263, 0.0000, 29.2818, -1568.7160, 0.0000, 0.6000, 0.0000, 0.3400, -2.7559, 0.0000, -17.2793, 620.3620, -1.0563, 0.0000, 32.0943, -1589.8070, 0.0000, 0.6000, 0.0000, 0.3400, -3.0206, 0.0000, -11.2229, 575.8420, -0.7563, 0.0000, 33.0367, -1602.8820, 0.0000, 0.6000, 0.0000, 0.3400, -3.1093, 0.0000, -8.0358, 530.0240)
+buffer = PackedFloat32Array(0.9544, 0.0000, -32.4527, -1529.0020, 0.0000, 0.6000, 0.0000, 0.4900, 3.0544, 0.0000, 10.1402, 547.5520, 0.7073, 0.0000, -33.1591, -1540.4820, 0.0000, 0.6000, 0.0000, 0.4900, 3.1209, 0.0000, 7.5147, 504.4250, -1.8241, 0.0000, 27.9353, -1515.6010, 0.0000, 0.6000, 0.0000, 0.4900, -2.6292, 0.0000, -19.3809, 696.9620, -1.8719, 0.0000, 27.5762, -1542.3500, 0.0000, 0.6000, 0.0000, 0.4900, -2.5954, 0.0000, -19.8886, 659.9230, -1.6263, 0.0000, 29.2818, -1568.7160, 0.0000, 0.6000, 0.0000, 0.4900, -2.7559, 0.0000, -17.2793, 620.3620, -1.0563, 0.0000, 32.0943, -1589.8070, 0.0000, 0.6000, 0.0000, 0.4900, -3.0206, 0.0000, -11.2229, 575.8420, -0.7563, 0.0000, 33.0367, -1602.8820, 0.0000, 0.6000, 0.0000, 0.4900, -3.1093, 0.0000, -8.0358, 530.0240)
+
+[sub_resource type="BoxShape3D" id="AlleyShape0"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape1"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape2"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape3"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape4"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape5"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape6"]
+size = Vector3(3.200, 0.600, 34.000)
 
 [node name="Bld_island_1_10" type="Node3D"]
 
@@ -418,3 +439,34 @@ shape = SubResource("LotShape28")
 
 [node name="Alleys" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Alleys")
+
+[node name="AlleyCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Alley0" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.298241, 0, -0.954491, 0, 1, 0, 0.954491, 0, 0.298241, -1529.002, 0.490, 547.552)
+shape = SubResource("AlleyShape0")
+
+[node name="Alley1" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.221021, 0, -0.975269, 0, 1, 0, 0.975269, 0, 0.221021, -1540.482, 0.490, 504.425)
+shape = SubResource("AlleyShape1")
+
+[node name="Alley2" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.570025, 0, 0.821627, 0, 1, 0, -0.821627, 0, -0.570025, -1515.601, 0.490, 696.962)
+shape = SubResource("AlleyShape2")
+
+[node name="Alley3" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.584958, 0, 0.811064, 0, 1, 0, -0.811064, 0, -0.584958, -1542.350, 0.490, 659.923)
+shape = SubResource("AlleyShape3")
+
+[node name="Alley4" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.508215, 0, 0.861230, 0, 1, 0, -0.861230, 0, -0.508215, -1568.716, 0.490, 620.362)
+shape = SubResource("AlleyShape4")
+
+[node name="Alley5" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.330086, 0, 0.943951, 0, 1, 0, -0.943951, 0, -0.330086, -1589.807, 0.490, 575.842)
+shape = SubResource("AlleyShape5")
+
+[node name="Alley6" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.236346, 0, 0.971669, 0, 1, 0, -0.971669, 0, -0.236346, -1602.882, 0.490, 530.024)
+shape = SubResource("AlleyShape6")

@@ -74,7 +74,22 @@ material = ExtResource("alleymat")
 transform_format = 1
 instance_count = 5
 mesh = SubResource("AlleyBox")
-buffer = PackedFloat32Array(2.2926, 0.0000, 23.7202, 1079.5090, 0.0000, 0.6000, 0.0000, -0.0510, -2.2325, 0.0000, 24.3588, 531.2650, 0.4888, 0.0000, 33.6009, 1023.6110, 0.0000, 0.6000, 0.0000, 0.3400, -3.1624, 0.0000, 5.1939, 634.8750, 2.1947, 0.0000, -24.7431, 1029.0560, 0.0000, 0.6000, 0.0000, 0.3400, 2.3288, 0.0000, 23.3191, 615.8720, -0.4872, 0.0000, -33.6036, 1077.5850, 0.0000, 0.6000, 0.0000, 0.3400, 3.1627, 0.0000, -5.1769, 643.1110, -3.0414, 0.0000, 10.5726, 1028.2000, 0.0000, 0.6000, 0.0000, 0.3400, -0.9951, 0.0000, -32.3144, 684.5210)
+buffer = PackedFloat32Array(2.2926, 0.0000, 23.7202, 1079.5090, 0.0000, 0.6000, 0.0000, 0.0990, -2.2325, 0.0000, 24.3588, 531.2650, 0.4888, 0.0000, 33.6009, 1023.6110, 0.0000, 0.6000, 0.0000, 0.4900, -3.1624, 0.0000, 5.1939, 634.8750, 2.1947, 0.0000, -24.7431, 1029.0560, 0.0000, 0.6000, 0.0000, 0.4900, 2.3288, 0.0000, 23.3191, 615.8720, -0.4872, 0.0000, -33.6036, 1077.5850, 0.0000, 0.6000, 0.0000, 0.4900, 3.1627, 0.0000, -5.1769, 643.1110, -3.0414, 0.0000, 10.5726, 1028.2000, 0.0000, 0.6000, 0.0000, 0.4900, -0.9951, 0.0000, -32.3144, 684.5210)
+
+[sub_resource type="BoxShape3D" id="AlleyShape0"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape1"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape2"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape3"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape4"]
+size = Vector3(3.200, 0.600, 34.000)
 
 [node name="Bld_island_12_10" type="Node3D"]
 
@@ -238,3 +253,26 @@ shape = SubResource("LotShape15")
 
 [node name="Alleys" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Alleys")
+
+[node name="AlleyCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Alley0" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.716436, 0, 0.697653, 0, 1, 0, -0.697653, 0, 0.716436, 1079.509, 0.099, 531.265)
+shape = SubResource("AlleyShape0")
+
+[node name="Alley1" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.152762, 0, 0.988263, 0, 1, 0, -0.988263, 0, 0.152762, 1023.611, 0.490, 634.875)
+shape = SubResource("AlleyShape1")
+
+[node name="Alley2" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.685856, 0, -0.727737, 0, 1, 0, 0.727737, 0, 0.685856, 1029.056, 0.490, 615.872)
+shape = SubResource("AlleyShape2")
+
+[node name="Alley3" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.152261, 0, -0.988340, 0, 1, 0, 0.988340, 0, -0.152261, 1077.585, 0.490, 643.111)
+shape = SubResource("AlleyShape3")
+
+[node name="Alley4" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.950424, 0, 0.310958, 0, 1, 0, -0.310958, 0, -0.950424, 1028.200, 0.490, 684.521)
+shape = SubResource("AlleyShape4")

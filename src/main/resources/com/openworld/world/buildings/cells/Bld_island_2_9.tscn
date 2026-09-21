@@ -117,7 +117,28 @@ material = ExtResource("alleymat")
 transform_format = 1
 instance_count = 7
 mesh = SubResource("AlleyBox")
-buffer = PackedFloat32Array(-3.1755, 0.0000, 4.1960, -1469.5140, 0.0000, 0.6000, 0.0000, 0.3400, -0.3949, 0.0000, -33.7401, 306.8500, -3.1759, 0.0000, 4.1612, -1423.8460, 0.0000, 0.6000, 0.0000, 0.3400, -0.3916, 0.0000, -33.7444, 312.5130, -3.1771, 0.0000, 4.0611, -1378.1350, 0.0000, 0.6000, 0.0000, 0.3400, -0.3822, 0.0000, -33.7566, 318.0890, -3.1789, 0.0000, 3.8955, -1332.3690, 0.0000, 0.6000, 0.0000, 0.3400, -0.3666, 0.0000, -33.7761, 323.4890, -3.1814, 0.0000, 3.6637, -1286.5390, 0.0000, 0.6000, 0.0000, 0.3400, -0.3448, 0.0000, -33.8020, 328.6230, 3.1789, 0.0000, -3.8949, -1324.6380, 0.0000, 0.6000, 0.0000, 0.3400, 0.3666, 0.0000, 33.7762, 257.3390, 3.1814, 0.0000, -3.6619, -1279.0400, 0.0000, 0.6000, 0.0000, 0.3400, 0.3447, 0.0000, 33.8022, 262.4450)
+buffer = PackedFloat32Array(-3.1755, 0.0000, 4.1960, -1469.5140, 0.0000, 0.6000, 0.0000, 0.4900, -0.3949, 0.0000, -33.7401, 306.8500, -3.1759, 0.0000, 4.1612, -1423.8460, 0.0000, 0.6000, 0.0000, 0.4900, -0.3916, 0.0000, -33.7444, 312.5130, -3.1771, 0.0000, 4.0611, -1378.1350, 0.0000, 0.6000, 0.0000, 0.4900, -0.3822, 0.0000, -33.7566, 318.0890, -3.1789, 0.0000, 3.8955, -1332.3690, 0.0000, 0.6000, 0.0000, 0.4900, -0.3666, 0.0000, -33.7761, 323.4890, -3.1814, 0.0000, 3.6637, -1286.5390, 0.0000, 0.6000, 0.0000, 0.4900, -0.3448, 0.0000, -33.8020, 328.6230, 3.1789, 0.0000, -3.8949, -1324.6380, 0.0000, 0.6000, 0.0000, 0.4900, 0.3666, 0.0000, 33.7762, 257.3390, 3.1814, 0.0000, -3.6619, -1279.0400, 0.0000, 0.6000, 0.0000, 0.4900, 0.3447, 0.0000, 33.8022, 262.4450)
+
+[sub_resource type="BoxShape3D" id="AlleyShape0"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape1"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape2"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape3"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape4"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape5"]
+size = Vector3(3.200, 0.600, 34.000)
+
+[sub_resource type="BoxShape3D" id="AlleyShape6"]
+size = Vector3(3.200, 0.600, 34.000)
 
 [node name="Bld_island_2_9" type="Node3D"]
 
@@ -426,3 +447,34 @@ shape = SubResource("LotShape28")
 
 [node name="Alleys" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Alleys")
+
+[node name="AlleyCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Alley0" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.992356, 0, 0.123411, 0, 1, 0, -0.123411, 0, -0.992356, -1469.514, 0.490, 306.850)
+shape = SubResource("AlleyShape0")
+
+[node name="Alley1" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.992482, 0, 0.122389, 0, 1, 0, -0.122389, 0, -0.992482, -1423.846, 0.490, 312.513)
+shape = SubResource("AlleyShape1")
+
+[node name="Alley2" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.992841, 0, 0.119444, 0, 1, 0, -0.119444, 0, -0.992841, -1378.135, 0.490, 318.089)
+shape = SubResource("AlleyShape2")
+
+[node name="Alley3" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.993415, 0, 0.114573, 0, 1, 0, -0.114573, 0, -0.993415, -1332.369, 0.490, 323.489)
+shape = SubResource("AlleyShape3")
+
+[node name="Alley4" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(-0.994177, 0, 0.107756, 0, 1, 0, -0.107756, 0, -0.994177, -1286.539, 0.490, 328.623)
+shape = SubResource("AlleyShape4")
+
+[node name="Alley5" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.993417, 0, -0.114556, 0, 1, 0, 0.114556, 0, 0.993417, -1324.638, 0.490, 257.339)
+shape = SubResource("AlleyShape5")
+
+[node name="Alley6" type="CollisionShape3D" parent="AlleyCollision"]
+transform = Transform3D(0.994183, 0, -0.107704, 0, 1, 0, 0.107704, 0, 0.994183, -1279.040, 0.490, 262.445)
+shape = SubResource("AlleyShape6")
