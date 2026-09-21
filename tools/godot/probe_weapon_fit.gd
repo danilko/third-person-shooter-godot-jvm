@@ -345,6 +345,22 @@ func _initialize() -> void:
 		var s_hold: Vector3 = to_body * (stock.global_position if stock != null else gun.global_position)
 		print("  hold: %s rel shoulder joint  %s" % [mount_name if stock != null else "grip", _parts(s_hold - joint)])
 
+		# THE SUPPORT HAND RUNS IN THE HOLD TOO, and nothing measured it (user walk-test,
+		# 2026-09-21: "SHG floats high with the support hand twisted, the pistol sinks"). The stock
+		# mount stands down out of combat (W23), so the hold is the CLIP's arms plus this modifier
+		# alone -- which is exactly where a short reach shows, and the aim-phase numbers cannot
+		# stand in for it: the carry is across the body (W24) and the aim is out in front.
+		var sp_h: Node3D = gun.get_node_or_null("SupportPoint") as Node3D
+		var sup_h: Node = sk.get_node_or_null("SupportHandIKModifier")
+		if sp_h != null:
+			var elbow_h: Vector3 = lowerarm_l.global_position
+			var arm_h: float = shoulder_l.global_position.distance_to(elbow_h) + elbow_h.distance_to(hand_l.global_position)
+			var reach_h: float = shoulder_l.global_position.distance_to(sp_h.global_position)
+			var miss_h: float = sup_h.call("last_grip_miss") if sup_h != null else -1.0
+			var clav_h: float = sup_h.call("last_clavicle_deg") if sup_h != null else 0.0
+			print("  hold: support grip %.3f m off, shoulder protracted %.1f deg (arm %.3f m, reach asked %.3f m, over %+.3f m)"
+				% [miss_h, clav_h, arm_h, reach_h, reach_h - arm_h])
+
 		if not pocket_checked and stance == "upright":  # the skin derivation is only valid in the upright hold
 			pocket_checked = true
 			var skin_pt: Vector3 = _skin_pocket(sk, _torso_mesh(sk), to_body, joint)
