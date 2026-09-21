@@ -1,98 +1,232 @@
 {
-  "notes": [
-    "Street furniture and road decals the Road Kit places (PLAN.md 3.6c, point_furniture.py is the one reader).",
-    "`kit` is the downloaded kit the pieces come from; each asset is a normalised kit piece (metres, +Y up, forward -Z).",
-    "A piece is stood on its own lowest point (`lift` added on top), turned so its -Z runs along the road, and scaled by `scale` [x, y, z] in its own axes.",
-    "`collide` puts an oriented box of the piece's footprint into the piece's collision (a StaticBody3D after import).",
-    "Distances are metres; `back` distances are measured from the stop line (the lane's end at a junction mouth) back along the approach.",
-    "`exclude_roads` lists road-name globs an asset is never placed on (a planter or a manhole does not belong on a mountain pass).",
-    "An asset may name its own `kit` (a res:// folder ending in /) when its piece is not in the default kit.",
-    "`collide_pole` [half width, height] puts a box round the pole only -- for a piece whose arm reaches over the road, where a box of the whole footprint would stand across the carriageway.",
-    "median_wall is the expressway's median panel (Quaternius' TrafficHighwayMidWall, fitted to point_solve.MEDIAN_WALL_HEIGHT by blender/tools/build_zombie_yard.py), tiled end to end along every WALL median by its own length; the median's collider is point_mesh.median_wall.",
-    "A lamp also stands ON a barrier (an elevated deck, a ramp, a bridge parapet) every barrier_lamp_spacing (0 turns it off). WHERE is derived, not authored: the shaft starts barrier_lamp_clear outboard of the inboard face of the car wall point_mesh builds on the barrier's line, so it can never stand in the carriageway (PLAN.md 0.8).",
-    "signal / lamp / lamp_twin are the Japanese signal and road lighting poles built by blender/tools/build_street_poles.py from the Zombie Apocalypse kit (CC0). A junction is signalised when any mouth is authored traffic_light, or (signal_all_junctions) when signal_min_arms arms have arriving traffic.",
-    "`breakable` {mass kg, break_speed m/s, respawn s} makes a collide_pole piece a knock-down pole (PLAN.md 3.11): it leaves the static collision proxy, and WorldBaker gives its batch a BreakableProps node that builds one collider per pole, knocks a pole down under a car at or above break_speed (the car keeps m_car / (m_car + mass) of its speed) and brings it back after respawn seconds where nobody sees it.",
-    "tree_a/b/c are street trees (街路樹) from the Stylized Nature kit, placed like planters but ONE SPECIES PER STREET (chosen by a hash of the road's name, the Japanese convention), only on a footway at least tree_min_footway wide -- which on this island is the trunk/arterial network, block streets having 2 m. It stands AT THE KERB (tree_kerb_gap), the Japanese 植樹帯 position, which is also what keeps the trunk off the footway's own walk line that the ambient crowd walks. Their collider is the TRUNK (collide_pole), never the canopy.",
-    "A per-asset visibility range was tried for the trees and REMOVED: a MultiMesh is ONE instance to the renderer, so the range is whole-batch, and a range shorter than the batch's own extent culls every instance at any camera distance (measured: a batch 803.7 m across, green pixels 20285 / 0 / 20285 / 20285 at range 0 / 350 / 700 / 1200). Cutting a piece's trees into several smaller batches is what would make one work.",
-    "Edit and rebuild: the Road Kit digest salts this file and every piece it names, so a change here rebuilds every road piece."
-  ],
-  "kit": "res://assets/world_source/kits/quaternius_downtown_city/",
-  "assets": {
-    "arrow_S":  {"piece": "pieces/decals/Decal_ArrowStraight.gltf",     "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
-    "arrow_L":  {"piece": "pieces/decals/Decal_ArrowTurnLeft.gltf",      "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
-    "arrow_R":  {"piece": "pieces/decals/Decal_ArrowTurnRight.gltf",     "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
-    "arrow_SL": {"piece": "pieces/decals/Decal_ArrowForwardLeft.gltf",   "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
-    "arrow_SR": {"piece": "pieces/decals/Decal_ArrowForwardRight.gltf",  "lift": 0.02, "scale": [1.3, 1.0, 2.1]},
-    "manhole":  {"piece": "pieces/props/Prop_ManholeCover.gltf",         "lift": 0.0, "exclude_roads": ["shrine_touge*"]},
-    "drain":    {"piece": "pieces/props/Prop_Drain.gltf",                "lift": 0.0},
-    "planter":  {"piece": "pieces/props/Sidewalk_Planter.gltf",          "lift": 0.0, "collide": true,
-                "exclude_roads": ["shrine_touge*"]},
-    "bollard":  {"piece": "pieces/props/Prop_Bollard.gltf",              "lift": 0.0, "collide": true},
-    "signal":   {"kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
-                "piece": "pieces/props/TrafficLight_JP.gltf",            "lift": 0.0, "collide_pole": [0.2, 5.8],
-                "breakable": {"mass": 450, "break_speed": 5.0, "respawn": 60},
-                "exclude_roads": ["shrine_touge*"]},
-    "lamp":     {"kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
-                "piece": "pieces/props/StreetLight_JP.gltf",             "lift": 0.0, "collide_pole": [0.18, 10.0],
-                "breakable": {"mass": 250, "break_speed": 5.0, "respawn": 60},
-                "exclude_roads": ["shrine_touge*"]},
-    "median_wall": {"kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
-                "piece": "pieces/yard/HighwayMidWall.gltf",           "lift": 0.0},
-    "lamp_twin": {"kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
-                "piece": "pieces/props/StreetLight_JP_Twin.gltf",        "lift": 0.0, "collide_pole": [0.18, 10.0],
-                "breakable": {"mass": 250, "break_speed": 5.0, "respawn": 60},
-                "exclude_roads": ["shrine_touge*"]},
-    "tree_a":   {"kit": "res://assets/world_source/kits/quaternius_stylized_nature/",
-                "piece": "pieces/trees_broadleaf/CommonTree_1.gltf",
-                "lift": 0.0, "collide_pole": [0.35, 2.3],
-                "exclude_roads": ["shrine_touge*", "kaigan_dori*", "shuto_*", "airport_*", "kuko_dori*"]},
-    "tree_b":   {"kit": "res://assets/world_source/kits/quaternius_stylized_nature/",
-                "piece": "pieces/trees_broadleaf/CommonTree_3.gltf",
-                "lift": 0.0, "collide_pole": [0.35, 2.3],
-                "exclude_roads": ["shrine_touge*", "kaigan_dori*", "shuto_*", "airport_*", "kuko_dori*"]},
-    "tree_c":   {"kit": "res://assets/world_source/kits/quaternius_stylized_nature/",
-                "piece": "pieces/trees_broadleaf/CommonTree_5.gltf",
-                "lift": 0.0, "collide_pole": [0.35, 2.3],
-                "exclude_roads": ["shrine_touge*", "kaigan_dori*", "shuto_*", "airport_*", "kuko_dori*"]}
+ "notes": [
+  "Street furniture and road decals the Road Kit places (PLAN.md 3.6c, point_furniture.py is the one reader).",
+  "`kit` is the downloaded kit the pieces come from; each asset is a normalised kit piece (metres, +Y up, forward -Z).",
+  "A piece is stood on its own lowest point (`lift` added on top), turned so its -Z runs along the road, and scaled by `scale` [x, y, z] in its own axes.",
+  "`collide` puts an oriented box of the piece's footprint into the piece's collision (a StaticBody3D after import).",
+  "Distances are metres; `back` distances are measured from the stop line (the lane's end at a junction mouth) back along the approach.",
+  "`exclude_roads` lists road-name globs an asset is never placed on (a planter or a manhole does not belong on a mountain pass).",
+  "An asset may name its own `kit` (a res:// folder ending in /) when its piece is not in the default kit.",
+  "`collide_pole` [half width, height] puts a box round the pole only -- for a piece whose arm reaches over the road, where a box of the whole footprint would stand across the carriageway.",
+  "median_wall is the expressway's median panel (Quaternius' TrafficHighwayMidWall, fitted to point_solve.MEDIAN_WALL_HEIGHT by blender/tools/build_zombie_yard.py), tiled end to end along every WALL median by its own length; the median's collider is point_mesh.median_wall.",
+  "A lamp also stands ON a barrier (an elevated deck, a ramp, a bridge parapet) every barrier_lamp_spacing (0 turns it off). WHERE is derived, not authored: the shaft starts barrier_lamp_clear outboard of the inboard face of the car wall point_mesh builds on the barrier's line, so it can never stand in the carriageway (PLAN.md 0.8).",
+  "signal / lamp / lamp_twin are the Japanese signal and road lighting poles built by blender/tools/build_street_poles.py from the Zombie Apocalypse kit (CC0). A junction is signalised when any mouth is authored traffic_light, or (signal_all_junctions) when signal_min_arms arms have arriving traffic.",
+  "`breakable` {mass kg, break_speed m/s, respawn s} makes a collide_pole piece a knock-down pole (PLAN.md 3.11): it leaves the static collision proxy, and WorldBaker gives its batch a BreakableProps node that builds one collider per pole, knocks a pole down under a car at or above break_speed (the car keeps m_car / (m_car + mass) of its speed) and brings it back after respawn seconds where nobody sees it.",
+  "tree_a/b/c are street trees (\u8857\u8def\u6a39) from the Stylized Nature kit, placed like planters but ONE SPECIES PER STREET (chosen by a hash of the road's name, the Japanese convention), only on a footway at least tree_min_footway wide -- which on this island is the trunk/arterial network, block streets having 2 m. It stands AT THE KERB (tree_kerb_gap), the Japanese \u690d\u6a39\u5e2f position, which is also what keeps the trunk off the footway's own walk line that the ambient crowd walks. Their collider is the TRUNK (collide_pole), never the canopy.",
+  "A per-asset visibility range was tried for the trees and REMOVED: a MultiMesh is ONE instance to the renderer, so the range is whole-batch, and a range shorter than the batch's own extent culls every instance at any camera distance (measured: a batch 803.7 m across, green pixels 20285 / 0 / 20285 / 20285 at range 0 / 350 / 700 / 1200). Cutting a piece's trees into several smaller batches is what would make one work.",
+  "Edit and rebuild: the Road Kit digest salts this file and every piece it names, so a change here rebuilds every road piece."
+ ],
+ "kit": "res://assets/world_source/kits/quaternius_downtown_city/",
+ "assets": {
+  "arrow_S": {
+   "piece": "pieces/decals/Decal_ArrowStraight.gltf",
+   "lift": 0.02,
+   "scale": [
+    1.3,
+    1.0,
+    2.1
+   ]
   },
-  "rules": {
-    "crosswalk_back": [1.0, 5.0],
-    "crosswalk_bar": 0.45,
-    "crosswalk_gap": 0.45,
-    "crosswalk_margin": 0.3,
-    "stop_back": 7.0,
-    "stop_width": 0.45,
-    "arrow_back": 14.0,
-    "arrow_min_lane": 20.0,
-    "paint_lift": 0.015,
-    "manhole_spacing": 90.0,
-    "manhole_end_clear": 25.0,
-    "drain_spacing": 20.0,
-    "drain_inset": 0.35,
-    "drain_end_clear": 8.0,
-    "planter_spacing": 30.0,
-    "planter_min_footway": 3.0,
-    "planter_kerb_gap": 0.3,
-    "planter_end_clear": 12.0,
-    "bollard_spacing": 1.8,
-    "bollard_inset": 0.35,
-    "bollard_end_clear": 0.9,
-    "signal_all_junctions": true,
-    "signal_min_arms": 3,
-    "signal_past_mouth": 6.0,
-    "signal_kerb_offset": 1.0,
-    "signal_near_inside": 0.5,
-    "lamp_spacing": 36.0,
-    "lamp_inset": 0.6,
-    "lamp_end_clear": 15.0,
-    "lamp_kerb_with_median": false,
-    "median_lamp_spacing": 36.0,
-    "median_lamp_min_half": 0.6,
-    "pole_clearance": 2.0,
-    "max_above_ground": 2.0,
-    "barrier_lamp_spacing": 45.0,
-    "barrier_lamp_clear": 0.05,
-    "tree_spacing": 18.0, "tree_min_footway": 3.0, "tree_kerb_gap": 0.9,
-    "tree_end_clear": 16.0, "tree_clearance": 2.5, "tree_lane_clear": 0.6, "tree_assets": ["tree_a", "tree_b", "tree_c"]
+  "arrow_L": {
+   "piece": "pieces/decals/Decal_ArrowTurnLeft.gltf",
+   "lift": 0.02,
+   "scale": [
+    1.3,
+    1.0,
+    2.1
+   ]
+  },
+  "arrow_R": {
+   "piece": "pieces/decals/Decal_ArrowTurnRight.gltf",
+   "lift": 0.02,
+   "scale": [
+    1.3,
+    1.0,
+    2.1
+   ]
+  },
+  "arrow_SL": {
+   "piece": "pieces/decals/Decal_ArrowForwardLeft.gltf",
+   "lift": 0.02,
+   "scale": [
+    1.3,
+    1.0,
+    2.1
+   ]
+  },
+  "arrow_SR": {
+   "piece": "pieces/decals/Decal_ArrowForwardRight.gltf",
+   "lift": 0.02,
+   "scale": [
+    1.3,
+    1.0,
+    2.1
+   ]
+  },
+  "manhole": {
+   "piece": "pieces/props/Prop_ManholeCover.gltf",
+   "lift": 0.0,
+   "exclude_roads": [
+    "shrine_touge*"
+   ]
+  },
+  "drain": {
+   "piece": "pieces/props/Prop_Drain.gltf",
+   "lift": 0.0
+  },
+  "planter": {
+   "piece": "pieces/props/Sidewalk_Planter.gltf",
+   "lift": 0.0,
+   "collide": true,
+   "exclude_roads": [
+    "shrine_touge*"
+   ]
+  },
+  "bollard": {
+   "piece": "pieces/props/Prop_Bollard.gltf",
+   "lift": 0.0,
+   "collide": true
+  },
+  "signal": {
+   "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
+   "piece": "pieces/props/TrafficLight_JP.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.2,
+    5.8
+   ],
+   "breakable": {
+    "mass": 450,
+    "break_speed": 5.0,
+    "respawn": 60
+   },
+   "exclude_roads": [
+    "shrine_touge*"
+   ]
+  },
+  "lamp": {
+   "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
+   "piece": "pieces/props/StreetLight_JP.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.18,
+    10.0
+   ],
+   "breakable": {
+    "mass": 250,
+    "break_speed": 5.0,
+    "respawn": 60
+   },
+   "exclude_roads": [
+    "shrine_touge*"
+   ]
+  },
+  "median_wall": {
+   "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
+   "piece": "pieces/yard/HighwayMidWall.gltf",
+   "lift": 0.0
+  },
+  "lamp_twin": {
+   "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
+   "piece": "pieces/props/StreetLight_JP_Twin.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.18,
+    10.0
+   ],
+   "breakable": {
+    "mass": 250,
+    "break_speed": 5.0,
+    "respawn": 60
+   },
+   "exclude_roads": [
+    "shrine_touge*"
+   ]
+  },
+  "tree_a": {
+   "kit": "res://assets/world_source/kits/quaternius_stylized_nature/",
+   "piece": "pieces/trees_broadleaf/CommonTree_3.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.35,
+    2.3
+   ],
+   "exclude_roads": [
+    "shrine_touge*",
+    "kaigan_dori*",
+    "shuto_*",
+    "airport_*",
+    "kuko_dori*"
+   ]
+  },
+  "tree_b": {
+   "kit": "res://assets/world_source/kits/quaternius_stylized_nature/",
+   "piece": "pieces/trees_conifer/Pine_3.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.35,
+    2.3
+   ],
+   "exclude_roads": [
+    "shrine_touge*",
+    "kaigan_dori*",
+    "shuto_*",
+    "airport_*",
+    "kuko_dori*"
+   ]
   }
+ },
+ "rules": {
+  "crosswalk_back": [
+   1.0,
+   5.0
+  ],
+  "crosswalk_bar": 0.45,
+  "crosswalk_gap": 0.45,
+  "crosswalk_margin": 0.3,
+  "stop_back": 7.0,
+  "stop_width": 0.45,
+  "arrow_back": 14.0,
+  "arrow_min_lane": 20.0,
+  "paint_lift": 0.015,
+  "manhole_spacing": 0.0,
+  "manhole_end_clear": 25.0,
+  "drain_spacing": 20.0,
+  "drain_inset": 0.35,
+  "drain_end_clear": 8.0,
+  "planter_spacing": 30.0,
+  "planter_min_footway": 3.0,
+  "planter_kerb_gap": 0.3,
+  "planter_end_clear": 12.0,
+  "bollard_spacing": 1.8,
+  "bollard_inset": 0.35,
+  "bollard_end_clear": 0.9,
+  "signal_all_junctions": true,
+  "signal_min_arms": 3,
+  "signal_past_mouth": 6.0,
+  "signal_kerb_offset": 1.0,
+  "signal_near_inside": 0.5,
+  "lamp_spacing": 36.0,
+  "lamp_inset": 0.6,
+  "lamp_end_clear": 15.0,
+  "lamp_kerb_with_median": false,
+  "median_lamp_spacing": 36.0,
+  "median_lamp_min_half": 0.6,
+  "pole_clearance": 2.0,
+  "max_above_ground": 2.0,
+  "barrier_lamp_spacing": 45.0,
+  "barrier_lamp_clear": 0.05,
+  "tree_spacing": 18.0,
+  "tree_min_footway": 3.0,
+  "tree_kerb_gap": 0.9,
+  "tree_end_clear": 16.0,
+  "tree_clearance": 2.5,
+  "tree_lane_clear": 0.6,
+  "tree_assets": [
+   "tree_a",
+   "tree_b"
+  ],
+  "tree_pit": 1.4,
+  "tree_pit_material": "M_Dirt"
+ }
 }

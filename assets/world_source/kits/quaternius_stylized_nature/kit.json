@@ -1,0 +1,110 @@
+{
+  "id": "quaternius_stylized_nature",
+  "title": "Stylized Nature MegaKit (Standard)",
+  "author": "Quaternius",
+  "source_url": "https://quaternius.com/packs/stylizednaturemegakit.html",
+  "licence": "CC0 1.0",
+  "downloaded": "2026-09-19",
+  "notes": [
+    "source/ is the Standard package's glTF export as downloaded (68 of the 116 models; gltf + bin). Its 20 PNGs were moved to textures/, the only change. source/ carries a .gdignore: Godot imports the normalised pieces/, never the raw files.",
+    "This is a kit of UNRELATED PROPS, not a modular kit: it has no plan module and no storey, so kit.json carries neither source_module_m nor source_storey_m and pieces.json writes no module_m/storey_m.",
+    "category_scale is the whole of what normalising this kit does, and every number in it was MEASURED (tools/building_kit/study_nature_kit.py, PLAN.md 3.16 step 1): each family is compared with the band a Japanese example of it really occupies, and the scale that puts the family's MEDIAN in the middle of that band is baked into every piece of it. ONE scale per family, never one per model, so a family keeps its own variation; baked, so nothing downstream holds the number (CLAUDE.md W19, the model IS the size).",
+    "The trees came out right and are scaled by 1.0. Everything at ground level came out 2.4-10x too large: a clover leaf stood 1.26 m, a flower 2.42 m, a stepping stone 1.48 m across. Those are the rescales.",
+    "Two of the 68 models -- Fern_1 and Plant_1_Big -- DECLARE a glTF POSITION box 3.18 m and 1.39 m larger than their own vertices. A declared box is what glTF asks a reader to trust, and trusting it measured the fern at 2.69 m (it is 0.84 m) and nearly baked a x0.28 rescale onto a model that needed none. normalize_kit.measure reads the VERTICES wherever the buffer is at hand, normalize_kit.declared_bounds_error is the check, and the pieces this kit writes carry a box computed from their own data.",
+    "A piece's base is BURIED below its origin (0.02-0.34 m, scaled with it). That is the download's own convention and it is KEPT: a tree or a rock set on uneven ground has no visible join. It is why a piece's `min` y is negative in pieces.json, unlike the building kits, whose origin sits on the ground.",
+    "A tree is not centred in plan either: TwistedTree_1's canopy reaches 11.3 m one way and 2.2 m the other from its trunk. The origin is the trunk, which is what a placement wants; its bounds are not a footprint.",
+    "6 of the 12 materials are alpha MASK (cutoff 0.2) leaf cards, 6 are opaque. Bark_NormalTree is MASK too, which is the download's, not ours: its trunk needs no alpha test. materials/MI_*.tres are hand-owned and resolved by the glTF material NAME (tools/godot/build_building_scenes.gd), which is why kit.json carries material_prefix MI_: the download names its materials Bark_NormalTree, Leaves, Rocks, and every other kit in this project names them MI_*.",
+    "Five textures in textures/ are referenced by no model in the Standard set (Leaf_Pine.png, Leaves_GiantPine_C.png, Leaves_NormalTree.png, Leaves_TwistedTree.png, Rocks_Desert_Diffuse.png): the _C files are the colour-variation set the models use, and these are their plain partners plus two Pro-only models' maps. They are kept because they are what a sakura or autumn recolour (3.16 step 3) is made from."
+  ],
+  "module_scale": 1.0,
+  "material_prefix": "MI_",
+  "category_scale": {
+    "trees_broadleaf": 1.0,
+    "trees_conifer": 1.0,
+    "trees_gnarled": 1.0,
+    "trees_bare": 1.0,
+    "bushes": 1.0,
+    "plants": 1.0,
+    "ground_plants": 0.37,
+    "ferns": 1.0,
+    "lawn": 0.1,
+    "flowers": 0.21,
+    "grass_tall": 1.0,
+    "grass": 0.41,
+    "mushrooms": 0.22,
+    "petals": 1.0,
+    "cobbles": 0.44,
+    "rocks": 1.0,
+    "stepping_stones": 0.3
+  },
+  "categories": [
+    [
+      "trees_broadleaf",
+      "^CommonTree"
+    ],
+    [
+      "trees_conifer",
+      "^Pine"
+    ],
+    [
+      "trees_gnarled",
+      "^TwistedTree"
+    ],
+    [
+      "trees_bare",
+      "^DeadTree"
+    ],
+    [
+      "bushes",
+      "^Bush_"
+    ],
+    [
+      "plants",
+      "^Plant_1"
+    ],
+    [
+      "ground_plants",
+      "^Plant_7"
+    ],
+    [
+      "ferns",
+      "^Fern"
+    ],
+    [
+      "lawn",
+      "^Clover"
+    ],
+    [
+      "flowers",
+      "^Flower"
+    ],
+    [
+      "grass_tall",
+      "^Grass_.*_Tall"
+    ],
+    [
+      "grass",
+      "^Grass"
+    ],
+    [
+      "mushrooms",
+      "^Mushroom"
+    ],
+    [
+      "petals",
+      "^Petal"
+    ],
+    [
+      "cobbles",
+      "^Pebble"
+    ],
+    [
+      "rocks",
+      "^Rock_"
+    ],
+    [
+      "stepping_stones",
+      "^RockPath"
+    ]
+  ]
+}

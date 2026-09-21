@@ -1,0 +1,59 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/game/mission/KonbiniMission.java" id="1_km"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ZoneTrigger.java" id="2_zt"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ZoneMarker.java" id="3_zm"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Zone.java" id="4_zone"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/NamedCharacterConfig.java" id="5_nc"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_start"]
+size = Vector3(22, 5, 16)
+
+[sub_resource type="Resource" id="NC_boss"]
+script = ExtResource("5_nc")
+character_id = "m01_boss"
+display_name = "Kaneda"
+faction = "neutral"
+weapon_scene_path = "res://src/main/resources/com/openworld/weapon/PIS1.tscn"
+offset = Vector3(0, 1, 0.5)
+
+[sub_resource type="Resource" id="NC_crew1"]
+script = ExtResource("5_nc")
+character_id = "m01_crew_1"
+display_name = "Crew"
+faction = "neutral"
+weapon_scene_path = "res://src/main/resources/com/openworld/weapon/SMG1.tscn"
+offset = Vector3(-3.5, 1, -1)
+
+[sub_resource type="Resource" id="NC_crew2"]
+script = ExtResource("5_nc")
+character_id = "m01_crew_2"
+display_name = "Crew"
+faction = "neutral"
+weapon_scene_path = "res://src/main/resources/com/openworld/weapon/ASR2.tscn"
+offset = Vector3(4, 1, -0.5)
+
+[sub_resource type="Resource" id="Zone_m01_crew"]
+script = ExtResource("4_zone")
+zone_id = "m01_crew"
+size = Vector3(40, 10, 40)
+load_radius = 250.0
+unload_radius = 350.0
+named_characters = Array[ExtResource("5_nc")]([SubResource("NC_boss"), SubResource("NC_crew1"), SubResource("NC_crew2")])
+
+[node name="M01_Konbini" type="Node3D"]
+script = ExtResource("1_km")
+crew_ids = Array[String](["m01_crew_1", "m01_crew_2"])
+
+[node name="StartTrigger" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -2)
+script = ExtResource("2_zt")
+beat_id = "m01_start"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StartTrigger"]
+shape = SubResource("BoxShape3D_start")
+
+[node name="CrewZone" type="Node3D" parent="."]
+script = ExtResource("3_zm")
+zone = SubResource("Zone_m01_crew")
+show_debug_volume = false

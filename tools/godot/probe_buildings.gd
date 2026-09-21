@@ -26,6 +26,19 @@ var _fails := 0
 var _passes := 0
 
 
+## The style of the doorway nearest a Door node, from the layout's own per-door fact.
+func _door_style(meta: Dictionary, at: Vector3) -> String:
+	var best := ""
+	var bd := 6.0
+	for d in meta.get("doors", []):
+		var c := Vector3(d["center"][0], at.y, d["center"][2])
+		var dist := c.distance_to(Vector3(at.x, at.y, at.z))
+		if dist < bd:
+			bd = dist
+			best = str(d.get("style", meta.get("door_style", "swing")))
+	return best if best != "" else str(meta.get("door_style", "swing"))
+
+
 func _check(ok: bool, msg: String) -> void:
 	if ok:
 		_passes += 1
@@ -167,11 +180,19 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 	# A shop, office, terminal or konbini has a SLIDING automatic entrance (自動ドア), a house a hinged 玄関ドア
 	# (user, 2026-09-19). It is the TYPE's fact, carried by the layout, so it is asserted per building here --
 	# and by MOVEMENT, not by the flag: a leaf that reads "SLIDE" and swings is the failure worth catching.
+	# Asked per DOOR, not per building: a SITE holds parts of different types, so a gas station's kiosk has the
+	# konbini's 自動ドア while another part keeps a swing door (user-reported, PLAN.md 3.18f). Which meta door a
+	# leaf belongs to is answered geometrically -- a Door node sits at its doorway's edge, and a leaf that
+	# belongs to no meta door (a roof stair house's frame) takes the building's own style.
 	var slide_want: bool = str(meta.get("door_style", "swing")) == "slide"
+	var want := {}
+	for d in doors.get_children():
+		want[d.name] = _door_style(meta, d.position)
+		var s: bool = want[d.name] == "slide"
+		_check((str(d.get("open_mode")) == "SLIDE") == s, "%s %s is a %s door" % [
+			id, d.name, "sliding" if s else "hinged"])
 	var before := {}
 	for d in doors.get_children():
-		_check((str(d.get("open_mode")) == "SLIDE") == slide_want, "%s %s is a %s door" % [
-			id, d.name, "sliding" if slide_want else "hinged"])
 		before[d.name] = [d.position, d.rotation.y]
 	for i in 90:
 		await physics_frame
@@ -179,7 +200,7 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 	for d in doors.get_children():
 		var moved: float = (d.position - (before[d.name][0] as Vector3)).length()
 		var turned: float = absf(d.rotation.y - float(before[d.name][1]))
-		if slide_want:
+		if want[d.name] == "slide":
 			_check(moved > 0.3 and turned < 0.05, "%s %s slid %.2f m and turned %.1f deg" % [
 				id, d.name, moved, rad_to_deg(turned)])
 			slid_dirs.append((d.position - (before[d.name][0] as Vector3)).normalized())

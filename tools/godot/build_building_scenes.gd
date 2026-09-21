@@ -99,21 +99,23 @@ func _openings(b: Dictionary) -> Array:
 			if dist < bd:
 				bd = dist
 				best = i
+		var style := str(d.get("style", b.get("door_style", "swing")))
 		if best >= 0:
 			used[best] = true
-			out.append({"xf": frames[best], "w": 0.91, "h": 2.002, "frame": true})
+			out.append({"xf": frames[best], "w": 0.91, "h": 2.002, "frame": true, "style": style})
 		else:
 			var ov := Vector3(d["outward"][0], 0.0, d["outward"][2])
 			var yaw := atan2(ov.x, ov.z) if ov.length() > 0.01 else 0.0
 			var op := {"xf": Transform3D(Basis(Vector3.UP, yaw), c), "w": float(d["width"]), "h": float(d["height"]),
-					"frame": false}
+					"frame": false, "style": style}
 			if d.has("shopfront"):
 				op["shopfront"] = d["shopfront"]        # {module, storey}: glaze the rest of the module
 			out.append(op)
 	# a frame with no meta door (a roof stair house): shut as well, never left as a hole
 	for i in frames.size():
 		if not used.has(i):
-			out.append({"xf": frames[i], "w": 0.91, "h": 2.002, "frame": true})
+			out.append({"xf": frames[i], "w": 0.91, "h": 2.002, "frame": true,
+					"style": str(b.get("door_style", "swing"))})
 	return out
 
 
@@ -124,7 +126,7 @@ var _lib_mats := {}
 ## "two door panel, and open on both side"); a hinged door, and a slide too narrow to halve, is one. ONE owner,
 ## because the shut mesh and the Door nodes must agree about what the door is.
 func _panels(b: Dictionary, op: Dictionary) -> int:
-	if str(b.get("door_style", "swing")) != "slide":
+	if str(op.get("style", b.get("door_style", "swing"))) != "slide":
 		return 1
 	return 2 if float(op["w"]) >= 1.2 else 1
 
@@ -518,9 +520,11 @@ func _build(b: Dictionary, variant: String) -> bool:
 		# leaves gets two, parting from the middle, which is what an automatic entrance looks like; a narrow
 		# one gets a single 片引き戸. Each leaf is its own `world.Door` with its own sensor, so nothing new was
 		# needed in the Door class -- `open_mode = "SLIDE"` and `slide_offset` have been there since I2.
-		var slide := str(b.get("door_style", "swing")) == "slide"
 		var dn := 0
 		for op in _openings(b):
+			# per OPENING: a SITE holds parts of different types, so its kiosk's 自動ドア and a back gate's
+			# swing door stand on one footprint (user-reported, PLAN.md 3.18f)
+			var slide := str(op.get("style", b.get("door_style", "swing"))) == "slide"
 			var oxf: Transform3D = op["xf"]
 			var w := float(op["w"])
 			var h := float(op["h"])

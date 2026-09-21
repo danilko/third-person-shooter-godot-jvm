@@ -5,6 +5,7 @@ import com.openworld.game.EventBus;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.Area3D;
 import godot.api.Input;
 import godot.api.Node;
@@ -86,6 +87,21 @@ public class Door extends Breakable {
     /** A door ignores damage unless this is set; then it can be forced open (gated by {@code breakMinDamage}). */
     @Export public boolean breakable = false;
 
+    /**
+     * A hinged door swings AWAY from whoever opens it (PLAN.md 3.18g, user-reported: "with the current detection
+     * the character is already close when the door opens, and then gets pushed out").
+     *
+     * <p>The sensor is a volume around the doorway, so it fires while the body is still walking up to the leaf --
+     * which is what makes an automatic door feel automatic, and is exactly why a leaf that always swings the same
+     * way meets somebody half the time. A real two-way door (自在戸, and every shop door with a push plate) opens
+     * whichever way it is pushed, so the leaf turns away from the side the opener is standing on. The sign is
+     * taken ONCE, at the moment the door starts to open, from the opener's position in the door's own frame, so
+     * it can never flip mid-swing.
+     *
+     * <p>Off, the leaf always swings by {@code +openAngleDeg} -- the old behaviour, and the gate's control.
+     */
+    @Export public boolean swingBothWays = true;
+
     private Vector3 closedPos;
     private Vector3 openPos;
     private double closedYaw;
@@ -97,6 +113,10 @@ public class Door extends Breakable {
     private int sensorOccupants;          // any character — drives AUTO open
     private boolean localPlayerInSensor;  // local player — drives MANUAL prompt + E
     private EventBus eventBus;
+    /** Which side of the closed leaf the last body to reach the sensor stands on: +1 = local +Z, -1 = -Z. */
+    private double openerSide = -1.0;
+    /** Which way the leaf is currently set to swing (+1 = +openAngleDeg). Probe readout. */
+    @Visible public double swingSign = 1.0;
 
     @Register
     @Override
@@ -138,7 +158,17 @@ public class Door extends Breakable {
     public void onSensorBodyEntered(Node3D body) {
         if (!isCharacterBody(body)) return;
         sensorOccupants++;
+        noteOpenerSide(body);
         if (isLocalPlayerBody(body)) { localPlayerInSensor = true; if (!autoOpen) emitPrompt(true); }
+    }
+
+    /**
+     * Record which side of the leaf a body reaching the sensor is on. The leaf spans the node's local -X and
+     * stands in the local XY plane, so its normal is local +Z and the body's own local Z IS the side.
+     */
+    private void noteOpenerSide(Node3D body) {
+        Vector3 local = getGlobalTransform().affineInverse().times(body.getGlobalPosition());
+        if (Math.abs(local.getZ()) > 1e-3) openerSide = local.getZ() > 0 ? 1.0 : -1.0;
     }
 
     @Register
@@ -218,6 +248,11 @@ public class Door extends Breakable {
         }
 
         float target = open ? 1.0f : 0.0f;
+        if (target > 0.0f && progress == 0.0f && !isSlide()) {
+            // the sign is taken once, while the door is still shut: away from the side the opener stands on
+            swingSign = swingBothWays ? -openerSide : 1.0;
+            openYaw = closedYaw + swingSign * Math.toRadians(openAngleDeg);
+        }
         if (progress != target) {
             float step = (float) (openSpeed * delta);
             if (target > progress) progress = Math.min(target, progress + step);

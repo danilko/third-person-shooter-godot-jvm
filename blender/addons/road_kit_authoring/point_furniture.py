@@ -457,7 +457,14 @@ def _junction_marks(fur, table, lanes, junctions, mine, mark_mat):
 
 
 def _lane_props(fur, table, lanes, mine, ground):
+    """Covers laid IN a through lane. Off by default (PLAN.md 3.18k, user: "in Japan / a modern city the manhole
+    is on the kerb side, not in the middle of the road -- remove it"): a Japanese carriageway's covers sit in the
+    gutter beside the kerb, which is what the `drain` run already lays. The placement is kept, behind
+    `manhole_spacing = 0`, because a service cover down the lane IS correct on some roads (an older trunk road,
+    a tunnel) and it is data, not code, that should decide."""
     r = table.rules
+    if r.get("manhole_spacing", 0.0) <= 0.0:
+        return
     for l in lanes.values():
         if l.get("kind") != "through" or not mine(l):
             continue
@@ -726,6 +733,7 @@ def _street_trees(fur, table, solves, bands, mine_run, ground, lanes):
     if not names or r.get("tree_spacing", 0.0) <= 0.0:
         return
     index = _LaneIndex(lanes)
+    pit_mat = r.get("tree_pit_material", "")
     for s in solves:
         if not mine_run(s):
             continue
@@ -742,7 +750,28 @@ def _street_trees(fur, table, solves, bands, mine_run, ground, lanes):
                 off = sgn * r["tree_kerb_gap"]
                 pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
                 if fur.clear_of(pos, r["tree_clearance"]) and index.clear_of(pos, r["tree_lane_clear"]):
-                    fur.put(table, asset, pos, d, s.road.name)
+                    if fur.put(table, asset, pos, d, s.road.name):
+                        _tree_pit(fur, r, pos, d, pit_mat)
+
+
+def _tree_pit(fur, r, pos, fwd, material):
+    """植樹枡, the square of open ground a street tree stands in (PLAN.md 3.18d, user-reported: "the tree should
+    be in a tree trench -- a square space on the street -- otherwise it seems a waste").
+
+    Paint, not a piece: a pit is a hole in the paving, and the cheapest honest way to draw one is the paving's
+    own surface replaced by earth over a square. Two triangles per tree (2 430 on the island, merged into the
+    piece's one paint object per material), against a modelled kerb ring that would be a second asset and a
+    second batch. It is laid on the tree's own square, turned with the footway, at `paint_lift` like every other
+    mark -- which is also why it cannot z-fight with the footway it sits on."""
+    size = float(r.get("tree_pit", 0.0))
+    if size <= 0.0 or not material:
+        return
+    h = 0.5 * size
+    f, l = fwd, _left(fwd)
+    z = pos[2] + float(r.get("paint_lift", 0.01))
+    cs = [(pos[0] + f[0] * h * sf + l[0] * h * sl, pos[1] + f[1] * h * sf + l[1] * h * sl)
+          for sf, sl in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    fur.paint_tris(material, _up_quad(*[(x, y, z) for x, y in cs]))
 
 
 def _median_walls(fur, table, solves, mine_run):

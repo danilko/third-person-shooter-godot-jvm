@@ -317,6 +317,7 @@ def layout_type(t, root):
             p = (start[0] + along[0] * c, start[1] + along[1] * c)
             out["doors"].append({"side": side, "module": i, "center": [round(p[0], 5), 0.0, round(p[1], 5)],
                                  "outward": [nrm[0], 0, nrm[1]], "width": round(2 * hw, 5), "height": round(dh, 5),
+                                 "style": "slide" if slide else "swing",
                                  **({"shopfront": {"module": round(m, 5), "storey": round(h0, 5)}} if slide else {})})
         box(side, cursor, length, 0.0, h0)
     for side in SIDES:
@@ -475,8 +476,13 @@ def layout_composite(c, built, root):
         for h in b.get("hulls", []):
             out["hulls"].append({**h, "pos": mv(h["pos"]), "yaw": (h["yaw"] + yaw) % 360.0})
         for d in b["doors"]:
+            # A door's STYLE is a fact about the building it belongs to, not about the site it stands on: a
+            # composite that took its own `door_style` gave the gas station's kiosk a swing door while the same
+            # kiosk standing alone had the konbini's 自動ドア (user-reported, PLAN.md 3.18f). The part's own row
+            # already says which it is, so the door carries it.
             out["doors"].append({**d, "side": part["type"] + "_" + d["side"], "center": mv(d["center"]),
-                                 "outward": turn(d["outward"])})
+                                 "outward": turn(d["outward"]),
+                                 "style": d.get("style", b.get("door_style", "swing"))})
         for sp in b["solid_probes"]:
             out["solid_probes"].append({**sp, "side": part["type"] + "_" + sp["side"], "center": mv(sp["center"]),
                                         "outward": turn(sp["outward"])})

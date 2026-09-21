@@ -6147,6 +6147,39 @@ library. Crawl is now **view +15 / -35, bone +10 / -30**. Measured on AimDebugAu
 view caps at 15.0 and the gun holds at 10.0 with the head at -15.0; looking down, view -35 and gun
 -26.4. Shooting upward is what standing up is for.
 
+**13. "THE ARM MOVES IN AND OUT CONSTANTLY IN CRAWL" — AN AIM CLIP HELD TWO POSES** (user-reported,
+2026-09-20, in game and in the workbench; not in the .blend, and crouch was clean). Measured with
+`tools/godot/probe_crawl_jitter.gd`, which holds a STATIONARY aim and logs the support hand frame by
+frame — a still target means anything that moves is a per-frame loop, and the PERIOD separates the
+suspects (1-2 frames is an IK solve fighting itself, ~9 is the 0.15 s bore blend).
+
+| crawl, stationary target | hand travel | support reach spread | reversals |
+|---|---:|---:|---:|
+| as reported | **0.1145 m** (0.0896 in ONE frame) | **0.0784 m** | 142 in 180 (~2.5 frames/cycle) |
+| crouch, same test | 0.0107 m | 0.0000 | 2 (steady) |
+| after the fix | **0.0146 m** | **0.0000** | **0 (steady)** |
+
+**It was not the aim solver.** The reach being ASKED for changed every frame on a still target, and
+the support clavicle never moved (0.00 spread), so the WEAPON was moving. Forcing the aim branch back
+to `Default` in crawl (`--aim-branch=`) was steady and `Crawl` was not, which put it in the clip —
+and the clip is **two frames whose hands are 0.49 m apart**: frame 0 the authored prone pose, frame 1
+the old placeholder it replaced (gun pitched **-80.7 deg**, elbow flared **157 deg**, the very pose
+measured as unusable). A blendspace point PLAYS its clip, so the game alternated between them.
+
+**AN AIM OR HOLD CLIP IS ONE POSE**, and nothing was watching because every upright aim clip happens
+to be a single frame. `check_character_anim.py`'s **`pose_clip_moves`** is that eye now: a hand may
+travel at most 0.05 m across a pose clip's own range (breathing, not a second pose), checked only on
+clips the AnimationTree actually PLAYS — an orphan cannot alternate in game, and failing an export
+over one would report a fact about the `.blend` as a defect in the game. It fired on the two crawl
+clips and on the sniper copy taken from one of them.
+
+**Probe traps this cost, all three already written down in this file:** `request_equip` is not a
+registered method, so calling it aborts the script — which in a `--script` run reads as a HANG
+(`probe_weapon_fit`'s pickup path is how a probe arms a body); Godot's stdout is block-buffered when
+piped, so a killed run prints nothing at all; and the stance keys are EDGE-driven, so a probe that
+releases the key measures UPRIGHT while reporting "crawl" — print the body's own stance ordinal, not
+the key that was pressed.
+
 **Gates, all on the final state:** `probe_weapon_fit` **12/12** (three bodies x upright/crouch/crawl/
 swim — the four-stance matrix 6.14 named as the verification gap that let W44 ship); AimDebugAuto
 **40/40**; `check_character_anim` PASS (171 clips, 0 errors); `probe_shared_anims` 2/2;

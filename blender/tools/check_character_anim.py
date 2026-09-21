@@ -268,6 +268,9 @@ def compose(rig, loco_pose, aim_clip, upper):
 
 # ----------------------------------------------------------------- the checks
 SHOULDER_BONES = ("clavicle_l", "clavicle_r")
+## How far a hand may travel across an AIM or HOLD clip's own range. A pose clip is one pose; the
+## allowance is for authored breathing, not for a second pose.
+POSE_CLIP_STILL_MAX = 0.05
 ## How far a collarbone turns on its own channel in the AIM AND HOLD poses, from the shared table.
 ## It is a description of those poses, not a budget every clip must fit: the gate only WARNs on it,
 ## and the one place it is a hard limit is the control rig's IK solve, where it is what stops the
@@ -310,6 +313,41 @@ def main():
 
     def clip(name):  # importer strips -loop
         return name + "-loop" if name + "-loop" in rig.anim else name
+
+    # -- pose_clip_moves ----------------------------------------------------
+    # AN AIM OR HOLD CLIP IS ONE POSE. A blendspace point PLAYS its clip, so a pose clip holding two
+    # different poses alternates between them every frame -- which is what "the arm moves in and out
+    # constantly" was: the authored crawl aim clips carried the new prone pose on frame 0 and the
+    # placeholder they replaced on frame 1, 0.49 m apart at the hand, and the game flipped between
+    # them at a ~2.5 frame cycle. Every upright aim clip is a single frame, which is why this had
+    # never bitten and why nothing was watching for it.
+    # Only clips the AnimationTree actually PLAYS: an orphan pose clip cannot alternate in game, and
+    # failing the export over one would be reporting a fact about the .blend as a defect in the game.
+    played = set(re.findall(r'^animation = &"([^"]+)"', open(TSCN).read(), re.M)) if os.path.exists(TSCN) else set()
+    for name in sorted(rig.anim):
+        base = name[:-5] if name.endswith("-loop") else name
+        if base not in played:
+            continue
+        if "_aim_" not in base and "_hold_" not in base:
+            continue
+        ps = samples(rig, name, 9)
+        if len(ps) < 2:
+            continue
+        worst, at = 0.0, None
+        for b in ("hand_l", "hand_r"):
+            if b not in rig.bone:
+                continue
+            pts = [rig.world(b, p) for p in ps]
+            for i in range(len(pts)):
+                for j in range(i + 1, len(pts)):
+                    d = sum((pts[i][k][3] - pts[j][k][3]) ** 2 for k in range(3)) ** 0.5
+                    if d > worst:
+                        worst, at = d, b
+        if worst > POSE_CLIP_STILL_MAX:
+            err("pose_clip_moves",
+                f"{name!r} is a POSE clip but {at} travels {worst:.3f} m across it (limit "
+                f"{POSE_CLIP_STILL_MAX:.2f}). A blendspace point plays its clip, so two poses in one "
+                f"pose clip alternate every frame. Keep the authored frame and delete the rest.")
 
     # -- shoulder_overbend --------------------------------------------------
     # A WARN, deliberately, and the limit is DESCRIPTIVE rather than universal (user, 2026-09-20).
