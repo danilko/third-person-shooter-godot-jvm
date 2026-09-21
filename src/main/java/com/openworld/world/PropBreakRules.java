@@ -21,24 +21,51 @@ package com.openworld.world;
 public final class PropBreakRules {
     private PropBreakRules() {}
 
-    /** Metres of margin added to the reach, so a pole a hair past the step's travel is still caught. */
+    /** Metres of margin added to the car's footprint, so a pole a hair outside it is caught before it is touched. */
     public static final double REACH_MARGIN = 0.35;
-    /** Physics steps of travel looked ahead: a car can come into contact within the step after this one. */
+    /** Physics steps of travel looked ahead ALONG THE MOTION: a car can come into contact within the step after this one. */
     public static final double LOOKAHEAD_STEPS = 2.0;
 
     /**
      * True when a pole at {@code (localX, localZ)} in the CAR's frame (metres from its centre, any horizontal axes the
-     * caller keeps consistent) lies inside the car's plan rectangle grown by the pole's radius plus this step's
-     * travel, and AHEAD of the car's motion. {@code (velX, velZ)} is the car's velocity in the same frame.
+     * caller keeps consistent) lies in the car's plan rectangle — grown by the pole's radius and {@link #REACH_MARGIN}
+     * — SWEPT along the car's motion by this step's travel, and ahead of that motion. {@code (velX, velZ)} is the
+     * car's velocity in the same frame.
+     *
+     * <p><b>The travel is added ALONG THE MOTION ONLY, never sideways</b> (PLAN.md 0.8). Growing the rectangle by the
+     * travel on both axes made the car wider the faster it went — at 31 m/s it reached 1.05 m further to each side
+     * than its own body, so a car driving dead centre down an expressway lane knocked down a barrier lamp every
+     * ~36 m without ever touching one (measured: 16 poles over a 2.7 km drive, 0 contacts). A car does not get
+     * wider with speed; it gets LONGER within a step, which is what the look-ahead is for.
      */
     public static boolean reachesPole(double localX, double localZ, double halfWidth, double halfLength,
                                       double poleRadius, double velX, double velZ, double dt) {
         double speed = Math.hypot(velX, velZ);
         if (speed < 1e-6) return false;
-        double reach = poleRadius + speed * dt * LOOKAHEAD_STEPS + REACH_MARGIN;
-        if (Math.abs(localX) > halfWidth + reach || Math.abs(localZ) > halfLength + reach) return false;
-        // ahead of the motion: a pole the car is moving AWAY from is not about to be hit
-        return localX * velX + localZ * velZ > 0.0;
+        double hw = halfWidth + poleRadius + REACH_MARGIN;
+        double hl = halfLength + poleRadius + REACH_MARGIN;
+        // A pole ALREADY inside the grown rectangle that the car is moving away from has been passed, not hit.
+        // The test is asked only of that case: a pole the car has not reached yet is decided by the sweep, so a
+        // FLANK that is about to slide into one (a car scraping a kerb, where the pole is nearly abeam and the
+        // dot product is nearly zero) is caught rather than refused.
+        if (Math.abs(localX) <= hw && Math.abs(localZ) <= hl && localX * velX + localZ * velZ <= 0.0) return false;
+        double travel = speed * dt * LOOKAHEAD_STEPS;
+        // the rectangle translated by t along the unit motion contains the pole for t in each axis's slab; the
+        // sweep reaches it when those slabs and [0, travel] share a t
+        double[] sx = slab(localX, velX / speed, hw);
+        if (sx == null) return false;
+        double[] sz = slab(localZ, velZ / speed, hl);
+        if (sz == null) return false;
+        return Math.max(0.0, Math.max(sx[0], sz[0])) <= Math.min(travel, Math.min(sx[1], sz[1]));
+    }
+
+    /** The t interval over which {@code |p - t*d| <= h} holds, or null when it never does. */
+    private static double[] slab(double p, double d, double h) {
+        if (Math.abs(d) < 1e-9) {
+            return Math.abs(p) <= h ? new double[]{Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY} : null;
+        }
+        double a = (p - h) / d, b = (p + h) / d;
+        return a <= b ? new double[]{a, b} : new double[]{b, a};
     }
 
     /** True when {@code speed} (m/s) knocks a pole down: at or above its break speed, which must be positive. */

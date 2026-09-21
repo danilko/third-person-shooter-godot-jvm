@@ -16,6 +16,7 @@ extends SceneTree
 ## Then a DRIVE: the player is moved at 30 m/s along the whole tour (every cell boundary a car can
 ## cross), and the physics frame time is sampled; the worst frame, and the worst frame in which a
 ## piece entered the tree, are reported against the 4 ms stream budget.
+## `-- --no-peds` / `-- --no-buildings` drop those derived blocks, to attribute the drive's frame time.
 ## `-- --control` puts every road zone's load radius at 150 m (unload 200): steps 1-4 still hold
 ## against those radii, so the control is step 5's coverage check, which must FAIL.
 
@@ -107,6 +108,14 @@ func _initialize() -> void:
 		kits[zid] = doc
 		for l in doc["lanes"]:
 			zone_of_lane[l["id"]] = zid
+	# What the DRIVE's frame times are paid on is not only the roads: `--no-peds` / `--no-buildings` drop the
+	# other two derived blocks, so a regression can be attributed rather than guessed at.
+	for flag in {"--no-peds": "PedZones", "--no-buildings": "BuildingZones"}:
+		if flag in OS.get_cmdline_user_args():
+			var n := w.get_node_or_null({"--no-peds": "PedZones", "--no-buildings": "BuildingZones"}[flag])
+			print("CONTROL: %s %s" % [flag, "removed" if n != null else "NOT FOUND"])
+			if n != null:
+				n.free()
 	if control:
 		print("CONTROL: every road zone's load radius 150 m")
 	check("World.tscn has the road grid", zones.size() >= 20, "%d road zones" % zones.size())

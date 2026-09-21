@@ -667,6 +667,7 @@ wind_direction = 2.35619451204804
 metadata/_custom_type_script = "uid://deo0gxkmk2ahd"
 
 [node name="SunLight" type="DirectionalLight3D" parent="Sky3D" unique_id=2039265666]
+groups = ["sun_light"]
 transform = Transform3D(0.8112598, -0.39697433, 0.4292656, 0, 0.73418164, 0.6789532, -0.58468586, -0.5508074, 0.595612, 0.4292656, 0.6789532, 0.595612)
 shadow_enabled = true
 directional_shadow_blend_splits = true
@@ -681,6 +682,7 @@ directional_shadow_max_distance = 256.0
 
 [node name="SkyDome" type="Node" parent="Sky3D" unique_id=787810982]
 script = ExtResource("sky_4")
+moon_light_energy = 0.6
 ground_color = Color(0.75, 0.85, 0.95, 1)
 sun_azimuth = -2.5170999
 sun_altitude = -0.82446045
@@ -692,6 +694,8 @@ wind_direction = 2.35619451204804
 
 [node name="TimeOfDay" type="Node" parent="Sky3D" unique_id=874700447]
 script = ExtResource("sky_3")
+celestials_calculations = 0
+minutes_per_day = 48.0
 dome_path = NodePath("../SkyDome")
 current_time = 10.035599999981525
 day = 4

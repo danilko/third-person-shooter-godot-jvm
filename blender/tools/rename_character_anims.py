@@ -64,10 +64,29 @@ for name in cfg["delete"]:
     changed += 1
 
 # 3. PLACEHOLDERS -- copies of the nearest real pose, named for what they must become.
+#
+# `--refresh-placeholders` re-copies one that is STILL a copy, because a placeholder is expected to
+# track its source until somebody authors it and nothing here did: `upright_aim_sniper` was minted
+# from `upright_aim_rifle` and then sat frozen while the rifle pose was re-authored twice, so the
+# two had silently diverged (found 2026-09-20 -- the sniper was the only clip left laying the head
+# 34 deg over). It is opt-in and it names what it overwrites, because once the sniper pose IS
+# authored, refreshing it is exactly the wrong thing.
+refresh = "--refresh-placeholders" in sys.argv
+only = None
+for a in sys.argv:
+    if a.startswith("--refresh-only="):
+        only = set(a.split("=", 1)[1].split(","))
 for name, src_name in cfg["placeholders"].items():
-    if bpy.data.actions.get(name) is not None:
+    existing = bpy.data.actions.get(name)
+    if existing is not None and not (refresh and (only is None or name in only)):
         print(f"[naming] placeholder {name!r} already present")
         continue
+    if existing is not None:
+        trk = track_for(existing)
+        if trk is not None:
+            ad.nla_tracks.remove(trk)
+        bpy.data.actions.remove(existing)
+        print(f"[naming] placeholder {name!r} REFRESHED from {src_name!r}")
     src = bpy.data.actions.get(src_name)
     if src is None:
         raise SystemExit(f"placeholder {name!r}: source {src_name!r} missing")

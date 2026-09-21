@@ -3,10 +3,35 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/TokyoStation_mesh.res" id="1_ybgjv"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/TokyoStation_collision.res" id="2_hj60s"]
 
-[node name="TokyoStation" type="Node3D" unique_id=1426674012]
+[sub_resource type="BoxShape3D" id="BoxShape3D_ywc6t"]
+size = Vector3(3.04, 7, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_12rxc"]
+size = Vector3(3.04, 7, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_djp7x"]
+size = Vector3(3.04, 7, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sjqdn"]
+size = Vector3(3.04, 7, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xtuxa"]
+size = Vector3(3.04, 7, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ee1cg"]
+size = Vector3(3.04, 7, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ma1s3"]
+size = Vector3(3.04, 7, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cx7ws"]
+size = Vector3(3.04, 7, 0.14)
+
+[node name="TokyoStation" type="Node3D" unique_id=1033954326]
 metadata/building = {
 "aabb": [Vector3(-160, -0.1, -14.9), Vector3(320, 36.1, 29.8)],
 "collision": "trimesh",
+"door_style": "slide",
 "doors": [{
 "center": [-125.0, 0.0, 13.5],
 "height": 7.0,
@@ -36,6 +61,9 @@ metadata/building = {
 "side": "south_platforms",
 "width": 6.0
 }],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
 "example": true,
 "footprint_m": [320.0, 29.8],
 "height_m": 36.1,
@@ -50,23 +78,58 @@ metadata/building = {
 "wall_top_m": 36.1
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=296365069]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1210491064]
+visibility_range_end = 732.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
 mesh = ExtResource("1_ybgjv")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=595152842]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=382759264]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1232877408]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=45555397]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -123.5, 3.5, 13.5)
+shape = SubResource("BoxShape3D_ywc6t")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1145739739]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -126.5, 3.5, 13.5)
+shape = SubResource("BoxShape3D_12rxc")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1777526766]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -126.5, 3.5, -14.5)
+shape = SubResource("BoxShape3D_djp7x")
+
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=414675649]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -123.5, 3.5, -14.5)
+shape = SubResource("BoxShape3D_sjqdn")
+
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=398372741]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 126.5, 3.5, 13.5)
+shape = SubResource("BoxShape3D_xtuxa")
+
+[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=754205131]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 123.5, 3.5, 13.5)
+shape = SubResource("BoxShape3D_ee1cg")
+
+[node name="DoorLeaf6" type="CollisionShape3D" parent="Collision" unique_id=659433551]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 123.5, 3.5, -14.5)
+shape = SubResource("BoxShape3D_ma1s3")
+
+[node name="DoorLeaf7" type="CollisionShape3D" parent="Collision" unique_id=597367654]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 126.5, 3.5, -14.5)
+shape = SubResource("BoxShape3D_cx7ws")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1680736682]
 shape = ExtResource("2_hj60s")
 
-[node name="Door_north_street_0" type="Marker3D" parent="." unique_id=1889104193]
+[node name="Door_north_street_0" type="Marker3D" parent="." unique_id=135496238]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -125, 0, 13.5)
 
-[node name="Door_north_platforms_1" type="Marker3D" parent="." unique_id=680002033]
+[node name="Door_north_platforms_1" type="Marker3D" parent="." unique_id=1013403858]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -125, 0, -14.5)
 
-[node name="Door_south_street_2" type="Marker3D" parent="." unique_id=1235064302]
+[node name="Door_south_street_2" type="Marker3D" parent="." unique_id=2058552079]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 125, 0, 13.5)
 
-[node name="Door_south_platforms_3" type="Marker3D" parent="." unique_id=1142328900]
+[node name="Door_south_platforms_3" type="Marker3D" parent="." unique_id=400370786]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 0, -14.5)

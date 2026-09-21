@@ -67,6 +67,7 @@ const SETTLE_FRAMES := 90
 
 ## `-- --visuals=res://...CharacterVisuals_X.tscn` measures another body or an exported pose study.
 var visuals_path := ""
+var emit_pocket := ""
 ## `-- --aim-reference=chest` turns off A2.1's gun-referenced aim on both aim modifiers (the control).
 var chest_reference := false
 ## `-- --stock-weight=0` sets StockMountIKModifier.max_weight (0 is the A2.2 control: the clip's arm).
@@ -79,6 +80,10 @@ var stance := "upright"
 const SWIM_ORDINAL := 4   # movement.character.StanceName.SWIM
 ## `-- --torso-layer-on=Crouch` turns Stance.weapon_torso_layer ON for another stance (an A2.5 experiment).
 var torso_layer_on := ""
+## `-- --neck-front=off` holds the NeckFront layer at 0 (the artist's authored head pose instead of
+## the T-pose). It is the measurement behind removing that layer: with the head aimed at the target
+## on its own, the T-pose has nothing left to hide.
+var neck_front_off := false
 
 var fails := 0
 var support_misses: Array[float] = []
@@ -121,12 +126,65 @@ func _attach(sk: Skeleton3D, bone: String) -> BoneAttachment3D:
 	a.bone_name = bone
 	return a
 
+## A bone's forward, in MeshRoot's frame. WHICH local axis is "forward" is a fact about the import,
+## not something to assume (W1 cost a wrong conclusion by taking a bone PAIR instead), so it is read
+## off the REST pose: the local axis whose rest direction lies closest to the mesh forward (-Z)
+## wins, and its sign with it. The rest is in SKELETON space and the Skeleton3D node carries the
+## glTF import's own orientation (W5), so it is brought into the body frame before being compared.
+## `live` is the bone's FINAL basis, which must come from a BoneAttachment3D: a modifier writes into
+## the final pose only, and `get_bone_global_pose` returns the pre-modifier one (and, in a headless
+## `--script` run, the rest pose outright -- W41).
+func _bone_forward(sk: Skeleton3D, bone: String, mesh_root: Node3D, live: Basis) -> Vector3:
+	var to_body: Basis = mesh_root.global_transform.basis.inverse()
+	var i: int = sk.find_bone(bone)
+	if i < 0:
+		return Vector3(0, 0, -1)
+	var rest_axes: Basis = (to_body * sk.global_transform.basis * sk.get_bone_global_rest(i).basis).orthonormalized()
+	var best := 0
+	var flip := 1.0
+	var score := -2.0
+	for axis in range(3):
+		for sign in [1.0, -1.0]:
+			var d: float = (rest_axes[axis] * sign).dot(Vector3(0, 0, -1))
+			if d > score:
+				score = d
+				best = axis
+				flip = sign
+	return ((to_body * live)[best] * flip).normalized()
+
 func _v(v: Vector3) -> String:
 	return "(%+.3f, %+.3f, %+.3f)" % [v.x, v.y, v.z]
 
 ## Body-frame components of an offset: + lateral = right, + up, + fwd = toward the aim (-Z).
 func _parts(d: Vector3) -> String:
 	return "right %+.3f  up %+.3f  fwd %+.3f" % [d.x, d.y, -d.z]
+
+## The mesh the SHOULDER is part of. Asked of the skin, never by name: `armor` is what the mesh is
+## called on Godot-chan and `Body` on a VRoid body, and a name lookup that misses simply errors
+## halfway through the check.
+func _torso_mesh(sk: Skeleton3D) -> MeshInstance3D:
+	var want := {}
+	for b in ["clavicle_r", "upperarm_r", "spine_03"]:
+		var bi: int = sk.find_bone(b)
+		if bi >= 0: want[bi] = true
+	var best: MeshInstance3D = null
+	var best_n := -1
+	for c in sk.get_children():
+		if not (c is MeshInstance3D): continue
+		var mi: MeshInstance3D = c
+		if mi.skin == null: continue
+		var n := 0
+		for si in mi.mesh.get_surface_count():
+			var arr: Array = mi.mesh.surface_get_arrays(si)
+			var bones: PackedInt32Array = arr[Mesh.ARRAY_BONES]
+			for bi2 in bones:
+				var bone: int = mi.skin.get_bind_bone(bi2)
+				if bone < 0: bone = sk.find_bone(mi.skin.get_bind_name(bi2))
+				if want.has(bone): n += 1
+		if n > best_n:
+			best_n = n
+			best = mi
+	return best
 
 ## The frontmost skin vertex of `mesh` in a column just inboard of and below the shoulder joint,
 ## in MeshRoot's frame. Hand-skinned from the PRE-modifier pose, so call it only in the hold pose.
@@ -184,6 +242,7 @@ func _armed_player(world: Node3D, weapon_id: String, at: Vector3) -> Array:
 
 func _initialize() -> void:
 	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--emit-pocket="): emit_pocket = a.substr(14)
 		if a.begins_with("--visuals="):
 			visuals_path = a.substr("--visuals=".length())
 		elif a == "--aim-reference=chest":
@@ -196,6 +255,8 @@ func _initialize() -> void:
 			torso_layer_on = a.substr("--torso-layer-on=".length())
 		elif a.begins_with("--stock-weight="):
 			stock_weight = float(a.substr("--stock-weight=".length()))
+		elif a == "--neck-front=off":
+			neck_front_off = true
 	print("visuals: %s" % ("(Player.tscn default)" if visuals_path == "" else visuals_path))
 	print("stance: %s" % stance)
 	print("aim reference: %s" % ("CHEST (control)" if chest_reference else "held weapon's bore"))
@@ -286,13 +347,25 @@ func _initialize() -> void:
 
 		if not pocket_checked and stance == "upright":  # the skin derivation is only valid in the upright hold
 			pocket_checked = true
-			var skin_pt: Vector3 = _skin_pocket(sk, sk.get_node("armor") as MeshInstance3D, to_body, joint)
+			var skin_pt: Vector3 = _skin_pocket(sk, _torso_mesh(sk), to_body, joint)
 			var cb: Basis = clavicle.global_transform.basis.orthonormalized()
 			var live: Vector3 = cb.inverse() * (mesh_root.global_transform.basis * (skin_pt - joint))
 			print("  pocket from the skin: body %s  -> clavicle frame %s  (constant %s)"
 				% [_parts(skin_pt - joint), _v(live), _v(pocket_offset)])
 			_check("pocket offset matches the mesh", live.distance_to(pocket_offset) < POCKET_DRIFT_TOLERANCE,
 				"drift %.3f m" % live.distance_to(pocket_offset))
+			# `--emit-pocket=<file>` makes this probe the OWNER of the number instead of merely its
+			# eye. `measure_body.gd` derives a first estimate off the rest rig, which is enough to
+			# build a body's scene; this is the same rule measured on the body the game actually
+			# poses, and a second measure/build round takes the anchor to it. Measured, the estimate
+			# lands within 2 cm on two of the three bodies and 4.9 cm on the third, so it is a
+			# bootstrap, not an answer.
+			if emit_pocket != "":
+				var fh := FileAccess.open(emit_pocket, FileAccess.WRITE)
+				fh.store_string(JSON.stringify({"pocket": var_to_str(live),
+					"measured_by": "tools/godot/probe_weapon_fit.gd", "visuals": visuals_path}, "  ", true) + "\n")
+				fh.close()
+				print("  wrote %s" % emit_pocket)
 
 		if stance == "swim":
 			_check("%s swim: the body is swimming" % weapon_id, int(p.get("stance_ordinal")) == SWIM_ORDINAL,
@@ -304,6 +377,11 @@ func _initialize() -> void:
 		# ── aim ──────────────────────────────────────────────────────────────────────────────
 		Input.action_press("aim")
 		await _tick(SETTLE_FRAMES)
+		if neck_front_off:
+			# AFTER combat is entered: AnimationController writes this parameter on the combat EDGE,
+			# so setting it earlier is overwritten by the press above.
+			(_find(p, "AnimationTree") as AnimationTree).set("parameters/NeckFront/blend_amount", 0.0)
+			await _tick(20)
 		_check("%s aim: in combat" % weapon_id, bool(p.get("combat")), "combat=%s" % p.get("combat"))
 		to_body = mesh_root.global_transform.affine_inverse()
 		joint = to_body * shoulder.global_position
@@ -329,12 +407,31 @@ func _initialize() -> void:
 			var arm_len: float = shoulder_l.global_position.distance_to(elbow_l) + elbow_l.distance_to(hand_l.global_position)
 			# the modifier's own grip point (A2.4: SupportPoint is where the hand GRIPS, not the wrist)
 			var miss: float = sup_mod.call("last_grip_miss") if sup_mod != null else -1.0
-			sup = "grip %.3f m off (left arm %.3f m long, SupportPoint %.3f m from its shoulder)" % [
-				miss, arm_len, shoulder_l.global_position.distance_to(sp.global_position)]
+			# and how far the SUPPORT SHOULDER had to protract to get there (W44). It is the
+			# left-shoulder over-bend number: a clavicle swung to force a contact reads as a shrug,
+			# and GTA's own hand IK stops short instead.
+			var clav_deg: float = sup_mod.call("last_clavicle_deg") if sup_mod != null else 0.0
+			sup = "grip %.3f m off, support shoulder protracted %.1f deg (left arm %.3f m long, SupportPoint %.3f m from its shoulder)" % [
+				miss, clav_deg, arm_len, shoulder_l.global_position.distance_to(sp.global_position)]
 			support_misses.append(miss)
 		var hd: Vector3 = to_body * head.global_position
+		# Where the EYE LINE points, which is what an FPS camera rides (W5: the rig hangs off
+		# `neck_01`). The gun is on the aim line by construction -- `ShoulderAimModifier` aims the
+		# BORE (W23) -- so a clip rotation the arms carry and the spine does not is absorbed by the
+		# clavicles and the NECK instead, and only the head shows it. Measured, never assumed: the
+		# head bone's own forward is taken as the axis whose rest direction lands on the mesh
+		# forward, the same derivation W1 records for `spine_03`.
+		var hf: Vector3 = _bone_forward(sk, "head_2", mesh_root, head.global_transform.basis)
+		var head_yaw: float = rad_to_deg(atan2(hf.x, -hf.z))
+		# The head's ROLL: how far its own up leans off the world vertical. A look-at aims a
+		# direction and says nothing about the twist about it, so this is what the T-pose layer was
+		# also flattening and the number to watch when it goes.
+		var head_up: Vector3 = head.global_transform.basis.y
+		var head_roll: float = rad_to_deg(acos(clampf(head_up.normalized().dot(Vector3.UP), -1.0, 1.0)))
 		print("  aim : blade (right shoulder behind left) %+.1f deg ; gun yaw %+.1f pitch %+.1f ; support hand %s"
 			% [blade, gun_yaw, gun_pitch, sup])
+		print("  aim : head yaw off aim %+.1f deg ; head tilt %.1f deg off vertical ; head %+.3f m right of the body centre line"
+			% [head_yaw, head_roll, hd.x])
 		var tree: AnimationTree = _find(p, "AnimationTree") as AnimationTree
 		print("  aim : head rel stock  %s ; spine modifier aimed the bore: %s ; torso layer %.2f"
 			% [_parts(hd - s_aim), sk.get_node("SpineAimModifier").call("aimed_with_bore"),

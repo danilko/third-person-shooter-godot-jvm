@@ -3,11 +3,15 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/RainbowBridge_mesh.res" id="1_nh3c0"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/RainbowBridge_collision.res" id="2_eb4b6"]
 
-[node name="RainbowBridge" type="Node3D" unique_id=1642671875]
+[node name="RainbowBridge" type="Node3D" unique_id=363528672]
 metadata/building = {
 "aabb": [Vector3(-424.5, -30, -24), Vector3(849, 138.8, 48)],
 "collision": "trimesh",
+"door_style": "swing",
 "doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
 "example": true,
 "footprint_m": [849.0, 48.0],
 "height_m": 138.8,
@@ -22,11 +26,14 @@ metadata/building = {
 "wall_top_m": 138.8
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1324655494]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1231771261]
+visibility_range_end = 900.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
 mesh = ExtResource("1_nh3c0")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=20739054]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1882665562]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1791776353]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=2057200395]
 shape = ExtResource("2_eb4b6")

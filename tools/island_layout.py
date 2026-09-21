@@ -14,7 +14,11 @@ The island's road record is two layers:
     3. `island_expressway.py`  -- C1, the airport JCT and spur, the diamond (step 2; after the streets, so its pier
                                   pass sees them);
     4. `island_turnarounds.py` -- every road end a loop (3.3b);
-    5. `roadkit_cli.py setback` -- every junction mouth solved.
+    5. `roadkit_cli.py setback` -- every junction mouth solved;
+    6. `island_grades.py smooth` -- every grade break rounded with a vertical curve (PLAN.md 0.7): each generator
+                                  holds a LIMIT per span and says nothing about the CHANGE from one span to the
+                                  next, so this is the one pass that owns it, over the arterials it did not
+                                  generate as much as over the roads it did.
 It then asserts the Road Kit gate (0 errors), a clean flow (0 broken / misjoined / unreached / orphaned / open ends) and
 that every road over another clears it by `roadkit_interchange.CLEARANCE` on the built surface.
 
@@ -58,6 +62,7 @@ def derive(out):
     sys.stdout.write(run(os.path.join(HERE, "island_turnarounds.py"), out))
     moved = json.loads(run(CLI, "setback", out))
     print("island_layout: setback moved %d mouth(s)" % len(moved["moved"]))
+    sys.stdout.write(run(os.path.join(HERE, "island_grades.py"), "smooth", out))
 
 
 def main(argv):

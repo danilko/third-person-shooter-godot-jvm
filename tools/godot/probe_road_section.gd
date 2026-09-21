@@ -3,6 +3,8 @@ extends SceneTree
 ##
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_road_section.gd \
 ##       -- --lane=loop_R0 --at=-181,106 [--half=16] [--step=0.25]
+##       -- --world=res://src/main/resources/com/openworld/world/World.tscn --park=1562,-464 ...   (another scene;
+##       `park` puts the streaming player over that XZ so the island's zone piece is loaded)
 ##
 ## Finds the point on `lane` nearest to (x, z), then casts a ray straight down every `step` metres across
 ## the lane (from `half` m left to `half` m right, perpendicular to its travel direction) and prints every
@@ -37,12 +39,15 @@ func _initialize() -> void:
 	var at_xz := _arg("at", "0,0").split(",")
 	var half := float(_arg("half", "16"))
 	var step := float(_arg("step", "0.25"))
-	var world: Node = (load(WORLD) as PackedScene).instantiate()
+	var world: Node = (load(_arg("world", WORLD)) as PackedScene).instantiate()
 	root.add_child(world)
 	current_scene = world
 	var player: Node3D = world.get_node("Characters/Player")
 	player.process_mode = Node.PROCESS_MODE_DISABLED
 	player.global_position = PARK
+	if _arg("park", "") != "":
+		var pxz := _arg("park", "").split(",")
+		player.global_position = Vector3(float(pxz[0]), 400.0, float(pxz[1]))
 	var lane: Node = null
 	for i in range(600):
 		await physics_frame

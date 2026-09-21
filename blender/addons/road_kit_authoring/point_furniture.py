@@ -203,7 +203,7 @@ class Furniture(object):
             return False
         lift = float(a.get("lift", 0.0)) - a["lo"][1] * a["scale"][1]
         self.placements.append({"asset": asset, "path": a["res"], "pos": (pos[0], pos[1], pos[2] + lift),
-                                "fwd": fwd, "scale": list(a["scale"])})
+                                "fwd": fwd, "scale": list(a["scale"]), "road": road or ""})
         if a.get("collide") or a.get("collide_pole"):
             self.placements[-1]["solid"] = True
         if a.get("collide_pole"):
@@ -489,9 +489,11 @@ def _edge_samples(pts, walk, kerb, wall, spacing, clear, phase=None):
     return out
 
 
-def _barrier_samples(pts, wall, spacing, clear, phase=None):
+def _barrier_samples(pts, walk, wall, spacing, clear, phase=None):
     """Stations along one edge run where it CARRIES a barrier (both ends of the segment): (point, plan direction,
-    barrier height)."""
+    barrier height, footway width). The footway width is what says where the barrier -- and the CAR WALL on its
+    line -- actually stands: `point_mesh` puts the barrier's centre `2*walk + BARRIER_THICKNESS/2` outboard of the
+    edge line, so its car wall's INBOARD face is at `2*walk`."""
     pts = [tuple(p) for p in pts]
     cum = _lengths(pts)
     out = []
@@ -500,7 +502,7 @@ def _barrier_samples(pts, wall, spacing, clear, phase=None):
         j = min(i + 1, len(pts) - 1)
         h = min(float(wall[i]), float(wall[j]))
         if h > 0.0:
-            out.append((p, d, h))
+            out.append((p, d, h, min(float(walk[i]), float(walk[j]))))
     return out
 
 
@@ -613,7 +615,8 @@ def _lamps(fur, table, solves, bands, mine_run, ground):
     the median every `median_lamp_spacing`; the others get single lamps on both kerbs every `lamp_spacing`,
     staggered half a spacing side to side, `lamp_inset` behind the kerb line, arm over the road. A lamp keeps
     `pole_clearance` from any solid prop already standing (a signal pole, a planter). Where an edge carries a barrier
-    the lamp stands ON it instead, every `barrier_lamp_spacing` (0 = none)."""
+    the lamp stands ON it instead, every `barrier_lamp_spacing` (0 = none), its shaft `barrier_lamp_clear` outboard
+    of the car wall that stands on the barrier's line."""
     r = table.rules
     for s in solves:
         if not mine_run(s) or len(s.samples) < 2:
@@ -658,13 +661,88 @@ def _lamps(fur, table, solves, bands, mine_run, ground):
             spacing = r.get("barrier_lamp_spacing", 0.0)
             if not spacing:
                 continue
-            for p, d, h in _barrier_samples(pts, wall, spacing, r["lamp_end_clear"],
-                                             0.5 * spacing if sgn > 0 else 0.0):
+            # WHERE it stands is DERIVED, not authored: a barrier lamp's shaft must clear the vehicle-only CAR
+            # WALL that `point_mesh` builds on the barrier's line, whose inboard face is at `2*walk` from the edge
+            # line. A fixed 0.15 m inset happened to be right for a road with no footway and no car wall, and once
+            # both existed the 0.18 m shaft stood 3 cm INSIDE the wall -- a post in the carriageway that a car
+            # scraping the parapet at 35 m/s caught and was flipped off a bridge by (PLAN.md 0.8, measured on
+            # DebugRoads' `link`: 5 pole contacts and 2 falls). The shaft now starts `barrier_lamp_clear` outboard
+            # of that face, which on a 0.32 m parapet still sits it on the barrier.
+            half_pole = float((table.assets.get("lamp", {}).get("collide_pole") or [0.18])[0])
+            for p, d, h, w_b in _barrier_samples(pts, walk, wall, spacing, r["lamp_end_clear"],
+                                                 0.5 * spacing if sgn > 0 else 0.0):
                 lat = _left(d)
-                o = sgn * r["barrier_lamp_inset"]
+                o = sgn * (2.0 * w_b + half_pole + r["barrier_lamp_clear"])
                 pos = (p[0] + lat[0] * o, p[1] + lat[1] * o, p[2] + h)
                 if fur.clear_of(pos, r["pole_clearance"]):
                     fur.put(table, "lamp", pos, (-sgn * lat[0], -sgn * lat[1]), road)
+
+
+class _LaneIndex(object):
+    """Every exported lane's plan segments on a coarse grid, for "is this spot in a lane".
+
+    A footway is a fact about ONE road, so a spot on it can still be in the CARRIAGEWAY of another that runs
+    alongside -- a ramp beside its mainline is the case (measured on the sample network: a tree on `demo_main`'s
+    footway stood 0.23 m off `demo_ramp_b_F0`'s centreline). A lamp post there is bad; a 9 m tree is worse."""
+
+    CELL = 20.0
+
+    def __init__(self, lanes):
+        self.cells = {}
+        for lane in lanes.values():
+            pts = _lane_kit(lane)
+            half = 0.5 * float(lane.get("lane_width", 4.5) or 4.5)
+            for a, b in zip(pts, pts[1:]):
+                lo_x, hi_x = sorted((a[0], b[0]))
+                lo_y, hi_y = sorted((a[1], b[1]))
+                for i in range(int(math.floor(lo_x / self.CELL)), int(math.floor(hi_x / self.CELL)) + 1):
+                    for j in range(int(math.floor(lo_y / self.CELL)), int(math.floor(hi_y / self.CELL)) + 1):
+                        self.cells.setdefault((i, j), []).append((a, b, half))
+
+    def clear_of(self, p, margin):
+        """True when `p` is more than that lane's half width plus `margin` from every lane centreline."""
+        i0, j0 = int(math.floor(p[0] / self.CELL)), int(math.floor(p[1] / self.CELL))
+        for i in range(i0 - 1, i0 + 2):
+            for j in range(j0 - 1, j0 + 2):
+                for a, b, half in self.cells.get((i, j), ()):
+                    vx, vy = b[0] - a[0], b[1] - a[1]
+                    n = vx * vx + vy * vy
+                    t = 0.0 if n <= 1e-12 else max(0.0, min(1.0, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / n))
+                    if math.hypot(p[0] - (a[0] + vx * t), p[1] - (a[1] + vy * t)) < half + margin:
+                        return False
+        return True
+
+
+def _street_trees(fur, table, solves, bands, mine_run, ground, lanes):
+    """街路樹: one species per STREET, at `tree_spacing` along every footway at least `tree_min_footway` wide,
+    `tree_kerb_gap` in from the kerb so the canopy overhangs the carriageway rather than the lot.
+
+    Which species is a hash of the ROAD's name, not of the spot: a Japanese street is planted with one tree, and
+    a per-spot choice reads as scrub. It runs after the signals and the lamps because those are functional and own
+    their place; a tree keeps `tree_clearance` from any solid prop already standing (a pole OR a planter), which
+    is the one rule that stops a tree growing through a lamp post."""
+    r = table.rules
+    names = [n for n in r.get("tree_assets", ()) if n in table.assets]
+    if not names or r.get("tree_spacing", 0.0) <= 0.0:
+        return
+    index = _LaneIndex(lanes)
+    for s in solves:
+        if not mine_run(s):
+            continue
+        asset = names[int(hashlib.sha1(s.road.name.encode()).hexdigest()[:8], 16) % len(names)]
+        # A tree whose station lands on a lamp's is simply dropped by the clearance below, which leaves the
+        # avenue with a hole every other tree (measured: 1270 of 2044 on the island). Start the run half a tree
+        # spacing past where the LAMPS start and the two interleave instead.
+        clear = max(r["tree_end_clear"], r["lamp_end_clear"] + 0.5 * r["tree_spacing"])
+        for _sfx, pts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
+            for p, d, w, k in _edge_samples(pts, walk, kerb, wall, r["tree_spacing"], clear):
+                if 2.0 * w < r["tree_min_footway"] or k <= 0.0 or not _grounded(ground, p, r["max_above_ground"]):
+                    continue
+                lat = _left(d)
+                off = sgn * r["tree_kerb_gap"]
+                pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
+                if fur.clear_of(pos, r["tree_clearance"]) and index.clear_of(pos, r["tree_lane_clear"]):
+                    fur.put(table, asset, pos, d, s.road.name)
 
 
 def _median_walls(fur, table, solves, mine_run):
@@ -712,6 +790,7 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     _lane_props(fur, table, dict(sorted(lanes.items())), mine_lane, ground)
     _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground)
     _lamps(fur, table, solves, bands, mine_run, ground)
+    _street_trees(fur, table, solves, bands, mine_run, ground, lanes)
     _median_walls(fur, table, solves, mine_run)
     return fur
 

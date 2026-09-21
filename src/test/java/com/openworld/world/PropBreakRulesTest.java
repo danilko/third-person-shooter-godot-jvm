@@ -35,6 +35,20 @@ class PropBreakRulesTest {
     }
 
     @Test
+    void theReachGrowsWithSpeedALONGtheMotionOnly() {
+        // PLAN.md 0.8. The barrier lamp on an expressway stands 2.40 m from the lane centre; SPC-1 is 1.10 m
+        // half-wide. Driving dead centre it must never be reached, at any speed -- a car does not get wider the
+        // faster it goes. On the pre-fix rule (travel added on both axes) 31 m/s reached 2.63 m and knocked down
+        // a lamp every ~36 m.
+        for (double v : new double[]{10.0, 20.0, 31.0, 45.0, 80.0}) {
+            assertFalse(PropBreakRules.reachesPole(2.40, 0.0, 1.10, 2.3, 0.18, 0.0, v, DT),
+                    "a pole 2.40 m to the side at " + v + " m/s");
+        }
+        // it IS reached where the car's own body would touch it (a hair ahead, so it is ahead of the motion)
+        assertTrue(PropBreakRules.reachesPole(1.55, 1.0, 1.10, 2.3, 0.18, 0.0, 31.0, DT));
+    }
+
+    @Test
     void theReachGrowsWithSpeed() {
         // 3.5 m ahead: out of reach at 10 m/s, in reach at 40 m/s
         assertFalse(PropBreakRules.reachesPole(0.0, 3.2, 1.2, 2.3, 0.18, 0.0, 10.0, DT));

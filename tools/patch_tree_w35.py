@@ -16,8 +16,10 @@ import os
 import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCENES = ["CharacterVisuals_GodotChan.tscn", "CharacterVisuals_GodotChanF.tscn"]
-SK = "Godot_Chan_Stealth/Skeleton3D:"
+SCENES = ["CharacterVisuals_GodotChan.tscn"]
+# Body-independent since the shared animation library landed: the AnimationTree resolves
+# against the ARMATURE node, so a filter names the skeleton and the bone, nothing else.
+SK = "Skeleton3D:"
 FLINCH = ["spine_01", "spine_02", "spine_03", "neck_01", "head_2"]
 
 

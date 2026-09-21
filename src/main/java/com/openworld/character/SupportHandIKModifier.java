@@ -9,6 +9,7 @@ import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.Skeleton3D;
 import godot.api.SkeletonModifier3D;
+import godot.core.Basis;
 import godot.core.NodePath;
 import godot.core.Transform3D;
 import godot.core.Vector3;
@@ -87,16 +88,63 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
      */
     @Export public float weight = 1.0f;
 
+    /**
+     * The support shoulder. Protracting it is how a human extends reach, and it is FREE here: the
+     * weapon hangs off {@code hand_r} under {@code clavicle_r}, so swinging {@code clavicle_l}
+     * moves the support shoulder toward a gun that does not move at all — no re-aim, no feedback
+     * loop with {@link ShoulderAimModifier} or {@link StockMountIKModifier}.
+     */
+    @Export public String shoulderBone = "clavicle_l";
+
+    /**
+     * How far {@link #shoulderBone} may protract to close a reach deficit, in degrees. **0 is the
+     * control and reproduces the two-bone-only behaviour exactly.**
+     *
+     * <p>It engages ONLY when the target is past the arm's own reach, and the angle is solved to
+     * close exactly the deficit — so a body and weapon that already fit get 0 and are bit-identical.
+     * Measured 2026-09-20 on the three shipped bodies: Godot-chan and Fumiriya reach every weapon
+     * unaided, and Shino (shoulders 0.2174 m against their 0.2955) is the only one that protracts.
+     *
+     * <p>Capped because protraction moves the skin over the clavicle, and past ~40 deg that reads as
+     * a shrug rather than a reach. Where the cap is not enough the hand stops short and
+     * {@link #lastGripMiss()} says by how much — which is what GTA does with its own hand IK rather
+     * than distorting the shoulder to force a contact.
+     */
+    @Export public float maxClavicleDeg = 40.0f;
+
     /** Path to the character owning this skeleton; empty resolves the scene owner. */
     @Export public NodePath characterPath = new NodePath();
 
     private WeaponController weaponController;
     private boolean controllerResolved = false;
     private double gripMiss = -1.0;
+    private double armReach = -1.0;
+    private double targetReach = -1.0;
+    private double clavicleDeg = 0.0;
 
     /** Distance (m) from the hand's grip point to the marker after the last solve; -1 when nothing was solved. */
     @Register
     public double lastGripMiss() { return gripMiss; }
+
+    /**
+     * How far this arm can reach: shoulder to wrist with the elbow straight, from the REST skeleton.
+     * A fact about the BODY, and half of why a support hand misses.
+     */
+    @Register
+    public double armReach() { return armReach; }
+
+    /**
+     * How far the last solve was ASKED to reach: shoulder to the wrist the weapon's support point
+     * implies. Past {@link #armReach} the arm straightens and the rest of the distance is the miss,
+     * so `targetReach - armReach` says whether a miss is the SOLVE or simply the weapon being out
+     * of reach -- which is a fact about the body's proportions, not about the IK.
+     */
+    @Register
+    public double lastTargetReach() { return targetReach; }
+
+    /** Degrees {@link #shoulderBone} protracted on the last solve; 0 when the arm reached unaided. */
+    @Register
+    public double lastClavicleDeg() { return clavicleDeg; }
 
     public String getUpperBone() { return upperBone; }
     public void setUpperBone(String v) { this.upperBone = v; }
@@ -114,6 +162,10 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
     public void setKeepHandRotation(boolean v) { this.keepHandRotation = v; }
     public float getWeight() { return weight; }
     public void setWeight(float v) { this.weight = v; }
+    public String getShoulderBone() { return shoulderBone; }
+    public void setShoulderBone(String v) { this.shoulderBone = v; }
+    public float getMaxClavicleDeg() { return maxClavicleDeg; }
+    public void setMaxClavicleDeg(float v) { this.maxClavicleDeg = v; }
     public NodePath getCharacterPath() { return characterPath; }
     public void setCharacterPath(NodePath v) { this.characterPath = v; }
 
@@ -141,6 +193,7 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
     @Override
     public void _processModification() {
         gripMiss = -1.0;
+        targetReach = -1.0;
         if (weight <= 0.0f) return;
         Skeleton3D skel = getSkeleton();
         if (skel == null) return;
@@ -166,7 +219,7 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
                 ? HeldWeaponPose.markerInSkeleton(gun, held, marker).getOrigin()
                 : skel.getGlobalTransform().affineInverse().times(marker.getGlobalPosition());
         // The grip point in the hand's REST frame, carried by the hand's current (kept) rotation.
-        Transform3D hand = skel.getBoneGlobalPose(ie);
+        Transform3D hand = skel.getBoneGlobalPose(ie);   // re-read after any protraction
         int ig = skel.findBone(gripBone);
         Vector3 grip = Vector3.Companion.getZERO();
         if (ig >= 0 && gripFraction != 0.0f) {
@@ -174,6 +227,47 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
                     .times(gripFraction);
         }
         Vector3 wrist = t.minus(hand.getBasis().orthonormalized().times(grip));
+        // Reported, not used: the reach this solve was asked for against the reach this arm has.
+        armReach = skel.getBoneGlobalRest(iu).getOrigin().minus(skel.getBoneGlobalRest(il).getOrigin()).length()
+                 + skel.getBoneGlobalRest(il).getOrigin().minus(skel.getBoneGlobalRest(ie).getOrigin()).length();
+        targetReach = wrist.minus(skel.getBoneGlobalPose(iu).getOrigin()).length();
+
+        // PROTRACT THE SUPPORT SHOULDER when, and only when, the arm cannot reach. Swinging
+        // clavicle_l about its own origin carries upperarm_l toward the target; the weapon hangs off
+        // the OTHER clavicle, so nothing this does moves the gun or needs re-aiming.
+        clavicleDeg = 0.0;
+        int ic = skel.findBone(shoulderBone);
+        if (maxClavicleDeg > 0.0f && ic >= 0 && targetReach > armReach) {
+            Transform3D clav = skel.getBoneGlobalPose(ic);
+            Vector3 pivot = clav.getOrigin();
+            Vector3 toShoulder = skel.getBoneGlobalPose(iu).getOrigin().minus(pivot);
+            Vector3 toTarget = wrist.minus(pivot);
+            double r = toShoulder.length();
+            double d = toTarget.length();
+            if (r > 1.0e-5 && d > 1.0e-5) {
+                Vector3 axis = toShoulder.cross(toTarget);
+                if (axis.length() > 1.0e-6) {
+                    // Rotating the shoulder toward the target by t closes the angle between them to
+                    // (phi - t); solve the law of cosines for the t that leaves exactly armReach.
+                    double phi = Math.acos(clamp(toShoulder.normalized().dot(toTarget.normalized())));
+                    double want = clamp((r * r + d * d - armReach * armReach) / (2.0 * r * d));
+                    double theta = phi - Math.acos(want);
+                    double cap = Math.toRadians(maxClavicleDeg);
+                    theta = Math.max(0.0, Math.min(theta, cap));
+                    if (theta > 1.0e-5) {
+                        Basis turn = new Basis(axis.normalized(), theta);
+                        skel.setBoneGlobalPose(ic, new Transform3D(turn.times(clav.getBasis()), pivot));
+                        clavicleDeg = Math.toDegrees(theta);
+                        // The hand rode round with the clavicle, so the grip offset -- and therefore
+                        // the wrist the solve aims at -- has to be re-read, not reused.
+                        hand = skel.getBoneGlobalPose(ie);
+                        wrist = t.minus(hand.getBasis().orthonormalized().times(grip));
+                        targetReach = wrist.minus(skel.getBoneGlobalPose(iu).getOrigin()).length();
+                    }
+                }
+            }
+        }
+
         Vector3 solved = TwoBoneIK.solve(skel, iu, il, ie, wrist, weight);
         if (solved == null) return;
         if (keepHandRotation) {
@@ -182,6 +276,8 @@ public class SupportHandIKModifier extends SkeletonModifier3D {
         Transform3D after = skel.getBoneGlobalPose(ie);
         gripMiss = after.getOrigin().plus(after.getBasis().orthonormalized().times(grip)).minus(t).length();
     }
+
+    private static double clamp(double v) { return v < -1.0 ? -1.0 : (v > 1.0 ? 1.0 : v); }
 
     /** The bone the weapon hangs from, used to place {@link #supportPointName} in this pass's pose. */
     @Export public String weaponBone = "hand_r";

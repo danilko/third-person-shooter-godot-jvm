@@ -752,10 +752,98 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Register
     @Override
     public void _process(double delta) {
+        refreshLights(delta);
         damageVfxTimer -= delta;
         if (damageVfxTimer > 0.0) return;
         damageVfxTimer = DAMAGE_VFX_INTERVAL;
         refreshDamageTier();
+    }
+
+    // ── Lights ────────────────────────────────────────────────────────────────
+    // Two low-beam SpotLight3D and two tail OmniLight3D, BUILT IN CODE from the config's measured lamp
+    // offsets (no scene wiring, so every carrier gets them and a new car needs no edit) and shown only
+    // when `DayNight` says it is dark AND the camera is near enough to see the beam land. They are built
+    // on first need rather than in _ready: ambient traffic spawns and despawns all day, and a car that
+    // never sees a night never pays for them.
+    //
+    // NO SHADOWS: a shadow-casting headlight is one shadow map per lamp per frame, and a street at night
+    // holds a dozen cars. The beam on the road is what a driver needs; the shadow of the car in its own
+    // beam is not.
+
+    private static final double LIGHT_VIEW_DISTANCE = 140.0;   // beyond this a beam is a few pixels
+    private static final double LIGHT_TICK = 0.25;
+
+    private SpotLight3D headLeft, headRight;
+    private OmniLight3D tailLeft, tailRight;
+    private double lightTimer;
+    private boolean lightsOn;
+
+    /** Are this car's lamps lit right now? (Probe readout, and what a future dashboard would read.) */
+    @Register public boolean headlightsOnNow() { return lightsOn; }
+
+    private void refreshLights(double delta) {
+        lightTimer -= delta;
+        if (lightTimer > 0.0) return;
+        lightTimer = LIGHT_TICK;
+        VehicleConfig cfg = getConfig();
+        boolean want = com.openworld.world.DayNight.lightsWanted()
+                && !(cfg.headlightOffset.getX() == 0.0 && cfg.headlightOffset.getZ() == 0.0)
+                && (healthNode == null || !healthNode.isDead())
+                && nearCamera();
+        if (want && headRight == null) buildLights(cfg);
+        if (headRight == null) return;
+        if (want == lightsOn) return;
+        lightsOn = want;
+        headLeft.setVisible(want);
+        headRight.setVisible(want);
+        if (tailLeft != null) tailLeft.setVisible(want);
+        if (tailRight != null) tailRight.setVisible(want);
+    }
+
+    private boolean nearCamera() {
+        Camera3D cam = getViewport() != null ? getViewport().getCamera3d() : null;
+        if (cam == null || !GD.isInstanceValid(cam)) return true;
+        return cam.getGlobalPosition().distanceTo(getGlobalPosition()) <= LIGHT_VIEW_DISTANCE;
+    }
+
+    private void buildLights(VehicleConfig cfg) {
+        Vector3 h = cfg.headlightOffset;
+        headRight = buildBeam(cfg, "HeadlightR", new Vector3(h.getX(), h.getY(), h.getZ()));
+        headLeft  = buildBeam(cfg, "HeadlightL", new Vector3(-h.getX(), h.getY(), h.getZ()));
+        Vector3 t = cfg.taillightOffset;
+        if (t.getX() != 0.0 || t.getZ() != 0.0) {
+            tailRight = buildTail("TaillightR", new Vector3(t.getX(), t.getY(), t.getZ()));
+            tailLeft  = buildTail("TaillightL", new Vector3(-t.getX(), t.getY(), t.getZ()));
+        }
+    }
+
+    private SpotLight3D buildBeam(VehicleConfig cfg, String name, Vector3 at) {
+        SpotLight3D l = new SpotLight3D();
+        l.setName(new StringName(name));
+        l.setParam(Light3D.Param.RANGE, cfg.headlightRange);
+        l.setParam(Light3D.Param.SPOT_ANGLE, cfg.headlightAngle);
+        l.setParam(Light3D.Param.SPOT_ATTENUATION, 0.6f);
+        l.setParam(Light3D.Param.ENERGY, cfg.headlightEnergy);
+        l.setColor(new Color(1.0, 0.97, 0.9, 1.0));
+        l.setShadow(false);
+        // a spot shines along its own -Z, so the car's forward is the beam's; pitch it DOWN a low beam's worth
+        l.setTransform(new Transform3D(new Basis(new Vector3(1, 0, 0), Math.toRadians(-cfg.headlightPitch)), at));
+        l.setVisible(false);
+        addChild(l);
+        return l;
+    }
+
+    private OmniLight3D buildTail(String name, Vector3 at) {
+        OmniLight3D l = new OmniLight3D();
+        l.setName(new StringName(name));
+        l.setParam(Light3D.Param.RANGE, 4.0f);
+        l.setParam(Light3D.Param.ENERGY, 1.2f);
+        l.setColor(new Color(1.0, 0.15, 0.08, 1.0));
+        l.setShadow(false);
+        l.setTransform(new Transform3D(new Basis(), at));
+        l.setVisible(false);
+        addChild(l);
+        return l;
     }
 
     private void refreshDamageTier() {

@@ -26,6 +26,8 @@ import json, os, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RES = os.path.join(ROOT, "src", "main", "resources", "com", "openworld", "vehicle")
 MODEL_Y = -0.8
+LAMP_OUT = 0.62              # a lamp sits this fraction of the way from the centreline out to the flank
+LAMP_UP = 0.42               # ... and this fraction of the body's height above the ground
 HIP_ABOVE, HIP_BEHIND = 0.452, 0.259       # a seated character's pelvis relative to its origin (seat marker)
 HIP_ON_CUSHION = 0.08                      # the pelvis sits this far above the cushion surface
 HIP_BACK_OF_CENTRE = 0.15                  # …and this far behind the cushion's centre, toward the backrest
@@ -34,14 +36,14 @@ G = 9.8
 # Per-vehicle tuning: mass (kg), suspension, power. The rest of the handling is the prototype's (Vehicle.tscn).
 TUNING = {
     "SPC1": {"name": "SPC-1", "mass": 1300, "rest": 0.35, "spring": 14000, "damping": 5000, "over": 0.2,
-             "max_speed": 67.0, "accel": 10000.0, "crash_hp": 6.0, "health": 500, "paint": "car"},
+             "max_speed": 55.0, "accel": 10000.0, "crash_hp": 6.0, "health": 500, "paint": "car"},
     "PIT1": {"name": "PIT-1", "mass": 1900, "rest": 0.45, "spring": 16000, "damping": 6500, "over": 0.25,
-             "max_speed": 50.0, "accel": 13000.0, "crash_hp": 5.0, "health": 650, "paint": "car",
+             "max_speed": 40.0, "accel": 13000.0, "crash_hp": 5.0, "health": 650, "paint": "car",
              # Vehicle.tscn has four seats and an inherited scene cannot delete one: a single-cab pickup's other two
              # ride in the BED (GTA's answer), sitting on its floor - measured flat at 0.855 m, 0.9-2.1 m aft.
              "extra_seats": [[-0.45, 0.855, 1.5], [0.45, 0.855, 1.5]]},
     "POC1": {"name": "POC-1", "mass": 1700, "rest": 0.38, "spring": 16000, "damping": 6000, "over": 0.2,
-             "max_speed": 62.0, "accel": 12000.0, "crash_hp": 5.0, "health": 600, "paint": ""},
+             "max_speed": 50.0, "accel": 12000.0, "crash_hp": 5.0, "health": 600, "paint": ""},
 }
 WHEELS = {"RR": "wheel_rb", "RL": "wheel_lb", "FR": "wheel_rf", "FL": "wheel_lf"}
 SEAT_ORDER = ["seat_front_l", "seat_front_r", "seat_rear_l", "seat_rear_r"]   # Seat0 = the driver, left
@@ -71,6 +73,13 @@ def build(vid):
         raise SystemExit(f"{vid}: {len(seats)} seats; Vehicle.tscn has 4 and an inherited scene cannot remove one - "
                          f"add extra_seats to its TUNING row")
     front_z, top_y = lo[2], hi[1] + MODEL_Y
+    # LAMPS, derived (never hand-placed): the front/rear face of the measured bounds, LAMP_OUT of the way out
+    # to the flank, at LAMP_UP of the body's height. Body space, so MODEL_Y applies; the left lamp is the
+    # mirror of the right, which is why only one is written.
+    lamp_x = LAMP_OUT * max(-lo[0], hi[0])
+    lamp_y = LAMP_UP * hi[1] + MODEL_Y
+    head = (lamp_x, lamp_y, lo[2])
+    tail = (lamp_x, lamp_y + 0.05, hi[2])
 
     cfg = f"""[gd_resource type="Resource" script_class="VehicleConfig" format=3]
 
@@ -97,6 +106,8 @@ hull_half_length = {f(max(-lo[2], hi[2]))}
 crash_health_per_dv = {f(t["crash_hp"])}
 wreck_scene = ExtResource("3_wreck")
 explosion_vfx = ExtResource("4_blast")
+headlight_offset = Vector3({f(head[0])}, {f(head[1])}, {f(head[2])})
+taillight_offset = Vector3({f(tail[0])}, {f(tail[1])}, {f(tail[2])})
 """
     hull = ", ".join(f"{f(x)}, {f(y + MODEL_Y)}, {f(z)}" for x, y, z in d["hull"])
     nodes = [f"""[gd_scene format=3]

@@ -34,5 +34,15 @@ public class SpawnConfig extends Resource {
     @Export public String weaponScenePath =
             "res://src/main/resources/com/openworld/weapon/ASR1.tscn";
 
+    /**
+     * How the spawned AI behaves. "" = the ordinary AI brain (AIController: patrol on the navmesh, perceive, fight).
+     * "sidewalk" = an ambient pedestrian (PLAN.md 3.6): set down on a footway inside the zone's box
+     * ({@link Sidewalks}) and driven by {@code ai.SidewalkWalkerController} -- walks the footway, no navmesh, no
+     * perception. Leave {@link #weaponScenePath} empty for an unarmed walker.
+     */
+    @Export public String behavior = "";
+
+    public static final String BEHAVIOR_SIDEWALK = "sidewalk";
+
     public SpawnConfig() { super(); }
 }

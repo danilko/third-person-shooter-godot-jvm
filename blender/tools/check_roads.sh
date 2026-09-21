@@ -74,6 +74,14 @@ run "island_road_zones.py --check" python3 "$ROOT/tools/island_road_zones.py" \
 run "island_traffic_zones.py --check" python3 "$ROOT/tools/island_traffic_zones.py" \
     "$ROOT"/assets/world_source/pieces/Roads_IslandRoads_island_*.lanekit.json \
     "$ROOT/src/main/resources/com/openworld/world/World.tscn" --load 1150 --unload 1550 --check   # tools/island_rebuild.sh's radii
+# PLAN.md 3.16 step 4: a street tree is road furniture, and no tree may stand in a lane.
+run "check_street_trees (island)" python3 "$BP/tools/check_street_trees.py" \
+    "$ROOT/assets/world_source/pieces/IslandRoads.roads.json" \
+    --lanekits "$ROOT/assets/world_source/pieces" --prefix Roads_IslandRoads \
+    --ground "$ROOT/assets/world_source/pieces/IslandRoads.ground.json"
+run "check_street_trees (sample, ramps beside a mainline)" python3 "$BP/tools/check_street_trees.py" \
+    "$ROOT/assets/world_source/pieces/RoadKitSample.roads.json" \
+    --lanekits "$ROOT/assets/world_source/pieces" --prefix Roads_RoadKitZones
 if [ "$QUICK" -eq 0 ]; then
   source "$HERE/env.sh"
   # `timeout -k`: a GDScript error inside `_initialize` HANGS instead of exiting, and a hung Godot

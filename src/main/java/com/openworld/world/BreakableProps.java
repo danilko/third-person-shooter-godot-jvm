@@ -374,6 +374,34 @@ public class BreakableProps extends MultiMeshInstance3D {
         return keyPrefix() + "|" + i;
     }
 
+    // ── What a lamp light needs (StreetLights) ────────────────────────────────
+
+    /** Every batch currently in the tree. The list is the live one; read it, do not keep it. */
+    public static List<BreakableProps> live() { return LIVE; }
+
+    /** This batch's kit piece ({@code StreetLight_JP}, …) — which bulb offsets apply. */
+    public String asset() { return assetName; }
+
+    /** Poles in this batch, once {@code _ready} has built its index. */
+    public int poles() { return built ? worldPos.length : 0; }
+
+    /** True while this pole is lying on the ground: its bulb is out. */
+    public boolean poleBroken(int i) { return i >= 0 && i < broken.length && broken[i]; }
+
+    /** This pole's base, in world space. */
+    public Vector3 poleBase(int i) { return worldPos[i]; }
+
+    /** This pole's yaw about +Y (radians), as the MultiMesh instance carries it. */
+    public float poleYaw(int i) { return yaws.get(i); }
+
+    /** The piece's own-axis scale, which a bulb offset rides too. */
+    public Vector3 poleScale() { return instanceScale; }
+
+    /** Cheap reject: could any pole of this batch be within {@code r} of (x, z)? */
+    public boolean nearBounds(double x, double z, double r) {
+        return built && x >= minX - r && x <= maxX + r && z >= minZ - r && z <= maxZ + r;
+    }
+
     // ── Probe readouts (question-named, so godot-jvm does not merge them into properties) ─────
 
     /** Poles in this batch. */

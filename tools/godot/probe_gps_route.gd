@@ -212,6 +212,54 @@ func _initialize() -> void:
 	_check("within 40 m the arrow points straight at the waypoint",
 		Vector2(target.x - wp.x, target.z - wp.z).length() < 0.5, "")
 
+	# ── 6b. the minimap turns with the heading, and the route is drawn ON THE ROAD ───────────
+	# (user, 2026-09-19: "character at center look forward, and map rotate to face that direction", and
+	# "lane trace on actual road lane itself".) Heading-up is asserted by MEASURING where a world point
+	# lands on the radar, not by reading the angle back: the picture, the blips and the route all go
+	# through RoadOverlay.project, so a point dead ahead must land straight up whichever way we face.
+	_place(start)
+	for i in 30:
+		await physics_frame
+	var cam: Camera3D = root.get_viewport().get_camera_3d()
+	var mini_ok := true
+	var mini_detail := ""
+	for heading_deg in [0.0, 90.0, -135.0]:
+		var yaw := deg_to_rad(heading_deg)
+		cam.global_position = start + Vector3(0, 8, 0)
+		cam.look_at(start + Vector3(sin(yaw), -0.6, -cos(yaw)) * 20.0, Vector3.UP)
+		await process_frame
+		var ahead_w := start + Vector3(sin(yaw), 0, -cos(yaw)) * 20.0
+		var px_ahead: Vector2 = minimap.call("minimap_screen_now", ahead_w)
+		var c: Vector2 = minimap.size * 0.5
+		var d: Vector2 = px_ahead - c
+		if d.length() < 4.0 or absf(d.x) > 6.0 or d.y > -6.0:
+			mini_ok = false
+			mini_detail += " heading %+.0f -> (%.1f, %.1f);" % [heading_deg, d.x, d.y]
+	_check("a point 20 m dead ahead lands straight UP on the minimap, whichever way we face",
+		mini_ok, mini_detail)
+	minimap.set("rotate_with_heading", false)
+	await process_frame
+	var north_w := start + Vector3(0, 0, -20)
+	var north_c: Vector2 = minimap.size * 0.5
+	var north_px: Vector2 = minimap.call("minimap_screen_now", north_w) - north_c
+	_check("... and north-up puts NORTH up instead", absf(north_px.x) < 4.0 and north_px.y < -6.0,
+		"(%.1f, %.1f)" % [north_px.x, north_px.y])
+	minimap.set("rotate_with_heading", true)
+
+	var ribbon := root.get_node_or_null("RouteRibbon")
+	_check("the RouteRibbon AutoLoad is present", ribbon != null, "")
+	if ribbon != null:
+		for i in 30:
+			await process_frame
+		var segs: int = ribbon.call("band_segments_now")
+		_check("the route is drawn on the road as a band", bool(ribbon.call("band_shown_now")) and segs > 5,
+			"%d quad(s)" % segs)
+		ribbon.set("enabled", false)
+		for i in 20:
+			await process_frame
+		_check("... and it is the control knob's to remove", not bool(ribbon.call("band_shown_now")), "")
+		ribbon.set("enabled", true)
+
 	# ── 7. a right-click clears it ───────────────────────────────────────────────────────────
 	_action("map")
 	await process_frame

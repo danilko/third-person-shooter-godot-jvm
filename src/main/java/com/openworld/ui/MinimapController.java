@@ -28,7 +28,8 @@ import java.util.Map;
 
 /**
  * Always-on corner minimap (PLAN.md I5) — a procedural radar, not a rendered camera view. Each frame it
- * draws, north-up and centred on the local player: nearby Characters/Vehicles from {@link SpatialEntityGrid}
+ * draws, centred on the local player and — since 2026-09-20, {@link #rotateWithHeading} — turned so the way
+ * the player is FACING is up (GTA's radar; north-up is one export away): nearby Characters/Vehicles from {@link SpatialEntityGrid}
  * (D1) as faction-coloured blips ({@link NameplateTarget#getNameplateColor()}), the local player as a
  * heading triangle (facing = the viewport camera's forward, correct on foot and in a vehicle), zone/region
  * outlines from {@link ZoneManager}, and GPS waypoints from {@link WaypointStore} (local + teammates,
@@ -58,6 +59,13 @@ public class MinimapController extends Control {
     @Export public float routeWidthPx = 3f;
     /** Draw each zone's load ring (a streaming debug aid; GTA's radar has none). */
     @Export public boolean showZoneRings = false;
+    /**
+     * Turn the map so the player's heading is up, with the arrow fixed pointing up (GTA, and every driving
+     * game since): following a route then means "the line goes left, so turn left", instead of reading a
+     * compass first. Off = north-up, which is what this drew before and what the FULL map still does — a
+     * paper map you are reading is a different job from a radar you are steering by.
+     */
+    @Export public boolean rotateWithHeading = true;
 
     private Character player;
     private boolean mapDrawn = false;
@@ -109,15 +117,16 @@ public class MinimapController extends Control {
 
         if (player == null || !godot.global.GD.isInstanceValid(player)) return;
         Vector3 origin = player.getGlobalPosition();
+        float rot = mapRotation();
 
         // Roads (4.7b) — the baked picture of the whole map, one textured disc — and the local
         // player's GPS route over them.
-        mapDrawn = RoadOverlay.drawMap(this, origin, center, scale, 0f, 0f, radiusPx, roadColor);
+        mapDrawn = RoadOverlay.drawMap(this, origin, center, scale, 0f, 0f, radiusPx, roadColor, rot);
         if (player instanceof Player pl && pl.characterInfo != null && pl.getWaypoint() != null) {
             com.openworld.world.RoadGraph.Route route = com.openworld.world.RoadMap.routeFor(
                     pl.characterInfo.characterId, origin, pl.getWaypoint());
             RoadOverlay.drawRoute(this, route, pl.getWaypoint(), origin, center, scale, radiusPx,
-                    routeWidthPx, pl.getNameplateColor());
+                    routeWidthPx, pl.getNameplateColor(), rot);
         }
 
         // Region outlines (zone load rings) within view.
@@ -125,7 +134,7 @@ public class MinimapController extends Control {
         if (wzm != null) {
             for (ZoneMarker m : wzm.getMarkers()) {
                 if (m == null || !godot.global.GD.isInstanceValid(m) || m.zone == null) continue;
-                Vector2 c = worldToScreen(m.getGlobalPosition(), origin, center, scale);
+                Vector2 c = worldToScreen(m.getGlobalPosition(), origin, center, scale, rot);
                 float rr = m.zone.loadRadius * scale;
                 if (distance(c, center) - rr <= radiusPx) drawCircle(c, rr, regionColor, false, 1f, true);
             }
@@ -138,7 +147,7 @@ public class MinimapController extends Control {
             grid.queryRadius(origin, rangeMeters, near);
             for (Node n : near) {
                 if (n == player || !(n instanceof Node3D n3) || !(n instanceof NameplateTarget nt)) continue;
-                Vector2 c = worldToScreen(n3.getGlobalPosition(), origin, center, scale);
+                Vector2 c = worldToScreen(n3.getGlobalPosition(), origin, center, scale, rot);
                 if (distance(c, center) > radiusPx) continue;
                 drawCircle(c, blipRadius, nt.getNameplateColor(), true, -1f, true);
             }
@@ -147,21 +156,50 @@ public class MinimapController extends Control {
         // GPS waypoints (local + teammates), clamped to the rim so off-range targets still show direction.
         for (Map.Entry<String, Vector3> e : WaypointStore.entries().entrySet()) {
             Color col = waypointColor(e.getKey());
-            Vector2 c = clampToDisc(worldToScreen(e.getValue(), origin, center, scale), center, radiusPx - 2f);
+            Vector2 c = clampToDisc(worldToScreen(e.getValue(), origin, center, scale, rot), center, radiusPx - 2f);
             drawWaypoint(c, col);
         }
 
-        // Local player heading triangle (camera forward projected to XZ).
-        drawHeading(center, headingScreenDir());
+        // The player's arrow. Heading-up it is FIXED pointing up, which is the whole point: the map turns
+        // under a still arrow, so "up" always means "where I am going".
+        drawHeading(center, rotateWithHeading ? new Vector2(0f, -1f) : headingScreenDir());
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    /** North-up world→screen: +X world = right, +Z world = down (so −Z/north points up). */
-    private Vector2 worldToScreen(Vector3 world, Vector3 origin, Vector2 center, float scale) {
-        float dx = (float) (world.getX() - origin.getX()) * scale;
-        float dz = (float) (world.getZ() - origin.getZ()) * scale;
-        return new Vector2((float) center.getX() + dx, (float) center.getY() + dz);
+    /**
+     * World→screen: +X world = right, +Z world = down (so −Z/north is up) — then turned by {@code rot}.
+     * It delegates to {@link RoadOverlay#project}, so the blips, the route and the baked road picture cannot
+     * come to disagree about which way the map is facing.
+     */
+    private Vector2 worldToScreen(Vector3 world, Vector3 origin, Vector2 center, float scale, float rot) {
+        return RoadOverlay.project(world.getX(), world.getZ(), origin.getX(), origin.getZ(),
+                center.getX(), center.getY(), scale, rot);
+    }
+
+    /**
+     * The angle the map is turned by: whatever puts the player's heading at screen-up, or 0 north-up.
+     * The heading is the CAMERA's forward, which is right on foot and in a seat alike (it is what the arrow
+     * already used), and it is what the player is steering by.
+     */
+    private float mapRotation() {
+        if (!rotateWithHeading) return 0f;
+        Vector2 h = headingScreenDir();
+        return (float) (-Math.PI / 2.0 - Math.atan2(h.getY(), h.getX()));
+    }
+
+    /** The angle the minimap is drawn at, in radians (probe readout; 0 = north-up). */
+    @Register
+    public double mapRotationNow() { return mapRotation(); }
+
+    /** Where a world point lands on the minimap right now, in its own pixels (probe readout). */
+    @Register
+    public Vector2 minimapScreenNow(Vector3 world) {
+        if (player == null || !godot.global.GD.isInstanceValid(player)) return Vector2.Companion.getZERO();
+        Vector2 size = getSize();
+        Vector2 center = new Vector2((float) size.getX() * 0.5f, (float) size.getY() * 0.5f);
+        float radiusPx = (float) Math.min(center.getX(), center.getY());
+        return worldToScreen(world, player.getGlobalPosition(), center, radiusPx / rangeMeters, mapRotation());
     }
 
     /** Camera-forward XZ as a screen-space unit vector (matches the north-up mapping); (0,-1) if unknown. */

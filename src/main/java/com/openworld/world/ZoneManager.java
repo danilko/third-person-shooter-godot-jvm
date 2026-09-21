@@ -18,6 +18,7 @@ import godot.core.Color;
 import godot.core.Error;
 import godot.core.NodePath;
 import godot.core.StringName;
+import godot.core.PackedVector3Array;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -77,6 +78,13 @@ public class ZoneManager extends Node {
 
 	/** Seconds between load/unload evaluations. */
 	@Export public float evalInterval = 0.5f;
+	/**
+	 * The ambient crowd's FAR tier (PLAN.md 3.6d). On: a {@code behavior = "sidewalk"} SpawnConfig fills a
+	 * {@link PedCrowd} with script-free bodies and only the ones a player comes near become AICharacters. Off:
+	 * every one of them is spawned as a full body, which is what this did before and what the gate measures
+	 * against.
+	 */
+	@Export public boolean lightCrowd = true;
 
 	/**
 	 * Max new zone stream-in pipelines <b>started</b> in a single eval tick. Starting a pipeline is
@@ -174,6 +182,9 @@ public class ZoneManager extends Node {
 		/** One "no lane matches this route yet" log per zone, not one per 0.5 s top-up tick. */
 		boolean laneMissLogged;
 		Node geometryInstance;                                // cosmetic, freed on unload
+		/** The zone's FAR pedestrians (PLAN.md 3.6d): script-free bodies one PedCrowd node walks. Local to
+		 *  this peer and never replicated, so unlike every other list here it exists on a client too. */
+		PedCrowd crowd;
 	}
 
 	// ── Incremental streaming pipeline (the anti-freeze rework) ────────────────
@@ -450,6 +461,7 @@ public class ZoneManager extends Node {
 
 		updateActiveRegion();
 		maintainTraffic();
+		maintainPedestrians();
 	}
 
 	/**
@@ -1080,6 +1092,9 @@ public class ZoneManager extends Node {
 	 */
 	private void buildSpawnWork(StreamTask t) {
 		NetworkManager net = networkManager();
+		// The FAR crowd is built on EVERY peer (it is local and unreplicated, PLAN.md 3.6d), so it comes
+		// before the "a client spawns no AI" return that guards everything else below.
+		if (lightCrowd) buildPedCrowd(t);
 		if (net != null && net.isNetworked() && !net.isServer()) return;
 		Zone zone = t.marker.zone;
 		Node container = charactersContainer();
@@ -1095,6 +1110,7 @@ public class ZoneManager extends Node {
 
 		for (SpawnConfig cfg : zone.spawnConfigs) {
 			if (cfg == null) continue;
+			if (lightCrowd && SpawnConfig.BEHAVIOR_SIDEWALK.equals(cfg.behavior)) continue;
 			// One squad per SpawnConfig group so the band shares awareness (PLAN.md E3). The squad
 			// node is created by the first work item of the group; members read it via the holder.
 			final AISquad[] squadRef = new AISquad[1];
@@ -1127,6 +1143,8 @@ public class ZoneManager extends Node {
 	}
 
 	/** One ambient SpawnConfig AI (extracted from the old synchronous load loop, one work item). */
+	private final java.util.Random sidewalkRng = new java.util.Random(0x51de);
+
 	private void spawnAmbient(LoadedZone lz, SpawnConfig cfg, AISquad squad, int index,
 							  Vector3 center, Zone zone, Node container) {
 		if (!GD.isInstanceValid(container)) return;
@@ -1143,15 +1161,137 @@ public class ZoneManager extends Node {
 		if (cfg.behaviorConfig != null) ai.behaviorConfig = cfg.behaviorConfig;
 
 		container.addChild(ai);
-		ai.activateForSpawn(randomPointInBox(center, zone.size));
+		Sidewalks.Spot walk = SpawnConfig.BEHAVIOR_SIDEWALK.equals(cfg.behavior)
+				? Sidewalks.randomNear(center, Math.max(zone.size.getX(), zone.size.getZ()) / 2.0, sidewalkRng) : null;
+		if (walk != null) {
+			// an ambient pedestrian: on a footway, with the walker brain (the AIController the scene carries is freed)
+			ai.activateForSpawn(walk.point().plus(new Vector3(0, 0.1, 0)));
+			com.openworld.ai.SidewalkWalkerController ctrl = new com.openworld.ai.SidewalkWalkerController();
+			ctrl.setup(walk.walk().packed(), walk.along(), sidewalkRng.nextBoolean() ? 1 : -1);
+			ai.attachController(ctrl);
+		} else {
+			ai.activateForSpawn(randomPointInBox(center, zone.size));
+		}
 		if (squad != null && GD.isInstanceValid(squad)) ai.setSquad(squad);
 		// A recycled body keeps its weapon, so skip the equip — unless it somehow came back
 		// unarmed (defensive: never leave a streamed AI with only fists).
-		if (!recycled || !isArmed(ai)) equipWeapon(ai, cfg.weaponScenePath, container);
+		if ((!recycled || !isArmed(ai)) && cfg.weaponScenePath != null && !cfg.weaponScenePath.isEmpty()) {
+			equipWeapon(ai, cfg.weaponScenePath, container);
+		}
 
 		lz.pooled.add(ai);
 		NetworkManager net = networkManager();
 		if (net != null) net.announceSpawn(ai);
+	}
+
+	// ── The ambient crowd's FAR tier (PLAN.md 3.6d) ────────────────────────────
+	//
+	// A `behavior = "sidewalk"` SpawnConfig does NOT spawn its count as bodies any more. It fills a
+	// PedCrowd with script-free peds, and the crowd hands one back here the moment it comes within a
+	// player's reach, where it becomes the ordinary pooled AICharacter this class has always spawned.
+	// So there is still exactly ONE place an interactive body is created, armed and announced.
+
+	/** Fill this zone's PedCrowd from the footways inside its box. Runs on every peer: the crowd is local. */
+	private void buildPedCrowd(StreamTask t) {
+		Zone zone = t.marker.zone;
+		if (zone == null) return;
+		int want = 0;
+		for (SpawnConfig cfg : zone.spawnConfigs) {
+			if (cfg != null && SpawnConfig.BEHAVIOR_SIDEWALK.equals(cfg.behavior)) want += cfg.count;
+		}
+		if (want <= 0) return;
+		Node container = charactersContainer();
+		if (container == null) return;
+		Vector3 center = t.marker.getGlobalPosition();
+		double radius = Math.max(zone.size.getX(), zone.size.getZ()) / 2.0;
+		// Warm the AI scene BEFORE any promotion. The first promotion otherwise runs a blocking GD.load
+		// inside a physics tick, while the zone's own geometry is still being parsed on a worker thread.
+		pool();
+		PedCrowd crowd = new PedCrowd();
+		container.addChild(crowd);
+		crowd.bind(this, t.marker);
+		t.lz.crowd = crowd;
+		for (int i = 0; i < want; i++) {
+			Sidewalks.Spot walk = Sidewalks.randomNear(center, radius, sidewalkRng);
+			if (walk == null) break;             // no footway data here: a zone with no city under it
+			crowd.addPed(walk.walk().packed(), walk.along(), sidewalkRng.nextBoolean() ? 1 : -1);
+		}
+		if (debugLog) {
+			GD.print("ZoneManager: zone '" + zone.zoneId + "' crowd " + crowd.pedCount()
+					+ " light peds (of " + want + " asked)");
+		}
+	}
+
+	/**
+	 * A light ped has walked within reach of a player: give it a real body. Called by {@link PedCrowd} on the
+	 * authoritative peer only. Returns false when this zone cannot take one (unloaded mid-walk, no sidewalk
+	 * SpawnConfig left, the pool exhausted), and the crowd then simply keeps walking it.
+	 */
+	boolean promoteSidewalkPed(Object zoneKey, PackedVector3Array path, double along, int dir) {
+		LoadedZone lz = loaded.get(zoneKey);
+		if (lz == null) return false;
+		ZoneMarker marker = (ZoneMarker) zoneKey;
+		if (!GD.isInstanceValid(marker) || marker.zone == null) return false;
+		SpawnConfig cfg = null;
+		for (SpawnConfig c : marker.zone.spawnConfigs) {
+			if (c != null && SpawnConfig.BEHAVIOR_SIDEWALK.equals(c.behavior)) { cfg = c; break; }
+		}
+		if (cfg == null) return false;
+		Node container = charactersContainer();
+		if (container == null) return false;
+		return spawnSidewalkWalker(lz, cfg, container, path, along, dir) != null;
+	}
+
+	/** The one place a full sidewalk walker is built, shared by a promotion and by nothing else today. */
+	private AICharacter spawnSidewalkWalker(LoadedZone lz, SpawnConfig cfg, Node container,
+											PackedVector3Array path, double along, int dir) {
+		SpawnPool sp = pool();
+		AICharacter ai = sp.acquire();
+		if (ai == null) return null;
+		boolean recycled = sp.wasLastAcquireRecycled();
+		CharacterInfo info = new CharacterInfo();
+		info.characterId = UUID.randomUUID().toString();
+		info.displayName = cfg.faction + " walker";
+		info.faction = cfg.faction;
+		ai.characterInfo = info;
+		if (cfg.behaviorConfig != null) ai.behaviorConfig = cfg.behaviorConfig;
+		container.addChild(ai);
+		com.openworld.ai.SidewalkWalkerController ctrl = new com.openworld.ai.SidewalkWalkerController();
+		ctrl.setup(path, along, dir);
+		ai.activateForSpawn(ctrl.pointAt(along).plus(new Vector3(0, 0.1, 0)));
+		ai.attachController(ctrl);
+		if ((!recycled || !isArmed(ai)) && cfg.weaponScenePath != null && !cfg.weaponScenePath.isEmpty()) {
+			equipWeapon(ai, cfg.weaponScenePath, container);
+		}
+		lz.pooled.add(ai);
+		NetworkManager net = networkManager();
+		if (net != null) net.announceSpawn(ai);
+		return ai;
+	}
+
+	/**
+	 * The other half of the LOD: a full walker that has left every player's reach goes back to being a light
+	 * ped. Without it a player who walks the length of a district promotes the whole crowd and never gives any
+	 * of it back, which is the same cost the light tier exists to avoid.
+	 */
+	private void maintainPedestrians() {
+		NetworkManager net = networkManager();
+		if (net != null && net.isNetworked() && !net.isServer()) return;
+		for (LoadedZone lz : loaded.values()) {
+			PedCrowd crowd = lz.crowd;
+			if (crowd == null || !GD.isInstanceValid(crowd)) continue;
+			for (int i = lz.pooled.size() - 1; i >= 0; i--) {
+				AICharacter ai = lz.pooled.get(i);
+				if (!GD.isInstanceValid(ai) || ai.isDead()) continue;
+				if (!(ai.getController() instanceof com.openworld.ai.SidewalkWalkerController w)) continue;
+				if (nearestPlayerDistXZ(ai.getGlobalPosition()) <= crowd.demoteDistance) continue;
+				crowd.addPed(w.path, w.along, w.dir);
+				lz.pooled.remove(i);
+				if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
+				silenceWeaponAudio(ai);
+				ai.queueFree();
+			}
+		}
 	}
 
 	/** One named story AI (extracted from the old synchronous load loop, one work item). */
@@ -1206,6 +1346,8 @@ public class ZoneManager extends Node {
 			}
 		}
 		if (lz.pooled.isEmpty() && lz.named.isEmpty() && lz.vehicles.isEmpty()) {
+			if (lz.crowd != null && GD.isInstanceValid(lz.crowd)) lz.crowd.queueFree();
+			lz.crowd = null;
 			for (AISquad squad : lz.squads) if (GD.isInstanceValid(squad)) squad.queueFree();
 			lz.squads.clear();
 			lz.driverOf.clear();
@@ -1320,6 +1462,8 @@ public class ZoneManager extends Node {
 	/** Free everything a LoadedZone tracks, in one go (cancel / unregister / exit paths). */
 	private void teardownZone(ZoneMarker marker, LoadedZone lz) {
 		NetworkManager net = networkManager();
+		if (lz.crowd != null && GD.isInstanceValid(lz.crowd)) lz.crowd.queueFree();
+		lz.crowd = null;
 		StreamTask stats = new StreamTask(marker, false, lz, Phase.FREE_BODIES);   // recycle/free counters only
 		for (AICharacter ai : lz.pooled) freeAmbient(stats, ai, net);
 		lz.pooled.clear();

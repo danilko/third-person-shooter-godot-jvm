@@ -38,6 +38,17 @@ final class RoadOverlay {
      */
     static boolean drawMap(CanvasItem ci, Vector3 origin, Vector2 center, float scale,
                            float viewW, float viewH, float clipRadiusPx, Color color) {
+        return drawMap(ci, origin, center, scale, viewW, viewH, clipRadiusPx, color, 0f);
+    }
+
+    /**
+     * As above, with the picture turned by {@code rot} radians about {@code center} — a heading-up minimap.
+     * The polygon's own vertices do not move; its UVs do, because a UV is the INVERSE of the world→screen
+     * mapping and must carry the same rotation backwards, or the picture and the blips drawn over it are of
+     * two different worlds.
+     */
+    static boolean drawMap(CanvasItem ci, Vector3 origin, Vector2 center, float scale,
+                           float viewW, float viewH, float clipRadiusPx, Color color, float rot) {
         Texture2D tex = RoadMap.mapTexture();
         double[] b = RoadMap.mapSquare();
         if (tex == null || b == null || scale <= 0) return false;
@@ -56,9 +67,11 @@ final class RoadOverlay {
         }
         List<Vector2> uvs = new ArrayList<>(pts.size());
         double ox = origin.getX(), oz = origin.getZ();
+        double cs = Math.cos(rot), sn = Math.sin(rot);
         for (Vector2 p : pts) {
-            double wx = ox + (p.getX() - center.getX()) / scale;
-            double wz = oz + (p.getY() - center.getY()) / scale;
+            double sx = (p.getX() - center.getX()) / scale, sy = (p.getY() - center.getY()) / scale;
+            double wx = ox + (sx * cs + sy * sn);            // the inverse rotation
+            double wz = oz + (-sx * sn + sy * cs);
             uvs.add(new Vector2((float) ((wx - b[0]) / b[2]), (float) ((wz - b[1]) / b[2])));
         }
         PackedColorArray colors = new PackedColorArray();
@@ -70,20 +83,32 @@ final class RoadOverlay {
     /** Draw a route, then a thin straight line from where it leaves the road to the waypoint. */
     static void drawRoute(CanvasItem ci, RoadGraph.Route r, Vector3 waypoint, Vector3 origin, Vector2 center,
                           float scale, float clipRadiusPx, float widthPx, Color color) {
+        drawRoute(ci, r, waypoint, origin, center, scale, clipRadiusPx, widthPx, color, 0f);
+    }
+
+    static void drawRoute(CanvasItem ci, RoadGraph.Route r, Vector3 waypoint, Vector3 origin, Vector2 center,
+                          float scale, float clipRadiusPx, float widthPx, Color color, float rot) {
         if (r == null) return;
         double ox = origin.getX(), oz = origin.getZ();
         double cx = center.getX(), cy = center.getY();
         double[] xz = r.drawXZ();
         List<Vector2> pts = new ArrayList<>(xz.length / 2);
-        for (int i = 0; i < xz.length; i += 2)
-            pts.add(new Vector2((float) (cx + (xz[i] - ox) * scale), (float) (cy + (xz[i + 1] - oz) * scale)));
+        for (int i = 0; i < xz.length; i += 2) pts.add(project(xz[i], xz[i + 1], ox, oz, cx, cy, scale, rot));
         polyline(ci, pts, cx, cy, clipRadiusPx, color, widthPx);
         if (waypoint != null && r.goalPoint != null) {
             List<Vector2> tail = new ArrayList<>(2);
-            tail.add(new Vector2((float) (cx + (r.goalPoint[0] - ox) * scale), (float) (cy + (r.goalPoint[2] - oz) * scale)));
-            tail.add(new Vector2((float) (cx + (waypoint.getX() - ox) * scale), (float) (cy + (waypoint.getZ() - oz) * scale)));
+            tail.add(project(r.goalPoint[0], r.goalPoint[2], ox, oz, cx, cy, scale, rot));
+            tail.add(project(waypoint.getX(), waypoint.getZ(), ox, oz, cx, cy, scale, rot));
             polyline(ci, tail, cx, cy, clipRadiusPx, color, Math.max(1f, widthPx * 0.4f));
         }
+    }
+
+    /** The ONE world→screen mapping of this overlay: a world XZ delta, scaled, turned by {@code rot}. */
+    static Vector2 project(double wx, double wz, double ox, double oz, double cx, double cy,
+                           double scale, double rot) {
+        double dx = (wx - ox) * scale, dz = (wz - oz) * scale;
+        double cs = Math.cos(rot), sn = Math.sin(rot);
+        return new Vector2((float) (cx + dx * cs - dz * sn), (float) (cy + dx * sn + dz * cs));
     }
 
     /** Draw {@code pts}, clipped to the circle when {@code r > 0}. True when anything was drawn. */

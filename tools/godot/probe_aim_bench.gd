@@ -27,8 +27,24 @@ func _initialize() -> void:
 	root.add_child(host)
 	await _tick(120)                               # visuals, stances, the mannequin's equip
 
-	_key(KEY_P, "P  player invulnerable")
+	# The fit sweep first, while nothing has been shot or moved: it arms the mannequin with every
+	# bench weapon in turn and logs how far each one misses on THIS body. That is the readout the
+	# workbench exists to show, so it is also the first thing this run proves still works.
+	_key(KEY_4, "4  combat on (the aim and IK layers only run in combat)")
+	# Aim at the PLAYER, which the mannequin faces: the aim ball sits behind it at spawn, and a
+	# reading taken with the gun clamped at the stance's yaw limit is a reading of the clamp.
 	_key(KEY_T, "T  target the player")
+	await _tick(180)                               # let the body turn onto the ball before measuring
+	_key(KEY_M, "M  fit sweep: every weapon's miss on this body")
+	await _tick(1800)
+	# and the same sweep on the next body, because a fit is a fact about a BODY: the point of the
+	# readout is that these two columns of numbers differ.
+	_key(KEY_V, "V  next mannequin body")
+	await _tick(240)
+	_key(KEY_M, "M  fit sweep on that body")
+	await _tick(1800)
+
+	_key(KEY_P, "P  player invulnerable")
 	await _tick(90)                                # the AI camera tracks at 90 deg/s
 	_key(KEY_Y, "Y  one AI shot at the player")
 	await _tick(40)

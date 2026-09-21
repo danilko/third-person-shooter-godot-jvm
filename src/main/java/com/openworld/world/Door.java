@@ -74,7 +74,13 @@ public class Door extends Breakable {
     /** {@link #tryUnlock(String)} releases the lock when {@code key} matches (blank = no key required). */
     @Export public String unlockKeyId = "";
 
-    /** If set, the door auto-unlocks when this mission id completes (blank = any mission completion). */
+    /**
+     * If set, the door auto-unlocks when THAT mission id completes; {@code "*"} means any mission completes.
+     * BLANK MEANS NEVER (changed 2026-09-19): blank used to mean "any mission", which was harmless while a door was
+     * hand-placed and is not now that every building in the city ships with locked doors -- the first mission
+     * completed would have unlocked every door in the world, and a mission that re-locks its own shop at the end
+     * (KonbiniMission) had its re-lock undone by its own completion event.
+     */
     @Export public String unlockMissionId = "";
 
     /** A door ignores damage unless this is set; then it can be forced open (gated by {@code breakMinDamage}). */
@@ -180,7 +186,8 @@ public class Door extends Breakable {
     @Register
     public void onMissionCompleted(String missionId, String winningFaction, String outcomeVariant) {
         if (!locked) return;
-        if (unlockMissionId == null || unlockMissionId.isEmpty() || unlockMissionId.equals(missionId)) setLocked(false);
+        if (unlockMissionId == null || unlockMissionId.isEmpty()) return;   // blank = never
+        if ("*".equals(unlockMissionId) || unlockMissionId.equals(missionId)) setLocked(false);
     }
 
     // ── Manual control (story beats, scripts, or the E key in MANUAL mode) ───────

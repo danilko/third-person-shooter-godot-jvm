@@ -8,8 +8,10 @@ extends SceneTree
 ##   materials every surface has a material, and it is the kit's shared `.tres`, not an import-embedded copy;
 ##   roof      a ray from above lands on the roof slab at the wall top;
 ##   floor     a ray down inside the ground storey lands on the ground slab;
-##   door      the character's own upright capsule (r 0.35, h 1.75, Character.tscn) fits in every doorway,
-##             and a ray walks in through it;
+##   door      every shipped building is SHUT (user, 2026-09-19): the capsule and a ray are blocked at each doorway.
+##             Its `<Id>_Open` variant (what a mission places) has a `world.Door` per doorway, LOCKED -- also blocked
+##             -- and once unlocked and opened the capsule fits through; its `<Id>_Shop` variant (a shop, or the
+##             player's home base) is the same but UNLOCKED with automatic doors;
 ##   wall      the SAME capsule and ray at a solid module of that side are blocked (the paired control: a
 ##             collider that never blocked anything passes every door check).
 ## A kit example (trimesh, no doors) is asked size, materials and roof only.
@@ -62,7 +64,7 @@ func _run() -> void:
 		x += 120.0
 		for i in 3:
 			await physics_frame
-		_probe(id, inst, meta)
+		await _probe(id, inst, meta)
 		inst.queue_free()
 		await physics_frame
 	_check(probed >= 10, "%d building scenes probed" % probed)
@@ -115,8 +117,22 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 		var at := c - out * 0.09
 		var blocked := _capsule_hits(space, at)
 		var r := _ray(space, c + out * 2.0 + Vector3(0, 1.0, 0), c - out * 1.5 + Vector3(0, 1.0, 0))
-		_check(not blocked and r.is_empty(), "%s door %s/%d: capsule fits (%s), ray walks in (%s), opening %.2f x %.2f m" % [
-			id, d["side"], d["module"], not blocked, r.is_empty(), d["width"], d["height"]])
+		if meta.get("doors_shop", false):
+			# a SHOP (or the player's home base): the door is shut but UNLOCKED and automatic -- anyone may walk in
+			_check(blocked, "%s door %s/%d is a shop door: shut (%s) but unlocked" % [id, d["side"], d["module"], blocked])
+		elif meta.get("doors_locked", false):
+			# the `_Open` variant: a real `world.Door`, LOCKED, so it still blocks until a mission unlocks it
+			_check(blocked and not r.is_empty(), "%s door %s/%d is LOCKED shut: blocks the capsule (%s), ray (%s)" % [
+				id, d["side"], d["module"], blocked, not r.is_empty()])
+		elif meta.get("doors_closed", false):
+			# every shipped building is shut (user, 2026-09-19): the leaf and its collider stop the character
+			_check(blocked and not r.is_empty(), "%s door %s/%d is SHUT: blocks the capsule (%s) and the ray (%s)" % [
+				id, d["side"], d["module"], blocked, not r.is_empty()])
+		else:
+			_check(not blocked and r.is_empty(), "%s door %s/%d: capsule fits (%s), ray walks in (%s), opening %.2f x %.2f m" % [
+				id, d["side"], d["module"], not blocked, r.is_empty(), d["width"], d["height"]])
+	if meta.get("doors_locked", false) or meta.get("doors_shop", false):
+		await _probe_unlock(id, inst, meta)
 	for sp in meta["solid_probes"]:
 		var c := o + Vector3(sp["center"][0], 0, sp["center"][2])
 		var out := Vector3(sp["outward"][0], 0, sp["outward"][2])
@@ -125,6 +141,94 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 		var at_wall := not r.is_empty() and absf((r.position - c).dot(out)) < 0.05
 		_check(blocked and at_wall, "%s wall %s/%d blocks the capsule (%s) and the ray at the facade (%s)" % [
 			id, sp["side"], sp["module"], blocked, at_wall])
+
+
+func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
+	## An `_Open` variant is what a MISSION places: unlocking and opening its doors must let the character in.
+	var doors := inst.get_node_or_null("Doors")
+	var n := 0 if doors == null else doors.get_child_count()
+	_check(n >= (meta["doors"] as Array).size(), "%s has a Door node per doorway (%d for %d doors)" % [
+		id, n, (meta["doors"] as Array).size()])
+	if doors == null:
+		return
+	var shop: bool = meta.get("doors_shop", false)
+	var want_locked: bool = not shop
+	for d in doors.get_children():
+		_check(bool(d.get("locked")) == want_locked, "%s %s starts %s" % [id, d.name,
+			"LOCKED" if want_locked else "unlocked (a shop)"])
+		_check(bool(d.get("auto_open")) == shop, "%s %s is %s" % [id, d.name,
+			"AUTOMATIC (a shop door)" if shop else "manual (press interact)"])
+		# WHO may open it is the flags above (and `world.Door`'s own sensor rule: only a Character opens a shop
+		# door). What the BUILDER owns is that the leaf clears the doorway when it does, so the door is driven
+		# directly here: auto off, unlock, open.
+		d.set("auto_open", false)
+		d.call("set_locked", false)
+		d.call("open_door")
+	# A shop, office, terminal or konbini has a SLIDING automatic entrance (自動ドア), a house a hinged 玄関ドア
+	# (user, 2026-09-19). It is the TYPE's fact, carried by the layout, so it is asserted per building here --
+	# and by MOVEMENT, not by the flag: a leaf that reads "SLIDE" and swings is the failure worth catching.
+	var slide_want: bool = str(meta.get("door_style", "swing")) == "slide"
+	var before := {}
+	for d in doors.get_children():
+		_check((str(d.get("open_mode")) == "SLIDE") == slide_want, "%s %s is a %s door" % [
+			id, d.name, "sliding" if slide_want else "hinged"])
+		before[d.name] = [d.position, d.rotation.y]
+	for i in 90:
+		await physics_frame
+	var slid_dirs := []
+	for d in doors.get_children():
+		var moved: float = (d.position - (before[d.name][0] as Vector3)).length()
+		var turned: float = absf(d.rotation.y - float(before[d.name][1]))
+		if slide_want:
+			_check(moved > 0.3 and turned < 0.05, "%s %s slid %.2f m and turned %.1f deg" % [
+				id, d.name, moved, rad_to_deg(turned)])
+			slid_dirs.append((d.position - (before[d.name][0] as Vector3)).normalized())
+		else:
+			_check(turned > 0.5 and moved < 0.05, "%s %s swung %.0f deg and slid %.2f m" % [
+				id, d.name, rad_to_deg(turned), moved])
+	# A Japanese automatic entrance is TWO leaves parting to OPPOSITE sides, in full glass (user, 2026-09-20).
+	# Counted per doorway, because one wide entrance and two separate single doors both give two Door nodes.
+	if slide_want and not (meta["doors"] as Array).is_empty():
+		# counted GEOMETRICALLY, per doorway: a building can carry Door nodes that belong to no meta door (a roof
+		# stair house's frame is shut too), so dividing by the doorway count is not the same question.
+		var per_door := 0
+		for d in meta["doors"]:
+			# measured on the CLOSED positions (`before`): by now the doors are open, and an open leaf has slid
+			# a leaf's width clear of its own doorway, which is the point of it
+			var dc := Vector2(d["center"][0], d["center"][2])
+			var n2 := 0
+			for leaf in doors.get_children():
+				var cp: Vector3 = before[leaf.name][0]
+				if Vector2(cp.x, cp.z).distance_to(dc) <= float(d["width"]) / 2.0 + 0.05:
+					n2 += 1
+			per_door = maxi(per_door, n2)
+			_check(n2 == 2, "%s doorway %s/%d has %d leaves" % [id, d["side"], d["module"], n2])
+		if slid_dirs.size() >= 2:
+			_check(slid_dirs[0].dot(slid_dirs[1]) < -0.9, "%s: the two leaves part to opposite sides (dot %.2f)"
+				% [id, slid_dirs[0].dot(slid_dirs[1])])
+		var glassy := 0
+		for d in doors.get_children():
+			var lm: MeshInstance3D = d.get_node_or_null("IntactVisual")
+			if lm != null and lm.mesh != null:
+				for si in (lm.mesh as Mesh).get_surface_count():
+					var lmat := (lm.mesh as Mesh).surface_get_material(si)
+					if lmat != null and str(lmat.resource_path).contains("MI_GlassClear"):
+						glassy += 1
+						break
+		_check(glassy == doors.get_child_count(), "%s: %d of %d leaves are glass" % [
+			id, glassy, doors.get_child_count()])
+
+	var space := inst.get_world_3d().direct_space_state
+	var o := inst.global_position
+	var opened := 0
+	for d in meta["doors"]:
+		var c := o + Vector3(d["center"][0], 0, d["center"][2])
+		var out := Vector3(d["outward"][0], 0, d["outward"][2])
+		if not _capsule_hits(space, c - out * 0.09):
+			opened += 1
+	_check(opened == (meta["doors"] as Array).size(), "%s %s: the capsule fits %d of %d doorways" % [
+		id, "opened" if meta.get("doors_shop", false) else "unlocked and opened", opened,
+		(meta["doors"] as Array).size()])
 
 
 func _ray(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> Dictionary:

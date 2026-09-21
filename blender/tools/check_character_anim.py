@@ -267,6 +267,29 @@ def compose(rig, loco_pose, aim_clip, upper):
 
 
 # ----------------------------------------------------------------- the checks
+SHOULDER_BONES = ("clavicle_l", "clavicle_r")
+## How far a collarbone turns on its own channel in the AIM AND HOLD poses, from the shared table.
+## It is a description of those poses, not a budget every clip must fit: the gate only WARNs on it,
+## and the one place it is a hard limit is the control rig's IK solve, where it is what stops the
+## solver answering "I cannot reach" with a dislocated shoulder.
+SHOULDER_MAX_DEG = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                               "character_anim_naming.json")))["limits"]["shoulder_channel_deg"]
+
+
+def quat_angle_from_rest(rest, pose):
+    """Degrees of `rest^-1 * pose` -- the bone's own rotation, which is what a shoulder articulates.
+
+    NOT the bone's world direction: a clip that rolls or dashes turns every bone in the body, and
+    measured that way a perfectly ordinary sword clip reads 160 deg at the collarbone while its own
+    channel moves 10 (measured -- it is what makes the direction a useless metric here).
+    """
+    rx, ry, rz, rw = rest
+    px, py, pz, pw = pose
+    # conjugate of rest, times pose
+    w = rw * pw + rx * px + ry * py + rz * pz
+    return math.degrees(2.0 * math.acos(min(1.0, abs(w))))
+
+
 def main():
     if not os.path.exists(GLB):
         print(f"check_character_anim: missing {GLB}", file=sys.stderr)
@@ -287,6 +310,37 @@ def main():
 
     def clip(name):  # importer strips -loop
         return name + "-loop" if name + "-loop" in rig.anim else name
+
+    # -- shoulder_overbend --------------------------------------------------
+    # A WARN, deliberately, and the limit is DESCRIPTIVE rather than universal (user, 2026-09-20).
+    # 60 deg is what the aim and hold poses measure -- it is a description of how those are built in
+    # the .blend, not a rule every clip owes: an attack, a throw or a prone reach legitimately swings
+    # the collarbone further, and the big prone rotation is in the SHOULDER JOINT anyway
+    # (`upperarm_l` 134.5 deg on the authored crawl rifle pose, against clavicles of 39.7/34.9).
+    # So this reports and does not fail: it is here to SAY when a clip has gone somewhere unusual,
+    # which is what caught the five ARMS-ONLY retargeted attacks at 73-171 deg (W34/W45), not to
+    # decide what a pose is allowed to be.
+    for name in sorted(rig.anim):
+        worst = {}
+        for b in SHOULDER_BONES:
+            i = rig.bone.get(b)
+            if i is None:
+                continue
+            rest = rig.nodes[i].get("rotation", [0, 0, 0, 1])
+            for p in samples(rig, name, 17):
+                q = p.get(i, {}).get("rotation")
+                if q is None:
+                    continue
+                d = quat_angle_from_rest(rest, q)
+                if d > worst.get(b, 0.0):
+                    worst[b] = d
+        over = {b: d for b, d in worst.items() if d > SHOULDER_MAX_DEG + 0.5}
+        if over:
+            warn("shoulder_overbend",
+                 f"{name!r} turns " + ", ".join(f"{b} {d:.1f} deg" for b, d in sorted(over.items()))
+                 + f" on its own channel, past the {SHOULDER_MAX_DEG:.0f} deg the aim and hold poses "
+                   f"use. Fine if the clip means it; `blender/tools/fix_shoulder_overbend.py` clamps "
+                   f"the shoulder and re-solves the arm so the hand stays put if it does not.")
 
     # -- root_baseline / loop_transition / gun_travel / feet_planted --------
     # The upper-body layer boundary, read off the scene so the gate and the

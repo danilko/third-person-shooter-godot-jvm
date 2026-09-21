@@ -57,8 +57,15 @@ which is why that probe counts pose clusters rather than trusting the table. The
   the way from wrist to middle knuckle, on it and keeps the hand's authored orientation). Put it on the
   handguard / pump centre line **where the character's arm reaches with the stock shouldered**: GodotChan's
   arm (shoulder to wrist) is 0.416 m, which reaches about 0.23–0.25 m ahead of the pistol grip — the rear
-  of a rifle handguard (ASR1 z −0.25, ASR2 −0.23) and the rear edge of a pump (SHG1 −0.30, still 4 cm
-  short). `probe_weapon_fit.gd` asserts it per weapon. (Before 2026-09-14 this was the WRIST position.)
+  of a rifle handguard (ASR2 −0.23) and the rear edge of a pump (SHG1 −0.30, still 4 cm short).
+  `probe_weapon_fit.gd` asserts it per weapon. (Before 2026-09-14 this was the WRIST position.)
+  **Author it for the SHORTEST-armed body that will hold the weapon, not the reference.** Reach is set by
+  shoulder WIDTH as much as by arm length — a narrow-shouldered body's off hand starts further from a gun
+  held on the right — and a shorter hold costs the longer-armed bodies nothing: measured on all three
+  shipped bodies, moving ASR1's from −0.285 to **−0.225** took GodotChan 0.014 → 0.000, Shino 0.078 →
+  0.021 and Fumiriya 0.019 → 0.000 (CLAUDE.md "W41"). Pulling the firing arm back in the CLIP is not the
+  lever: for a stocked weapon the stock mount decides where the whole gun sits, so the clip's right arm is
+  overridden while aiming.
 * A MOUNT marker, if the archetype mounts (`weapon_archetypes.json` `holds`): `StockPoint` at the butt-pad centre for
   a shouldered long gun, `ShoulderRestPoint` on the underside of a launcher tube where it rests on the shoulder.
   `StockMountIKModifier` puts the first one the weapon declares on its body anchor while aiming; a pistol declares

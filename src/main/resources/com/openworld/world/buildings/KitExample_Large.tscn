@@ -3,11 +3,15 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/KitExample_Large_mesh.res" id="1_1p7d0"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/KitExample_Large_collision.res" id="2_et4k4"]
 
-[node name="KitExample_Large" type="Node3D" unique_id=1606878272]
+[node name="KitExample_Large" type="Node3D" unique_id=1083292783]
 metadata/building = {
 "aabb": [Vector3(-9.393069, 0, -7.5732913), Vector3(18.78614, 25.480034, 15.146583)],
 "collision": "trimesh",
+"door_style": "swing",
 "doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
 "example": true,
 "footprint_m": [18.7862, 15.1466],
 "height_m": 25.48,
@@ -21,11 +25,14 @@ metadata/building = {
 "wall_top_m": 25.48
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=918264543]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=283355606]
+visibility_range_end = 605.7604
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
 mesh = ExtResource("1_1p7d0")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1848642432]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1989634553]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1553472710]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1743340753]
 shape = ExtResource("2_et4k4")

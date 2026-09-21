@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://b0k50kireg5qy" path="res://src/main/java/com/openworld/character/SupportHandIKModifier.java" id="6_supportik"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/character/StockMountIKModifier.java" id="7_stockmount"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/character/WeaponRecoilModifier.java" id="8_recoil"]
+[ext_resource type="AnimationLibrary" path="res://src/main/resources/com/openworld/character/anim/character_anims.res" id="9_anims"]
 
 [sub_resource type="Resource" id="Resource_meshcfg"]
 script = ExtResource("2_mc")
@@ -24,7 +25,7 @@ stance_raycast_paths = Dictionary[String, NodePath]({
 })
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_ige6o"]
-filters = ["Godot_Chan_Stealth/Skeleton3D:pelvis"]
+filters = ["Skeleton3D:pelvis"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_2iqcg"]
 animation = &"air_jump"
@@ -166,7 +167,7 @@ blend_point_4/name = &"4"
 animation = &"falling"
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_2iqcg"]
-filters = ["Godot_Chan_Stealth/Skeleton3D:pelvis"]
+filters = ["Skeleton3D:pelvis"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jn40o"]
 animation = &"jump"
@@ -175,13 +176,13 @@ animation = &"jump"
 
 [sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_3f5w5"]
 filter_enabled = true
-filters = ["Godot_Chan_Stealth/Skeleton3D:head_2", "Godot_Chan_Stealth/Skeleton3D:neck_01"]
+filters = ["Skeleton3D:head_2", "Skeleton3D:neck_01"]
 
 [sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_ige6o"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_dnye5"]
 filter_enabled = true
-filters = ["Godot_Chan_Stealth/Skeleton3D:clavicle_l", "Godot_Chan_Stealth/Skeleton3D:clavicle_r", "Godot_Chan_Stealth/Skeleton3D:hand_l", "Godot_Chan_Stealth/Skeleton3D:hand_r", "Godot_Chan_Stealth/Skeleton3D:head_2", "Godot_Chan_Stealth/Skeleton3D:index_01_l", "Godot_Chan_Stealth/Skeleton3D:index_01_r", "Godot_Chan_Stealth/Skeleton3D:index_02_l", "Godot_Chan_Stealth/Skeleton3D:index_02_r", "Godot_Chan_Stealth/Skeleton3D:index_03_l", "Godot_Chan_Stealth/Skeleton3D:index_03_r", "Godot_Chan_Stealth/Skeleton3D:lowerarm_l", "Godot_Chan_Stealth/Skeleton3D:lowerarm_r", "Godot_Chan_Stealth/Skeleton3D:middle_01_l", "Godot_Chan_Stealth/Skeleton3D:middle_01_r", "Godot_Chan_Stealth/Skeleton3D:middle_02_l", "Godot_Chan_Stealth/Skeleton3D:middle_02_r", "Godot_Chan_Stealth/Skeleton3D:middle_03_l", "Godot_Chan_Stealth/Skeleton3D:middle_03_r", "Godot_Chan_Stealth/Skeleton3D:neck_01", "Godot_Chan_Stealth/Skeleton3D:pinky_01_l", "Godot_Chan_Stealth/Skeleton3D:pinky_01_r", "Godot_Chan_Stealth/Skeleton3D:pinky_02_l", "Godot_Chan_Stealth/Skeleton3D:pinky_02_r", "Godot_Chan_Stealth/Skeleton3D:pinky_03_l", "Godot_Chan_Stealth/Skeleton3D:pinky_03_r", "Godot_Chan_Stealth/Skeleton3D:ring_01_l", "Godot_Chan_Stealth/Skeleton3D:ring_01_r", "Godot_Chan_Stealth/Skeleton3D:ring_02_l", "Godot_Chan_Stealth/Skeleton3D:ring_02_r", "Godot_Chan_Stealth/Skeleton3D:ring_03_l", "Godot_Chan_Stealth/Skeleton3D:ring_03_r", "Godot_Chan_Stealth/Skeleton3D:spine_03", "Godot_Chan_Stealth/Skeleton3D:thumb_01_l", "Godot_Chan_Stealth/Skeleton3D:thumb_01_r", "Godot_Chan_Stealth/Skeleton3D:thumb_02_l", "Godot_Chan_Stealth/Skeleton3D:thumb_02_r", "Godot_Chan_Stealth/Skeleton3D:thumb_03_l", "Godot_Chan_Stealth/Skeleton3D:thumb_03_r", "Godot_Chan_Stealth/Skeleton3D:upperarm_l", "Godot_Chan_Stealth/Skeleton3D:upperarm_r"]
+filters = ["Skeleton3D:clavicle_l", "Skeleton3D:clavicle_r", "Skeleton3D:hand_l", "Skeleton3D:hand_r", "Skeleton3D:head_2", "Skeleton3D:index_01_l", "Skeleton3D:index_01_r", "Skeleton3D:index_02_l", "Skeleton3D:index_02_r", "Skeleton3D:index_03_l", "Skeleton3D:index_03_r", "Skeleton3D:lowerarm_l", "Skeleton3D:lowerarm_r", "Skeleton3D:middle_01_l", "Skeleton3D:middle_01_r", "Skeleton3D:middle_02_l", "Skeleton3D:middle_02_r", "Skeleton3D:middle_03_l", "Skeleton3D:middle_03_r", "Skeleton3D:neck_01", "Skeleton3D:pinky_01_l", "Skeleton3D:pinky_01_r", "Skeleton3D:pinky_02_l", "Skeleton3D:pinky_02_r", "Skeleton3D:pinky_03_l", "Skeleton3D:pinky_03_r", "Skeleton3D:ring_01_l", "Skeleton3D:ring_01_r", "Skeleton3D:ring_02_l", "Skeleton3D:ring_02_r", "Skeleton3D:ring_03_l", "Skeleton3D:ring_03_r", "Skeleton3D:spine_03", "Skeleton3D:thumb_01_l", "Skeleton3D:thumb_01_r", "Skeleton3D:thumb_02_l", "Skeleton3D:thumb_02_r", "Skeleton3D:thumb_03_l", "Skeleton3D:thumb_03_r", "Skeleton3D:upperarm_l", "Skeleton3D:upperarm_r"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1oyrj"]
 animation = &"reload"
@@ -327,6 +328,72 @@ animation = &"upright_aim_shield_melee"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wa08"]
 animation = &"upright_aim_throwable"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_pistol"]
+animation = &"crawl_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_rifle"]
+animation = &"crawl_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_launcher"]
+animation = &"crawl_aim_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_dual_pistol"]
+animation = &"crawl_aim_dual_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_melee"]
+animation = &"crawl_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_fist"]
+animation = &"crawl_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_shield"]
+animation = &"crawl_aim_shield"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_shield_melee"]
+animation = &"crawl_aim_shield_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_throwable"]
+animation = &"crawl_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_sniper"]
+animation = &"crawl_aim_sniper"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_aimcrawl"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_caim_pistol")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_caim_rifle")
+blend_point_1/pos = 1.0
+blend_point_2/node = SubResource("AnimationNodeAnimation_caim_launcher")
+blend_point_2/pos = 2.0
+blend_point_3/node = SubResource("AnimationNodeAnimation_caim_dual_pistol")
+blend_point_3/pos = 3.0
+blend_point_4/node = SubResource("AnimationNodeAnimation_caim_melee")
+blend_point_4/pos = 4.0
+blend_point_5/node = SubResource("AnimationNodeAnimation_caim_fist")
+blend_point_5/pos = 5.0
+blend_point_6/node = SubResource("AnimationNodeAnimation_caim_shield")
+blend_point_6/pos = 6.0
+blend_point_7/node = SubResource("AnimationNodeAnimation_caim_shield_melee")
+blend_point_7/pos = 7.0
+blend_point_8/node = SubResource("AnimationNodeAnimation_caim_throwable")
+blend_point_8/pos = 8.0
+blend_point_9/node = SubResource("AnimationNodeAnimation_caim_sniper")
+blend_point_9/pos = 9.0
+max_space = 9.0
+snap = 1.0
+value_label = "weapon"
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_aimstance"]
+xfade_time = 0.15
+input_0/name = "Default"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = false
+input_1/name = "Crawl"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = false
+
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_dnye5"]
 min_space = 0.0
 max_space = 9.0
@@ -397,15 +464,15 @@ blend_point_9/name = &"9"
 
 [sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_torso"]
 filter_enabled = true
-filters = ["Godot_Chan_Stealth/Skeleton3D:head_2", "Godot_Chan_Stealth/Skeleton3D:neck_01", "Godot_Chan_Stealth/Skeleton3D:spine_03"]
+filters = ["Skeleton3D:head_2", "Skeleton3D:neck_01", "Skeleton3D:spine_03"]
 
 [sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_3qk6j"]
 filter_enabled = true
-filters = ["Godot_Chan_Stealth/Skeleton3D:clavicle_l", "Godot_Chan_Stealth/Skeleton3D:clavicle_r", "Godot_Chan_Stealth/Skeleton3D:hand_l", "Godot_Chan_Stealth/Skeleton3D:hand_r", "Godot_Chan_Stealth/Skeleton3D:index_01_l", "Godot_Chan_Stealth/Skeleton3D:index_01_r", "Godot_Chan_Stealth/Skeleton3D:index_02_l", "Godot_Chan_Stealth/Skeleton3D:index_02_r", "Godot_Chan_Stealth/Skeleton3D:index_03_l", "Godot_Chan_Stealth/Skeleton3D:index_03_r", "Godot_Chan_Stealth/Skeleton3D:lowerarm_l", "Godot_Chan_Stealth/Skeleton3D:lowerarm_r", "Godot_Chan_Stealth/Skeleton3D:middle_01_l", "Godot_Chan_Stealth/Skeleton3D:middle_01_r", "Godot_Chan_Stealth/Skeleton3D:middle_02_l", "Godot_Chan_Stealth/Skeleton3D:middle_02_r", "Godot_Chan_Stealth/Skeleton3D:middle_03_l", "Godot_Chan_Stealth/Skeleton3D:middle_03_r", "Godot_Chan_Stealth/Skeleton3D:pinky_01_l", "Godot_Chan_Stealth/Skeleton3D:pinky_01_r", "Godot_Chan_Stealth/Skeleton3D:pinky_02_l", "Godot_Chan_Stealth/Skeleton3D:pinky_02_r", "Godot_Chan_Stealth/Skeleton3D:pinky_03_l", "Godot_Chan_Stealth/Skeleton3D:pinky_03_r", "Godot_Chan_Stealth/Skeleton3D:ring_01_l", "Godot_Chan_Stealth/Skeleton3D:ring_01_r", "Godot_Chan_Stealth/Skeleton3D:ring_02_l", "Godot_Chan_Stealth/Skeleton3D:ring_02_r", "Godot_Chan_Stealth/Skeleton3D:ring_03_l", "Godot_Chan_Stealth/Skeleton3D:ring_03_r", "Godot_Chan_Stealth/Skeleton3D:thumb_01_l", "Godot_Chan_Stealth/Skeleton3D:thumb_01_r", "Godot_Chan_Stealth/Skeleton3D:thumb_02_l", "Godot_Chan_Stealth/Skeleton3D:thumb_02_r", "Godot_Chan_Stealth/Skeleton3D:thumb_03_l", "Godot_Chan_Stealth/Skeleton3D:thumb_03_r", "Godot_Chan_Stealth/Skeleton3D:upperarm_l", "Godot_Chan_Stealth/Skeleton3D:upperarm_r"]
+filters = ["Skeleton3D:clavicle_l", "Skeleton3D:clavicle_r", "Skeleton3D:hand_l", "Skeleton3D:hand_r", "Skeleton3D:index_01_l", "Skeleton3D:index_01_r", "Skeleton3D:index_02_l", "Skeleton3D:index_02_r", "Skeleton3D:index_03_l", "Skeleton3D:index_03_r", "Skeleton3D:lowerarm_l", "Skeleton3D:lowerarm_r", "Skeleton3D:middle_01_l", "Skeleton3D:middle_01_r", "Skeleton3D:middle_02_l", "Skeleton3D:middle_02_r", "Skeleton3D:middle_03_l", "Skeleton3D:middle_03_r", "Skeleton3D:pinky_01_l", "Skeleton3D:pinky_01_r", "Skeleton3D:pinky_02_l", "Skeleton3D:pinky_02_r", "Skeleton3D:pinky_03_l", "Skeleton3D:pinky_03_r", "Skeleton3D:ring_01_l", "Skeleton3D:ring_01_r", "Skeleton3D:ring_02_l", "Skeleton3D:ring_02_r", "Skeleton3D:ring_03_l", "Skeleton3D:ring_03_r", "Skeleton3D:thumb_01_l", "Skeleton3D:thumb_01_r", "Skeleton3D:thumb_02_l", "Skeleton3D:thumb_02_r", "Skeleton3D:thumb_03_l", "Skeleton3D:thumb_03_r", "Skeleton3D:upperarm_l", "Skeleton3D:upperarm_r"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_4ftlg"]
 filter_enabled = true
-filters = ["Godot_Chan_Stealth/Skeleton3D:clavicle_l", "Godot_Chan_Stealth/Skeleton3D:clavicle_r", "Godot_Chan_Stealth/Skeleton3D:hand_l", "Godot_Chan_Stealth/Skeleton3D:hand_r", "Godot_Chan_Stealth/Skeleton3D:head_2", "Godot_Chan_Stealth/Skeleton3D:index_01_l", "Godot_Chan_Stealth/Skeleton3D:index_01_r", "Godot_Chan_Stealth/Skeleton3D:index_02_l", "Godot_Chan_Stealth/Skeleton3D:index_02_r", "Godot_Chan_Stealth/Skeleton3D:index_03_l", "Godot_Chan_Stealth/Skeleton3D:index_03_r", "Godot_Chan_Stealth/Skeleton3D:lowerarm_l", "Godot_Chan_Stealth/Skeleton3D:lowerarm_r", "Godot_Chan_Stealth/Skeleton3D:middle_01_l", "Godot_Chan_Stealth/Skeleton3D:middle_01_r", "Godot_Chan_Stealth/Skeleton3D:middle_02_l", "Godot_Chan_Stealth/Skeleton3D:middle_02_r", "Godot_Chan_Stealth/Skeleton3D:middle_03_l", "Godot_Chan_Stealth/Skeleton3D:middle_03_r", "Godot_Chan_Stealth/Skeleton3D:neck_01", "Godot_Chan_Stealth/Skeleton3D:pinky_01_l", "Godot_Chan_Stealth/Skeleton3D:pinky_01_r", "Godot_Chan_Stealth/Skeleton3D:pinky_02_l", "Godot_Chan_Stealth/Skeleton3D:pinky_02_r", "Godot_Chan_Stealth/Skeleton3D:pinky_03_l", "Godot_Chan_Stealth/Skeleton3D:pinky_03_r", "Godot_Chan_Stealth/Skeleton3D:ring_01_l", "Godot_Chan_Stealth/Skeleton3D:ring_01_r", "Godot_Chan_Stealth/Skeleton3D:ring_02_l", "Godot_Chan_Stealth/Skeleton3D:ring_02_r", "Godot_Chan_Stealth/Skeleton3D:ring_03_l", "Godot_Chan_Stealth/Skeleton3D:ring_03_r", "Godot_Chan_Stealth/Skeleton3D:spine_03", "Godot_Chan_Stealth/Skeleton3D:thumb_01_l", "Godot_Chan_Stealth/Skeleton3D:thumb_01_r", "Godot_Chan_Stealth/Skeleton3D:thumb_02_l", "Godot_Chan_Stealth/Skeleton3D:thumb_02_r", "Godot_Chan_Stealth/Skeleton3D:thumb_03_l", "Godot_Chan_Stealth/Skeleton3D:thumb_03_r", "Godot_Chan_Stealth/Skeleton3D:upperarm_l", "Godot_Chan_Stealth/Skeleton3D:upperarm_r"]
+filters = ["Skeleton3D:clavicle_l", "Skeleton3D:clavicle_r", "Skeleton3D:hand_l", "Skeleton3D:hand_r", "Skeleton3D:head_2", "Skeleton3D:index_01_l", "Skeleton3D:index_01_r", "Skeleton3D:index_02_l", "Skeleton3D:index_02_r", "Skeleton3D:index_03_l", "Skeleton3D:index_03_r", "Skeleton3D:lowerarm_l", "Skeleton3D:lowerarm_r", "Skeleton3D:middle_01_l", "Skeleton3D:middle_01_r", "Skeleton3D:middle_02_l", "Skeleton3D:middle_02_r", "Skeleton3D:middle_03_l", "Skeleton3D:middle_03_r", "Skeleton3D:neck_01", "Skeleton3D:pinky_01_l", "Skeleton3D:pinky_01_r", "Skeleton3D:pinky_02_l", "Skeleton3D:pinky_02_r", "Skeleton3D:pinky_03_l", "Skeleton3D:pinky_03_r", "Skeleton3D:ring_01_l", "Skeleton3D:ring_01_r", "Skeleton3D:ring_02_l", "Skeleton3D:ring_02_r", "Skeleton3D:ring_03_l", "Skeleton3D:ring_03_r", "Skeleton3D:spine_03", "Skeleton3D:thumb_01_l", "Skeleton3D:thumb_01_r", "Skeleton3D:thumb_02_l", "Skeleton3D:thumb_02_r", "Skeleton3D:thumb_03_l", "Skeleton3D:thumb_03_r", "Skeleton3D:upperarm_l", "Skeleton3D:upperarm_r"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_3f5w5"]
 animation = &"weapon_switch_pistol"
@@ -591,7 +658,7 @@ input_6/reset = true
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_atk"]
 filter_enabled = true
-filters = ["Godot_Chan_Stealth/Skeleton3D:clavicle_l", "Godot_Chan_Stealth/Skeleton3D:clavicle_r", "Godot_Chan_Stealth/Skeleton3D:hand_l", "Godot_Chan_Stealth/Skeleton3D:hand_r", "Godot_Chan_Stealth/Skeleton3D:head_2", "Godot_Chan_Stealth/Skeleton3D:index_01_l", "Godot_Chan_Stealth/Skeleton3D:index_01_r", "Godot_Chan_Stealth/Skeleton3D:index_02_l", "Godot_Chan_Stealth/Skeleton3D:index_02_r", "Godot_Chan_Stealth/Skeleton3D:index_03_l", "Godot_Chan_Stealth/Skeleton3D:index_03_r", "Godot_Chan_Stealth/Skeleton3D:lowerarm_l", "Godot_Chan_Stealth/Skeleton3D:lowerarm_r", "Godot_Chan_Stealth/Skeleton3D:middle_01_l", "Godot_Chan_Stealth/Skeleton3D:middle_01_r", "Godot_Chan_Stealth/Skeleton3D:middle_02_l", "Godot_Chan_Stealth/Skeleton3D:middle_02_r", "Godot_Chan_Stealth/Skeleton3D:middle_03_l", "Godot_Chan_Stealth/Skeleton3D:middle_03_r", "Godot_Chan_Stealth/Skeleton3D:neck_01", "Godot_Chan_Stealth/Skeleton3D:pinky_01_l", "Godot_Chan_Stealth/Skeleton3D:pinky_01_r", "Godot_Chan_Stealth/Skeleton3D:pinky_02_l", "Godot_Chan_Stealth/Skeleton3D:pinky_02_r", "Godot_Chan_Stealth/Skeleton3D:pinky_03_l", "Godot_Chan_Stealth/Skeleton3D:pinky_03_r", "Godot_Chan_Stealth/Skeleton3D:ring_01_l", "Godot_Chan_Stealth/Skeleton3D:ring_01_r", "Godot_Chan_Stealth/Skeleton3D:ring_02_l", "Godot_Chan_Stealth/Skeleton3D:ring_02_r", "Godot_Chan_Stealth/Skeleton3D:ring_03_l", "Godot_Chan_Stealth/Skeleton3D:ring_03_r", "Godot_Chan_Stealth/Skeleton3D:spine_03", "Godot_Chan_Stealth/Skeleton3D:thumb_01_l", "Godot_Chan_Stealth/Skeleton3D:thumb_01_r", "Godot_Chan_Stealth/Skeleton3D:thumb_02_l", "Godot_Chan_Stealth/Skeleton3D:thumb_02_r", "Godot_Chan_Stealth/Skeleton3D:thumb_03_l", "Godot_Chan_Stealth/Skeleton3D:thumb_03_r", "Godot_Chan_Stealth/Skeleton3D:upperarm_l", "Godot_Chan_Stealth/Skeleton3D:upperarm_r"]
+filters = ["Skeleton3D:clavicle_l", "Skeleton3D:clavicle_r", "Skeleton3D:hand_l", "Skeleton3D:hand_r", "Skeleton3D:head_2", "Skeleton3D:index_01_l", "Skeleton3D:index_01_r", "Skeleton3D:index_02_l", "Skeleton3D:index_02_r", "Skeleton3D:index_03_l", "Skeleton3D:index_03_r", "Skeleton3D:lowerarm_l", "Skeleton3D:lowerarm_r", "Skeleton3D:middle_01_l", "Skeleton3D:middle_01_r", "Skeleton3D:middle_02_l", "Skeleton3D:middle_02_r", "Skeleton3D:middle_03_l", "Skeleton3D:middle_03_r", "Skeleton3D:neck_01", "Skeleton3D:pinky_01_l", "Skeleton3D:pinky_01_r", "Skeleton3D:pinky_02_l", "Skeleton3D:pinky_02_r", "Skeleton3D:pinky_03_l", "Skeleton3D:pinky_03_r", "Skeleton3D:ring_01_l", "Skeleton3D:ring_01_r", "Skeleton3D:ring_02_l", "Skeleton3D:ring_02_r", "Skeleton3D:ring_03_l", "Skeleton3D:ring_03_r", "Skeleton3D:spine_03", "Skeleton3D:thumb_01_l", "Skeleton3D:thumb_01_r", "Skeleton3D:thumb_02_l", "Skeleton3D:thumb_02_r", "Skeleton3D:thumb_03_l", "Skeleton3D:thumb_03_r", "Skeleton3D:upperarm_l", "Skeleton3D:upperarm_r"]
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_psg0"]
 animation = &"sit_idle"
@@ -646,7 +713,7 @@ input_1/reset = true
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_hr"]
 filter_enabled = true
-filters = ["Godot_Chan_Stealth/Skeleton3D:spine_01", "Godot_Chan_Stealth/Skeleton3D:spine_02", "Godot_Chan_Stealth/Skeleton3D:spine_03", "Godot_Chan_Stealth/Skeleton3D:neck_01", "Godot_Chan_Stealth/Skeleton3D:head_2"]
+filters = ["Skeleton3D:spine_01", "Skeleton3D:spine_02", "Skeleton3D:spine_03", "Skeleton3D:neck_01", "Skeleton3D:head_2"]
 fadein_time = 0.05
 fadeout_time = 0.15
 
@@ -686,6 +753,10 @@ nodes/WeaponAimTorso/node = SubResource("AnimationNodeBlendSpace1D_aimtorso")
 nodes/WeaponAimTorso/position = Vector2(1280, 440)
 nodes/WeaponAim/node = SubResource("AnimationNodeBlendSpace1D_dnye5")
 nodes/WeaponAim/position = Vector2(1020, 620)
+nodes/WeaponAimCrawl/node = SubResource("AnimationNodeBlendSpace1D_aimcrawl")
+nodes/WeaponAimCrawl/position = Vector2(1020, 1060)
+nodes/AimStanceTransition/node = SubResource("AnimationNodeTransition_aimstance")
+nodes/AimStanceTransition/position = Vector2(1200, 620)
 nodes/WeaponHold/node = SubResource("AnimationNodeBlendSpace1D_3qk6j")
 nodes/WeaponHold/position = Vector2(1020, 840)
 nodes/CombatTransition/node = SubResource("AnimationNodeTransition_j83q5")
@@ -740,7 +811,7 @@ nodes/hit_chest/node = SubResource("AnimationNodeAnimation_hrc")
 nodes/hit_chest/position = Vector2(2020, 340)
 nodes/hit_head/node = SubResource("AnimationNodeAnimation_hrh")
 nodes/hit_head/position = Vector2(2020, 460)
-node_connections = [&"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"WeaponAimTorso", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"WeaponAim", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
+node_connections = [&"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"WeaponAimTorso", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"AimStanceTransition", &"AimStanceTransition", 0, &"WeaponAim", &"AimStanceTransition", 1, &"WeaponAimCrawl", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gapvf"]
 radius = 0.048
@@ -827,9 +898,11 @@ script = ExtResource("1_cv")
 mesh_config = SubResource("Resource_meshcfg")
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1655806234]
-root_node = NodePath("../MeshRoot/Model")
+root_node = NodePath("../MeshRoot/Model/Godot_Chan_Stealth")
 tree_root = SubResource("AnimationNodeBlendTree_jn40o")
-anim_player = NodePath("../MeshRoot/Model/AnimationPlayer")
+libraries = {
+&"": ExtResource("9_anims")
+}
 parameters/UprightMovementBlend/blend_position = Vector2(1, 0)
 parameters/CrawlMovementBlend/blend_position = Vector2(1, 0)
 parameters/CrouchMovementBlend/blend_position = Vector2(1, 0)

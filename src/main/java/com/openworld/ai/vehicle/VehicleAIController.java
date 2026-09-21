@@ -15,6 +15,8 @@ import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.Node;
 import godot.api.RayCast3D;
+import godot.core.StringName;
+import godot.core.Transform3D;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -100,6 +102,21 @@ public class VehicleAIController extends Controller {
 
     private Vehicle   vehicleBody;
     private RayCast3D obstacleRay;
+    private final RayCast3D[] flankRays = new RayCast3D[4];
+    private double flankHalf = 0.9;
+
+    /** Where the i-th extra ray sits across the car, as a fraction of its half width. */
+    private static double flankOffset(int i) {
+        return new double[]{-1.0, -0.5, 0.5, 1.0}[i];
+    }
+
+    /** Shortest and longest the obstacle rays ever reach (m). */
+    @Export public float obstacleLookMin = 12.0f;
+    @Export public float obstacleLookMax = 55.0f;
+    /** The deceleration the look-ahead assumes (m/s²) — how hard this brain expects to have to stop. */
+    @Export public float obstacleBrakeDecel = 3.0f;
+    /** Seconds of travel added on top, for the tick it takes to react. */
+    private static final double OBSTACLE_REACTION = 0.4;
     private boolean   resolved = false;
 
     private VehicleAIState currentState;
@@ -222,6 +239,7 @@ public class VehicleAIController extends Controller {
             return cmd;
         }
 
+        updateObstacleReach();
         VehicleAIState next = currentState.update(vehicleBody, this, cmd, delta);
         if (next != currentState) transitionTo(next);
 
@@ -363,9 +381,74 @@ public class VehicleAIController extends Controller {
 
     // ── Sensing ─────────────────────────────────────────────────────────────────
 
-    /** True when the forward obstacle ray is hitting something within its look-ahead length. */
+    /**
+     * True when something is in the way ahead: a car, or a person.
+     *
+     * <p><b>The look-ahead is the STOPPING DISTANCE, not a constant</b> (user, 2026-09-19: "the AI driver will
+     * not stop in front of a character to block"). The scene's `ObstacleRay` reaches 7 m, which is 0.3 s at
+     * 22 m/s while stopping takes 40-60 m, so the car did see the person — it just saw them far too late to do
+     * anything, every time, which reads exactly like a car that does not look. It now reaches
+     * {@code v²/(2·brake) + } a reaction margin, clamped to {@link #obstacleLookMax} so a car on an open road
+     * is not braking for a dot on the horizon.
+     *
+     * <p><b>And it is three rays, not one.</b> A single ray down the centreline misses a person standing
+     * anywhere but dead ahead — which is most of them — so the two flanking rays sit at the car's own hull
+     * half-width. They are built here rather than authored, so every carrier gets them and a new vehicle scene
+     * needs no edit. The mask is the scene ray's own (CHARACTER | VEHICLE), so what counts as an obstacle
+     * still has ONE owner.
+     */
     public boolean isPathBlocked() {
-        return obstacleRay != null && obstacleRay.isColliding();
+        if (obstacleRay == null) return false;
+        if (obstacleRay.isColliding()) return true;
+        for (RayCast3D r : flankRays) if (r != null && r.isColliding()) return true;
+        return false;
+    }
+
+    /**
+     * Re-aim the obstacle rays for this frame's speed, ALONG THE LANE. Called from {@link #gatherInput}.
+     *
+     * <p>Aiming straight ahead is what a 7 m ray could afford; a 30 m one cannot. On any bend a straight ray
+     * leaves the carriageway, and since its mask is CHARACTER | VEHICLE the thing it then finds is the
+     * oncoming traffic — a car that brakes for every vehicle on the other side of a curve. So the rays are
+     * pointed at the lane point {@code look} metres ahead, which is the same {@code pointAtLength} the
+     * steering already follows: one owner of "where is my road going".
+     */
+    private void updateObstacleReach() {
+        if (obstacleRay == null) return;
+        double v = currentSpeed();
+        double look = Math.min(obstacleLookMax,
+                Math.max(obstacleLookMin, v * v / (2.0 * Math.max(1.0, obstacleBrakeDecel)) + v * OBSTACLE_REACTION));
+        if (flankRays[0] == null) buildFlankRays();
+        Vector3 ahead = route == null ? null : route.pointAtLength(routeProgress + look);
+        Vector3 local = ahead == null ? new Vector3(0, 0, -look)
+                : obstacleRay.toLocal(ahead).minus(new Vector3(0, obstacleRay.toLocal(ahead).getY(), 0));
+        if (local.length() < obstacleLookMin) local = new Vector3(0, 0, -look);
+        obstacleRay.setTargetPosition(local);
+        for (int i = 0; i < flankRays.length; i++) {
+            if (flankRays[i] == null) continue;
+            // the same chord, kept parallel: each ray sits `offset` out and aims `offset` out
+            flankRays[i].setTargetPosition(local.plus(new Vector3(flankOffset(i) * flankHalf, 0, 0)));
+        }
+    }
+
+    private void buildFlankRays() {
+        if (vehicleBody == null || obstacleRay == null) return;
+        double half = Math.max(0.6, vehicleBody.getConfig().hullHalfWidth - 0.15);
+        flankHalf = half;
+        // FIVE lines across the car's own width, not three: a person is a 0.35 m capsule, so two rays a metre
+        // apart leave a gap wider than they are -- measured, a person standing exactly on the lane centre was
+        // missed by both while one standing 1.0 m off it was seen at 33 m, because the car itself rides a
+        // little off the centreline and the centre ray then passes beside them.
+        for (int i = 0; i < flankRays.length; i++) {
+            RayCast3D r = new RayCast3D();
+            r.setName(new StringName("ObstacleRay" + i));
+            r.setCollisionMask(obstacleRay.getCollisionMask());
+            r.setEnabled(true);
+            r.setTransform(new Transform3D(obstacleRay.getTransform().getBasis(),
+                    obstacleRay.getTransform().getOrigin().plus(new Vector3(flankOffset(i) * half, 0, 0))));
+            vehicleBody.addChild(r);
+            flankRays[i] = r;
+        }
     }
 
     // ── Junction right-of-way (I3b) ──────────────────────────────────────────────

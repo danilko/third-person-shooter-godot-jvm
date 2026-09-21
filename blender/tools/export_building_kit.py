@@ -47,10 +47,9 @@ BOUNDS_TOL = 0.001
 STAGE = tempfile.mkdtemp(prefix="building_kit_")
 KIT = json.load(open(os.path.join(KIT_DIR, "kit.json")))
 s = float(KIT["module_scale"])
-manifest = {"kit": KIT["id"], "module_scale": s,
-            "module_m": round(KIT["source_module_m"] * s, 4),
-            "storey_m": round(KIT["source_storey_m"] * s, 4),
-            "generated_by": "blender/tools/export_building_kit.py", "pieces": {}}
+# The manifest header has ONE owner (normalize_kit), so the two writers of pieces.json cannot disagree about
+# what a kit's header says -- including a props kit that has no module and no storey.
+manifest = nk.manifest_header(KIT, "blender/tools/export_building_kit.py")
 
 pieces = sorted((c for c in bpy.data.collections if c.get("bk_piece_path")), key=lambda c: c.name)
 if not pieces:
@@ -82,13 +81,14 @@ for col in pieces:
     # export_keep_originals writes the texture's path relative to where the FILE is; a --out elsewhere would
     # point at the wrong place, so the uri is always the kit's own textures folder.
     gltf = json.load(open(path))
+    blob = open(os.path.join(os.path.dirname(path), gltf["buffers"][0]["uri"]), "rb").read()
     for img in gltf.get("images", []):
         img["uri"] = "../../textures/" + os.path.basename(img["uri"])
     gltf.setdefault("asset", {})["extras"] = {"exported_by": "blender/tools/export_building_kit.py",
                                               "module_scale": s}
     with open(path, "w") as fh:
         fh.write(json.dumps(gltf, indent=1) + "\n")
-    lo, hi = nk.measure(gltf)
+    lo, hi = nk.measure(gltf, blob)
     manifest["pieces"][name] = nk.manifest_entry(name, cat, gltf, lo, hi)
 
 

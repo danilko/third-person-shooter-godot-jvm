@@ -250,8 +250,21 @@ public class AnimationController extends Node {
     animationTree.set("parameters/WeaponBlend/blend_amount", holster ? 0 : 1);
   }
 
+  /** Transition input names on {@code AimStanceTransition}; the crawl one is the stance's own key. */
+  private static final String AIM_STANCE_DEFAULT = "Default";
+  private static final String AIM_STANCE_CRAWL = "Crawl";
+  /** The grip archetype last equipped, so a stance change can re-assert it on the branch it selects. */
+  private int animationWeaponIndex = 0;
+
   public void onWeaponEquip(int animationWeaponIndex) {
+    this.animationWeaponIndex = animationWeaponIndex;
     animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
+    // The aim branch has a STANCE dimension as well as a grip one (W45): a prone body's arms are
+    // not a standing body's arms, and until this existed there was nowhere for an authored prone
+    // aim pose to go -- `crawl_aim_*` were exported, orphaned and unreachable. Its own copy of the
+    // archetype blendspace, for the same reason WeaponAimTorso has one: a node's output feeds ONE
+    // input.
+    animationTree.set("parameters/WeaponAimCrawl/blend_position", animationWeaponIndex);
     // The torso layer's own copy of the aim branch: a blend-tree node's output can feed ONE input
     // (Godot refuses the second connection and the whole tree stops evaluating -- measured, every
     // stance read the rest pose), so WeaponTorsoBlend cannot share CombatTransition with WeaponBlend.
@@ -352,6 +365,10 @@ public class AnimationController extends Node {
     }
 
     animationTree.set("parameters/StanceTransition/transition_request", key);
+    // Which AIM set this stance uses. Keyed on the stance's own animation key, so a stance that
+    // borrows another's ring (Swim borrows Crawl) borrows its aim too, with no second table.
+    animationTree.set("parameters/AimStanceTransition/transition_request",
+        AIM_STANCE_CRAWL.equals(key) ? AIM_STANCE_CRAWL : AIM_STANCE_DEFAULT);
     this.currentStanceName = key;
     this.currentStance = stance;
 

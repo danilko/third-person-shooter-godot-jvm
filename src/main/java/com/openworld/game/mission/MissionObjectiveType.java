@@ -18,6 +18,13 @@ public final class MissionObjectiveType {
     public static final String DELIVER       = "DELIVER";
     /** Checkpoint race (GTA SA/VC-style street race) — schema only; see PLAN.md "Race missions (groundwork)". */
     public static final String RACE          = "RACE";
+    /**
+     * The mission's own content decides when it is won and with which outcome variant: a beat script
+     * (e.g. {@code KonbiniMission}) calls {@code MissionManager.completeMission}/{@code failMission} itself.
+     * {@code MissionManager} tracks nothing for it -- ELIMINATE_ALL counts every non-player character in the
+     * tree, which in a populated world includes every traffic driver.
+     */
+    public static final String SCRIPTED      = "SCRIPTED";
 
     private MissionObjectiveType() {}
 }

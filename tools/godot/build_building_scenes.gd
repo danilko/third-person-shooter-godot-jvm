@@ -15,6 +15,29 @@ extends SceneTree
 ## Nothing here decides where a piece goes: that is the layout's.
 
 const OUT_DIR := "res://src/main/resources/com/openworld/world/buildings"
+const LOD_NORMAL_MERGE_DEG := 25.0
+const LOD_NORMAL_SPLIT_DEG := 60.0
+const VIS_BASE_M := 300.0        # visibility_range_end = base + per_height x roof height, clamped
+const VIS_PER_HEIGHT := 12.0
+const VIS_MIN_M := 350.0
+const VIS_MAX_M := 900.0
+const VIS_FADE_M := 40.0
+const OCCLUDER_TYPES := ["Mansion", "OfficeMid", "PencilBuilding", "ShopHouse", "Apartment", "Warehouse"]
+# EVERY building is shut by default (user, 2026-09-19): a city of open doorways into hollow shells reads worse than
+# a city you cannot walk into, and an interior is authored content. A building a MISSION needs entered is placed as
+# its `<Id>_Open` variant instead, whose doors are real `world.Door` nodes, LOCKED until the mission unlocks them.
+const OPEN_VARIANT_SUFFIX := "_Open"
+const SHOP_VARIANT_SUFFIX := "_Shop"
+const DOOR_SCRIPT := "res://src/main/java/com/openworld/world/Door.java"
+const DOOR_LEAF := "res://assets/world_source/kits/quaternius_downtown_city/pieces/doors/Door_1.gltf"
+const GLASS_T := 0.06        # a shopfront pane's thickness (its frame reads, not its glass)
+const FRAME_T := 0.04        # the slim aluminium stile/rail of a Japanese automatic door
+# Two leaves that meet exactly at the doorway centre share a face, and a ray straight down that seam can pass
+# between them (measured: probe_buildings' shut-door ray did). A real pair overlaps at the meeting stile, so the
+# COLLIDER of each leaf is this much wider each way -- the pane is not, so nothing changes to look at.
+const LEAF_MEET := 0.02
+const OCCLUDER_INSET := 0.6      # inside the walls, so the box never occludes its own building
+const OCCLUDER_FLOOR := 0.3
 
 var _piece_cache := {}   # path -> Array of [Mesh, surface, Transform3D]
 var _materials := {}     # "<kit>/<name>" -> Material
@@ -40,10 +63,165 @@ func _initialize() -> void:
 	for b in doc["buildings"]:
 		if not only.is_empty() and not only.has(b["id"]):
 			continue
-		if not _build(b):
+		if not _build(b, ""):
 			failed += 1
+		elif not (b.get("doors", []) as Array).is_empty():
+			# ... and the two enterable variants: `_Open` (a mission's, doors LOCKED until it unlocks them) and
+			# `_Shop` (a shop or the player's home base: unlocked, automatic doors, GTA's always-open store)
+			if not _build(b, OPEN_VARIANT_SUFFIX):
+				failed += 1
+			if not _build(b, SHOP_VARIANT_SUFFIX):
+				failed += 1
 	print("BUILD %s" % ("FAIL %d" % failed if failed else "OK"))
 	quit(1 if failed else 0)
+
+
+## Every doorway of a building, as {xf, w, h, frame}: the transform is the door's own frame (origin at the opening's
+## centre at floor level, +X along the wall, -Z... the leaf sits in the wall plane), `frame` true when the kit's own
+## `DoorFrame_Metal_Single` sits there (then the kit leaf fits it exactly) and false for a doorway modelled into a
+## library piece (a terminal's glass front, a station hall), which gets a plain leaf of the declared size.
+func _openings(b: Dictionary) -> Array:
+	var out := []
+	var frames := []
+	for p in b["pieces"]:
+		if p["piece"] == "DoorFrame_Metal_Single":
+			var fpos: Array = p["pos"]
+			frames.append(Transform3D(Basis(Vector3.UP, deg_to_rad(float(p["yaw"]))), Vector3(fpos[0], fpos[1], fpos[2])))
+	var used := {}
+	for d in b["doors"]:
+		var c := Vector3(d["center"][0], d["center"][1], d["center"][2])
+		var best := -1
+		var bd := 0.6
+		for i in frames.size():
+			if used.has(i):
+				continue
+			var dist: float = (frames[i] as Transform3D).origin.distance_to(c)
+			if dist < bd:
+				bd = dist
+				best = i
+		if best >= 0:
+			used[best] = true
+			out.append({"xf": frames[best], "w": 0.91, "h": 2.002, "frame": true})
+		else:
+			var ov := Vector3(d["outward"][0], 0.0, d["outward"][2])
+			var yaw := atan2(ov.x, ov.z) if ov.length() > 0.01 else 0.0
+			var op := {"xf": Transform3D(Basis(Vector3.UP, yaw), c), "w": float(d["width"]), "h": float(d["height"]),
+					"frame": false}
+			if d.has("shopfront"):
+				op["shopfront"] = d["shopfront"]        # {module, storey}: glaze the rest of the module
+			out.append(op)
+	# a frame with no meta door (a roof stair house): shut as well, never left as a hole
+	for i in frames.size():
+		if not used.has(i):
+			out.append({"xf": frames[i], "w": 0.91, "h": 2.002, "frame": true})
+	return out
+
+
+var _leaf_mesh: ArrayMesh = null
+var _lib_mats := {}
+
+## How many leaves this opening has. A sliding entrance is TWO, parting from the middle (user, 2026-09-20:
+## "two door panel, and open on both side"); a hinged door, and a slide too narrow to halve, is one. ONE owner,
+## because the shut mesh and the Door nodes must agree about what the door is.
+func _panels(b: Dictionary, op: Dictionary) -> int:
+	if str(b.get("door_style", "swing")) != "slide":
+		return 1
+	return 2 if float(op["w"]) >= 1.2 else 1
+
+## A library material by name (the palette owns its look: `assets/world_source/kits/library/palette.json`).
+func _lib_material(name: String) -> Material:
+	if not _lib_mats.has(name):
+		var path := "res://assets/world_source/kits/library/materials/%s.tres" % name
+		_lib_mats[name] = load(path) if ResourceLoader.exists(path) else null
+	return _lib_mats[name]
+
+## The fixed glass round a sliding shop entrance: the header over the doors and a sidelight each side, filling
+## the module to the storey top. The leaves slide BEHIND these, which is what makes the entrance read as one
+## glass shopfront rather than a door punched in a wall (user, 2026-09-20). Returns [{mesh box, xf, mat}].
+func _shopfront_glazing(op: Dictionary) -> Array:
+	var sf: Dictionary = op["shopfront"]
+	var module := float(sf["module"])
+	var storey := float(sf["storey"])
+	var w := float(op["w"])
+	var h := float(op["h"])
+	var xf: Transform3D = op["xf"]
+	var glass := _lib_material("MI_GlassClear")
+	var frame := _lib_material("MI_PaintedMetal")
+	var out := []
+	var side := maxf((module - w) / 2.0, 0.0)          # the mullion each side of the opening
+	if storey - h > 0.01:                              # header glazing, opening head -> storey top
+		out.append({"size": Vector3(module, storey - h, GLASS_T),
+				"xf": xf * Transform3D(Basis.IDENTITY, Vector3(0.0, (h + storey) / 2.0, 0.0)), "mat": glass})
+	for sgn in [-1.0, 1.0]:
+		if side > 0.01:
+			out.append({"size": Vector3(side, h, GLASS_T),
+					"xf": xf * Transform3D(Basis.IDENTITY, Vector3(sgn * (w + side) / 2.0, h / 2.0, 0.0)),
+					"mat": frame})
+	# the head rail: what the leaves hang from, and the line a Japanese shopfront reads by
+	out.append({"size": Vector3(module, FRAME_T * 2.0, GLASS_T * 1.6),
+			"xf": xf * Transform3D(Basis.IDENTITY, Vector3(0.0, h, 0.0)), "mat": frame})
+	return out
+
+
+func _door_material() -> Material:
+	## The kit door leaf's own material, for a plain leaf built as a box.
+	var sf := _surfaces(DOOR_LEAF)
+	return null if sf.is_empty() else _kit_material(_kit_res(DOOR_LEAF), sf[0][3])
+
+func _door_leaf_mesh() -> ArrayMesh:
+	## The kit's own door leaf as one mesh, shared by every Door node (written once).
+	if _leaf_mesh != null:
+		return _leaf_mesh
+	var path := "%s/DoorLeaf_mesh.res" % OUT_DIR
+	var tools := {}
+	var mats := {}
+	var order := []
+	for sf in _surfaces(DOOR_LEAF):
+		var mat := _kit_material(_kit_res(DOOR_LEAF), sf[3])
+		var key := mat.resource_path if mat != null else "<none>"
+		if not tools.has(key):
+			tools[key] = SurfaceTool.new()
+			mats[key] = mat
+			order.append(key)
+		(tools[key] as SurfaceTool).append_from(sf[0], sf[1], sf[2] as Transform3D)
+	var m := ArrayMesh.new()
+	for key in order:
+		(tools[key] as SurfaceTool).commit(m)
+		m.surface_set_material(m.get_surface_count() - 1, mats[key])
+	ResourceSaver.save(m, path, ResourceSaver.FLAG_COMPRESS)
+	_leaf_mesh = load(path)
+	return _leaf_mesh
+
+
+var _glass_leaves := {}
+
+## One sliding leaf of a Japanese automatic door: a full pane of glass in a slim aluminium frame, built at the
+## kit leaf's own convention (it spans the node's local -X and stands on y = 0) so a Door node needs no offset.
+func _glass_leaf_mesh(lw: float, h: float) -> ArrayMesh:
+	var key := "%.3f_%.3f" % [lw, h]
+	if _glass_leaves.has(key):
+		return _glass_leaves[key]
+	var path := "%s/GlassLeaf_%s_mesh.res" % [OUT_DIR, key.replace(".", "")]
+	var pane := SurfaceTool.new()
+	var bars := SurfaceTool.new()
+	var pm := BoxMesh.new()
+	pm.size = Vector3(lw - FRAME_T * 2.0, h - FRAME_T * 2.0, GLASS_T)
+	pane.append_from(pm, 0, Transform3D(Basis.IDENTITY, Vector3(-lw / 2.0, h / 2.0, 0.0)))
+	for b in [[Vector3(FRAME_T, h, GLASS_T * 1.2), Vector3(-FRAME_T / 2.0, h / 2.0, 0.0)],
+			[Vector3(FRAME_T, h, GLASS_T * 1.2), Vector3(-lw + FRAME_T / 2.0, h / 2.0, 0.0)],
+			[Vector3(lw, FRAME_T, GLASS_T * 1.2), Vector3(-lw / 2.0, FRAME_T / 2.0, 0.0)],
+			[Vector3(lw, FRAME_T, GLASS_T * 1.2), Vector3(-lw / 2.0, h - FRAME_T / 2.0, 0.0)]]:
+		var bm := BoxMesh.new()
+		bm.size = b[0]
+		bars.append_from(bm, 0, Transform3D(Basis.IDENTITY, b[1]))
+	var m := ArrayMesh.new()
+	pane.commit(m)
+	m.surface_set_material(m.get_surface_count() - 1, _lib_material("MI_GlassClear"))
+	bars.commit(m)
+	m.surface_set_material(m.get_surface_count() - 1, _lib_material("MI_PaintedMetal"))
+	ResourceSaver.save(m, path, ResourceSaver.FLAG_COMPRESS)
+	_glass_leaves[key] = load(path)
+	return _glass_leaves[key]
 
 
 func _kit_res(piece_path: String) -> String:
@@ -111,12 +289,38 @@ func _kit_material(kit_res: String, mat: Material) -> Material:
 	return loaded
 
 
-func _build(b: Dictionary) -> bool:
+func _build(b: Dictionary, variant: String) -> bool:
 	var id: String = b["id"]
+	var out_id: String = id + variant
+	var open_variant := variant != ""
+	var shop := variant == SHOP_VARIANT_SUFFIX
 	var tools := {}          # material key -> SurfaceTool
 	var mats := {}           # material key -> Material
 	var order := []
-	for p in b["pieces"]:
+	var pieces: Array = b["pieces"].duplicate()
+	var leaves := []         # Transform3D of each closed door leaf
+	if not open_variant:
+		# EVERY building is shut: the kit's own leaf where there is a door frame, a plain leaf of the declared size
+		# where the doorway is modelled into a library piece. The leaf's pivot edge is its local x = 0 and it spans
+		# -0.91..0, so a kit leaf is placed half a leaf along the frame's +X and in the middle of the frame's depth.
+		for op in _openings(b):
+			var oxf: Transform3D = op["xf"]
+			if op["frame"]:
+				var lxf := oxf * Transform3D(Basis.IDENTITY, Vector3(0.455, 0.0, -0.09))
+				leaves.append({"xf": lxf, "w": 0.91, "h": 2.0})
+				pieces.append({"piece": "Door_1", "path": DOOR_LEAF,
+						"pos": [lxf.origin.x, lxf.origin.y, lxf.origin.z], "yaw": rad_to_deg(oxf.basis.get_euler().y)})
+			elif _panels(b, op) == 2:
+				# shut, the two leaves meet in the middle: each spans its own half, from its outer edge inward
+				var lw := float(op["w"]) / 2.0
+				for li in range(2):
+					leaves.append({"xf": oxf * Transform3D(Basis.IDENTITY, Vector3(float(op["w"]) / 2.0 - lw * li, 0.0, 0.0)),
+							"w": lw, "lw": lw, "h": float(op["h"]), "glass": true,
+							"c": Vector3(-lw / 2.0, float(op["h"]) / 2.0, 0.0)})
+			else:
+				leaves.append({"xf": oxf * Transform3D(Basis.IDENTITY, Vector3(0.0, float(op["h"]) / 2.0, 0.0)),
+						"w": float(op["w"]), "h": float(op["h"]), "plain": true})
+	for p in pieces:
 		var path: String = p["path"]
 		var kit_res := _kit_res(path)
 		var pos: Array = p["pos"]
@@ -133,25 +337,96 @@ func _build(b: Dictionary) -> bool:
 				mats[key] = mat
 				order.append(key)
 			(tools[key] as SurfaceTool).append_from(s[0], s[1], xf * (s[2] as Transform3D))
-	var mesh := ArrayMesh.new()
+	# the fixed shopfront glazing is not a door: it is in BOTH variants, shut and open
+	var extra := []
+	for op in _openings(b):
+		if op.has("shopfront"):
+			extra += _shopfront_glazing(op)
+	for lf in leaves:
+		if lf.get("glass", false):
+			var gm := _glass_leaf_mesh(float(lf["lw"]), float(lf["h"]))
+			for si in gm.get_surface_count():
+				var gmat := gm.surface_get_material(si)
+				var gkey: String = gmat.resource_path if gmat != null else "<none>"
+				if not tools.has(gkey):
+					tools[gkey] = SurfaceTool.new()
+					mats[gkey] = gmat
+					order.append(gkey)
+				(tools[gkey] as SurfaceTool).append_from(gm, si, lf["xf"])
+	for g in extra:
+		var gmat2: Material = g["mat"]
+		var gkey2: String = gmat2.resource_path if gmat2 != null else "<none>"
+		if not tools.has(gkey2):
+			tools[gkey2] = SurfaceTool.new()
+			mats[gkey2] = gmat2
+			order.append(gkey2)
+		var gbox := BoxMesh.new()
+		gbox.size = g["size"]
+		(tools[gkey2] as SurfaceTool).append_from(gbox, 0, g["xf"])
+	for lf in leaves:
+		if not lf.get("plain", false):
+			continue
+		# a plain leaf: a box of the declared opening, in the kit's door material
+		var pm := BoxMesh.new()
+		pm.size = Vector3(float(lf["w"]), float(lf["h"]), 0.1)
+		var pmat := _door_material()
+		var pkey: String = pmat.resource_path if pmat != null else "<none>"
+		if not tools.has(pkey):
+			tools[pkey] = SurfaceTool.new()
+			mats[pkey] = pmat
+			order.append(pkey)
+		(tools[pkey] as SurfaceTool).append_from(pm, 0, lf["xf"])
+	# Indexed and LOD'd (PLAN.md 3.6, `probe_city_perf.gd`): a streamed city put 10-30 M triangles in view at street
+	# level with the full meshes, most of them in buildings a few pixels tall. `generate_lods` (meshoptimizer) makes
+	# the chain the renderer picks from by screen-space error, so a near building is drawn exactly as built.
+	var im := ImporterMesh.new()
 	for key in order:
 		var st: SurfaceTool = tools[key]
-		st.commit(mesh)
-		mesh.surface_set_material(mesh.get_surface_count() - 1, mats[key])
-		mesh.surface_set_name(mesh.get_surface_count() - 1, (mats[key] as Material).resource_name if mats[key] else "none")
-	var mesh_path := "%s/%s_mesh.res" % [OUT_DIR, id]
+		st.index()
+		# a kit piece may carry custom vertex channels (the Standard kit's wear data): their format rides in the flags
+		var flags := 0
+		for c in 4:
+			var cf := st.get_custom_format(c)
+			if cf != SurfaceTool.CUSTOM_MAX:
+				flags |= int(cf) << (Mesh.ARRAY_FORMAT_CUSTOM_BASE + c * Mesh.ARRAY_FORMAT_CUSTOM_BITS)
+		im.add_surface(Mesh.PRIMITIVE_TRIANGLES, st.commit_to_arrays(), [], {}, mats[key],
+				(mats[key] as Material).resource_name if mats[key] else "none", flags)
+	im.generate_lods(LOD_NORMAL_MERGE_DEG, LOD_NORMAL_SPLIT_DEG, [])
+	var mesh: ArrayMesh = im.get_mesh()
+	var mesh_path := "%s/%s_mesh.res" % [OUT_DIR, id + (OPEN_VARIANT_SUFFIX if open_variant else "")]
 	if ResourceSaver.save(mesh, mesh_path, ResourceSaver.FLAG_COMPRESS) != OK:
 		push_error("cannot save " + mesh_path)
 		return false
 	mesh = load(mesh_path)
 
 	var root := Node3D.new()
-	root.name = id
+	root.name = out_id
 	var mi := MeshInstance3D.new()
 	mi.name = "Mesh"
 	mi.mesh = mesh
+	# Past this the building is not drawn: a street-level city needs no 1 km horizon of kit geometry, and a tall
+	# building is seen further than a house. Faded (dithered), not popped.
+	mi.visibility_range_end = clampf(VIS_BASE_M + VIS_PER_HEIGHT * mesh.get_aabb().end.y, VIS_MIN_M, VIS_MAX_M)
+	mi.visibility_range_end_margin = VIS_FADE_M
+	mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	root.add_child(mi)
 	mi.owner = root
+	if OCCLUDER_TYPES.has(id):
+		# The streamed city draws every building behind the frontage row without occlusion culling (probe_city_perf.gd:
+		# ~2000 in the tree, ~10 M triangles in view at street level). A solid building's box, shrunk inside its own
+		# walls so it never hides itself, lets the renderer skip what stands behind it. Glass-fronted and hollow types
+		# (konbini, restaurant, stations, landmarks with halls) get none: a character inside must stay visible.
+		var bb := mesh.get_aabb()
+		var top := float(b.get("roofline_m", b.get("wall_top_m", bb.end.y)))
+		var occ := OccluderInstance3D.new()
+		occ.name = "Occluder"
+		var box := BoxOccluder3D.new()
+		box.size = Vector3(maxf(bb.size.x - 2.0 * OCCLUDER_INSET, 0.5), maxf(top - OCCLUDER_FLOOR, 0.5),
+				maxf(bb.size.z - 2.0 * OCCLUDER_INSET, 0.5))
+		occ.occluder = box
+		occ.position = Vector3(bb.get_center().x, OCCLUDER_FLOOR + box.size.y / 2.0, bb.get_center().z)
+		root.add_child(occ)
+		occ.owner = root
 
 	var body := StaticBody3D.new()
 	body.name = "Collision"
@@ -160,6 +435,18 @@ func _build(b: Dictionary) -> bool:
 	root.add_child(body)
 	body.owner = root
 	var k := 0
+	for lf in leaves:
+		var dcs := CollisionShape3D.new()
+		dcs.name = "DoorLeaf%d" % k
+		k += 1
+		var dshape := BoxShape3D.new()
+		dshape.size = Vector3(float(lf["w"]) + (LEAF_MEET * 2.0 if lf.get("glass", false) else 0.0),
+				float(lf["h"]), 0.14)
+		dcs.shape = dshape
+		var coff: Vector3 = lf.get("c", Vector3.ZERO if lf.get("plain", false) else Vector3(-0.455, 1.0, 0.0))
+		dcs.transform = (lf["xf"] as Transform3D) * Transform3D(Basis.IDENTITY, coff)
+		body.add_child(dcs)
+		dcs.owner = root
 	for bx in b["boxes"]:
 		var cs := CollisionShape3D.new()
 		cs.name = "Box%d" % k
@@ -211,7 +498,7 @@ func _build(b: Dictionary) -> bool:
 			var cps := ConcavePolygonShape3D.new()
 			cps.set_faces(faces)
 			tri = cps
-		var shape_path := "%s/%s_collision.res" % [OUT_DIR, id]
+		var shape_path := "%s/%s_collision.res" % [OUT_DIR, id + (OPEN_VARIANT_SUFFIX if open_variant else "")]
 		ResourceSaver.save(tri, shape_path, ResourceSaver.FLAG_COMPRESS)
 		var cs := CollisionShape3D.new()
 		cs.name = "Trimesh"
@@ -219,6 +506,88 @@ func _build(b: Dictionary) -> bool:
 		body.add_child(cs)
 		cs.owner = root
 
+	if open_variant:
+		# one `world.Door` per frame: the node sits at the HINGE edge (the leaf spans its local -X), MANUAL (the
+		# player presses interact) and LOCKED, so only a mission's unlock lets anyone in.
+		var doors_root := Node3D.new()
+		doors_root.name = "Doors"
+		root.add_child(doors_root)
+		doors_root.owner = root
+		# SLIDING or hinged is the TYPE's own fact, carried here by the layout (user, 2026-09-19: a Japanese
+		# store, office, terminal or konbini has a 自動ドア, not a swing door). A slide wide enough for two
+		# leaves gets two, parting from the middle, which is what an automatic entrance looks like; a narrow
+		# one gets a single 片引き戸. Each leaf is its own `world.Door` with its own sensor, so nothing new was
+		# needed in the Door class -- `open_mode = "SLIDE"` and `slide_offset` have been there since I2.
+		var slide := str(b.get("door_style", "swing")) == "slide"
+		var dn := 0
+		for op in _openings(b):
+			var oxf: Transform3D = op["xf"]
+			var w := float(op["w"])
+			var h := float(op["h"])
+			var panels := _panels(b, op)
+			for li in range(panels):
+				var lw := w / float(panels)
+				# hinged: the node is the HINGE edge and the leaf hangs along its local -X.
+				# sliding: the node is the leaf's own outer edge, and it slides OUTWARD along the wall by lw.
+				var edge := w / 2.0 if not slide else (w / 2.0 - lw * li)
+				var door := StaticBody3D.new()
+				door.set_script(load(DOOR_SCRIPT))
+				door.name = "Door%d" % dn
+				dn += 1
+				door.transform = oxf * Transform3D(Basis.IDENTITY,
+						Vector3(edge, 0.0, -0.09 if op["frame"] else 0.0))
+				door.collision_layer = 1
+				door.collision_mask = 0
+				doors_root.add_child(door)
+				door.owner = root
+				var leaf := MeshInstance3D.new()
+				leaf.name = "IntactVisual"
+				if slide:
+					# full glass in a slim frame, the Japanese shop entrance; it already spans local -X from 0
+					leaf.mesh = _glass_leaf_mesh(lw, h)
+				elif op["frame"] and panels == 1:
+					leaf.mesh = _door_leaf_mesh()
+				else:
+					var lm := BoxMesh.new()
+					lm.size = Vector3(lw, h, 0.1)
+					leaf.mesh = lm
+					leaf.material_override = _door_material()
+					leaf.position = Vector3(-lw / 2.0, h / 2.0, 0.0)
+				door.add_child(leaf)
+				leaf.owner = root
+				var lcs := CollisionShape3D.new()
+				lcs.name = "CollisionShape3D"
+				var lshape := BoxShape3D.new()
+				lshape.size = Vector3(lw + (LEAF_MEET * 2.0 if panels > 1 else 0.0), h, 0.14)
+				lcs.shape = lshape
+				lcs.position = Vector3(-lw / 2.0, h / 2.0, 0.0)
+				door.add_child(lcs)
+				lcs.owner = root
+				var sensor := Area3D.new()
+				sensor.name = "Sensor"
+				sensor.collision_layer = 0
+				sensor.collision_mask = 2          # CollisionLayers.CHARACTER
+				var scs := CollisionShape3D.new()
+				scs.name = "CollisionShape3D"
+				var sbox := BoxShape3D.new()
+				sbox.size = Vector3(w + 1.4, h + 0.2, 2.4)
+				scs.shape = sbox
+				# the sensor covers the WHOLE doorway whichever leaf this is, so both leaves open together
+				scs.position = Vector3((w / 2.0) - edge - (w / 2.0), h / 2.0, 0.0)
+				sensor.add_child(scs)
+				door.add_child(sensor)
+				sensor.owner = root
+				scs.owner = root
+				if slide:
+					door.set("open_mode", "SLIDE")
+					# slide_offset is in the door's PARENT frame (Door adds it to its own position), so the
+					# direction is the opening's own +X, away from the middle
+					var dir := oxf.basis.x.normalized() * (lw if li == 0 else -lw)
+					door.set("slide_offset", dir)
+				door.set("auto_open", shop)        # a shop's door is automatic; a mission's is MANUAL (press interact)
+				door.set("locked", not shop)       # a shop is always open; a mission's door until it unlocks it
+				door.set("breakable", false)
+				door.set("sensor_path", NodePath("Sensor"))
 	var di := 0
 	for d in b["doors"]:
 		var mk := Marker3D.new()
@@ -235,19 +604,22 @@ func _build(b: Dictionary) -> bool:
 	meta.erase("boxes")
 	meta.erase("hulls")
 	meta["piece_count"] = b["pieces"].size()
+	meta["doors_closed"] = not open_variant
+	meta["doors_locked"] = open_variant and not shop
+	meta["doors_shop"] = shop
 	meta["aabb"] = [mesh.get_aabb().position, mesh.get_aabb().size]
 	root.set_meta("building", meta)
 
 	var packed := PackedScene.new()
 	if packed.pack(root) != OK:
-		push_error("cannot pack " + id)
+		push_error("cannot pack " + out_id)
 		root.free()
 		return false
-	var scene_path := "%s/%s.tscn" % [OUT_DIR, id]
+	var scene_path := "%s/%s.tscn" % [OUT_DIR, out_id]
 	var err := ResourceSaver.save(packed, scene_path)
 	root.free()
 	var aabb := mesh.get_aabb()
-	print("%-18s %5d pieces -> %d surfaces, %d verts, aabb %s, %s" % [id, b["pieces"].size(), mesh.get_surface_count(),
+	print("%-18s %5d pieces -> %d surfaces, %d verts, aabb %s, %s" % [out_id, b["pieces"].size(), mesh.get_surface_count(),
 		_vert_count(mesh), aabb.size, "OK" if err == OK else "SAVE FAILED"])
 	return err == OK
 

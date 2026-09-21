@@ -25,6 +25,12 @@ import os
 import sys
 
 SIDES = ("front", "right", "back", "left")
+# A Japanese automatic shop entrance (自動ドア) is the WHOLE wall module, not a door hole in it: full-height
+# glass with two leaves parting from the middle, and the leaves slide behind the fixed sidelights beside them.
+# So a `door_style: slide` type's entrance module gets NO kit wall piece -- the builder glazes it -- and the
+# opening is these metres instead of the kit's 0.91 m single-leaf hole (user, 2026-09-20).
+SLIDE_OPENING_W = 1.70          # inside a 1.82 m module: two 0.85 m leaves, 6 cm of mullion each side
+SLIDE_OPENING_H = 2.10          # a shop door's head height; the glazing carries on to the storey top
 KITS_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "world_source", "kits"))
 TYPES_PATH = os.path.normpath(os.path.join(KITS_DIR, "..", "buildings", "building_types.json"))
 YAW = {"front": 0.0, "right": 90.0, "back": 180.0, "left": 270.0}
@@ -77,7 +83,12 @@ def layout_type(t, root):
     W, D = nw * m, nd * m
     out = {"id": t["id"], "kit": t["kit"], "use": t.get("use", ""), "jp": t.get("jp", {}),
            "module_m": m, "modules": [nw, nd], "footprint_m": [round(W, 4), round(D, 4)],
+           # a Japanese shop, office, station or restaurant has a SLIDING automatic entrance (自動ドア); a
+           # house or a flat has a hinged 玄関ドア. It is a fact about the TYPE, so it is declared there.
+           "door_style": t.get("door_style", "swing"),
            "pieces": [], "boxes": [], "doors": [], "solid_probes": []}
+    # a Japanese automatic entrance is the whole module, glazed (see SLIDE_OPENING_W)
+    slide = str(t.get("door_style", "swing")) == "slide"
     place = out["pieces"]
 
     def put(name, pos, yaw):
@@ -165,6 +176,8 @@ def layout_type(t, root):
                 raise SystemExit(f"{t['id']}: row {row_for(g, side)} has no door piece for the {side} door")
             for i in range(gm[4]):
                 c = at(gm, i)
+                if i in door_idx and slide:
+                    continue                      # a glazed shopfront: the builder fills the whole module
                 name = row["door"] if i in door_idx else row["pieces"][i % len(row["pieces"])]
                 put(name, (c[0], base, c[1]), yaw)
                 if row.get("band"):
@@ -264,6 +277,8 @@ def layout_type(t, root):
     thick = pieces["pieces"][rows[row_for(storeys[0][0], "front")]["pieces"][0]]["size"][2]
     thick = max(thick, 0.18)
     hw, dh = kit["door_opening"][0] * s, kit["door_opening"][1] * s
+    if slide:                                     # the glazed entrance is the module, not the kit's door hole
+        hw, dh = SLIDE_OPENING_W / 2.0, SLIDE_OPENING_H
     h0 = storeys[0][1]
 
     def box(side, a0, a1, y0, y1, back=0.0):
@@ -301,7 +316,8 @@ def layout_type(t, root):
             cursor = c + hw
             p = (start[0] + along[0] * c, start[1] + along[1] * c)
             out["doors"].append({"side": side, "module": i, "center": [round(p[0], 5), 0.0, round(p[1], 5)],
-                                 "outward": [nrm[0], 0, nrm[1]], "width": round(2 * hw, 5), "height": round(dh, 5)})
+                                 "outward": [nrm[0], 0, nrm[1]], "width": round(2 * hw, 5), "height": round(dh, 5),
+                                 **({"shopfront": {"module": round(m, 5), "storey": round(h0, 5)}} if slide else {})})
         box(side, cursor, length, 0.0, h0)
     for side in SIDES:
         n = nw if side in ("front", "back") else nd
@@ -432,7 +448,8 @@ def layout_composite(c, built, root):
     footprint centred on the origin. Doors, walls and collision of every part come with it."""
     W, D = c["footprint_m"]
     out = {"id": c["id"], "kit": "library", "use": c.get("use", ""), "jp": c.get("jp", {}), "composite": True,
-           "footprint_m": [W, D], "pieces": [], "boxes": [], "hulls": [], "doors": [], "solid_probes": []}
+           "footprint_m": [W, D], "door_style": c.get("door_style", "swing"),
+           "pieces": [], "boxes": [], "hulls": [], "doors": [], "solid_probes": []}
     rects = []
     height = 0.0
     for part in c.get("parts", []):
@@ -510,6 +527,7 @@ def layout_example(e, root):
            "pieces": [{"piece": e["piece"], "path": res + "/" + p["path"],
                        "pos": [round(v, 5) for v in pos], "yaw": 0.0}],
            "footprint_m": [p["size"][0], p["size"][2]], "height_m": p["size"][1], "wall_top_m": p["size"][1],
+           "door_style": e.get("door_style", "swing"),
            "boxes": [], "hulls": [], "doors": [], "solid_probes": [], "collision": "trimesh",
            "trimesh_pieces": 1}
     if "probe_xz" in e:

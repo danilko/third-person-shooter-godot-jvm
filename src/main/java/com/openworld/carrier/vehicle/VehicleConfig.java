@@ -6,6 +6,7 @@ import godot.api.Curve;
 import godot.api.PackedScene;
 import godot.api.Resource;
 import godot.api.Texture2D;
+import godot.core.Vector3;
 import com.openworld.weapon.FirearmItem;
 
 /**
@@ -286,6 +287,22 @@ public class VehicleConfig extends Resource {
     /** Boat: hull buoyancy-probe half extents (m) — 4 corner probes at ±width/±length. */
     @Export public float hullHalfWidth  = 1.0f;
     @Export public float hullHalfLength = 2.0f;
+
+    // ── Lights ────────────────────────────────────────────────────────────
+    // DERIVED from the model's MEASURED bounds by tools/build_vehicle_scenes.py, never hand-placed: the
+    // front/rear face, 62% of the way out to the flank, at 42% of the body's height. Zero = no lamp
+    // (the motorcycle, the boat and the airplane still carry the prototype's defaults).
+
+    /** The RIGHT headlamp in body space; the left one is its mirror in X. */
+    @Export public Vector3 headlightOffset = new Vector3(0, 0, 0);
+    /** The RIGHT tail lamp in body space; the left one is its mirror in X. */
+    @Export public Vector3 taillightOffset = new Vector3(0, 0, 0);
+    /** How far a low beam throws (m) and how wide it opens (degrees of half-angle). */
+    @Export public float headlightRange = 45f;
+    @Export public float headlightAngle = 32f;
+    /** Beam brightness, and how far below the horizon it is aimed (degrees — a low beam points DOWN). */
+    @Export public float headlightEnergy = 8f;
+    @Export public float headlightPitch = 9f;
 
     /** Boat: buoyancy spring (N per metre submerged, per probe) and its vertical damping. */
     @Export public float buoyancyStrength = 15000f;

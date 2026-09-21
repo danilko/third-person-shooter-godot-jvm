@@ -3,10 +3,47 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/AirportTerminal_mesh.res" id="1_pduc0"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/AirportTerminal_collision.res" id="2_k4ui6"]
 
-[node name="AirportTerminal" type="Node3D" unique_id=1047347213]
+[sub_resource type="BoxShape3D" id="BoxShape3D_5y8f7"]
+size = Vector3(2.04, 3.5, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_50bye"]
+size = Vector3(2.04, 3.5, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6bgeb"]
+size = Vector3(2.04, 3.5, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2e3fq"]
+size = Vector3(2.04, 3.5, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5rg4w"]
+size = Vector3(2.04, 3.5, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_gxaxp"]
+size = Vector3(2.04, 3.5, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_acsu6"]
+size = Vector3(2.04, 3.5, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sxd06"]
+size = Vector3(2.04, 3.5, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_etvc6"]
+size = Vector3(4.04, 4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hiw25"]
+size = Vector3(4.04, 4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_st8am"]
+size = Vector3(4.04, 4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sbbh4"]
+size = Vector3(4.04, 4, 0.14)
+
+[node name="AirportTerminal" type="Node3D" unique_id=1837440144]
 metadata/building = {
 "aabb": [Vector3(-121, -0.1, -85), Vector3(242, 47.1, 170)],
 "collision": "trimesh",
+"door_style": "slide",
 "doors": [{
 "center": [-45.0, 0.0, 65.0],
 "height": 3.5,
@@ -50,6 +87,9 @@ metadata/building = {
 "side": "airside",
 "width": 8.0
 }],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
 "example": true,
 "footprint_m": [242.0, 170.0],
 "height_m": 47.1,
@@ -64,29 +104,80 @@ metadata/building = {
 "wall_top_m": 47.1
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=791624991]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=120411811]
+visibility_range_end = 864.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
 mesh = ExtResource("1_pduc0")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=911808296]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=2146672032]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1873773171]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1951437218]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44, 1.75, 65)
+shape = SubResource("BoxShape3D_5y8f7")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=835022234]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 1.75, 65)
+shape = SubResource("BoxShape3D_50bye")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=2056311854]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 1.75, 65)
+shape = SubResource("BoxShape3D_6bgeb")
+
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=364532774]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 1.75, 65)
+shape = SubResource("BoxShape3D_2e3fq")
+
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=530262752]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 1.75, 65)
+shape = SubResource("BoxShape3D_5rg4w")
+
+[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=1720624534]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 1.75, 65)
+shape = SubResource("BoxShape3D_gxaxp")
+
+[node name="DoorLeaf6" type="CollisionShape3D" parent="Collision" unique_id=1517432708]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 1.75, 65)
+shape = SubResource("BoxShape3D_acsu6")
+
+[node name="DoorLeaf7" type="CollisionShape3D" parent="Collision" unique_id=1209645436]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 1.75, 65)
+shape = SubResource("BoxShape3D_sxd06")
+
+[node name="DoorLeaf8" type="CollisionShape3D" parent="Collision" unique_id=2041019309]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -42, 2, 5.0000005)
+shape = SubResource("BoxShape3D_etvc6")
+
+[node name="DoorLeaf9" type="CollisionShape3D" parent="Collision" unique_id=244217658]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -38, 2, 5)
+shape = SubResource("BoxShape3D_hiw25")
+
+[node name="DoorLeaf10" type="CollisionShape3D" parent="Collision" unique_id=886088944]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 38, 2, 5.0000005)
+shape = SubResource("BoxShape3D_st8am")
+
+[node name="DoorLeaf11" type="CollisionShape3D" parent="Collision" unique_id=935696372]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 42, 2, 5)
+shape = SubResource("BoxShape3D_sbbh4")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1496038878]
 shape = ExtResource("2_k4ui6")
 
-[node name="Door_departures_0" type="Marker3D" parent="." unique_id=1470354930]
+[node name="Door_departures_0" type="Marker3D" parent="." unique_id=275360091]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -45, 0, 65)
 
-[node name="Door_departures_1" type="Marker3D" parent="." unique_id=1985278200]
+[node name="Door_departures_1" type="Marker3D" parent="." unique_id=985064997]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -15, 0, 65)
 
-[node name="Door_departures_2" type="Marker3D" parent="." unique_id=1897055468]
+[node name="Door_departures_2" type="Marker3D" parent="." unique_id=2059489867]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 15, 0, 65)
 
-[node name="Door_departures_3" type="Marker3D" parent="." unique_id=1991314319]
+[node name="Door_departures_3" type="Marker3D" parent="." unique_id=1038082749]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 45, 0, 65)
 
-[node name="Door_airside_4" type="Marker3D" parent="." unique_id=2142012143]
+[node name="Door_airside_4" type="Marker3D" parent="." unique_id=91508436]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 5)
 
-[node name="Door_airside_5" type="Marker3D" parent="." unique_id=118361668]
+[node name="Door_airside_5" type="Marker3D" parent="." unique_id=590556638]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 5)

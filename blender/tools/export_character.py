@@ -17,10 +17,14 @@ import bpy
 import os
 import sys
 
-# Derived from the .blend being exported, so ONE exporter serves every body: merged_animation.blend
-# -> merged_animation.glb, merged_animation_f.blend -> merged_animation_f.glb. A hardcoded output
+# Derived from the .blend being exported, so ONE exporter serves every body. A hardcoded output
 # meant a second character could only be built by editing this file, and a mistake there would
 # silently overwrite the first body's export.
+#
+# This .blend is the CLIP SOURCE as well as a body: the shared library
+# (src/main/resources/com/openworld/character/anim/character_anims.res) is built from its export by
+# tools/godot/build_character_anims.gd. A body brought in from a .vrm carries no clips at all --
+# see blender/tools/import_vrm_body.py and blender/SKELETON_CONTRACT.md.
 OUT = os.path.splitext(bpy.data.filepath)[0] + ".glb"
 
 arm = bpy.data.objects.get("Godot_Chan_Stealth")
@@ -45,7 +49,15 @@ bpy.ops.export_scene.gltf(
     export_lights=True,
     export_skins=True,
     export_all_influences=True,
-    export_def_bones=False,
+    # TRUE since the control layer landed (blender/tools/add_control_rig.py): a CTRL_ bone is not a
+    # deform bone, but `use_deform = False` does NOT keep it out of the export -- measured, it comes
+    # through as a 54th joint with its own animation track, which breaks the 53-bone contract
+    # silently. With this on: 53 joints, no CTRL_ node, no CTRL_ track, all 171 clips, and an IK
+    # result still fully baked (the exporter samples the evaluated pose).
+    # It is NOT bit-identical: it shifts rotations by up to 0.065 deg, against the 0.056 deg of
+    # float32 key noise probe_shared_anims already tolerates. So a re-export is a gate pass, not a
+    # no-op -- which is why the shipped .glb was deliberately NOT re-baked when this was flipped.
+    export_def_bones=True,
     export_animations=True,
     export_animation_mode='ACTIONS',
     export_force_sampling=True,

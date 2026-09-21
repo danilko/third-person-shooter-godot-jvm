@@ -43,8 +43,15 @@ public class LaneDriveProbeController extends VehicleAIController {
         return getRoute() instanceof godot.api.Node n ? n.getName().toString() : "";
     }
 
+    /**
+     * Normally this brain is blind to other cars, so a launch run cannot be spoiled by traffic it did not mean
+     * to measure. {@link #seeObstacles} gives it the SHIPPED sensing back, for the one probe that is about
+     * exactly that (`probe_ai_stops.gd`: does a car stop for a person standing in the road).
+     */
+    @Export public boolean seeObstacles = false;
+
     @Override
-    public boolean isPathBlocked() { return false; }
+    public boolean isPathBlocked() { return seeObstacles && super.isPathBlocked(); }
 
     @Override
     public boolean shouldYield() { return false; }

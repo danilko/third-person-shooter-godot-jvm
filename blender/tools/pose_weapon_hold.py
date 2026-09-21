@@ -10,14 +10,13 @@ support hand, clips, the solve arguments the shipped clips were written with). E
     $B solve-aim  --hold H [--write --save]         # placement: mount | eye_line (or a --placed model)
     $B solve-hold --hold H [--write --save]         # a carry: grip placed off the shoulder, muzzle down/across
     $B body-anchor R U F | skin-anchor | remove-object NAME... --save
-    blender -b assets/characters/godot_chan/merged_animation_f.blend ... -- copy-from assets/characters/godot_chan/merged_animation.blend --save
 
 What shipped (2026-09-15): rifle aim ADOPTED from the artist's placed ASR1 (clip untouched); rifle hold, launcher
 aim and hold SOLVED from their rows; pistol clips kept, PIS1's SupportPoint adopted from them.
 
 NOT idempotent where a gesture is relative: the shoulder shrug and the head gestures apply to the clip they start
 from, so a second rifle-style solve over a solved clip shrugs again. The launcher row (no shrug, head kept) is
-idempotent. Pre-A2.4 copies: merged_animation.pre-A24.blend / merged_animation_f.pre-A24.blend, in git history before 2026-09-19.
+idempotent. Pre-A2.4 copies: merged_animation.pre-A24.blend, in git history before 2026-09-19.
 
 Why a script and not a hand edit. The rifle aim pose has to satisfy several GEOMETRIC facts at once --
 the bore on the body's forward line, the butt pad in the shoulder pocket, the right eye over the bore,
@@ -978,7 +977,9 @@ def write_anchors(anchors, visuals_paths):
         print("  wrote mount anchors into %s" % os.path.relpath(path, ROOT))
 
 
-VISUALS_ALL = [VISUALS, VISUALS.replace("CharacterVisuals_GodotChan.tscn", "CharacterVisuals_GodotChanF.tscn")]
+# One visuals scene per BODY, and one body per .blend. The byte-identical "_f" placeholder was
+# retired when the real second body (Shino) landed -- see blender/SKELETON_CONTRACT.md.
+VISUALS_ALL = [VISUALS]
 
 
 def skin_shoulder_top(pose):

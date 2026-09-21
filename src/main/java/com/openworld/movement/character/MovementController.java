@@ -191,6 +191,8 @@ public class MovementController extends Node {
     if (self != null) {
       Controller ctrl = self.getController();
       if (ctrl != null && !ctrl.isAuthority()) return;
+      // a distant sidewalk walker is moved along its footway by its controller, with no slide (PLAN.md 3.6 crowd)
+      if (ctrl instanceof com.openworld.ai.SidewalkWalkerController w && w.gliding()) return;
     }
 
     boolean onFloor = player.isOnFloor();

@@ -128,6 +128,54 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
     }
 
     /**
+     * The bone the HEAD's own aim is applied to — the neck. Empty turns the head aim off, which is
+     * the control and restores the pre-fix behaviour exactly.
+     *
+     * <h2>THE BORE IS AIMED BY THE SHOULDERS; THE HEAD LOOKS AT THE TARGET</h2>
+     *
+     * One delta used to be solved (from the bore, or the chest) and applied to the clavicles AND
+     * the neck alike, so the head inherited whatever correction the ARMS happened to need. That is
+     * wrong in KIND rather than in degree, and the reason is in the authored pose: a shouldered
+     * rifle is held BLADED — measured on the shipped clips, the chest turns 42–57 deg off the line
+     * while the bore stays on it — and {@code neck_01} is a CHILD of {@code spine_03}, so the head
+     * rides that blade. A shooter's head does the opposite: it comes down onto the stock and looks
+     * along the bore. Measured before this split, on all three bodies and all four stances, the
+     * head sat <b>28–34 deg off the aim</b> while the gun was on it to 0.0 deg.
+     *
+     * <p>So the neck gets its OWN delta, solved from {@link #headForwardBone}'s own forward onto
+     * the target and clamped by the same stance limits. The shoulders keep the bore's. Two
+     * different jobs, two different solves, and neither can drag the other — which is also what
+     * lets the {@code NeckFront} layer (the neck replaced 100% by the T-pose in combat, whose only
+     * real job was hiding this) go away and give the artist's authored head pose back.
+     */
+    @Export
+    public String headBone = "neck_01";
+
+    public String getHeadBone() { return headBone; }
+    public void setHeadBone(String v) { this.headBone = v; }
+
+    /**
+     * The bone whose forward must end up on the target — the head itself. Its forward AXIS is
+     * derived once from the rest pose against {@link #referenceBone}'s (this rig's chest forward is
+     * +Z, measured, and a head is not obliged to agree), never assumed: W1 records what assuming an
+     * axis on this rig costs.
+     */
+    @Export
+    public String headForwardBone = "head_2";
+
+    public String getHeadForwardBone() { return headForwardBone; }
+    public void setHeadForwardBone(String v) { this.headForwardBone = v; }
+
+    /** Degrees the head was off the aim BEFORE this pass corrected it. For probes and the workbench. */
+    @Register
+    public double lastHeadCorrectionDeg() { return headCorrectionDeg; }
+
+    private double headCorrectionDeg = 0.0;
+    /** The derived local forward axis of {@link #headForwardBone}; solved once, then cached. */
+    private Vector3 headForwardAxis = null;
+    private int headForwardAxisFor = -1;
+
+    /**
      * Symmetric YAW cap in degrees, driven per stance from {@link
      * com.openworld.movement.character.Stance#aimYawLimit}. 0 or less means uncapped.
      *
@@ -322,7 +370,18 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
                 lastAimedBore = boreWeight >= 0.5;
             }
         }
-        if (aim == null || aim[3] == 0.0) return;
+        // The HEAD's own aim runs even when the shoulders have nothing to do, which is the ordinary
+        // upright case: there the bore is already on the line and the shared delta is ~0 while the
+        // head is still carrying the clip's blade. It is solved AFTER the shoulders, so the neck is
+        // measured against the chest it actually ends up under.
+        boolean headAimOn = headBone != null && !headBone.isEmpty()
+                && headForwardBone != null && !headForwardBone.isEmpty()
+                && skel.findBone(headBone) >= 0 && skel.findBone(headForwardBone) >= 0;
+
+        if (aim == null || aim[3] == 0.0) {
+            if (headAimOn) applyHeadAim(skel, skelBasis, solveHeadAim(skel, skelXf, skelBasis, targetPos, bodyFlat, up));
+            return;
+        }
         Vector3 axis = new Vector3(aim[0], aim[1], aim[2]);
         double angle = aim[3];
 
@@ -333,6 +392,9 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
         for (int i = 0; i < drivenBones.size(); i++) {
             String name = drivenBones.get(i);
             if (name == null || name.isEmpty()) continue;
+            // The neck is in this list so that a stance whose spine cannot move still turns its
+            // head; what it must NOT take is the arms' correction. It gets its own, below.
+            if (headAimOn && name.equals(headBone)) continue;
             int idx = skel.findBone(name);
             if (idx < 0) continue;
             float w = weightFor(i);
@@ -343,6 +405,118 @@ public class ShoulderAimModifier extends SkeletonModifier3D {
             Basis rotated = toLocal.times(delta).times(skelBasis).times(g.getBasis());
             skel.setBoneGlobalPose(idx, new Transform3D(rotated, g.getOrigin()));
         }
+        // AFTER the shoulders, because the neck is a child of the reference bone in the chest-aim
+        // case and would otherwise be solved against a chest about to move.
+        if (headAimOn) applyHeadAim(skel, skelBasis, solveHeadAim(skel, skelXf, skelBasis, targetPos, bodyFlat, up));
+    }
+
+    /**
+     * The world rotation that puts {@link #headForwardBone}'s forward on the target, about
+     * {@link #headBone}'s origin, or null when there is no head aim to make. Two passes for the
+     * same reason the bore needs them: turning the neck MOVES the head, so the direction from the
+     * head to the target changes with it.
+     */
+    private double[] solveHeadAim(Skeleton3D skel, Transform3D skelXf, Basis skelBasis,
+                                  Vector3 targetPos, Vector3 bodyFlat, Vector3 up) {
+        headCorrectionDeg = 0.0;
+        if (headBone == null || headBone.isEmpty()) return null;
+        int neck = skel.findBone(headBone);
+        int hf = (headForwardBone == null || headForwardBone.isEmpty()) ? -1 : skel.findBone(headForwardBone);
+        if (neck < 0 || hf < 0) return null;
+        Vector3 localFwd = headForwardAxis(skel, hf);
+        if (localFwd == null) return null;
+
+        Vector3 pivot = skelXf.times(skel.getBoneGlobalPose(neck).getOrigin());
+        double[] best = null;
+        for (int pass = 0; pass < 2; pass++) {
+            Transform3D head = skel.getBoneGlobalPose(hf);
+            Vector3 from = skelBasis.times(head.getBasis().times(localFwd));
+            Vector3 eye = skelXf.times(head.getOrigin());
+            if (best != null) {
+                // where the head WILL be once this pass's rotation is applied about the neck
+                Basis turn = new Basis(new Vector3(best[0], best[1], best[2]), best[3]);
+                eye = pivot.plus(turn.times(eye.minus(pivot)));
+                from = turn.times(from);
+            }
+            if (from.lengthSquared() < 1e-8) return null;
+            Vector3 to = targetPos.minus(eye);
+            if (to.length() < MIN_AIM_DISTANCE) return null;
+            Vector3 want = clampAim(to.normalized(), bodyFlat, up);
+            Vector3 fromN = from.normalized();
+            Vector3 ax = rotationAxis(fromN, want);
+            if (ax == null) {
+                if (best == null) return new double[] {0.0, 1.0, 0.0, 0.0};
+                break;
+            }
+            double ang = angleBetween(fromN, want);
+            if (best == null) {
+                headCorrectionDeg = Math.toDegrees(ang);
+                best = new double[] {ax.getX(), ax.getY(), ax.getZ(), ang};
+            } else {
+                // compose the correction onto the first pass's rotation
+                best = composeAxisAngle(best, new double[] {ax.getX(), ax.getY(), ax.getZ(), ang});
+            }
+        }
+        return best;
+    }
+
+    private void applyHeadAim(Skeleton3D skel, Basis skelBasis, double[] headAim) {
+        if (headAim == null || headAim[3] == 0.0 || headBone == null || headBone.isEmpty()) return;
+        int neck = skel.findBone(headBone);
+        if (neck < 0) return;
+        Basis delta = new Basis(new Vector3(headAim[0], headAim[1], headAim[2]), headAim[3]);
+        Transform3D g = skel.getBoneGlobalPose(neck);
+        Basis rotated = skelBasis.inverse().times(delta).times(skelBasis).times(g.getBasis());
+        skel.setBoneGlobalPose(neck, new Transform3D(rotated, g.getOrigin()));
+    }
+
+    /** {@code b} applied after {@code a}, as one axis-angle. */
+    private static double[] composeAxisAngle(double[] a, double[] b) {
+        double[] qa = quat(a), qb = quat(b);
+        double[] q = new double[] {
+            qb[3] * qa[0] + qb[0] * qa[3] + qb[1] * qa[2] - qb[2] * qa[1],
+            qb[3] * qa[1] - qb[0] * qa[2] + qb[1] * qa[3] + qb[2] * qa[0],
+            qb[3] * qa[2] + qb[0] * qa[1] - qb[1] * qa[0] + qb[2] * qa[3],
+            qb[3] * qa[3] - qb[0] * qa[0] - qb[1] * qa[1] - qb[2] * qa[2]};
+        double n = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+        if (n < 1e-9) return a;
+        for (int i = 0; i < 4; i++) q[i] /= n;
+        double ang = 2 * Math.acos(Math.max(-1.0, Math.min(1.0, q[3])));
+        double sn = Math.sqrt(Math.max(0.0, 1 - q[3] * q[3]));
+        if (sn < 1e-6) return new double[] {0.0, 1.0, 0.0, 0.0};
+        return new double[] {q[0] / sn, q[1] / sn, q[2] / sn, ang};
+    }
+
+    /**
+     * Which LOCAL axis of the head bone is its forward, derived once from the REST pose: the axis
+     * whose rest direction lies closest to the reference bone's rest forward (+Z, this rig's chest
+     * forward). Derived rather than written down because a body is only obliged to satisfy the
+     * skeleton contract's bone NAMES and rest ORIENTATIONS, and an axis assumed on one rig is the
+     * defect W1 records.
+     */
+    private Vector3 headForwardAxis(Skeleton3D skel, int hf) {
+        if (headForwardAxis != null && headForwardAxisFor == hf) return headForwardAxis;
+        int ref = skel.findBone(referenceBone);
+        if (ref < 0) return null;
+        Basis chest = skel.getBoneGlobalRest(ref).getBasis().orthonormalized();
+        Vector3 fwd = chest.getZ();
+        Basis head = skel.getBoneGlobalRest(hf).getBasis().orthonormalized();
+        Vector3 bestAxis = null;
+        double bestDot = -2.0;
+        Vector3[] axes = {head.getX(), head.getY(), head.getZ()};
+        Vector3[] local = {new Vector3(1.0, 0.0, 0.0), new Vector3(0.0, 1.0, 0.0), new Vector3(0.0, 0.0, 1.0)};
+        for (int i = 0; i < 3; i++) {
+            for (float sign : new float[] {1.0f, -1.0f}) {
+                double d = axes[i].times(sign).dot(fwd);
+                if (d > bestDot) {
+                    bestDot = d;
+                    bestAxis = local[i].times(sign);
+                }
+            }
+        }
+        headForwardAxis = bestAxis;
+        headForwardAxisFor = hf;
+        return bestAxis;
     }
 
     /**

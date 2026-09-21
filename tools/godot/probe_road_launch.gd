@@ -7,9 +7,20 @@ extends SceneTree
 ##       -- ... --corner-accel=0   (a single case drives with the traffic brain's own corner governor unless told
 ##       otherwise; GATE_CASES turn it off, because they exist to reach the parapets at speed)
 ##       -- ... --park=x,z   put the (disabled) streaming player over (x, z) instead of PARK
+##       -- ... --see-obstacles=1   let the brain BRAKE for other cars (it is blind by default): 0.7 cause 1 is
+##       rear-ending ambient traffic at 45 m/s, which masks the road defects underneath it
 ##       -- ... --follow=1   keep the streaming player 400 m over the car, for a drive longer than one zone
+##       -- ... --wheel-sensor=1   drive with the sphere ground sensor (2 = tyre cylinder, 0 = the shipped rays);
+##       the review measured all three equal in cost and sphere/cylinder 15x smoother over a kerb, so this is how
+##       a kerb strike at speed is compared between them (PLAN.md 0.7)
+##       -- ... --phys=120   run the physics at 120 Hz instead of the project's 60 (PLAN.md 0.7: is a launch the
+##       solver running out of steps at speed? compare the same case at 60 and 120 -- half the travel per step)
 ##       A FALL (the car metres below the lane it is on: through or over a wall, off a deck edge) counts like a launch;
 ##       drive with --offset beside a barrier (e.g. +7 on a 2-lane ramp) to test a wall at speed.
+##
+## It also counts what a car MEETS on the way (PLAN.md 0.8): every body contact with a street pole, and every pole
+## knocked down (`BreakableProps.breaksTotalNow`, summed over the scene -- at speed a pole is knocked down BEFORE
+## the contact, so the knock-down is the number, not the contact). A drive down a lane centre must report 0 of both.
 ##
 ## Runs the real DebugWorld with its two streamed Road Kit pieces, puts one Vehicle.tscn on a named lane
 ## with LaneDriveProbeController (the ordinary traffic brain, aimable by name, blind to other cars,
@@ -22,6 +33,7 @@ extends SceneTree
 const WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
 const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 const CTRL := "res://src/main/java/com/openworld/debug/LaneDriveProbeController.java"
+const VEHICLE_CFG := "res://src/main/resources/com/openworld/vehicle/SPC1Config.tres"
 const TRACE_DV := 0.6            # a tick gaining this much upward velocity is printed with its contacts
 const RISE_DV := 3.0             # a LAUNCH: vertical velocity rising this much within WINDOW ticks
 const WINDOW := 15
@@ -33,6 +45,7 @@ var world: Node
 var player: Node3D
 var car: RigidBody3D
 var ctrl: Node
+var HZ := 60.0     # the live physics rate (--phys); every printed time and rate is in it
 
 func _arg(name: String, def: String) -> String:
 	for a in OS.get_cmdline_user_args():
@@ -76,7 +89,7 @@ func _name_of(o: Object) -> String:
 ## One traced tick: body contacts (collider, normal, impulse) and each wheel's ray. Returns the colliders.
 func _trace(f: int, vy: float, dv: float, ln: String, lat: float, p: Vector3) -> Dictionary:
 	var e := car.global_basis.get_euler()
-	var line := "    t=%.2f vy %+.2f (%+.2f)  %.1f m/s  lat %+.2f  roll %+.1f pitch %+.1f  y %.2f |" % [f / 60.0, vy, dv,
+	var line := "    t=%.2f vy %+.2f (%+.2f)  %.1f m/s  lat %+.2f  roll %+.1f pitch %+.1f  y %.2f |" % [f / HZ, vy, dv,
 			car.linear_velocity.length(), lat, rad_to_deg(e.z), rad_to_deg(e.x), p.y]
 	var st := PhysicsServer3D.body_get_direct_state(car.get_rid())
 	var causes := {}
@@ -98,6 +111,22 @@ func _trace(f: int, vy: float, dv: float, ln: String, lat: float, p: Vector3) ->
 			line += " %s:-" % r.name
 	print(line)
 	return causes
+
+## Every BreakableProps node in the scene -- the street poles (PLAN.md 3.11). Re-found each case because
+## zones stream in and out.
+func _pole_nodes() -> Array:
+	var out: Array = []
+	for n in world.find_children("Breakable_*", "MultiMeshInstance3D", true, false):
+		if n.has_method("breaks_total_now"):
+			out.append(n)
+	return out
+
+func _breaks_total() -> int:
+	var t := 0
+	for n in _pole_nodes():
+		t += int(n.call("breaks_total_now"))
+	return t
+
 
 func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float = -1.0) -> bool:
 	var lane := _lane(lane_name)
@@ -125,6 +154,10 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 	ctrl.set("lateral_offset", offset)
 	if corner_accel >= 0.0:
 		ctrl.set("corner_lateral_accel", corner_accel)
+	# Normally blind to other cars, so a launch run is not spoiled by traffic it did not mean to measure --
+	# but rear-ending an ambient car IS one of 0.7's causes, and it masks the rest, so it can be switched on.
+	if _arg("see-obstacles", "") != "":
+		ctrl.set("see_obstacles", _arg("see-obstacles", "0") != "0")
 	car.add_child(ctrl)
 	world.add_child(car)
 	car.global_position = at + Vector3(0, 0.8, 0) + dir.cross(Vector3.UP) * offset
@@ -145,6 +178,18 @@ const GATE_CASES := [
 ]
 
 func _initialize() -> void:
+	if _arg("wheel-sensor", "") != "":
+		# The config is a shared .tres, loaded from the resource cache, so writing it here reaches every car
+		# built afterwards -- which is what a sensor comparison wants. It must happen BEFORE any car enters
+		# the tree (VehicleWheel._ready builds its probe there), and it cannot be done through the car node:
+		# a godot-jvm @Export resource reads as null while its node is off-tree.
+		var cfg := load(VEHICLE_CFG)
+		cfg.set("wheel_sensor", int(_arg("wheel-sensor", "0")))
+		print("probe: wheel sensor %s (0 rays, 1 sphere, 2 tyre cylinder)" % str(cfg.get("wheel_sensor")))
+	if _arg("phys", "") != "":
+		Engine.physics_ticks_per_second = int(_arg("phys", "60"))
+		HZ = float(Engine.physics_ticks_per_second)
+		print("probe: physics at %d Hz" % Engine.physics_ticks_per_second)
 	world = (load(_arg("world", WORLD)) as PackedScene).instantiate()
 	root.add_child(world)
 	current_scene = world
@@ -184,6 +229,9 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 			str(ctrl.get("corner_lateral_accel")) + " m/s2", waited / 60.0])
 
 	var prev_vy := 0.0
+	var pole_hits := 0
+	var breaks0 := _breaks_total()
+	var prev_breaks := breaks0
 	var launches := 0
 	var off_road_launches := 0
 	var worst_lat := 0.0
@@ -198,7 +246,8 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 	var prev_lane_y := NAN
 	var hist: Array = []          # [vy, causes] per tick, last WINDOW ticks
 	var cooldown := 0
-	for f in range(int(seconds * 60)):
+	var hz := HZ
+	for f in range(int(seconds * hz)):
 		await physics_frame
 		if not is_instance_valid(car):
 			break
@@ -216,15 +265,30 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 		# is not a launch. A lane change (junction) resets the reference.
 		var road_vy := 0.0
 		if ln == prev_lane and is_finite(lane_y) and is_finite(prev_lane_y):
-			road_vy = (lane_y - prev_lane_y) * 60.0
+			road_vy = (lane_y - prev_lane_y) * hz
 		prev_lane = ln
 		prev_lane_y = lane_y
 		var on_road := is_finite(lat) and absf(lat) <= ON_ROAD_M
 		if is_finite(lat):
 			worst_lat = maxf(worst_lat, absf(lat))
 		if ln != last_lane:
-			print("  t=%5.1f  lane %s  speed %.1f m/s  at (%.1f, %.1f, %.1f)" % [f / 60.0, ln, car.linear_velocity.length(), p.x, p.y, p.z])
+			print("  t=%5.1f  lane %s  speed %.1f m/s  at (%.1f, %.1f, %.1f)" % [f / HZ, ln, car.linear_velocity.length(), p.x, p.y, p.z])
 			last_lane = ln
+		# PLAN.md 0.8: what the car MEETS. A pole at or above break_speed is knocked down before the contact
+		# happens, so the knock-down is what a fast drive shows and the contact what a slow one shows.
+		var breaks := _breaks_total()
+		if breaks != prev_breaks:
+			print("  POLE t=%5.1f  %d knocked down  speed %.1f m/s  lane %s  %.2f m right of it  at (%.0f, %.0f, %.0f)"
+					% [f / HZ, breaks - prev_breaks, car.linear_velocity.length(), ln, lat, p.x, p.y, p.z])
+			prev_breaks = breaks
+		var cst := PhysicsServer3D.body_get_direct_state(car.get_rid())
+		for i in range(cst.get_contact_count()):
+			if not _name_of(cst.get_contact_collider_object(i)).contains("Breakable_"):
+				continue
+			pole_hits += 1
+			print("  POLE HIT t=%5.1f  speed %.1f m/s  lane %s  %.2f m right of it  at (%.0f, %.0f, %.0f)"
+					% [f / HZ, car.linear_velocity.length(), ln, lat, p.x, p.y, p.z])
+			break
 		var vy := car.linear_velocity.y - road_vy
 		var dv := vy - prev_vy
 		prev_vy = vy
@@ -232,7 +296,7 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 		if dv > TRACE_DV:
 			causes = _trace(f, vy, dv, ln, lat, p)
 		hist.append([vy, causes])
-		if hist.size() > WINDOW:
+		if hist.size() > int(WINDOW * hz / 60.0):
 			hist.pop_front()
 		var lo := INF
 		for h in hist:
@@ -241,8 +305,8 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 		if on_road:
 			max_rise = maxf(max_rise, rise)
 		cooldown -= 1
-		if rise > RISE_DV and cooldown <= 0 and f > SETTLE_TICKS:
-			cooldown = WINDOW
+		if rise > RISE_DV and cooldown <= 0 and f > SETTLE_TICKS * hz / 60.0:
+			cooldown = int(WINDOW * hz / 60.0)
 			var why := {}
 			for h in hist:
 				for k in h[1]:
@@ -256,13 +320,13 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 			else:
 				off_road_launches += 1
 			print("  %s t=%.2f  vy rose %.2f m/s in %.2f s  speed %.1f  lane %s  %.2f m right of it  at (%.0f, %.0f, %.0f)  from: %s"
-					% ["LAUNCH" if on_road else "off-road bounce", f / 60.0, rise, WINDOW / 60.0,
+					% ["LAUNCH" if on_road else "off-road bounce", f / HZ, rise, WINDOW / 60.0,
 					car.linear_velocity.length(), ln, lat, p.x, p.y, p.z, ", ".join(why.keys())])
 		# A FALL: the car is metres below the lane it is on (through or over a wall, off a deck edge). On an elevated
 		# road that is the defect the wall test (--offset beside a barrier) exists to find.
-		if f > 60 and is_finite(lane_y) and p.y < lane_y - 3.0 and not (is_finite(lat) and absf(lat) > 25.0):
+		if f > hz and is_finite(lane_y) and p.y < lane_y - 3.0 and not (is_finite(lat) and absf(lat) > 25.0):
 			falls += 1
-			print("  FELL t=%.1f  %.1f m below lane %s, %.2f m right of it, at (%.0f, %.0f, %.0f), %.1f m/s" % [f / 60.0,
+			print("  FELL t=%.1f  %.1f m below lane %s, %.2f m right of it, at (%.0f, %.0f, %.0f), %.1f m/s" % [f / HZ,
 					lane_y - p.y, ln, lat, p.x, p.y, p.z, car.linear_velocity.length()])
 			respawns += 1
 			if respawns > 2 or not _spawn(lane_name, speed, offset, corner_accel):
@@ -273,9 +337,9 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 			last_lane = ""
 			last_pos = car.global_position
 			continue
-		if f > 60 and (p.y < -30.0 or (is_finite(lat) and absf(lat) > 25.0)):
+		if f > hz and (p.y < -30.0 or (is_finite(lat) and absf(lat) > 25.0)):
 			respawns += 1
-			print("  t=%.1f car off the network (y %.1f, lane '%s', %.1f m right of it) -- respawning" % [f / 60.0, p.y, ln, lat])
+			print("  t=%.1f car off the network (y %.1f, lane '%s', %.1f m right of it) -- respawning" % [f / HZ, p.y, ln, lat])
 			if respawns > 2 or not _spawn(lane_name, speed, offset, corner_accel):
 				break
 			prev_vy = 0.0
@@ -286,8 +350,9 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 	if is_instance_valid(car):
 		car.queue_free()
 		car = null
-	print("--- %s at %.0f m/s, offset %+.1f m: drove %.0f m, %d launches on the road (vy +%.1f m/s within %.2f s), %d more off it, worst on-road rise %.2f m/s, worst lateral %.1f m, %d falls, %d respawns"
-			% [lane_name, speed, offset, dist, launches, RISE_DV, WINDOW / 60.0, off_road_launches, max_rise, worst_lat, falls, respawns])
+	var broke := _breaks_total() - breaks0
+	print("--- %s at %.0f m/s, offset %+.1f m: drove %.0f m, %d launches on the road (vy +%.1f m/s within %.2f s), %d more off it, worst on-road rise %.2f m/s, worst lateral %.1f m, %d falls, %d respawns, %d poles knocked down, %d pole contacts"
+			% [lane_name, speed, offset, dist, launches, RISE_DV, WINDOW / 60.0, off_road_launches, max_rise, worst_lat, falls, respawns, broke, pole_hits])
 	for k in by_cause:
 		print("    %3d  %s" % [by_cause[k], k])
 	return launches + falls
