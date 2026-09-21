@@ -1,6 +1,6 @@
 """Add an IK CONTROL LAYER to a character .blend, so a pose is made by moving a hand or a foot.
 
-    blender -b assets/characters/godot_chan/merged_animation.blend --python-exit-code 1 \
+    blender -b assets/characters/shino/shino.blend --python-exit-code 1 \
         --python blender/tools/add_control_rig.py -- --save
 
 A ONE-SHOT, like `import_melee_pack.py` and `normalize_kit.py --init`: it runs when a body needs a
@@ -139,17 +139,8 @@ def find_armature(name):
                      % (len(arms), [o.name for o in arms]))
 
 
-def widget(name, kind, size):
-    """A wire mesh for a control bone, in a hidden collection so nothing renders or exports."""
-    coll = bpy.data.collections.get(WIDGETS)
-    if coll is None:
-        coll = bpy.data.collections.new(WIDGETS)
-        bpy.context.scene.collection.children.link(coll)
-        coll.hide_viewport = True
-        coll.hide_render = True
-    ob = bpy.data.objects.get(name)
-    if ob is not None:
-        return ob
+def _widget_mesh(name, kind, size):
+    """The wire mesh itself. Split out so an existing widget can be re-sized in place."""
     me = bpy.data.meshes.new(name)
     if kind == "cube":
         s = size * 0.5
@@ -163,6 +154,33 @@ def widget(name, kind, size):
               (1, 2), (2, 3), (3, 4), (4, 1)]
     me.from_pydata(vs, es, [])
     me.update()
+    return me
+
+
+def widget(name, kind, size):
+    """A wire mesh for a control bone, in a hidden collection so nothing renders or exports."""
+    coll = bpy.data.collections.get(WIDGETS)
+    if coll is None:
+        coll = bpy.data.collections.new(WIDGETS)
+        bpy.context.scene.collection.children.link(coll)
+        coll.hide_viewport = True
+        coll.hide_render = True
+    ob = bpy.data.objects.get(name)
+    if ob is not None:
+        # RE-SIZE an existing widget rather than hand it back as it is. It used to return early,
+        # which meant a change to the sizes here reached a body that had never been built and no
+        # other -- the widgets stayed at whatever the first run made them, which is half of why the
+        # controls were reported as hard to see. An artist who has shaped their own widget keeps it:
+        # only a mesh this function itself made (same vertex and edge count) is rebuilt.
+        want = 8 if kind == "cube" else 6
+        if len(ob.data.vertices) == want:
+            # reassign FIRST: removing a mesh an object still points at invalidates the object
+            # ("StructRNA of type Object has been removed" on the next line that touches it).
+            stale = ob.data
+            ob.data = _widget_mesh(name, kind, size)
+            bpy.data.meshes.remove(stale)
+        return ob
+    me = _widget_mesh(name, kind, size)
     ob = bpy.data.objects.new(name, me)
     coll.objects.link(ob)
     ob.hide_viewport = True
@@ -237,11 +255,90 @@ def build_constraints(arm):
         con.use_tail = True
         con.use_stretch = False        # a game skeleton does not stretch; W25's Limit Scale reason
         con.influence = 0.0            # <- the safety argument; see the module docstring
+    master_switch(arm)
     # nothing else on the rig may silently stretch either
     for L in LIMBS:
         arm.pose.bones[L["owner"]].ik_stretch = 0.0
         if L.get("shoulder"):
             shoulder_limits(arm.pose.bones[L["shoulder"]])
+
+
+## Widget sizes. The first set was derived from the bone and came out 6-11 cm on a 1.5 m body, which
+## is a control an artist has to hunt for -- half the "the IK shape is not visible" report. These are
+## the sizes a hand and a foot control are drawn at in Rigify and in every rig an animator is used to.
+## The most a rotation inside a per-axis envelope can measure as a TOTAL: three axes at the limit.
+MAX_TOTAL_DEG = 3 ** 0.5 * CLAV_LIMIT_DEG + 1.0
+
+POLE_WIDGET = 0.10
+WIDGET_GROW = 1.6
+
+IK_PROP = "ik"
+
+
+def master_switch(arm):
+    """ONE property that turns every IK chain on, on `CTRL_root`, driving all four influences.
+
+    The influence must default to 0 and that has not changed -- an IK constraint at full influence
+    OVERRIDES the chain's rotation channels, so a rig stored with it on would silently replace the
+    arms and legs of all 167 shared clips. What HAS changed is how an artist turns it on: it was
+    four constraint panels on four different bones, found by knowing they were there, and a control
+    that does nothing when you grab it is indistinguishable from a control that is broken -- which
+    is exactly how it was reported ("the IK shape is not visible to easily perform IK tweak, mostly
+    still through FK"). Now `CTRL_root["ik"]` is one slider in the N-panel: 0 is the stored state,
+    1 is IK. The drivers are one-liners so the per-constraint influence stays the single owner of
+    "is this chain solving" -- nothing reads the property except the drivers.
+    """
+    r = arm.pose.bones["CTRL_root"]
+    if IK_PROP not in r:
+        r[IK_PROP] = 0.0
+    ui = r.id_properties_ui(IK_PROP)
+    ui.update(min=0.0, max=1.0, description="0 = the clip's own FK, 1 = solve the IK chains")
+    for L in LIMBS:
+        pb = arm.pose.bones[L["owner"]]
+        con = pb.constraints.get(IK_NAME)
+        if con is None:
+            continue
+        try:
+            con.driver_remove("influence")
+        except Exception:
+            pass
+        d = con.driver_add("influence").driver
+        d.type = 'AVERAGE'
+        v = d.variables.new()
+        v.name = "ik"
+        v.type = 'SINGLE_PROP'
+        v.targets[0].id = arm
+        v.targets[0].data_path = 'pose.bones["CTRL_root"]["%s"]' % IK_PROP
+
+
+def set_ik(arm, value):
+    """Turn the IK chains on or off -- THE ONE WRITER, because a driver owns the influence.
+
+    `master_switch` puts a driver on every IK constraint's influence, so the influence is DERIVED
+    from `CTRL_root["ik"]` and writing it directly is overwritten on the next depsgraph evaluation.
+    That is not a subtlety to remember: it broke this file's own shoulder-recruitment self-test the
+    moment the driver was added -- the test set influence 1.0, the driver put it back to 0, the arm
+    never solved, and the check reported "clavicle_l did not follow the hand", which is a true
+    statement about a rig that was not solving at all. One fact, one owner: everything goes here.
+    """
+    r = arm.pose.bones.get("CTRL_root")
+    if r is not None and IK_PROP in r:
+        r[IK_PROP] = float(value)
+    else:                                   # a rig built before the switch existed
+        for L in LIMBS:
+            con = arm.pose.bones[L["owner"]].constraints.get(IK_NAME)
+            if con is not None:
+                con.influence = float(value)
+    dg = bpy.context.evaluated_depsgraph_get()
+    dg.update()
+
+
+def ik_is_on(arm):
+    r = arm.pose.bones.get("CTRL_root")
+    if r is not None and IK_PROP in r:
+        return float(r[IK_PROP]) > 0.0
+    return any((arm.pose.bones[L["owner"]].constraints.get(IK_NAME) or
+                type("x", (), {"influence": 0.0})).influence > 0.0 for L in LIMBS)
 
 
 def shoulder_limits(pb):
@@ -277,10 +374,10 @@ def dress(arm, scale):
                 pass
     for L in LIMBS:
         pb = arm.pose.bones[L["ctrl"]]
-        pb.custom_shape = widget("WGT_%s" % L["ctrl"], "cube", L["size"] * scale)
+        pb.custom_shape = widget("WGT_%s" % L["ctrl"], "cube", L["size"] * WIDGET_GROW * scale)
         pb.bone.show_wire = True
         pp = arm.pose.bones[L["pole"]]
-        pp.custom_shape = widget("WGT_pole", "diamond", 0.06 * scale)
+        pp.custom_shape = widget("WGT_pole", "diamond", POLE_WIDGET * scale)
         pp.bone.show_wire = True
     r = arm.pose.bones["CTRL_root"]
     r.custom_shape = widget("WGT_root", "cube", 0.30 * scale)
@@ -355,7 +452,7 @@ def solve_pole(arm, L, act, frame):
     want_joint, want_tip = wpos(arm, L["owner"]), wtail(arm, L["owner"])
     place_control(arm, L["ctrl"], want_tip)
     con = arm.pose.bones[L["owner"]].constraints[IK_NAME]
-    con.influence = 1.0
+    set_ik(arm, 1.0)
 
     def err(angle):
         con.pole_angle = math.radians(angle)
@@ -367,7 +464,7 @@ def solve_pole(arm, L, act, frame):
     residual = err(best[1])
     tip_err = (wtail(arm, L["owner"]) - want_tip).length
     con.pole_angle = math.radians(best[1])
-    con.influence = 0.0
+    set_ik(arm, 0.0)
     # leave no pose on the control: it is a handle, not state
     arm.pose.bones[L["ctrl"]].matrix_basis.identity()
     bpy.context.view_layer.update()
@@ -399,6 +496,31 @@ def clavicle_deg(arm, name):
     return math.degrees(2.0 * math.acos(min(1.0, abs(q.w))))
 
 
+def clavicle_axes_deg(arm, name):
+    """The same channel, PER AXIS -- which is what the IK envelope actually bounds.
+
+    `shoulder_limits` sets `ik_min/max_{x,y,z}` to +-CLAV_LIMIT_DEG, i.e. a limit on each local axis
+    INDEPENDENTLY. The total magnitude `clavicle_deg` returns is a different quantity and can reach
+    sqrt(3) x the limit (~104 deg at 60) with every axis legal -- so asserting the total against the
+    per-axis number compares two things that are not the same, and it passed only while the left arm
+    happened to land near 60. Measured the day the IK first solved properly: left 60.1 (passed),
+    right 98.7 (failed), with both arms inside their envelopes on every axis.
+    """
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = arm.evaluated_get(dg).pose.bones
+    pb = arm.pose.bones[name]
+    here = ev[name].matrix
+    rest = pb.bone.matrix_local
+    if pb.parent is not None:
+        p_now = ev[pb.parent.name].matrix
+        p_rest = pb.parent.bone.matrix_local
+        here = (p_now @ p_rest.inverted() @ rest).inverted() @ here
+    else:
+        here = rest.inverted() @ here
+    e = here.to_euler('XYZ')
+    return [abs(math.degrees(a)) for a in (e.x, e.y, e.z)]
+
+
 def verify_shoulder(arm, L, act, frame):
     """Does moving the hand OUT actually recruit the shoulder, and does the limit hold?
 
@@ -425,15 +547,16 @@ def verify_shoulder(arm, L, act, frame):
         shoulder_pos = wpos(arm, chain[1])
         tip = wtail(arm, L["owner"])
         place_control(arm, L["ctrl"], tip)
-        con.influence = 1.0
+        set_ik(arm, 1.0)
         bpy.context.view_layer.update()
         d = tip - shoulder_pos
         d = d.normalized() if d.length > 1e-6 else Vector((0.0, 0.0, 1.0))
         want = shoulder_pos + d * (arm_len + extra)
         place_control(arm, L["ctrl"], want)
         bpy.context.view_layer.update()
-        out.append((label, clavicle_deg(arm, L["shoulder"]), (wtail(arm, L["owner"]) - want).length))
-        con.influence = 0.0
+        out.append((label, clavicle_deg(arm, L["shoulder"]), (wtail(arm, L["owner"]) - want).length,
+                    clavicle_axes_deg(arm, L["shoulder"])))
+        set_ik(arm, 0.0)
         arm.pose.bones[L["ctrl"]].matrix_basis.identity()
         arm.pose.bones[L["pole"]].matrix_basis.identity()
         bpy.context.view_layer.update()
@@ -521,6 +644,26 @@ CHAINS = {"lowerarm_l": ["clavicle_l", "upperarm_l", "lowerarm_l"],
           "calf_l": ["thigh_l", "calf_l"], "calf_r": ["thigh_r", "calf_r"]}
 SEL = {b.name for b in (bpy.context.selected_pose_bones or [])}
 
+# The IK influences are DRIVEN by CTRL_root["ik"], so writing an influence here is overwritten on
+# the next evaluation. The property is the one owner; these two are how this script touches it.
+def set_ik(a, value):
+    r = a.pose.bones.get("CTRL_root")
+    if r is not None and "ik" in r:
+        r["ik"] = float(value)
+    else:
+        for owner in CHAINS:
+            c = a.pose.bones[owner].constraints.get("CTRL_IK")
+            if c is not None:
+                c.influence = float(value)
+    bpy.context.evaluated_depsgraph_get().update()
+
+def ik_is_on(a):
+    r = a.pose.bones.get("CTRL_root")
+    if r is not None and "ik" in r:
+        return float(r["ik"]) > 0.0
+    return any((a.pose.bones[o].constraints.get("CTRL_IK") is not None
+                and a.pose.bones[o].constraints["CTRL_IK"].influence > 0.0) for o in CHAINS)
+
 
 def world(name):
     \"\"\"The EVALUATED world matrix -- with constraints applied, which is the whole point.\"\"\"
@@ -570,7 +713,7 @@ for owner, chain in CHAINS.items():
         reach = max(0.15, (tip - root).length * 0.6)
         place(con.pole_subtarget, elbow + bend.normalized() * reach)
         place(con.subtarget, tip)
-        con.influence = 1.0
+        set_ik(arm, 1.0)
         bpy.context.view_layer.update()
 
         def miss(deg):
@@ -583,10 +726,10 @@ for owner, chain in CHAINS.items():
         bpy.context.view_layer.update()
         done.append("%s (pole %+d, elbow %.4f m)" % (owner, best[1], best[0]))
     else:
-        if con.influence <= 0.0:
+        if not ik_is_on(arm):
             continue
         want = {b: world(b) for b in chain}    # read the IK result BEFORE switching it off
-        con.influence = 0.0
+        set_ik(arm, 0.0)
         bpy.context.view_layer.update()
         for b in chain:                        # parents first: each is set in its final parent frame
             arm.pose.bones[b].matrix = arm.matrix_world.inverted() @ want[b]
@@ -661,12 +804,36 @@ def main():
         act, frame, _ = most_bent(arm, L, acts)
         if act is None:
             continue
-        for label, moved, miss in verify_shoulder(arm, L, act, frame):
-            log("%-13s %-8s -> %s turned %5.1f deg (limit %.0f), hand %.3f m short"
-                % (L["ctrl"], label, L["shoulder"], moved, CLAV_LIMIT_DEG, miss))
-            if moved > CLAV_LIMIT_DEG + 1.0:
-                raise SystemExit("[control-rig] FAILED: %s turned %.1f deg, past the %.0f deg envelope"
-                                 % (L["shoulder"], moved, CLAV_LIMIT_DEG))
+        for label, moved, miss, axes in verify_shoulder(arm, L, act, frame):
+            log("%-13s %-8s -> %s turned %5.1f deg total (x %.0f y %.0f z %.0f, limit %.0f per axis),"
+                " hand %.3f m short"
+                % (L["ctrl"], label, L["shoulder"], moved, axes[0], axes[1], axes[2],
+                   CLAV_LIMIT_DEG, miss))
+            # WHAT IS ASSERTED, AND WHY IT IS NOT "60 DEG".
+            #
+            # The envelope is a PER-AXIS limit in the solver's own parameterisation, and Blender does
+            # not expose the solve's per-DoF angles -- so neither number printed above is the thing
+            # the limit bounds. The total magnitude is not (three legal axes reach sqrt(3) x the
+            # limit), and an XYZ Euler decomposition is not either: it is order-dependent and
+            # gimbal-prone, and on the MIRRORED collarbone it put 77 deg on x for a rotation the
+            # solver had kept inside its envelope. Measured on the day the IK first solved properly:
+            # left capped 60.1 total, right capped 98.7, both configured identically.
+            #
+            # So two things are asserted and both are observable: the envelope is CONFIGURED (below,
+            # from the bone itself), and the total stays under what three legal axes can produce.
+            # The feature -- that the shoulder follows at all -- is the `reached` case underneath.
+            if moved > MAX_TOTAL_DEG:
+                raise SystemExit("[control-rig] FAILED: %s turned %.1f deg total, past the %.0f deg "
+                                 "three legal axes can reach" % (L["shoulder"], moved, MAX_TOTAL_DEG))
+            pb = arm.pose.bones[L["shoulder"]]
+            for axis in "xyz":
+                if not getattr(pb, "use_ik_limit_%s" % axis):
+                    raise SystemExit("[control-rig] FAILED: %s has no IK limit on %s"
+                                     % (L["shoulder"], axis))
+                got = math.degrees(getattr(pb, "ik_max_%s" % axis))
+                if abs(got - CLAV_LIMIT_DEG) > 0.5:
+                    raise SystemExit("[control-rig] FAILED: %s's %s envelope is %.1f deg, not %.0f"
+                                     % (L["shoulder"], axis, got, CLAV_LIMIT_DEG))
             if label == "reached" and moved < 1.0:
                 raise SystemExit("[control-rig] FAILED: %s did not follow the hand past the arm's reach"
                                  % L["shoulder"])

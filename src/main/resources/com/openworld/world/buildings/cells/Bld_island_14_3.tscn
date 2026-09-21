@@ -1,0 +1,31 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Warehouse.tscn" id="1"]
+[ext_resource type="Material" path="res://assets/world_source/kits/road_kit/materials/M_TileWhite.tres" id="lotmat"]
+
+[sub_resource type="BoxMesh" id="LotBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Lots"]
+transform_format = 1
+instance_count = 1
+mesh = SubResource("LotBox")
+buffer = PackedFloat32Array(34.0476, 0.0000, -30.6204, 1515.8622, 0.0000, 0.6100, 0.0000, 0.5050, 60.5235, 0.0000, 17.2255, -1038.6724)
+
+[sub_resource type="BoxShape3D" id="LotShape0"]
+size = Vector3(69.443, 0.610, 35.133)
+
+[node name="Bld_island_14_3" type="Node3D"]
+
+[node name="Warehouse_000" parent="." instance=ExtResource("1")]
+transform = Transform3D(0.490295, 0, -0.871556, 0, 1, 0, 0.871556, 0, 0.490295, 1518.978, 0.830, -1023.206)
+
+[node name="Lots" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Lots")
+
+[node name="LotCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Lot0" type="CollisionShape3D" parent="LotCollision"]
+transform = Transform3D(0.490295, 0, -0.871556, 0, 1, 0, 0.871556, 0, 0.490295, 1515.862, 0.505, -1038.672)
+shape = SubResource("LotShape0")

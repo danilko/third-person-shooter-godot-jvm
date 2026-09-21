@@ -1,6 +1,6 @@
 """Write the skeleton CONTRACT's rest pose to `assets/characters/skeleton_rest.json`.
 
-    blender -b assets/characters/godot_chan/merged_animation.blend --python-exit-code 1 \
+    blender -b assets/characters/shino/shino.blend --python-exit-code 1 \
         --python blender/tools/dump_skeleton_rest.py
 
 The contract every body presents is bone NAMES plus rest ORIENTATIONS (see

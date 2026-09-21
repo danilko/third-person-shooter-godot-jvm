@@ -5294,10 +5294,15 @@ the AnimationTree needs no edit). Re-running is idempotent; `--only a,b` rebuild
   `R_t = R_s @ R_s_rest^-1 @ R_t_rest`. Positions come down the TARGET's chain; the pelvis takes the
   source pelvis scaled by the rest pelvis heights (0.839). Root is held at the pose it has in the clip
   being replaced (else `upright_idle`), so a ring's Root baseline does not move.
-- **Auto-Rig Pro was not used.** Its Remap would do the same job interactively, but in headless Blender
-  5.2 it fails to register (draw-handler errors) and it is driven by scene/UI state, so it is not a
-  reproducible build step. Converting the rig to ARP/Rigify would rename the bones every modifier and
-  the Java address — the deform skeleton is already a game skeleton; keep it.
+- **Auto-Rig Pro was not used.** Its Remap would do the same job interactively, but it is driven by
+  scene/UI state, so it is not a reproducible build step. Converting the rig to ARP/Rigify would
+  rename the bones every modifier and the Java address — the deform skeleton is already a game
+  skeleton; keep it.
+  **CORRECTION (W48, 2026-09-20): "it fails to register (draw-handler errors)" is no longer true and
+  should not be quoted.** Re-measured under `blender -b`: `auto_rig_pro` and
+  `auto_rig_pro_quick_rig` are both `enabled=True loaded=True` and register **185 operators**
+  (`bpy.ops.arp`), plus `arp_export_scene.fbx`. Whether its rig GENERATION completes headless was
+  not tested. The reasons not to adopt it stand on other ground — see W48.
 - **Replaced:** `drive_idle` <- `Driving_Loop` (a real seated, hands-on-wheel pose); `attack_jab_fist` /
   `attack_cross_fist` <- `Punch_Jab` / `Punch_Cross`; `attack_stab_mw1` <- `Punch_Cross` (a right-hand
   thrust); `attack_slash_mw1` <- `Sword_Regular_A+…_A_Rec`; `attack_swing_mw2` <- `Sword_Regular_B+…_B_Rec`;
@@ -6186,6 +6191,401 @@ swim — the four-stance matrix 6.14 named as the verification gap that let W44 
 `probe_body_contract` 3/3 on both VRoid bodies; `probe_self_hit`, `probe_support_hand_ik`,
 `probe_switch_spin`, `probe_crawl_balance`, `probe_melee`, `probe_recoil_kick`, `probe_fps_camera`,
 `probe_weapon_{sockets,holster,archetypes}` PASS; `./gradlew build test` green.
+
+### W46 — THE EYE KEEPS UP WITH A STANCE CHANGE, AND A HOLSTER IS DERIVED ON EVERY BODY (2026-09-20)
+
+Two of the three open per-body items, and both were a measurement that had ONE owner too few.
+
+**1. The FPS eye lagged a stance change, and the filter was working exactly as designed.** W5 splits the
+neck mount's motion into a slow average (`baselineFollow`, 6/s) that IS the resting eye point and a
+scaled, clamped residual that is the bob. That is right while the rest point is STILL — and a crouch
+moves the rest point itself **~0.33 m in ~0.17 s**, so the filter correctly classified the whole of it
+as "fast", clamped it to `maxBoneOffset` (0.08 m) and admitted a quarter, leaving the 6/s baseline as
+the only thing that could travel the distance. Measured before: the camera sat **0.23 m** below the
+true eye at the frame the body had already arrived, and took **0.55 s** to come within 2 cm — the head
+finishes standing and the view is still crouched.
+
+- **A rate, not a snap, and for a measured reason:** the head has not moved yet on the frame the stance
+  changes (the animation blends over the frames after it), so a snap on the signal frame catches up to
+  the OLD pose and then lags exactly as before. `stanceFollow` (30/s) replaces `baselineFollow` for
+  `stanceCatchUpSeconds` (0.35 s) — a touch longer than the transition, no longer.
+- **30 is the knee, and past it the bound is something else.** Swept: 0 (the control) settles in 34
+  frames, 30 in 15, 45 in 14, 60 in 13 — because at 30 the baseline's time constant (33 ms) is already
+  under `positionSmoothing`'s (40 ms), so a faster baseline buys a frame and admits more bob for it.
+- **Read, never latched.** The window opens on the character's own `getStanceOrdinal()` changing, not on
+  a `changed_stance` connection: "which stance am I in" already has one owner, a signal would have to be
+  added to every character scene and could then be missing from one of them, and this way a body
+  re-stanced by replication or by a script gets the same treatment.
+- Gate: `probe_fps_camera.gd` case 5 (2 new checks) — at the frame the body has arrived the eye is
+  within 0.12 m and within 2 cm by frame 20, asserted against the MOUNT rather than an expected height,
+  because where the true eye is is a fact about the body (W41). Measured after: **0.07/0.09 m** and
+  frame 14/15. `-- --control` sets `stance_follow` 0 and fails exactly those 2 (0.22 m, frame 33/34).
+
+**2. Every holster socket is derived now, by ONE rule: keep at least the clearance the REFERENCE keeps,
+from BOTH surfaces, AT EVERY HEIGHT of the band the weapon hangs in.** The hip pair was the last
+transferred number in `measure_body.gd` (the reference's authored transform scaled by thigh-BONE
+separation, which is not skin width), and the back slings were designed afresh on each body against one
+band of its upper back. `probe_weapon_holster.gd` failed **5 checks on Shino and 7 on Fumiriya**.
+
+Four things had to be true at once, and each was a wrong answer first:
+- **The arms are not the waist, and they are exactly where the waist is.** Every skin reading is taken
+  standing with the arms DOWN, so the widest thing in a sideways wedge at hip height is the HAND hanging
+  beside the hip: measured **0.282 m** on the reference, where her waist is ~0.15, and the derived
+  clearance came out NEGATIVE on three of four sockets — "the authored holster is inside the body",
+  which it is not. A vertex is waist skin only if the bone that owns it is not below a collarbone.
+  (W24's shoulder column finding the forearm, from the other side.)
+- **There are TWO surfaces and a holster has to clear both.** The SKIN is what a player sees a pistol
+  rest against; the CAPSULES are what everything at runtime treats as the body — bullets, and this
+  gate — and W41 sizes each from a percentile of the skin around ONE BONE, so a round capsule
+  legitimately bulges past a slim waist while a skin reading legitimately reaches past a capsule at the
+  hip. Against the skin alone, Fumiriya's PIS1 came out **30.7%** inside his spine capsules; against the
+  capsules alone, the reference's own two rear-hip sockets sit **3–5 cm INSIDE** them, so carrying that
+  clearance put a knife deep inside a narrower body. Neither is "the surface".
+- **A single number per surface is not enough either.** Fumiriya's widest point in the band is his
+  THIGH, 12 cm below the socket, where a pistol is already past the body — so matching that clearance
+  still left the gun 2.3 cm inside his spine capsules. The clearance is carried **per slice** (27, 1 cm
+  apart), by the slice's own offset from the socket, and the slice that binds on this body decides.
+- **The band is where the weapon HANGS, not where the socket is.** A holstered weapon hangs by its
+  GRIP, so it reaches well below the socket and barely above it: 0.20 m down / 0.06 m up at the hip,
+  0.60/0.30 for a long gun on the back.
+
+**The back slings go through the same rule**, with the reference's own design as the thing reproduced
+rather than a fresh design per body — one rule for every holster socket. Measured: Fumiriya's SMG1 was
+13.8% inside his spine and shoulder capsules because a sling clear of his upper back is not clear of his
+lumbar curve.
+
+**The gate learned the same lesson it taught.** Its poke test counted the ARMS, which is the one part of
+the body a belt holster is expected to be under and which no static placement can clear — measured, a
+knife correctly on Shino's right hip reads **0.072 m** inside her hanging forearm while the deepest it
+reaches into her torso and legs is 0.023 m. Arm hitboxes are excluded from the judgement and reported on
+their own line, because a weapon buried in a SHOULDER would still be wrong.
+
+**The reference reproduces itself exactly** — the four hip sockets to the last rounded digit, positions
+identical — which is the property the whole file is built on (W41).
+
+Gates: `probe_weapon_holster.gd` **PASS on all three bodies**; `measure_body.gd -- --control` puts the
+bone-separation transfer back and fails 2 on Shino / 1 on Fumiriya. Unchanged: `probe_weapon_fit` PASS
+on **3 bodies x 4 stances** (the matrix W44's regression made mandatory), `probe_character_visuals`
+10/10 on each VRoid body, AimDebugAuto 40/40, `probe_shared_anims` 2/2, `probe_body_contract` 3/3 each,
+`probe_melee`, `probe_support_hand_ik`, `probe_self_hit`, `probe_switch_spin`, `probe_crawl_balance`,
+`probe_weapon_{sockets,archetypes}`, `probe_vehicle_views`, `probe_sniper_scope`, `probe_scope_sway`
+PASS; `./gradlew build test` green.
+
+**Measured away, not built: the `shotgun` grip archetype (PLAN.md 6.12).** W45's new upright aim pose
+plus W44's clavicle protraction closed the reach on their own — Shino now measures **SHG1 0.035 m** and
+**SNR1 0.002 m** against a 0.05 tolerance, where 6.12 was written against 0.105 and 0.065. What is left
+is a LOOK question: SHG1 passes with her support shoulder pinned at the 40 deg protraction cap, so a
+shotgun-specific bladed hold would give the headroom back — and that is an AUTHORED pose. The empty
+slot was deliberately NOT created: W45 item 11 had just retired the `sniper` split because a
+placeholder archetype is four more clips to keep in sync and the sniper's had silently diverged twice.
+
+### W47 — THE CROUCH AIM POSE REACHES THE GAME, AND A STANCE DROP IS NOT ABSOLUTE METRES (2026-09-20, user-asked)
+
+Three user reports, one session, and two of them were a pose or a key that had nowhere to go.
+
+**1. THE CROUCH AIM BRANCH HAD NEVER BEEN WIRED, so an authored crouch pose could not show.**
+`crouch_aim_pistol` / `crouch_aim_rifle` have been exported and ORPHANED since W10 — crouch aimed
+from the UPRIGHT archetype clips, which is why W24 measured "the crouched upper body identical to
+upright". W45 built the mechanism for crawl (`AimStanceTransition`) and only crawl used it. Now:
+- `WeaponAimCrouch`, the crouch copy of the 10-point archetype blendspace, on a third
+  `AimStanceTransition` input; `AnimationController` drives it from the stance's own animation key
+  (`AIM_STANCE_BRANCHES`, so adding a stance is one set entry, not a new branch in an `if`).
+- **The TORSO layer needed the same dimension, and crouch is the first stance where that shows.**
+  `WeaponTorsoBlend` takes `spine_03`/`neck_01`/`head_2` from `WeaponAimTorso`, which is its own copy
+  of the archetype blendspace (a node's output feeds ONE input — W23). Wire only the arm layer and a
+  crouching body reads its ARMS from the crouch pose and its SPINE from the upright one. Crawl never
+  showed it because `Stance.weaponTorsoLayer` is off there, so the layer does not run at all. So
+  there is now an `AimStanceTorsoTransition` (Default / Crouch) as well. Measured: head-to-stock in
+  crouch went from `right -0.179` to `-0.127`, against upright's `-0.131`.
+- The 8 unauthored archetypes are minted placeholders (`crouch_aim_<arch>`, copies of their upright
+  twins) so every point is a wired, editable slot; the two AUTHORED ones are deliberately NOT listed
+  in `character_anim_naming.json`'s placeholder map, because a row there is a mint source and
+  `--refresh-placeholders` over an authored pose overwrites it.
+
+**Measured, the artist's pose now reaches the game and it costs the support hand.** The clip itself
+differs from the shipped one by about **7 deg of `spine_03`** and nothing else. In game the blade
+falls **44.5 -> 29-31 deg**, the head comes over the stock — and `probe_weapon_fit --stance=crouch`
+FAILS on all three bodies: the support hand sits **0.060 m** (ASR1), **0.083** (SNR1) and **0.116**
+(SHG1) off its grip, against a 0.05 tolerance. The cause is in the pose and is one number: it holds
+the palm **0.312 m** in front of the shoulder joint where the upright pose holds it at 0.215, so with
+the stock seated on the shoulder anchor (measured: stock-to-pocket 0.001 m, gun on the aim line) the
+`SupportPoint` ends up **0.485 m** from a **0.416 m** arm, with the protraction already pinned at its
+40 deg cap. **That is a kneeling shooter holding the rifle at arm's length rather than tucked**, and
+it is authored work, not code: bring the firing hand in toward the chest and the support hand
+follows. Shipped live rather than held back, because a gate reporting "the support hand is 6 cm off
+the gun in crouch" is the gate doing its job, and the alternative is a pose that cannot be seen.
+
+**2. "IS THE RAISED KNEE ON THE WRONG SIDE?" — YES, AND THE FIX IS TO MIRROR THE LEGS, NOT THE UPPER
+BODY.** Measured on `crouch_idle`: `calf_l` sits at **0.163 m** (the knee down, near the ground) and
+`calf_r` at **0.433 m** (the knee up), with the left foot forward and the right foot back. So the
+body kneels on its **LEFT** knee with the **RIGHT** knee raised. For a right-handed shooter the
+standard kneeling firing position is the opposite — kneel on the RIGHT knee so the LEFT (support)
+elbow can rest on the raised LEFT knee — so this clip is the mirror of it, and the raised knee is
+under the FIRING arm, which is what reads as wrong.
+- **Mirroring the UPPER body is not the fix**: it would put the weapon in the left hand, and every
+  socket, mount anchor, holster and IK target in the codebase is authored for a right-handed hold.
+- **DONE, as an X-flip of the whole crouch LOCOMOTION ring** (user's call: "flip all animation in
+  crouch with x-pose flip in blender"). `pose_weapon_hold.py flip` is new and is Blender's
+  "paste X-flipped pose" over a whole clip: where `symmetrize` averages each bone with its partner's
+  mirror to make a pose symmetric, this takes the partner's mirror OUTRIGHT, so left becomes right.
+  Same `mirror_basis` reflection, so whatever W26 established about one holds for the other, and
+  `Root` is excluded for the same reason (it carries the stance DROP, and mirroring a drop is a
+  no-op). Measured on every clip: the hip yaw and the knee asymmetry reverse sign with the magnitude
+  unchanged and the cycle's own peak-to-peak untouched -- which is what says it is a mirror and not
+  a re-pose. `crouch_idle` is now `calf_l` 0.433 UP / `calf_r` 0.163 DOWN, the exact swap.
+- **A DIRECTIONAL clip must be flipped AND EXCHANGED with its partner, not flipped in place.** All
+  nine points of `CrouchMovementBlend` are wired, and an X-flip of `crouch_walk_left` IS a
+  right-strafe -- left at the blendspace's LEFT corner it would strafe the wrong way. So
+  `--action` takes `dest=src`: `left=right`, `right=left`, and the same for both diagonal pairs,
+  with every source read BEFORE anything is written or the first write destroys the second's source.
+  Measured: `crouch_walk_forward_left` keeps its -39.7 deg hip yaw (it still turns left) while its
+  knee asymmetry takes the mirrored right clip's -0.338. `crouch_idle`, `_walk_forward`, `_walk_back`
+  and the three orphans flip in place.
+- **The aim poses are NOT flipped**, and that is the whole point: the legs move to the correct side
+  and the authored right-handed upper body stays as it is.
+- Nothing moved in any gate: AimDebugAuto 40/40 (its two crouch strafe cases included),
+  `probe_character_visuals` 10/10 on each body, `probe_melee`, `probe_crawl_balance`,
+  `probe_fps_camera`, `probe_shared_anims` PASS, and the crouch fit failures are unchanged at
+  3 / 4 / 1 -- they are the aim pose's reach, not the legs.
+
+**3. A STANCE DROP IS ABSOLUTE METRES, AND `Skeleton3D.motion_scale` IS GODOT'S OWN ANSWER.**
+User-reported: "beside godot chan, other models float in the air when shooting in crawl". Measured,
+the foot (`ball_l`) in `crawl_idle`: reference **0.163 m**, Shino **0.334**, Fumiriya **0.525** — the
+taller bodies lying a third of a metre above the ground. W40 keeps position tracks only on `Root` and
+`pelvis` precisely because everything else is a fact about the body, but those two are still metres
+authored on a 1.49 m reference, and the biggest of them is the stance drop: `crawl_idle` takes `Root`
+to -0.601 and `crouch_idle` to -0.289 whoever plays it.
+- `Skeleton3D.motion_scale` multiplies exactly those animated positions — it exists to retarget
+  position tracks onto a differently-sized skeleton — so the fix is **one property per body**, no
+  modifier, no per-frame work and no second copy of the library. The scalar is the body's own
+  **pelvis rest height over the reference's** (Shino 1.219, Fumiriya 1.4788): the drop is the pelvis
+  travelling from standing to prone, so it scales with the leg. Derived by `measure_body.gd`, written
+  by `build_character_visuals.gd`, 1.0 on the reference, which is therefore untouched.
+- **Measured after: crawl foot 0.334 -> 0.202 and 0.525 -> 0.237**, against proportional targets of
+  0.199 and 0.241 — within **4 mm**.
+- **W41 was right about CROUCH and wrong about CRAWL, and now there are numbers for both.** Its note
+  rejected leg-length scaling because "the leg rotations fold a longer leg further by themselves".
+  That is true of a FOLD and not of lying down: crouch over-corrects, the two VRoid feet landing
+  **0.022-0.030 m BELOW** the floor where they used to float 0.060-0.128 above it. A sink of 3 cm is
+  hidden by the ground and a float of 13 cm is not, so the derived scalar ships as it stands rather
+  than being tuned to a compromise neither stance asks for. **Foot grounding remains the exact
+  answer** and is now a smaller job: it has to cover a 3 cm fold error, not a 36 cm one.
+- The capsules are re-derived with it: `measure_body.gd` sets `motion_scale` on its own rig BEFORE
+  any reading, or a stance capsule would be a capsule for a pose the game never holds.
+- **Measured as the lowest skinned VERTEX, which is the question actually being asked** (the foot
+  BONE is a proxy): upright -0.006 / +0.000 / +0.001, crouch -0.012 / **-0.064** / **-0.079**,
+  `crawl_idle` **-0.078** / -0.013 / +0.030, `crawl_forward` -0.016 / -0.001 / -0.010. So in crawl
+  the two VRoid bodies now sit CLOSER to the floor than the reference does -- her own `crawl_idle`
+  has put her 7.8 cm through it since it was authored, which is a fact about that clip and not about
+  this fix.
+
+**Two tool defects found on the way, both silent and both fixed or recorded:**
+- **`rename_character_anims.py` died on a `_comment` key** in the placeholder map ("source ...
+  missing" — the value is a sentence, not a clip). W45 added that key and nothing re-ran the tool
+  since, so the very first placeholder pass after it failed. It skips `_`-prefixed keys now.
+- **`tools/godot/study_character_pose.sh` HAS BEEN STALE SINCE W40 and reports the SHIPPED pose.** It
+  re-points a scratch scene at a scratch `.glb`, which was the whole story when the body's own export
+  carried the clips — but the AnimationTree now loads `character_anims.res`, so the study measures
+  the shipped library whatever is in the blend. Caught by a control: a copy with **+25 deg** of blade
+  applied to `crouch_aim_rifle` measured byte-identical to the unmodified one (support 0.060 and
+  0.116, to the millimetre). Anything that studies a CLIP edit must rebuild the library too
+  (`tools/godot/build_character_anims.gd`) or point the study scene's tree at a scratch one.
+
+**THE POSE WAS RE-AUTHORED THE SAME DAY AND THE STRETCH IS GONE** (user). The support arm is
+0.416 m and the first pose put its target **0.459 m** away — past the point any solver can close, so
+the protraction pinned at its 40 deg cap and the hand still hung short. The re-authored pose puts it
+at **0.253 m**, the same as upright's, and the in-game grip miss went **0.060 -> 0.002 m** with
+`--stance=crouch` PASSING on all three bodies. It keeps what a kneeling pose should differ in — gun
+pitch -22.3 deg against upright's -10.9, firing elbow flare +46 against +34, the head lower over the
+stock — while matching upright on the one number that was breaking it. The lesson is the number to
+check first when a shared aim pose "stretches": **`SupportPoint` from the support shoulder against
+the arm's own length**, which `pose_weapon_hold.py measure` prints per weapon.
+
+**THE UNREACHABLE AIM CLIPS ARE DELETED, AND THE RESERVED INDICES PLAY THEIR BASE POSE** (user:
+"remove these unused ... so at least artists know which one to fix"). Four grip archetypes have no
+shipped weapon — `dual_pistol`, `shield`, `shield_melee`, `sniper` — and each carried five clips
+(aim standing / kneeling / prone, hold, draw): **20 clips no weapon could reach**, every one a copy
+of another pose. That is precisely the thing W45 item 11 retired the sniper split over, because a
+copy nobody can reach goes stale in silence, and the sniper's had already diverged twice.
+- **The INDEX LIST IS UNTOUCHED** (W12: it is append-only, and a scene stores the archetype by name
+  whose ordinal is the blendspace position). What changed is what those four points PLAY: their
+  `base`, which `weapon_archetypes.json` already declares (`dual_pistol`/`shield`/`shield_melee` ->
+  pistol, `sniper` -> rifle) — and which is exactly what the deleted copies were. So the render is
+  unchanged, measured: `probe_weapon_archetypes` still finds **4 hand-pose clusters**.
+- Their placeholder rows are gone from `character_anim_naming.json` and the names are in its
+  `delete` list, so a re-run cannot mint them back. 187 -> **167 clips**, tree refs 81 -> 71.
+- **`check_character_anim` prints the artist's list now** (`aim_coverage`): per family, which
+  archetypes have a pose of their own and which share, plus the reserved four. Today that is six
+  archetypes — pistol, rifle, launcher, melee, fist, throwable — across five families, i.e. the 30
+  poses an edit can actually change something with, down from 50.
+
+Gates: `probe_weapon_fit` PASS on **3 bodies x 4 stances**; `probe_weapon_holster` PASS on all three;
+`probe_character_visuals` 10/10 each; AimDebugAuto 40/40; `probe_melee`, `probe_support_hand_ik`,
+`probe_crawl_balance`, `probe_switch_spin`, `probe_shared_anims`, `probe_weapon_archetypes` PASS;
+`check_character_anim` 187 clips with only 6.16's four pre-existing `gun_travel` errors.
+
+### W48 — THE CONTROL RIG WAS UNUSABLE FOR THREE REASONS, AND RIGIFY GENERATES HEADLESS (2026-09-20, user-reported)
+
+User: "the IK shape is not visible to easily perform IK tweak of bones, mostly still through FK for
+the entire body." Diagnosed rather than guessed at, and it was three separate things.
+
+- **Turning IK on was four constraint influences on four different bones, all at 0.** W42's
+  influence-0 default is right and is unchanged — an IK constraint at full influence OVERRIDES the
+  chain's rotation channels, so a rig stored with it on would silently replace the arms and legs of
+  all 167 shared clips. But a control that does nothing when you grab it is indistinguishable from a
+  control that is broken. `CTRL_root["ik"]` is one slider in the N-panel now, 0..1, driving all four.
+- **The widgets were 6–11 cm on a 1.5 m body.** Hand 0.09 -> **0.144**, foot 0.11 -> **0.176**, pole
+  0.06 -> **0.10**. And `widget()` returned an existing mesh WITHOUT re-sizing it, so a change to
+  those numbers reached only a body built from scratch; it re-sizes in place now, and leaves a mesh
+  an artist has reshaped (anything but its own 8-vertex cube or 6-vertex diamond) alone.
+- **Only four chains exist — arms and legs.** Nothing for the spine, chest, head or fingers, which is
+  the "FK for the entire body" half and is NOT fixed here. See the Rigify note below.
+
+**Three defects the fix surfaced, and the first is this file's own recurring shape:**
+- **A DRIVER TAKES OWNERSHIP OF THE INFLUENCE.** Adding the switch broke the tool's own
+  shoulder-recruitment self-test instantly: it set `con.influence = 1.0`, the driver put it back to
+  the property's 0, nothing solved, and the check reported "clavicle_l did not follow the hand" —
+  a true statement about a rig that was not solving at all. `set_ik()` is the ONE writer now, and
+  the artist-facing GRAB/BAKE text block carries its own copy, because it runs in its own scope.
+- **Once the IK actually solved, the stored pole angles turned out to be garbage** — **-185 deg** on
+  all four chains, the value a search produces when the thing it is searching never moves. Re-solved:
+  -58 / -60 / -60 / -128, elbow residual 0.0006–0.0103 m, and `CTRL_hand_l reached -> clavicle_l
+  turned 23.1 deg, hand 0.002 m short`, which is W45's own recorded figure reproduced.
+- **The envelope check compared a TOTAL against a PER-AXIS bound.** `shoulder_limits` sets
+  `ik_min/max_{x,y,z}` to ±`CLAV_LIMIT_DEG` — a limit on each axis independently — while the check
+  tested the channel's total magnitude, which three legal axes reach **sqrt(3) x the limit** (~104
+  deg at 60). It had only ever passed because the left arm happened to land at 60.1; the right
+  measures **98.7** with every axis inside its envelope. An XYZ Euler decomposition is not the
+  solver's parameterisation either (it put 77 deg on x for that same rotation), and Blender does not
+  expose the solve's per-DoF angles — so what is asserted is what is OBSERVABLE: the envelope is
+  configured (read off the bone), and the total stays under `MAX_TOTAL_DEG`. The feature itself is
+  the `reached` case, which is a measurement and not a configuration.
+
+Unchanged by all of it: **POSE UNCHANGED AT INFLUENCE 0, worst bone 0.000000 m over 477 samples**,
+the export still 53 bones / 167 clips, AimDebugAuto 40/40, `probe_weapon_fit` PASS upright/crouch/
+crawl, `probe_melee`, `probe_shared_anims`, `probe_weapon_archetypes` PASS.
+
+**ONE FILE, AND THE EXPORT ENFORCES THE SEPARATION** (user: "two files confuse the artist"). A
+control rig may live in the clip `.blend` beside the deform armature — an ARP or Rigify rig included
+— because three things keep it out of the export and the third is now checked rather than trusted:
+control BONES are filtered by `export_def_bones=True` (measured: a `CTRL_` bone comes through as a
+54th joint without it), widget objects are in a hidden collection and `use_visible` drops them, and
+**nothing may be DRIVING the deform bones**. That last one is the dangerous one: the glTF exporter
+samples the EVALUATED pose, so an artist who left the IK switch on would ship every clip with an IK
+result welded into it and nothing downstream could tell.
+- `export_character.py` now mutes every constraint on the deform armature, hides every OTHER
+  armature, and then **measures whether doing so changed the pose**. Unchanged -> export. Changed ->
+  it names the bone and the distance and **refuses**, because a file that looks fine is worse than no
+  file. Measured: a clean export reports `neutralised 4 constraint(s) ... the pose moved 0.000000 m`;
+  with `CTRL_root["ik"] = 1` and a hand control dragged 0.15 m it refuses with `'pinky_01_l' moves
+  0.7590 m`, and the `.glb` is left **byte-identical**.
+- The deform armature is found through the MESHES (the object of an Armature modifier), not by name,
+  so one exporter serves every body and a second armature in the file cannot be mistaken for it.
+- Same shape as `export_world.py` unlinking the ground cutters and restoring them, and
+  `NavBaker.NO_PED_TOKEN` clearing collision layers for the duration of a parse.
+
+**TWO WORKFLOWS, AND ONLY ONE OF THEM NEEDS A PLUGIN.** Tweaking an existing clip — nudging a pose,
+adjusting the blade, fixing a knee — happens on the base rig in the clip file with FK plus the limb
+IK that is already there, and needs nothing new; that is what the crouch aim pose edit of 2026-09-20
+actually was. Authoring a new pose full-body is the case that wants ARP or Rigify. And the migration
+does NOT block the first: the `Root`-metres hazard is about moving an action BETWEEN bodies, so
+editing a clip in the file it already lives in is self-consistent whatever body that file is.
+
+**RIGIFY GENERATES HEADLESS, AND W42's OBJECTION DOES NOT APPLY TO A DRIVING RIG** (measured, since
+the user asked for Rigify/ARP to be revisited). Blender's bundled Rigify builds its sample metarig
+and generates a **706-bone rig with 220 controls** under `-b`; the first attempt that failed did so
+under `--factory-startup --addons rigify`, which is an addon-registration artefact and not a limit.
+ARP and its Quick Rig are installed and enabled here too; Rigodotify is installed and disabled.
+- **W42 rejected all three on bone ROLL** (median 24.4 deg from our rests, which would re-mean all
+  167 clips and force a re-conform of both VRoid bodies). That is correct **only for a rig that
+  BECOMES the deform skeleton.** The standard integration does not: generate Rigify from a metarig
+  fitted to our bones, constrain our 53 deform bones to its `DEF-*` outputs, animate on Rigify's
+  controls, and BAKE down to our skeleton for export. Our rests never change, the contract holds,
+  and the exported clips are ordinary 53-bone actions.
+- That is the answer to full-body IK (spine, chest, head, fingers, IK/FK switching) and it is a
+  session-sized piece: the work is fitting the metarig, which is derivable from our rests rather
+  than typed, plus the bake step. NOT started.
+
+**SHINO AS THE BASE: the premise is wrong and the conclusion is right** (user asked, on the grounds
+that she is the shortest). Measured: **Godot-chan is the shortest at 1.523 m** (Shino 1.645,
+Fumiriya 1.908), and height is the wrong axis anyway — a clip is rotations, which are
+body-independent, and the only absolute-metre keys are handled by `motion_scale` (W47). What DOES
+bind is **shoulder width**, and Shino is **0.2174 m against the other two bodies' 0.2955** — 7.8 cm
+narrower. Every reach failure this project has recorded has been hers and nobody else's, so a pose
+authored to reach on her reaches on everyone, which is the property a base wants.
+- **The migration is cheaper than it looks, because the rests are already conformed**
+  (`probe_body_contract`: every clip poses her within 0.06 deg of the reference). Re-home the 167
+  actions on her armature (the rotation channels transfer unchanged), scale the `Root`/`pelvis`
+  position keys by 1/1.219, flip `REFERENCE_BODY` in `measure_body.gd` and the tools that name her,
+  freeze her derived sockets and anchors as authored, and Godot-chan becomes a generated body or
+  leaves the repo. NOT started: it moves the foundation every derived number is expressed against.
+- **What blocks Shino as the in-game body today is five things**, and only one is code. Measured by
+  pointing `Character.tscn` at her and running the game path — `probe_melee`, `probe_self_hit` and
+  `probe_weapon_sockets` all PASS, so she fights correctly as the player body, and `AICharacter.tscn`
+  inherits the same scene so AI get her and equip weapons through the unchanged path. The five:
+  `PedCrowd.PED_SCENE` is hardcoded to `godot_chan/merged_animation.tscn` (one constant, and it
+  wants a mixed crowd rather than a second constant); the LOOK (17 MToon-derived materials against
+  Godot-chan's 7, and no toon shader — 6.10, gated on 3.14); the 6.4 cm crouch sink (W47's
+  `motion_scale` over-correction, whose exact answer is foot grounding); the face morphs and
+  hair/skirt motion dropped on import (6.11, deferred by decision); and the FPS collar, which is
+  W36's class of problem and **needs a render to judge, not a measurement**.
+
+### W49 — SHINO IS THE BODY THE GAME SHIPS, AND THE CLIP LIBRARY LIVES ON HER (2026-09-21, user-asked)
+
+W48 measured the migration and stopped short of it. This is it, and the honest part is which of
+Godot-chan's three jobs actually moved.
+
+- **The CLIP OWNER moved.** `blender/tools/rehome_clips.py` (a one-shot, the `import_melee_pack.py`
+  contract) imported all 167 actions onto Shino's armature, scaled the `Root`/`pelvis` position keys
+  by the pelvis-rest ratio and dropped every other position fcurve — W43's `TRANSLATING_BONES` rule,
+  applied at the import rather than at the library build. `shino.blend` is the one file that owns the
+  actions now: `build_character_anims.gd`, `probe_shared_anims.gd`, `check_character_anim.py`,
+  `build_animation_review.py` and every clip tool's usage line name it. Verified where it matters:
+  `probe_shared_anims` 2/2 at **0.000000 m / 0.056 deg** — the shared library poses her own export
+  bit-for-bit, which is the only thing a re-home can get wrong.
+- **The SHIPPING BODY moved.** `Character.tscn` instances `CharacterVisuals_Shino.tscn`, so the
+  player, every AI and every replicated puppet are her, and `PedCrowd.PED_SCENE` is a new
+  `assets/characters/shino/shino.tscn` — a scripts-free instance of her export that exists only to
+  state the armature's 180 deg turn (W41: a VRoid export faces +Z, the game faces −Z, and a crowd
+  written onto an unturned body walks backwards). Gates on her body: **AimDebugAuto 40/40**,
+  `probe_weapon_fit` upright/crouch/crawl, `probe_weapon_holster`, `probe_melee`, `probe_self_hit`,
+  `probe_support_hand_ik`, `probe_weapon_sockets`, `probe_weapon_archetypes` all PASS.
+- **The GEOMETRY REFERENCE did NOT move, and that is a measurement, not an omission.** Every other
+  body's sockets, mount anchors, holster slings and clearance profiles are DERIVED from Godot-chan's
+  hand-authored ones (W20–W46). Making Shino the reference means deriving from a derivation, and it
+  compounds: measured, Fumiriya's rear-hip socket went 0.211 -> **0.329 m** and `probe_weapon_holster`
+  failed **17** checks on him. So `measure_body.gd` keeps `REFERENCE_BODY = "godot_chan"` beside the
+  new `CLIP_BASE = "shino"` (the only thing `motion_scale` is measured against) and the AUTHORING
+  body, which is Shino. Three roles, one constant each, stated at the top of that file.
+  **What would let her files go is FREEZING those readings into data** — the per-slice skin and
+  hitbox profiles are a function of the query, not a fixed list, so it is a real piece of work with
+  its own gate, and it is the named next step rather than something to do quietly.
+- **What did leave the repo**: the three adopted pose deliveries
+  (`merged_animation_new_{upright,crawl,crouch}_aim_pose.blend`, 29 MB each). Each had been adopted
+  into the library, so each was a second owner of a pose that already ships; git holds them.
+  `assets/characters/godot_chan/` went **237 MB -> 65 MB** (the rest was untracked `.blend1`).
+- **`probe_fps_camera.gd` looked for a node called `head`**, which is a fact about ONE body: Shino's
+  head meshes are `Face` and `Hair001`, so the lookup returned null and the probe died on
+  `head.visible` — and a GDScript error inside `_initialize` aborts before `quit()`, so it read as a
+  HANG, not a failure (13 orphaned Godot processes before it was noticed). It asks
+  `MeshConfig.head_mesh_paths` now, which is the list `Character.refreshHeadVisibility` actually
+  hides, so the probe tests the thing under test and any body works. **PASS on Shino** (head shown in
+  TPS, hidden in FPS and while riding; eye 0.021 m off centre, steadier than the bone).
+  Note what this exposes: Shino declares no split neck mesh, so **W36's FPS collar is unjudged on
+  her** — it needs a render, not a measurement.
+- **`study_character_pose.sh` was stale since W40 and is rewritten.** It assumed a visuals scene
+  instances an intermediate body `.tscn`; a generated one ext_resources its body's `.glb` directly.
+  It now FINDS the scene by what it instances rather than from a table, so adding a body needs no
+  edit, and its default blend is Shino's.
+
+**A PASS BY 2 mm IS NOT EVIDENCE, AND IT IS HOW THIS GATE WENT QUIET.** Every limit in
+`check_character_anim.py` is a distance in metres measured on the clip source's own body, so the
+same keys measure differently on two bodies. Moving the library to Shino took crawl's placeholder
+ring (6.16) from **0.110 m** of gun bob to **0.078** against a limit of 0.08 — four real ERRORs
+became silence, with nothing on either run to say the defect was still there. The limit is NOT bent:
+`gauge(check, value, limit, msg)` reports a measurement inside `NEAR_FRACTION` (0.85) of its own
+limit as a WARN that names the margin. On Shino the crawl ring now says 98%, and the reference export
+still FAILs with all four ERRORs, which is the control.
 
 ## Vehicles — the component car: GTA III / SA damage, three models (2026-09-19)
 
@@ -7689,6 +8089,141 @@ and it does not record gas-station canopies (their sizes are design choices, sta
 **Licence audit** (`assets/LICENCE_AUDIT.md`): everything traced (`SNR1` is Quaternius 50 Low-poly Guns, CC0,
 owner-confirmed); every PLATEAU-derived file deleted after the landmarks were rebuilt (above).
 
+## One tone per building, and a Japanese shop window you can see through (2026-09-21)
+
+**A city of ONE grey is the same defect as a city of one yellow.** The retone gave `MI_Trim` a single target and
+the merged mesh is per TYPE, so every building of a type wore it. The mixture is now per BUILDING, and it costs
+no new mesh: the tone is an **instance override** (`surface_material_override/<i>`) on the shared mesh, so 3852
+buildings wear 4 greys out of 6 materials.
+
+- **A FACADE IS TWO MATERIAL FAMILIES HERE, NOT ONE.** `Trim_*` pieces wear `MI_Trim` (the 磁器タイル of a
+  mansion, a shop-house, a pencil building); `Metal_*` pieces wear `MI_Trim_MetalConcrete` (an office, a
+  warehouse, a konbini — and the SIDES of nearly every other type). Measured after a first pass that named only
+  the tile: **4 of 19 types had a tile surface at all**, so downtown's offices and the harbour's warehouses
+  would have kept one grey between them. Both families get the same four levels.
+- **PLATEAU was RE-MEASURED, and that is itself a finding.** The percentiles this repo carried (p10 113 /
+  median 146 / p90 168) had no way to be re-derived. `blender/tools/measure_plateau_facades.py` now exists and
+  states its method (a facade material here is TEXTURED, so its tone is the mean of its own base-colour image,
+  converted linear → sRGB before averaging), and over the SAME 3048 materials it reads **p10 100.0, median
+  135.6, p90 160.6, mean 132.6, R-B +0.9**. Two consequences: Tokyo is GREY, so every tone is a LUMINANCE on one
+  neutral texture and never a hue; and the shipped single target of 150 sat at this distribution's **p75** — the
+  whole city was lit a quarter brighter than its reference — so `MI_Trim` moved onto the measured median.
+  Three of the four tones are measured percentiles outright (100 / 136 / 161); the fourth (185) is a stated
+  extension, because aerial photogrammetry compresses both tails and a white porcelain-tile facade is ordinary.
+- **One owner each, and neither fact is written twice.** `retone_downtown_kit.py` writes the variants FROM each
+  base `.tres` (so a change to the facade's textures reaches all four) plus `facade_tones.json`, the one record
+  of which materials are facades. `build_building_scenes.gd` writes `facade_surfaces` into each type's own meta,
+  because only the merge knows its surface order. `island_buildings.py` picks the tone from the slot's OWN key
+  with its own salt — never by drawing from the `rng` that decides which TYPE stands there, which would silently
+  re-roll the whole city.
+- **A region may bias its tones**, which is what makes a working district read greyer: `REGIONS`' 7th field is a
+  weight per level, and `harbour`/`industry`/`nightlife` draw from the dark end (measured: industry places 202
+  Slate and 168 base and **no** Pale at all).
+- Gates: `island_buildings.py tones` (the materials are distinct greys, every override addresses the surface its
+  type's meta records, the mixture is a mixture) and `probe_buildings.gd`'s own runtime pass — it LOADS every
+  cell and reads the overrides back off the live `MeshInstance3D`, which is the half a text check cannot make,
+  because a `.tscn` whose override syntax Godot silently drops reads exactly like a city that was never given a
+  mixture. Control: one scrambled override fails BOTH gates.
+
+**A JAPANESE SHOP WINDOW IS CLEAR GLASS WITH A STRIP ACROSS THE MIDDLE** (user, twice: "the konbini window is
+still not visible ... in Japan the store window glass CAN see internal folks, just in the middle of the glass
+there is a strip along the whole window panel, white gloss with store colour strips; top and bottom stay
+transparent"). **The glass was never the cause.** Measured on the kit's `Metal_FirstFloor_Window`: behind the
+2.21 m pane (y 0.470–2.677 at z −0.061) sits an opaque `MI_FakeInterior` quad (y 0.184–2.714 at z −0.067). That
+card is what you were looking at.
+- **A shopfront on a building with a ROOM loses the card**, and the test is derived, not authored:
+  `layout_buildings` writes `has_interior` (true exactly for the four types that place interior fittings), and
+  `kit.json` names `shopfront_rows`, so the same glazed piece on a tower's curtain wall keeps its card — which
+  is what makes an unenterable building read as occupied. That is the gate's control, and it passes on
+  `OfficeMid` and `Mansion`.
+- **The layout now records each piece's ROW**, which only it can know: a glazed panel on a shopfront is a window
+  you look into, the same piece on a floor 8 of a tower is not, and recovering that from the geometry afterwards
+  is guesswork.
+- **A shopfront gets its own clearer glass** (`MI_GlassShopfront`, alpha 0.14 against the tower glazing's 0.28),
+  which closes the follow-up `MI_Glass`'s own comment recorded — it said the ground storey wants its own
+  material and that "the row table knows which rows are shopfronts, the MERGED mesh no longer does". It does now.
+- **The 目隠しシート** is built from the panel's OWN glass (width, plane and floor), so a narrower pane gets a
+  strip that fits it: a white gloss band with two livery stripes, **1.25–1.70 m above the panel's floor**. That
+  height is measured from the FLOOR and not from the pane's bottom edge — adding it to the glass's own bottom
+  (0.47) put the strip at 1.72–2.17 m, over a head rather than across a face, which is what the first render
+  showed. Liveries are brand-neutral (blue/green/red/amber per type) and a type's own fascia picks which.
+- Gate: `probe_buildings.gd` **1043/1043**, asserting both halves — a shop window has no card and wears the
+  strip, glazing that is not a shop window keeps its card and gets no strip.
+
+## The island's districts are a gradient, and the plan is a picture (2026-09-21)
+
+**`tools/island_region_map.py`** draws the district plan whole — pure Python + PIL, no display, no Godot, so it
+regenerates in any session. Everything on it is DERIVED from what the game reads: the land from a Terrain3D
+height dump, the roads from the BUILT lanekits (so the streets shown are the streets that exist), the region
+boxes, their names and their DRAW ORDER from `island_buildings.REGIONS` — including the first-match-wins rule,
+so a box hidden behind an earlier one is drawn hidden, which is what it is — every building coloured by the
+region the placement GAVE it, and the landmarks by name. Committed as
+`assets/world_source/reference/island_districts_2026-09-21.png`.
+
+**The regions are a gradient from the port to the fields** (user), and the order of the table IS that gradient:
+harbour → industry → residential → nightlife/downtown/city → farm and beach. Two are new. **`industry`** is the
+band a real port city has between its quays and its flats — the container terminal used to meet the residential
+grid across one street — and it is measured, not chosen: x −1000..200, z 600..1040 is 100% land at 0.6 m and
+sits exactly between the harbour box's north edge and the housing. **`nightlife`** is a 歓楽街 beside the
+station, which is Kabukichō's relationship to Shinjuku: 雑居ビル at a 20 m pitch, no flats. Both draw from the
+DARK end of the facade tones, which is what makes a working district read greyer — and that costs nothing,
+because a building's tone is already an instance override.
+
+**Three landmarks had been built and never placed.** `TokyoTower`, `TokyoStation` and `AirportTerminal` shipped
+as finished scenes with 3.12c and nothing in `World.tscn` instanced any of them. `island_sites.py` sites them
+the way it already sites the castle — a measured search, never a typed coordinate: the tower on the flattest
+clear patch in downtown, the station along **`ekimae_dori`** (駅前通り, "the street in front of the station", so
+the trunk grid's own naming says where it goes and which way it faces), the terminal on the airport island's
+flattest clear ground. Two defects surfaced doing it, both of which made every candidate fail:
+- **A ground floor written in the GODOT frame rejects the whole city.** `Ground.z` returns the RECORD frame,
+  where the city plain measures **0.00 m** — the +0.6 m everything sits at in Godot is the network node's own Y.
+  A 0.4 m floor found nothing at any road clearance from 70 m down to 20 m, so the clearance looked like the
+  constraint and never was.
+- **A street is several ROADS.** `island_road_zones.py --split` cuts a long run at every 504 m zone boundary
+  (3.10), so `ekimae_dori` is 13 roads and the one keeping the bare name is **43 m** long. A search for "a
+  straight run of it" has to re-join them by name prefix and walk them along the street's own principal axis.
+
+**What the plan then showed, measured rather than eyeballed: 44% of the island's land (4.40 km²) is in NO
+region**, so nothing is placed there — the massif (1.99) and the north-west cliffs (2.08) correctly, but also
+the **airport island (0.67 km², which has no region at all)** and 0.42 km² of east coast; and `suburb` is 51%
+sea, `farm` 58%, `harbour` 69%. That is PLAN.md 3.18(s), and the coverage table is its gate.
+
+## The map says where you are (PLAN.md 3.18n, 2026-09-21)
+
+The map drew roads and a route and nothing that NAMED a place, so a player could not say where they were and a
+developer could not tell which zone a bug was in. Both halves are DERIVED from records that already exist.
+
+- **`world.Places`** reads `world/places/<Scene>.places.json`, written by `island_buildings.py` from the same
+  placement that writes the buildings: a building is a place because the placement made it enterable (its scene
+  is a `_Shop` or `_Open` variant), and a region is a box that placement already uses. So a new shop reaches the
+  map by re-running `derive`, and **the map can never name a building that is not there** — the failure a
+  hand-kept marker list has.
+- **PER SCENE, like `RoadMap`'s bake.** One fixed path drew the island's shops on DebugWorld's map at island
+  coordinates. The world is found by walking the OWNER chain to its outermost root, not from
+  `getCurrentScene()`, which is null for a world a probe `add_child`ed rather than `change_scene_to_file`d —
+  keying on it would make every gate measure a different code path from the game.
+- **Two positions per place and they mean different things:** `at` is where the blip sits, `go` is the front
+  face, which is where the door is. A click within `placePickPx` of a blip takes that PLACE and sets the
+  waypoint to `go`; `RoadMap` then snaps the goal to the nearest lane, so `go` decides which side of the block
+  you are routed to. Blips are SQUARES so they never read as a character or a vehicle (both are discs), and
+  ordinary shops appear only under `placeDetailRange` so a whole-island view is landmarks, not 94 konbini.
+- **The region underlay goes UNDER the roads** (it must not hide what you navigate by), and the HUD announces a
+  region on entry — DERIVED every frame from the player's position against the same boxes, never latched on a
+  trigger volume, so it is right after a teleport or a scene load, with a 1 s settle because the boxes touch.
+- **`showZoneIds`** is the debug half: each streaming zone's id over its marker, off by default.
+- Gate: `probe_gps_route.gd` **29/29 island** (every place is an enterable building or a site in the scene; the
+  region the map reads is the record's own box, 0 of 109 disagree; a click on a blip takes that place and its
+  waypoint is the door; a click away from every blip is an ordinary waypoint) and **23/23 DebugWorld**, where
+  the first check is that a world with no record draws no places.
+- **Two probe defects fixed here, both of which made a gate measure nothing.** The heading-up minimap case set
+  `look_at` on `ActiveCamera`, which the TPS rig rewrites every frame (the trap `probe_night_lights` records) —
+  it turns the PLAYER now, and derives the view yaw from the game's own `atan2(-dx, -dz)` rather than writing a
+  sign down. And **a GDScript error inside an awaited coroutine aborts THAT coroutine and lets the caller reach
+  its RESULT line**, so a probe that skipped half its cases printed PASS; the probe counts its checks now.
+- **Matching a record to a record by a FORMATTED coordinate is a trap**: the places record rounds to 2 dp and
+  two printf implementations disagree on a .x5 boundary, which read as 4 shops that do not exist. Matched by
+  DISTANCE.
+
 ## The ambient crowd has two tiers, and the far one has no scripts at all (PLAN.md 3.6d, 2026-09-19)
 
 `world.PedCrowd` is the GTA pedestrian LOD. A `SpawnConfig` with `behavior = "sidewalk"` no longer spawns its
@@ -8452,6 +8987,110 @@ so anyone not dead ahead was invisible. Both halves are fixed in `VehicleAIContr
   `build_vehicle_scenes.py`'s `TUNING`. 241 km/h is realistic for an unrestricted sports coupe (JDM cars ship
   180 km/h-limited), but the island is 3.7 km across and its roads are authored at 80/60/30 km/h, so the old
   number crossed the world in 55 s and ran at 3× the traffic; every launch measured in PLAN.md 0.7 was at 45 m/s.
+
+## The pavement is for walking on, and the city is not yellow (user's walk-test, 2026-09-20)
+
+A batch of walk-test reports, each measured before it was touched. PLAN.md 3.18 carries the ones still open.
+
+**The crowd got stuck on street furniture, and the cause was the WALK LINE, not the brain.** The footway
+centreline the ambient crowd follows (`IslandSidewalks.json`, derived by `island_buildings.py`) was the footway's
+MIDDLE, while every street prop stands in the KERB-SIDE strip — so the two were laid on top of each other.
+Measured over the island, every solid prop against the walk line for a 0.35 m capsule: **1081 of 1139 planters
+blocked it (worst −0.92 m), 483 of 1061 lamps (−0.13), 108 of 333 signals (−0.55), 2 of 401 trees**; bollards were
+clear. A blocked walker is stuck FOR EVER, not briefly, because `SidewalkWalkerController` advances `along` by the
+step the body actually took: no step, no progress, so it never reaches the end of its path and never turns round.
+- **`island_buildings.ped_walk_offset` puts the line in the middle of the CLEAR band** — outboard of the furniture
+  strip, inboard of the footway's outer edge. The strip is DERIVED from `furniture.json` (`furniture_strip`): each
+  kerb-side asset's own offset plus its own half width across the footway, and only the assets a footway that wide
+  can carry (`*_min_footway`). It reads the SAME table the placer reads, so the two cannot come to disagree about
+  where a planter is. On a 4 m footway the line moves 2.00 → 3.05 m from the kerb; on a 2 m footway 1.00 → 1.55.
+- **Measured after: 1676 → 88 blocking, and planters 1081 → 0.** What is left is 82 signals grazing at −0.00 m on
+  2 m footways (a 1.2 m signal strip plus a 0.7 m capsule does not fit in 2.0 m — the remedy is a narrower
+  `signal_kerb_offset` on a narrow footway, not a different walk line) and 6 outliers where the line curves at a
+  pad. The gate is **`island_buildings.py clearance`**, which measures from the OTHER side of the pipeline — the
+  placer's own output against the derived record — so it cannot agree with `furniture_strip` by construction.
+- **`SidewalkWalkerController` gained an unstick rule**, because the derivation cannot see a parked car, a player
+  in a doorway or another walker: under `STALL_PROGRESS_M` (0.25) of progress in `STALL_SECONDS` (1.5) reverses
+  `dir` and counts a `stalls`. Turning round rather than stepping around is deliberate — it is what a pedestrian
+  meeting a blocked passage does, it costs two doubles and a compare, and stepping around wants the navmesh this
+  whole tier exists to avoid.
+- **`island_buildings.py sidewalks`** re-derives ONLY that record, with no terrain dump and no building moved: the
+  walk line is a fact about the ROAD, which the road solve already has. `walk_lines` is the one owner, shared with
+  `derive`.
+
+**The city was yellow because three materials share one texture and none of them was tinted.** Measured, the mean
+of each base-colour texture: `T_Trim` **146/135/102, R−B +44** (the tile facade — every `tile_*` row, and the sides
+of nearly every type), `T_MarbleFloor` +49, `T_RedBrick` +44 (correct: brick IS red), `T_Ornaments` +27, against a
+neutral `T_Concrete` (+5). Two defects that no screenshot separates: **`MI_Trim`, `MI_Trim_Dark` and
+`MI_Trim_Green` are the same texture with no tint on any of them**, so the kit's three trim variants render
+identically and a "dark" shopfront frame is the same tan as the wall behind it; and **`MI_InteriorWall` is on
+`T_RedBrick`**, so every interior wall in the game is brick brown. `tools/building_kit/retone_downtown_kit.py` is
+the owner: each row is "this surface should read as a <target> grey", and the tint is `target / measured mean` per
+channel, so the numbers are arguable rather than picked by eye. Shipped: the tile facade 178 (light off-white
+porcelain), dark panel 52, balcony guard 140, exposed concrete 168, interior wall 214 and ceiling 226 (both moved
+onto the neutral concrete texture), interior floor 212 (white tile). Brick, asphalt, ground and the lit-window
+fake are left alone, each with its reason in the table.
+
+**What a Japanese facade MEASURES, from the two sources the user named** (2026-09-20). The photograph
+(`/data/danilko/references/japan/20240317_133825.jpg`) reads **strongly COOL** — built mean R−B **−13.8**, every
+cluster cool, sunlit facades 195/201/202. `japan_city.blend` (PLATEAU, textured, **3048 real Tokyo facade
+materials**) reads **NEUTRAL and mid-light** — mean 143.8/142.4/142.0, R−B **+1.7**, luminance p10 113 /
+**median 146** / p90 168, R−B spread only −4.0 to +7.2. **The disagreement is the finding:** the photograph is lit
+by a blue sky, so its cool cast is LIGHTING, which our own sky light applies again at run time — tinting the
+albedo cool would count it twice. PLATEAU is averaged over a city and largely de-lit, so it is the albedo source,
+and what it says is that Tokyo is a **neutral grey at ~146**, not white and not warm. The facade targets sit at
+150 because of it, not at the 178 the first pass carried.
+
+**A TINT CANNOT REACH A PER-TEXEL HUE, AND RUST IS PER-TEXEL** (user, 2026-09-20: "the grey still has a reddish
+cast … can the material be changed?"). `albedo_color` MULTIPLIES, so it moves a texture's MEAN onto a neutral
+target while every rust-streaked texel stays rust — which is exactly what a render of the retoned kit showed.
+`retone_downtown_kit.neutralise` writes `<stem>_Neutral.png` beside each kit texture, and it separates the two
+things by SCALE rather than by judgement: a rust run is hundreds of texels across, a tile joint is a few, so the
+copy keeps **only what survives a high pass** (`lum − blur(lum, 48 texels on a 2048 px map)`) laid back on a flat
+field. Measured, large-scale blotching against detail kept: `T_Trim` **35.1 → 4.4** (detail sd 15.3),
+`T_MetalConcrete` **30.9 → 1.6** (7.5), `T_Ornaments` 19.0 → 2.4 (13.3). The NORMAL and ORM maps are untouched,
+so all the relief and roughness variation stays — the user's own framing, "keep the normal, remove the rust".
+`T_RedBrick` is not in the list: brick is red.
+
+**A door's STYLE is a fact about the door, not about the site it stands on.** `layout_composite` took
+`door_style` from the COMPOSITE's row, so the gas station's kiosk had a hinged swing door while the same kiosk
+standing alone had the konbini's 自動ドア. The part's own type row already says which it is, so the door carries
+it (`d["style"]`), `_openings` hands it to `_panels` and to the door loop, and `probe_buildings.gd` asks the
+doorway NEAREST each leaf instead of the building. 979 checks PASS.
+
+**A hinged door swings AWAY from whoever opens it** (`Door.swingBothWays`, on). The sensor is a volume around the
+doorway, so it fires while the body is still walking up — which is what makes an automatic door feel automatic,
+and is exactly why a leaf that always swings one way meets somebody half the time. The leaf spans the node's local
+−X, so its normal is local +Z and the opener's own local Z IS the side; the sign is taken ONCE, at the moment the
+door starts to open, so it cannot flip mid-swing. Off, the leaf always swings by `+openAngleDeg` — the old
+behaviour, and the control.
+
+**THREE heights, one rule** (and the second half came from the user's Shibuya photograph: the public footway in
+dark asphalt with its yellow 点字ブロック, each building's OWN frontage paving in a different material, slightly
+PROUD of it). In Japan the footway belongs to the ROAD and the strip in front of a building belongs to the LOT
+(民地), so they are two surfaces at two heights, never one: footway top = carriageway + `KERB_H`; lot slab top =
+footway + `LOT_RAISE` (6 cm); building floor and a composite's apron = lot + `FLOOR_LIFT` (2 cm). `FLOOR_LIFT` is
+the z-fighting fix and it fixes it by CONSTRUCTION — a composite draws its apron at its own origin height, so
+while that was the slab's height too the two were exactly coplanar, which is what z-fighting IS and what no depth
+bias answers honestly. 8 cm from footway to floor: visible, the shallow end of the 10–15 cm a Japanese shop really
+stands up, and far under `stepHeight`. Both are applied in `write`, so changing them needs no terrain dump and no
+re-derive. HISTORIC first attempt: **A lot is white tile, and it sits 2 cm below the floor it meets.** The forecourt a player crosses to a shop door
+is the same surface family as the floor inside it (`M_TileWhite`, the footway's own triplanar concrete tinted
+near-white at a 0.6 m tile), and `island_buildings.LOT_DROP` is the z-fighting answer: a composite draws its own
+apron at its origin height and the lot slab was exactly coplanar with it, which is what z-fighting IS and what no
+depth bias fixes honestly. A Japanese shop floor stands 10–15 cm above its forecourt anyway, so the drop is both
+the fix and the look, and it is far under `MovementController.stepHeight`.
+
+**A manhole belongs in the gutter, not down the lane** (user). `manhole_spacing` is 0, and `_lane_props` returns
+on it — the placement is kept because a service cover down the lane IS correct on an older trunk road or in a
+tunnel, and data, not code, should decide. The kerb-side `drain` run is untouched.
+
+**Street trees: a pit, and two Japanese species.** `point_furniture._tree_pit` lays a 1.4 m square of `M_Dirt`
+(植樹枡) at each tree's foot — paint, not a piece, because a pit is a hole in the paving and two triangles per tree
+merge into the piece's one paint object, against a modelled kerb ring that would be a second asset and a second
+batch. `tree_assets` is now **sakura** (`CommonTree_3`, with `MI_Leaves_NormalTree` retinted over the kit's white
+leaf mask) and **黒松** (`Pine_3`), two species instead of three interchangeable broadleaves. A GREEN CommonTree
+beside the pink one needs a per-asset material override, which is PLAN.md 3.16 step 3's own next step.
 
 ## Known Quirks / Gotchas
 

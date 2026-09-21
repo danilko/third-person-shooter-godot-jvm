@@ -157,4 +157,20 @@ public class Player extends Character {
     public godot.core.Vector3 getWaypoint() {
         return com.openworld.game.WaypointStore.get(waypointKey());
     }
+
+    /**
+     * The waypoint as a probe can read it, or ZERO (godot-jvm merges {@code getWaypoint} with a field and a
+     * getter with no setter registers READ_ONLY, so the question-named reader beside it is the shape this
+     * codebase already uses for {@code healthNow} / {@code activeSlotNow}). Ask {@link #hasWaypointNow} first:
+     * the origin is a legal destination.
+     */
+    @Register
+    public godot.core.Vector3 waypointNow() {
+        godot.core.Vector3 w = getWaypoint();
+        return w != null ? w : godot.core.Vector3.Companion.getZERO();
+    }
+
+    /** Whether a waypoint is set at all (probe readout). */
+    @Register
+    public boolean hasWaypointNow() { return getWaypoint() != null; }
 }

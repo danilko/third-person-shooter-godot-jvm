@@ -160,7 +160,13 @@ def main(argv):
                 open(path, "wb").write(data)
     for name, m in pal["materials"].items():
         if "tex" in m and m["tex"] not in GENERATED:
-            for part in ("_Color.jpg", "_NormalGL.jpg", "_Roughness.jpg"):
+            # Only the maps this material actually WEARS. A painted surface declares `albedo_tex: false` -- its
+            # colour is the palette's, which is what "painted" means -- so demanding its set's _Color.jpg refused
+            # a material that never reads one (MI_PaintedMetal, whose Metal027 set ships here without it).
+            want = ["_NormalGL.jpg", "_Roughness.jpg"]
+            if m.get("albedo_tex", True):
+                want.append("_Color.jpg")
+            for part in want:
                 if not os.path.exists(os.path.join(KIT, "textures", m["tex"] + part)):
                     raise SystemExit("%s: texture set %s has no %s" % (name, m["tex"], part))
         text = material_tres(name, m)

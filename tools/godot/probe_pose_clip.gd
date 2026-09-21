@@ -3,7 +3,7 @@ extends SceneTree
 ##
 ##   godot --headless --path . --script tools/godot/probe_pose_clip.gd -- \
 ##       [--visuals=res://...CharacterVisuals_X.tscn] [--clip=upright_aim_rifle] \
-##       [--compare=res://assets/characters/godot_chan/merged_animation.tscn]
+##       [--compare=res://assets/characters/shino/shino.glb]
 ##
 ## PLAN.md A2.0. `probe_weapon_fit.gd` measures a pose THROUGH the rig, and the rig changes what it
 ## shows: the WeaponBlend filter drops the clip's spine and head, and both aim modifiers add their own
@@ -29,7 +29,7 @@ extends SceneTree
 ## With --compare, the clip's local bone rotations are diffed against the same clip in another export
 ## (max quaternion component delta, the unit the 2026-09-14 snapshot used, and the angle in degrees).
 
-const DEFAULT_VISUALS := "res://src/main/resources/com/openworld/character/CharacterVisuals_GodotChan.tscn"
+const DEFAULT_VISUALS := "res://src/main/resources/com/openworld/character/CharacterVisuals_Shino.tscn"
 const WEAPONS := ["ASR1", "ASR2", "SHG1"]
 const WEAPON_DIR := "res://src/main/resources/com/openworld/weapon/%s.tscn"
 const POCKET_IN_CLAVICLE := Vector3(-0.0280, -0.0419, 0.0880)

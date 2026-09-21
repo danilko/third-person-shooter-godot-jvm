@@ -27,7 +27,12 @@ const TRANSLATING_BONES := ["Root", "pelvis"]
 const POS_EPS := 1.0e-3        # metres; between the 4.2e-05 noise floor and the 9.5e-03 real motion
 const SKELETON_NODE := "Skeleton3D"
 
-const SOURCE := "res://assets/characters/godot_chan/merged_animation.glb"
+## THE CLIP SOURCE. Shino is the base (PLAN.md): a clip is a fact about the skeleton, and the body
+## a shared pose fails FIRST is the one to author it on -- her shoulders measure 0.2174 m against
+## the other two bodies' 0.2955, and every reach failure this project has recorded has been hers.
+## Height is not the axis (Godot-chan is the shortest at 1.523 m); rotations are body-independent
+## and the only absolute-metre keys are handled by `Skeleton3D.motion_scale`.
+const SOURCE := "res://assets/characters/shino/shino.glb"
 const OUT_RES := "res://src/main/resources/com/openworld/character/anim/character_anims.res"
 const OUT_JSON := "res://src/main/resources/com/openworld/character/anim/character_anims.json"
 
@@ -73,8 +78,25 @@ func _initialize() -> void:
 	var src_lib := ap.get_animation_library(ap.get_animation_library_list()[0])
 	var names := src_lib.get_animation_list()
 	names.sort()
+	var skipped: Array[String] = []
 	for n in names:
 		var a: Animation = (src_lib.get_animation(n) as Animation).duplicate(true)
+		# A BODY CLIP ANIMATES BONES, NOT BLEND SHAPES. A VRoid body carries ~40 facial shape keys
+		# and Blender's glTF exporter emits an extra animation for them named after the MESH, so
+		# Shino's export arrived with a 168th clip called `Face` that none of the 167 authored
+		# actions matches. "Does it touch the skeleton" does NOT separate it -- measured, that clip
+		# carries 73 Skeleton3D tracks as well as 41 blend-shape ones. Carrying a BLEND SHAPE track
+		# does: this library is skeletal by construction (every path is rewritten to
+		# `Skeleton3D:<bone>`), and a facial expression is runtime state driven from a record, not a
+		# clip every other body would then be asked for.
+		var has_morph := false
+		for i in a.get_track_count():
+			if a.track_get_type(i) == Animation.TYPE_BLEND_SHAPE:
+				has_morph = true
+				break
+		if has_morph:
+			skipped.append(String(n))
+			continue
 		for i in range(a.get_track_count() - 1, -1, -1):
 			var p := a.track_get_path(i)
 			var sub := p.get_concatenated_subnames()
@@ -129,6 +151,8 @@ func _initialize() -> void:
 	moving_list.sort()
 	print("[anims] source          %s" % source)
 	print("[anims] clips           %d" % clips.size())
+	if not skipped.is_empty():
+		print("[anims] skipped %d non-skeleton clip(s): %s" % [skipped.size(), skipped])
 	print("[anims] rotation tracks %d" % rot)
 	print("[anims] position tracks %d kept, %d dropped as constant-at-rest" % [kept_pos, dropped_pos])
 	print("[anims] of those, %d dropped BY RULE (not %s); most authored motion given up %.6f m (%s)"
@@ -147,6 +171,9 @@ func _initialize() -> void:
 	var manifest := {
 		"source": source,
 		"clips": clips,
+		# What the library deliberately left out, so a gate can tell a SKIP from a LOSS without
+		# re-implementing the rule and drifting from it.
+		"skipped": skipped,
 		"bones": bone_list,
 		"moving_bones": moving_list,
 		"rotation_tracks": rot,

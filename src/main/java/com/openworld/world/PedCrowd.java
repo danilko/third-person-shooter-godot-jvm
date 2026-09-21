@@ -45,7 +45,7 @@ import java.util.List;
 public class PedCrowd extends Node3D {
 
 	/** The script-free body every light ped instances: the imported character, no MeshConfig and no modifiers. */
-	public static final String PED_SCENE = "res://assets/characters/godot_chan/merged_animation.tscn";
+	public static final String PED_SCENE = "res://assets/characters/shino/shino.tscn";
 	private static final StringName WALK_CLIP = new StringName("upright_walk_forward");
 
 	/** A walking pace (m/s). The same number {@code SidewalkWalkerController} glides at, so a promotion does not

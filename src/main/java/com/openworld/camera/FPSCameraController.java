@@ -96,6 +96,23 @@ public class FPSCameraController extends Node3D {
     @Export
     public double baselineFollow = 6.0;
 
+    /**
+     * Rate (1/s) the resting eye point follows the mount for {@link #stanceCatchUpSeconds} after a
+     * stance change. See {@link #stanceCatchUp} for why a second rate exists at all; 0 turns the
+     * catch-up off, which is the pre-catch-up behaviour and the gate's control.
+     */
+    @Export
+    public double stanceFollow = 30.0;
+
+    /**
+     * How long that faster rate lasts, seconds. It only has to cover the stance TRANSITION — the
+     * animation blend that actually moves the head — so it is a touch longer than that blend and
+     * not a fraction of a second more: past it, the ordinary slow split is what keeps a walk from
+     * shaking the view.
+     */
+    @Export
+    public double stanceCatchUpSeconds = 0.35;
+
     /** Rate (1/s) of the final position smoothing — removes single-frame jitter. */
     @Export
     public double positionSmoothing = 25.0;
@@ -117,6 +134,32 @@ public class FPSCameraController extends Node3D {
     private Vector3 baseline = Vector3.Companion.getZERO();
     private Vector3 smoothed = Vector3.Companion.getZERO();
     private boolean primed   = false;
+
+    /**
+     * Seconds of fast baseline still owed to a stance change.
+     *
+     * <p><b>A STANCE CHANGE IS THE ONE CASE THE SPLIT ABOVE GETS WRONG, and it is not a tuning
+     * question.</b> The slow average IS the resting eye point, which is exactly right while the
+     * rest point is not moving: bob, recoil shove and clip noise are the fast half and get
+     * filtered. Standing up moves the rest point itself ~0.33 m in ~0.17 s — so the filter
+     * correctly classifies the whole of it as "fast", clamps it to {@link #maxBoneOffset} and
+     * admits a quarter of that, leaving the 6/s baseline as the only thing that can travel the
+     * distance. Measured before this existed: the camera sat <b>0.23 m</b> below the true eye at
+     * the moment the body was already up, and took <b>0.55 s</b> to come within 2 cm — the head
+     * finishes standing and the view is still crouched.
+     *
+     * <p>So the rate is raised for the length of the transition rather than the filter being
+     * weakened, which would give back the bob it exists to remove. It is a rate and not a SNAP
+     * because the head has not moved yet on the frame the stance changes: the animation blends
+     * over the frames after it, and a snap on the signal frame would catch up to a head that is
+     * still in the old pose and then lag exactly as before.
+     *
+     * <p>Derived from the character's own stance rather than wired to {@code changed_stance}:
+     * "which stance am I in" already has one owner, and a signal connection would have to be
+     * added to every character scene and could then be missing from one of them.
+     */
+    private double stanceCatchUp = 0.0;
+    private int    lastStanceOrdinal = -1;
 
     @Register
     @Override
@@ -151,6 +194,14 @@ public class FPSCameraController extends Node3D {
         if (character.carrierOwnsView()) {
             primed = false;
             return;
+        }
+
+        // A stance change opens the catch-up window (see `stanceCatchUp`). Read, never latched by
+        // a signal, so a body that is re-stanced by replication or by a script gets it too.
+        int stance = character.getStanceOrdinal();
+        if (stance != lastStanceOrdinal) {
+            if (lastStanceOrdinal >= 0) stanceCatchUp = stanceCatchUpSeconds;
+            lastStanceOrdinal = stance;
         }
 
         // ... the world basis stated outright, for the same reason and with the same words as
@@ -204,8 +255,14 @@ public class FPSCameraController extends Node3D {
         }
 
         // Rest point: the mount's own slow average, so the eye sits where this mesh's head is in
-        // this stance with nothing authored per stance.
-        baseline = baseline.lerp(local, weight(baselineFollow, delta));
+        // this stance with nothing authored per stance -- at the faster rate while a stance change
+        // is still moving that rest point.
+        double follow = baselineFollow;
+        if (stanceCatchUp > 0.0) {
+            stanceCatchUp -= delta;
+            if (stanceFollow > follow) follow = stanceFollow;
+        }
+        baseline = baseline.lerp(local, weight(follow, delta));
 
         // Everything faster than that is bob/aim-swing/clip noise: clamp it, then admit a fraction.
         Vector3 dev = local.minus(baseline);
@@ -245,6 +302,12 @@ public class FPSCameraController extends Node3D {
 
     public double getBaselineFollow() { return baselineFollow; }
     public void setBaselineFollow(double v) { this.baselineFollow = v; }
+
+    public double getStanceFollow() { return stanceFollow; }
+    public void setStanceFollow(double v) { this.stanceFollow = v; }
+
+    public double getStanceCatchUpSeconds() { return stanceCatchUpSeconds; }
+    public void setStanceCatchUpSeconds(double v) { this.stanceCatchUpSeconds = v; }
 
     public double getPositionSmoothing() { return positionSmoothing; }
     public void setPositionSmoothing(double v) { this.positionSmoothing = v; }

@@ -12,8 +12,15 @@ extends SceneTree
 ## `--control` keeps the constant position tracks (i.e. does not run the drop) on a skeleton whose
 ## bone rest is shifted, which is what a differently-proportioned body is: the dropped tracks then
 ## override that body's own bone lengths and the check fails, which is the whole reason they go.
-const SOURCE := "res://assets/characters/godot_chan/merged_animation.glb"
+## The CLIP SOURCE -- the body whose .glb the shared library is built from. Overridable so the gate
+## can be pointed at a new home when the library moves (PLAN.md: Shino as the base), and so the
+## migration can be proven BEFORE any constant is flipped.
+const SOURCE := "res://assets/characters/shino/shino.glb"
 const SHARED := "res://src/main/resources/com/openworld/character/anim/character_anims.res"
+## The builder records what it deliberately left out (a clip carrying blend-shape tracks is not a
+## body clip -- a VRoid face's 42 shape keys export as one). Read from its manifest rather than
+## re-tested here, or the gate and the builder would each own a copy of the rule.
+const MANIFEST := "res://src/main/resources/com/openworld/character/anim/character_anims.json"
 const SAMPLES := 5
 const POS_TOL := 0.0005      # m, per bone, global
 const ROT_TOL := 0.10        # deg, per bone, global -- measured worst 0.056 deg on a
@@ -25,7 +32,11 @@ var _fail := 0
 
 func _initialize() -> void:
 	var control := "--control" in OS.get_cmdline_user_args()
-	var ps := load(SOURCE) as PackedScene
+	var source := SOURCE
+	for cli in OS.get_cmdline_user_args():
+		if cli.begins_with("--source="):
+			source = cli.substr(9)
+	var ps := load(source) as PackedScene
 
 	var a_root := ps.instantiate()
 	root.add_child(a_root)
@@ -59,11 +70,21 @@ func _initialize() -> void:
 
 	var names := a_ap.get_animation_list()
 	names.sort()
+	var skipped := {}
+	if FileAccess.file_exists(MANIFEST):
+		var man = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST))
+		if man is Dictionary:
+			for n in (man.get("skipped", []) as Array):
+				skipped[String(n)] = true
 	var missing: PackedStringArray = []
 	for n in names:
+		if skipped.has(String(n)): continue
 		if not b_ap.has_animation(n): missing.append(n)
 	_check("every clip is in the shared library", missing.is_empty(),
-		"%d clips, missing: %s" % [names.size(), "none" if missing.is_empty() else String(", ").join(missing)])
+		"%d clips (%d deliberately skipped: %s), missing: %s"
+		% [names.size(), skipped.size(),
+		   "none" if skipped.is_empty() else String(", ").join(PackedStringArray(skipped.keys())),
+		   "none" if missing.is_empty() else String(", ").join(missing)])
 
 	var worst_pos := 0.0
 	var worst_rot := 0.0

@@ -5,6 +5,7 @@ import com.openworld.character.NameplateTarget;
 import com.openworld.character.Player;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.game.WaypointStore;
+import com.openworld.world.Places;
 import com.openworld.world.SpatialEntityGrid;
 import com.openworld.world.ZoneManager;
 import com.openworld.world.ZoneMarker;
@@ -65,6 +66,21 @@ public class WorldMapManager extends Control {
     @Export public float blipRangeMeters = 400f;
     /** Draw each zone's load ring (a streaming debug aid). */
     @Export public boolean showZoneRings = false;
+    /** PLAN.md 3.18n: place blips, the region underlay, and how near a click has to land to take a blip. */
+    @Export public boolean showPlaces = true;
+    @Export public boolean showRegions = true;
+    @Export public float placeSizePx = 9f;
+    @Export public float placePickPx = 14f;
+    /** Ordinary shops appear only once the view is tighter than this (m centre-to-edge); landmarks always. */
+    @Export public float placeDetailRange = 900f;
+    @Export public Color regionTint = new Color(0.35f, 0.55f, 0.8f, 0.12f);
+    @Export public int placeFontSize = 12;
+    @Export public int regionFontSize = 22;
+    /** The debug underlay: each streaming zone's id over its marker (PLAN.md 3.18n, "which zone is this bug in"). */
+    @Export public boolean showZoneIds = false;
+
+    /** The place a click last took, or "" (probe readout). */
+    private String pickedPlace = "";
 
     private Player player;
     private boolean open = false;
@@ -81,6 +97,18 @@ public class WorldMapManager extends Control {
     /** The map's own world→screen mapping (probe readout). */
     @Register
     public Vector2 worldToScreenNow(Vector3 world) { return worldToScreen(world); }
+
+    /** The place a click last snapped its waypoint to, or "" (probe readout). */
+    @Register
+    public String pickedPlaceNow() { return pickedPlace; }
+
+    /** How many places the map would draw at the current view (probe readout). */
+    @Register
+    public int placesDrawnNow() { return showPlaces ? visiblePlaces().size() : 0; }
+
+    /** The region under a world point, as the map reads it (probe readout). */
+    @Register
+    public String regionAtNow(Vector3 world) { return Places.regionAt(world.getX(), world.getZ()); }
 
     /** The map's own screen→world mapping (probe readout); Y is the player's height. */
     @Register
@@ -120,7 +148,15 @@ public class WorldMapManager extends Control {
                     pressing = false;
                     if (!dragging) {
                         Vector3 world = screenToWorld(mb.getPosition());
-                        if (world != null) player.setWaypoint(world);
+                        if (world != null) {
+                            // A click within `placePickPx` of a blip is a click on that PLACE, and its waypoint
+                            // goes to the front of the building rather than to the bare pixel: picking a shop off
+                            // the map is the whole point of drawing it. The pick radius is in PIXELS, so it does
+                            // not change with zoom.
+                            Places.Place hit = pickPlace(mb.getPosition());
+                            pickedPlace = hit == null ? "" : hit.name();
+                            player.setWaypoint(hit == null ? world : hit.go());
+                        }
                     }
                     dragging = false;
                 }
@@ -215,6 +251,7 @@ public class WorldMapManager extends Control {
     @Override
     public void _draw() {
         if (!open) return;
+        Places.bind(this);   // the places are per scene
         Vector2 size = getSize();
         drawRect(new godot.core.Rect2(0.0, 0.0, size.getX(), size.getY()), backgroundColor, true, -1f, false);
         if (player == null || !godot.global.GD.isInstanceValid(player)) return;
@@ -224,15 +261,32 @@ public class WorldMapManager extends Control {
         Vector3 view = new Vector3(viewX, 0.0, viewZ);
         Vector3 origin = player.getGlobalPosition();
 
+        // The region underlay goes UNDER the roads: it says which part of the island you are looking at, and it
+        // must not hide what you navigate by.
+        if (showRegions) {
+            RoadOverlay.drawRegions(this, Places.regions(), view, center, scale, 0f, regionTint,
+                    RoadOverlay.mapFont(), regionFontSize);
+        }
         // Roads (4.7b): the baked picture under the whole control, one textured quad.
         mapDrawn = RoadOverlay.drawMap(this, view, center, scale, (float) size.getX(), (float) size.getY(),
                 0f, roadColor);
+        if (showPlaces) {
+            RoadOverlay.drawPlaces(this, visiblePlaces(), view, center, scale, 0f, 0f, placeSizePx,
+                    minPlaceTier(), RoadOverlay.mapFont(), placeFontSize);
+        }
 
-        ZoneManager wzm = showZoneRings ? ZoneManager.get() : null;
+        ZoneManager wzm = (showZoneRings || showZoneIds) ? ZoneManager.get() : null;
         if (wzm != null) {
             for (ZoneMarker m : wzm.getMarkers()) {
                 if (m == null || !godot.global.GD.isInstanceValid(m) || m.zone == null) continue;
-                drawCircle(worldToScreen(m.getGlobalPosition()), m.zone.loadRadius * scale, regionColor, false, 1f, true);
+                Vector2 at = worldToScreen(m.getGlobalPosition());
+                if (showZoneRings) drawCircle(at, m.zone.loadRadius * scale, regionColor, false, 1f, true);
+                // "which zone is this bug in" is answered by reading coordinates today; this is the debug half
+                // of the underlay and is off by default, because a populated world has ~200 markers.
+                if (showZoneIds && RoadOverlay.mapFont() != null && m.zone.zoneId != null) {
+                    drawString(RoadOverlay.mapFont(), at, m.zone.zoneId,
+                            godot.core.HorizontalAlignment.LEFT, -1f, placeFontSize, regionColor);
+                }
             }
         }
 
@@ -285,6 +339,33 @@ public class WorldMapManager extends Control {
         double wx = viewX + (px.getX() - center.getX()) / scale;
         double wz = viewZ + (px.getY() - center.getY()) / scale;
         return new Vector3(wx, player.getGlobalPosition().getY(), wz);
+    }
+
+    /** Ordinary shops only once the view is tight enough that they are not a wall of blips. */
+    private int minPlaceTier() { return rangeMeters > placeDetailRange ? Places.LANDMARK_TIER : 0; }
+
+    /** The places that can fall inside the view, at the current tier. */
+    private List<Places.Place> visiblePlaces() {
+        Vector2 size = getSize();
+        double radius = 0.5 * Math.hypot(size.getX(), size.getY()) / Math.max(1e-5f, scale());
+        List<Places.Place> out = new ArrayList<>();
+        int tier = minPlaceTier();
+        for (Places.Place p : Places.near(new Vector3(viewX, 0.0, viewZ), radius)) {
+            if (p.tier() >= tier) out.add(p);
+        }
+        return out;
+    }
+
+    /** The place whose blip is within {@link #placePickPx} of a screen point, or null. */
+    private Places.Place pickPlace(Vector2 px) {
+        if (!showPlaces) return null;
+        Places.Place best = null;
+        float bd = placePickPx;
+        for (Places.Place p : visiblePlaces()) {
+            float d = distance(px, worldToScreen(p.at()));
+            if (d <= bd) { bd = d; best = p; }
+        }
+        return best;
     }
 
     private static float distance(Vector2 a, Vector2 b) {

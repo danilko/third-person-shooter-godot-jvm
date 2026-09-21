@@ -102,6 +102,24 @@ func _wait(seconds: float) -> void:
 		await process_frame
 
 
+## Wait until STREAMING HAS SETTLED, not for a fixed wall time: how long the crowd zones round the player take
+## to arrive depends on whether loading is threaded, and it is (`ZoneManager.threadedLoadMode` auto) on every
+## display but the headless one. A 4 s wait measured 47 pedestrians in the 150-300 m ring headless and 8 under
+## xvfb -- the same world, a different clock. Settled = the ped count has not risen for `quiet` seconds.
+func _settle(quiet := 6.0, cap := 90.0) -> void:
+	var best := 0
+	var last := Time.get_ticks_msec()
+	var t0 := last
+	while Time.get_ticks_msec() - t0 < int(cap * 1000.0):
+		await process_frame
+		var n := _peds().size() + _walkers().size()
+		if n > best:
+			best = n
+			last = Time.get_ticks_msec()
+		elif best > 0 and Time.get_ticks_msec() - last >= int(quiet * 1000.0):
+			return       # settled: nothing new has ARRIVED for `quiet` seconds, and something is there
+
+
 func _load_walks() -> void:
 	var doc = JSON.parse_string(FileAccess.get_file_as_string(SIDEWALKS))
 	for s in doc["sidewalks"]:
@@ -176,7 +194,7 @@ func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	while Time.get_ticks_msec() - t0 < 25000 and _peds().is_empty():
 		await process_frame
-	await _wait(4.0)
+	await _settle()
 	var peds := _peds()
 	var walkers := _walkers()
 	var in_range := peds.size() + walkers.size()

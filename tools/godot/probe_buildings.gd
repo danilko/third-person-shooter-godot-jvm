@@ -81,6 +81,8 @@ func _run() -> void:
 		inst.queue_free()
 		await physics_frame
 	_check(probed >= 10, "%d building scenes probed" % probed)
+	if only.is_empty():
+		_probe_cell_tones()
 	print("RESULT %s (%d passed, %d failed)" % ["PASS" if _fails == 0 else "FAIL", _passes, _fails])
 	quit(1 if _fails else 0)
 
@@ -101,6 +103,26 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 		if m == null or not m.resource_path.contains("/materials/MI_"):
 			bad.append(s)
 	_check(bad.is_empty(), "%s %d surfaces, all on kit materials %s" % [id, mi.mesh.get_surface_count(), bad])
+
+	# PLAN.md 3.18o follow-up, user 2026-09-21: a Japanese shop window is CLEAR GLASS with a privacy strip
+	# across the middle, not a panel you cannot see through. What hid the shop was the kit's opaque
+	# fake-interior card BEHIND the pane, so this asserts both halves of the rule and its control at once: a
+	# building with a room has no card and wears the strip; one without keeps its card, because a lit fake
+	# interior is exactly what makes an unenterable tower read as occupied.
+	var surf_names := {}
+	var faked := false
+	for s in mi.mesh.get_surface_count():
+		var sm := mi.mesh.surface_get_material(s)
+		if sm != null:
+			surf_names[sm.resource_name] = true
+			# the kit ships one card and its numbered variants (MI_FakeInterior, _1.._4)
+			faked = faked or sm.resource_name.begins_with("MI_FakeInterior")
+	if surf_names.has("MI_GlassShopfront"):
+		_check(not faked and surf_names.has("MI_ShopBand"),
+			"%s: a shop window is clear (no fake-interior card) and wears the privacy strip" % id)
+	elif surf_names.has("MI_Glass"):
+		_check(faked and not surf_names.has("MI_ShopBand"),
+			"%s: glazing that is not a shop window keeps its lit fake interior and gets no strip" % id)
 
 	var space := inst.get_world_3d().direct_space_state
 	var o := inst.global_position
@@ -267,3 +289,67 @@ func _capsule_hits(space: PhysicsDirectSpaceState3D, foot: Vector3) -> bool:
 	# the capsule stands 2 cm off the floor, as a character on the ground does
 	q.transform = Transform3D(Basis.IDENTITY, foot + Vector3(0, CAPSULE_H / 2.0 + 0.02, 0))
 	return not space.intersect_shape(q, 4).is_empty()
+
+const CELLS := "res://src/main/resources/com/openworld/world/buildings/cells"
+const TONES_JSON := "res://assets/world_source/kits/quaternius_downtown_city/materials/facade_tones.json"
+
+## PLAN.md 3.18p, and it is the half a text check cannot make: LOAD every streamed cell and read the facade tone
+## overrides back off the live MeshInstance3D. A `.tscn` whose override syntax Godot silently drops reads exactly
+## like a city that was never given a mixture, and `island_buildings.py tones` -- which reads the same text --
+## would pass on it. Skipped where there are no cells, so a kit-only build still runs.
+func _probe_cell_tones() -> void:
+	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(CELLS)):
+		return
+	if not FileAccess.file_exists(TONES_JSON):
+		return
+	var doc = JSON.parse_string(FileAccess.get_file_as_string(TONES_JSON))
+	var fams: Dictionary = doc.get("facades", {})
+	var owner_of := {}            # tone material name -> its family
+	for fam in fams:
+		for n in fams[fam]:
+			owner_of[n] = fam
+	var meshes := 0
+	var overrides := 0
+	var worn := {}
+	var bad := []
+	for f in DirAccess.get_files_at(CELLS):
+		if not f.ends_with(".tscn"):
+			continue
+		var ps: PackedScene = load("%s/%s" % [CELLS, f])
+		if ps == null:
+			bad.append("%s does not load" % f)
+			continue
+		var cell: Node = ps.instantiate()
+		for c in cell.get_children():
+			var mi := c.get_node_or_null("Mesh") as MeshInstance3D
+			if mi == null or mi.mesh == null:
+				continue
+			meshes += 1
+			var surf := {}       # family -> the surface it is on, read off the SHARED mesh
+			for s in mi.mesh.get_surface_count():
+				var bm := mi.mesh.surface_get_material(s)
+				if bm != null and fams.has(bm.resource_name):
+					surf[bm.resource_name] = s
+			for s in mi.mesh.get_surface_count():
+				var m := mi.get_surface_override_material(s)
+				if m == null:
+					continue
+				overrides += 1
+				worn[m.resource_name] = int(worn.get(m.resource_name, 0)) + 1
+				var fam: String = str(owner_of.get(m.resource_name, ""))
+				if fam == "":
+					bad.append("%s/%s surface %d wears %s, which is no facade tone" % [f, c.name, s, m.resource_name])
+				elif int(surf.get(fam, -1)) != s:
+					bad.append("%s/%s: %s on surface %d, its %s is surface %s"
+						% [f, c.name, m.resource_name, s, fam, surf.get(fam, -1)])
+		cell.free()
+	_check(bad.is_empty(), "cell facade tones: %d overrides on %d building meshes, %s" % [overrides, meshes, worn])
+	for b in bad.slice(0, 5):
+		print("  ", b)
+	# a mixture is a mixture: every tone past the base is really worn
+	var missing := []
+	for fam in fams:
+		for i in range((fams[fam] as Array).size()):
+			if i > 0 and not worn.has(fams[fam][i]):
+				missing.append(fams[fam][i])
+	_check(missing.is_empty(), "every facade tone is worn by some building (%s unused)" % [missing])

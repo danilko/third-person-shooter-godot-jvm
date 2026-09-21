@@ -324,7 +324,7 @@ public class AimDebugHost extends Node3D {
 	 * Puts a real firearm in the character's hand so {@link #gunAimError()} has a {@code Muzzle} to
 	 * measure.
 	 *
-	 * <p>CharacterVisuals_GodotChan instances only {@code Fist} under {@code WeaponAttachment} — a
+	 * <p>A body's CharacterVisuals scene instances only {@code Fist} under {@code WeaponAttachment} — a
 	 * MeleeItem, which has no muzzle — so without this the gun column reads "n/a" and the one
 	 * number that says whether the ARMS carry the weapon to the aim is missing. That matters most
 	 * for the shoulder-aim stances (crawl, drive, swim): their spine deliberately does not move, so
@@ -2078,7 +2078,7 @@ public class AimDebugHost extends Node3D {
 	 * number says so. Reported, not asserted: what an acceptable value is has never been decided.
 	 *
 	 * <p><b>It reads {@code n/a} today because this stand is unarmed.</b>
-	 * CharacterVisuals_GodotChan instances only {@code Fist} under WeaponAttachment (a MeleeItem,
+	 * A body's CharacterVisuals scene instances only {@code Fist} under WeaponAttachment (a MeleeItem,
 	 * which has no {@code Muzzle}); the firearms are added elsewhere. Arming the stand -- instance
 	 * ASR1 under {@code SocketRifle} and equip it through WeaponController -- is what turns this into
 	 * a real assertion, and is the thing to do BEFORE authoring any per-stance aim clip, since the

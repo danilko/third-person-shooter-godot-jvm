@@ -24,7 +24,7 @@ Checks the facts that were each a shipped defect (`PLAN.archive.md`, "Crouch/cra
                     a strafe swings the body for real, a forward walk has nothing to swing about.
   feet_planted      a clip whose feet leave the floor is a Root offset applied without re-posing
                     the legs; the repair for a Root disagreement must not become this.
-  tree_refs         every clip CharacterVisuals_GodotChan.tscn names must exist in the export.
+  tree_refs         every clip the reference visuals scene names must exist in the export.
   orphan_clips      and the reverse: a clip that exists and is named by no AnimationTree node is
                     unreachable, so authoring into it changes nothing while looking like a broken
                     animation. WARN — an unused clip is a normal work-in-progress state.
@@ -40,11 +40,16 @@ import struct
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-GLB = os.path.join(ROOT, "assets", "characters", "godot_chan", "merged_animation.glb")
+## The pelvis rest height the per-ring bob/foot limits below were calibrated on (the 1.52 m
+## reference). Every body's limits scale by its own pelvis against this, so the reference scales to
+## exactly 1.0 and a taller clip source is not failed for being tall.
+REFERENCE_PELVIS_Y = 0.7671
+HEIGHT_SCALE = 1.0
+GLB = os.path.join(ROOT, "assets", "characters", "shino", "shino.glb")
 if len(sys.argv) > 1:                      # optional: check some other export (e.g. a backup)
     GLB = sys.argv[1]
 TSCN = os.path.join(ROOT, "src", "main", "resources", "com", "openworld",
-                    "character", "CharacterVisuals_GodotChan.tscn")
+                    "character", "CharacterVisuals_Shino.tscn")
 # A second BODY is a second visuals scene with its own AnimationTree over its own export, and the
 # clip names are the contract between them -- so the gate has to be pointable at either.
 if len(sys.argv) > 2:
@@ -119,6 +124,16 @@ GUN_SWAY_MAX      = 0.10  # m, LATERAL travel of the gun within one loop, FORWAR
                           #    0.140 m of side-to-side gun swing -- a regression the height-only
                           #    checks scored as PASS.
 
+## A PASS BY 2 mm IS NOT EVIDENCE, AND IT IS HOW THIS GATE WENT QUIET (2026-09-21).
+## Every limit below is a distance in METRES measured on the clip source's own body, so the same
+## clip keys measure differently on two bodies: crawl's placeholder ring (6.16) reads 0.110 m of
+## gun bob on the 1.49 m reference and 0.078 m on Shino, against a 0.08 limit. Moving the library
+## to Shino therefore turned four real ERRORs into silence, with nothing on either run to say the
+## defect was still there. So a measurement that lands inside NEAR_FRACTION of its own limit is
+## REPORTED as a warning rather than passing without a word -- the limit is not bent, the margin is
+## made visible.
+NEAR_FRACTION = 0.85
+
 findings = []
 
 
@@ -128,6 +143,17 @@ def err(check, msg):
 
 def warn(check, msg):
     findings.append(("WARN", check, msg))
+
+
+def gauge(check, value, limit, msg):
+    """Report `value` against `limit`: an ERROR past it, a WARN inside NEAR_FRACTION of it."""
+    if value > limit:
+        err(check, msg + f" [{value:.3f} of {limit:.2f} m]")
+    elif value > limit * NEAR_FRACTION:
+        warn(check, msg + f" -- NOT over the limit, but only just inside it "
+                          f"[{value:.3f} of {limit:.2f} m, {100.0 * value / limit:.0f}%]. "
+                          f"A margin this thin is not evidence the fact is right; it is usually "
+                          f"the same defect measured on a body it happens to suit.")
 
 
 # ----------------------------------------------------------------- glTF reader
@@ -302,8 +328,33 @@ def main():
     nbones = len(J["skins"][0]["joints"])
     expect = nbones * 3
 
+    # THE BOB AND FOOT LIMITS ARE METRES, SO THEY SCALE WITH THE BODY. They were calibrated on the
+    # 1.52 m reference; the clip source is Shino now (1.645 m) and a taller body lifts its foot
+    # further for the same motion -- measured, `upright_run_forward` reads 0.905 m on her against a
+    # limit of 0.85 that she was never measured under. Scaled by this body's own pelvis rest (the
+    # leg, which is what a foot lift is a function of) rather than total height, since a head does
+    # not lift a foot. The reference scales to exactly 1.0.
+    global HEIGHT_SCALE
+    HEIGHT_SCALE = rig.world("pelvis", {})[1][3] / REFERENCE_PELVIS_Y
+
+    # A MORPH ANIMATION IS NOT A BODY CLIP, and the library skips it for the same reason
+    # (`build_character_anims.gd`): a VRoid body's ~40 facial shape keys export as one extra
+    # animation named after the MESH, so Shino's export carries a 168th called `Face`. Checking it
+    # as a body clip reports a channel-count "duplicate" that is nothing of the sort.
+    def is_body_clip(a):
+        for c in a["channels"]:
+            if c.get("target", {}).get("path") == "weights":
+                return False
+        return True
+
+    body_clips = [a for a in J["animations"] if is_body_clip(a)]
+    skipped_morph = [a["name"] for a in J["animations"] if not is_body_clip(a)]
+    if skipped_morph:
+        print(f"  morph_clips: {len(skipped_morph)} shape-key animation(s) not checked as body "
+              f"clips: {', '.join(skipped_morph)}")
+
     # -- duplicate_clips ----------------------------------------------------
-    for a in J["animations"]:
+    for a in body_clips:
         if len(a["channels"]) != expect:
             err("duplicate_clips",
                 f"{a['name']!r} has {len(a['channels'])} channels, expected {expect} "
@@ -416,20 +467,17 @@ def main():
         lo = min(stats, key=lambda k: stats[k]["mean"])
         hi = max(stats, key=lambda k: stats[k]["mean"])
         spread = stats[hi]["mean"] - stats[lo]["mean"]
-        if spread > ROOT_BASELINE_MAX:
-            err("root_baseline",
-                f"{fam}: Root.y baseline spans {spread:.3f} m inside one blendspace ring "
-                f"(limit {ROOT_BASELINE_MAX:.2f}) -- {lo!r} at {stats[lo]['mean']:.3f} vs "
-                f"{hi!r} at {stats[hi]['mean']:.3f}.")
+        gauge("root_baseline", spread, ROOT_BASELINE_MAX,
+              f"{fam}: Root.y baseline spans {spread:.3f} m inside one blendspace ring "
+              f"-- {lo!r} at {stats[lo]['mean']:.3f} vs {hi!r} at {stats[hi]['mean']:.3f}.")
 
         # a loop whose first frame is not its last is a stance TRANSITION baked into a
         # looping clip; it then plays that transition forever
         for label, st in stats.items():
-            if st["close"] > LOOP_CLOSE_MAX:
-                err("loop_transition",
-                    f"{fam}: {label!r} does not close -- Root.y differs by {st['close']:.3f} m "
-                    f"between its first and last frame (limit {LOOP_CLOSE_MAX:.2f}). Find the "
-                    f"frame that matches the last one and trim everything before it.")
+            gauge("loop_transition", st["close"], LOOP_CLOSE_MAX,
+                  f"{fam}: {label!r} does not close -- Root.y differs by {st['close']:.3f} m "
+                  f"between its first and last frame. Find the frame that matches the last one "
+                  f"and trim everything before it.")
 
         # the same fact where it is felt: the gun, on the pose that actually ships
         # Compare CENTRES, not floors: a gait legitimately bobs, and the idle clip does not,
@@ -441,28 +489,24 @@ def main():
         base = centre(idle)
         for label in stats:
             step = abs(centre(label) - base)
-            if label != idle and step > GUN_STEP_MAX:
-                err("gun_travel",
-                    f"{fam}: gun centre shifts {step:.3f} m from {idle!r} to {label!r} "
-                    f"(limit {GUN_STEP_MAX:.2f}).")
+            if label != idle:
+                gauge("gun_travel", step, GUN_STEP_MAX,
+                      f"{fam}: gun centre shifts {step:.3f} m from {idle!r} to {label!r}.")
             bob = max(stats[label]["gun"]) - min(stats[label]["gun"])
-            if bob > spec["bob"]:
-                err("gun_travel",
-                    f"{fam}: gun travels {bob:.3f} m inside {label!r} alone "
-                    f"(limit {spec['bob']:.2f} for this ring).")
+            gauge("gun_travel", bob, spec["bob"],
+                  f"{fam}: gun travels {bob:.3f} m inside {label!r} alone.")
             sway = max(max(stats[label]["gun_x"]) - min(stats[label]["gun_x"]),
                        max(stats[label]["gun_z"]) - min(stats[label]["gun_z"]))
             lateral = "left" in label or "right" in label
-            if not lateral and sway > GUN_SWAY_MAX:
-                err("gun_sway",
-                    f"{fam}: gun swings {sway:.3f} m sideways inside {label!r} (limit "
-                    f"{GUN_SWAY_MAX:.2f}) -- the torso is not absorbing the pelvis twist. "
-                    f"Check what the upper-body filter takes from the aim clip: a STATIC "
-                    f"spine_01/spine_02 replaces the counter-rotation the walk clip animates.")
-            if stats[label]["foot"] > spec["foot"]:
-                err("feet_planted",
-                    f"{fam}: {label!r} lifts a foot to {stats[label]['foot']:.3f} m (limit "
-                    f"{spec['foot']:.2f}) -- a Root offset applied without re-posing the legs.")
+            if not lateral:
+                gauge("gun_sway", sway, GUN_SWAY_MAX,
+                      f"{fam}: gun swings {sway:.3f} m sideways inside {label!r} -- the torso "
+                      f"is not absorbing the pelvis twist. Check what the upper-body filter takes "
+                      f"from the aim clip: a STATIC spine_01/spine_02 replaces the "
+                      f"counter-rotation the walk clip animates.")
+            gauge("feet_planted", stats[label]["foot"], spec["foot"] * HEIGHT_SCALE,
+                  f"{fam}: {label!r} lifts a foot to {stats[label]['foot']:.3f} m "
+                  f"-- a Root offset applied without re-posing the legs.")
 
     # -- tree_refs ----------------------------------------------------------
     if os.path.exists(TSCN):
@@ -473,6 +517,41 @@ def main():
             if r not in imported:
                 err("tree_refs", f"AnimationTree references clip {r!r}, absent from the export.")
         print(f"  tree_refs: {len(refs)} clips referenced by the AnimationTree")
+
+        # -- aim_coverage: THE ARTIST'S LIST -------------------------------
+        # A grip archetype's index is APPEND-ONLY (W12), so an archetype no weapon uses cannot be
+        # deleted -- but its CLIPS can, and they were: a copy of another pose that nothing can reach
+        # is a clip that silently goes stale (the sniper set diverged twice, W45). Those indices now
+        # point at their base clip, so the render is unchanged and there is one pose to keep right
+        # instead of two. What is left is exactly the set an artist can change something with, and
+        # this prints it per stance so nobody has to work that out from a blendspace.
+        try:
+            arch = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                               "weapon_archetypes.json")))
+            cat = json.load(open(os.path.join(ROOT, "src/main/resources/com/openworld/weapon/"
+                                                    "weapon_catalog.json")))
+        except OSError:
+            arch = cat = None
+        if arch and cat:
+            weapons = {}
+            for row in cat["weapons"]:
+                weapons.setdefault(row["archetype"], []).append(row["id"])
+            print("  aim_coverage: the poses an artist can change something with")
+            for fam, what in (("upright_aim_%s", "aim, standing"), ("crouch_aim_%s", "aim, kneeling"),
+                              ("crawl_aim_%s", "aim, prone"), ("upright_hold_%s", "hold, non-combat"),
+                              ("weapon_switch_%s", "draw")):
+                own, shared = [], []
+                for a in arch["archetypes"]:
+                    if a["name"] not in weapons:
+                        continue
+                    (own if (fam % a["name"]) in imported else shared).append(a["name"])
+                line = "    %-18s own: %s" % (what, ", ".join(own) if own else "-")
+                if shared:
+                    line += "   |  SHARED (no clip of their own): " + ", ".join(shared)
+                print(line)
+            idle = [a["name"] for a in arch["archetypes"] if a["name"] not in weapons]
+            print("    %-18s %s -- no shipped weapon; their blendspace points play their base pose"
+                  % ("reserved:", ", ".join(idle) if idle else "-"))
 
         # -- orphan_clips ---------------------------------------------------
         # The other direction, which cost a whole investigation: a clip that exists, exports, and

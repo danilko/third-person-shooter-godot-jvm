@@ -30,14 +30,31 @@ import point_model as pm        # noqa: E402
 MOUTH = 22.0
 SPACING = 80.0
 JUNCTION_CLEAR = 55.0     # a new junction no nearer an existing junction's centre than this
-MIN_SPAN = 75.0           # consecutive junctions on a new street at least this far apart
+MIN_SPAN = 60.0           # consecutive junctions on a new street at least this far apart
+# A line set is either an explicit tuple of coordinates or a SPACING (a float): the spacing generates lines
+# across the box, which is what closes BLOCKS (PLAN.md 3.18c). Measured on the hand-listed version: the road
+# network enclosed almost nothing -- 44% of the island's 8.13 km2 of open land was ONE component of 3.60 km2,
+# and only 16% sat in components under 5 ha, the size a real 街区 is. Hand-listing lines cannot close a mesh:
+# every dropped line leaves a gap, and a gap joins two blocks into one.
+#
+# The spacing is the BLOCK size. PLATEAU Tokyo's blocks are 60-120 m; this world's lanes are stretched (4.5 m
+# against the book's 3.25), so the blocks are stretched with them and the city's is 150 m.
+# WHICH REGIONS GET A BLOCK GRID is the user's call (2026-09-20): "only need to do for city/downtown/resident;
+# suburb/harbour/airport/mountain assume will be different". They are also the only ones it CAN be done for --
+# `suburb` and `harbour` were tried and every line reported "meets no road", because those boxes have almost no
+# arterials for a grid to attach to. They need arterials first (3.3's reach gaps), and they are meant to read
+# differently anyway: a harbour is yards and sheds, a suburb is loose plots.
+BLOCK_STEP = {"city": 150.0, "sw": 170.0, "farm": 260.0}
 REGIONS = (
-    # name, box (x0, y0, x1, y1), preset, x lines, y lines
-    ("city", (40.0, -250.0, 1540.0, 560.0), "block", (224.0, 562.0, 912.0, 1250.0), (110.0, 350.0, 540.0)),
-    ("sw", (-1560.0, -1150.0, -100.0, -280.0), "block", (-1300.0, -1050.0, -800.0, -550.0, -330.0), (-560.0, -800.0)),
-    ("farm", (850.0, 900.0, 1500.0, 1720.0), "farm", (960.0, 1200.0), (1100.0, 1350.0)),
+    # name, box (x0, y0, x1, y1), preset, x lines, y lines -- a float means "generate at this spacing".
+    # `city` covers DOWNTOWN too (the buildings' downtown box sits inside it); its north edge stops at y 560
+    # because the C1 diamond's ramps come down past it.
+    ("city", (40.0, -250.0, 1560.0, 560.0), "block", BLOCK_STEP["city"], BLOCK_STEP["city"]),
+    ("sw", (-1560.0, -1150.0, -100.0, -280.0), "block", BLOCK_STEP["sw"], BLOCK_STEP["sw"]),
+    ("farm", (850.0, 900.0, 1500.0, 1720.0), "farm", BLOCK_STEP["farm"], BLOCK_STEP["farm"]),
 )
 NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "farm": ("hata_michi", "hata_yoko")}
+LINE_INSET = 60.0        # a generated line no nearer the box edge than this (its first crossing needs room)
 
 
 def _crossings(net, a, b, skip=()):
@@ -87,10 +104,18 @@ def _line_ok(net, ground, obst, kind, v, box):
     cr = _crossings(net, a, b)
     if not cr:
         return None, "meets no road"
-    nodes = [(c[2], c[1]) for c in cr]
-    for p, _road in nodes:
-        if min((math.hypot(p[0] - c[0], p[1] - c[1]) for c in obst), default=1e9) < JUNCTION_CLEAR:
-            return None, "a junction at (%.0f, %.0f) crowds an existing one" % p
+    # A crowding crossing is dropped, not the LINE. Dropping the line was right while the lines were hand-listed
+    # and few; with a generated grid one bad crossing would discard a whole street, and one missing street is a
+    # gap that merges two blocks into one (PLAN.md 3.18c). A line that keeps nothing is still dropped.
+    nodes, crowded = [], 0
+    for c in cr:
+        p = c[2]
+        if min((math.hypot(p[0] - o[0], p[1] - o[1]) for o in obst), default=1e9) < JUNCTION_CLEAR:
+            crowded += 1
+            continue
+        nodes.append((p, c[1]))
+    if not nodes:
+        return None, "every one of its %d crossings crowds an existing junction" % len(cr)
     return nodes, None
 
 
@@ -102,10 +127,30 @@ def _wet(ground, p, q):
     return False
 
 
+def _line_values(box, kind, spec):
+    """The coordinates of one axis's lines: a tuple is taken as given, a float is a SPACING laid across the box.
+
+    Generated, because a mesh only closes if the lines really cross: a hand-listed set leaves a gap wherever one
+    line is dropped, and one gap merges two blocks. Laid symmetrically about the box's centre so a region reads
+    as a grid rather than as a set of lines counted from one edge."""
+    if not isinstance(spec, (int, float)):
+        return tuple(spec)
+    lo, hi = (box[0], box[2]) if kind == "x" else (box[1], box[3])
+    lo, hi = lo + LINE_INSET, hi - LINE_INSET
+    if hi <= lo:
+        return ()
+    mid = 0.5 * (lo + hi)
+    n = int(math.floor((hi - lo) / float(spec)))
+    if n <= 0:
+        return (mid,)
+    return tuple(mid + (k - n / 2.0) * float(spec) for k in range(n + 1))
+
+
 def plan_region(net, ground, region):
     """The lines of one region that survive, each as [(point, road name or None)] from its first to last crossing. A
     line that fails is nudged up to 60 m either way before it is dropped."""
     name, box, _preset, xs, ys = region
+    xs, ys = _line_values(box, "x", xs), _line_values(box, "y", ys)
     obst = _obstacles(net)
     kept, why = [], []
     for kind, vals in (("x", xs), ("y", ys)):
@@ -158,7 +203,20 @@ def plan_region(net, ground, region):
             if n < 2:
                 verdict[i] = "meets one road and no other street"
             elif any(b_ - a_ < MIN_SPAN for a_, b_ in zip(pts, pts[1:])):
-                verdict[i] = "two of its junctions are closer than %.0f m" % MIN_SPAN
+                # prefer giving up the CROSSING with another new line: a crossing is one junction of a grid,
+                # while the line is a whole street, and losing the street is what leaves a gap
+                mine = [k for k in active if i == (k[0] if kind == "x" else k[1])]
+                worst, wk = None, None
+                for k in mine:
+                    c = cross[k][ax]
+                    near = min((abs(c - q) for q in pts if abs(c - q) > 1e-6), default=1e9)
+                    if near < MIN_SPAN and (worst is None or near < worst):
+                        worst, wk = near, k
+                if wk is not None:
+                    active.discard(wk)
+                    changed = True
+                else:
+                    verdict[i] = "two of its junctions on ROADS are closer than %.0f m" % MIN_SPAN
         if not verdict and not changed:
             # water is judged only once everything else has settled: a partner dropped may shorten the line
             for i in list(alive):
@@ -191,20 +249,33 @@ def build_region(net, ground, region):
     rname, _box, preset, _xs, _ys = region
     fixed = lines
     junctions = {}
+    skipped = []
 
     def add(c, u):
         junctions.setdefault((round(c[0], 1), round(c[1], 1)), []).append(u)
-    cut = set()
+    cut, dead = set(), set()
     for kind, v, nodes in fixed:
         for p, road in nodes:
             key = (round(p[0], 1), round(p[1], 1))
             if road is not None and key not in cut:
-                ma, mb = cut_road(net, p, road.split("__")[0], MOUTH)
+                try:
+                    ma, mb = cut_road(net, p, road.split("__")[0], MOUTH)
+                except ValueError as e:
+                    # No room on that road for a mouth here (its end is too near). The junction cannot be made,
+                    # so the street must not be built OUT to it either: doing that leaves a dangling end, which
+                    # is what `flow`'s `open_end` reported on four new streets the first time this ran.
+                    skipped.append(str(e))
+                    dead.add(key)
+                    continue
                 add(p, ma)
                 add(p, mb)
                 cut.add(key)
     made = 0
     for kind, v, nodes in fixed:
+        # a node whose junction could not be made is no longer an end this street may run to
+        nodes = [n for n in nodes if (round(n[0][0], 1), round(n[0][1], 1)) not in dead]
+        if len(nodes) < 2:
+            continue
         stem = NAMES[rname][0 if kind == "x" else 1]
         base = "%s_%d" % (stem, int(round(abs(v))))
         seg = 0
@@ -224,6 +295,8 @@ def build_region(net, ground, region):
             made += 1
     for c, mouths in junctions.items():
         make_junction(net, mouths, signal=(preset != "farm" and len(mouths) >= 4))
+    if skipped:
+        why.append("%s: %d junction(s) skipped for want of room on the road they would cut" % (rname, len(skipped)))
     return made, len(junctions), why
 
 

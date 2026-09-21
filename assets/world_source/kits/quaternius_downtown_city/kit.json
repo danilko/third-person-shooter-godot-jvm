@@ -1,197 +1,202 @@
 {
-  "id": "quaternius_downtown_city",
-  "title": "Downtown City MegaKit (Standard)",
-  "author": "Quaternius",
-  "source_url": "https://quaternius.com/packs/downtowncitymegakit.html",
-  "licence": "CC0 1.0",
-  "downloaded": "2026-09-17",
-  "notes": [
-    "source/ is the Standard package's glTF export as downloaded (gltf + bin). Its PNGs were moved to textures/, the only other change.",
-    "source/ carries a .gdignore: Godot imports the normalised pieces/, never the raw files.",
-    "The kit is authored on a 2 m plan module and a 3 m storey (a 1 m band piece makes a 4 m storey). Walls span x -1..1, y 0..3, with the exterior face at z = 0 facing +Z and the interior face at z = -0.2.",
-    "module_scale is baked into every piece's vertices by tools/building_kit/normalize_kit.py. 0.91 puts the 2 m module on the Japanese ken (1.82 m), a storey at 2.73 m, a banded storey at 3.64 m and the door openings at 2.0 m. Change it here and rebuild; nothing else holds the number."
+ "id": "quaternius_downtown_city",
+ "title": "Downtown City MegaKit (Standard)",
+ "author": "Quaternius",
+ "source_url": "https://quaternius.com/packs/downtowncitymegakit.html",
+ "licence": "CC0 1.0",
+ "downloaded": "2026-09-17",
+ "notes": [
+  "source/ is the Standard package's glTF export as downloaded (gltf + bin). Its PNGs were moved to textures/, the only other change.",
+  "source/ carries a .gdignore: Godot imports the normalised pieces/, never the raw files.",
+  "The kit is authored on a 2 m plan module and a 3 m storey (a 1 m band piece makes a 4 m storey). Walls span x -1..1, y 0..3, with the exterior face at z = 0 facing +Z and the interior face at z = -0.2.",
+  "module_scale is baked into every piece's vertices by tools/building_kit/normalize_kit.py. 0.91 puts the 2 m module on the Japanese ken (1.82 m), a storey at 2.73 m, a banded storey at 3.64 m and the door openings at 2.0 m. Change it here and rebuild; nothing else holds the number."
+ ],
+ "source_module_m": 2.0,
+ "source_storey_m": 3.0,
+ "module_scale": 0.91,
+ "categories": [
+  [
+   "buildings",
+   "^Building_"
   ],
-  "source_module_m": 2.0,
-  "source_storey_m": 3.0,
-  "module_scale": 0.91,
-  "categories": [
-    [
-      "buildings",
-      "^Building_"
-    ],
-    [
-      "cornices",
-      "^Cornice_"
-    ],
-    [
-      "roofs",
-      "^Roof_"
-    ],
-    [
-      "floors",
-      "^Floor_"
-    ],
-    [
-      "doors",
-      "^(Door|DoorFrame|Entrance|Stairs)"
-    ],
-    [
-      "props",
-      "^(Prop_|Sidewalk_Planter)"
-    ],
-    [
-      "streets",
-      "^(Street_|Sidewalk_)"
-    ],
-    [
-      "decals",
-      "^Decal_"
-    ],
-    [
-      "columns",
-      "Column"
-    ],
-    [
-      "corners",
-      "(Corner|90Angle)"
-    ],
-    [
-      "walls",
-      "^(Brick|Metal|Trim)_"
-    ]
+  [
+   "cornices",
+   "^Cornice_"
   ],
-  "rows_notes": [
-    "A ROW is one storey of one side: `pieces` cycle along the side's modules (2 m source pieces only), `band` stacks a 1 m piece on top (a 3 + 1 m storey), `door` replaces the module(s) a type puts a door on, `corner` stands at each end of the side, `rail` is laid at the storey's base on the outside.",
-    "door_opening is the walk-through hole of every `door` piece in SOURCE metres (half width, height), measured on the pieces' own triangles; collision leaves exactly that gap.",
-    "party_wall_row: the row an `attached` side uses on every storey (a blank party wall), `banded` for a storey whose open sides carry a band. stair_house: the row and footprint (modules) of the 塔屋 on a flat roof over three storeys."
+  [
+   "roofs",
+   "^Roof_"
   ],
-  "rows": {
-    "shopfront": {
-      "pieces": [
-        "Metal_FirstFloor_Window"
-      ],
-      "band": "Metal_FirstFloor_Wall_1",
-      "door": "DoorFrame_Metal_Single",
-      "corner": "Metal_Column_Bottom"
-    },
-    "shop_back": {
-      "pieces": [
-        "Metal_FirstFloor_Wall"
-      ],
-      "band": "Metal_FirstFloor_Wall_1",
-      "door": "DoorFrame_Metal_Single"
-    },
-    "lobby": {
-      "pieces": [
-        "Metal_FullWindow"
-      ],
-      "band": "Metal_Plain_1",
-      "door": "DoorFrame_Metal_Single",
-      "corner": "Metal_Column_Bottom"
-    },
-    "curtain_wall": {
-      "pieces": [
-        "Metal_FullWindow"
-      ],
-      "band": "Metal_Plain_1",
-      "corner": "Metal_Column_Center"
-    },
-    "glass_floor": {
-      "pieces": [
-        "Metal_FullWindow"
-      ],
-      "corner": "Metal_Column_Small_Center"
-    },
-    "metal_windows": {
-      "pieces": [
-        "Metal_Window_Half",
-        "Metal_Plain_3"
-      ],
-      "band": "Metal_Plain_1"
-    },
-    "metal_plain": {
-      "pieces": [
-        "Metal_Plain_3"
-      ]
-    },
-    "metal_banded": {
-      "pieces": [
-        "Metal_Plain_3"
-      ],
-      "band": "Metal_Plain_1",
-      "door": "DoorFrame_Metal_Single"
-    },
-    "tile_windows": {
-      "pieces": [
-        "Trim_Window",
-        "Trim_Plain_3"
-      ]
-    },
-    "tile_plain": {
-      "pieces": [
-        "Trim_Plain_3"
-      ]
-    },
-    "tile_ground": {
-      "pieces": [
-        "Trim_FirstFloor_Wall"
-      ],
-      "door": "DoorFrame_Metal_Single"
-    },
-    "tile_balcony": {
-      "pieces": [
-        "Trim_Window"
-      ],
-      "rail": "Trim_Wall_Guard"
-    },
-    "brick_windows": {
-      "pieces": [
-        "Brick_Window_Trim_Single",
-        "Brick_Plain_3"
-      ]
-    },
-    "residential_windows": {
-      "pieces": [
-        "Metal_Window_Half",
-        "Trim_Plain_3"
-      ]
-    },
-    "residential_balcony": {
-      "pieces": [
-        "Metal_Window_Half"
-      ],
-      "rail": "Trim_Wall_Guard"
-    }
+  [
+   "floors",
+   "^Floor_"
+  ],
+  [
+   "doors",
+   "^(Door|DoorFrame|Entrance|Stairs)"
+  ],
+  [
+   "props",
+   "^(Prop_|Sidewalk_Planter)"
+  ],
+  [
+   "streets",
+   "^(Street_|Sidewalk_)"
+  ],
+  [
+   "decals",
+   "^Decal_"
+  ],
+  [
+   "columns",
+   "Column"
+  ],
+  [
+   "corners",
+   "(Corner|90Angle)"
+  ],
+  [
+   "walls",
+   "^(Brick|Metal|Trim)_"
+  ]
+ ],
+ "rows_notes": [
+  "A ROW is one storey of one side: `pieces` cycle along the side's modules (2 m source pieces only), `band` stacks a 1 m piece on top (a 3 + 1 m storey), `door` replaces the module(s) a type puts a door on, `corner` stands at each end of the side, `rail` is laid at the storey's base on the outside.",
+  "door_opening is the walk-through hole of every `door` piece in SOURCE metres (half width, height), measured on the pieces' own triangles; collision leaves exactly that gap.",
+  "party_wall_row: the row an `attached` side uses on every storey (a blank party wall), `banded` for a storey whose open sides carry a band. stair_house: the row and footprint (modules) of the 塔屋 on a flat roof over three storeys."
+ ],
+ "rows": {
+  "shopfront": {
+   "pieces": [
+    "Metal_FirstFloor_Window"
+   ],
+   "band": "Metal_FirstFloor_Wall_1",
+   "door": "DoorFrame_Metal_Single",
+   "corner": "Metal_Column_Bottom"
   },
-  "parapets": {
-    "metal": {
-      "piece": "Metal_Plain_1",
-      "cornice": "Cornice_Metal_Center"
-    },
-    "plain": {
-      "piece": "Metal_Plain_1"
-    },
-    "brick": {
-      "piece": "Brick_Plain_1",
-      "cornice": "Cornice_Brick_Center"
-    }
+  "shop_back": {
+   "pieces": [
+    "Metal_FirstFloor_Wall"
+   ],
+   "band": "Metal_FirstFloor_Wall_1",
+   "door": "DoorFrame_Metal_Single"
   },
-  "roof_tile": "Roof_2x2",
-  "floor_tile": "Floor_2x2",
-  "ac_unit": "Prop_ACUnit",
-  "door_opening": [
-    0.5,
-    2.2
-  ],
-  "party_wall_row": {
-    "plain": "tile_plain",
-    "banded": "metal_banded"
+  "lobby": {
+   "pieces": [
+    "Metal_FullWindow"
+   ],
+   "band": "Metal_Plain_1",
+   "door": "DoorFrame_Metal_Single",
+   "corner": "Metal_Column_Bottom"
   },
-  "stair_house": {
-    "row": "metal_banded",
-    "modules": [
-      2,
-      2
-    ]
+  "curtain_wall": {
+   "pieces": [
+    "Metal_FullWindow"
+   ],
+   "band": "Metal_Plain_1",
+   "corner": "Metal_Column_Center"
+  },
+  "glass_floor": {
+   "pieces": [
+    "Metal_FullWindow"
+   ],
+   "corner": "Metal_Column_Small_Center"
+  },
+  "metal_windows": {
+   "pieces": [
+    "Metal_Window_Half",
+    "Metal_Plain_3"
+   ],
+   "band": "Metal_Plain_1"
+  },
+  "metal_plain": {
+   "pieces": [
+    "Metal_Plain_3"
+   ]
+  },
+  "metal_banded": {
+   "pieces": [
+    "Metal_Plain_3"
+   ],
+   "band": "Metal_Plain_1",
+   "door": "DoorFrame_Metal_Single"
+  },
+  "tile_windows": {
+   "pieces": [
+    "Trim_Window",
+    "Trim_Plain_3"
+   ]
+  },
+  "tile_plain": {
+   "pieces": [
+    "Trim_Plain_3"
+   ]
+  },
+  "tile_ground": {
+   "pieces": [
+    "Trim_FirstFloor_Wall"
+   ],
+   "door": "DoorFrame_Metal_Single"
+  },
+  "tile_balcony": {
+   "pieces": [
+    "Trim_Window"
+   ],
+   "rail": "Trim_Wall_Guard"
+  },
+  "brick_windows": {
+   "pieces": [
+    "Brick_Window_Trim_Single",
+    "Brick_Plain_3"
+   ]
+  },
+  "residential_windows": {
+   "pieces": [
+    "Metal_Window_Half",
+    "Trim_Plain_3"
+   ]
+  },
+  "residential_balcony": {
+   "pieces": [
+    "Metal_Window_Half"
+   ],
+   "rail": "Trim_Wall_Guard"
   }
+ },
+ "shopfront_rows": [
+  "shopfront",
+  "lobby",
+  "glass_floor"
+ ],
+ "parapets": {
+  "metal": {
+   "piece": "Metal_Plain_1",
+   "cornice": "Cornice_Metal_Center"
+  },
+  "plain": {
+   "piece": "Metal_Plain_1"
+  },
+  "brick": {
+   "piece": "Brick_Plain_1",
+   "cornice": "Cornice_Brick_Center"
+  }
+ },
+ "roof_tile": "Roof_2x2",
+ "floor_tile": "Floor_2x2",
+ "ac_unit": "Prop_ACUnit",
+ "door_opening": [
+  0.5,
+  2.2
+ ],
+ "party_wall_row": {
+  "plain": "tile_plain",
+  "banded": "metal_banded"
+ },
+ "stair_house": {
+  "row": "metal_banded",
+  "modules": [
+   2,
+   2
+  ]
+ }
 }

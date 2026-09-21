@@ -38,6 +38,25 @@ const FRAME_T := 0.04        # the slim aluminium stile/rail of a Japanese autom
 const LEAF_MEET := 0.02
 const OCCLUDER_INSET := 0.6      # inside the walls, so the box never occludes its own building
 const OCCLUDER_FLOOR := 0.3
+# PLAN.md 3.18p: the merged mesh is per TYPE and shared, so a per-BUILDING facade tone has to be an INSTANCE
+# override -- and an override is addressed by surface INDEX, which only this merge knows. Which material is the
+# facade is the kit's fact and is read from the record the retone tool writes, never named twice.
+const FACADE_TONES_JSON := "res://assets/world_source/kits/quaternius_downtown_city/materials/facade_tones.json"
+
+# A JAPANESE SHOP WINDOW IS CLEAR GLASS WITH A STRIP ACROSS THE MIDDLE (user, 2026-09-21). What hid the
+# customers was never the glass: the kit's shopfront panel carries an opaque `MI_FakeInterior` card BEHIND the
+# pane (measured: a 2.53 m quad at z -0.067, right behind a 2.21 m pane at z -0.061). That card is correct for a
+# tower with nothing modelled inside it and wrong for a konbini that has a room. So on a building the layout
+# says HAS an interior, a shopfront panel loses its card and gains the 目隠しシート -- a white gloss strip at eye
+# height with the store's livery stripes through it, leaving the panel clear above and below.
+const FAKE_INTERIOR := "MI_FakeInterior"
+const BAND_MAT := "MI_ShopBand"
+const BAND_DEFAULT_STRIPE := "MI_ShopStripe_Blue"
+const BAND_BOTTOM := 1.25       # m above the panel's own FLOOR: a real 1.25-1.70 m strip is at face height
+const BAND_HEIGHT := 0.45
+const BAND_STRIPE_H := 0.06     # each livery stripe inside the white strip
+const BAND_PROUD := 0.012       # in front of the glass plane, so it is applied TO the window and cannot z-fight
+const SHOP_GLASS := "MI_GlassShopfront"   # a shop window is clearer than a tower's glazing
 
 var _piece_cache := {}   # path -> Array of [Mesh, surface, Transform3D]
 var _materials := {}     # "<kit>/<name>" -> Material
@@ -165,10 +184,23 @@ func _shopfront_glazing(op: Dictionary) -> Array:
 	return out
 
 
-func _door_material() -> Material:
-	## The kit door leaf's own material, for a plain leaf built as a box.
-	var sf := _surfaces(DOOR_LEAF)
-	return null if sf.is_empty() else _kit_material(_kit_res(DOOR_LEAF), sf[0][3])
+const KIT_MATERIALS := "res://assets/world_source/kits/quaternius_downtown_city/materials/"
+
+## A hinged door LEAF's material (PLAN.md 3.18l, user: "most doors should be sliding glass; the few hinged ones
+## should be white or wood, not grey with aged red"). The kit's own leaf wears the WALL's material, so a door read
+## as a panel of the wall. A type says `door_leaf`: "white" (the default -- a Japanese 玄関ドア is white painted
+## steel) or "wood".
+func _door_material(b := {}) -> Material:
+	var want := str(b.get("door_leaf", "white")).to_lower()
+	var path := KIT_MATERIALS + ("MI_DoorLeaf_Wood.tres" if want == "wood" else "MI_DoorLeaf_White.tres")
+	if _lib_mats.has(path):
+		return _lib_mats[path]
+	var m: Material = load(path) if ResourceLoader.exists(path) else null
+	if m == null:
+		var sf := _surfaces(DOOR_LEAF)     # fall back to the kit leaf's own material
+		m = null if sf.is_empty() else _kit_material(_kit_res(DOOR_LEAF), sf[0][3])
+	_lib_mats[path] = m
+	return m
 
 func _door_leaf_mesh() -> ArrayMesh:
 	## The kit's own door leaf as one mesh, shared by every Door node (written once).
@@ -322,6 +354,9 @@ func _build(b: Dictionary, variant: String) -> bool:
 			else:
 				leaves.append({"xf": oxf * Transform3D(Basis.IDENTITY, Vector3(0.0, float(op["h"]) / 2.0, 0.0)),
 						"w": float(op["w"]), "h": float(op["h"]), "plain": true})
+	var shop_rows := _shopfront_rows(b)
+	var see_through: bool = bool(b.get("has_interior", false))
+	var band_panels := []       # [transform, glass AABB] of every shopfront panel that gets the strip
 	for p in pieces:
 		var path: String = p["path"]
 		var kit_res := _kit_res(path)
@@ -330,8 +365,19 @@ func _build(b: Dictionary, variant: String) -> bool:
 		var surfs := _surfaces(path)
 		if surfs.is_empty():
 			return false
+		var shop_window := see_through and shop_rows.has(str(p.get("row", "")))
+		var glass := AABB()
+		var has_glass := false
 		for s in surfs:
 			var mat := _kit_material(kit_res, s[3])
+			var mname := mat.resource_name if mat != null else ""
+			if shop_window and mname == FAKE_INTERIOR:
+				continue                     # the card behind the pane: there is a real room behind it
+			if shop_window and mname == "MI_Glass":
+				var gb := _surface_aabb(s)
+				glass = gb if not has_glass else glass.merge(gb)
+				has_glass = true
+				mat = _kit_named(SHOP_GLASS)
 			var key := mat.resource_path if mat != null else "<none>"
 			if not tools.has(key):
 				var st := SurfaceTool.new()
@@ -339,6 +385,8 @@ func _build(b: Dictionary, variant: String) -> bool:
 				mats[key] = mat
 				order.append(key)
 			(tools[key] as SurfaceTool).append_from(s[0], s[1], xf * (s[2] as Transform3D))
+		if shop_window and has_glass:
+			band_panels.append([xf, glass])
 	# the fixed shopfront glazing is not a door: it is in BOTH variants, shut and open
 	var extra := []
 	for op in _openings(b):
@@ -378,6 +426,18 @@ func _build(b: Dictionary, variant: String) -> bool:
 			mats[pkey] = pmat
 			order.append(pkey)
 		(tools[pkey] as SurfaceTool).append_from(pm, 0, lf["xf"])
+	for bp in band_panels:
+		for box in _shop_band_boxes(bp[0], bp[1], str(b.get("shop_band", ""))):
+			var bmat: Material = box["mat"]
+			var bkey: String = bmat.resource_path if bmat != null else "<none>"
+			if not tools.has(bkey):
+				tools[bkey] = SurfaceTool.new()
+				mats[bkey] = bmat
+				order.append(bkey)
+			var bm := BoxMesh.new()
+			bm.size = box["size"]
+			(tools[bkey] as SurfaceTool).append_from(bm, 0, box["xf"])
+
 	# Indexed and LOD'd (PLAN.md 3.6, `probe_city_perf.gd`): a streamed city put 10-30 M triangles in view at street
 	# level with the full meshes, most of them in buildings a few pixels tall. `generate_lods` (meshoptimizer) makes
 	# the chain the renderer picks from by screen-space error, so a near building is drawn exactly as built.
@@ -551,11 +611,12 @@ func _build(b: Dictionary, variant: String) -> bool:
 					leaf.mesh = _glass_leaf_mesh(lw, h)
 				elif op["frame"] and panels == 1:
 					leaf.mesh = _door_leaf_mesh()
+					leaf.material_override = _door_material(b)
 				else:
 					var lm := BoxMesh.new()
 					lm.size = Vector3(lw, h, 0.1)
 					leaf.mesh = lm
-					leaf.material_override = _door_material()
+					leaf.material_override = _door_material(b)
 					leaf.position = Vector3(-lw / 2.0, h / 2.0, 0.0)
 				door.add_child(leaf)
 				leaf.owner = root
@@ -612,6 +673,9 @@ func _build(b: Dictionary, variant: String) -> bool:
 	meta["doors_locked"] = open_variant and not shop
 	meta["doors_shop"] = shop
 	meta["aabb"] = [mesh.get_aabb().position, mesh.get_aabb().size]
+	# which merged surface each facade family is, for the per-building tone override (PLAN.md 3.18p). An empty
+	# map is a legitimate answer (a landmark built of library pieces wears neither), not a failure.
+	meta["facade_surfaces"] = _facade_surfaces(order, mats)
 	root.set_meta("building", meta)
 
 	var packed := PackedScene.new()
@@ -626,6 +690,94 @@ func _build(b: Dictionary, variant: String) -> bool:
 	print("%-18s %5d pieces -> %d surfaces, %d verts, aabb %s, %s" % [out_id, b["pieces"].size(), mesh.get_surface_count(),
 		_vert_count(mesh), aabb.size, "OK" if err == OK else "SAVE FAILED"])
 	return err == OK
+
+
+## The rows the KIT calls a shop's glazed front. Named there, not here: which rows those are is a fact about
+## the kit's own row table.
+var _shop_rows_cache := {}
+func _shopfront_rows(b: Dictionary) -> Dictionary:
+	var kit := str(b.get("kit", ""))
+	if _shop_rows_cache.has(kit):
+		return _shop_rows_cache[kit]
+	var out := {}
+	var path := "res://assets/world_source/kits/%s/kit.json" % kit
+	if FileAccess.file_exists(path):
+		var doc = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if typeof(doc) == TYPE_DICTIONARY:
+			for r in doc.get("shopfront_rows", []):
+				out[str(r)] = true
+	_shop_rows_cache[kit] = out
+	return out
+
+
+func _surface_aabb(s: Array) -> AABB:
+	var arr := (s[0] as Mesh).surface_get_arrays(s[1])
+	var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	var sxf: Transform3D = s[2]
+	var lo := Vector3(INF, INF, INF)
+	var hi := -lo
+	for q in v:
+		var w: Vector3 = sxf * q
+		lo = lo.min(w)
+		hi = hi.max(w)
+	return AABB(lo, hi - lo)
+
+
+## The 目隠しシート across one panel: a white strip at eye height with two livery stripes through it. Its width,
+## its plane and its floor all come from the panel's OWN glass, so a narrower or lower pane gets a strip that
+## fits it rather than a constant that happens to suit the konbini.
+func _shop_band_boxes(xf: Transform3D, glass: AABB, stripe_mat: String) -> Array:
+	var w: float = glass.size.x
+	if w < 0.2 or glass.end.y < glass.position.y + BAND_HEIGHT:
+		return []                            # too small or too short to carry a strip
+	var z: float = glass.position.z - BAND_PROUD          # the pane faces the panel's -Z (the street)
+	# Measured from the panel's own FLOOR (its local y = 0), never from the pane's bottom edge: on this kit the
+	# glass starts 0.47 m up, so adding the offset to it put the strip at 1.72-2.17 m -- over a head rather than
+	# across a face, and near the top of the pane rather than its middle. Clamped to stay on the glass.
+	var y0: float = clampf(BAND_BOTTOM, glass.position.y, glass.end.y - BAND_HEIGHT)
+	var cx: float = glass.position.x + w * 0.5
+	var band := _kit_named(BAND_MAT)
+	var stripe := _kit_named(stripe_mat if stripe_mat != "" else BAND_DEFAULT_STRIPE)
+	var out := []
+	out.append({"mat": band, "size": Vector3(w, BAND_HEIGHT, 0.012),
+			"xf": xf * Transform3D(Basis.IDENTITY, Vector3(cx, y0 + BAND_HEIGHT * 0.5, z))})
+	for k in 2:
+		var sy: float = y0 + (BAND_HEIGHT * 0.20 if k == 0 else BAND_HEIGHT * 0.80)
+		out.append({"mat": stripe, "size": Vector3(w, BAND_STRIPE_H, 0.016),
+				"xf": xf * Transform3D(Basis.IDENTITY, Vector3(cx, sy, z))})
+	return out
+
+
+func _kit_named(name: String) -> Material:
+	return load(KIT_MATERIALS + name + ".tres")
+
+
+## {facade material name: merged surface index} for the facade families this building wears. `order` is the
+## surface order the merge emitted, so this cannot drift from what `surface_material_override/<i>` addresses.
+func _facade_surfaces(order: Array, mats: Dictionary) -> Dictionary:
+	var out := {}
+	var want := _facade_names()
+	for i in order.size():
+		var m: Material = mats[order[i]]
+		if m != null and want.has(m.resource_name) and not out.has(m.resource_name):
+			out[m.resource_name] = i
+	return out
+
+
+var _facade_cache: PackedStringArray
+var _facade_read := false
+func _facade_names() -> PackedStringArray:
+	if _facade_read:
+		return _facade_cache
+	_facade_read = true
+	if not FileAccess.file_exists(FACADE_TONES_JSON):
+		push_warning("no %s: buildings get no per-building facade tone" % FACADE_TONES_JSON)
+		return _facade_cache
+	var doc = JSON.parse_string(FileAccess.get_file_as_string(FACADE_TONES_JSON))
+	if typeof(doc) == TYPE_DICTIONARY:
+		for k in (doc.get("facades", {}) as Dictionary).keys():
+			_facade_cache.append(str(k))
+	return _facade_cache
 
 
 func _vert_count(mesh: ArrayMesh) -> int:

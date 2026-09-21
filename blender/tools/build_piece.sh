@@ -36,7 +36,17 @@ source "$BP/tools/env.sh"
 # NOT --headless for bake/convert runs: MultiMesh data routes through the RenderingServer, and
 # the headless dummy RS drops the transform buffers (instances collapse to origin).
 RUN=("$GODOT")
-command -v xvfb-run >/dev/null 2>&1 && RUN=(xvfb-run -a "$GODOT")
+if command -v xvfb-run >/dev/null 2>&1; then
+  RUN=(xvfb-run -a "$GODOT")
+else
+  # Measured on 4.7.2 (`scratchpad mm_test.gd`): under --headless the dummy RenderingServer still drops a
+  # MultiMesh's transform buffer -- set/get and save/reload both come back at the origin -- so a bake cannot be
+  # headless and WILL open a window on whatever display it finds. Say so, because a 45-minute bake taking over
+  # the screen is otherwise a mystery.
+  echo "── NOTE: xvfb-run is not installed, so this bake opens a REAL window on \$DISPLAY and will get in your"
+  echo "──       way for as long as it runs. Install it once and every bake goes off-screen by itself:"
+  echo "──           sudo dnf install xorg-x11-server-Xvfb"
+fi
 RES_DIR="src/main/resources/com/openworld/world/pieces"     # relative to res://
 ABS_DIR="$REPO/$RES_DIR"
 mkdir -p "$ABS_DIR"

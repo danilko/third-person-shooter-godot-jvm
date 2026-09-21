@@ -5,6 +5,7 @@ import com.openworld.character.NameplateTarget;
 import com.openworld.character.Player;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.game.WaypointStore;
+import com.openworld.world.Places;
 import com.openworld.world.SpatialEntityGrid;
 import com.openworld.world.ZoneManager;
 import com.openworld.world.ZoneMarker;
@@ -66,6 +67,9 @@ public class MinimapController extends Control {
      * paper map you are reading is a different job from a radar you are steering by.
      */
     @Export public boolean rotateWithHeading = true;
+    /** PLAN.md 3.18n: draw a square blip for each place in range (a shop you can walk into, a landmark). */
+    @Export public boolean showPlaces = true;
+    @Export public float placeSizePx = 7f;
 
     private Character player;
     private boolean mapDrawn = false;
@@ -105,6 +109,7 @@ public class MinimapController extends Control {
     @Override
     public void _draw() {
         Vector2 size = getSize();
+        Places.bind(this);   // the places are per scene
         float cx = (float) size.getX() * 0.5f;
         float cy = (float) size.getY() * 0.5f;
         Vector2 center = new Vector2(cx, cy);
@@ -127,6 +132,12 @@ public class MinimapController extends Control {
                     pl.characterInfo.characterId, origin, pl.getWaypoint());
             RoadOverlay.drawRoute(this, route, pl.getWaypoint(), origin, center, scale, radiusPx,
                     routeWidthPx, pl.getNameplateColor(), rot);
+        }
+
+        // Places (3.18n): the shops and landmarks in range, as squares so they never read as a character.
+        if (showPlaces) {
+            RoadOverlay.drawPlaces(this, Places.near(origin, rangeMeters * 1.5), origin, center, scale,
+                    radiusPx, rot, placeSizePx, 0, null, 0);
         }
 
         // Region outlines (zone load rings) within view.

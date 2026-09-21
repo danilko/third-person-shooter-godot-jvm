@@ -387,9 +387,11 @@ def cut_road(net, xy, prefix, gap, new_name=None):
         f = (s - cum[k]) / max(1e-9, cum[k + 1] - cum[k])
         return tuple(pts[k][c] + (pts[k + 1][c] - pts[k][c]) * f for c in range(3)), k
 
-    (pa, ka), (pb, kb) = at(s0 - gap), at(s0 + gap)
+    # the guard FIRST: `at()` cannot answer for a station off either end of the chain (`max()` over an empty
+    # range), so asking it before the check turned "no room for a mouth here" into a crash
     if s0 - gap <= 1.0 or s0 + gap >= cum[-1] - 1.0:
         raise ValueError("%s: a junction at %s is within %.0f m of the road's end" % (name, xy, gap))
+    (pa, ka), (pb, kb) = at(s0 - gap), at(s0 + gap)
     keep = [u for j, u in enumerate(chain) if cum[j] < s0 - gap - 6.0]
     rest = [u for j, u in enumerate(chain) if cum[j] > s0 + gap + 6.0]
     doomed = [u for u in chain if u not in keep and u not in rest]

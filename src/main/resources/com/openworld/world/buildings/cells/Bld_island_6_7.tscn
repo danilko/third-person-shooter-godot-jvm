@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+[ext_resource type="Material" path="res://assets/world_source/kits/road_kit/materials/M_ConcreteTile.tres" id="alleymat"]
+
+[sub_resource type="BoxMesh" id="AlleyBox"]
+material = ExtResource("alleymat")
+
+[sub_resource type="MultiMesh" id="Alleys"]
+transform_format = 1
+instance_count = 1
+mesh = SubResource("AlleyBox")
+buffer = PackedFloat32Array(1.5207, 0.0000, 29.9154, -265.9860, 0.0000, 0.6000, 0.0000, 0.3400, -2.8156, 0.0000, 16.1576, -8.4000)
+
+[node name="Bld_island_6_7" type="Node3D"]
+
+[node name="Alleys" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Alleys")

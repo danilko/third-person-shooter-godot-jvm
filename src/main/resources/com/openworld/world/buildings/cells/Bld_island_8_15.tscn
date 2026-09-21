@@ -1,31 +1,17 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Warehouse.tscn" id="1"]
-[ext_resource type="Material" path="res://assets/world_source/kits/road_kit/materials/M_TileWhite.tres" id="lotmat"]
+[ext_resource type="Material" path="res://assets/world_source/kits/road_kit/materials/M_ConcreteTile.tres" id="alleymat"]
 
-[sub_resource type="BoxMesh" id="LotBox"]
-material = ExtResource("lotmat")
+[sub_resource type="BoxMesh" id="AlleyBox"]
+material = ExtResource("alleymat")
 
-[sub_resource type="MultiMesh" id="Lots"]
+[sub_resource type="MultiMesh" id="Alleys"]
 transform_format = 1
 instance_count = 1
-mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-38.8105, 0.0000, -17.2784, 48.4973, 0.0000, 0.5500, 0.0000, 4.4550, 36.7410, 0.0000, -18.2517, 1780.8320)
-
-[sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(53.443, 0.550, 25.133)
+mesh = SubResource("AlleyBox")
+buffer = PackedFloat32Array(-2.3964, 0.0000, -22.5326, 52.2670, 0.0000, 0.6000, 0.0000, 4.3400, 2.1207, 0.0000, -25.4613, 1785.6530)
 
 [node name="Bld_island_8_15" type="Node3D"]
 
-[node name="Warehouse_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.726203, 0, -0.687481, 0, 1, 0, 0.687481, 0, -0.726203, 52.214, 4.750, 1777.496)
-
-[node name="Lots" type="MultiMeshInstance3D" parent="."]
-multimesh = SubResource("Lots")
-
-[node name="LotCollision" type="StaticBody3D" parent="."]
-collision_mask = 0
-
-[node name="Lot0" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.726203, 0, -0.687481, 0, 1, 0, 0.687481, 0, -0.726203, 48.497, 4.455, 1780.832)
-shape = SubResource("LotShape0")
+[node name="Alleys" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Alleys")

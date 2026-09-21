@@ -1,8 +1,13 @@
 package com.openworld.ui;
 
+import com.openworld.world.Places;
 import com.openworld.world.RoadGraph;
 import com.openworld.world.RoadMap;
 import godot.api.CanvasItem;
+import godot.api.Font;
+import godot.api.ThemeDB;
+import godot.core.HorizontalAlignment;
+import godot.core.Rect2;
 import godot.api.Texture2D;
 import godot.core.Color;
 import godot.core.PackedColorArray;
@@ -161,4 +166,65 @@ final class RoadOverlay {
         }
         return runs;
     }
+
+    // ── places and regions (PLAN.md 3.18n) ─────────────────────────────────────────────────────────
+
+    /** A place's blip is a SQUARE, so it never reads as a character or a vehicle (both are discs). */
+    static final Color PLACE = new Color(1f, 0.86f, 0.45f, 0.95f);
+    static final Color LANDMARK = new Color(1f, 0.72f, 0.3f, 1f);
+
+    /**
+     * Draw a square blip for each place, and its name when {@code font} is given. {@code minTier} hides the
+     * ordinary shops when the view is zoomed out, so a whole-island map shows landmarks and not 130 konbini.
+     * Nothing is latched: what is drawn is derived from the view every frame.
+     */
+    static void drawPlaces(CanvasItem ci, List<Places.Place> places, Vector3 origin, Vector2 center,
+                           float scale, float clipRadiusPx, float rot, float sizePx, int minTier, Font font,
+                           int fontSize) {
+        double ox = origin.getX(), oz = origin.getZ();
+        double cx = center.getX(), cy = center.getY();
+        for (Places.Place p : places) {
+            if (p.tier() < minTier) continue;
+            Vector2 at = project(p.at().getX(), p.at().getZ(), ox, oz, cx, cy, scale, rot);
+            if (clipRadiusPx > 0) {
+                double dx = at.getX() - cx, dy = at.getY() - cy;
+                if (dx * dx + dy * dy > clipRadiusPx * clipRadiusPx) continue;
+            }
+            Color col = p.tier() >= Places.LANDMARK_TIER ? LANDMARK : PLACE;
+            float h = sizePx * 0.5f;
+            ci.drawRect(new Rect2(at.getX() - h, at.getY() - h, sizePx, sizePx), col, true, -1f, false);
+            ci.drawRect(new Rect2(at.getX() - h, at.getY() - h, sizePx, sizePx),
+                    new Color(0f, 0f, 0f, 0.55f), false, 1f, false);
+            if (font != null) {
+                ci.drawString(font, new Vector2((float) (at.getX() + h + 3f), (float) (at.getY() + fontSize * 0.35f)),
+                        p.name(), HorizontalAlignment.LEFT, -1f, fontSize, col);
+            }
+        }
+    }
+
+    /**
+     * The region underlay: each named region as a tinted box with its name in the middle. Drawn UNDER the
+     * roads, so it tells you which part of the island you are looking at without hiding what you navigate by.
+     */
+    static void drawRegions(CanvasItem ci, List<Places.Region> regions, Vector3 origin, Vector2 center,
+                            float scale, float rot, Color tint, Font font, int fontSize) {
+        double ox = origin.getX(), oz = origin.getZ();
+        double cx = center.getX(), cy = center.getY();
+        for (Places.Region r : regions) {
+            PackedVector2Array poly = new PackedVector2Array();
+            poly.pushBack(project(r.x0(), r.z0(), ox, oz, cx, cy, scale, rot));
+            poly.pushBack(project(r.x1(), r.z0(), ox, oz, cx, cy, scale, rot));
+            poly.pushBack(project(r.x1(), r.z1(), ox, oz, cx, cy, scale, rot));
+            poly.pushBack(project(r.x0(), r.z1(), ox, oz, cx, cy, scale, rot));
+            ci.drawColoredPolygon(poly, tint, new PackedVector2Array(), null);
+            if (font != null) {
+                Vector2 mid = project((r.x0() + r.x1()) * 0.5, (r.z0() + r.z1()) * 0.5, ox, oz, cx, cy, scale, rot);
+                ci.drawString(font, new Vector2((float) mid.getX() - 60f, (float) mid.getY()), r.name(),
+                        HorizontalAlignment.CENTER, 120f, fontSize, new Color(1f, 1f, 1f, 0.5f));
+            }
+        }
+    }
+
+    /** The shared fallback font, or null. */
+    static Font mapFont() { return ThemeDB.getFallbackFont(); }
 }

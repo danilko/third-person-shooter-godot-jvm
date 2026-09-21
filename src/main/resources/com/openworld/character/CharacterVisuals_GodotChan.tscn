@@ -305,13 +305,13 @@ animation = &"upright_aim_pistol"
 animation = &"upright_aim_rifle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_aim_sniper"]
-animation = &"upright_aim_sniper"
+animation = &"upright_aim_rifle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wa02"]
 animation = &"upright_aim_launcher"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wa03"]
-animation = &"upright_aim_dual_pistol"
+animation = &"upright_aim_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wa04"]
 animation = &"upright_aim_melee"
@@ -320,10 +320,10 @@ animation = &"upright_aim_melee"
 animation = &"upright_aim_fist"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wa06"]
-animation = &"upright_aim_shield"
+animation = &"upright_aim_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wa07"]
-animation = &"upright_aim_shield_melee"
+animation = &"upright_aim_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wa08"]
 animation = &"upright_aim_throwable"
@@ -338,7 +338,7 @@ animation = &"crawl_aim_rifle"
 animation = &"crawl_aim_launcher"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_dual_pistol"]
-animation = &"crawl_aim_dual_pistol"
+animation = &"crawl_aim_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_melee"]
 animation = &"crawl_aim_melee"
@@ -347,16 +347,71 @@ animation = &"crawl_aim_melee"
 animation = &"crawl_aim_fist"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_shield"]
-animation = &"crawl_aim_shield"
+animation = &"crawl_aim_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_shield_melee"]
-animation = &"crawl_aim_shield_melee"
+animation = &"crawl_aim_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_throwable"]
 animation = &"crawl_aim_throwable"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_caim_sniper"]
-animation = &"crawl_aim_sniper"
+animation = &"crawl_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_pistol"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_rifle"]
+animation = &"crouch_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_launcher"]
+animation = &"crouch_aim_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_dual_pistol"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_melee"]
+animation = &"crouch_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_fist"]
+animation = &"crouch_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_shield"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_shield_melee"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_throwable"]
+animation = &"crouch_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kaim_sniper"]
+animation = &"crouch_aim_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_aimcrouch"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_kaim_pistol")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_kaim_rifle")
+blend_point_1/pos = 1.0
+blend_point_2/node = SubResource("AnimationNodeAnimation_kaim_launcher")
+blend_point_2/pos = 2.0
+blend_point_3/node = SubResource("AnimationNodeAnimation_kaim_dual_pistol")
+blend_point_3/pos = 3.0
+blend_point_4/node = SubResource("AnimationNodeAnimation_kaim_melee")
+blend_point_4/pos = 4.0
+blend_point_5/node = SubResource("AnimationNodeAnimation_kaim_fist")
+blend_point_5/pos = 5.0
+blend_point_6/node = SubResource("AnimationNodeAnimation_kaim_shield")
+blend_point_6/pos = 6.0
+blend_point_7/node = SubResource("AnimationNodeAnimation_kaim_shield_melee")
+blend_point_7/pos = 7.0
+blend_point_8/node = SubResource("AnimationNodeAnimation_kaim_throwable")
+blend_point_8/pos = 8.0
+blend_point_9/node = SubResource("AnimationNodeAnimation_kaim_sniper")
+blend_point_9/pos = 9.0
+max_space = 9.0
+snap = 1.0
+value_label = "weapon"
 
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_aimcrawl"]
 blend_point_0/node = SubResource("AnimationNodeAnimation_caim_pistol")
@@ -393,6 +448,10 @@ input_1/name = "Crawl"
 input_1/auto_advance = false
 input_1/break_loop_at_end = false
 input_1/reset = false
+input_2/name = "Crouch"
+input_2/auto_advance = false
+input_2/break_loop_at_end = false
+input_2/reset = false
 
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_dnye5"]
 min_space = 0.0
@@ -427,6 +486,72 @@ blend_point_8/name = &"8"
 blend_point_9/node = SubResource("AnimationNodeAnimation_aim_sniper")
 blend_point_9/pos = 9.0
 blend_point_9/name = &"9"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_pistol"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_rifle"]
+animation = &"crouch_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_launcher"]
+animation = &"crouch_aim_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_dual_pistol"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_melee"]
+animation = &"crouch_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_fist"]
+animation = &"crouch_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_shield"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_shield_melee"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_throwable"]
+animation = &"crouch_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ktaim_sniper"]
+animation = &"crouch_aim_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_aimtorsocrouch"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_ktaim_pistol")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_ktaim_rifle")
+blend_point_1/pos = 1.0
+blend_point_2/node = SubResource("AnimationNodeAnimation_ktaim_launcher")
+blend_point_2/pos = 2.0
+blend_point_3/node = SubResource("AnimationNodeAnimation_ktaim_dual_pistol")
+blend_point_3/pos = 3.0
+blend_point_4/node = SubResource("AnimationNodeAnimation_ktaim_melee")
+blend_point_4/pos = 4.0
+blend_point_5/node = SubResource("AnimationNodeAnimation_ktaim_fist")
+blend_point_5/pos = 5.0
+blend_point_6/node = SubResource("AnimationNodeAnimation_ktaim_shield")
+blend_point_6/pos = 6.0
+blend_point_7/node = SubResource("AnimationNodeAnimation_ktaim_shield_melee")
+blend_point_7/pos = 7.0
+blend_point_8/node = SubResource("AnimationNodeAnimation_ktaim_throwable")
+blend_point_8/pos = 8.0
+blend_point_9/node = SubResource("AnimationNodeAnimation_ktaim_sniper")
+blend_point_9/pos = 9.0
+max_space = 9.0
+snap = 1.0
+value_label = "weapon"
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_aimstancetorso"]
+xfade_time = 0.15
+input_0/name = "Default"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = false
+input_1/name = "Crouch"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = false
 
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_aimtorso"]
 min_space = 0.0
@@ -481,13 +606,13 @@ animation = &"weapon_switch_pistol"
 animation = &"weapon_switch_rifle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_switch_sniper"]
-animation = &"weapon_switch_sniper"
+animation = &"weapon_switch_rifle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wc02"]
 animation = &"weapon_switch_launcher"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wc03"]
-animation = &"weapon_switch_dual_pistol"
+animation = &"weapon_switch_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wc04"]
 animation = &"weapon_switch_melee"
@@ -496,10 +621,10 @@ animation = &"weapon_switch_melee"
 animation = &"weapon_switch_fist"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wc06"]
-animation = &"weapon_switch_shield"
+animation = &"weapon_switch_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wc07"]
-animation = &"weapon_switch_shield_melee"
+animation = &"weapon_switch_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wc08"]
 animation = &"weapon_switch_throwable"
@@ -549,13 +674,13 @@ animation = &"upright_hold_pistol"
 animation = &"upright_hold_rifle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hold_sniper"]
-animation = &"upright_hold_sniper"
+animation = &"upright_hold_rifle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wh02"]
 animation = &"upright_hold_launcher"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wh03"]
-animation = &"upright_hold_dual_pistol"
+animation = &"upright_hold_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wh04"]
 animation = &"upright_hold_melee"
@@ -564,10 +689,10 @@ animation = &"upright_hold_melee"
 animation = &"upright_hold_fist"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wh06"]
-animation = &"upright_hold_shield"
+animation = &"upright_hold_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wh07"]
-animation = &"upright_hold_shield_melee"
+animation = &"upright_hold_pistol"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wh08"]
 animation = &"upright_hold_throwable"
@@ -751,10 +876,16 @@ nodes/WeaponTorsoBlend/node = SubResource("AnimationNodeBlend2_torso")
 nodes/WeaponTorsoBlend/position = Vector2(1490, 300)
 nodes/WeaponAimTorso/node = SubResource("AnimationNodeBlendSpace1D_aimtorso")
 nodes/WeaponAimTorso/position = Vector2(1280, 440)
+nodes/WeaponAimTorsoCrouch/node = SubResource("AnimationNodeBlendSpace1D_aimtorsocrouch")
+nodes/WeaponAimTorsoCrouch/position = Vector2(1280, 220)
+nodes/AimStanceTorsoTransition/node = SubResource("AnimationNodeTransition_aimstancetorso")
+nodes/AimStanceTorsoTransition/position = Vector2(1460, 440)
 nodes/WeaponAim/node = SubResource("AnimationNodeBlendSpace1D_dnye5")
 nodes/WeaponAim/position = Vector2(1020, 620)
 nodes/WeaponAimCrawl/node = SubResource("AnimationNodeBlendSpace1D_aimcrawl")
 nodes/WeaponAimCrawl/position = Vector2(1020, 1060)
+nodes/WeaponAimCrouch/node = SubResource("AnimationNodeBlendSpace1D_aimcrouch")
+nodes/WeaponAimCrouch/position = Vector2(1020, 1280)
 nodes/AimStanceTransition/node = SubResource("AnimationNodeTransition_aimstance")
 nodes/AimStanceTransition/position = Vector2(1200, 620)
 nodes/WeaponHold/node = SubResource("AnimationNodeBlendSpace1D_3qk6j")
@@ -811,7 +942,7 @@ nodes/hit_chest/node = SubResource("AnimationNodeAnimation_hrc")
 nodes/hit_chest/position = Vector2(2020, 340)
 nodes/hit_head/node = SubResource("AnimationNodeAnimation_hrh")
 nodes/hit_head/position = Vector2(2020, 460)
-node_connections = [&"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"WeaponAimTorso", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"AimStanceTransition", &"AimStanceTransition", 0, &"WeaponAim", &"AimStanceTransition", 1, &"WeaponAimCrawl", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
+node_connections = [&"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"AimStanceTorsoTransition", &"AimStanceTorsoTransition", 0, &"WeaponAimTorso", &"AimStanceTorsoTransition", 1, &"WeaponAimTorsoCrouch", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"AimStanceTransition", &"AimStanceTransition", 0, &"WeaponAim", &"AimStanceTransition", 1, &"WeaponAimCrawl", &"AimStanceTransition", 2, &"WeaponAimCrouch", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gapvf"]
 radius = 0.048
@@ -947,6 +1078,7 @@ parameters/PassengerMovementBlend/blend_position = Vector2(0, 0)
 [node name="Model" parent="MeshRoot" unique_id=2091451191 instance=ExtResource("3_anim")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" parent_id_path=PackedInt32Array(2091451191, 1572765218) index="0" unique_id=673689560]
+motion_scale = 0.8204
 bones/0/position = Vector3(5.155809e-10, -0.016772537, -0.080805)
 bones/0/rotation = Quaternion(0.49999997, 0.5000001, 0.5, 0.49999994)
 bones/1/rotation = Quaternion(0.70238364, 0.59747034, 0.38679963, -0.008518755)

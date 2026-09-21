@@ -349,6 +349,50 @@ public class HUDManager extends CanvasLayer {
 	  raceActive = active;
 	  applyContext(currentSituation);
 	}
+	tickRegion(delta);
+  }
+
+  // ── which part of the island you are in (PLAN.md 3.18n) ───────────────────
+
+  /** Announce a region when the local player enters it, GTA's district toast: what makes "I'm in the
+   *  harbour" sayable. DERIVED from the player's position every frame against the same region boxes the
+   *  placement uses ({@link com.openworld.world.Places#regionAt}), never latched on a trigger volume, so it
+   *  is right after a teleport, a respawn or a scene load with no event to miss. */
+  private Player localPlayer;
+  private String currentRegion = "";
+  private String pendingRegion = "";
+  private double pendingFor = 0.0;
+  /** A new region must hold this long before it is announced. The boxes touch, so a body standing on an
+   *  edge would otherwise toast on every frame's worth of jitter. */
+  private static final double REGION_SETTLE = 1.0;
+
+  private void tickRegion(double delta) {
+	if (localPlayer == null || !GD.isInstanceValid(localPlayer)) return;
+	com.openworld.world.Places.bind(this);   // the places are per scene
+	var at = localPlayer.getGlobalPosition();
+	String region = com.openworld.world.Places.regionAt(at.getX(), at.getZ());
+	if (region.equals(currentRegion)) {
+	  pendingRegion = "";
+	  return;
+	}
+	if (!region.equals(pendingRegion)) {
+	  pendingRegion = region;
+	  pendingFor = 0.0;
+	  return;
+	}
+	pendingFor += delta;
+	if (pendingFor < REGION_SETTLE) return;
+	currentRegion = region;
+	pendingRegion = "";
+	if (!region.isEmpty()) pushStatus(regionLabel(region), null);
+  }
+
+  /** The region the local player is in, or "" (probe readout). */
+  @Register
+  public String regionNow() { return currentRegion; }
+
+  private static String regionLabel(String id) {
+	return id.isEmpty() ? "" : java.lang.Character.toUpperCase(id.charAt(0)) + id.substring(1).replace('_', ' ');
   }
 
   private void applyDriverCorner(Situation situation) {
@@ -512,6 +556,8 @@ public class HUDManager extends CanvasLayer {
 	}
 	// I5 navigation widgets follow the local player.
 	if (newPlayer instanceof Player p) {
+	  localPlayer = p;
+	  currentRegion = "";                  // re-announce after a respawn or a body swap
 	  if (minimap != null)  minimap.wirePlayer(p);
 	  if (worldMap != null) worldMap.wirePlayer(p);
 	  if (gpsArrow != null) gpsArrow.wirePlayer(p);

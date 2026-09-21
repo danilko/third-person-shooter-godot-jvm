@@ -91,9 +91,14 @@ def layout_type(t, root):
     slide = str(t.get("door_style", "swing")) == "slide"
     place = out["pieces"]
 
-    def put(name, pos, yaw):
-        place.append({"piece": name, "path": piece_path(name), "pos": [round(v, 5) for v in pos],
-                      "yaw": yaw})
+    def put(name, pos, yaw, row=""):
+        # The ROW a piece came from is a fact only the layout has, and the scene builder needs it: a glazed
+        # panel on a SHOPFRONT is a window you look into, while the same piece on a tower's curtain wall is
+        # a floor you do not. Recovering it from the geometry afterwards is guesswork.
+        e = {"piece": name, "path": piece_path(name), "pos": [round(v, 5) for v in pos], "yaw": yaw}
+        if row:
+            e["row"] = row
+        place.append(e)
 
     doors = t.get("doors", {"front": [nw // 2]})
     for side, idx in doors.items():
@@ -179,13 +184,14 @@ def layout_type(t, root):
                 if i in door_idx and slide:
                     continue                      # a glazed shopfront: the builder fills the whole module
                 name = row["door"] if i in door_idx else row["pieces"][i % len(row["pieces"])]
-                put(name, (c[0], base, c[1]), yaw)
+                rname = row_for(g, side)
+                put(name, (c[0], base, c[1]), yaw, rname)
                 if row.get("band"):
-                    put(row["band"], (c[0], base + storey, c[1]), yaw)
+                    put(row["band"], (c[0], base + storey, c[1]), yaw, rname)
                 if row.get("rail"):
-                    put(row["rail"], (c[0], base, c[1]), yaw)
+                    put(row["rail"], (c[0], base, c[1]), yaw, rname)
             if row.get("corner"):
-                put(row["corner"], (gm[2][0], base, gm[2][1]), 0.0)
+                put(row["corner"], (gm[2][0], base, gm[2][1]), 0.0, row_for(g, side))
         base += h
 
     # ac units on upper storeys
@@ -347,10 +353,15 @@ def layout_type(t, root):
     out["roofline_m"] = round(total, 4)
     out["height_m"] = round(max(total, stair_top), 4)
     out["terrace_m"] = round(h_low, 4) if sbd else None
+    out["shop_band"] = t.get("shop_band", "")
     out["setback_m"] = round(sbd, 4)
     out["storeys"] = [round(h, 4) for _, h in storeys]
 
     out["hulls"] = []
+    # Does this building have a ROOM to see into? Derived, not authored: a type that places interior fittings
+    # has one, and the four that do are exactly the four shops. It decides whether the shopfront's glass keeps
+    # the kit's fake-interior card (right for a tower with nothing modelled behind it) or is really glazed.
+    out["has_interior"] = bool(t.get("props"))
     place_props(t.get("props", []), out, root, (W, D))
     check_doors_clear(out)
 
@@ -491,6 +502,7 @@ def layout_composite(c, built, root):
             fw, fd = fd, fw
         rects.append((ox - fw / 2, ox + fw / 2, oz - fd / 2, oz + fd / 2))
         height = max(height, b["height_m"])
+    out["has_interior"] = bool(c.get("props")) or out.get("has_interior", False)
     place_props(c.get("props", []), out, root, (W, D))
     # the apron: paving tiles over the footprint, except under a part (whose own floor is there)
     if c.get("apron"):

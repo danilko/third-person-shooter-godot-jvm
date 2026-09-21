@@ -525,7 +525,8 @@ def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground):
                 lat = _left(d)
                 off = -sgn * r["drain_inset"]
                 fur.put(table, "drain", (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2]), d, s.road.name)
-            for p, d, w, k in _edge_samples(pts, walk, kerb, wall, r["planter_spacing"], r["planter_end_clear"]):
+            for p, d, w, k in (_edge_samples(pts, walk, kerb, wall, r["planter_spacing"], r["planter_end_clear"])
+                               if r.get("planter_spacing", 0.0) > 0.0 else ()):
                 if 2.0 * w < r["planter_min_footway"] or not _grounded(ground, p, r["max_above_ground"]):
                     continue
                 a = table.assets["planter"]
@@ -571,6 +572,10 @@ def _signals(fur, table, lanes, junctions, mine, ground):
     if "signal" not in table.assets:
         return
     r = table.rules
+    # How far in from the kerb the pole stands. 0.7 m, not 1.0: on a 2 m block-street footway a 1.0 m offset put
+    # the pole's far face 1.2 m out, and a 0.7 m walking capsule does not fit in the 0.8 m left -- measured, 118
+    # of 450 signals stood exactly on the crowd's walk line (PLAN.md 3.18a). 0.7 leaves +0.20 m and is if
+    # anything the more Japanese placement: a signal pole stands AT the kerb, not out in the footway.
     off = float(r["signal_kerb_offset"])
     for arm in _arms(lanes, junctions):
         if not _signalised(table, arm["junction"]):
@@ -751,7 +756,17 @@ def _street_trees(fur, table, solves, bands, mine_run, ground, lanes):
                 pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
                 if fur.clear_of(pos, r["tree_clearance"]) and index.clear_of(pos, r["tree_lane_clear"]):
                     if fur.put(table, asset, pos, d, s.road.name):
-                        _tree_pit(fur, r, pos, d, pit_mat)
+                        # The planter IS the tree's socket (PLAN.md 3.18m, user-reported with a screenshot: a
+                        # tree and a planter standing side by side on one footway "appear at the same time and
+                        # is kind of awkward"). A Japanese street tree stands in a 植樹枡 -- an open box at its
+                        # foot -- so the two were never two props; the planter had its own spacing rule and the
+                        # tree had another, and where both fired they simply stood next to each other. Now the
+                        # planter is placed ON the tree and its own run is off (`planter_spacing = 0`), so a
+                        # planter only ever appears as what it is.
+                        if r.get("tree_planter", True) and "planter" in table.assets:
+                            fur.put(table, "planter", pos, d, s.road.name)
+                        else:
+                            _tree_pit(fur, r, pos, d, pit_mat)
 
 
 def _tree_pit(fur, r, pos, fwd, material):

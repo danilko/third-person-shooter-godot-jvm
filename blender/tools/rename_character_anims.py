@@ -1,6 +1,6 @@
-"""Apply the character clip naming pass to assets/characters/godot_chan/merged_animation.blend.
+"""Apply the character clip naming pass to assets/characters/shino/shino.blend.
 
-    blender -b assets/characters/godot_chan/merged_animation.blend --python <this> -- <map.json>
+    blender -b assets/characters/shino/shino.blend --python <this> -- <map.json>
 
 Reads the SAME map the scene patcher reads, so the .blend and the AnimationTree cannot end up
 spelling a clip differently. Idempotent: a rename whose target already exists is skipped.
@@ -77,6 +77,11 @@ for a in sys.argv:
     if a.startswith("--refresh-only="):
         only = set(a.split("=", 1)[1].split(","))
 for name, src_name in cfg["placeholders"].items():
+    # A `_comment*` key is prose about the table, not a clip. This map has carried one since W45 and
+    # nothing had re-run the tool since, so the very first placeholder pass after it died on
+    # "source ... missing" -- the value is a sentence, and there is no action by that name.
+    if name.startswith("_"):
+        continue
     existing = bpy.data.actions.get(name)
     if existing is not None and not (refresh and (only is None or name in only)):
         print(f"[naming] placeholder {name!r} already present")

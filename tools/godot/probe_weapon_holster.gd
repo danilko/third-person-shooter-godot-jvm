@@ -155,17 +155,37 @@ func _proxy(world: Node3D, cs: CollisionShape3D) -> StaticBody3D:
 	return b
 
 ## Deepest overlap of `cs`'s box with whatever is on `mask`, in metres (0.0 = clear).
-func _overlap(space: PhysicsDirectSpaceState3D, cs: CollisionShape3D, mask: int) -> float:
+func _overlap(space: PhysicsDirectSpaceState3D, cs: CollisionShape3D, mask: int,
+			  exclude: Array[RID] = []) -> float:
 	var sq := PhysicsShapeQueryParameters3D.new()
 	sq.shape = cs.shape
 	sq.transform = cs.global_transform
 	sq.collide_with_bodies = true
 	sq.collision_mask = mask
+	sq.exclude = exclude
 	var pairs: Array = space.collide_shape(sq, 16)
 	var depth := 0.0
 	for i in range(0, pairs.size() - 1, 2):
 		depth = maxf(depth, (pairs[i] as Vector3).distance_to(pairs[i + 1] as Vector3))
 	return depth
+
+## Every arm hitbox body of this character, by RID. Named from the ragdoll's own bone names, which
+## `measure_body.gd` shares (ARM_HITBOXES there) -- the PhysicalBone3D nodes are "Physical Bone <n>".
+func _arm_hitboxes(p: Node) -> Array[RID]:
+	var out: Array[RID] = []
+	for n in _all(p):
+		if not (n is PhysicalBone3D): continue
+		for a in ["upperarm_", "lowerarm_", "hand_"]:
+			if String(n.name).contains(a):
+				out.append((n as PhysicalBone3D).get_rid())
+				break
+	return out
+
+func _all(n: Node, out: Array = []) -> Array:
+	out.append(n)
+	for c in n.get_children():
+		_all(c, out)
+	return out
 
 ## The top of the skinned `head` mesh in MeshRoot's frame: this body's crown. Hand-skinned from
 ## `get_bone_global_pose` (the PRE-modifier pose), which is what the head is in while idle and not
@@ -228,12 +248,26 @@ func _measure(space: PhysicsDirectSpaceState3D, p: Node3D, gun: Node3D, weapon_i
 	# The PhysicalBone3D bodies (layer 4) track the live pose -- they are what a bullet hits -- so
 	# they are the body the weapon is measured against. A holstered weapon RESTS on the body, so
 	# contact is expected and it is the DEPTH that says whether it is inside it.
+	#
+	# THE ARMS ARE NOT JUDGED, and that is the same rule `measure_body.gd` derives a socket under:
+	# an arm swings through the space beside the hip and the back in every animation, so no static
+	# holster placement can clear one and a reading taken in whatever pose the scene happens to open
+	# in says nothing. Measured on Shino, a knife correctly on her right hip reads 0.072 m inside her
+	# hanging FOREARM, while the deepest it reaches into her torso and legs is 0.023 m. They are
+	# reported on their own line instead, because a weapon buried in a SHOULDER would still be wrong.
+	var arms: Array[RID] = _arm_hitboxes(p)
 	var pq := PhysicsPointQueryParameters3D.new()
 	pq.collide_with_bodies = true
 	pq.collision_mask = HITBOX_LAYER
+	pq.exclude = arms
 	var inside := 0
 	var total := 0
 	var bones := {}
+	var arm_bones := {}
+	var arm_inside := 0
+	var pa := PhysicsPointQueryParameters3D.new()
+	pa.collide_with_bodies = true
+	pa.collision_mask = HITBOX_LAYER
 	for iz in range(GRID_LONG):
 		for ix in range(GRID_SHORT):
 			for iy in range(GRID_SHORT):
@@ -247,10 +281,19 @@ func _measure(space: PhysicsDirectSpaceState3D, p: Node3D, gun: Node3D, weapon_i
 					inside += 1
 					for h in hits:
 						bones[String((h["collider"] as Node).name)] = true
-	var depth: float = _overlap(space, cs, HITBOX_LAYER)
+				pa.position = pq.position
+				for h in space.intersect_point(pa, 4):
+					var nm := String((h["collider"] as Node).name)
+					if not arms.has((h["collider"] as CollisionObject3D).get_rid()): continue
+					arm_bones[nm] = true
+					arm_inside += 1
+					break
+	var depth: float = _overlap(space, cs, HITBOX_LAYER, arms)
 	var frac := float(inside) / float(total)
 	print("  poke: %d/%d samples inside (%.1f%%), deepest overlap %.3f m %s" % [
 		inside, total, frac * 100.0, depth, bones.keys()])
+	if arm_inside > 0:
+		print("  arms (reported, not judged): %d/%d samples inside %s" % [arm_inside, total, arm_bones.keys()])
 
 	# ── head, crown and ground ────────────────────────────────────────────────────────────────
 	var head_p: Vector3 = head.global_position

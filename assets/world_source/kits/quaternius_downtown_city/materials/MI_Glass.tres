@@ -2,7 +2,13 @@
 
 [resource]
 resource_name = "MI_Glass"
+; Clear glass, not a mirror (PLAN.md 3.18o, user: "for the konbini / enterable buildings the glass is no longer
+; transparent"). It was alpha 0.586 over a 0.25 grey -- dark enough that a shopfront read as a grey panel and
+; you could not see the shop behind it. 0.28 alpha over a cool pale tint is a window you look through, which is
+; what an enterable building needs; a Tokyo tower's upper glazing is more reflective than this, and giving the
+; ground storey its own clearer material is the follow-up (the row table knows which rows are shopfronts, the
+; MERGED mesh no longer does).
 transparency = 4
 cull_mode = 2
-albedo_color = Color(0.25315982, 0.25315982, 0.25315982, 0.5863637)
+albedo_color = Color(0.62, 0.70, 0.74, 0.28)
 roughness = 0.5

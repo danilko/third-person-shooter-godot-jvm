@@ -250,9 +250,16 @@ public class AnimationController extends Node {
     animationTree.set("parameters/WeaponBlend/blend_amount", holster ? 0 : 1);
   }
 
-  /** Transition input names on {@code AimStanceTransition}; the crawl one is the stance's own key. */
+  /**
+   * Transition input names on {@code AimStanceTransition}; each specialised one is the STANCE'S OWN
+   * animation key, so a stance that borrows another's ring borrows its aim with no second table.
+   */
   private static final String AIM_STANCE_DEFAULT = "Default";
   private static final String AIM_STANCE_CRAWL = "Crawl";
+  private static final String AIM_STANCE_CROUCH = "Crouch";
+  /** The specialised branches, by that key. Anything not here aims from {@code Default}. */
+  private static final java.util.Set<String> AIM_STANCE_BRANCHES =
+      java.util.Set.of(AIM_STANCE_CRAWL, AIM_STANCE_CROUCH);
   /** The grip archetype last equipped, so a stance change can re-assert it on the branch it selects. */
   private int animationWeaponIndex = 0;
 
@@ -265,10 +272,14 @@ public class AnimationController extends Node {
     // archetype blendspace, for the same reason WeaponAimTorso has one: a node's output feeds ONE
     // input.
     animationTree.set("parameters/WeaponAimCrawl/blend_position", animationWeaponIndex);
+    // ... and CROUCH's, for the same reason: a kneeling body's arms are not a standing body's, and
+    // a crouch aim pose had been exported and orphaned since W10 with nowhere to go.
+    animationTree.set("parameters/WeaponAimCrouch/blend_position", animationWeaponIndex);
     // The torso layer's own copy of the aim branch: a blend-tree node's output can feed ONE input
     // (Godot refuses the second connection and the whole tree stops evaluating -- measured, every
     // stance read the rest pose), so WeaponTorsoBlend cannot share CombatTransition with WeaponBlend.
     animationTree.set("parameters/WeaponAimTorso/blend_position", animationWeaponIndex);
+    animationTree.set("parameters/WeaponAimTorsoCrouch/blend_position", animationWeaponIndex);
     animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
     animationTree.set("parameters/WeaponChangeAnimation/blend_position", animationWeaponIndex);
     animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
@@ -368,7 +379,12 @@ public class AnimationController extends Node {
     // Which AIM set this stance uses. Keyed on the stance's own animation key, so a stance that
     // borrows another's ring (Swim borrows Crawl) borrows its aim too, with no second table.
     animationTree.set("parameters/AimStanceTransition/transition_request",
-        AIM_STANCE_CRAWL.equals(key) ? AIM_STANCE_CRAWL : AIM_STANCE_DEFAULT);
+        AIM_STANCE_BRANCHES.contains(key) ? key : AIM_STANCE_DEFAULT);
+    // The TORSO layer carries the same dimension or it would take its spine from one stance's pose
+    // and its arms from another's. Only Crouch needs a branch: `Stance.weaponTorsoLayer` is off in
+    // Crawl, so the layer does not run there at all.
+    animationTree.set("parameters/AimStanceTorsoTransition/transition_request",
+        AIM_STANCE_CROUCH.equals(key) ? AIM_STANCE_CROUCH : AIM_STANCE_DEFAULT);
     this.currentStanceName = key;
     this.currentStance = stance;
 

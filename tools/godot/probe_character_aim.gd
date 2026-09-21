@@ -12,7 +12,7 @@ extends SceneTree
 ##    from one bone's own +Z. A thigh's local axes point down the bone, so comparing raw bone
 ##    bases across the body compares nothing and hides a real hips-vs-shoulders yaw split.
 
-const VISUALS := "res://src/main/resources/com/openworld/character/CharacterVisuals_GodotChan.tscn"
+const VISUALS := "res://src/main/resources/com/openworld/character/CharacterVisuals_Shino.tscn"
 
 var skel: Skeleton3D
 var tree: AnimationTree

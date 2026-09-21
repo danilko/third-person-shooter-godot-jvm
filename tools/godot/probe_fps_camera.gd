@@ -16,9 +16,44 @@ extends SceneTree
 ##     camera actually did, in MeshRoot space so running is not counted as shake.
 ##  4. does the HEAD come back? Head visibility used to be latched at the view toggle, so a
 ##     player who entered a vehicle in FPS drove a headless character.
+##  5. does the eye KEEP UP WITH A STANCE CHANGE? (6.14b) The split in 3 is right while the rest
+##     point is still: a crouch moves the rest point itself ~0.33 m, which the filter correctly
+##     classifies as "fast" and clamps, leaving only the slow baseline to travel it. Measured
+##     before the catch-up: 0.23 m behind at the moment the body was already up, 0.55 s to settle.
+##
+##   -- --control  sets `stance_follow` to 0 (the pre-catch-up rig) and must fail case 5.
 
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
 const SAMPLES := 90
+
+## The body has arrived by ~frame 10 of a stance transition; the eye may be at most this far
+## behind it once it has, and must be within SETTLE_M by SETTLE_FRAMES.
+const ARRIVED_FRAME := 10
+const ARRIVED_LAG_M := 0.12
+const SETTLE_M := 0.02
+const SETTLE_FRAMES := 20
+
+## The first head mesh a body declares, resolved exactly as `Character.wireFromMeshConfig` does.
+func _head_mesh(p: Node) -> Node3D:
+	var vis: Node = _find(p, "CharacterVisuals")
+	if vis == null:
+		for c in p.get_children():
+			if c.get("mesh_config") != null:
+				vis = c
+				break
+	if vis == null:
+		return null
+	var cfg = vis.get("mesh_config")
+	if cfg == null:
+		return null
+	var paths = cfg.get("head_mesh_paths")
+	if paths == null:
+		return null
+	for np in paths:
+		var n: Node = vis.get_node_or_null(np)
+		if n != null and n is Node3D:
+			return n as Node3D
+	return null
 
 func _find(n: Node, nm: String) -> Node:
 	if n.name == nm:
@@ -55,6 +90,7 @@ func _stats(pts: Array) -> Dictionary:
 	}
 
 func _initialize() -> void:
+	var control := "--control" in OS.get_cmdline_user_args()
 	var world := Node3D.new()
 	root.add_child(world)
 	_floor(world)
@@ -83,9 +119,14 @@ func _initialize() -> void:
 	var mesh_root: Node3D = _find(p, "MeshRoot") as Node3D
 	var mount: Node3D = _find(p, "MarkerFPSCamera") as Node3D
 	var cam: Node3D = _find(p, "ActiveCamera") as Node3D
-	var head: Node3D = _find(p, "head") as Node3D
-	if mesh_root == null or mount == null or cam == null:
-		print("   FAIL: missing MeshRoot/MarkerFPSCamera/ActiveCamera")
+	# THE HEAD IS WHATEVER THE BODY SAYS IT IS. Reading a node called "head" is a fact about ONE
+	# body -- Shino's head meshes are `Face` and `Hair001`, so that lookup returned null and the
+	# probe died on `head.visible`, which in a `--script` run reads as a HANG (the error aborts
+	# before quit()). `MeshConfig.head_mesh_paths` is the list `Character.refreshHeadVisibility`
+	# itself hides, so asking it is asking the thing under test.
+	var head: Node3D = _head_mesh(p)
+	if mesh_root == null or mount == null or cam == null or head == null:
+		print("   FAIL: missing MeshRoot/MarkerFPSCamera/ActiveCamera/head mesh")
 		quit(1)
 		return
 
@@ -163,6 +204,54 @@ func _initialize() -> void:
 		print("   FAIL: a passenger in FPS should still be behind their own eyes")
 		fails += 1
 	p.set("current_vehicle_node", null)
+
+	# 5. the eye keeps up with a stance change ----------------------------------------
+	#
+	# Measured against the MOUNT, not against an expected height: the true eye point is wherever
+	# this body's neck bone is in this stance, which is a fact about the body (W41), so a constant
+	# here would be a second owner of it and wrong on the next body.
+	var fps: Node = _find(p, "FPSCameraController")
+	if control and fps != null:
+		fps.set("stance_follow", 0.0)
+	print("")
+	print("   stance_follow       : %s%s" % [fps.get("stance_follow") if fps != null else "?",
+		"   (CONTROL)" if control else ""])
+	p.set("is_fps_mode", true)
+	Input.action_press("aim")
+	for i in range(40):
+		await physics_frame
+
+	for case in [["crouch down", true], ["stand up", false]]:
+		var label: String = case[0]
+		if case[1]:
+			Input.action_press("crouch")
+		else:
+			Input.action_release("crouch")
+		var arrived := 0.0
+		var settled := -1
+		for i in range(60):
+			await physics_frame
+			var lag: float = (mesh_root.to_local(mount.global_position)
+				- mesh_root.to_local(cam.global_position)).length()
+			if i == ARRIVED_FRAME:
+				arrived = lag
+			if settled < 0 and i > ARRIVED_FRAME and lag < SETTLE_M:
+				settled = i
+		print("   %-11s: lag at frame %d %6.3f m (limit %.2f), within %.2f m at frame %s (limit %d)"
+			% [label, ARRIVED_FRAME, arrived, ARRIVED_LAG_M, SETTLE_M,
+			   settled if settled >= 0 else "never", SETTLE_FRAMES])
+		if arrived > ARRIVED_LAG_M:
+			print("   FAIL: the body has arrived and the view has not")
+			fails += 1
+		elif settled < 0 or settled > SETTLE_FRAMES:
+			print("   FAIL: the eye is still catching up long after the stance change")
+			fails += 1
+		else:
+			print("   PASS: the eye tracks the stance change")
+		for i in range(50):
+			await physics_frame
+	Input.action_release("crouch")
+	Input.action_release("aim")
 
 	print("")
 	print("=== %s (%d failures) ===" % ["PASS" if fails == 0 else "FAIL", fails])

@@ -36,7 +36,21 @@ extends SceneTree
 ##     basis.x/y/z in order transposes it, which lays a slung rifle flat across the back with the
 ##     position still exactly right).
 
+## THREE ROLES, AND ONLY ONE OF THEM MOVED TO SHINO.
+##
+##  * the CLIP SOURCE -- whose metres the shared library's Root/pelvis keys are in. That is Shino
+##    now (`CLIP_BASE`), and it is the only thing `motion_scale` is measured against.
+##  * the GEOMETRY REFERENCE -- the body whose AUTHORED sockets, mount anchors and holster
+##    clearances every other body is derived from. That stays Godot-chan, and it has to: hers are
+##    hand-authored and tuned across W20-W46, while Shino's are a DERIVATION of them, and deriving
+##    from a derivation compounds. Measured the day this was tried: with Shino as the geometry
+##    reference, Fumiriya's rear-hip socket went 0.211 -> 0.329 m -- 12 cm off his hip -- and
+##    `probe_weapon_holster` failed 17 checks on him and 1 on her.
+##  * the AUTHORING body -- who the artist looks at while posing. Shino, and that is a choice with
+##    no constant behind it.
 const REFERENCE_BODY := "godot_chan"
+## The body the shared animation library's metres belong to. Only `motion_scale` reads it.
+const CLIP_BASE := "shino"
 const BODIES := {
 	"godot_chan": "res://assets/characters/godot_chan/merged_animation.glb",
 	"shino": "res://assets/characters/shino/shino.glb",
@@ -59,12 +73,21 @@ const HOLD_CLIP := "upright_hold_rifle"
 
 var _body := ""
 var _check := false
+## `--control`: put the pre-6.13 holster rule back -- the reference's authored transform with its
+## position scaled by a bone-separation ratio. It WRITES the body file like an ordinary run, so run
+## the tool again without the flag afterwards. Measured with it: `probe_weapon_holster.gd` fails
+## 5 checks on Shino and 7 on Fumiriya, and 0 on either without it.
+var _control := false
 var _fail := 0
 var _eye_point := Vector3.ZERO
+## This body's share of the shared library's animated POSITION (`Skeleton3D.motion_scale`). Computed
+## once in `_run`, because it has to be APPLIED before anything is measured as well as written out.
+var _motion_scale := 1.0
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
 	_check = "--check" in args
+	_control = "--control" in args
 	for a in args:
 		if a.begins_with("--body="): _body = a.substr(7)
 	if not BODIES.has(_body):
@@ -84,19 +107,32 @@ func _run() -> void:
 	doc["armature"] = rig.armature.name
 	doc["skeleton"] = String(rig.armature.get_path_to(rig.skel))
 
+	# The body is posed the way the GAME poses it, `motion_scale` included -- the shared library's
+	# position keys are absolute metres and the generated scene scales them (see `_size`), so a
+	# capsule measured without it is a capsule for a pose the game never holds. The reference's is
+	# 1.0, so it is unaffected.
+	# Against the CLIP BASE, not the geometry reference: the number scales the library's own metres.
+	var base := ref if CLIP_BASE == REFERENCE_BODY else Rig.of(root, BODIES[CLIP_BASE])
+	_motion_scale = snappedf(rig.rest("pelvis").origin.y / base.rest("pelvis").origin.y, 0.0001)
+	rig.skel.motion_scale = _motion_scale
+
 	# Every skin reading is taken STANDING (see Rig.pose). The bones' RESTS are what the socket
 	# and ragdoll frames are built from, and those are pose-independent by definition.
 	rig.pose(STAND_CLIP)
 	ref.pose(STAND_CLIP)
 
 	_meshes(doc, rig)
-	_size(doc, rig)
+	_size(doc, rig, ref)
 	_hand(doc, rig, ref)
 	_camera(doc, rig, ref)
 	_shoulder(doc, rig, ref)
-	_holsters(doc, rig, ref)
-	_stances(doc, rig, ref)
+	# The ragdoll first: its capsules are part of "where this body's surface is" for a holster (see
+	# `_body_surface`), and `_holsters` reads them. The document's keys are written sorted, so the
+	# call order is not the file's order.
 	_ragdoll(doc, rig)
+	var ref_rag: Dictionary = doc["ragdoll"] if rig == ref else _ragdoll_of(ref)
+	_holsters(doc, rig, ref, doc["ragdoll"], ref_rag)
+	_stances(doc, rig, ref)
 
 	var path := OUT_DIR + _body + "/" + _body + ".body.json"
 	var text := JSON.stringify(doc, "  ", true) + "\n"
@@ -332,7 +368,7 @@ func _meshes(doc: Dictionary, rig: Rig) -> void:
 # what the first-person camera mount wants -- W5's rig filters the neck bone and keeps a slow
 # baseline, so the mount only has to BE the eye.
 # ---------------------------------------------------------------------------------------------
-func _size(doc: Dictionary, rig: Rig) -> void:
+func _size(doc: Dictionary, rig: Rig, ref: Rig) -> void:
 	var top := -INF
 	var crown := -INF
 	var eye := Vector3.ZERO
@@ -353,6 +389,13 @@ func _size(doc: Dictionary, rig: Rig) -> void:
 				eye += v
 				eye_n += 1
 	doc["height_m"] = snappedf(top, 0.0001)
+	# How much of the shared library's ANIMATED POSITION this body takes (`Skeleton3D.motion_scale`,
+	# written by build_character_visuals.gd). See its comment for the whole argument; the short of it
+	# is that the library's only surviving position keys are `Root` and `pelvis`, they are absolute
+	# metres authored on the reference, and the largest of them is the stance drop -- so a taller body
+	# played straight ends up standing in the air. The scalar is the PELVIS REST HEIGHT ratio, because
+	# the drop is the pelvis travelling from standing to prone and that scales with the leg.
+	doc["motion_scale"] = _motion_scale
 	doc["crown_m"] = snappedf(crown, 0.0001)
 	var e: Vector3 = eye / maxf(1.0, float(eye_n)) if eye_n > 0 else rig.posed("head_2").origin
 	doc["eye"] = _v(GAME_FROM_BONE * e)          # game frame, so -z is in front of the face
@@ -592,9 +635,17 @@ func _torso_mesh(rig: Rig) -> MeshInstance3D:
 # spine, and the back's own skin surface. What the WEAPON supplies is the clearance behind it, which
 # does not scale with the body -- a rifle is the same thickness on a small character as on a big one.
 #
-# The hip pair keeps the reference's authored bases (a sling direction is a design choice, and the
-# contract guarantees a bone's rest means the same thing on every body); only the position scales,
-# with the hips' own width.
+# The hip pair is the same idea from the side. It used to be the reference's authored transform with
+# its position scaled by THIGH-BONE SEPARATION, and that is the last transferred number in this file:
+# bone separation is not skin width, so on a body whose hips are wider than its thigh bones suggest
+# the weapon sat inside the hip -- measured on Fumiriya, REV1 11.1% and MEW1 20.0% of their own
+# volume inside a ragdoll bone against a 10% limit, where the reference's hip weapons are 0.0%.
+# So a hip socket is now derived the way a sling is: find the body's own skin surface along that
+# socket's OWN outward direction, over the height band the socket sits in, and stand the socket the
+# same distance outside it that the reference's stands outside the reference's skin. A weapon's
+# thickness does not scale with the body, so that clearance is metres and is not scaled either --
+# and because the rule is "the reference's clearance", measuring the reference reproduces the
+# reference's authored sockets exactly, which is this file's whole property.
 # ---------------------------------------------------------------------------------------------
 const SLING_TILT_DEG := 22.0
 ## Each back socket as (fraction of the shoulder half-width, fraction of spine_03 -> clavicle, metres
@@ -606,30 +657,247 @@ const BACK_SLINGS := {
 const HIP_SOCKETS := ["ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2",
 					  "ShortWeaponHolsterMaker3", "ShortWeaponHolsterMaker4"]
 const BACK_SPARE := ["LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4"]
+## The bone each holster attachment hangs off, so a socket's offset is measured from the same place
+## the scene measures it from. Must match the BoneAttachment3D names in the visuals scene.
+const HOLSTER_BONE := {"Long": "spine_03", "Short": "spine_01"}
+## The height band a hip socket's surface is read over, relative to the socket: a holstered short
+## weapon hangs by its GRIP, so it reaches well below the socket and barely above it, and what binds
+## is usually not the waist at all -- measured, a pistol on the hip is stopped by the THIGH 12 cm
+## below it. A band that only reads the socket's own height answers the wrong question, and a band
+## tighter than the body's own vertex spacing answers nothing.
+const HIP_BAND_DOWN := 0.20
+const HIP_BAND_UP := 0.06
+## The same band for a long weapon slung on the back, which hangs much further by its grip.
+const BACK_BAND_DOWN := 0.60
+const BACK_BAND_UP := 0.30
+## Half-angle of the skin wedge read along the socket's outward direction. Wide enough to hold
+## vertices on a low-poly hip, narrow enough that the FRONT of the body cannot answer for the SIDE.
+const HIP_WEDGE_DEG := 25.0
+## Hitbox bones an arm swings, so a holster cannot be placed to clear them.
+const ARM_HITBOXES := ["upperarm_l", "lowerarm_l", "hand_l", "upperarm_r", "lowerarm_r", "hand_r"]
+## Samples along a capsule's axis when asking where its surface is at a given height.
+const HITBOX_SLICES := 16
+## Height slices the band is read in. 1 cm apart at the shipped band.
+const BAND_SLICES := 27
 
-func _holsters(doc: Dictionary, rig: Rig, ref: Rig) -> void:
+func _holsters(doc: Dictionary, rig: Rig, ref: Rig, rag: Dictionary, ref_rag: Dictionary) -> void:
 	var out := {}
 	var back_bone := rig.posed("spine_03")
 	var clav := rig.posed("clavicle_r").origin
 	var half := absf(rig.posed("upperarm_r").origin.x)
 	var back_z := _back_surface(rig, back_bone.origin.y, clav.y)
+	# The sling is DESIGNED on the reference and then carried to another body by the same clearance
+	# rule the hips use -- one rule for every holster socket, with the reference's own socket (a
+	# design here, an artist's marker at the hip) as the thing reproduced. Designing it afresh on
+	# each body was the earlier shape and it reads only ONE height (the upper back), which is the
+	# hips' defect from the other side: measured, Fumiriya's SMG1 came out 13.8% inside his spine
+	# and shoulder capsules, because a sling clear of his upper back is not clear of his lumbar curve.
+	var ref_back := _sling_design(ref)
 	for name in BACK_SLINGS:
-		var d: Dictionary = BACK_SLINGS[name]
-		var design := Transform3D(_sling_basis(), Vector3(
-			float(d["across"]) * half,
-			back_bone.origin.y + float(d["up"]) * (clav.y - back_bone.origin.y),
-			back_z + float(d["behind"])))
+		var design: Transform3D = _sling_design(rig)[name] if _control else ref_back[name]
+		if rig != ref and not _control:
+			design = _carried_socket(design, "spine_03", BACK_BAND_UP, BACK_BAND_DOWN,
+									 rig, ref, rag, ref_rag)
 		out[name] = var_to_str(_round_t(back_bone.affine_inverse() * Transform3D(GAME_FROM_BONE) * design))
-	# the spare back pair and the hips: the reference's own transforms, position scaled by the body
+	# the hips: derived per body against its own skin (above). The spare back pair is unreachable
+	# today (nothing can hold four long weapons at once) and keeps the width-scaled transfer.
 	var authored := _reference_markers(BACK_SPARE + HIP_SOCKETS)
-	var hip_s: float = _hip_width(rig) / _hip_width(ref)
 	var sh_s: float = _shoulder_width(rig) / _shoulder_width(ref)
-	for name in authored:
+	for name in BACK_SPARE:
+		if not authored.has(name): continue
 		var t: Transform3D = authored[name]
-		var s: float = sh_s if name in BACK_SPARE else hip_s
-		out[name] = var_to_str(_round_t(Transform3D(t.basis, t.origin * s)))
+		out[name] = var_to_str(_round_t(Transform3D(t.basis, t.origin * sh_s)))
+	var hip_bone := rig.posed(HOLSTER_BONE["Short"])
+	var hip_s: float = _thigh_separation(rig) / _thigh_separation(ref)
+	for name in HIP_SOCKETS:
+		if not authored.has(name): continue
+		if _control:
+			var t: Transform3D = authored[name]
+			out[name] = var_to_str(_round_t(Transform3D(t.basis, t.origin * hip_s)))
+			continue
+		var design := _carried_socket(_body_frame(authored[name], ref.posed(HOLSTER_BONE["Short"])),
+									  HOLSTER_BONE["Short"], HIP_BAND_UP, HIP_BAND_DOWN,
+									  rig, ref, rag, ref_rag)
+		out[name] = var_to_str(_round_t(hip_bone.affine_inverse() * Transform3D(GAME_FROM_BONE) * design))
 	doc["holsters"] = out
 	doc["back_surface_z"] = snappedf(back_z, 0.0001)
+
+## One hip socket, derived: the body's own waist surface along the socket's outward direction, plus
+## the clearance the reference's socket keeps from the reference's waist.
+##
+## **THERE ARE TWO SURFACES AND A HOLSTER HAS TO CLEAR BOTH.** The SKIN is what a player sees a
+## pistol resting against; the CAPSULES are what everything at runtime treats as the body (bullets,
+## and the poke check in `probe_weapon_holster.gd`), and W41 sizes each from a percentile of the skin
+## AROUND ONE BONE, so a round capsule legitimately bulges past a flat back or a slim waist while a
+## skin reading legitimately reaches past a capsule at the hip. Neither is "the surface". So the rule
+## is the clearance the reference keeps from EACH, and the one that binds on this body wins.
+## Measured on the way: against the skin alone Fumiriya's PIS1 came out 30.7% inside his spine
+## capsules (limit 10%), because 1.5 cm outside his skin is still inside spine_03's 0.137 m capsule;
+## and against the capsules alone the reference's own two rear-hip sockets sit 3-5 cm INSIDE them, so
+## carrying that clearance put a knife deep inside a narrower body. A single surface cannot say both.
+##
+## Height is carried as a FRACTION of the body's own spine_01 -> spine_03 span rather than in metres,
+## for the reason the sling's `up` is: a waist is at a different height on a 1.65 m body and a 1.91 m
+## one, and the socket must stay on the waist.
+##
+## The BASIS is the reference's, unscaled and unrotated. Which way a holster hangs is a design
+## choice, and W40's contract is exactly the guarantee that makes transferring it legitimate: a
+## bone's rest orientation means the same thing on every body.
+func _carried_socket(ref_socket: Transform3D, anchor: String, band_up: float, band_down: float,
+					 rig: Rig, ref: Rig, rag: Dictionary, ref_rag: Dictionary) -> Transform3D:
+	var ref_y: float = ref.posed(anchor).origin.y
+	var ref_span: float = ref.posed("spine_03").origin.y - ref.posed(HOLSTER_BONE["Short"]).origin.y
+	var flat := Vector3(ref_socket.origin.x, 0.0, ref_socket.origin.z)
+	var dir: Vector3 = flat.normalized() if flat.length() > 1e-5 else Vector3(1, 0, 0)
+	var ref_radius: float = flat.length()
+	var up: float = (ref_socket.origin.y - ref_y) / ref_span if absf(ref_span) > 1e-5 else 0.0
+
+	var span: float = rig.posed("spine_03").origin.y - rig.posed(HOLSTER_BONE["Short"]).origin.y
+	var y: float = rig.posed(anchor).origin.y + up * span
+	# At least the clearance the reference keeps, from EACH of the two surfaces and at EVERY height
+	# of the band -- see the doc above. Whichever slice binds on this body is the one that decides.
+	var skin := _clearance_radius(_skin_profile(rig, dir, y, band_up, band_down),
+								  _skin_profile(ref, dir, ref_socket.origin.y, band_up, band_down), ref_radius)
+	var hits := _clearance_radius(_hitbox_profile(rig, rag, dir, y, band_up, band_down),
+								  _hitbox_profile(ref, ref_rag, dir, ref_socket.origin.y, band_up, band_down),
+								  ref_radius)
+	var radius: float = maxf(skin, hits)
+	# Printed, not stored: it is how a placement is argued about, and a number in the file would be
+	# a second copy of what the transform the caller writes already says.
+	print("[measure-body]   socket dir (%5.2f,%5.2f) y %.3f  skin %.3f  hitbox %.3f  -> %.3f (ref %.3f)"
+		% [dir.x, dir.z, y, skin, hits, radius, ref_radius])
+	return Transform3D(ref_socket.basis, Vector3(dir.x * radius, y, dir.z * radius))
+
+## The smallest radius that keeps at least the reference's clearance AT EVERY HEIGHT of the band.
+##
+## A single number per body is not enough, and the reason is measured: Fumiriya's widest point in the
+## band is his thigh, 12 cm below the socket, where a pistol is already past the body -- so matching
+## THAT clearance still left the gun 2.3 cm inside his spine capsules, where the reference's authored
+## socket clears hers by millimetres. The clearance is therefore carried per slice, by the slice's
+## own offset from the socket (the band is the same metres on every body, because a pistol is), and
+## the slice that binds on this body is the one that decides.
+func _clearance_radius(here: PackedFloat32Array, there: PackedFloat32Array, ref_radius: float) -> float:
+	var best := 0.0
+	for i in here.size():
+		best = maxf(best, here[i] + (ref_radius - there[i]))
+	return best
+
+## Where the ragdoll capsules reach along `dir`, one reading per slice of the band. Exact for a
+## capsule: the horizontal slice of a sphere of radius r centred on a point of the axis is a circle,
+## so the furthest point along `dir` is that point's own offset plus the circle's radius.
+##
+## The ARM capsules are left out for the reason the arm skin is (below), and with more force: an arm
+## swings, so no holster can be placed to clear one.
+func _hitbox_profile(rig: Rig, rag: Dictionary, dir: Vector3, y: float,
+					 band_up: float, band_down: float) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(BAND_SLICES)
+	for bone in rag:
+		if bone in ARM_HITBOXES: continue
+		var d: Dictionary = rag[bone]
+		if not rig.has(bone): continue
+		var posed := rig.posed(bone)
+		var child: Vector3 = str_to_var(d["child"])
+		var a: Vector3 = GAME_FROM_BONE * posed.origin
+		var b: Vector3 = GAME_FROM_BONE * (posed * child)
+		var r: float = float(d["radius"])
+		for k in HITBOX_SLICES + 1:
+			var p: Vector3 = a.lerp(b, float(k) / float(HITBOX_SLICES))
+			var flat: float = Vector3(p.x, 0.0, p.z).dot(dir)
+			for i in BAND_SLICES:
+				var dy: float = absf(p.y - _band_y(y, i, band_up, band_down))
+				if dy > r: continue
+				out[i] = maxf(out[i], flat + sqrt(maxf(0.0, r * r - dy * dy)))
+	return out
+
+## The height of band slice `i` around a socket at `y`.
+func _band_y(y: float, i: int, band_up: float, band_down: float) -> float:
+	return y + band_up - (band_up + band_down) * float(i) / float(BAND_SLICES - 1)
+
+## Where the skin reaches along `dir`, one reading per slice of the band. Each vertex is filed into
+## the nearest slice, so a low-poly body's slices are never empty for want of a vertex exactly there.
+## The same reading as `_back_surface`, asked in an arbitrary horizontal direction instead of straight
+## back. Returns 0 if the band holds nothing, which places the socket at the reference's clearance
+## from the axis -- visibly wrong rather than silently plausible.
+##
+## **THE ARMS ARE NOT THE WAIST, and they are exactly where the waist is.** Every skin reading here
+## is taken standing with the arms DOWN (`STAND_CLIP`), so at hip height the widest thing in a
+## sideways wedge is the hand hanging beside the hip: measured on the reference, the wedge answered
+## **0.282 m** where her waist is ~0.15, and the derived clearance came out NEGATIVE on three of the
+## four sockets -- i.e. "the authored holster is inside the body", which it is not. So a vertex is
+## only waist skin if the bone that owns it is not in an arm. Same trap as W24's shoulder column
+## finding the forearm, and W41's note that the pose a skin reading is taken in is part of the
+## reading.
+func _skin_profile(rig: Rig, dir: Vector3, y: float,
+				   band_up: float, band_down: float) -> PackedFloat32Array:
+	var cos_min := cos(deg_to_rad(HIP_WEDGE_DEG))
+	var arms := _arm_bones(rig)
+	var out := PackedFloat32Array()
+	out.resize(BAND_SLICES)
+	var step: float = (band_up + band_down) / float(BAND_SLICES - 1)
+	for m in rig.meshes:
+		var sk: Array = rig.skinned(m)
+		var verts: PackedVector3Array = sk[0]
+		var surf: PackedInt32Array = sk[1]
+		var dom: PackedInt32Array = sk[2]
+		var reg := {}
+		for si in m.mesh.get_surface_count():
+			reg[si] = _region(rig.material_name(m, si))
+		for i in verts.size():
+			var r: String = reg[surf[i]]
+			if r == "HAIR" or r == "OTHER": continue
+			if arms.has(dom[i]): continue
+			var v: Vector3 = GAME_FROM_BONE * verts[i]
+			if v.y > y + band_up or v.y < y - band_down: continue
+			var flat := Vector3(v.x, 0.0, v.z)
+			var d := flat.length()
+			if d < 1e-4: continue
+			if flat.dot(dir) / d < cos_min: continue
+			var slot: int = clampi(int(round((y + band_up - v.y) / step)), 0, BAND_SLICES - 1)
+			out[slot] = maxf(out[slot], flat.dot(dir))
+	# A slice with no vertex of its own takes its neighbour's, so an empty slot cannot read as "the
+	# body is not there" and pull the socket in.
+	for i in BAND_SLICES:
+		if out[i] > 0.0: continue
+		for j in BAND_SLICES:
+			if i - j >= 0 and out[i - j] > 0.0:
+				out[i] = out[i - j]; break
+			if i + j < BAND_SLICES and out[i + j] > 0.0:
+				out[i] = out[i + j]; break
+	return out
+
+## Every bone below either collarbone, by index. Derived from the skeleton, never a name list: the
+## contract fixes the 53 names but a body carries its own extras (Shino 158 bones, Fumiriya 117).
+func _arm_bones(rig: Rig) -> Dictionary:
+	var out := {}
+	for i in rig.skel.get_bone_count():
+		var b := i
+		while b >= 0:
+			var n := rig.skel.get_bone_name(b)
+			if n == "clavicle_l" or n == "clavicle_r":
+				out[i] = true
+				break
+			b = rig.skel.get_bone_parent(b)
+	return out
+
+## The two back slings as W28 designs them, in the BODY frame, on whichever rig is asked.
+func _sling_design(rig: Rig) -> Dictionary:
+	var back := rig.posed("spine_03").origin
+	var clav := rig.posed("clavicle_r").origin
+	var half := absf(rig.posed("upperarm_r").origin.x)
+	var back_z := _back_surface(rig, back.y, clav.y)
+	var out := {}
+	for name in BACK_SLINGS:
+		var d: Dictionary = BACK_SLINGS[name]
+		out[name] = Transform3D(_sling_basis(), Vector3(
+			float(d["across"]) * half,
+			back.y + float(d["up"]) * (clav.y - back.y),
+			back_z + float(d["behind"])))
+	return out
+
+## A socket authored in a bone attachment's frame, read in the BODY frame.
+func _body_frame(local: Transform3D, bone: Transform3D) -> Transform3D:
+	return Transform3D(GAME_FROM_BONE) * (bone * local)
 
 ## The sling's basis in the BODY frame: local -Z down the sling (tilted toward the body's left),
 ## local X straight out of the back so the weapon lies FLAT against it. W28's rule, restated.
@@ -660,7 +928,9 @@ func _back_surface(rig: Rig, y0: float, y1: float) -> float:
 			if v.y > y0 and v.y < y1 and absf(v.x) < 0.10 and -v.z > z: z = -v.z
 	return z
 
-func _hip_width(rig: Rig) -> float:
+## The pre-6.13 hip scale, kept only for `--control`: the distance between the thigh BONES, which is
+## not the width of the body around them, which is why it put a weapon inside the hip.
+func _thigh_separation(rig: Rig) -> float:
 	return absf(rig.rest("thigh_r").origin.x - rig.rest("thigh_l").origin.x)
 
 func _reference_markers(names: Array) -> Dictionary:
@@ -824,6 +1094,12 @@ const RAGDOLL_ORDER := ["pelvis", "spine_01", "spine_02", "spine_03", "head_2",
 	"thigh_l", "calf_l", "foot_l", "thigh_r", "calf_r", "foot_r"]
 const RADIUS_PERCENTILE := 0.75   # of the skin's distance from the bone axis; the tail is a sleeve
 const MIN_RADIUS := 0.02          # m; under this Jolt loses the shape to a long ray anyway
+
+## The reference's own ragdoll, for the holster clearance. Measuring the reference measures it once.
+func _ragdoll_of(rig: Rig) -> Dictionary:
+	var d := {}
+	_ragdoll(d, rig)
+	return d["ragdoll"]
 
 func _ragdoll(doc: Dictionary, rig: Rig) -> void:
 	var per_bone := _skin_by_bone(rig)

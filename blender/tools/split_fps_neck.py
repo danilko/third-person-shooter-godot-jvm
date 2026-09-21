@@ -1,6 +1,6 @@
 """Split the collar out of the body mesh so first person can hide it (W36).
 
-    blender -b assets/characters/godot_chan/merged_animation.blend --python-exit-code 1 \\
+    blender -b assets/characters/shino/shino.blend --python-exit-code 1 \\
         --python blender/tools/split_fps_neck.py -- [--save]
 
 In first person the camera sits inside the head, and `MeshConfig.headMeshPaths` hides the head, hair,

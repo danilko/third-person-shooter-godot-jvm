@@ -108,6 +108,30 @@ func _build(f: Dictionary) -> void:
 	tree.callback_mode_process = ref_tree.callback_mode_process
 	tree.deterministic = ref_tree.deterministic
 
+	# THE SHARED LIBRARY'S POSITION KEYS ARE ABSOLUTE METRES, AND `motion_scale` IS GODOT'S OWN
+	# ANSWER TO THAT. W40 keeps position tracks only on `Root` and `pelvis` because everything else
+	# is a fact about the BODY -- but the two that are kept are still metres authored on a 1.49 m
+	# reference, and the biggest of them is the stance DROP: `crawl_idle` takes Root to -0.601 and
+	# `crouch_idle` to -0.289 whoever is playing it. On a taller body that is not enough drop, and
+	# the body ends up standing in the air: measured, in `crawl_idle` the foot sits at 0.163 m on the
+	# reference, 0.334 on Shino and 0.525 on Fumiriya (user-reported as "other models float when
+	# shooting in crawl"), and in `crouch_idle` 0.014 / 0.103 / 0.178.
+	#
+	# `Skeleton3D.motion_scale` multiplies exactly those animated positions, which is what it is for
+	# (retargeting position tracks onto a differently-sized skeleton) -- so it needs no modifier, no
+	# per-frame work and no second copy of the library. The scalar is the body's own PELVIS REST
+	# HEIGHT over the reference's: the drop is the pelvis travelling from standing to prone, so it
+	# scales with the leg. Measured after: Fumiriya's crawl foot 0.525 -> 0.237 against a
+	# proportional target of 0.241, and his crouch foot 0.178 -> 0.040 against 0.021 -- within a
+	# centimetre, where it was out by 36 cm. The reference's scalar is 1.0, so it is untouched.
+	#
+	# W41 recorded this as needing FOOT GROUNDING and rejected leg-length scaling on paper ("the leg
+	# rotations fold a longer leg further by themselves"). Measured, that reasoning was wrong: the
+	# ratio lands within a centimetre on both bodies and in both stances. Foot grounding is still the
+	# exact answer for uneven ground; this is the proportional one, and it is free.
+	if f.has("motion_scale"):
+		skel.motion_scale = float(f["motion_scale"])
+
 	_weapon_sockets(skel, f)
 	_aim_modifiers(skel, ref)
 	_camera_and_holsters(skel, f)

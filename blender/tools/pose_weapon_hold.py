@@ -4,7 +4,7 @@ One row per archetype in blender/tools/weapon_archetypes.json `holds` (socket, r
 support hand, clips, the solve arguments the shipped clips were written with). Every command takes --hold <name>
 (default rifle); `--flag value` overrides a row argument.
 
-    B="blender -b assets/characters/godot_chan/merged_animation.blend --python-exit-code 1 --python blender/tools/pose_weapon_hold.py --"
+    B="blender -b assets/characters/shino/shino.blend --python-exit-code 1 --python blender/tools/pose_weapon_hold.py --"
     $B measure    [--hold H] [--action CLIP] [--frame F] [--placed OBJ] [--render DIR] [--poke-detail]
     $B adopt      --hold H [--placed OBJ] --apply   # derive socket / mount anchor / SupportPoint from the pose
     $B solve-aim  --hold H [--write --save]         # placement: mount | eye_line (or a --placed model)
@@ -1043,6 +1043,31 @@ def symmetrize_pose(pose):
     return out
 
 
+def flip_pose(pose):
+    """The pose MIRRORED across the body's midplane -- Blender's "paste X-flipped pose", over a whole clip.
+
+    `symmetrize_pose` averages each bone with its partner's mirror, which makes a pose symmetric.
+    This takes the partner's mirror OUTRIGHT, which swaps left for right: a body kneeling on its left
+    knee kneels on its right. Same `mirror_basis` reflection, so whatever is true of one is true of
+    the other (the rig is X-symmetric to 0.0002 m -- W26).
+
+    `Root` is excluded, exactly as `symmetrize_pose` excludes it: it carries the stance DROP, which is
+    the one translation in the shared library that is not a fact about the body (W47), and mirroring
+    a drop is a no-op while mirroring its X travel is a change nobody asked for.
+    """
+    out = copy_pose(pose)
+    B = arm_obj().data.bones
+    for n in pose:
+        if n == "Root" or B[n].parent is None:
+            continue
+        m = mirror_name(n)
+        if m not in pose:
+            continue
+        ml, mq = mirror_basis(m, pose[m][0], pose[m][1])
+        out[n] = [ml, mq.normalized(), pose[n][2].copy()]
+    return out
+
+
 def hip_yaw(M):
     tl, tr = body(M["thigh_l"].translation), body(M["thigh_r"].translation)
     return math.degrees(math.atan2(tr.z - tl.z, tr.x - tl.x))
@@ -1150,27 +1175,37 @@ def pose_from_dump(frame):
 def main():
     a = args_after_dashdash()
     cmd = a[0] if a else "measure"
-    if cmd in ("symmetrize", "damp-hip-yaw", "clip-report"):
+    if cmd in ("symmetrize", "flip", "damp-hip-yaw", "clip-report"):
+        # `--action` takes `name` or `dest=src`. The second form is what a DIRECTIONAL clip needs: an
+        # X-flip of `crouch_walk_left` is a right-strafe, and leaving it at the blendspace's LEFT
+        # corner would strafe the wrong way -- so the pair is flipped AND exchanged. Every source is
+        # read BEFORE anything is written, or the first write corrupts the second's source.
         names = opt(a, "--action", "crawl_idle-loop").split(",")
+        jobs = []
         for n in names:
-            action = bpy.data.actions[n]
+            dest, _, src = n.partition("=")
+            jobs.append((dest, src or dest))
+        sources = {src: {f: pose_of(bpy.data.actions[src], f) for f in action_frames(bpy.data.actions[src])}
+                   for _, src in jobs} if cmd != "clip-report" else {}
+        for dest, src in jobs:
+            action = bpy.data.actions[dest]
             clip_report(action, "before")
             if cmd == "clip-report":
                 continue
-            frames = action_frames(action)
             poses = {}
-            for f in frames:
-                pose = pose_of(action, f)
+            for f, pose in sources[src].items():
                 if cmd == "symmetrize":
                     pose = symmetrize_pose(pose)
+                elif cmd == "flip":
+                    pose = flip_pose(pose)
                 else:
                     damp_hip_yaw(pose, opt(a, "--factor", 0.75))
                 poses[f] = pose
-            bones = [b.name for b in arm_obj().data.bones if b.name != "Root"] if cmd == "symmetrize" else \
-                ["pelvis", "spine_03"]
+            bones = [b.name for b in arm_obj().data.bones if b.name != "Root"] \
+                if cmd in ("symmetrize", "flip") else ["pelvis", "spine_03"]
             if "--write" in a:
                 write_frames(action, poses, bones)
-                clip_report(action, "after")
+                clip_report(action, "after" if dest == src else "after (from %s)" % src)
         if "--save" in a:
             arm = arm_obj()
             if arm.animation_data is not None:

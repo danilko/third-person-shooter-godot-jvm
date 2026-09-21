@@ -1,6 +1,6 @@
 """Retarget the Quaternius Universal Animation Library onto the Godot-chan rig.
 
-    blender -b assets/characters/godot_chan/merged_animation.blend --python-exit-code 1 \\
+    blender -b assets/characters/shino/shino.blend --python-exit-code 1 \\
         --python blender/tools/retarget_ual.py -- [--only NAME,NAME] [--no-replace] [--save]
 
 The table is `blender/tools/ual_retarget.json`: `clips` adds a source clip under a new action name,

@@ -3,7 +3,7 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/TokyoTower_mesh.res" id="1_qbtvi"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/TokyoTower_collision.res" id="2_6k3di"]
 
-[node name="TokyoTower" type="Node3D" unique_id=671150586]
+[node name="TokyoTower" type="Node3D" unique_id=1327836183]
 metadata/building = {
 "aabb": [Vector3(-47.30641, -1.4901161e-05, -47.30641), Vector3(94.61282, 334.13092, 94.61282)],
 "collision": "trimesh",
@@ -13,6 +13,7 @@ metadata/building = {
 "doors_locked": false,
 "doors_shop": false,
 "example": true,
+"facade_surfaces": {},
 "footprint_m": [94.6128, 94.6128],
 "height_m": 334.1309,
 "id": "TokyoTower",
@@ -25,14 +26,14 @@ metadata/building = {
 "wall_top_m": 334.1309
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1955770179]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1155558397]
 visibility_range_end = 900.0
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_qbtvi")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1089613955]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=451246036]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=251209397]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=904615771]
 shape = ExtResource("2_6k3di")

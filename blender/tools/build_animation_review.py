@@ -19,7 +19,7 @@ This file is the fix, and it is a VIEW rather than a copy:
   to make two.
 
 **The workflow is therefore: judge here, edit there.** Open this file, scrub a clip, see it on every
-body at once; when something reads wrong, fix it in `merged_animation.blend`, save, and come back
+body at once; when something reads wrong, fix it in `shino.blend`, save, and come back
 here with `File > External Data > Reload`.
 
 **Judge it on SHINO** (user's call, 2026-09-20): she has the shortest effective reach of the three --
@@ -40,14 +40,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 OUT = os.path.join(ROOT, "assets/characters/animation_review.blend")
 
 # The clip source: the one file that owns the actions.
-CLIP_SOURCE = "assets/characters/godot_chan/merged_animation.blend"
+CLIP_SOURCE = "assets/characters/shino/shino.blend"
 
-# The bodies, in the order they stand. SHINO IS FIRST, at the origin: she is the yardstick.
+# The bodies, in the order they stand. SHINO IS FIRST, at the origin: she owns the clips and is
+# the body the game ships, so a pose is judged on her.
 BODIES = [
     {"blend": "assets/characters/shino/shino.blend", "armature": "shino",
      "label": "Shino 1.65 m  (the yardstick: narrowest shoulders, shortest reach)", "x": 0.0},
-    {"blend": CLIP_SOURCE, "armature": "Godot_Chan_Stealth",
-     "label": "Godot-chan 1.49 m  (the clip source, and the rest reference)", "x": -1.3},
+    {"blend": "assets/characters/godot_chan/merged_animation.blend", "armature": "Godot_Chan_Stealth",
+     "label": "Godot-chan 1.49 m  (retired from the game; still the GEOMETRY reference)", "x": -1.3},
     {"blend": "assets/characters/fumiriya/fumiriya.blend", "armature": "fumiriya",
      "label": "Fumiriya 1.91 m", "x": 1.3},
 ]
@@ -163,7 +164,7 @@ def main():
         "and are READ-ONLY here on purpose: a clip has ONE owner, and two editable copies could\n"
         "never be merged back.\n"
         "\n"
-        "  judge here  ->  edit in merged_animation.blend  ->  File > External Data > Reload\n"
+        "  judge here  ->  edit in shino.blend  ->  File > External Data > Reload\n"
         "\n"
         "Judge it on SHINO (centre, at the origin). She has the narrowest shoulders of the three,\n"
         "which is what decides whether an off hand reaches a weapon held on the right -- a hold\n"

@@ -1,6 +1,6 @@
 """Reset a clip whose COLLARBONE is turned further than a shoulder turns, keeping the hand put.
 
-    blender -b assets/characters/godot_chan/merged_animation.blend --python-exit-code 1 \
+    blender -b assets/characters/shino/shino.blend --python-exit-code 1 \
         --python blender/tools/fix_shoulder_overbend.py -- [--limit 60] [--dry-run] [--save]
 
 A ONE-SHOT, like `add_control_rig.py` and `import_melee_pack.py`: it runs when a clip needs

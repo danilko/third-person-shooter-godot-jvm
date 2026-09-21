@@ -38,7 +38,10 @@ var gps: Node
 var minimap: Node
 var worldmap: Control
 
+var checks := 0
+
 func _check(label: String, ok: bool, detail: String) -> void:
+	checks += 1
 	if not ok:
 		fails += 1
 	print("  %s  %-58s %s" % ["PASS" if ok else "FAIL", label, detail])
@@ -220,14 +223,23 @@ func _initialize() -> void:
 	_place(start)
 	for i in 30:
 		await physics_frame
-	var cam: Camera3D = root.get_viewport().get_camera_3d()
+	# TURN THE PLAYER, not the camera. `ActiveCamera` is the TPS rig's and it is rewritten from the player's
+	# own ControlRotation every frame, so a probe that sets `look_at` on it measures nothing -- the camera is
+	# back where the rig wants it before the minimap reads it (the same trap probe_night_lights records).
+	# Turning the view is also the shipped path: the player faces X, so the radar turns.
+	var helper := preload("res://src/main/java/com/openworld/debug/VehicleProbeHelper.java").new()
+	root.add_child(helper)
 	var mini_ok := true
 	var mini_detail := ""
 	for heading_deg in [0.0, 90.0, -135.0]:
 		var yaw := deg_to_rad(heading_deg)
-		cam.global_position = start + Vector3(0, 8, 0)
-		cam.look_at(start + Vector3(sin(yaw), -0.6, -cos(yaw)) * 20.0, Vector3.UP)
-		await process_frame
+		# The view yaw that FACES `dir` is the game's own aim-yaw formula (MovementController.aimYaw):
+		# atan2(-dx, -dz). Deriving it here rather than writing a sign down is what keeps the probe honest
+		# about the convention it is testing.
+		var dir := Vector3(sin(yaw), 0, -cos(yaw))
+		helper.call("set_view", player, rad_to_deg(atan2(-dir.x, -dir.z)), 0.0)
+		for k in 6:
+			await process_frame
 		var ahead_w := start + Vector3(sin(yaw), 0, -cos(yaw)) * 20.0
 		var px_ahead: Vector2 = minimap.call("minimap_screen_now", ahead_w)
 		var c: Vector2 = minimap.size * 0.5
@@ -245,6 +257,7 @@ func _initialize() -> void:
 	_check("... and north-up puts NORTH up instead", absf(north_px.x) < 4.0 and north_px.y < -6.0,
 		"(%.1f, %.1f)" % [north_px.x, north_px.y])
 	minimap.set("rotate_with_heading", true)
+	helper.queue_free()
 
 	var ribbon := root.get_node_or_null("RouteRibbon")
 	_check("the RouteRibbon AutoLoad is present", ribbon != null, "")
@@ -269,8 +282,111 @@ func _initialize() -> void:
 	target = gps.call("gps_target_now")
 	_check("a right-click on the map clears the waypoint", target.distance_to(player.global_position) < 0.01, "")
 
-	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
+	await _check_places(which)
+
+	# A GDScript error inside an awaited coroutine aborts THAT coroutine and lets the caller carry on, so a
+	# probe that skipped half its cases can otherwise print PASS. Assert the count.
+	_check("every case ran (%d checks)" % checks, checks >= (26 if which == "island" else 22), "")
+	print("RESULT %s (%d of %d checks failed)" % ["PASS" if fails == 0 else "FAIL", fails, checks])
 	quit(0 if fails == 0 else 1)
+
+
+## PLAN.md 3.18n: the map says WHERE you are. Island only -- the places and the regions are that world's
+## derived record, and DebugWorld has neither (which the first check states rather than skipping silently).
+func _check_places(which: String) -> void:
+	var record := "res://src/main/resources/com/openworld/world/places/World.places.json"
+	var have := FileAccess.file_exists(record)
+	if which != "island":
+		_check("DebugWorld has no places record and the map does not pretend otherwise",
+			int(worldmap.call("places_drawn_now")) == 0, "")
+		return
+	_check("the island has a places record", have, record)
+	if not have:
+		return
+	var doc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(record))
+	var places: Array = doc["places"]
+	# 1. the record matches the BUILDINGS record: every place is a building that was really made enterable,
+	#    or a site in the scene. A map that can name a shop that is not there is the failure a hand-kept
+	#    marker list has, and it is exactly what this derivation exists to make impossible.
+	var bdoc: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(
+		"res://assets/world_source/buildings/IslandBuildings.json"))
+	# Matched by DISTANCE, never by a formatted coordinate: the record rounds to 2 dp and two printf
+	# implementations disagree on a .x5 boundary, which read as 4 shops that do not exist.
+	var enterable: Array[Vector2] = []
+	for b in bdoc["buildings"]:
+		if b.get("scene", b["type"]) != b["type"]:
+			enterable.append(Vector2(b["pos"][0], b["pos"][2]))
+	var orphans := 0
+	var sites := 0
+	for pl in places:
+		var at2d := Vector2(pl["at"][0], pl["at"][2])
+		var hit := false
+		for e in enterable:
+			if e.distance_squared_to(at2d) < 0.0025:      # 5 cm
+				hit = true
+				break
+		if hit:
+			continue
+		if world.find_child(str(pl["kind"]), true, false) != null:
+			sites += 1
+		else:
+			orphans += 1
+	_check("every place is an enterable building or a site in the scene",
+		orphans == 0, "%d places, %d sites, %d naming nothing" % [places.size(), sites, orphans])
+	# 2. the region the map reads agrees with the record's own boxes, at every place
+	var wrong := 0
+	for pl in places:
+		var at := Vector3(pl["at"][0], 0.0, pl["at"][2])
+		var want := ""
+		for r in doc["regions"]:
+			var bx: Array = r["box"]
+			if at.x >= bx[0] and at.x <= bx[2] and at.z >= bx[1] and at.z <= bx[3]:
+				want = str(r["name"])
+				break
+		if str(worldmap.call("region_at_now", at)) != want:
+			wrong += 1
+	_check("the region the map reads is the record's own box", wrong == 0, "%d of %d disagree" % [wrong, places.size()])
+	# 3. a CLICK on a blip sets the waypoint to that place's door, not to the bare pixel under the cursor
+	_action("map")
+	await process_frame
+	var pick: Dictionary = {}
+	for pl in places:
+		if int(pl["tier"]) >= 2:
+			pick = pl
+			break
+	if pick.is_empty():
+		pick = places[0]
+	var at2 := Vector3(pick["at"][0], 0.0, pick["at"][2])
+	_place(at2 + Vector3(0, 2, 0))
+	if not worldmap.visible:
+		_action("map")          # it opens FITTED, so a landmark's blip is on screen wherever the player is
+	for i in 3:
+		await process_frame
+	_check("the map draws places", worldmap.visible and int(worldmap.call("places_drawn_now")) > 0,
+		"%d drawn, open=%s" % [int(worldmap.call("places_drawn_now")), worldmap.visible])
+	var blip: Vector2 = worldmap.call("world_to_screen_now", at2)
+	_mouse(MOUSE_BUTTON_LEFT, true, blip)
+	_mouse(MOUSE_BUTTON_LEFT, false, blip)
+	var took: String = worldmap.call("picked_place_now")
+	var has: bool = player.call("has_waypoint_now")
+	var wp: Vector3 = player.call("waypoint_now")
+	var door := Vector3(pick["go"][0], wp.y, pick["go"][2])
+	_check("a click on a blip takes that place", took == str(pick["name"]),
+		"took '%s' at %s" % [took, blip])
+	_check("... and its waypoint is the place's DOOR, not the pixel",
+		has and wp.distance_to(door) < 0.5,
+		"%.2f m from it" % wp.distance_to(door) if has else "no waypoint")
+	# 4. a click on bare road is still a bare-road waypoint
+	var away: Vector2 = blip + Vector2(0, 60)
+	var bare: Vector3 = worldmap.call("screen_to_world_now", away)
+	_mouse(MOUSE_BUTTON_LEFT, true, away)
+	_mouse(MOUSE_BUTTON_LEFT, false, away)
+	var wp2: Vector3 = player.call("waypoint_now")
+	_check("a click away from every blip is still an ordinary waypoint",
+		str(worldmap.call("picked_place_now")) == "" and bool(player.call("has_waypoint_now"))
+		and Vector2(bare.x, bare.z).distance_to(Vector2(wp2.x, wp2.z)) < 0.5, "")
+	_action("map")
+	await process_frame
 
 # ── helpers ─────────────────────────────────────────────────────────────────────────────────
 
