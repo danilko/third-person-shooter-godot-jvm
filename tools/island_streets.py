@@ -217,6 +217,12 @@ def plan_region(net, ground, region):
                 tried.append("%+.0f: %s" % (dv, last))
             else:
                 why.append("%s %s=%.0f dropped (%s)" % (name, kind, v0, "; ".join(tried)))
+    # the plan's hand-removed lines (island_plan.STREET_DROP), matched on the surviving coordinate
+    drop = [(k, v) for r_, k, v in _PL.STREET_DROP if r_ == name]
+    for L in list(kept):
+        if any(L[0] == k and abs(L[1] - v) <= 1.0 for k, v in drop):
+            kept.remove(L)
+            why.append("%s %s=%.0f dropped: removed by the plan (island_plan.STREET_DROP)" % (name, L[0], L[1]))
     # crossings of two new lines: kept only where at least one of the two runs THROUGH the point (a crossing that is
     # the end of both would be a two-armed pad, which the kit refuses); lines re-clipped until nothing changes
     cross = {}

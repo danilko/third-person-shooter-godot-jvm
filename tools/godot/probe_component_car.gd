@@ -1,7 +1,7 @@
 extends SceneTree
 ## SPC-1, the component-damage car (assets/vehicles/SPC1.blend -> SPC1.glb -> SPC1.tscn, VehicleDamageModel).
 ##
-##   godot --headless --path . --script tools/godot/probe_component_car.gd [-- --car=SPC1|PIT1|POC1] [--control]
+##   godot --headless --path . --script tools/godot/probe_component_car.gd [-- --car=SPC1|PIT1|POC1] [--visuals=res://.../CharacterVisuals_X.tscn] [--control]
 ##
 ## 1. the scene agrees with the MEASURED model facts (assets/vehicles/SPC1.vehicle.json, written by
 ##    blender/tools/build_vehicle.py): wheel mounts, hull, the model offset;
@@ -204,6 +204,9 @@ func _initialize() -> void:
 	await _tick(5)
 	var tdm: Node = fresh.get_node("DamageModel")
 	var ai: Node3D = (load(AI) as PackedScene).instantiate() as Node3D
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--visuals="):                     # another body in the seat (before _ready)
+			ai.set("character_visuals", load(a.substr("--visuals=".length())))
 	world.add_child(ai)
 	ai.global_position = fresh.global_position + Vector3(-2.5, 0.2, 0)
 	await _tick(5)
@@ -223,12 +226,34 @@ func _initialize() -> void:
 	var pelvis := skel.global_transform * skel.get_bone_global_pose(skel.find_bone("pelvis"))
 	var cushion: Array = facts["seats"]["seat_front_l"]
 	var cushion_y: float = (fresh.global_transform * Vector3(cushion[0], cushion[1] + MODEL_Y, cushion[2])).y
-	_check("the driver's hips sit on the cushion", absf(pelvis.origin.y - (cushion_y + 0.08)) < 0.05,
+	var drop: float = float(fresh.get("vehicle_config").get("seat_drop"))   # a low car's bucket seat
+	_check("the driver's hips sit on the cushion", absf(pelvis.origin.y - (cushion_y + 0.08 - drop)) < 0.05,
 			"pelvis %.3f m above the cushion, ai lod %d" % [pelvis.origin.y - cushion_y, ai.call("lod_level_now")])
 	var eye: Node3D = fresh.get_node("Seats/Seat0/CockpitCameraMount")
 	var roof: float = (fresh.global_transform * Vector3(0, facts["bounds"]["max"][1] + MODEL_Y, 0)).y
 	_check("the driver's eye is under the roof", eye.global_position.y < roof - 0.05,
 			"eye %.3f m below the roof top" % (roof - eye.global_position.y))
+	# THE HEAD, not the camera mount: the mount is a fixed marker on the seat and cannot see the body
+	# (user-reported "seated, the character goes through the roof" passed the check above). The crown's
+	# height above the head bone is the body's own measurement (<body>.body.json crown_m against the
+	# head bone's rest height), placed on the seated head bone.
+	var hb: int = skel.find_bone("head_2") if skel.find_bone("head_2") >= 0 else skel.find_bone("head")
+	var body_scene: Node = skel.get_parent()
+	while body_scene != null and body_scene.scene_file_path == "":
+		body_scene = body_scene.get_parent()
+	var body_json := "" if body_scene == null else body_scene.scene_file_path.get_basename() + ".body.json"
+	if body_json != "" and not FileAccess.file_exists(body_json):   # the reference's glb is not named after it
+		var dir: String = body_json.get_base_dir()
+		body_json = dir + "/" + dir.get_file() + ".body.json"
+	if hb >= 0 and body_json != "" and FileAccess.file_exists(body_json):
+		var body: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(body_json))
+		var rest_head_h: float = (skel.global_transform.basis * skel.get_bone_global_rest(hb).origin).y
+		var crown_off: float = float(body["crown_m"]) - rest_head_h
+		var head_y: float = (skel.global_transform * skel.get_bone_global_pose(hb)).origin.y
+		_check("the driver's head is under the roof", head_y + crown_off < roof - 0.05,
+				"crown %.3f m below the roof top (%s)" % [roof - head_y - crown_off, body_json.get_file()])
+	else:
+		_check("the driver's head is under the roof", false, "no head bone or no body record (%s)" % body_json)
 	helper.call("exit_driver", fresh)                         # Vehicle.tryExit
 	var fastest := 0.0
 	for i in range(20):

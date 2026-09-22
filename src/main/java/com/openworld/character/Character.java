@@ -138,6 +138,15 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     @Export
     public PackedScene characterVisuals;
 
+    /**
+     * Wear the character toon look (PLAN.md 6.10, character.ToonLook). OFF by default: whether the game
+     * ships in it is PLAN.md 3.14's decision. Read once, when the visuals are wired.
+     */
+    @Export
+    public boolean toonLook = false;
+    public boolean getToonLook() { return toonLook; }
+    public void setToonLook(boolean v) { this.toonLook = v; }
+
     // ── Protected state ───────────────────────────────────────────────────────
     protected Vector3 movementDirection = new Vector3();
     protected StanceName currentStanceName = StanceName.UPRIGHT;
@@ -210,6 +219,12 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     protected Node3D cameraRoot;
     protected FPSCameraController fpsCameraController;
+
+    /** The body's own eye marker (MeshConfig.fpsCameraMarkerPath), or null. A car reads it once when this
+     *  body sits in the driver's seat, to put its cockpit camera behind THIS body's eyes. */
+    public Node3D eyeMarker() {
+        return fpsCameraController != null ? fpsCameraController.fpsCameraMount : null;
+    }
 
     /**
      * Which of the on-foot views the shared {@link #activeCamera} is being written from — false =
@@ -327,6 +342,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
                 meshConfig = cv.meshConfig;
             }
             wireFromMeshConfig();
+            if (toonLook) applyToonLook();
         } else {
             // Legacy fallback: visuals embedded directly in Character scene.
             for (NodePath headMeshPath : headMeshPaths) {
@@ -383,6 +399,24 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
      * {@link CharacterVisuals} scene and wires them into sibling components.
      * Called in _ready() immediately after addChild(visualsInstance).
      */
+    private void applyToonLook() {
+        MeshInstance3D face = null;
+        Skeleton3D skeleton = null;
+        for (int i = 0; i < meshConfig.headMeshPaths.size(); i++) {
+            Node n = visualsInstance.getNodeOrNull(meshConfig.headMeshPaths.get(i));
+            if (n instanceof MeshInstance3D mi) {
+                String nm = mi.getName().toString().toLowerCase();
+                if (nm.equals("face") || nm.equals("head")) face = mi;
+                if (skeleton == null && mi.getParent() instanceof Skeleton3D sk) skeleton = sk;
+            }
+        }
+        Node mr = visualsInstance.getNodeOrNull(meshConfig.meshRootPath);
+        ToonLook look = new ToonLook();
+        look.setName("ToonLook");
+        addChild(look);
+        look.apply(visualsInstance, face, skeleton, mr instanceof Node3D m ? m : null);
+    }
+
     private void wireFromMeshConfig() {
         if (meshConfig == null || visualsInstance == null) return;
 

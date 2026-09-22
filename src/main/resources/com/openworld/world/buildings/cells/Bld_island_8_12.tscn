@@ -1,37 +1,4 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse.tscn" id="1"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool2.tres" id="tone0_3"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone1_3"]
-[ext_resource type="Material" path="res://assets/world_source/kits/road_kit/materials/M_TileWhite.tres" id="lotmat"]
-
-[sub_resource type="BoxMesh" id="LotBox"]
-material = ExtResource("lotmat")
-
-[sub_resource type="MultiMesh" id="Lots"]
-transform_format = 1
-instance_count = 1
-mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(10.3198, 0.0000, 7.7372, 11.0683, 0.0000, 1.1380, 0.0000, 0.8670, -3.4399, 0.0000, 23.2114, 1005.9390)
-
-[sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(10.878, 1.138, 24.467)
 
 [node name="Bld_island_8_12" type="Node3D"]
-
-[node name="ShopHouse_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(0.948683, 0, 0.316229, 0, 1, 0, -0.316229, 0, 0.948683, 12.575, 1.456, 1010.459)
-
-[node name="Mesh" parent="./ShopHouse_000" index="0"]
-surface_material_override/5 = ExtResource("tone0_3")
-surface_material_override/1 = ExtResource("tone1_3")
-
-[node name="Lots" type="MultiMeshInstance3D" parent="."]
-multimesh = SubResource("Lots")
-
-[node name="LotCollision" type="StaticBody3D" parent="."]
-collision_mask = 0
-
-[node name="Lot0" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.948683, 0, 0.316229, 0, 1, 0, -0.316229, 0, 0.948683, 11.068, 0.867, 1005.939)
-shape = SubResource("LotShape0")

@@ -36,7 +36,10 @@ G = 9.8
 # Per-vehicle tuning: mass (kg), suspension, power. The rest of the handling is the prototype's (Vehicle.tscn).
 TUNING = {
     "SPC1": {"name": "SPC-1", "mass": 1300, "rest": 0.35, "spring": 14000, "damping": 5000, "over": 0.2,
-             "max_speed": 55.0, "accel": 10000.0, "crash_hp": 6.0, "health": 500, "paint": "car"},
+             "max_speed": 55.0, "accel": 10000.0, "crash_hp": 6.0, "health": 500, "paint": "car",
+             # a low coupe: a deep bucket seat so the tallest body's head clears the roof (measured by
+             # probe_component_car: Fumiriya's crown 0.006 m through the roof on the plain seat)
+             "seat_drop": 0.07},
     "PIT1": {"name": "PIT-1", "mass": 1900, "rest": 0.45, "spring": 16000, "damping": 6500, "over": 0.25,
              "max_speed": 40.0, "accel": 13000.0, "crash_hp": 5.0, "health": 650, "paint": "car",
              # Vehicle.tscn has four seats and an inherited scene cannot delete one: a single-cab pickup's other two
@@ -108,6 +111,7 @@ wreck_scene = ExtResource("3_wreck")
 explosion_vfx = ExtResource("4_blast")
 headlight_offset = Vector3({f(head[0])}, {f(head[1])}, {f(head[2])})
 taillight_offset = Vector3({f(tail[0])}, {f(tail[1])}, {f(tail[2])})
+seat_drop = {f(t.get("seat_drop", 0.0))}
 """
     hull = ", ".join(f"{f(x)}, {f(y + MODEL_Y)}, {f(z)}" for x, y, z in d["hull"])
     nodes = [f"""[gd_scene format=3]

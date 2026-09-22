@@ -1,0 +1,13 @@
+{
+  "note": "THE ONE OWNER of the character toon look (PLAN.md 6.10). tools/build_toon.py generates the Godot uniform defaults (toon_params.gdshaderinc) from this file and blender/tools/build_toon_nodegroup.py the Blender node group, so the two DCCs cannot disagree; tools/godot/probe_toon_parity.gd renders both and compares. Edit HERE, then run both tools. NOT an MToon shader: it is a ramp OVER the engine's own lights, so the sun, the moon, the street-lamp pool and headlights all light a character, and it receives and casts shadows.",
+  "shade_threshold": 0.08,
+  "shade_softness": 0.03,
+  "shade_tint": [0.66, 0.60, 0.74],
+  "specular_threshold": 0.94,
+  "specular_softness": 0.01,
+  "specular_strength": 0.12,
+  "rim_width": 0.30,
+  "rim_softness": 0.04,
+  "rim_strength": 0.30,
+  "face_flatten": 0.6
+}

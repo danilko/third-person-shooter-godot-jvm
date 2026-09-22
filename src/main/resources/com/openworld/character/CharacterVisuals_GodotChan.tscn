@@ -462,7 +462,10 @@ input_2/name = "Crouch"
 input_2/auto_advance = false
 input_2/break_loop_at_end = false
 input_2/reset = false
-
+input_3/name = "Drive"
+input_3/auto_advance = false
+input_3/break_loop_at_end = false
+input_3/reset = false
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_dnye5"]
 min_space = 0.0
 max_space = 10.0
@@ -912,6 +915,66 @@ input_1/auto_advance = false
 input_1/break_loop_at_end = false
 input_1/reset = true
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim0"]
+animation = &"drive_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim1"]
+animation = &"drive_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim2"]
+animation = &"drive_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim3"]
+animation = &"upright_aim_dual_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim4"]
+animation = &"upright_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim5"]
+animation = &"upright_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim6"]
+animation = &"drive_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim7"]
+animation = &"drive_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim8"]
+animation = &"upright_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim9"]
+animation = &"drive_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_daim10"]
+animation = &"drive_aim_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_aimdrive"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_daim0")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_daim1")
+blend_point_1/pos = 1.0
+blend_point_2/node = SubResource("AnimationNodeAnimation_daim2")
+blend_point_2/pos = 2.0
+blend_point_3/node = SubResource("AnimationNodeAnimation_daim3")
+blend_point_3/pos = 3.0
+blend_point_4/node = SubResource("AnimationNodeAnimation_daim4")
+blend_point_4/pos = 4.0
+blend_point_5/node = SubResource("AnimationNodeAnimation_daim5")
+blend_point_5/pos = 5.0
+blend_point_6/node = SubResource("AnimationNodeAnimation_daim6")
+blend_point_6/pos = 6.0
+blend_point_7/node = SubResource("AnimationNodeAnimation_daim7")
+blend_point_7/pos = 7.0
+blend_point_8/node = SubResource("AnimationNodeAnimation_daim8")
+blend_point_8/pos = 8.0
+blend_point_9/node = SubResource("AnimationNodeAnimation_daim9")
+blend_point_9/pos = 9.0
+blend_point_10/node = SubResource("AnimationNodeAnimation_daim10")
+blend_point_10/pos = 10.0
+max_space = 10.0
+snap = 1.0
+value_label = "weapon"
+
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jn40o"]
 nodes/output/position = Vector2(2740, 140)
 nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_u0wnu")
@@ -1018,7 +1081,9 @@ nodes/SwimMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_swm")
 nodes/SwimMovementBlend/position = Vector2(-360, 960)
 nodes/swim_stroke/node = SubResource("AnimationNodeAnimation_swmf")
 nodes/swim_stroke/position = Vector2(-360, 1100)
-node_connections = [&"StanceTransition", 5, &"SwimTransition", &"SwimTransition", 0, &"SwimMovementBlend", &"SwimTransition", 1, &"swim_stroke", &"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"AimStanceTorsoTransition", &"AimStanceTorsoTransition", 0, &"WeaponAimTorso", &"AimStanceTorsoTransition", 1, &"WeaponAimTorsoCrouch", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"AimStanceTransition", &"AimStanceTransition", 0, &"WeaponAim", &"AimStanceTransition", 1, &"WeaponAimCrawl", &"AimStanceTransition", 2, &"WeaponAimCrouch", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
+nodes/WeaponAimDrive/node = SubResource("AnimationNodeBlendSpace1D_aimdrive")
+nodes/WeaponAimDrive/position = Vector2(1020, 1500)
+node_connections = [&"AimStanceTransition", 3, &"WeaponAimDrive", &"StanceTransition", 5, &"SwimTransition", &"SwimTransition", 0, &"SwimMovementBlend", &"SwimTransition", 1, &"swim_stroke", &"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"AimStanceTorsoTransition", &"AimStanceTorsoTransition", 0, &"WeaponAimTorso", &"AimStanceTorsoTransition", 1, &"WeaponAimTorsoCrouch", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"AimStanceTransition", &"AimStanceTransition", 0, &"WeaponAim", &"AimStanceTransition", 1, &"WeaponAimCrawl", &"AimStanceTransition", 2, &"WeaponAimCrouch", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gapvf"]
 radius = 0.048
@@ -1155,6 +1220,7 @@ parameters/PassengerMovementBlend/blend_position = Vector2(0, 0)
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" parent_id_path=PackedInt32Array(2091451191, 1572765218) index="0" unique_id=673689560]
 motion_scale = 0.8204
+metadata/seated_motion_scale = 0.8204
 bones/0/position = Vector3(5.155809e-10, -0.016772537, -0.080805)
 bones/0/rotation = Quaternion(0.49999997, 0.5000001, 0.5, 0.49999994)
 bones/1/rotation = Quaternion(0.70238364, 0.59747034, 0.38679963, -0.008518755)

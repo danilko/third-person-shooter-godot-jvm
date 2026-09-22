@@ -431,6 +431,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // seated AI driver can be freed/removed out from under us by a despawn race, and reading its
         // transform then throws `get_global_transform "!is_inside_tree"` → native use-after-free segfault.
         // isInstanceValid is checked first (short-circuit) so isInsideTree is never called on a freed node.
+        calibrateCockpitMount(delta);
         // Every seat is validated + pinned (runs on every peer — puppets pin their riders too).
         for (int seat = 0; seat < seatOccupants.length; seat++) {
             Character rider = seatOccupants[seat];
@@ -454,9 +455,18 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 Vector3 right = getGlobalTransform().getBasis().getColumn(0);
                 seatPos = seatPos.plus(right.times((float) shift));
             }
-            rider.setGlobalPosition(seatPos);
             Vector3 occRot = rider.getGlobalRotation();
-            occRot.setY((float) (getGlobalRotation().getY() + yawForHeading(postureHeading)));
+            double yaw = getGlobalRotation().getY() + yawForHeading(postureHeading);
+            occRot.setY((float) yaw);
+            // SEAT DROP: a low car's bucket seat sits the occupant deeper, so the head clears the roof
+            // (user-reported: seated, the head went through SPC-1's roof). NOT a recline: the seated clip
+            // already leans the torso ~25 deg toward the wheel, so tilting the body back brings the torso
+            // UPRIGHT first and RAISES the head -- measured, a 24 deg recline lifted the crown 6 cm.
+            VehicleConfig seatCfg = getConfig();
+            if (seatCfg != null && seatCfg.seatDrop != 0.0) {
+                seatPos = seatPos.plus(getGlobalTransform().getBasis().getColumn(1).times((float) -seatCfg.seatDrop));
+            }
+            rider.setGlobalPosition(seatPos);
             rider.setGlobalRotation(occRot);
         }
 
@@ -475,6 +485,40 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 else          vehicleWeaponController.onWeaponNotFire();
             }
         }
+    }
+
+    // ── The cockpit view sits at THIS driver's eye ─────────────────────────────
+    //
+    // Seats/Seat0/CockpitCameraMount was placed by hand for one body (W11). Bodies differ (1.49 m to
+    // 1.91 m) and a low car sits its driver deeper (VehicleConfig.seatDrop), so one fixed marker cannot be
+    // behind every driver's eyes -- measured, 0.186 m off for Shino in SPC-1. Once the seated pose has
+    // blended in, the car reads the driver's own eye marker ONCE, in the seat's frame, and moves the mount
+    // there. Once, not every frame: a camera that follows the neck every frame is W8.3's feedback loop
+    // (bone -> camera -> aim -> bone).
+
+    private static final double COCKPIT_CALIBRATE_SECONDS = 0.6;
+    private double cockpitCalibrateIn = -1.0;
+
+    private void calibrateCockpitMount(double delta) {
+        if (cockpitCalibrateIn < 0.0) return;
+        cockpitCalibrateIn -= delta;
+        if (cockpitCalibrateIn > 0.0) return;
+        cockpitCalibrateIn = -1.0;
+        Character driver = seatOccupants.length > 0 ? seatOccupants[0] : null;
+        Node3D seat = !seatNodes.isEmpty() ? seatNodes.get(0) : driverSeatNode;
+        if (driver == null || seat == null || !GD.isInstanceValid(driver)) return;
+        Node3D eye = driver.eyeMarker();
+        Node mount = seat.getNodeOrNull("CockpitCameraMount");
+        if (eye == null || !(mount instanceof Node3D m) || !eye.isInsideTree()) return;
+        m.setPosition(seat.toLocal(eye.getGlobalPosition()));
+    }
+
+    /** The cockpit mount's position in its seat's frame now. For probes. */
+    @Register
+    public Vector3 cockpitMountNow() {
+        Node3D seat = !seatNodes.isEmpty() ? seatNodes.get(0) : driverSeatNode;
+        Node mount = seat == null ? null : seat.getNodeOrNull("CockpitCameraMount");
+        return mount instanceof Node3D m ? m.getPosition() : Vector3.Companion.getZERO();
     }
 
     // ── Knock-down street poles (PLAN.md 3.11) ────────────────────────────────
@@ -1550,6 +1594,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
         occupant    = c;
         seatOccupants[0] = c;
+        cockpitCalibrateIn = COCKPIT_CALIBRATE_SECONDS;   // put the cockpit view at THIS driver's eye
         justEntered = true;
         wakeUp();   // a parked (sleeping) car resumes physics the moment someone takes the seat
 

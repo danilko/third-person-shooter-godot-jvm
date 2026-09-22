@@ -49,7 +49,8 @@ LEAD_IN = 40.0                  # level off the junction before climbing (3.2d: 
 # stalled after one hairpin against the east descent's corridor). So phase 1 leaves nishi_dori further south, where
 # the widened face is widest, and climbs west between y 250 and 700.
 JN_OLD = (-180.0, 250.0)
-WEST_FOOT = (-1113.0, 814.0)    # record: the plateau junction, phase 1's top, where the west climb starts (v13)
+WEST_FOOT = (-1060.0, 620.0)    # record: the plateau junction, phase 1's top, where the west climb starts (v16: the
+                                # moved crest's flank covers the plateau's north half, so on its south half)
 EAST_FOOT = (132.0, 729.0)      # record: near the T on the farm arterial (v13)
 TOE_Z = 1.2                     # Godot: the widened face "starts" where the ground passes this
 TOE_CLEAR = 45.0                # phase 1's legs keep this far west of the toe

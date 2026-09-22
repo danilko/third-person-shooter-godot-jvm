@@ -22,6 +22,28 @@ const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 
 var fails := 0
 
+## The first head mesh a body declares, resolved exactly as `Character.wireFromMeshConfig` does.
+func _head_mesh(p: Node) -> Node3D:
+	var vis: Node = _find(p, "CharacterVisuals")
+	if vis == null:
+		for c in p.get_children():
+			if c.get("mesh_config") != null:
+				vis = c
+				break
+	if vis == null:
+		return null
+	var cfg = vis.get("mesh_config")
+	if cfg == null:
+		return null
+	var paths = cfg.get("head_mesh_paths")
+	if paths == null:
+		return null
+	for np in paths:
+		var n: Node = vis.get_node_or_null(np)
+		if n != null and n is Node3D:
+			return n as Node3D
+	return null
+
 func _find(n: Node, nm: String) -> Node:
 	if n.name == nm:
 		return n
@@ -78,7 +100,7 @@ func _initialize() -> void:
 	p.position = Vector3(0, 1.0, 2.9)
 	await _tick(30)
 
-	var head: Node3D      = _find(p, "head") as Node3D
+	var head: Node3D      = _head_mesh(p)   # the body's own head mesh (MeshConfig), not a node named "head"
 	var cockpit: Node3D   = _find(car, "CockpitCameraMount") as Node3D
 	var bonnet: Node3D    = _find(car, "FPSCameraMount") as Node3D
 	var car_cam: Camera3D = _find(car, "ActiveCamera") as Camera3D

@@ -213,6 +213,16 @@ STREET_REGIONS = (
     ("logistics", (-820.0, -1540.0, -60.0, -1040.0), "block", 220.0, 220.0),
     ("suburb", (880.0, -1060.0, 1300.0, -330.0), "block", 150.0, 150.0),
 )
+#: Streets the plan REMOVES by hand (user, 2026-09-22, marked on `reference/island_plan_v16_2026-09-22-remove-too-small-
+#: street-blocks.png`): lines that cut a block too small for a building to be placed simply, so the grid stays larger
+#: and more uniform. (region, axis, the line's final coordinate -- the number in its street name), matched to 1 m.
+STREET_DROP = (
+    ("city", "x", 342.0),        # machi_342, between nishi_hondori and the ring's west side
+    ("city", "x", 1032.0),       # machi_1032, beside higashi_hondori
+    ("sw", "x", -1100.0),        # nishi_machi_1100, the westmost N-S residential street
+    ("sw", "x", -440.0),         # nishi_machi_440, beside kichi_dori (x -500)
+    ("industry", "x", -200.0),   # kojo_michi_200, a one-block stub
+)
 STREET_NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "farm": ("hata_michi", "hata_yoko"),
                 "north": ("kita_machi", "kita_cho"), "north_e": ("kita_machi_e", "kita_cho_e"), "industry": ("kojo_michi", "kojo_yoko"),
                 "logistics": ("butsuryu_michi", "butsuryu_yoko"), "suburb": ("kogai_machi", "kogai_cho")}
@@ -235,3 +245,18 @@ DIAMOND_J = (465.0, 665.0)
 BRIDGE_X = 1250.0
 BRIDGE_SEARCH_Y = (-500.0, -1700.0)    # record y range the water gap is looked for in
 SPUR_EAST_Y = -500.0                   # the spur runs south from the JCT, then east at this y to the bridge axis
+
+
+# ------------------------------------------------------------------ the Wangan, east section (PLAN.md 3.30 L2)
+#: GODOT (x, z). The plan's orange line from the spur JCT along the south waterfront to the port corner (v8). The WEST
+#: section (R6, over the port's north edge to the west coast) is not built yet: this section ends at grade on the
+#: coastal ring's north-south stretch at the port corner, as v8 drew it before v11 extended it.
+#: The spur JCT is PARTIAL -- Wangan <-> airport only (the racing route, "off the airport spur"): the Wangan meets the
+#: spur's east leg from the south-west, where airport -> Wangan leaves spur_in to its own left and Wangan -> airport
+#: passes under both spur carriageways to join spur_out from its left. Wangan <-> C1 would need two loops.
+WANGAN_S_X = 1000.0            # the spur station the two Wangan ramps leave / join (spur_in diverge, spur_out merge)
+WANGAN_J_X = 890.0             # a joint on spur_out before it: the loop JCT's acceleration lane and the Wangan's
+                               # entrance are both on spur_out, and one run carries one aux slot
+WANGAN_CENTRE = [(430.0, 800.0), (600.0, 800.0), (780.0, 585.0)]   # the shared corridor, offshore of the park
+WANGAN_T_E = (237.0, 760.0)    # where the eastbound carriageway starts, at a T on the ring (ring_kita, x ~237)
+WANGAN_T_W = (237.0, 880.0)    # where the westbound carriageway ends, at its own T

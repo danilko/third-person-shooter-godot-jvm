@@ -6742,6 +6742,40 @@ head and chest out of the water, and treading is upright, so Swim aims from the 
 Gate `tools/godot/probe_swim_anims.gd` 6/6 (trunk 1.1 deg off vertical treading, 73.2 stroking, 2.4 aiming
 while swimming forward); `-- --control` puts `animation_stance_key = "Crawl"` back and fails 5.
 
+### A seat plays every body at the reference's scale; a low car sits deeper; the cockpit view finds the eye (2026-09-22, user-reported)
+
+"Seated in a car, the character goes above the roof." Measured: Shino's pelvis 0.178 m above the cushion.
+Since W49 the clips' `Root`/`pelvis` keys are in SHINO's metres (the re-home scaled them by her leg ratio),
+which is right standing and wrong seated: the hips rest on the cushion whatever the legs, and every car seat
+was measured with the reference body.
+- **`AnimationController.applySeatedMotionScale`**: while the stance key is DriveCarrier or Passenger the
+  skeleton plays at `seated_motion_scale` (skeleton metadata = the reference body's motion_scale, written by
+  `build_character_visuals.gd` from `godot_chan.body.json`); the body's own comes back on leaving.
+  Measured: hips 0.080 m above the cushion for all three bodies in all three cars.
+- **`VehicleConfig.seatDrop`** (SPC-1 0.07 m, `build_vehicle_scenes.py` TUNING `seat_drop`): a low coupe's
+  bucket seat. NOT a recline -- the seated clip leans the torso ~25 deg toward the wheel, so tilting the
+  body back brings it UPRIGHT first and RAISES the head (measured, a 24 deg recline lifted the crown 6 cm).
+- **The probe had checked the CAMERA MOUNT, not the head.** `probe_component_car.gd` now measures the crown
+  (the body's own `crown_m` over its head bone) against the roof, and takes `--visuals=` for any body:
+  9/9 body x car, tightest Fumiriya in SPC-1 at 0.064 m below the roof top.
+- **The cockpit view is at THIS driver's eye**: 0.6 s after a driver sits, `Vehicle.calibrateCockpitMount`
+  reads the driver's own eye marker ONCE, in the seat's frame, and moves `CockpitCameraMount` there (once,
+  not per frame: W8.3's loop). Was 0.186 m off for Shino in SPC-1; now 0.001 m (`probe_vehicle_views`,
+  whose head lookup now uses `MeshConfig.head_mesh_paths` -- it had died on Godot-chan's `head` node name).
+
+### P6 code items closed (2026-09-22): seated aim branch, melee timings, the toon shader
+
+- **6.5** `AimStanceTransition["Drive"] <- WeaponAimDrive` for driver AND passenger; each archetype plays its
+  base's seated pose except dual pistols / fist / melee / throwable (they keep their upright pose).
+- **6.6** The hit lands on the clip's strike: `tools/godot/measure_attack_clips.gd` finds each attack clip's
+  contact frame (the striking hand's peak speed), and each step's windup is moved so that frame lands mid
+  active window, KEEPING the tuned total duration. Before, four attacks hit up to ~0.1 s after the strike.
+- **6.10** `assets/vfx/toon/` (its README is the record): one JSON owns the look, generated into Godot
+  uniforms and a Blender node group; `tools/check_toon_parity.sh` renders one lit sphere in each and both
+  put the edge at N.L 0.0796 (want 0.08). `Character.toonLook` is OFF by default until 3.14 decides.
+  Trap it cost: `LIGHT_COLOR` in `light()` carries a factor of pi; a white specular band at that scale drew
+  bright streaks across dark cloth -- the highlight is now the surface's own tone, divided by pi.
+
 ### W51 — OUR OWN FULL-BODY CONTROL RIG ON `shino` (2026-09-21, PLAN.md 6.17)
 
 `blender/tools/add_control_rig.py` is now the full-body layer (W50's ARP route is superseded; the file
@@ -8969,6 +9003,35 @@ downstream is hand-edited.
 - **A generated street keeps away from a road running alongside it** (`island_streets.PARALLEL_CLEAR` 35 m over more
   than 40 m): `machi_612` ran 12.5 m off `naka_hondori` for 460 m and died inside that road's own junction
   (`open_end`, the layout's flow assert).
+- **THE CITY PLAIN IS NEVER RAISED, SO THE SUMMIT MOVED (v16, 2026-09-22, user decision).** `island_reshape`'s dome
+  falls off over 490 m and `mass_mask` runs to x 350, so its skirt stood 18-70 m of hillside on land the base had at
+  0.6 m -- the chuo_dori x nishi_dori junction came out on a **42%** slope with its pad lifted 8 m, and no gate saw it
+  (arterials are pure DRAPE with no grade limit; `island_grades` only ranks). Now land under `PLAIN_Z` on the city
+  side keeps its own height and the massif rises from it at <= 1:1 (`PLAIN_K`, the coasts' 45 deg). That and a 435 m
+  plateau cannot both fit where the crest was (365 m from the plain; the massif is ~1.2 km wide), so the crest was
+  MOVED, by a search for the centre and turn that clear both the sea and the plain at 1:1: `CREST_C` (-675, -1125),
+  -45 deg, 9 m spare. Its west flank covers the shrine plateau's north half, so the level gate (`PLATEAU_C`) and touge
+  phase 1's top (`island_touges.WEST_FOOT`) moved to the south half; `island_touges.py derive` was re-run. **When the
+  land changes, the arterials INPUT keeps the old drape** (`island_network.py` is one-shot): re-drape the stations
+  that moved.
+- **THE BLOCK GROUND IS A LAYER THE STAMP KNOWS ABOUT.** `island_ground.py`'s block surface is written after the road
+  stamp, and a stamp re-derives every vertex it reaches from the natural ground -- so a dock Stamp after
+  `island_world.sh` took the kerb-level fill back down 0.15 m, silently. `apply_paint_grid.gd` now also writes
+  `urban_block.layer` (sparse: "UBL1", nx, nz, x0, z0, step, count, then (index i32, height f32)) beside
+  `urban_paint.marker`; `road_kit_stamp.stamp_network` refuses while the marker exists (`--force` in
+  `stamp_roadkit_terrain.gd`), and `Stamp.stamp(..., layer)` lays the layer over the stamp -- which is how
+  `probe_road_stamp` re-stamps idempotently and judges the restore only on vertices the layer does not own. Beside a
+  road with NO footway the block ground is capped at the road less the stamp's clearance (`island_ground.CAP_REACH`),
+  or Terrain3D's interpolation lifts it 2 cm over the outer lane. The probe also skips a FILL sample over a road more
+  than `UNDERPASS` below (a ramp over a street: the stamp caps to the lower road on purpose).
+- **The Wangan, east section** (`island_expressway.wangan_east`, `island_plan.WANGAN_*`): two one-way elevated
+  carriageways from a PARTIAL JCT on the spur's east leg (Wangan <-> airport only: C1 would need two loops) along the
+  south waterfront offshore of the park, each down to its own T on the ring at the port corner. Keep-left decides
+  the JCT: airport -> Wangan leaves spur_in to its own left; Wangan -> airport must pass UNDER both spur carriageways
+  to reach spur_out's left. spur_out is cut at a joint before the Wangan's merge because the loop JCT's
+  acceleration lane is on spur_out too (one aux slot per run), and both taper spans are held at 110 m (the gate
+  wants 108 at taper 0.25). Iterate on it with `island_expressway.py <out> --from <base> --check` (~17 min; `--fast`
+  writes only); the base is `island_coast_road.py add` + `island_touges.py add` over the arterials input.
 
 ## The island's road layout is DERIVED: arterials in, expressway, trunk grid, streets and turnarounds out (PLAN.md 3.13 steps 2-5, 3.3, 3.3b, 2026-09-19)
 

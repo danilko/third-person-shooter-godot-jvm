@@ -1,4 +1,7 @@
 extends SceneTree
+
+## The body every car seat was measured with (W11); a seated body plays at its motion_scale.
+const SEATED_REFERENCE := "godot_chan"
 ## Write a body's CharacterVisuals scene from its measurements (PLAN.md 6.9).
 ##
 ##   godot --headless --path . --script tools/godot/build_character_visuals.gd -- --body=shino
@@ -132,6 +135,13 @@ func _build(f: Dictionary) -> void:
 	# exact answer for uneven ground; this is the proportional one, and it is free.
 	if f.has("motion_scale"):
 		skel.motion_scale = float(f["motion_scale"])
+	# ...EXCEPT IN A SEAT. Seated, the hips rest on the cushion whatever the leg length, and every car
+	# seat was measured with the REFERENCE body -- so a seated body plays the clips at the reference's
+	# scale (user-reported: seated, Shino's head went through the roof; measured, her pelvis sat 0.178 m
+	# above the cushion). AnimationController swaps to this on entering a seat and back on leaving.
+	var ref_f: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(
+		"res://assets/characters/%s/%s.body.json" % [SEATED_REFERENCE, SEATED_REFERENCE]))
+	skel.set_meta("seated_motion_scale", float(ref_f.get("motion_scale", 1.0)))
 
 	_weapon_sockets(skel, f)
 	_aim_modifiers(skel, ref)

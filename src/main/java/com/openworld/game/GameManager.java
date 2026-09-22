@@ -162,6 +162,7 @@ public class GameManager extends Node {
     @Override
     public void _exitTree() {
         IconRegistry.clear();
+        com.openworld.character.ToonLook.clear();
         com.openworld.ui.IconFit.clear();
         com.openworld.util.RayExclusions.clear();
         WaypointStore.clearAll();   // I5 — hygiene + clean restart (Vector3 values, but clear anyway)

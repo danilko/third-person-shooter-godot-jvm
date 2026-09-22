@@ -409,6 +409,15 @@ public class VehicleConfig extends Resource {
     @Export public double postureTurnSpeed = 360.0;
 
     /**
+     * How far below the seat marker a seated occupant sits, metres (0 = on it). A low car's bucket seat
+     * holds the occupant deeper, so the head clears the roof; the sunk hips are hidden by the body. NOT a
+     * recline -- the seated clip leans the torso toward the wheel, so a recline raises the head. Measured
+     * per car against every shipped body by tools/godot/probe_component_car.gd ("the driver's head is
+     * under the roof"); set in tools/build_vehicle_scenes.py's TUNING row, never by hand here.
+     */
+    @Export public double seatDrop = 0.0;
+
+    /**
      * Beyond this heading magnitude the body KEEPS the side it is already turned to, degrees.
      *
      * <p>The only latch left, and it exists for one unavoidable discontinuity: directly behind, +179

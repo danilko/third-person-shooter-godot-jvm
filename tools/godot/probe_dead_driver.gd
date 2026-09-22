@@ -99,6 +99,8 @@ func _initialize() -> void:
 	var ctl_car: RigidBody3D = c[0]
 	var driver: Node3D = v[1]
 	var seat: Node3D = car.get_node("Seats/Seat0")
+	# a low car's bucket seat holds the occupant VehicleConfig.seat_drop below the marker (SPC-1: 0.07 m)
+	var seat_drop: float = float(car.get("vehicle_config").get("seat_drop"))
 	for i in range(int(WARMUP * 60)):
 		await physics_frame
 	var lean_alive := 0.0
@@ -123,7 +125,8 @@ func _initialize() -> void:
 	var ever_simulating := false
 	for i in range(int(REST_SECONDS * 60)):
 		await physics_frame
-		worst_seat = maxf(worst_seat, driver.global_position.distance_to(seat.global_position)
+		var seat_point: Vector3 = seat.global_position - car.global_transform.basis.y * seat_drop
+		worst_seat = maxf(worst_seat, driver.global_position.distance_to(seat_point)
 				- car.linear_velocity.length() / 60.0)
 		if i >= 30 and i < 60:          # measured while still coasting straight, before any crash can move it
 			lean_dead += _chest_lean(car, v[2]) / 30.0

@@ -257,9 +257,12 @@ public class AnimationController extends Node {
   private static final String AIM_STANCE_DEFAULT = "Default";
   private static final String AIM_STANCE_CRAWL = "Crawl";
   private static final String AIM_STANCE_CROUCH = "Crouch";
-  /** The specialised branches, by that key. Anything not here aims from {@code Default}. */
-  private static final java.util.Set<String> AIM_STANCE_BRANCHES =
-      java.util.Set.of(AIM_STANCE_CRAWL, AIM_STANCE_CROUCH);
+  /** The SEATED branch (PLAN.md 6.5): a driver and a passenger aim from the same seated poses. */
+  private static final String AIM_STANCE_DRIVE = "Drive";
+  /** The specialised branches, by animation key. Anything not here aims from {@code Default}. */
+  private static final java.util.Map<String, String> AIM_STANCE_BRANCHES = java.util.Map.of(
+      AIM_STANCE_CRAWL, AIM_STANCE_CRAWL, AIM_STANCE_CROUCH, AIM_STANCE_CROUCH,
+      "DriveCarrier", AIM_STANCE_DRIVE, "Passenger", AIM_STANCE_DRIVE);
   /** The grip archetype last equipped, so a stance change can re-assert it on the branch it selects. */
   private int animationWeaponIndex = 0;
 
@@ -275,6 +278,7 @@ public class AnimationController extends Node {
     // ... and CROUCH's, for the same reason: a kneeling body's arms are not a standing body's, and
     // a crouch aim pose had been exported and orphaned since W10 with nowhere to go.
     animationTree.set("parameters/WeaponAimCrouch/blend_position", animationWeaponIndex);
+    animationTree.set("parameters/WeaponAimDrive/blend_position", animationWeaponIndex);
     // The torso layer's own copy of the aim branch: a blend-tree node's output can feed ONE input
     // (Godot refuses the second connection and the whole tree stops evaluating -- measured, every
     // stance read the rest pose), so WeaponTorsoBlend cannot share CombatTransition with WeaponBlend.
@@ -327,6 +331,36 @@ public class AnimationController extends Node {
     animationTree.set(ATTACK_SCALE, frozen ? 0f : attackScale);
   }
 
+  // ── Seated motion scale ───────────────────────────────────────────────────
+  //
+  // A body plays the shared clips' Root/pelvis position keys at its own Skeleton3D.motion_scale (W47),
+  // because a stance DROP scales with leg length. A SEAT does not: the hips rest on the cushion whatever
+  // the legs, and every car seat was measured with the reference body. So seated, the skeleton plays at
+  // the reference's scale (`seated_motion_scale` metadata, written by build_character_visuals.gd), and
+  // the body's own comes back on leaving. User-reported: Shino's head through the roof, pelvis measured
+  // 0.178 m above the cushion.
+
+  private Skeleton3D skeleton;
+  private double bodyMotionScale = Double.NaN;
+
+  private void applySeatedMotionScale(boolean seated) {
+    if (skeleton == null) {
+      Node armature = animationTree.getNodeOrNull(animationTree.getRootNode());
+      if (armature == null) return;
+      skeleton = armature instanceof Skeleton3D s ? s : (Skeleton3D) armature.getNodeOrNull("Skeleton3D");
+      if (skeleton == null) return;
+      bodyMotionScale = skeleton.getMotionScale();
+    }
+    StringName meta = new StringName("seated_motion_scale");
+    double target = seated && skeleton.hasMeta(meta)
+        ? ((Number) skeleton.getMeta(meta)).doubleValue() : bodyMotionScale;
+    if (skeleton.getMotionScale() != target) skeleton.setMotionScale((float) target);
+  }
+
+  /** The skeleton's motion_scale now (the seated one in a seat). For probes. */
+  @Register
+  public double motionScaleNow() { return skeleton == null ? Double.NaN : skeleton.getMotionScale(); }
+
   private static final String PASSENGER_KEY_FROM = "DriveCarrier";
   private static final String PASSENGER_KEY = "Passenger";
 
@@ -374,12 +408,13 @@ public class AnimationController extends Node {
       key = PASSENGER_KEY;
     }
 
+    applySeatedMotionScale(PASSENGER_KEY_FROM.equals(key) || PASSENGER_KEY.equals(key));
     animationTree.set("parameters/StanceTransition/transition_request", key);
     // Which AIM set this stance uses. Keyed on the stance's own animation key, so a stance that
     // borrows another's ring borrows its aim too, with no second table. Swim has its own ring now
     // and aims from Default: an aiming swimmer TREADS, and treading is upright (PLAN.md 6.4).
     animationTree.set("parameters/AimStanceTransition/transition_request",
-        AIM_STANCE_BRANCHES.contains(key) ? key : AIM_STANCE_DEFAULT);
+        AIM_STANCE_BRANCHES.getOrDefault(key, AIM_STANCE_DEFAULT));
     // The TORSO layer carries the same dimension or it would take its spine from one stance's pose
     // and its arms from another's. Only Crouch needs a branch: `Stance.weaponTorsoLayer` is off in
     // Crawl, so the layer does not run there at all.
