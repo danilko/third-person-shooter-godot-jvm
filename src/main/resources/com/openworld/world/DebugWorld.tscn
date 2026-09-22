@@ -23,6 +23,8 @@
 [ext_resource type="PackedScene" uid="uid://dmk2axe000002" path="res://src/main/resources/com/openworld/weapon/MEW2.tscn" id="23_mw2ax"]
 [ext_resource type="PackedScene" uid="uid://c8sr3wqn0pj21" path="res://src/main/resources/com/openworld/weapon/SNR1.tscn" id="24_sr3pk"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/REV1.tscn" id="25_rev1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/PIS2.tscn" id="25_pis2"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/DUP1.tscn" id="25_dup1"]
 [ext_resource type="Script" uid="uid://c72nxrh65t2ct" path="res://src/main/java/com/openworld/world/WaterVolume.java" id="25_water"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/SMG1.tscn" id="26_smg1"]
 [ext_resource type="PackedScene" uid="uid://bj04qmxbiqrf4" path="res://assets/weapons/REV1.glb" id="30_gbi85"]
@@ -326,7 +328,9 @@ sky_material = SubResource("sky_ShaderMaterial_v8wrf")
 background_mode = 2
 sky = SubResource("sky_Sky_0j4pb")
 ambient_light_source = 3
-ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_sky_contribution = 0.35
+ambient_light_energy = 1.4
+ambient_light_color = Color(1, 0.95, 0.86, 1)
 reflected_light_source = 2
 tonemap_mode = 3
 tonemap_white = 6.0
@@ -642,6 +646,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252.05074, 15.05798, 0)
 [node name="REV1" parent="Pickups" unique_id=300600001 instance=ExtResource("25_rev1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -251.05074, 15.05798, 0)
 
+[node name="PIS2" parent="Pickups" unique_id=300600002 instance=ExtResource("25_pis2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -251.05074, 15.05798, 1.2)
+
+[node name="DUP1" parent="Pickups" unique_id=300600003 instance=ExtResource("25_dup1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -251.05074, 15.05798, 2.4)
+
 [node name="SMG1" parent="Pickups" unique_id=300700001 instance=ExtResource("26_smg1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -250.05074, 15.05798, 0)
 
@@ -661,6 +671,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -247.5, 14.887523, 3.57179)
 environment = SubResource("sky_Environment_1g8sw")
 camera_attributes = SubResource("sky_CameraAttributesPractical_d0ed4")
 script = ExtResource("sky_2_cejat")
+sky_contribution = 0.35
+ambient_energy = 1.4
 current_time = 10.035599999981525
 wind_speed = 7.000000000000001
 wind_direction = 2.35619451204804

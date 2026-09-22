@@ -60,6 +60,9 @@ HOLDER = "TrafficZones"
 
 # ---------------------------------------------------------------------------- lanes -> clusters
 
+FAR_JOINT = 600.0
+
+
 def spawn_entries(lanekits: list[dict]) -> tuple[list[list[float]], list[list[list[float]]], str]:
     """(entry point per spawnable lane, every spawnable lane's polyline, the ROUTE they share).
 
@@ -79,6 +82,15 @@ def spawn_entries(lanekits: list[dict]) -> tuple[list[list[float]], list[list[li
     # would scatter markers along every arterial. The clusters stay junctions and road ends.
     lanes = [l for l in every if l.get("spawnable")
              and not (preds.get(l["id"]) and all(kind.get(p) != "connector" for p in preds[l["id"]]))]
+    # ...except on a long road with no junction (the 12.5 km touge, the 4 km coast road, 3.30): there a joint lane
+    # is the only place a spawn source can be, so one counts once it is FAR_JOINT from every entry already taken
+    # (in id order, so the choice is a function of the network alone)
+    taken = [l["points"][0] for l in lanes]
+    for l in sorted((l for l in every if l.get("spawnable") and l not in lanes), key=lambda l: l["id"]):
+        p = l["points"][0]
+        if all(math.dist((p[0], p[2]), (q[0], q[2])) > FAR_JOINT for q in taken):
+            lanes.append(l)
+            taken.append(p)
     if not lanes:
         raise SystemExit("no spawnable lanes in the lanekit(s) — nothing to build traffic zones from")
     zone_ids = sorted({l.get("zone_id", "") for l in lanes})
@@ -117,6 +129,20 @@ def cluster(points: list[list[float]], radius: float) -> list[tuple[float, float
     groups: dict[int, list[int]] = {}
     for i in range(len(points)):
         groups.setdefault(find(i), []).append(i)
+    # A dense street grid CHAINS: every junction is within `radius` of the next, and single linkage made the whole
+    # city one cluster (measured after the land redo: 1028 entries, 2 clusters, a lane 2.3 km from its marker). A
+    # cluster wider than 2 x radius is split on a grid of that size -- still a function of the points alone.
+    cell = 2.0 * radius
+    split: dict[tuple, list[int]] = {}
+    for g, members in groups.items():
+        xs = [points[j][0] for j in members]
+        zs = [points[j][2] for j in members]
+        if max(xs) - min(xs) <= cell and max(zs) - min(zs) <= cell:
+            split[(g,)] = members
+            continue
+        for j in members:
+            split.setdefault((g, math.floor(points[j][0] / cell), math.floor(points[j][2] / cell)), []).append(j)
+    groups = split
     out = []
     for members in groups.values():
         n = len(members)

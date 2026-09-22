@@ -85,7 +85,12 @@
   "bollard": {
    "piece": "pieces/props/Prop_Bollard.gltf",
    "lift": 0.0,
-   "collide": true
+   "collide": true,
+   "breakable": {
+    "mass": 40,
+    "break_speed": 1.5,
+    "respawn": 60
+   }
   },
   "signal": {
    "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
@@ -201,6 +206,7 @@
   "bollard_spacing": 1.8,
   "bollard_inset": 0.35,
   "bollard_end_clear": 0.9,
+  "prop_lane_clear": 1.2,
   "signal_all_junctions": true,
   "signal_min_arms": 3,
   "signal_past_mouth": 6.0,

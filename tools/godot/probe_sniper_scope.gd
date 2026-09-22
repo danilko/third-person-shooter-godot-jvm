@@ -59,6 +59,29 @@ func _tick(n: int) -> void:
 	for i in range(n):
 		await physics_frame
 
+## The first head mesh the body's MeshConfig lists (what Character.refreshHeadVisibility hides); copied from
+## probe_fps_camera.gd, which W49 fixed the same way.
+func _head_mesh(p: Node) -> Node3D:
+	var vis: Node = _find(p, "CharacterVisuals")
+	if vis == null:
+		for c in p.get_children():
+			if c.get("mesh_config") != null:
+				vis = c
+				break
+	if vis == null:
+		return null
+	var cfg = vis.get("mesh_config")
+	if cfg == null:
+		return null
+	var paths = cfg.get("head_mesh_paths")
+	if paths == null:
+		return null
+	for np in paths:
+		var n: Node = vis.get_node_or_null(np)
+		if n != null and n is Node3D:
+			return n as Node3D
+	return null
+
 func _find(n: Node, nm: String) -> Node:
 	if n.name == nm:
 		return n
@@ -175,7 +198,7 @@ func _initialize() -> void:
 		var p: Node3D = a[0]
 		var gun: Node3D = a[1]
 		var wc: Node = a[2]
-		var head: Node3D = _find(p, "head") as Node3D
+		var head: Node3D = _head_mesh(p)   # MeshConfig.head_mesh_paths: the body's own head meshes (Shino has no "head" node)
 		var ov: Node = _overlay(p)
 		var want_fov := float(gun.get("scope").get("fov"))
 		await _tick(90)   # let the resting FOV finish its own tween before it is used as a baseline

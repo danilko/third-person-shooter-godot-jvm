@@ -159,6 +159,10 @@ one `albedo_color` each over the white one. `shot_nature_kit.gd --variants` rend
 
 ## Known gaps in the Standard kit (the manual Japanese pass is PLAN.md 3.6b)
 
+**The artist's checklist is `JAPAN_ART_REVIEW.md`** (beside this file): every type, block rule, material and
+library piece that needs re-authoring, with the target measured from PLATEAU and where to look on pakutaso.
+
+
 - No pitched tile roof, so there are no detached houses (一戸建て) or machiya.
 - No roll-up shutters (シャッター), vertical signs, external stairs or balcony slabs; a balcony is a rail strip.
 - The Standard glTF has no colour variants: `MI_RedBrick` and `MI_RedBrick_Pale`, and every `MI_Trim_*`, share

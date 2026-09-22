@@ -2,7 +2,9 @@ extends SceneTree
 ## Road Kit B7, headless: stamp a network's roads into the scene's Terrain3D (or restore it), exactly as
 ## the dock's Stamp Terrain / Restore Terrain do, and SAVE the terrain data directory.
 ##
-##   godot --headless --path . --script tools/godot/stamp_roadkit_terrain.gd -- <scene.tscn> <network> [--restore]
+##   godot --headless --path . --script tools/godot/stamp_roadkit_terrain.gd -- <scene.tscn> <network> [--restore] [--force]
+##
+## Refuses over a city's block ground (`urban_paint.marker`, see `road_kit_stamp.gd`); `--force` overrides.
 ##
 ## Order, and why: the NATURAL ground is sampled into the ground sidecar first (a stamped network keeps
 ## its sidecar as the natural record where it covers -- `road_kit_ground.gd`), the corridors are solved
@@ -36,7 +38,7 @@ func _initialize() -> void:
 	if net.all_points().is_empty():
 		net.load_record()
 	var terrain: Node = terrains[0]
-	var r := Stamp.stamp_network(net, terrain, restore)
+	var r := Stamp.stamp_network(net, terrain, restore, args.has("--force"))
 	print(r["message"])
 	if r["ok"] and r.get("changed", 0) > 0:
 		var dir := str(terrain.get("data_directory"))

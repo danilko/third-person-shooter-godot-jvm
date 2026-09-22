@@ -268,8 +268,11 @@ func _initialize() -> void:
 		_check("the route is drawn on the road as a band", bool(ribbon.call("band_shown_now")) and segs > 5,
 			"%d quad(s)" % segs)
 		ribbon.set("enabled", false)
-		for i in 20:
+		# wait for the band to go rather than a fixed count: under load (several probes at once) 20 frames was not enough
+		for i in 120:
 			await process_frame
+			if not bool(ribbon.call("band_shown_now")):
+				break
 		_check("... and it is the control knob's to remove", not bool(ribbon.call("band_shown_now")), "")
 		ribbon.set("enabled", true)
 

@@ -2958,7 +2958,7 @@ error** to 0.00 and 0.00, rotate-before (the world scenes) was and stays clean.
 `world/hosts/AimWorkbench.tscn` is the same host with `workbench = true`: a **mannequin** (a real
 `AICharacter` with its `AIController` swapped for a `ScriptedInputController`, so it holds a pose
 instead of wandering), a movable **aim ball**, and a **free-fly camera** (`G`, which freezes the
-Player because both want WASD). Keys: `1/2/3` stance, `4` combat, `Q/E` weapon slot, `F` fire (through `UserCommand.fire`, so the
+Player because both want WASD). Keys: `1/2/3` stance, `4` combat, `Q/E` the WEAPON (rebuilds the mannequin armed with the next catalog gun; it carries one, so a slot change showed nothing), `F` fire (through `UserCommand.fire`, so the
 real trace/recoil/bloom/stimulus path runs), `I/J/K/L`+`U/O` the ball, `H` to drop the Player and
 fly with no character. It also spawns a **car and a pool**, the only way to reach DriveCarrier and
 Swim, and prints a setup line per body (controller, stance, aim mechanism, yaw cap, held weapon). **Driving an AI's aim needs BOTH halves** — the command's `aimTargetPosition` (which moves
@@ -6438,6 +6438,8 @@ the entire body." Diagnosed rather than guessed at, and it was three separate th
   0.06 -> **0.10**. And `widget()` returned an existing mesh WITHOUT re-sizing it, so a change to
   those numbers reached only a body built from scratch; it re-sizes in place now, and leaves a mesh
   an artist has reshaped (anything but its own 8-vertex cube or 6-vertex diamond) alone.
+  **CORRECTION (2026-09-21): those are MESH sizes and they were not the drawn sizes**, so this half
+  of the fix bought almost nothing — see "The control you can see" below.
 - **Only four chains exist — arms and legs.** Nothing for the spine, chest, head or fingers, which is
   the "FK for the entire body" half and is NOT fixed here. See the Rigify note below.
 
@@ -6530,6 +6532,49 @@ authored to reach on her reaches on everyone, which is the property a base wants
   hair/skirt motion dropped on import (6.11, deferred by decision); and the FPS collar, which is
   W36's class of problem and **needs a render to judge, not a measurement**.
 
+### THE CONTROL YOU CAN SEE: the drawn size is not the mesh size, and a bone in no collection cannot be hidden (2026-09-21, user-reported)
+
+Two measured defects behind "the control circles cover the model, and hiding CTRL leaves no bones".
+
+- **`use_custom_shape_bone_size` was ON, so Blender scaled every widget by its BONE's length — and a
+  CTRL bone is a stub.** Measured on Shino, `CTRL_hand_r` is **0.0191 m** long, so a 0.1348 m mesh
+  **DREW AT 2.6 mm**. The drawn sizes were hand **2.6 mm**, pole 7.4, foot 27, root 45. That is the
+  whole of W48's "the IK shape is not visible", and W48's own remedy — mesh 0.09 -> 0.144 — moved the
+  drawn hand control from **1.7 mm to 2.6 mm**, which is why it did not help. It is off now, so the
+  mesh size IS the drawn size: hand **0.097 / 0.090 / 0.099 m** on reference / Shino / Fumiriya.
+  **A number that is never compared against the thing it sizes is not a measurement** — W48 quoted
+  mesh centimetres and never asked how many millimetres reached the screen.
+- **The hand control is sized from the HAND, not from the body.** Every widget was
+  `size * WIDGET_GROW * scale` with `scale` the pelvis height, which is right for a foot (a foot
+  grows with the leg) and wrong for a hand: measured wrist -> middle fingertip, Godot-chan 0.1616,
+  Shino 0.1498, Fumiriya 0.1648 m — within 10% of each other. `hand_span(arm, side)` reads it off
+  the rig and `HAND_WIDGET_FACTOR` (0.6) sizes the cube, so the control sits inside the hand and the
+  fingers stay visible; `--hand-widget-factor=` takes it lower still.
+- **THE CLUTTER WAS NOT A CONTROL AT ALL — every DEFORM bone wore a 19 cm sphere.** The user's
+  screenshot settled it in a second where three rounds of reasoning had not: the model was buried in
+  spheres while the actual controls were wire cubes off to one side. Measured, `Icosphere` (a 2.0 m
+  unit sphere) is the custom shape on EVERY non-CTRL bone of all three bodies — **158 / 53 / 117** —
+  scaled by a flat `custom_shape_scale_xyz` 0.08–0.10 with bone-size scaling OFF, so a fingertip and
+  the pelvis both drew a **0.155–0.190 m** ball against a finger bone of 0.020–0.037 m.
+  `tidy_deform_shapes` turns bone-size scaling back ON and sets the scale so each sphere is
+  `DEFORM_SHAPE_FRACTION` (0.5) of ITS OWN bone — **clamped to 0.006–0.060 m**, because a fraction
+  alone swaps one absurdity for another: `Root`, `Global` and `Position` are 0.935–1.0 m bones, and
+  the first pass gave them **0.500 / 0.567 m** balls, worse than the flat 0.19 it replaced. After:
+  every body **0.007–0.060 m**. Reversible (the Icosphere is untouched, two display fields move) and
+  `--deform-shape=0` clears the shapes instead, leaving each bone as its own octahedron.
+- **158 of 167 bones were in NO bone collection**, so the only thing an artist could switch off was
+  the controls. `sort_collections` files every bone into **CTRL** (9), **Body** (the 53 contract
+  bones, read from `skeleton_rest.json` rather than a second list) and **Extras** (the rest, which
+  on a VRoid body is ~100 hair and skirt spring bones): reference 9/53/0, Shino 9/53/105, Fumiriya
+  9/53/64. Hide Extras and the springs go; hide CTRL and the body bones are still there.
+- **`head` vs `head_2` is the one recorded name asymmetry across the seam** (W40) and it showed up
+  here as one contract bone filed under Extras: the reference `.blend` calls the bone `head` and the
+  contract record, dumped from the Godot side, says `head_2`. Both spellings are accepted.
+- Re-run on all three bodies with the script's own guard reporting **`POSE UNCHANGED AT INFLUENCE 0:
+  worst bone moved 0.000000 m`** (477 / 1422 samples; Fumiriya has no clips to check against, which
+  the script says rather than passing silently). No `.glb` was re-exported, so nothing in the game
+  moved and no gate could have shifted.
+
 ### W49 — SHINO IS THE BODY THE GAME SHIPS, AND THE CLIP LIBRARY LIVES ON HER (2026-09-21, user-asked)
 
 W48 measured the migration and stopped short of it. This is it, and the honest part is which of
@@ -6586,6 +6631,208 @@ became silence, with nothing on either run to say the defect was still there. Th
 `gauge(check, value, limit, msg)` reports a measurement inside `NEAR_FRACTION` (0.85) of its own
 limit as a WARN that names the margin. On Shino the crawl ring now says 98%, and the reference export
 still FAILs with all four ERRORs, which is the control.
+
+### W52 — SHINO'S CONTROL RIG IS AUTO-RIG PRO (PRESERVE) BEHIND ONE SWITCH (2026-09-21, user decision)
+
+W51's own layer was replaced on `shino` after the user found the arm twisting when the hand control was
+dragged back ("with a Rigify / Auto-Rig Pro IK the arm and shoulder resolve correctly"). PLAN.md 6.17 has
+the pipeline and numbers. The three rules that make ARP safe in the CLIP-SOURCE file:
+- **PRESERVE, never CONVERT:** our 53 bones, rests, names and clips are untouched; ARP's `rig` drives them
+  through 312 `COPY_TRANSFORMS`/`COPY_SCALE` from `<bone>_qr_offset`.
+- **One switch at 0:** `rig.pose.bones["c_pos"]["drive_game_rig"]` drives every one of those influences
+  (`blender/tools/arp/wire_switch.py`). At 0 the clips play and export byte-identically; at 1 ARP poses.
+- **Export with the button, N-panel > Game > "Export to Game"** (`blender/tools/game_export_ui.py`): it
+  turns every rig switch off, runs `export_character.py`, puts the switches back, and updates Godot.
+  `export_character.py` exports from a constraint-free COPY of the armature, because Blender's glTF
+  exporter resamples any bone that has a constraint, muted or not (652 channels STEP -> LINEAR, measured).
+- **A clip lives on ARP as `ARP_<clip>`** (`blender/tools/arp_clips.py`: move / bake), and the button bakes
+  it into the game clip `<clip>` before exporting; an unchanged channel keeps its original keys bit for bit.
+  The exporter leaves `ARP_*` actions out and writes no scene extras.
+- **The file opens in ARP; the EXPORTER switches it off and back** (`export_character.py` bakes `ARP_*`
+  clips, zeroes every rig switch, exports, restores). The bake takes each limb segment's DIRECTION from the
+  rig and its TWIST from the clip (on the joint-to-joint line), so an IK conversion no longer wrings a limb
+  (70 -> 1.2 deg, measured; unfixed, it re-folded the skirt in game).
+- **A clip moves onto ARP's controls exactly only in FK** (0.00 deg; IK retarget guesses the pole: 70 deg).
+- **Quick Rig is scriptable only with a window:** `xvfb-run blender` + a timer, and EXEC with invoke's
+  class attributes pre-set (`blender/tools/arp/build_limb_map.py`). ARP's source never enters the repo.
+- **Five traps the first real edits hit, each fixed in the tools:** an artist keyed the switch itself with
+  "key everything", which undid the exporter's switch-off (`arp_clips.strip_switch_keys`, run by move, bake,
+  export and a `save_pre` handler); an `ARP_*` action with no user was dropped on save (the handler gives
+  them a fake user -- the lost shotgun clip was recovered from `.blend1`); a placed reference gun exported as
+  part of the character (the exporter hides every mesh the armature does not deform and every empty that is
+  not its parent); and a switch change did not re-evaluate until `update_tag` + a depsgraph update.
+- **SHOTGUN is grip archetype 10** (base rifle, append-only): `SocketShotgun`, its own aim clip
+  `upright_aim_shotgun` at point 10 of WeaponAim/WeaponAimTorso (`tools/patch_tree_shotgun.py`); every other
+  family plays the rifle's clip there. SHG1 uses it.
+- **The Blender file shows where the GAME holds each weapon** (`blender/tools/game_weapon_preview.py`,
+  collection `GAME_WEAPON_PREVIEW`): a `SOCKET_<X>` empty on `hand_r` at the body's socket with the linked
+  weapon models and their SupportPoint/StockPoint/Muzzle. **Moving a socket empty IS the edit:** the export
+  writes any socket that differs from the measured one into `<body>.sockets.json`, and
+  `build_character_visuals.gd` applies it. Shino's rifle and shotgun sockets are the user's placed guns,
+  adopted that way (`probe_weapon_fit` PASS: ASR1 grip 0.000 m, SHG1 0.038 m, stocks seated).
+- **An aim clip is authored WITH the butt on the game's shoulder anchor, or the game moves the gun.** The
+  preview shows `ANCHOR_StockPoint` (on `clavicle_r`, from the visuals scene's `mount_offsets`). The first
+  rifle/shotgun edits held the butt 17 cm behind / 7 cm below (rifle) and 10 cm behind / 31 cm below (shotgun)
+  it, so in game `StockMountIKModifier` dragged hand + gun 0.19 / 0.21 m and "Blender and game differ". Both
+  clips were fitted by ONE rigid move of both ARP hand controls and poles (bore level on -Y, butt onto the
+  anchor), then the left hand onto `SupportPoint`: in-game mount move 0.000 m on both, rifle grip 0.000, shotgun
+  grip 0.029 (a pump is past Shino's reach; the shoulder push closes the rest). ARP's `fingers_grasp` does not
+  drive Quick Rig fingers: the support hand's finger wrap is still a pose job.
+- **Pistols (2026-09-21, user):** the Makarov is gone. PIS1 is Quaternius `Pistol_5` again (the 8eeacbf
+  conform, 0.22 m), PIS2 is `Pistol_6` as the large pistol, sized by a Desert Eagle's 0.149 m HEIGHT (0.314 m
+  long; by length its grip came out smaller than PIS1's). `blender/tools/import_quaternius_pistols.py` is the
+  record. For dual pistols (the reserved `dual_pistol` archetype) `Pistol_1`/`Pistol_2` are the pick: one frame,
+  two finishes, the classic 1911 / Beretta shape of CS's Dual Berettas and L4D's dual pistols.
+- **Dual pistols are DUP1** (grip archetype 3, `dual_pistol`, now with its own poses; model Pistol_1).
+  `weapon.DualPistolItem`: while the item hangs from its hold socket it makes a `BoneAttachment3D` on `hand_l` and
+  moves its `ModelLeft` subtree there, at the right grip MIRRORED in rest frames (the relation to `hand_r` is read
+  from the node chain up to the hand's BoneAttachment, never `getBoneGlobalPose`, which is pre-modifier). Two
+  traps: `reparent()` fires `_exitTree` on every equip/holster, so cleanup runs only `isQueuedForDeletion()`; and
+  the collider stays ONE gun wide (a pair-wide box read 12% inside the body when holstered). The muzzle flash
+  alternates; shots come from the right gun. The poses are the pistol poses with the right arm chain X-flipped
+  onto the left (`blender/tools/make_dual_pistol_clips.py`; the carry swings the arms out 31 deg first), wired at
+  point 3 by `tools/patch_tree_dual_pistol.py`. `probe_weapon_archetypes` now expects 5 hand clusters.
+  **The left barrel is aligned every frame, not left to the mirror** (`alignLeftBore`, on): the aim modifiers
+  turn both shoulders by the RIGHT gun's correction and the mirror doubles it on the left, so the left barrel sat
+  **9.7 deg outward**. It is now turned about its own grip PARALLEL to the right one (0.00 deg);
+  `toeInDeg` (default 0) turns it inward to converge. Gate `tools/godot/probe_dual_pistol.gd` (`--control` =
+  align off, fails at -9.69; `--toe-in=2.5` reads +2.50 inward).
+- **SNR1 is Quaternius `SniperRifle_3` again** (user, 2026-09-21): the conformed `SNR1.blend` / `.glb` / icon
+  and scene markers of 686f4c0 are restored (1.124 m AWP / L96A1, grip -> rear 0.306 m, grip lifted 2 cm, the
+  `Bolt` part and its `bolt_work` clip, SupportPoint 3.5 cm under the forend), keeping the `rifle` archetype.
+  The 3DModelsCC0 M24 row is gone from `import_guns_pack.py` so a re-run cannot bring it back. Credit for SNR1
+  and the pistols (PIS1, PIS2, DUP1) is Quaternius' 50 Low-poly Guns, per the download's `license_link.txt` (CC0).
+- **Every rifle/shotgun aim shares one finger set:** right hand = the upright rifle's, left hand = the single
+  pistol aim's support hand (set on ARP's same-named finger bones in the two ARP clips, copied in the crouch and
+  crawl clips). It is a gentle cup (35-57 deg at the middle joints), so a handguard grip still reads nearly flat.
+- **Open: SHG1 in crouch** misses the left grip by 5.4 cm (tolerance 5): crouch still plays the rifle's crouch
+  aim, never fitted to the shotgun's adopted socket (the mount drags the hand 0.27 m there).
+- **The revolver and SMG1 sit 3 cm higher in the hand, the pistols (PIS1, PIS2, DUP1) 1.5 cm** (user asked ~5 cm, then
+  pulled the pistols back 1.5 cm so the fist lines up near the trigger; `blender/tools/shift_weapon_grip.py`
+  moves the model up in its .blend and every Marker3D/CollisionShape3D with it). 5 cm was measured and rejected: the
+  grips reach only 5.3-6.4 cm below the old fist centre. A PISTOL's SupportPoint is the support hand cupped round
+  the FIST, so it stays put (PIS1/PIS2/REV1); SMG1's foregrip moves with the gun, and its stock mount now drops the
+  hand 4.2 cm on the grip instead of raising the gun (the butt stays in the shoulder).
+- **EVERY clip lives on the rig, and `ARP_` is internal** (2026-09-22, user: "remove the need to remember ARP vs
+  non-ARP"). `arp_clips.py move-all` moved every game clip onto the ARP controls in FK, each PROVED by an unedited
+  bake that must write 0 keys; the sidebar (N-panel > Game) lists clips by plain name with **Edit on Rig** / **New
+  Clip** / **Limbs to IK**, and the game action `<clip>` is derived at export, never edited by hand. A clip made on
+  the rig gets its game action and NLA track CREATED by the bake. The export skips a clip whose rig action AND
+  game action are both unchanged since its last bake (digests on the `ARP_` action), so it stays fast.
+  **Three bake defects the batch found** (105 of 170 clips first failed the proof, every one a false alarm):
+  - the limb swing was measured from the rig's joint POSITIONS, and ARP's connected leg puts the knee 3-6 mm
+    off a disconnected VRoid knee (every rotation exact) -- it is now the clip's own joint offset carried by the
+    rig's ROTATION, and a bone's position is the clip's own offset from its parent except `Root`/`pelvis`;
+  - a linearly interpolated quaternion is not unit length, so components differed for the SAME rotation -- a
+    quaternion is compared as a rotation, in the chord form `4 asin(|q-v|/2)` (`2 acos(dot)` is float noise
+    near 1 and flagged a 0.0001 finger wobble);
+  - a clip keyed at fractional frames (`jump`, every 0.48 frame, ends at 33.6) has a rig copy ending at 33
+    (ARP's retarget stops at the last whole frame): the bake samples to the last WHOLE frame.
+  ARP's FK knee and elbow are hinge-LOCKED (X/Y), which looked like the cause and was not: the retarget does
+  not go through the locks. Probe trap: the FIRST switch-off after a file load read a stale pose (0.9 m off on
+  whichever clip was measured first), while the exporter's own guard read 0.000 m.
+
+### Swim has its own branch: tread and stroke (PLAN.md 6.4, 2026-09-21)
+
+`StanceTransition["Swim"] <- SwimTransition { Tread <- SwimMovementBlend ; Stroke <- swim_forward }`
+(`tools/patch_tree_swim.py` on the reference tree, then `build_character_visuals.gd` for each generated body);
+the Swim stance no longer borrows Crawl's ring. `AnimationController.updateSwimPosture` is the one rule: moving
+forward OUT of combat strokes; at rest, sideways, back and ANY movement in combat treads -- a swimmer aims with
+head and chest out of the water, and treading is upright, so Swim aims from the Default (upright) branch.
+Gate `tools/godot/probe_swim_anims.gd` 6/6 (trunk 1.1 deg off vertical treading, 73.2 stroking, 2.4 aiming
+while swimming forward); `-- --control` puts `animation_stance_key = "Crawl"` back and fails 5.
+
+### W51 — OUR OWN FULL-BODY CONTROL RIG ON `shino` (2026-09-21, PLAN.md 6.17)
+
+`blender/tools/add_control_rig.py` is now the full-body layer (W50's ARP route is superseded; the file
+held no ARP when this ran). Measured on `shino.blend`, and every number is re-asserted each run:
+- **FK controls ARE the deform bones, wearing typed shapes** -- hips square (COG), rings (spine, neck,
+  limbs), a head ring with a forward tick, 30 finger rings (own `Fingers` collection), a floor square on
+  the stance `Root`; sized from the skin each bone dominates (`skin_radii`, hair excluded), Rigify colours,
+  armature drawn in front. A `CTRL_` copy per FK bone would be a second owner of every rotation and a
+  switch the library must keep at 0; rotating a ring keys exactly the bone the export writes.
+- **IK solves on a hidden joint-to-joint MCH chain.** A VRoid deform bone is disconnected and short
+  (Shino's lowerarm 0.066 m against 0.214 m elbow-to-wrist), so an IK on it reached the forearm's TAIL
+  and left the hand **0.15 m** from the cube; `use_tail = False` on the hand does not solve at all. Followers
+  (`MCH_F_*`) carry each deform bone's own rest frame and the deform bone COPY_TRANSFORMS them, so no rest,
+  roll or length changes. Hands/feet also COPY their control's rotation; the foot control is a sole outline.
+- **The arm is a plain 2-bone IK hanging from the FK collarbone -- Rigify / ARP's shape -- and that was a
+  user report, measured.** The first build recruited the collarbone (a pole-less 3-bone "reach" stage),
+  and dragging the hand control in 1 cm steps showed why it felt wrong: the shoulder did not move at all
+  short of full reach (1-4 mm), then slammed from 10 to its 60 deg limit within 10 cm, pulling DOWN as
+  well as forward. Now the clavicle ring poses the shoulder in IK mode too and a hand past its reach
+  stops short. Measured on all four limbs: to IK moves nothing (0.0000 m), the tip stays on its control
+  wherever reachable, the shoulder moves 0, no bone turns more than 10.6 deg per cm of drag (the elbow
+  straightening near full reach), to FK leaves the limb where it was.
+- **Per-limb IK, switched from a sidebar** (N-panel > Rig): `CTRL_root["ik_arm_l"]` etc., stored 0, and
+  "to IK" / "to FK" snaps (auto-keying keys the limb on "to FK"). `blender/tools/control_rig_ui.py` is the
+  one owner: written into the .blend as a registered text block (Rigify's `rig_ui.py` idiom -- Blender
+  asks to allow the file's scripts) AND imported by `verify_drag`, which drives those same snaps.
+  It replaced the text-block GRAB/BAKE, which had been broken since W48's single master switch.
+- `export_character.py`'s guard measures DEFORM bones only; it still refuses a live rig (0.865 m).
+- Headless picture of the shapes (the overlay does not render): turn each custom shape into a curve at
+  `pose matrix @ T(translation) @ R(euler) @ S(scale)` and Workbench-render it. Trap: `object.convert`
+  converts EVERY selected object, the body included -- deselect first.
+
+### W50 — THE CONTROL RIG IS AUTO-RIG PRO'S, AND OURS IS REMOVED (2026-09-21, user-asked)
+
+> **SUPERSEDED THE SAME DAY — read PLAN.md 6.17 before acting on this section.** The user's direction is
+> our OWN full-body control layer on `shino` (control shapes + IK), not a vendor rig. Measured after this
+> was written: merging ARP into `shino` hits **143 bone-name collisions**, 196 drivers and 216 constraints
+> and loses ARP's own picker/snap (it identifies its rig by `arp_rig_type`/`rig_id`); and exporting through
+> ARP would re-mean **~1400 bone-name references across ~40 files**, both VRoid bodies' conformance, and
+> every bone-frame constant, since its rests differ by up to **176.6°**. A later Quick Rig run in PRESERVE
+> mode DID drive our 53 bones correctly (334 `COPY_TRANSFORMS` via `<bone>_qr_offset`, clips byte-identical)
+> — so the shape below is sound; what changed is that it is not the shipping path. The `--remove` recorded
+> here was also undone by a file rollback, so the 9 `CTRL_` bones are back in `shino.blend`.
+
+
+W48 measured Rigify/ARP/Rigodotify and rejected them on bone ROLL — correct **only for a rig that
+BECOMES the deform skeleton**. ARP's Quick Rig in **`PRESERVE`** mode does not: it leaves our 53
+bones as they are and builds a 381-bone control rig that DRIVES them. The rolls never change, the
+contract holds, every clip stays an ordinary 53-bone action, and `export_character.py` already
+refuses an export in which anything drives the deform bones — which is the safety net for
+forgetting to bake down.
+
+**The limb map is DERIVED from our contract and is stored IN `shino.blend`**, so Quick Rig opens
+ready (`blender/tools/arp/build_limb_map.py`, a one-shot in the `import_melee_pack.py` contract;
+`blender/tools/arp/shino_quick_rig_mapping.py` is ARP's own exported form, loadable with
+Quick Rig ▸ Import Mapping). Six limbs: ARM `clavicle/upperarm/lowerarm/hand` in slots 1/2/4/6,
+LEG `thigh/calf/foot/ball` in 1/3/5/6, SPINE `pelvis` + the three spines, HEAD `neck_01` + `head_2`.
+**ARP is commercial: its source never enters the repo.** What lives here is our own table.
+
+**The blocker was never a missing bone — it was a COUNT.** Every per-limb count has to be stated,
+not left at its default: `neck_bones_amount` defaults to **2** against our single `neck_01`, and
+Quick Rig died on `KeyError: 'neck_ref'`. Set to 1, the same map takes the generated rig from
+**223 bones / 32 deform to 381 / 173**. Three more traps, all script-only: `rig_presets` is
+`rig_preset`; `arp_ver_int` is computed in a DRAW-TIME helper so it stays None under `-b`; and ARP
+reaches for `bpy.context.space_data.overlay`, so it needs a VIEW_3D `temp_override` and **cannot run
+headless — it is an artist one-shot, never a build step**. `restore_base_arm_loc` reads state set in
+`invoke()`, which a `bpy.ops` call from Python skips, so a script dies on `None.location` AFTER
+building the rig; **pressing the button in the UI runs `invoke()` and never had this problem.**
+
+**TWO CONTROL RIGS IN ONE FILE IS WORSE THAN NONE, and our own layer is what caused the next
+report** ("the hand control ... when move them, nothing happen ... rest seem work pretty well"). Our
+`CTRL_hand_l` and ARP's `c_hand_ik.l` are drawn at the same place on the same hand, and ours is
+stored at **influence 0 by design** (`master_switch`, W42) — so the artist grabs whichever is on top
+and half the time nothing happens, which is *the very report the CTRL layer was built to answer*,
+now produced by it. Both reported-inert controls are ours: the hand and the foot, the two we drew
+solid widgets for (`WGT_CTRL_hand_*`, `WGT_CTRL_foot_*`).
+
+**`add_control_rig.py --remove`** (W48's open item) takes back every piece that script added and
+nothing else: the 9 `CTRL_` bones, the 4 `CTRL_IK` constraints **and their drivers first** (a driver
+whose target bone is gone is a broken driver), the `CTRL` bone collection, the six `WGT_*` widget
+objects and the `IK CONTROLS` text block. Widgets go **by NAME, not by user count** — a datablock's
+users are not re-counted until the depsgraph runs, so "unused now" is not yet true on the line after
+the bones went. It asserts the same thing the builder does and refuses to save otherwise:
+**the pose moved 0.000000 m over 1422 samples**. Applied to `shino.blend` only (167 → 158 bones,
+167 actions, `Body`/`Extras` collections and the limb map intact); Godot-chan and Fumiriya keep
+theirs, since only the authoring body has ARP.
+
+**The game is unchanged, and that is measured rather than assumed**: a scratch re-export reads
+164 nodes / 158 joints / 168 animations, identical to the shipped `.glb`, because
+`export_def_bones=True` had always filtered the CTRL bones out — so the shipped export was never
+rewritten.
 
 ## Vehicles — the component car: GTA III / SA damage, three models (2026-09-19)
 
@@ -8150,6 +8397,140 @@ card is what you were looking at.
 - Gate: `probe_buildings.gd` **1043/1043**, asserting both halves — a shop window has no card and wears the
   strip, glazing that is not a shop window keeps its card and gets no strip.
 
+## The block owns its ground: the terrain IS the city's surface (2026-09-21, user-reported with a photograph)
+
+"The block inside the street is not completely filled between the buildings' lands." It was not, and nothing
+could have filled it: **a lot is a rotated rectangle grown greedily per building, and a union of rectangles is
+not a partition of a block** — two lots in different frames cannot tile, and `grow_lots` stops a whole side at
+its first obstructed cell. Whatever the rectangles failed to claim was not "yard" by decision, it was
+LEFTOVER: raw heightmap **0.212 m** below the slab beside it (p5 through p75 of 14 368 samples, the kerb 0.15 +
+`LOT_RAISE` 0.06), and painted **SAND**, because `paint_terrain.gd` picks a texture by elevation alone
+(`SAND_TOP` 5.0 m) and the city plain is 0.6 m. Measured before: **154 km** of paved edge standing against bare
+ground, and **21% of a city block bare**, all of it within 90 m of a footway.
+
+**The industry answer is an ownership rule: the paving is a property of the BLOCK; a lot is a property of a
+building drawn on it.** CityEngine, the Houdini city HDAs, Skylines and GTA's hand-built blocks all extract the
+street-graph face, give it ONE ground surface and only then subdivide. Here that needs **no new geometry**,
+because the ground already exists — Terrain3D — so the block's surface is written INTO the height field and
+painted. No mesh, no collider, no draw call.
+
+**`tools/island_ground.py` is the one owner.** It rebuilds the placer's own road mask
+(`island_buildings.solve_bands`), then the fill is a **geodesic walk out of the LOTS through land that is not
+road**, so it cannot cross a street (roads bound it), never paves countryside a building does not reach, and
+needs no region box:
+
+    a component of (land minus road) that holds a lot and is <= BLOCK_MAX (4 ha)  -> filled whole (a 街区)
+    anything else (the countryside, a huge block's core)                          -> filled to REACH_OPEN (12 m)
+
+Each fill vertex takes its nearest lot's **footway level** (the slab's top less `LOT_RAISE`), so the private
+slab keeps standing the authored 6 cm proud of the ground around it — the 民地/公道 rule, and the reason the
+terrain is not raised flush, which would z-fight. It writes three grids on `dump_height_grid.gd`'s own 2 m
+vertex grid: `.height.f32`, `.paint.u8` and `.natural.f32` (the restore). `tools/godot/apply_paint_grid.gd` is
+new beside `apply_height_grid.gd` and **refuses to paint when the terrain's own heights disagree with the grid
+by more than 1 cm** — a control map is addressed by REGION texel and the mask by world metre, and getting that
+mapping wrong paints somewhere else entirely with nothing in the log to see.
+
+**Measured, on the paving's own edges** — an edge with a ROAD vertex either side is skipped, because the road
+piece's paving is a MESH standing on the terrain, so a step there is under the pavement and cannot be seen (it
+was 9.1 of 15.0 km, and the SAME before and after):
+
+| | steps over 10 cm | |
+|---|---:|---|
+| `industry` alone (the trial district, user's choice) | 26.0 km -> **2.1 km** | 92% gone |
+| the whole island | 174.6 km -> **11.7 km** | 93% gone |
+
+637 092 terrain vertices moved, median **+0.152 m** (the kerb), at most +1.50 m (`MAX_STEP`). **The stamp never
+rises above the road network**: over all 108 699 lane samples of all 31 road pieces the terrain is at most
+5.4 cm BELOW a lane and never above one — `probe_road_stamp`'s own assertion, measured directly in numpy
+because that probe takes about an hour on World. `probe_buildings.gd` **1043/1043**.
+
+**Four rules, each a defect first:**
+- **The walk is 8-connected.** A corner wedge between a junction pad and a lot touches the lot only
+  diagonally, so a 4-connected walk left exactly those wedges bare — the tan triangles at every crossing.
+- **The paint bleeds 3 vertices past the fill; the height does not.** A junction pad's road MASK is an
+  over-estimate of its paving, so a ring of ground shows between the pad's edge and where a lot may stand.
+  Raising it is the pad's business; leaving it the colour of a beach is the report.
+- **A SITE is not a road and not a block.** Its own scene carries whatever ground it has, so nothing may raise
+  terrain under it — but Tokyo Station's forecourt was the largest single patch of sand in the world. Sites
+  are out of the fill and IN the paint.
+- **A batter gives back a step, not a bank** (`RAMP_DROP` 0.06 m per vertex, `RAMP_MAX` 5). Where the ground
+  behind a lot falls further than the whole ramp can return (measured 2.49 m on one 路地 reserved across
+  falling ground), a batter is a mound of fill standing in a field. That edge is left for a 塀 / 擁壁.
+
+**The 路地 was a 17 cm TRENCH and had to be fixed with it** — otherwise its slab would have been buried by its
+own block's new ground. A lot's top is `road + KERB_H`; a passage's was the CARRIAGEWAY height, so the alley
+shipped 0.170 m below the slabs either side of it (measured over 379 passages) against the 2 cm `ALLEY_DROP`
+its own comment claimed. `derive` adds `KERB_H` where the road is kerbed: **1150 of 1184 passages moved up
+0.150 m, 34 (roads with no footway) did not, and every building in the record is byte-identical.** The alley
+MultiMesh also got the box collision it never had — without it a player stood on the terrain under the slab.
+
+**The urban ground is a GENERATED texture, not a tint** (`tools/make_urban_texture.py`, the
+`make_sand_texture.py` precedent; a 5th `Terrain3DTextureAsset` "Urban", **id 4 — the id is what the paint
+grid writes, so the list is append-only**). Both shipped sets were tried on screen first and both fail for a
+reason worth keeping: Ground037's albedo is strongly yellow-green (mean 155/150/92), so any tint of it reads
+as earth; Rock023 is neutral (140/139/137) but its features are BOULDER-scale and stretched over a block it
+read as cracked slabs. The generated one is fine grey aggregate, mean **101/102/105**, deliberately weak at
+the large scale so it does not grow features at the far end.
+
+**`tools/godot/shot_city.gd`** takes the picture — a camera at a named viewpoint in the real World.tscn after
+streaming settles. It **needs a display** (`xvfb-run -a`): a `--headless` run draws with the dummy renderer,
+which drops MultiMesh transforms, so the lots and the street furniture would be missing from the very picture
+being taken to judge them.
+
+**The 路地 slab is GONE (PLAN.md 3.18(c3a), 2026-09-21).** It existed only because the ground between the
+lots was bare heightmap; with the block's ground paved it was a second surface doing the first one's job, in all
+92 cells. What stays is the RESERVATION (`field.passage`, i.e. 接道義務, and `passages` in the record), and
+`island_ground`'s rasterising of passages into the lot mask is now the ONLY thing paving an alley — load-bearing,
+and commented as such. Decided by looking (`reference/alley_slab_2026-09-21_*`): the block's grey ground between
+the white lots reads as a way through, so there is no second paint id.
+
+**The facade tones are PLATEAU's wall colours, and the sky light is no longer blue (PLAN.md 3.19(e)+(a),
+2026-09-21; user: "with the grey setup everything looks greyish ... I wish for PLATEAU's actual building data
+theme").** Two causes, both ours. `retone_downtown_kit.neutralise` takes every facade texture to ZERO chroma
+(`T_Trim_Neutral` is exactly 134.6/134.6/134.6) and 3.18(p)'s tones then varied only LIGHTNESS; and the Sky3D sky
+light painted every wall blue (a white car read navy at noon).
+- **The palette is measured on WALLS** (`blender/tools/measure_plateau_wall_colours.py` -> numbers-only
+  `assets/world_source/buildings/plateau_wall_palette.json`): each building's texture sampled on its vertical faces
+  through their UVs (the older `measure_plateau_facades.py` averages whole atlases, roof included, so it could only
+  say how light), median per building, k-means into 8 in L*a*b*. 1 804 walls: **chroma p50 3.3, p90 7.0** --
+  central Tokyo IS low-saturation, but warm greige, beige and cool blue-grey panel, not grey. Each cluster's L* is
+  LIFTED +9.1 so the median lands on the whole-facade median (aerial walls are in shade; our renderer shades them
+  again). Deterministic (seeded).
+- **The tones are those colours, in their measured shares.** `retone_downtown_kit.tone_levels` reads the palette;
+  tone 0 (the base material) is the largest cluster; names are derived (`_WhiteWarm`, `_DarkCool`, ...) and a tone
+  the new palette drops is DELETED so no cell can reference a stale colour. `facade_tones.json` carries each tone's
+  `srgb`, `share` and `lum`. `island_buildings.py` draws with the SHARES (`tone_weights`); a region's 7th field is
+  now `"dark"` or None (`DARK_BIAS` leans a working district to the darker colours). `island_buildings.py retone`
+  re-assigns from each building's own key with NO re-derive (only `tone` fields change). The tones gate checks
+  colour DISTANCE between tints and that each tone is worn by at least half its measured share.
+- **Lighting: less blue, NOT neutral grey.** The first diagnosis (sky contribution 0 + a grey ambient) removed
+  the blue and read flat; the user rejected it. Shipped in World and DebugWorld: `Sky3D.sky_contribution` 0.35
+  (the value its day tween restores; the Environment's own `ambient_light_sky_contribution` matches),
+  `ambient_energy` 1.4, `ambient_light_color` (1, 0.95, 0.86) -- the sky still lights, a warm bounce term fills.
+  Shaded walls keep a photographic cool cast. Sky3D's night boost takes the same flat colour, so night luma rose
+  ~10% (0.163 -> 0.181 at midnight, `shot_night.gd`), which the "night is barely visible" report welcomes.
+- **Still blue: the glass towers** (`MI_Glass` + `MI_FakeInterior` reflecting the sky) -- a material item in the
+  review doc, not lighting.
+- **Found on the way: `probe_night_lights.gd` failed on HEAD** ("a lamp lying on the ground is not lit") and it
+  was the PROBE: it read `lit_lamps_now` 20 headless frames after coming back from its 400 m case, which is shorter
+  than the pool's 0.25 s re-assign, so `before` was 0. It waits in TIME now: 18/18, control still fails exactly 6.
+
+**The artist's Japan checklist is `assets/world_source/buildings/JAPAN_ART_REVIEW.md`** — every type, block rule,
+material, library piece and street prop to re-author, each with a target measured from the PLATEAU extract
+(`blender/tools/measure_plateau_blocks.py`, massing: gaps, footprint/height percentiles per class, roofs,
+setbacks) and pakutaso search keywords (reference only: its terms forbid redistributing the photos, so none is
+ever committed). Two findings in it are code (PLAN.md 3.19): **the whole city renders BLUE because of the sky's
+AMBIENT light**, not the materials (facade R100 G136 B171 shipped, R102 G138 B174 with metallic off everywhere,
+R100 G102 B102 with a neutral ambient and reflections off); and **buildings never touch** — central Tokyo's median
+gap to a neighbour is 0.2 m (59% touching), ours 4.4 m (0% within 1 m), because `ALLEY` keeps 1.5 m free on both
+sides of every building.
+
+**Still open, and stated so it is not mistaken for done:** the ~12 km of edge the batter refuses wants a
+boundary wall (art); parcels that genuinely partition a block (the CityEngine step, which moves every building
+and is its own session); `grow_lots`' per-run growth; and — the trap — **`paint_terrain.gd` knows nothing
+about any of this, so re-running it repaints the city as beach.** It must learn the mask or always be run
+BEFORE `apply_paint_grid.gd`, and nothing enforces that ordering yet.
+
 ## The island's districts are a gradient, and the plan is a picture (2026-09-21)
 
 **`tools/island_region_map.py`** draws the district plan whole — pure Python + PIL, no display, no Godot, so it
@@ -8182,6 +8563,33 @@ flattest clear ground. Two defects surfaced doing it, both of which made every c
 - **A street is several ROADS.** `island_road_zones.py --split` cuts a long run at every 504 m zone boundary
   (3.10), so `ekimae_dori` is 13 roads and the one keeping the bare name is **43 m** long. A search for "a
   straight run of it" has to re-join them by name prefix and walk them along the street's own principal axis.
+
+**A LANEKIT POINT IS `[x, HEIGHT, z]` IN GODOT AXES, and reading it as a record `(x, y)` pair is silent.** The
+first plan drew every road at `z = -height`, i.e. one line through the middle of the picture — and it did not
+look empty, because the BUILDINGS are drawn as dots along their frontages and read as streets. It was handed
+over as decision material before the mistake was caught, and it changed the answer to two zoning questions once
+fixed. The sidecar's `lanes[].points` are already PLACED in world space (the piece's own frame is applied at
+export), so there is no record→Godot flip to do; `lanes[].curve[].p` is the same value. A lane also comes in two
+kinds (`through` 992, `connector` 1496) and every carriageway repeats per `lane_index`, so "how much STREET is
+here" is `kind == "through" and lane_index == 0` — counting them all triples the length.
+
+**A REGION ONLY DOES ANYTHING WHERE THERE IS STREET FRONTAGE ON FLAT LAND**, because a building is placed along a
+road, never inside a box — so that, not area, is the number a zoning decision turns on. Measured per region
+(buildable = the street's own 24 m band flat to 0.7 m and above the water line):
+
+| region | street | buildable | buildings |
+|---|---:|---:|---:|
+| city | 48.8 km | 48.1 km | 996 |
+| downtown | 20.5 | 20.3 | 568 |
+| residential | 20.5 | 19.9 | 862 |
+| industry | 8.0 | 8.0 | 445 |
+| residential_north | 7.7 | 7.4 | 391 |
+| suburb | 5.3 | 2.5 (46%) | 36 |
+| residential_west | 4.6 | 1.5 (33%) | 58 |
+
+So a box drawn over the massif or over a shore with no arterials is not a district — it is a label. That is why
+the bay market quarter (0.9 km of street, 0.5 buildable) is recorded as blocked on ROADS rather than zoned, and
+why `residential_west` is described as a coastal 集落 rather than a suburb.
 
 **What the plan then showed, measured rather than eyeballed: 44% of the island's land (4.40 km²) is in NO
 region**, so nothing is placed there — the massif (1.99) and the north-west cliffs (2.08) correctly, but also
@@ -8474,6 +8882,93 @@ beside it, one per family with the character's 1.49 m capsule for scale, plus `-
     fill toe in the sea gets the shelf too; then `stamp_roadkit_terrain.gd`), or a re-stamp or restore puts the old
     seabed back under every stamped corridor (the probe measured 191 388 vertices "re-stamped", 23.3 m off on restore). The same holds for ANY terrain edit
     under a stamped network.
+
+## The land redo: the island is rebuilt from a committed BASE, in one order (PLAN.md 3.30, 2026-09-21)
+
+3.29's final plan (`reference/island_final_plan_2026-09-21.png`) is built by tools, never by editing the world in
+place. **`tools/island_world.sh`** is the one order (`--from/--to/--only <stage>`): `land` -> `layout` -> `bridge` ->
+`natural` -> `terrain` -> `roads` -> `sites` -> `buildings` -> `ground`. Each stage re-runs the one before it; nothing
+downstream is hand-edited.
+
+- **The terrain has a BASE, and the base is committed.** `assets/world_source/terrain/island_base.f32` (LFS, 2305 x 2305
+  at 2 m, Godot axes, `dump_height_grid.gd`'s layout) is the island as imported -- 245ed60's Terrain3D data -- plus the
+  -24 m seabed clamp and the first mountain's widen. Verified equal to the previous natural ground to 1 mm on every land
+  cell away from the touge. `island_touge_presculpt.sh` named a commit (a389d61) that a history rewrite removed; the
+  base does not depend on history. `island_reshape.py base <dump>` rebuilds it from a raw dump.
+- **`tools/island_reshape.py`** (`build`, `check`) writes the LAND (`terrain/island_land.f32`): the gulf-head landfill,
+  the harbour tip / south trim, the far west/east trims, the east seawall, the airport ending at x 1500, the farm moved
+  150 m south, and the mountain (x0.55 / x0.5 above 200 m, a level 435 m summit plateau round a 330 m crest, the west
+  shore pulled in). Gates: the plateau stays level where the touge meets it, no land step over 8 m, **every mountain
+  coast <= 45 deg between any two land cells** (a Lipschitz clamp over the massif -- a `h <= 1 + d` cap bounds a cell by
+  its distance and let the SOURCE's cliffs through cell by cell), snow ~0.29 km2, the crest level. Three rules each
+  measured as a defect first: the farm shift is SMOOTH (a rigid block cut a 150 m step into the coastline that the coast
+  road could not follow), the massif's convex corners are rounded (an 80 m opening), and a trimmed coast gets either a
+  QUAY (seabed at the edge) or the base's own shelving SHORE -- a trim that only set land to seabed left the old
+  shallow nearshore ring standing 240 m offshore.
+- **The ARTERIAL layer is DATA.** `tools/island_plan.py` is the plan: `deform()` (downtown 125 m west, the north 150 m
+  south, the band between downtown and the bay compressed -- smooth versions of the plan picture's own maps), the
+  plan's new roads (the coastal ring, the bay roads, the castle approach, the military access), the TRUNK GRID as
+  lines, the street regions, C1/JCT/diamond numbers, the bridge line. **`tools/island_network.py`** (ONE-SHOT: it
+  wrote `IslandRoads.arterials.roads.json`; the pre-redo input is `...arterials.pre_redo.roads.json`) turns named
+  lines into a network by rules: clip to land (short wet gaps are bridged), end-to-end joins, a free end within 130 m
+  of a line is extended onto it (a T), every crossing is a junction, junctions nearer than two mouths along a line merge,
+  a stub past the last junction is trimmed. The trunk grid stopped being a generator because it CUT arterials by NAME
+  and names are not stable once lines are joined.
+- **`island_roadgen.Ground` reads the land grid**, not the road sidecar: the sidecar is sampled after a build, so it
+  described the PREVIOUS world's ground and a generator laid roads on land that had moved.
+- **The coast road and the mountain road** are re-derived on the new land: `island_coast_road.py` finds the ring's
+  free ends by position (never by name) and its walker's loops are cut out (`remove_loops`); **`tools/island_touges.py`**
+  (derive/add/sculpt) is ONE road, `shrine_touge`: phase 1 from a T on nishi_dori up to the plateau junction, the west
+  flank, the summit straight, the east flank to a T on the farm arterial (12.5 km, 25 hairpins, <= 10%, cut/fill
+  <= 20 m). **3.2d's phase 1 could not be kept** (v13 hoped to): the new summit dome buries its upper legs up to 130 m.
+  Two walks sharing one flank crossed each other 36 m apart in height -- phase 1 leaves the arterial further south and
+  the east descent keeps north of y 745.
+- **The natural ground is the land + the touge sculpt + the beach shelf** (`terrain/island_natural.f32`, committed: it
+  is the restore). The `terrain` stage writes it to every vertex and removes the stamp record, the natural-ground
+  sidecar and `urban_paint.marker`, then paints by elevation; **`paint_terrain.gd` refuses** while that marker exists
+  (`apply_paint_grid.gd` writes it), which closes the "re-running it repaints the city as beach" trap.
+- **Sites are FROZEN data** (`assets/world_source/buildings/IslandSites.json`, `island_sites.py --resite[=ids]`): an
+  ordinary run places the recorded (x, y, yaw) and re-samples only the height, so an access road can no longer move the
+  site it was built for. **A generated record refuses hand edits**: `RoadKitNetwork.generated` (World's `IslandRoads`)
+  refuses to save a changed record; `IslandRoadsArterials` (hidden) is the editable input (R5).
+- **Two layout clean-ups the network needs**, in `island_layout.tidy`: a pad of TWO arms (a street cut a road and was
+  dropped) becomes a joint, and a station inside a solved mouth's clear distance is removed. The expressway now runs
+  BEFORE the streets, so they route round its interchanges. A joint's two end stations must share a FACING
+  (`freeze`), or the outer lane of a 2-lane ramp ends beside the successor's head (`broken`).
+- The Rainbow Bridge stands on the plan's crossing (x 1250, the water gap measured on the land grid,
+  `island_rainbow_bridge.crossing_plan`); the lower deck is rail (R7), the spur rides the upper deck, and the spur's
+  airport end turns west along the island's south side to descend at <= 4% onto an airport road south of it.
+- Road-zone minimum load radius is derived from the building cells (`island_road_zones.min_road_load`, 1350 m, R7);
+  `WorldBaker` saves one external mesh per kit asset (`<kit>/baked/<stem>.res`, R15).
+- **A WALL IS FOR A ROAD NOBODY FRONTS** (user, 2026-09-21: "the wall is only for the coast road where it runs
+  against the mountain; farmland, residential, city and the harbour stay open, with a sidewalk, so the buildings on both
+  sides can be entered"). The `coast` preset (no footway, walled end to end) had been put on the whole coastal ring,
+  and **339 placed buildings fronted `ring_kita`** with a 1 m parapet between every door and the street. The ring is
+  now `arterial` (a new preset: 2 + 2, painted median, 4 m kerbed footways, `ped_access` on, so the barrier rule walls
+  it only where it stands 2 m off its ground or on piers). The cliff road splits itself at a joint where it leaves a
+  built-up region (`island_coast_road.open_built_up`, "built-up" = `island_buildings.REGIONS`, one owner): the built-up
+  stretch is its own street `kaigan_machi` (`arterial`, and not prefixed `kaigan_dori`, which `SKIP_ROADS` never
+  builds on), the mountain stretch stays `kaigan_dori` (`coast`). Walled at grade after it: only `kaigan_dori`.
+- **A corner bollard keeps clear of every lane, and a car knocks it over** (`point_furniture._edge_props`,
+  `prop_lane_clear` 1.2 m past the lane's half width, the tree rule; `furniture.json` `bollard.breakable`, 40 kg,
+  1.5 m/s, the 3.11 pole mechanism, now also for a BOX prop, which is not a "pole" to the spacing rules so a row
+  keeps its 1.8 m pitch). A turn connector may cut the corner (`turn_off_pad`), and a car turning there pinned its
+  hull against a solid bollard with its throttle on: every one of 34 traffic cars reclaimed `stalled` in one
+  `probe_traffic_spawn --world=island` run stood beside corner bollards, several at the identical spot. 0.3 m left 2
+  (cars running 4.5 m wide on a sharp connector); 1.2 m drops 22% of the island's 9668 bollards. After both: 0.
+  `ZoneManager`'s stalled-reclaim log line now names the car's lane, progress, state and what its obstacle ray sees
+  (`VehicleAIController.describeBlock`), and the probe prints where each reclaimed car stopped. Also:
+  `IntersectionZone` hands the grant on when its holder has stood still 2.5 s (a single-holder arbiter deadlocks when
+  the holder's own obstacle ray stops it behind a queued car); it was not this bug's cause, and is kept because it is
+  a real deadlock shape.
+- **The airport road has no dead end** (`island_expressway`): the island ends at x ~815 west of junction B, so its
+  turnaround loop could only turn 90 deg off a 2-station stub, the connector into it was a ~125 deg turn in a small
+  pad, and traffic ran onto its kerb. A-B is now one-way westbound and turns at B into the bridge-bound spur (a joint),
+  so the airport side is a through route. `island_turnarounds` also tries a near-straight loop (+-45 deg, with the
+  road shortened up to 3 stations, evaluated without touching the network) before any wider axis.
+- **A generated street keeps away from a road running alongside it** (`island_streets.PARALLEL_CLEAR` 35 m over more
+  than 40 m): `machi_612` ran 12.5 m off `naka_hondori` for 460 m and died inside that road's own junction
+  (`open_end`, the layout's flow assert).
 
 ## The island's road layout is DERIVED: arterials in, expressway, trunk grid, streets and turnarounds out (PLAN.md 3.13 steps 2-5, 3.3, 3.3b, 2026-09-19)
 

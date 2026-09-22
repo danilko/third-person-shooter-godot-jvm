@@ -2,7 +2,14 @@
 """island_sites.py -- place the island's composite sites and landmarks in World.tscn, from MEASURED facts
 (PLAN.md 3.8 steps 5 and 8).
 
-    python3 tools/island_sites.py [--check]
+    python3 tools/island_sites.py [--check]      # place the FROZEN sites (IslandSites.json) in World.tscn
+    python3 tools/island_sites.py --resite       # search every site again, write IslandSites.json, then place
+
+**Sites are frozen as data (PLAN.md R6 / 3.30 L0.4).** Each search below runs only with `--resite`, and its answer
+-- a record-frame (x, y) and a yaw -- is written to `assets/world_source/buildings/IslandSites.json`, reviewed like the
+road record. An ordinary run places the frozen sites, re-sampling only the GROUND height under each (a terrain edit
+must not float a site), so a new access road -- which every search's road-clearance rule would read as an obstacle --
+can never move the site it was built for. `--resite=<id>[,<id>]` searches only those.
 
 Nothing is typed in as a coordinate; each placement is derived, like `island_rainbow_bridge.py`'s:
 
@@ -34,12 +41,13 @@ import point_model as pm                             # noqa: E402
 
 SCENE = os.path.join(ROOT, "src/main/resources/com/openworld/world/World.tscn")
 RECORD = os.path.join(ROOT, "assets/world_source/pieces/IslandRoads.roads.json")
+FROZEN = os.path.join(ROOT, "assets/world_source/buildings/IslandSites.json")
 BUILDINGS = "res://src/main/resources/com/openworld/world/buildings/"
 
 QUAY_SPAN = (-1150.0, -1480.0)       # record y range of the terminal's quay (north end of the east quay)
 QUAY_X_RANGE = (0.0, 400.0)          # where to look for the edge
 TERMINAL_D = 218.4                   # site_container_terminal.D
-DOWNTOWN = (725.0, 300.0)            # the trunk grid's centre (island_trunk_grid NS naka_hondori x ekimae_dori)
+DOWNTOWN = (600.0, 100.0)            # the trunk grid's centre: naka_hondori x ekimae_dori, moved with the plan (3.30)
 CASTLE_HALF = 70.0
 # UP AND LEFT, as far as the terrain allows (user, 2026-09-21). MEASURED first, because the search had exactly
 # ONE valid site at the old relief, so re-scoring it could not move the castle at all. Sweeping the constraint:
@@ -81,10 +89,11 @@ STATION_LOAD = 1200.0
 TERMINAL_HALF = (121.0, 85.0)        # AirportTerminal is 242 x 170
 TERMINAL_RELIEF = 4.0
 TERMINAL_CLEAR = 40.0
-AIRPORT_BOX = (700.0, 2304.0, 1300.0, 2304.0)    # island_coast.json `airport_island`, GODOT (x0, x1, z0, z1)
+AIRPORT_BOX = (700.0, 1500.0, 1300.0, 2304.0)    # island_coast.json `airport_island`, GODOT (x0, x1, z0, z1); the island
+                                                 # ends at x 1500 since the land redo (island_reshape.AIRPORT_END_X)
 AIRPORT_LOAD = 1500.0
 # the region boxes the placement uses, so a landmark cannot be sited outside the district it belongs to
-REGION_BOX = {"downtown": (150.0, 40.0, 1300.0, 720.0)}
+REGION_BOX = {"downtown": (25.0, -110.0, 1175.0, 570.0)}   # inside C1 (island_plan.C1_CORNERS)
 
 
 def quay_line(g):
@@ -164,6 +173,9 @@ def road_index(net, step=10.0, cell=50.0):
     return near
 
 
+FOOTPRINT_CLEAR = 10.0               # no road within this of a flat site's own footprint
+
+
 def flat_site(g, near, box, half, relief, clear, target, zmin=-0.3, zmax=30.0, step=20.0):
     """The flattest clear patch in a RECORD-frame box, scored by how near it is to `target`.
 
@@ -191,6 +203,11 @@ def flat_site(g, near, box, half, relief, clear, target, zmin=-0.3, zmax=30.0, s
             if lo < zmin or hi > zmax or hi - lo > relief:
                 continue
             if near(cx, cy, clear):
+                continue
+            # ...and no road under the FOOTPRINT itself: the clearance above is from the centre, and a 242 x 170 m
+            # terminal passed it standing over the airport spur (3.30 L3)
+            if any(near(cx + dx, cy + dy, FOOTPRINT_CLEAR)
+                   for dx in range(-int(hx), int(hx) + 1, int(step)) for dy in range(-int(hy), int(hy) + 1, int(step))):
                 continue
             score = math.hypot(cx - target[0], cy - target[1]) + (hi - lo) * 40.0
             if best is None or score < best[0]:
@@ -270,72 +287,134 @@ def yaw_to(dx_g, dz_g):
     return math.degrees(math.atan2(dx_g, dz_g))
 
 
+def search(g, net, only=None):
+    """Every site's search, as frozen-data rows: {id, scene, x, y, yaw, size, load, ground}. `ground` says how an
+    ordinary run re-samples its height: "centre" (the terminal stands at its quay's land) or "min" (the lowest ground
+    under the footprint -- a platform or plinth takes up the rest). `only` limits it to those ids."""
+    rows = []
+
+    def want(zid):
+        return only is None or zid in only
+    if want("container_terminal"):
+        (qx, qy), u, sea, n, resid = quay_line(g)
+        cy = (QUAY_SPAN[0] + QUAY_SPAN[1]) / 2
+        cx = qx + (u[0] / u[1]) * (cy - qy) if abs(u[1]) > 1e-9 else qx
+        centre = (cx - sea[0] * TERMINAL_D / 2, cy - sea[1] * TERMINAL_D / 2)
+        print("island_sites: quay fitted through %d edge samples (worst %.1f m off the line); terminal at (%.1f, %.1f)"
+              ", front facing (%.3f, %.3f)" % (n, resid, centre[0], centre[1], sea[0], sea[1]))
+        rows.append(dict(id="container_terminal", scene="ContainerTerminal", x=centre[0], y=centre[1],
+                         yaw=yaw_to(sea[0], -sea[1]), size=[364.0, 218.4], load=TERMINAL_LOAD, ground="centre"))
+    if want("shuri_castle"):
+        site = castle_site(g, net)
+        if site is None:
+            raise SystemExit("island_sites: no castle site passes (relief %.0f m, road clearance %.0f m)"
+                             % (CASTLE_RELIEF, CASTLE_CLEAR))
+        _s, kx, ky, lo, hi, back = site
+        print("island_sites: castle at (%d, %d), ground %.1f-%.1f m under it, the mountain %.0f m behind"
+              % (kx, ky, lo, hi, back))
+        rows.append(dict(id="shuri_castle", scene="ShuriCastle", x=kx, y=ky,
+                         yaw=yaw_to(DOWNTOWN[0] - kx, -(DOWNTOWN[1] - ky)), size=[158.0, 128.0], load=CASTLE_LOAD,
+                         ground="patch"))
+    near = road_index(net)
+    if want("tokyo_tower"):
+        tower = flat_site(g, near, REGION_BOX["downtown"], (TOWER_HALF, TOWER_HALF), TOWER_RELIEF, TOWER_CLEAR,
+                          DOWNTOWN, zmax=12.0)
+        if tower is None:
+            print("island_sites: NO tower site in downtown (flat within %.0f m, %.0f m clear of every road)"
+                  % (TOWER_RELIEF, TOWER_CLEAR))
+        else:
+            tx, ty, tlo, thi = tower
+            print("island_sites: Tokyo Tower at (%d, %d), ground %.1f-%.1f m" % (tx, ty, tlo, thi))
+            rows.append(dict(id="tokyo_tower", scene="TokyoTower", x=tx, y=ty, yaw=0.0, size=[94.6, 94.6],
+                             load=TOWER_LOAD, ground="min"))
+    if want("tokyo_station"):
+        st = station_site(g, net, near)
+        if st is None:
+            print("island_sites: NO station site along %s (no %.0f m straight run with flat land beside it)"
+                  % (STATION_ROAD, STATION_L))
+        else:
+            sx, sy, slo, s_yaw = st
+            print("island_sites: Tokyo Station at (%d, %d), along %s (yaw %.0f)" % (sx, sy, STATION_ROAD, s_yaw))
+            rows.append(dict(id="tokyo_station", scene="TokyoStation_Shop", x=sx, y=sy, yaw=s_yaw,
+                             size=[STATION_L, STATION_D], load=STATION_LOAD, ground="min"))
+    if want("airport_terminal"):
+        ax0, ax1, az0, az1 = AIRPORT_BOX                 # godot (x0, x1, z0, z1) -> record (x0, y0, x1, y1)
+        apt = flat_site(g, near, (ax0, -az1, ax1, -az0), TERMINAL_HALF, TERMINAL_RELIEF, TERMINAL_CLEAR,
+                        ((ax0 + ax1) / 2, -(az0 + az1) / 2), zmax=12.0, step=25.0)
+        if apt is None:
+            print("island_sites: NO terminal site on the airport island (flat within %.0f m, %.0f m clear)"
+                  % (TERMINAL_RELIEF, TERMINAL_CLEAR))
+        else:
+            px, py, plo, phi = apt
+            print("island_sites: Airport terminal at (%d, %d), ground %.1f-%.1f m" % (px, py, plo, phi))
+            rows.append(dict(id="airport_terminal", scene="AirportTerminal_Shop", x=px, y=py, yaw=0.0,
+                             size=[242.0, 170.0], load=AIRPORT_LOAD, ground="min"))
+    return rows
+
+
+def site_ground(g, row):
+    """The height a frozen site stands at on TODAY's ground (record frame, network-relative)."""
+    if row["ground"] == "centre":
+        return g.z(row["x"], row["y"])
+    if row["ground"] == "patch":           # castle_site's own measure: the axis-aligned patch, 20 m apart
+        H = int(CASTLE_HALF)
+        return min(g.z(row["x"] + dx, row["y"] + dy) for dx in range(-H, H + 1, 20) for dy in range(-H, H + 1, 20))
+    a = math.radians(row["yaw"])
+    # +Z of the scene is its front; in the record frame (x, y) a Godot direction (dx, dz) is (dx, -dz)
+    fx, fy = math.sin(a), -math.cos(a)
+    rx, ry = -fy, fx
+    hw, hd = row["size"][0] / 2, row["size"][1] / 2
+    lo = None
+    for i in range(-4, 5):
+        for j in range(-4, 5):
+            p = (row["x"] + rx * hw * i / 4 + fx * hd * j / 4, row["y"] + ry * hw * i / 4 + fy * hd * j / 4)
+            v = g.z(*p)
+            lo = v if lo is None else min(lo, v)
+    return lo
+
+
+def load_frozen():
+    import json
+    if not os.path.exists(FROZEN):
+        return []
+    return json.load(open(FROZEN))["sites"]
+
+
+def save_frozen(rows):
+    import json
+    doc = {"notes": "Written by tools/island_sites.py --resite (PLAN.md R6): each site's record-frame (x, y) and yaw, "
+                    "frozen. An ordinary run re-samples only the ground height. Re-search with --resite[=<id>].",
+           "sites": [{k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()} for r in rows]}
+    text = json.dumps(doc, indent=1) + "\n"
+    if not os.path.exists(FROZEN) or open(FROZEN).read() != text:
+        open(FROZEN, "w").write(text)
+        print("island_sites: wrote %s" % os.path.relpath(FROZEN, ROOT))
+
+
 def main(argv):
     g = Ground()
     net = pm.load_network(RECORD)
     text = open(SCENE).read()
     ny = float(re.search(r'\[node name="IslandRoads"[^\]]*\]\s*\ntransform = Transform3D\(([^)]*)\)', text)
                .group(1).split(",")[10])
-    # the terminal
-    (qx, qy), u, sea, n, resid = quay_line(g)
-    cy = (QUAY_SPAN[0] + QUAY_SPAN[1]) / 2
-    cx = qx + (u[0] / u[1]) * (cy - qy) if abs(u[1]) > 1e-9 else qx
-    centre = (cx - sea[0] * TERMINAL_D / 2, cy - sea[1] * TERMINAL_D / 2)
-    land = g.z(*centre)
-    t_yaw = yaw_to(sea[0], -sea[1])                  # record (x, y) -> Godot (x, -y)
-    print("island_sites: quay fitted through %d edge samples (worst %.1f m off the line); terminal at (%.1f, %.1f), "
-          "ground %.2f m, front facing (%.3f, %.3f)" % (n, resid, centre[0], centre[1], land, sea[0], sea[1]))
-    # the castle
-    site = castle_site(g, net)
-    if site is None:
-        raise SystemExit("island_sites: no castle site passes (relief %.0f m, road clearance %.0f m)"
-                         % (CASTLE_RELIEF, CASTLE_CLEAR))
-    _s, kx, ky, lo, hi, back = site
-    c_yaw = yaw_to(DOWNTOWN[0] - kx, -(DOWNTOWN[1] - ky))
-    print("island_sites: castle at (%d, %d), ground %.1f-%.1f m under it, the mountain %.0f m behind, facing downtown"
-          % (kx, ky, lo, hi, back))
-    # each site STREAMS: a ZoneMarker whose Zone places the building scene in world space (the island's road pieces'
-    # mechanism, `Zone.geometry_world_placed`), so a 900-box terminal exists only near the harbour
-    sites = [("container_terminal", "ContainerTerminal", (centre[0], centre[1], ny + land), t_yaw, (364.0, 218.4),
-              TERMINAL_LOAD),
-             ("shuri_castle", "ShuriCastle", (kx, ky, ny + lo), c_yaw, (158.0, 128.0), CASTLE_LOAD)]
-
-    # --- the three landmarks that were built and never placed
-    near = road_index(net)
-    dt = REGION_BOX["downtown"]
-    tower = flat_site(g, near, dt, (TOWER_HALF, TOWER_HALF), TOWER_RELIEF, TOWER_CLEAR, DOWNTOWN, zmax=12.0)
-    if tower is None:
-        print("island_sites: NO tower site in downtown (flat within %.0f m, %.0f m clear of every road)"
-              % (TOWER_RELIEF, TOWER_CLEAR))
-    else:
-        tx, ty, tlo, thi = tower
-        print("island_sites: Tokyo Tower at (%d, %d), ground %.1f-%.1f m, %.0f m from the downtown centre"
-              % (tx, ty, tlo, thi, math.hypot(tx - DOWNTOWN[0], ty - DOWNTOWN[1])))
-        sites.append(("tokyo_tower", "TokyoTower", (tx, ty, ny + tlo), 0.0, (94.6, 94.6), TOWER_LOAD))
-
-    st = station_site(g, net, near)
-    if st is None:
-        print("island_sites: NO station site along %s (no %.0f m straight run with flat land beside it)"
-              % (STATION_ROAD, STATION_L))
-    else:
-        sx, sy, slo, s_yaw = st
-        print("island_sites: Tokyo Station at (%d, %d), ground %.1f m, along %s facing it (yaw %.0f)"
-              % (sx, sy, slo, STATION_ROAD, s_yaw))
-        sites.append(("tokyo_station", "TokyoStation_Shop", (sx, sy, ny + slo), s_yaw,
-                      (STATION_L, STATION_D), STATION_LOAD))
-
-    ax0, ax1, az0, az1 = AIRPORT_BOX                 # godot (x0, x1, z0, z1) -> record (x0, y0, x1, y1)
-    apt_box = (ax0, -az1, ax1, -az0)
-    apt = flat_site(g, near, apt_box, TERMINAL_HALF, TERMINAL_RELIEF, TERMINAL_CLEAR,
-                    ((ax0 + ax1) / 2, -(az0 + az1) / 2), zmax=12.0, step=25.0)
-    if apt is None:
-        print("island_sites: NO terminal site on the airport island (flat within %.0f m, %.0f m clear)"
-              % (TERMINAL_RELIEF, TERMINAL_CLEAR))
-    else:
-        px, py, plo, phi = apt
-        print("island_sites: Airport terminal at (%d, %d), ground %.1f-%.1f m" % (px, py, plo, phi))
-        sites.append(("airport_terminal", "AirportTerminal_Shop", (px, py, ny + plo), 0.0,
-                      (242.0, 170.0), AIRPORT_LOAD))
+    frozen = load_frozen()
+    resite = [a for a in argv if a.startswith("--resite")]
+    if resite or not frozen:
+        only = None
+        if resite and "=" in resite[0]:
+            only = set(resite[0].split("=", 1)[1].split(","))
+        found = search(g, net, only)
+        keep = [r for r in frozen if only is not None and r["id"] not in only]
+        order = [r["id"] for r in frozen] + [r["id"] for r in found if r["id"] not in {f["id"] for f in frozen}]
+        byid = {r["id"]: r for r in keep + found}
+        frozen = [byid[i] for i in order if i in byid]
+        if "--check" not in argv:
+            save_frozen(frozen)
+    sites = []
+    for r in frozen:
+        h = site_ground(g, r)
+        print("island_sites: %-18s at (%.0f, %.0f), ground %.2f m (frozen)" % (r["id"], r["x"], r["y"], h))
+        sites.append((r["id"], r["scene"], (r["x"], r["y"], ny + h), r["yaw"], tuple(r["size"]), r["load"]))
     sites = tuple(sites)
     import island_traffic_zones as itz
     sections = itz.split_sections(text)

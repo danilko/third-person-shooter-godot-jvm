@@ -96,8 +96,6 @@ SLOT_STEP = 3.0        # how far along a row a rejected slot moves before trying
 PASSAGE_EVERY = 46.0   # along the frontage: about every third building
 PASSAGE_W = 3.2        # wide enough for a scooter and two people to pass, the ordinary 路地
 PASSAGE_DEPTH = 34.0   # back from the footway: past the frontage row's lot, into the block
-ALLEY_MATERIAL = "res://assets/world_source/kits/road_kit/materials/M_ConcreteTile.tres"   # the footway's own
-ALLEY_DROP = 0.02      # the alley's top, below the lot slabs it runs between (it is the lower, public-ish way)
 LOAD = 800.0           # a cell's buildings stream in within this of its centre
 UNLOAD = 1100.0
 
@@ -114,9 +112,9 @@ FACADE_MAT_RES = "res://assets/world_source/kits/quaternius_downtown_city/materi
 # region: (name, record-frame box (x0, y0, x1, y1), rows, pitch, mix, skip chance, tone weights).
 # First box that holds a point wins, so the order IS the priority.
 #
-# `tone weights` is per facade tone (PLAN.md 3.18p's four, darkest last: base, Pale, Light, Slate) or None for
-# an even mix. A working district reads GREYER than a residential street, and now that a building's facade tone
-# is an instance override the zoning can say so instead of it being a look applied by hand.
+# `tone bias` is None (draw facade tones in PLATEAU's own measured shares, PLAN.md 3.19(e)) or "dark" (the same
+# shares, leaned towards the darker colours: a working district reads GREYER than a residential street). A tone
+# is a measured central-Tokyo wall colour, so the bias moves the mixture, never the palette.
 #
 # THE WORKING WATERFRONT IS A BAND, NOT A LINE (user, 2026-09-21: "the harbour above should be industry +
 # downtown ... then residential at the upward border instead of directly harbour -> residential"). The harbour's
@@ -136,7 +134,7 @@ FACADE_MAT_RES = "res://assets/world_source/kits/quaternius_downtown_city/materi
 REGIONS = (
     ("nightlife", (520.0, 180.0, 980.0, 560.0), 3, 20.0,
      {"PencilBuilding": 6, "ShopHouse": 3, "Konbini": 1, "OfficeMid": 0.8, "FamilyRestaurant": 0.5},
-     0.0, (2, 0, 2, 3)),
+     0.0, "dark"),
     # RESIDENTIAL WRAPS THE CITY (user, 2026-09-21, drawn on the district plan: "add resident around city
     # before castle/farmland"). Both bands are MEASURED, because a region only does anything where there is
     # street frontage on flat land -- buildings stand on road frontages, never on a box:
@@ -160,9 +158,9 @@ REGIONS = (
     ("city", (-150.0, -330.0, 1700.0, 960.0), 2, 22.0,
      {"Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "Konbini": 1, "OfficeMid": 0.5,
       "FamilyRestaurant": 0.6, "KonbiniLot": 0.6, "GasStation": 0.5}, 0.05, None),
-    ("harbour", (-820.0, -2050.0, 250.0, -1040.0), 2, 30.0, {"Warehouse": 1}, 0.2, (2, 0, 1, 3)),
+    ("harbour", (-820.0, -2050.0, 250.0, -1040.0), 2, 30.0, {"Warehouse": 1}, 0.2, "dark"),
     ("industry", (-1000.0, -1040.0, 200.0, -600.0), 2, 26.0,
-     {"Warehouse": 4, "OfficeMid": 1, "ShopHouse": 0.5, "Konbini": 0.4, "GasStation": 0.3}, 0.15, (2, 0, 1, 3)),
+     {"Warehouse": 4, "OfficeMid": 1, "ShopHouse": 0.5, "Konbini": 0.4, "GasStation": 0.3}, 0.15, "dark"),
     ("residential", (-1800.0, -1160.0, -150.0, -200.0), 2, 18.0,
      {"Apartment": 4, "ShopHouse": 2, "Mansion": 1, "KonbiniLot": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
       "Konbini": 0.4}, 0.15, None),
@@ -769,7 +767,13 @@ def derive(heights_path):
                     hs = field.heights(ii, jj)
                     if float(hs.min()) > LAND_Z and not field.blocked[jj, ii].all():
                         field.passage[jj, ii] = True
-                        passages.append({"pos": [round(cx_, 3), round(py, 3), round(cz_, 3)],
+                        # A 路地 STANDS WITH THE LOTS IT RUNS BETWEEN, NOT WITH THE CARRIAGEWAY. `py` is the
+                        # road SURFACE, while a lot's top is `road + KERB_H`, so the alley shipped 0.17 m
+                        # below the slabs either side of it (measured over 379 passages: median 0.170 m). The
+                        # alley has no slab of its own now (3.18(c3a)); this height is what `island_ground.py`
+                        # paves its ground to, so it is load-bearing.
+                        passages.append({"pos": [round(cx_, 3), round(py + (KERB_H if kerbed else 0.0), 3),
+                                                 round(cz_, 3)],
                                          "yaw": round(math.degrees(yaw_), 3),
                                          "size": [PASSAGE_W, PASSAGE_DEPTH]})
                 s += PASSAGE_EVERY
@@ -873,36 +877,7 @@ def derive(heights_path):
                     else:
                         k += 1
     grow_lots(field, placed)
-    # One tone per building (PLAN.md 3.18p). Chosen from the slot's OWN key with its own salt, never by drawing
-    # from the `rng` above: that stream decides which TYPE stands there, and taking one more number out of it
-    # would silently re-roll the whole city.
-    n_tones = tone_count()
-    if n_tones:
-        tone_counts, by_region = {}, {}
-        weights = {r[0]: (r[6] if len(r) > 6 else None) for r in REGIONS}
-        for b in placed:
-            w = weights.get(b["region"])
-            h = zlib.crc32((b["key"] + "|tone").encode())
-            if w and sum(w[:n_tones]) > 0:
-                # a weighted pick from the SAME hash: a working district is greyer, and it stays deterministic
-                total = sum(w[:n_tones])
-                pick, acc = 0, h % total
-                for i in range(n_tones):
-                    acc -= w[i]
-                    if acc < 0:
-                        pick = i
-                        break
-                b["tone"] = pick
-            else:
-                b["tone"] = h % n_tones
-            tone_counts[b["tone"]] = tone_counts.get(b["tone"], 0) + 1
-            by_region.setdefault(b["region"], {}).setdefault(b["tone"], 0)
-            by_region[b["region"]][b["tone"]] += 1
-        print("island_buildings: facade tone mix %s over %d tones" % (dict(sorted(tone_counts.items())), n_tones))
-        for reg in sorted(by_region):
-            print("  %-12s %s" % (reg, dict(sorted(by_region[reg].items()))))
-    else:
-        print("island_buildings: no facade_tones.json -- every building wears its type's own facade")
+    assign_tones(placed)
     shops = 0
     for b in placed:
         if b["type"] in SHOP_TYPES:
@@ -1011,13 +986,65 @@ def scene_of(b):
     return b.get("scene", b["type"])
 
 
-def passage_box(p):
-    """(basis cos/sin, size, centre) of one 路地's paving slab: its own rect, top ALLEY_DROP below the lots."""
-    w, d = p["size"]
-    a = math.radians(p["yaw"])
-    c, s = math.cos(a), math.sin(a)
-    depth = 0.6
-    return (c, s), (w, depth, d), (p["pos"][0], p["pos"][1] + LOT_RAISE - ALLEY_DROP - depth / 2.0, p["pos"][2])
+DARK_BIAS = 1.5    # "dark": the darkest tone's weight is (1 + this) x its share, the lightest's 1 x
+
+
+def tone_weights(region):
+    """The draw weight of each facade tone in `region`: PLATEAU's measured share, leaned dark where the region
+    says so (PLAN.md 3.19(e))."""
+    levels = tone_levels()
+    shares = [lv.get("share", 1.0) for lv in levels]
+    bias = next((r[6] for r in REGIONS if r[0] == region and len(r) > 6), None)
+    if bias != "dark":
+        return shares
+    lums = [lv.get("lum", 128.0) for lv in levels]
+    lo, hi = min(lums), max(lums)
+    return [sh * (1.0 + DARK_BIAS * (hi - l) / max(1e-6, hi - lo)) for sh, l in zip(shares, lums)]
+
+
+def assign_tones(placed):
+    """One tone per building (PLAN.md 3.18p). Chosen from the slot's OWN key with its own salt, never by drawing
+    from the placement's `rng`: that stream decides which TYPE stands there, and taking one more number out of it
+    would silently re-roll the whole city. So a new palette re-colours the city without moving a building."""
+    n_tones = tone_count()
+    if not n_tones:
+        print("island_buildings: no facade_tones.json -- every building wears its type's own facade")
+        return
+    tone_counts, by_region, cache = {}, {}, {}
+    for b in placed:
+        if b["region"] not in cache:
+            cache[b["region"]] = tone_weights(b["region"])
+        w = cache[b["region"]]
+        total = sum(w)
+        u = (zlib.crc32((b["key"] + "|tone").encode()) % 1000003) / 1000003.0 * total
+        pick = n_tones - 1
+        for i in range(n_tones):
+            u -= w[i]
+            if u < 0:
+                pick = i
+                break
+        b["tone"] = pick
+        tone_counts[pick] = tone_counts.get(pick, 0) + 1
+        by_region.setdefault(b["region"], {}).setdefault(pick, 0)
+        by_region[b["region"]][pick] += 1
+    print("island_buildings: facade tone mix %s over %d tones" % (dict(sorted(tone_counts.items())), n_tones))
+    for reg in sorted(by_region):
+        print("  %-18s %s" % (reg, dict(sorted(by_region[reg].items()))))
+
+
+def retone_record(check):
+    """Re-assign every building's facade tone in the existing record (no terrain dump, no building moves)."""
+    doc = json.load(open(OUT))
+    before = [b.get("tone", 0) for b in doc["buildings"]]
+    assign_tones(doc["buildings"])
+    changed = sum(1 for a, b in zip(before, doc["buildings"]) if a != b.get("tone", 0))
+    print("island_buildings: %d of %d buildings change tone" % (changed, len(before)))
+    if changed and not check:
+        with open(OUT, "w") as f:
+            json.dump(doc, f, indent=1)      # derive's own format, so the diff is the tones and nothing else
+            f.write("\n")
+    return 1 if (check and changed) else 0
+
 
 
 def facade_tones():
@@ -1026,6 +1053,12 @@ def facade_tones():
     if not os.path.exists(FACADE_TONES_JSON):
         return {}
     return json.load(open(FACADE_TONES_JSON))["facades"]
+
+
+def tone_levels():
+    if not os.path.exists(FACADE_TONES_JSON):
+        return []
+    return json.load(open(FACADE_TONES_JSON))["levels"]
 
 
 def tone_count():
@@ -1053,8 +1086,11 @@ def facade_surfaces(scene):
 
 
 def cell_scene(name, blds, passages=()):
-    """One streamed cell: every building instanced, its lot slabs as ONE MultiMesh (+ box collision), and the
-    路地 paving as another.
+    """One streamed cell: every building instanced, and its lot slabs as ONE MultiMesh (+ box collision).
+
+    A 路地 is NOT drawn here (PLAN.md 3.18(c3a)): it is a RESERVATION (`field.passage`, 接道義務) and its ground is
+    the block's own, which `tools/island_ground.py` raises to the lots' footway level and paints. `passages` is
+    still accepted so the record stays the one list a caller hands over.
 
     A `.tscn` is written in THREE phases and the order is not cosmetic: every `[ext_resource]` must precede every
     `[sub_resource]`, and both must precede `[node]`. Emitting the alley's material where its geometry was built
@@ -1082,8 +1118,6 @@ def cell_scene(name, blds, passages=()):
         ext.append('[ext_resource type="Material" path="%s" id="%s"]\n' % (FACADE_MAT_RES % tones[fam][t], rid))
     if lots:
         ext.append('[ext_resource type="Material" path="%s" id="lotmat"]\n' % LOT_MATERIAL)
-    if passages:
-        ext.append('[ext_resource type="Material" path="%s" id="alleymat"]\n' % ALLEY_MATERIAL)
     ext.append("\n")
 
     if lots:
@@ -1101,16 +1135,6 @@ def cell_scene(name, blds, passages=()):
             _cs, (sx, sy, sz), _o = lot_boxes(b)
             sub.append('[sub_resource type="BoxShape3D" id="LotShape%d"]\nsize = Vector3(%.3f, %.3f, %.3f)\n\n'
                        % (k, sx, sy, sz))
-    if passages:
-        sub.append('[sub_resource type="BoxMesh" id="AlleyBox"]\nmaterial = ExtResource("alleymat")\n\n')
-        buf = []
-        for pg in passages:
-            (c, s), (sx, sy, sz), (ox, oy, oz) = passage_box(pg)
-            buf += [c * sx, 0.0, s * sz, ox, 0.0, sy, 0.0, oy, -s * sx, 0.0, c * sz, oz]
-        sub.append('[sub_resource type="MultiMesh" id="Alleys"]\ntransform_format = 1\ninstance_count = %d\n'
-                   'mesh = SubResource("AlleyBox")\nbuffer = PackedFloat32Array(%s)\n\n'
-                   % (len(passages), ", ".join("%.4f" % v for v in buf)))
-
     for k, b in enumerate(blds):
         pos = [b["pos"][0], b["pos"][1] + LOT_RAISE + FLOOR_LIFT, b["pos"][2]]
         nodes.append('\n[node name="%s_%03d" parent="." instance=ExtResource("%s")]\ntransform = %s\n'
@@ -1130,9 +1154,6 @@ def cell_scene(name, blds, passages=()):
             nodes.append('\n[node name="Lot%d" type="CollisionShape3D" parent="LotCollision"]\n'
                          'transform = Transform3D(%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f, %.3f, %.3f, %.3f)\n'
                          'shape = SubResource("LotShape%d")\n' % (k, c, s, -s, c, ox, oy, oz, k))
-    if passages:
-        nodes.append('\n[node name="Alleys" type="MultiMeshInstance3D" parent="."]\n'
-                     'multimesh = SubResource("Alleys")\n')
     return "".join(ext + sub + nodes)
 
 
@@ -1437,9 +1458,9 @@ def tones_gate(check):
         print("island_buildings: no facade_tones.json -- run tools/building_kit/retone_downtown_kit.py")
         return 1 if check else 0
     bad = []
-    # 1. within each family the tones are distinct greys
+    # 1. within each family the tones are distinct COLOURS (PLAN.md 3.19(e): PLATEAU's measured wall palette)
     for fam, names in sorted(tones.items()):
-        lums = {}
+        cols = {}
         for n in names:
             path = os.path.join(ROOT, "assets/world_source/kits/quaternius_downtown_city/materials", n + ".tres")
             m = re.search(r"^albedo_color = Color\(([\d.]+), ([\d.]+), ([\d.]+)", open(path).read(), re.M) \
@@ -1447,12 +1468,14 @@ def tones_gate(check):
             if m is None:
                 bad.append("%s has no albedo_color" % n)
                 continue
-            lums[n] = 0.2126 * float(m.group(1)) + 0.7152 * float(m.group(2)) + 0.0722 * float(m.group(3))
-        order = sorted(lums.values())
-        for x, y in zip(order, order[1:]):
-            if y - x < 0.08:          # a tint step under this is not a tone, it is noise
-                bad.append("%s: two tones differ by only %.3f of the texture's own level" % (fam, y - x))
-        print("  %-24s %s" % (fam, ", ".join("%s %.3f" % (n, lums[n]) for n in names if n in lums)))
+            cols[n] = tuple(float(m.group(k)) for k in (1, 2, 3))
+        vals = list(cols.items())
+        for a in range(len(vals)):
+            for b2 in range(a + 1, len(vals)):
+                d = math.dist(vals[a][1], vals[b2][1])
+                if d < 0.06:          # a tint step under this is not a tone, it is noise
+                    bad.append("%s: %s and %s differ by only %.3f" % (fam, vals[a][0], vals[b2][0], d))
+        print("  %-24s %s" % (fam, ", ".join("%s (%.2f %.2f %.2f)" % (n, *cols[n]) for n in names if n in cols)))
     # 2-4. what the cell scenes actually say
     doc = json.load(open(OUT))
     want = [b for b in doc["buildings"] if facade_surfaces(scene_of(b))]
@@ -1485,9 +1508,11 @@ def tones_gate(check):
     mix = {}
     for b in want:
         mix[int(b.get("tone", 0))] = mix.get(int(b.get("tone", 0)), 0) + 1
-    for t in range(n):
-        if mix.get(t, 0) < len(want) // (2 * n):
-            bad.append("tone %d is worn by only %d of %d buildings" % (t, mix.get(t, 0), len(want)))
+    # every tone worn by at least half its MEASURED share (the regions lean dark, so not the full share)
+    for t, lv in enumerate(tone_levels()[:n]):
+        if mix.get(t, 0) < 0.5 * lv.get("share", 1.0 / n) * len(want):
+            bad.append("tone %d is worn by only %d of %d buildings (PLATEAU share %.1f%%)"
+                       % (t, mix.get(t, 0), len(want), 100 * lv.get("share", 0)))
     print("island_buildings: %d buildings wear a facade family, tone mix %s, %d overrides in %d materials"
           % (len(want), dict(sorted(mix.items())), seen, len(used)))
     for x in bad:
@@ -1510,6 +1535,8 @@ def main(argv):
         return clearance("--check" in argv)
     if argv[:1] == ["tones"]:
         return tones_gate("--check" in argv)
+    if argv[:1] == ["retone"]:
+        return retone_record("--check" in argv)
     if argv[:1] == ["peds"]:
         cells = ped_cells()
         by = {}

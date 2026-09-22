@@ -44,7 +44,7 @@ var ramp_carriageway: OptionButton
 var ramp_entrance: CheckBox
 var road_type: OptionButton
 ## the road types `point_presets.PRESETS` defines (roadkit_cli.py `preset` refuses any other name)
-const ROAD_TYPES := ["expressway", "trunk", "block", "lane", "farm", "coast"]
+const ROAD_TYPES := ["expressway", "trunk", "arterial", "block", "lane", "farm", "coast"]
 var cross_groups := {}
 ## The point the artist selected LAST -- the kit's "active" point (Apply Cross-Section's source).
 var active_point: Node

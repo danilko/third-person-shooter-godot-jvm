@@ -15,6 +15,13 @@ const PointScript := preload("res://addons/road_kit/road_kit_point.gd")
 ## solver and the builder read; the scene is its editable view.
 @export_file("*.json") var record_path := ""
 
+## This network's record is the OUTPUT of a generator (the island's is written by `tools/island_layout.py` from
+## `input_record`), so an edit made here is lost on the next run (PLAN.md R5). Such a network still loads,
+## previews and builds; only saving a CHANGED record over it is refused, naming the input to edit instead.
+@export var generated := false
+## The record a generated network is derived from -- edit THAT (World.tscn carries a network for it).
+@export_file("*.json") var input_record := ""
+
 ## Emitted when anything the record describes may have changed: a point moved or rotated, a field set in
 ## the inspector, the network reloaded. The plugin debounces it into a refresh (B10.2).
 signal edited
@@ -369,6 +376,9 @@ func save_record(path: String = "", force: bool = false) -> Error:
 		if p == record_path:
 			_disk_text = text
 		return OK
+	if generated and not force and p == record_path and Engine.is_editor_hint():
+		push_warning("RoadKitNetwork %s: %s is GENERATED (tools/island_layout.py) -- not saving an edit over it; edit %s instead" % [name, record_path, input_record])
+		return ERR_UNAUTHORIZED
 	var tmp := p + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:

@@ -66,10 +66,10 @@ MEAN = {
 #
 # material -> (texture stem to wear, neutral target mean, why)
 PLAN = {
-    "MI_Trim":              ("T_Trim", 136.0, "the 磁器タイル facade -- tone 0 (see TONE_LEVELS)"),
+    "MI_Trim":              ("T_Trim", 136.0, "the 磁器タイル facade -- tone 0 is PLATEAU's commonest wall (see tone_levels); this target is unused"),
     "MI_Trim_Dark":         ("T_Trim", 52.0, "dark panel and sash: the near-black the kit's name always claimed"),
     "MI_Trim_Green":        ("T_Trim", 140.0, "balcony guard: grey aluminium, not green"),
-    "MI_Trim_MetalConcrete":("T_MetalConcrete", 136.0, "the panel facade -- tone 0 (see TONE_LEVELS)"),
+    "MI_Trim_MetalConcrete":("T_MetalConcrete", 136.0, "the panel facade -- tone 0 is PLATEAU's commonest wall (see tone_levels); this target is unused"),
     "MI_Ornaments":         ("T_Ornaments", 150.0, "cornices and mouldings, neutral (set against the OLD median; not re-tuned here)"),
     "MI_InteriorWall":      ("T_Concrete", 214.0, "white plaster (moved OFF the red-brick texture)"),
     "MI_InteriorRoof":      ("T_Concrete", 226.0, "white ceiling"),
@@ -155,12 +155,14 @@ def neutralise(check):
 
 
 def tint(stem, target):
+    """The albedo multiplier that puts `stem`'s texture mean on `target`: a grey level, or an sRGB (r, g, b)."""
+    t = tuple(target) if isinstance(target, (tuple, list)) else (target, target, target)
     r, g, b = MEAN[stem]
     if stem in NEUTRALISE:
-        # the neutral copy IS its own luminance, so one factor serves all three channels
+        # the neutral copy IS its own luminance in all three channels, so a coloured target is a coloured tint
         lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-        return (target / lum, target / lum, target / lum)
-    return (target / r, target / g, target / b)
+        return (t[0] / lum, t[1] / lum, t[2] / lum)
+    return (t[0] / r, t[1] / g, t[2] / b)
 
 
 def texture_stem(stem):
@@ -231,19 +233,58 @@ def patch(text, stem, colour):
 # WHICH merged surface each is, which only the merge knows) and by `tools/island_buildings.py` (to choose one
 # tone per building and override every facade surface it has).
 FACADES = ("MI_Trim", "MI_Trim_MetalConcrete")
-# suffix, target, why -- the levels, shared by every facade family. Index 0 IS the base material.
-TONE_LEVELS = (
-    ("",       136.0, "mid grey: the measured PLATEAU median"),
-    ("_Pale",  185.0, "white, past p95 (photogrammetry compresses the light tail)"),
-    ("_Light", 161.0, "light grey: the measured p90"),
-    ("_Slate", 100.0, "dark grey: the measured p10"),
-)
 TONES_JSON = "facade_tones.json"
+
+# --- THE TONES ARE PLATEAU'S OWN WALL COLOURS, NOT GREYS (PLAN.md 3.19(e), user 2026-09-21: "with the grey setup
+# everything looks greyish, which seems not correct; I wish for PLATEAU's actual building data theme").
+#
+# The four luminance levels above were right about HOW LIGHT Tokyo is and wrong to stop there: `neutralise` takes
+# every facade texture to zero chroma, so a tone that is only a lightness is a city with no colour at all. The
+# palette is now MEASURED per building on its wall faces (`blender/tools/measure_plateau_wall_colours.py`, which
+# writes `plateau_wall_palette.json`): 1 804 walls, chroma p50 3.3 / p90 7.0 -- low-saturation, but warm greige,
+# beige and cool blue-grey panel, not grey. Each cluster becomes a tone at its `lit_srgb` (its L* lifted so the
+# median lands on the de-lit facade median; see the script), and its measured SHARE becomes the weight
+# `tools/island_buildings.py` draws with, so the city's mixture IS central Tokyo's. Tone 0, the base material,
+# is the largest cluster, so a building with no override still wears the commonest Tokyo wall.
+PALETTE_JSON = os.path.normpath(os.path.join(KIT, "..", "..", "buildings", "plateau_wall_palette.json"))
+
+
+def _tone_name(rgb, b_star, used):
+    lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+    light = ("Charcoal" if lum < 90 else "Dark" if lum < 120 else "Mid" if lum < 145
+             else "Light" if lum < 172 else "White")
+    hue = "Warm" if b_star > 1.5 else "Cool" if b_star < -1.5 else ""
+    name = "_" + light + hue
+    k = 2
+    while name in used:
+        name = "_%s%s%d" % (light, hue, k)
+        k += 1
+    used.add(name)
+    return name
+
+
+def tone_levels():
+    """[(suffix, sRGB, share, why)] from the measured palette; index 0 (the base material) is the largest share."""
+    doc = json.load(open(PALETTE_JSON))
+    rows = sorted(doc["clusters"], key=lambda r: -r["share"])
+    used, out = set(), []
+    for i, r in enumerate(rows):
+        rgb = tuple(r["lit_srgb"])
+        suffix = "" if i == 0 else _tone_name(rgb, r["b"], used)
+        out.append((suffix, rgb, r["share"],
+                    "PLATEAU wall cluster, %.1f%% of central Tokyo's walls (L* %.1f a* %+.1f b* %+.1f, lifted %+.1f)"
+                    % (100 * r["share"], r["L"], r["a"], r["b"], doc["lift_L"])))
+    return out
 
 
 def write_tones(check):
-    """Write each tone variant of every facade material from its own base `.tres`, and the record naming them."""
+    """Write each tone variant of every facade material from its own base `.tres`, and the record naming them.
+    A tone file the previous record named and this one does not is deleted, so a re-measured palette cannot
+    leave a stale colour on disk for a cell scene to keep referencing."""
     changed, doc = [], {}
+    levels = tone_levels()
+    jpath = os.path.join(MATS, TONES_JSON)
+    old = json.load(open(jpath))["facades"] if os.path.exists(jpath) else {}
     for facade in FACADES:
         base = os.path.join(MATS, facade + ".tres")
         if not os.path.exists(base):
@@ -251,32 +292,38 @@ def write_tones(check):
             return None
         src, stem = open(base).read(), PLAN[facade][0]
         names = []
-        for suffix, target, _why in TONE_LEVELS:
+        for suffix, rgb, _share, _why in levels:
             name = facade + suffix
             names.append(name)
-            if suffix == "":
-                continue                  # the base IS tone 0; `main` has already written it
             path = os.path.join(MATS, name + ".tres")
-            body = patch(src, stem, tint(stem, target))
+            body = patch(src, stem, tint(stem, rgb))
             body = re.sub(r'^resource_name = .*$', 'resource_name = "%s"' % name, body, count=1, flags=re.M)
             if not os.path.exists(path) or open(path).read() != body:
                 changed.append(name)
                 if not check:
                     open(path, "w").write(body)
+            if suffix == "":
+                src = body                # the variants are written from the re-tinted base
+        for stale in old.get(facade, []):
+            if stale not in names and os.path.exists(os.path.join(MATS, stale + ".tres")):
+                changed.append("-" + stale)
+                if not check:
+                    os.remove(os.path.join(MATS, stale + ".tres"))
         doc[facade] = names
         print("facade tones (%s): %s" % (facade, ", ".join(
-            "%s %.0f" % (n, t) for n, (_s, t, _w) in zip(names, TONE_LEVELS))))
-    record = {"_comment": "PLAN.md 3.18p. Written by tools/building_kit/retone_downtown_kit.py -- do not hand-edit.",
-              "levels": [{"suffix": s_, "target": t, "why": w} for s_, t, w in TONE_LEVELS],
+            "%s (%.0f %.0f %.0f) %.1f%%" % (n, *rgb, 100 * sh) for n, (_s, rgb, sh, _w) in zip(names, levels))))
+    record = {"_comment": "PLAN.md 3.18p / 3.19(e). Written by tools/building_kit/retone_downtown_kit.py -- do not "
+                          "hand-edit. The tones are PLATEAU's measured wall colours (plateau_wall_palette.json).",
+              "levels": [{"suffix": s_, "srgb": list(rgb), "share": sh,
+                          "lum": round(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2], 1), "why": w}
+                         for s_, rgb, sh, w in levels],
               "facades": doc}
-    jpath = os.path.join(MATS, TONES_JSON)
-    text = json.dumps(record, indent=2) + "\n"
+    text = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
     if not os.path.exists(jpath) or open(jpath).read() != text:
         changed.append(TONES_JSON)
         if not check:
             open(jpath, "w").write(text)
     return changed
-
 
 
 # --- THE SHOP WINDOW'S 目隠しシート (PLAN.md 3.18o follow-up, user 2026-09-21: "in Japan the store window glass
@@ -343,6 +390,8 @@ def main(argv):
     print()
     print("%-24s %-18s %-7s  tint                 -> mean" % ("material", "texture", "target"))
     for name, (stem, target, why) in sorted(PLAN.items()):
+        if name in FACADES:
+            continue              # a facade's base IS tone 0 of the measured palette: `write_tones` owns it
         path = os.path.join(MATS, name + ".tres")
         if not os.path.exists(path):
             print("  MISSING %s" % path)

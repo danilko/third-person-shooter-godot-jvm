@@ -32,6 +32,22 @@ HALF_LENGTH = 575.0 / 2 + 115.0 + 22.0      # library_landmarks: RB_MAIN / 2 + R
 DECK_MIN_Z = 20.0                            # a station "on the deck" (the crossing's deck is at 24 m)
 
 
+def crossing_plan():
+    """(centre (x, y) record, unit axis (x, y)) of the final plan's crossing (PLAN.md 3.29 v9): the water gap along
+    `island_plan.BRIDGE_X`, measured on the land grid, its axis north -> south. The spur (upper deck) and the rail
+    (lower deck, R7) cross there; the airport road does not any more."""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import island_plan as PL
+    from island_roadgen import Ground
+    g = Ground()
+    y0, y1 = PL.BRIDGE_SEARCH_Y
+    wet = [y for y in [y0 - k * 2.0 for k in range(int((y0 - y1) / 2.0))] if (g.z(PL.BRIDGE_X, y) or -99.0) < -1.0]
+    if not wet:
+        raise SystemExit("island_rainbow_bridge: no water along x %.0f" % PL.BRIDGE_X)
+    a, b = max(wet), min(wet)
+    return (PL.BRIDGE_X, (a + b) / 2.0), (0.0, -1.0)
+
+
 def crossing(net):
     """(centre (x, y) in the network frame, unit axis (x, y)) of the airport crossing, from the record."""
     chain = []
@@ -66,7 +82,7 @@ def scene_block(centre, axis, y):
 
 
 CORRIDOR = 15.0          # library_landmarks: the clear road corridor, |local z| < 15
-ROAD_LOWER = 24.0        # library_landmarks.RB_ROAD_LOWER: the airport road's deck in the model's frame
+ROAD_LOWER = 32.0        # library_landmarks.RB_ROAD_UPPER: the SPUR's deck (the lower deck, 24 m, is rail -- R7)
 SPAN = 575.0 / 2 + 115.0 # the suspension span, towers to anchorages
 
 
@@ -81,7 +97,7 @@ def alignment(centre, axis, y):
     n, worst_side, worst_h = 0, -1e9, 0.0
     for f in glob.glob(os.path.join(ROOT, "assets/world_source/pieces/Roads_IslandRoads_island_*.lanekit.json")):
         for lane in json.load(open(f))["lanes"]:
-            if not lane.get("road_name", "").startswith("kuko_dori"):
+            if not lane.get("road_name", "").startswith("shuto_spur"):
                 continue
             half = float(lane.get("lane_width", 4.5)) / 2
             for c in lane["curve"]:
@@ -100,7 +116,8 @@ def alignment(centre, axis, y):
 def main(argv):
     check = "--check" in argv
     net = pm.load_network(RECORD)
-    centre, axis, pts = crossing(net)
+    centre, axis = crossing_plan()
+    pts = []
     changed = []
 
     def along(p):

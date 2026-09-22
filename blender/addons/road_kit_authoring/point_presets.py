@@ -58,6 +58,15 @@ PRESETS = {
                  "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,
                  "right_kerb_height": 0.0, "design_speed": 40.0},
     },
+    # A 2 + 2 AT-GRADE arterial with footways: buildings front it, so it is walkable and kerbed, and the barrier
+    # rule (`point_solve.solve_road`) walls it only where it is off the ground or on piers. The `coast` preset is its
+    # opposite -- a road cut into a cliff with no frontage, walled end to end.
+    "arterial": {
+        "road": {"road_class": "arterial", "ped_access": True, "barrier_height": 1.0, "median_style": pm.MED_PAINT},
+        "base": {"lanes_fwd": 2, "lanes_bwd": 2, "lane_width": 4.5, "median_width": 0.5,
+                 "left_walk_width": 4.0, "right_walk_width": 4.0, "left_kerb_height": 0.15,
+                 "right_kerb_height": 0.15, "design_speed": 50.0},
+    },
     "coast": {
         "road": {"road_class": "arterial", "ped_access": False, "barrier_height": 1.0, "median_style": pm.MED_PAINT,
                  "cut_batter": 10.0},

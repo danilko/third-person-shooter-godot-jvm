@@ -118,8 +118,8 @@ public class AnimationController extends Node {
   private Tween tween;
   private String currentStanceName = "Upright";
   private Stance currentStance = null;
-  // True while in the SWIM stance — keeps the locomotion blend grounded so the (placeholder Crawl)
-  // swim pose plays fully instead of blending to the airborne/falling pose while floating off-floor.
+  // True while in the SWIM stance — keeps the locomotion blend grounded so the swim ring plays fully
+  // instead of blending to the airborne/falling pose while floating off-floor.
   private boolean swimming = false;
   private boolean combat = false;
 
@@ -363,8 +363,7 @@ public class AnimationController extends Node {
   public void onSetStance(Stance stance) {
     if (animationTree == null) return;
 
-    // Use the stance's animation-key override when set (e.g. SWIM → "Crawl" placeholder, I1);
-    // otherwise the stance's node name drives the AnimationTree transition + movement blend.
+    // Use the stance's animation-key override when set; otherwise the stance's node name drives the AnimationTree transition + movement blend.
     swimming = "Swim".equals(stance.getName().toString());
     String key = stance.getAnimationStanceKey();
     if (key == null || key.isEmpty()) key = stance.getName().toString();
@@ -377,7 +376,8 @@ public class AnimationController extends Node {
 
     animationTree.set("parameters/StanceTransition/transition_request", key);
     // Which AIM set this stance uses. Keyed on the stance's own animation key, so a stance that
-    // borrows another's ring (Swim borrows Crawl) borrows its aim too, with no second table.
+    // borrows another's ring borrows its aim too, with no second table. Swim has its own ring now
+    // and aims from Default: an aiming swimmer TREADS, and treading is upright (PLAN.md 6.4).
     animationTree.set("parameters/AimStanceTransition/transition_request",
         AIM_STANCE_BRANCHES.contains(key) ? key : AIM_STANCE_DEFAULT);
     // The TORSO layer carries the same dimension or it would take its spine from one stance's pose
@@ -385,6 +385,7 @@ public class AnimationController extends Node {
     // Crawl, so the layer does not run there at all.
     animationTree.set("parameters/AimStanceTorsoTransition/transition_request",
         AIM_STANCE_CROUCH.equals(key) ? AIM_STANCE_CROUCH : AIM_STANCE_DEFAULT);
+    if (!SWIM_KEY.equals(key)) swimPosture = "";
     this.currentStanceName = key;
     this.currentStance = stance;
 
@@ -397,6 +398,9 @@ public class AnimationController extends Node {
     combat = combatState.isCombat();
     animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
     animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
+    // Combat decides the swim posture (a swimmer who aims treads), so re-derive it now, not on the
+    // next movement change.
+    if (SWIM_KEY.equals(currentStanceName)) updateAnimationBlend(currentMovementState);
     updateAimModifiers();
   }
 
@@ -504,6 +508,30 @@ public class AnimationController extends Node {
     updateAnimationBlend(currentMovementState);
   }
 
+  // ── Swim: two postures, not one ring (PLAN.md 6.4) ─────────────────────────
+  //
+  // Treading water is UPRIGHT and the stroke is HORIZONTAL; W34 measured one blendspace between them
+  // moving the gun centre 0.41 m, so the tree holds them as a Transition (SwimTransition: Tread |
+  // Stroke) and this picks. A swimmer in combat TREADS whatever the direction -- you aim with your
+  // head and chest out of the water, and the tread posture is what the upright aim branch fits --
+  // and out of combat moving forward is the stroke.
+
+  private static final String SWIM_KEY = "Swim";
+  private static final String SWIM_REQUEST = "parameters/SwimTransition/transition_request";
+  /** The posture last requested, so an unchanged one is not re-requested every blend update. */
+  private String swimPosture = "";
+
+  private void updateSwimPosture() {
+    String posture = (!combat && animationDirection.getY() > 0.5f) ? "Stroke" : "Tread";
+    if (posture.equals(swimPosture)) return;
+    swimPosture = posture;
+    animationTree.set(SWIM_REQUEST, posture);
+  }
+
+  /** The swim posture now requested ("Tread" / "Stroke", "" before the first swim). For probes. */
+  @Register
+  public String swimPostureNow() { return swimPosture; }
+
   private static float quantize(double component) {
     if (component > AXIS_DEADZONE) return 1.0f;
     if (component < -AXIS_DEADZONE) return -1.0f;
@@ -527,6 +555,8 @@ public class AnimationController extends Node {
       animationDirection.setX(0.0f);
       animationDirection.setY(movementState.getId());
     }
+
+    if (SWIM_KEY.equals(currentStanceName)) updateSwimPosture();
 
     NodePath blendPath = blendPathCache.computeIfAbsent(currentStanceName,
         name -> new NodePath("parameters/" + name + "MovementBlend/blend_position"));

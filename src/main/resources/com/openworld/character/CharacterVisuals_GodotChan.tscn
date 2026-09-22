@@ -226,7 +226,10 @@ input_4/name = "Passenger"
 input_4/auto_advance = false
 input_4/break_loop_at_end = false
 input_4/reset = true
-
+input_5/name = "Swim"
+input_5/auto_advance = false
+input_5/break_loop_at_end = false
+input_5/reset = true
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_k4e70"]
 animation = &"upright_idle"
 
@@ -863,6 +866,52 @@ filters = ["Skeleton3D:spine_01", "Skeleton3D:spine_02", "Skeleton3D:spine_03", 
 fadein_time = 0.05
 fadeout_time = 0.15
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_swm0"]
+animation = &"swim_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_swm1"]
+animation = &"swim_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_swm2"]
+animation = &"swim_back"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_swm3"]
+animation = &"swim_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_swm4"]
+animation = &"swim_right"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_swm"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_swm0")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_swm1")
+blend_point_1/pos = Vector2(0, 1)
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_swm2")
+blend_point_2/pos = Vector2(0, -1)
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_swm3")
+blend_point_3/pos = Vector2(-1, 0)
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_swm4")
+blend_point_4/pos = Vector2(1, 0)
+blend_point_4/name = &"4"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_swmf"]
+animation = &"swim_forward"
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_swm"]
+xfade_time = 0.4
+input_0/name = "Tread"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = true
+input_1/name = "Stroke"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = true
+
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jn40o"]
 nodes/output/position = Vector2(2740, 140)
 nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_u0wnu")
@@ -963,7 +1012,13 @@ nodes/hit_chest/node = SubResource("AnimationNodeAnimation_hrc")
 nodes/hit_chest/position = Vector2(2020, 340)
 nodes/hit_head/node = SubResource("AnimationNodeAnimation_hrh")
 nodes/hit_head/position = Vector2(2020, 460)
-node_connections = [&"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"AimStanceTorsoTransition", &"AimStanceTorsoTransition", 0, &"WeaponAimTorso", &"AimStanceTorsoTransition", 1, &"WeaponAimTorsoCrouch", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"AimStanceTransition", &"AimStanceTransition", 0, &"WeaponAim", &"AimStanceTransition", 1, &"WeaponAimCrawl", &"AimStanceTransition", 2, &"WeaponAimCrouch", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
+nodes/SwimTransition/node = SubResource("AnimationNodeTransition_swm")
+nodes/SwimTransition/position = Vector2(-120, 1000)
+nodes/SwimMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_swm")
+nodes/SwimMovementBlend/position = Vector2(-360, 960)
+nodes/swim_stroke/node = SubResource("AnimationNodeAnimation_swmf")
+nodes/swim_stroke/position = Vector2(-360, 1100)
+node_connections = [&"StanceTransition", 5, &"SwimTransition", &"SwimTransition", 0, &"SwimMovementBlend", &"SwimTransition", 1, &"swim_stroke", &"output", 0, &"HitReact", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"StanceTransition", 4, &"PassengerMovementBlend", &"AttackClip", 6, &"attack_throw", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"AimStanceTorsoTransition", &"AimStanceTorsoTransition", 0, &"WeaponAimTorso", &"AimStanceTorsoTransition", 1, &"WeaponAimTorsoCrouch", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"CombatTransition", 0, &"AimStanceTransition", &"AimStanceTransition", 0, &"WeaponAim", &"AimStanceTransition", 1, &"WeaponAimCrawl", &"AimStanceTransition", 2, &"WeaponAimCrouch", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gapvf"]
 radius = 0.048

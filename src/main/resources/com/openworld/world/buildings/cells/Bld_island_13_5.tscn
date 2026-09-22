@@ -1,0 +1,70 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Mansion.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse.tscn" id="2"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool.tres" id="tone2_1"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool2.tres" id="tone0_3"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_CharcoalCool.tres" id="tone4_7"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool.tres" id="tone3_1"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone1_3"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_CharcoalCool.tres" id="tone5_7"]
+[ext_resource type="Material" path="res://assets/world_source/kits/road_kit/materials/M_TileWhite.tres" id="lotmat"]
+
+[sub_resource type="BoxMesh" id="LotBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Lots"]
+transform_format = 1
+instance_count = 3
+mesh = SubResource("LotBox")
+buffer = PackedFloat32Array(-3.0411, 0.0000, -22.5606, 1266.4075, 0.0000, 0.6100, 0.0000, 0.5050, 22.9998, 0.0000, -2.9830, -654.4611, -1.6880, 0.0000, -19.2990, 1267.1359, 0.0000, 0.6100, 0.0000, 0.5050, 12.7669, 0.0000, -2.5517, -672.5208, -3.3032, 0.0000, -22.5606, 1271.2566, 0.0000, 0.6100, 0.0000, 0.5050, 24.9826, 0.0000, -2.9830, -691.1415)
+
+[sub_resource type="BoxShape3D" id="LotShape0"]
+size = Vector3(23.200, 0.610, 22.757)
+
+[sub_resource type="BoxShape3D" id="LotShape1"]
+size = Vector3(12.878, 0.610, 19.467)
+
+[sub_resource type="BoxShape3D" id="LotShape2"]
+size = Vector3(25.200, 0.610, 22.757)
+
+[node name="Bld_island_13_5" type="Node3D"]
+
+[node name="Mansion_000" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.131080, 0, -0.991372, 0, 1, 0, 0.991372, 0, -0.131080, 1261.611, 0.830, -656.104)
+
+[node name="Mesh" parent="./Mansion_000" index="0"]
+surface_material_override/0 = ExtResource("tone0_3")
+surface_material_override/2 = ExtResource("tone1_3")
+
+[node name="ShopHouse_001" parent="." instance=ExtResource("2")]
+transform = Transform3D(-0.131080, 0, -0.991372, 0, 1, 0, 0.991372, 0, -0.131080, 1265.022, 0.830, -673.809)
+
+[node name="Mesh" parent="./ShopHouse_001" index="0"]
+surface_material_override/5 = ExtResource("tone2_1")
+surface_material_override/1 = ExtResource("tone3_1")
+
+[node name="Mansion_002" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.131080, 0, -0.991372, 0, 1, 0, 0.991372, 0, -0.131080, 1266.329, 0.830, -691.793)
+
+[node name="Mesh" parent="./Mansion_002" index="0"]
+surface_material_override/0 = ExtResource("tone4_7")
+surface_material_override/2 = ExtResource("tone5_7")
+
+[node name="Lots" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Lots")
+
+[node name="LotCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Lot0" type="CollisionShape3D" parent="LotCollision"]
+transform = Transform3D(-0.131080, 0, -0.991372, 0, 1, 0, 0.991372, 0, -0.131080, 1266.408, 0.505, -654.461)
+shape = SubResource("LotShape0")
+
+[node name="Lot1" type="CollisionShape3D" parent="LotCollision"]
+transform = Transform3D(-0.131080, 0, -0.991372, 0, 1, 0, 0.991372, 0, -0.131080, 1267.136, 0.505, -672.521)
+shape = SubResource("LotShape1")
+
+[node name="Lot2" type="CollisionShape3D" parent="LotCollision"]
+transform = Transform3D(-0.131080, 0, -0.991372, 0, 1, 0, 0.991372, 0, -0.131080, 1271.257, 0.505, -691.141)
+shape = SubResource("LotShape2")

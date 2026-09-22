@@ -35,15 +35,18 @@ N = 2305
 
 #: kind -> [(x0, x1, z0, z1), ...] in Godot metres. Beaches are the only kind the shelf reads.
 ZONES = {
-    "beach":            [(-2304.0, -1450.0, -600.0, 700.0),     # the west coast along rinkai_dori (resort beach)
-                         (-2000.0, -780.0, 600.0, 1250.0),      # the south-west shore (0.57 km2, 99% flat): beach park
-                         (700.0, 2304.0, -2304.0, -350.0)],     # the north-east farm coast (sugar cane to the sea)
-    "cliff":            [(-2304.0, 700.0, -2304.0, -600.0)],    # the north-west massif meets the sea
-    "industrial_harbour": [(-780.0, 220.0, 950.0, 2304.0)],     # the square peninsula: reclaimed land, quays
-    "gulf":             [(220.0, 700.0, 400.0, 2304.0)],        # the U inlet, open water, the city's waterfront north
-    "military_harbour": [(700.0, 1150.0, 450.0, 1050.0)],       # the inlet's east shore, beside the airport bridge
+    # redrawn for the final plan's coast (PLAN.md 3.30 L0.6, island_reshape.py): the west trimmed to the residential
+    # line, the gulf head filled, the harbour's tip cut, the east a seawall, the farm moved 150 m south
+    "beach":            [(-2304.0, -1250.0, 150.0, 1250.0),     # the residential south-west shore ("Beach", 3.29)
+                         (850.0, 1400.0, 900.0, 1250.0),        # the resort's south shore ("Beach + hotels")
+                         (350.0, 1600.0, -2304.0, -1100.0)],    # the farm's north coast (sugar cane to the sea)
+    "cliff":            [(-2304.0, 350.0, -2304.0, 150.0)],     # the massif's coasts: a 45 deg shore, deep water
+    "seawall":          [(1250.0, 2304.0, -1100.0, 900.0)],     # the city's east seawall (v9), and the resort's east
+    "industrial_harbour": [(-420.0, 300.0, 1040.0, 2304.0)],    # the port: container terminal, logistics
+    "gulf":             [(300.0, 850.0, 760.0, 2304.0)],        # the lower gulf: the container basin (v8)
+    "military_harbour": [(-1000.0, -420.0, 1040.0, 2304.0)],    # the gated base in the port's south-west corner (v7)
     "airport_island":   [(700.0, 2304.0, 1300.0, 2304.0)],      # one terminal, one or two runways
-    "fishing_port":     [(1500.0, 1900.0, -1400.0, -1000.0)],   # a small 漁港 on the farm coast (placement later)
+    "fishing_port":     [(1150.0, 1450.0, -1650.0, -1250.0)],   # a small 漁港 on the farm's north-east coast
 }
 BEACH_LAND_MAX = 3.0
 SHELF_EDGE, SHELF_DEEP = -0.3, -3.0
@@ -77,7 +80,8 @@ def in_rects(kind):
 
 def hard_zones():
     """Water that keeps its depth whatever beach is near: cliffs, the harbours and the gulf."""
-    return in_rects("cliff") | in_rects("industrial_harbour") | in_rects("gulf") | in_rects("military_harbour")
+    return (in_rects("cliff") | in_rects("seawall") | in_rects("industrial_harbour") | in_rects("gulf")
+            | in_rects("military_harbour"))
 
 
 def distance_from(src, max_m):
@@ -117,14 +121,24 @@ def shelf_target(d):
     return t
 
 
-def shelf_grid(h):
-    """The shelf applied to a height grid (N x N, Godot metres); returns the new grid."""
+def open_sea(water):
+    """Water connected to the edge of the world: a lake or a reservoir inside the land is not the sea and takes no
+    shelf (it read as "a beach with deep water" to the check). PIL's flood fill, so it is one C call."""
+    from PIL import Image, ImageDraw
+    a = np.pad(np.where(water, 255, 0).astype(np.uint8), 1, constant_values=255)
+    im = Image.frombytes("L", (a.shape[1], a.shape[0]), a.tobytes())   # (fromarray shares a buffer a fill misses)
+    ImageDraw.floodfill(im, (0, 0), 128)
+    return np.asarray(im).reshape(a.shape)[1:-1, 1:-1] == 128
+
+
+def shelf_parts(h):
+    """(take, w, target): which sea cells take the shelf, its fade weight (1 = full strength) and its target."""
     land = h >= 0.0
     beach_land = land & (h < BEACH_LAND_MAX) & in_rects("beach")
-    other_land = land & ~beach_land
+    other_land = (land & ~beach_land) | ((~land) & ~open_sea(~land & np.isfinite(h)))
     db = distance_from(beach_land, SHELF_W + DROP_W)
     do = distance_from(other_land, SHELF_W + DROP_W)
-    sea = ~land & np.isfinite(h)
+    sea = ~land & np.isfinite(h) & open_sea(~land & np.isfinite(h))
     # a sea cell takes the shelf only where BEACH land is its nearest shore (a quay or a cliff next door keeps depth)
     target = shelf_target(db)
     target[~np.isfinite(target)] = SEABED             # past the drop the shelf IS the seabed
@@ -134,6 +148,12 @@ def shelf_grid(h):
     # nearest shore is not a beach), so there is no underwater wall at its edge. The target itself fades toward the
     # seabed, so the result depends on the land mask only and the shelf of a shelved grid is itself (idempotent)
     w = np.clip(distance_from(sea & ~take, HARD_FADE) / HARD_FADE, 0.0, 1.0)
+    return take, w, target
+
+
+def shelf_grid(h):
+    """The shelf applied to a height grid (N x N, Godot metres); returns the new grid."""
+    take, w, target = shelf_parts(h)
     faded = w * target + (1.0 - w) * SEABED
     out = h.copy()
     out[take] = np.maximum(h[take], faded[take])
@@ -156,9 +176,10 @@ def check(path, orig_path=None):
     land = h >= 0.0
     beach_land = land & (h < BEACH_LAND_MAX) & in_rects("beach")
     db = distance_from(beach_land, 60.0)
-    # water within HARD_FADE of a cliff/harbour zone is faded back to depth on purpose; judge the rest
-    shallow = (~land) & (db <= 60.0) & (db > 0) & ~np.isfinite(distance_from(hard_zones() & ~in_rects("beach"),
-                                                                              HARD_FADE))
+    # judged where the shelf applies at FULL strength: water it takes, not faded toward a cliff, a harbour or a shore
+    # that is not a beach (the fade is on purpose), and not a lake
+    take, w, _t = shelf_parts(h)
+    shallow = take & (w >= 1.0) & (db <= 60.0) & (db > 0)
     frac = float(np.mean(h[shallow] > -2.5)) if shallow.any() else 0.0
     ok = frac >= 0.95
     msg = "%.1f%% of sea within 60 m of a beach is shallower than 2.5 m" % (100 * frac)

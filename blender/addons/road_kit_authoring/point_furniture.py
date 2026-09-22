@@ -209,10 +209,16 @@ class Furniture(object):
         if a.get("collide_pole"):
             self.placements[-1]["pole"] = True
         self.counts[asset] = self.counts.get(asset, 0) + 1
-        if a.get("collide_pole") and a.get("breakable"):
+        if a.get("breakable") and (a.get("collide_pole") or a.get("collide")):
             # a knock-down pole (PLAN.md 3.11) has no static box: its batch's BreakableProps node builds a collider
-            # per pole at runtime and takes it away when a car knocks the pole down
-            half, height = a["collide_pole"]
+            # per pole at runtime and takes it away when a car knocks the pole down. A breakable BOX prop (a corner
+            # bollard) is sized from its own footprint and is not a "pole" to the spacing rules, so a row of them
+            # keeps its 1.8 m pitch.
+            if a.get("collide_pole"):
+                half, height = a["collide_pole"]
+            else:
+                half = 0.5 * max((a["hi"][0] - a["lo"][0]) * a["scale"][0], (a["hi"][2] - a["lo"][2]) * a["scale"][2])
+                height = (a["hi"][1] - a["lo"][1]) * a["scale"][1]
             b = a["breakable"]
             self.placements[-1]["breakable"] = {"pole_half": float(half), "pole_height": float(height),
                                                 "mass": float(b.get("mass", 250.0)),
@@ -513,7 +519,7 @@ def _barrier_samples(pts, walk, wall, spacing, clear, phase=None):
     return out
 
 
-def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground):
+def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, index=None):
     r = table.rules
     for s in solves:
         if not mine_run(s):
@@ -535,7 +541,8 @@ def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground):
                 off = sgn * (r["planter_kerb_gap"] + half)
                 pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
                 if fur.clear_of(pos, r.get("pole_clearance", 0.0) + 0.5 * (a["hi"][2] - a["lo"][2]) * a["scale"][2],
-                                poles_only=True):
+                                poles_only=True) and (index is None or index.clear_of(
+                                    pos, r.get("prop_lane_clear", 0.0) + half)):
                     fur.put(table, "planter", pos, d, s.road.name)
     for j in jsolves:
         if not mine_pad(j):
@@ -547,7 +554,12 @@ def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground):
                 lat = _left(d)
                 off = sgn * r["bollard_inset"]
                 pos = (p[0] + lat[0] * off, p[1] + lat[1] * off, p[2] + k)
-                if fur.clear_of(pos, r.get("pole_clearance", 0.0), poles_only=True):
+                # A turn connector may cut the corner a bollard stands on (`turn_off_pad`), and a car turning
+                # there pins its hull against a solid post and never gets free -- measured on the rebuilt island,
+                # every traffic car reclaimed as `stalled` (34 in one run) stood beside corner bollards with its
+                # throttle on. So a bollard keeps clear of every lane, the rule a tree already had.
+                if fur.clear_of(pos, r.get("pole_clearance", 0.0), poles_only=True) and (
+                        index is None or index.clear_of(pos, r.get("prop_lane_clear", 0.0))):
                     fur.put(table, "bollard", pos, d)
 
 
@@ -832,7 +844,7 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     # the signals first: every later solid prop (planter, bollard, lamp) keeps clear of a pole already standing
     _signals(fur, table, lanes, ordered, mine_lane, ground)
     _lane_props(fur, table, dict(sorted(lanes.items())), mine_lane, ground)
-    _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground)
+    _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, _LaneIndex(lanes))
     _lamps(fur, table, solves, bands, mine_run, ground)
     _street_trees(fur, table, solves, bands, mine_run, ground, lanes)
     _median_walls(fur, table, solves, mine_run)

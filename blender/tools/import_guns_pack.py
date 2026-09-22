@@ -54,19 +54,16 @@ MODELS = {
     # like the old ASR2.
     "ASR2": dict(folder="M4A1", fbx="M4A1.fbx", png="M4A1_Base_Color.png", tip=(+1, 1), up=(+1, 2),
                  grip=(None, -0.077, -0.068), length=0.838),
-    # A Remington 700 / M24-pattern scoped rifle, authored with the bore pitched 10.46 deg up (the barrel's
-    # principal axis), scaled to the M24's 1.092 m. Fist on the semi-pistol grip behind the trigger.
-    "SNR1": dict(folder="Sniper", fbx="Sniper.fbx", png="Sniper_Base_Color.png", tip=(+1, 1), up=(+1, 2),
-                 pitch=10.46, grip=(-0.0037, -0.315, -0.110), length=1.092, parts={"Bolt": "bolt_work"}),
+    # (SNR1 was the pack's Remington 700 / M24-pattern rifle from 2026-09-19 to 2026-09-21; it is Quaternius'
+    # SniperRifle_3 again, the conformed SNR1.blend of 686f4c0 restored. The row is removed so a re-run cannot
+    # overwrite it. BORE_Z / BOLT_KEYS below were its bolt's; nothing else uses them.)
     # A Remington 870-pattern pump gun, 1.219 m raw, scaled to the 870's 0.98 (18.5 in barrel). Stock-wrist grip.
     # The pump sat 0.36 m ahead of the grip, past this character's 0.416 m arm (grip missed by 9 cm in
     # probe_weapon_fit); an 870's pump travels ~9 cm, so it is slid 8.5 cm back along its tube (partly racked).
     "SHG1": dict(folder="Shotgun", fbx="Shotgun.fbx", png="Shotgun_Base_Color.png", tip=(+1, 1), up=(+1, 2),
                  grip=(None, -0.48, -0.037), length=0.98, slide={"Fore_Stock": -0.085}),
-    # Makarov PM, 0.168 m raw, scaled to the real PM's 0.161. Its spare magazine lies loose behind the gun in the
-    # file, so it is dropped. Fist on the grip, bore 6 cm over it like the old PIS1.
-    "PIS1": dict(folder="Pistol_MK", fbx="Makarov.fbx", png="Makarov_Base_Color.png", tip=(+1, 1), up=(+1, 2),
-                 grip=(0.0048, -0.0057, -0.015), length=0.161, drop=("Magazine",)),
+    # (PIS1 was the pack's Makarov PM until 2026-09-21; it is Quaternius' Pistol_5 again, conformed by
+    # import_quaternius_pistols.py. The Makarov row is removed so a re-run cannot overwrite it.)
     # Throwables and the charge: real-size already, kept at their raw size (length None). A grenade's origin is its
     # BODY CENTRE with the fuze forward (the FRG1 rule); raw +Z is the fuze on every one of them.
     "FRG1": dict(folder="FragGrenade", fbx="FragGrenadeModel.fbx", png="FragGrenade_Base_Color.png",

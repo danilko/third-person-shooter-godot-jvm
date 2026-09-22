@@ -263,6 +263,21 @@ def patch(text: str, zones, a) -> str:
 
 # ---------------------------------------------------------------------------- main
 
+def min_road_load():
+    """The smallest road-zone load radius: roads must be under every building that is streamed (PLAN.md R7).
+
+    A building cell (`island_buildings.CELL`, 252 m) loads within `island_buildings.LOAD` of ITS centre, so a building
+    can stand up to LOAD + its cell's half-diagonal from the player; a road zone owns a 504 m cell, so a road point can
+    be up to that cell's half-diagonal from the zone centre. Measured before: buildings 800 m against roads 700 m, and
+    between ~350 and ~620 m a block could stand with no asphalt under it and traffic ran off the stream edge. Derived
+    from the building constants so the two cannot drift apart again (one owner: the building cells)."""
+    import island_buildings as ib
+    import island_v3_geom as geom
+    road_cell = geom.DISTRICT
+    need = ib.LOAD + ib.CELL * math.sqrt(0.5) + road_cell * math.sqrt(0.5)
+    return math.ceil(need / 50.0) * 50.0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("record", help="<stem>.roads.json")
@@ -271,7 +286,7 @@ def main() -> int:
     ap.add_argument("--prefix", default="island", help="zone id prefix: <prefix>_<gx>_<gz>")
     ap.add_argument("--cell", type=float, default=geom.DISTRICT)
     ap.add_argument("--grid", type=int, default=geom.GRID_N, help="cells per side of the world square")
-    ap.add_argument("--load", type=float, default=700.0, help="the smallest load radius, m")
+    ap.add_argument("--load", type=float, default=min_road_load(), help="the smallest load radius, m")
     ap.add_argument("--lead", type=float, default=200.0,
                     help="load radius past a zone's farthest station (streaming time a fast car closes)")
     ap.add_argument("--hysteresis", type=float, default=300.0, help="unload - load, m")

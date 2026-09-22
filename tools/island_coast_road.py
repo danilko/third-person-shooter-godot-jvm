@@ -35,11 +35,16 @@ import point_presets as ppr           # noqa: E402
 
 ALIGNMENT = os.path.join(ROOT, "assets", "world_source", "pieces", "IslandCoastRoad.json")
 NAME = "kaigan_dori"
-HEAD_ROAD = "kitahama_dori__3"        # the coast road continues this road's tail westward (a joint)
-CORNER_S = "nishihama_dori__2"        # ... and ends at the corner where this one turns into ...
-CORNER_E = "rinkai_dori"              # ... this one, which becomes a T
-START = (-1602.7, -215.0)             # the walk's start: north of that corner, on nishihama's line
-CORNER_MOUTH = 45.0                   # the T's mouths, this far from the corner (the setback re-solves them)
+# THE COASTAL RING (PLAN.md 3.29 v8/v14, 3.30 L2): this road is its north-west side. Its two ends are FREE road ends
+# of the arterial layer (`island_network.py`), found by position, never by name -- the builder names roads by how it
+# cut them. HEAD: the ring's north-east end on the farm coast; the coast road continues it westward (a joint).
+# CORNER: the residential south-west shore, where the ring's west side and rinkai_dori both end; the coast road's tail
+# makes the T there.
+HEAD_NEAR = (631.0, 1652.0)           # record: near the ring's north-east free end
+CORNER_NEAR = (-1420.0, -330.0)       # record: near the ring's south-west free end (and rinkai's west end)
+CORNER_R = 90.0                       # every free road end this near the corner is an arm of the T
+CORNER_MOUTH = 45.0                   # the coast road's own mouth, this far from the corner (setback re-solves it)
+START_BACK = 0.0                      # the walk starts AT the corner
 
 # the dump
 N, X0, CELL = 1153, -2304.0, 4.0
@@ -180,6 +185,36 @@ def walk(field, start, heading, end, end_heading):
     return pts
 
 
+def remove_loops(pts):
+    """A walk that meets a notch in the shore can circle once before it finds the coast again (measured on the
+    reshaped island, 3.30: four full loops). Where the polyline crosses itself the loop between is cut out."""
+    def cross(a, b, c, d):
+        r = (b[0] - a[0], b[1] - a[1])
+        s = (d[0] - c[0], d[1] - c[1])
+        den = r[0] * s[1] - r[1] * s[0]
+        if abs(den) < 1e-9:
+            return None
+        t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den
+        u = ((c[0] - a[0]) * r[1] - (c[1] - a[1]) * r[0]) / den
+        return (a[0] + r[0] * t, a[1] + r[1] * t) if 0 <= t <= 1 and 0 <= u <= 1 else None
+    out = list(pts)
+    cut = 0
+    i = 0
+    while i < len(out) - 3:
+        hit = None
+        for j in range(min(len(out) - 2, i + 400), i + 1, -1):      # the LATEST crossing: the widest loop
+            q = cross(out[i], out[i + 1], out[j], out[j + 1])
+            if q is not None:
+                hit = (j, q)
+                break
+        if hit:
+            j, q = hit
+            out = out[:i + 1] + [q] + out[j + 1:]
+            cut += 1
+        i += 1
+    return out, cut
+
+
 def resample(pts, step):
     cum = [0.0]
     for a, b in zip(pts, pts[1:]):
@@ -297,19 +332,58 @@ def shed_spans(cum, face):
     return sorted(out)
 
 
+def free_ends(net):
+    """[(uid, road name, neighbour uid)] of every road END that joins nothing: no junction and no other road."""
+    out = []
+    for name, r in net.roads.items():
+        for u, nb in ((r.points[0], r.points[1]), (r.points[-1], r.points[-2])):
+            p = net.points[u]
+            if any(l.type == pm.LINK_JUNCTION for l in p.links):
+                continue
+            if len([l for l in p.links if l.type == pm.LINK_SEGMENT]) > 1:
+                continue
+            out.append((u, name, nb))
+    return out
+
+
+def head_end(net):
+    """(uid, previous station's uid) of the ring's free end the coast road continues."""
+    u, _n, nb = min(free_ends(net), key=lambda e: math.dist(net.points[e[0]].pos[:2], HEAD_NEAR))
+    if math.dist(net.points[u].pos[:2], HEAD_NEAR) > 250.0:
+        raise SystemExit("island_coast_road: no free road end near %s for the head" % (HEAD_NEAR,))
+    return u, nb
+
+
+def corner_ends(net):
+    """The free road ends of the corner T and the corner itself (their centroid). With no free end there (the ring's
+    west side and rinkai_dori were built as ONE road through the corner), the corner is the nearest point of the
+    nearest road, and `add` CUTS that road to land the T."""
+    ends = [e for e in free_ends(net) if math.dist(net.points[e[0]].pos[:2], CORNER_NEAR) < CORNER_R + 150.0]
+    if ends:
+        c = (sum(net.points[e[0]].pos[0] for e in ends) / len(ends),
+             sum(net.points[e[0]].pos[1] for e in ends) / len(ends))
+        return ends, c
+    from island_roadgen import nearest_span
+    name, i, t, d = nearest_span(net, CORNER_NEAR, "")
+    a, b = (net.points[u].pos for u in net.roads[name].points[i:i + 2])
+    return [], (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+
 def cmd_derive(dump_path):
     net = pm.load_network(os.path.join(ROOT, "assets", "world_source", "pieces", "IslandRoads.arterials.roads.json"))
-    head = net.roads[HEAD_ROAD]
-    e_pos = net.points[head.points[-1]].pos
-    e_prev = net.points[head.points[-2]].pos
+    e_uid, e_nb = head_end(net)
+    e_pos = net.points[e_uid].pos
+    e_prev = net.points[e_nb].pos
     end = (e_pos[0], e_pos[1])
+    _ends, START = corner_ends(net)
     dump = Dump(dump_path)
-    rect = (-2100.0, -400.0, end[0] + 400.0, 2150.0)
+    rect = (-2100.0, min(START[1], end[1]) - 400.0, end[0] + 400.0, 2150.0)
     field = Field(*dump.distance_field(rect))
     # walked SW -> NE with the sea on the left; the road's chain runs the other way (kitahama's tail -> the corner)
     arrive = _heading_to(end, e_prev)                  # arriving at kitahama's tail, running against its chain
     plan = walk(field, START, math.pi / 2, end, arrive)
-    plan = smooth(resample(plan, STEP), SMOOTH_M)
+    plan, cut = remove_loops(resample(plan, STEP))
+    plan = smooth(plan, SMOOTH_M)
     total_moved = 0
     for _ in range(12):
         plan, moved = push_inland(field, plan)
@@ -373,20 +447,12 @@ def add(net, doc=None):
     if NAME in net.roads:
         raise SystemExit("island_coast_road: %s is already in the record" % NAME)
     doc = doc or json.load(open(ALIGNMENT))
-    head = net.roads[HEAD_ROAD]
-    e_uid = head.points[-1]
+    e_uid, _nb = head_end(net)
     sts = doc["stations"]
     if math.dist(sts[0][:2], net.points[e_uid].pos[:2]) > 0.05:
-        raise SystemExit("island_coast_road: the alignment starts %.2f m from %s's tail -- re-derive"
-                         % (math.dist(sts[0][:2], net.points[e_uid].pos[:2]), HEAD_ROAD))
-    # the corner T: the fillet between nishihama__2 and rinkai dropped, each ends at a mouth CORNER_MOUTH out
-    s_road, e_road = net.roads[CORNER_S], net.roads[CORNER_E]
-    corner = net.points[e_road.points[0]].pos[:2]
-    ms = _nearest_station(net, s_road, corner, CORNER_MOUTH)
-    me = _nearest_station(net, e_road, corner, CORNER_MOUTH)
-    net.unlink(s_road.points[-1], e_road.points[0])
-    _drop_until(net, s_road, ms, from_head=False)
-    _drop_until(net, e_road, me, from_head=True)
+        raise SystemExit("island_coast_road: the alignment starts %.2f m from the ring's end -- re-derive"
+                         % math.dist(sts[0][:2], net.points[e_uid].pos[:2]))
+    ends, corner = corner_ends(net)
     # the road: stations, then cut short so its last station is a mouth CORNER_MOUTH from the corner
     road = net.add_road(pm.RoadData(NAME, pm.PointData(uid=""), ()))
     cum = [0.0]
@@ -424,11 +490,78 @@ def add(net, doc=None):
         if any(s0 - 0.5 <= s < s1 - 0.5 for s0, s1 in sheds):
             net.points[u].shed = open_side
             n_shed += 1
-    # the T: nishihama__2 -> kaigan_dori is the through road (both along the west coast), rinkai the stem
-    from island_roadgen import make_junction
-    make_junction(net, [ms, me, road.points[-1]], signal=False)
-    return "%s: %d stations, %.0f m, %d under %d shed(s), a joint on %s, a T at the %s/%s corner" % (
-        NAME, len(road.points), rcum[-1], n_shed, len(sheds), HEAD_ROAD, CORNER_S, CORNER_E)
+    # the corner: the coast road's tail joins the free ends there -- one road end is a joint, two or more a junction
+    from island_roadgen import make_junction, cut_road, nearest_span
+    arms = [e[0] for e in ends]
+    if not arms:
+        name = nearest_span(net, corner, "")[0]
+        arms = list(cut_road(net, corner, name, CORNER_MOUTH))
+    if len(arms) == 1:
+        net.link(arms[0], road.points[-1])
+        kind = "a joint"
+    else:
+        make_junction(net, arms + [road.points[-1]], signal=False)
+        kind = "a %d-arm junction" % (len(arms) + 1)
+    head = "%s: %d stations, %.0f m, %d under %d shed(s), a joint on the ring's north-east end, %s at the corner" % (
+        NAME, len(road.points), rcum[-1], n_shed, len(sheds), kind)
+    return head + open_built_up(net, road)
+
+
+#: The part of the coast road inside a BUILT-UP region is a street with footways, not a road cut into a cliff (user,
+#: 2026-09-21: "the wall is only for the coast road where it runs against the mountain; farmland, residential, city
+#: and the harbour stay open, with a sidewalk, so the buildings on both sides can be entered"). The regions are the
+#: ones the buildings are placed in (`island_buildings.REGIONS`, record frame), so "built-up" has one owner.
+OPEN_PRESET = "arterial"
+#: ... and it is its own STREET by name: `island_buildings.SKIP_ROADS` fronts no building on `kaigan_dori` (the cliff
+#: road), so the open stretches must not carry that prefix or nothing would ever be built beside them.
+OPEN_NAME = "kaigan_machi"
+
+
+def _rename(net, road, name):
+    del net.roads[road.name]
+    road.name = name
+    net.roads[name] = road
+
+
+def _built_up(x, y):
+    import island_buildings as ib
+    return any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for _n, b, *_r in ib.REGIONS)
+
+
+def open_built_up(net, road):
+    """Split the coast road at a JOINT where it enters and leaves a built-up region, and put the built-up ends on
+    `OPEN_PRESET`. Only whole leading/trailing runs are opened (the road's middle is the mountain), a shed station is
+    never one of them, and a run shorter than two spans is left walled. Returns a summary suffix."""
+    import point_record_ops as pro
+    chain = list(road.points)
+    flag = [_built_up(*net.points[u].pos[:2]) and net.points[u].shed == pm.SHED_NONE for u in chain]
+    lead = 0
+    while lead < len(chain) and flag[lead]:
+        lead += 1
+    trail = 0
+    while trail < len(chain) and flag[len(chain) - 1 - trail]:
+        trail += 1
+    if lead >= len(chain):
+        _rename(net, road, OPEN_NAME)
+        ppr.apply_preset(net, OPEN_NAME, OPEN_PRESET)
+        return ", all of it open (built-up)"
+    notes = []
+    # the trailing run first, so the leading split does not move the chain the trailing index is counted in
+    if trail >= 3:
+        at = chain[len(chain) - trail]
+        _msg, out = pro.split_at_joint(net, at, OPEN_NAME + "__2")
+        ppr.apply_preset(net, out["road"], OPEN_PRESET)
+        notes.append("%s (%d stations)" % (out["road"], trail))
+    if lead >= 3:
+        at = chain[lead - 1]
+        _msg, out = pro.split_at_joint(net, at, NAME + "__mountain")
+        # the part BEFORE the joint is the built-up one: it becomes the street; the rest keeps the cliff road's name
+        mountain = net.roads[out["road"]]
+        _rename(net, road, OPEN_NAME)
+        _rename(net, mountain, NAME)
+        ppr.apply_preset(net, OPEN_NAME, OPEN_PRESET)
+        notes.append("%s (%d stations)" % (OPEN_NAME, lead))
+    return (", footways where built up: " + ", ".join(notes)) if notes else ""
 
 
 def _chain_cum(net, road):

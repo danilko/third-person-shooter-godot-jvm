@@ -34,11 +34,33 @@ PREFIX = "shuto_"
 
 # ------------------------------------------------------------------------------------------ ground
 
-class Ground(object):
-    """The network's NATURAL ground (`<stem>.ground.bin`, float32, NaN = no sample), bilinear."""
+TERRAIN_LAND = os.path.join(ROOT, "assets", "world_source", "terrain", "island_land.f32")
+NET_Y = 0.6           # the IslandRoads node's Y: a record height is the Godot height less this
 
-    def __init__(self, stem=os.path.join(PIECES, "IslandRoads")):
+
+class Ground(object):
+    """The NATURAL ground under the network, in the record frame (x, y; height = Godot Y - NET_Y), bilinear.
+
+    Since the land redo (PLAN.md 3.30) the source is the island's LAND grid (`island_reshape.py`, the whole world at
+    2 m, Godot axes) -- the ground the layout is derived FROM, before any road is sculpted into it or stamped onto it.
+    The old source, the network's `<stem>.ground.bin` sidecar, is sampled from the terrain AFTER a build, so it
+    described the previous world's ground and a generator reading it laid roads on land that had since moved. The
+    sidecar is still the fallback where no land grid exists (a checkout from before the redo), and `stem=` asks for
+    it explicitly."""
+
+    def __init__(self, stem=None, grid=None):
         import numpy as np
+        self.np = np
+        if stem is None and (grid or os.path.exists(TERRAIN_LAND)):
+            n = 2305
+            g = np.fromfile(grid or TERRAIN_LAND, dtype="<f4").reshape(n, n)
+            # record frame: row j = record y = -(Godot z); Godot row 0 is z -2304, so record row 0 (y -2304) is the
+            # LAST Godot row
+            self.g = (g[::-1, :] - NET_Y).astype("<f4")
+            self.ox, self.oy = -2304.0, -2304.0
+            self.step = 2.0
+            return
+        stem = stem or os.path.join(PIECES, "IslandRoads")
         h = json.load(open(stem + ".ground.json"))
         self.g = np.fromfile(os.path.join(PIECES, h["bin"]), dtype="<f4").reshape(h["ny"], h["nx"])
         self.ox, self.oy = h["origin"]
@@ -394,6 +416,8 @@ def cut_road(net, xy, prefix, gap, new_name=None):
     (pa, ka), (pb, kb) = at(s0 - gap), at(s0 + gap)
     keep = [u for j, u in enumerate(chain) if cum[j] < s0 - gap - 6.0]
     rest = [u for j, u in enumerate(chain) if cum[j] > s0 + gap + 6.0]
+    if not keep or not rest:        # a station of the road stands inside the mouths' reach on one side: no room
+        raise ValueError("%s: a junction at %s leaves no station outside its mouths" % (name, xy))
     doomed = [u for u in chain if u not in keep and u not in rest]
     src = net.points[chain[ka]]
     kw = {n: getattr(src, n) for n in pm.DELTA_FIELDS}

@@ -1,0 +1,14 @@
+[gd_scene format=3]
+
+; The BODY with no scripts on it -- the far tier of the ambient crowd (PedCrowd, PLAN.md 3.6d).
+; It exists only to state the armature's 180-degree turn: a VRoid export faces +Z while the game
+; faces -Z (W41, "the armature's frame is not the game's"), and a crowd that writes walk transforms
+; onto an unturned body walks backwards. CharacterVisuals_Shino.tscn states the same turn for the
+; playable body; this is the same fact with nothing else attached.
+
+[ext_resource type="PackedScene" path="res://assets/characters/shino/shino.glb" id="1_shino"]
+
+[node name="shino_body" instance=ExtResource("1_shino")]
+
+[node name="shino" parent="." index="0"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)

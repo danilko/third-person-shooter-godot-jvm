@@ -736,7 +736,9 @@ public class ZoneManager extends Node {
 					if (debugLog) GD.print("ZoneManager: traffic reclaim in '" + marker.zone.zoneId
 							+ "' (" + (dead ? "dead" : fin ? "route-finished"
 									 : fell ? "fell-out" : far ? "out-of-range"
-									 : unrouted ? "unrouted" : stalled ? "stalled" : "abandoned") + ")");
+									 : unrouted ? "unrouted" : stalled ? "stalled" : "abandoned") + ")"
+							+ (stalled && v.getController() instanceof VehicleAIController c4
+									? " " + c4.describeBlock() : ""));
 					freeTrafficCar(lz, v, net);
 					it.remove();
 				}

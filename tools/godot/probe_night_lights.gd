@@ -137,9 +137,10 @@ func _initialize() -> void:
 	_check(int(sl.call("lit_lamps_now")) == 0, "a camera 400 m from every lamp lights none")
 
 	# --- 3. a lamp that is down is dark
+	# Wait in TIME, not frames: the pool re-assigns every 0.25 s, and 20 headless frames are shorter than that, so
+	# coming straight back from the 400 m case read `before` as 0 lit and the check below could never pass.
 	_camera_at(eye, (lamp + Vector3(0, 5, 0) - eye).normalized())
-	for f in 20:
-		await process_frame
+	await create_timer(0.6).timeout
 	var before: int = sl.call("lit_lamps_now")
 	b.call("pole_world_position_now", 0)     # (no-op; keeps the call shape beside the knock-down below)
 	var mm: MultiMesh = b.multimesh
@@ -156,8 +157,7 @@ func _initialize() -> void:
 			break
 		car.linear_velocity = aim.normalized() * 16.0 + Vector3(0, car.linear_velocity.y, 0)
 		await physics_frame
-	for f in 20:
-		await process_frame
+	await create_timer(0.6).timeout
 	var down: bool = b.call("pole_broken_now", 0)
 	var after: int = sl.call("lit_lamps_now")
 	print("probe: drove into the lamp -> broken %s, lit %d -> %d" % [down, before, after])

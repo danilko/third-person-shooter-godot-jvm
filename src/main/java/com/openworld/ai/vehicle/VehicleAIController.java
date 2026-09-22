@@ -397,6 +397,25 @@ public class VehicleAIController extends Controller {
      * needs no edit. The mask is the scene ray's own (CHARACTER | VEHICLE), so what counts as an obstacle
      * still has ONE owner.
      */
+    /** Debug: what this car is waiting on (a stalled-reclaim log line reads it). */
+    public String describeBlock() {
+        StringBuilder b = new StringBuilder();
+        b.append("lane=").append(route == null ? "none" : (route instanceof Node rn ? rn.getName().toString() : route.toString())).append(String.format(" at %.1f", routeProgress));
+        b.append(" state=").append(currentState == null ? "?" : currentState.getClass().getSimpleName());
+        if (shouldYield()) b.append(" yield");
+        RayCast3D[] all = new RayCast3D[flankRays.length + 1];
+        all[0] = obstacleRay;
+        System.arraycopy(flankRays, 0, all, 1, flankRays.length);
+        for (RayCast3D r : all) {
+            if (r == null || !r.isColliding()) continue;
+            Object o = r.getCollider();
+            b.append(" ray->").append(o instanceof Node n ? n.getName().toString() + "@" + (n instanceof godot.api.Node3D n3 ? n3.getGlobalPosition().toString() : "") : String.valueOf(o));
+            break;
+        }
+        b.append(" pos=").append(vehicleBody == null ? "?" : vehicleBody.getGlobalPosition().toString());
+        return b.toString();
+    }
+
     public boolean isPathBlocked() {
         if (obstacleRay == null) return false;
         if (obstacleRay.isColliding()) return true;

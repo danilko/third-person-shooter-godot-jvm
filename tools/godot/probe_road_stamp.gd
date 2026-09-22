@@ -13,6 +13,10 @@ extends SceneTree
 ##   4. stamping again changes NOTHING (idempotent -- every height is derived from the natural ground);
 ##   5. restoring puts the natural ground back exactly;
 ## with a CONTROL: the natural ground fails (2). Steps 4-5 run in memory and are never saved.
+##
+## A terrain carrying a city's BLOCK GROUND (`urban_paint.marker` + `urban_block.layer`, laid after the stamp by
+## `tools/island_world.sh`'s ground stage) is judged as the pipeline built it: 4 re-stamps WITH the layer over it,
+## and 5 compares only the vertices the layer does not own (the restore is the stamp's, the block ground is not).
 
 const Ground := preload("res://addons/road_kit/road_kit_ground.gd")
 const Stamp := preload("res://addons/road_kit/road_kit_stamp.gd")
@@ -187,7 +191,11 @@ func _initialize() -> void:
 
 	# 4 + 5: in memory only.
 	var corr := Service.run("corridors", net.record_path, ["--ground", ProjectSettings.globalize_path(Ground.sidecar_path(net.record_path))])
-	var again := Stamp.stamp(net, terrain, corr, record.get("corridors", []))
+	var layer := Stamp.load_layer(terrain) if Stamp.has_block_layer(terrain) else {}
+	if Stamp.has_block_layer(terrain):
+		check(not layer.is_empty(), "the block ground carries its layer (%s)" % Stamp.URBAN_LAYER,
+				"%d vertices" % int(layer.get("count", 0)))
+	var again := Stamp.stamp(net, terrain, corr, record.get("corridors", []), false, layer)
 	check(again["ok"] and again["changed"] == 0, "stamping again changes nothing", again["message"])
 	print("  INFO  corridors + re-stamp %d ms" % (Time.get_ticks_msec() - t0))
 	t0 = Time.get_ticks_msec()
@@ -200,6 +208,8 @@ func _initialize() -> void:
 			# On the 1 cm grid, as the pad vertices below and for the same reason: a lane sample a few mm off an exact
 			# terrain vertex reads the FAR vertex, which on the 10% touge is 0.20 m up the grade (measured: two samples
 			# "0.07/0.09 m proud" read 0.097/0.100 m UNDER the lane once snapped, PLAN.md 3.2d).
+			if not layer.is_empty() and not is_nan(Stamp.layer_height(layer, w.x, w.z)):
+				continue        # the block ground's vertex, not the stamp's
 			var h: float = terrain.data.get_height(Vector3(snappedf(w.x, 0.01), w.y, snappedf(w.z, 0.01)))
 			var g: float = nat.call(w)
 			if not is_nan(h) and not is_nan(g):

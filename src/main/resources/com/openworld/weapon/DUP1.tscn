@@ -1,0 +1,63 @@
+[gd_scene format=3 uid="uid://c2162c0cmow05"]
+
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/DUP1.tres" id="90_stats"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/DualPistolItem.java" id="1_wa52e"]
+[ext_resource type="Texture2D" path="res://assets/ui/weapons/DUP1.png" id="2_4tcni"]
+[ext_resource type="AudioStream" uid="uid://c0v8ncowcuy0l" path="res://assets/audio/Pistol_fire.wav" id="3_t6cmh"]
+[ext_resource type="AudioStream" uid="uid://b11jauobcpulr" path="res://assets/audio/Pistol_reload.wav" id="4_l5qg7"]
+[ext_resource type="PackedScene" path="res://assets/weapons/DUP1.glb" id="5_28o6u"]
+[ext_resource type="PackedScene" path="res://assets/vfx/muzzle_flash/effects/short_flash/short_flash_01.tscn" id="6_muzzle"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(0.08, 0.1405, 0.22)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_area"]
+size = Vector3(0.5, 0.5, 0.5)
+
+[node name="DUP1" type="Node3D" unique_id=358619058]
+transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
+script = ExtResource("1_wa52e")
+stats = ExtResource("90_stats")
+weapon_id = "DUP1"
+weapon_archetype = "dual_pistol"
+weapon_name = "DUP-1"
+slot_type = 1
+weapon_icon = ExtResource("2_4tcni")
+hold_socket = "SocketPistol"
+holster_sockets = PackedStringArray("ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2", "ShortWeaponHolsterMaker3", "ShortWeaponHolsterMaker4")
+magazine = 30
+reserve = 60
+fire_audio = ExtResource("3_t6cmh")
+reload_audio = ExtResource("4_l5qg7")
+require_interact = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=100000002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0327, -0.0727)
+shape = SubResource("BoxShape3D_body")
+
+[node name="PickupArea" type="Area3D" parent="." unique_id=100000003]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=1413815655]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0327, -0.0727)
+shape = SubResource("BoxShape3D_area")
+
+[node name="Muzzle" type="Marker3D" parent="." unique_id=1222425939]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0798, -0.1827)
+
+[node name="MuzzleVFX" parent="Muzzle" unique_id=1454172846 instance=ExtResource("6_muzzle")]
+
+[node name="Model" parent="." unique_id=509308939 instance=ExtResource("5_28o6u")]
+
+[node name="ModelLeft" type="Node3D" parent="." unique_id=509308940]
+
+[node name="Model" parent="ModelLeft" unique_id=509308941 instance=ExtResource("5_28o6u")]
+
+[node name="MuzzleLeft" type="Marker3D" parent="ModelLeft" unique_id=509308942]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0798, -0.1827)
+
+[node name="MuzzleVFX" parent="ModelLeft/MuzzleLeft" unique_id=509308943 instance=ExtResource("6_muzzle")]
+
+[connection signal="body_entered" from="PickupArea" to="." method="on_body_entered"]
+[connection signal="body_exited" from="PickupArea" to="." method="on_body_exited"]

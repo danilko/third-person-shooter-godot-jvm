@@ -181,8 +181,9 @@ func _initialize() -> void:
 						left_range += 1
 					else:
 						done.append({"dist": c["dist"], "secs": (f - c["spawn"]) / 60.0})
-				print("  car gone after %5.1f s, drove %6.1f m%s"
-						% [(f - c["spawn"]) / 60.0, c["dist"],
+				print("  car gone after %5.1f s, drove %6.1f m at (%.1f, %.1f, %.1f), last idle %.1f s%s"
+						% [(f - c["spawn"]) / 60.0, c["dist"], c["last"].x, c["last"].y, c["last"].z,
+						(f - c["moved_frame"]) / 60.0,
 						("  [%.0f m out — left range%s]" % [gone, ", stream edge" if why == "stream-edge" else ""])
 								if out_of_range else ("  [%s]" % why if why != "" else "")])
 				cars.erase(id)

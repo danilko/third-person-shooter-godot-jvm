@@ -52,9 +52,10 @@ TAPER = 0.25          # expressway taper_factor: the compressed world's choice, 
 
 # ------------------------------------------------------------------------------------------ the layout
 
-C1_CORNERS = [(150.0, 40.0), (1300.0, 40.0), (1300.0, 720.0), (150.0, 720.0)]
+import island_plan as PL        # noqa: E402  the final plan's numbers (PLAN.md 3.30 L2): C1 moved with the city
+C1_CORNERS = PL.C1_CORNERS
 C1_RADIUS = 180.0
-C1_Y = 40.0
+C1_Y = C1_CORNERS[0][1]
 SOUND_WALL = 3.0        # a city expressway's sound walls (防音壁)
 # ONLY where C1 is central to the city (user): its SOUTH half -- the JCT road and the south-west road, i.e. the south
 # side, both lower corners and the lower half of each side -- faces downtown and the station area. The north half faces
@@ -62,19 +63,29 @@ SOUND_WALL = 3.0        # a city expressway's sound walls (防音壁)
 # bridge. C1's four roads are the cuts the ring already has (the JCT, both sides at y 300, the north overpass).
 SOUND_WALL_ROADS = (PREFIX + "c1", PREFIX + "c1__4")
 RAMP_LANES = 2          # every exit and entrance is two lanes wide (user, 3.13: a wider ramp for racing)
-JCT_X = 780.0          # the airport JCT on C1's south side
-SPUR_OFF = 8.0         # each spur carriageway's centre off the spur's centreline
+JCT_X = PL.JCT_X       # the airport JCT on C1's south side
+SPUR_OFF = 5.5         # each spur carriageway's centre off the spur's centreline: its lanes run OUTWARD from it,
+                       # so the outer lane's edge is SPUR_OFF + 2 x 4.5 = 14.5 m, inside the Rainbow Bridge's upper-deck
+                       # corridor (|local z| < 15, library_landmarks). At 8.0 it stood 17 m out (3.30 L2).
+AUX_CLOSE = (320.0, 440.0)   # no spur station in this arclength range: the loop's acceleration lanes (a 2-lane
+                       # entrance at s 190) end at the first span long enough for their taper, and at the spur's
+                       # ~60 m station spacing none was -- they ran all 2 km, four lanes over the bridge
 BRIDGE_Z = 32.0        # the Rainbow Bridge's upper deck
-AIR_P = (1430.0, -1790.0)   # where the spur's carriageways part on the airport island
-AIR_A = (1190.0, -1738.0)   # the airport-bound spur's junction on the airport road
-AIR_B = (1310.0, -1714.0)   # the bridge-bound spur's junction
-AIR_END = (1000.0, -1770.0) # the airport road's west end, for now (the terminal, 3.3b)
+# The airport end (3.30 L2): the spur leaves the bridge heading SOUTH on the island, turns WEST along its south side
+# (descending: the upper deck is 32 m, the island 8 m, and 4% needs ~600 m), and its carriageways part onto an airport
+# road SOUTH of it -- the westbound spur's left (south) carriageway turns down to junction A; the city-bound one comes
+# up from junction B further west, passing north of A's arm, so the two never cross (the pre-redo end, turned).
+SPUR_TURN_Y = -1850.0       # the spur's west-running stretch on the island
+AIR_P = (1050.0, -1850.0)   # where the spur's carriageways part
+AIR_A = (990.0, -1935.0)    # the airport-bound spur's junction on the airport road
+AIR_B = (890.0, -1935.0)    # the bridge-bound spur's junction
+AIR_DROP = 2.5              # the spur's tails descend this last bit off the parting point
 AIR_Z = 8.0            # the airport island's ground
 
 
-DIAMOND_X = {"d_bwd_off": 345.0, "d_fwd_on": 465.0, "d_bwd_on": 985.0, "d_fwd_off": 1105.0}
-DIAMOND_ROAD = ("naka_hondori", 725.0)      # the trunk the diamond lands on
-DIAMOND_J = (615.0, 815.0)                  # its two junctions (inside C1, outside C1)
+DIAMOND_X = PL.DIAMOND_X
+DIAMOND_ROAD = PL.DIAMOND_ROAD              # the trunk the diamond lands on
+DIAMOND_J = PL.DIAMOND_J                    # its two junctions (inside C1, outside C1)
 MOUTH = 26.0
 
 
@@ -158,8 +169,8 @@ def build(net, ground):
     for k, x in DIAMOND_X.items():
         marks[k] = s_on(plan, cum, (x, C1_CORNERS[2][1]))
     top = C1_CORNERS[2][1]
-    cut = [c1_s(JCT_X), s_on(plan, cum, (C1_CORNERS[1][0], 300.0)), s_on(plan, cum, (DIAMOND_ROAD[1], top)),
-           s_on(plan, cum, (C1_CORNERS[0][0], 300.0))]
+    cut = [c1_s(JCT_X), s_on(plan, cum, (C1_CORNERS[1][0], PL.C1_SIDE_CUT_Y)), s_on(plan, cum, (DIAMOND_ROAD[1], top)),
+           s_on(plan, cum, (C1_CORNERS[0][0], PL.C1_SIDE_CUT_Y))]
     st = ring(net, PREFIX + "c1", plan, ground, marks=list(marks.values()), cut_marks=cut)
     at = {k: st[v] for k, v in marks.items()}
     z1 = net.points[at["eb_loop"]].pos[2]
@@ -170,7 +181,7 @@ def build(net, ground):
     # --- the spur's plan: south from the JCT, east at y -396, onto the bridge axis at its north anchorage, along it,
     # then south, west and north into the airport junction
     import island_rainbow_bridge as rb
-    centre, axis, _pts = rb.crossing(net)
+    centre, axis = rb.crossing_plan()
     half = rb.HALF_LENGTH
     na = (centre[0] - axis[0] * half, centre[1] - axis[1] * half)
     sa = (centre[0] + axis[0] * half, centre[1] + axis[1] * half)
@@ -178,11 +189,11 @@ def build(net, ground):
     def on_axis_at_y(y):
         t = (y - na[1]) / axis[1]
         return (na[0] + axis[0] * t, na[1] + axis[1] * t)
-    east_y = C1_Y - 436.0
+    east_y = PL.SPUR_EAST_Y
     corner_ne = on_axis_at_y(east_y)
-    corner_se = on_axis_at_y(-1760.0)
+    corner_se = on_axis_at_y(SPUR_TURN_Y)
     plan = [(JCT_X, C1_Y - 140.0), (JCT_X, east_y), corner_ne, corner_se, AIR_P]
-    radii = [0.0, 100.0, 140.0, 150.0, 0.0]
+    radii = [0.0, 100.0, 140.0, 120.0, 0.0]
     cl = rounded_polygon(plan, radii, closed=False)
     ccum = arclen(cl, False)
     # stations: the plan's vertices, plus the merge station 190 m down (the loop ramp joins there), plus the two
@@ -203,7 +214,7 @@ def build(net, ground):
     s_na, s_sa = s_of(na), s_of(sa)
     span = [s_na + (s_sa - s_na) * k / 12.0 for k in range(13)]
     ss = station_at(cl, ccum, False, [0.0, 190.0], loose=span + [ccum[-1]])
-    ss = [v for v in ss if v <= ccum[-1] + 1e-6]
+    ss = [v for v in ss if v <= ccum[-1] + 1e-6 and not (AUX_CLOSE[0] < v < AUX_CLOSE[1])]
     zj, zm = 18.0, 24.0
 
     def zat(v):
@@ -213,7 +224,7 @@ def build(net, ground):
             return zm + (BRIDGE_Z - zm) * (v - 190.0) / (s_na - 190.0)
         if v <= s_sa:
             return BRIDGE_Z
-        return BRIDGE_Z + (AIR_Z - BRIDGE_Z) * (v - s_sa) / (ccum[-1] - s_sa)
+        return BRIDGE_Z + (AIR_Z + AIR_DROP - BRIDGE_Z) * (v - s_sa) / (ccum[-1] - s_sa)
     cpts = [at_s(cl, ccum, v, False) for v in ss]
 
     def offset(i, side):
@@ -229,12 +240,12 @@ def build(net, ground):
     # the two carriageways PART at the airport: each meets the airport road at its own T (two parallel arms on one
     # pad is a pad no ring fits). The airport-bound one runs on west to junction A, the bridge-bound one leaves
     # junction B further east.
-    tail = rounded_polygon([out_pts[-1][:2], (AIR_A[0], out_pts[-1][1]), (AIR_A[0], AIR_A[1] - MOUTH)], 30.0,
+    tail = rounded_polygon([out_pts[-1][:2], (AIR_A[0], out_pts[-1][1]), (AIR_A[0], AIR_A[1] + MOUTH)], 30.0,
                            closed=False)[1:]
-    out_pts += [(x, y, AIR_Z) for x, y in tail]
-    head = rounded_polygon([(AIR_B[0], AIR_B[1] - MOUTH), (AIR_B[0], in_pts[0][1]), in_pts[0][:2]], 30.0,
+    out_pts += [(x, y, round(AIR_Z + AIR_DROP * (1.0 - (k + 1) / len(tail)), 2)) for k, (x, y) in enumerate(tail)]
+    head = rounded_polygon([(AIR_B[0], AIR_B[1] + MOUTH), (AIR_B[0], in_pts[0][1]), in_pts[0][:2]], 30.0,
                            closed=False)[:-1]
-    in_pts = [(x, y, AIR_Z) for x, y in head] + in_pts
+    in_pts = [(x, y, round(AIR_Z + AIR_DROP * k / len(head), 2)) for k, (x, y) in enumerate(head)] + in_pts
     spur_out = chain_road(net, PREFIX + "spur_out", out_pts, one_way=True)
     spur_in = chain_road(net, PREFIX + "spur_in", in_pts, one_way=True)
     for r in (spur_out, spur_in):
@@ -242,6 +253,12 @@ def build(net, ground):
             net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
     merge_uid = spur_out.points[ss.index(190.0)]
 
+    # the expressway's taper factor BEFORE its ramps: `open_aux_slot` sizes each aux slot's taper from the road's own
+    # factor, and set only after the build (as it was) every slot here was sized for the book's 432 m, so the loop's
+    # acceleration lanes found no span that long and ran the whole spur (3.30 L2)
+    for n_, r_ in net.roads.items():
+        if n_.startswith(PREFIX):
+            r_.taper_factor = TAPER
     # --- the JCT (the LOOP template, `roadkit_interchange.build_loop`, three of its four movements)
     ro.branch_ramp(net, at["wb_out"], name=PREFIX + "wb_out", aux_lanes=2, carriageway="BWD", length=90.0,
                    spread=10.0, drop=0.5)
@@ -254,6 +271,11 @@ def build(net, ground):
     # wb_out's last station and spur_out's first are the JOINT: make them one position, one facing
     last = net.roads[PREFIX + "wb_out"].points[-1]
     net.points[last].pos = net.points[spur_out.points[0]].pos
+    # ...and one FACING: a joint's two end stations must share a tangent (CLAUDE.md, 3.13), or the outer lane ends
+    # beside the successor's head -- after the land redo the ramp met the spur at a 41 deg kink and wb_out_F1 was broken
+    s0, s1 = net.points[spur_out.points[0]].pos, net.points[spur_out.points[1]].pos
+    for u in (last, spur_out.points[0]):
+        freeze(net, u, (s1[0] - s0[0], s1[1] - s0[1]))
     ro.branch_ramp(net, at["eb_loop"], name=PREFIX + "eb_loop", aux_lanes=RAMP_LANES, carriageway="FWD", length=80.0,
                    spread=8.0, drop=0.5)
     pts = [A(150.0, 45.0, z1)] + [A(x - JCT_X, y - C1_Y, z) for (x, y, z) in
@@ -275,33 +297,44 @@ def build(net, ground):
                    (spur_in.points[-2], in_wb.points[1])):
         pass
 
-    # --- the airport road: kuko_dori__4 on west through junction B (the bridge-bound spur leaves) and junction A (the
-    # airport-bound spur arrives), then on to the terminal (3.3b builds the terminal and its loop)
-    kuko = net.roads["kuko_dori__4"]
-    kend = net.points[kuko.points[-1]].pos
-
+    # --- the airport road, ON the island only (R7: the bridge's lower deck is rail, cars cross on the spur): from its
+    # east end through junction B (the bridge-bound spur leaves) and junction A (the airport-bound spur arrives), then
+    # on to the terminal. Its east end is a free end the turnaround pass loops.
     def toward(c, q, d):
         L = math.hypot(q[0] - c[0], q[1] - c[1])
         return (c[0] + (q[0] - c[0]) / L * d, c[1] + (q[1] - c[1]) / L * d, AIR_Z)
-    kb = net.add_station(kuko, toward(AIR_B, kend, MOUTH))
-    net.link(kuko.points[-2], kb.uid)
-    road1 = chain_road(net, "airport_dori", [toward(AIR_B, AIR_A, MOUTH), toward(AIR_A, AIR_B, MOUTH)], preset=None)
-    road2 = chain_road(net, "airport_dori__2", [toward(AIR_A, AIR_END, MOUTH), (AIR_A[0] - 110.0, AIR_A[1] - 17.0,
-                                                AIR_Z), AIR_END + (AIR_Z,)], preset=None)
-    for r in (road1, road2):
-        r.road_class = kuko.road_class
-        r.base = kuko.base.copy()
-        for u in r.points:
-            net.points[u].lanes_fwd, net.points[u].lanes_bwd = kuko.base.lanes_fwd, kuko.base.lanes_bwd
-    make_junction(net, [kb.uid, road1.points[0], spur_in.points[0]])
-    make_junction(net, [road1.points[-1], road2.points[0], spur_out.points[-1]])
+    east_end = (AIR_A[0] + 140.0, AIR_A[1])
+    road0 = chain_road(net, "airport_dori", [east_end + (AIR_Z,), toward(AIR_A, east_end, MOUTH)], preset=None)
+    road0.road_class = "arterial"
+    road0.base.median_width, road0.base.left_walk_width, road0.base.right_walk_width = 3.0, 4.0, 4.0
+    # West of junction A the airport road is ONE-WAY and turns north at B straight into the bridge-bound spur (a
+    # joint). There used to be a two-way stub on west past B to a turnaround loop, but the island ends at x ~815 there:
+    # the loop could only turn 90 deg off the stub, its connector was a ~125 deg turn inside a small pad, and traffic
+    # ran onto its kerb (`probe_traffic_spawn`, reclaimed `stalled` twice). Now every movement on the airport side is a
+    # through route: spur out -> A -> east to the terminal (and its loop), or -> west -> B -> spur in.
+    j = net.points[spur_in.points[0]].pos
+    bend = rounded_polygon([toward(AIR_A, AIR_B, MOUTH)[:2], AIR_B, j[:2]], 20.0, closed=False)
+    road1 = chain_road(net, "airport_dori__2", [(x, y, AIR_Z) for x, y in bend[:-1]] + [tuple(j)], preset=None,
+                       one_way=True)
+    road1.road_class = "arterial"
+    road1.base.lanes_fwd, road1.base.lanes_bwd = 2, 0
+    road1.base.left_walk_width, road1.base.right_walk_width = 4.0, 4.0
+    for v in road1.points:
+        net.points[v].lanes_fwd, net.points[v].lanes_bwd = 2, 0
+    make_junction(net, [road0.points[-1], road1.points[0], spur_out.points[-1]])
+    # the joint: coincident end stations sharing one facing (a joint's two ends must agree, or the outer lane breaks)
+    up = (j[0] - AIR_B[0], j[1] - AIR_B[1])
+    freeze(net, road1.points[-1], up)
+    freeze(net, spur_in.points[0], up)
+    net.link(road1.points[-1], spur_in.points[0])
+
 
 def bridge_skip(net):
     """The spur rides the Rainbow Bridge's UPPER deck: inside the suspension structure the bridge carries it, so its
     stations there are `pillar_skip` by `island_rainbow_bridge`'s own rule (a station skips when the span it starts lies
     wholly inside the structure), as `kuko_dori`'s on the lower deck are."""
     import island_rainbow_bridge as irb
-    centre, axis, _pts = irb.crossing(net)
+    centre, axis = irb.crossing_plan()
     n = 0
     for name, r in net.roads.items():
         if not name.startswith(PREFIX + "spur"):

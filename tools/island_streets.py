@@ -31,6 +31,9 @@ MOUTH = 22.0
 SPACING = 80.0
 JUNCTION_CLEAR = 55.0     # a new junction no nearer an existing junction's centre than this
 MIN_SPAN = 60.0           # consecutive junctions on a new street at least this far apart
+PARALLEL_CLEAR = 35.0     # a new street no nearer than this to an existing road running ALONGSIDE it ...
+PARALLEL_COS = 0.94       # ... "alongside" = within ~20 deg of parallel
+PARALLEL_RUN = 40.0       # ... over more than this much of its length (a crossing's approach is not "alongside")
 # A line set is either an explicit tuple of coordinates or a SPACING (a float): the spacing generates lines
 # across the box, which is what closes BLOCKS (PLAN.md 3.18c). Measured on the hand-listed version: the road
 # network enclosed almost nothing -- 44% of the island's 8.13 km2 of open land was ONE component of 3.60 km2,
@@ -45,15 +48,10 @@ MIN_SPAN = 60.0           # consecutive junctions on a new street at least this 
 # arterials for a grid to attach to. They need arterials first (3.3's reach gaps), and they are meant to read
 # differently anyway: a harbour is yards and sheds, a suburb is loose plots.
 BLOCK_STEP = {"city": 150.0, "sw": 170.0, "farm": 260.0}
-REGIONS = (
-    # name, box (x0, y0, x1, y1), preset, x lines, y lines -- a float means "generate at this spacing".
-    # `city` covers DOWNTOWN too (the buildings' downtown box sits inside it); its north edge stops at y 560
-    # because the C1 diamond's ramps come down past it.
-    ("city", (40.0, -250.0, 1560.0, 560.0), "block", BLOCK_STEP["city"], BLOCK_STEP["city"]),
-    ("sw", (-1560.0, -1150.0, -100.0, -280.0), "block", BLOCK_STEP["sw"], BLOCK_STEP["sw"]),
-    ("farm", (850.0, 900.0, 1500.0, 1720.0), "farm", BLOCK_STEP["farm"], BLOCK_STEP["farm"]),
-)
-NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "farm": ("hata_michi", "hata_yoko")}
+# The regions and their names are the final plan's (PLAN.md 3.30 L2): `island_plan.STREET_REGIONS`, one owner.
+import island_plan as _PL   # noqa: E402
+REGIONS = _PL.STREET_REGIONS
+NAMES = _PL.STREET_NAMES
 LINE_INSET = 60.0        # a generated line no nearer the box edge than this (its first crossing needs room)
 
 
@@ -98,7 +96,55 @@ def _obstacles(net):
     return pts
 
 
-def _line_ok(net, ground, obst, kind, v, box):
+class _Segs(object):
+    """Every road's plan segments on a grid, for "does this street run alongside a road that is already there".
+    A street 12.5 m from a trunk road and parallel to it is a second carriageway nobody drew: measured, `machi_612`
+    ran 12.5 m off `naka_hondori` for 460 m and died inside that road's own junction (`open_end`)."""
+    CELL = 50.0
+
+    def __init__(self, net):
+        self.cells = {}
+        for r in net.roads.values():
+            pts = [net.points[u].pos[:2] for u in r.points]
+            for a, b in zip(pts, pts[1:]):
+                L = math.hypot(b[0] - a[0], b[1] - a[1])
+                if L < 1e-6:
+                    continue
+                d = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+                for i in range(int(math.floor(min(a[0], b[0]) / self.CELL)), int(math.floor(max(a[0], b[0]) / self.CELL)) + 1):
+                    for j in range(int(math.floor(min(a[1], b[1]) / self.CELL)),
+                                   int(math.floor(max(a[1], b[1]) / self.CELL)) + 1):
+                        self.cells.setdefault((i, j), []).append((a, b, d))
+
+    def alongside(self, p, u):
+        i0, j0 = int(math.floor(p[0] / self.CELL)), int(math.floor(p[1] / self.CELL))
+        for i in (i0 - 1, i0, i0 + 1):
+            for j in (j0 - 1, j0, j0 + 1):
+                for a, b, d in self.cells.get((i, j), ()):
+                    if abs(d[0] * u[0] + d[1] * u[1]) < PARALLEL_COS:
+                        continue
+                    vx, vy = b[0] - a[0], b[1] - a[1]
+                    n = vx * vx + vy * vy
+                    t = max(0.0, min(1.0, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / n))
+                    if math.hypot(p[0] - a[0] - vx * t, p[1] - a[1] - vy * t) < PARALLEL_CLEAR:
+                        return True
+        return False
+
+
+def _parallel_run(segs, kind, v, lo, hi):
+    """Metres of the line between `lo` and `hi` (along its own axis) that run alongside an existing road."""
+    u = (0.0, 1.0) if kind == "x" else (1.0, 0.0)
+    run = best = 0.0
+    t = lo
+    while t <= hi:
+        p = (v, t) if kind == "x" else (t, v)
+        run = run + 5.0 if segs.alongside(p, u) else 0.0
+        best = max(best, run)
+        t += 5.0
+    return best
+
+
+def _line_ok(net, ground, obst, kind, v, box, segs=None):
     x0, y0, x1, y1 = box
     a, b = ((v, y0), (v, y1)) if kind == "x" else ((x0, v), (x1, v))
     cr = _crossings(net, a, b)
@@ -116,6 +162,12 @@ def _line_ok(net, ground, obst, kind, v, box):
         nodes.append((p, c[1]))
     if not nodes:
         return None, "every one of its %d crossings crowds an existing junction" % len(cr)
+    if segs is not None:
+        ax = 1 if kind == "x" else 0
+        along = [p[ax] for p, _r in nodes]
+        run = _parallel_run(segs, kind, v, min(along), max(along))
+        if run > PARALLEL_RUN:
+            return None, "runs alongside an existing road for %.0f m" % run
     return nodes, None
 
 
@@ -152,12 +204,13 @@ def plan_region(net, ground, region):
     name, box, _preset, xs, ys = region
     xs, ys = _line_values(box, "x", xs), _line_values(box, "y", ys)
     obst = _obstacles(net)
+    segs = _Segs(net)
     kept, why = [], []
     for kind, vals in (("x", xs), ("y", ys)):
         for v0 in vals:
             tried = []
             for dv in (0.0, 30.0, -30.0, 60.0, -60.0):
-                nodes, last = _line_ok(net, ground, obst, kind, v0 + dv, box)
+                nodes, last = _line_ok(net, ground, obst, kind, v0 + dv, box, segs)
                 if nodes:
                     kept.append([kind, v0 + dv, nodes])
                     break

@@ -28,6 +28,9 @@ import point_model as pm        # noqa: E402
 LOOP_GAP = 30.0                   # the junction centre this far past the stem's end; the loop's arms leave it this far out
 ARM_DEG = 35.0                    # the loop's arms, either side of its axis
 AXIS_MAX = 150                    # the axis may turn this far either side of straight on
+AXIS_PREFER = 45                  # ... but a loop within this is tried first, shortening the road if it must: a loop
+                                  # turned 90 deg makes the stem's connector into it a ~125 deg turn inside a small
+                                  # pad, and traffic ran wide onto its kerb (the airport end, `stalled` twice)
 REACHES = (55.0, 70.0, 90.0, 110.0)   # the loop's far corners this far out along its axis
 FLAT = 3.0                        # the ground under a loop stays within this of the end's own height
 CORNER_R = 40.0                   # the loop's two far corners
@@ -71,10 +74,10 @@ def loop_line(end_xy, u, axis, reach):
     return rounded_polygon([H, A, B, T], CORNER_R, closed=False), J
 
 
-def best_loop(net, ground, end, stem_name, u, others):
+def best_loop(net, ground, end, stem_name, u, others, axis_max=AXIS_MAX):
     p = net.points[end].pos
     best = None
-    for axis in range(-AXIS_MAX, AXIS_MAX + 1, 5):
+    for axis in range(-axis_max, axis_max + 1, 5):
         for reach in REACHES:
             line, J = loop_line(p, u, axis, reach)
             probe = densify([J] + line, 4.0)
@@ -109,21 +112,27 @@ def build(net, ground):
                 continue
             for x, y in densify([net.points[v].pos[:2] for v in r2.points], 8.0):
                 others.append((n2, x, y))
-        best = best_loop(net, ground, end, name, u, others)
-        trimmed = 0
-        # no room at the very end (a road run out onto a strip between a slope and the sea): shorten the road a
-        # station at a time until a loop fits, never below two stations
         stem = net.roads[name]
-        while best is None and len(stem.points) > 2 and trimmed < 3:
-            at_head = stem.points[0] == end
-            net.remove_point(end)
-            trimmed += 1
-            end = stem.points[0] if at_head else stem.points[-1]
-            nxt = stem.points[1] if at_head else stem.points[-2]
-            a, b = net.points[end].pos, net.points[nxt].pos
-            L = math.hypot(a[0] - b[0], a[1] - b[1])
-            u = ((a[0] - b[0]) / L, (a[1] - b[1]) / L)
-            best = best_loop(net, ground, end, name, u, others)
+        # a near-straight loop first, then any axis. Where the very end has no room (a road run out onto a strip
+        # between a slope and the sea) the road may be shortened by up to 3 stations, never below two: the trims are
+        # evaluated WITHOUT touching the network, and stations are removed only once a loop is chosen
+        at_head = stem.points[0] == end
+        chain = list(stem.points) if at_head else list(reversed(stem.points))
+        best, trimmed = None, 0
+        for axis_max in (AXIS_PREFER, AXIS_MAX):
+            for k in range(0, min(3, len(chain) - 2) + 1):
+                a, b = net.points[chain[k]].pos, net.points[chain[k + 1]].pos
+                L = math.hypot(a[0] - b[0], a[1] - b[1])
+                uk = ((a[0] - b[0]) / L, (a[1] - b[1]) / L)
+                best = best_loop(net, ground, chain[k], name, uk, others, axis_max)
+                if best is not None:
+                    trimmed = k
+                    break
+            if best is not None:
+                break
+        for k in range(trimmed):
+            net.remove_point(chain[k])
+        end = chain[trimmed]
         if best is None:
             failed.append(name)
             continue

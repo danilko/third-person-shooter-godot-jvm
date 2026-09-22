@@ -58,6 +58,17 @@ const LAND_Z := 0.3
 ## (the lower keeps its ground); by less, they are one paved area meeting itself -- a junction mouth, a
 ## ramp's gore -- and the NEAREST decides.
 const UNDERPASS := 3.0
+## THE BLOCK LAYER (PLAN.md 3.30 L2, CLAUDE.md "The block owns its ground"). `tools/island_ground.py` writes the city
+## blocks' own surface into the terrain AFTER the road stamp, and `apply_paint_grid.gd` leaves two files in the data
+## directory: the marker `paint_terrain.gd` refuses over, and the layer itself, sparse (`URBAN_LAYER`). A stamp run
+## afterwards re-derives every vertex it reaches from the NATURAL ground and so wipes the block ground there, with
+## nothing to say so -- a dock Stamp after `tools/island_world.sh` took the kerb-level fill back down 0.15 m. So
+## `stamp_network` refuses while the marker exists (rebuild with `island_world.sh --from terrain`), and `stamp` takes
+## the layer, applied OVER the stamp where it has a value, which is exactly the order the pipeline built it in: a
+## probe re-stamping with it must change nothing.
+const URBAN_MARKER := "urban_paint.marker"
+const URBAN_LAYER := "urban_block.layer"
+const LAYER_MAGIC := 0x314C4255   # "UBL1", little-endian
 
 ## `{"segments": [...], "buckets": {Vector2i: [int]}, "rect": Rect2 (world XZ)}` from the CLI's corridors
 ## (Godot axes, network frame) placed by `to_world`.
@@ -173,7 +184,7 @@ static func height_at(index: Dictionary, params: Dictionary, x: float, z: float,
 ## stamp record's corridors (re-derived so a moved road leaves nothing behind). Writes the heights and
 ## updates the maps; SAVING is the caller's (the tool saves the data directory, the editor its scene).
 ## `{"ok", "message", "changed", "carved", "filled", "restored", "lowest", "highest"}`.
-static func stamp(net: Node3D, terrain: Node, corridors: Dictionary, previous: Array = [], restore_only: bool = false) -> Dictionary:
+static func stamp(net: Node3D, terrain: Node, corridors: Dictionary, previous: Array = [], restore_only: bool = false, layer: Dictionary = {}) -> Dictionary:
 	var natural := Ground.load_grid(Ground.sidecar_path(str(net.get("record_path"))))
 	if natural.is_empty():
 		return {"ok": false, "message": "no ground sidecar for %s -- sample the natural ground first (write_roadkit_ground.gd / Build)" % net.name}
@@ -214,6 +225,10 @@ static func stamp(net: Node3D, terrain: Node, corridors: Dictionary, previous: A
 					var h := height_at(now, corridors, x, z, nat, spacing)
 					if is_nan(h):
 						h = nat
+					if not layer.is_empty():
+						var lv := layer_height(layer, x, z)
+						if not is_nan(lv):
+							h = lv
 					if absf(h - cur) > 0.0005:
 						data.set_height(world, h)
 						regions[data.get_region_location(world)] = true
@@ -237,6 +252,45 @@ static func stamp(net: Node3D, terrain: Node, corridors: Dictionary, previous: A
 			"lowest": lowest, "highest": highest, "regions": regions.size(),
 			"message": "%s %d vertex(es) in %d region(s): %d carved (to %.2f m), %d filled (to +%.2f m), %d restored to natural" % [
 				"restored" if restore_only else "stamped", changed, regions.size(), carved, lowest, filled, highest, restored]}
+
+## The block layer of `terrain`'s data directory, `{}` when there is none: `{"nx", "nz", "x0", "z0", "step", "h":
+## PackedFloat32Array (dense, NAN where the layer has no value)}`. The file is sparse: "UBL1", nx, nz (i32), x0, z0,
+## step (f32), count (i32), then count x (index i32, height f32), index = row * nx + column on the
+## `dump_height_grid.gd` vertex grid.
+static func load_layer(terrain: Node) -> Dictionary:
+	var path := str(terrain.get("data_directory")).path_join(URBAN_LAYER)
+	if not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null or f.get_32() != LAYER_MAGIC:
+		return {}
+	var nx := f.get_32()
+	var nz := f.get_32()
+	var out := {"nx": nx, "nz": nz, "x0": f.get_float(), "z0": f.get_float(), "step": f.get_float()}
+	var n := f.get_32()
+	var h := PackedFloat32Array()
+	h.resize(nx * nz)
+	h.fill(NAN)
+	var raw := f.get_buffer(n * 8)
+	var idx := raw.to_int32_array()
+	var val := raw.to_float32_array()
+	for i in n:
+		h[idx[2 * i]] = val[2 * i + 1]
+	out["h"] = h
+	out["count"] = n
+	return out
+
+## The layer's height at world XZ, NAN off the layer. Snapped to the grid: the layer is written per vertex.
+static func layer_height(layer: Dictionary, x: float, z: float) -> float:
+	var st: float = layer["step"]
+	var i := int(round((x - float(layer["x0"])) / st))
+	var j := int(round((z - float(layer["z0"])) / st))
+	if i < 0 or j < 0 or i >= int(layer["nx"]) or j >= int(layer["nz"]):
+		return NAN
+	return (layer["h"] as PackedFloat32Array)[j * int(layer["nx"]) + i]
+
+static func has_block_layer(terrain: Node) -> bool:
+	return FileAccess.file_exists(str(terrain.get("data_directory")).path_join(URBAN_MARKER))
 
 static func read_record(net: Node) -> Dictionary:
 	var path := Ground.stamp_record_path(str(net.get("record_path")))
@@ -262,7 +316,12 @@ static func delete_record(net: Node) -> void:
 ## ground (a stamped network keeps its sidecar as the natural record where it covers), solve the
 ## corridors over it, stamp, record. `restore` puts the natural ground back and forgets the stamp.
 ## Saving the terrain data is the caller's.
-static func stamp_network(net: Node3D, terrain: Node, restore: bool = false) -> Dictionary:
+static func stamp_network(net: Node3D, terrain: Node, restore: bool = false, force: bool = false) -> Dictionary:
+	if has_block_layer(terrain) and not force:
+		return {"ok": false, "changed": 0, "message": ("REFUSED: %s carries the city's block ground (%s). A %s would "
+				+ "re-derive every vertex it reaches from the natural ground and take the block ground there back down "
+				+ "with nothing to say so. Rebuild in order instead: tools/island_world.sh --from terrain.")
+				% [str(terrain.get("data_directory")), URBAN_MARKER, "restore" if restore else "stamp"]}
 	var prev: Dictionary = read_record(net)
 	if restore:
 		if prev.is_empty():

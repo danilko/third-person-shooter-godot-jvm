@@ -6,6 +6,7 @@ import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.Area3D;
 import godot.api.Node3D;
+import godot.api.Engine;
 import godot.core.Callable;
 import godot.core.MethodCallable;
 import godot.core.StringName;
@@ -38,6 +39,21 @@ public class IntersectionZone extends Area3D {
     /** Vehicles currently inside, in arrival order. Head of the list holds the junction. */
     private final List<Vehicle> queue = new ArrayList<>();
 
+    /**
+     * A holder that has stood still this long hands the junction to the next car in line (it goes to
+     * the back of the queue). Single occupancy is only deadlock-free while the holder can always move:
+     * on a big pad the holder's own obstacle ray can stop it behind a car that is QUEUED inside the
+     * area waiting for the holder -- each waiting on the other for ever, which is what the island's
+     * 5-arm pads produced (ambient cars reclaimed as {@code stalled} 12 s after stopping at a mouth).
+     * 0 turns the rule off (the old behaviour, and the control).
+     */
+    public static final long HOLDER_STALL_MS = 2500;
+    /** Below this speed the holder counts as standing still. */
+    public static final double HOLDER_STALL_SPEED = 0.5;
+
+    private Vehicle stallHead;
+    private long stallSinceFrame;
+
     @Register
     @Override
     public void _ready() {
@@ -66,6 +82,25 @@ public class IntersectionZone extends Area3D {
     public boolean blocks(Vehicle v) {
         queue.removeIf(x -> !GD.isInstanceValid(x));
         if (queue.isEmpty()) return false;
+        rotateStalledHolder();
         return queue.get(0) != v;
+    }
+
+    private void rotateStalledHolder() {
+        if (HOLDER_STALL_MS <= 0 || queue.size() < 2) { stallHead = null; return; }
+        Vehicle head = queue.get(0);
+        // The PHYSICS clock, not wall time: a headless --fixed-fps run is not real-time.
+        long now = Engine.INSTANCE.getPhysicsFrames();
+        long stallFrames = HOLDER_STALL_MS * Engine.INSTANCE.getPhysicsTicksPerSecond() / 1000;
+        if (head != stallHead || head.getLinearVelocity().length() > HOLDER_STALL_SPEED) {
+            stallHead = head;
+            stallSinceFrame = now;
+            return;
+        }
+        if (now - stallSinceFrame < stallFrames) return;
+        queue.remove(0);
+        queue.add(head);
+        stallHead = queue.get(0);
+        stallSinceFrame = now;
     }
 }

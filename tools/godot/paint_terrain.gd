@@ -58,7 +58,18 @@ func _ctl(base: int, overlay: int, blend: float) -> float:
 	return Terrain3DUtil.as_float(v)
 
 
+## The urban paint (`apply_paint_grid.gd`, the block ground of `island_ground.py`) leaves a marker in the data
+## directory, because painting by elevation after it repaints every city block as BEACH (the city plain is 0.6 m,
+## under SAND_TOP) with nothing in the log to say so. So this refuses over that marker; `tools/island_terrain.sh`
+## removes it as part of restoring the natural ground, which is the only order the two may run in.
+const URBAN_MARKER := "urban_paint.marker"
+
+
 func _run() -> int:
+	if FileAccess.file_exists(_dir.path_join(URBAN_MARKER)) and not ("--force" in OS.get_cmdline_user_args()):
+		push_error("REFUSED: %s carries the urban paint grid (%s); painting by elevation would repaint the city as "
+			% [_dir, URBAN_MARKER] + "beach. Run tools/island_terrain.sh, or pass --force.")
+		return 1
 	_terrain.set("vertex_spacing", 2.0)
 	_terrain.set("data_directory", _dir)
 	var data: Variant = _terrain.get("data")

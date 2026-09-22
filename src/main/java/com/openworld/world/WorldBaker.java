@@ -8,6 +8,7 @@ import godot.api.Area3D;
 import godot.api.BoxShape3D;
 import godot.api.CollisionShape3D;
 import godot.api.Curve3D;
+import godot.api.DirAccess;
 import godot.api.FileAccess;
 import godot.api.JSON;
 import godot.api.Marker3D;
@@ -19,6 +20,7 @@ import godot.api.MultiMeshInstance3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.PackedScene;
+import godot.api.ProjectSettings;
 import godot.api.Path3D;
 import godot.api.ResourceLoader;
 import godot.api.ResourceSaver;
@@ -393,6 +395,8 @@ public class WorldBaker extends Node {
      * carries its own copy (a few hundred vertices per asset).
      */
     private static Mesh withKitMaterials(Mesh mesh, String piecePath) {
+        Mesh cached = KIT_MESHES.get(piecePath);
+        if (cached != null) return cached;
         int cut = piecePath.lastIndexOf("/pieces/");
         String kitMaterials = cut < 0 ? "" : piecePath.substring(0, cut) + "/materials/";
         Mesh copy = (Mesh) mesh.duplicate();
@@ -408,8 +412,23 @@ public class WorldBaker extends Node {
                 }
             }
         }
+        // ONE external resource per kit asset (PLAN.md R15): an embedded copy put the same mesh into every road piece
+        // that places it -- a lamp's geometry stored 47 times. The piece now references `<kit>/baked/<stem>.res`.
+        if (cut >= 0) {
+            String dir = piecePath.substring(0, cut) + "/baked/";
+            String out = dir + assetStem(piecePath) + ".res";
+            DirAccess.makeDirRecursiveAbsolute(ProjectSettings.globalizePath(dir));
+            if (ResourceSaver.save(copy, out, ResourceSaver.SaverFlags.FLAG_COMPRESS) == Error.OK
+                    && ResourceLoader.load(out, "", ResourceLoader.CacheMode.REPLACE) instanceof Mesh ext) {
+                copy = ext;
+            }
+        }
+        KIT_MESHES.put(piecePath, copy);
         return copy;
     }
+
+    /** The external kit meshes this process has written (one per asset path; see {@link #withKitMaterials}). */
+    private static final java.util.Map<String, Mesh> KIT_MESHES = new java.util.HashMap<>();
 
     /** Load a kit asset scene and return its first visual mesh resource (kit leaves are at origin). */
     private static Mesh loadVisualMesh(String path) {
