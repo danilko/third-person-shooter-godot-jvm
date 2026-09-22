@@ -2618,7 +2618,7 @@ pictures `tools/godot/shot_hud.gd`, needs a display):
 | where | on foot | in a vehicle |
 |---|---|---|
 | bottom-left | `Minimap` (150 px) over `FootHUD` health number + bar (and the air bar while swimming) | same |
-| bottom-right | `WeaponHUD` (icon cropped to its silhouette and drawn at one common height, `ui.IconFit`; name; magazine large / reserve small; no count for fist or melee); `WeaponSlotsUI` above it is ALWAYS visible at `idle_alpha` 0.6 (PUBG / Valorant / Apex: six slots and a growing loadout should be readable at a glance) and comes up to full for 2.5 s on a switch or an inventory change; `idle_alpha = 0` is the CS behaviour | the DRIVER gets the vehicle cluster: speed (km/h; `imperial` for mph) beside `VehicleStatus`, a top-down damage diagram (body coloured by health, a square per wheel where the wheels really are: white, amber when the tire is damaged, red when flat, pulsing while sliding). No health NUMBER; the car smokes and burns as well. In a drive-by car the compact `WeaponHUD` stacks ABOVE the cluster (always, no swap on aim); the inventory column stays hidden (the weapon wheel shows the loadout). A PASSENGER with a gun gets the weapon panel and column. While a race runs (`RaceDirector.raceActiveNow`) the weapon HUD and column step aside for `RaceHUD`; missions hide anything via `setWidgetEnabled` |
+| bottom-right | `WeaponHUD` (icon cropped to its silhouette and drawn at one common height, `ui.IconFit`; name; magazine large / reserve small; no count for fist or melee); `WeaponSlotsUI` above it is ALWAYS visible at `idle_alpha` 0.6 (PUBG / Valorant / Apex: six slots and a growing loadout should be readable at a glance) and comes up to full for 2.5 s on a switch or an inventory change; `idle_alpha = 0` is the CS behaviour | the DRIVER gets the vehicle cluster: speed (km/h; `imperial` for mph) beside `VehicleStatus`, a top-down damage diagram (body coloured by health, a square per wheel where the wheels really are: white, amber when the tire is damaged, red when flat, pulsing while sliding), and beside it the car's health as a PERCENTAGE in the same colour ramp (user, 2026-09-22: colour alone did not say how close the car was to burning); the car smokes and burns as well. In a drive-by car the compact `WeaponHUD` stacks ABOVE the cluster (always, no swap on aim); the inventory column stays hidden (the weapon wheel shows the loadout). A PASSENGER with a gun gets the weapon panel and column. While a race runs (`RaceDirector.raceActiveNow`) the weapon HUD and column step aside for `RaceHUD`; missions hide anything via `setWidgetEnabled` |
 | top-right | kill feed (`Feed`) | same |
 | top-left | pickup / mission notices (`StatusFeed`) | same |
 | centre | crosshair, `WeaponProgress` ring, hit marker, damage direction, interact prompt just under the crosshair | same |
@@ -6893,6 +6893,10 @@ rule (3-letter type code + series). DebugWorld parks all three behind `VehicleRo
   - **Crashes**: `Vehicle._integrateForces` → `feedCrash`: this step's contact impulses / mass (skipping a contact that
     pushes UP — resting or landing) at the impulse-weighted point, summed over a crash's steps into ONE impact and
     shared among the parts near it. `VehicleConfig.crashHealthPerDv` makes crashes cost health (0 in the prototype).
+    A crash is scored by `VehicleDamageRules.crashDeltaV`: the impulse sum, never more than the car's REAL change of
+    velocity over the window, and a window closes after `MAX_CRASH_STEPS` (0.25 s) of unbroken contact (2026-09-22,
+    user: "easily damaged on a kerb"). A car held against a kerb planter under throttle used to add a fresh impulse
+    every step: a 10 m/s bump scored 33 m/s (184 hp of 500), pinned 231 more; now 61 hp. A flat kerb costs 0.
   - **Bullets**: `ImpactManager.processHit` → `applyHit` on the part under the hit point (not a tyre hit).
   - **The net**: a 2-bit-per-part mask (`VehicleDamageRules.SLOTS`, APPEND-ONLY) rides the vehicle snapshot
     (`partMask` i32, `VEHICLE_SNAPSHOT_ENTRY_FIXED_BYTES` +4). States only rise, so every peer MAX-merges any report
@@ -8649,8 +8653,8 @@ developer could not tell which zone a bug was in. Both halves are DERIVED from r
   waypoint to `go`; `RoadMap` then snaps the goal to the nearest lane, so `go` decides which side of the block
   you are routed to. Blips are SQUARES so they never read as a character or a vehicle (both are discs), and
   ordinary shops appear only under `placeDetailRange` so a whole-island view is landmarks, not 94 konbini.
-- **The region underlay goes UNDER the roads** (it must not hide what you navigate by), and the HUD announces a
-  region on entry — DERIVED every frame from the player's position against the same boxes, never latched on a
+- **The region underlay was REMOVED from the map (2026-09-22: overlapping boxes, hard to read); the postal grid is the
+  background now** (see "The safe-house start" below). The HUD still announces a region on entry — DERIVED every frame from the player's position against the same boxes, never latched on a
   trigger volume, so it is right after a teleport or a scene load, with a 1 s settle because the boxes touch.
 - **`showZoneIds`** is the debug half: each streaming zone's id over its marker, off by default.
 - Gate: `probe_gps_route.gd` **29/29 island** (every place is an enterable building or a site in the scene; the
@@ -9024,14 +9028,108 @@ downstream is hand-edited.
   road with NO footway the block ground is capped at the road less the stamp's clearance (`island_ground.CAP_REACH`),
   or Terrain3D's interpolation lifts it 2 cm over the outer lane. The probe also skips a FILL sample over a road more
   than `UNDERPASS` below (a ramp over a street: the stamp caps to the lower road on purpose).
-- **The Wangan, east section** (`island_expressway.wangan_east`, `island_plan.WANGAN_*`): two one-way elevated
-  carriageways from a PARTIAL JCT on the spur's east leg (Wangan <-> airport only: C1 would need two loops) along the
-  south waterfront offshore of the park, each down to its own T on the ring at the port corner. Keep-left decides
+- **The Wangan** (`island_expressway.wangan_east`, `island_plan.WANGAN_*`): two one-way elevated carriageways from a
+  PARTIAL JCT on the spur's east leg (Wangan <-> airport only: C1 would need two loops) along the south waterfront
+  offshore of the park, over the gulf and the ring's port-corner bend, then west along the port platform's north
+  strip, each down to its own T on the ring at x -730 / -810. Keep-left decides
   the JCT: airport -> Wangan leaves spur_in to its own left; Wangan -> airport must pass UNDER both spur carriageways
   to reach spur_out's left. spur_out is cut at a joint before the Wangan's merge because the loop JCT's
   acceleration lane is on spur_out too (one aux slot per run), and both taper spans are held at 110 m (the gate
   wants 108 at taper 0.25). Iterate on it with `island_expressway.py <out> --from <base> --check` (~17 min; `--fast`
   writes only); the base is `island_coast_road.py add` + `island_touges.py add` over the arterials input.
+
+## Traffic is a ring and a budget; hotspots are found by postal code (2026-09-22, PLAN.md 3.32 / 3.26)
+
+- **`ZoneManager.trafficSimRadius` (300 m) and `trafficBudget` (20 cars across every zone)** -- GTA's two rules. A
+  traffic zone decides WHERE cars may spawn; these decide how many exist and how far out. The island's traffic zones
+  are sized for coverage (unload 1550 m), which alone kept ~80 cars + seated drivers simulated round the player and
+  put downtown at 30 fps (physics 13-18 ms a tick, 2-3 catch-up ticks a frame). A ring WITHOUT a budget is worse,
+  not better: every zone covers ~1.5 km of lanes, so all of them fill their cars inside the ring. Measured p50 downtown
+  walk 33.3 -> 10.9 ms, into Tokyo Station 35.1 -> 13.8, downtown drive 32.8 -> 8.8. Zone-load spawns are
+  player-gated too while the ring is on (a zone loads 1+ km out). 0 on either = the old behaviour.
+- **`tools/godot/probe_walk_perf.gd`** (display) moves the REAL player along walk/drive legs and files every frame
+  under its postal code; it prints per-leg frame/physics times, a census (cars, seated drivers, walking AI, light
+  peds) and the worst cells, which `postal <code> tp` in the console goes straight to. `--no-traffic` / `--no-peds` /
+  `--no-buildings` attribute the cost.
+- **`world.PostalGrid`** is the one owner of the x-y postal code (24 x 24 cells of 192 m, keypad sub-cell 1-9); the
+  minimap prints it, the full map draws the grid, the console has `postal`, `tp`, `where`, and **Ctrl+F9** prints and
+  copies the bug-report line (`world.PostalReport`). Gate `tools/godot/probe_postal.gd`.
+- **A joint's two stations are one point, height included**: `island_layout.weld_joints` runs last (a later pass had
+  left ring_kita and kaigan_machi 0.107 m apart, and the stamp put the ground 2 cm over the ring's lane).
+- **A pier is founded on the lowest ground within 1.5 m of each shaft vertex** (`point_mesh.FOOT_REACH`): over a
+  vertical quay (0.6 m land to the -24 m seabed in one cell) a column's sea-side foot stopped 9 m short.
+- **Streets the plan removes by hand** are `island_plan.STREET_DROP` (region, axis, coordinate), for blocks too small
+  to place buildings simply; the plan picture is `tools/island_plan_picture.py` (postal grid overlaid).
+
+## The safe-house start, the weapon counter, the map grid, and three hitches (user, 2026-09-22)
+
+- **The game starts at the SAFE HOUSE.** `island_buildings.py`'s `PUBLIC_BUILDINGS` rows carry a ROLE:
+  `safehouse` (a `ShopHouse` at (87, -3), central city) and `armoury` (the `Konbini` two doors along the same street).
+  `write` (`patch_start`) derives from them, so nothing is a typed coordinate:
+  * `PlayerSpawn` (root, read by `GameManager.jitteredSpawnPosition` for every joiner and by `WorldBounds` for a
+    fall-out) and the `Player`, 1.5 m out from the safe house's front face, facing the street -- no longer the old
+    spawn by the bay at (-20, 1180);
+  * the starting car (`VehicleRoot`) parked OFF the carriageway, nose to the street, in the nearest lot space beside
+    the house (searched along the frontage: on lots, 0.4 m clear of every building). A car in the kerb lane was the
+    first try and is wrong: the traffic brain cannot pass a parked car, so the whole lane queues behind it;
+  * the camera starts BEHIND the player (`Player._ready` copies the body's yaw into `controlRotation.yaw`, which
+    started at 0 = looking -Z, so a spawn facing anywhere else opened on the player's face);
+  * the map places "Safehouse" and "Weapon Counter" (tier 2, always drawn), from `ROLE_PLACES`.
+  `island_buildings.py anchors` re-applies the anchors to the existing record (no terrain dump); then `write`.
+- **The loose weapons at the spawn are gone; a WEAPON COUNTER replaced them.** `item.WeaponPad` (an `Area3D`, glowing
+  disc, the weapon's own `Model` turning above it, "FREE" label): stepping on gives that catalog weapon through the
+  ordinary pickup path (`requestEquip`, as the console's `give` does); a weapon already carried is REFILLED instead.
+  It re-arms only after the character steps OFF plus `cooldownSeconds`. Only the authoritative peer grants (a
+  weapon spawned on a client exists there alone) -- the two-process path is NOT measured. `ARMOURY_PADS` puts 12
+  (PIS1 PIS2 REV1 DUP1 SMG1 ASR1 ASR2 SHG1 SNR1 ATL1 FRG1 MEW1) in the konbini's clear aisle, in its own frame, under
+  `WeaponCounter`. Gate **`tools/godot/probe_weapon_counter.gd`** 9/9 (spawn at the door, standing; the car settled;
+  a pad grants once, not twice while stood on, and refills after stepping off).
+- **R9 -- cell HLOD** (PLAN.md 3.32/3.34). `island_buildings.py write` records each cell's buildings as boxes
+  (`cells/hlod/boxes.json`: placement, the type's footprint + height, the facade tone's sRGB; `HLOD_GLASS` for
+  curtain walls); **`tools/godot/build_building_hlod.gd`** (`--check`) turns each cell's into ONE vertex-coloured
+  mesh (`cells/hlod/<cell>.res`, `MI_HLOD.tres`; walls in the tone with a dark band per 3 m storey, grey roof;
+  written only when its boxes' hash changes). The cell scene carries it as `HLOD` (`visibility_range_begin`
+  `HLOD_BEGIN` 450 m of the cell's AABB centre, dithered, no shadow) and every building's `Mesh` override gets
+  `visibility_parent = ../../HLOD`: Godot's own HLOD rule, so a building draws exactly while its cell's HLOD is
+  hidden for being near. Re-run order: `island_buildings.py write`, then `build_building_hlod.gd`.
+  Measured (`probe_walk_perf.gd`, `--no-hlod` is the control): triangles in the far-view cells cut 55-70 %
+  (15-12-5 6.0 -> 2.7 M, 14-12-6 3.2 -> 0.9 M), draws -10-25 %, frame time unchanged at the station -- **the
+  station quarter is not bound by the far city**: attributed with `--no-peds` / `--no-traffic`, each alone took its
+  p50 from 13.3 to 6.9 ms. The light crowd was ~1 100 of ~4 000 draws there, so `PedCrowd.drawDistance` (180 m, set
+  once per ped's meshes at creation: no shadows, dithered fade; a light ped is never nearer than 80 m) took the
+  station walk p50/p95 13.3/18.3 -> **11.8/16.2 ms** and downtown p50 8.7 -> 7.6. Still over 16.7 at p95 by
+  ~0.2 ms: cells 15-12-2/3 (~3.6k draws; traffic + the station landmark).
+- **The map's background is the POSTAL GRID; the region underlay is removed** (its boxes overlapped).
+  `RoadOverlay.drawPostalGrid` (one owner, both maps): a faint checkerboard of the 192 m cells under the roads, the
+  cell lines, and each cell's "x-y" upright in the middle of its VISIBLE part. On the minimap it is clipped to the
+  disc (`clipConvex`, Sutherland-Hodgman against the disc polygon) and turns with a heading-up map; on the full map
+  it is clipped to the view, with the column/row numbers still on the edges. `showPostalGrid` on both.
+- **The 3.27 s freeze on the way to 12-18 was ONE node:** `BreakableProps._ready` added each pole's
+  `CollisionShape3D` to a `StaticBody3D` ALREADY IN THE TREE, so the physics body was rebuilt per shape -- quadratic,
+  and a piece's bollard batch has hundreds. The body is filled off-tree and entered once. Found with
+  **`tools/godot/probe_start_hitch.gd`** (display; no settle, walks the player from `--from` to `--to`, prints
+  every frame over `--slow` ms; with `ZM_TRACE=1` the streaming step of that frame is interleaved -- the trace
+  prints BEFORE each `addChild`, so the last "enter" line before a SLOW line is the node that took the time).
+  Before: 921 ms at start + 3268 ms at 12-18; after: none over 50 ms past the first 0.7 s of loading.
+- **The car camera had W3's frozen-frame bug too** (user: "when I drive, the camera flips 180 and shows the
+  character's front"). `VehicleCameraController` is top-level, so its world basis froze at the car's rotation at
+  `_ready`, and its Yaw node then added the car's WORLD yaw on top: right only for a car built at 0 deg. The parked
+  starting car faces the street (180 deg), so the chase camera sat in front; a 90 deg car was a quarter turn off.
+  Traffic never showed it because a traffic car is turned AFTER `_ready`. The rig now restates its AUTHORED local
+  rotation (Vehicle.tscn's 180 deg flip, cancelled by `Pivot`) as its world rotation every frame. Gate
+  **`tools/godot/probe_vehicle_camera_frame.gd`** 4/4 (cars built at 0/90/180/-90 deg, camera behind and looking
+  ahead); with the line removed 3 fail (180 deg reads -1.00). `probe_vehicle_views`, `probe_driveby_aim`,
+  `probe_component_car` still pass.
+- **Zones start loading NEAREST FIRST** (`ZoneManager`: candidates ranked by distance / load radius, then
+  `maxLoadsPerTick` of them). They started in MARKER order, so at the start far cells took every slot and the safe
+  house's own block had not appeared after 12 s; now it stands at 4 s.
+- **No traffic car is born in front of a player** (it was: a top-up set a car 136-163 m ahead of a player doing
+  45 m/s, some in their own lane). `world.TrafficSpawnRules` (engine-free, `TrafficSpawnRulesTest`): never within
+  `trafficSpawnMinDist` (80 m); never in the corridor a moving player covers in `trafficSpawnLeadSeconds` (6 s) +
+  that (40 m wide, widening 0.5 per metre ahead, so side streets entering it count); and `ZoneManager` adds never
+  inside this peer's camera frustum nearer than `trafficSpawnViewDist` (160 m). Checked on the car's actual
+  placement; 0 on all three = the old gate. Gate **`tools/godot/probe_traffic_ahead.gd`** (`--speed=45`): 0 born
+  ahead, 21 still born; `--control` 6 born ahead.
 
 ## The island's road layout is DERIVED: arterials in, expressway, trunk grid, streets and turnarounds out (PLAN.md 3.13 steps 2-5, 3.3, 3.3b, 2026-09-19)
 
@@ -9649,6 +9747,35 @@ merge into the piece's one paint object, against a modelled kerb ring that would
 batch. `tree_assets` is now **sakura** (`CommonTree_3`, with `MI_Leaves_NormalTree` retinted over the kit's white
 leaf mask) and **黒松** (`Pine_3`), two species instead of three interchangeable broadleaves. A GREEN CommonTree
 beside the pink one needs a per-asset material override, which is PLAN.md 3.16 step 3's own next step.
+
+## Lots never overlap, arterials have a grade gate, the light crowd flees (2026-09-22, forty-eighth session)
+
+- **Two lot slabs never share plan area** (`island_buildings.separate_lots`, run by `derive` after `grow_lots`, and on
+  its own as `island_buildings.py lots [--check]`, no terrain dump). `grow_lots` claims whole 1 m cells by their
+  CENTRES, so two lots never claim one cell, but a rectangle's continuous edge runs up to a cell past the last centre
+  it covers: neighbours grown toward each other shared a strip up to 0.9 m wide along their whole side. Measured
+  **1453 overlapping pairs, 5 995 m2, 1421 of them coplanar** (z-fighting). The pass trims, per pair, the one side
+  of either lot that clears it with the least cut, never into the building's own footprint (its type AABB).
+  After: 0 pairs (checked independently with shapely), 1137 lots trimmed (median 0.25 m, max 1.0), no building moved.
+  The ground under a trimmed strip is the block ground at footway level, 6 cm below the slab, already paved.
+- **An arterial has a grade gate** (`island_layout.arterial_grades`, asserted by `island_layout.py` and by its new
+  `--check`, which runs the asserts on the committed output without deriving). An arterial is pure drape, so a
+  terrain edit could tilt one silently (v16's junction on a 42 % slope). `ARTERIAL_GRADE` 6 % over at least
+  `ARTERIAL_SPAN` 20 m, on every road of the arterials INPUT (its `__n` zone splits included). Measured: 127
+  arterial roads, steepest 2.4 % (`chuo_dori`). The gate's `pad_grade` WARNs on pads with an arterial mouth are
+  printed beside it, not asserted (a pad slope is a stop-line placement): today 3, worst 19.9 % where the touge's
+  east foot meets `nishi_dori__6` (its mouth 2.26 m above the arterial's).
+- **The light crowd REACTS, with no promotion** (`world.PedCrowd`, PLAN.md 3.32): a light ped that hears a GUNSHOT or
+  EXPLOSION within `panicRange` 120 m (capped by the stimulus's own radius), or that a player in combat is aiming at
+  (within `aimedAtRadius` 2 m of that player's aim marker -- beyond the promote ring that means a scope), runs AWAY
+  along its footway at `fleeSpeed` 4.5 m/s on `upright_sprint_forward` for `panicSeconds` 8 s, then walks again.
+  Stimuli are read once per frame (each newer than the last seen), so the cost is one list walk plus a distance per
+  ped. `reactions` off is the control. `StimulusManager.postNoise(type, origin, radius)` is the registered form of
+  `post` for probes. Gate **`tools/godot/probe_ped_panic.gd`** 7/7 (bare stand: 5 peds 20-40 m from a shot run away
+  at 4.50 m/s, 5 at 200 m keep walking at 1.40, all walk again after the panic); `--control` fails the flee case.
+  Not gated: the aimed-at half (it needs a Player's aim marker in a scope).
+- `probe_ped_crowd.gd`'s "the crowd added nothing to the characters group" had been failing on World.tscn since the
+  traffic ring (3.32) streams 9 cars and their drivers round the stand; it now counts bodies on foot only.
 
 ## Known Quirks / Gotchas
 

@@ -160,9 +160,15 @@ public class DebugConsole extends CanvasLayer {
                 print("save [slot]                            write the campaign save (default 1)");
                 print("load [slot]                            restore it (default 1)");
                 print("hud [0-3]                              debug HUD: off / FPS / perf + graph / + game state");
+                print("where                                  the bug-report line (postal code, position, zone, road)");
+                print("postal <x-y[-s]> [tp]                  waypoint (or teleport) to a postal code, e.g. postal 12-7-5");
+                print("tp <x> <y> <z>                         teleport the local player (host / single player)");
                 print("close                                  close the console");
             }
             case "close" -> close();
+            case "where" -> where();
+            case "postal" -> postal(a);
+            case "tp" -> tp(a);
             case "named" -> print(director == null ? "no MissionDirector"
                     : "named: " + orNone(director.namedCharacterIds()));
             case "move" -> {
@@ -294,6 +300,71 @@ public class DebugConsole extends CanvasLayer {
         }
         print("no local player");
         return null;
+    }
+
+    // ── Postal codes and the bug-report line (PLAN.md 3.26) ─────────────────────────────────────
+
+    private Player localPlayer() {
+        for (Player p : PlayerRegistry.getPlayers()) {
+            if (GD.isInstanceValid(p) && p.isLocallyOwnedPlayer()) return p;
+        }
+        print("no local player");
+        return null;
+    }
+
+    private void where() {
+        Player p = localPlayer();
+        if (p == null) return;
+        String line = com.openworld.world.PostalReport.line(this, p.getGlobalPosition());
+        print(line);
+        godot.api.DisplayServer.clipboardSet(line);
+    }
+
+    private void postal(String[] a) {
+        com.openworld.world.PostalGrid.Code c = a.length >= 2 ? com.openworld.world.PostalGrid.parse(a[1]) : null;
+        if (c == null) { print("usage: postal <x-y[-s]> [tp]   x, y 1-24 (west->east, north->south), s 1-9 keypad"); return; }
+        Player p = a.length >= 3 && a[2].equals("tp") ? spawnPlayer() : localPlayer();
+        if (p == null) return;
+        double[] xz = com.openworld.world.PostalGrid.centre(c);
+        Vector3 at = new Vector3(xz[0], p.getGlobalPosition().getY(), xz[1]);
+        if (a.length >= 3 && a[2].equals("tp")) {
+            teleport(p, at);
+            print("teleported to " + c);
+        } else {
+            p.setWaypoint(at);
+            print("waypoint at " + c + String.format(" (x %.0f z %.0f)", xz[0], xz[1]));
+        }
+    }
+
+    private void tp(String[] a) {
+        if (a.length < 4) { print("usage: tp <x> <y> <z>"); return; }
+        Player p = spawnPlayer();
+        if (p == null) return;
+        try {
+            teleport(p, new Vector3(Double.parseDouble(a[1]), Double.parseDouble(a[2]), Double.parseDouble(a[3])));
+            print("teleported");
+        } catch (NumberFormatException e) {
+            print("usage: tp <x> <y> <z>");
+        }
+    }
+
+    /** Put the player at `at`, lifted onto whatever surface is below-or-at a point 400 m up (so a postal centre, which
+     *  carries only x/z, lands on the ground or a roof instead of inside it). */
+    private void teleport(Player p, Vector3 at) {
+        Vector3 to = at;
+        var space = p.getWorld3d() != null ? p.getWorld3d().getDirectSpaceState() : null;
+        if (space != null) {
+            var q = godot.api.PhysicsRayQueryParameters3D.Companion.create(
+                    new Vector3(at.getX(), 400.0, at.getZ()), new Vector3(at.getX(), -50.0, at.getZ()));
+            q.setExclude(new godot.core.VariantArray<>(godot.core.RID.class));
+            var hit = space.intersectRay(q);
+            if (hit != null && hit.containsKey("position")) {
+                Vector3 h = (Vector3) hit.get("position");
+                to = new Vector3(at.getX(), h.getY() + 1.0, at.getZ());
+            }
+        }
+        p.setVelocity(Vector3.Companion.getZERO());
+        p.setGlobalPosition(to);
     }
 
     private String weaponId(String[] a) {

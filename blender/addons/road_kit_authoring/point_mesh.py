@@ -365,6 +365,10 @@ def pier_extent(pier):
     return (min(zs) if zs else 0.0), (max(xs) if xs else 0.0)
 
 
+FOOT_REACH = 1.5
+FOOT_OFFSETS = ((0.0, 0.0), (FOOT_REACH, 0.0), (-FOOT_REACH, 0.0), (0.0, FOOT_REACH), (0.0, -FOOT_REACH))
+
+
 def place_pier(pier, top, height, fwd, zb=None, ground=None):
     """One pier asset stood at `top` (the soffit), facing `fwd`, its lowest point `height` below: every vertex above
     `stretch_z` rigid, every one below stretched linearly so the lowest lands on the ground. `{material: [tri]}`.
@@ -382,9 +386,14 @@ def place_pier(pier, top, height, fwd, zb=None, ground=None):
                 return z
             foot = -height
             if ground is not None:
-                g = ground(wx, wy)
-                if g is not None:
-                    foot = min(g - top[2], sz - PIER_MIN_SHAFT)
+                # the LOWEST ground within FOOT_REACH of the vertex: a column over a vertical quay edge (0.6 m land
+                # to the -24 m seabed inside one 2 m cell) otherwise left its sea-side bottom vertices 9 m short of
+                # the seabed (probe_road_ground, the Wangan at the park quay). Its land side is then buried in the
+                # quay, which is how a pier is founded.
+                gs = [ground(wx + dx, wy + dy) for dx, dy in FOOT_OFFSETS]
+                gs = [v for v in gs if v is not None]
+                if gs:
+                    foot = min(min(gs) - top[2], sz - PIER_MIN_SHAFT)
             return sz + (z - sz) * (foot - sz) / (zb - sz)
     else:
         k = height / -zb if zb < 0.0 else 1.0
@@ -675,8 +684,14 @@ def self_test():
     slope = lambda x, y: -5.0 - 0.5 * x
     sloped = place_pier(pier, (0.0, 0.0, 20.0), 25.0, (0.0, 1.0, 0.0), ground=slope)["M_Concrete"]
     feet = [p for t in sloped for p in t if p[2] < 20.0 + cap_z - 1e-6]
-    assert feet and all(abs(p[2] - slope(p[0], p[1])) < 1e-9 for p in feet), feet
-    print("OK: with a ground sampler each shaft vertex stretches to the ground under itself")
+    # ...to the lowest ground within FOOT_REACH of itself: on this slope, its own ground less 0.5 x FOOT_REACH
+    assert feet and all(abs(p[2] - (slope(p[0], p[1]) - 0.5 * FOOT_REACH)) < 1e-9 for p in feet), feet
+    # and over a vertical quay edge (land to the seabed inside one cell) no foot is left on the land side
+    quay = lambda x, y: 0.0 if x < -0.5 else -24.0
+    q = place_pier(pier, (0.0, 0.0, 20.0), 25.0, (0.0, 1.0, 0.0), ground=quay)["M_Concrete"]
+    qf = [p for t in q for p in t if p[2] < 20.0 + cap_z - 1e-6]
+    assert qf and all(abs(p[2] + 24.0) < 1e-9 for p in qf), qf
+    print("OK: with a ground sampler each shaft vertex stretches to the lowest ground within %.1f m of itself" % FOOT_REACH)
     short = place_pier(pier, (0.0, 0.0, 5.0), 0.8, (0.0, 1.0, 0.0))["M_Concrete"]
     assert abs(min(p[2] for t in short for p in t) - 4.2) < 1e-9, "a short pier squashes whole, foot on the ground"
     print("OK: a pier asset keeps its cap, stretches its shaft to the ground and turns onto the road")

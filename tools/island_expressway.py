@@ -330,7 +330,7 @@ def build(net, ground):
     freeze(net, spur_in.points[0], up)
     net.link(road1.points[-1], spur_in.points[0])
     # last: it cuts spur_out at a joint, and everything above reads spur_out's own ends
-    wangan_east(net, spur_out, spur_in)
+    wangan_east(net, spur_out, spur_in, ground)
 
 
 def _g(x, z, h=0.0):
@@ -360,66 +360,70 @@ def _profile(pts, anchors):
     return [(p[0], p[1], round(z, 2)) for p, z in zip(pts, out)]
 
 
-def wangan_east(net, spur_out, spur_in):
-    """THE WANGAN, EAST SECTION (PLAN.md 3.30 L2; `island_plan.WANGAN_*`): two one-way elevated carriageways, like the
-    spur, from a PARTIAL JCT on the spur's east leg along the south waterfront (offshore of the park) to the port
-    corner, where each comes down to its own T on the coastal ring (two parallel one-way arms on one pad is a pad no
-    ring fits -- the airport end's rule).
+def wangan_east(net, spur_out, spur_in, ground=None):
+    """THE WANGAN (PLAN.md 3.30 L2; `island_plan.WANGAN_*`): two one-way elevated carriageways, like the spur, from a
+    PARTIAL JCT on the spur's east leg along the south waterfront (offshore of the park), over the gulf and the ring's
+    port-corner bend, then west along the port platform's north strip, each coming down to its own T on the ring (two
+    parallel one-way arms on one pad is a pad no ring fits -- the airport end's rule).
 
     * airport -> Wangan: `shuto_wangan_w` LEAVES spur_in (westbound there) at S to its own left (south), descends
-      south-west into the corridor's south-east lane line and on down to its T;
-    * Wangan -> airport: `shuto_wangan_e` rises from its T, runs the corridor's north-west lane line, passes UNDER both
+      south-west into the corridor's south lane line, and runs west to its T;
+    * Wangan -> airport: `shuto_wangan_e` rises from its T, runs the corridor's north lane line, passes UNDER both
       spur carriageways west of S (the spur is ~26.6 m there, this ~19 m) and joins spur_out from its own left
       (north) at S. spur_out is cut at a joint J before S, because the loop JCT's acceleration lane is on spur_out too
       and one run carries one aux slot.
     Wangan <-> C1 is not a movement here (two loops); it is reached through the ring and the city."""
-    y_out = net.points[_nearest(net, spur_out, _g(PL.WANGAN_S_X, 494.0))].pos
     u_out_s = _nearest(net, spur_out, _g(PL.WANGAN_S_X, 494.0))
     u_in_s = _nearest(net, spur_in, _g(PL.WANGAN_S_X, 506.0))
-    z_s = net.points[u_out_s].pos[2]
-    # the corridor, and its two lane lines (a one-way carriageway sits LEFT of its own travel, as the spur's do)
+    y_out = net.points[u_out_s].pos
+    z_s = y_out[2]
+    gz = (lambda x, y: max(0.0, ground.z(x, y) or 0.0)) if ground is not None else (lambda x, y: 0.0)
     cen = [(x, -z) for x, z in PL.WANGAN_CENTRE]
-    cl = rounded_polygon(cen, [0.0, 120.0, 0.0], closed=False)
+    cl = rounded_polygon(cen, PL.WANGAN_RADII, closed=False)
     cum = arclen(cl, False)
     n = max(2, int(round(cum[-1] / 45.0)))
     cp = [at_s(cl, cum, cum[-1] * k / n, False) for k in range(n + 1)]
 
     def off(i, side):
-        a, b = cp[max(0, i - 1)], cp[min(len(cp) - 1, i + 1)]
-        dx, dy = b[0] - a[0], b[1] - a[1]
+        a_, b_ = cp[max(0, i - 1)], cp[min(len(cp) - 1, i + 1)]
+        dx, dy = b_[0] - a_[0], b_[1] - a_[1]
         L = math.hypot(dx, dy)
         return (cp[i][0] - dy / L * SPUR_OFF * side, cp[i][1] + dx / L * SPUR_OFF * side)
-    left = [off(i, 1) for i in range(len(cp))]          # eastbound lane line (north-west)
-    right = [off(i, -1) for i in range(len(cp))]        # westbound lane line (south-east)
-    i600 = min(range(len(cp)), key=lambda i: abs(cp[i][0] - 600.0))
+    left = [off(i, 1) for i in range(len(cp))]          # eastbound lane line (north / north-west)
+    right = [off(i, -1) for i in range(len(cp))]        # westbound lane line (south / south-east)
     deck = 11.0
-    # --- eastbound: T -> corridor -> under the spur -> the gore at S
+    i_deck = min(i for i in range(len(cp)) if cp[i][0] >= PL.WANGAN_DECK_FROM_X)
+    top = len(cp) - 1
+    # --- eastbound: its T on the ring -> the corridor -> under the spur -> the gore at S
     te = PL.WANGAN_T_E
-    e_plan = [(te[0] + MOUTH, -te[1]), (te[0] + 90.0, -(te[1] + 12.0))] + left
+    m_e = (te[0], -(te[1] + MOUTH))
+    e_plan = [m_e, (te[0] + 25.0, -(te[1] + MOUTH + 22.0))] + left
     k_top = len(e_plan) - 1
     e_plan += [(815.0, -512.0), (838.0, -478.0), (872.0, -464.0), (925.0, -463.0), (965.0, -472.0)]
     k_under = k_top + 1
     e_plan.append((PL.WANGAN_S_X, y_out[1] + 8.0))
-    e = _profile(e_plan, {0: 0.0, 2 + i600: deck, k_top: 14.0, k_under: 18.5, k_under + 1: 19.0,
+    e = _profile(e_plan, {0: gz(*m_e), 2 + i_deck: deck, k_top: 14.0, k_under: 18.5, k_under + 1: 19.0,
                           len(e_plan) - 1: z_s})
     we = chain_road(net, PREFIX + "wangan_e", e, one_way=True)
     for u in we.points:
         net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
     ro.make_ramp(net, u_out_s, we.points[-1], lanes=RAMP_LANES)
-    # --- westbound: off spur_in at S -> down into the corridor -> its T
+    # --- westbound: off spur_in at S -> down into the corridor -> west -> its T
     _m, info = ro.branch_ramp(net, u_in_s, name=PREFIX + "wangan_w", aux_lanes=RAMP_LANES, carriageway="FWD",
                               length=90.0, spread=10.0, drop=-0.5)
     far = net.points[info["far"]].pos
     tw = PL.WANGAN_T_W
-    w_plan = [(far[0], far[1]), (872.0, -540.0)] + right[::-1] + [(te[0] + 90.0, -(tw[1] - 12.0)),
-                                                                   (tw[0] + MOUTH, -tw[1])]
-    j600 = 2 + (len(right) - 1 - i600)
-    w = _profile(w_plan, {0: far[2], 2: 21.5, j600: deck, len(w_plan) - 1: 0.0})
+    m_w = (tw[0], -(tw[1] + MOUTH))
+    w_plan = [(far[0], far[1]), (872.0, -540.0)] + right[::-1] + [(tw[0] + 40.0, -(tw[1] + 70.0)),
+                                                                   (tw[0] + 10.0, -(tw[1] + 45.0)), m_w]
+    j_deck = 2 + (top - i_deck)
+    i600 = min(range(len(cp)), key=lambda i: abs(cp[i][0] - 600.0) + abs(cp[i][1] + 800.0))
+    w = _profile(w_plan, {0: far[2], 2: 21.5, 2 + (top - i600): deck, j_deck: deck, len(w_plan) - 1: gz(*m_w)})
     extend(net, PREFIX + "wangan_w", w[1:])
     wr = net.roads[PREFIX + "wangan_w"]
     for u in wr.points[1:]:
         net.points[u].lanes_fwd, net.points[u].lanes_bwd = RAMP_LANES, 0
-    # --- the two T's on the ring's north-south stretch at the port corner
+    # --- the two T's on the ring along the port's north edge
     for t, arm in ((te, we.points[0]), (tw, wr.points[-1])):
         a, b = cut_road(net, (t[0], -t[1]), "ring_", MOUTH)
         make_junction(net, [a, b, arm])

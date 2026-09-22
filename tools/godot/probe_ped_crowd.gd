@@ -148,7 +148,7 @@ func _run() -> void:
 	_put_player(FAR)
 	await _wait(3.0)
 
-	var before_bodies := get_nodes_in_group("characters").size()
+	var before_set := get_nodes_in_group("characters")
 	var m := _make_zone("probe_peds", AT, want)
 	# The zone streams in as a task; give it room, then let the crowd walk.
 	var t0 := Time.get_ticks_msec()
@@ -161,8 +161,15 @@ func _run() -> void:
 	print("  crowd: %d light peds, %d full walkers (asked %d)" % [peds, walkers, want])
 	check(peds > want * 0.5, "the zone filled its crowd (%d light peds of %d asked)" % [peds, want])
 	check(walkers == 0, "no full body was spawned for a pedestrian out of reach (%d)" % walkers)
-	check(get_nodes_in_group("characters").size() - before_bodies <= 0,
-		"the crowd added nothing to the characters group")
+	var added := []
+	for c in get_nodes_in_group("characters"):
+		if not before_set.has(c):
+			added.append(c)
+	print("  characters group grew by %d: %s" % [added.size(), added.map(func(c): return "%s(%s)" % [c.name, c.get_class()])])
+	# traffic streams in round the stand too (3.32's ring): a car, or a body seated in one, is not the crowd's
+	var foot := added.filter(func(c): return not (c is RigidBody3D) and c.get("current_vehicle_node") == null)
+	check(foot.is_empty(), "the crowd added nothing on foot to the characters group (%d traffic bodies aside)"
+		% (added.size() - foot.size()))
 
 	# They walk, and they walk on the footway.
 	var crowd: Node = _crowds()[0] if not _crowds().is_empty() else null

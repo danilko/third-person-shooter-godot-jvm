@@ -135,8 +135,16 @@ public class Door extends Breakable {
         EventBus bus = getEventBus();
         if (bus != null) bus.connect(new StringName("mission_completed"),
                 MethodCallable.createUnsafe(this, "on_mission_completed"));
-        setPhysicsProcess(true); // doors tick every frame for the open/close easing
+        wake();   // one tick to settle; after that a door SLEEPS until something can change it (R14, below)
     }
+
+    /**
+     * R14 (PLAN.md review, measured on the island: every Door ticked every physics frame forever, one JVM call each
+     * per tick for ~hundreds of doors): a door ticks only while it can change -- swinging, a player standing at a
+     * MANUAL door (the E key is polled), or a Breakable restore pending. Everything that can start a change wakes it:
+     * the sensor, the lock, the manual calls and a restore.
+     */
+    private void wake() { setPhysicsProcess(true); }
 
     private void bindSensor() {
         if (sensorPath == null || sensorPath.isEmpty()) return;
@@ -159,6 +167,7 @@ public class Door extends Breakable {
         if (!isCharacterBody(body)) return;
         sensorOccupants++;
         noteOpenerSide(body);
+        wake();
         if (isLocalPlayerBody(body)) { localPlayerInSensor = true; if (!autoOpen) emitPrompt(true); }
     }
 
@@ -175,6 +184,7 @@ public class Door extends Breakable {
     public void onSensorBodyExited(Node3D body) {
         if (!isCharacterBody(body)) return;
         sensorOccupants = Math.max(0, sensorOccupants - 1);
+        wake();
         if (isLocalPlayerBody(body)) { localPlayerInSensor = false; if (!autoOpen) emitPrompt(false); }
     }
 
@@ -202,6 +212,7 @@ public class Door extends Breakable {
     public void setLocked(boolean value) {
         locked = value;
         if (locked) open = false;
+        wake();
         if (!autoOpen && localPlayerInSensor) emitPrompt(true); // refresh "Locked" / "Door (E)" text
     }
 
@@ -222,9 +233,9 @@ public class Door extends Breakable {
 
     // ── Manual control (story beats, scripts, or the E key in MANUAL mode) ───────
 
-    @Register public void openDoor()   { if (!locked) open = true; }
-    @Register public void closeDoor()  { open = false; }
-    @Register public void toggleDoor() { open = !locked && !open; }
+    @Register public void openDoor()   { if (!locked) open = true; wake(); }
+    @Register public void closeDoor()  { open = false; wake(); }
+    @Register public void toggleDoor() { open = !locked && !open; wake(); }
 
     /** Doors ignore damage unless {@link #breakable}; then they fall back to {@link Breakable} damage. */
     @Override
@@ -237,7 +248,10 @@ public class Door extends Breakable {
     @Override
     public void _physicsProcess(double delta) {
         super._physicsProcess(delta); // Breakable restore-timer (no-op unless a restore is pending)
-        if (isBroken()) return;       // a broken-down door no longer swings
+        if (isBroken()) {             // a broken-down door no longer swings; it ticks only for a pending restore
+            if (!restorePending()) setPhysicsProcess(false);
+            return;
+        }
 
         if (locked) {
             open = false;
@@ -259,7 +273,12 @@ public class Door extends Breakable {
             else progress = Math.max(target, progress - step);
             applyOpening();
         }
+        // asleep once settled, unless the E key must be polled or a restore is pending
+        if (progress == target && !(localPlayerInSensor && !autoOpen) && !restorePending()) setPhysicsProcess(false);
     }
+
+    /** Whether this door is ticking right now (probe readout for R14). */
+    @Register public boolean tickingNow() { return isPhysicsProcessing(); }
 
     private void applyOpening() {
         if (isSlide()) {
@@ -275,7 +294,7 @@ public class Door extends Breakable {
     @Override
     public void restore(boolean broadcast) {
         super.restore(broadcast);
-        setPhysicsProcess(true);
+        wake();
     }
 
     // ── HUD prompt (manual doors) ────────────────────────────────────────────────

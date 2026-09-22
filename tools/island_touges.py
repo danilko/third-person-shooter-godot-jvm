@@ -103,6 +103,29 @@ def sea_distance(path=RS.LAND):
     return at
 
 
+SITE_CLEAR = 25.0               # a walk keeps this far outside a frozen site's footprint (PLAN.md 3.33: v16's re-walk
+                                # ran 113 m of phase 1 through Shuri Castle)
+
+
+def site_free():
+    """(x, y) record -> False inside any frozen site (IslandSites.json) grown by SITE_CLEAR."""
+    path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandSites.json")
+    rects = []
+    if os.path.exists(path):
+        for st in json.load(open(path)).get("sites", []):
+            a = math.radians(st.get("yaw", 0.0))
+            sx, sy = (st.get("size") or [0.0, 0.0])[:2]
+            rects.append((st["x"], st["y"], math.cos(a), math.sin(a), sx / 2.0 + SITE_CLEAR, sy / 2.0 + SITE_CLEAR))
+
+    def f(x, y):
+        for cx, cy, c, s_, hx, hy in rects:
+            dx, dy = x - cx, y - cy
+            if abs(dx * c + dy * s_) <= hx and abs(-dx * s_ + dy * c) <= hy:
+                return False
+        return True
+    return f
+
+
 def unit(a, b):
     dx, dy = b[0] - a[0], b[1] - a[1]
     n = math.hypot(dx, dy) or 1.0
@@ -141,8 +164,10 @@ def derive(land_path):
     jn = (pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t)
     w1 = wedge(WEST_FOOT, (jn[0] - WEST_FOOT[0], jn[1] - WEST_FOOT[1]), PHASE1_WEDGE)
 
+    free = site_free()
+
     def inside1(x, y):
-        return w1(x, y) and y <= EAST_MIN_Y - 45.0 and dsea(x, y) > SEA_CLEAR
+        return w1(x, y) and y <= EAST_MIN_Y - 45.0 and dsea(x, y) > SEA_CLEAR and free(x, y)
     plateau_z = raw(*WEST_FOOT)
     walk_top = plateau_z - 25.0          # the plateau falls ~20 m from the junction toward the south-west
     uj = unit(jn, WEST_FOOT)
@@ -170,7 +195,8 @@ def derive(land_path):
     west_start = (WEST_FOOT[0] + u[0] * s, WEST_FOOT[1] + u[1] * s)
     ww = wedge(A, (WEST_FOOT[0] - A[0], WEST_FOOT[1] - A[1]), WEST_WEDGE)
     west, arcs_w = IT.hill_road(walk, west_start, top, LIMIT, leg=420.0, step=10.0,
-                                inside=lambda x, y: dsea(x, y) > SEA_CLEAR and ww(x, y), radius=ST.HAIRPIN_R,
+                                inside=lambda x, y: dsea(x, y) > SEA_CLEAR and ww(x, y) and free(x, y),
+                                radius=ST.HAIRPIN_R,
                                 heading=u, lookahead=ST.HAIRPIN_R + 10.0)
     # --- the east descent, walked UP from the farm arterial and reversed
     v = unit(EAST_FOOT, B)
@@ -182,7 +208,7 @@ def derive(land_path):
     we = wedge(B, (EAST_FOOT[0] - B[0], EAST_FOOT[1] - B[1]), EAST_WEDGE)
     east, arcs_e = IT.hill_road(walk, east_start, top, LIMIT, leg=380.0, step=10.0,
                                 inside=lambda x, y: (dsea(x, y) > SEA_CLEAR and we(x, y) and x < 330.0
-                                                    and y >= EAST_MIN_Y),
+                                                    and y >= EAST_MIN_Y and free(x, y)),
                                 radius=ST.HAIRPIN_R, heading=v, lookahead=ST.HAIRPIN_R + 10.0)
     # --- one line: junction -> phase 1 -> plateau junction -> west -> the summit straight -> east -> junction
     pins, keep, nodrop = set(), set(), set()

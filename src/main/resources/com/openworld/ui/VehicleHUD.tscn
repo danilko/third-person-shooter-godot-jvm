@@ -11,6 +11,12 @@ font_size = 34
 outline_size = 2
 outline_color = Color(0, 0, 0, 0.55)
 
+[sub_resource type="LabelSettings" id="LabelSettings_health"]
+font = ExtResource("2_font")
+font_size = 22
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.55)
+
 [sub_resource type="LabelSettings" id="LabelSettings_unit"]
 font = ExtResource("2_font")
 font_size = 12
@@ -34,7 +40,7 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -200.0
+offset_left = -260.0
 offset_top = -64.0
 offset_right = -20.0
 offset_bottom = -20.0
@@ -92,3 +98,14 @@ offset_right = 40.0
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("3_status")
+
+[node name="Health" type="Label" parent="Speed"]
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = 44.0
+offset_right = 104.0
+grow_vertical = 2
+text = "100%"
+label_settings = SubResource("LabelSettings_health")
+vertical_alignment = 1

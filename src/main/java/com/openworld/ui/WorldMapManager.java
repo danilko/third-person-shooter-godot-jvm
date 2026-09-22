@@ -66,18 +66,21 @@ public class WorldMapManager extends Control {
     @Export public float blipRangeMeters = 400f;
     /** Draw each zone's load ring (a streaming debug aid). */
     @Export public boolean showZoneRings = false;
-    /** PLAN.md 3.18n: place blips, the region underlay, and how near a click has to land to take a blip. */
+    /** PLAN.md 3.18n: place blips, and how near a click has to land to take a blip. */
     @Export public boolean showPlaces = true;
-    @Export public boolean showRegions = true;
     @Export public float placeSizePx = 9f;
     @Export public float placePickPx = 14f;
     /** Ordinary shops appear only once the view is tighter than this (m centre-to-edge); landmarks always. */
     @Export public float placeDetailRange = 900f;
-    @Export public Color regionTint = new Color(0.35f, 0.55f, 0.8f, 0.12f);
     @Export public int placeFontSize = 12;
-    @Export public int regionFontSize = 22;
     /** The debug underlay: each streaming zone's id over its marker (PLAN.md 3.18n, "which zone is this bug in"). */
     @Export public boolean showZoneIds = false;
+    /** PLAN.md 3.26: the postal grid -- 24 x 24 cells of 192 m, x across the top and y down the side, and each
+     *  cell's "x-y" when zoomed in far enough to read it. Every cell, sea included. */
+    @Export public boolean showPostalGrid = true;
+    @Export public Color postalLabelColor = new Color(1f, 1f, 1f, 0.55f);
+    /** A cell's own "x-y" is drawn only once it is this many pixels across. */
+    @Export public float postalCellLabelPx = 70f;
 
     /** The place a click last took, or "" (probe readout). */
     private String pickedPlace = "";
@@ -261,11 +264,11 @@ public class WorldMapManager extends Control {
         Vector3 view = new Vector3(viewX, 0.0, viewZ);
         Vector3 origin = player.getGlobalPosition();
 
-        // The region underlay goes UNDER the roads: it says which part of the island you are looking at, and it
-        // must not hide what you navigate by.
-        if (showRegions) {
-            RoadOverlay.drawRegions(this, Places.regions(), view, center, scale, 0f, regionTint,
-                    RoadOverlay.mapFont(), regionFontSize);
+        // The postal grid goes UNDER the roads: a light checkerboard of the 192 m cells with each cell's number,
+        // so the next boundary is readable at a glance without hiding what you navigate by.
+        if (showPostalGrid) {
+            RoadOverlay.drawPostalGrid(this, view, center, scale, 0f, (float) size.getX(), (float) size.getY(),
+                    0f, RoadOverlay.mapFont(), placeFontSize, postalCellLabelPx);
         }
         // Roads (4.7b): the baked picture under the whole control, one textured quad.
         mapDrawn = RoadOverlay.drawMap(this, view, center, scale, (float) size.getX(), (float) size.getY(),
@@ -289,6 +292,8 @@ public class WorldMapManager extends Control {
                 }
             }
         }
+
+        if (showPostalGrid) drawPostalEdgeNumbers(size);
 
         Vector3 wp = player.getWaypoint();
         if (wp != null && player.characterInfo != null) {
@@ -322,6 +327,27 @@ public class WorldMapManager extends Control {
         Vector2 size = getSize();
         float radiusPx = Math.min((float) size.getX(), (float) size.getY()) * 0.5f - 10f;
         return Math.max(1e-5f, radiusPx / rangeMeters);
+    }
+
+    /** The column numbers along the top edge and the row numbers down the left edge, kept on screen. */
+    private void drawPostalEdgeNumbers(Vector2 size) {
+        var font = RoadOverlay.mapFont();
+        if (font == null) return;
+        double half = com.openworld.world.PostalGrid.HALF, cell = com.openworld.world.PostalGrid.CELL;
+        int n = com.openworld.world.PostalGrid.CELLS;
+        float w = (float) size.getX(), h = (float) size.getY();
+        int fs = placeFontSize;
+        for (int k = 1; k <= n; k++) {
+            double mid = -half + (k - 0.5) * cell;
+            float sx = (float) worldToScreen(new Vector3(mid, 0.0, 0.0)).getX();
+            float sy = (float) worldToScreen(new Vector3(0.0, 0.0, mid)).getY();
+            if (sx > 0 && sx < w)
+                drawString(font, new Vector2(sx - 12f, fs + 4f), Integer.toString(k),
+                        godot.core.HorizontalAlignment.CENTER, 24f, fs, postalLabelColor);
+            if (sy > 0 && sy < h)
+                drawString(font, new Vector2(4f, sy + fs * 0.4f), Integer.toString(k),
+                        godot.core.HorizontalAlignment.LEFT, -1f, fs, postalLabelColor);
+        }
     }
 
     private Vector2 worldToScreen(Vector3 world) {

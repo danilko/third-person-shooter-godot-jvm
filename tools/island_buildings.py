@@ -5,6 +5,7 @@
     python3 tools/island_buildings.py derive <heights.f32>     # writes IslandBuildings.json (needs a terrain dump)
     python3 tools/island_buildings.py write [--check]          # cell scenes + the BuildingZones / PedZones blocks
     python3 tools/island_buildings.py peds                     # the derived crowd density, per region
+    python3 tools/island_buildings.py lots [--check]           # trim lot slabs so no two overlap (no dump needed)
 
 `derive` reads a Terrain3D height dump of World's terrain (`tools/godot/dump_height_grid.gd -- <out> -2304 -2304
 2305 2305 2`: Godot frame, 2 m, the STAMPED terrain the buildings stand on) and the road record, and writes the
@@ -29,6 +30,7 @@ How a lot is found (nothing is typed in as a coordinate):
   record rebuilds byte-identically. Lots, gas stations and restaurants only front an arterial (>= 2 lanes a side)
   and keep a spacing from the next of their kind (`SPACING`).
 """
+import glob
 import json
 import math
 import os
@@ -96,6 +98,16 @@ SLOT_STEP = 3.0        # how far along a row a rejected slot moves before trying
 PASSAGE_EVERY = 46.0   # along the frontage: about every third building
 PASSAGE_W = 3.2        # wide enough for a scooter and two people to pass, the ordinary 路地
 PASSAGE_DEPTH = 34.0   # back from the footway: past the frontage row's lot, into the block
+# R9 (PLAN.md 3.32/3.34): each cell carries ONE merged, vertex-coloured box per building (its HLOD), shown only
+# beyond HLOD_BEGIN of the cell's centre; every building's own Mesh has the HLOD as its `visibility_parent`, so
+# Godot shows the detail exactly while the HLOD is hidden for being near. One draw call per far cell instead of a
+# few hundred. The boxes are written here (`hlod/boxes.json`, the placement's facts) and turned into meshes by
+# `tools/godot/build_building_hlod.gd` (a Godot tool: an ArrayMesh is a binary resource).
+HLOD_BEGIN = 450.0
+HLOD_MARGIN = 40.0
+HLOD_DIR = os.path.join(BLD_DIR, "cells", "hlod")
+HLOD_RES = CELL_RES + "/hlod"
+HLOD_GLASS = {"OfficeMid": (78.0, 88.0, 102.0)}    # a curtain wall reads as dark glass, not as its facade tone
 LOAD = 800.0           # a cell's buildings stream in within this of its centre
 UNLOAD = 1100.0
 
@@ -177,9 +189,22 @@ ARTERIAL_ONLY = {"GasStation", "KonbiniLot", "FamilyRestaurant"}
 # * `<Type>_Open` -- `world.Door` nodes LOCKED until a MISSION unlocks them (KonbiniMission does).
 SHOP_TYPES = {"Konbini", "KonbiniLot", "FamilyRestaurant", "GasStation", "GasKiosk", "StationBuilding",
               "StationRural"}
-PUBLIC_BUILDINGS = (      # (Godot x, z, why): a specific building that is always open, beside the shop types
-    (682.0, -363.0, "the player's home base (placeholder: the block behind the konbini)"),
+PUBLIC_BUILDINGS = (      # (Godot x, z, why, wanted TYPE, "", ROLE): a specific building that is always open
+    # The player's SAFE HOUSE (user, 2026-09-22): where a player starts and respawns -- `write` puts World.tscn's
+    # `PlayerSpawn`, the `Player` and the starting car at its front door. A shop-house (a flat over a shop) two
+    # doors along the street from a central city konbini, both fronting the same street.
+    (87.0, -3.0, "the player's safe house", "ShopHouse", "", "safehouse"),
+    # The WEAPON COUNTER: a row of `item.WeaponPad`s inside the konbini next door (free for now), which replaced
+    # the loose weapons that used to lie at the spawn point. `write` places the pads in the shop's own frame.
+    (66.0, -3.0, "the weapon counter (free for now)", "Konbini", "", "armoury"),
 )
+ROLE_PLACES = {"safehouse": ("Safehouse", 2), "armoury": ("Weapon Counter", 2)}
+# The counter's pads, in the KONBINI's own frame (front +Z at z 5.46): the clear aisle between the last gondola
+# (x <= 6.02) and the side wall (x 9.1), clear of the WC partitions (z <= -2.66). 1.2 m apart, r 0.5.
+ARMOURY_PADS = (("PIS1", 6.75, -1.9), ("PIS2", 8.25, -1.9), ("REV1", 6.75, -0.7), ("DUP1", 8.25, -0.7),
+                ("SMG1", 6.75, 0.5), ("ASR1", 8.25, 0.5), ("ASR2", 6.75, 1.7), ("SHG1", 8.25, 1.7),
+                ("SNR1", 6.75, 2.9), ("ATL1", 8.25, 2.9), ("FRG1", 6.75, 4.1), ("MEW1", 8.25, 4.1))
+PAD_SCRIPT = "res://src/main/java/com/openworld/item/WeaponPad.java"
 # (Godot x, z, why, wanted TYPE or "", the `Missions` child to move onto it or ""): locked until its mission
 # unlocks it, and wins over the two above.
 #
@@ -210,7 +235,6 @@ PLACE_KINDS = {
     "GasKiosk":         ("Petrol Station", 1),
     "StationBuilding":  ("Station", 2),
     "StationRural":     ("Station", 2),
-    "PencilBuilding":   ("Safehouse", 2),          # only ever a place as the home-base anchor
 }
 SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: always drawn)
     "ContainerTerminal": ("Container Terminal", 2),
@@ -559,6 +583,121 @@ def grow_lots(field, placed):
         b["lot_depth"] = round(top - lowest + LOT_SKIRT, 3)
 
 
+LOT_SEPARATE_STEP = 0.05   # `separate_lots` trims a side this much at a time
+LOT_OVERLAP_TOL = 1e-4     # m2: two slabs sharing less than this are touching (float round-off), not overlapping
+
+
+def lot_polygon(b, lot=None):
+    """The world-plan corners (x, z) of a lot slab, counter-clockwise in its own frame."""
+    x0, z0, x1, z1 = lot or b["lot"]
+    a = math.radians(b["yaw"])
+    c, s = math.cos(a), math.sin(a)
+    cx, cz = b["pos"][0], b["pos"][2]
+    return [(cx + lx * c + lz * s, cz - lx * s + lz * c) for lx, lz in ((x0, z0), (x1, z0), (x1, z1), (x0, z1))]
+
+
+def _clip(poly, a, b):
+    """Sutherland-Hodgman: `poly` clipped to the left of the directed edge a -> b (or its right, for a clockwise
+    clip polygon -- `overlap_area` passes the clip polygon in its own winding and checks the sign)."""
+    out = []
+    def side(p):
+        return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+    for k in range(len(poly)):
+        p, q = poly[k], poly[(k + 1) % len(poly)]
+        sp, sq = side(p), side(q)
+        if sp >= 0.0:
+            out.append(p)
+        if (sp >= 0.0) != (sq >= 0.0):
+            t = sp / (sp - sq)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+    return out
+
+
+def _area(poly):
+    return 0.5 * sum(poly[k][0] * poly[(k + 1) % len(poly)][1] - poly[(k + 1) % len(poly)][0] * poly[k][1]
+                     for k in range(len(poly)))
+
+
+def overlap_area(p, q):
+    """Plan area two convex polygons share."""
+    if _area(q) < 0.0:
+        q = list(reversed(q))
+    if _area(p) < 0.0:
+        p = list(reversed(p))
+    out = p
+    for k in range(len(q)):
+        out = _clip(out, q[k], q[(k + 1) % len(q)])
+        if len(out) < 3:
+            return 0.0
+    return abs(_area(out))
+
+
+def lot_overlaps(placed):
+    """[(area, i, j)] of every pair of lot slabs that share plan area, with a 16 m bucket index."""
+    polys = [lot_polygon(b) for b in placed]
+    grid = {}
+    for i, p in enumerate(polys):
+        xs, zs = [v[0] for v in p], [v[1] for v in p]
+        for gx in range(int(math.floor(min(xs) / 16.0)), int(math.floor(max(xs) / 16.0)) + 1):
+            for gz in range(int(math.floor(min(zs) / 16.0)), int(math.floor(max(zs) / 16.0)) + 1):
+                grid.setdefault((gx, gz), []).append(i)
+    pairs = set()
+    for ids in grid.values():
+        for a in range(len(ids)):
+            for b in range(a + 1, len(ids)):
+                pairs.add((min(ids[a], ids[b]), max(ids[a], ids[b])))
+    out = []
+    for i, j in sorted(pairs):
+        ar = overlap_area(polys[i], polys[j])
+        if ar > LOT_OVERLAP_TOL:
+            out.append((ar, i, j))
+    return out
+
+
+def separate_lots(placed, aabbs):
+    """No two lot slabs overlap (PLAN.md P3 "lot-slab overlap slivers").
+
+    `grow_lots` claims whole 1 m cells of `field.owner` by their CENTRES, so two lots never claim the same cell --
+    but a rectangle's continuous edge runs up to a cell past the last centre it covers, and two neighbours grown
+    toward each other end up sharing a strip up to ~0.9 m wide along their whole common side. Every such pair is
+    coplanar (both lots stand at their footway's height), so the strip z-fights: measured 1421 of 1453 overlapping
+    pairs, 5 890 m2, before this pass. The cell test cannot see it; the plan geometry can.
+
+    For each overlapping pair, trim the one SIDE of either lot that clears it with the least cut, never into that
+    building's own footprint (a side stops at the type's AABB), and repeat until nothing overlaps. A pair whose
+    footprints themselves overlap cannot be separated by trimming and is reported."""
+    stuck = set()
+    for _ in range(8):
+        pairs = [p for p in lot_overlaps(placed) if (p[1], p[2]) not in stuck]
+        if not pairs:
+            break
+        for _ar, i, j in pairs:
+            best = None
+            for k, other in ((i, j), (j, i)):
+                b = placed[k]
+                fx0, fz0, fx1, fz1, _h = aabbs[b["type"]]
+                q = lot_polygon(placed[other])
+                for side, limit in ((0, fx0), (1, fz0), (2, fx1), (3, fz1)):
+                    lot = list(b["lot"])
+                    cut = 0.0
+                    while overlap_area(lot_polygon(b, lot), q) > LOT_OVERLAP_TOL:
+                        cut += LOT_SEPARATE_STEP
+                        lot[side] = b["lot"][side] + (cut if side < 2 else -cut)
+                        if (side < 2 and lot[side] > limit) or (side >= 2 and lot[side] < limit):
+                            cut = None
+                            break
+                    if cut is not None and (best is None or cut < best[0]):
+                        best = (cut, k, lot)
+            if best is None:
+                stuck.add((i, j))
+                continue
+            placed[best[1]]["lot"] = [round(v, 3) for v in best[2]]
+    left = lot_overlaps(placed)
+    print("island_buildings: lots separated; %d pair(s) still overlap (%.1f m2)%s"
+          % (len(left), sum(a for a, _i, _j in left), "" if not left else " -- footprints clash"))
+    return left
+
+
 def walk_lines(owner, cl, walk):
     """The footway walk lines of ONE road run -- what the ambient crowd walks (`world.Sidewalks`).
 
@@ -611,7 +750,7 @@ def write_places(placed, aabbs, text):
         scene = scene_of(b)
         if scene == b["type"]:
             continue                       # shut: not a place
-        label, tier = PLACE_KINDS.get(b["type"], ("", 0))
+        label, tier = ROLE_PLACES.get(b.get("role", ""), PLACE_KINDS.get(b["type"], ("", 0)))
         if not label:
             continue
         x0, z0, x1, z1, _h = aabbs[b["type"]]
@@ -877,6 +1016,7 @@ def derive(heights_path):
                     else:
                         k += 1
     grow_lots(field, placed)
+    separate_lots(placed, aabbs)
     assign_tones(placed)
     shops = 0
     for b in placed:
@@ -884,25 +1024,7 @@ def derive(heights_path):
             b["scene"] = b["type"] + "_Shop"
             shops += 1
     print("island_buildings: %d shops are always open (%s)" % (shops, ", ".join(sorted(SHOP_TYPES))))
-    anchored = {}
-    for anchors, suffix, what in ((PUBLIC_BUILDINGS, "_Shop", "ALWAYS OPEN"), (OPEN_BUILDINGS, "_Open", "ENTERABLE")):
-        for row in anchors:
-            ox, oz, why = row[0], row[1], row[2]
-            want = row[3] if len(row) > 3 else ""
-            node = row[4] if len(row) > 4 else ""
-            pool = [b for b in placed if b["type"] == want] if want else placed
-            reach = ANCHOR_REACH if want else OPEN_MATCH
-            near = min(pool, key=lambda b: (b["pos"][0] - ox) ** 2 + (b["pos"][2] - oz) ** 2, default=None)
-            if near is None or math.hypot(near["pos"][0] - ox, near["pos"][2] - oz) > reach:
-                print("island_buildings: no %s within %.0f m of (%.0f, %.0f) -- %s"
-                      % (want or "building", reach, ox, oz, why))
-                continue
-            near["scene"] = near["type"] + suffix
-            if node:
-                anchored[node] = [round(v, 3) for v in near["pos"]]
-            print("island_buildings: %s at (%.1f, %.1f) is %s%s (%s)"
-                  % (near["scene"], near["pos"][0], near["pos"][2], what,
-                     ", and '%s' moves onto it" % node if node else "", why))
+    anchored, roles = apply_anchors(placed)
     report_cover(field)
     placed.sort(key=lambda b: (b["pos"][0], b["pos"][2]))
     by_region = {}
@@ -910,7 +1032,7 @@ def derive(heights_path):
         by_region[b["region"]] = by_region.get(b["region"], 0) + 1
     doc = {"schema": 1, "source": "tools/island_buildings.py derive", "network_y": ny,
            "counts": dict(sorted(counts.items())), "regions": dict(sorted(by_region.items())),
-           "passages": passages, "anchored_missions": anchored, "buildings": placed}
+           "passages": passages, "anchored_missions": anchored, "roles": roles, "buildings": placed}
     with open(OUT, "w") as f:
         json.dump(doc, f, indent=1)
         f.write("\n")
@@ -1032,6 +1154,21 @@ def assign_tones(placed):
         print("  %-18s %s" % (reg, dict(sorted(by_region[reg].items()))))
 
 
+def lots_record(check):
+    """`separate_lots` on the existing record (no terrain dump, no building moves: only lot rects shrink)."""
+    doc = json.load(open(OUT))
+    before = [list(b["lot"]) for b in doc["buildings"]]
+    aabbs = {t: type_aabb(t) for t in {b["type"] for b in doc["buildings"]}}
+    left = separate_lots(doc["buildings"], aabbs)
+    changed = sum(1 for a, b in zip(before, doc["buildings"]) if a != b["lot"])
+    print("island_buildings: %d of %d lots trimmed" % (changed, len(before)))
+    if changed and not check:
+        with open(OUT, "w") as f:
+            json.dump(doc, f, indent=1)
+            f.write("\n")
+    return 1 if (check and (changed or left)) else 0
+
+
 def retone_record(check):
     """Re-assign every building's facade tone in the existing record (no terrain dump, no building moves)."""
     doc = json.load(open(OUT))
@@ -1118,7 +1255,13 @@ def cell_scene(name, blds, passages=()):
         ext.append('[ext_resource type="Material" path="%s" id="%s"]\n' % (FACADE_MAT_RES % tones[fam][t], rid))
     if lots:
         ext.append('[ext_resource type="Material" path="%s" id="lotmat"]\n' % LOT_MATERIAL)
+    if blds:
+        ext.append('[ext_resource type="ArrayMesh" path="%s/%s.res" id="hlod"]\n' % (HLOD_RES, name))
     ext.append("\n")
+    if blds:
+        nodes.append('\n[node name="HLOD" type="MeshInstance3D" parent="."]\nmesh = ExtResource("hlod")\n'
+                 'cast_shadow = 0\nvisibility_range_begin = %.1f\nvisibility_range_begin_margin = %.1f\n'
+                 'visibility_range_fade_mode = 1\n' % (HLOD_BEGIN, HLOD_MARGIN))
 
     if lots:
         # ONE draw call for every slab of the cell: a unit box, scaled per instance (the material is world-space
@@ -1142,6 +1285,7 @@ def cell_scene(name, blds, passages=()):
         tone = int(b.get("tone", 0))
         lines = ["surface_material_override/%d = ExtResource(\"%s\")" % (idx, used[(fam, tone)])
                  for fam, idx in sorted(facade_surfaces(scene_of(b)).items()) if (fam, tone) in used]
+        lines.append('visibility_parent = NodePath("../../HLOD")')
         if lines:
             # the override is on the type's Mesh node, addressed by the surface index that type's own meta records
             nodes.append('\n[node name="Mesh" parent="./%s_%03d" index="0"]\n%s\n'
@@ -1250,6 +1394,55 @@ def patch_peds(text, cells, network_y):
     return itz.splice(sections, generated, sub, nodes, ext=added)
 
 
+def apply_anchors(placed):
+    """Give each anchored building its variant (and role), from PUBLIC_BUILDINGS and OPEN_BUILDINGS. Returns
+    ({mission node: pos}, {role: {pos, yaw, type}}). Shared by `derive` and `anchors`, so moving an anchor needs
+    no terrain dump."""
+    anchored, roles = {}, {}
+    for anchors, suffix, what in ((PUBLIC_BUILDINGS, "_Shop", "ALWAYS OPEN"), (OPEN_BUILDINGS, "_Open", "ENTERABLE")):
+        for row in anchors:
+            ox, oz, why = row[0], row[1], row[2]
+            want = row[3] if len(row) > 3 else ""
+            node = row[4] if len(row) > 4 else ""
+            role = row[5] if len(row) > 5 else ""
+            pool = [b for b in placed if b["type"] == want] if want else placed
+            reach = ANCHOR_REACH if want else OPEN_MATCH
+            near = min(pool, key=lambda b: (b["pos"][0] - ox) ** 2 + (b["pos"][2] - oz) ** 2, default=None)
+            if near is None or math.hypot(near["pos"][0] - ox, near["pos"][2] - oz) > reach:
+                print("island_buildings: no %s within %.0f m of (%.0f, %.0f) -- %s"
+                      % (want or "building", reach, ox, oz, why))
+                continue
+            near["scene"] = near["type"] + suffix
+            if node:
+                anchored[node] = [round(v, 3) for v in near["pos"]]
+            if role:
+                near["role"] = role
+                roles[role] = {"pos": [round(v, 3) for v in near["pos"]], "yaw": near["yaw"], "type": near["type"]}
+            print("island_buildings: %s at (%.1f, %.1f) is %s%s (%s)"
+                  % (near["scene"], near["pos"][0], near["pos"][2], what,
+                     ", and '%s' moves onto it" % node if node else "", why))
+    return anchored, roles
+
+
+def anchors_only(check):
+    """Re-apply the anchors to the existing record (no terrain dump, no building moves), then the places."""
+    doc = json.load(open(OUT))
+    before = json.dumps(doc, sort_keys=True)
+    for b in doc["buildings"]:
+        b.pop("role", None)
+        sc = b.get("scene", b["type"])
+        if sc.endswith("_Open") or (sc.endswith("_Shop") and b["type"] not in SHOP_TYPES):
+            b.pop("scene", None)
+    doc["anchored_missions"], doc["roles"] = apply_anchors(doc["buildings"])
+    changed = json.dumps(doc, sort_keys=True) != before
+    if check:
+        print("island_buildings: anchors %s" % ("STALE" if changed else "up to date"))
+        return 1 if changed else 0
+    with open(OUT, "w") as f:
+        json.dump(doc, f, indent=1)
+    return places_only(False)
+
+
 def patch_missions(text, anchored):
     """Move each `Missions` child onto the building `derive` anchored it to.
 
@@ -1278,6 +1471,137 @@ def patch_missions(text, anchored):
     return text
 
 
+START_NODE_ID = 910018000
+START_HOLDER = "WeaponCounter"
+
+
+def patch_start(text, doc):
+    """PLAN.md 3 (user, 2026-09-22): the game starts at the SAFE HOUSE and the weapons are at the WEAPON COUNTER.
+
+    One owner, like `patch_missions`: the anchors in PUBLIC_BUILDINGS choose the buildings, and this puts
+      * `PlayerSpawn` (read by GameManager for every joining player and by WorldBounds for a fall-out recovery)
+        and the `Player` 1.5 m out from the safe house's front door, facing the street;
+      * the starting car (`VehicleRoot`) parked OFF the carriageway, nose to the street, in the nearest lot space
+        beside the house (never in a lane: the traffic brain cannot pass a parked car);
+      * the counter's `WeaponPad`s inside the weapon-counter konbini, in its own frame;
+    and deletes the loose `Pickups` that used to lie at the old spawn point."""
+    roles = doc.get("roles", {})
+    home, shop = roles.get("safehouse"), roles.get("armoury")
+    if home is None:
+        print("island_buildings: no safe house anchored -- the start is left where it is")
+        return text
+    ny = doc["network_y"]
+    x0, z0, x1, z1, _h = type_aabb(home["type"])
+    a = math.radians(home["yaw"])
+    sn, cs = math.sin(a), math.cos(a)
+    hx, hy, hz = home["pos"]
+    out = z1 + 1.5
+    sx, sz = hx + sn * out, hz + cs * out
+    sy = hy + LOT_RAISE + 0.9
+    # facing OUT of the door: a character's forward is -Z, so the yaw is the building's plus 180
+    fy = a + math.pi
+    rot = "%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f" % (math.cos(fy), math.sin(fy), -math.sin(fy), math.cos(fy))
+    spawn_tf = "Transform3D(%s, %.3f, %.3f, %.3f)" % (rot, sx, sy, sz)
+
+    # the starting car: PARKED OFF THE CARRIAGEWAY, nose to the street, in the nearest lot space beside the safe
+    # house (a car in the kerb lane is an obstacle the traffic brain cannot pass, so every car on that lane would
+    # queue behind it). Searched along the frontage in the house's own frame: the car's footprint must lie on lots
+    # and clear every building footprint by CAR_CLEAR.
+    CAR_HX, CAR_HZ, CAR_CLEAR = 1.15, 2.4, 0.4
+    rects = []                       # (cx, cz, cos, sin, x0, z0, x1, z1): a building footprint, world placement
+    lots = []
+    for ob in doc["buildings"]:
+        if math.hypot(ob["pos"][0] - hx, ob["pos"][2] - hz) > 60.0:
+            continue
+        oa = math.radians(ob["yaw"])
+        bx0, bz0, bx1, bz1, _bh = type_aabb(ob["type"])
+        rects.append((ob["pos"][0], ob["pos"][2], math.cos(oa), math.sin(oa), bx0, bz0, bx1, bz1))
+        if "lot" in ob:
+            lx0, lz0, lx1, lz1 = ob["lot"]
+            lots.append((ob["pos"][0], ob["pos"][2], math.cos(oa), math.sin(oa), lx0, lz0, lx1, lz1))
+
+    def local(r, wx, wz):
+        dx, dz = wx - r[0], wz - r[1]
+        return dx * r[2] - dz * r[3], dx * r[3] + dz * r[2]      # inverse of x' = x c + z s, z' = -x s + z c
+
+    def car_ok(wx, wz):
+        pts = [(wx + cs * lx + sn * lz, wz - sn * lx + cs * lz)
+               for lx in (-CAR_HX, 0.0, CAR_HX) for lz in (-CAR_HZ, 0.0, CAR_HZ)]
+        for r in rects:
+            for px, pz in pts:
+                ux, uz = local(r, px, pz)
+                if r[4] - CAR_CLEAR < ux < r[6] + CAR_CLEAR and r[5] - CAR_CLEAR < uz < r[7] + CAR_CLEAR:
+                    return False
+        for px, pz in pts:
+            if not any(r[4] <= local(r, px, pz)[0] <= r[6] and r[5] <= local(r, px, pz)[1] <= r[7] for r in lots):
+                return False
+        return True
+
+    home_lot = next((ob["lot"] for ob in doc["buildings"]
+                     if math.hypot(ob["pos"][0] - hx, ob["pos"][2] - hz) < 0.5 and "lot" in ob), [0, 0, 0, z1])
+    car_tf = None
+    for step in range(0, 81):
+        off = (step + 1) // 2 * 0.5 * (1 if step % 2 else -1)
+        for back in (0.2, 2.0, 4.0):
+            lz = home_lot[3] - CAR_HZ - back
+            wx, wz = hx + off * cs + lz * sn, hz - off * sn + lz * cs
+            if car_ok(wx, wz):
+                crot = "%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f" % (math.cos(fy), math.sin(fy), -math.sin(fy), math.cos(fy))
+                car_tf = "Transform3D(%s, %.3f, %.3f, %.3f)" % (crot, wx, hy + LOT_RAISE + 0.6, wz)
+                best = (math.hypot(wx - sx, wz - sz),)
+                break
+        if car_tf:
+            break
+    if car_tf is None:
+        print("island_buildings: no lot space beside the safe house fits a car -- the car is left where it is")
+
+    def set_tf(t, name, parent, tf):
+        pat = re.compile(r'(\[node name="%s" parent="%s"[^\]]*\]\n)(transform = Transform3D\([^)]*\)\n)?'
+                         % (re.escape(name), re.escape(parent)))
+        m = pat.search(t)
+        if m is None:
+            print("island_buildings: World.tscn has no %s/%s to move" % (parent, name))
+            return t
+        return t[:m.start()] + m.group(1) + "transform = %s\n" % tf + t[m.end():]
+
+    text = set_tf(text, "Player", "Characters", spawn_tf)
+    if car_tf:
+        text = set_tf(text, "VehicleRoot", ".", car_tf)
+
+    sections = itz.split_sections(text)
+    added = []
+    rid = itz.ext_resource_id(sections, PAD_SCRIPT)
+    if rid is None:
+        rid = "gen_%d" % itz.next_ext_id(sections)
+        added.append('[ext_resource type="Script" path="%s" id="%s"]\n\n' % (PAD_SCRIPT, rid))
+    nodes = ['[node name="PlayerSpawn" type="Node3D" parent="." unique_id=%d]\ntransform = %s\n\n'
+             % (START_NODE_ID, spawn_tf)]
+    if shop is not None:
+        nodes.append('[node name="%s" type="Node3D" parent="." unique_id=%d]\n\n' % (START_HOLDER, START_NODE_ID + 1))
+        b = math.radians(shop["yaw"])
+        bs, bc = math.sin(b), math.cos(b)
+        px, py, pz = shop["pos"]
+        for i, (wid, lx, lz) in enumerate(ARMOURY_PADS):
+            wx, wz = px + lx * bc + lz * bs, pz - lx * bs + lz * bc
+            nodes.append('[node name="Pad_%s" type="Area3D" parent="%s" unique_id=%d]\n'
+                         'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, %.3f, %.3f, %.3f)\n'
+                         'script = ExtResource("%s")\nweapon_id = "%s"\n\n'
+                         % (wid, START_HOLDER, START_NODE_ID + 2 + i, wx, py + LOT_RAISE + FLOOR_LIFT + 0.1, wz,
+                            rid, wid))
+
+    def generated(header):
+        if not header.startswith("[node"):
+            return False
+        name, parent = itz.attr(header, "name"), itz.attr(header, "parent")
+        return ((parent == "." and name in ("PlayerSpawn", START_HOLDER, "Pickups"))
+                or parent in (START_HOLDER, "Pickups"))
+    new = itz.splice(sections, generated, [], nodes, ext=added)
+    print("island_buildings: start at the safe house (%.1f, %.1f)%s; %d weapon pads"
+          % (sx, sz, ", car parked off the street %.1f m away" % best[0] if car_tf else "",
+             len(ARMOURY_PADS) if shop else 0))
+    return new
+
+
 def write(check):
     doc = json.load(open(OUT))
     cells = {}
@@ -1291,6 +1615,31 @@ def write(check):
     changed = []
     want = set()
     os.makedirs(CELL_DIR, exist_ok=True)
+    os.makedirs(HLOD_DIR, exist_ok=True)
+    levels = tone_levels()
+    aabbs = {}
+    boxes = {}
+    for (gx, gz), blds in sorted(cells.items()):
+        out = []
+        for b in blds:
+            t = b["type"]
+            if t not in aabbs:
+                aabbs[t] = type_aabb(t)
+            x0, z0, x1, z1, h = aabbs[t]
+            tone = int(b.get("tone", 0))
+            rgb = HLOD_GLASS.get(t) or (levels[tone]["srgb"] if tone < len(levels) else (150.0, 150.0, 150.0))
+            out.append([round(b["pos"][0], 3), round(b["pos"][1] + LOT_RAISE + FLOOR_LIFT, 3), round(b["pos"][2], 3),
+                        round(b["yaw"], 3), x0, z0, x1, z1, h, [round(c / 255.0, 4) for c in rgb]])
+        if out:
+            boxes["Bld_island_%d_%d" % (gx, gz)] = out
+    body = json.dumps({"schema": 1, "source": "tools/island_buildings.py write",
+                       "note": "per cell: [x, y, z, yaw deg, x0, z0, x1, z1, height, srgb 0-1] per building",
+                       "cells": boxes}, separators=(",", ":")) + "\n"
+    bpath = os.path.join(HLOD_DIR, "boxes.json")
+    if not os.path.exists(bpath) or open(bpath).read() != body:
+        changed.append(bpath)
+        if not check:
+            open(bpath, "w").write(body)
     for (gx, gz), blds in sorted(cells.items()):
         name = "Bld_island_%d_%d" % (gx, gz)
         path = os.path.join(CELL_DIR, name + ".tscn")
@@ -1341,6 +1690,7 @@ def write(check):
     peds = ped_cells()
     new = patch_peds(new, peds, doc["network_y"])
     new = patch_missions(new, doc.get("anchored_missions", {}))
+    new = patch_start(new, doc)
     if new != text:
         changed.append(SCENE)
         if not check:
@@ -1527,6 +1877,8 @@ def main(argv):
         return 0
     if argv[:1] == ["write"]:
         return write("--check" in argv)
+    if argv[:1] == ["anchors"]:
+        return anchors_only("--check" in argv)
     if argv[:1] == ["places"]:
         return places_only("--check" in argv)
     if argv[:1] == ["sidewalks"]:
@@ -1535,6 +1887,8 @@ def main(argv):
         return clearance("--check" in argv)
     if argv[:1] == ["tones"]:
         return tones_gate("--check" in argv)
+    if argv[:1] == ["lots"]:
+        return lots_record("--check" in argv)
     if argv[:1] == ["retone"]:
         return retone_record("--check" in argv)
     if argv[:1] == ["peds"]:

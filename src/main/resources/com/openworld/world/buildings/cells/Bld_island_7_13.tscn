@@ -1,0 +1,58 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Warehouse.tscn" id="1"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool.tres" id="tone0_1"]
+[ext_resource type="Material" path="res://assets/world_source/kits/road_kit/materials/M_TileWhite.tres" id="lotmat"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_7_13.res" id="hlod"]
+
+[sub_resource type="BoxMesh" id="LotBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Lots"]
+transform_format = 1
+instance_count = 2
+mesh = SubResource("LotBox")
+buffer = PackedFloat32Array(-68.2307, 0.0000, 2.6273, -207.7505, 0.0000, 0.5230, 0.0000, 4.5675, -5.3866, 0.0000, -33.2795, 1287.9605, -55.9611, 0.0000, -19.7665, -138.6089, 0.0000, 0.5050, 0.0000, 4.5585, 41.1180, 0.0000, -26.9019, 1260.8095)
+
+[sub_resource type="BoxShape3D" id="LotShape0"]
+size = Vector3(68.443, 0.523, 33.383)
+
+[sub_resource type="BoxShape3D" id="LotShape1"]
+size = Vector3(69.443, 0.505, 33.383)
+
+[node name="Bld_island_7_13" type="Node3D"]
+
+[node name="HLOD" type="MeshInstance3D" parent="."]
+mesh = ExtResource("hlod")
+cast_shadow = 0
+visibility_range_begin = 450.0
+visibility_range_begin_margin = 40.0
+visibility_range_fade_mode = 1
+
+[node name="Warehouse_000" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.996898, 0, 0.078703, 0, 1, 0, -0.078703, 0, -0.996898, -221.761, 4.849, 1281.094)
+
+[node name="Mesh" parent="./Warehouse_000" index="0"]
+surface_material_override/0 = ExtResource("tone0_1")
+visibility_parent = NodePath("../../HLOD")
+
+[node name="Warehouse_001" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.805856, 0, -0.592112, 0, 1, 0, 0.592112, 0, -0.805856, -154.103, 4.831, 1265.068)
+
+[node name="Mesh" parent="./Warehouse_001" index="0"]
+surface_material_override/0 = ExtResource("tone0_1")
+visibility_parent = NodePath("../../HLOD")
+
+[node name="Lots" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Lots")
+
+[node name="LotCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Lot0" type="CollisionShape3D" parent="LotCollision"]
+transform = Transform3D(-0.996898, 0, 0.078703, 0, 1, 0, -0.078703, 0, -0.996898, -207.750, 4.567, 1287.960)
+shape = SubResource("LotShape0")
+
+[node name="Lot1" type="CollisionShape3D" parent="LotCollision"]
+transform = Transform3D(-0.805856, 0, -0.592112, 0, 1, 0, 0.592112, 0, -0.805856, -138.609, 4.558, 1260.810)
+shape = SubResource("LotShape1")

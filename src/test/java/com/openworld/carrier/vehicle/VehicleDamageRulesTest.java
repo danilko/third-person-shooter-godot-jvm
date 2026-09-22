@@ -45,6 +45,19 @@ class VehicleDamageRulesTest {
     }
 
     @Test
+    void aPushIsNotACrash() {
+        // 10 m/s into a planter and stopped: the crash is the 10 m/s the car lost
+        assertEquals(10.0, crashDeltaV(12.0, 0, 0, -10, 0, 0, 0), 1e-9);
+        // held against it under throttle: impulses pile up every step, the car does not move - no crash
+        assertEquals(0.0, crashDeltaV(33.0, 0, 0, -0.2, 0, 0, -0.2), 1e-9);
+        assertEquals(0.0, impactPoints(crashDeltaV(33.0, 0, 0, -0.2, 0, 0, -0.2)), 1e-9);
+        // a glancing scrape changes the velocity's direction a little: bounded by what actually changed
+        assertTrue(crashDeltaV(5.0, 0, 0, -20, 1.0, 0, -19.9) < MIN_IMPACT_DV);
+        // the impulse sum is still the upper bound (gravity or the engine inside the window is not a crash)
+        assertEquals(3.0, crashDeltaV(3.0, 0, 0, -10, 0, 0, 0), 1e-9);
+    }
+
+    @Test
     void masksMergeByTheMostBrokenReport() {
         int host = withState(0, slotOf("door_lf"), LOOSE);        // shot loose on the host
         int driver = withState(0, slotOf("door_lf"), DENTED);    // only dented where the car is driven…

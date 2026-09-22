@@ -17,7 +17,7 @@
 #              paint marker removed (none of them describes this ground) ; paint_terrain.gd
 #   roads      island_rebuild.sh --no-layout (ground sidecar, zones, pieces, stamp, traffic zones, road map)
 #   sites      island_sites.py (the FROZEN sites; re-search by hand with --resite)
-#   buildings  dump the stamped terrain ; island_buildings.py derive + write
+#   buildings  dump the stamped terrain ; island_buildings.py derive + write ; build_building_hlod.gd
 #   ground     dump ; island_ground.py derive ; apply_height_grid.gd + apply_paint_grid.gd
 #
 # The natural grid is committed: it is the restore (a stamp can always be undone by applying it again), and the
@@ -87,6 +87,7 @@ if want buildings; then
     godot 900 tools/godot/dump_height_grid.gd -- "$TMP/stamped.f32" -2304 -2304 2305 2305 2 | tail -1
     python3 tools/island_buildings.py derive "$TMP/stamped.f32" | tail -3
     python3 tools/island_buildings.py write | tail -2
+    godot 600 tools/godot/build_building_hlod.gd | tail -1      # R9: each cell's HLOD, from write's boxes
 fi
 if want ground; then
     echo "── ground"

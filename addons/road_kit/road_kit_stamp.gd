@@ -37,6 +37,7 @@ const SCHEMA_VER := 1
 ## 0.10 m since 2026-09-17 (user: "let road always be 0.1 m above ground"): 0.05 left the terrain's
 ## bilinear triangles a few cm under the lane on a cross-fall, so a 2 m cell could still poke through.
 const CLEARANCE := 0.10
+const CHANGE_TOL := 0.002
 ## Flat shelf past the PAVED edge. A band's half-width is the carriageway (`band_corridors` reads it off
 ## the paved outline), so the shelf must carry a footway (4 m on a T2) plus one 2 m terrain cell --
 ## the island's "the verge is one ground cell" rule: no terrain triangle spanning the road may have a
@@ -229,7 +230,11 @@ static func stamp(net: Node3D, terrain: Node, corridors: Dictionary, previous: A
 						var lv := layer_height(layer, x, z)
 						if not is_nan(lv):
 							h = lv
-					if absf(h - cur) > 0.0005:
+					# 2 mm, not 0.5: a height round-trips through float32 (dump -> numpy -> apply), and a re-stamp
+					# read 3 of 855 845 vertices 1 mm off with nothing moved (probe_road_stamp, 3.30 L2)
+					if absf(h - cur) > CHANGE_TOL:
+						if OS.get_environment("STAMP_DEBUG") != "" and changed < 20:
+							print("  stamp changes (%.1f, %.1f): %.3f -> %.3f (natural %.3f)" % [x, z, cur, h, nat])
 						data.set_height(world, h)
 						regions[data.get_region_location(world)] = true
 						changed += 1

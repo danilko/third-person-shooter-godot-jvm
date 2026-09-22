@@ -189,6 +189,8 @@ public class VehicleCameraController extends Node3D {
     private boolean    passengerAimMode = false;
 
     private double yaw          = 0.0;
+    /** The rig's authored rotation relative to its car, restated as its WORLD rotation every frame. */
+    private Vector3 authoredFrame = Vector3.Companion.getZERO();
     private double pitch        = 0.0;
     private double recoilPitch  = 0.0;
     private double recoilYaw    = 0.0;
@@ -231,6 +233,7 @@ public class VehicleCameraController extends Node3D {
             if (aimRay != null)       com.openworld.util.RayExclusions.add(aimRay, co);
         }
 
+        authoredFrame = getRotation();          // local to the car, read BEFORE top-level freezes it into world
         setAsTopLevel(true);
         yaw   = Math.toDegrees(target.getGlobalRotation().getY());
         pitch = followPitchDeg;
@@ -360,6 +363,15 @@ public class VehicleCameraController extends Node3D {
                 && INSTANCE.isActionJustPressed("view", false)) {
             cycleView();
         }
+
+        // The rig is top-level, and setAsTopLevel FREEZES its world basis at whatever the car's rotation was when
+        // _ready ran. The Yaw node below is then turned by the car's WORLD yaw on top of that frozen frame, which is
+        // right only for a car that had no rotation at _ready: a car placed facing the other way (the safe house's
+        // starting car, parked nose to the street) drove with the camera in FRONT of it. State the rig's world basis
+        // every frame instead -- the on-foot rig's W3 fix, for the same reason. The frame stated is the rig's AUTHORED
+        // local rotation (Vehicle.tscn gives CameraController a 180 deg Y flip that the Pivot flip cancels), so a car
+        // with no rotation behaves exactly as before.
+        setGlobalRotation(authoredFrame);
 
         recoilPitch = GD.lerp(recoilPitch, 0.0, recoilRecoverySpeed * delta);
         recoilYaw   = GD.lerp(recoilYaw,   0.0, recoilRecoverySpeed * delta);

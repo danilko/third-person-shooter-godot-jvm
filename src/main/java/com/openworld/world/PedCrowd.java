@@ -47,6 +47,7 @@ public class PedCrowd extends Node3D {
 	/** The script-free body every light ped instances: the imported character, no MeshConfig and no modifiers. */
 	public static final String PED_SCENE = "res://assets/characters/shino/shino.tscn";
 	private static final StringName WALK_CLIP = new StringName("upright_walk_forward");
+	private static final StringName RUN_CLIP = new StringName("upright_sprint_forward");
 
 	/** A walking pace (m/s). The same number {@code SidewalkWalkerController} glides at, so a promotion does not
 	 *  visibly change speed. */
@@ -64,12 +65,38 @@ public class PedCrowd extends Node3D {
 	/** Beyond this a ped's AnimationPlayer is stopped: a frozen skeleton still skins, but costs no animation
 	 *  tick, and a walk cycle is not readable at this range. */
 	@Visible public double animateDistance = 60.0;
+	/**
+	 * How far a light ped is DRAWN (R9 follow-up, measured 2026-09-22 with probe_walk_perf.gd at the station: the light
+	 * crowd was ~1 100 of its ~4 000 draw calls, p50 13.3 ms with it against 6.9 without). A light ped is never nearer
+	 * than {@link #promoteDistance} (closer ones are real bodies), so it draws WITHOUT shadows and fades out at this
+	 * distance: a 1.6 m figure is ~10 px tall at 180 m. Set once per ped on its meshes (engine-side culling, no
+	 * per-frame cost). 0 = drawn to the zone's edge with shadows (the control).
+	 */
+	@Visible public double drawDistance = 180.0;
 	/** Peds are advanced in this many groups, one group per physics frame, each moved by the whole group's worth
 	 *  of time. A ped is a straight-line walker, so the coarser step is invisible and the per-frame cost is
 	 *  divided by it. */
 	@Visible public int updateGroups = 4;
 	/** Off = the control: every ped updated every frame with its animation running. */
 	@Visible public boolean staggerUpdates = true;
+
+	/**
+	 * The light tier REACTS (PLAN.md 3.32): a ped that hears a gunshot or an explosion within {@link #panicRange}
+	 * (and inside the stimulus's own audible radius), or that a player is AIMING at from beyond the promote ring
+	 * (a scope), runs AWAY along its own footway for {@link #panicSeconds} and then walks again. It is the whole
+	 * of "the majority is startled and flees" and it costs no promotion: no body, no script, no physics -- one
+	 * clip change and a timer per ped. What a light ped cannot do (fight back, be carjacked, ragdoll) is what a
+	 * promotion is for. Off = the control: the crowd ignores everything.
+	 */
+	@Visible public boolean reactions = true;
+	/** How far a light ped hears trouble, capped by each stimulus's own radius. */
+	@Visible public double panicRange = 120.0;
+	/** How long a startled ped runs before it calms down (a new scare restarts it). */
+	@Visible public double panicSeconds = 8.0;
+	/** A fleeing ped's pace (m/s), a run, and its walk cycle is replaced by {@code upright_sprint_forward}. */
+	@Visible public double fleeSpeed = 4.5;
+	/** A ped within this of a player's aim point, while that player is in combat, counts as aimed at. */
+	@Visible public double aimedAtRadius = 2.0;
 
 	/** Metres walked by the whole crowd -- a probe readout, so "are they actually moving" is measurable. */
 	@Visible public double walkedTotal = 0.0;
@@ -84,11 +111,19 @@ public class PedCrowd extends Node3D {
 		int dir;
 		boolean animating = true;
 		boolean hidden = false;
+		/** Seconds of panic left (0 = calm). */
+		double flee = 0.0;
+		/** Where the scare came from (world), so the ped keeps running away from it. */
+		Vector3 threat;
+		boolean running = false;
 	}
 
 	private final List<Ped> peds = new ArrayList<>();
 	private PackedScene pedScene;
 	private int group = 0;
+	/** The newest stimulus timestamp this crowd has already reacted to. */
+	private double heardUpTo = -1.0;
+	private int scaresTotal = 0;
 
 	/** Set by {@link ZoneManager} so a promotion can be handed back to the one owner of AI spawning. */
 	private ZoneManager owner;
@@ -128,6 +163,15 @@ public class PedCrowd extends Node3D {
 		p.along = Math.max(0.5, Math.min(along, Math.max(0.5, length(p) - 0.5)));
 		p.dir = dir >= 0 ? 1 : -1;
 		addChild(body);
+		if (drawDistance > 0.0) {
+			for (Node g : body.findChildren("*", "GeometryInstance3D", true, false)) {
+				if (!(g instanceof godot.api.GeometryInstance3D gi)) continue;
+				gi.setCastShadowsSetting(godot.api.GeometryInstance3D.ShadowCastingSetting.OFF);
+				gi.setVisibilityRangeEnd((float) drawDistance);
+				gi.setVisibilityRangeEndMargin(20.0f);
+				gi.setVisibilityRangeFadeMode(godot.api.GeometryInstance3D.VisibilityRangeFadeMode.SELF);
+			}
+		}
 		p.anim = body.getNodeOrNull("AnimationPlayer") instanceof AnimationPlayer ap ? ap : null;
 		if (p.anim != null) {
 			// Every ped starts the same clip at its OWN offset, or a crowd marches in step.
@@ -150,6 +194,17 @@ public class PedCrowd extends Node3D {
 	}
 
 	@Register public double walkedTotalNow() { return walkedTotal; }
+
+	/** How many peds are running from something right now (a probe readout). */
+	@Register
+	public int fleeingNow() {
+		int n = 0;
+		for (Ped p : peds) if (p.flee > 0.0) n++;
+		return n;
+	}
+
+	/** Scares taken since the crowd was built (each ped counts once per scare). */
+	@Register public int scaresNow() { return scaresTotal; }
 
 	/** Remove and free every ped (zone unload). */
 	@Register
@@ -177,9 +232,18 @@ public class PedCrowd extends Node3D {
 		// Promotions are collected and applied AFTER the walk: removing from `peds` mid-loop shifts every
 		// later ped into a different group, so the stagger would silently stop being a partition.
 		List<Ped> promoted = null;
+		if (reactions) hear();
+		List<Vector3> aims = reactions ? aimPoints(players) : null;
 		for (int i = group; i < peds.size(); i += groups) {
 			Ped p = peds.get(i);
 			if (!GD.isInstanceValid(p.body)) continue;
+			if (aims != null && !aims.isEmpty()) {
+				Vector3 here = pointAt(p, p.along);
+				for (Vector3 a : aims) {
+					if (here.distanceTo(a) <= aimedAtRadius + 1.0) { scare(p, a); break; }
+				}
+			}
+			if (p.flee > 0.0) p.flee = Math.max(0.0, p.flee - step);
 			advance(p, step);
 			double d = nearestPlayerDist(p, players);
 			if (d < promoteDistance) {
@@ -201,9 +265,11 @@ public class PedCrowd extends Node3D {
 				p.body.setVisible(true);
 			}
 			boolean wantAnim = !p.hidden && d < animateDistance;
-			if (p.anim != null && wantAnim != p.animating) {
+			boolean wantRun = p.flee > 0.0;
+			if (p.anim != null && (wantAnim != p.animating || (wantAnim && wantRun != p.running))) {
 				p.animating = wantAnim;
-				if (wantAnim) p.anim.play(WALK_CLIP, -1.0, 1.0f, false); else p.anim.pause();
+				p.running = wantRun;
+				if (wantAnim) p.anim.play(wantRun ? RUN_CLIP : WALK_CLIP, 0.2, 1.0f, false); else p.anim.pause();
 			}
 			place(p);
 		}
@@ -225,8 +291,46 @@ public class PedCrowd extends Node3D {
 
 	private double length(Ped p) { return p.cum.length == 0 ? 0.0 : p.cum[p.cum.length - 1]; }
 
+	/** React to every stimulus newer than the last frame's: each ped in range starts (or restarts) running. */
+	private void hear() {
+		StimulusManager sm = StimulusManager.get();
+		if (sm == null) return;
+		double newest = heardUpTo;
+		for (StimulusManager.Stimulus st : sm.getStimuli()) {
+			if (st.timestamp <= heardUpTo) continue;
+			newest = Math.max(newest, st.timestamp);
+			if (st.type != StimulusManager.Type.GUNSHOT && st.type != StimulusManager.Type.EXPLOSION) continue;
+			double r = Math.min(panicRange, st.radius);
+			for (Ped p : peds) {
+				if (pointAt(p, p.along).distanceTo(st.origin) <= r) scare(p, st.origin);
+			}
+		}
+		heardUpTo = newest;
+	}
+
+	/** Where each player in combat is aiming (their aim marker), beyond the promote ring only by construction:
+	 *  a nearer ped is a real body that reacts through its own brain. */
+	private List<Vector3> aimPoints(List<Player> players) {
+		List<Vector3> out = new ArrayList<>();
+		for (Player pl : players) {
+			if (!GD.isInstanceValid(pl) || !pl.isCombat()) continue;
+			out.add(pl.getAimTargetPosition());
+		}
+		return out;
+	}
+
+	/** Start (or restart) a ped's panic, heading along its footway AWAY from {@code from}. */
+	private void scare(Ped p, Vector3 from) {
+		if (p.flee <= 0.0) scaresTotal++;
+		p.flee = panicSeconds;
+		p.threat = from;
+		double a = pointAt(p, p.along + 1.0).distanceTo(from);
+		double b = pointAt(p, p.along - 1.0).distanceTo(from);
+		p.dir = a >= b ? 1 : -1;
+	}
+
 	private void advance(Ped p, double dt) {
-		double moved = speed * dt;
+		double moved = (p.flee > 0.0 ? fleeSpeed : speed) * dt;
 		p.along += p.dir * moved;
 		walkedTotal += moved;
 		double L = length(p);

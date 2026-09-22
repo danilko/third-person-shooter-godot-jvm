@@ -67,9 +67,23 @@ public class MinimapController extends Control {
      * paper map you are reading is a different job from a radar you are steering by.
      */
     @Export public boolean rotateWithHeading = true;
+    /** R3: how often the radar redraws with nothing turning or moving (0 < ... ; 60 = every frame, the control). */
+    @Export public double redrawHz = 20.0;
+    private double redrawIn = 0.0;
+    private float lastDrawnRot = 0f;
+    private Vector3 lastDrawnAt = null;
     /** PLAN.md 3.18n: draw a square blip for each place in range (a shop you can walk into, a landmark). */
     @Export public boolean showPlaces = true;
     @Export public float placeSizePx = 7f;
+    /** PLAN.md 3.26: the postal code under the player ("12-7-5 · Downtown"), inside the disc's bottom edge. */
+    @Export public boolean showPostal = true;
+    @Export public int postalFontSize = 12;
+    /**
+     * The postal grid under the roads (user, 2026-09-22): a light checkerboard of the 192 m cells, their lines and
+     * each cell's "x-y" at the middle of its visible part, so crossing into the next cell is visible on the radar.
+     */
+    @Export public boolean showPostalGrid = true;
+    @Export public int gridFontSize = 11;
 
     private Character player;
     private boolean mapDrawn = false;
@@ -102,7 +116,19 @@ public class MinimapController extends Control {
     @Register
     @Override
     public void _process(double delta) {
-        queueRedraw();   // redraw every frame; cheap (a few dozen shapes)
+        // R3 (PLAN.md review): the radar redrew every frame, each blip a JVM call into the canvas. 20 Hz reads as live
+        // on a radar (GTA's own blips step), and a turn of the view or 0.5 m of travel redraws at once so a heading-up
+        // map never lags a turn.
+        redrawIn -= delta;
+        float rot = mapRotation();
+        Vector3 at = player != null && godot.global.GD.isInstanceValid(player) ? player.getGlobalPosition() : null;
+        boolean moved = at != null && (lastDrawnAt == null || at.distanceTo(lastDrawnAt) > 0.5);
+        if (redrawIn <= 0.0 || Math.abs(rot - lastDrawnRot) > 0.03f || moved) {
+            redrawIn = 1.0 / Math.max(1.0, redrawHz);
+            lastDrawnRot = rot;
+            lastDrawnAt = at;
+            queueRedraw();
+        }
     }
 
     @Register
@@ -126,6 +152,10 @@ public class MinimapController extends Control {
 
         // Roads (4.7b) — the baked picture of the whole map, one textured disc — and the local
         // player's GPS route over them.
+        if (showPostalGrid) {
+            RoadOverlay.drawPostalGrid(this, origin, center, scale, radiusPx, 0f, 0f, rot, RoadOverlay.mapFont(),
+                    gridFontSize, gridFontSize * 3f);
+        }
         mapDrawn = RoadOverlay.drawMap(this, origin, center, scale, 0f, 0f, radiusPx, roadColor, rot);
         if (player instanceof Player pl && pl.characterInfo != null && pl.getWaypoint() != null) {
             com.openworld.world.RoadGraph.Route route = com.openworld.world.RoadMap.routeFor(
@@ -174,7 +204,23 @@ public class MinimapController extends Control {
         // The player's arrow. Heading-up it is FIXED pointing up, which is the whole point: the map turns
         // under a still arrow, so "up" always means "where I am going".
         drawHeading(center, rotateWithHeading ? new Vector2(0f, -1f) : headingScreenDir());
+
+        if (showPostal && RoadOverlay.mapFont() != null) {
+            postalText = com.openworld.world.PostalReport.address(origin);
+            Vector2 at = new Vector2(0f, cy + radiusPx - 8f);
+            float w = (float) size.getX();
+            drawStringOutline(RoadOverlay.mapFont(), at, postalText, godot.core.HorizontalAlignment.CENTER, w,
+                    postalFontSize, HudPalette.OUTLINE_PX, HudPalette.OUTLINE);
+            drawString(RoadOverlay.mapFont(), at, postalText, godot.core.HorizontalAlignment.CENTER, w,
+                    postalFontSize, new Color(1f, 1f, 1f, 0.95f));
+        }
     }
+
+    private String postalText = "";
+
+    /** The postal readout drawn on the last frame (probe readout, PLAN.md 3.26). */
+    @Register
+    public String postalNow() { return postalText; }
 
     // ── helpers ────────────────────────────────────────────────────────────────
 

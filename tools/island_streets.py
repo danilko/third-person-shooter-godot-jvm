@@ -162,13 +162,51 @@ def _line_ok(net, ground, obst, kind, v, box, segs=None):
         nodes.append((p, c[1]))
     if not nodes:
         return None, "every one of its %d crossings crowds an existing junction" % len(cr)
+    ax = 1 if kind == "x" else 0
+    along = [p[ax] for p, _r in nodes]
+    lo_, hi_ = min(along), max(along)
+    sid = _site_hit((v, lo_) if kind == "x" else (lo_, v), (v, hi_) if kind == "x" else (hi_, v))
+    if sid:
+        return None, "runs through the site %s" % sid
     if segs is not None:
-        ax = 1 if kind == "x" else 0
-        along = [p[ax] for p, _r in nodes]
         run = _parallel_run(segs, kind, v, min(along), max(along))
         if run > PARALLEL_RUN:
             return None, "runs alongside an existing road for %.0f m" % run
     return nodes, None
+
+
+SITE_CLEAR = 10.0      # a street keeps this far outside a frozen site's footprint (PLAN.md 3.33)
+_SITES = None
+
+
+def _sites():
+    """The frozen sites (`IslandSites.json`, record frame): (id, cx, cy, cos, sin, half x, half y), inflated by
+    SITE_CLEAR. A block street never runs through one -- Tokyo Station stood over 265 m of `cho_169`."""
+    global _SITES
+    if _SITES is None:
+        path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandSites.json")
+        _SITES = []
+        if os.path.exists(path):
+            for st in json.load(open(path)).get("sites", []):
+                a = math.radians(st.get("yaw", 0.0))
+                sx, sy = (st.get("size") or [0.0, 0.0])[:2]
+                _SITES.append((st["id"], st["x"], st["y"], math.cos(a), math.sin(a),
+                               sx / 2.0 + SITE_CLEAR, sy / 2.0 + SITE_CLEAR))
+    return _SITES
+
+
+def _site_hit(a, b):
+    """The id of the first site the segment a-b passes through, or None (sampled every 4 m)."""
+    L = math.hypot(b[0] - a[0], b[1] - a[1])
+    n = max(1, int(L / 4.0))
+    for sid, cx, cy, c, s_, hx, hy in _sites():
+        for k in range(n + 1):
+            x = a[0] + (b[0] - a[0]) * k / n - cx
+            y = a[1] + (b[1] - a[1]) * k / n - cy
+            u, v = x * c + y * s_, -x * s_ + y * c
+            if abs(u) <= hx and abs(v) <= hy:
+                return sid
+    return None
 
 
 def _wet(ground, p, q):

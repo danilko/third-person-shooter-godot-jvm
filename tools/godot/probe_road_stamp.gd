@@ -98,6 +98,7 @@ func _initialize() -> void:
 	var fill_ok_natural := 0
 	var fill_miss := ""
 	var fill_under := 0
+	var fill_abut := 0
 	var pier_n := 0
 	var pier_open := 0
 	var n := 0
@@ -140,6 +141,9 @@ func _initialize() -> void:
 				if _over_lower_road(from_world * w, (from_world * w).y):
 					fill_under += 1
 					continue
+				if _near_kind(from_world * w, "PIER", ABUTMENT_REACH):
+					fill_abut += 1
+					continue
 				fill_n += 1
 				if w.y - h <= AT_GRADE_TOL:
 					fill_ok += 1
@@ -167,6 +171,7 @@ func _initialize() -> void:
 				worst_at = "pad vertex (%.1f, %.1f, %.1f)" % [v.x, v.y, v.z]
 	print("  %d lane samples, %d pad vertices, %d FILL, %d clear PIER (%d ms)" % [n, pad_verts.size(), fill_n, pier_n, Time.get_ticks_msec() - t0])
 	print("  INFO  %d FILL-height samples stand over a road more than %.1f m below (carried by that road's cap, not judged)" % [fill_under, Stamp.UNDERPASS])
+	print("  INFO  %d FILL-height samples are ABUTMENTS (a PIER corridor point within %.0f m: the fill batter ends there, the lane stays above the ground)" % [fill_abut, ABUTMENT_REACH])
 	t0 = Time.get_ticks_msec()
 	check(proud == 0 and proud_pad == 0, "no ground proud of a road (%.2f m lanes, %.2f m pad mesh)" % [PROUD_TOL, PAD_PROUD_TOL], "%d + %d, highest %.3f m at %s" % [proud, proud_pad, worst, worst_at])
 	check(fill_n > 0 and fill_ok == fill_n, "every FILL sample is carried (at grade, within %.2f m)" % AT_GRADE_TOL, "%d/%d %s" % [fill_ok, fill_n, fill_miss])
@@ -219,13 +224,27 @@ func _initialize() -> void:
 			var g: float = nat.call(w)
 			if not is_nan(h) and not is_nan(g):
 				worst_back = maxf(worst_back, absf(h - g))
-	check(back["ok"] and worst_back < 0.001, "restore puts the natural ground back", "%s; worst %.4f m" % [back["message"], worst_back])
+	# within the stamp's own change threshold: a vertex nearer its target than CHANGE_TOL is left (a float32 round trip)
+	check(back["ok"] and worst_back <= Stamp.CHANGE_TOL + 1e-4, "restore puts the natural ground back", "%s; worst %.4f m" % [back["message"], worst_back])
 	_done()
 
 ## The kit's support kind at the corridor point nearest `local` (network frame, Godot axes), or "PAD"
 ## when that point is on a junction pad. Through a 32 m bucket index built once: a scan of every corridor
 ## point per lane sample took the island (58 k points x 70 k samples) past 50 minutes.
 const KIND_CELL := 32.0
+## The stamp decides fill per corridor point (the NEARER end of a segment), so a lane sample the kit calls FILL within
+## one corridor spacing of a PIER point is an abutment: the batter ends under it.
+const ABUTMENT_REACH := 6.0
+
+func _near_kind(local: Vector3, kind: String, reach: float) -> bool:
+	var cx := int(floor(local.x / KIND_CELL))
+	var cz := int(floor(local.z / KIND_CELL))
+	for i in range(cx - 1, cx + 2):
+		for j in range(cz - 1, cz + 2):
+			for q in _kind_index.get(Vector2i(i, j), []):
+				if q[2] == kind and Vector2(q[0] - local.x, q[1] - local.z).length() <= reach:
+					return true
+	return false
 var _kind_index := {}
 
 func _kind_near(record: Dictionary, local: Vector3) -> String:

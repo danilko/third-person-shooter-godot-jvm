@@ -139,6 +139,87 @@ public class ZoneManager extends Node {
 	 */
 	@Export public float stallReclaimMinDist = 60.0f;
 
+	/**
+	 * THE TRAFFIC RING (PLAN.md 3.30, measured 2026-09-22). A zone decides WHERE traffic may spawn; this decides how far
+	 * from the players it exists at all. The island's traffic zones are sized for COVERAGE (unload 1550 m, so a spawn
+	 * gate of 1.4 km), which kept ~80 fully simulated cars and drivers alive round the player at all times: measured
+	 * with `probe_walk_perf.gd`, downtown driving ran p50 26.8 ms with traffic against 4.0 ms without, and physics ran
+	 * 2-3 catch-up ticks a frame. GTA's rule is a ring of a few hundred metres, spawned out there and reclaimed past
+	 * it. A car spawns only within this of a player and is reclaimed beyond {@code trafficSimRadius +
+	 * trafficReclaimMargin} (the smaller of that and the zone's unload radius). 0 = the zone's radii alone (the old
+	 * behaviour, and the control).
+	 */
+	@Export public float trafficSimRadius = 300.0f;
+	@Export public float trafficReclaimMargin = 120.0f;
+	/**
+	 * THE CAR BUDGET: ambient traffic cars alive across EVERY loaded zone. The ring alone concentrated traffic -- each of
+	 * the island's 29 traffic zones covers ~1.5 km of lanes, so all of them filled their cars inside the ring (measured:
+	 * 49 cars + 48 seated drivers within 420 m downtown). A car and its driver cost ~0.16-0.18 ms of physics each per
+	 * tick (3.6), so the budget is what bounds the frame. 0 = unlimited (the control).
+	 */
+	@Export public int trafficBudget = 20;
+	/**
+	 * WHERE A CAR MAY NOT BE BORN (user, 2026-09-22: "a vehicle spawns right in front of me while driving, and I crash
+	 * into it, especially at high speed"). The gate used to ask only "is a player within the ring" and "is the spot
+	 * 10 m clear", so a top-up could set a car down 20 m ahead of a car doing 40 m/s. GTA's rules
+	 * ({@link TrafficSpawnRules}): never within {@code trafficSpawnMinDist} of a player, never in the corridor a moving
+	 * player covers in {@code trafficSpawnLeadSeconds}, and never inside this peer's camera view nearer than
+	 * {@code trafficSpawnViewDist}. Checked on the car's actual placement. 0 on all three = the old gate (the control).
+	 */
+	@Export public float trafficSpawnMinDist = 80.0f;
+	@Export public float trafficSpawnLeadSeconds = 6.0f;
+	@Export public float trafficSpawnViewDist = 160.0f;
+	private int spawnsRefusedNearPlayer = 0;
+
+	/** How many traffic placements the player rules refused (probe readout). */
+	@Register
+	public int trafficSpawnsRefusedNow() { return spawnsRefusedNearPlayer; }
+
+	/** True when a car set down at {@code p} would appear near, ahead of, or in view of a player. */
+	private boolean spawnRefusedByPlayers(Vector3 p) {
+		for (Player pl : PlayerRegistry.getPlayers()) {
+			if (!GD.isInstanceValid(pl)) continue;
+			Vector3 pp = pl.getGlobalPosition();
+			Vector3 v = pl.currentVehicleNode instanceof godot.api.RigidBody3D rb && GD.isInstanceValid(rb)
+					? rb.getLinearVelocity() : pl.getVelocity();
+			if (TrafficSpawnRules.refuses(p.getX(), p.getZ(), pp.getX(), pp.getZ(), v.getX(), v.getZ(),
+					trafficSpawnMinDist, trafficSpawnLeadSeconds)) return true;
+		}
+		if (trafficSpawnViewDist > 0f) {
+			godot.api.Viewport vp = getViewport();
+			godot.api.Camera3D cam = vp != null ? vp.getCamera3d() : null;
+			if (cam != null && GD.isInstanceValid(cam)) {
+				Vector3 c = cam.getGlobalPosition();
+				double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
+				if (dx * dx + dz * dz < (double) trafficSpawnViewDist * trafficSpawnViewDist
+						&& cam.isPositionInFrustum(p.plus(new Vector3(0, 1.0, 0)))) return true;
+			}
+		}
+		return false;
+	}
+
+	/** Ambient cars alive right now, over every loaded zone. */
+	private int trafficAlive() {
+		int n = 0;
+		for (LoadedZone lz : loaded.values()) n += lz.vehicles.size();
+		for (StreamTask t : tasks.values()) if (t.lz != null) n += t.lz.vehicles.size();
+		return n;
+	}
+
+	private boolean trafficFull() { return trafficBudget > 0 && trafficAlive() >= trafficBudget; }
+
+	/** The spawn gate for traffic: the ring, or the zone's own 0.9 x unload where that is smaller. */
+	private float trafficSpawnGate(Zone zone) {
+		float g = zone.unloadRadius * 0.9f;
+		return trafficSimRadius > 0f ? Math.min(g, trafficSimRadius) : g;
+	}
+
+	/** The reclaim radius for traffic: the ring plus its margin, or the zone's unload radius where that is smaller. */
+	private float trafficReclaimRadius(Zone zone) {
+		float r = zone.unloadRadius;
+		return trafficSimRadius > 0f ? Math.min(r, trafficSimRadius + trafficReclaimMargin) : r;
+	}
+
 	private static final String AI_SCENE_PATH =
 			"res://src/main/resources/com/openworld/character/AICharacter.tscn";
 
@@ -320,6 +401,9 @@ public class ZoneManager extends Node {
 	/** Read-only view of the registered zone markers (I5 map/minimap region outlines). */
 	public List<ZoneMarker> getMarkers() { return markers; }
 
+	/** Whether this marker's zone is streamed in right now (the bug report, PLAN.md 3.26). */
+	public boolean isZoneLoaded(ZoneMarker marker) { return loaded.containsKey(marker); }
+
 	/** The nearest loaded zone carrying a RegionConfig (see {@link #updateActiveRegion}), or null
 	 * if the local player isn't currently near any loaded region — e.g. a debug HUD readout. */
 	public ZoneMarker getActiveRegionMarker() { return activeRegionMarker; }
@@ -428,6 +512,8 @@ public class ZoneManager extends Node {
 		evalTimer = evalInterval;
 
 		int loadsThisTick = 0;
+		wantLoad.clear();
+		wantLoadKey.clear();
 		for (ZoneMarker marker : new ArrayList<>(markers)) {
 			if (!GD.isInstanceValid(marker) || marker.zone == null) continue;
 			float dist = nearestPlayerDistXZ(marker.getGlobalPosition());
@@ -442,9 +528,8 @@ public class ZoneManager extends Node {
 			}
 			boolean isLoaded = loaded.containsKey(marker);
 			if (!isLoaded && dist < marker.zone.loadRadius) {
-				if (loadsThisTick >= maxLoadsPerTick) continue;   // next tick(s) pick up the rest
-				beginLoad(marker);
-				loadsThisTick++;
+				wantLoad.add(marker);
+				wantLoadKey.put(marker, dist / Math.max(1f, marker.zone.loadRadius));
 			} else if (isLoaded && dist > marker.zone.unloadRadius) {
 				beginUnload(marker);
 			} else if (debugLog && dist < marker.zone.unloadRadius * 1.2f
@@ -459,10 +544,24 @@ public class ZoneManager extends Node {
 			}
 		}
 
+		// NEAREST FIRST (user, 2026-09-22: at the start the safe house's own block had not appeared after 12 s): the
+		// loads used to start in MARKER order, so a far cell could take every slot while the one under the player
+		// waited. Ranked by distance over load radius, so a road piece the player stands in ranks with the building
+		// cell beside them rather than behind it for being 504 m across.
+		wantLoad.sort((a, b) -> Float.compare(wantLoadKey.get(a), wantLoadKey.get(b)));
+		for (ZoneMarker marker : wantLoad) {
+			if (loadsThisTick >= maxLoadsPerTick) break;   // next tick(s) pick up the rest
+			beginLoad(marker);
+			loadsThisTick++;
+		}
+
 		updateActiveRegion();
 		maintainTraffic();
 		maintainPedestrians();
 	}
+
+	private final List<ZoneMarker> wantLoad = new ArrayList<>();
+	private final Map<ZoneMarker, Float> wantLoadKey = new HashMap<>();
 
 	/**
 	 * Pick the active region (PLAN.md I4) = the nearest loaded zone that carries a {@link RegionConfig},
@@ -674,7 +773,7 @@ public class ZoneManager extends Node {
 				// its XZ stays inside the zone so the range check never reclaims it.
 				boolean fell = !dead && v.getGlobalPosition().getY() < FELL_OUT_Y;
 				boolean far = !dead && !fin && !fell
-						&& nearestPlayerDistXZ(v.getGlobalPosition()) > marker.zone.unloadRadius;
+						&& nearestPlayerDistXZ(v.getGlobalPosition()) > trafficReclaimRadius(marker.zone);
 				// A car with no Lane cannot drive: it sits where it spawned, forever. That used to be
 				// impossible — baked VehicleRoutes register in _ready, so the registry was complete
 				// before the first eval tick — but road-generator builds its RoadLanes through
@@ -772,6 +871,7 @@ public class ZoneManager extends Node {
 			for (VehicleSpawnConfig vc : configs) target += scaledCount(vc.count, vehDensity);
 			Vector3 center = marker.getGlobalPosition();
 			for (int k = lz.vehicles.size(); k < target && !configs.isEmpty(); k++) {
+				if (trafficFull()) break;
 				VehicleSpawnConfig vc = configs.get(k % configs.size());
 				// Spawn-gated by PLAYER distance (gateOnPlayers): the cull above reclaims any car farther
 				// than unloadRadius from every player, but a lane entry is only filtered against the ZONE
@@ -1137,7 +1237,10 @@ public class ZoneManager extends Node {
 			int n = scaledCount(vc.count, vehDensity);
 			for (int i = 0; i < n; i++) {
 				t.spawnWork.add(() -> {
-					Vehicle v = spawnTrafficCar(vc, center, container, zone, t.lz, false);
+					if (trafficFull()) return;
+					// gated on the players when the traffic ring is on: a zone loads 1+ km out, and a car spawned there
+					// would be reclaimed on the next tick (the maintain tick tops the zone up once a player is near)
+					Vehicle v = spawnTrafficCar(vc, center, container, zone, t.lz, trafficSimRadius > 0f);
 					if (v != null) t.lz.vehicles.add(v);
 				});
 			}
@@ -1213,14 +1316,19 @@ public class ZoneManager extends Node {
 		container.addChild(crowd);
 		crowd.bind(this, t.marker);
 		t.lz.crowd = crowd;
+		// R8 (PLAN.md review): ONE WORK ITEM PER PED. Each is an instantiate() of a skinned body plus its addChild, and a
+		// busy cell asks for 40: done here in one go, that was a frame of its own outside the streaming budget. As
+		// work items they drain with the rest of the zone's SPAWN phase, `streamBudgetMs` a frame (at least one item).
 		for (int i = 0; i < want; i++) {
-			Sidewalks.Spot walk = Sidewalks.randomNear(center, radius, sidewalkRng);
-			if (walk == null) break;             // no footway data here: a zone with no city under it
-			crowd.addPed(walk.walk().packed(), walk.along(), sidewalkRng.nextBoolean() ? 1 : -1);
+			t.spawnWork.add(() -> {
+				if (!GD.isInstanceValid(crowd)) return;
+				Sidewalks.Spot walk = Sidewalks.randomNear(center, radius, sidewalkRng);
+				if (walk == null) return;        // no footway data here: a zone with no city under it
+				crowd.addPed(walk.walk().packed(), walk.along(), sidewalkRng.nextBoolean() ? 1 : -1);
+			});
 		}
 		if (debugLog) {
-			GD.print("ZoneManager: zone '" + zone.zoneId + "' crowd " + crowd.pedCount()
-					+ " light peds (of " + want + " asked)");
+			GD.print("ZoneManager: zone '" + zone.zoneId + "' crowd of " + want + " light peds queued");
 		}
 	}
 
@@ -1736,9 +1844,13 @@ public class ZoneManager extends Node {
 			Vector3 entry = lane.entryPoint();
 			// 0.9 leaves hysteresis between this gate and the out-of-range reclaim radius.
 			if (gateOnPlayers && entry != null
-					&& nearestPlayerDistXZ(entry) > zone.unloadRadius * 0.9f) continue;
+					&& nearestPlayerDistXZ(entry) > trafficSpawnGate(zone)) continue;
 			Placement at = placementOn(lane);
 			if (at == null) continue;
+			if (gateOnPlayers && spawnRefusedByPlayers(at.position)) {
+				spawnsRefusedNearPlayer++;
+				continue;
+			}
 			Vehicle v = spawnVehicle(vc, container, at, idx, lz);
 			if (v != null && debugLog) {
 				GD.print("ZoneManager: traffic spawn in '" + zone.zoneId + "' lane="

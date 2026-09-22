@@ -183,6 +183,7 @@ final class RoadOverlay {
                            int fontSize) {
         double ox = origin.getX(), oz = origin.getZ();
         double cx = center.getX(), cy = center.getY();
+        List<float[]> labels = new ArrayList<>();
         for (Places.Place p : places) {
             if (p.tier() < minTier) continue;
             Vector2 at = project(p.at().getX(), p.at().getZ(), ox, oz, cx, cy, scale, rot);
@@ -196,33 +197,147 @@ final class RoadOverlay {
             ci.drawRect(new Rect2(at.getX() - h, at.getY() - h, sizePx, sizePx),
                     new Color(0f, 0f, 0f, 0.55f), false, 1f, false);
             if (font != null) {
-                ci.drawString(font, new Vector2((float) (at.getX() + h + 3f), (float) (at.getY() + fontSize * 0.35f)),
-                        p.name(), HorizontalAlignment.LEFT, -1f, fontSize, col);
+                // two places side by side (the safe house and the weapon counter are 21 m apart) must not print
+                // their names on top of each other: a label that would overlap one already drawn steps down a line
+                float lx = (float) (at.getX() + h + 3f), ly = (float) (at.getY() + fontSize * 0.35f);
+                float lw = (float) font.getStringSize(p.name(), HorizontalAlignment.LEFT, -1f, fontSize).getX();
+                for (int step = 0; step < 4 && overlaps(labels, lx, ly, lw, fontSize); step++) ly += fontSize + 2f;
+                labels.add(new float[] {lx, ly - fontSize, lw, fontSize + 2f});
+                ci.drawString(font, new Vector2(lx, ly), p.name(), HorizontalAlignment.LEFT, -1f, fontSize, col);
             }
         }
     }
 
+    private static boolean overlaps(List<float[]> rs, float x, float baseline, float w, float h) {
+        float y = baseline - h;
+        for (float[] r : rs) {
+            if (x < r[0] + r[2] && x + w > r[0] && y < r[1] + r[3] && y + h > r[1]) return true;
+        }
+        return false;
+    }
+
+    // ── the postal grid as the map's background (PLAN.md 3.26, user 2026-09-22) ──────────────────────
+
+    /** Alternating cell fills: a faint checkerboard, so crossing into the next cell is visible at a glance. */
+    static final Color GRID_A = new Color(1f, 1f, 1f, 0.04f);
+    static final Color GRID_B = new Color(1f, 1f, 1f, 0.11f);
+    static final Color GRID_LINE = new Color(1f, 1f, 1f, 0.22f);
+    static final Color GRID_LABEL = new Color(1f, 1f, 1f, 0.42f);
+
     /**
-     * The region underlay: each named region as a tinted box with its name in the middle. Drawn UNDER the
-     * roads, so it tells you which part of the island you are looking at without hiding what you navigate by.
+     * The postal grid ({@link com.openworld.world.PostalGrid}, the ONE owner of the cells) as a light
+     * checkerboard with its cell lines and each cell's "x-y" in the middle — drawn UNDER the roads, so it
+     * tells you where the next cell boundary is without hiding what you navigate by. It replaced the region
+     * underlay, whose overlapping boxes were hard to read (user, 2026-09-22).
+     *
+     * <p>{@code clipRadiusPx > 0} clips to the minimap's disc (the cells are turned by {@code rot} with the
+     * rest of a heading-up map); otherwise the rectangle {@code (0,0)-(viewW,viewH)}. A cell's number is
+     * drawn upright at the middle of its VISIBLE part, and only where that part is at least
+     * {@code minLabelPx} across, so a zoomed-out map is not a wall of numbers.
      */
-    static void drawRegions(CanvasItem ci, List<Places.Region> regions, Vector3 origin, Vector2 center,
-                            float scale, float rot, Color tint, Font font, int fontSize) {
+    static void drawPostalGrid(CanvasItem ci, Vector3 origin, Vector2 center, float scale, float clipRadiusPx,
+                               float viewW, float viewH, float rot, Font font, int fontSize, float minLabelPx) {
+        double half = com.openworld.world.PostalGrid.HALF, cell = com.openworld.world.PostalGrid.CELL;
+        int n = com.openworld.world.PostalGrid.CELLS;
         double ox = origin.getX(), oz = origin.getZ();
         double cx = center.getX(), cy = center.getY();
-        for (Places.Region r : regions) {
-            PackedVector2Array poly = new PackedVector2Array();
-            poly.pushBack(project(r.x0(), r.z0(), ox, oz, cx, cy, scale, rot));
-            poly.pushBack(project(r.x1(), r.z0(), ox, oz, cx, cy, scale, rot));
-            poly.pushBack(project(r.x1(), r.z1(), ox, oz, cx, cy, scale, rot));
-            poly.pushBack(project(r.x0(), r.z1(), ox, oz, cx, cy, scale, rot));
-            ci.drawColoredPolygon(poly, tint, new PackedVector2Array(), null);
-            if (font != null) {
-                Vector2 mid = project((r.x0() + r.x1()) * 0.5, (r.z0() + r.z1()) * 0.5, ox, oz, cx, cy, scale, rot);
-                ci.drawString(font, new Vector2((float) mid.getX() - 60f, (float) mid.getY()), r.name(),
-                        HorizontalAlignment.CENTER, 120f, fontSize, new Color(1f, 1f, 1f, 0.5f));
+        // how far from the view centre anything on screen can be, in world metres
+        double reach = clipRadiusPx > 0 ? clipRadiusPx / scale
+                : Math.hypot(Math.max(cx, viewW - cx), Math.max(cy, viewH - cy)) / scale;
+        int i0 = Math.max(1, (int) Math.floor((ox - reach + half) / cell) + 1);
+        int i1 = Math.min(n, (int) Math.floor((ox + reach + half) / cell) + 1);
+        int j0 = Math.max(1, (int) Math.floor((oz - reach + half) / cell) + 1);
+        int j1 = Math.min(n, (int) Math.floor((oz + reach + half) / cell) + 1);
+        if (i0 > i1 || j0 > j1) return;
+        List<Vector2> disc = clipRadiusPx > 0 ? discPolygon(cx, cy, clipRadiusPx) : null;
+        for (int i = i0; i <= i1; i++) {
+            for (int j = j0; j <= j1; j++) {
+                double x0 = -half + (i - 1) * cell, z0 = -half + (j - 1) * cell;
+                List<Vector2> quad = new ArrayList<>(4);
+                quad.add(project(x0, z0, ox, oz, cx, cy, scale, rot));
+                quad.add(project(x0 + cell, z0, ox, oz, cx, cy, scale, rot));
+                quad.add(project(x0 + cell, z0 + cell, ox, oz, cx, cy, scale, rot));
+                quad.add(project(x0, z0 + cell, ox, oz, cx, cy, scale, rot));
+                List<Vector2> poly = disc != null ? clipConvex(quad, disc)
+                        : clipConvex(quad, rectPolygon(viewW, viewH));
+                if (poly.size() < 3) continue;
+                ci.drawColoredPolygon(new PackedVector2Array(poly), ((i + j) & 1) == 0 ? GRID_A : GRID_B,
+                        new PackedVector2Array(), null);
+                if (font == null) continue;
+                double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+                double sx = 0, sy = 0;
+                for (Vector2 v : poly) {
+                    minX = Math.min(minX, v.getX()); maxX = Math.max(maxX, v.getX());
+                    minY = Math.min(minY, v.getY()); maxY = Math.max(maxY, v.getY());
+                    sx += v.getX(); sy += v.getY();
+                }
+                if (Math.min(maxX - minX, maxY - minY) < minLabelPx) continue;
+                float lx = (float) (sx / poly.size()), ly = (float) (sy / poly.size());
+                ci.drawString(font, new Vector2(lx - 40f, ly + fontSize * 0.35f), i + "-" + j,
+                        HorizontalAlignment.CENTER, 80f, fontSize, GRID_LABEL);
             }
         }
+        // the cell lines, clipped like everything else on the map
+        for (int k = i0 - 1; k <= i1; k++) {
+            double v = -half + k * cell;
+            double za = Math.max(-half, oz - reach), zb = Math.min(half, oz + reach);
+            List<Vector2> line = List.of(project(v, za, ox, oz, cx, cy, scale, rot), project(v, zb, ox, oz, cx, cy, scale, rot));
+            polyline(ci, new ArrayList<>(line), cx, cy, clipRadiusPx, GRID_LINE, 1f);
+        }
+        for (int k = j0 - 1; k <= j1; k++) {
+            double v = -half + k * cell;
+            double xa = Math.max(-half, ox - reach), xb = Math.min(half, ox + reach);
+            List<Vector2> line = List.of(project(xa, v, ox, oz, cx, cy, scale, rot), project(xb, v, ox, oz, cx, cy, scale, rot));
+            polyline(ci, new ArrayList<>(line), cx, cy, clipRadiusPx, GRID_LINE, 1f);
+        }
+    }
+
+    private static List<Vector2> discPolygon(double cx, double cy, double r) {
+        List<Vector2> pts = new ArrayList<>(DISC_SEGMENTS);
+        for (int i = 0; i < DISC_SEGMENTS; i++) {
+            double a = 2 * Math.PI * i / DISC_SEGMENTS;
+            pts.add(new Vector2((float) (cx + Math.cos(a) * r), (float) (cy + Math.sin(a) * r)));
+        }
+        return pts;
+    }
+
+    private static List<Vector2> rectPolygon(double w, double h) {
+        return List.of(new Vector2(0f, 0f), new Vector2((float) w, 0f), new Vector2((float) w, (float) h),
+                new Vector2(0f, (float) h));
+    }
+
+    /**
+     * Sutherland-Hodgman: {@code subject} clipped to the convex {@code clip}. Both wound the same way
+     * (the screen-space projections here are all clockwise on a y-down screen, and a rotation keeps that).
+     */
+    static List<Vector2> clipConvex(List<Vector2> subject, List<Vector2> clip) {
+        List<Vector2> out = new ArrayList<>(subject);
+        double area = 0;
+        for (int i = 0; i < clip.size(); i++) {
+            Vector2 a = clip.get(i), b = clip.get((i + 1) % clip.size());
+            area += a.getX() * b.getY() - b.getX() * a.getY();
+        }
+        double sign = Math.signum(area);
+        for (int e = 0; e < clip.size() && !out.isEmpty(); e++) {
+            Vector2 a = clip.get(e), b = clip.get((e + 1) % clip.size());
+            List<Vector2> in = out;
+            out = new ArrayList<>(in.size() + 2);
+            for (int i = 0; i < in.size(); i++) {
+                Vector2 p = in.get(i), q = in.get((i + 1) % in.size());
+                double dp = sign * side(a, b, p), dq = sign * side(a, b, q);
+                if (dp >= 0) out.add(p);
+                if ((dp >= 0) != (dq >= 0)) {
+                    double t = dp / (dp - dq);
+                    out.add(new Vector2((float) (p.getX() + (q.getX() - p.getX()) * t),
+                            (float) (p.getY() + (q.getY() - p.getY()) * t)));
+                }
+            }
+        }
+        return out;
+    }
+
+    private static double side(Vector2 a, Vector2 b, Vector2 p) {
+        return (b.getX() - a.getX()) * (p.getY() - a.getY()) - (b.getY() - a.getY()) * (p.getX() - a.getX());
     }
 
     /** The shared fallback font, or null. */

@@ -119,6 +119,24 @@ public final class VehicleDamageRules {
 
     // ── impact attribution ───────────────────────────────────────────────────────────────────────────
 
+    /** The longest one crash window may run (physics steps, 0.25 s at 60 Hz) before it is scored and a new one starts. */
+    public static final int MAX_CRASH_STEPS = 15;
+
+    /**
+     * How hard a crash was: the contact impulses summed over its steps, never more than the car's real change of
+     * velocity across them. The impulse sum alone is not a crash measure: a car held against an obstacle (a planter,
+     * a wall, a car in front) under throttle gets a fresh contact impulse EVERY step - its engine being pushed back -
+     * and those add up without limit while the car does not change speed at all. Measured, a 10 m/s bump into a kerb
+     * planter scored 33 m/s (184 hp of a 500 hp car) because the driver kept the throttle on. The velocity change is
+     * the physical answer; the impulse sum stays as the upper bound so the engine and gravity inside the window are
+     * never counted as a crash either.
+     */
+    public static double crashDeltaV(double impulseSum, double vStartX, double vStartY, double vStartZ,
+                                     double vEndX, double vEndY, double vEndZ) {
+        double dx = vEndX - vStartX, dy = vEndY - vStartY, dz = vEndZ - vStartZ;
+        return Math.min(impulseSum, Math.sqrt(dx * dx + dy * dy + dz * dz));
+    }
+
     /** Crash damage points at the point of impact for a change of velocity {@code deltaV} (m/s). */
     public static double impactPoints(double deltaV) {
         return Math.max(0.0, deltaV - MIN_IMPACT_DV) * IMPACT_POINTS_PER_DV;

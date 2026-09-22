@@ -247,11 +247,23 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 	var hist: Array = []          # [vy, causes] per tick, last WINDOW ticks
 	var cooldown := 0
 	var hz := HZ
+	var hp_prev: float = car.get_node("Health").call("health_now")
+	var hp_lost := 0.0
 	for f in range(int(seconds * hz)):
 		await physics_frame
 		if not is_instance_valid(car):
 			break
 		var p := car.global_position
+		var hp_now: float = car.get_node("Health").call("health_now")
+		if hp_now < hp_prev - 0.01:
+			var hst := PhysicsServer3D.body_get_direct_state(car.get_rid())
+			var who := {}
+			for i in range(hst.get_contact_count()):
+				who[_name_of(hst.get_contact_collider_object(i))] = true
+			print("  DAMAGE t=%5.1f  -%.1f hp  speed %.1f  at (%.0f, %.1f, %.0f)  touching %s" % [f / HZ, hp_prev - hp_now,
+					car.linear_velocity.length(), p.x, p.y, p.z, who.keys()])
+			hp_lost += hp_prev - hp_now
+		hp_prev = hp_now
 		if _arg("follow", "") != "":
 			# the streaming player rides 400 m over the car, so a long drive (the island's expressway) stays streamed
 			player.global_position = Vector3(p.x, 400.0, p.z)
@@ -347,6 +359,7 @@ func _case(lane_name: String, speed: float, offset: float, seconds: float, corne
 			prev_lane = ""
 			last_lane = ""
 			last_pos = car.global_position
+	print("    health lost %.1f" % hp_lost)
 	if is_instance_valid(car):
 		car.queue_free()
 		car = null

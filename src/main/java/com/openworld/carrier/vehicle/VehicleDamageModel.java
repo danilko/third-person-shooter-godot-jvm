@@ -99,6 +99,9 @@ public class VehicleDamageModel extends Node {
     private double crashDv = 0.0;
     private final double[] crashPoint = new double[3];
     private int quietSteps = 0;
+    private int crashSteps = 0;
+    private Vector3 crashStartVel = Vector3.Companion.getZERO();
+    private boolean syntheticCrash = false;          // crashAt: a probe's crash, scored as given
 
     // the car's own motion, for the hinges (from its position, so a frozen puppet works too)
     private Vector3 lastPos, lastVel = Vector3.Companion.getZERO(), accel = Vector3.Companion.getZERO();
@@ -171,6 +174,7 @@ public class VehicleDamageModel extends Node {
     /** One physics step's crash contact (vehicle-local point, change of velocity in m/s). Simulating peer only. */
     public void queueImpact(Vector3 localPoint, double deltaV) {
         if (!damageEnabled || deltaV <= 0.0) return;
+        if (crashDv <= 0.0) { crashStartVel = lastVel; crashSteps = 0; }   // the velocity before the contact
         double w = crashDv + deltaV;
         crashPoint[0] = (crashPoint[0] * crashDv + localPoint.getX() * deltaV) / w;
         crashPoint[1] = (crashPoint[1] * crashDv + localPoint.getY() * deltaV) / w;
@@ -228,7 +232,13 @@ public class VehicleDamageModel extends Node {
 
     private void flushCrash() {
         if (crashDv <= 0.0) return;
-        if (++quietSteps < 2) return;            // the crash is still going on
+        // the crash is still going on: score it once it goes quiet, or after MAX_CRASH_STEPS of unbroken contact
+        // (a car pinned against something), when the next window starts from the velocity it has then
+        if (++quietSteps < 2 && ++crashSteps < MAX_CRASH_STEPS) return;
+        Vector3 v = vehicle.getLinearVelocity();
+        if (syntheticCrash) syntheticCrash = false;
+        else crashDv = crashDeltaV(crashDv, crashStartVel.getX(), crashStartVel.getY(), crashStartVel.getZ(),
+                v.getX(), v.getY(), v.getZ());
         double points = impactPoints(crashDv);
         if (points > 0.0) {
             for (Part p : parts) {
@@ -525,9 +535,13 @@ public class VehicleDamageModel extends Node {
         for (Part p : parts) if (p.name.equals(name)) addDamage(p, points);
     }
 
-    /** Queues a crash at a vehicle-local point, as Vehicle._integrateForces does (probe). */
+    /**
+     * Queues a crash at a vehicle-local point, as Vehicle._integrateForces does (probe). The car is standing still,
+     * so the velocity bound would score it 0: the crash is marked as having taken exactly {@code deltaV} off it.
+     */
     @Register public void crashAt(Vector3 localPoint, double deltaV) {
         queueImpact(localPoint, deltaV);
+        syntheticCrash = true;
     }
 
     @Register public int debrisCountNow() {

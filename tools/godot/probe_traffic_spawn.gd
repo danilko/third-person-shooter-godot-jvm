@@ -106,6 +106,10 @@ func _traffic_reclaim_radius() -> float:
 		var vs = z.get("vehicle_spawn_configs")
 		if vs != null and vs.size() > 0:
 			r = maxf(r, float(z.get("unload_radius")))
+	# the traffic ring (ZoneManager.trafficSimRadius): a car past ring + margin is reclaimed as out-of-range
+	var zm := root.get_node_or_null("ZoneManager")
+	if zm != null and float(zm.get("traffic_sim_radius")) > 0.0:
+		r = minf(r, float(zm.get("traffic_sim_radius")) + float(zm.get("traffic_reclaim_margin")))
 	return r
 
 func _initialize() -> void:
@@ -174,7 +178,7 @@ func _initialize() -> void:
 				# road (road pieces stream nearer than traffic spawns), far out of sight: not a failure to drive either.
 				var zm := root.get_node_or_null("ZoneManager")
 				var why: String = str(zm.call("reclaim_reason_of", id)) if zm != null else ""
-				if why == "stream-edge":
+				if why == "stream-edge" or why == "out-of-range":
 					out_of_range = true
 				if not c["early"]:
 					if out_of_range:

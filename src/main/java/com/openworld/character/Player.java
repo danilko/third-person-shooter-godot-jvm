@@ -37,6 +37,10 @@ public class Player extends Character {
     @Override
     public void _ready() {
         super._ready();
+        // The camera starts BEHIND the player: controlRotation is a world yaw that starts at 0 (looking -Z), so a
+        // player placed facing any other way (the safe-house spawn faces the street) opened the game looking at
+        // their own face. A body's yaw and a view yaw share one convention (atan2(-x, -z)), so it is a copy.
+        controlRotation.yaw = Math.toDegrees(getGlobalRotation().getY());
         com.openworld.util.RayExclusions.add(aimRay, this);
         // Register with the player registry so AI LOD can find the nearest player in
         // O(playerCount) instead of scanning the whole "characters" group (PLAN.md Part D).

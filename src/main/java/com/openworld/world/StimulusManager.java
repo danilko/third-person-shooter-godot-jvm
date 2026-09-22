@@ -103,6 +103,14 @@ public class StimulusManager extends Node {
                 sourceFaction == null ? "" : sourceFaction, elapsed));
     }
 
+    /** Probe / console form of {@link #post}: {@code type} is a {@link Type} ordinal, no source, no faction. */
+    @Register
+    public void postNoise(int type, Vector3 origin, float radius) {
+        Type[] all = Type.values();
+        if (type < 0 || type >= all.length) return;
+        post(all[type], origin, radius, null, "");
+    }
+
     /**
      * The live stimulus list — callers iterate it read-only (must not mutate), the same backing-list
      * convention as {@code PlayerRegistry.getPlayers()}. Each listener applies its own range + faction

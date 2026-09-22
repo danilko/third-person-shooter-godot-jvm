@@ -6,10 +6,16 @@
 A dead end is where a car stops being traffic: the ambient brain finishes its lane and `ZoneManager` reclaims it as
 route-finished. So every road end that joins nothing (a station at a chain end with one SEGMENT link and no JUNCTION or
 AUX link, i.e. not a joint, not a mouth) gets the summit's treatment (`island_shrine_touge.summit_loop`), generalised
-here: the end station becomes a junction MOUTH, and a TEARDROP loop road (`<road>_loop`, one lane each way, the stem's
-lane width) leaves and rejoins a 3-arm junction `LOOP_GAP` past it. Its two arms leave `ARM_DEG` either side of an
-axis, and the axis and the loop's reach are SEARCHED (`AXIS_MAX` either side of straight on, `REACHES`) for the
-candidate that stays on land, keeps `CLEAR` from every other road's centreline and sits flattest. An end with no
+here: the end station becomes a junction MOUTH, and a loop road (`<road>_loop`, one lane each way, the stem's lane
+width) leaves and rejoins a 3-arm junction `LOOP_GAP` past it.
+
+**The loop is a ROUNDED SQUARE, not a teardrop** (user, 2026-09-22: "Japan rarely has the direct circular approach
+on a road"; a square with rounded corners is also a block buildings can be placed round). The junction is a plain T
+on the square's near side: the stem arrives square to it, the two arms leave it at 90 deg left and right, and the
+road goes round the block with four 90 deg corners of `CORNER_R` -- the ordinary "turn left at the next corner" of a
+Japanese block, never a sweeping curve. The square's side and its turn about the stem's axis are SEARCHED (`SIDES`,
+`AXIS_MAX` either side of straight on) for the candidate that stays on land, keeps `CLEAR` from every other road's
+centreline and sits flattest. An end with no
 candidate is reported, not forced. `roadkit_cli.py setback` then solves the mouths (the island pipeline in PLAN.md).
 
 A facility at an end (the airport terminal, the container wharf) is a short stub off its loop, built with the
@@ -25,15 +31,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from island_roadgen import *    # noqa: E402,F401,F403
 import point_model as pm        # noqa: E402
 
-LOOP_GAP = 30.0                   # the junction centre this far past the stem's end; the loop's arms leave it this far out
-ARM_DEG = 35.0                    # the loop's arms, either side of its axis
+LOOP_GAP = 30.0                   # the junction centre this far past the stem's end
+ARM_GAP = 18.0                    # the loop's two arm mouths this far from the junction centre, along the near side
 AXIS_MAX = 150                    # the axis may turn this far either side of straight on
 AXIS_PREFER = 45                  # ... but a loop within this is tried first, shortening the road if it must: a loop
                                   # turned 90 deg makes the stem's connector into it a ~125 deg turn inside a small
                                   # pad, and traffic ran wide onto its kerb (the airport end, `stalled` twice)
-REACHES = (55.0, 70.0, 90.0, 110.0)   # the loop's far corners this far out along its axis
+SIDES = (90.0, 110.0, 130.0)      # the square's side: at 90 m the arm mouth still has 12 m of straight before its
+                                  # first corner (half the side - ARM_GAP - CORNER_R), clear of `station_crowds_mouth`
 FLAT = 3.0                        # the ground under a loop stays within this of the end's own height
-CORNER_R = 40.0                   # the loop's two far corners
+CORNER_R = 15.0                   # every corner of the square: a 90 deg street corner, driven at a street's pace
 CLEAR = 30.0                      # a loop keeps this far from any other road's centreline
 SHORE = 13.0                      # ... and this far from the water: its paved half + the stamp's 6 m verge
 LAND_MIN = -0.3                   # ... and stays on ground at least this high (not over the sea)
@@ -62,23 +69,30 @@ def _rot(u, deg):
     return (u[0] * math.cos(a) - u[1] * math.sin(a), u[0] * math.sin(a) + u[1] * math.cos(a))
 
 
-def loop_line(end_xy, u, axis, reach):
+def loop_line(end_xy, u, axis, side):
+    """The square loop's centreline, from its left arm mouth round to its right one, and the junction centre J.
+
+    J sits in the middle of the square's NEAR side; the square is turned `axis` deg about J from the stem's own
+    direction u (so the stem still meets the near side as a T, at 90 +- axis deg). Corners in order: the near-left
+    corner, the far-left, the far-right, the near-right -- four 90 deg turns, each filleted to CORNER_R."""
     J = (end_xy[0] + u[0] * LOOP_GAP, end_xy[1] + u[1] * LOOP_GAP)
-    ua = _rot(u, axis)
-    a_l, a_r = _rot(ua, ARM_DEG), _rot(ua, -ARM_DEG)
-    H = (J[0] + a_l[0] * LOOP_GAP, J[1] + a_l[1] * LOOP_GAP)
-    T = (J[0] + a_r[0] * LOOP_GAP, J[1] + a_r[1] * LOOP_GAP)
-    far = reach / math.cos(math.radians(ARM_DEG))
-    A = (J[0] + a_l[0] * far, J[1] + a_l[1] * far)
-    B = (J[0] + a_r[0] * far, J[1] + a_r[1] * far)
-    return rounded_polygon([H, A, B, T], CORNER_R, closed=False), J
+    ua = _rot(u, axis)                  # the square's depth direction
+    left = _rot(ua, 90.0)
+    h = side / 2.0
+    H = (J[0] + left[0] * ARM_GAP, J[1] + left[1] * ARM_GAP)
+    T = (J[0] - left[0] * ARM_GAP, J[1] - left[1] * ARM_GAP)
+    c1 = (J[0] + left[0] * h, J[1] + left[1] * h)
+    c2 = (c1[0] + ua[0] * side, c1[1] + ua[1] * side)
+    c4 = (J[0] - left[0] * h, J[1] - left[1] * h)
+    c3 = (c4[0] + ua[0] * side, c4[1] + ua[1] * side)
+    return rounded_polygon([H, c1, c2, c3, c4, T], CORNER_R, closed=False), J
 
 
 def best_loop(net, ground, end, stem_name, u, others, axis_max=AXIS_MAX):
     p = net.points[end].pos
     best = None
     for axis in range(-axis_max, axis_max + 1, 5):
-        for reach in REACHES:
+        for reach in SIDES:
             line, J = loop_line(p, u, axis, reach)
             probe = densify([J] + line, 4.0)
             gz = [ground.z(x, y) for x, y in probe]
@@ -96,7 +110,7 @@ def best_loop(net, ground, end, stem_name, u, others, axis_max=AXIS_MAX):
             flat = max(abs(g - p[2]) for g in gz)
             if flat > FLAT:
                 continue
-            score = flat + abs(axis) * 0.01
+            score = flat + abs(axis) * 0.01 + reach * 0.001    # the smallest square that fits, all else equal
             if best is None or score < best[0]:
                 best = (score, axis, reach, line, flat)
     return best
@@ -173,7 +187,7 @@ def main(argv):
     sample_ground(net, ground, prefix="\0")
     pm.save_network(net, path)
     for name, loop, axis, reach, flat in done:
-        print("island_turnarounds: %-28s -> %-22s axis %+3d deg, reach %3.0f m, ground within %.1f m"
+        print("island_turnarounds: %-28s -> %-22s axis %+3d deg, square %3.0f m, ground within %.1f m"
               % (name, loop, axis, reach, flat))
     for name in failed:
         print("island_turnarounds: %s -- NO loop fits (sea, or another road within %.0f m); left as an end" % (name, CLEAR))

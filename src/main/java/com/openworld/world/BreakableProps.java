@@ -151,7 +151,9 @@ public class BreakableProps extends MultiMeshInstance3D {
         body.setName(new StringName("Poles"));
         body.setCollisionLayer(CollisionLayers.WORLD);
         body.setCollisionMask(0);
-        addChild(body);
+        // The body is filled OFF-TREE and entered once. Adding each shape to a body already in the tree makes the
+        // physics server rebuild the body's compound shape per shape -- quadratic in the pole count, and a piece's
+        // bollard batch has hundreds: measured 3.27 s in ONE frame entering island_3_3 (probe_start_hitch.gd).
         BoxShape3D box = new BoxShape3D();
         box.setSize(new Vector3(2 * poleHalfWidth, poleHeight, 2 * poleHalfWidth));
         Transform3D frame = getGlobalTransform();
@@ -171,6 +173,7 @@ public class BreakableProps extends MultiMeshInstance3D {
             minZ = Math.min(minZ, (float) w.getZ()); maxZ = Math.max(maxZ, (float) w.getZ());
             cells.computeIfAbsent(cellKey(w.getX(), w.getZ()), k -> new ArrayList<>()).add(i);
         }
+        addChild(body);
         setProcess(false);   // ticks only while a pole is down
     }
 

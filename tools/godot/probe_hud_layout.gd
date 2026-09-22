@@ -159,7 +159,8 @@ func _initialize() -> void:
 			"%s over %s" % [drive["weapon"], drive["speed"]])
 	var sp: String = hud.get_node("VehicleHUD").call("speed_text_now")
 	_check("speed in km/h", sp.is_valid_int() and int(sp) > 20, sp + " km/h")
-	_check("no vehicle health NUMBER on the HUD", hud.get_node("VehicleHUD").get_node_or_null("Health") == null)
+	var hp_text: String = hud.get_node("VehicleHUD").call("health_text_now")
+	_check("the car's health is shown as a percentage", hp_text == "100%", hp_text)
 	_check("your own car carries no nameplate", not (car.get_node("Nameplate") as Node3D).visible)
 	_check("nothing overlaps in the car", _overlaps(drive).is_empty(), str(_overlaps(drive)))
 	Input.action_press("aim")
@@ -177,6 +178,9 @@ func _initialize() -> void:
 	await _wait(0.1)
 	var s1: String = status.call("state_now")
 	_check("damage shows: body at 30%, one tire flat", s1.begins_with("body 0.30") and s1.count("(flat)") == 1, s1)
+	var hp30: String = hud.get_node("VehicleHUD").call("health_text_now")
+	var hp_col: Color = (hud.get_node("VehicleHUD/Speed/Health") as Label).modulate
+	_check("the percentage follows: 30%, amber", hp30 == "30%" and hp_col.b < 0.5 and hp_col.r > 0.8, "%s %s" % [hp30, hp_col])
 
 	print("== underwater, seated")
 	var water: Area3D = load("res://src/main/java/com/openworld/world/WaterVolume.java").new()

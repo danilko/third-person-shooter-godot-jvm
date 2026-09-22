@@ -23,6 +23,7 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(out)
 	var world: Node = (load(WORLDS[which]) as PackedScene).instantiate()
 	root.add_child(world)
+	current_scene = world        # the streamer puts its bodies under the current scene's Characters
 	for i in 30:
 		await process_frame
 	var player: Node3D = world.get_node("Characters/Player")
@@ -33,7 +34,12 @@ func _initialize() -> void:
 	var wp := Vector3(-player.global_position.x * 0.8, player.global_position.y, -player.global_position.z * 0.8)
 	if wp.distance_to(player.global_position) < he * 0.3:
 		wp = player.global_position + Vector3(he * 0.6, 0, he * 0.4)
-	player.call("set_waypoint", wp)
+	# setWaypoint is not a registered method; the console's `postal` sets one the way a player would
+	var console: Node = load("res://src/main/java/com/openworld/debug/DebugConsole.java").new()
+	root.add_child(console)
+	await process_frame
+	console.call("on_submit", "postal %d-%d" % [clampi(int(floor((wp.x + 2304.0) / 192.0)) + 1, 1, 24),
+			clampi(int(floor((wp.z + 2304.0) / 192.0)) + 1, 1, 24)])
 	for i in 30:
 		await process_frame
 	await _save(out + "/%s_minimap.png" % which)
@@ -57,6 +63,7 @@ func _initialize() -> void:
 	quit()
 
 func _save(path: String) -> void:
-	await RenderingServer.frame_post_draw
+	RenderingServer.force_draw()     # an unfocused window otherwise hands back the same frame (or none)
+	await process_frame
 	root.get_texture().get_image().save_png(path)
 	print("wrote ", path)

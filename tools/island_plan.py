@@ -91,8 +91,40 @@ NEW_ROADS_GODOT = [
     ("kogai_michi", "block", True, [(930, 420), (1000, 700), (1200, 850)]),
     ("jokamachi_dori", "block", False, [(-610, 20), (-610, 360)]),     # the castle (frozen at (-600, 40)) south to nishi_dori
     # the military base, reached THROUGH the blocks (v15): industry street x -500, logistics street z 1150, the gate
-    ("kichi_dori", "block", False, [(-500, 150), (-500, 1150), (-490, 1150), (-490, 1250)]),
+    ("kichi_dori", "block", False, [(-500, 150), (-500, 1054)]),
+    # the PORT's own streets (3.30 L2, 2026-09-22): without them the logistics and military regions make no street at
+    # all ("meets one road" -- only the ring touches them). futo_dori runs down the container terminal's west side
+    # (the terminal is x 0..218); butsuryu_dori is v15's logistics street (drawn at z 1150, laid at 1230 so it clears
+    # the Wangan's port-strip deck at 1128), crossing kichi_dori on its way to the base's north gate.
+    # ONE road with rounded corners, not three lines: island_network turns a two-arm meeting into a joint between two
+    # mouths that are not coincident, which left the corners' lanes as open ends. Its ends cross the ring, continuing
+    # kichi_dori (x -500) and chuo_dori (x -160) as X junctions.
+    ("futo_dori", "block", False, None),
 ]
+
+
+def _rounded(pts, r, step=10.0):
+    """A polyline with every interior corner replaced by a curve of about radius r (points every ~`step` m)."""
+    out = [pts[0]]
+    for i in range(1, len(pts) - 1):
+        a, b, c = pts[i - 1], pts[i], pts[i + 1]
+        u = (a[0] - b[0], a[1] - b[1]); lu = math.hypot(*u); u = (u[0] / lu, u[1] / lu)
+        v = (c[0] - b[0], c[1] - b[1]); lv = math.hypot(*v); v = (v[0] / lv, v[1] / lv)
+        half = math.acos(max(-1.0, min(1.0, u[0] * v[0] + u[1] * v[1]))) / 2.0
+        t = min(r / math.tan(half), lu * 0.45, lv * 0.45)
+        p0 = (b[0] + u[0] * t, b[1] + u[1] * t)
+        p1 = (b[0] + v[0] * t, b[1] + v[1] * t)
+        n = max(2, int(t * (math.pi - 2 * half) / step))
+        for k in range(n + 1):                       # a quadratic through the corner, close to the arc at these sizes
+            f = k / n
+            out.append(((1 - f) ** 2 * p0[0] + 2 * (1 - f) * f * b[0] + f * f * p1[0],
+                        (1 - f) ** 2 * p0[1] + 2 * (1 - f) * f * b[1] + f * f * p1[1]))
+    out.append(pts[-1])
+    return out
+
+
+PORT_LOOP = _rounded([(-500, 1062), (-500, 1230), (-160, 1230), (-160, 1112)], 45.0)
+NEW_ROADS_GODOT = [(n, pr, how, PORT_LOOP if pts is None else pts) for n, pr, how, pts in NEW_ROADS_GODOT]
 
 
 def pre_redo_lines():
@@ -247,16 +279,22 @@ BRIDGE_SEARCH_Y = (-500.0, -1700.0)    # record y range the water gap is looked 
 SPUR_EAST_Y = -500.0                   # the spur runs south from the JCT, then east at this y to the bridge axis
 
 
-# ------------------------------------------------------------------ the Wangan, east section (PLAN.md 3.30 L2)
-#: GODOT (x, z). The plan's orange line from the spur JCT along the south waterfront to the port corner (v8). The WEST
-#: section (R6, over the port's north edge to the west coast) is not built yet: this section ends at grade on the
-#: coastal ring's north-south stretch at the port corner, as v8 drew it before v11 extended it.
+# ------------------------------------------------------------------ the Wangan (PLAN.md 3.30 L2)
+#: GODOT (x, z). The plan's orange line: from the spur JCT along the south waterfront offshore of the park, over the
+#: gulf and the ring's port-corner bend, then WEST along the port platform's north strip (40-60 m south of the ring,
+#: north of the container terminal) -- R6's "over the port's north edge" -- down to two T's on the ring there.
 #: The spur JCT is PARTIAL -- Wangan <-> airport only (the racing route, "off the airport spur"): the Wangan meets the
 #: spur's east leg from the south-west, where airport -> Wangan leaves spur_in to its own left and Wangan -> airport
 #: passes under both spur carriageways to join spur_out from its left. Wangan <-> C1 would need two loops.
+#: Not yet: its far-west run over the bay to the west coast (the port platform ends at x -760, and past it the ring IS
+#: the shore), and a port-corner interchange with ramps (keep-left puts the westbound exit on the wrong side of the
+#: line there); both are recorded in PLAN.md.
 WANGAN_S_X = 1000.0            # the spur station the two Wangan ramps leave / join (spur_in diverge, spur_out merge)
 WANGAN_J_X = 890.0             # a joint on spur_out before it: the loop JCT's acceleration lane and the Wangan's
                                # entrance are both on spur_out, and one run carries one aux slot
-WANGAN_CENTRE = [(430.0, 800.0), (600.0, 800.0), (780.0, 585.0)]   # the shared corridor, offshore of the park
-WANGAN_T_E = (237.0, 760.0)    # where the eastbound carriageway starts, at a T on the ring (ring_kita, x ~237)
-WANGAN_T_W = (237.0, 880.0)    # where the westbound carriageway ends, at its own T
+WANGAN_CENTRE = [(-540.0, 1128.0), (-100.0, 1128.0), (120.0, 1060.0), (300.0, 900.0), (430.0, 800.0),
+                 (600.0, 800.0), (780.0, 585.0)]   # the shared corridor, west -> east
+WANGAN_RADII = [0.0, 160.0, 160.0, 160.0, 120.0, 120.0, 0.0]
+WANGAN_T_E = (-730.0, 1058.0)  # the ring point where the eastbound carriageway starts (a T from the port side)
+WANGAN_T_W = (-810.0, 1050.0)  # the ring point where the westbound carriageway ends (its own T)
+WANGAN_DECK_FROM_X = -520.0     # the deck is at full height east of this; west of it both carriageways come down

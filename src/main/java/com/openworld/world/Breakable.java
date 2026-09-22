@@ -122,6 +122,9 @@ public class Breakable extends HittableBody {
 	/** True if currently broken (collider disabled / hole open). */
 	public boolean isBroken() { return broken; }
 
+	/** Whether a timed restore is scheduled (a subclass that sleeps between events must keep ticking for it). */
+	protected boolean restorePending() { return restoreTimer > 0.0; }
+
 	@Register
 	@Override
 	public void _physicsProcess(double delta) {

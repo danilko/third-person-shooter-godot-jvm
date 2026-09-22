@@ -59,6 +59,9 @@ import godot.api.OS;
  *       to test escort/squad behaviour against the F10 hostiles.
  * F8  — postDebugGunshot(): drops a "player"-faction GUNSHOT stimulus ~35 m in front of the
  *       player so the zone's "enemy" AI investigate the noise (PLAN.md E2 perception test).
+ * Ctrl+F9 — the BUG-REPORT line (PLAN.md 3.26): postal code, region, position, facing, streaming zone, nearest
+ *       road lane -- printed to the log AND copied to the clipboard, so "it happened here" is one paste
+ *       ({@code postal 12-7-5} / {@code tp x y z} in the console go back there).
  * Shift+F9 — dumpCollisionInventory(): prints every CollisionObject3D + CollisionShape3D in the
  *       tree (path, global pos, layer/mask, shape type/size) — the "what is solid here" answer
  *       when hunting an unexpected collision layer. Headless: launch with `-- --dump-collision`
@@ -112,14 +115,25 @@ public class DebugHarness extends Node {
     /** Backtick command line — lazily constructed, toggled open/closed. */
     private DebugConsole console;
 
+    private void bugReport() {
+        for (com.openworld.character.Player p : com.openworld.game.PlayerRegistry.getPlayers()) {
+            if (!GD.isInstanceValid(p) || !p.isLocallyOwnedPlayer()) continue;
+            String line = com.openworld.world.PostalReport.line(this, p.getGlobalPosition());
+            GD.print("BUG REPORT: " + line);
+            godot.api.DisplayServer.clipboardSet(line);
+            return;
+        }
+    }
+
     @Register
     @Override
     public void _input(InputEvent event) {
         if (!(event instanceof InputEventKey iek) || !iek.isPressed() || iek.isEcho()) return;
 
         if (iek.getKeycode() == Key.F9) {
-            // Shift+F9 = collision inventory dump; plain F9 = debug mission.
-            if (iek.isShiftPressed()) dumpCollisionInventory();
+            // Ctrl+F9 = the bug-report line (PLAN.md 3.26); Shift+F9 = collision inventory dump; F9 = debug mission.
+            if (iek.isCtrlPressed()) bugReport();
+            else if (iek.isShiftPressed()) dumpCollisionInventory();
             else if (canSpawnLocally()) startDebugMission();
         } else if (iek.getKeycode() == Key.F10) {
             // Shift+F10 = motorcycle stub walk-test; plain F10 = enemy AI spawn.

@@ -468,9 +468,12 @@ func _build(b: Dictionary, variant: String) -> bool:
 	mi.mesh = mesh
 	# Past this the building is not drawn: a street-level city needs no 1 km horizon of kit geometry, and a tall
 	# building is seen further than a house. Faded (dithered), not popped.
-	mi.visibility_range_end = clampf(VIS_BASE_M + VIS_PER_HEIGHT * mesh.get_aabb().end.y, VIS_MIN_M, VIS_MAX_M)
-	mi.visibility_range_end_margin = VIS_FADE_M
-	mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	# R11 (PLAN.md review): NOT a landmark. Tokyo Tower faded out at 900 m while its zone loads at 3 km, so the one
+	# thing the skyline is for vanished from the expressway; a landmark is drawn as far as it is streamed.
+	if not bool(b.get("landmark", false)):
+		mi.visibility_range_end = clampf(VIS_BASE_M + VIS_PER_HEIGHT * mesh.get_aabb().end.y, VIS_MIN_M, VIS_MAX_M)
+		mi.visibility_range_end_margin = VIS_FADE_M
+		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	root.add_child(mi)
 	mi.owner = root
 	if OCCLUDER_TYPES.has(id):
