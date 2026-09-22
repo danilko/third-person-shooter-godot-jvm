@@ -97,7 +97,10 @@ Measured against central Tokyo (PLATEAU, 1 851 buildings) and our island (3 592 
   varied: dark granite pavers at an office, coloured interlocking block at a shop, bare concrete at a house, a
   gravel or concrete parking apron at a konbini. Needed: 3–4 lot materials chosen per type, darker than today's
   white. Reference: pakutaso `歩道 タイル`, `インターロッキング`, `駐車場`; `/texture/concrete/`.
-- [ ] **B5. The block's own ground should be the SAME paving as the footway** (user, 2026-09-21; PLAN.md
+- [x] **B5. DONE 2026-09-22: the block's ground IS the footway's paving.** Terrain3D's "Urban" layer is now packed
+  from the footway's own `T_Concrete` maps (`tools/make_urban_texture.py --from-footway`) with the material's tint
+  and 2.73 m tile on the texture asset, so kerb-back to door is one surface. ORIGINAL: **The block's own ground
+  should be the SAME paving as the footway** (user, 2026-09-21; PLAN.md
   3.19(d)). Today the footway mesh is the kit's `T_Concrete` (2.73 m tile, warm light grey) and the block's
   ground is Terrain3D's generated "Urban" aggregate (`tools/make_urban_texture.py`, cool dark grey), so every
   kerb-back is a visible material line. In Japan the public footway and a block's paved back land are usually

@@ -74,7 +74,17 @@ public class MinimapController extends Control {
     private Vector3 lastDrawnAt = null;
     /** PLAN.md 3.18n: draw a square blip for each place in range (a shop you can walk into, a landmark). */
     @Export public boolean showPlaces = true;
-    @Export public float placeSizePx = 7f;
+    @Export public float placeSizePx = 9f;
+    /** The building layer ({@link com.openworld.world.BuildingMap}), under the roads. */
+    @Export public boolean showBuildings = true;
+    @Export public Color buildingColor = new Color(0.62f, 0.64f, 0.70f, 0.6f);
+    /** An "N" just outside the rim, where north is. */
+    @Export public boolean showNorth = true;
+    @Export public float northRadiusPx = 8f;
+    private Vector2 northAt = new Vector2(0f, 0f);
+
+    /** Where the north marker was drawn on the last frame (probe readout, in the control's own pixels). */
+    @Register public Vector2 northAtNow() { return northAt; }
     /** PLAN.md 3.26: the postal code under the player ("12-7-5 · Downtown"), inside the disc's bottom edge. */
     @Export public boolean showPostal = true;
     @Export public int postalFontSize = 12;
@@ -156,6 +166,9 @@ public class MinimapController extends Control {
             RoadOverlay.drawPostalGrid(this, origin, center, scale, radiusPx, 0f, 0f, rot, RoadOverlay.mapFont(),
                     gridFontSize, gridFontSize * 3f);
         }
+        if (showBuildings) {
+            RoadOverlay.drawBuildings(this, origin, center, scale, 0f, 0f, radiusPx, buildingColor, rot);
+        }
         mapDrawn = RoadOverlay.drawMap(this, origin, center, scale, 0f, 0f, radiusPx, roadColor, rot);
         if (player instanceof Player pl && pl.characterInfo != null && pl.getWaypoint() != null) {
             com.openworld.world.RoadGraph.Route route = com.openworld.world.RoadMap.routeFor(
@@ -167,7 +180,19 @@ public class MinimapController extends Control {
         // Places (3.18n): the shops and landmarks in range, as squares so they never read as a character.
         if (showPlaces) {
             RoadOverlay.drawPlaces(this, Places.near(origin, rangeMeters * 1.5), origin, center, scale,
-                    radiusPx, rot, placeSizePx, 0, null, 0);
+                    radiusPx, rot, placeSizePx, 0, null, 0, RoadOverlay.mapFont(), false);
+        }
+        // North on the rim, in north's on-screen direction: on a heading-up radar it travels round as you turn.
+        if (showNorth) {
+            Vector2 n = worldToScreen(new Vector3(origin.getX(), origin.getY(), origin.getZ() - rangeMeters),
+                    origin, center, scale, rot);
+            float dx = (float) (n.getX() - center.getX()), dy = (float) (n.getY() - center.getY());
+            float len = (float) Math.max(1e-3, Math.hypot(dx, dy));
+            // just OUTSIDE the rim, so it never covers the postal readout inside the disc's bottom edge (facing
+            // south puts north there) nor a blip at the edge
+            float rr = radiusPx + northRadiusPx * 0.5f;
+            northAt = new Vector2(center.getX() + dx / len * rr, center.getY() + dy / len * rr);
+            RoadOverlay.drawNorth(this, RoadOverlay.mapFont(), northAt, northRadiusPx);
         }
 
         // Region outlines (zone load rings) within view.

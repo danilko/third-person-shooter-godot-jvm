@@ -12,7 +12,15 @@ large features, so it disappears under the eye instead of drawing it.
     <name>_alb_ht.png   RGB = albedo, A = height
     <name>_nrm_rgh.png  RGB = normal (tangent space, +Y up), A = roughness
 
-    python3 tools/make_urban_texture.py
+    python3 tools/make_urban_texture.py                  # the generated aggregate (the original)
+    python3 tools/make_urban_texture.py --from-footway   # the FOOTWAY's own concrete (shipped, 2026-09-22)
+
+**`--from-footway` is what ships** (user, 2026-09-22: "use the same fill for a street block's ground as the
+sidewalk; currently the two differ, prefer one"). It packs the footway material's own maps
+(`M_ConcreteTile` = `T_Concrete_{BaseColor,Normal,ORM}`, downtown kit) into Terrain3D's two layers, resized to the
+terrain array's size: albedo + a height from the albedo's luminance, and the normal + the ORM's roughness. The
+footway's TINT and TILE live on the texture asset (`terrain_assets.tres` "Urban": `albedo_color` = the material's
+`albedo_color`, `uv_scale` = its `uv1_scale`), so the kerb-to-door surface is one material seen twice.
 """
 
 from __future__ import annotations
@@ -42,7 +50,36 @@ def _tileable_noise(rng, size, cells):
             + c * (1 - fx) * fy + d * fx * fy)
 
 
+FOOTWAY = "assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_%s.png"
+
+
+def from_footway() -> int:
+    """Pack the footway's concrete into the Terrain3D layers (see the module docstring)."""
+    def load(name, mode):
+        im = Image.open(FOOTWAY % name).convert(mode)
+        if im.size != (SIZE, SIZE):
+            im = im.resize((SIZE, SIZE), Image.LANCZOS)
+        return np.asarray(im).astype(np.float32) / 255.0
+
+    albedo = load("BaseColor", "RGB")
+    normal = load("Normal", "RGB")
+    orm = load("ORM", "RGB")
+    lum = albedo @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+    height = (lum - lum.min()) / max(1e-6, float(lum.max() - lum.min()))
+    alb_ht = np.dstack([albedo, height])
+    Image.fromarray((alb_ht * 255).round().astype(np.uint8), mode="RGBA").save("%s/urban_alb_ht.png" % OUT)
+    nrm_rgh = np.dstack([normal, orm[..., 1]])
+    Image.fromarray((nrm_rgh * 255).round().astype(np.uint8), mode="RGBA").save("%s/urban_nrm_rgh.png" % OUT)
+    print("wrote %s/urban_alb_ht.png and urban_nrm_rgh.png (%dx%d) from the footway's T_Concrete" % (OUT, SIZE, SIZE))
+    print("  albedo mean %s, roughness mean %.2f" % (np.round(albedo.reshape(-1, 3).mean(0) * 255, 1),
+                                                    float(orm[..., 1].mean())))
+    return 0
+
+
 def main() -> int:
+    import sys
+    if "--from-footway" in sys.argv:
+        return from_footway()
     rng = np.random.default_rng(20260921)
 
     grain = rng.random((SIZE, SIZE)).astype(np.float32)       # the aggregate itself

@@ -70,8 +70,10 @@ public class WorldMapManager extends Control {
     @Export public boolean showPlaces = true;
     @Export public float placeSizePx = 9f;
     @Export public float placePickPx = 14f;
-    /** Ordinary shops appear only once the view is tighter than this (m centre-to-edge); landmarks always. */
-    @Export public float placeDetailRange = 900f;
+    private String pickedPostal = "";
+    /** Ordinary shops' NAMES appear only once the view is tighter than this (m centre-to-edge); their squares and
+     *  every landmark's name always. */
+    @Export public float placeDetailRange = 150f;
     @Export public int placeFontSize = 12;
     /** The debug underlay: each streaming zone's id over its marker (PLAN.md 3.18n, "which zone is this bug in"). */
     @Export public boolean showZoneIds = false;
@@ -79,8 +81,13 @@ public class WorldMapManager extends Control {
      *  cell's "x-y" when zoomed in far enough to read it. Every cell, sea included. */
     @Export public boolean showPostalGrid = true;
     @Export public Color postalLabelColor = new Color(1f, 1f, 1f, 0.55f);
-    /** A cell's own "x-y" is drawn only once it is this many pixels across. */
-    @Export public float postalCellLabelPx = 70f;
+    /** A cell's own "x-y" is drawn once it is this many pixels across: small enough that the fitted, whole-island
+     *  view prints every cell's code (user, 2026-09-22), the font shrinking to fit. */
+    @Export public float postalCellLabelPx = 20f;
+    /** The building layer ({@link com.openworld.world.BuildingMap}): every footprint, under the roads. */
+    @Export public boolean showBuildings = true;
+    @Export public Color buildingColor = new Color(0.62f, 0.64f, 0.70f, 0.55f);
+    private boolean buildingsDrawn = false;
 
     /** The place a click last took, or "" (probe readout). */
     private String pickedPlace = "";
@@ -92,6 +99,10 @@ public class WorldMapManager extends Control {
     private double viewX, viewZ;
     private boolean pressing = false, dragging = false;
     private Vector2 pressAt = new Vector2(0f, 0f), lastMouse = new Vector2(0f, 0f);
+
+    /** Whether the building layer was drawn on the last frame the map was open (probe readout). */
+    @Register
+    public boolean buildingsDrawnNow() { return buildingsDrawn; }
 
     /** Whether the road picture was drawn on the last frame the map was open (probe readout). */
     @Register
@@ -158,6 +169,15 @@ public class WorldMapManager extends Control {
                             // not change with zoom.
                             Places.Place hit = pickPlace(mb.getPosition());
                             pickedPlace = hit == null ? "" : hit.name();
+                            // then a click on a cell's printed "x-y" is a click on that POSTAL CODE (3.26(c)): the
+                            // waypoint goes to the cell's centre (sub-cell 5), exactly as `postal x-y` does
+                            int[] code = hit == null && showPostalGrid ? pickPostal(mb.getPosition()) : null;
+                            pickedPostal = code == null ? "" : code[0] + "-" + code[1];
+                            if (code != null) {
+                                double[] c = com.openworld.world.PostalGrid.centre(
+                                        com.openworld.world.PostalGrid.parse(pickedPostal + "-5"));
+                                world = new Vector3(c[0], world.getY(), c[1]);
+                            }
                             player.setWaypoint(hit == null ? world : hit.go());
                         }
                     }
@@ -270,13 +290,24 @@ public class WorldMapManager extends Control {
             RoadOverlay.drawPostalGrid(this, view, center, scale, 0f, (float) size.getX(), (float) size.getY(),
                     0f, RoadOverlay.mapFont(), placeFontSize, postalCellLabelPx);
         }
+        // Buildings (user, 2026-09-22): every footprint as one textured quad, under the roads.
+        if (showBuildings) {
+            buildingsDrawn = RoadOverlay.drawBuildings(this, view, center, scale, (float) size.getX(),
+                    (float) size.getY(), 0f, buildingColor, 0f);
+        }
         // Roads (4.7b): the baked picture under the whole control, one textured quad.
         mapDrawn = RoadOverlay.drawMap(this, view, center, scale, (float) size.getX(), (float) size.getY(),
                 0f, roadColor);
         if (showPlaces) {
+            // EVERY place at every zoom, as its kind's numbered square; names only once zoomed in
             RoadOverlay.drawPlaces(this, visiblePlaces(), view, center, scale, 0f, 0f, placeSizePx,
-                    minPlaceTier(), RoadOverlay.mapFont(), placeFontSize);
+                    minPlaceTier(), RoadOverlay.mapFont(), placeFontSize, RoadOverlay.mapFont(),
+                    rangeMeters <= placeDetailRange);
+            // clear of the row numbers down the left edge (drawPostalEdgeNumbers puts them at x 4)
+            RoadOverlay.drawPlaceLegend(this, RoadOverlay.mapFont(), placeFontSize, 44f, (float) size.getY() - 14f,
+                    placeSizePx + 2f);
         }
+        RoadOverlay.drawNorth(this, RoadOverlay.mapFont(), new Vector2((float) size.getX() - 30f, 44f), 14f);
 
         ZoneManager wzm = (showZoneRings || showZoneIds) ? ZoneManager.get() : null;
         if (wzm != null) {
@@ -368,7 +399,9 @@ public class WorldMapManager extends Control {
     }
 
     /** Ordinary shops only once the view is tight enough that they are not a wall of blips. */
-    private int minPlaceTier() { return rangeMeters > placeDetailRange ? Places.LANDMARK_TIER : 0; }
+    /** Every place is drawn at every zoom now (a numbered square per kind); only the NAMES wait for
+     *  {@link #placeDetailRange}. Kept as one method so a future crowding rule has one place to live. */
+    private int minPlaceTier() { return 0; }
 
     /** The places that can fall inside the view, at the current tier. */
     private List<Places.Place> visiblePlaces() {
@@ -381,6 +414,16 @@ public class WorldMapManager extends Control {
         }
         return out;
     }
+
+    /** The postal cell whose "x-y" label is under a screen point, {column, row}, or null. */
+    private int[] pickPostal(Vector2 at) {
+        Vector2 size = getSize();
+        return RoadOverlay.pickPostalLabel(new Vector3(viewX, 0.0, viewZ), size.times(0.5f), scale(),
+                (float) size.getX(), (float) size.getY(), postalCellLabelPx, at, 24f, placeFontSize);
+    }
+
+    /** The postal code the last click picked ("" if it picked none) -- a probe readout. */
+    @Register public String pickedPostalNow() { return pickedPostal; }
 
     /** The place whose blip is within {@link #placePickPx} of a screen point, or null. */
     private Places.Place pickPlace(Vector2 px) {

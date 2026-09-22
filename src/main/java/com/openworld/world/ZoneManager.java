@@ -175,6 +175,31 @@ public class ZoneManager extends Node {
 	@Register
 	public int trafficSpawnsRefusedNow() { return spawnsRefusedNearPlayer; }
 
+	/**
+	 * How much streaming work is outstanding RIGHT NOW: in-flight tasks, plus every registered marker
+	 * that still owes one — inside its load radius with nothing loaded, or loaded and past its unload
+	 * radius. 0 means the streamer is quiet: everything in range is in the tree, everything out of range
+	 * is gone, and nothing is waiting.
+	 *
+	 * <p>It exists because "has the world round me finished streaming" has no other honest answer: a
+	 * caller watching one KIND of zone (a probe counting road pieces, say) sees its own set stop changing
+	 * while the pipeline is still working through the building cells and crowds queued ahead of it, and
+	 * reads that as settled. This counts the whole queue, so it cannot.
+	 */
+	@Register
+	public int streamingPendingNow() {
+		int n = tasks.size();
+		for (ZoneMarker marker : markers) {
+			if (!GD.isInstanceValid(marker) || marker.zone == null) continue;
+			if (tasks.containsKey(marker)) continue;
+			float d = nearestPlayerDistXZ(marker.getGlobalPosition());
+			boolean isLoaded = loaded.containsKey(marker);
+			if (!isLoaded && d < marker.zone.loadRadius) n++;
+			else if (isLoaded && d > marker.zone.unloadRadius) n++;
+		}
+		return n;
+	}
+
 	/** True when a car set down at {@code p} would appear near, ahead of, or in view of a player. */
 	private boolean spawnRefusedByPlayers(Vector3 p) {
 		for (Player pl : PlayerRegistry.getPlayers()) {
@@ -549,10 +574,16 @@ public class ZoneManager extends Node {
 		// waited. Ranked by distance over load radius, so a road piece the player stands in ranks with the building
 		// cell beside them rather than behind it for being 504 m across.
 		wantLoad.sort((a, b) -> Float.compare(wantLoadKey.get(a), wantLoadKey.get(b)));
+		// The cap is on threaded PARSES (its own doc): a zone with no geometry -- a crowd, a traffic zone, a
+		// trigger -- parses nothing and starts at once. Counting it made a crowd zone next door wait behind every
+		// building cell in range (measured 2026-09-22: `probe_island_peds` found the four neighbouring crowds still
+		// queued when the player's own had settled).
 		for (ZoneMarker marker : wantLoad) {
-			if (loadsThisTick >= maxLoadsPerTick) break;   // next tick(s) pick up the rest
+			boolean parses = marker.zone.geometry != null
+					|| (marker.zone.geometryPath != null && !marker.zone.geometryPath.isEmpty());
+			if (parses && loadsThisTick >= maxLoadsPerTick) continue;   // next tick(s) pick up the rest
 			beginLoad(marker);
-			loadsThisTick++;
+			if (parses) loadsThisTick++;
 		}
 
 		updateActiveRegion();
@@ -963,11 +994,20 @@ public class ZoneManager extends Node {
 
 	// ── Streaming pipeline ──────────────────────────────────────────────────────
 
+	private static final float UNLOAD_RANK = 0.5f;
+
 	private void processStreamTasks() {
 		if (tasks.isEmpty()) return;
 		long budgetNanos = (long) (streamBudgetMs * 1_000_000L);
 		long start = System.nanoTime();
-		boolean workerTaken = false;   // one budgeted task per frame keeps the budget honest
+		// One budgeted task per frame keeps the budget honest -- and it is the NEAREST ready one, by the same
+		// distance / load radius the loads are started in (2026-09-22). In map order a crowd zone's spawn queue
+		// could hold the main thread while the road piece under the player waited, which `probe_island_zones`
+		// measured once geometry-less zones stopped queueing behind the parse cap. An unload ranks at
+		// UNLOAD_RANK: after anything the player is well inside, before the edge of the load rings, so freeing
+		// memory is never starved by a drive that keeps loading.
+		StreamTask pick = null;
+		float best = Float.MAX_VALUE;
 		for (StreamTask t : new ArrayList<>(tasks.values())) {
 			if (!GD.isInstanceValid(t.marker) || t.marker.zone == null) { discardTask(t); continue; }
 			// Threaded-load polling is near-free — poll every waiting task every frame so a parse
@@ -976,10 +1016,12 @@ public class ZoneManager extends Node {
 				pollThreadedLoad(t);
 				if (t.phase == Phase.GEO_WAIT) continue;   // still parsing on the worker
 			}
-			if (workerTaken) continue;
-			workerTaken = true;
-			stepTask(t, start, budgetNanos);
+			float rank = t.isLoad
+					? nearestPlayerDistXZ(t.marker.getGlobalPosition()) / Math.max(1f, t.marker.zone.loadRadius)
+					: UNLOAD_RANK;
+			if (rank < best) { best = rank; pick = t; }
 		}
+		if (pick != null && tasks.get(pick.marker) == pick) stepTask(pick, start, budgetNanos);
 	}
 
 	/** `ZM_TRACE=1` in the environment: print every streaming step (phase, zone, and each child entered or freed), so

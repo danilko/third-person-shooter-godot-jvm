@@ -574,7 +574,47 @@ def _signalised(table, junction):
     return bool(r.get("signal_all_junctions")) and sum(1 for a in arms if a.get("in_lanes")) >= r["signal_min_arms"]
 
 
-def _signals(fur, table, lanes, junctions, mine, ground):
+#: How far a pole may be stepped OUTBOARD to get out of a lane before it is dropped instead. A signal must
+#: still be readable from its approach and a lamp must still reach the road, so this is a nudge, not a search.
+POLE_PUSH_MAX = 2.5
+POLE_PUSH_STEP = 0.25
+
+
+def _pole_half(table, asset):
+    """The shaft's own radius (`collide_pole`), which is what a car actually meets."""
+    c = (table.assets.get(asset, {}) or {}).get("collide_pole") or [0.2]
+    return float(c[0])
+
+
+def _out_of_lane(index, table, rules, asset, pos, out, push=True):
+    """`pos` moved OUTBOARD along `out` until the pole is clear of every lane, or None when it cannot be.
+
+    A functional pole -- a traffic signal, a street lamp -- is placed by its own rule (so far in from the kerb,
+    so far past the far mouth) and that rule is about the KERB of one road. It says nothing about a turn
+    connector swinging wide over the footway, or about a second road running alongside; `_LaneIndex` is the one
+    owner of "is this spot in a carriageway", and until now only the trees and the edge props asked it, so a
+    signal or a lamp could stand where a car drives (measured on the island: 12 lanes, 2 of them through lanes).
+
+    The margin is the SHAFT's own radius plus `pole_lane_clear`, not the generous `prop_lane_clear` a bollard
+    keeps: the question here is whether a car meets the pole, and a Japanese signal stands AT the kerb by design.
+    """
+    if index is None:
+        return pos
+    margin = _pole_half(table, asset) + float(rules.get("pole_lane_clear", 0.15))
+    if index.clear_of(pos, margin):
+        return pos
+    if not push:
+        return None
+    d = POLE_PUSH_STEP
+    while d <= POLE_PUSH_MAX + 1e-9:
+        cand = (pos[0] + out[0] * d, pos[1] + out[1] * d, pos[2])
+        if index.clear_of(cand, margin):
+            return cand
+        d += POLE_PUSH_STEP
+    return None
+
+
+def _signals(fur, table, lanes, junctions, mine, ground, index=None):
     """One Japanese mast-arm signal per signalised arm, on the FAR side of the junction: the pole on the kerb
     the arriving traffic keeps to (keep-left: its left), `signal_past_mouth` beyond the far mouth (past the far
     arm's zebra), the arm reaching back over the arriving lanes and the heads facing them. Where the arm has a
@@ -620,6 +660,7 @@ def _signals(fur, table, lanes, junctions, mine, ground):
             pos = (end[0] + d[0] * r["signal_past_mouth"] + side[0] * (half + off),
                    end[1] + d[1] * r["signal_past_mouth"] + side[1] * (half + off), end[2])
             fwd = d
+            out = side
         else:
             # no straight-ahead movement (the stem of a T, a Y): there is no far side to stand on, so the signal is
             # NEAR-side -- on this arm's own kerb, just junction-side of its zebra, as Japan does where the far
@@ -629,12 +670,20 @@ def _signals(fur, table, lanes, junctions, mine, ground):
             lat = kerb["lat"] + kerb["half"] + off
             z = kerb["sample"](max(0.0, back))[2]
             pos = (anchor[0] + left[0] * lat - fwd[0] * back, anchor[1] + left[1] * lat - fwd[1] * back, z)
+            out = left
+        moved = _out_of_lane(index, table, r, "signal", pos, out)
+        if moved is None:
+            fur.counts["signal_in_lane"] = fur.counts.get("signal_in_lane", 0) + 1
+            continue
+        if moved[0] != pos[0] or moved[1] != pos[1]:
+            fur.counts["signal_moved_clear"] = fur.counts.get("signal_moved_clear", 0) + 1
+        pos = moved
         if not _grounded(ground, pos, r["max_above_ground"]):
             continue
         fur.put(table, "signal", pos, fwd, lane.get("road_name", ""))
 
 
-def _lamps(fur, table, solves, bands, mine_run, ground):
+def _lamps(fur, table, solves, bands, mine_run, ground, index=None):
     """Street lighting. A run with a raised median wide enough (`median_lamp_min_half`) gets twin-arm lamps down
     the median every `median_lamp_spacing`; the others get single lamps on both kerbs every `lamp_spacing`,
     staggered half a spacing side to side, `lamp_inset` behind the kerb line, arm over the road. A lamp keeps
@@ -664,6 +713,11 @@ def _lamps(fur, table, solves, bands, mine_run, ground):
                 if wall:
                     mz += ps.MEDIAN_WALL_HEIGHT
                 pos = (p[0], p[1], p[2] + mz)
+                # A median lamp cannot be nudged -- its place IS the median -- so one that lands in a lane
+                # (a lamp correct on its own road standing in a second road that runs alongside) is dropped.
+                if _out_of_lane(index, table, r, "lamp_twin", pos, (0.0, 0.0), push=False) is None:
+                    fur.counts["lamp_twin_in_lane"] = fur.counts.get("lamp_twin_in_lane", 0) + 1
+                    continue
                 if fur.clear_of(pos, r["pole_clearance"]) and fur.put(table, "lamp_twin", pos, d, road):
                     on_median += 1
         if (on_median and not r.get("lamp_kerb_with_median")) or "lamp" not in table.assets:
@@ -677,6 +731,10 @@ def _lamps(fur, table, solves, bands, mine_run, ground):
                 lat = _left(d)
                 o = sgn * r["lamp_inset"]
                 pos = (p[0] + lat[0] * o, p[1] + lat[1] * o, p[2] + (k if w > 0.0 else 0.0))
+                pos = _out_of_lane(index, table, r, "lamp", pos, (sgn * lat[0], sgn * lat[1]))
+                if pos is None:
+                    fur.counts["lamp_in_lane"] = fur.counts.get("lamp_in_lane", 0) + 1
+                    continue
                 if fur.clear_of(pos, r["pole_clearance"]):
                     fur.put(table, "lamp", pos, (-sgn * lat[0], -sgn * lat[1]), road)
             # ON THE BARRIER: where the edge carries one (an elevated deck, a ramp, a bridge) the kerb lamp above is
@@ -698,6 +756,10 @@ def _lamps(fur, table, solves, bands, mine_run, ground):
                 lat = _left(d)
                 o = sgn * (2.0 * w_b + half_pole + r["barrier_lamp_clear"])
                 pos = (p[0] + lat[0] * o, p[1] + lat[1] * o, p[2] + h)
+                pos = _out_of_lane(index, table, r, "lamp", pos, (sgn * lat[0], sgn * lat[1]))
+                if pos is None:
+                    fur.counts["lamp_in_lane"] = fur.counts.get("lamp_in_lane", 0) + 1
+                    continue
                 if fur.clear_of(pos, r["pole_clearance"]):
                     fur.put(table, "lamp", pos, (-sgn * lat[0], -sgn * lat[1]), road)
 
@@ -842,10 +904,13 @@ def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, gro
     ordered = [junctions[k] for k in sorted(junctions)]
     _junction_marks(fur, table, lanes, ordered, mine_lane, mark_mat)
     # the signals first: every later solid prop (planter, bollard, lamp) keeps clear of a pole already standing
-    _signals(fur, table, lanes, ordered, mine_lane, ground)
+    # ONE lane index, shared: "may a solid thing stand here" is one question, and a functional pole that skips
+    # it is how a signal came to stand in a turn connector and a median lamp in a neighbouring road's lane.
+    index = _LaneIndex(lanes)
+    _signals(fur, table, lanes, ordered, mine_lane, ground, index)
     _lane_props(fur, table, dict(sorted(lanes.items())), mine_lane, ground)
-    _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, _LaneIndex(lanes))
-    _lamps(fur, table, solves, bands, mine_run, ground)
+    _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, index)
+    _lamps(fur, table, solves, bands, mine_run, ground, index)
     _street_trees(fur, table, solves, bands, mine_run, ground, lanes)
     _median_walls(fur, table, solves, mine_run)
     return fur
@@ -986,7 +1051,22 @@ def self_test():
     sigs = [p for p in f.placements if p["asset"] == "signal"]
     near = 50.0 - (table.rules["crosswalk_back"][0] - table.rules["signal_near_inside"])
     assert len(sigs) == 1 and abs(sigs[0]["pos"][0] - near) < 1e-6, sigs
-    assert abs(sigs[0]["pos"][1] - (6.75 + 2.25 + table.rules["signal_kerb_offset"])) < 1e-6, sigs
+    # ... and it is pushed OUTBOARD until it is out of every lane. The kerb offset alone puts it at
+    # 9.70, which in this junction is 2.18 m from the LEFT-turn connector's centreline -- inside a
+    # 2.25 m half lane, i.e. a pole standing in the turn path. That is the island's own defect in
+    # miniature (measured 2026-09-22: 12 lanes carried a signal or a lamp), and the remedy is a nudge:
+    # the pole ends up clear, on the same kerb, facing the same way.
+    authored = 6.75 + 2.25 + table.rules["signal_kerb_offset"]
+    idx = _LaneIndex({l["id"]: l for l in kl3})
+    margin = _pole_half(table, "signal") + table.rules.get("pole_lane_clear", 0.15)
+    assert sigs[0]["pos"][1] > authored + 0.1, sigs
+    assert idx.clear_of(sigs[0]["pos"], margin), sigs
+    assert not idx.clear_of((sigs[0]["pos"][0], authored, 0.0), margin), "the fixture must carry the defect"
+    # CONTROL: with no index the placer is what it was, and the pole stands in the turn.
+    f_ctl = Furniture()
+    _signals(f_ctl, table, {l["id"]: l for l in kl3}, [{"id": "j3", "arms": arms}], lambda l: True, None, None)
+    ctl = [p for p in f_ctl.placements if p["asset"] == "signal"]
+    assert len(ctl) == 1 and abs(ctl[0]["pos"][1] - authored) < 1e-6, ctl
     row = Furniture()
     for k in range(5):
         pos = (k * table.rules["bollard_spacing"], 0.0, 0.0)

@@ -60,6 +60,7 @@ N = int(round(2 * HALF / STEP)) + 1        # 2305 vertices a side, matching dump
 
 BLOCK_MAX = 40000.0    # m2: a component this size or smaller that holds a lot is a 街区 and is filled whole
 REACH_OPEN = 12.0      # ...anything bigger is filled only this far from a lot (no countryside aprons)
+UNDER_REACH = 20       # vertices (40 m): how far from paved ground the land under an elevated road is painted too
 PAINT_BLEED = 3        # vertices the paint runs past the fill, into the road mask and across a diagonal gap
 RAMP_DROP = 0.06       # metres the batter gives back per 2 m vertex outside the fill (a ~4.5% grade)
 RAMP_MAX = 5           # ...and the furthest it walks, so a lot on a bank does not batter across a field
@@ -162,6 +163,7 @@ def road_mask(ib, grid_fn, text):
     net, grid, cors = ib.solve_bands()
     ny = network_y(text)
     road = np.zeros((N, N), bool)
+    under = np.zeros((N, N), bool)      # land under an ELEVATED road (a deck's footprint): painted, never raised
     cap = np.full((N, N), np.nan)
     for line, _h, owner in cors:
         owner = str(owner)
@@ -176,6 +178,8 @@ def road_mask(ib, grid_fn, text):
             hard = max(hard, ib.ELEVATED_GAP)
         for a, b in zip(pts, pts[1:]):
             capsule_into(road, a[:2], b[:2], max(a[3], b[3]) + hard)
+            if high or owner.startswith("shuto_"):
+                capsule_into(under, a[:2], b[:2], max(a[3], b[3]) + hard)
             if hard <= 0.0 and not high and not owner.startswith("JCT:"):
                 capsule_cap(cap, a[:2], b[:2], max(a[3], b[3]) + CAP_REACH,
                             a[2] + ny - CLEARANCE, b[2] + ny - CLEARANCE)
@@ -188,7 +192,7 @@ def road_mask(ib, grid_fn, text):
     site = np.zeros((N, N), bool)
     for (cx, cz, yaw, hx, hz) in ib.site_exclusions(text):
         rect_into(site, cx, cz, yaw, -hx, -hz, hx, hz)
-    return road, site, cap
+    return road, site, cap, under
 
 
 DIRS8 = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
@@ -235,7 +239,7 @@ def build(heights_path, area=None):
         # do not drop passages from it
         rect_into(lot, p["pos"][0], p["pos"][2], p["yaw"], -w / 2.0, -dd / 2.0, w / 2.0, dd / 2.0,
                   heights=lot_top, h=p["pos"][1] + ib.LOT_RAISE)
-    road, site, cap = road_mask(ib, None, text)
+    road, site, cap, under = road_mask(ib, None, text)
     lot &= ~road & ~site
     print("island_ground: %d lot vertices, %d road vertices" % (int(lot.sum()), int(road.sum())))
 
@@ -340,7 +344,7 @@ def build(heights_path, area=None):
     print("island_ground: %d vertices move, biggest %+.3f m, median %+.3f m"
           % (int(moved.sum()), float(np.nanmax(height[moved] - nat[moved])) if moved.any() else 0.0,
              float(np.median(height[moved] - nat[moved])) if moved.any() else 0.0))
-    return nat, height, paved, fill, lot, lot_top, road, site
+    return nat, height, paved, fill, lot, lot_top, road, site, under
 
 
 def components(mask):
@@ -415,7 +419,7 @@ def main(argv):
         else:
             print("unknown argument %s" % rest[0])
             return 2
-    nat, height, paved, fill, lot, lot_top, road, site = build(heights, area)
+    nat, height, paved, fill, lot, lot_top, road, site, under = build(heights, area)
     # Measure only the PAVING'S OWN edges. Over the whole island the natural relief carries thousands of km
     # of 10 cm steps -- mountains, cliffs, the shore -- and counting those buries the number this is about.
     where = paved.copy()
@@ -444,6 +448,18 @@ def main(argv):
             g |= shift_bool(paint, dj, di)
         paint = g & (nat > LAND_Z)
     paint |= site & (nat > LAND_Z)
+    # UNDER AN ELEVATED ROAD the land is the city's, not a beach (user, 2026-09-22: the strip under the expressway
+    # stayed sand-coloured between two paved blocks). Its footprint is kept out of the FILL on purpose -- a deck is
+    # not ground, so nothing raises it -- but where it adjoins paved ground (within UNDER_REACH vertices) it takes
+    # the same paint, so the block's concrete runs on under the viaduct. Open country under a viaduct (the bay
+    # approaches) stays as it is.
+    near = paved.copy()
+    for _ in range(UNDER_REACH):
+        g = near.copy()
+        for dj, di in DIRS8:
+            g |= shift_bool(near, dj, di)
+        near = g
+    paint |= under & near & (nat > LAND_Z)
     if area is not None:
         X, Z = vertex_grid()
         paint &= (X >= area[0]) & (X <= area[2]) & (Z >= area[1]) & (Z <= area[3])

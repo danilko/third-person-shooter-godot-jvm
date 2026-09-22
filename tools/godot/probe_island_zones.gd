@@ -69,21 +69,29 @@ func _loaded() -> Array:
 			out.append(zid)
 	return out
 
-func _settle(seconds: float) -> void:
-	# Streaming is a per-frame state machine; wait until the loaded set has not changed for 1 s.
-	var last := []
-	var still := 0
-	for i in int(seconds * 60):
+var zm: Node = null
+var settle_worst := 0.0
+
+func _settle(seconds: float) -> float:
+	# Ask the STREAMER whether it is quiet, not the road set whether it stopped changing. The island
+	# holds 39 road zones, 92 building cells and 71 crowd zones, and a stop has 100+ of them in range:
+	# while the pipeline works through the building cells the road set legitimately does not change for
+	# seconds at a time, which the old predicate read as "settled" and then failed the coverage check on
+	# zones that were still queued. `ZoneManager.streamingPendingNow()` counts the whole queue.
+	var frames := int(seconds * 60)
+	for i in frames:
 		await physics_frame
-		var now := _loaded()
-		now.sort()
-		if now == last:
-			still += 1
-			if still >= 60:
-				return
-		else:
-			still = 0
-			last = now
+		if zm != null and int(zm.call("streaming_pending_now")) == 0:
+			settle_worst = maxf(settle_worst, float(i + 1) / 60.0)
+			return float(i + 1) / 60.0
+	settle_worst = maxf(settle_worst, seconds)
+	return seconds
+
+func _arg(name: String, dflt):
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--%s=" % name):
+			return a.substr(name.length() + 3)
+	return dflt
 
 func _xz(v: Vector3) -> Vector2:
 	return Vector2(v.x, v.z)
@@ -121,6 +129,8 @@ func _initialize() -> void:
 	check("World.tscn has the road grid", zones.size() >= 20, "%d road zones" % zones.size())
 	root.add_child(w)
 	current_scene = w
+	zm = root.get_node_or_null("ZoneManager")
+	check("the ZoneManager AutoLoad answers streaming_pending_now", zm != null and zm.has_method("streaming_pending_now"))
 	var player: Node3D = w.get_node("Characters/Player")
 	var health: Node = player.get_node("Health")
 	health.set("max_health", 1000000.0)
@@ -137,6 +147,11 @@ func _initialize() -> void:
 	for k in keys:
 		tour.append(zones[cells[k]]["centre"])
 
+	# `--stops=N` walks only the first N cells of the tour: the whole tour is ~15 minutes, and a streaming
+	# question ("is the zone round the player loaded") reproduces on a handful of stops.
+	var only := int(_arg("stops", 0))
+	if only > 0 and only < tour.size():
+		tour = tour.slice(0, only)
 	var worst_start := 0.0
 	var bad_load := []
 	var bad_unload := []
@@ -146,7 +161,7 @@ func _initialize() -> void:
 	var stops := 0
 	for at in tour:
 		player.global_position = at + Vector3(0, 2, 0)
-		await _settle(30.0)
+		await _settle(90.0)
 		stops += 1
 		var loaded := _loaded()
 		for zid in zones:
@@ -196,7 +211,7 @@ func _initialize() -> void:
 
 	# The drive: 30 m/s along the tour, one physics frame per 0.5 m.
 	player.global_position = tour[0] + Vector3(0, 2, 0)
-	await _settle(30.0)
+	await _settle(90.0)
 	var frame_us := []
 	var enter_us := []
 	var prev_loaded := _loaded()
@@ -225,6 +240,7 @@ func _initialize() -> void:
 	print("  drive: %d frames at 30 m/s, frame p50 %.2f ms, p99 %.2f ms, worst %.2f ms; %d piece(s) finished entering, worst such frame %.2f ms" \
 			% [frame_us.size(), p50, p99, worst, enter_us.size(), worst_enter])
 	check("the drive streamed pieces in", enter_us.size() > 0, "%d" % enter_us.size())
+	print("  settle: worst wait for the streamer to go quiet %.1f s (cap 90 s)" % settle_worst)
 	_finish()
 
 func _finish() -> void:

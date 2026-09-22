@@ -48,6 +48,10 @@ public final class Places {
     }
 
     private static List<Place> places = null;
+    /** Every building's footprint quad, {kind, x0, z0, x1, z1, x2, z2, x3, z3} (kind 1 = a place). */
+    private static List<float[]> footprints = new ArrayList<>();
+    /** Bumped on every (re)load, so a picture built from the footprints knows it is stale. */
+    private static int version = 0;
     private static List<Region> regions = null;
     private static String loadedFor = "\u0000";
     private static String wanted = "";
@@ -102,6 +106,8 @@ public final class Places {
         loadedFor = path;
         places = new ArrayList<>();
         regions = new ArrayList<>();
+        footprints = new ArrayList<>();
+        version++;
         buckets.clear();
         if (path.isEmpty() || !FileAccess.fileExists(path)) return;
         Map<String, Object> doc = (Map<String, Object>) MiniJson.parse(FileAccess.getFileAsString(path));
@@ -116,6 +122,15 @@ public final class Places {
             regions.add(new Region(String.valueOf(m.get("name")), (Double) b.get(0), (Double) b.get(1),
                     (Double) b.get(2), (Double) b.get(3)));
         }
+        Object fps = doc.get("footprints");
+        if (fps instanceof List<?> rows) {
+            for (Object o : rows) {
+                List<Object> r = (List<Object>) o;
+                float[] q = new float[r.size()];
+                for (int k = 0; k < q.length; k++) q[k] = (float) (double) (Double) r.get(k);
+                if (q.length == 9) footprints.add(q);
+            }
+        }
         for (int i = 0; i < places.size(); i++) {
             Vector3 p = places.get(i).at();
             buckets.computeIfAbsent(key(p.getX(), p.getZ()), k -> new ArrayList<>()).add(i);
@@ -123,6 +138,12 @@ public final class Places {
     }
 
     public static List<Place> all() { load(); return places; }
+
+    /** The building footprints of this world (see {@code island_buildings.write_places}); empty with none. */
+    public static List<float[]> footprints() { load(); return footprints; }
+
+    /** Changes whenever the record is (re)loaded -- for a picture that caches what it drew from it. */
+    public static int version() { load(); return version; }
 
     public static List<Region> regions() { load(); return regions; }
 

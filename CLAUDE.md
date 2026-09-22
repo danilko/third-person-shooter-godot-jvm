@@ -9181,7 +9181,7 @@ inserted into a chain, `cut_road` to land a junction on a ground road, `make_jun
   of two new lines is kept only where one of them runs THROUGH it (never a two-armed pad); water is judged only once
   the crossings have settled (a partner dropped in the same pass shortens a line).
 - **Turnarounds** (`tools/island_turnarounds.py`, 3.3b): every road end that joins nothing becomes a mouth of a 3-arm
-  junction with a teardrop loop (the summit loop, generalised), its axis and reach searched for flat land clear of
+  junction with a loop (a teardrop until 2026-09-22, a rounded square since -- see "The map shows the city"), its axis and reach searched for flat land clear of
   every other road; an end with no room is shortened a station at a time. 7 ends, `open_end` 15 -> 0.
 - **Measured:** gate 0 errors; flow 1811 lanes, 0 broken / misjoined / unreached / orphans / open ends; 31 grade
   separations, tightest 7.7 m (the airport loop over the westbound exit).
@@ -9776,6 +9776,107 @@ beside the pink one needs a per-asset material override, which is PLAN.md 3.16 s
   Not gated: the aimed-at half (it needs a Player's aim marker in a scope).
 - `probe_ped_crowd.gd`'s "the crowd added nothing to the characters group" had been failing on World.tscn since the
   traffic ring (3.32) streams 9 cars and their drivers round the stand; it now counts bodies on foot only.
+
+## The map shows the city: buildings, typed places, every grid code, north; one ground fill; square turnarounds (2026-09-22)
+
+- **Every building is on both maps** (`world.BuildingMap`): `island_buildings.py write` puts each building's
+  footprint (its type AABB, placed) into the places record as `footprints` ([kind, 4 corners]), and the map paints
+  them ONCE into one LA8 picture over the road picture's own square (2048 px max, averaged mips so a zoomed-out city
+  reads as block density), drawn UNDER the roads with the same view mapping (`RoadOverlay.drawBuildings`, the road
+  picture's `drawPicture`). Painted at load rather than baked: the buildings are re-derived more often than the
+  roads. `buildings_drawn_now` is the probe readout.
+- **Every place at every zoom, typed** (`RoadOverlay.PlaceKind`, the one table): a coloured square with a type code
+  in it -- H safe house, W weapon counter, 1 konbini, 2 gas station, 3 restaurant, 4 station, 5 landmark, 6 other --
+  and a legend on the full map. Names wait for `placeDetailRange` (landmarks always), so a zoomed-out map is squares,
+  not text; the code is the stand-in for a label later.
+- **Every postal cell prints its code** (user: "so the user does not need to guess"): `postalCellLabelPx` 20 on the
+  full map, the font shrinking to the cell (`RoadOverlay.labelFontSize`, >= 7 px), white at 85 % with a dark
+  outline. A click on a code sets the waypoint to that cell's centre (`pickPostalLabel`, sharing the label's own
+  position rule `postalLabelPoint`; `picked_postal_now`), after a place blip and before a bare waypoint.
+- **North marker** (`RoadOverlay.drawNorth`): on the minimap RIM in north's on-screen direction (it travels round a
+  heading-up radar; `north_at_now`), top-right on the north-up full map.
+- **One ground fill.** The terrain's "Urban" layer (the block ground `island_ground.py` paints) is the footway's own
+  concrete (`tools/make_urban_texture.py --from-footway`: `T_Concrete` albedo + a luminance height, normal + the
+  ORM's roughness), with `M_ConcreteTile`'s tint (0.92, 0.90, 0.86) and tile (`uv_scale` 0.3663 = 2.73 m) on the
+  texture asset. The generated aggregate is still the script's default mode.
+- **`island_world.sh --only ground` is NOT safe on its own** (measured 2026-09-22): the stage derives the block
+  surface from a dump of the CURRENT terrain, which already carries the previous block layer, so the layer it
+  writes no longer agrees with the road stamp -- `probe_road_stamp` then fails "stamping again changes nothing"
+  (22 337 vertices) and "restore puts the natural ground back" (0.09 m). Re-run from `--from terrain`, which lays
+  the natural ground down first. (The block heights themselves are absolute and unchanged; it is the layer and
+  the restore that break.)
+- **The land under an elevated road is painted with the block** (`island_ground.UNDER_REACH` 40 m): a deck's
+  footprint is kept out of the FILL on purpose (nothing may raise ground under a viaduct), so the strip under C1
+  between two paved blocks kept the elevation-based BEACH paint. It now takes the block's paint wherever it adjoins
+  paved ground; open country under a viaduct is untouched. Island paint 3.132 -> 3.317 km2.
+- **`ZoneManager.maxLoadsPerTick` caps PARSES, and the main thread goes NEAREST FIRST.** A zone with no geometry
+  (a crowd, a traffic zone) parses nothing and now starts at once instead of queueing behind every building cell --
+  measured, the four crowd zones next to the player were still queued when its own had settled
+  (`probe_island_peds` "the streets ahead are already populated" failed, 0 in the 150-300 m ring; after, 5 crowds
+  and 74 light peds). And `processStreamTasks` steps the NEAREST ready task (distance / load radius; an unload
+  ranks at `UNLOAD_RANK` 0.5) rather than the first in map order, so a crowd's spawn queue cannot hold the one
+  main-thread slot while the road piece under the player waits.
+- **A turnaround is a rounded SQUARE** (user: Japan rarely has a circular approach; a square is a block to build
+  round): `island_turnarounds.loop_line` puts a T junction in the middle of the square's near side, the arms leave at
+  90 deg, and four 90 deg corners are filleted to `CORNER_R` 15 m; `SIDES` 90/110/130 m are searched, smallest
+  first. The airport end became 90 x 90 m (was a 43 x 59 m teardrop).
+
+## "Has the world finished streaming" has ONE owner; nothing solid stands in a carriageway (PLAN.md 3.35, 2026-09-22)
+
+**`ZoneManager.streamingPendingNow()`** counts the whole outstanding queue: in-flight tasks, plus every marker
+inside its load radius with nothing loaded, plus every loaded marker past its unload radius. 0 means quiet.
+It exists because a caller watching one KIND of zone cannot answer the question: `probe_island_zones` settled on
+"the ROAD set has not changed for 1 s", and the island's 221 markers (39 road zones, 82 building cells, 71 crowd
+zones, 29 traffic zones) put 100+ of them in range of any stop -- so while the pipeline worked through the
+building cells the road set legitimately stood still, the probe called that settled, and then failed its own
+coverage check on zones that were merely still queued (the pre-existing failure the forty-eighth session handed over).
+**It was the probe, not the streamer**: settled on the real predicate, the worst wait for the streamer to go
+quiet is **4.7 s** against a 90 s cap, and the gate is 8/8 + the drive over all 39 stops. Counting only LOADS was not enough
+either -- the symmetric half (a zone past its unload radius) then failed at 2078 m, so the readout owes both
+directions or it answers a different question from the one its name asks.
+
+### `probe_road_clear.gd` -- the driving space is asked of the COLLISION, not of a placement rule
+
+A road is assembled by several owners that each put solid things near a lane and none of which sees the others:
+the Road Kit's piers, median and sound walls, rock-shed columns, the 3 m car wall on every barrier,
+`point_furniture`'s signals, lamps, planters, bollards and trees, and -- outside the road pipeline entirely --
+lot slabs, sites and landmarks. Every one has its own clearance rule and every rule is about the LANE EDGE.
+None of them asks the question a player asks, so the gate does: it sweeps the CAR's own envelope
+(`CAR_HALF` 1.10 m either side of the lane centre) along every exported lane of every streamed piece, on a
+vehicle's own mask (`WORLD | CAR_WALL`), in two bands -- **OBSTRUCTION** (0.30-1.20 m, in front of the bumper,
+FAILS) and **HEADROOM** (1.20-2.00 m, only the roof would touch, reported) -- so a low soffit cannot mask a
+bollard and a kerb, a lane line and a deck 5.5 m up are all legitimately outside it. The probe instances the
+pieces itself (`Zone.placeGeometry`'s rule) and then FREES every ZoneMarker, because a streamed second copy in
+the same physics space would answer a query the probe did not ask. `--control` drops a post in every 40th lane.
+It belongs to the Standard gates and must be re-run after any road, furniture, site or landmark change.
+
+**A SIGNAL AND A LAMP HAD SKIPPED THE ONE OWNER OF "IS THIS SPOT IN A CARRIAGEWAY".** `point_furniture._LaneIndex`
+exists precisely because a footway is a fact about ONE road (a tree on `demo_main`'s footway measured 0.23 m off
+a ramp's centreline), and the trees and the edge props asked it -- while `_signals` and `_lamps` never did, so a
+far-side signal stood in the left-turn path it faces and a median lamp stood in a neighbouring road's lane. Both
+now nudge the pole OUTBOARD (`_out_of_lane`, `POLE_PUSH_MAX` 2.5 m in 0.25 m steps) or are dropped and counted
+(`signal_moved_clear` / `signal_in_lane` / `lamp_in_lane` / `lamp_twin_in_lane`; a median lamp cannot move).
+**The margin is the SHAFT's own radius plus `pole_lane_clear` (0.15 m), not a bollard's generous
+`prop_lane_clear` (1.2)**: the question is whether a car meets the pole, and a Japanese signal stands AT the
+kerb by design -- the bollard margin would have moved every signal in the world. The self-test's own fixture
+carried the defect (its near-side signal sat 2.18 m from a 2.25 m half-lane left-turn connector), so it asserts
+the new rule plus a control rather than the old hard-coded coordinate. **Measured on the rebuilt island:
+21 blocked lanes -> 9, every one of the 12 signal/lamp lanes clear**; on one piece (`island_4_4`) 1 signal
+moved clear, 1 dropped, 4 kerb lamps and 10 median lamps dropped -- a dropped median lamp is nearly always one
+standing where a turn connector crosses the median, which is where Japan does not put one either.
+
+**What one run found, and it is four different defects -- three of them invisible to every existing check.**
+Beside the poles, measured from the lanekits at each reported spot: **a PIER standing in the loop's own lane**
+(`shuto_eb_loop_F1` runs 9.71 m BELOW `shuto_eb_loop__2`, so what is in its driving box is a column, and a
+column lives in `<road>__surface`, which is why the hit is filed under the surface proxy's name --
+`point_mesh.build` passes `own = {road_name}` to `pier_on_road` so a pier is not refused for standing on the
+deck it CARRIES, and a loop or a switchback passes under its own alignment, where that exemption is exactly
+wrong); **a ramp diverging 0.25 m below its mainline while still under its deck** (`shuto_d_fwd_off_F0` is
+2.49 m beside `shuto_c1__6_F1` at dy +0.25, a step rather than a crossing, so `roadkit_interchange --check`'s
+5.5 m rule -- which measures DIFFERENT roads -- cannot see it); **a gore nose's footway and car wall laid
+across live asphalt** (the two lanes it sits between are 4.50 m apart at the same height); and
+`site_tokyo_station`'s collider over `naka_hondori` (3.33's known placeholder, now with a number).
+DebugWorld fails it too, and truly: `loop_F1` runs 0.6 m inside the hand-authored CSG blockout.
 
 ## Known Quirks / Gotchas
 

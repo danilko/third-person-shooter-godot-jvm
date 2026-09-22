@@ -388,6 +388,38 @@ func _check_places(which: String) -> void:
 	_check("a click away from every blip is still an ordinary waypoint",
 		str(worldmap.call("picked_place_now")) == "" and bool(player.call("has_waypoint_now"))
 		and Vector2(bare.x, bare.z).distance_to(Vector2(wp2.x, wp2.z)) < 0.5, "")
+	# 5. a click on a postal cell's printed "x-y" sets the waypoint to that cell's centre (3.26(c)); zoom until
+	#    the labels are drawn (a cell >= postal_cell_label_px on screen), then click the label of the cell under
+	#    the view centre, whose whole cell is on screen, so its label sits on the cell's own centre
+	var mid: Vector2 = worldmap.size * 0.5
+	for i in 12:
+		var c0: Vector2 = worldmap.call("world_to_screen_now", Vector3(0, 0, 0))
+		var c1: Vector2 = worldmap.call("world_to_screen_now", Vector3(192, 0, 0))
+		if c1.x - c0.x > 110.0:         # big enough that a point inside the cell is clear of every label
+			break
+		_wheel(MOUSE_BUTTON_WHEEL_UP, mid)
+		await process_frame
+	var here: Vector3 = worldmap.call("screen_to_world_now", mid)
+	var ci := int(floor((here.x + 2304.0) / 192.0)) + 1
+	var cj := int(floor((here.z + 2304.0) / 192.0)) + 1
+	var centre := Vector3(-2304.0 + (ci - 0.5) * 192.0, 0.0, -2304.0 + (cj - 0.5) * 192.0)
+	var label: Vector2 = worldmap.call("world_to_screen_now", centre)
+	_mouse(MOUSE_BUTTON_LEFT, true, label)
+	_mouse(MOUSE_BUTTON_LEFT, false, label)
+	var wp3: Vector3 = player.call("waypoint_now")
+	var code := "%d-%d" % [ci, cj]
+	_check("a click on a postal label takes that code (%s)" % code,
+		str(worldmap.call("picked_postal_now")) == code or str(worldmap.call("picked_place_now")) != "",
+		"picked '%s', place '%s'" % [worldmap.call("picked_postal_now"), worldmap.call("picked_place_now")])
+	if str(worldmap.call("picked_place_now")) == "":
+		_check("... and its waypoint is the cell's centre",
+			Vector2(wp3.x, wp3.z).distance_to(Vector2(centre.x, centre.z)) < 0.5,
+			"%.1f m from it" % Vector2(wp3.x, wp3.z).distance_to(Vector2(centre.x, centre.z)))
+	var cell_px: float = (worldmap.call("world_to_screen_now", centre + Vector3(192, 0, 0)) - label).x
+	var off := label + Vector2(0, cell_px * 0.35)   # inside the same cell, well away from its label
+	_mouse(MOUSE_BUTTON_LEFT, true, off)
+	_mouse(MOUSE_BUTTON_LEFT, false, off)
+	_check("a click off the label is an ordinary waypoint", str(worldmap.call("picked_postal_now")) == "", "")
 	_action("map")
 	await process_frame
 

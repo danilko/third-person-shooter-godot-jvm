@@ -54,7 +54,20 @@ final class RoadOverlay {
      */
     static boolean drawMap(CanvasItem ci, Vector3 origin, Vector2 center, float scale,
                            float viewW, float viewH, float clipRadiusPx, Color color, float rot) {
-        Texture2D tex = RoadMap.mapTexture();
+        return drawPicture(ci, RoadMap.mapTexture(), origin, center, scale, viewW, viewH, clipRadiusPx, color, rot);
+    }
+
+    /** The building layer ({@link com.openworld.world.BuildingMap}), over the same square as the roads and drawn
+     *  UNDER them, with the same view mapping. False when there is none. */
+    static boolean drawBuildings(CanvasItem ci, Vector3 origin, Vector2 center, float scale,
+                                 float viewW, float viewH, float clipRadiusPx, Color color, float rot) {
+        return drawPicture(ci, com.openworld.world.BuildingMap.texture(), origin, center, scale, viewW, viewH,
+                clipRadiusPx, color, rot);
+    }
+
+    /** Any picture that covers {@link RoadMap#mapSquare} as one textured polygon (the roads, the buildings). */
+    private static boolean drawPicture(CanvasItem ci, Texture2D tex, Vector3 origin, Vector2 center, float scale,
+                                       float viewW, float viewH, float clipRadiusPx, Color color, float rot) {
         double[] b = RoadMap.mapSquare();
         if (tex == null || b == null || scale <= 0) return false;
         List<Vector2> pts = new ArrayList<>();
@@ -181,6 +194,17 @@ final class RoadOverlay {
     static void drawPlaces(CanvasItem ci, List<Places.Place> places, Vector3 origin, Vector2 center,
                            float scale, float clipRadiusPx, float rot, float sizePx, int minTier, Font font,
                            int fontSize) {
+        drawPlaces(ci, places, origin, center, scale, clipRadiusPx, rot, sizePx, minTier, font, fontSize, font, true);
+    }
+
+    /**
+     * As above: {@code numberFont} prints each place's type number in its square (null = none), and
+     * {@code showAllNames} false prints names only for landmark-tier places, so a zoomed-out map carries every
+     * shop as a numbered square without a wall of text.
+     */
+    static void drawPlaces(CanvasItem ci, List<Places.Place> places, Vector3 origin, Vector2 center,
+                           float scale, float clipRadiusPx, float rot, float sizePx, int minTier, Font font,
+                           int fontSize, Font numberFont, boolean showAllNames) {
         double ox = origin.getX(), oz = origin.getZ();
         double cx = center.getX(), cy = center.getY();
         List<float[]> labels = new ArrayList<>();
@@ -191,12 +215,20 @@ final class RoadOverlay {
                 double dx = at.getX() - cx, dy = at.getY() - cy;
                 if (dx * dx + dy * dy > clipRadiusPx * clipRadiusPx) continue;
             }
-            Color col = p.tier() >= Places.LANDMARK_TIER ? LANDMARK : PLACE;
+            PlaceKind k = PlaceKind.of(p);
+            Color col = k.color;
             float h = sizePx * 0.5f;
             ci.drawRect(new Rect2(at.getX() - h, at.getY() - h, sizePx, sizePx), col, true, -1f, false);
             ci.drawRect(new Rect2(at.getX() - h, at.getY() - h, sizePx, sizePx),
-                    new Color(0f, 0f, 0f, 0.55f), false, 1f, false);
-            if (font != null) {
+                    new Color(0f, 0f, 0f, 0.7f), false, 1f, false);
+            // the type's NUMBER inside the square (the legend on the full map says which is which): a stand-in for
+            // a label that would crowd a zoomed-out map
+            if (numberFont != null && sizePx >= 9f) {
+                int fs = Math.max(7, (int) (sizePx * 0.8f));
+                ci.drawString(numberFont, new Vector2(at.getX() - h, at.getY() + fs * 0.36f), k.code,
+                        HorizontalAlignment.CENTER, sizePx, fs, new Color(0f, 0f, 0f, 0.9f));
+            }
+            if (font != null && (p.tier() >= Places.LANDMARK_TIER || showAllNames)) {
                 // two places side by side (the safe house and the weapon counter are 21 m apart) must not print
                 // their names on top of each other: a label that would overlap one already drawn steps down a line
                 float lx = (float) (at.getX() + h + 3f), ly = (float) (at.getY() + fontSize * 0.35f);
@@ -216,13 +248,92 @@ final class RoadOverlay {
         return false;
     }
 
+    /**
+     * What KIND of place a blip is -- one colour and one number per kind (user, 2026-09-22: "a number on the square /
+     * a different colour for each type of location for now; later maybe a label"). The ONE table, read by the blips
+     * and by the full map's legend, so the two cannot disagree. Keyed on the place's scene kind (a type from
+     * {@code building_types.json}) and, for the roles the placement names, on the place's own name.
+     */
+    enum PlaceKind {
+        SAFEHOUSE("H", "Safe house", new Color(1.00f, 1.00f, 1.00f, 1f)),
+        ARMOURY("W", "Weapon counter", new Color(1.00f, 0.35f, 0.30f, 1f)),
+        KONBINI("1", "Convenience store", new Color(0.40f, 0.85f, 0.45f, 1f)),
+        GAS("2", "Gas station", new Color(1.00f, 0.62f, 0.20f, 1f)),
+        FOOD("3", "Restaurant", new Color(1.00f, 0.88f, 0.30f, 1f)),
+        STATION("4", "Station", new Color(0.40f, 0.70f, 1.00f, 1f)),
+        LANDMARK("5", "Landmark", new Color(0.80f, 0.55f, 1.00f, 1f)),
+        OTHER("6", "Other", new Color(0.85f, 0.85f, 0.85f, 1f));
+
+        final String code;
+        final String label;
+        final Color color;
+
+        PlaceKind(String code, String label, Color color) {
+            this.code = code;
+            this.label = label;
+            this.color = color;
+        }
+
+        static PlaceKind of(Places.Place p) {
+            String k = p.kind() == null ? "" : p.kind();
+            String n = p.name() == null ? "" : p.name().toLowerCase(java.util.Locale.ROOT);
+            if (n.contains("safe")) return SAFEHOUSE;
+            if (n.contains("weapon")) return ARMOURY;
+            if (k.startsWith("Konbini")) return KONBINI;
+            if (k.startsWith("Gas")) return GAS;
+            if (k.startsWith("FamilyRestaurant")) return FOOD;
+            if (k.contains("Station")) return STATION;
+            if (p.tier() >= Places.LANDMARK_TIER) return LANDMARK;
+            return OTHER;
+        }
+    }
+
+    /** The full map's key to {@link PlaceKind}: one square and one line per kind, bottom-left of the view. */
+    static void drawPlaceLegend(CanvasItem ci, Font font, int fontSize, float x, float bottom, float sizePx) {
+        if (font == null) return;
+        PlaceKind[] all = PlaceKind.values();
+        float line = Math.max(sizePx, fontSize) + 4f;
+        float w = 0f;
+        for (PlaceKind k : all) {
+            w = Math.max(w, (float) font.getStringSize(k.label, HorizontalAlignment.LEFT, -1f, fontSize).getX());
+        }
+        float top = bottom - line * all.length - 8f;
+        ci.drawRect(new Rect2(x - 6f, top, w + sizePx + 22f, line * all.length + 8f), new Color(0f, 0f, 0f, 0.55f),
+                true, -1f, false);
+        float y = top + 4f;
+        for (PlaceKind k : all) {
+            ci.drawRect(new Rect2(x, y + (line - sizePx) * 0.5f, sizePx, sizePx), k.color, true, -1f, false);
+            int fs = Math.max(7, (int) (sizePx * 0.8f));
+            ci.drawString(font, new Vector2(x, y + (line - sizePx) * 0.5f + sizePx * 0.5f + fs * 0.36f), k.code,
+                    HorizontalAlignment.CENTER, sizePx, fs, new Color(0f, 0f, 0f, 0.9f));
+            ci.drawString(font, new Vector2(x + sizePx + 6f, y + line * 0.5f + fontSize * 0.36f), k.label,
+                    HorizontalAlignment.LEFT, -1f, fontSize, new Color(1f, 1f, 1f, 0.9f));
+            y += line;
+        }
+    }
+
+    /**
+     * A north marker: an "N" in a dark disc, {@code radius} px, at {@code at}. The minimap puts it ON ITS RIM in
+     * north's on-screen direction (so on a heading-up radar it travels round the rim as you turn); the full map, which
+     * is north-up, puts it in a corner.
+     */
+    static void drawNorth(CanvasItem ci, Font font, Vector2 at, float radius) {
+        ci.drawCircle(at, radius, new Color(0f, 0f, 0f, 0.7f), true, -1f, false);
+        ci.drawArc(at, radius, 0f, (float) (2 * Math.PI), 24, new Color(1f, 1f, 1f, 0.8f), 1.5f, false);
+        if (font == null) return;
+        int fs = Math.max(8, (int) (radius * 1.3f));
+        ci.drawString(font, new Vector2(at.getX() - radius, at.getY() + fs * 0.36f), "N",
+                HorizontalAlignment.CENTER, radius * 2f, fs, new Color(1f, 0.35f, 0.3f, 1f));
+    }
+
     // ── the postal grid as the map's background (PLAN.md 3.26, user 2026-09-22) ──────────────────────
 
     /** Alternating cell fills: a faint checkerboard, so crossing into the next cell is visible at a glance. */
     static final Color GRID_A = new Color(1f, 1f, 1f, 0.04f);
     static final Color GRID_B = new Color(1f, 1f, 1f, 0.11f);
     static final Color GRID_LINE = new Color(1f, 1f, 1f, 0.22f);
-    static final Color GRID_LABEL = new Color(1f, 1f, 1f, 0.42f);
+    static final Color GRID_LABEL = new Color(1f, 1f, 1f, 0.85f);
+    static final Color GRID_LABEL_OUTLINE = new Color(0f, 0f, 0f, 0.8f);
 
     /**
      * The postal grid ({@link com.openworld.world.PostalGrid}, the ONE owner of the cells) as a light
@@ -235,6 +346,66 @@ final class RoadOverlay {
      * drawn upright at the middle of its VISIBLE part, and only where that part is at least
      * {@code minLabelPx} across, so a zoomed-out map is not a wall of numbers.
      */
+    /** One postal cell (1-based column i, row j) projected to the screen and clipped to what is drawn. */
+    private static List<Vector2> postalCellPoly(int i, int j, double ox, double oz, double cx, double cy, float scale,
+                                                float rot, List<Vector2> disc, float viewW, float viewH) {
+        double half = com.openworld.world.PostalGrid.HALF, cell = com.openworld.world.PostalGrid.CELL;
+        double x0 = -half + (i - 1) * cell, z0 = -half + (j - 1) * cell;
+        List<Vector2> quad = new ArrayList<>(4);
+        quad.add(project(x0, z0, ox, oz, cx, cy, scale, rot));
+        quad.add(project(x0 + cell, z0, ox, oz, cx, cy, scale, rot));
+        quad.add(project(x0 + cell, z0 + cell, ox, oz, cx, cy, scale, rot));
+        quad.add(project(x0, z0 + cell, ox, oz, cx, cy, scale, rot));
+        return disc != null ? clipConvex(quad, disc) : clipConvex(quad, rectPolygon(viewW, viewH));
+    }
+
+    /** A cell label's font size: the map's own size when the cell is big, down to 7 px on a small one. */
+    private static int labelFontSize(List<Vector2> poly, int fontSize) {
+        double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE;
+        for (Vector2 v : poly) { minX = Math.min(minX, v.getX()); maxX = Math.max(maxX, v.getX()); }
+        return Math.max(7, Math.min(fontSize, (int) ((maxX - minX) * 0.26)));
+    }
+
+    /** Where a cell's "x-y" is drawn -- the centroid of its visible part -- or null when that part is too small to
+     *  carry a label. The ONE owner, so a click on a label and the label itself cannot disagree. */
+    private static Vector2 postalLabelPoint(List<Vector2> poly, float minLabelPx) {
+        if (poly.size() < 3) return null;
+        double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+        double sx = 0, sy = 0;
+        for (Vector2 v : poly) {
+            minX = Math.min(minX, v.getX()); maxX = Math.max(maxX, v.getX());
+            minY = Math.min(minY, v.getY()); maxY = Math.max(maxY, v.getY());
+            sx += v.getX(); sy += v.getY();
+        }
+        if (Math.min(maxX - minX, maxY - minY) < minLabelPx) return null;
+        return new Vector2((float) (sx / poly.size()), (float) (sy / poly.size()));
+    }
+
+    /**
+     * The postal cell whose drawn "x-y" label is under {@code click} (within {@code halfW} x {@code halfH} px of it),
+     * as {i, j}, or null -- for a full (unclipped, north-up) map view. Same arguments as {@link #drawPostalGrid}.
+     */
+    static int[] pickPostalLabel(Vector3 origin, Vector2 center, float scale, float viewW, float viewH,
+                                 float minLabelPx, Vector2 click, float halfW, float halfH) {
+        double half = com.openworld.world.PostalGrid.HALF, cell = com.openworld.world.PostalGrid.CELL;
+        int n = com.openworld.world.PostalGrid.CELLS;
+        double ox = origin.getX(), oz = origin.getZ(), cx = center.getX(), cy = center.getY();
+        // the label sits inside its cell's visible part, so only the cell under the click and its neighbours can own it
+        double wx = ox + (click.getX() - cx) / scale, wz = oz + (click.getY() - cy) / scale;
+        int ci = (int) Math.floor((wx + half) / cell) + 1, cj = (int) Math.floor((wz + half) / cell) + 1;
+        for (int i = Math.max(1, ci - 1); i <= Math.min(n, ci + 1); i++) {
+            for (int j = Math.max(1, cj - 1); j <= Math.min(n, cj + 1); j++) {
+                Vector2 at = postalLabelPoint(postalCellPoly(i, j, ox, oz, cx, cy, scale, 0f, null, viewW, viewH),
+                        minLabelPx);
+                if (at != null && Math.abs(click.getX() - at.getX()) <= halfW
+                        && Math.abs(click.getY() - at.getY()) <= halfH) {
+                    return new int[] {i, j};
+                }
+            }
+        }
+        return null;
+    }
+
     static void drawPostalGrid(CanvasItem ci, Vector3 origin, Vector2 center, float scale, float clipRadiusPx,
                                float viewW, float viewH, float rot, Font font, int fontSize, float minLabelPx) {
         double half = com.openworld.world.PostalGrid.HALF, cell = com.openworld.world.PostalGrid.CELL;
@@ -253,28 +424,18 @@ final class RoadOverlay {
         for (int i = i0; i <= i1; i++) {
             for (int j = j0; j <= j1; j++) {
                 double x0 = -half + (i - 1) * cell, z0 = -half + (j - 1) * cell;
-                List<Vector2> quad = new ArrayList<>(4);
-                quad.add(project(x0, z0, ox, oz, cx, cy, scale, rot));
-                quad.add(project(x0 + cell, z0, ox, oz, cx, cy, scale, rot));
-                quad.add(project(x0 + cell, z0 + cell, ox, oz, cx, cy, scale, rot));
-                quad.add(project(x0, z0 + cell, ox, oz, cx, cy, scale, rot));
-                List<Vector2> poly = disc != null ? clipConvex(quad, disc)
-                        : clipConvex(quad, rectPolygon(viewW, viewH));
+                List<Vector2> poly = postalCellPoly(i, j, ox, oz, cx, cy, scale, rot, disc, viewW, viewH);
                 if (poly.size() < 3) continue;
                 ci.drawColoredPolygon(new PackedVector2Array(poly), ((i + j) & 1) == 0 ? GRID_A : GRID_B,
                         new PackedVector2Array(), null);
                 if (font == null) continue;
-                double minX = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, minY = Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
-                double sx = 0, sy = 0;
-                for (Vector2 v : poly) {
-                    minX = Math.min(minX, v.getX()); maxX = Math.max(maxX, v.getX());
-                    minY = Math.min(minY, v.getY()); maxY = Math.max(maxY, v.getY());
-                    sx += v.getX(); sy += v.getY();
-                }
-                if (Math.min(maxX - minX, maxY - minY) < minLabelPx) continue;
-                float lx = (float) (sx / poly.size()), ly = (float) (sy / poly.size());
-                ci.drawString(font, new Vector2(lx - 40f, ly + fontSize * 0.35f), i + "-" + j,
-                        HorizontalAlignment.CENTER, 80f, fontSize, GRID_LABEL);
+                Vector2 at = postalLabelPoint(poly, minLabelPx);
+                if (at == null) continue;
+                // the number fits its cell: a zoomed-out map prints every cell's code small instead of none
+                int fs = labelFontSize(poly, fontSize);
+                Vector2 pos = new Vector2(at.getX() - 40f, at.getY() + fs * 0.35f);
+                ci.drawStringOutline(font, pos, i + "-" + j, HorizontalAlignment.CENTER, 80f, fs, 3, GRID_LABEL_OUTLINE);
+                ci.drawString(font, pos, i + "-" + j, HorizontalAlignment.CENTER, 80f, fs, GRID_LABEL);
             }
         }
         // the cell lines, clipped like everything else on the map

@@ -765,17 +765,30 @@ def write_places(placed, aabbs, text):
         places.append({"name": label, "kind": name, "tier": tier,
                        "at": [round(x, 2), 0.0, round(z, 2)], "go": [round(x, 2), 0.0, round(z, 2)]})
     regions = [{"name": r[0], "box": [r[1][0], -r[1][3], r[1][2], -r[1][1]]} for r in REGIONS]   # record -> godot
+    # every building's FOOTPRINT (its type's AABB, placed), for the map's building layer (user, 2026-09-22: "place
+    # squares on the minimap / big map so the user knows the surroundings"): [kind, x0, z0, x1, z1, x2, z2, x3, z3]
+    # with kind 1 for a place (enterable), 0 for any other building
+    footprints = []
+    for b in placed:
+        x0, z0, x1, z1, _h = aabbs[b["type"]]
+        a = math.radians(b["yaw"])
+        c, sn = math.cos(a), math.sin(a)
+        cx, cz = b["pos"][0], b["pos"][2]
+        row = [1 if scene_of(b) != b["type"] else 0]
+        for lx, lz in ((x0, z0), (x1, z0), (x1, z1), (x0, z1)):
+            row += [round(cx + lx * c + lz * sn, 1), round(cz - lx * sn + lz * c, 1)]
+        footprints.append(row)
     os.makedirs(os.path.dirname(PLACES), exist_ok=True)
     with open(PLACES, "w") as f:
         json.dump({"schema": 1, "source": "tools/island_buildings.py derive",
                    "note": "map places and region boxes, Godot world frame (box = x0, z0, x1, z1)",
-                   "regions": regions, "places": places}, f, separators=(",", ":"))
+                   "regions": regions, "places": places, "footprints": footprints}, f, separators=(",", ":"))
         f.write("\n")
     by = {}
     for pl in places:
         by[pl["name"]] = by.get(pl["name"], 0) + 1
-    print("island_buildings: %d map places %s -> %s"
-          % (len(places), dict(sorted(by.items())), os.path.relpath(PLACES, ROOT)))
+    print("island_buildings: %d map places %s, %d footprints -> %s"
+          % (len(places), dict(sorted(by.items())), len(footprints), os.path.relpath(PLACES, ROOT)))
 
 
 def places_only(check):
