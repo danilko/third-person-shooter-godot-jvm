@@ -17,10 +17,10 @@ folder and matched to a CREDITS.md row; a folder with no row was opened and trac
 | `assets/characters/godot_chan`, `assets/audio` | model, textures, 4 wavs | Johnny Rouddro, MIT, credited | ok |
 | `assets/Universal*Animation*Library*` | clips | Quaternius, CC0, credited | ok |
 | `assets/weapons` REV1 SMG1 | models | Quaternius 50 Low-poly Guns, CC0, credited | ok |
-| `assets/weapons` ASR1 ASR2 PIS1 SHG1 SNR1 FRG1 PIB1 FLA1 SMO1 REC1 + `textures/<id>_base_color.png` | models | 3DModelsCC0 Free CC0 Guns & Explosives Pack, CC0, credited (2026-09-19: re-imported by `import_guns_pack.py`; the download was removed from the repo after import) | ok |
+| `assets/weapons` ASR1 ASR2 SHG1 FRG1 PIB1 FLA1 SMO1 REC1 + `textures/<id>_base_color.png` | models | 3DModelsCC0 Free CC0 Guns & Explosives Pack, CC0, credited (2026-09-19: re-imported by `import_guns_pack.py`; the download was removed from the repo after import) | ok |
 | `assets/weapons` MEW1-7 + `textures/` | models, 28 textures | 3DModelsCC0 melee pack, CC0, credited | ok |
 | `assets/weapons` ATL1, FRG1, ATL1_Rocket, SHI1 | primitives | this project | ok |
-| `assets/weapons/SNR1` (was `SR3`, added e9ede64) | sniper rifle model | was Quaternius 50 Low-poly Guns (CC0, owner confirmed 2026-09-18); replaced 2026-09-19 by the Guns & Explosives pack model (row above) | ok (resolved) |
+| `assets/weapons/SNR1` (was `SR3`, added e9ede64) | sniper rifle model | was Quaternius 50 Low-poly Guns (CC0, owner confirmed 2026-09-18); replaced 2026-09-19 by the Guns & Explosives pack model, and back to Quaternius `SniperRifle_3` on 2026-09-21 (50 Low-poly Guns, CC0, `license_link.txt`); PIS1 / PIS2 / DUP1 are Quaternius `Pistol_5` / `Pistol_6` / `Pistol_1` from the same pack | ok |
 | `assets/vfx` | effects, water shader | Binbun3D, CC0, credited | ok |
 | `assets/terrain3d` | ambientCG CC0 + generated | credited | ok |
 | `assets/ui` | Aldrich font (OFL 1.1), generated icons, `white.png` | credited / ours | ok |

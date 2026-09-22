@@ -58,3 +58,7 @@ assets/world_source/kits/**/*.jpg filter=lfs diff=lfs merge=lfs -text
 assets/world_source/kits/**/*.bin filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/buildings/*.res filter=lfs diff=lfs merge=lfs -text
 assets/world_source/reference/*.png filter=lfs diff=lfs merge=lfs -text
+
+# Git LFS -- the island's terrain grids (PLAN.md 3.30): the committed BASE the land is rebuilt from, the LAND and the
+# NATURAL ground (the restore). float32, 2305 x 2305, 21 MB each, never diffable.
+assets/world_source/terrain/*.f32 filter=lfs diff=lfs merge=lfs -text

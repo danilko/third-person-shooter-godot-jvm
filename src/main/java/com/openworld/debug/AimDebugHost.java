@@ -635,12 +635,6 @@ public class AimDebugHost extends Node3D {
 		if (playerHidden && !flying) toggleFly();
 	}
 
-	private void cycleWeapon(int dir) {
-		mannequinWeapon += dir;
-		if (mannequinWeapon < 0) mannequinWeapon = 0;
-		if (pose != null) pose.desiredWeapon = mannequinWeapon;
-	}
-
 	private void setMannequinStance(StanceName st) {
 		mannequinStance = st;
 		if (pose != null) pose.desiredStance = st;
@@ -663,8 +657,10 @@ public class AimDebugHost extends Node3D {
 		else if (code == Key.KEY_2) setMannequinStance(StanceName.CROUCH);
 		else if (code == Key.KEY_3) setMannequinStance(StanceName.CRAWL);
 		else if (code == Key.KEY_4 && pose != null) pose.wantCombat = !pose.wantCombat;
-		else if (code == Key.Q) cycleWeapon(-1);
-		else if (code == Key.E) cycleWeapon(1);
+		// Q/E swap the WEAPON, not the slot: the mannequin carries one gun, so a slot change showed
+		// nothing. This rebuilds it armed with the next catalog weapon (the same path as [ ]).
+		else if (code == Key.Q) cycleBenchWeapon(-1);
+		else if (code == Key.E) cycleBenchWeapon(1);
 		else if (code == Key.G) toggleFly();
 		else if (code == Key.F) toggleFire();
 		else if (code == Key.H) togglePlayer();
@@ -1124,7 +1120,7 @@ public class AimDebugHost extends Node3D {
 		String fly = flying ? "FLY (player frozen)" : "player camera";
 		StringBuilder b = new StringBuilder();
 		b.append("AIM WORKBENCH\n")
-		 .append("  1/2/3 mannequin stance   4 combat on/off   Q/E weapon slot\n")
+		 .append("  1/2/3 mannequin stance   4 combat on/off   Q/E weapon (every catalog gun)\n")
 		 .append("  F hold fire   I/J/K/L move aim ball, U/O height\n")
 		 .append("  G free-fly camera (WASD + R/F, mouse, Shift fast)   H drop the player\n")
 		 .append("  SHOOTING: [ ] AI weapon   T target ball/PLAYER   Y one AI shot   C flick: turn away + shoot\n")
@@ -1134,7 +1130,7 @@ public class AimDebugHost extends Node3D {
 		 .append("\n")
 		 .append("mannequin (AI rig) : ").append(stance)
 		 .append(pose != null && pose.wantCombat ? " / combat" : " / relaxed")
-		 .append("   weapon slot ").append(mannequinWeapon).append("\n")
+		 .append("   weapon ").append(BENCH_WEAPONS[benchWeaponIndex]).append("\n")
 		 .append("view               : ").append(fly).append("\n");
 		b.append("firing             : ").append(firing ? "YES" : "no")
 		 .append("      player: ").append(playerHidden ? "REMOVED" : "in scene").append("\n");

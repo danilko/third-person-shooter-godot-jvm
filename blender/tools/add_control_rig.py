@@ -20,30 +20,23 @@ slings, the ragdoll frames, all three `<body>.body.json`). This script instead A
 constraints and touches no rest, no deform bone and no action. It also needs no add-on, runs
 headless, and is idempotent -- the same contract every other generator here has.
 
-WHAT IT ADDS (nothing else):
-  * 4 IK targets  CTRL_hand_l/r, CTRL_foot_l/r   -- the thing you grab
-  * 4 pole targets CTRL_elbow_l/r, CTRL_knee_l/r -- which way the joint bends
-  * 1 root        CTRL_root                      -- parent of all of the above, to move the lot
-  * an IK constraint on lowerarm_l/r (chain 3: THE CLAVICLE IS IN IT) and calf_l/r (chain 2),
-    **influence 0**
-  * stiffness and a symmetric angle envelope on each clavicle, so the hand pushes the adjustment up
-    into the shoulder only as far as it must and can never dislocate it (CLAV_STIFFNESS /
-    CLAV_LIMIT_DEG)
-  * a hideable bone collection `CTRL`, wire widgets in a hidden `CTRL_WIDGETS` collection
-  * a `IK CONTROLS` text block: the workflow, and the snap-to-FK helper
+WHAT IT ADDS (nothing else) -- the FULL-BODY layer since PLAN.md 6.17:
+  * FK: every contract bone (pelvis, spine, neck, head, collarbones, arms, legs, fingers, Root)
+    wears a typed control SHAPE sized from its own skin. THE RINGS ARE THE DEFORM BONES: rotating
+    one keys the bone the export writes, so FK needs no switch and no bake (see body_shapes)
+  * IK, per limb, Rigify / Auto-Rig Pro style: CTRL_hand_* (cube) / CTRL_foot_* (sole outline) that
+    move AND turn the hand/foot, CTRL_elbow_* / CTRL_knee_* poles, CTRL_root carrying them; a plain
+    2-bone chain hanging from the FK collarbone (arm) or pelvis (leg), solved on a hidden joint-to-
+    joint MCH chain because VRoid deform bones are disconnected (MCH_DOC)
+  * one slider per limb, CTRL_root["ik_arm_l"] etc., stored at **0**, driving that limb's constraints
+  * the sidebar (N-panel > Rig): per-limb "to IK" / "to FK" snaps and the collection toggles --
+    `control_rig_ui.py`, written into the .blend as a registered text block AND imported by this
+    script's self-test, so the buttons are the code that was measured
+  * bone collections CTRL / Body / Fingers / Extras, a hidden MCH, Rigify's colours, drawn in front
 
-**THE INFLUENCE IS 0 AND THAT IS THE WHOLE SAFETY ARGUMENT.** An IK constraint at full influence
-OVERRIDES the chain's own rotation channels, so switching it on globally would silently replace the
-arms of all 171 clips with whatever the control bone happens to be near. At 0 the rig evaluates
-exactly as it did before -- asserted by this script, and by `probe_shared_anims.gd` afterwards.
-
-TWO WAYS TO USE IT, and the second is the one that keeps the clips portable:
-  1. raise the constraint's influence, pose, and KEY the control. The glTF export samples the
-     evaluated pose, so the .glb is correct -- but the ACTION then keys control bones, which means
-     every body in `animation_review.blend` needs this layer too, and `export_def_bones` must be on.
-  2. raise the influence, pose, then SNAP TO FK (the text block's helper) and drop it back to 0.
-     The action ends up keying only the 53 contract bones, exactly as today: no control keys, no
-     export flag needed, and the review file and every other body are unaffected. Prefer this.
+**AN IK LIMB IGNORES ITS CLIP, SO EVERY SLIDER IS STORED AT 0.** At 0 the rig evaluates exactly as
+before -- asserted here over 1422 samples -- and export_character.py refuses a file with a limb in IK.
+The workflow is snap to IK, pose, snap to FK, key: the action then keys only the 53 contract bones.
 
 The pole angle is SOLVED, not guessed: after the constraints are built the script sweeps
 `pole_angle` and keeps the one that moves the limb least away from the pose it already has, so
@@ -60,6 +53,7 @@ ARM_DEFAULT = "Godot_Chan_Stealth"
 COLLECTION = "CTRL"
 WIDGETS = "CTRL_WIDGETS"
 TEXT_BLOCK = "IK CONTROLS"
+UI_TEXT = "control_rig_ui.py"
 
 # (control, chain tip bone, IK owner = last bone of the chain, pole, pole direction in BLENDER axes)
 # The rig rests facing -Y with the left arm at +X (the contract), so "behind" is +Y and "in front"
@@ -69,14 +63,18 @@ TEXT_BLOCK = "IK CONTROLS"
 LIMBS = [
     {"ctrl": "CTRL_hand_l", "tip": "hand_l", "owner": "lowerarm_l", "pole": "CTRL_elbow_l",
      "joint": "lowerarm_l", "dir": Vector((0.0, 1.0, 0.0)), "size": 0.09,
-     "chain": 3, "shoulder": "clavicle_l"},
+     "key": "arm_l", "base": "clavicle_l",
+     "segs": [("upperarm_l", "lowerarm_l"), ("lowerarm_l", "hand_l")]},
     {"ctrl": "CTRL_hand_r", "tip": "hand_r", "owner": "lowerarm_r", "pole": "CTRL_elbow_r",
      "joint": "lowerarm_r", "dir": Vector((0.0, 1.0, 0.0)), "size": 0.09,
-     "chain": 3, "shoulder": "clavicle_r"},
+     "key": "arm_r", "base": "clavicle_r",
+     "segs": [("upperarm_r", "lowerarm_r"), ("lowerarm_r", "hand_r")]},
     {"ctrl": "CTRL_foot_l", "tip": "foot_l", "owner": "calf_l", "pole": "CTRL_knee_l",
-     "joint": "calf_l", "dir": Vector((0.0, -1.0, 0.0)), "size": 0.11, "chain": 2},
+     "joint": "calf_l", "dir": Vector((0.0, -1.0, 0.0)), "size": 0.11, "key": "leg_l", "base": "pelvis",
+     "segs": [("thigh_l", "calf_l"), ("calf_l", "foot_l")]},
     {"ctrl": "CTRL_foot_r", "tip": "foot_r", "owner": "calf_r", "pole": "CTRL_knee_r",
-     "joint": "calf_r", "dir": Vector((0.0, -1.0, 0.0)), "size": 0.11, "chain": 2},
+     "joint": "calf_r", "dir": Vector((0.0, -1.0, 0.0)), "size": 0.11, "key": "leg_r", "base": "pelvis",
+     "segs": [("thigh_r", "calf_r"), ("calf_r", "foot_r")]},
 ]
 POLE_TOLERANCE = 0.02   # metres the elbow may move when IK is switched on
 POLE_REACH = 0.35        # metres out from the joint; scaled by the body's own limb length
@@ -113,14 +111,21 @@ def log(msg):
 
 def args():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    out = {"armature": ARM_DEFAULT, "save": False, "out": None}
+    out = {"armature": ARM_DEFAULT, "save": False, "out": None, "remove": False,
+           "hand_factor": HAND_WIDGET_FACTOR, "deform_shape": DEFORM_SHAPE_FRACTION}
     for a in argv:
         if a == "--save":
             out["save"] = True
+        elif a == "--remove":
+            out["remove"] = True
         elif a.startswith("--armature="):
             out["armature"] = a.split("=", 1)[1]
         elif a.startswith("--out="):
             out["out"] = a.split("=", 1)[1]
+        elif a.startswith("--hand-widget-factor="):
+            out["hand_factor"] = float(a.split("=", 1)[1])
+        elif a.startswith("--deform-shape="):
+            out["deform_shape"] = float(a.split("=", 1)[1])
         else:
             raise SystemExit("[control-rig] unknown argument %r" % a)
     return out
@@ -137,6 +142,156 @@ def find_armature(name):
         return arms[0]
     raise SystemExit("[control-rig] cannot pick an armature (%d in the file): %s"
                      % (len(arms), [o.name for o in arms]))
+
+
+## A BONE IN NO COLLECTION CANNOT BE FILTERED (user, 2026-09-21: "hide the CTRL and then I see no
+## bone at all"). This rig shipped with exactly ONE collection, `CTRL` (9 bones), and the other 158
+## in none -- so the only thing an artist could switch off was the controls, and what is left is
+## noisy: `Global`, `Root` and `Position` are 1.0 / 1.0 / 0.935 m bones drawn as OCTAHEDRA, i.e. a
+## metre-wide glowing diamond over the whole model, plus ~100 VRoid spring bones (`J_Sec_*`).
+## Three collections, so either half can be hidden:
+##   CTRL   the 9 IK controls
+##   Body   the 53 contract bones (SKELETON_CONTRACT.md) -- what you actually pose
+##   Extras everything else: the oversized transform bones and the body's own secondaries
+BODY_COLL, EXTRA_COLL = "Body", "Extras"
+
+
+def contract_bones():
+    """The 53 names, read from the contract record rather than copied into a second list."""
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    path = os.path.join(here, "assets", "characters", "skeleton_rest.json")
+    try:
+        with open(path) as fh:
+            names = set(json.load(fh)["rest"].keys())
+        # `head_2` vs `head` is the one recorded name asymmetry across the seam (W40): the
+        # reference .blend calls the bone `head`, and Godot's importer renamed it because a MESH
+        # called `head` sits beside it -- so the contract record, dumped from the Godot side, says
+        # `head_2`. Both spellings are the same contract bone.
+        if "head_2" in names:
+            names.add("head")
+        return names
+    except Exception as exc:                      # a checkout without the record still builds
+        log("no contract record (%s); Body collection skipped" % exc)
+        return set()
+
+
+def sort_collections(arm):
+    """File every bone into CTRL / Body / Extras. Idempotent; it never moves a CTRL bone."""
+    d = arm.data
+    have = {c.name: c for c in d.collections_all}
+    for name in (BODY_COLL, EXTRA_COLL, FINGER_COLL, MCH_COLL):
+        if name not in have:
+            have[name] = d.collections.new(name)
+    have[MCH_COLL].is_visible = False          # the solving chain is machinery: never grabbed
+    contract = contract_bones()
+    if not contract:
+        return
+    n_body = n_extra = 0
+    for b in d.bones:
+        if b.name.startswith("CTRL_"):
+            continue
+        if b.name.startswith(MCH):
+            if b.name not in {x.name for x in have[MCH_COLL].bones}:
+                have[MCH_COLL].assign(b)
+            for c in (have[BODY_COLL], have[EXTRA_COLL], have[FINGER_COLL]):
+                if b.name in {x.name for x in c.bones}:
+                    c.unassign(b)
+            continue
+        # A bone is drawn while ANY of its collections is visible, so the three are a PARTITION:
+        # fingers are in their own collection and not also in Body, or hiding Fingers would hide
+        # nothing. Thirty finger rings crowd the hand the IK control sits on; hide them to grab it.
+        if b.name not in contract:
+            want = have[EXTRA_COLL]
+        elif b.name.startswith(FINGERS):
+            want = have[FINGER_COLL]
+        else:
+            want = have[BODY_COLL]
+        for c in (have[BODY_COLL], have[EXTRA_COLL], have[FINGER_COLL]):
+            if c is not want and b.name in {x.name for x in c.bones}:
+                c.unassign(b)
+        if b.name not in {x.name for x in want.bones}:
+            want.assign(b)
+        if want is have[BODY_COLL]:
+            n_body += 1
+        elif want is have[EXTRA_COLL]:
+            n_extra += 1
+    ctrl = next((c for c in d.collections_all if c.name == COLLECTION), None)
+    log("bone collections: %s %d, %s %d, %s %d, %s %d"
+        % (COLLECTION, len(ctrl.bones) if ctrl else 0, BODY_COLL, n_body,
+           FINGER_COLL, len(have[FINGER_COLL].bones), EXTRA_COLL, n_extra))
+
+
+## EVERY DEFORM BONE WORE A 19 cm SPHERE (user, 2026-09-21, with a picture: "the sphere control for
+## bone is too large, cover entire hand models"). Measured: `Icosphere` -- a 2.0 m unit sphere -- is
+## the custom shape on EVERY non-CTRL bone of all three bodies (158 / 53 / 117), scaled by a flat
+## `custom_shape_scale_xyz` 0.08-0.10 with `use_custom_shape_bone_size` OFF, so it draws at a fixed
+## 0.155-0.190 m whatever bone it is on. A finger bone is 0.020-0.037 m, i.e. the ball is ~7x the
+## bone it marks and the hand disappears inside a cluster of them.
+##
+## The fix is the flag that already exists for exactly this: turn bone-size scaling back ON for
+## those bones, so the sphere follows the bone it belongs to. Drawn = mesh(2.0) x length x scale, so
+## the scale that draws a ball `DEFORM_SHAPE_FRACTION` of the bone's own length is that over 2.
+## It is REVERSIBLE -- the Icosphere is untouched and only two per-bone display fields move -- and it
+## is skipped entirely for a bone whose shape an artist has changed to something else.
+## CAPPED AT BOTH ENDS, because "a fraction of the bone" alone swaps one absurdity for another: the
+## transform bones `Root`, `Global` and `Position` are 0.935-1.0 m long, so half of that is a HALF
+## METRE ball -- measured 0.500 m on Shino and 0.567 on Fumiriya on the first pass, worse than the
+## flat 0.19 it replaced. A marker sphere says "a joint is here"; it is never large, and it must
+## still be visible on a fingertip.
+DEFORM_SHAPE_FRACTION = 0.5
+DEFORM_SHAPE_MIN, DEFORM_SHAPE_MAX = 0.006, 0.060
+
+
+def tidy_deform_shapes(arm, fraction):
+    """Make each deform bone's marker sphere follow ITS OWN length instead of a flat 19 cm."""
+    if fraction <= 0.0:                      # --deform-shape=0 clears them instead
+        n = 0
+        for pb in arm.pose.bones:
+            if not pb.name.startswith("CTRL_") and pb.custom_shape is not None:
+                pb.custom_shape = None
+                n += 1
+        log("deform bone shapes: cleared %d (bones draw as their own octahedra)" % n)
+        return
+    n, before, after = 0, [], []
+    for pb in arm.pose.bones:
+        if pb.name.startswith("CTRL_") or pb.custom_shape is None:
+            continue
+        if pb.custom_shape.name.startswith("WGT_"):   # a typed control shape (body_shapes), not a marker
+            continue
+        mesh = _shape_extent(pb.custom_shape)
+        if mesh <= 0.0:
+            continue
+        L = arm.data.bones[pb.name].length
+        was = mesh * (L if pb.use_custom_shape_bone_size else 1.0) * pb.custom_shape_scale_xyz[0]
+        pb.use_custom_shape_bone_size = True
+        want = min(max(fraction * L, DEFORM_SHAPE_MIN), DEFORM_SHAPE_MAX)
+        k = want / (mesh * L)                # drawn = mesh * L * k = want
+        pb.custom_shape_scale_xyz = (k, k, k)
+        before.append(was)
+        after.append(mesh * L * k)
+        n += 1
+    if n:
+        log("deform bone shapes: %d re-sized to %.2f x their own bone (was %.3f-%.3f m flat, now %.3f-%.3f m)"
+            % (n, fraction, min(before), max(before), min(after), max(after)))
+
+
+def _shape_extent(ob):
+    vs = [v.co for v in ob.data.vertices]
+    return max(max(abs(v[i]) for v in vs) for i in range(3)) * 2 if vs else 0.0
+
+
+def hand_span(arm, side):
+    """Wrist to the furthest fingertip, on this rig. The one number a hand control should follow."""
+    b = arm.data.bones
+    wrist = b.get("hand_%s" % side)
+    if wrist is None:
+        return None
+    far = 0.0
+    for bone in b:
+        if bone.name.endswith("_%s" % side) and bone.name.split("_")[0] in (
+                "index", "middle", "ring", "pinky", "thumb"):
+            far = max(far, (bone.tail_local - wrist.head_local).length)
+    return far if far > 1e-4 else None
 
 
 def _widget_mesh(name, kind, size):
@@ -205,6 +360,7 @@ def build_bones(arm, scale):
         b.parent = None
         return b
 
+    wanted = set()
     root = ensure("CTRL_root")
     root.head = Vector((0.0, 0.0, 0.0))
     root.tail = Vector((0.0, 0.0, 0.10 * scale))
@@ -235,32 +391,139 @@ def build_bones(arm, scale):
         p.roll = 0.0
         p.parent = root
 
+        # THE SOLVING CHAIN, joint to joint (see MCH_DOC). Its segment k runs from deform bone k's
+        # head to deform bone k+1's head, so its last tail IS the wrist / ankle and the IK target
+        # (the control's head) is exactly where the hand is. The FOLLOWER under each segment carries
+        # the deform bone's own rest frame, so copying it moves the deform bone without re-meaning a
+        # single rotation.
+        # THE SOLVING CHAIN (MCH_DOC): joint to joint, hanging from the FK collarbone (an arm) or the
+        # pelvis (a leg), with a follower under each segment carrying the deform bone's own rest.
+        parent = eb.get(L["base"])
+        for k, (bone, nxt) in enumerate(L["segs"]):
+            d, n = eb.get(bone), eb.get(nxt)
+            m = ensure(MCH + bone)
+            m.head, m.tail = d.head.copy(), n.head.copy()
+            m.align_roll(d.z_axis)
+            m.parent = parent
+            m.use_connect = k > 0
+            f = ensure(MCH_F + bone)
+            f.head, f.tail, f.roll = d.head.copy(), d.tail.copy(), d.roll
+            f.parent = m
+            parent = m
+            wanted.update((MCH + bone, MCH_F + bone))
+
+    # a layer of an older shape (the two-stage arm: MCH_clavicle_*, MCH_P_*) leaves bones behind
+    for b in [b for b in eb if b.name.startswith(MCH) and b.name not in wanted]:
+        eb.remove(b)
+
     bpy.ops.object.mode_set(mode='OBJECT')
     return made, moved
 
 
+MCH, MCH_F = "MCH_", "MCH_F_"
+MCH_COLL = "MCH"
+SOLVE_NAME = "CTRL_IK_SOLVE"
+## MCH_DOC -- WHY THE IK SOLVES ON A SEPARATE CHAIN. A VRoid body's deform bones are DISCONNECTED and
+## short: Shino's lowerarm is 0.066 m long against a 0.214 m elbow-to-wrist, so its TAIL is not the
+## wrist. An IK on the deform forearm (use_tail) reaches the forearm's tail to the control, which put
+## the hand 15 cm from the cube you grab. Blender's other answer, use_tail OFF on the hand, does not
+## solve at all on this rig (0.15 m residual at every chain length, measured). So the IK solves on a
+## hidden chain whose segments run JOINT TO JOINT (shoulder, elbow, wrist), and each deform bone
+## copies a follower bone that rides that chain with the deform bone's own rest frame -- Rigify's
+## MCH-*_ik shape. It touches no rest: the deform bones keep every roll and length they had.
+##
+## THE COLLARBONE IS NOT IN THE CHAIN, and it was, twice (user, 2026-09-21: "not as fluid as Auto-Rig
+## Pro or Rigify ... barely impacts the arm/shoulder or controls in wacky ways"). Measured by dragging
+## the hand control in 1 cm steps: an IK that may spend the collarbone spends ALL of it the moment the
+## arm runs out -- 10 deg to its 60 deg limit between 10 and 20 cm of forward drag, the same pulling
+## the hand DOWN -- while short of full reach it moved the shoulder 1-4 mm, i.e. not at all. Rigify and
+## ARP keep the shoulder its own FK control and hang a 2-bone arm from it, and that is what this is:
+## the clavicle ring poses the shoulder in IK mode too, the arm follows the hand, and a hand past the
+## arm's reach stops short where you can see it.
+
+
+def ik_con(arm, L):
+    """The IK constraint of one limb -- on the solving chain's last segment."""
+    pb = arm.pose.bones.get(MCH + L["segs"][-1][0])
+    return pb.constraints.get(SOLVE_NAME) if pb is not None else None
+
+
+def ik_prop(L):
+    return "ik_" + L["key"]
+
+
+def _drive(con, arm, L):
+    """Make a constraint's influence its LIMB's IK slider (the one owner of 'is this limb IK')."""
+    con.influence = 0.0
+    try:
+        con.driver_remove("influence")
+    except Exception:
+        pass
+    d = con.driver_add("influence").driver
+    d.type = 'AVERAGE'
+    v = d.variables.new()
+    v.name = "ik"
+    v.type = 'SINGLE_PROP'
+    v.targets[0].id = arm
+    v.targets[0].data_path = 'pose.bones["CTRL_root"]["%s"]' % ik_prop(L)
+
+
+def _strip(pb, name):
+    con = pb.constraints.get(name)
+    if con is not None:
+        try:
+            con.driver_remove("influence")
+        except Exception:
+            pass
+        pb.constraints.remove(con)
+
+
 def build_constraints(arm):
-    """One IK per limb, influence 0. An existing CTRL_IK is updated rather than duplicated."""
+    """Per limb: the IK on the solving chain, and each deform bone copying its follower -- that copy
+    is what the limb's slider drives, stored at 0. Idempotent; an older layer's pieces are replaced."""
+    r = arm.pose.bones["CTRL_root"]
+    if "ik" in r:                                  # the single switch of the previous layer
+        del r["ik"]
     for L in LIMBS:
-        pb = arm.pose.bones[L["owner"]]
-        con = pb.constraints.get(IK_NAME)
+        prop = ik_prop(L)
+        if prop not in r:
+            r[prop] = 0.0
+        r.id_properties_ui(prop).update(
+            min=0.0, max=1.0, description="0 = the clip's own FK, 1 = this limb follows its IK control")
+        _strip(arm.pose.bones[L["base"]], IK_NAME)   # the collarbone copied the solver before
+        _strip(arm.pose.bones[L["tip"]], IK_NAME)    # a mid-6.17 layer put the IK on the hand
+        for bone, _ in L["segs"]:
+            dpb = arm.pose.bones[bone]
+            con = dpb.constraints.get(IK_NAME)
+            if con is not None and con.type != 'COPY_TRANSFORMS':   # an older layer's IK
+                _strip(dpb, IK_NAME)
+                con = None
+            if con is None:
+                con = dpb.constraints.new('COPY_TRANSFORMS')
+                con.name = IK_NAME
+            con.target = arm
+            con.subtarget = MCH_F + bone
+            con.target_space = 'WORLD'
+            con.owner_space = 'WORLD'
+            _drive(con, arm, L)
+            dpb.ik_stretch = 0.0
+            arm.pose.bones[MCH + bone].ik_stretch = 0.0
+        last = arm.pose.bones[MCH + L["segs"][-1][0]]
+        # the two-stage arm's pole-less reach lived here; with the collarbone out of the solving
+        # chain its 3-bone count would reach THROUGH the parent into the real clavicle
+        _strip(last, "CTRL_IK_REACH")
+        con = last.constraints.get(SOLVE_NAME)
         if con is None:
-            con = pb.constraints.new('IK')
-            con.name = IK_NAME
+            con = last.constraints.new('IK')
+            con.name = SOLVE_NAME
         con.target = arm
         con.subtarget = L["ctrl"]
         con.pole_target = arm
         con.pole_subtarget = L["pole"]
-        con.chain_count = L.get("chain", 2)
+        con.chain_count = len(L["segs"])
         con.use_tail = True
         con.use_stretch = False        # a game skeleton does not stretch; W25's Limit Scale reason
-        con.influence = 0.0            # <- the safety argument; see the module docstring
-    master_switch(arm)
-    # nothing else on the rig may silently stretch either
-    for L in LIMBS:
-        arm.pose.bones[L["owner"]].ik_stretch = 0.0
-        if L.get("shoulder"):
-            shoulder_limits(arm.pose.bones[L["shoulder"]])
+        con.influence = 1.0            # the chain is not a deform bone; the COPY above is the switch
 
 
 ## Widget sizes. The first set was derived from the bone and came out 6-11 cm on a 1.5 m body, which
@@ -272,73 +535,38 @@ MAX_TOTAL_DEG = 3 ** 0.5 * CLAV_LIMIT_DEG + 1.0
 POLE_WIDGET = 0.10
 WIDGET_GROW = 1.6
 
+## THE HAND CONTROL IS SIZED FROM THE HAND, NOT FROM THE BODY (user, 2026-09-21: "make it smaller so
+## I can see the model when tweaking fingers"). Every other widget is `size * WIDGET_GROW * scale`,
+## and `scale` is the pelvis height -- which is right for a foot (a foot grows with the leg) and
+## wrong for a hand, because a hand barely varies between bodies. Measured, wrist -> middle
+## fingertip: Godot-chan 0.1616, Shino 0.1498, Fumiriya 0.1648 m -- within 10% of each other, while
+## the widget they were given ran 0.144 / 0.176 / 0.213. So the cube was 0.89x the hand on the
+## reference (fingers poke out, which is why it was never reported there) and 1.17x / 1.29x on the
+## two VRoid bodies, i.e. the taller the body the bigger the box over the smaller hand.
+## The factor reproduces the reference's own ratio, so it is unchanged there and only the bodies
+## that were wrong move. `--hand-widget-factor=` takes it lower for finger work.
+## AND THE DRAWN SIZE IS THE MESH SIZE, because `use_custom_shape_bone_size` is off (below).
+## With it ON -- which is Blender's default and what this rig shipped with -- the shape is scaled by
+## the BONE's length, and a CTRL bone is a stub: measured, `CTRL_hand_r` is 0.0191 m on Shino, so a
+## 0.1348 m mesh DREW AT 2.6 mm. That is the whole of W48's "the IK shape is not visible", and W48's
+## own fix (mesh 0.09 -> 0.144) moved the drawn control from 1.7 mm to 2.6 mm, which is why it did
+## not help. Measured drawn sizes with bone-size on: hand 2.6 mm, pole 7.4 mm, foot 27 mm, root 45 mm.
+HAND_WIDGET_FACTOR = 0.6
+
 IK_PROP = "ik"
 
 
-def master_switch(arm):
-    """ONE property that turns every IK chain on, on `CTRL_root`, driving all four influences.
-
-    The influence must default to 0 and that has not changed -- an IK constraint at full influence
-    OVERRIDES the chain's rotation channels, so a rig stored with it on would silently replace the
-    arms and legs of all 167 shared clips. What HAS changed is how an artist turns it on: it was
-    four constraint panels on four different bones, found by knowing they were there, and a control
-    that does nothing when you grab it is indistinguishable from a control that is broken -- which
-    is exactly how it was reported ("the IK shape is not visible to easily perform IK tweak, mostly
-    still through FK"). Now `CTRL_root["ik"]` is one slider in the N-panel: 0 is the stored state,
-    1 is IK. The drivers are one-liners so the per-constraint influence stays the single owner of
-    "is this chain solving" -- nothing reads the property except the drivers.
-    """
-    r = arm.pose.bones["CTRL_root"]
-    if IK_PROP not in r:
-        r[IK_PROP] = 0.0
-    ui = r.id_properties_ui(IK_PROP)
-    ui.update(min=0.0, max=1.0, description="0 = the clip's own FK, 1 = solve the IK chains")
-    for L in LIMBS:
-        pb = arm.pose.bones[L["owner"]]
-        con = pb.constraints.get(IK_NAME)
-        if con is None:
-            continue
-        try:
-            con.driver_remove("influence")
-        except Exception:
-            pass
-        d = con.driver_add("influence").driver
-        d.type = 'AVERAGE'
-        v = d.variables.new()
-        v.name = "ik"
-        v.type = 'SINGLE_PROP'
-        v.targets[0].id = arm
-        v.targets[0].data_path = 'pose.bones["CTRL_root"]["%s"]' % IK_PROP
-
-
 def set_ik(arm, value):
-    """Turn the IK chains on or off -- THE ONE WRITER, because a driver owns the influence.
-
-    `master_switch` puts a driver on every IK constraint's influence, so the influence is DERIVED
-    from `CTRL_root["ik"]` and writing it directly is overwritten on the next depsgraph evaluation.
-    That is not a subtlety to remember: it broke this file's own shoulder-recruitment self-test the
-    moment the driver was added -- the test set influence 1.0, the driver put it back to 0, the arm
-    never solved, and the check reported "clavicle_l did not follow the hand", which is a true
-    statement about a rig that was not solving at all. One fact, one owner: everything goes here.
-    """
-    r = arm.pose.bones.get("CTRL_root")
-    if r is not None and IK_PROP in r:
-        r[IK_PROP] = float(value)
-    else:                                   # a rig built before the switch existed
-        for L in LIMBS:
-            con = arm.pose.bones[L["owner"]].constraints.get(IK_NAME)
-            if con is not None:
-                con.influence = float(value)
-    dg = bpy.context.evaluated_depsgraph_get()
-    dg.update()
+    """Every limb's IK slider at once (the per-limb writer is control_rig_ui.set_ik)."""
+    for L in LIMBS:
+        arm.pose.bones["CTRL_root"][ik_prop(L)] = float(value)
+    bpy.context.evaluated_depsgraph_get().update()
+    bpy.context.view_layer.update()
 
 
 def ik_is_on(arm):
     r = arm.pose.bones.get("CTRL_root")
-    if r is not None and IK_PROP in r:
-        return float(r[IK_PROP]) > 0.0
-    return any((arm.pose.bones[L["owner"]].constraints.get(IK_NAME) or
-                type("x", (), {"influence": 0.0})).influence > 0.0 for L in LIMBS)
+    return r is not None and any(float(r.get(ik_prop(L), 0.0)) > 0.0 for L in LIMBS)
 
 
 def shoulder_limits(pb):
@@ -352,6 +580,11 @@ def shoulder_limits(pb):
     """
     lim = math.radians(CLAV_LIMIT_DEG)
     pb.ik_stretch = 0.0
+    # NO TWIST. A collarbone rolling about its own length moves no joint -- the shoulder is on that
+    # axis -- so twist is never what the solver needs, and it is exactly what the pole alignment
+    # hands the chain's ROOT on a 3-bone arm: measured 133 deg of roll on clavicle_r with the axis
+    # free, i.e. a shoulder wrung like a towel for a hand 4 cm out of reach.
+    pb.lock_ik_y = True
     for axis in "xyz":
         setattr(pb, "ik_stiffness_%s" % axis, CLAV_STIFFNESS)
         setattr(pb, "use_ik_limit_%s" % axis, True)
@@ -359,7 +592,7 @@ def shoulder_limits(pb):
         setattr(pb, "ik_max_%s" % axis, lim)
 
 
-def dress(arm, scale):
+def dress(arm, scale, hand_factor=HAND_WIDGET_FACTOR):
     """Bone collection + widgets, so the controls are visible and hideable in the viewport."""
     coll = arm.data.collections.get(COLLECTION) if hasattr(arm.data, "collections") else None
     if coll is None:
@@ -374,14 +607,366 @@ def dress(arm, scale):
                 pass
     for L in LIMBS:
         pb = arm.pose.bones[L["ctrl"]]
-        pb.custom_shape = widget("WGT_%s" % L["ctrl"], "cube", L["size"] * WIDGET_GROW * scale)
+        # A HAND follows the hand; a FOOT follows the body (see HAND_WIDGET_FACTOR).
+        span = hand_span(arm, L["ctrl"][-1]) if L["ctrl"].startswith("CTRL_hand") else None
+        w_size = span * hand_factor if span is not None else L["size"] * WIDGET_GROW * scale
+        if span is not None:
+            log("  %s widget %.4f m (hand span %.4f x %.2f)" % (L["ctrl"], w_size, span, hand_factor))
+        sole = foot_sole(arm, L) if L["ctrl"].startswith("CTRL_foot") else None
+        if sole is not None:
+            pb.custom_shape = sole
+        else:
+            pb.custom_shape = widget("WGT_%s" % L["ctrl"], "cube", w_size)
+        pb.custom_shape_translation = (0.0, 0.0, 0.0)
+        pb.custom_shape_rotation_euler = (0.0, 0.0, 0.0)
+        pb.custom_shape_scale_xyz = (1.0, 1.0, 1.0)
+        pb.use_custom_shape_bone_size = False
         pb.bone.show_wire = True
         pp = arm.pose.bones[L["pole"]]
         pp.custom_shape = widget("WGT_pole", "diamond", POLE_WIDGET * scale)
+        pp.use_custom_shape_bone_size = False
         pp.bone.show_wire = True
     r = arm.pose.bones["CTRL_root"]
     r.custom_shape = widget("WGT_root", "cube", 0.30 * scale)
+    r.use_custom_shape_bone_size = False
     r.bone.show_wire = True
+
+
+# ---------------------------------------------------------------- the full body (PLAN.md 6.17)
+
+## THE FK CONTROLS ARE THE DEFORM BONES THEMSELVES, WEARING A SHAPE. The plan's first sketch was a
+## `CTRL_` duplicate per bone driving the deform bone through COPY_TRANSFORMS, which is what ARP did
+## -- and it buys nothing for an FK control while costing the two defects this file keeps fighting:
+## a second owner of every rotation (the control's, and the clip's) and a switch that has to be at 0
+## for the library to play. A spine, a neck, a head or a finger is posed by ROTATING it, and the
+## rotation an artist keys should land on the bone the export writes. So those bones are simply given
+## a shape an artist can see and grab, and the action keys exactly the 53 contract bones -- with no
+## BAKE step, no influence, and nothing for `export_character.py`'s guard to refuse.
+##
+## Only a control that is a DIFFERENT THING from a bone needs a bone of its own: a hand or foot IK
+## target (a point the chain reaches for), a pole (a direction), and the layer's root. Those are the
+## nine `CTRL_` bones that already existed.
+##
+## Every ring is SIZED FROM THE SKIN weighted to its bone (the radius a percentile of how far that
+## bone's vertices sit from its axis, plus a margin), so it hugs a slim wrist and a wide chest alike
+## and moves with the body when the body changes -- the rule `hand_span()` set for the hand control.
+
+# Where each FK ring sits: the bone's SEGMENT, i.e. from its head to the head of the bone it leads
+# to. Measured on Shino the bone TAILS do not reach their children (upperarm 0.108 m long against a
+# 0.219 m shoulder-to-elbow), so the bone's own length is the wrong span for a limb ring.
+def _segment_end(b):
+    n = b.name
+    nxt = None
+    for pre, succ in (("spine_01", "spine_02"), ("spine_02", "spine_03"), ("spine_03", "neck_01"),
+                      ("neck_01", "head_2"), ("clavicle_", "upperarm_"), ("upperarm_", "lowerarm_"),
+                      ("lowerarm_", "hand_"), ("hand_", "middle_01_"), ("thigh_", "calf_"),
+                      ("calf_", "foot_"), ("foot_", "ball_")):
+        if n.startswith(pre):
+            nxt = succ + n[len(pre):] if pre.endswith("_") else succ
+            break
+    if nxt is None and n[:-3] in ("index_0", "middle_0", "ring_0", "pinky_0", "thumb_0"):
+        i = int(n[-3])                                   # index_01_l -> index_02_l
+        if i < 3:
+            nxt = "%s%d%s" % (n[:-3], i + 1, n[-2:])
+    if nxt == "head_2" and "head_2" not in b.id_data.bones:
+        nxt = "head"
+    c = b.id_data.bones.get(nxt) if nxt else None
+    return c.head_local.copy() if c is not None else b.tail_local.copy()
+
+
+FINGERS = ("index_", "middle_", "ring_", "pinky_", "thumb_")
+
+# The shape each bone wears. A TYPE is something an artist should be able to tell at a glance, and
+# they are told apart by FORM first and colour second (colour alone fails colour-blind, and fails in
+# a greyscale viewport theme).
+#   hips    a square around the pelvis, level with the floor -- moves the whole body (the COG)
+#   ring    a circle round the limb or the spine segment
+#   head    a circle with a nose tick, so which way the head faces is on the widget
+#   finger  a small circle (the Fingers collection, hidden on its own)
+#   floor   the contract `Root`: a square on the floor with an arrow, which is the STANCE drop bone
+#           (it carries the crouch/crawl metres, W47) -- distinct from CTRL_root, a circle, which
+#           only carries the IK controls
+def shape_kind(name):
+    if name == "pelvis":
+        return "hips"
+    if name == "Root":
+        return "floor"
+    if name in ("head", "head_2"):
+        return "head"
+    if name.startswith(FINGERS):
+        return "finger"
+    return "ring"
+
+
+## COLOURS -- Rigify's convention, which is what an animator's eye already reads: the BODY'S LEFT
+## blue, RIGHT red, the centre line yellow; the IK targets in the strong shade of their side, the FK
+## rings in the light one, the poles purple, the layer's root green. Pose-bone colours, so the
+## armature data (which a .vrm re-import rewrites) is not where they live.
+PALETTE = {"ik_l": 'THEME04', "ik_r": 'THEME01', "fk_l": 'THEME07', "fk_r": 'THEME05',
+           "mid": 'THEME09', "pole": 'THEME06', "root": 'THEME03'}
+
+
+def _side(name):
+    return "l" if name.endswith("_l") else ("r" if name.endswith("_r") else "")
+
+
+def _ring_mesh(name, kind):
+    """A unit wire shape whose PLANE NORMAL is mesh +Y and whose 'forward' tick is mesh -Z."""
+    me = bpy.data.meshes.new(name)
+    vs, es = [], []
+    if kind in ("ring", "head", "finger", "circle"):
+        n = 32 if kind != "finger" else 16
+        vs = [(math.cos(2 * math.pi * i / n), 0.0, math.sin(2 * math.pi * i / n)) for i in range(n)]
+        es = [(i, (i + 1) % n) for i in range(n)]
+        if kind == "head":                     # the nose: a tick out of the ring toward -Z
+            k = len(vs)
+            vs += [(-0.25, 0.0, -1.0), (0.0, 0.0, -1.45), (0.25, 0.0, -1.0)]
+            es += [(k, k + 1), (k + 1, k + 2)]
+    else:                                      # hips / floor: a square, the floor one with an arrow
+        vs = [(-1, 0, -1), (1, 0, -1), (1, 0, 1), (-1, 0, 1)]
+        es = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        if kind == "floor":
+            vs += [(-0.35, 0, -1.0), (0.0, 0, -1.6), (0.35, 0, -1.0)]
+            es += [(4, 5), (5, 6)]
+    me.from_pydata(vs, es, [])
+    me.update()
+    return me
+
+
+SOLE_MARGIN = 0.012
+
+
+def foot_sole(arm, L):
+    """The FOOT IK control is the outline of the SOLE, measured off this body's own foot.
+
+    It was a cube sized from the pelvis height -- 0.21 m on Shino, a box that swallowed the whole
+    foot and half the shin, so the control you grab hid the thing you were posing. A sole outline is
+    what a foot control is in every rig an animator knows: flat on the ground plane, heel to toe,
+    and it cannot be confused with the hand cube. Built in the control bone's own rest frame, so it
+    needs no transform and follows the control when the foot is turned."""
+    side = L["ctrl"][-1]
+    pts = dominated_points(arm).get("foot_" + side, []) + dominated_points(arm).get("ball_" + side, [])
+    if len(pts) < 8:
+        return None
+    xs, ys = [p.x for p in pts], [p.y for p in pts]
+    z = min(p.z for p in pts)
+    x0, x1 = min(xs) - SOLE_MARGIN, max(xs) + SOLE_MARGIN
+    y0, y1 = min(ys) - SOLE_MARGIN, max(ys) + SOLE_MARGIN
+    to_bone = arm.data.bones[L["ctrl"]].matrix_local.inverted()
+    # the toe end (-Y, the body's front) is drawn pointed, so which way the foot faces is on the shape
+    tip = (x0 + x1) * 0.5
+    ring = [(x0, y1), (x1, y1), (x1, y0 + 0.25 * (y1 - y0) * 0.3), (tip, y0), (x0, y0 + 0.25 * (y1 - y0) * 0.3)]
+    vs = [to_bone @ Vector((x, y, z)) for x, y in ring]
+    name = "WGT_%s" % L["ctrl"]
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(vs, [(i, (i + 1) % len(vs)) for i in range(len(vs))], [])
+    me.update()
+    ob = bpy.data.objects.get(name)
+    if ob is None:
+        ob = widget(name, "cube", 0.1)
+    if len(ob.data.vertices) in (8, len(vs)):       # ours (the old cube, or a sole): rebuild; else keep
+        stale = ob.data
+        ob.data = me
+        bpy.data.meshes.remove(stale)
+    else:
+        bpy.data.meshes.remove(me)
+    return ob
+
+
+def shape_widget(kind):
+    """One mesh per TYPE, shared by every bone of that type; each bone scales and places it."""
+    name = "WGT_body_%s" % kind
+    coll = bpy.data.collections.get(WIDGETS)
+    if coll is None:
+        coll = bpy.data.collections.new(WIDGETS)
+        bpy.context.scene.collection.children.link(coll)
+        coll.hide_viewport = True
+        coll.hide_render = True
+    ob = bpy.data.objects.get(name)
+    if ob is None:
+        ob = bpy.data.objects.new(name, _ring_mesh(name, kind))
+        coll.objects.link(ob)
+        ob.hide_viewport = True
+        ob.hide_render = True
+    return ob
+
+
+_DOMINATED = {}
+
+
+def dominated_points(arm):
+    """{bone: [rest-pose vertex, armature space]} for the vertices each bone carries MOST of.
+
+    Only the body and face meshes -- VRoid hair cards stand 10-20 cm off the skull and would size
+    the head ring round the hairstyle, not the head. Cached per armature for one run."""
+    if arm.name in _DOMINATED:
+        return _DOMINATED[arm.name]
+    inv = arm.matrix_world.inverted()
+    per = {}
+    for ob in bpy.data.objects:
+        if ob.type != 'MESH' or ob.name.startswith("WGT_"):
+            continue
+        if not any(m.type == 'ARMATURE' and m.object == arm for m in ob.modifiers):
+            continue
+        if "hair" in ob.name.lower():
+            continue
+        names = [g.name for g in ob.vertex_groups]
+        to_arm = inv @ ob.matrix_world
+        for v in ob.data.vertices:
+            best, w = None, 0.0
+            for g in v.groups:
+                if g.weight > w:
+                    best, w = names[g.group], g.weight
+            if best is not None and w >= 0.5:
+                per.setdefault(best, []).append(to_arm @ v.co)
+    _DOMINATED[arm.name] = per
+    return per
+
+
+def skin_radii(arm):
+    """For every bone: (radial p85, axial median) of the vertices it DOMINATES, in armature space."""
+    out = {}
+    for bname, pts in dominated_points(arm).items():
+        b = arm.data.bones.get(bname)
+        if b is None or len(pts) < 4:
+            continue
+        a, e = b.head_local, _segment_end(b)
+        ax = e - a
+        L = ax.length
+        if L < 1e-6:
+            continue
+        u = ax / L
+        radial = sorted(((p - a) - u * (p - a).dot(u)).length for p in pts)
+        axial = sorted((p - a).dot(u) / L for p in pts)
+        if bname in ("head", "head_2"):
+            # the HEAD ring goes round the skull, i.e. the middle of what the bone carries top to
+            # bottom -- the median sat at the jaw, because a face mesh is dense round the mouth
+            out[bname] = (radial[int(0.90 * (len(radial) - 1))], 0.5 * (axial[0] + axial[-1]))
+            continue
+        out[bname] = (radial[int(0.85 * (len(radial) - 1))], axial[len(axial) // 2])
+    return out
+
+
+def _frame_rotation(b, normal_arm):
+    """The rotation (bone space) putting mesh +Y on `normal_arm` and mesh -Z toward the body's front.
+
+    The body faces -Y in armature space (the contract), so 'front' is -Y projected off the normal;
+    for a bone that itself runs front-to-back (a foot) the reference falls back to up."""
+    to_bone = b.matrix_local.to_3x3().inverted()
+    y = (to_bone @ normal_arm).normalized()
+    for ref in (Vector((0.0, -1.0, 0.0)), Vector((0.0, 0.0, 1.0))):
+        f = to_bone @ ref
+        f = f - y * f.dot(y)
+        if f.length > 0.2:
+            break
+    z = -f.normalized()
+    x = y.cross(z).normalized()
+    from mathutils import Matrix
+    m = Matrix((x, y, z)).transposed()
+    return m.to_euler('XYZ')
+
+
+RING_MARGIN = 1.25           # the ring sits 25% outside the skin it is measured from
+RING_MIN = {"finger": 0.006, "ring": 0.020}
+RING_FALLBACK = {"finger": 0.010, "ring": 0.045, "head": 0.11, "hips": 0.16, "floor": 0.30}
+
+
+def body_shapes(arm, scale):
+    """Give every contract bone its typed shape, sized from the skin. Returns {kind: count}."""
+    contract = contract_bones()
+    radii = skin_radii(arm)
+    icosphere = bpy.data.objects.get("Icosphere")
+    counts = {}
+    up = Vector((0.0, 0.0, 1.0))
+    for pb in arm.pose.bones:
+        b = pb.bone
+        if b.name not in contract:
+            continue
+        # an artist's own shape is theirs; only a marker sphere, nothing, or one of ours is replaced
+        cur = pb.custom_shape
+        if cur is not None and cur is not icosphere and not cur.name.startswith("WGT_body_"):
+            continue
+        kind = shape_kind(b.name)
+        a, e = b.head_local, _segment_end(b)
+        seg = e - a
+        rad, mid = radii.get(b.name, (None, 0.5))
+        if kind in ("hips", "floor"):
+            normal = up
+            centre = a.copy() if kind == "hips" else Vector((a.x, a.y, 0.0))
+            if kind == "hips":        # as wide as the hips: the thighs' own spread + their skin
+                tl, tr = arm.data.bones.get("thigh_l"), arm.data.bones.get("thigh_r")
+                r = (tl.head_local - tr.head_local).length * 0.5 if tl and tr else 0.0
+                r += radii.get("thigh_l", (0.08,))[0] * RING_MARGIN
+                size = max(r, RING_FALLBACK["hips"] * scale)
+            else:
+                size = RING_FALLBACK["floor"] * scale
+        else:
+            normal = seg.normalized() if seg.length > 1e-6 else up
+            t = mid if kind in ("head", "finger") else min(max(mid, 0.25), 0.75)
+            if b.name.startswith(("upperarm_", "thigh_")):
+                t = 0.5                                   # a limb's ring belongs on the limb's middle
+            centre = a + seg * t
+            if rad is None:
+                size = RING_FALLBACK[kind] * (1.0 if kind == "finger" else scale)
+            else:
+                size = max(rad * RING_MARGIN, RING_MIN.get(kind, 0.02))
+        pb.custom_shape = shape_widget("circle" if kind == "ring" else kind)
+        pb.use_custom_shape_bone_size = False
+        pb.custom_shape_translation = b.matrix_local.inverted() @ centre
+        pb.custom_shape_rotation_euler = _frame_rotation(b, normal)
+        pb.custom_shape_scale_xyz = (size, size, size)
+        if hasattr(pb, "custom_shape_wire_width"):
+            pb.custom_shape_wire_width = 2.0
+        side = _side(b.name)
+        pb.color.palette = PALETTE["fk_" + side] if side else PALETTE["mid"]
+        b.show_wire = True
+        counts[kind] = counts.get(kind, 0) + 1
+    # the IK layer, in the strong shades
+    for L in LIMBS:
+        side = L["ctrl"][-1]
+        for n, key in ((L["ctrl"], "ik_" + side), (L["pole"], "pole")):
+            pb = arm.pose.bones.get(n)
+            if pb is not None:
+                pb.color.palette = PALETTE[key]
+                if hasattr(pb, "custom_shape_wire_width"):
+                    pb.custom_shape_wire_width = 2.5
+    r = arm.pose.bones.get("CTRL_root")
+    if r is not None:
+        # a CIRCLE on the floor, not the cube it was: the contract `Root` stands on the same spot
+        # and wears a SQUARE, so the two roots differ in form, not only in colour
+        r.custom_shape = shape_widget("circle")
+        r.use_custom_shape_bone_size = False
+        r.custom_shape_translation = (0.0, 0.0, 0.0)
+        r.custom_shape_rotation_euler = _frame_rotation(r.bone, up)
+        s = 0.45 * scale
+        r.custom_shape_scale_xyz = (s, s, s)
+        r.color.palette = PALETTE["root"]
+    return counts
+
+
+## THE HAND AND FOOT FOLLOW THEIR CONTROL'S ROTATION. The IK constraint puts the wrist and ankle on
+## the control's HEAD; nothing turned the hand or foot with it, so rotating CTRL_hand_* did nothing
+## at all -- a second shape of the "I grab it and nothing happens" report. A world-space
+## COPY_ROTATION on the tip bone, driven by the same `ik` switch, so it is 0 whenever IK is.
+ROT_NAME = "CTRL_IK_ROT"
+
+
+def build_tip_rotation(arm):
+    for L in LIMBS:
+        pb = arm.pose.bones[L["tip"]]
+        con = pb.constraints.get(ROT_NAME)
+        if con is None:
+            con = pb.constraints.new('COPY_ROTATION')
+            con.name = ROT_NAME
+        con.target = arm
+        con.subtarget = L["ctrl"]
+        con.target_space = 'WORLD'
+        con.owner_space = 'WORLD'
+        con.mix_mode = 'REPLACE'
+        _drive(con, arm, L)
+
+
+FINGER_COLL = "Fingers"
 
 
 # ---------------------------------------------------------------- measuring
@@ -409,7 +994,7 @@ def bend_deg(arm, L):
     """The angle at the joint. 180 is a straight limb, which is useless for solving a pole."""
     chain_root = arm.pose.bones[L["owner"]].parent.name
     a = wpos(arm, chain_root) - wpos(arm, L["owner"])
-    b = wtail(arm, L["owner"]) - wpos(arm, L["owner"])
+    b = wpos(arm, L["tip"]) - wpos(arm, L["owner"])
     if a.length < 1e-6 or b.length < 1e-6:
         return 180.0
     return math.degrees(a.angle(b))
@@ -440,19 +1025,26 @@ def place_control(arm, ctrl, target):
     bpy.context.view_layer.update()
 
 
-def solve_pole(arm, L, act, frame):
-    """Sweep pole_angle and keep the one that disturbs the posed limb least.
+def _ui():
+    """The sidebar module, imported: its snaps are the ones this script measures (one owner)."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import control_rig_ui
+    return control_rig_ui
 
-    Turning IK on must not SNAP the elbow to a different plane, and the correct angle depends on the
-    bone's roll -- per body, per rig -- so it is measured rather than written down. The control is
-    placed on the posed tip FIRST: with the control left at its rest position the chain is dragged
-    the whole way there (measured 0.83 m on the arms) and no pole angle can fix that.
-    """
+
+def solve_pole(arm, L, act, frame):
+    """Find the limb's pole ANGLE: the one that leaves the posed elbow where it is on switch-on.
+
+    For a 2-bone chain it is a constant of the rig (it relates the solving bones' roll to the bend
+    plane), so it is solved ONCE here and stored; the snap only places the pole along the bend. It is
+    measured rather than written down because the roll is per body."""
+    ui = _ui()
     apply_action(arm, act, frame)
-    want_joint, want_tip = wpos(arm, L["owner"]), wtail(arm, L["owner"])
-    place_control(arm, L["ctrl"], want_tip)
-    con = arm.pose.bones[L["owner"]].constraints[IK_NAME]
-    set_ik(arm, 1.0)
+    arm.animation_data.action = None
+    bpy.context.view_layer.update()
+    want_joint = wpos(arm, L["owner"])
+    ui.to_ik(arm, L["key"])
+    con = ik_con(arm, L)
 
     def err(angle):
         con.pole_angle = math.radians(angle)
@@ -460,15 +1052,13 @@ def solve_pole(arm, L, act, frame):
         return (wpos(arm, L["owner"]) - want_joint).length
 
     best = min(((err(a), a) for a in range(-180, 180, 5)), key=lambda t: t[0])
-    best = min(((err(a), a) for a in [best[1] + d for d in range(-5, 6)]), key=lambda t: t[0])
-    residual = err(best[1])
-    tip_err = (wtail(arm, L["owner"]) - want_tip).length
+    best = min(((err(a), a) for a in [best[1] + d * 0.5 for d in range(-10, 11)]), key=lambda t: t[0])
     con.pole_angle = math.radians(best[1])
-    set_ik(arm, 0.0)
-    # leave no pose on the control: it is a handle, not state
-    arm.pose.bones[L["ctrl"]].matrix_basis.identity()
     bpy.context.view_layer.update()
-    return best[1], residual, tip_err
+    tip_err = (wpos(arm, L["tip"]) - (arm.matrix_world @ arm.pose.bones[L["ctrl"]].matrix).translation).length
+    ui.set_ik(arm, L["key"], 0.0)
+    return best[1], best[0], tip_err
+
 
 def clavicle_deg(arm, name):
     """The collarbone's OWN rotation from rest, degrees -- its channel relative to its parent, not
@@ -521,46 +1111,59 @@ def clavicle_axes_deg(arm, name):
     return [abs(math.degrees(a)) for a in (e.x, e.y, e.z)]
 
 
-def verify_shoulder(arm, L, act, frame):
-    """Does moving the hand OUT actually recruit the shoulder, and does the limit hold?
+DRAG_PATHS = {"forward": (0, -1, 0), "back": (0, 1, 0), "up": (0, 0, 1), "down": (0, 0, -1),
+              "out": (1, 0, 0), "in": (-1, 0, 0)}
+DRAG_STEP, DRAG_STEPS = 0.01, 15          # 1 cm steps, 15 cm each way: inside the arm's reach
+DRAG_JUMP_DEG = 12.0                      # no bone may turn more than this for 1 cm of drag
+DRAG_REACH_MM = 1.0
 
-    The feature is "reach past what the arm can do and the collarbone follows", so it is measured
-    the way it is used, and the target is placed past the arm's OWN reach -- not merely further
-    from where the clip left the hand, which on a bent arm the elbow alone absorbs (measured: 0.15 m
-    out of a 95 deg bend recruited 0.9 deg of shoulder, i.e. nothing).
 
-    Two cases, because they check different halves:
-      REACHED  target just past the straight arm  -> the shoulder must move AND the hand must arrive
-      CAPPED   target far past any reach          -> the shoulder must stop at the envelope
-    """
+def verify_drag(arm, L, act, frame):
+    """Drag the IK control the way an artist does and measure what the limb does.
+
+    This is the test the previous layer did not have and failed in the hand (user, 2026-09-21): the
+    hand must FOLLOW the control, every step must be SMOOTH (no bone turns more than DRAG_JUMP_DEG for
+    a centimetre of drag -- a flip or a snap is exactly that), and the shoulder must NOT MOVE (it is
+    FK now; the old reach stage slammed it from 10 to 60 deg). Returns per-path numbers."""
+    ui = _ui()
+    apply_action(arm, act, frame)
+    arm.animation_data.action = None
+    bpy.context.view_layer.update()
+    snap = ui.to_ik(arm, L["key"])
+    ctrl = arm.pose.bones[L["ctrl"]]
+    start = ctrl.matrix.copy()
+    watch = [L["base"]] + [b for b, _ in L["segs"]] + [L["tip"]]
+    sh0 = wpos(arm, L["segs"][0][0])
+    b = arm.data.bones
+    reach = ((b[L["segs"][0][0]].head_local - b[L["segs"][1][0]].head_local).length
+             + (b[L["segs"][1][0]].head_local - b[L["tip"]].head_local).length)
     out = []
-    chain = [L["shoulder"], L["owner"].replace("lower", "upper"), L["owner"]]
-    # The reach is the two JOINT-TO-JOINT distances, not the two bone lengths: a bone's tail need
-    # not sit on its child's head, and taking the lengths under-measured this arm by 4 cm -- enough
-    # that the "past its reach" target was still reachable and the case tested nothing.
-    up_b, lo_b = arm.data.bones[chain[1]], arm.data.bones[chain[2]]
-    arm_len = ((up_b.head_local - lo_b.head_local).length
-               + (lo_b.head_local - lo_b.tail_local).length)
-    con = arm.pose.bones[L["owner"]].constraints[IK_NAME]
-    for label, extra in (("reached", 0.04), ("capped", 0.60)):
-        apply_action(arm, act, frame)
-        shoulder_pos = wpos(arm, chain[1])
-        tip = wtail(arm, L["owner"])
-        place_control(arm, L["ctrl"], tip)
-        set_ik(arm, 1.0)
+    for name, d in DRAG_PATHS.items():
+        ctrl.matrix = start
         bpy.context.view_layer.update()
-        d = tip - shoulder_pos
-        d = d.normalized() if d.length > 1e-6 else Vector((0.0, 0.0, 1.0))
-        want = shoulder_pos + d * (arm_len + extra)
-        place_control(arm, L["ctrl"], want)
-        bpy.context.view_layer.update()
-        out.append((label, clavicle_deg(arm, L["shoulder"]), (wtail(arm, L["owner"]) - want).length,
-                    clavicle_axes_deg(arm, L["shoulder"])))
-        set_ik(arm, 0.0)
-        arm.pose.bones[L["ctrl"]].matrix_basis.identity()
-        arm.pose.bones[L["pole"]].matrix_basis.identity()
-        bpy.context.view_layer.update()
-    return out
+        prev = {b: ui.world(arm, b).to_quaternion() for b in watch}
+        jump, miss, where = 0.0, 0.0, ""
+        for k in range(1, DRAG_STEPS + 1):
+            m = start.copy()
+            m.translation = start.translation + arm.matrix_world.inverted().to_3x3() @ (Vector(d) * DRAG_STEP * k)
+            ctrl.matrix = m
+            bpy.context.view_layer.update()
+            for b in watch:
+                q = ui.world(arm, b).to_quaternion()
+                a = math.degrees(q.rotation_difference(prev[b]).angle)
+                a = min(a, 360.0 - a)                  # q and -q are one rotation
+                if a > jump:
+                    jump, where = a, "%s@%dcm" % (b, k)
+                prev[b] = q
+            target = (arm.matrix_world @ ctrl.matrix).translation
+            # judged only where the limb CAN reach: past that it stops short on purpose
+            if (target - wpos(arm, L["segs"][0][0])).length < reach - 0.002:
+                miss = max(miss, (wpos(arm, L["tip"]) - target).length)
+        out.append((name, jump, where, miss, (wpos(arm, L["segs"][0][0]) - sh0).length))
+    ctrl.matrix = start
+    bpy.context.view_layer.update()
+    back = ui.to_fk(arm, L["key"])
+    return out, back, snap
 
 
 def pose_signature(arm, actions):
@@ -571,7 +1174,7 @@ def pose_signature(arm, actions):
         for f in (int(lo), int((lo + hi) / 2), int(hi)):
             apply_action(arm, act, f)
             for b in sorted(arm.pose.bones.keys()):
-                if b.startswith("CTRL_"):
+                if b.startswith(("CTRL_", MCH)):
                     continue
                 sig.append(wpos(arm, b).copy())
     return sig
@@ -584,163 +1187,34 @@ def compare(a, b):
 # ---------------------------------------------------------------- the text block
 
 NOTE = '''\
-IK CONTROLS -- added by blender/tools/add_control_rig.py. Re-run that script; do not hand-build.
+CONTROLS -- added by blender/tools/add_control_rig.py. Re-run that script; do not hand-build.
 
-WHAT YOU GRAB
-  CTRL_hand_l / CTRL_hand_r    move the hand, the arm AND THE SHOULDER follow
-  CTRL_foot_l / CTRL_foot_r    move the foot, the leg follows
-  CTRL_elbow_* / CTRL_knee_*   which way the joint bends
-  CTRL_root                    parent of all of them, moves the lot
-They live in the `CTRL` bone collection -- hide it and the rig looks exactly as it did.
+THE BUTTONS ARE IN THE SIDEBAR: N-panel > "Rig" tab (select the armature). If the tab is missing,
+allow this file's scripts when Blender asks, or open the text `control_rig_ui.py` and Run Script.
 
-THE SHOULDER IS IN THE ARM CHAIN.
-Reach past what the arm can do and the collarbone protracts to follow, which is what a person does
-and what the runtime support-hand IK already does in game. It is STIFF (it moves only once the arm
-has run out) and it is LIMITED to 60 deg from rest on every axis, so it cannot be driven into a
-pose no shoulder holds. If the hand still will not reach, it stops short -- that is the honest
-answer, and it means the WEAPON's SupportPoint or the pose wants moving, not the shoulder forcing.
+WHAT YOU GRAB (colour: body's LEFT blue, RIGHT red, centre yellow; IK strong, FK light)
+  square round the hips   pelvis      the COG -- moves and turns the whole body
+  rings on the spine      spine_01..03  bend the torso; the arms and head ride it
+  rings on neck / head    neck_01, head (the head ring has a nose tick: it shows the facing)
+  ring on each collarbone clavicle    THE SHOULDER. It is FK in IK mode too: shrug / reach with it
+  rings on arms and legs  upperarm, lowerarm, hand, thigh, calf, foot (FK mode), ball (toe bend)
+  small rings on fingers  30, in their own `Fingers` collection -- hide it to reach the hand
+  square with an arrow    Root        the STANCE bone (it carries the crouch/crawl drop). Rarely touched.
+  cube / sole outline     CTRL_hand_* / CTRL_foot_*   IK: move AND turn the hand/foot, the limb follows
+  diamonds                CTRL_elbow_* / CTRL_knee_*  which way the elbow/knee points
+  green circle on floor   CTRL_root   carries the IK controls
 
-THE INFLUENCE STARTS AT 0, ON PURPOSE.
-An IK constraint at full influence OVERRIDES the chain's own rotation channels, so leaving it on
-would replace the arms of all 171 shared clips with wherever the control happens to sit. At 0 the
-rig evaluates exactly as before. To pose a limb, raise the IK influence on lowerarm_l / lowerarm_r /
-calf_l / calf_r (Bone Constraint tab, "CTRL_IK") -- or run the helper below.
+THE WORKFLOW, per limb (Rigify / Auto-Rig Pro style)
+  1. "to IK": the controls jump onto the limb as it is posed, the limb switches to IK. Nothing moves.
+  2. move / turn the cube or sole, drag the diamond for the elbow/knee, rotate the collarbone ring
+     for the shoulder. A hand pulled past the arm's reach stops short -- move the shoulder instead.
+  3. "to FK": the limb keeps the pose, as ordinary rotations on its own bones, and leaves IK.
+  4. key the bones as usual. (With auto-keying on, step 3 keys the limb for you.)
 
-THE WORKFLOW -- SNAP ON, pose, SNAP OFF
-  1. run the script below with GRAB (it moves each control onto the hand/foot where the clip
-     already has it, then raises influence). Nothing moves -- measured to 0.0000 m at the tip.
-  2. move CTRL_hand_* / CTRL_foot_*, and CTRL_elbow_* / CTRL_knee_* for the bend
-  3. run it again with BAKE: it writes what IK produced into the FK bones and influence goes to 0
-  4. key the FK bones as usual
-
-**STEP 1 IS NOT OPTIONAL.** A control you have not grabbed sits where it was left, and raising
-influence drags the limb to it -- measured 0.83 m on an arm from the rest position. Grab first.
-Step 3 is what keeps a clip portable: the action ends up keying only the 53 contract bones, exactly
-as today, so `animation_review.blend`, every other body and the shared library are unaffected and
-the export needs no extra flag.
-
-(You CAN skip step 3 and key the controls instead -- the glTF export samples the evaluated pose, so
-the .glb would still be right. But then the action keys control bones, every body needs this layer,
-and export_def_bones must be on. Prefer the snap.)
-
-SNAP -- select the armature, be in Pose mode, set MODE below, run it (Text > Run Script).
+EVERY IK SLIDER MUST BE 0 TO EXPORT OR TO PLAY THE CLIPS. An IK limb ignores its clip -- right while
+posing, wrong while playing -- and export_character.py refuses a file with a limb left in IK.
+The FK rings (spine, head, fingers, collarbones) never need a switch: they ARE the exported bones.
 '''
-
-SNAP = """
-MODE = "GRAB"     # "GRAB" = put the controls on the limbs and switch IK on
-                  # "BAKE" = write the IK result into the FK bones and switch IK off
-# Select some bones to limit it to those limbs; select none and it does all four.
-
-import bpy
-from math import radians
-from mathutils import Vector
-
-arm = bpy.context.object
-assert arm and arm.type == 'ARMATURE', "select the armature, in Pose mode"
-# The BAKE must write every bone the solver drove, or the shoulder silently springs back to the
-# clip's pose the moment influence drops: the arms are 3-bone chains (the collarbone is in them).
-CHAINS = {"lowerarm_l": ["clavicle_l", "upperarm_l", "lowerarm_l"],
-          "lowerarm_r": ["clavicle_r", "upperarm_r", "lowerarm_r"],
-          "calf_l": ["thigh_l", "calf_l"], "calf_r": ["thigh_r", "calf_r"]}
-SEL = {b.name for b in (bpy.context.selected_pose_bones or [])}
-
-# The IK influences are DRIVEN by CTRL_root["ik"], so writing an influence here is overwritten on
-# the next evaluation. The property is the one owner; these two are how this script touches it.
-def set_ik(a, value):
-    r = a.pose.bones.get("CTRL_root")
-    if r is not None and "ik" in r:
-        r["ik"] = float(value)
-    else:
-        for owner in CHAINS:
-            c = a.pose.bones[owner].constraints.get("CTRL_IK")
-            if c is not None:
-                c.influence = float(value)
-    bpy.context.evaluated_depsgraph_get().update()
-
-def ik_is_on(a):
-    r = a.pose.bones.get("CTRL_root")
-    if r is not None and "ik" in r:
-        return float(r["ik"]) > 0.0
-    return any((a.pose.bones[o].constraints.get("CTRL_IK") is not None
-                and a.pose.bones[o].constraints["CTRL_IK"].influence > 0.0) for o in CHAINS)
-
-
-def world(name):
-    \"\"\"The EVALUATED world matrix -- with constraints applied, which is the whole point.\"\"\"
-    dg = bpy.context.evaluated_depsgraph_get()
-    return arm.matrix_world @ arm.evaluated_get(dg).pose.bones[name].matrix
-
-
-def tail_of(name):
-    m = world(name)
-    return m.translation + m.col[1].xyz.normalized() * arm.pose.bones[name].bone.length
-
-
-def place(name, target):
-    \"\"\"Move a control bone so its HEAD lands on `target` (world).\"\"\"
-    m = world(name).copy()
-    m.translation = target
-    arm.pose.bones[name].matrix = arm.matrix_world.inverted() @ m
-    bpy.context.view_layer.update()
-
-
-done = []
-for owner, chain in CHAINS.items():
-    pb = arm.pose.bones.get(owner)
-    con = pb.constraints.get("CTRL_IK") if pb else None
-    if con is None:
-        continue
-    if SEL and not (SEL & set(chain + [con.subtarget, con.pole_subtarget])):
-        continue
-
-    if MODE == "GRAB":
-        # Put BOTH handles where this pose already has them, then re-solve the pole angle.
-        # The correct pole angle depends on the pose (the elbow plane differs from clip to clip),
-        # so a single stored value cannot preserve every one -- measured, a value solved on a
-        # crouch moved an aim pose's forearm 0.231 m. Re-solving here costs ~80 evaluations.
-        # The bend plane is the one at the JOINT ABOVE the owner (elbow/knee), so the chain root
-        # for that measurement is chain[-2] -- the upper arm or thigh -- not chain[0], which on a
-        # 3-bone arm is the collarbone and would tilt the plane by the shoulder's own offset.
-        root, elbow, tip = world(chain[-2]).translation, world(owner).translation, tail_of(owner)
-        axis = tip - root
-        if axis.length > 1e-6:                 # push the pole out along the way the joint bends
-            along = (elbow - root).dot(axis.normalized())
-            bend = elbow - (root + axis.normalized() * along)
-        else:
-            bend = Vector((0.0, 0.0, 0.0))
-        if bend.length < 1e-4:                 # a straight limb has no plane; keep the pole put
-            bend = (world(con.pole_subtarget).translation - elbow)
-        reach = max(0.15, (tip - root).length * 0.6)
-        place(con.pole_subtarget, elbow + bend.normalized() * reach)
-        place(con.subtarget, tip)
-        set_ik(arm, 1.0)
-        bpy.context.view_layer.update()
-
-        def miss(deg):
-            con.pole_angle = radians(deg)
-            bpy.context.view_layer.update()
-            return (world(owner).translation - elbow).length
-        best = min(((miss(d), d) for d in range(-180, 180, 5)), key=lambda t: t[0])
-        best = min(((miss(d), d) for d in [best[1] + k for k in range(-5, 6)]), key=lambda t: t[0])
-        con.pole_angle = radians(best[1])
-        bpy.context.view_layer.update()
-        done.append("%s (pole %+d, elbow %.4f m)" % (owner, best[1], best[0]))
-    else:
-        if not ik_is_on(arm):
-            continue
-        want = {b: world(b) for b in chain}    # read the IK result BEFORE switching it off
-        set_ik(arm, 0.0)
-        bpy.context.view_layer.update()
-        for b in chain:                        # parents first: each is set in its final parent frame
-            arm.pose.bones[b].matrix = arm.matrix_world.inverted() @ want[b]
-            bpy.context.view_layer.update()
-        arm.pose.bones[con.subtarget].matrix_basis.identity()
-        arm.pose.bones[con.pole_subtarget].matrix_basis.identity()
-        done.append(owner)
-
-print("[snap] %s: %s" % (MODE, ", ".join(done) or "nothing matched"))
-"""
-
 
 
 def write_note(scale):
@@ -748,7 +1222,93 @@ def write_note(scale):
     if t is None:
         t = bpy.data.texts.new(TEXT_BLOCK)
     t.clear()
-    t.write(NOTE + SNAP)
+    t.write(NOTE)
+    # the sidebar: the SAME file this script imports for its self-test, registered on load
+    ui = bpy.data.texts.get(UI_TEXT)
+    if ui is None:
+        ui = bpy.data.texts.new(UI_TEXT)
+    ui.clear()
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), UI_TEXT)) as fh:
+        ui.write(fh.read())
+    ui.use_module = True
+
+
+def remove_layer(arm):
+    """Take the hand-made CTRL layer back out -- every piece this script added, and nothing else.
+
+    It exists for the body that has adopted a REAL control rig (Auto-Rig Pro, Rigify). Two control
+    rigs in one file is worse than none: ARP's `c_hand_ik.l` and our `CTRL_hand_l` are drawn at the
+    same place on the same hand, and ours is stored at influence 0 BY DESIGN (see `master_switch`),
+    so the artist grabs whichever is on top and half the time nothing happens -- which is the very
+    report the CTRL layer was built to answer, now caused by it. Reported on Shino after her Quick
+    Rig: "the hand control ... when move them, nothing happen ... rest seem work pretty well".
+
+    The deform bones, their constraints from any other source, the clips and the pose are untouched,
+    and the caller asserts that: the removal must move the rig by 0.
+    """
+    removed = {"bones": [], "constraints": [], "widgets": [], "collections": []}
+    # constraints + their drivers first: a driver whose target bone is gone is a broken driver
+    # every deform bone a layer of any vintage put CTRL_IK on: the chain bones (COPY_TRANSFORMS since
+    # 6.17, an IK before it) and the hand/foot (a mid-6.17 layer)
+    for bone in {b for L in LIMBS for b in [s for s, _ in L["segs"]] + [L["tip"], L["base"]]}:
+        pb = arm.pose.bones.get(bone)
+        if pb is None:
+            continue
+        con = pb.constraints.get(IK_NAME)
+        if con is not None:
+            try:
+                con.driver_remove("influence")
+            except Exception:
+                pass
+            pb.constraints.remove(con)
+            removed["constraints"].append("%s/%s" % (pb.name, IK_NAME))
+    for L in LIMBS:
+        pb = arm.pose.bones.get(L["tip"])
+        con = pb.constraints.get(ROT_NAME) if pb is not None else None
+        if con is not None:
+            try:
+                con.driver_remove("influence")
+            except Exception:
+                pass
+            pb.constraints.remove(con)
+            removed["constraints"].append("%s/%s" % (pb.name, ROT_NAME))
+    # the typed body shapes go back to the marker sphere they replaced
+    ico = bpy.data.objects.get("Icosphere")
+    for pb in arm.pose.bones:
+        if pb.custom_shape is not None and pb.custom_shape.name.startswith("WGT_body_"):
+            pb.custom_shape = ico
+            pb.custom_shape_translation = (0.0, 0.0, 0.0)
+            pb.custom_shape_rotation_euler = (0.0, 0.0, 0.0)
+            pb.color.palette = 'DEFAULT'
+    r = arm.pose.bones.get("CTRL_root")
+    for key in [IK_PROP] + [ik_prop(L) for L in LIMBS]:
+        if r is not None and key in r:
+            del r[key]
+
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    for eb in [b for b in arm.data.edit_bones if b.name.startswith(("CTRL_", MCH))]:
+        removed["bones"].append(eb.name)
+        arm.data.edit_bones.remove(eb)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    for c in list(arm.data.collections_all):
+        if c.name in (COLLECTION, FINGER_COLL, MCH_COLL):
+            removed["collections"].append(c.name)
+            arm.data.collections.remove(c)
+
+    # by NAME, not by user count: a datablock's users are not re-counted until the depsgraph runs,
+    # so "unused now" is not yet true on the line after the bones went.
+    ours = {"WGT_pole", "WGT_root"} | {"WGT_%s" % L["ctrl"] for L in LIMBS}
+    for ob in [o for o in bpy.data.objects if o.name in ours or o.name.startswith("WGT_body_")]:
+        removed["widgets"].append(ob.name)
+        bpy.data.objects.remove(ob, do_unlink=True)
+
+    for name in (TEXT_BLOCK, UI_TEXT):
+        t = bpy.data.texts.get(name)
+        if t is not None:
+            bpy.data.texts.remove(t)
+    return removed
 
 
 # ---------------------------------------------------------------- main
@@ -778,9 +1338,36 @@ def main():
     prev_action = arm.animation_data.action if arm.animation_data else None
     before = pose_signature(arm, acts) if acts else []
 
+    if a["remove"]:
+        gone = remove_layer(arm)
+        for k in ("bones", "constraints", "collections", "widgets"):
+            log("removed %-12s %d%s" % (k, len(gone[k]), (" (%s)" % ", ".join(gone[k])) if gone[k] else ""))
+        if acts:
+            worst = compare(before, pose_signature(arm, acts))
+            log("pose after removal: worst bone moved %.6f m over %d samples" % (worst, len(before)))
+            if worst > 1e-5:
+                raise SystemExit("[control-rig] REFUSED: removing the layer moved the rig %.6f m" % worst)
+        if arm.animation_data:
+            arm.animation_data.action = prev_action
+        dest = a["out"] or bpy.data.filepath
+        if (a["save"] or a["out"]) and dest:
+            bpy.ops.wm.save_as_mainfile(filepath=dest)
+            log("saved %s" % dest)
+        else:
+            log("NOT saved (pass --save)")
+        return
+
     made, moved = build_bones(arm, scale)
     build_constraints(arm)
-    dress(arm, scale)
+    build_tip_rotation(arm)
+    dress(arm, scale, a["hand_factor"])
+    sort_collections(arm)
+    tidy_deform_shapes(arm, a["deform_shape"])
+    counts = body_shapes(arm, scale)
+    # The controls draw IN FRONT of the mesh: a ring round a thigh sits under a VRoid skirt and one
+    # round the head inside the hair, and a control you cannot see is a control you cannot grab.
+    arm.show_in_front = True
+    log("body shapes: %s" % ", ".join("%s %d" % kv for kv in sorted(counts.items())))
     write_note(scale)
     log("bones: %d created%s, %d updated" % (len(made), (" (%s)" % ", ".join(made)) if made else "", len(moved)))
 
@@ -791,52 +1378,34 @@ def main():
                 % (L["ctrl"], bend))
             continue
         angle, residual, tip_err = solve_pole(arm, L, act, frame)
-        log("%-13s pole %+4d deg  (%s frame %d, bend %.1f deg)  elbow %.4f m  tip %.4f m"
+        log("%-13s pole %+6.1f deg  (%s frame %d, bend %.1f deg)  elbow %.4f m  tip %.4f m"
             % (L["ctrl"], angle, act.name, frame, bend, residual, tip_err))
         if residual > POLE_TOLERANCE:
             log("%-13s WARNING: the solved plane is %.3f m off the posed elbow" % (L["ctrl"], residual))
 
-    # THE FEATURE, measured rather than asserted from the constraint settings: pulling the hand
-    # past the arm's reach must recruit the shoulder, and the shoulder must stop at the envelope.
+    # THE FEEL, measured the way it is used: snap to IK on a pose, drag each control 15 cm six ways
+    # in 1 cm steps, snap back to FK. See verify_drag for what each number means.
     for L in LIMBS:
-        if not L.get("shoulder") or not acts:
-            continue
+        if not acts:
+            break
         act, frame, _ = most_bent(arm, L, acts)
         if act is None:
             continue
-        for label, moved, miss, axes in verify_shoulder(arm, L, act, frame):
-            log("%-13s %-8s -> %s turned %5.1f deg total (x %.0f y %.0f z %.0f, limit %.0f per axis),"
-                " hand %.3f m short"
-                % (L["ctrl"], label, L["shoulder"], moved, axes[0], axes[1], axes[2],
-                   CLAV_LIMIT_DEG, miss))
-            # WHAT IS ASSERTED, AND WHY IT IS NOT "60 DEG".
-            #
-            # The envelope is a PER-AXIS limit in the solver's own parameterisation, and Blender does
-            # not expose the solve's per-DoF angles -- so neither number printed above is the thing
-            # the limit bounds. The total magnitude is not (three legal axes reach sqrt(3) x the
-            # limit), and an XYZ Euler decomposition is not either: it is order-dependent and
-            # gimbal-prone, and on the MIRRORED collarbone it put 77 deg on x for a rotation the
-            # solver had kept inside its envelope. Measured on the day the IK first solved properly:
-            # left capped 60.1 total, right capped 98.7, both configured identically.
-            #
-            # So two things are asserted and both are observable: the envelope is CONFIGURED (below,
-            # from the bone itself), and the total stays under what three legal axes can produce.
-            # The feature -- that the shoulder follows at all -- is the `reached` case underneath.
-            if moved > MAX_TOTAL_DEG:
-                raise SystemExit("[control-rig] FAILED: %s turned %.1f deg total, past the %.0f deg "
-                                 "three legal axes can reach" % (L["shoulder"], moved, MAX_TOTAL_DEG))
-            pb = arm.pose.bones[L["shoulder"]]
-            for axis in "xyz":
-                if not getattr(pb, "use_ik_limit_%s" % axis):
-                    raise SystemExit("[control-rig] FAILED: %s has no IK limit on %s"
-                                     % (L["shoulder"], axis))
-                got = math.degrees(getattr(pb, "ik_max_%s" % axis))
-                if abs(got - CLAV_LIMIT_DEG) > 0.5:
-                    raise SystemExit("[control-rig] FAILED: %s's %s envelope is %.1f deg, not %.0f"
-                                     % (L["shoulder"], axis, got, CLAV_LIMIT_DEG))
-            if label == "reached" and moved < 1.0:
-                raise SystemExit("[control-rig] FAILED: %s did not follow the hand past the arm's reach"
-                                 % L["shoulder"])
+        paths, back, snap = verify_drag(arm, L, act, frame)
+        worst = max(paths, key=lambda t: t[1])
+        miss = max(t[3] for t in paths)
+        shoulder = max(t[4] for t in paths)
+        log("%-13s to IK moved the joint %.4f m / the tip %.4f m; drag: worst step %4.1f deg (%s %s), "
+            "tip off its control %.4f m, shoulder moved %.4f m; to FK left the limb %.4f m off"
+            % (L["ctrl"], snap[0], snap[1], worst[1], worst[0], worst[2], miss, shoulder, back))
+        if (worst[1] > DRAG_JUMP_DEG or miss > DRAG_REACH_MM / 1000.0 or shoulder > 1e-4 or back > 1e-3
+                or snap[0] > POLE_TOLERANCE or snap[1] > 1e-3):
+            raise SystemExit("[control-rig] FAILED: %s does not drag cleanly" % L["ctrl"])
+        set_ik(arm, 0.0)
+        for pb in arm.pose.bones:                 # leave no test pose on the controls
+            if pb.name.startswith(("CTRL_", MCH)):
+                pb.matrix_basis.identity()
+        bpy.context.view_layer.update()
 
     # the assertion this whole design rests on
     if acts:

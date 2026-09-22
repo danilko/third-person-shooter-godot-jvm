@@ -102,9 +102,9 @@ func _initialize() -> void:
 	# The clusters are the authored hold poses: pistol (and the four placeholders copied from it),
 	# the fist's boxing guard (Punch_Jab), which melee and throwable share with only the wrist turned (CLAUDE.md W36), rifle (a patrol carry, CLAUDE.md W24) and launcher (its own carry, W25). A count other than EXPECTED_CLUSTERS is either a new authored pose (raise it
 	# deliberately) or an index that resolved to nothing.
-	const EXPECTED_CLUSTERS := 4   # sniper (9) ships as a copy of the rifle pose, so it joins that cluster
+	const EXPECTED_CLUSTERS := 5   # sniper (9) and shotgun (10) hold like the rifle; dual_pistol (3) has its own (mirrored) hold, 2026-09-21
 	if distinct.size() != EXPECTED_CLUSTERS:
-		print("  FAIL  expected %d clusters (pistol family, fist guard, rifle, launcher); a different count is an" % EXPECTED_CLUSTERS)
+		print("  FAIL  expected %d clusters (pistol family, fist guard, rifle, launcher, dual pistol); a different count is an" % EXPECTED_CLUSTERS)
 		print("        index that resolved to nothing, or a newly authored pose -- raise the number deliberately.")
 		fails += 1
 	elif poses[4].distance_to(poses[5]) > REST_TOLERANCE or poses[8].distance_to(poses[5]) > REST_TOLERANCE or poses[5].distance_to(poses[0]) < REST_TOLERANCE:
@@ -114,7 +114,7 @@ func _initialize() -> void:
 		print("  FAIL  launcher collapsed onto rifle, so the third cluster is something else")
 		fails += 1
 	else:
-		print("  PASS  every index resolves; %d clusters = pistol family, fist guard, rifle, launcher" % EXPECTED_CLUSTERS)
+		print("  PASS  every index resolves; %d clusters = pistol family, fist guard, rifle, launcher, dual pistol" % EXPECTED_CLUSTERS)
 
 	# 2. The two shipped archetypes must still differ from each other -- if they collapsed together
 	#    the branch is not blending at all and check 1 would pass vacuously.

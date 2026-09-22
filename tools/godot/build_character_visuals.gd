@@ -31,7 +31,8 @@ const S_RECOIL := "res://src/main/java/com/openworld/character/WeaponRecoilModif
 ## Bone frame -> game frame; see measure_body.gd. Its own inverse.
 const ARMATURE_TURN := Basis(Vector3(-1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, -1))
 const HITBOX_LAYER := 8          # CollisionLayers.HITBOX -- these bones are also what a bullet hits
-const SOCKETS := ["SocketRifle", "SocketPistol", "SocketLauncher", "SocketMelee", "SocketThrowable", "SocketFist"]
+const SOCKETS := ["SocketRifle", "SocketPistol", "SocketLauncher", "SocketMelee", "SocketThrowable", "SocketFist",
+		"SocketShotgun"]
 const BACK_MARKERS := ["LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2",
 					   "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4"]
 const HIP_MARKERS := ["ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2",
@@ -269,7 +270,20 @@ func _modifier(skel: Skeleton3D, nm: String, script_path: String) -> Node:
 # socket for a WeaponItem.
 func _weapon_sockets(skel: Skeleton3D, f: Dictionary) -> void:
 	var a := _attach(skel, "WeaponAttachment", "hand_r")
-	var sockets: Dictionary = f["sockets"]
+	var sockets: Dictionary = (f["sockets"] as Dictionary).duplicate()
+	# The shotgun hangs where the rifle does until someone places it (PLAN.md 6.17).
+	if not sockets.has("SocketShotgun") and sockets.has("SocketRifle"):
+		sockets["SocketShotgun"] = sockets["SocketRifle"]
+	# ARTIST OVERRIDES, on top of the measured sockets: `<body>.sockets.json`, written by
+	# blender/tools/export_character.py from the SOCKET_* empties in the body's .blend (a socket moved or
+	# turned there -- "hold the pistol a little lower" -- lands here). The measured facts stay derived.
+	var over_path := "res://assets/characters/%s/%s.sockets.json" % [_body, _body]
+	if FileAccess.file_exists(over_path):
+		var over = JSON.parse_string(FileAccess.get_file_as_string(over_path))
+		if over is Dictionary and over.has("sockets"):
+			for k in over["sockets"]:
+				sockets[k] = over["sockets"][k]
+			print("[build-visuals] socket overrides from %s: %s" % [over_path, ", ".join(PackedStringArray(over["sockets"].keys()))])
 	for nm in SOCKETS:
 		var m := _marker(a, nm, _t(sockets[nm]) if sockets.has(nm) else Transform3D.IDENTITY)
 		if nm == "SocketFist":

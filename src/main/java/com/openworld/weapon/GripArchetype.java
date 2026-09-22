@@ -17,7 +17,10 @@ public enum GripArchetype {
     SHIELD("shield"),
     SHIELD_MELEE("shield_melee"),
     THROWABLE("throwable"),
-    SNIPER("sniper");
+    SNIPER("sniper"),
+    /** A pump shotgun: its support hand is on the pump, far forward of a rifle's, so it has its own AIM
+     *  pose ({@code upright_aim_shotgun}); every other family plays the rifle's (PLAN.md 6.17). */
+    SHOTGUN("shotgun");
 
     public final String key;
 

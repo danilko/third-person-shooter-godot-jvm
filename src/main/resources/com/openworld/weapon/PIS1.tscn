@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" path="res://assets/vfx/muzzle_flash/effects/short_flash/short_flash_01.tscn" id="6_muzzle"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body"]
-size = Vector3(0.08, 0.1197, 0.161)
+size = Vector3(0.08, 0.1449, 0.22)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_area"]
 size = Vector3(0.5, 0.5, 0.5)
@@ -31,7 +31,7 @@ reload_audio = ExtResource("4_l5qg7")
 require_interact = true
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=100000002]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0129, -0.0493)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0266, -0.0694)
 shape = SubResource("BoxShape3D_body")
 
 [node name="PickupArea" type="Area3D" parent="." unique_id=100000003]
@@ -39,11 +39,11 @@ collision_layer = 0
 collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=1413815655]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0129, -0.0493)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0266, -0.0694)
 shape = SubResource("BoxShape3D_area")
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=1222425939]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.060, -0.1298)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0779, -0.1794)
 
 [node name="MuzzleVFX" parent="Muzzle" unique_id=1454172846 instance=ExtResource("6_muzzle")]
 

@@ -23,7 +23,7 @@
       "index": 3,
       "name": "dual_pistol",
       "base": "pistol",
-      "exists": false
+      "exists": true
     },
     {
       "index": 4,
@@ -60,6 +60,12 @@
       "name": "sniper",
       "base": "rifle",
       "exists": false
+    },
+    {
+      "index": 10,
+      "name": "shotgun",
+      "base": "rifle",
+      "exists": true
     }
   ],
   "clip_families": {
@@ -166,6 +172,31 @@
         "collarbones": 8,
         "elbow_flare": 20,
         "support_flare": 15,
+        "curl": 1
+      }
+    },
+    "shotgun": {
+      "socket": "SocketShotgun",
+      "reference": "SHG1",
+      "mount": "StockPoint",
+      "support": true,
+      "aim_clip": "upright_aim_shotgun-loop",
+      "hold_clip": "upright_hold_rifle-loop",
+      "aim": {
+        "placement": "arp",
+        "note": "authored on the Auto-Rig Pro controls as ARP_upright_aim_shotgun-loop (PLAN.md 6.17), baked into the game clip at export; the support hand sits on the pump"
+      },
+      "hold": {
+        "grip": [
+          -0.12,
+          -0.22,
+          0.22
+        ],
+        "muzzle_down": 35,
+        "muzzle_across": 55,
+        "collarbones": 10,
+        "elbow_flare": 20,
+        "support_flare": 10,
         "curl": 1
       }
     }
