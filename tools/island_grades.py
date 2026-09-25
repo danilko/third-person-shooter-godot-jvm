@@ -180,6 +180,158 @@ def corridors(net):
     return out
 
 
+# ------------------------------------------------------------------------------------ the gore is level
+
+GORE_MARGIN = 1.0     # the ramp holds its mainline's height until the two paved bands are this far apart
+GORE_GRADE = 0.07     # ...and leaves that height no steeper than this
+_GORE_HELD = set()    # uids `level_gores` fixed: anchors for `held_indices`
+
+
+def _road_half(road):
+    b = road.base
+    return max(b.lanes_fwd, b.lanes_bwd) * b.lane_width + b.median_width / 2.0 + max(b.left_walk_width,
+                                                                                         b.right_walk_width)
+
+
+def _nearest(poly, x, y):
+    """(plan distance, surface z) of the nearest point of polyline `poly` [(x, y, z)] to (x, y)."""
+    best = (1e18, 0.0)
+    for a, b in zip(poly, poly[1:]):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L2 = dx * dx + dy * dy
+        t = 0.0 if L2 < 1e-12 else max(0.0, min(1.0, ((x - a[0]) * dx + (y - a[1]) * dy) / L2))
+        px, py = a[0] + dx * t, a[1] + dy * t
+        d = math.hypot(px - x, py - y)
+        if d < best[0]:
+            best = (d, a[2] + (b[2] - a[2]) * t)
+    return best
+
+
+def level_gores(net):
+    """A RAMP IS LEVEL WITH ITS MAINLINE UNTIL THE TWO PAVED BANDS HAVE PARTED (PLAN.md 0.10(b)).
+
+    Each ramp generator made its ramp level AT ITS MOUTH and then graded it away from there -- and the paving of the
+    ramp and of the mainline still overlaps for tens of metres past the mouth. Measured: the diamond's exit
+    `shuto_d_fwd_off` was 0.25-1.2 m below C1's deck while still under it (a car on the ramp meets C1's edge in front
+    of its bumper, `probe_road_clear`), and the Wangan's merge `shuto_wangan_e__3` ran 0.86 m under
+    `shuto_spur_out_w` the same way. So: from every RAMP mouth, along the ramp, every station takes the mainline's own
+    surface height until the ramp's centreline is `half(mainline) + half(ramp) + GORE_MARGIN` from the mainline's;
+    a station is inserted where that happens inside a span; beyond it the ramp's own profile is pulled into a
+    GORE_GRADE cone from the held height. The held stations are anchors for `smooth` (`_GORE_HELD`).
+
+    Returns report lines."""
+    import island_roadgen as rg
+    road_of = {q: n for n, r in net.roads.items() for q in r.points}
+    out = []
+    for u, p in list(net.points.items()):
+        if str(p.role) != "RAMP" or u not in road_of:
+            continue
+        src = [m for m, q in net.points.items() for l in q.links if l.target == u and str(l.type) == "AUX"]
+        if not src or src[0] not in road_of:
+            continue
+        main = net.roads[road_of[src[0]]]
+        ramp = net.roads[road_of[u]]
+        # the mainline and every road joined to it end to end (a zone split cuts C1 into several roads)
+        mains = [main]
+        for r in net.roads.values():
+            if r is main or not r.points:
+                continue
+            for e in (r.points[0], r.points[-1]):
+                if any(math.dist(net.points[e].pos[:2], net.points[m].pos[:2]) < 0.5
+                       for m in (main.points[0], main.points[-1])):
+                    mains.append(r)
+                    break
+        polys = [[net.points[q].pos for q in r.points] for r in mains]
+        need = _road_half(main) + _road_half(ramp) + GORE_MARGIN
+        chain = list(ramp.points)
+        if chain[-1] == u:
+            chain.reverse()
+        if chain[0] != u:
+            continue
+
+        def main_at(x, y):
+            return min((_nearest(pl, x, y) for pl in polys), key=lambda t: t[0])
+        # walk out from the mouth until the bands have parted
+        clear, s = None, 0.0
+        for a, b in zip(chain, chain[1:]):
+            pa, pb = net.points[a].pos, net.points[b].pos
+            L = math.dist(pa[:2], pb[:2])
+            n = max(1, int(L / 2.0))
+            for k in range(1, n + 1):
+                t = k / n
+                x, y = pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t
+                if main_at(x, y)[0] >= need:
+                    clear = (a, b, t, x, y)
+                    break
+            if clear:
+                break
+            s += L
+        if clear is None:
+            out.append("%s: never parts from %s (whole ramp held)" % (ramp.name, main.name))
+            clear = (chain[-2], chain[-1], 1.0) + tuple(net.points[chain[-1]].pos[:2])
+        a, b, t, x, y = clear
+        if 0.05 < t < 0.95 and math.dist((x, y), net.points[b].pos[:2]) > 4.0:
+            # insert where the bands part, in the ramp's CHAIN order (insert_after follows road.points)
+            first, second = (a, b) if ramp.points.index(a) < ramp.points.index(b) else (b, a)
+            nu = rg.insert_after(net, ramp, first, (x, y, main_at(x, y)[1]))
+            road_of[nu] = ramp.name
+            stop = nu
+        else:
+            stop = b if t >= 0.95 else a
+        chain = list(ramp.points)
+        if chain[-1] == u:
+            chain.reverse()
+        k_stop = chain.index(stop)
+        moved = 0
+        for q in chain[:k_stop + 1]:
+            P = net.points[q]
+            z = main_at(P.pos[0], P.pos[1])[1] if q != u else P.pos[2]
+            if abs(z - P.pos[2]) > 1e-3:
+                moved += 1
+            P.pos = (P.pos[0], P.pos[1], round(z, 3))
+            _GORE_HELD.add(q)
+        # beyond: rejoin the ramp's OWN profile at the first station reachable from the held height at no more than
+        # GORE_GRADE, with one even grade in between; every station past that one is left as its generator made it.
+        # (Re-grading to the ramp road's far end instead flattened the Wangan, which is one long road at this stage
+        # and was designed to climb over kichi_dori: 7.1 m of clearance became 1.3 m.)
+        rest = chain[k_stop:]
+        z0, cum, rejoin = net.points[stop].pos[2], 0.0, None
+        for a_, b_ in zip(rest, rest[1:]):
+            cum += math.dist(net.points[a_].pos[:2], net.points[b_].pos[:2])
+            if cum > 1e-6 and abs(net.points[b_].pos[2] - z0) / cum <= GORE_GRADE:
+                rejoin = (b_, cum)
+                break
+        if rejoin is not None:
+            end, L = rejoin
+            z1 = net.points[end].pos[2]
+            c = 0.0
+            for a_, b_ in zip(rest, rest[1:]):
+                if b_ == end:
+                    break
+                c += math.dist(net.points[a_].pos[:2], net.points[b_].pos[:2])
+                P = net.points[b_]
+                P.pos = (P.pos[0], P.pos[1], round(z0 + (z1 - z0) * c / L, 3))
+            out.append("%s: level with %s for %.0f m, then %.1f %% for %.0f m back onto its own profile"
+                       % (ramp.name, main.name, s + t * math.dist(net.points[a].pos[:2], net.points[b].pos[:2]),
+                          100.0 * abs(z1 - z0) / L, L))
+            continue
+        z0, d, prev, cone = net.points[stop].pos[2], 0.0, net.points[stop].pos, 0
+        for q in chain[k_stop + 1:]:
+            P = net.points[q]
+            d += math.dist(prev[:2], P.pos[:2])
+            prev = P.pos
+            lo, hi = z0 - GORE_GRADE * d, z0 + GORE_GRADE * d
+            z = min(max(P.pos[2], lo), hi)
+            if abs(z - P.pos[2]) < 1e-3:
+                break
+            P.pos = (P.pos[0], P.pos[1], round(z, 3))
+            cone += 1
+        out.append("%s: level with %s for %.0f m (%d station(s) moved, %d in the cone)"
+                   % (ramp.name, main.name, s + t * math.dist(net.points[a].pos[:2], net.points[b].pos[:2]),
+                      moved, cone))
+    return out
+
+
 # ------------------------------------------------------------------------------------ smooth
 
 def held_indices(nodes):
@@ -187,6 +339,8 @@ def held_indices(nodes):
     held = {0, len(nodes) - 1}
     deck = set()
     for i, ps in enumerate(nodes):
+        if any(p.uid in _GORE_HELD for p in ps):          # level_gores: the ramp still shares its mainline's paving
+            held.add(i)
         if any(str(p.role) == "INTERSECTION" for p in ps):
             held.add(i)
         if any(str(p.role) == "RAMP" for p in ps):         # the mouth and the far end of its gore span
@@ -232,6 +386,8 @@ def cmd_smooth(argv):
     rec = argv[0]
     length = float(argv[argv.index("--length") + 1]) if "--length" in argv else LENGTH
     net = pm.load_network(rec)
+    for line in level_gores(net):
+        print("island_grades: gore " + line)
     runs = corridors(net)
     total, worst_move, rough = 0, ("", 0.0), []
     for name, nodes in runs:

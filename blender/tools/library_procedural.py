@@ -126,6 +126,115 @@ def coffee_machine(material):
     return "Shop_CoffeeMachine", "interior", b.mesh()
 
 
+# ── konbini back of house and the rest of the store (PLAN.md C0, 2026-09-25): PLACEHOLDERS for an artist ─────────
+# Sizes are the Japanese konbini's; every one of these is a labelled block to be hand-modelled (PIECES.md lists them).
+
+PARTITION_H = 2.7      # the ceiling of a one-storey store (the storey is 2.73 m + a band; the fascia hides the rest)
+PARTITION_T = 0.12
+
+
+def partition(material):
+    """One ken (1.82 m) of interior wall, 0.12 m thick, PARTITION_H tall, centred on the origin along X: the
+    back-of-house and the washroom are rooms made of these (placed as props, `collide` box)."""
+    b = Builder("Wall_Partition", material)
+    b.box((-0.91, -PARTITION_T / 2, 0), (0.91, PARTITION_T / 2, PARTITION_H), "MI_Plaster")
+    b.box((-0.91, -PARTITION_T / 2 - 0.01, 0), (0.91, PARTITION_T / 2 + 0.01, 0.08), "MI_PaintedMetalDark")
+    return "Wall_Partition", "interior", b.mesh()
+
+
+def partition_door(material):
+    """One ken of interior wall with a 0.85 x 2.0 m DOORWAY in the middle and no leaf (a leaf would stand in the
+    capsule's way; the artist may model an open one). Its collider is the two jambs and the header
+    (`PARTITION_DOOR_BOXES`, used by the building table's `collide`)."""
+    b = Builder("Wall_PartitionDoor", material)
+    t, w, h = PARTITION_T / 2, 0.425, 2.0
+    b.box((-0.91, -t, 0), (-w, t, PARTITION_H), "MI_Plaster")
+    b.box((w, -t, 0), (0.91, t, PARTITION_H), "MI_Plaster")
+    b.box((-w, -t, h), (w, t, PARTITION_H), "MI_Plaster")
+    for x in (-w, w):                                                      # the frame
+        b.box((x - 0.03, -t - 0.01, 0), (x + 0.03, t + 0.01, h), "MI_PaintedMetal")
+    b.box((-w, -t - 0.01, h), (w, t + 0.01, h + 0.05), "MI_PaintedMetal")
+    return "Wall_PartitionDoor", "interior", b.mesh()
+
+
+def walkin_cooler(material):
+    """One ken (1.82 m wide, 1.82 m deep, 2.4 m tall) of WALK-IN COOLER (ウォークイン冷蔵庫): the insulated room behind
+    the drink wall that staff restock from behind. Its FRONT (-Y) is where the reach-in doors (`Shop_FridgeDoor`)
+    stand; the back has a staff door strip."""
+    b = Builder("Shop_WalkInCooler", material)
+    b.box((-0.91, -0.91, 0), (0.91, 0.91, 2.4), "MI_PlasticWhite")
+    b.box((-0.91, 0.91, 0.1), (0.91, 0.93, 2.3), "MI_Steel")               # the staff side's panel seams
+    b.box((-0.4, 0.93, 0.0), (0.4, 0.95, 2.0), "MI_PaintedMetal")          # a cooler door on the back
+    return "Shop_WalkInCooler", "interior", b.mesh()
+
+
+def locker(material):
+    """A staff locker bank: 0.9 x 0.5 x 1.8 m, three doors."""
+    b = Builder("Office_Locker", material)
+    b.box((-0.45, -0.25, 0), (0.45, 0.25, 1.8), "MI_PaintedMetal")
+    for k in range(3):
+        x = -0.45 + 0.3 * k
+        b.box((x + 0.01, -0.26, 0.05), (x + 0.29, -0.25, 1.75), "MI_PaintedMetalDark")
+    return "Office_Locker", "interior", b.mesh()
+
+
+def desk(material):
+    """An office desk, 1.2 x 0.7 x 0.72 m, with a monitor."""
+    b = Builder("Office_Desk", material)
+    b.box((-0.6, -0.35, 0.68), (0.6, 0.35, 0.72), "MI_Wood")
+    for x in (-0.57, 0.57):
+        b.box((x - 0.03, -0.32, 0), (x + 0.03, 0.32, 0.68), "MI_PaintedMetal")
+    b.box((-0.25, 0.1, 0.72), (0.25, 0.13, 1.05), "MI_PlasticDark")
+    return "Office_Desk", "interior", b.mesh()
+
+
+def safe(material):
+    """A floor safe, 0.6 x 0.6 x 1.0 m."""
+    b = Builder("Office_Safe", material)
+    b.box((-0.3, -0.3, 0), (0.3, 0.3, 1.0), "MI_PaintedMetalDark")
+    b.box((-0.05, -0.31, 0.55), (0.05, -0.3, 0.65), "MI_Steel")
+    return "Office_Safe", "interior", b.mesh()
+
+
+def atm(material):
+    """A konbini ATM, 0.7 x 0.8 x 1.6 m, screen and slot on the front."""
+    b = Builder("Shop_ATM", material)
+    b.box((-0.35, -0.4, 0), (0.35, 0.4, 1.6), "MI_PlasticWhite")
+    b.box((-0.25, -0.41, 1.05), (0.25, -0.4, 1.4), "MI_PlasticDark")
+    b.box((-0.3, -0.5, 0.95), (0.3, -0.4, 1.0), "MI_PlasticDark")          # the ledge
+    b.box((-0.34, -0.41, 1.45), (0.34, -0.4, 1.58), "MI_Sign")
+    return "Shop_ATM", "interior", b.mesh()
+
+
+def hot_case(material):
+    """The hot-snack case on the counter's end (fried chicken, nikuman): 0.9 x 0.6 x 1.2 m, glass box on a base."""
+    b = Builder("Shop_HotCase", material)
+    b.box((-0.45, -0.3, 0), (0.45, 0.3, 0.8), "MI_PaintedMetal")
+    b.box((-0.45, -0.3, 0.8), (0.45, 0.3, 1.2), "MI_GlassClear")
+    b.box((-0.4, -0.25, 0.85), (0.4, 0.25, 0.95), "MI_Goods")
+    b.box((-0.44, -0.29, 1.18), (0.44, 0.29, 1.2), "MI_Light")
+    return "Shop_HotCase", "interior", b.mesh()
+
+
+def magazine_rack(material):
+    """The magazine rack along the front glass: one ken, 0.4 m deep, 1.2 m tall, sloped shelves of goods."""
+    b = Builder("Shop_MagazineRack", material)
+    b.box((-0.91, 0.1, 0), (0.91, 0.2, 1.2), "MI_PaintedMetal")
+    for k in range(3):
+        z = 0.3 + 0.3 * k
+        b.box((-0.9, -0.2 + 0.05 * k, z), (0.9, 0.1, z + 0.04), "MI_Steel")
+        b.box((-0.88, -0.15 + 0.05 * k, z + 0.04), (0.88, 0.05, z + 0.26), "MI_Goods")
+    return "Shop_MagazineRack", "interior", b.mesh()
+
+
+def copier(material):
+    """The multi-copier (マルチコピー機), 1.2 x 0.7 x 1.1 m, a touch screen on top."""
+    b = Builder("Shop_Copier", material)
+    b.box((-0.6, -0.35, 0), (0.6, 0.35, 1.0), "MI_PlasticWhite")
+    b.box((-0.2, -0.35, 1.0), (0.2, -0.05, 1.12), "MI_PlasticDark")
+    return "Shop_Copier", "interior", b.mesh()
+
+
 def fascia(material, name, mat, h, d):
     """A fascia band one ken long, `h` tall, `d` deep, its face at -Y and its bottom at the origin."""
     b = Builder(name, material)
@@ -350,6 +459,13 @@ def harbour_apron(material):
 EDIT_NOTE_DEFAULT = ("Placeholder, ours (CC0). Keep the frame: Z up, origin at the footprint centre on the ground, the side "
                      "a person uses facing -Y; real size in metres. After editing: tools/building_kit/build_buildings.sh.")
 EDIT_NOTES = {
+    "Wall_Partition": "Placeholder interior wall, ONE KEN (1.82 m) long along X, 0.12 m thick, 2.7 m tall. Konbini back "
+                      "of house and washroom rooms are rows of these (building_types.json props). Keep the length.",
+    "Wall_PartitionDoor": "Placeholder interior wall with a 0.85 x 2.0 m doorway, no leaf. Its COLLIDER is the jambs and "
+                          "header written in building_types.json (`collide: boxes`), not its mesh: move them with the "
+                          "doorway. A leaf, if modelled, must stand OPEN (the capsule walks through).",
+    "Shop_WalkInCooler": "Placeholder walk-in cooler, one ken square, 2.4 m tall. The reach-in drink doors "
+                         "(Shop_FridgeDoor) stand on its -Y face; staff restock from +Y.",
     "Harbour_Crane": "Placeholder ship-to-shore crane: rails 30.48 m apart along Y (the sea is -Y), legs 17 m apart along "
                      "X, portal clear 18 m, boom hinge 45 m, boom raised (nothing may overhang -Y past the seaside "
                      "rail + 2 m: the quay line). Its COLLIDER is not its mesh: CRANE_BOXES in "
@@ -372,6 +488,16 @@ def build_all(material):
         fridge_door(material),
         coffee_machine(material),
         fascia(material, "Fascia_Shop", "MI_FasciaKonbini", 0.9, 0.12),
+        partition(material),
+        partition_door(material),
+        walkin_cooler(material),
+        locker(material),
+        desk(material),
+        safe(material),
+        atm(material),
+        hot_case(material),
+        magazine_rack(material),
+        copier(material),
         wc_partition(material),
         gas_canopy(material),
         gas_column(material),

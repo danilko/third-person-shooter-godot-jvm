@@ -74,12 +74,12 @@ conditioner units on the facade. The type table is where that lives.
 |---|---|---|---|---|
 | PencilBuilding | ペンシルビル / 雑居ビル | 4 × 7 | 7.3 × 12.7 × 21.8 | shop 3.64 + 6 × 2.73 |
 | ShopHouse | 店舗併用住宅 | 4 × 6 | 7.3 × 10.9 × 10.0 | shop 3.64 + 2 × 2.73 |
-| Konbini | コンビニ | 10 × 7 | 18.2 × 12.7 × 4.6 | 1 × 3.64 |
+| KonbiniS | コンビニ (小, deep) | 7 × 10 | 12.7 × 18.2 × 4.6 | 1 × 3.64, sales floor + back of house, WC room |
+| KonbiniL | コンビニ (大) | 12 × 12 | 21.8 × 21.8 × 4.6 | 1 × 3.64, back of house, walk-in cooler, WC room |
 | Mansion | マンション | 10 × 5 | 18.2 × 9.1 × 17.3 | 6 × 2.73 |
 | Apartment | アパート | 8 × 4 | 14.6 × 7.3 × 6.4 | 2 × 2.73 |
 | OfficeMid | 中規模オフィスビル | 12 × 8 | 21.8 × 14.6 × 34.6 | 9 × 3.64 |
 | Warehouse | 倉庫 | 20 × 12 | 36.4 × 21.8 × 8.2 | 2 × 3.64 |
-| Konbini (re-sized) | コンビニ | 10 × 6 | 18.2 × 10.9 × 4.6 | 1 × 3.64, full interior |
 | GasKiosk | 給油所の事務所・売店 | 5 × 3 | 9.1 × 5.5 × 4.6 | 1 × 3.64 |
 | StationBuilding | 駅舎 (小規模) | 7 × 4 | 12.7 × 7.3 × 4.6 | 1 × 3.64, ticket gates |
 | FamilyRestaurant | ファミリーレストラン | 11 × 16 | 20.0 × 29.1 × 5.5 | 1 × 3.64, booths, kitchen, WC |
@@ -90,7 +90,7 @@ Composite SITES (`composites` in `building_types.json`: whole types + library pr
 | scene | 日本語 | site (m) | what |
 |---|---|---|---|
 | GasStation | ガソリンスタンド | 30.9 × 25.5 | canopy (4.7 m clear) on 3 columns, 3 islands, 6 pumps, the kiosk |
-| KonbiniLot | コンビニ (駐車場付き) | 21.8 × 21.8 | the konbini behind seven 2.5 × 5.0 m bays with wheel stops |
+| ParkingLot4 / 8 / 14 | 駐車場 | 12.7 × 12.7 / 21.8 × 12.7 / 21.8 × 18.2 | a car park on its own (2.5 × 5.0 m bays, 6 m aisle); ParkingLot8 is placed beside every KonbiniL |
 | StationRural | 小さな地上駅 | 32.8 × 16.4 | station building, 21.8 m platform (0.94 m above rail) with end ramps, shelters, benches, name board, 1067 mm track |
 
 Sizes: PLATEAU MEASUREMENTS (`tools/plateau2json/measure_building_types.py`, statistics only, see CLAUDE.md), the

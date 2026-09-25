@@ -673,6 +673,11 @@ def check_pads(net, out):
             continue
         if j is None:
             continue
+        for a_uid, b_uid, far in getattr(j, "runaway", ()):
+            out(Finding("corner_runaway", WARN, a_uid,
+                        "the kerb corner from this mouth to %s would run %.0f m from the pad's centre -- it was "
+                        "NOT built. The approaches are too close to parallel for a corner; split the junction or "
+                        "turn the mouths" % (b_uid, far)))
         if not j.star_ok:
             # WARN, NOT ERROR, and that downgrade is the point. The pad is now tessellated by
             # `pad_triangles`, which moves the fan's apex to a kernel point and ear-clips when

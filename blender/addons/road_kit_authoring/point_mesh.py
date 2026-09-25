@@ -419,18 +419,30 @@ PIER_ROAD_CLEAR = 3.0
 PIER_ROAD_DZ = 4.0
 
 
-def pier_on_road(bands, own, top, fwd, half):
-    """Would a column at `top` (the soffit), `half` wide across `fwd`, stand on or beside another road's paved band
-    that runs more than `PIER_ROAD_DZ` below it? `own` names the bands that do not count (this road's)."""
+def pier_on_road(bands, top, fwd, half):
+    """Would a column at `top` (the soffit), `half` wide across `fwd`, stand on or beside a paved band that runs more
+    than `PIER_ROAD_DZ` below it?
+
+    **A ROAD IS NOT EXEMPT FROM ITSELF.** This took an `own` set of road names, so a pier was never refused for
+    standing on its own road -- right for the deck it CARRIES, and wrong for a road that passes under ITSELF: a loop
+    ramp, a switchback, an interchange spur. Measured on the island, `shuto_eb_loop_F1` runs **9.71 m below**
+    `shuto_eb_loop__2`, and a column of the upper leg stood in the lower leg's lane at (728, 12, 70) -- a car could
+    not drive it (`probe_road_clear.gd`, PLAN.md 0.10(a)).
+
+    The name was never the fact that mattered: **the deck a pier carries is AT its soffit**, so the height test below
+    already tells the two apart, whoever owns the band. Dropping the exemption is therefore not a widening of the
+    rule -- it is the same rule asked of the geometry instead of of a label. And the height is the band's LOWEST
+    surface there (`Band.lowest_surface_z`), because a loop's band covers the pier's own point twice and its nearest
+    spine sample is as likely to be the deck the pier carries as the leg it would stand on."""
     rx, ry = fwd[1], -fwd[0]
     reach = half + PIER_ROAD_CLEAR
     n = max(1, int(math.ceil(2.0 * half / 2.0)))
     probes = [(top[0] + rx * (-half + 2.0 * half * k / n), top[1] + ry * (-half + 2.0 * half * k / n)) for k in range(n + 1)]
     for b in bands:
-        if b.owner in own or not b.bbox_hit(top[0], top[1], reach):
+        if not b.bbox_hit(top[0], top[1], reach):
             continue
         for x, y in probes:
-            if ped._signed_depth(b.poly, x, y) > -PIER_ROAD_CLEAR and b.surface_z(x, y) < top[2] - PIER_ROAD_DZ:
+            if ped._signed_depth(b.poly, x, y) > -PIER_ROAD_CLEAR and b.lowest_surface_z(x, y) < top[2] - PIER_ROAD_DZ:
                 return True
     return False
 
@@ -575,9 +587,8 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 _add(objs, name + "__shed", SHED_LAMP_MATERIAL, sh["lamps"])
                 _add(objs, collision_name(name + "_shed", COL_ROAD, False), NO_MATERIAL, sh["concrete"])
             if any(float(v.get("rka_pillar_param", 0.0)) > 0.0 for v in values):
-                own = {road_name}
                 cols, over, dropped = pillars(pts, values, lats, style.pier(), ground,
-                                              blocked=lambda top, fwd, half: pier_on_road(bands, own, top, fwd, half))
+                                              blocked=lambda top, fwd, half: pier_on_road(bands, top, fwd, half))
                 if dropped and report is not None:
                     report.setdefault("pier_on_road", []).append((name, dropped))
                 for mat, tris in cols.items():
@@ -723,13 +734,25 @@ def self_test():
     level = ped.Band("level", [(94.0, -200.0), (106.0, -200.0), (106.0, 200.0), (94.0, 200.0)],
                      [(100.0, -200.0, 8.0), (100.0, 200.0, 8.0)])
     fwd = (1.0, 0.0, 0.0)
-    assert pier_on_road([street], {"deck"}, (100.0, 0.0, 10.0), fwd, 0.7)          # on it
-    assert pier_on_road([street], {"deck"}, (108.0, 0.0, 10.0), fwd, 0.7)          # 1.3 m past its edge
-    assert not pier_on_road([street], {"deck"}, (120.0, 0.0, 10.0), fwd, 0.7)      # 14 m clear
-    assert not pier_on_road([level], {"deck"}, (100.0, 0.0, 10.0), fwd, 0.7)       # 2 m below: not a road UNDER it
-    assert not pier_on_road([street], {"street"}, (100.0, 0.0, 10.0), fwd, 0.7)    # its own band
+    assert pier_on_road([street], (100.0, 0.0, 10.0), fwd, 0.7)          # on it
+    assert pier_on_road([street], (108.0, 0.0, 10.0), fwd, 0.7)          # 1.3 m past its edge
+    assert not pier_on_road([street], (120.0, 0.0, 10.0), fwd, 0.7)      # 14 m clear
+    assert not pier_on_road([level], (100.0, 0.0, 10.0), fwd, 0.7)       # 2 m below: not a road UNDER it
+    # THE DECK A PIER CARRIES is at its soffit, so it is not a road under it -- and that, not the road's NAME, is
+    # what tells them apart. A band named like the pier's own road is judged on the same rule as any other.
+    deck = ped.Band("loop", [(94.0, -200.0), (106.0, -200.0), (106.0, 200.0), (94.0, 200.0)],
+                    [(100.0, -200.0, 10.0), (100.0, 200.0, 10.0)])
+    assert not pier_on_road([deck], (100.0, 0.0, 10.0), fwd, 0.7)        # the deck it carries
+    # ...and a LOOP that passes under ITSELF is refused, where the old `own` set exempted it (PLAN.md 0.10(a)).
+    assert pier_on_road([ped.Band("loop", street.poly, street.spine)], (100.0, 0.0, 10.0), fwd, 0.7)
+    # ...and it must still be refused when the loop is ONE band covering the pier's point twice: the spine passes
+    # (100, 0) at 2 m (the leg below) and again at 10 m (the deck the pier carries), the upper sample NEARER.
+    twice = ped.Band("loop", [(94.0, -30.0), (106.0, -30.0), (106.0, 30.0), (94.0, 30.0)],
+                     [(100.0, -20.0, 2.0), (100.5, 0.0, 2.0), (100.5, 20.0, 2.0), (100.0, 0.2, 10.0)])
+    assert pier_on_road([twice], (100.0, 0.0, 10.0), fwd, 0.7)
+    assert twice.surface_z(100.0, 0.0) == 10.0                           # control: the nearest sample is the deck
     # a portal pier 16 m across, centred 12 m off the street, still reaches over it
-    assert pier_on_road([street], {"deck"}, (100.0, 12.0, 10.0), (0.0, 1.0, 0.0), 8.0)
+    assert pier_on_road([street], (100.0, 12.0, 10.0), (0.0, 1.0, 0.0), 8.0)
     # A barrier edge run carries a car wall on the same line, CAR_WALL_HEIGHT tall from the barrier's foot; none without.
     objs = {}
     run = [(0.0, 0.0, 5.0), (10.0, 0.0, 5.0), (20.0, 0.0, 5.0)]

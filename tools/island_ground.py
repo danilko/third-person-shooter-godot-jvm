@@ -256,11 +256,11 @@ def build(heights_path, area=None):
     print("island_ground: %d components, %d hold a lot, %d are 街区 (<= %.0f m2)"
           % (len(sizes), int(holds.sum()), int(block.sum()), BLOCK_MAX))
 
-    # geodesic walk out of the lots through open ground, carrying the nearest lot's own FOOTWAY level --
-    # the slab's top LESS `LOT_RAISE`, so the private slab keeps standing the authored 6 cm proud of the
-    # ground around it (3.18(j)) instead of being made flush with it, which would z-fight.
+    # geodesic walk out of the lots through open ground, carrying the nearest lot's own level (footway +
+    # LOT_RAISE, less LOT_FILL_GAP, which is 0 now): there is no lot slab any more (user, 2026-09-25) -- the fill IS
+    # the private ground, from the lot's own frontage to the next street, and a building stands on its plinth on it.
     reach_cells = int(math.ceil(REACH_OPEN / STEP))
-    target = np.where(lot, lot_top - ib.LOT_RAISE, np.nan)
+    target = np.where(lot, lot_top - ib.LOT_FILL_GAP, np.nan)
     frontier = lot.copy()
     filled = lot.copy()
     steps = 0
@@ -329,8 +329,11 @@ def build(heights_path, area=None):
     capped = ~np.isnan(height) & ~np.isnan(cap) & (height > cap)
     height = np.where(capped, cap, height)
     print("island_ground: %d vertices capped beside a road with no footway" % int(capped.sum()))
-    # never lower the ground: this is a fill, and lowering would cut under a road or into the sea
-    height = np.where(np.isnan(height), np.nan, np.maximum(height, nat))
+    # never lower the ground: this is a fill, and lowering would cut under a road or into the sea -- EXCEPT on a
+    # lot, which is the building's own ground and may stand up to BURY_TOL under the natural ground (a lot is
+    # refused past that). The slab used to cover that; with no slab, ground left standing there would poke
+    # through the shop floor.
+    height = np.where(np.isnan(height), np.nan, np.where(lot, height, np.maximum(height, nat)))
     if area is not None:
         x0, z0, x1, z1 = area
         keep = np.zeros((N, N), bool)

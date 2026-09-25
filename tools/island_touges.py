@@ -126,6 +126,22 @@ def site_free():
     return f
 
 
+def arterial_point(arts, at):
+    """`(x, y, z)` on the arterial network nearest the plan point `at` -- its OWN surface, not the ground.
+
+    A T MUST ARRIVE AT THE ROAD IT MEETS, and that height is the arterial's, which is not the ground's:
+    an arterial is draped and then smoothed (`island_grades`), and the two part company by metres at a
+    mountain toe. Measured on v16, the touge's east end was pinned to `raw(EAST_FOOT)` = **2.26 m** while
+    `nishi_dori__6` sits at **0.00 m** 19 m away, so the pad between them came out **19.9 % steep** on its
+    left movement -- `island_layout.py`'s own `pad_grade` finding (PLAN.md 0.10 / tier B6). The plan point
+    is already interpolated along the nearest SPAN for x and y; this returns its z from the same span,
+    which is the one place the two can agree by construction.
+    """
+    name, i, t, _d = nearest_span(arts, at, "")
+    pa, pb = (arts.points[u].pos for u in arts.roads[name].points[i:i + 2])
+    return tuple(pa[k] + (pb[k] - pa[k]) * t for k in range(3))
+
+
 def unit(a, b):
     dx, dy = b[0] - a[0], b[1] - a[1]
     n = math.hypot(dx, dy) or 1.0
@@ -159,9 +175,8 @@ def derive(land_path):
     # (measured at (-580, 805)). So it is re-walked, inside the flank between its junction and the plateau junction
     # (a wedge from WEST_FOOT toward the junction) and south of the east descent.
     arts = pm.load_network(ARTERIALS)
-    name, i, t, _d = nearest_span(arts, JN_OLD, "")
-    pa, pb = (arts.points[u].pos for u in arts.roads[name].points[i:i + 2])
-    jn = (pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t)
+    jn3 = arterial_point(arts, JN_OLD)
+    jn = (jn3[0], jn3[1])
     w1 = wedge(WEST_FOOT, (jn[0] - WEST_FOOT[0], jn[1] - WEST_FOOT[1]), PHASE1_WEDGE)
 
     free = site_free()
@@ -225,8 +240,11 @@ def derive(land_path):
     line, _arc = ST.fillet(line, keep=keep, nodrop=nodrop)
     st = ST._stations(line)
     ground = [raw(*p) for p in st]
-    fixed = {k: raw(*jn) for k in range(len(st)) if math.dist(st[k], jn) <= LEAD_IN + 0.5}
-    fixed.update({k: raw(*EAST_FOOT) for k in range(len(st)) if math.dist(st[k], EAST_FOOT) <= 20.5})
+    # BOTH ENDS ARE PINNED TO THE ARTERIAL THEY JOIN, never to the ground under them -- see
+    # `arterial_point`. `raw()` here is what put the east mouth 2.26 m over `nishi_dori__6`.
+    east3 = arterial_point(arts, EAST_FOOT)
+    fixed = {k: jn3[2] for k in range(len(st)) if math.dist(st[k], jn) <= LEAD_IN + 0.5}
+    fixed.update({k: east3[2] for k in range(len(st)) if math.dist(st[k], EAST_FOOT) <= 20.5})
     ab = (B[0] - A[0], B[1] - A[1])
     L2 = ab[0] ** 2 + ab[1] ** 2
     for k, p in enumerate(st):

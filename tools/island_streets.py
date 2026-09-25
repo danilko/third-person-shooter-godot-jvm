@@ -209,6 +209,49 @@ def _site_hit(a, b):
     return None
 
 
+def _site_gaps(kind, v, lo, hi, step=2.0):
+    """The stretches of the line `kind = v` between `lo` and `hi` that stand OUTSIDE every site (SITE_CLEAR included),
+    as [(lo, hi)] along the line."""
+    out, start, n = [], None, max(1, int((hi - lo) / step))
+    for k in range(n + 1):
+        t = lo + (hi - lo) * k / n
+        p = (v, t) if kind == "x" else (t, v)
+        free = _site_hit(p, p) is None
+        if free and start is None:
+            start = t
+        elif not free and start is not None:
+            out.append((start, lo + (hi - lo) * (k - 1) / n))
+            start = None
+    if start is not None:
+        out.append((start, hi))
+    return out
+
+
+def _line_split(net, obst, kind, v, box, segs=None):
+    """A line no nudge could take clear of a site, CUT by that site instead of dropped: [(nodes, (lo, hi))], one per
+    stretch outside every site that keeps at least one road crossing. Only a last resort (`plan_region`): a whole
+    street nudged clear is better than two halves, and cutting first would stop the ordinary nudge from moving a
+    street off a site's face (the station's north street, 2026-09-25). Dropping the whole line instead deleted the
+    parts of it nowhere near the site and merged the blocks on both sides."""
+    x0, y0, x1, y1 = box
+    a, b = ((v, y0), (v, y1)) if kind == "x" else ((x0, v), (x1, v))
+    cr = _crossings(net, a, b)
+    ax = 1 if kind == "x" else 0
+    nodes = [(c[2], c[1]) for c in cr
+             if min((math.hypot(c[2][0] - o[0], c[2][1] - o[1]) for o in obst), default=1e9) >= JUNCTION_CLEAR]
+    lo, hi = (y0, y1) if kind == "x" else (x0, x1)
+    out = []
+    for g0, g1 in _site_gaps(kind, v, lo, hi):
+        mine = [n for n in nodes if g0 <= n[0][ax] <= g1]
+        if not mine:
+            continue
+        along = [p[ax] for p, _r in mine]
+        if segs is not None and _parallel_run(segs, kind, v, min(along), max(along)) > PARALLEL_RUN:
+            continue
+        out.append((mine, (g0, g1)))
+    return out
+
+
 def _wet(ground, p, q):
     for f in [k / 20.0 for k in range(1, 20)]:
         g = ground.z(p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f)
@@ -246,15 +289,22 @@ def plan_region(net, ground, region):
     kept, why = [], []
     for kind, vals in (("x", xs), ("y", ys)):
         for v0 in vals:
-            tried = []
+            tried, site_only = [], True
             for dv in (0.0, 30.0, -30.0, 60.0, -60.0):
                 nodes, last = _line_ok(net, ground, obst, kind, v0 + dv, box, segs)
                 if nodes:
-                    kept.append([kind, v0 + dv, nodes])
+                    kept.append([kind, v0 + dv, nodes, None])
                     break
                 tried.append("%+.0f: %s" % (dv, last))
+                site_only = site_only and last.startswith("runs through the site")
             else:
-                why.append("%s %s=%.0f dropped (%s)" % (name, kind, v0, "; ".join(tried)))
+                pieces = _line_split(net, obst, kind, v0, box, segs) if site_only else []
+                for nodes, lim in pieces:
+                    kept.append([kind, v0, nodes, lim])
+                if pieces:
+                    why.append("%s %s=%.0f cut by a site into %d piece(s)" % (name, kind, v0, len(pieces)))
+                else:
+                    why.append("%s %s=%.0f dropped (%s)" % (name, kind, v0, "; ".join(tried)))
     # the plan's hand-removed lines (island_plan.STREET_DROP), matched on the surviving coordinate
     drop = [(k, v) for r_, k, v in _PL.STREET_DROP if r_ == name]
     for L in list(kept):
@@ -267,13 +317,18 @@ def plan_region(net, ground, region):
     for i, L in enumerate(kept):
         for j, M in enumerate(kept):
             if L[0] == "x" and M[0] == "y":
+                # a piece of a line cut by a site crosses nothing beyond its own stretch
+                if L[3] is not None and not L[3][0] <= M[1] <= L[3][1]:
+                    continue
+                if M[3] is not None and not M[3][0] <= L[1] <= M[3][1]:
+                    continue
                 cross[(i, j)] = (L[1], M[1])
     alive = set(range(len(kept)))
     active = set(cross)
     while True:
         ext = {}
         for i in alive:
-            kind, v, nodes = kept[i]
+            kind, v, nodes = kept[i][:3]
             ax = 1 if kind == "x" else 0
             vals = [p[ax] for p, _r in nodes] + [cross[k][ax] for k in active if i in (k[0] if kind == "x" else k[1],)]
             ext[i] = (min(vals), max(vals)) if vals else (0.0, 0.0)
@@ -292,7 +347,7 @@ def plan_region(net, ground, region):
                 changed = True
         verdict = {}
         for i in list(alive):
-            kind, v, nodes = kept[i]
+            kind, v, nodes = kept[i][:3]
             n = len(nodes) + sum(1 for k in active if i == (k[0] if kind == "x" else k[1]))
             ax = 1 if kind == "x" else 0
             pts = sorted([pp[ax] for pp, _r in nodes] + [cross[k][ax] for k in active
@@ -317,7 +372,7 @@ def plan_region(net, ground, region):
         if not verdict and not changed:
             # water is judged only once everything else has settled: a partner dropped may shorten the line
             for i in list(alive):
-                kind, v, _nodes = kept[i]
+                kind, v, _nodes = kept[i][:3]
                 lo, hi = ext[i]
                 p = (v, lo) if kind == "x" else (lo, v)
                 q = (v, hi) if kind == "x" else (hi, v)
@@ -325,7 +380,7 @@ def plan_region(net, ground, region):
                     verdict[i] = "crosses water"
                     break                       # one at a time: dropping it may clear another
         for i, reason in verdict.items():
-            kind, v, _nodes = kept[i]
+            kind, v, _nodes = kept[i][:3]
             why.append("%s %s=%.0f dropped: %s" % (name, kind, v, reason))
             alive.discard(i)
             changed = True
@@ -333,7 +388,7 @@ def plan_region(net, ground, region):
             break
     out = []
     for i in sorted(alive):
-        kind, v, nodes = kept[i]
+        kind, v, nodes = kept[i][:3]
         nodes = list(nodes) + [(cross[k], None) for k in active if i == (k[0] if kind == "x" else k[1])]
         ax = 1 if kind == "x" else 0
         nodes.sort(key=lambda n: n[0][ax])

@@ -1,8 +1,8 @@
 [gd_scene format=3]
 
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Apartment.tscn" id="1"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/KonbiniLot_Shop.tscn" id="2"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Konbini_Shop.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/KonbiniL_Shop.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/KonbiniS_Shop.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Mansion.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse.tscn" id="5"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool.tres" id="tone2_1"]
@@ -19,7 +19,7 @@
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_WhiteWarm2.tres" id="tone1_5"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_MidWarm.tres" id="tone13_6"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_CharcoalCool.tres" id="tone5_7"]
-[ext_resource type="Material" path="res://assets/world_source/kits/road_kit/materials/M_TileWhite.tres" id="lotmat"]
+[ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_2_9.res" id="hlod"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
@@ -27,138 +27,135 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Lots"]
 transform_format = 1
-instance_count = 43
+instance_count = 42
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-21.4159, 0.0000, 9.0845, -1438.8665, 0.0000, 0.5100, 0.0000, 0.5550, -43.5825, 0.0000, -4.4640, 311.3170, -4.6872, 0.0000, 20.3884, -1431.4533, 0.0000, 0.5100, 0.0000, 0.5550, -9.5386, 0.0000, -10.0187, 340.6833, -10.2096, 0.0000, 18.8537, -1423.2323, 0.0000, 0.7120, 0.0000, 0.4540, -20.7771, 0.0000, -9.2645, 355.4739, -10.8315, 0.0000, 17.7004, -1417.9517, 0.0000, 0.6100, 0.0000, 0.5050, -22.0425, 0.0000, -8.6978, 319.9816, -22.2980, 0.0000, 17.1619, -1404.0957, 0.0000, 0.7190, 0.0000, 0.4505, -45.3775, 0.0000, -8.4332, 392.2815, -7.7443, 0.0000, 16.9376, -1408.0887, 0.0000, 0.6100, 0.0000, 0.5050, -15.7600, 0.0000, -8.3229, 339.0904, -4.7974, 0.0000, 17.4716, -1401.7394, 0.0000, 0.6100, 0.0000, 0.5050, -9.7630, 0.0000, -8.5853, 352.6837, -8.3256, 0.0000, 17.4716, -1393.8014, 0.0000, 0.6100, 0.0000, 0.5050, -16.9430, 0.0000, -8.5853, 368.8392, -11.6500, 0.0000, 31.6554, -1373.3335, 0.0000, 0.6100, 0.0000, 0.5050, -24.1798, 0.0000, -15.2517, 428.6625, -22.0463, 0.0000, 1.4633, -1364.8464, 0.0000, 0.6100, 0.0000, 0.5050, -2.6078, 0.0000, -12.3708, 306.1565, 10.7869, 0.0000, -12.9931, -1365.9985, 0.0000, 0.6100, 0.0000, 0.5050, 21.9519, 0.0000, 6.3847, 326.6212, -14.2535, 0.0000, 18.3343, -1371.4383, 0.0000, 0.5120, 0.0000, 0.5540, -25.4848, 0.0000, -10.2542, 459.6243, -5.2237, 0.0000, 17.0756, -1357.4273, 0.0000, 0.6100, 0.0000, 0.5050, -9.5417, 0.0000, -9.3482, 442.5394, 7.4435, 0.0000, -12.9841, -1354.7004, 0.0000, 0.6100, 0.0000, 0.5050, 15.1480, 0.0000, 6.3802, 349.6254, -12.4580, 0.0000, 19.5580, -1357.1305, 0.0000, 0.5120, 0.0000, 0.5540, -21.0485, 0.0000, -11.5758, 486.3916, -8.2711, 0.0000, 16.9693, -1350.5910, 0.0000, 0.6100, 0.0000, 0.5050, -14.7124, 0.0000, -9.5398, 454.8590, 7.0025, 0.0000, -16.7985, -1348.5956, 0.0000, 0.5100, 0.0000, 0.5550, 14.2505, 0.0000, 8.2546, 323.7843, -18.4315, 0.0000, 1.1831, -1343.8518, 0.0000, 0.6100, 0.0000, 0.5050, -2.1802, 0.0000, -10.0023, 307.4395, -10.5849, 0.0000, 16.0802, -1343.9421, 0.0000, 0.5120, 0.0000, 0.5540, -16.4485, 0.0000, -10.3479, 504.6130, -9.4018, 0.0000, 16.2715, -1339.5677, 0.0000, 0.6100, 0.0000, 0.5050, -16.0025, 0.0000, -9.5598, 473.4937, 23.3600, 0.0000, 0.0000, -1332.7720, 0.0000, 0.5100, 0.0000, 0.5550, -0.0000, 0.0000, 18.9220, 349.2390, -5.6729, 0.0000, 16.6102, -1331.7922, 0.0000, 0.6100, 0.0000, 0.5050, -9.2817, 0.0000, -10.1521, 487.0629, 16.8780, 0.0000, 0.0000, -1329.8720, 0.0000, 0.6100, 0.0000, 0.5050, -0.0000, 0.0000, 19.4670, 368.7165, -13.8780, 0.0000, 0.0000, -1328.3720, 0.0000, 0.6100, 0.0000, 0.5050, -0.0000, 0.0000, -16.4670, 399.7835, -13.7819, 0.0000, 1.7288, -1326.5831, 0.0000, 0.5100, 0.0000, 0.5550, -1.6302, 0.0000, -14.6151, 331.7084, -6.5590, 0.0000, 16.2299, -1325.5180, 0.0000, 0.6100, 0.0000, 0.5050, -9.9028, 0.0000, -10.7497, 497.0446, -18.4315, 0.0000, 2.2169, -1321.5278, 0.0000, 0.6100, 0.0000, 0.5050, -2.1802, 0.0000, -18.7413, 314.5106, -10.8027, 0.0000, 2.0812, -1314.3458, 0.0000, 0.5100, 0.0000, 0.5550, -1.2778, 0.0000, -17.5943, 334.6658, 10.8780, 0.0000, 0.0000, -1312.8720, 0.0000, 0.6100, 0.0000, 0.5050, -0.0000, 0.0000, 14.9670, 370.9665, -31.2000, 0.0000, 0.0000, -1302.8720, 0.0000, 0.6100, 0.0000, 0.5050, -0.0000, 0.0000, -19.7070, 401.4035, -24.1500, 0.0000, 0.0000, -1306.3970, 0.0000, 0.5120, 0.0000, 0.5540, -0.0000, 0.0000, -18.0070, 420.3035, -17.4384, 0.0000, 1.2771, -1302.6864, 0.0000, 0.6100, 0.0000, 0.5050, -2.0627, 0.0000, -10.7967, 312.7110, 0.0000, 0.0000, 12.7170, -1302.6585, 0.0000, 0.5100, 0.0000, 0.5550, -11.6280, 0.0000, 0.0000, 342.6250, 0.0000, 0.0000, 21.7170, -1307.1585, 0.0000, 0.5100, 0.0000, 0.5550, -11.8780, 0.0000, 0.0000, 357.5000, 0.0000, 0.0000, 11.5720, -1302.0860, 0.0000, 0.5100, 0.0000, 0.5550, -17.5600, 0.0000, 0.0000, 328.0000, 0.0000, 0.0000, 9.1220, -1300.8610, 0.0000, 0.6100, 0.0000, 0.5050, -22.5600, 0.0000, 0.0000, 450.2690, 19.5600, 0.0000, 0.0000, -1296.8720, 0.0000, 0.6100, 0.0000, 0.5050, -0.0000, 0.0000, 11.9720, 372.4640, -16.8780, 0.0000, 0.0000, -1285.8720, 0.0000, 0.6100, 0.0000, 0.5050, -0.0000, 0.0000, -12.7170, 417.6585, 5.5141, 0.0000, -11.8241, -1285.1177, 0.0000, 0.6100, 0.0000, 0.5050, 9.3768, 0.0000, 6.9532, 442.5044, 0.0000, 0.0000, 17.3670, -1285.2335, 0.0000, 0.6100, 0.0000, 0.5050, -13.8780, 0.0000, 0.0000, 320.5000, 0.0000, 0.0000, 19.4670, -1286.2835, 0.0000, 0.6100, 0.0000, 0.5050, -14.8780, 0.0000, 0.0000, 359.0000, 0.0000, 0.0000, 19.7070, -1286.4035, 0.0000, 0.6100, 0.0000, 0.5050, -20.7000, 0.0000, 0.0000, 461.0190, 0.0000, 0.0000, 19.7220, -1286.4110, 0.0000, 0.6100, 0.0000, 0.5050, -20.3100, 0.0000, 0.0000, 337.6250)
+buffer = PackedFloat32Array(-6.6418, 0.0000, 7.2899, -1431.3496, 0.0000, 0.5250, 0.0000, 0.5625, -13.5163, 0.0000, -3.5822, 323.7793, -3.6948, 0.0000, 10.5163, -1426.3479, 0.0000, 0.5250, 0.0000, 0.5625, -7.5191, 0.0000, -5.1676, 338.0353, -8.2471, 0.0000, 8.9810, -1417.6418, 0.0000, 0.7270, 0.0000, 0.4615, -16.7832, 0.0000, -4.4132, 353.8131, -6.6418, 0.0000, 7.2899, -1412.5486, 0.0000, 0.6250, 0.0000, 0.5125, -13.5163, 0.0000, -3.5822, 321.2263, -6.6418, 0.0000, 7.2899, -1404.8886, 0.0000, 0.7340, 0.0000, 0.4580, -13.5163, 0.0000, -3.5822, 377.6293, -6.6418, 0.0000, 7.2899, -1404.6106, 0.0000, 0.6250, 0.0000, 0.5125, -13.5163, 0.0000, -3.5822, 337.3813, -3.6948, 0.0000, 10.5163, -1399.6079, 0.0000, 0.6250, 0.0000, 0.5125, -7.5191, 0.0000, -5.1676, 351.6363, -3.6948, 0.0000, 10.5163, -1390.3469, 0.0000, 0.6250, 0.0000, 0.5125, -7.5191, 0.0000, -5.1676, 370.4843, -9.8091, 0.0000, 20.4025, -1368.5687, 0.0000, 0.6250, 0.0000, 0.5125, -20.3591, 0.0000, -9.8300, 427.6208, -18.5705, 0.0000, 1.1755, -1365.3752, 0.0000, 0.6260, 0.0000, 0.5150, -2.1967, 0.0000, -9.9375, 306.3709, -9.1281, 0.0000, 8.7336, -1364.4674, 0.0000, 0.5270, 0.0000, 0.5615, -16.3208, 0.0000, -4.8846, 460.3086, 5.9533, 0.0000, -17.0588, -1360.6348, 0.0000, 0.6250, 0.0000, 0.5125, 12.1152, 0.0000, 8.3825, 328.9994, -4.0231, 0.0000, 10.2779, -1355.3441, 0.0000, 0.6250, 0.0000, 0.5125, -7.3487, 0.0000, -5.6268, 441.3990, 3.6948, 0.0000, -10.5163, -1353.2651, 0.0000, 0.6250, 0.0000, 0.5125, 7.5191, 0.0000, 5.1676, 352.2627, -9.5247, 0.0000, 8.6115, -1350.7442, 0.0000, 0.5270, 0.0000, 0.5615, -16.0926, 0.0000, -5.0969, 484.2047, -4.1056, 0.0000, 10.2139, -1348.0307, 0.0000, 0.6250, 0.0000, 0.5125, -7.3029, 0.0000, -5.7421, 454.5669, -14.9557, 0.0000, 0.9541, -1344.4100, 0.0000, 0.6260, 0.0000, 0.5140, -1.7691, 0.0000, -8.0662, 307.9018, -8.1497, 0.0000, 6.8304, -1338.5654, 0.0000, 0.5270, 0.0000, 0.5615, -12.6643, 0.0000, -4.3955, 502.3421, -7.6288, 0.0000, 7.0032, -1335.9731, 0.0000, 0.6250, 0.0000, 0.5125, -12.9848, 0.0000, -4.1145, 471.9617, 15.0600, 0.0000, 0.0000, -1333.8720, 0.0000, 0.5250, 0.0000, 0.5625, -0.0000, 0.0000, 8.1224, 354.8893, -4.3691, 0.0000, 9.9978, -1329.7658, 0.0000, 0.6250, 0.0000, 0.5125, -7.1484, 0.0000, -6.1106, 485.8244, 8.3779, 0.0000, 0.0000, -1327.8720, 0.0000, 0.6250, 0.0000, 0.5125, -0.0000, 0.0000, 11.7173, 371.0914, -8.3779, 0.0000, 0.0000, -1327.8720, 0.0000, 0.6250, 0.0000, 0.5125, -0.0000, 0.0000, -11.7173, 398.9086, -8.3199, 0.0000, 1.3764, -1325.8810, 0.0000, 0.5260, 0.0000, 0.5630, -0.9841, 0.0000, -11.6362, 330.0293, -4.6263, 0.0000, 9.7689, -1323.2619, 0.0000, 0.6250, 0.0000, 0.5125, -6.9847, 0.0000, -6.4703, 496.1500, -14.9557, 0.0000, 0.9541, -1320.5760, 0.0000, 0.6250, 0.0000, 0.5125, -1.7691, 0.0000, -8.0662, 310.7208, -8.3199, 0.0000, 1.3764, -1313.9640, 0.0000, 0.5250, 0.0000, 0.5625, -0.9841, 0.0000, -11.6362, 331.4383, 8.3779, 0.0000, 0.0000, -1312.8720, 0.0000, 0.6250, 0.0000, 0.5125, -0.0000, 0.0000, 11.7173, 371.0914, -18.7000, 0.0000, 0.0000, -1306.8720, 0.0000, 0.6250, 0.0000, 0.5125, -0.0000, 0.0000, -10.0068, 398.0536, -18.7000, 0.0000, 0.0000, -1306.8720, 0.0000, 0.5270, 0.0000, 0.5615, -0.0000, 0.0000, -10.0068, 416.0536, -14.9557, 0.0000, 0.9541, -1302.7010, 0.0000, 0.6250, 0.0000, 0.5125, -1.7691, 0.0000, -8.0662, 312.8348, 0.0000, 0.0000, 11.7173, -1301.9086, 0.0000, 0.5250, 0.0000, 0.5625, -8.3779, 0.0000, 0.0000, 343.0000, 0.0000, 0.0000, 11.7173, -1301.9086, 0.0000, 0.5250, 0.0000, 0.5625, -8.3779, 0.0000, 0.0000, 358.0000, 0.0000, 0.0000, 8.1224, -1300.1107, 0.0000, 0.5250, 0.0000, 0.5625, -15.0600, 0.0000, 0.0000, 328.0000, 0.0000, 0.0000, 8.1224, -1300.1107, 0.0000, 0.6250, 0.0000, 0.5125, -15.0600, 0.0000, 0.0000, 448.7690, 15.0600, 0.0000, 0.0000, -1297.8720, 0.0000, 0.6250, 0.0000, 0.5125, -0.0000, 0.0000, 8.1224, 372.8893, -8.3779, 0.0000, 0.0000, -1288.8720, 0.0000, 0.6250, 0.0000, 0.5125, -0.0000, 0.0000, -11.7173, 416.9086, 4.2468, 0.0000, -10.1003, -1286.1952, 0.0000, 0.6250, 0.0000, 0.5125, 7.2217, 0.0000, 5.9396, 443.1380, 0.0000, 0.0000, 11.7173, -1283.9086, 0.0000, 0.6250, 0.0000, 0.5125, -8.3779, 0.0000, 0.0000, 322.0000, 0.0000, 0.0000, 11.7173, -1283.9086, 0.0000, 0.6250, 0.0000, 0.5125, -8.3779, 0.0000, 0.0000, 361.0000, 0.0000, 0.0000, 10.0068, -1283.0536, 0.0000, 0.6250, 0.0000, 0.5125, -18.7000, 0.0000, 0.0000, 460.7690, 0.0000, 0.0000, 8.1224, -1282.1107, 0.0000, 0.6250, 0.0000, 0.5125, -15.0600, 0.0000, 0.0000, 337.0000)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(48.560, 0.510, 10.122)
+size = Vector3(15.060, 0.525, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape1"]
-size = Vector3(10.628, 0.510, 22.717)
+size = Vector3(8.378, 0.525, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape2"]
-size = Vector3(23.150, 0.712, 21.007)
+size = Vector3(18.700, 0.727, 10.007)
 
 [sub_resource type="BoxShape3D" id="LotShape3"]
-size = Vector3(24.560, 0.610, 19.722)
+size = Vector3(15.060, 0.625, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape4"]
-size = Vector3(50.560, 0.719, 19.122)
+size = Vector3(15.060, 0.734, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape5"]
-size = Vector3(17.560, 0.610, 18.872)
+size = Vector3(15.060, 0.625, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape6"]
-size = Vector3(10.878, 0.610, 19.467)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape7"]
-size = Vector3(18.878, 0.610, 19.467)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape8"]
-size = Vector3(26.840, 0.610, 35.138)
+size = Vector3(22.599, 0.625, 22.647)
 
 [sub_resource type="BoxShape3D" id="LotShape9"]
-size = Vector3(22.200, 0.610, 12.457)
+size = Vector3(18.700, 0.626, 10.007)
 
 [sub_resource type="BoxShape3D" id="LotShape10"]
-size = Vector3(24.459, 0.610, 14.477)
+size = Vector3(18.700, 0.527, 10.007)
 
 [sub_resource type="BoxShape3D" id="LotShape11"]
-size = Vector3(29.200, 0.512, 21.007)
+size = Vector3(13.499, 0.625, 19.007)
 
 [sub_resource type="BoxShape3D" id="LotShape12"]
-size = Vector3(10.878, 0.610, 19.467)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape13"]
-size = Vector3(16.878, 0.610, 14.467)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape14"]
-size = Vector3(24.459, 0.512, 22.727)
+size = Vector3(18.700, 0.527, 10.007)
 
 [sub_resource type="BoxShape3D" id="LotShape15"]
-size = Vector3(16.878, 0.610, 19.467)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape16"]
-size = Vector3(15.878, 0.510, 18.717)
+size = Vector3(15.060, 0.626, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape17"]
-size = Vector3(18.560, 0.610, 10.072)
+size = Vector3(15.060, 0.527, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape18"]
-size = Vector3(19.560, 0.512, 19.122)
+size = Vector3(15.060, 0.625, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape19"]
-size = Vector3(18.560, 0.610, 18.872)
+size = Vector3(15.060, 0.525, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape20"]
-size = Vector3(23.360, 0.510, 18.922)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape21"]
-size = Vector3(10.878, 0.610, 19.467)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape22"]
-size = Vector3(16.878, 0.610, 19.467)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape23"]
-size = Vector3(13.878, 0.610, 16.467)
+size = Vector3(8.378, 0.526, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape24"]
-size = Vector3(13.878, 0.510, 14.717)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape25"]
-size = Vector3(11.878, 0.610, 19.467)
+size = Vector3(15.060, 0.625, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape26"]
-size = Vector3(18.560, 0.610, 18.872)
+size = Vector3(8.378, 0.525, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape27"]
-size = Vector3(10.878, 0.510, 17.717)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape28"]
-size = Vector3(10.878, 0.610, 14.967)
+size = Vector3(18.700, 0.625, 10.007)
 
 [sub_resource type="BoxShape3D" id="LotShape29"]
-size = Vector3(31.200, 0.610, 19.707)
+size = Vector3(18.700, 0.527, 10.007)
 
 [sub_resource type="BoxShape3D" id="LotShape30"]
-size = Vector3(24.150, 0.512, 18.007)
+size = Vector3(15.060, 0.625, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape31"]
-size = Vector3(17.560, 0.610, 10.872)
+size = Vector3(8.378, 0.525, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape32"]
-size = Vector3(11.628, 0.510, 12.717)
+size = Vector3(8.378, 0.525, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape33"]
-size = Vector3(11.878, 0.510, 21.717)
+size = Vector3(15.060, 0.525, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape34"]
-size = Vector3(17.560, 0.510, 11.572)
+size = Vector3(15.060, 0.625, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape35"]
-size = Vector3(22.560, 0.610, 9.122)
+size = Vector3(15.060, 0.625, 8.122)
 
 [sub_resource type="BoxShape3D" id="LotShape36"]
-size = Vector3(19.560, 0.610, 11.972)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape37"]
-size = Vector3(16.878, 0.610, 12.717)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape38"]
-size = Vector3(10.878, 0.610, 13.717)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape39"]
-size = Vector3(13.878, 0.610, 17.367)
+size = Vector3(8.378, 0.625, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape40"]
-size = Vector3(14.878, 0.610, 19.467)
+size = Vector3(18.700, 0.625, 10.007)
 
 [sub_resource type="BoxShape3D" id="LotShape41"]
-size = Vector3(20.700, 0.610, 19.707)
-
-[sub_resource type="BoxShape3D" id="LotShape42"]
-size = Vector3(20.310, 0.610, 19.722)
+size = Vector3(15.060, 0.625, 8.122)
 
 [node name="Bld_island_2_9" type="Node3D"]
 
@@ -170,7 +167,7 @@ visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
 [node name="Apartment_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1431.235, 0.830, 323.723)
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1431.235, 0.840, 323.723)
 
 [node name="Mesh" parent="./Apartment_000" index="0"]
 surface_material_override/0 = ExtResource("tone0_5")
@@ -178,7 +175,7 @@ surface_material_override/2 = ExtResource("tone1_5")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ShopHouse_001" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1426.447, 0.830, 338.084)
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1426.447, 0.840, 338.084)
 
 [node name="Mesh" parent="./ShopHouse_001" index="0"]
 surface_material_override/5 = ExtResource("tone0_5")
@@ -186,7 +183,7 @@ surface_material_override/1 = ExtResource("tone1_5")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Mansion_002" parent="." instance=ExtResource("4")]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1417.556, 0.830, 353.771)
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1417.556, 0.840, 353.771)
 
 [node name="Mesh" parent="./Mansion_002" index="0"]
 surface_material_override/0 = ExtResource("tone2_1")
@@ -194,7 +191,7 @@ surface_material_override/2 = ExtResource("tone3_1")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Apartment_003" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1412.434, 0.830, 321.170)
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1412.434, 0.840, 321.170)
 
 [node name="Mesh" parent="./Apartment_003" index="0"]
 surface_material_override/0 = ExtResource("tone2_1")
@@ -202,7 +199,7 @@ surface_material_override/2 = ExtResource("tone3_1")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Apartment_004" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1404.774, 0.830, 377.573)
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1404.774, 0.840, 377.573)
 
 [node name="Mesh" parent="./Apartment_004" index="0"]
 surface_material_override/0 = ExtResource("tone4_7")
@@ -210,7 +207,7 @@ surface_material_override/2 = ExtResource("tone5_7")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Apartment_005" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1404.496, 0.830, 337.325)
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1404.496, 0.840, 337.325)
 
 [node name="Mesh" parent="./Apartment_005" index="0"]
 surface_material_override/0 = ExtResource("tone6_4")
@@ -218,7 +215,7 @@ surface_material_override/2 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ShopHouse_006" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1399.707, 0.830, 351.685)
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1399.707, 0.840, 351.685)
 
 [node name="Mesh" parent="./ShopHouse_006" index="0"]
 surface_material_override/5 = ExtResource("tone8_2")
@@ -226,43 +223,43 @@ surface_material_override/1 = ExtResource("tone9_2")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ShopHouse_007" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1390.446, 0.830, 370.533)
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1390.446, 0.840, 370.533)
 
 [node name="Mesh" parent="./ShopHouse_007" index="0"]
 surface_material_override/5 = ExtResource("tone10_3")
 surface_material_override/1 = ExtResource("tone11_3")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="KonbiniLot_Shop_008" parent="." instance=ExtResource("2")]
-transform = Transform3D(-0.434052, 0, 0.900888, 0, 1, 0, -0.900888, 0, -0.434052, -1368.486, 0.830, 427.437)
+[node name="KonbiniL_Shop_008" parent="." instance=ExtResource("2")]
+transform = Transform3D(-0.434052, 0, 0.900888, 0, 1, 0, -0.900888, 0, -0.434052, -1368.720, 0.840, 427.550)
 
-[node name="Mesh" parent="./KonbiniLot_Shop_008" index="0"]
+[node name="Mesh" parent="./KonbiniL_Shop_008" index="0"]
 surface_material_override/1 = ExtResource("tone5_7")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Mansion_009" parent="." instance=ExtResource("4")]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1365.364, 0.830, 306.276)
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1365.364, 0.843, 306.276)
 
 [node name="Mesh" parent="./Mansion_009" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Konbini_Shop_010" parent="." instance=ExtResource("3")]
-transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1365.073, 0.830, 327.982)
+[node name="Mansion_010" parent="." instance=ExtResource("4")]
+transform = Transform3D(-0.488134, 0, 0.872769, 0, 1, 0, -0.872769, 0, -0.488134, -1364.384, 0.840, 460.262)
 
-[node name="Mesh" parent="./Konbini_Shop_010" index="0"]
-surface_material_override/1 = ExtResource("tone1_5")
-visibility_parent = NodePath("../../HLOD")
-
-[node name="Mansion_011" parent="." instance=ExtResource("4")]
-transform = Transform3D(-0.488134, 0, 0.872769, 0, 1, 0, -0.872769, 0, -0.488134, -1364.384, 0.830, 460.262)
-
-[node name="Mesh" parent="./Mansion_011" index="0"]
+[node name="Mesh" parent="./Mansion_010" index="0"]
 surface_material_override/0 = ExtResource("tone4_7")
 surface_material_override/2 = ExtResource("tone5_7")
 visibility_parent = NodePath("../../HLOD")
 
+[node name="KonbiniS_Shop_011" parent="." instance=ExtResource("3")]
+transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1360.483, 0.840, 329.069)
+
+[node name="Mesh" parent="./KonbiniS_Shop_011" index="0"]
+surface_material_override/1 = ExtResource("tone1_5")
+visibility_parent = NodePath("../../HLOD")
+
 [node name="ShopHouse_012" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.480208, 0, 0.877155, 0, 1, 0, -0.877155, 0, -0.480208, -1355.441, 0.830, 441.452)
+transform = Transform3D(-0.480208, 0, 0.877155, 0, 1, 0, -0.877155, 0, -0.480208, -1355.441, 0.840, 441.452)
 
 [node name="Mesh" parent="./ShopHouse_012" index="0"]
 surface_material_override/5 = ExtResource("tone10_3")
@@ -270,402 +267,393 @@ surface_material_override/1 = ExtResource("tone11_3")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ShopHouse_013" parent="." instance=ExtResource("5")]
-transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1353.166, 0.830, 352.214)
+transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1353.166, 0.840, 352.214)
 
 [node name="Mesh" parent="./ShopHouse_013" index="0"]
 surface_material_override/5 = ExtResource("tone8_2")
 surface_material_override/1 = ExtResource("tone9_2")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Konbini_Shop_014" parent="." instance=ExtResource("3")]
-transform = Transform3D(-0.509342, 0, 0.860564, 0, 1, 0, -0.860564, 0, -0.509342, -1351.575, 0.830, 484.696)
+[node name="Mansion_014" parent="." instance=ExtResource("4")]
+transform = Transform3D(-0.509342, 0, 0.860564, 0, 1, 0, -0.860564, 0, -0.509342, -1350.662, 0.840, 484.156)
 
-[node name="Mesh" parent="./Konbini_Shop_014" index="0"]
-surface_material_override/1 = ExtResource("tone7_4")
+[node name="Mesh" parent="./Mansion_014" index="0"]
+surface_material_override/0 = ExtResource("tone6_4")
+surface_material_override/2 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="ShopHouse_015" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.490052, 0, 0.871693, 0, 1, 0, -0.871693, 0, -0.490052, -1348.127, 0.830, 454.621)
+transform = Transform3D(-0.490052, 0, 0.871693, 0, 1, 0, -0.871693, 0, -0.490052, -1348.127, 0.840, 454.621)
 
 [node name="Mesh" parent="./ShopHouse_015" index="0"]
 surface_material_override/5 = ExtResource("tone12_6")
 surface_material_override/1 = ExtResource("tone13_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_016" parent="." instance=ExtResource("5")]
-transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1346.272, 0.830, 325.428)
+[node name="Apartment_016" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1344.395, 0.842, 307.775)
 
-[node name="Mesh" parent="./ShopHouse_016" index="0"]
-visibility_parent = NodePath("../../HLOD")
-
-[node name="Apartment_017" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1344.395, 0.830, 307.775)
-
-[node name="Mesh" parent="./Apartment_017" index="0"]
+[node name="Mesh" parent="./Apartment_016" index="0"]
 surface_material_override/0 = ExtResource("tone0_5")
 surface_material_override/2 = ExtResource("tone1_5")
 visibility_parent = NodePath("../../HLOD")
 
+[node name="Apartment_017" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.541151, 0, 0.840926, 0, 1, 0, -0.840926, 0, -0.541151, -1338.458, 0.840, 502.273)
+
+[node name="Mesh" parent="./Apartment_017" index="0"]
+visibility_parent = NodePath("../../HLOD")
+
 [node name="Apartment_018" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.541151, 0, 0.840926, 0, 1, 0, -0.840926, 0, -0.541151, -1338.458, 0.830, 502.273)
+transform = Transform3D(-0.506561, 0, 0.862204, 0, 1, 0, -0.862204, 0, -0.506561, -1335.863, 0.840, 471.897)
 
 [node name="Mesh" parent="./Apartment_018" index="0"]
+surface_material_override/0 = ExtResource("tone0_5")
+surface_material_override/2 = ExtResource("tone1_5")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Apartment_019" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.506561, 0, 0.862204, 0, 1, 0, -0.862204, 0, -0.506561, -1335.863, 0.830, 471.897)
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1333.872, 0.840, 355.017)
 
 [node name="Mesh" parent="./Apartment_019" index="0"]
 surface_material_override/0 = ExtResource("tone0_5")
 surface_material_override/2 = ExtResource("tone1_5")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Apartment_020" parent="." instance=ExtResource("1")]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1333.872, 0.830, 355.017)
+[node name="ShopHouse_020" parent="." instance=ExtResource("5")]
+transform = Transform3D(-0.521501, 0, 0.853251, 0, 1, 0, -0.853251, 0, -0.521501, -1329.860, 0.840, 485.882)
 
-[node name="Mesh" parent="./Apartment_020" index="0"]
-surface_material_override/0 = ExtResource("tone0_5")
-surface_material_override/2 = ExtResource("tone1_5")
-visibility_parent = NodePath("../../HLOD")
-
-[node name="ShopHouse_021" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.521501, 0, 0.853251, 0, 1, 0, -0.853251, 0, -0.521501, -1329.860, 0.830, 485.882)
-
-[node name="Mesh" parent="./ShopHouse_021" index="0"]
+[node name="Mesh" parent="./ShopHouse_020" index="0"]
 surface_material_override/5 = ExtResource("tone12_6")
 surface_material_override/1 = ExtResource("tone13_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_022" parent="." instance=ExtResource("5")]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1327.872, 0.830, 370.981)
+[node name="ShopHouse_021" parent="." instance=ExtResource("5")]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1327.872, 0.840, 370.981)
 
-[node name="Mesh" parent="./ShopHouse_022" index="0"]
+[node name="Mesh" parent="./ShopHouse_021" index="0"]
 surface_material_override/5 = ExtResource("tone6_4")
 surface_material_override/1 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_023" parent="." instance=ExtResource("5")]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1327.872, 0.830, 399.019)
+[node name="ShopHouse_022" parent="." instance=ExtResource("5")]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1327.872, 0.840, 399.019)
 
-[node name="Mesh" parent="./ShopHouse_023" index="0"]
+[node name="Mesh" parent="./ShopHouse_022" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_024" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1325.894, 0.830, 330.139)
+[node name="ShopHouse_023" parent="." instance=ExtResource("5")]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1325.894, 0.841, 330.139)
 
-[node name="Mesh" parent="./ShopHouse_024" index="0"]
+[node name="Mesh" parent="./ShopHouse_023" index="0"]
 surface_material_override/5 = ExtResource("tone12_6")
 surface_material_override/1 = ExtResource("tone13_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_025" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.552199, 0, 0.833712, 0, 1, 0, -0.833712, 0, -0.552199, -1323.354, 0.830, 496.211)
+[node name="ShopHouse_024" parent="." instance=ExtResource("5")]
+transform = Transform3D(-0.552199, 0, 0.833712, 0, 1, 0, -0.833712, 0, -0.552199, -1323.354, 0.840, 496.211)
 
-[node name="Mesh" parent="./ShopHouse_025" index="0"]
+[node name="Mesh" parent="./ShopHouse_024" index="0"]
 surface_material_override/5 = ExtResource("tone2_1")
 surface_material_override/1 = ExtResource("tone3_1")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Apartment_026" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1320.561, 0.830, 310.594)
+[node name="Apartment_025" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1320.561, 0.840, 310.594)
 
-[node name="Mesh" parent="./Apartment_026" index="0"]
+[node name="Mesh" parent="./Apartment_025" index="0"]
 surface_material_override/0 = ExtResource("tone12_6")
 surface_material_override/2 = ExtResource("tone13_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_027" parent="." instance=ExtResource("5")]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1313.977, 0.830, 331.548)
+[node name="ShopHouse_026" parent="." instance=ExtResource("5")]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1313.977, 0.840, 331.548)
 
-[node name="Mesh" parent="./ShopHouse_027" index="0"]
+[node name="Mesh" parent="./ShopHouse_026" index="0"]
 surface_material_override/5 = ExtResource("tone6_4")
 surface_material_override/1 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_028" parent="." instance=ExtResource("5")]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1312.872, 0.830, 370.981)
+[node name="ShopHouse_027" parent="." instance=ExtResource("5")]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1312.872, 0.840, 370.981)
 
-[node name="Mesh" parent="./ShopHouse_028" index="0"]
+[node name="Mesh" parent="./ShopHouse_027" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Mansion_029" parent="." instance=ExtResource("4")]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1306.872, 0.830, 397.958)
+[node name="Mansion_028" parent="." instance=ExtResource("4")]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1306.872, 0.840, 397.958)
 
-[node name="Mesh" parent="./Mansion_029" index="0"]
+[node name="Mesh" parent="./Mansion_028" index="0"]
 surface_material_override/0 = ExtResource("tone0_5")
 surface_material_override/2 = ExtResource("tone1_5")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Mansion_030" parent="." instance=ExtResource("4")]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1306.872, 0.830, 415.958)
+[node name="Mansion_029" parent="." instance=ExtResource("4")]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1306.872, 0.840, 415.958)
 
-[node name="Mesh" parent="./Mansion_030" index="0"]
+[node name="Mesh" parent="./Mansion_029" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Apartment_031" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1302.686, 0.830, 312.708)
+[node name="Apartment_030" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1302.686, 0.840, 312.708)
 
-[node name="Mesh" parent="./Apartment_031" index="0"]
+[node name="Mesh" parent="./Apartment_030" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_032" parent="." instance=ExtResource("5")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1302.019, 0.830, 343.000)
+[node name="ShopHouse_031" parent="." instance=ExtResource("5")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1302.019, 0.840, 343.000)
 
-[node name="Mesh" parent="./ShopHouse_032" index="0"]
+[node name="Mesh" parent="./ShopHouse_031" index="0"]
 surface_material_override/5 = ExtResource("tone4_7")
 surface_material_override/1 = ExtResource("tone5_7")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_033" parent="." instance=ExtResource("5")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1302.019, 0.830, 358.000)
+[node name="ShopHouse_032" parent="." instance=ExtResource("5")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1302.019, 0.840, 358.000)
 
-[node name="Mesh" parent="./ShopHouse_033" index="0"]
+[node name="Mesh" parent="./ShopHouse_032" index="0"]
 surface_material_override/5 = ExtResource("tone12_6")
 surface_material_override/1 = ExtResource("tone13_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Apartment_034" parent="." instance=ExtResource("1")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1299.983, 0.830, 328.000)
+[node name="Apartment_033" parent="." instance=ExtResource("1")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1299.983, 0.840, 328.000)
 
-[node name="Mesh" parent="./Apartment_034" index="0"]
+[node name="Mesh" parent="./Apartment_033" index="0"]
 surface_material_override/0 = ExtResource("tone0_5")
 surface_material_override/2 = ExtResource("tone1_5")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Apartment_035" parent="." instance=ExtResource("1")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1299.983, 0.830, 448.769)
+[node name="Apartment_034" parent="." instance=ExtResource("1")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1299.983, 0.840, 448.769)
 
-[node name="Mesh" parent="./Apartment_035" index="0"]
+[node name="Mesh" parent="./Apartment_034" index="0"]
 surface_material_override/0 = ExtResource("tone6_4")
 surface_material_override/2 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Apartment_036" parent="." instance=ExtResource("1")]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1297.872, 0.830, 373.017)
+[node name="Apartment_035" parent="." instance=ExtResource("1")]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1297.872, 0.840, 373.017)
 
-[node name="Mesh" parent="./Apartment_036" index="0"]
+[node name="Mesh" parent="./Apartment_035" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_037" parent="." instance=ExtResource("5")]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1288.872, 0.830, 417.019)
+[node name="ShopHouse_036" parent="." instance=ExtResource("5")]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1288.872, 0.840, 417.019)
 
-[node name="Mesh" parent="./ShopHouse_037" index="0"]
+[node name="Mesh" parent="./ShopHouse_036" index="0"]
 surface_material_override/5 = ExtResource("tone6_4")
 surface_material_override/1 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_038" parent="." instance=ExtResource("5")]
-transform = Transform3D(0.506907, 0, -0.862001, 0, 1, 0, 0.862001, 0, 0.506907, -1286.100, 0.830, 443.082)
+[node name="ShopHouse_037" parent="." instance=ExtResource("5")]
+transform = Transform3D(0.506907, 0, -0.862001, 0, 1, 0, 0.862001, 0, 0.506907, -1286.100, 0.840, 443.082)
 
-[node name="Mesh" parent="./ShopHouse_038" index="0"]
+[node name="Mesh" parent="./ShopHouse_037" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_039" parent="." instance=ExtResource("5")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1284.019, 0.830, 322.000)
+[node name="ShopHouse_038" parent="." instance=ExtResource("5")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1284.019, 0.840, 322.000)
 
-[node name="Mesh" parent="./ShopHouse_039" index="0"]
+[node name="Mesh" parent="./ShopHouse_038" index="0"]
 surface_material_override/5 = ExtResource("tone0_5")
 surface_material_override/1 = ExtResource("tone1_5")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_040" parent="." instance=ExtResource("5")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1284.019, 0.830, 361.000)
+[node name="ShopHouse_039" parent="." instance=ExtResource("5")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1284.019, 0.840, 361.000)
 
-[node name="Mesh" parent="./ShopHouse_040" index="0"]
+[node name="Mesh" parent="./ShopHouse_039" index="0"]
 surface_material_override/5 = ExtResource("tone6_4")
 surface_material_override/1 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Mansion_041" parent="." instance=ExtResource("4")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1282.958, 0.830, 460.769)
+[node name="Mansion_040" parent="." instance=ExtResource("4")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1282.958, 0.840, 460.769)
 
-[node name="Mesh" parent="./Mansion_041" index="0"]
+[node name="Mesh" parent="./Mansion_040" index="0"]
 surface_material_override/0 = ExtResource("tone6_4")
 surface_material_override/2 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Apartment_042" parent="." instance=ExtResource("1")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1281.983, 0.830, 337.000)
+[node name="Apartment_041" parent="." instance=ExtResource("1")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1281.983, 0.840, 337.000)
 
-[node name="Mesh" parent="./Apartment_042" index="0"]
+[node name="Mesh" parent="./Apartment_041" index="0"]
 surface_material_override/0 = ExtResource("tone4_7")
 surface_material_override/2 = ExtResource("tone5_7")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Lots" type="MultiMeshInstance3D" parent="."]
+[node name="Plinths" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Lots")
 
-[node name="LotCollision" type="StaticBody3D" parent="."]
+[node name="PlinthCollision" type="StaticBody3D" parent="."]
 collision_mask = 0
 
-[node name="Lot0" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1438.867, 0.555, 311.317)
+[node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1431.350, 0.562, 323.779)
 shape = SubResource("LotShape0")
 
-[node name="Lot1" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1431.453, 0.555, 340.683)
+[node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1426.348, 0.562, 338.035)
 shape = SubResource("LotShape1")
 
-[node name="Lot2" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1423.232, 0.454, 355.474)
+[node name="Plinth2" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1417.642, 0.461, 353.813)
 shape = SubResource("LotShape2")
 
-[node name="Lot3" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1417.952, 0.505, 319.982)
+[node name="Plinth3" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1412.549, 0.512, 321.226)
 shape = SubResource("LotShape3")
 
-[node name="Lot4" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1404.096, 0.451, 392.282)
+[node name="Plinth4" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1404.889, 0.458, 377.629)
 shape = SubResource("LotShape4")
 
-[node name="Lot5" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1408.089, 0.505, 339.090)
+[node name="Plinth5" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1404.611, 0.512, 337.381)
 shape = SubResource("LotShape5")
 
-[node name="Lot6" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1401.739, 0.505, 352.684)
+[node name="Plinth6" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1399.608, 0.512, 351.636)
 shape = SubResource("LotShape6")
 
-[node name="Lot7" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1393.801, 0.505, 368.839)
+[node name="Plinth7" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.441020, 0, 0.897497, 0, 1, 0, -0.897497, 0, -0.441020, -1390.347, 0.512, 370.484)
 shape = SubResource("LotShape7")
 
-[node name="Lot8" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.434052, 0, 0.900888, 0, 1, 0, -0.900888, 0, -0.434052, -1373.334, 0.505, 428.663)
+[node name="Plinth8" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.434052, 0, 0.900888, 0, 1, 0, -0.900888, 0, -0.434052, -1368.569, 0.512, 427.621)
 shape = SubResource("LotShape8")
 
-[node name="Lot9" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1364.846, 0.505, 306.156)
+[node name="Plinth9" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1365.375, 0.515, 306.371)
 shape = SubResource("LotShape9")
 
-[node name="Lot10" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1365.999, 0.505, 326.621)
+[node name="Plinth10" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.488134, 0, 0.872769, 0, 1, 0, -0.872769, 0, -0.488134, -1364.467, 0.561, 460.309)
 shape = SubResource("LotShape10")
 
-[node name="Lot11" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.488134, 0, 0.872769, 0, 1, 0, -0.872769, 0, -0.488134, -1371.438, 0.554, 459.624)
+[node name="Plinth11" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1360.635, 0.512, 328.999)
 shape = SubResource("LotShape11")
 
-[node name="Lot12" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.480208, 0, 0.877155, 0, 1, 0, -0.877155, 0, -0.480208, -1357.427, 0.505, 442.539)
+[node name="Plinth12" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.480208, 0, 0.877155, 0, 1, 0, -0.877155, 0, -0.480208, -1355.344, 0.512, 441.399)
 shape = SubResource("LotShape12")
 
-[node name="Lot13" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1354.700, 0.505, 349.625)
+[node name="Plinth13" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1353.265, 0.512, 352.263)
 shape = SubResource("LotShape13")
 
-[node name="Lot14" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.509342, 0, 0.860564, 0, 1, 0, -0.860564, 0, -0.509342, -1357.131, 0.554, 486.392)
+[node name="Plinth14" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.509342, 0, 0.860564, 0, 1, 0, -0.860564, 0, -0.509342, -1350.744, 0.561, 484.205)
 shape = SubResource("LotShape14")
 
-[node name="Lot15" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.490052, 0, 0.871693, 0, 1, 0, -0.871693, 0, -0.490052, -1350.591, 0.505, 454.859)
+[node name="Plinth15" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.490052, 0, 0.871693, 0, 1, 0, -0.871693, 0, -0.490052, -1348.031, 0.512, 454.567)
 shape = SubResource("LotShape15")
 
-[node name="Lot16" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.441020, 0, -0.897497, 0, 1, 0, 0.897497, 0, 0.441020, -1348.596, 0.555, 323.784)
+[node name="Plinth16" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1344.410, 0.514, 307.902)
 shape = SubResource("LotShape16")
 
-[node name="Lot17" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1343.852, 0.505, 307.439)
+[node name="Plinth17" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.541151, 0, 0.840926, 0, 1, 0, -0.840926, 0, -0.541151, -1338.565, 0.561, 502.342)
 shape = SubResource("LotShape17")
 
-[node name="Lot18" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.541151, 0, 0.840926, 0, 1, 0, -0.840926, 0, -0.541151, -1343.942, 0.554, 504.613)
+[node name="Plinth18" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.506561, 0, 0.862204, 0, 1, 0, -0.862204, 0, -0.506561, -1335.973, 0.512, 471.962)
 shape = SubResource("LotShape18")
 
-[node name="Lot19" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.506561, 0, 0.862204, 0, 1, 0, -0.862204, 0, -0.506561, -1339.568, 0.505, 473.494)
+[node name="Plinth19" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1333.872, 0.562, 354.889)
 shape = SubResource("LotShape19")
 
-[node name="Lot20" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1332.772, 0.555, 349.239)
+[node name="Plinth20" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.521501, 0, 0.853251, 0, 1, 0, -0.853251, 0, -0.521501, -1329.766, 0.512, 485.824)
 shape = SubResource("LotShape20")
 
-[node name="Lot21" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.521501, 0, 0.853251, 0, 1, 0, -0.853251, 0, -0.521501, -1331.792, 0.505, 487.063)
+[node name="Plinth21" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1327.872, 0.512, 371.091)
 shape = SubResource("LotShape21")
 
-[node name="Lot22" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1329.872, 0.505, 368.716)
+[node name="Plinth22" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1327.872, 0.512, 398.909)
 shape = SubResource("LotShape22")
 
-[node name="Lot23" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1328.372, 0.505, 399.784)
+[node name="Plinth23" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1325.881, 0.563, 330.029)
 shape = SubResource("LotShape23")
 
-[node name="Lot24" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1326.583, 0.555, 331.708)
+[node name="Plinth24" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.552199, 0, 0.833712, 0, 1, 0, -0.833712, 0, -0.552199, -1323.262, 0.512, 496.150)
 shape = SubResource("LotShape24")
 
-[node name="Lot25" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.552199, 0, 0.833712, 0, 1, 0, -0.833712, 0, -0.552199, -1325.518, 0.505, 497.045)
+[node name="Plinth25" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1320.576, 0.512, 310.721)
 shape = SubResource("LotShape25")
 
-[node name="Lot26" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1321.528, 0.505, 314.511)
+[node name="Plinth26" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1313.964, 0.562, 331.438)
 shape = SubResource("LotShape26")
 
-[node name="Lot27" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1314.346, 0.555, 334.666)
+[node name="Plinth27" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1312.872, 0.512, 371.091)
 shape = SubResource("LotShape27")
 
-[node name="Lot28" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1312.872, 0.505, 370.966)
+[node name="Plinth28" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1306.872, 0.512, 398.054)
 shape = SubResource("LotShape28")
 
-[node name="Lot29" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1302.872, 0.505, 401.404)
+[node name="Plinth29" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1306.872, 0.561, 416.054)
 shape = SubResource("LotShape29")
 
-[node name="Lot30" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1306.397, 0.554, 420.304)
+[node name="Plinth30" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1302.701, 0.512, 312.835)
 shape = SubResource("LotShape30")
 
-[node name="Lot31" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-0.993077, 0, 0.117468, 0, 1, 0, -0.117468, 0, -0.993077, -1302.686, 0.505, 312.711)
+[node name="Plinth31" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1301.909, 0.562, 343.000)
 shape = SubResource("LotShape31")
 
-[node name="Lot32" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1302.659, 0.555, 342.625)
+[node name="Plinth32" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1301.909, 0.562, 358.000)
 shape = SubResource("LotShape32")
 
-[node name="Lot33" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1307.159, 0.555, 357.500)
+[node name="Plinth33" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1300.111, 0.562, 328.000)
 shape = SubResource("LotShape33")
 
-[node name="Lot34" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1302.086, 0.555, 328.000)
+[node name="Plinth34" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1300.111, 0.512, 448.769)
 shape = SubResource("LotShape34")
 
-[node name="Lot35" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1300.861, 0.505, 450.269)
+[node name="Plinth35" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1297.872, 0.512, 372.889)
 shape = SubResource("LotShape35")
 
-[node name="Lot36" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, -1296.872, 0.505, 372.464)
+[node name="Plinth36" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1288.872, 0.512, 416.909)
 shape = SubResource("LotShape36")
 
-[node name="Lot37" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, -1285.872, 0.505, 417.659)
+[node name="Plinth37" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.506907, 0, -0.862001, 0, 1, 0, 0.862001, 0, 0.506907, -1286.195, 0.512, 443.138)
 shape = SubResource("LotShape37")
 
-[node name="Lot38" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.506907, 0, -0.862001, 0, 1, 0, 0.862001, 0, 0.506907, -1285.118, 0.505, 442.504)
+[node name="Plinth38" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1283.909, 0.512, 322.000)
 shape = SubResource("LotShape38")
 
-[node name="Lot39" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1285.234, 0.505, 320.500)
+[node name="Plinth39" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1283.909, 0.512, 361.000)
 shape = SubResource("LotShape39")
 
-[node name="Lot40" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1286.284, 0.505, 359.000)
+[node name="Plinth40" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1283.054, 0.512, 460.769)
 shape = SubResource("LotShape40")
 
-[node name="Lot41" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1286.404, 0.505, 461.019)
+[node name="Plinth41" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1282.111, 0.512, 337.000)
 shape = SubResource("LotShape41")
-
-[node name="Lot42" type="CollisionShape3D" parent="LotCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, -1286.411, 0.505, 337.625)
-shape = SubResource("LotShape42")

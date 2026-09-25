@@ -93,7 +93,7 @@ Measured against central Tokyo (PLATEAU, 1 851 buildings) and our island (3 592 
   for every type. Needed: 2–3 widths and 2–3 heights per type (a width/height set in `building_types.json`, the
   layout already scales by modules). Tool + data, then art review of each variant's facade.
 - [ ] **B4. The lot slab reads as a bright white carpet.** Every lot is one white tile slab
-  (`road_kit/materials/M_TileWhite.tres`, `LOT_MATERIAL`). In Japan the 民地 strip in front of a building is
+  (`road_kit/materials/M_ConcreteTile.tres` since 2026-09-25 -- the one pavement shared with the footway and the block fill, `LOT_MATERIAL`). In Japan the 民地 strip in front of a building is
   varied: dark granite pavers at an office, coloured interlocking block at a shop, bare concrete at a house, a
   gravel or concrete parking apron at a konbini. Needed: 3–4 lot materials chosen per type, darker than today's
   white. Reference: pakutaso `歩道 タイル`, `インターロッキング`, `駐車場`; `/texture/concrete/`.
@@ -202,7 +202,7 @@ the variety is in lightness, never hue**).
 | [ ] | `MI_Asphalt`, `MI_Concrete`, `MI_Dirt` | kit ground pieces | fine | — |
 
 **Road kit** (`kits/road_kit/materials/`): `M_Asphalt` (fine), `M_ConcreteTile` (footway — Japanese footways
-are usually dark asphalt or interlocking block, often with a coloured stripe; review), `M_TileWhite` (the lot —
+are usually dark asphalt or interlocking block, often with a coloured stripe; review), `M_ConcreteTile` (the one pavement: footway, lot and block fill —
 see B4), `M_Concrete`/`M_Barrier` (fine). Markings: Japanese white/yellow lines are shipped; add 止まれ,
 the diamond ◇ and speed numbers (PLAN 3.6b step 4 / `jp_street`).
 

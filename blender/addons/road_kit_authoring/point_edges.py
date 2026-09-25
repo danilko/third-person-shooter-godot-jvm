@@ -138,6 +138,27 @@ class Band(object):
                 best, bz = d, sz
         return bz
 
+    def lowest_surface_z(self, x, y, slack=6.0):
+        """The LOWEST of this band's own surface heights at `(x, y)`: the minimum over every spine sample
+        within `slack` metres (plan) of the nearest one.
+
+        `surface_z` is right while a band covers a point once. A band that passes over ITSELF -- a loop
+        ramp, a switchback -- covers it twice, and the nearest sample is then a coin toss between the two
+        legs: measured on the island's airport loop, it returned the upper leg's 21.0 m at (728, 70),
+        where the lower leg runs at 11.3 m, so a pier of the upper leg was judged to stand on its own
+        deck and was kept in the lower leg's lane (PLAN.md 0.10(a)). The slack is small against a leg's
+        separation and large against a grade: 6 m along a 10 % road is 0.6 m of height."""
+        near = None
+        pts = []
+        for sx, sy, sz in self.spine:
+            d = math.hypot(sx - x, sy - y)
+            pts.append((d, sz))
+            if near is None or d < near:
+                near = d
+        if near is None:
+            return 0.0
+        return min(sz for d, sz in pts if d <= near + slack)
+
     def __repr__(self):
         return "Band(%s %d pts)" % (self.owner, len(self.poly))
 

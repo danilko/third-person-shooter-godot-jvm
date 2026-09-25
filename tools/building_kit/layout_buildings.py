@@ -364,6 +364,7 @@ def layout_type(t, root):
     out["has_interior"] = bool(t.get("props"))
     place_props(t.get("props", []), out, root, (W, D))
     check_doors_clear(out)
+    out["boxes"] = merge_boxes(out["boxes"])
 
     jp = t.get("jp", {})
     for key, got, tol in (("frontage_m", W, m), ("depth_m", D, m), ("height_m", total, storey)):  # roofline
@@ -438,14 +439,51 @@ def place_props(props, out, root, footprint=None):
                 out["props_top_m"] = round(max(out.get("props_top_m", 0.0), top), 4)
 
 
+def merge_boxes(boxes, eps=1e-4):
+    """Merge collision boxes whose union is EXACTLY a box: same height band and same extent across, touching or
+    overlapping along the third axis. The collision geometry is unchanged; only the node count falls (user,
+    2026-09-25: the node count of a building is its CollisionShape3D boxes -- one per prop instance, so a row of
+    eight drink doors was eight nodes). Repeats until nothing merges."""
+    bs = [(list(b["center"]), list(b["size"])) for b in boxes]
+
+    def lohi(c, sz):
+        return [c[i] - sz[i] / 2 for i in range(3)], [c[i] + sz[i] / 2 for i in range(3)]
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(bs)):
+            if bs[i] is None:
+                continue
+            li, hi = lohi(*bs[i])
+            for j in range(i + 1, len(bs)):
+                if bs[j] is None:
+                    continue
+                lj, hj = lohi(*bs[j])
+                for ax in (0, 2):                      # merge along X or Z; the other two axes must match exactly
+                    others = [k for k in range(3) if k != ax]
+                    if all(abs(li[k] - lj[k]) < eps and abs(hi[k] - hj[k]) < eps for k in others) \
+                            and li[ax] <= hj[ax] + eps and lj[ax] <= hi[ax] + eps:
+                        lo = [min(li[k], lj[k]) for k in range(3)]
+                        up = [max(hi[k], hj[k]) for k in range(3)]
+                        bs[i] = ([(lo[k] + up[k]) / 2 for k in range(3)], [up[k] - lo[k] for k in range(3)])
+                        bs[j] = None
+                        li, hi = lo, up
+                        changed = True
+                        break
+    return [{"center": [round(v, 5) for v in c], "size": [round(v, 5) for v in sz]} for c, sz in
+            (b for b in bs if b is not None)]
+
+
 def check_doors_clear(out):
     """Every door keeps a corridor the character's capsule (r 0.35) can walk: nothing a prop added may stand in the
     1.2 m just inside it, across its width, at knee and chest height."""
     for d in out["doors"]:
         o = d["outward"]
         side = [-o[2], 0, o[0]]
+        # across the CAPSULE's own width (r 0.35 + 1 cm), not a narrower sample: at +-0.30 a staff locker 1 cm into
+        # the large konbini's back door passed here and failed probe_buildings (2026-09-25)
         for depth in (0.09, 0.6, 1.2):
-            for lat in (-0.3, 0.0, 0.3):
+            for lat in (-0.36, -0.18, 0.0, 0.18, 0.36):
                 for y in (0.5, 1.2):
                     p = [d["center"][0] - o[0] * depth + side[0] * lat, y,
                          d["center"][2] - o[2] * depth + side[2] * lat]
@@ -526,6 +564,7 @@ def layout_composite(c, built, root):
     out["height_m"] = round(max(height, out.get("props_top_m", 0.0)), 4)
     out["roofline_m"] = out["height_m"]
     check_doors_clear(out)
+    out["boxes"] = merge_boxes(out["boxes"])
     return out
 
 
@@ -635,7 +674,7 @@ def self_test():
     # stair house: on the >3-storey flat roofs, counted in the mesh height and NOT in the roofline
     check("stair_house" in b and b["height_m"] > b["roofline_m"], f"pencil has a stair house "
           f"(roofline {b['roofline_m']}, height {b['height_m']})")
-    check("stair_house" not in by["Konbini"] and by["Konbini"]["height_m"] == by["Konbini"]["roofline_m"],
+    check("stair_house" not in by["KonbiniS"] and by["KonbiniS"]["height_m"] == by["KonbiniS"]["roofline_m"],
           "a one-storey konbini has none")
     hit = [0.0, b["wall_top_m"] + 0.5, 0.0]           # the probe's roof ray lands on open roof, not the stair house
     check(not covered(hit, b["boxes"]), "the stair house leaves the roof centre clear")
@@ -650,7 +689,7 @@ def self_test():
         except SystemExit as e:
             check(why in str(e), f"refused: {why}")
     # door gap: no collision box covers the door centre at 1 m height; a box covers the solid probe
-    for bid in ("PencilBuilding", "Konbini", "Warehouse", "Apartment"):
+    for bid in ("PencilBuilding", "KonbiniS", "KonbiniL", "Warehouse", "Apartment"):
         bb = by[bid]
         for d in bb["doors"]:
             inside = [d["center"][0] - d["outward"][0] * 0.09, 1.0, d["center"][2] - d["outward"][2] * 0.09]
@@ -667,11 +706,11 @@ def self_test():
     except SystemExit as e:
         check("misses the declared" in str(e), "a type whose height misses its declared metres is refused")
     # library props and composite sites (PLAN.md 3.12)
-    k = by["Konbini"]
+    k = by["KonbiniS"]
     check(any(p["path"].startswith("res://assets/world_source/kits/library/") for p in k["pieces"]),
           "the konbini carries library props")
     types = json.load(open(TYPES_PATH))["types"]
-    bad = json.loads(json.dumps(next(x for x in types if x["id"] == "Konbini")))
+    bad = json.loads(json.dumps(next(x for x in types if x["id"] == "KonbiniS")))
     d0 = next(d for d in k["doors"] if d["side"] == "front")
     bad["props"].append({"piece": "library:Shop_Gondola", "at": [d0["center"][0], d0["center"][2] - 1.0]})
     try:

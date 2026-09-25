@@ -82,9 +82,20 @@ TOWER_HALF = 55.0                    # TokyoTower is 94.6 m across; leave room r
 TOWER_RELIEF = 3.0
 TOWER_CLEAR = 70.0
 TOWER_LOAD = 3000.0                  # 334 m: it is the skyline
-STATION_L, STATION_D = 320.0, 29.8
+STATION_L, STATION_D = 320.0, 29.8   # the station BUILDING scene (TokyoStation*), 320 x 29.8 m
 STATION_ROAD = "ekimae_dori"         # 駅前通り: the street the station fronts
-STATION_SETBACK = 55.0               # from the road centreline to the station's own centre
+# The central station's RESERVE (PLAN.md B4 / 3.36, user 2026-09-25: "use Tokyo Station ... from PLATEAU for
+# data/sizing; an artist rebuilds the models later"). Measured with tools/plateau2json/measure_stations.py on
+# Chiyoda-ku 2025: the whole complex is ~430 m along the rail x ~250 m across it -- the Marunouchi building band
+# 62 m (the building itself 58.7 x 316.7 m, 35.5 m tall) and the JR + Shinkansen platform canopies 21-33 m wide x
+# 420-433 m long over ~200 m. This world compresses it to the building's own length and ONE block's depth:
+# forecourt (the 駅前ロータリー, B8) + building + platform band. The reserve is what the roads, the block streets and
+# the building placer keep clear of; the scene is only the building, standing at the reserve's front.
+STATION_RESERVE_D = 130.0
+STATION_FORECOURT = 30.0             # reserve front edge -> the building's front face (the rotary's room)
+STATION_FRONT_GAP = 4.0              # the station road's own paved edge -> the reserve's front edge
+STATION_ROAD_HALF = 18.5             # a trunk road's half width (point_presets "trunk": 3 x 4.5 + 1 + 4)
+STATION_ROAD_CLEAR = 2.0             # no road's PAVED EDGE (block streets aside) within this of the reserve
 STATION_LOAD = 1200.0
 TERMINAL_HALF = (121.0, 85.0)        # AirportTerminal is 242 x 170
 TERMINAL_RELIEF = 4.0
@@ -157,17 +168,29 @@ def castle_site(g, net):
     return best
 
 
-def road_index(net, step=10.0, cell=50.0):
-    """Every road centreline point, bucketed, so "is there a road within R" is a few array reads."""
+def road_half(r):
+    """A road's paved half width from its BASE section (lanes, median, footway) -- the widest side."""
+    b = r.base
+    lanes = max(b.lanes_fwd, b.lanes_bwd) * b.lane_width
+    return lanes + b.median_width / 2.0 + max(b.left_walk_width, b.right_walk_width)
+
+
+def road_index(net, step=10.0, cell=50.0, skip=None, widths=False):
+    """Every road centreline point, bucketed, so "is there a road within R" is a few array reads. `skip(name)` leaves
+    a road out. With `widths`, `near(x, y, R)` asks for a road's PAVED EDGE within R (its own half width added)."""
     grid = collections.defaultdict(list)
-    for r in net.roads.values():
+    for name, r in net.roads.items():
+        if skip is not None and skip(str(name)):
+            continue
+        h = road_half(r) if widths else 0.0
         for x, y in densify([net.points[v].pos[:2] for v in r.points], step):
-            grid[(int(x // cell), int(y // cell))].append((x, y))
+            grid[(int(x // cell), int(y // cell))].append((x, y, h))
+    pad = 25.0 if widths else 0.0
 
     def near(x, y, R):
-        for i in range(int((x - R) // cell), int((x + R) // cell) + 1):
-            for j in range(int((y - R) // cell), int((y + R) // cell) + 1):
-                if any(abs(p[0] - x) < R and abs(p[1] - y) < R for p in grid.get((i, j), ())):
+        for i in range(int((x - R - pad) // cell), int((x + R + pad) // cell) + 1):
+            for j in range(int((y - R - pad) // cell), int((y + R + pad) // cell) + 1):
+                if any(abs(p[0] - x) < R + p[2] and abs(p[1] - y) < R + p[2] for p in grid.get((i, j), ())):
                     return True
         return False
     return near
@@ -215,16 +238,25 @@ def flat_site(g, near, box, half, relief, clear, target, zmin=-0.3, zmax=30.0, s
     return None if best is None else best[1:]
 
 
-def station_site(g, net, near):
-    """The station's place ALONG `ekimae_dori`: the longest straight run of it with clear, flat land beside it.
+def is_block_street(name):
+    """A generated block street (`island_streets.py`, named by `island_plan.STREET_NAMES`): it re-routes around a
+    frozen site on the next layout run by itself, so a site search may stand over one."""
+    import island_plan as _PL
+    stems = {v for pair in _PL.STREET_NAMES.values() for v in pair}
+    return any(name == st or name.startswith(st + "_") for st in stems)
+
+
+def station_site(g, net, near=None):
+    """The central station's RESERVE along `ekimae_dori`, as (reserve centre x, y, lowest ground, yaw).
 
     Derived from the road, not from a coordinate, because the road is named for the station (駅前通り) -- so if
-    the trunk grid moves, the station moves with it."""
-    # THE STREET IS 13 ROADS, NOT ONE. `island_road_zones.py --split` cuts a long run at every 504 m zone
-    # boundary (PLAN.md 3.10), so `ekimae_dori` is `ekimae_dori`, `__2`, `__x1`, ... and the piece that keeps
-    # the bare name is 43 m long. Re-joining the pieces by name prefix and walking them in order along the
-    # street's own principal axis is recovering the street, which is what a search for "a straight run of it"
-    # has to be asked of.
+    the trunk grid moves, the station moves with it. The reserve (STATION_L x STATION_RESERVE_D) stands beside the
+    street, its front edge STATION_FRONT_GAP past the street's paved edge, and must be CLEAR of every road except a
+    block street: the first version checked only that the street was straight and the land flat, and put the
+    station across `naka_hondori`, blocking three of its lanes (PLAN.md 0.10(d) / B4)."""
+    # THE STREET IS MANY ROADS, NOT ONE. `island_road_zones.py --split` cuts a long run at every 504 m zone
+    # boundary (PLAN.md 3.10), so `ekimae_dori` is `ekimae_dori`, `__2`, `__x1`, ... Re-joining the pieces by name
+    # prefix and walking them along the street's own principal axis is recovering the street.
     parts = [r for k, r in net.roads.items() if str(k) == STATION_ROAD or str(k).startswith(STATION_ROAD + "_")]
     if not parts:
         return None
@@ -236,29 +268,51 @@ def station_site(g, net, near):
     span_x = max(p[0] for p in pts) - min(p[0] for p in pts)
     span_y = max(p[1] for p in pts) - min(p[1] for p in pts)
     pts.sort(key=lambda p: p[0] if span_x >= span_y else p[1])
-    line = pts
+    # candidates every 5 m along the JOINED line, across the junction gaps between the pieces too: the one place a
+    # 320 m reserve fits between two trunk roads can be where a cross street meets the station street (measured:
+    # east of naka_hondori it is x 780-795, and ekimae_dori is broken at x 777-808 by machi_792's junction)
+    fine = [pts[0]]
+    for a, b in zip(pts, pts[1:]):
+        L = math.dist(a, b)
+        if L > 80.0:                       # not a junction gap: two unrelated stretches
+            fine.append(b)
+            continue
+        n = max(1, int(L / 5.0))
+        fine += [(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n) for k in range(1, n + 1)]
+    pts = fine
+    clear = road_index(net, widths=True,
+                       skip=lambda n: is_block_street(n) or n == STATION_ROAD or n.startswith(STATION_ROAD + "_"))
+    street = road_index(net, skip=lambda n: not (n == STATION_ROAD or n.startswith(STATION_ROAD + "_")))
+    off = STATION_ROAD_HALF + STATION_FRONT_GAP + STATION_RESERVE_D / 2
     best = None
-    for i in range(len(line)):
-        j = i
-        while j + 1 < len(line) and math.dist(line[i], line[j + 1]) < STATION_L:
-            j += 1
-        if math.dist(line[i], line[j]) < STATION_L * 0.95:
-            continue
-        ax, ay = line[i]
-        bx, by = line[j]
-        ux, uy = (bx - ax), (by - ay)
+    for i in range(1, len(pts) - 1):
+        (ax, ay), (bx, by) = pts[i - 1], pts[i + 1]
+        ux, uy = bx - ax, by - ay
         L = math.hypot(ux, uy)
-        ux, uy = ux / L, uy / L
-        # straight enough to carry a 320 m building
-        if max(abs((p[0] - ax) * -uy + (p[1] - ay) * ux) for p in line[i:j + 1]) > 12.0:
+        if L < 1e-6:
             continue
-        mx, my = (ax + bx) / 2, (ay + by) / 2
+        ux, uy = ux / L, uy / L
+        mx, my = pts[i]
         for sgn in (1.0, -1.0):
             nx, ny = -uy * sgn, ux * sgn
-            cx, cy = mx + nx * STATION_SETBACK, my + ny * STATION_SETBACK
-            zs = [g.z(cx + ux * t + nx * d, cy + uy * t + ny * d)
-                  for t in (-STATION_L / 2, 0.0, STATION_L / 2) for d in (-STATION_D / 2, STATION_D / 2)]
-            if any(z is None for z in zs):
+            cx, cy = mx + nx * off, my + ny * off
+            ok, zs = True, []
+            for ti in range(17):
+                for di in range(8):
+                    t = -STATION_L / 2 + STATION_L * ti / 16.0
+                    d = -STATION_RESERVE_D / 2 + STATION_RESERVE_D * di / 7.0
+                    x, y = cx + ux * t + nx * d, cy + uy * t + ny * d
+                    z = g.z(x, y)
+                    if z is None or clear(x, y, STATION_ROAD_CLEAR):
+                        ok = False
+                        break
+                    zs.append(z)
+                if not ok:
+                    break
+            if not ok:
+                continue
+            # ...and the station street runs along the WHOLE front, not past one end of it
+            if not all(street(mx + ux * t, my + uy * t, 15.0) for t in range(-int(STATION_L / 2), int(STATION_L / 2) + 1, 40)):
                 continue
             lo, hi = min(zs), max(zs)
             if lo < -0.3 or hi - lo > 2.5:     # record frame: the city plain is ~0.00 m
@@ -268,6 +322,17 @@ def station_site(g, net, near):
                 # the station's front (+Z) looks back at the road it is named for
                 best = (score, cx, cy, lo, yaw_to(-nx, ny))
     return None if best is None else best[1:]
+
+
+def scene_offset(row):
+    """The record-frame (dx, dy) from a site's reserve centre to where its SCENE stands. A site whose reserve is its
+    scene has none; the central station's building stands at the FRONT of its reserve."""
+    f = row.get("scene_front", 0.0)
+    if not f:
+        return 0.0, 0.0
+    a = math.radians(row["yaw"])
+    fx, fy = math.sin(a), -math.cos(a)          # +Z of the scene, in the record frame
+    return fx * f, fy * f
 
 
 SITE_ID_BASE = 910015000
@@ -328,15 +393,16 @@ def search(g, net, only=None):
             rows.append(dict(id="tokyo_tower", scene="TokyoTower", x=tx, y=ty, yaw=0.0, size=[94.6, 94.6],
                              load=TOWER_LOAD, ground="min"))
     if want("tokyo_station"):
-        st = station_site(g, net, near)
+        st = station_site(g, net)
         if st is None:
-            print("island_sites: NO station site along %s (no %.0f m straight run with flat land beside it)"
-                  % (STATION_ROAD, STATION_L))
+            print("island_sites: NO station site along %s (no %.0f x %.0f m reserve beside it, flat and clear of "
+                  "every road but a block street)" % (STATION_ROAD, STATION_L, STATION_RESERVE_D))
         else:
             sx, sy, slo, s_yaw = st
             print("island_sites: Tokyo Station at (%d, %d), along %s (yaw %.0f)" % (sx, sy, STATION_ROAD, s_yaw))
             rows.append(dict(id="tokyo_station", scene="TokyoStation_Shop", x=sx, y=sy, yaw=s_yaw,
-                             size=[STATION_L, STATION_D], load=STATION_LOAD, ground="min"))
+                             size=[STATION_L, STATION_RESERVE_D], load=STATION_LOAD, ground="min",
+                             scene_front=STATION_RESERVE_D / 2 - STATION_FORECOURT - STATION_D / 2))
     if want("airport_terminal"):
         ax0, ax1, az0, az1 = AIRPORT_BOX                 # godot (x0, x1, z0, z1) -> record (x0, y0, x1, y1)
         apt = flat_site(g, near, (ax0, -az1, ax1, -az0), TERMINAL_HALF, TERMINAL_RELIEF, TERMINAL_CLEAR,
@@ -414,14 +480,20 @@ def main(argv):
     for r in frozen:
         h = site_ground(g, r)
         print("island_sites: %-18s at (%.0f, %.0f), ground %.2f m (frozen)" % (r["id"], r["x"], r["y"], h))
-        sites.append((r["id"], r["scene"], (r["x"], r["y"], ny + h), r["yaw"], tuple(r["size"]), r["load"]))
+        sites.append((r["id"], r["scene"], (r["x"], r["y"], ny + h), r["yaw"], tuple(r["size"]), r["load"],
+                      scene_offset(r)))
     sites = tuple(sites)
     import island_traffic_zones as itz
     sections = itz.split_sections(text)
     zone_ext = itz.ext_resource_id(sections, itz.ZONE_SCRIPT)
     marker_ext = itz.ext_resource_id(sections, itz.MARKER_SCRIPT)
     sub, nodes = [], ['[node name="%s" type="Node" parent="." unique_id=%d]\n\n' % (HOLDER, SITE_ID_BASE)]
-    for i, (zid, scene, pos, yaw, size, load) in enumerate(sites):
+    for i, (zid, scene, pos, yaw, size, load, (ox, oy)) in enumerate(sites):
+        # the RESERVE (godot x, z, yaw, half x, half z), read by island_buildings.site_exclusions: the scene may
+        # stand off its reserve's centre (the central station), so the scene transform cannot say where it is
+        reserve = "PackedFloat64Array(%.3f, %.3f, %.6f, %.3f, %.3f)" % (pos[0], -pos[1], math.radians(yaw),
+                                                                      size[0] / 2, size[1] / 2)
+        spos = (pos[0] + ox, pos[1] + oy, pos[2])
         sub.append('[sub_resource type="Resource" id="%s%s"]\n'
                    'script = ExtResource("%s")\n'
                    'zone_id = "site_%s"\n'
@@ -430,9 +502,10 @@ def main(argv):
                    'unload_radius = %.1f\n'
                    'geometry_path = "%s%s.tscn"\n'
                    'geometry_world_placed = true\n'
-                   'geometry_world_transform = %s\n\n'
+                   'geometry_world_transform = %s\n'
+                   'metadata/site_reserve = %s\n\n'
                    % (SUB_PREFIX, zid, zone_ext, zid, max(size), max(size), load, load + 300.0, BUILDINGS, scene,
-                      site_xf(pos, yaw)))
+                      site_xf(spos, yaw), reserve))
         nodes.append('[node name="%s" type="Node3D" parent="%s" unique_id=%d]\n'
                      'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, %.3f, %.3f, %.3f)\n'
                      'script = ExtResource("%s")\n'

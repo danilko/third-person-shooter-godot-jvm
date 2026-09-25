@@ -182,7 +182,10 @@ public class TPSCameraController extends Node3D {
 
     // TPS positioning: smooth shoulder-offset follow.
     positionOffset = positionOffset.lerp(positionOffsetTarget, shoulderOffsetLerpSpeed * delta);
-    Vector3 playerBase = player.getGlobalPosition().plus(new Vector3(0, positionOffset.getY(), 0));
+    // + the body's step-smoothing offset, so the camera eases over a kerb with the visible body instead of popping
+    double stepY = character != null && character.movementControllerNow() != null
+        ? character.movementControllerNow().stepSmoothOffset() : 0.0;
+    Vector3 playerBase = player.getGlobalPosition().plus(new Vector3(0, positionOffset.getY() + stepY, 0));
     Vector3 yawRight   = yawNode.getGlobalTransform().getBasis().getX();
     Vector3 targetPos  = playerBase.plus(yawRight.times(positionOffset.getX()));
     float followSpeedWeight = combat ? 1.0f : (float) (followLerpSpeed * delta);

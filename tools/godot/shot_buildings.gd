@@ -5,7 +5,9 @@ extends SceneTree
 ##
 ## A daylight sky and sun, a ground plane, the building at the origin and a 1.49 m capsule (the character's
 ## height) outside its first door, so the scale reads. Writes <out_dir>/<Id>_<view>.png. A view: `front` 3/4 from the
-## front-left, `back` 3/4 from the back-right, `door` close on the first door at eye height.
+## front-left, `back` 3/4 from the back-right, `door` close on the first door at eye height, `plan` straight down from
+## just under the ceiling (orthographic, the roof behind the camera, shadows off) -- the floor plan, which is the only
+## way to check an interior's layout (which way a counter faces, whether a room has its door); not in the default set.
 
 const DIR := "res://src/main/resources/com/openworld/world/buildings"
 
@@ -90,7 +92,16 @@ func _run() -> void:
 		man.position = door + outward * 1.2 + outward.cross(Vector3.UP) * 0.9 + Vector3(0, 0.745, 0)
 		root.add_child(man)
 		var r: float = max(fp[0], fp[1], h) * 1.35 + 6.0
+		cam.projection = Camera3D.PROJECTION_PERSPECTIVE
+		sun.shadow_enabled = true
 		match view:
+			"plan":
+				cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+				cam.size = max(fp[0], fp[1]) * 1.1
+				cam.position = Vector3(0, 3.2, 0)
+				cam.near = 0.05
+				cam.rotation_degrees = Vector3(-90, 0, 0)
+				sun.shadow_enabled = false
 			"front":
 				cam.position = Vector3(-0.55 * r, 0.45 * h + 3.0, 0.85 * r)
 				cam.look_at(Vector3(0, 0.4 * h, 0))

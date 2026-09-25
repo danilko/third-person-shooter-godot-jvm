@@ -52,6 +52,77 @@ public class MovementController extends Node {
   public double stepHeight = 0.35;
 
   /**
+   * STEP SMOOTHING (user, 2026-09-25: "a sudden height increase rather than a smooth transition"). The capsule
+   * steps a kerb or a stair INSTANTLY -- {@link #stepUpLedge} and the floor snap on the way down are both one-tick
+   * moves, which is right for collision -- so what the eye saw was the whole body and camera jumping up to 15 cm in
+   * one frame. This is the Source / Unreal / Unity answer: the COLLISION steps, the VISUAL does not. The step's
+   * height is taken as an offset on `meshRoot` (the visible body and everything that hangs off it -- the FPS
+   * camera's neck mount, the held weapon, the hitboxes) and on the TPS rig's follow point
+   * ({@link #stepSmoothOffset}), and eased back to zero over about this many seconds. 0 turns it off (the control).
+   * Foot IK would plant the feet but leave the body and camera jump in place, and a sloped collider on every
+   * edge would be kilometres of shapes that do not match the kerb you see.
+   */
+  @Export
+  public double stepSmoothTime = 0.15;
+
+  /** A one-tick height change this much past what the floor's slope explains is a LIP (a kerb, a plate edge), up
+   *  or down, and is eased on screen; under it is ordinary ground noise and is drawn as it is. */
+  private static final double STEP_LIP_MIN = 0.015;
+
+  /** The visual's current offset below/above the body, metres (negative = drawn lower than the capsule). */
+  private double stepOffset = 0.0;
+
+  /** Where the visible body is drawn relative to the capsule right now (the TPS rig adds it to its follow point). */
+  public double stepSmoothOffset() { return stepOffset; }
+
+  @Register
+  public double stepSmoothOffsetNow() { return stepOffset; }
+
+  /** Take a one-tick height change of the capsule into the visual offset, so the eye sees it eased. */
+  private void absorbStep(double dy) {
+    if (stepSmoothTime <= 0.0) return;
+    double cap = stepHeight * 1.5;
+    stepOffset = Math.max(-cap, Math.min(cap, stepOffset - dy));
+    drawStepOffset();   // NOW, not next tick: the capsule already moved this tick, and a frame drawn in between
+                        // would show the body riding up with it
+  }
+
+  private void drawStepOffset() {
+    Vector3 p = meshRoot.getPosition();
+    if (p.getY() != stepOffset) meshRoot.setPosition(new Vector3(p.getX(), stepOffset, p.getZ()));
+  }
+
+  /** The offset's own rate of change, m/s. */
+  private double stepVel = 0.0;
+
+  /**
+   * Ease the offset back to zero as a CRITICALLY DAMPED spring (omega = 4 / stepSmoothTime) and draw it. A spring,
+   * not an exponential: an exponential moves fastest on its FIRST tick (34% of a 15 cm kerb in one frame at
+   * 0.12 s, measured 0.051 m), which still reads as a small pop; a spring starts from rest, so the largest
+   * one-tick move is ~20% of that and the body settles in about stepSmoothTime * 1.3.
+   */
+  private void tickStepSmoothing(double delta) {
+    if (stepSmoothTime <= 0.0) {
+      stepOffset = 0.0;
+      stepVel = 0.0;
+    } else if (stepOffset != 0.0 || stepVel != 0.0) {
+      // the spring's EXACT step, not an Euler one: with w * delta ~ 0.55 at 60 Hz a semi-implicit Euler step
+      // overshoots the first tick (measured 0.046 m of a 0.15 m kerb, the pop this exists to remove)
+      double w = 4.0 / stepSmoothTime;
+      double e = Math.exp(-w * delta);
+      double c = stepVel + w * stepOffset;
+      double x = (stepOffset + c * delta) * e;
+      stepVel = (stepVel - w * c * delta) * e;
+      stepOffset = x;
+      if (Math.abs(stepOffset) < 0.001 && Math.abs(stepVel) < 0.01) {
+        stepOffset = 0.0;
+        stepVel = 0.0;
+      }
+    }
+    drawStepOffset();
+  }
+
+  /**
    * How far forward the step probe reaches, in metres — at least far enough to put the body's
    * CENTRE over the ledge top.
    *
@@ -176,6 +247,7 @@ public class MovementController extends Node {
   @Override
   public void _physicsProcess(double delta) {
     if (player == null || meshRoot == null) return;
+    tickStepSmoothing(delta);
     // Non-authority bodies (NetworkController-driven remote peers/AI on a client) must
     // be driven *only* by replicated MSG_SNAPSHOT data — Character._physicsProcess
     // already early-returns for them (see its `!controller.isAuthority()` check), but
@@ -283,8 +355,29 @@ public class MovementController extends Node {
 
     player.setVelocity(new Vector3(newX, newY, newZ));
     float appliedVelocityY = (float) newY;
+    Vector3 before = player.getGlobalPosition();
+    Vector3 floorN = wasOnFloor ? player.getFloorNormal() : null;
     player.moveAndSlide();
-    if (!swimming && stepUpLedge(newX, newZ, delta)) velocity.setY(0.0);
+    Vector3 slid = player.getGlobalPosition();
+    double ySlid = slid.getY();
+    // A LIP the slide itself rode over, up or down (a 6 cm plate edge, a kerb stepped DOWN by the floor snap): on
+    // the floor before and after, the part of this tick's height change the floor's own slope does not explain
+    if (!swimming && floorN != null && player.isOnFloor() && floorN.getY() > 0.1) {
+      // On ONE plane (the normal unchanged across the tick) a height change is the slope and is drawn as it is.
+      // A tick that changed floor crossed an edge, and there the normal is the edge's tilted CONTACT, not a slope
+      // (measured: a 6 cm plate lip read as sloped ground and pushed the drawn body 8.7 cm the wrong way), so the
+      // whole change is the lip's.
+      Vector3 afterN = player.getFloorNormal();
+      double dx = slid.getX() - before.getX(), dz = slid.getZ() - before.getZ();
+      double slope = afterN.dot(floorN) > 0.9995
+          ? -(floorN.getX() * dx + floorN.getZ() * dz) / floorN.getY() : 0.0;
+      double excess = (ySlid - before.getY()) - slope;
+      if (Math.abs(excess) > STEP_LIP_MIN && Math.abs(excess) <= stepHeight + 0.05) absorbStep(excess);
+    }
+    if (!swimming && stepUpLedge(newX, newZ, delta)) {
+      velocity.setY(0.0);
+      absorbStep(player.getGlobalPosition().getY() - ySlid);
+    }
 
     // Fall damage: compare velocity just before landing to the configured threshold.
     // Skipped while swimming — water cushions the entry/landing.

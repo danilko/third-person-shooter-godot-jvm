@@ -5,6 +5,11 @@ extends SceneTree
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_kerb_step.gd
 ##       [-- --control]        step_height 0: the behaviour before MovementController.stepUpLedge existed
 ##       [-- --street=nishi_cho_530_R0 --at=-1175,530]
+##       [-- --no-smooth]      step_smooth_time 0: the capsule's one-tick step shows on screen (case 3's control)
+##
+## Case 3 (2026-09-25, user: "a sudden height increase rather than a smooth transition"): the CAPSULE still steps
+## the kerb in one tick -- that is collision, and it must -- while the VISIBLE body (MeshRoot) and the camera rise
+## over several ticks (MovementController.stepSmoothTime).
 ##
 ## A REAL walk on a REAL street of World.tscn: the player's own PlayerController reading the `forward`
 ## action, up the kerb the Road Kit built (measured: road top 0.600 m, footway top 0.750 m, so 0.15 m
@@ -19,7 +24,7 @@ extends SceneTree
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
 const VEHICLE := "res://src/main/resources/com/openworld/vehicle/SPC1.tscn"
 const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java"
-const STREET_AT := Vector2(-1175, 530)     # a city street measured E-W, so its kerb is crossed in +-Z
+const STREET_AT := Vector2(51, -106)       # ekimae_dori (after the 2026-09-25 redo): E-W, its kerb crossed in -Z
 const KERB_REACH := 14.0                   # how far to look across the road for the pavement edge
 const WALK_SECONDS := 6.0
 const CLIMB_MIN := 0.12                    # the pavement stands 0.15 m over the road
@@ -83,6 +88,35 @@ func _walk(from: Vector3, dir: Vector3) -> Array:
 	await _tick(10)
 	var p1 := player.global_position
 	return [y0, p1.y, Vector2(p1.x - p0.x, p1.z - p0.z).length()]
+
+## Walk as `_walk` does, sampling per tick the capsule, the visible body (MeshRoot) and the current camera.
+## Returns the largest ONE-TICK rise of each, and how far the body rose overall.
+func _walk_sampled(from: Vector3) -> Array:
+	player.global_position = from
+	await _tick(20)
+	var mesh: Node3D = player.get_node("MovementController").get("mesh_root")
+	var cam := root.get_viewport().get_camera_3d()
+	var y0 := player.global_position.y
+	var last := [player.global_position.y, mesh.global_position.y, cam.global_position.y]
+	var worst := [0.0, 0.0, 0.0]
+	var trace := []
+	var worst_at := 0
+	Input.action_press("forward")
+	for i in range(int(WALK_SECONDS * 60)):
+		await physics_frame
+		var now := [player.global_position.y, mesh.global_position.y, cam.global_position.y]
+		trace.append(now)
+		if now[1] - last[1] > worst[1]:
+			worst_at = i
+		for k in range(3):
+			worst[k] = maxf(worst[k], now[k] - last[k])
+		last = now
+	if _arg("trace", "") != "":
+		for i in range(maxi(0, worst_at - 6), mini(trace.size(), worst_at + 8)):
+			print("    tick %3d  capsule %.3f  body %.3f  camera %.3f" % [i, trace[i][0], trace[i][1], trace[i][2]])
+	Input.action_release("forward")
+	await _tick(10)
+	return [worst[0], worst[1], worst[2], player.global_position.y - y0]
 
 ## SWEEP: every streamed lane near the player, sampled along its length, asking at each sample what a
 ## character walking off the road onto the pavement would MEET -- the first surface outboard of the kerb line
@@ -202,6 +236,8 @@ func _initialize() -> void:
 
 	if control:
 		player.get_node("MovementController").set("step_height", 0.0)
+	if _arg("no-smooth", "") != "":
+		player.get_node("MovementController").set("step_smooth_time", 0.0)
 
 	if _arg("sweep", "") != "":
 		print("")
@@ -246,6 +282,16 @@ func _initialize() -> void:
 	print("  walked %.2f m, y %.3f -> %.3f" % [r2[2], r2[0], r2[1]])
 	_check("the player walked onto the pavement after the car", r2[1] - r2[0] >= CLIMB_MIN and r2[2] >= 1.5,
 		"rose %.3f m over %.2f m" % [r2[1] - r2[0], r2[2]])
+
+	# --- 3. the step is SMOOTH on screen: the capsule steps in one tick, the visible body and camera do not
+	print("")
+	print("=== 3. the kerb eased on screen (step smoothing) ===")
+	var r3: Array = await _walk_sampled(start)
+	print("  largest one-tick rise: capsule %.3f m, visible body %.3f m, camera %.3f m (rose %.3f m)"
+		% [r3[0], r3[1], r3[2], r3[3]])
+	_check("the capsule stepped the kerb in one tick", r3[0] >= 0.10, "%.3f m" % r3[0])
+	_check("the visible body rose over several ticks", r3[1] <= 0.04, "%.3f m in one tick" % r3[1])
+	_check("the camera rose over several ticks", r3[2] <= 0.04, "%.3f m in one tick" % r3[2])
 
 	print("")
 	print("RESULT: %s (%d/%d)" % ["PASS" if failures == 0 else "FAIL (%d failures)" % failures,

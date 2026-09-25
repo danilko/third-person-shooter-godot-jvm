@@ -742,7 +742,7 @@ class JunctionSolve(object):
     """One pad: its members, its boundary, the triangle fan and the turn paths."""
 
     __slots__ = ("uids", "centre", "mouths", "boundary", "fan", "fan_apex", "turns",
-                 "kerb_radius", "star_ok", "star_worst", "corners")
+                 "kerb_radius", "star_ok", "star_worst", "corners", "runaway")
 
     def __init__(self, uids, centre, mouths, boundary, fan, turns, kerb_radius,
                  star_ok, star_worst, fan_apex=None, corners=()):
@@ -761,6 +761,8 @@ class JunctionSolve(object):
         self.star_ok, self.star_worst = star_ok, star_worst
         #: The pad's own edge furniture -- see `Corner`.
         self.corners = list(corners)
+        #: `[(a uid, b uid, reach m)]` -- corners `junction_corners` refused as running away (CORNER_REACH_FACTOR).
+        self.runaway = []
 
     def __repr__(self):
         return "JunctionSolve(%d arms, %d ring pts%s)" % (
@@ -1489,7 +1491,15 @@ def _cap_points(m, tail_length=1.0):
             ik.vadd(ik.vscale(perp, m.arm.out_width()), c))
 
 
-def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None, field=None):
+#: A kerb corner is METRES from its pad, never a kilometre (PLAN.md B11). Measured on the island: a 5-arm pad whose
+#: approaches ran nearly parallel solved corners reaching 1.1-1.7 km out (to x -2307), and their footways lay across
+#: four lanes of `nishi_dori`. A corner whose arc runs further from the pad centre than this factor x the farthest
+#: mouth cap, plus the slack, is REFUSED (not built) and reported as `corner_runaway`.
+CORNER_REACH_FACTOR = 1.5
+CORNER_REACH_SLACK = 20.0
+
+
+def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None, field=None, refused=None):
     """`[Corner]` -- one per real corner of the pad. A through-pair contributes none, because the
     road runs straight on through and its own edge run already owns that stretch. `ring` (the pad's
     own, local) supplies each corner's SOLVED radius -- grown by `contain_turns` -- so the kerb
@@ -1504,6 +1514,8 @@ def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None, field=N
                 if _len2(_sub2(v[:2], seg[1][:2])) < 1e-3:
                     seg[1] = (seg[1][0], seg[1][1], v[2])
     caps = {m.uid: _cap_points(m) for m in mouths}
+    reach = CORNER_REACH_FACTOR * max((math.hypot(*c[:2]) for pr in caps.values() for c in pr), default=0.0) \
+        + CORNER_REACH_SLACK
     out = []
     for seg in segs:
         # `build_junction_curb_segments` does not say WHICH pair each segment came from, and the
@@ -1516,6 +1528,11 @@ def junction_corners(mouths, kerb_radius, cx, cy, segments=8, ring=None, field=N
         # open corner correctly with no second implementation of an arc.
         flat = _round_ring(list(seg), segments)
         if len(flat) < 2:
+            continue
+        far = max(math.hypot(x, y) for x, y in flat)
+        if far > reach:
+            if refused is not None:
+                refused.append((a.uid, b.uid, far))
             continue
         zfn = field.z if field is not None else (lambda xy: _idw_z(mouths, xy))
         pts = [(x + cx, y + cy, zfn((x + cx, y + cy))) for (x, y) in flat]
@@ -1803,9 +1820,12 @@ def solve_junction(net, uids, segments=8, ground_fn=None, contain=True):
 
     apex, fan, star_ok, star_worst = pad_triangles(boundary, mouths, (cx, cy), field)
     turns = build_turns(mouths, fan=fan)
-    corners = junction_corners(mouths, kerb_radius, cx, cy, segments, ring=ring, field=field)
-    return JunctionSolve(list(uids), centre, mouths, boundary, fan, turns, kerb_radius,
-                         star_ok, star_worst, fan_apex=apex, corners=corners)
+    refused = []
+    corners = junction_corners(mouths, kerb_radius, cx, cy, segments, ring=ring, field=field, refused=refused)
+    js = JunctionSolve(list(uids), centre, mouths, boundary, fan, turns, kerb_radius,
+                       star_ok, star_worst, fan_apex=apex, corners=corners)
+    js.runaway = refused
+    return js
 
 
 def build_turns(mouths, segments=9, fan=None):
@@ -1884,6 +1904,28 @@ GORE_STEP = 2.0
 #: A parallel-type exit diverges at 2-5 degrees; past this the "edge alignment" the model promises
 #: is true at exactly one point and false a metre later.
 GORE_MAX_DIVERGE_DEG = 8.0
+
+#: How much wider than `GORE_NOSE_WIDTH` the strip's wide end may measure before the two boundaries
+#: are not a PAIR at all and the gore is refused. The strip stops on the first sample at or past the
+#: nose width, and the step is 2 m, so at `GORE_MAX_DIVERGE_DEG` a legitimate overshoot is ~0.28 m.
+#: MEASURED over every network in the repo, so the margin is visible rather than assumed: the island's
+#: seven gores cap at 4.10-4.49 m, the two interchange templates at 4.05-4.62, and RoadKitSample's
+#: widest at **5.32** -- so the bound below clears the worst real gore by 0.68 m. A ramp diverging
+#: faster than `GORE_MAX_DIVERGE_DEG` (a WARN, not a hard bound) could overshoot further; if a
+#: legitimate gore is ever refused, that finding will be on it, and this number is what to raise.
+#:
+#: WHAT IT CATCHES, measured (PLAN.md 0.10(c)). `a` is the mainline boundary RE-INDEXED by projecting
+#: each ramp point onto it, and that projection CLAMPS at the end of the mainline's own edge walk --
+#: so once the ramp outruns the mainline's edge, every later ramp point pairs with the SAME foot. On
+#: the island's `shuto_eb_loop` the mainline edge came back as two identical points, the strip had
+#: length 0.00 m, and its cap was struck **27.79 m** across the loop's own carriageway: 11 walk and 8
+#: car-wall samples standing in lanes `shuto_eb_loop__2_F0/F1`, which a car cannot drive.
+#:
+#: The signed gap cannot see it (perpendicular offset stays small while the pair slides apart along
+#: the road), which is why this is asked of the CAP -- the one number a wall is actually built from.
+#: It is the same bound `self_test`'s "a cap is a wall across the ramp" case already asserted; what
+#: was missing is that the solver never checked it.
+GORE_CAP_SLACK = 2.0
 
 #: How many vertices the gore's nose cap carries. A short straight run, but the furniture BLENDS
 #: across it -- a mainline that declares a barrier meeting a ramp that declares a footway must not
@@ -2474,8 +2516,8 @@ def solve_gore(net, main_uid, ramp_uid, main_solve, ramp_solve,
         gap = math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1])
         if gap >= nose:
             break
-    if len(pa) < 2:
-        return None
+    if len(pa) < 2 or gap > nose + GORE_CAP_SLACK:
+        return None                    # see GORE_CAP_SLACK: the two boundaries never paired
     tris = []
     for i in range(len(pa) - 1):
         tris.append((pa[i], pb[i], pb[i + 1]))
@@ -2483,6 +2525,8 @@ def solve_gore(net, main_uid, ramp_uid, main_solve, ramp_solve,
     poly = [(p[0], p[1]) for p in pa] + [(p[0], p[1]) for p in reversed(pb)]
     length = sum(math.hypot(pa[i + 1][0] - pa[i][0], pa[i + 1][1] - pa[i][1])
                  for i in range(len(pa) - 1))
+    if length <= 1e-6:
+        return None                    # a strip with no length is not a wedge, whatever its cap
     # ---- and the cap across the wide end.
     # AT THE NOSE, flush with the paint: the cap's two ends ARE the last pair of the gore strip,
     # so there is no seam between the wedge and the wall that closes it. That only works because
@@ -2761,6 +2805,7 @@ def _setback_pass(net, uids, margin, clamped):
         # the other way. Stop `MIN_MOUTH_CLEAR` short, which is the span the gate asks for, and say
         # so: the remedy is the gate's (delete the station, or lock the mouth).
         _od, _fwd, seg = mouth_axis(net, m.uid)
+        grade = 0.0
         if seg is not None and seg in net.points:
             q = net.points[seg].pos
             reach = (q[0] - ax) * m.out_dir[0] + (q[1] - ay) * m.out_dir[1] - pv.MIN_MOUTH_CLEAR
@@ -2770,7 +2815,24 @@ def _setback_pass(net, uids, margin, clamped):
                     clamped[m.uid] = (tail, along, seg)
             elif clamped is not None:
                 clamped.pop(m.uid, None)
-        want = (ax + m.out_dir[0] * along, ay + m.out_dir[1] * along, m.pos[2])
+            # A SLIDING MOUTH TAKES ITS ROAD'S OWN HEIGHT AT THE NEW PLACE.
+            #
+            # This kept `m.pos[2]` while moving the mouth metres along the road, so on any road that is
+            # not level the stop line ended up at the height it had BEFORE the slide -- and a pad is
+            # solved FROM its mouths (`_idw_z`), so the pad then has to cover that error over the
+            # setback. Measured on the island: `shrine_touge__16`'s east mouth slid ~20 m down a 10 %
+            # descent and kept the height of the station it had left, landing **2.26 m above**
+            # `nishi_dori__6`, which it Ts into 19 m away -- a pad **19.9 %** steep on its left
+            # movement (`island_layout.py`'s `pad_grade`, PLAN.md tier B6). It is general, not the
+            # touge's: every junction on a graded road carried a share of it.
+            #
+            # The road's own grade here is the span to the station beyond the mouth -- the same `seg`
+            # the clamp above already reads, and the only piece of this road the mouth is sliding along.
+            run = (q[0] - m.pos[0]) * m.out_dir[0] + (q[1] - m.pos[1]) * m.out_dir[1]
+            if abs(run) > 1e-6:
+                grade = (q[2] - m.pos[2]) / run
+        want = (ax + m.out_dir[0] * along, ay + m.out_dir[1] * along,
+                m.pos[2] + grade * (foot + along))
         d = _len2((want[0] - m.pos[0], want[1] - m.pos[1]))
         if d < 1e-4:
             continue
@@ -3095,6 +3157,46 @@ def self_test():
         again = auto_setback(bn, barms)
         assert not again, ("press %d moved mouths" % (_press + 2), again)
     assert all(bn.points[u].pos == placed[u] for u in barms)
+    # ---- A SLIDING MOUTH TAKES ITS ROAD'S OWN HEIGHT (PLAN.md tier B6) ------------------------
+    # A plain crossing whose north-south road CLIMBS at 10 % (the touge's own limit) with its mouths
+    # parked close in, so the setback really pushes them out. After the press each moved mouth must
+    # still lie on the line its own UNTOUCHED stations describe -- measured against those, so the check
+    # cannot agree with the slide by construction. Keeping `m.pos[2]` is what put the island's touge
+    # mouth 2.26 m over the arterial it Ts into, and a pad is solved FROM its mouths.
+    GRADE = 0.10
+    gn = pm.NetworkData()
+    gew = gn.add_road(pm.RoadData("g_ew", pm.PointData(lanes_fwd=2, lanes_bwd=2, lane_width=3.5)))
+    gns = gn.add_road(pm.RoadData("g_ns", pm.PointData(lanes_fwd=2, lanes_bwd=2, lane_width=3.5)))
+    gchain = []
+    for road, pts in ((gew, ((-200.0, 0.0), (-60.0, 0.0), (-8.0, 0.0), (8.0, 0.0), (60.0, 0.0), (200.0, 0.0))),
+                      (gns, ((0.0, -200.0), (0.0, -60.0), (0.0, -8.0), (0.0, 8.0), (0.0, 60.0), (0.0, 200.0)))):
+        z = (lambda y: GRADE * y) if road is gns else (lambda _x: 0.0)
+        ch = [gn.add_station(road, (x, y, z(y if road is gns else x)), has_ground_z=True,
+                             role=(pm.INTERSECTION if i in (2, 3) else pm.SEGMENT))
+              for i, (x, y) in enumerate(pts)]
+        for u_, v_ in zip(ch, ch[1:]):
+            if not (u_.role == pm.INTERSECTION and v_.role == pm.INTERSECTION):
+                gn.link(u_.uid, v_.uid, pm.LINK_SEGMENT)
+        gchain.append(ch)
+    garms = [gchain[0][2].uid, gchain[0][3].uid, gchain[1][2].uid, gchain[1][3].uid]
+    for i_ in range(len(garms)):
+        for j_ in range(i_ + 1, len(garms)):
+            gn.link(garms[i_], garms[j_], pm.LINK_JUNCTION)
+    before_g = {u: gn.points[u].pos for u in garms}
+    auto_setback(gn, garms)
+    checked = 0
+    for u in (gchain[1][2].uid, gchain[1][3].uid):
+        q_ = gn.points[u].pos
+        slid = math.hypot(q_[0] - before_g[u][0], q_[1] - before_g[u][1])
+        assert slid > 3.0, ("the case must really slide the mouth", u, slid)
+        want_z = GRADE * q_[1]                      # the road's own surface at the new place
+        assert abs(q_[2] - want_z) < 0.05, (u, q_[2], want_z, slid)
+        # CONTROL: keeping the height it had before the slide is wrong by grade x slide.
+        assert abs(before_g[u][2] - want_z) > 0.25, ("CONTROL", u, before_g[u][2], want_z, slid)
+        checked += 1
+    assert checked == 2, checked
+    ok += 1
+
     # ONE OWNER: the seeder asks `solved_setback` with no start and must get the same number.
     jb = solve_junction(bn, barms)
     assert abs(solved_setback(jb.mouths, jb.kerb_radius) - bn.points[barms[0]].setback_solved) < 1e-9
@@ -3174,6 +3276,14 @@ def self_test():
                       g.main_edge[0][1] - g.ramp_edge[0][1])
     assert head < 1.0, "the gore opens at the theoretical gore, %.2f m apart" % head
     assert g.nose_gap >= GORE_NOSE_WIDTH - 1e-6 or g.length >= GORE_MAX_LENGTH - 1e-6, g
+    # A CAP IS AT MOST THE NOSE WIDTH PLUS ONE OVERSHOOT (PLAN.md 0.10(c), `GORE_CAP_SLACK`). The
+    # mainline boundary is the ramp's points PROJECTED onto it and that projection CLAMPS at the end
+    # of the mainline's own edge walk, so once the ramp outruns it every later ramp point pairs with
+    # the same foot and the "gap" is a slide ALONG the road rather than across a wedge. Measured on
+    # the island, that built a 27.79 m cap over a 0.00 m strip, laid across `shuto_eb_loop__2`'s own
+    # carriageway. The gate for the real geometry is `tools/godot/probe_road_clear.gd`; here the
+    # invariant is asserted on every gore this fixture produces.
+    assert g.nose_gap <= GORE_NOSE_WIDTH + GORE_CAP_SLACK and g.length > 1e-6, g
 
     # ---- ...and the CAP that closes the open V at its wide end --------------------------------
     # Both flanking walls open across a gore (`point_edges.Band.carries_edge` is False for one),

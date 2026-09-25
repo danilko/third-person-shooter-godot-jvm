@@ -44,8 +44,18 @@ import java.util.List;
 @Script(className = "PedCrowd")
 public class PedCrowd extends Node3D {
 
-	/** The script-free body every light ped instances: the imported character, no MeshConfig and no modifiers. */
-	public static final String PED_SCENE = "res://assets/characters/shino/shino.tscn";
+	/**
+	 * The script-free body every light ped instances: no MeshConfig and no modifiers.
+	 *
+	 * <p>It is the <b>LOD</b> body ({@code blender/tools/build_ped_body.py}), not the playable one. At the
+	 * nearest distance this tier is ever drawn -- {@link #promoteDistance}, 80 m -- a 1.65 m body is ~14 px tall
+	 * on a 1080p screen, so what costs anything is DRAW CALLS: the playable body is 3 {@code MeshInstance3D} but
+	 * <b>17 surfaces with 17 materials</b>, i.e. ~17 draws per light ped with ~100 of them in range downtown.
+	 * The LOD body is ONE surface over one atlas (and 2 clips instead of 173, so 2.0 MB against 48.8). It is
+	 * built FROM the shipped export and clones that body's own material, so it can never drift from what the
+	 * player sees -- gate {@code tools/godot/probe_ped_body.gd}.
+	 */
+	public static final String PED_SCENE = "res://assets/characters/shino/shino_ped.tscn";
 	private static final StringName WALK_CLIP = new StringName("upright_walk_forward");
 	private static final StringName RUN_CLIP = new StringName("upright_sprint_forward");
 

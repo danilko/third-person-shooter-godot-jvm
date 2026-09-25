@@ -1,4 +1,13 @@
 [gd_resource type="StandardMaterial3D" format=3]
+; PUBLIC pavement: the FOOTWAY (歩道, the road's land). The road kit's default footway material
+; (`point_kit.DEFAULT_MATERIAL["footway"]`), resolved by name at bake, so an edit here restyles every road piece
+; with no rebuild. Its PRIVATE twin is `assets/world_source/buildings/materials/M_LotConcrete.tres` (the building
+; plates and the block fill between them). The two share textures and tile; the private one is ~8% lighter (user,
+; 2026-09-25), otherwise one look, kerb to
+; door -- plain grey cast concrete, 土間コンクリート, world-space triplanar at the kit's 2.73 m module) and are two
+; files so an artist can move either without the other. In Japan a public footway is as often asphalt, interlocking
+; block or a permeable coloured paving as concrete, and a private forecourt is usually brushed 土間コンクリート
+; (light when new, darkening with weather), so there is no fixed "private is darker" rule to encode here.
 
 [ext_resource type="Texture2D" path="res://assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_BaseColor.png" id="1_base"]
 [ext_resource type="Texture2D" path="res://assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_ORM.png" id="2_orm"]

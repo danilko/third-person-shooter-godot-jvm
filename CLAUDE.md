@@ -8765,6 +8765,76 @@ same `--check`.
   the cell pitch (only the cell you stand in ever streams) and fails exactly the "the streets ahead are already
   populated" check, 60 -> 0.
 
+## A LIGHT PED IS ONE SURFACE: the crowd's LOD body (2026-09-22)
+
+3.6d built the two-tier crowd and pointed its far tier at the PLAYABLE body, which is **3
+`MeshInstance3D` but 17 surfaces with 17 materials** -- ~17 draws per light ped, with ~100 in range
+downtown, i.e. ~1 100 of the station quarter's ~4 000 draws. `blender/tools/build_ped_body.py` writes
+`assets/characters/<body>/<body>_ped.glb`: **one skinned mesh, one material, one atlas, two clips**
+(48.8 MB -> 2.0 MB), and `PedCrowd.PED_SCENE` points at `shino_ped.tscn`.
+
+- **Measured, the whole reason it exists** (`probe_walk_perf.gd --legs=walk_station`, display, this dev
+  PC): the station walk went **p50 15.4 / p95 20.8 ms -> p50 10.84 / p95 15.72**, and the run's own
+  verdict flipped to `RESULT PASS worst leg p95 15.72 ms (budget 16.7)`. That quarter was the ONLY
+  place on the island over 16.7 ms p95.
+- **It is built FROM THE SHIPPED `.glb`, not the `.blend`.** The game plays the export, so the LOD is
+  derived from the same artefact the full body is and can never disagree with what is on screen; it
+  also needs to know nothing about the authoring file (Auto-Rig Pro, the control rig, the linked weapon
+  libraries, the 173 authored actions). One tool serves every body, the way `export_character.py`
+  derives its output from the file it was handed.
+- **THE PED'S MATERIAL IS THE BODY'S MATERIAL WITH THE ATLAS IN IT**, cloned, never a fresh Principled
+  one. Every shino surface is `KHR_materials_unlit` -- a VRoid/VRM import artefact that survives the
+  export, so **the shipped character body is shadeless and ignores the sun, the night and every street
+  lamp** (worth knowing on its own; it is the body export's business, P6 / 3.14, not the crowd's). A LIT
+  ped beside an UNLIT player would change brightness at the moment it promotes, 80 m from the camera.
+  Cloning makes the ped match whatever that body is, with nothing here to keep in step.
+- **What it drops, and the measurement that allows it.** The eight sub-pixel face surfaces (iris, white,
+  highlight, extra, eyelash, eyeline, brow, mouth -- 1 808 tris and 8 of the 17 textures) cannot be
+  resolved at the nearest distance this tier is ever drawn: at `promoteDistance` (80 m) a 1.65 m body is
+  **~14 px tall** on a 1080p screen and a head is ~2 px. A client, which may not promote, HIDES its light
+  peds inside that ring rather than drawing them close, so no path puts this body in front of a camera
+  at conversational range. Everything carrying the SILHOUETTE is kept, all three hair surfaces included
+  -- hair is 53 % of the triangles and is alpha cut-out, so dropping its alpha would make it a block.
+- **The atlas's one known limit, stated rather than hidden:** each cell is grown by a gutter of its own
+  EDGE pixels (16 px), so the first four mip levels cannot sample a neighbour; past that -- once the whole
+  ped is a few tens of pixels -- cells do average into each other, a slight colour shift on a body that is
+  already a smudge. A per-cell mip chain cannot cross glTF, and the alternative is the 17 draws this
+  removes.
+
+**Four traps, each of which cost a build:**
+- **A `baseColorFactor` is not in the texture.** VRoid tints a GREYSCALE hair texture with a constant
+  (shino's is a dark blue 0.098/0.141/0.220 over a white mask), so the first atlas -- which copied the
+  textures alone -- would have put a **white-haired** ped in the crowd. Each cell now bakes its own
+  material's factor in, sRGB texel x linear factor, the way a renderer multiplies them.
+- **Blender's glTF IMPORTER builds an `Icosphere`** as the display shape for all 158 bones and leaves it
+  in the scene (in a `glTF_not_exported` collection), so a filter on `type == 'MESH'` silently joins a
+  bone widget into the body. Only what the armature DEFORMS may enter -- `export_character
+  .deform_armature`'s rule from the other side.
+- **Since Blender 4.2 the glTF exporter derives `alphaMode` from the NODE TREE, not from
+  `blend_method`** (`search_node_tree.gather_alpha_info` / `detect_alpha_clip`). Setting
+  `blend_method = 'CLIP'` exports as **BLEND** and says nothing; what it looks for is a compare node on
+  the alpha (`GREATER_THAN` -> MASK with that cutoff). A MASK donor already carries such a chain and a
+  BLEND one wires the alpha straight through, so the chain is cut back to the image and re-made.
+- **Blender hands back a FRESH Python wrapper for an RNA socket on every access**, so `l.from_socket is
+  sock` is False even for one socket -- match the node and the socket NAME instead. This read as "the
+  donor material does not route its alpha anywhere".
+
+Gate **`tools/godot/probe_ped_body.gd`** (19/19; `-- --control` measures the FULL body and fails exactly
+the 4 surface/material checks). Every failure here is silent in game -- a scene that quietly kept 17
+surfaces looks identical and costs 17x, one whose clips were renamed stands still (`AnimationPlayer.play`
+of a missing clip is a no-op), one whose skeleton lost a bone plays the walk on a body that does not move
+-- so each is asserted, clip LOOPING included. `probe_ped_crowd` 12/12 and `probe_island_peds` 12/12 are
+unchanged on the new body.
+
+**An atlas is a PICTURE question and no structural check can see it** -- a cell mapped to the wrong face, or
+flipped, passes every assertion above. `tools/godot/shot_ped_body.gd` (NEEDS A DISPLAY) puts the full body
+and the LOD side by side in one frame at each distance. Looked at: at **2.5 m**, 32x nearer than this tier
+is ever drawn, the two are the same body -- hair colour, uniform, ribbon, socks, shoes and skin all match --
+and the ONLY difference is the face, which is the eight surfaces that were deliberately dropped (the eyes
+read as flat ovals, no brows or mouth). At **80 m**, the nearest a light ped is drawn, they are
+indistinguishable and the mip bleeding is not visible.
+
+
 ## Street trees are ROAD FURNITURE, one species per street (PLAN.md 3.16 step 4, 2026-09-20)
 
 The first half of 3.16 step 4. A 街路樹 is placed by **`point_furniture._street_trees`**, beside the planters,
@@ -9877,6 +9947,142 @@ wrong); **a ramp diverging 0.25 m below its mainline while still under its deck*
 across live asphalt** (the two lanes it sits between are 4.50 m apart at the same height); and
 `site_tokyo_station`'s collider over `naka_hondori` (3.33's known placeholder, now with a number).
 DebugWorld fails it too, and truly: `loop_F1` runs 0.6 m inside the hand-authored CSG blockout.
+
+### Three of those four, fixed -- and each was a fact asked of a LABEL instead of of the geometry (2026-09-22)
+
+- **A ROAD IS NOT EXEMPT FROM ITSELF.** `pier_on_road` took an `own` set of road names so a pier was never
+  refused for standing on its own road -- right for the deck it CARRIES, wrong for a road that passes under
+  ITSELF (a loop ramp, a switchback, an interchange spur). The name was never the fact that mattered: **the
+  deck a pier carries is AT its soffit**, so the existing height test (`PIER_ROAD_DZ`, 4 m below) already
+  tells the two apart whoever owns the band. Dropping the exemption is not a widening of the rule -- it is
+  the same rule asked of the geometry. `point_mesh.py` self-test carries both cases (the deck at the soffit
+  is allowed; a band named like the pier's own road 10 m below is refused). **It needed a second half
+  (2026-09-25), found by `probe_road_clear` still failing after the rebuild:** `Band.surface_z` is the
+  NEAREST spine sample, and a loop's band covers the pier's point TWICE, so it returned the upper leg's
+  height and the pier survived. `pier_on_road` now asks `Band.lowest_surface_z` (the lowest spine height
+  within 6 m of the nearest sample).
+- **A GORE'S CAP IS A LIE WHEN ITS TWO BOUNDARIES NEVER PAIRED.** 3.35 guessed "the nose is too far back";
+  the measurement said otherwise. The mainline boundary is the ramp's points PROJECTED onto it, and that
+  projection CLAMPS at the end of the mainline's own edge walk -- so once the ramp outruns it, every later
+  ramp point pairs with the SAME foot and the "gap" is a slide ALONG the road, not across a wedge. Measured
+  on the island: that gore came back with **two identical mainline points, length 0.00 m and a nose gap of
+  27.79 m**, and its cap was struck 27.79 m across `shuto_eb_loop__2`'s own carriageway. The signed gap
+  cannot see it (the perpendicular offset stays small), so the refusal is asked of the CAP, the one number a
+  wall is actually built from: `GORE_CAP_SLACK` (2.0 m past `GORE_NOSE_WIDTH`) plus a refusal of a
+  zero-length strip. That bound is the one the self-test's own "a cap is a wall across the ramp" case had
+  asserted since 8j and which the solver never checked. Measured after: **8 gores -> 7**, the degenerate one
+  gone and the other 7 unchanged to the centimetre (gaps 4.10-4.49 m, lengths 8.3-20.2 m).
+- **A SLIDING MOUTH TAKES ITS ROAD'S OWN HEIGHT AT THE NEW PLACE** (`point_solve._setback_pass`). W17 made
+  the setback idempotent and made a mouth slide along its own road; the slide wrote back **`m.pos[2]`, the
+  height it had BEFORE moving**, so on any road that is not level the stop line ended up at the height of a
+  station metres away -- and a pad is solved FROM its mouths (`_idw_z`), so the pad then had to cover the
+  error over the setback. Measured: `shrine_touge__16`'s east mouth slid ~20 m down a 10 % descent and
+  landed **2.26 m above** `nishi_dori__6`, which it Ts into 19 m away -- a pad **19.9 %** steep on its left
+  movement. **It is general, not the touge's**: every junction on a graded road carried a share of it, and
+  two more `pad_grade` WARNs (13.1 %, 10.2 %) are the same shape. The slide now takes the road's grade from
+  the span to the station beyond the mouth -- the same `seg` the `MIN_MOUTH_CLEAR` clamp already reads, and
+  the only piece of this road the mouth is sliding along. It converges with the plan position, so W17's
+  fixed point is unaffected. Self-test: a crossing whose north-south road climbs at 10 % with its mouths
+  parked close in, asserting each moved mouth still lies on its own UNTOUCHED stations' line (< 0.05 m),
+  with an inline control that the old behaviour is wrong by > 0.25 m.
+
+**A pin is not always the cause.** B6 was written as "ease the touge's last spans onto 0 m", and the touge's
+own generator looked guilty: both ends were pinned to the RAW GROUND (`raw(*EAST_FOOT)`) rather than to the
+arterial they join. That rule was wrong and is fixed (`island_touges.arterial_point` -- a T must arrive at
+the road it meets, and an arterial is draped and then smoothed, so it is not the ground) -- but re-deriving
+with it produced a **byte-identical alignment**: its last station was already at z 0.26 against the
+arterial's 0.00. The 2.26 m was put there afterwards, by the setback. Measure the OUTPUT record, not the
+generator, before believing a generator is at fault.
+
+## The station moved off the trunk road; ramps are level through the gore; two konbini and a car park (2026-09-25)
+
+The tier-B road batch and C0 (PLAN.md "Order check before the tier-B rebuild"). Each rule below replaced a defect
+that `probe_road_clear` or the layout gates measured.
+
+- **A site's footprint is a RESERVE, and the station's is sized from PLATEAU.** `island_sites.station_site` used to
+  check only that `ekimae_dori` was straight and the land flat, so it put Tokyo Station across `naka_hondori` and
+  blocked three lanes. It now places a `STATION_L x STATION_RESERVE_D` (320 x 130 m) reserve beside the street. The
+  reserve must be clear of every road's PAVED EDGE (`road_index(widths=True)`, each road's own half width from its
+  base section), except block streets, which re-route round a site by themselves.
+  - Candidates are walked every 5 m along the JOINED street, across junction gaps: the only place it fits, east of
+    `naka_hondori`, is exactly where `ekimae_dori` is broken by a cross street.
+  - The building scene stands at the reserve's FRONT (`scene_front` in `IslandSites.json`), with the forecourt in
+    front of it and the platform band behind.
+  - Each site Zone carries `metadata/site_reserve` (godot x, z, yaw, half x, half z), and
+    `island_buildings.site_exclusions` prefers it, because a scene standing off its reserve's centre can no longer
+    say where the reserve is.
+  - Sizes: `tools/plateau2json/measure_stations.py` (prints numbers only; credited in CREDITS.md). Tokyo Station is
+    ~430 x 250 m; the ladder of smaller stations is in PLAN.md B4.
+- **A street that no nudge takes clear of a site is CUT by it, not dropped** (`island_streets._line_split`, a last
+  resort only when every nudge failed on a site). Cutting first would stop the ordinary nudge moving a street off a
+  site's face.
+- **A ramp is level with its mainline until the paved bands part** (`island_grades.level_gores`, run first in
+  `smooth`). From each RAMP mouth, the ramp takes the mainline's own surface height out to where its centreline is
+  `half(main) + half(ramp) + 1 m` from the mainline's (a station is inserted there). Beyond that it rejoins its OWN
+  profile at the first station reachable at no more than 7 %; every later station is left alone. The held stations
+  are smoothing anchors.
+  - Measured before: the diamond exit ran 0.25-1.2 m under C1's deck edge, and the Wangan merge 0.86 m under the
+    spur.
+  - **Re-grading to the ramp road's far end is wrong, and it was tried**: the Wangan is one long road at layout
+    time, designed to climb over `kichi_dori`, and a linear regrade took its clearance from 7.1 m to 1.3 m.
+- **A pier's "road below" is the band's LOWEST surface there** (`Band.lowest_surface_z`). `surface_z` is the nearest
+  spine sample, and a loop's band covers its own pier's point twice (see "A ROAD IS NOT EXEMPT FROM ITSELF").
+- **A kerb corner is metres, never a kilometre.** `point_solve.junction_corners` refuses a corner whose arc runs
+  past `CORNER_REACH_FACTOR` (1.5) x the farthest mouth cap + 20 m from the pad centre; validate reports it as
+  `corner_runaway`. On the old record it caught 6, including a 5-arm pad's three (1.1-1.8 km) and one of 4.1 km.
+  That 5-arm pad was split in the arterials INPUT: `nishi_dori` passes through as a joint, and `rinkai_dori` x
+  `kichi_dori` is a T.
+- **ONE LOOK, TWO MATERIALS, kerb to door** (user, 2026-09-25): PUBLIC = the footway,
+  `road_kit/materials/M_ConcreteTile.tres` (`point_kit.DEFAULT_MATERIAL["footway"]`); PRIVATE (民地) = every building's
+  lot slab (`island_buildings.LOT_MATERIAL`) and the block ground between them,
+  `buildings/materials/M_LotConcrete.tres`. They ship with the SAME values (plain grey cast concrete, 土間コンクリート,
+  at the kit's 2.73 m module) except that the private one is ~8% lighter (albedo 1.0/0.98/0.94 vs 0.92/0.90/0.86,
+  user 2026-09-25: fresh private concrete beside the public footway); two files so an artist can move either alone.
+  Japan has no fixed "private is darker" rule: a public footway is as often asphalt, interlocking block or coloured
+  permeable paving as concrete, and a private forecourt is usually brushed concrete, light when new and darkening
+  with weather. `M_TileWhite` is deleted. Only the carriageway differs (`M_Asphalt`).
+  - The private file lives OUTSIDE `road_kit/materials/` on purpose: that folder is hashed into every road piece's
+    digest (`point_digest.builder_salt`), so a lot edit there would rebuild every road. After editing it:
+    `island_buildings.py write` (the cells reference the path) and `make_urban_texture.py --from-lot` (repacks the
+    Urban layer and prints the tint/uv to set on `terrain_assets.tres`).
+  - The fill is FLUSH with the plates: it stands `LOT_FILL_GAP` (2 cm) under the slab's top, where it was 6 cm
+    (`LOT_RAISE`). Two centimetres is invisible and unwalkable as a step, and it keeps the slab winning the depth
+    test (exactly coplanar would z-fight).
+- **THE BLOCK IS THE PRIVATE GROUND; THE LOT SLAB IS GONE, A BUILDING STANDS ON A PLINTH** (user, 2026-09-25: "small
+  gaps between building plates, which seem not normal"). A lot slab was a rectangle grown from its own building in its
+  own frame, and rectangles in different frames cannot tile a block, so strips of the fill always showed between
+  neighbouring slabs -- a gap no edge bevel could close. The block fill (`island_ground.py`) now stands AT the old
+  slab's top (footway + `LOT_RAISE`, `LOT_FILL_GAP` 0) and may LOWER ground on a lot by up to `BURY_TOL` (ground
+  left there would poke through a shop floor). Each building keeps a PLINTH (`island_buildings.plinth_boxes`): its
+  type footprint + `PLINTH_MARGIN` 0.25 m, top `PLINTH_LIFT` 1.5 cm over the fill and under the floor
+  (`FLOOR_LIFT` 3 cm), in `M_LotConcrete`, one MultiMesh + box collision per cell (`Plinths`, `PlinthCollision`).
+  The lot RECORD stays: it seeds the fill and decides each building's ground height.
+- **A STEP IS EASED ON SCREEN, NOT IN COLLISION** (user, 2026-09-25: "a sudden height increase rather than a smooth
+  transition"). `MovementController` still steps the capsule in one tick (`stepUpLedge`, the floor snap), and takes
+  that tick's height change into an offset on `meshRoot` (the drawn body, and everything on it: the FPS neck mount,
+  the held weapon, the hitboxes) and on the TPS rig's follow point, eased back by a critically damped spring stepped
+  EXACTLY (`stepSmoothTime` 0.15 s; 0 is the control). A lip is any on-floor tick whose height change the floor's
+  slope does not explain; a tick that changed floor normal is all lip (on a lip the normal is the edge's tilted
+  contact, and reading it as a slope pushed the body 8.7 cm the wrong way). The kerb MESH is unchanged and its
+  collider stays the true kerb. Gate: `probe_kerb_step.gd -- --at=51,-106` case 3, a 0.15 m kerb: capsule 0.151 m in
+  one tick, drawn body at most 0.024 m, camera 0.017 m; `--no-smooth` fails exactly those two.
+- **Two konbini and a car park that is an addition.** `KonbiniS` (7 x 10 modules, deep: 12.74 x 18.2 m) and
+  `KonbiniL` (12 x 12, 21.84 m square) are laid out from `assets/world_source/store/` (the picture and the text are
+  support, not a spec).
+  - Each has a real back of house (a staff room with toilet, lockers, desk and safe, a rear staff exit; a walk-in
+    cooler behind the drink wall), a customer toilet ROOM with its own door off the sales floor, and the counter
+    facing into the store.
+  - Interior walls need no layout code: `Wall_Partition` / `Wall_PartitionDoor` are library pieces placed as props.
+    The doorway's collider is `collide: {boxes}` (two jambs and a header).
+  - `Konbini` and `KonbiniLot` are gone from the table. `ParkingLot4/8/14` are part-less composites (2.5 x 5.0 m
+    bays, a 6 m aisle), and `island_buildings.PARKING` places a `ParkingLot8` beside every `KonbiniL`.
+  - `layout_buildings.check_doors_clear` samples the capsule's full 0.36 m half-width now. At +-0.30 a locker 1 cm
+    into a door passed there and failed `probe_buildings`.
+  - `shot_buildings.gd --views=plan` renders an orthographic top-down cut under the ceiling: the only way to check a
+    floor plan.
+- **Every library piece has a state and a source** (`tools/building_kit/library_status.py` -> `kits/library/
+  PIECES.md`). An artist marks a finished model in `kits/library/status.json`. `--check` fails on a piece with no
+  recorded source.
 
 ## Known Quirks / Gotchas
 

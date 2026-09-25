@@ -30,6 +30,10 @@ KIT_JSON = os.path.join(KIT_DIR, "road_kit.json")
 KIT_BLEND = os.path.join(KIT_DIR, "road_kit.blend")
 
 #: `point_build.MATERIAL_KEYS` -> `kit_common.MATS` / `TILED_MATS` names: a layer's default material.
+#: THE FOOTWAY IS THE PUBLIC PAVEMENT (user, 2026-09-25): `M_ConcreteTile`, which ships with the same values as the
+#: PRIVATE `buildings/materials/M_LotConcrete.tres` (the lot slabs and the block ground), so kerb to door reads as one
+#: surface while the two stay separately editable; only the carriageway differs. (For an hour it was `M_Asphalt`, the Japanese public/private split; the user chose one
+#: surface instead.) A road can still ask for another through its `footway_mat` style slot.
 DEFAULT_MATERIAL = {"asphalt": "M_Asphalt", "concrete": "M_Concrete", "footway": "M_ConcreteTile",
                     "median": "M_Median", "barrier": "M_Barrier", "line_w": "M_LineW", "line_y": "M_LineY"}
 #: slot -> its default key in `DEFAULT_MATERIAL` (`point_style.SLOTS`).
@@ -143,7 +147,7 @@ def self_test():
     r.surface_mat, r.kerb_asset, r.footway_mat, r.barrier_asset = "M_Brick", "RKA_PROFILE_kerb_std", "M_Nope", "X"
     r.pillar_asset = ""
     s = resolve(r, kit)
-    assert s.material("surface") == "M_Brick" and s.material("footway") == "M_ConcreteTile", s._mats
+    assert s.material("surface") == "M_Brick" and s.material("footway") == DEFAULT_MATERIAL["footway"], s._mats
     assert s.material("median") == "M_Median" and s.asset("kerb")["name"] == "RKA_PROFILE_kerb_std"
     assert sorted(s.missing()) == [("barrier", "asset", "X"), ("footway", "material", "M_Nope")], s.missing()
     assert s.pier() is None

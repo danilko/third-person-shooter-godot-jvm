@@ -137,7 +137,10 @@ tower spacing and cable sag, written as numbers in `blender/tools/library_landma
 `assets/world_source/buildings/building_types.json` (konbini, family restaurant, small station building) are
 rounded from statistics that `tools/plateau2json/measure_building_types.py` computed locally from PLATEAU
 CityGML (Ota-ku 2023, Tama-shi and Higashiyamato-shi 2023): percentiles of footprint and height per building use.
-Only those few numbers are in the repo; no PLATEAU geometry or data file is. The massing and facade-tone
+Only those few numbers are in the repo; no PLATEAU geometry or data file is. The central station's reserve and the
+station size ladder (PLAN.md B4/B10) are rounded from `tools/plateau2json/measure_stations.py`, run locally on
+Chiyoda-ku, Minato-ku, Ota-ku and Shibuya-ku 2025 (CityGML buildings of transport use, and the station/railway
+GeoJSON in each ward's `*_related.zip`). The massing and facade-tone
 targets in `assets/world_source/buildings/JAPAN_ART_REVIEW.md` (gaps between buildings, footprint / height
 percentiles per class, roof and setback shares, facade luminance) are likewise numbers measured locally by
 `blender/tools/measure_plateau_blocks.py`, `measure_plateau_facades.py` and `measure_plateau_wall_colours.py` (the facade colour palette, `plateau_wall_palette.json`) from a textured PLATEAU LOD2 extract of

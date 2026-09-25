@@ -82,7 +82,7 @@ def styled(tmp):
     for obj, mat in (("demo_main_0__surface", "M_Brick"), ("demo_main_0__surface", "M_Leaf"),
                      ("demo_main_0__marks_w", "M_Neon"), ("demo_hwy__surface", "M_Steel"),
                      ("demo_hwy__edges_left_0", "M_Red"), ("demo_cross_0__marks_y", "M_Accent"),
-                     ("demo_ramp__surface", "M_Dirt"), ("demo_cross_0__edges_left_0", "M_ConcreteTile")):
+                     ("demo_ramp__surface", "M_Dirt"), ("demo_cross_0__edges_left_0", __import__("point_kit").DEFAULT_MATERIAL["footway"])):  # a missing footway_mat falls back to the default
         check(mat in objs.get(obj, {}), "%s wears %s" % (obj, mat), str(sorted(objs.get(obj, {}))))
     kit = pk.load()
     pier = kit.pier("RKA_PIER_hammerhead")

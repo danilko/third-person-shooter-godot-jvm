@@ -13,11 +13,12 @@ large features, so it disappears under the eye instead of drawing it.
     <name>_nrm_rgh.png  RGB = normal (tangent space, +Y up), A = roughness
 
     python3 tools/make_urban_texture.py                  # the generated aggregate (the original)
-    python3 tools/make_urban_texture.py --from-footway   # the FOOTWAY's own concrete (shipped, 2026-09-22)
+    python3 tools/make_urban_texture.py --from-footway   # the FOOTWAY's own material (2026-09-22 .. 09-25)
+    python3 tools/make_urban_texture.py --from-lot       # the building LOTS' material (shipped, 2026-09-25)
 
 **`--from-footway` is what ships** (user, 2026-09-22: "use the same fill for a street block's ground as the
 sidewalk; currently the two differ, prefer one"). It packs the footway material's own maps
-(`M_ConcreteTile` = `T_Concrete_{BaseColor,Normal,ORM}`, downtown kit) into Terrain3D's two layers, resized to the
+(whatever `point_kit.DEFAULT_MATERIAL["footway"]` names -- `M_Asphalt` since 2026-09-25, `M_ConcreteTile` before) into Terrain3D's two layers, resized to the
 terrain array's size: albedo + a height from the albedo's luminance, and the normal + the ORM's roughness. The
 footway's TINT and TILE live on the texture asset (`terrain_assets.tres` "Urban": `albedo_color` = the material's
 `albedo_color`, `uv_scale` = its `uv1_scale`), so the kerb-to-door surface is one material seen twice.
@@ -50,13 +51,60 @@ def _tileable_noise(rng, size, cells):
             + c * (1 - fx) * fy + d * fx * fy)
 
 
-FOOTWAY = "assets/world_source/kits/quaternius_downtown_city/textures/T_Concrete_%s.png"
+KIT_MATERIALS = "assets/world_source/kits/road_kit/materials"
 
 
-def from_footway() -> int:
-    """Pack the footway's concrete into the Terrain3D layers (see the module docstring)."""
+def lot_material():
+    """The building LOT's material (`island_buildings.LOT_MATERIAL`), read from its `.tres` like `footway_material`.
+    The block fill between lots is PRIVATE ground like the lots themselves (民地), so it wears the lots' surface
+    (user, 2026-09-25: private and public are separate materials -- `M_LotConcrete` here, the footway's
+    `M_ConcreteTile` -- that ship with the same values)."""
+    import sys
+    sys.path.insert(0, "tools")
+    import island_buildings as ib
+    return material_maps(ib.LOT_MATERIAL.replace("res://", ""))
+
+
+def footway_material():
+    """The FOOTWAY's material, read from its owner rather than written here: the road kit's default footway name
+    (`point_kit.DEFAULT_MATERIAL["footway"]`) and that material's own `.tres` -> {albedo, normal, orm, tint, uv}.
+    The footway became the street's own asphalt (user, 2026-09-25: a Japanese footway is usually the carriageway's
+    asphalt); before that it was the downtown kit's concrete, and this path was hard-coded to it."""
+    import os
+    import re
+    import sys
+    sys.path.insert(0, "blender/addons/road_kit_authoring")
+    import point_kit as pk
+    return material_maps(os.path.join(KIT_MATERIALS, pk.DEFAULT_MATERIAL["footway"] + ".tres"))
+
+
+def material_maps(path):
+    """{name, albedo, normal, orm, tint, uv} of a StandardMaterial3D `.tres` (its texture paths, albedo_color and
+    uv1_scale): the one reader both modes use."""
+    import os
+    import re
+    text = open(path).read()
+    nm = re.search(r'^resource_name = "([^"]+)"', text, re.M)
+    name = nm.group(1) if nm else os.path.basename(path)
+    ext = dict((i, p) for p, i in re.findall(r'ext_resource type="Texture2D" path="res://([^"]+)" id="([^"]+)"', text))
+
+    def tex(prop):
+        m = re.search(r'^%s = ExtResource\("([^"]+)"\)' % prop, text, re.M)
+        return ext[m.group(1)] if m else None
+    col = re.search(r"^albedo_color = Color\(([^)]*)\)", text, re.M)
+    uv = re.search(r"^uv1_scale = Vector3\(([^,]*),", text, re.M)
+    return dict(name=name, albedo=tex("albedo_texture"), normal=tex("normal_texture"), orm=tex("roughness_texture"),
+                tint=[float(v) for v in col.group(1).split(",")] if col else [1, 1, 1, 1],
+                uv=float(uv.group(1)) if uv else 1.0)
+
+
+def from_footway(mat=None) -> int:
+    """Pack the footway's material (or `mat`) into the Terrain3D layers (see the module docstring)."""
+    mat = mat or footway_material()
+    paths = {"BaseColor": mat["albedo"], "Normal": mat["normal"], "ORM": mat["orm"]}
+
     def load(name, mode):
-        im = Image.open(FOOTWAY % name).convert(mode)
+        im = Image.open(paths[name]).convert(mode)
         if im.size != (SIZE, SIZE):
             im = im.resize((SIZE, SIZE), Image.LANCZOS)
         return np.asarray(im).astype(np.float32) / 255.0
@@ -70,7 +118,9 @@ def from_footway() -> int:
     Image.fromarray((alb_ht * 255).round().astype(np.uint8), mode="RGBA").save("%s/urban_alb_ht.png" % OUT)
     nrm_rgh = np.dstack([normal, orm[..., 1]])
     Image.fromarray((nrm_rgh * 255).round().astype(np.uint8), mode="RGBA").save("%s/urban_nrm_rgh.png" % OUT)
-    print("wrote %s/urban_alb_ht.png and urban_nrm_rgh.png (%dx%d) from the footway's T_Concrete" % (OUT, SIZE, SIZE))
+    print("wrote %s/urban_alb_ht.png and urban_nrm_rgh.png (%dx%d) from %s" % (OUT, SIZE, SIZE, mat["name"]))
+    print("  set terrain_assets.tres Urban: albedo_color = Color(%s), uv_scale = %g" % (
+        ", ".join("%g" % v for v in mat["tint"]), mat["uv"]))
     print("  albedo mean %s, roughness mean %.2f" % (np.round(albedo.reshape(-1, 3).mean(0) * 255, 1),
                                                     float(orm[..., 1].mean())))
     return 0
@@ -78,6 +128,8 @@ def from_footway() -> int:
 
 def main() -> int:
     import sys
+    if "--from-lot" in sys.argv:
+        return from_footway(lot_material())
     if "--from-footway" in sys.argv:
         return from_footway()
     rng = np.random.default_rng(20260921)

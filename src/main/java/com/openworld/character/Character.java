@@ -1112,6 +1112,9 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     private MovementController movementControllerRef;
 
+    /** The body's MovementController (the camera reads its step-smoothing offset). Not registered. */
+    public MovementController movementControllerNow() { return movementController(); }
+
     /** Lazily-cached MovementController sibling (never freed/swapped during the body's life). */
     private MovementController movementController() {
         if (movementControllerRef == null) {

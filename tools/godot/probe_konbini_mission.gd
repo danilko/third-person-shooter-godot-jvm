@@ -86,6 +86,11 @@ func _initialize() -> void:
 				return false
 		return true, 40.0)
 	check("the crew streams in (3 named story characters)", loaded, str(dir.call("named_character_ids")))
+	# ...and the SHOP's own building cell: the crew's zone is small and loads first, while the cell holding the
+	# `_Open` konbini is a big parse, and the doors below are counted off it. "Has the world finished streaming"
+	# has one owner (ZoneManager.streamingPendingNow, PLAN.md 3.35); a probe watching only its own zone cannot tell.
+	var zm: Node = root.get_node("ZoneManager")
+	await _wait(func(): return int(zm.call("streaming_pending_now")) == 0, 90.0)
 	check("the crew loiters neutral before the job", IDS.all(func(id): return _faction(id) == "neutral"),
 			str(IDS.map(func(id): return _faction(id))))
 	check("no mission is running yet", not mm.call("mission_active_now"))
@@ -106,7 +111,9 @@ func _initialize() -> void:
 		if n.get_script() == null or not str(n.get_script().resource_path).ends_with("Door.java"):
 			continue
 		var d3 := n as Node3D
-		if d3.global_position.distance_to(at) > 60.0:
+		# 150 m: the nearest always-open shop to the job is ~99 m away since the 2026-09-25 layout (a family
+		# restaurant); the mission's own reach is doorUnlockRadius (25 m), so anything in 25..150 m is a bystander
+		if d3.global_position.distance_to(at) > 150.0:
 			continue
 		# which BUILDING it belongs to, not how far away it is: the mission shop is a `_Open` variant, a shop (and
 		# the home base) a `_Shop` one

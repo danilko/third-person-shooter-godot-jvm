@@ -145,7 +145,7 @@ FACADE_MAT_RES = "res://assets/world_source/kits/quaternius_downtown_city/materi
 # working districts. It is inside downtown's box, so it must come FIRST to win the first-match rule.
 REGIONS = (
     ("nightlife", (520.0, 180.0, 980.0, 560.0), 3, 20.0,
-     {"PencilBuilding": 6, "ShopHouse": 3, "Konbini": 1, "OfficeMid": 0.8, "FamilyRestaurant": 0.5},
+     {"PencilBuilding": 6, "ShopHouse": 3, "KonbiniS": 1, "OfficeMid": 0.8, "FamilyRestaurant": 0.5},
      0.0, "dark"),
     # RESIDENTIAL WRAPS THE CITY (user, 2026-09-21, drawn on the district plan: "add resident around city
     # before castle/farmland"). Both bands are MEASURED, because a region only does anything where there is
@@ -160,34 +160,38 @@ REGIONS = (
     #          builds on frontage, but it makes the district plan read wrong and it makes the HUD announce
     #          "Residential West" while you stand on a 300 m peak, because `Places.regionAt` reads these boxes.
     ("residential_north", (-330.0, 700.0, 1700.0, 960.0), 2, 20.0,
-     {"Apartment": 3, "ShopHouse": 2, "Mansion": 1, "Konbini": 0.5, "KonbiniLot": 0.4, "GasStation": 0.3},
+     {"Apartment": 3, "ShopHouse": 2, "Mansion": 1, "KonbiniS": 0.5, "KonbiniL": 0.4, "GasStation": 0.3},
      0.15, None),
     ("residential_west", (-900.0, -200.0, -150.0, 400.0), 1, 18.0,
-     {"Apartment": 3, "ShopHouse": 1.5, "Mansion": 0.8, "Konbini": 0.3}, 0.3, None),
+     {"Apartment": 3, "ShopHouse": 1.5, "Mansion": 0.8, "KonbiniS": 0.3}, 0.3, None),
     ("downtown", (150.0, 40.0, 1300.0, 720.0), 3, 24.0,
-     {"OfficeMid": 4, "PencilBuilding": 4, "Mansion": 2, "ShopHouse": 1.5, "Konbini": 1, "FamilyRestaurant": 0.3},
+     {"OfficeMid": 4, "PencilBuilding": 4, "Mansion": 2, "ShopHouse": 1.5, "KonbiniS": 1, "FamilyRestaurant": 0.3},
      0.0, None),
     ("city", (-150.0, -330.0, 1700.0, 960.0), 2, 22.0,
-     {"Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "Konbini": 1, "OfficeMid": 0.5,
-      "FamilyRestaurant": 0.6, "KonbiniLot": 0.6, "GasStation": 0.5}, 0.05, None),
+     {"Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "KonbiniS": 1, "OfficeMid": 0.5,
+      "FamilyRestaurant": 0.6, "KonbiniL": 0.6, "GasStation": 0.5}, 0.05, None),
     ("harbour", (-820.0, -2050.0, 250.0, -1040.0), 2, 30.0, {"Warehouse": 1}, 0.2, "dark"),
     ("industry", (-1000.0, -1040.0, 200.0, -600.0), 2, 26.0,
-     {"Warehouse": 4, "OfficeMid": 1, "ShopHouse": 0.5, "Konbini": 0.4, "GasStation": 0.3}, 0.15, "dark"),
+     {"Warehouse": 4, "OfficeMid": 1, "ShopHouse": 0.5, "KonbiniS": 0.4, "GasStation": 0.3}, 0.15, "dark"),
     ("residential", (-1800.0, -1160.0, -150.0, -200.0), 2, 18.0,
-     {"Apartment": 4, "ShopHouse": 2, "Mansion": 1, "KonbiniLot": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
-      "Konbini": 0.4}, 0.15, None),
+     {"Apartment": 4, "ShopHouse": 2, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
+      "KonbiniS": 0.4}, 0.15, None),
     ("suburb", (850.0, -1060.0, 1800.0, -330.0), 2, 18.0,
-     {"Apartment": 4, "ShopHouse": 1.5, "Mansion": 1, "KonbiniLot": 0.6, "GasStation": 0.4,
+     {"Apartment": 4, "ShopHouse": 1.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4,
       "FamilyRestaurant": 0.4}, 0.25, None),
-    ("farm", (350.0, 960.0, 1850.0, 1900.0), 1, 30.0, {"Apartment": 2, "Warehouse": 1, "KonbiniLot": 0.2},
+    ("farm", (350.0, 960.0, 1850.0, 1900.0), 1, 30.0, {"Apartment": 2, "Warehouse": 1, "KonbiniL": 0.2},
      0.65, None),
 )
-ARTERIAL_ONLY = {"GasStation", "KonbiniLot", "FamilyRestaurant"}
+ARTERIAL_ONLY = {"GasStation", "KonbiniL", "FamilyRestaurant"}
+# THE CAR PARK IS AN ADDITION, NOT PART OF THE STORE (user, 2026-09-25: "extract the parking lot out as an addition
+# instead of the left-over konbini lot"). A type named here gets that car park placed BESIDE it on the same row when
+# the land allows -- to its right along the street, else its left -- and stands without one otherwise.
+PARKING = {"KonbiniL": "ParkingLot8"}
 # Every building ships SHUT (user, 2026-09-19), with two exceptions, both placed as a variant of the same type:
 # * `<Type>_Shop` -- unlocked, automatic doors: the shops a player walks into as ordinary play (GTA's konbini, diner,
 #   petrol station, station hall) and the player's home base;
 # * `<Type>_Open` -- `world.Door` nodes LOCKED until a MISSION unlocks them (KonbiniMission does).
-SHOP_TYPES = {"Konbini", "KonbiniLot", "FamilyRestaurant", "GasStation", "GasKiosk", "StationBuilding",
+SHOP_TYPES = {"KonbiniS", "KonbiniL", "FamilyRestaurant", "GasStation", "GasKiosk", "StationBuilding",
               "StationRural"}
 PUBLIC_BUILDINGS = (      # (Godot x, z, why, wanted TYPE, "", ROLE): a specific building that is always open
     # The player's SAFE HOUSE (user, 2026-09-22): where a player starts and respawns -- `write` puts World.tscn's
@@ -196,14 +200,15 @@ PUBLIC_BUILDINGS = (      # (Godot x, z, why, wanted TYPE, "", ROLE): a specific
     (87.0, -3.0, "the player's safe house", "ShopHouse", "", "safehouse"),
     # The WEAPON COUNTER: a row of `item.WeaponPad`s inside the konbini next door (free for now), which replaced
     # the loose weapons that used to lie at the spawn point. `write` places the pads in the shop's own frame.
-    (66.0, -3.0, "the weapon counter (free for now)", "Konbini", "", "armoury"),
+    (66.0, -3.0, "the weapon counter (free for now)", "KonbiniS", "", "armoury"),
 )
 ROLE_PLACES = {"safehouse": ("Safehouse", 2), "armoury": ("Weapon Counter", 2)}
-# The counter's pads, in the KONBINI's own frame (front +Z at z 5.46): the clear aisle between the last gondola
-# (x <= 6.02) and the side wall (x 9.1), clear of the WC partitions (z <= -2.66). 1.2 m apart, r 0.5.
-ARMOURY_PADS = (("PIS1", 6.75, -1.9), ("PIS2", 8.25, -1.9), ("REV1", 6.75, -0.7), ("DUP1", 8.25, -0.7),
-                ("SMG1", 6.75, 0.5), ("ASR1", 8.25, 0.5), ("ASR2", 6.75, 1.7), ("SHG1", 8.25, 1.7),
-                ("SNR1", 6.75, 2.9), ("ATL1", 8.25, 2.9), ("FRG1", 6.75, 4.1), ("MEW1", 8.25, 4.1))
+# The counter's pads, in the SMALL KONBINI's own frame (KonbiniS: 12.74 x 18.2 m, front +Z at z 9.1): the clear
+# aisle between the right-hand gondola run (x <= 2.67) and the side wall (x 6.37), from the drink wall's front
+# (z -6.29) to the customer toilet room (z >= 1.82). 1.2 m apart, r 0.5.
+ARMOURY_PADS = (("PIS1", 3.7, -5.3), ("PIS2", 5.1, -5.3), ("REV1", 3.7, -4.1), ("DUP1", 5.1, -4.1),
+                ("SMG1", 3.7, -2.9), ("ASR1", 5.1, -2.9), ("ASR2", 3.7, -1.7), ("SHG1", 5.1, -1.7),
+                ("SNR1", 3.7, -0.5), ("ATL1", 5.1, -0.5), ("FRG1", 3.7, 0.7), ("MEW1", 5.1, 0.7))
 PAD_SCRIPT = "res://src/main/java/com/openworld/item/WeaponPad.java"
 # (Godot x, z, why, wanted TYPE or "", the `Missions` child to move onto it or ""): locked until its mission
 # unlocks it, and wins over the two above.
@@ -214,7 +219,7 @@ PAD_SCRIPT = "res://src/main/java/com/openworld/item/WeaponPad.java"
 # node onto the building it actually chose -- one owner for "where is this mission", instead of a scene
 # transform and a constant here that have to be kept in step by hand.
 OPEN_BUILDINGS = (
-    (685.0, -336.0, "m01_konbini: the shop the konbini job is played at", "Konbini", "M01_Konbini"),
+    (685.0, -336.0, "m01_konbini: the shop the konbini job is played at", "KonbiniS", "M01_Konbini"),
 )
 OPEN_MATCH = 12.0      # the placement nearest an anchor with no wanted type, within this
 
@@ -228,8 +233,8 @@ OPEN_MATCH = 12.0      # the placement nearest an anchor with no wanted type, wi
 # The labels are English because the HUD's font (Aldrich) carries no CJK glyphs; the Japanese name each type
 # already declares in `building_types.json` is the one to switch to when a font that can draw it lands.
 PLACE_KINDS = {
-    "Konbini":          ("Convenience Store", 1),
-    "KonbiniLot":       ("Convenience Store", 1),
+    "KonbiniS":         ("Convenience Store", 1),
+    "KonbiniL":         ("Convenience Store", 1),
     "FamilyRestaurant": ("Diner", 1),
     "GasStation":       ("Petrol Station", 1),
     "GasKiosk":         ("Petrol Station", 1),
@@ -245,9 +250,9 @@ SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: 
     "AirportTerminal_Shop": ("Airport", 2),
 }
 ANCHOR_REACH = 250.0   # ... and the furthest a WANTED TYPE may be found from the wish
-SPACING = {"GasStation": 450.0, "KonbiniLot": 250.0, "FamilyRestaurant": 350.0, "Konbini": 120.0}
+SPACING = {"GasStation": 450.0, "KonbiniL": 250.0, "FamilyRestaurant": 350.0, "KonbiniS": 120.0}
 SKIP_ROADS = ("shuto_", "shrine_touge", "kaigan_dori", "airport_", "kuko_dori")
-TYPES = sorted({t for r in REGIONS for t in r[4]})
+TYPES = sorted({t for r in REGIONS for t in r[4]} | set(PARKING.values()))
 
 # --- the ambient crowd (PLAN.md 3.6d). A pedestrian zone is derived from the SAME footways the buildings front,
 # on the SAME 252 m cell grid, so "where do people walk" has one owner. What a zone carries is a
@@ -480,6 +485,11 @@ def site_exclusions(text):
         body = m.group(1)
         size = re.search(r"size = Vector3\(([^)]*)\)", body)
         xf = re.search(r"geometry_world_transform = Transform3D\(([^)]*)\)", body)
+        res = re.search(r"metadata/site_reserve = PackedFloat64Array\(([^)]*)\)", body)
+        if res:        # island_sites writes the reserve outright when the scene stands off its centre
+            v = [float(x) for x in res.group(1).split(",")]
+            out.append((v[0], v[1], v[2], v[3] + SITE_CLEAR, v[4] + SITE_CLEAR))
+            continue
         if size and xf:
             s = [float(v) for v in size.group(1).split(",")]
             t = [float(v) for v in xf.group(1).split(",")]
@@ -933,6 +943,7 @@ def derive(heights_path):
 
     aabbs = {t: type_aabb(t) for t in TYPES}
     placed, counts, seen_kind = [], {}, {}
+    parking_misses = [0]
 
     def far_from_kind(t, x, z):
         d = SPACING.get(t)
@@ -940,7 +951,7 @@ def derive(heights_path):
             return True
         return all((x - px) ** 2 + (z - pz) ** 2 >= d * d for px, pz in seen_kind.get(t, ()))
 
-    def try_place(t, px, pz, nx, nz, key, region, road_y, front_gap, kerbed):
+    def try_place(t, px, pz, nx, nz, key, region, road_y, front_gap, kerbed, over_passage=False):
         x0, z0, x1, z1, hgt = aabbs[t]
         yaw = math.atan2(nx, nz)          # local +Z (the front) turned onto the road direction
         # the front face (local z1) on the row line
@@ -948,7 +959,10 @@ def derive(heights_path):
         ii, jj = field.rect_points(cx, cz, yaw, x0 - ALLEY, z0 - ALLEY, x1 + ALLEY, z1)
         if ii.size == 0:
             return None
-        if field.blocked[jj, ii].any() or field.occupied[jj, ii].any() or field.passage[jj, ii].any():
+        # a CAR PARK may stand over a 路地 reservation: it is open ground and keeps the access open, and a 21.8 m
+        # lot beside a 21.8 m store otherwise straddles the next reserved passage every time (2026-09-25)
+        if field.blocked[jj, ii].any() or field.occupied[jj, ii].any() or \
+                (not over_passage and field.passage[jj, ii].any()):
             return None
         hs = field.heights(ii, jj)
         if float(hs.max() - hs.min()) > RELIEF or float(hs.min()) <= LAND_Z:
@@ -1026,8 +1040,37 @@ def derive(heights_path):
                         placed.append(got)
                         counts[got["type"]] = counts.get(got["type"], 0) + 1
                         seen_kind.setdefault(got["type"], []).append((got["pos"][0], got["pos"][2]))
+                        lot_t = PARKING.get(got["type"])
+                        if lot_t:
+                            # the car park BESIDE the store, on the same row line: right (further along the
+                            # street) first, else left; the store stands alone when neither fits
+                            wp = aabbs[lot_t][2] - aabbs[lot_t][0]
+                            ws = aabbs[got["type"]][2] - aabbs[got["type"]][0]
+                            # ROUNDED UP: rounding put the car park 0.84 m into the store's own alley, and every
+                            # one of the first rebuild's seven KonbiniL stood alone (2026-09-25)
+                            step = int(math.ceil((ws / 2.0 + wp / 2.0 + 2 * ALLEY) / SLOT_STEP))
+                            jj0 = j
+                            for jp in (jj0 + step, jj0 - step, jj0 + step + 1, jj0 - step - 1, jj0 + step + 2,
+                                       jj0 - step - 2):
+                                if not 0 <= jp < len(pts_rows):
+                                    continue
+                                lx, lz, lnx, lnz, ly = pts_rows[jp]
+                                lot = try_place(lot_t, lx - lnx * back, lz - lnz * back, lnx, lnz, key + "|P", reg,
+                                                ly, (KERB_GAP + 0.3 - LOT_FOOTWAY_GAP) if row == 0 else 0.0, kerbed,
+                                                over_passage=True)
+                                if lot is None:
+                                    parking_misses[0] += 1
+                                if lot:
+                                    lot["with"] = len(placed) - 1
+                                    placed.append(lot)
+                                    counts[lot_t] = counts.get(lot_t, 0) + 1
+                                    if jp > jj0:
+                                        k = max(k, jp + int(math.ceil((wp / 2.0 + ALLEY) / SLOT_STEP)))
+                                    break
                     else:
                         k += 1
+    print("island_buildings: %d car park(s) placed beside their store, %d candidate spot(s) refused"
+          % (sum(1 for b in placed if b["type"] in PARKING.values()), parking_misses[0]))
     grow_lots(field, placed)
     separate_lots(placed, aabbs)
     assign_tones(placed)
@@ -1077,7 +1120,9 @@ def xf(pos, yaw_deg):
 # mostly white square tile ... as long as the internal floor is white it can run out past the building"). It is
 # `M_ConcreteTile` tinted near-white and laid at a 0.6 m tile, so the forecourt a player crosses to a shop door
 # and the floor inside it are one surface.
-LOT_MATERIAL = "res://assets/world_source/kits/road_kit/materials/M_TileWhite.tres"
+# PRIVATE / PUBLIC are two materials with one look (user, 2026-09-25): the lot and the block fill wear the PRIVATE
+# M_LotConcrete, the footway the PUBLIC M_ConcreteTile; both ship identical, so an artist can move either alone.
+LOT_MATERIAL = "res://assets/world_source/buildings/materials/M_LotConcrete.tres"
 
 # --- THREE heights, one rule (PLAN.md 3.18j, user-reported twice: the gas station's apron z-fighting the slab
 # under it, and then a photograph of a Shibuya street showing what it should look like -- the public footway in
@@ -1096,24 +1141,42 @@ LOT_MATERIAL = "res://assets/world_source/kits/road_kit/materials/M_TileWhite.tr
 # nothing has to climb it. Both are applied in `write`, so changing them re-writes the cell scenes and needs no
 # terrain dump and no re-derive.
 LOT_RAISE = 0.06
-FLOOR_LIFT = 0.02
+FLOOR_LIFT = 0.03
+# THE BLOCK IS THE PRIVATE GROUND; THERE IS NO LOT SLAB (user, 2026-09-25). A lot was a rectangle grown out from
+# its own building in its own frame, and rectangles in different frames cannot tile a block, so neighbouring slabs
+# always left strips of the fill showing between them -- a gap no bevel could close, because it came from WHERE the
+# slabs were, not from what their edges looked like. The block fill (`island_ground.py`, Terrain3D) paves every
+# block from the kerb inward already, so it now stands AT the old slab's top (footway + LOT_RAISE) and is the one
+# private surface; LOT_FILL_GAP is 0. The lot RECORD stays: it is the fill's seed (the geodesic walk starts from the
+# lots) and where each building's own ground height is decided. What a building keeps is a PLINTH (基礎): its own
+# footprint grown by PLINTH_MARGIN, its top PLINTH_LIFT over the fill and under the building's floor (FLOOR_LIFT),
+# so the walls never meet the ground on a seam and neither face is coplanar with the other.
+LOT_FILL_GAP = 0.0
+PLINTH_MARGIN = 0.25
+PLINTH_LIFT = 0.015
 
 
-def lot_boxes(b):
-    """(world transform rows [12 floats], size, centre) of a building's lot slab: its local rect, from the lot's top
-    (the building's origin height) down `lot_depth`."""
-    x0, z0, x1, z1 = b["lot"]
-    depth = b["lot_depth"]
+_AABBS = {}
+
+
+def plinth_boxes(b):
+    """(cos/sin, size, world centre) of a building's PLINTH: its type's footprint grown by PLINTH_MARGIN, its top
+    PLINTH_LIFT above the fill (footway + LOT_RAISE), its foot where the lot's slab foot was (below the lowest ground
+    under it)."""
+    t = b["type"]
+    if t not in _AABBS:
+        _AABBS[t] = type_aabb(t)
+    x0, z0, x1, z1, _h = _AABBS[t]
+    x0, z0, x1, z1 = x0 - PLINTH_MARGIN, z0 - PLINTH_MARGIN, x1 + PLINTH_MARGIN, z1 + PLINTH_MARGIN
+    top = LOT_RAISE + PLINTH_LIFT
+    depth = b.get("lot_depth", 0.5) + top
     sx, sz = x1 - x0, z1 - z0
     lx, lz = (x0 + x1) / 2.0, (z0 + z1) / 2.0
     a = math.radians(b["yaw"])
     c, s = math.cos(a), math.sin(a)
     ox = b["pos"][0] + lx * c + lz * s
     oz = b["pos"][2] - lx * s + lz * c
-    # the slab keeps its foot where the derive put it (below the lowest ground under the lot) and its TOP rises
-    # to LOT_RAISE above the footway, so it grows rather than floats
-    depth += LOT_RAISE
-    oy = b["pos"][1] + LOT_RAISE - depth / 2.0
+    oy = b["pos"][1] + top - depth / 2.0
     return (c, s), (sx, depth, sz), (ox, oy, oz)
 
 
@@ -1277,18 +1340,18 @@ def cell_scene(name, blds, passages=()):
                  'visibility_range_fade_mode = 1\n' % (HLOD_BEGIN, HLOD_MARGIN))
 
     if lots:
-        # ONE draw call for every slab of the cell: a unit box, scaled per instance (the material is world-space
-        # triplanar, so a scaled box is not a stretched texture)
+        # ONE draw call for every PLINTH of the cell: a unit box, scaled per instance (the material is world-space
+        # triplanar, so a scaled box is not a stretched texture). The lot slab is gone; the block fill is the ground.
         sub.append('[sub_resource type="BoxMesh" id="LotBox"]\nmaterial = ExtResource("lotmat")\n\n')
         buf = []
         for b in lots:
-            (c, s), (sx, sy, sz), (ox, oy, oz) = lot_boxes(b)
+            (c, s), (sx, sy, sz), (ox, oy, oz) = plinth_boxes(b)
             buf += [c * sx, 0.0, s * sz, ox, 0.0, sy, 0.0, oy, -s * sx, 0.0, c * sz, oz]
         sub.append('[sub_resource type="MultiMesh" id="Lots"]\ntransform_format = 1\ninstance_count = %d\n'
                    'mesh = SubResource("LotBox")\nbuffer = PackedFloat32Array(%s)\n\n'
                    % (len(lots), ", ".join("%.4f" % v for v in buf)))
         for k, b in enumerate(lots):
-            _cs, (sx, sy, sz), _o = lot_boxes(b)
+            _cs, (sx, sy, sz), _o = plinth_boxes(b)
             sub.append('[sub_resource type="BoxShape3D" id="LotShape%d"]\nsize = Vector3(%.3f, %.3f, %.3f)\n\n'
                        % (k, sx, sy, sz))
     for k, b in enumerate(blds):
@@ -1304,11 +1367,11 @@ def cell_scene(name, blds, passages=()):
             nodes.append('\n[node name="Mesh" parent="./%s_%03d" index="0"]\n%s\n'
                          % (scene_of(b), k, "\n".join(lines)))
     if lots:
-        nodes.append('\n[node name="Lots" type="MultiMeshInstance3D" parent="."]\nmultimesh = SubResource("Lots")\n')
-        nodes.append('\n[node name="LotCollision" type="StaticBody3D" parent="."]\ncollision_mask = 0\n')
+        nodes.append('\n[node name="Plinths" type="MultiMeshInstance3D" parent="."]\nmultimesh = SubResource("Lots")\n')
+        nodes.append('\n[node name="PlinthCollision" type="StaticBody3D" parent="."]\ncollision_mask = 0\n')
         for k, b in enumerate(lots):
-            (c, s), _size, (ox, oy, oz) = lot_boxes(b)
-            nodes.append('\n[node name="Lot%d" type="CollisionShape3D" parent="LotCollision"]\n'
+            (c, s), _size, (ox, oy, oz) = plinth_boxes(b)
+            nodes.append('\n[node name="Plinth%d" type="CollisionShape3D" parent="PlinthCollision"]\n'
                          'transform = Transform3D(%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f, %.3f, %.3f, %.3f)\n'
                          'shape = SubResource("LotShape%d")\n' % (k, c, s, -s, c, ox, oy, oz, k))
     return "".join(ext + sub + nodes)
