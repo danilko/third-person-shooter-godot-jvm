@@ -1,0 +1,19 @@
+[gd_scene format=3]
+
+; The LIGHT-PED body -- the far tier of the ambient crowd (PedCrowd, PLAN.md 3.6d), built by
+; blender/tools/build_ped_body.py from the SHIPPED shino.glb.
+;
+; It is shino.tscn's job with one surface instead of seventeen: at PedCrowd's nearest draw distance
+; (promoteDistance, 80 m) a 1.65 m body is ~14 px tall, so what costs anything there is DRAW CALLS.
+; One atlas, one material, one skinned mesh, and only the two clips PedCrowd plays.
+;
+; Like shino.tscn it exists to state the armature's 180-degree turn: a VRoid export faces +Z while
+; the game faces -Z (W41, "the armature's frame is not the game's"), and a crowd that writes walk
+; transforms onto an unturned body walks backwards.
+
+[ext_resource type="PackedScene" path="res://assets/characters/shino/shino_ped.glb" id="1_shino_ped"]
+
+[node name="shino_ped_body" instance=ExtResource("1_shino_ped")]
+
+[node name="shino" parent="." index="0"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)

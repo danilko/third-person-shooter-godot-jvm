@@ -1,0 +1,76 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot4_mesh.res" id="1_yw8wr"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_c8ew1"]
+size = Vector3(1.8, 0.12, 0.16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_25ltm"]
+size = Vector3(1.8, 0.12, 0.16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1dnhq"]
+size = Vector3(1.8, 0.12, 0.16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cx3ml"]
+size = Vector3(1.8, 0.12, 0.16)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_w2omm"]
+size = Vector3(12.74, 0.1, 12.74)
+
+[node name="ParkingLot4" type="Node3D" unique_id=1106079872]
+metadata/building = {
+"aabb": [Vector3(-6.37, -0.02, -6.37), Vector3(12.74, 0.14, 12.74)],
+"clear_probes": [],
+"composite": true,
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"facade_surfaces": {},
+"footprint_m": [12.74, 12.74],
+"has_interior": true,
+"height_m": 0.12,
+"id": "ParkingLot4",
+"jp": {
+"name": "駐車場 (4台)",
+"note": "a car park as an ADDITION placed beside a building (PLAN.md C0/C1), not a store's composite: Japanese standard bay 2.5 x 5.0 m (駐車場法 guidance), 90-degree parking with an aisle of at least 6 m; front (+Z) faces the street, the bays nose in toward the back. The kerb gap into it is the road's (B9)."
+},
+"kit": "library",
+"piece_count": 58,
+"probe_xz": [0.3, 3.0],
+"props_top_m": 0.12,
+"roofline_m": 0.12,
+"solid_probes": [],
+"use": "a four-bay car park beside a small building",
+"wall_top_m": 0.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=323367432]
+visibility_range_end = 350.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_yw8wr")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=445631249]
+collision_mask = 0
+
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=343413052]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.75, 0.06, -5.67)
+shape = SubResource("BoxShape3D_c8ew1")
+
+[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=903526385]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.25, 0.06, -5.67)
+shape = SubResource("BoxShape3D_25ltm")
+
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=2143202125]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.25, 0.06, -5.67)
+shape = SubResource("BoxShape3D_1dnhq")
+
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=492799950]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.75, 0.06, -5.67)
+shape = SubResource("BoxShape3D_cx3ml")
+
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1852978066]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_w2omm")
