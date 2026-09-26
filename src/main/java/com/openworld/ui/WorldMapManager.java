@@ -74,6 +74,9 @@ public class WorldMapManager extends Control {
     /** Ordinary shops' NAMES appear only once the view is tighter than this (m centre-to-edge); their squares and
      *  every landmark's name always. */
     @Export public float placeDetailRange = 150f;
+    /** Print place NAMES beside the squares (user, 2026-09-26: off -- the squares' codes and the legend key say
+     *  what each is, and names over a crowded map read as clutter). */
+    @Export public boolean showPlaceNames = false;
     @Export public int placeFontSize = 12;
     /** The debug underlay: each streaming zone's id over its marker (PLAN.md 3.18n, "which zone is this bug in"). */
     @Export public boolean showZoneIds = false;
@@ -301,7 +304,7 @@ public class WorldMapManager extends Control {
         if (showPlaces) {
             // EVERY place at every zoom, as its kind's numbered square; names only once zoomed in
             RoadOverlay.drawPlaces(this, visiblePlaces(), view, center, scale, 0f, 0f, placeSizePx,
-                    minPlaceTier(), RoadOverlay.mapFont(), placeFontSize, RoadOverlay.mapFont(),
+                    minPlaceTier(), showPlaceNames ? RoadOverlay.mapFont() : null, placeFontSize, RoadOverlay.mapFont(),
                     rangeMeters <= placeDetailRange);
             // clear of the row numbers down the left edge (drawPostalEdgeNumbers puts them at x 4)
             RoadOverlay.drawPlaceLegend(this, RoadOverlay.mapFont(), placeFontSize, 44f, (float) size.getY() - 14f,
@@ -339,6 +342,7 @@ public class WorldMapManager extends Control {
             grid.queryRadius(origin, blipRangeMeters, near);
             for (Node n : near) {
                 if (n == player || !(n instanceof Node3D n3) || !(n instanceof NameplateTarget nt)) continue;
+                if (!RoadOverlay.worthABlip(player, n)) continue;
                 drawCircle(worldToScreen(n3.getGlobalPosition()), blipRadius, nt.getNameplateColor(), true, -1f, true);
             }
         }
@@ -348,7 +352,11 @@ public class WorldMapManager extends Control {
         }
 
         // The player, wherever they are on the map.
-        drawCircle(worldToScreen(origin), 5f, selfColor, true, -1f, true);
+        // ...as the minimap's heading triangle (user, 2026-09-26), a black edge under it so it reads on a road
+        Vector2 me = worldToScreen(origin);
+        Vector2 dir = RoadOverlay.cameraHeading(this);
+        RoadOverlay.drawHeading(this, me, dir, 10f, new Color(0f, 0f, 0f, 0.85f));
+        RoadOverlay.drawHeading(this, me, dir, 8f, selfColor);
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────

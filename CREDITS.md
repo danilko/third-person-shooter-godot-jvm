@@ -88,7 +88,7 @@ There is a per-folder copy of this list in `assets/terrain3d/textures/asset_lice
 
 ## Visual effects
 
-All four packs are by **Binbun3D** ([bun3d.com](https://bun3d.com)), released under CC0 1.0 (no attribution
+All five packs are by **Binbun3D** ([bun3d.com](https://bun3d.com)), released under CC0 1.0 (no attribution
 required; credited as thanks, as the author asks). Re-organised under `assets/vfx/`, and their GDScript
 controllers rewritten in Java (`com.openworld.vfx`); see `assets/vfx/README.md` for what changed. The licence
 text is `assets/vfx/LICENSE.txt`.
@@ -99,6 +99,7 @@ text is `assets/vfx/LICENSE.txt`.
 | Muzzle flashes (24 variants) | `assets/vfx/muzzle_flash/` | [Godot Muzzle Flash](https://binbun3d.itch.io/muzzle-flash-vfx) by Binbun3D | CC0 1.0 |
 | Smoke plumes (24 variants) | `assets/vfx/smoke/` | [Godot 4.x Smoke VFX Effects](https://binbun3d.itch.io/smoke-vfx) by Binbun3D | CC0 1.0 |
 | Water shader, materials and textures (the sea in `World.tscn` / `DebugWorld.tscn`) | `assets/vfx/water/` | [Godot Water](https://binbun3d.itch.io/godot-water-shader) by Binbun3D; the distance LOD in `water_common.gdshaderinc` is this project's | CC0 1.0 (the changes Project (MIT)) |
+| Grass / crop shader, blade textures and palettes (the rice and wheat fields) | `assets/vfx/grass/` | [Godot Grass](https://binbun3d.itch.io/godot-grass) by Binbun3D (no licence file in the pack; its itch page states CC0) | CC0 1.0 |
 
 ## Shaders (the toon character look)
 

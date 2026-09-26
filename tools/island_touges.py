@@ -16,7 +16,7 @@ The derivation is the plan's sketch (scratchpad `touge/sample3.py`) made a tool,
 `island_v3_terrain.hill_road` walks each flank at <= 10% with 18 m hairpins inside a wedge of that flank, and the
 shared `island_shrine_touge` passes round the corners (`fillet`), lay stations (`_stations`), take the profile
 (`_profile`: the bench midpoint with the fixed stations held, both grade cones) and round every grade break
-(`vertical_curves`). Heights are the LAND grid (`island_reshape.py`), record frame (Godot Y - 0.6).
+(`vertical_curves`). Heights are the LAND grid (`island_reshape.py`), record frame (Godot Y - NET_Y).
 
 `derive` is run once, on purpose, like `island_coast_road.py`'s: the file is the authored alignment and is reviewed.
 `add` and `sculpt` are deterministic and run in every layout / terrain build.
@@ -168,7 +168,7 @@ def derive(land_path):
     walk = Land(land_path, smooth_m=20.0)
     dsea = sea_distance(land_path)
     A, B = crest_record()
-    plat = RS.PLATEAU_Z - NET_Y
+    plat = RS.PLATEAU_Z + RS.RAISE - NET_Y
     top = plat - 4.0
     # --- phase 1: from its junction up to the shrine plateau. 3.2d's alignment could NOT be kept (v13 hoped to): the
     # new summit dome covers its upper legs, and read on the lowered mountain it ran up to 130 m under the ground

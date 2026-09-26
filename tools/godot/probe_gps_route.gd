@@ -380,14 +380,25 @@ func _check_places(which: String) -> void:
 		has and wp.distance_to(door) < 0.5,
 		"%.2f m from it" % wp.distance_to(door) if has else "no waypoint")
 	# 4. a click on bare road is still a bare-road waypoint
+	#    (a denser city has more blips, so the first spot tried may land on another one: try a few, keep the first
+	#    that takes no place)
 	var away: Vector2 = blip + Vector2(0, 60)
 	var bare: Vector3 = worldmap.call("screen_to_world_now", away)
-	_mouse(MOUSE_BUTTON_LEFT, true, away)
-	_mouse(MOUSE_BUTTON_LEFT, false, away)
+	for off in [Vector2(0, 60), Vector2(60, 0), Vector2(0, -60), Vector2(-60, 0), Vector2(90, 90), Vector2(-90, -90),
+			Vector2(120, -40), Vector2(-120, 40)]:
+		away = blip + off
+		bare = worldmap.call("screen_to_world_now", away)
+		_mouse(MOUSE_BUTTON_LEFT, true, away)
+		_mouse(MOUSE_BUTTON_LEFT, false, away)
+		# ...and no postal label either: a printed "x-y" is a click target of its own (3.26(c))
+		if str(worldmap.call("picked_place_now")) == "" and str(worldmap.call("picked_postal_now")) == "":
+			break
 	var wp2: Vector3 = player.call("waypoint_now")
 	_check("a click away from every blip is still an ordinary waypoint",
 		str(worldmap.call("picked_place_now")) == "" and bool(player.call("has_waypoint_now"))
-		and Vector2(bare.x, bare.z).distance_to(Vector2(wp2.x, wp2.z)) < 0.5, "")
+		and Vector2(bare.x, bare.z).distance_to(Vector2(wp2.x, wp2.z)) < 0.5,
+		"place '%s', postal '%s', %.2f m from the click" % [str(worldmap.call("picked_place_now")),
+			str(worldmap.call("picked_postal_now")), Vector2(bare.x, bare.z).distance_to(Vector2(wp2.x, wp2.z))])
 	# 5. a click on a postal cell's printed "x-y" sets the waypoint to that cell's centre (3.26(c)); zoom until
 	#    the labels are drawn (a cell >= postal_cell_label_px on screen), then click the label of the cell under
 	#    the view centre, whose whole cell is on screen, so its label sits on the cell's own centre

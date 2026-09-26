@@ -36,6 +36,13 @@ func _door_style(meta: Dictionary, at: Vector3) -> String:
 		if dist < bd:
 			bd = dist
 			best = str(d.get("style", meta.get("door_style", "swing")))
+	# an INTERIOR door (a staff room, a toilet: user 2026-09-26) is always hinged
+	for d in meta.get("inner_doors", []):
+		var c := Vector3(d["center"][0], at.y, d["center"][2])
+		var dist := c.distance_to(Vector3(at.x, at.y, at.z))
+		if dist < bd:
+			bd = dist
+			best = "inner"
 	return best if best != "" else str(meta.get("door_style", "swing"))
 
 
@@ -189,10 +196,12 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var shop: bool = meta.get("doors_shop", false)
 	var want_locked: bool = not shop
 	for d in doors.get_children():
-		_check(bool(d.get("locked")) == want_locked, "%s %s starts %s" % [id, d.name,
-			"LOCKED" if want_locked else "unlocked (a shop)"])
-		_check(bool(d.get("auto_open")) == shop, "%s %s is %s" % [id, d.name,
-			"AUTOMATIC (a shop door)" if shop else "manual (press interact)"])
+		# an interior door is never locked and opens as you walk up, in a mission shop as in any other
+		var inner := _door_style(meta, d.position) == "inner"
+		_check(bool(d.get("locked")) == (want_locked and not inner), "%s %s starts %s" % [id, d.name,
+			"LOCKED" if want_locked and not inner else "unlocked (a shop or an interior door)"])
+		_check(bool(d.get("auto_open")) == (shop or inner), "%s %s is %s" % [id, d.name,
+			"AUTOMATIC (a shop or an interior door)" if shop or inner else "manual (press interact)"])
 		# WHO may open it is the flags above (and `world.Door`'s own sensor rule: only a Character opens a shop
 		# door). What the BUILDER owns is that the leaf clears the doorway when it does, so the door is driven
 		# directly here: auto off, unlock, open.
@@ -236,6 +245,8 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 		# stair house's frame is shut too), so dividing by the doorway count is not the same question.
 		var per_door := 0
 		for d in meta["doors"]:
+			if str(d.get("style", "swing")) != "slide":
+				continue                    # a back or side exit is a hinged steel door (user, 2026-09-26)
 			# measured on the CLOSED positions (`before`): by now the doors are open, and an open leaf has slid
 			# a leaf's width clear of its own doorway, which is the point of it
 			var dc := Vector2(d["center"][0], d["center"][2])
@@ -250,7 +261,11 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 			_check(slid_dirs[0].dot(slid_dirs[1]) < -0.9, "%s: the two leaves part to opposite sides (dot %.2f)"
 				% [id, slid_dirs[0].dot(slid_dirs[1])])
 		var glassy := 0
+		var sliders := 0
 		for d in doors.get_children():
+			if want[d.name] != "slide":
+				continue
+			sliders += 1
 			var lm: MeshInstance3D = d.get_node_or_null("IntactVisual")
 			if lm != null and lm.mesh != null:
 				for si in (lm.mesh as Mesh).get_surface_count():
@@ -258,8 +273,7 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 					if lmat != null and str(lmat.resource_path).contains("MI_GlassClear"):
 						glassy += 1
 						break
-		_check(glassy == doors.get_child_count(), "%s: %d of %d leaves are glass" % [
-			id, glassy, doors.get_child_count()])
+		_check(glassy == sliders, "%s: %d of %d sliding leaves are glass" % [id, glassy, sliders])
 
 	var space := inst.get_world_3d().direct_space_state
 	var o := inst.global_position

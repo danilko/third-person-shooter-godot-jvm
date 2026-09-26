@@ -1,5 +1,9 @@
 package com.openworld.ui;
 
+import com.openworld.carrier.vehicle.Vehicle;
+import com.openworld.character.Character;
+import com.openworld.character.Faction;
+import com.openworld.character.Player;
 import com.openworld.world.Places;
 import com.openworld.world.RoadGraph;
 import com.openworld.world.RoadMap;
@@ -191,6 +195,44 @@ final class RoadOverlay {
      * ordinary shops when the view is zoomed out, so a whole-island map shows landmarks and not 130 konbini.
      * Nothing is latched: what is drawn is derived from the view every frame.
      */
+    /** The player as a heading TRIANGLE pointing along {@code dir} (screen space, unit), the minimap's own shape --
+     *  one owner, so both maps draw the same player. */
+    static void drawHeading(CanvasItem ci, Vector2 center, Vector2 dir, float size, Color col) {
+        float dx = (float) dir.getX(), dy = (float) dir.getY();
+        float cx = (float) center.getX(), cy = (float) center.getY();
+        PackedVector2Array tri = new PackedVector2Array();
+        tri.pushBack(new Vector2(cx + dx * size, cy + dy * size));
+        tri.pushBack(new Vector2(cx - dx * size * 0.5f - dy * size * 0.55f, cy - dy * size * 0.5f + dx * size * 0.55f));
+        tri.pushBack(new Vector2(cx - dx * size * 0.5f + dy * size * 0.55f, cy - dy * size * 0.5f - dx * size * 0.55f));
+        ci.drawColoredPolygon(tri, col, new PackedVector2Array(), null);
+    }
+
+    /** The viewport camera's forward on the XZ plane as a north-up screen direction (x right, +z down). */
+    static Vector2 cameraHeading(CanvasItem ci) {
+        godot.api.Viewport vp = ci.getViewport();
+        godot.api.Camera3D cam = vp != null ? vp.getCamera3d() : null;
+        if (cam == null) return new Vector2(0f, -1f);
+        Vector3 fwd = cam.getGlobalBasis().getZ().times(-1f);
+        float x = (float) fwd.getX(), z = (float) fwd.getZ();
+        float len = (float) Math.sqrt(x * x + z * z);
+        return len < 1e-3f ? new Vector2(0f, -1f) : new Vector2(x / len, z / len);
+    }
+
+    /**
+     * Whether a body earns a blip on either map (user, 2026-09-26: GTA shows no neutral pedestrians or ambient
+     * traffic -- a map full of dots nobody can act on hides the ones that matter): another PLAYER, anyone HOSTILE
+     * to the local player, and a vehicle driven by either. One rule for the minimap and the full map.
+     */
+    static boolean worthABlip(Character self, godot.api.Node n) {
+        if (n == self) return false;
+        Character c = n instanceof Vehicle v ? v.driverNow() : (n instanceof Character ch ? ch : null);
+        if (c == null || !c.isAlive()) return false;
+        if (c instanceof Player) return true;
+        String mine = self != null && self.characterInfo != null ? self.characterInfo.faction : Faction.NEUTRAL;
+        String theirs = c.characterInfo != null ? c.characterInfo.faction : Faction.NEUTRAL;
+        return Faction.areHostile(mine, theirs);
+    }
+
     static void drawPlaces(CanvasItem ci, List<Places.Place> places, Vector3 origin, Vector2 center,
                            float scale, float clipRadiusPx, float rot, float sizePx, int minTier, Font font,
                            int fontSize) {

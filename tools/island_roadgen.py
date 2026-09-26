@@ -35,7 +35,9 @@ PREFIX = "shuto_"
 # ------------------------------------------------------------------------------------------ ground
 
 TERRAIN_LAND = os.path.join(ROOT, "assets", "world_source", "terrain", "island_land.f32")
-NET_Y = 0.6           # the IslandRoads node's Y: a record height is the Godot height less this
+NET_Y = 5.6           # the IslandRoads node's Y: a record height is the Godot height less this. The city plain
+                      # (0.6) + island_reshape.RAISE (5.0): the land stands 5 m higher behind the seawall, and moving
+                      # the NETWORK with it leaves every road record unchanged
 
 
 class Ground(object):
@@ -59,12 +61,43 @@ class Ground(object):
             self.g = (g[::-1, :] - NET_Y).astype("<f4")
             self.ox, self.oy = -2304.0, -2304.0
             self.step = 2.0
+            self._dike_crest()
             return
         stem = stem or os.path.join(PIECES, "IslandRoads")
         h = json.load(open(stem + ".ground.json"))
         self.g = np.fromfile(os.path.join(PIECES, h["bin"]), dtype="<f4").reshape(h["ny"], h["nx"])
         self.ox, self.oy = h["origin"]
         self.step = h["step"]
+
+    def _dike_crest(self):
+        """The ring-road dike's crest (`island_dike.py raise` writes it before the expressway is derived) stood in the
+        ground: the embankment is sculpted into the terrain only in the natural stage, and a deck derived from the
+        land grid alone would clear the ring by 5 m less than it stands."""
+        np = self.np
+        path = os.path.join(ROOT, "assets", "world_source", "island_dike_line.json")
+        if not os.path.exists(path):
+            return
+        for ln in json.load(open(path))["lines"]:
+            if ln.get("kind") != "dike":
+                continue
+            for a, b in zip(ln["pts"], ln["pts"][1:]):
+                if len(a) < 5:
+                    continue
+                w = max(a[4], b[4])
+                i0 = max(0, int((min(a[0], b[0]) - w - self.ox) / self.step))
+                i1 = min(self.g.shape[1], int((max(a[0], b[0]) + w - self.ox) / self.step) + 2)
+                j0 = max(0, int((min(a[1], b[1]) - w - self.oy) / self.step))
+                j1 = min(self.g.shape[0], int((max(a[1], b[1]) + w - self.oy) / self.step) + 2)
+                if i0 >= i1 or j0 >= j1:
+                    continue
+                jj, ii = np.mgrid[j0:j1, i0:i1]
+                x, y = self.ox + ii * self.step, self.oy + jj * self.step
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                t = np.clip(((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy or 1.0), 0.0, 1.0)
+                d = np.hypot(a[0] + t * dx - x, a[1] + t * dy - y)
+                zc = a[3] + (b[3] - a[3]) * t
+                win = self.g[j0:j1, i0:i1]
+                win[d <= w] = np.maximum(win, zc)[d <= w]
 
     def z(self, x, y):
         i, j = (x - self.ox) / self.step, (y - self.oy) / self.step

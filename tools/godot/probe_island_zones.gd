@@ -8,7 +8,7 @@ extends SceneTree
 ## (every road cell's centre, in a snake), and at each stop, once streaming has settled:
 ##   1. every road zone whose marker is within its LOAD radius is loaded, and none past its UNLOAD
 ##      radius is (the hysteresis band may be either);
-##   2. every loaded piece sits at the NETWORK's transform (Y +0.6), not its marker's;
+##   2. every loaded piece sits at the NETWORK's transform (Y +5.6), not its marker's;
 ##   3. every streamed lane starts where its piece's lanekit says (0.05 m);
 ##   4. a successor that does not resolve names a lane of a zone that is NOT loaded -- the only
 ##      acceptable dangle, the cost of a cut;
@@ -22,7 +22,7 @@ extends SceneTree
 
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
 const PIECES := "res://assets/world_source/pieces/%s.lanekit.json"
-const NET_ORIGIN := Vector3(0, 0.6, 0)
+const NET_ORIGIN := Vector3(0, 5.6, 0)
 
 var fails := 0
 var w: Node
@@ -204,7 +204,7 @@ func _initialize() -> void:
 					break
 	check("every zone within its load radius is loaded (%d stops)" % stops, bad_load.is_empty(), str(bad_load.slice(0, 4)))
 	check("no zone past its unload radius stays loaded", bad_unload.is_empty(), str(bad_unload.slice(0, 4)))
-	check("every loaded piece sits at the network (Y +0.6)", bad_place.is_empty(), str(bad_place.slice(0, 3)))
+	check("every loaded piece sits at the network (Y +5.6)", bad_place.is_empty(), str(bad_place.slice(0, 3)))
 	check("every streamed lane starts where its lanekit says", worst_start < 0.05, "worst %.4f m" % worst_start)
 	check("a successor dangles only into an UNLOADED zone", bad_dangle.is_empty(), "%d %s" % [bad_dangle.size(), bad_dangle.slice(0, 3)])
 	check("every road within 150 m of the player is streamed", uncovered.is_empty(), "%d %s" % [uncovered.size(), uncovered.slice(0, 3)])

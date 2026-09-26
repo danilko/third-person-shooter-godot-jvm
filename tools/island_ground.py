@@ -86,9 +86,81 @@ def load_record():
     return ib, doc
 
 
+def military_paint():
+    """The military base, its air base strip and its piers are CONCRETE (2026-09-26): they stand at the port's 4.6 m,
+    under the 5 m below which `paint_terrain.gd` paints everything sand. Their boxes are the plan's own
+    (`island_plan.RESERVES` military_*, `island_reshape.MILITARY_PIERS`), so paint and land cannot disagree."""
+    import island_plan as PL
+    import island_reshape as ir
+    X, Z = vertex_grid()
+    m = np.zeros((N, N), dtype=bool)
+    for name, (x0, z0, x1, z1) in PL.RESERVES:
+        if name.startswith("military"):
+            m |= (X >= x0) & (X <= x1) & (Z >= z0) & (Z <= z1)
+    for x0, x1, z0, z1 in ir.MILITARY_PIERS:
+        m |= (X >= x0) & (X <= x1) & (Z >= z0) & (Z <= z1)
+    return m
+
+
+def dike_paint(key="cells"):
+    """The coastal SEAWALL is CONCRETE (user, 2026-09-26: it read as a sand dune): the cells `island_reshape`'s
+    `coastal_works` built the wall on, from the runs it records in island_dike.json. Painted with the block's
+    concrete (id 4). `key="works"` is the wall + its beach + the road fill in front of the old coast: nothing a
+    block may fill."""
+    m = np.zeros((N, N), dtype=bool)
+    path = os.path.join(ROOT, "assets", "world_source", "island_dike.json")
+    cells = json.load(open(path)).get(key) if os.path.exists(path) else None
+    if not cells:
+        print("island_ground: no dike cells recorded (re-run the land stage)")
+        return m
+    X, Z = vertex_grid()
+    x0, z0, st = float(X[0, 0]), float(Z[0, 0]), cells["step"]
+    oi, oj = int(round((cells["x0"] - x0) / st)), int(round((cells["z0"] - z0) / st))
+    for j, a, b in cells["runs"]:
+        jj = j + oj
+        if 0 <= jj < N:
+            m[jj, max(0, a + oi):min(N, b + oi + 1)] = True
+    return m
+
+
+def field_soil():
+    """The paddy fields' SOIL (user, 2026-09-25), painted as its own terrain texture (id 5) by a second
+    `apply_paint_grid.gd` pass: every vertex whose 2 m cell (the cell the vertex is the lower-left corner of) is a
+    field cell of `island_buildings.farm_fields`' chunks. The ground's HEIGHT under a field is left alone."""
+    ib, doc = load_record()
+    soil = np.zeros((N, N), dtype=bool)
+    n, cell = ib.FIELD_CELLS, ib.FIELD_CHUNK / ib.FIELD_CELLS
+    for f in doc.get("fields", ()):
+        word = bin(int(f["mask"], 16))[2:].zfill(len(f["mask"]) * 4)
+        for b in range(n * n):
+            if word[b] != "1":
+                continue
+            i, j = idx(f["x0"] + (b % n) * cell), idx(f["z0"] + (b // n) * cell)
+            if 0 <= i < N and 0 <= j < N:
+                soil[j, i] = True
+    return soil
+
+
 def vertex_grid():
     xs = np.arange(N) * STEP - HALF
     return np.meshgrid(xs, xs)          # X (columns = Godot x), Z (rows = Godot z)
+
+
+LEVELLED_UNDER = 0.02   # a levelled site's apron stands this far over the ground filled under it (z-fighting)
+
+
+def levelled_sites(text):
+    """[(godot x, z, yaw rad, half x, half z, godot y)] of every site zone carrying `metadata/site_level`."""
+    import re
+    out = []
+    for m in re.finditer(r'\[sub_resource type="Resource" id="Zone_site_[^"]*"\]\n(.*?)\n\n', text, re.S):
+        body = m.group(1)
+        lv = re.search(r"metadata/site_level = ([-0-9.]+)", body)
+        res = re.search(r"metadata/site_reserve = PackedFloat64Array\(([^)]*)\)", body)
+        if lv and res:
+            v = [float(x) for x in res.group(1).split(",")]
+            out.append((v[0], v[1], v[2], v[3], v[4], float(lv.group(1))))
+    return out
 
 
 def rect_into(target, cx, cz, yaw_deg, x0, z0, x1, z1, value=True, heights=None, h=None):
@@ -191,7 +263,9 @@ def road_mask(ib, grid_fn, text):
     # clearest case in the world. It is kept out of the fill and put into the paint.
     site = np.zeros((N, N), bool)
     for (cx, cz, yaw, hx, hz) in ib.site_exclusions(text):
-        rect_into(site, cx, cz, yaw, -hx, -hz, hx, hz)
+        # site_exclusions' yaw is RADIANS (island_buildings.block_box's convention) and rect_into takes DEGREES: passed
+        # straight through, every site mask was laid near axis-aligned (a yaw-90 terminal across its quay, not along it)
+        rect_into(site, cx, cz, math.degrees(yaw), -hx, -hz, hx, hz)
     return road, site, cap, under
 
 
@@ -240,10 +314,19 @@ def build(heights_path, area=None):
         rect_into(lot, p["pos"][0], p["pos"][2], p["yaw"], -w / 2.0, -dd / 2.0, w / 2.0, dd / 2.0,
                   heights=lot_top, h=p["pos"][1] + ib.LOT_RAISE)
     road, site, cap, under = road_mask(ib, None, text)
+    # a LEVELLED site (an access car park, island_sites.access_parking) is ground this stage owns: the terrain under it
+    # is filled up to its level exactly like a lot, and it is no longer a site the fill must keep out of
+    levelled = np.zeros((N, N), bool)
+    for (cx, cz, yaw, hx, hz, level) in levelled_sites(text):
+        rect_into(levelled, cx, cz, math.degrees(yaw), -hx, -hz, hx, hz, heights=lot_top,
+                  h=level - LEVELLED_UNDER + ib.LOT_FILL_GAP)
+    site &= ~levelled
+    lot |= levelled
     lot &= ~road & ~site
     print("island_ground: %d lot vertices, %d road vertices" % (int(lot.sum()), int(road.sum())))
 
-    open_ground = land & ~road & ~site
+    # the dike embankment, the beach and the fill in front of the old coast are not a block's
+    open_ground = land & ~road & ~site & ~dike_paint("works") & ~dike_paint("cells")
     comp, sizes = components(open_ground)
     # which components hold a lot, and how big they are
     holds = np.zeros(len(sizes) + 1, bool)
@@ -463,13 +546,19 @@ def main(argv):
             g |= shift_bool(near, dj, di)
         near = g
     paint |= under & near & (nat > LAND_Z)
+    paint |= military_paint() & (nat > LAND_Z)
+    paint |= dike_paint()
     if area is not None:
         X, Z = vertex_grid()
         paint &= (X >= area[0]) & (X <= area[2]) & (Z >= area[1]) & (Z <= area[3])
     print("island_ground: paint %.3f km2 (%d vertices)" % (paint.sum() * STEP * STEP * 1e-6, int(paint.sum())))
     (paint.astype(np.uint8)).tofile(prefix + ".paint.u8")
+    soil = field_soil()
+    print("island_ground: soil %.3f km2 (%d vertices) under the paddy fields" % (
+        soil.sum() * STEP * STEP * 1e-6, int(soil.sum())))
+    (soil.astype(np.uint8)).tofile(prefix + ".soil.u8")
     nat.astype("<f4").tofile(prefix + ".natural.f32")
-    print("island_ground: wrote %s.{height.f32,paint.u8,natural.f32}" % os.path.relpath(prefix, ROOT))
+    print("island_ground: wrote %s.{height.f32,paint.u8,soil.u8,natural.f32}" % os.path.relpath(prefix, ROOT))
     return 0
 
 

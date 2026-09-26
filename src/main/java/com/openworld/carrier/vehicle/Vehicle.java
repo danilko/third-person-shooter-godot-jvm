@@ -613,6 +613,11 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
     }
 
+    /** Who is in the driver's seat, or null (the map's blip rule asks). Not a getter-shaped name: see Known Quirks. */
+    public Character driverNow() {
+        return occupant != null && GD.isInstanceValid(occupant) ? occupant : null;
+    }
+
     /** True when the driver seat holds a dead body (the car coasts, and is reclaimable at rest). */
     public boolean hasDefeatedDriver() {
         return occupant != null && GD.isInstanceValid(occupant) && !occupant.isAlive();

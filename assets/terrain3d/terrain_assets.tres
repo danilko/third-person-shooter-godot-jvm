@@ -8,6 +8,8 @@
 [ext_resource type="Texture2D" uid="uid://eyvje88u6ulp" path="res://assets/terrain3d/textures/sand_nrm_rgh.png" id="6_sand_nrm"]
 [ext_resource type="Texture2D" uid="uid://dp7nvdqbbpjpj" path="res://assets/terrain3d/textures/urban_alb_ht.png" id="7_urban_alb"]
 [ext_resource type="Texture2D" uid="uid://b3ob2ldysoslm" path="res://assets/terrain3d/textures/urban_nrm_rgh.png" id="8_urban_nrm"]
+[ext_resource type="Texture2D" uid="uid://dq5qo7cn2ps3m" path="res://assets/terrain3d/textures/soil_alb_ht.png" id="9_soil_alb"]
+[ext_resource type="Texture2D" uid="uid://bq48xedsqvi84" path="res://assets/terrain3d/textures/soil_nrm_rgh.png" id="10_soil_nrm"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dstje"]
 transparency = 4
@@ -75,6 +77,15 @@ normal_depth = 1.0
 ao_strength = 0.8
 uv_scale = 0.3663
 
+[sub_resource type="Terrain3DTextureAsset" id="Tex_soil"]
+name = "Soil"
+id = 5
+albedo_texture = ExtResource("9_soil_alb")
+normal_texture = ExtResource("10_soil_nrm")
+normal_depth = 1.0
+ao_strength = 1.0
+uv_scale = 0.25
+
 [resource]
 mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_pysb7")])
-texture_list = Array[Terrain3DTextureAsset]([SubResource("Tex_grass"), SubResource("Tex_cliff"), SubResource("Tex_sand"), SubResource("Tex_seabed"), SubResource("Tex_urban")])
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Tex_grass"), SubResource("Tex_cliff"), SubResource("Tex_sand"), SubResource("Tex_seabed"), SubResource("Tex_urban"), SubResource("Tex_soil")])

@@ -113,7 +113,8 @@ func _initialize() -> void:
 		var d3 := n as Node3D
 		# 150 m: the nearest always-open shop to the job is ~99 m away since the 2026-09-25 layout (a family
 		# restaurant); the mission's own reach is doorUnlockRadius (25 m), so anything in 25..150 m is a bystander
-		if d3.global_position.distance_to(at) > 150.0:
+		# (400 m since the one-row blocks of 2026-09-26 moved the nearest shop further out)
+		if d3.global_position.distance_to(at) > 400.0:
 			continue
 		# which BUILDING it belongs to, not how far away it is: the mission shop is a `_Open` variant, a shop (and
 		# the home base) a `_Shop` one
@@ -124,7 +125,9 @@ func _initialize() -> void:
 				owner_name = str(up.name)
 			up = up.get_parent()
 		if owner_name.contains("_Open"):
-			doors.append(n)
+			# an INTERIOR door (staff room, toilet: automatic, never locked) is not the shop's to lock or unlock
+			if not bool(n.get("auto_open")):
+				doors.append(n)
 		elif owner_name.contains("_Shop"):
 			shop_doors.append(n)
 	for d in doors:

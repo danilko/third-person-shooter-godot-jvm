@@ -13,11 +13,14 @@ import godot.api.BaseMaterial3D;
 import godot.api.CollisionShape3D;
 import godot.api.CylinderMesh;
 import godot.api.CylinderShape3D;
+import godot.api.GeometryInstance3D;
 import godot.api.Label3D;
 import godot.api.MeshInstance3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.StandardMaterial3D;
+import godot.api.VisibleOnScreenNotifier3D;
+import godot.core.AABB;
 import godot.core.MethodCallable;
 import godot.core.Color;
 import godot.core.StringName;
@@ -53,9 +56,11 @@ public class WeaponPad extends Area3D {
     /** The pad disc's glow; the label above it says what it gives. */
     @Export public Color padColor = new Color(0.25f, 0.85f, 1.0f, 1.0f);
 
+    /** Past this the disc, model and label are not drawn (every konbini on the island carries pads, 2026-09-26). */
+    @Export public double drawDistance = 40.0;
+
     private final Map<Long, Double> offAt = new HashMap<>();   // instance id -> time it stepped off
     private Node3D display;
-    private double time = 0.0;
     private int grants = 0;
 
     /** How many grants this pad has made (probe readout). */
@@ -128,6 +133,16 @@ public class WeaponPad extends Area3D {
         text.setPosition(new Vector3(0, 1.55, 0));
         addChild(text);
 
+        fadeOut(this);
+        // the model only turns while it is on screen: a streamed city holds a few hundred pads, and a per-frame
+        // callback into the JVM for each one nobody can see is the cost the crowd tiers exist to avoid
+        setProcess(false);
+        VisibleOnScreenNotifier3D eye = new VisibleOnScreenNotifier3D();
+        eye.setAabb(new AABB(new Vector3(-0.6, 0.0, -0.6), new Vector3(1.2, 1.9, 1.2)));
+        addChild(eye);
+        eye.connect(new StringName("screen_entered"), MethodCallable.createUnsafe(this, "on_screen_entered"));
+        eye.connect(new StringName("screen_exited"), MethodCallable.createUnsafe(this, "on_screen_exited"));
+
         connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_body_entered"));
         connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_body_exited"));
     }
@@ -135,22 +150,36 @@ public class WeaponPad extends Area3D {
     @Register
     @Override
     public void _process(double delta) {
-        time += delta;
         if (display != null) display.rotateY((float) (delta * 1.2));
     }
 
     @Register
+    public void onScreenEntered() { setProcess(true); }
+
+    @Register
+    public void onScreenExited() { setProcess(false); }
+
+    private void fadeOut(Node n) {
+        if (n instanceof GeometryInstance3D g) g.setVisibilityRangeEnd((float) drawDistance);
+        for (Node c : n.getChildren()) fadeOut(c);
+    }
+
+    @Register
     public void onBodyExited(Node body) {
-        offAt.put(body.getInstanceId(), time);
+        offAt.put(body.getInstanceId(), now());
     }
 
     @Register
     public void onBodyEntered(Node body) {
         if (!(body instanceof Player p) || p.weaponController == null || !authoritative()) return;
         Double left = offAt.get(p.getInstanceId());
-        if (left != null && time - left < cooldownSeconds) return;
+        if (left != null && now() - left < cooldownSeconds) return;
         grant(p);
     }
+
+    /** Seconds, from the engine clock: NOT a _process accumulator -- a pad off screen does not process, and its
+     *  cooldown must still run out. */
+    private static double now() { return godot.api.Time.getTicksMsec() / 1000.0; }
 
     private boolean authoritative() {
         return !(getNodeOrNull("/root/NetworkManager") instanceof com.openworld.net.NetworkManager net)

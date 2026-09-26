@@ -89,6 +89,9 @@ def layout_type(t, root):
            "pieces": [], "boxes": [], "doors": [], "solid_probes": []}
     # a Japanese automatic entrance is the whole module, glazed (see SLIDE_OPENING_W)
     slide = str(t.get("door_style", "swing")) == "slide"
+    # ...but only on the STREET side (user, 2026-09-26): a konbini's back door, its staff exit, is an ordinary
+    # hinged steel door. `slide_sides` names the sides that slide (default: the front).
+    slide_sides = set(t.get("slide_sides", ["front"])) if slide else set()
     place = out["pieces"]
 
     def put(name, pos, yaw, row=""):
@@ -181,7 +184,7 @@ def layout_type(t, root):
                 raise SystemExit(f"{t['id']}: row {row_for(g, side)} has no door piece for the {side} door")
             for i in range(gm[4]):
                 c = at(gm, i)
-                if i in door_idx and slide:
+                if i in door_idx and side in slide_sides:
                     continue                      # a glazed shopfront: the builder fills the whole module
                 name = row["door"] if i in door_idx else row["pieces"][i % len(row["pieces"])]
                 rname = row_for(g, side)
@@ -282,9 +285,7 @@ def layout_type(t, root):
     # lower part runs full length to the terrace and its upper part stands back, and the terrace edge has its own
     thick = pieces["pieces"][rows[row_for(storeys[0][0], "front")]["pieces"][0]]["size"][2]
     thick = max(thick, 0.18)
-    hw, dh = kit["door_opening"][0] * s, kit["door_opening"][1] * s
-    if slide:                                     # the glazed entrance is the module, not the kit's door hole
-        hw, dh = SLIDE_OPENING_W / 2.0, SLIDE_OPENING_H
+    swing_hw, swing_dh = kit["door_opening"][0] * s, kit["door_opening"][1] * s
     h0 = storeys[0][1]
 
     def box(side, a0, a1, y0, y1, back=0.0):
@@ -315,6 +316,9 @@ def layout_type(t, root):
             continue
         box(side, 0.0, length, h0, low_top)
         cursor = 0.0
+        sl = side in slide_sides
+        # the glazed entrance is the module, not the kit's door hole
+        hw, dh = (SLIDE_OPENING_W / 2.0, SLIDE_OPENING_H) if sl else (swing_hw, swing_dh)
         for i in idx:
             c = m * (i + 0.5)
             box(side, cursor, c - hw, 0.0, h0)
@@ -323,8 +327,8 @@ def layout_type(t, root):
             p = (start[0] + along[0] * c, start[1] + along[1] * c)
             out["doors"].append({"side": side, "module": i, "center": [round(p[0], 5), 0.0, round(p[1], 5)],
                                  "outward": [nrm[0], 0, nrm[1]], "width": round(2 * hw, 5), "height": round(dh, 5),
-                                 "style": "slide" if slide else "swing",
-                                 **({"shopfront": {"module": round(m, 5), "storey": round(h0, 5)}} if slide else {})})
+                                 "style": "slide" if sl else "swing",
+                                 **({"shopfront": {"module": round(m, 5), "storey": round(h0, 5)}} if sl else {})})
         box(side, cursor, length, 0.0, h0)
     for side in SIDES:
         n = nw if side in ("front", "back") else nd
@@ -420,6 +424,15 @@ def place_props(props, out, root, footprint=None):
             if footprint and (abs(pos[0]) > footprint[0] / 2 + 0.5 or abs(pos[2]) > footprint[1] / 2 + 0.5):
                 raise SystemExit(f"{out['id']}: prop {name} at {pos} stands outside the footprint {footprint}")
             out["pieces"].append({"piece": name, "path": path, "pos": [round(v, 5) for v in pos], "yaw": yaw})
+            if p.get("door"):
+                # an INTERIOR hinged door (user, 2026-09-26: a konbini's staff room and toilets): the doorway is the
+                # prop's own hole (a `Wall_PartitionDoor`), and `door` is its opening {w, h} in metres; the scene
+                # builder hangs a hinged leaf there. Outward is the piece's own +Z, turned by its yaw.
+                a = math.radians(yaw)
+                out.setdefault("inner_doors", []).append({
+                    "center": [round(pos[0], 5), round(pos[1], 5), round(pos[2], 5)],
+                    "outward": [round(math.sin(a), 6), 0, round(math.cos(a), 6)],
+                    "width": float(p["door"].get("w", 0.85)), "height": float(p["door"].get("h", 2.0))})
             kind = p.get("collide", "box")
             if kind == "box":
                 c, sz = turned_box(entry["min"], entry["max"], yaw, pos)

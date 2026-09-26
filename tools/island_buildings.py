@@ -72,18 +72,30 @@ KERB_GAP = 1.5         # past the footway (or the carriageway edge, where there 
 ELEVATED_GAP = 3.0     # clear of an elevated deck's edge (its piers and caps)
 PAD_GAP = 5.0          # clear of a junction pad (its corner footways)
 SITE_CLEAR = 20.0
-ALLEY = 1.5            # kept free on a building's sides and back (half the alley between two)
+ALLEY = 1.5            # kept free on a building's sides and back (half the alley between two) -- the default
+# ...and per district (user, 2026-09-26: "more occupied, like the PLATEAU city"): central Tokyo's median gap to a
+# neighbour is 0.2 m, 59% touching (measure_plateau_blocks); housing keeps a narrow side gap
+# Outside the 防火地域 core a building keeps about ONE PERSON's width to its neighbour (user, 2026-09-26: 0.5 each
+# side = a 1 m gap; the Civil Code asks 50 cm from the boundary, i.e. the same 1 m between two houses)
+REGION_ALLEY = {"downtown": 0.25, "nightlife": 0.2, "west_ekimae": 0.2, "west_centre": 0.5, "city": 0.5,
+                "residential": 0.6, "residential_north": 0.6, "residential_west": 0.8, "light_industry": 0.6,
+                "light_industry_w": 0.5, "bay_processing": 0.8}
+
+
+def alley_of(reg):
+    return REGION_ALLEY.get(reg[0], ALLEY) if reg else ALLEY
 RELIEF = 0.7
+REFUSED = {}          # why each tried lot was refused (derive prints it)
 SIDEWALK_STEP = 6.0    # sidewalk path sample spacing
 KERB_H = 0.15          # a footway stands this far above its carriageway
 LOT_BURY_TOL = 0.05    # the ground may stand this far above a lot's top (inside it: the slab covers it)
 LOT_MAX_STEP = 1.2     # ... and fall at most this far below it
-LOT_GROW_MAX = 10.0    # a lot grows at most this far to its back / front toward the pavement
+LOT_GROW_MAX = 20.0    # a lot grows at most this far to its back / front toward the pavement
 LOT_GROW_SIDE = 30.0   # ... and this far along its street (to the corner)
 PAD_WALK = 4.0         # a junction pad's corner footway width, for the lot-stop mask
 LOT_SKIRT = 0.3        # the slab reaches this far below the lowest ground under it
 LOT_FOOTWAY_GAP = 0.05 # the frontage slab stops this short of the footway's outer edge
-SLOT_STEP = 3.0        # how far along a row a rejected slot moves before trying again
+SLOT_STEP = 1.0        # how far along a row a rejected slot moves before trying again (3.0 left gaps)
 
 # --- the 路地: how a block behind the frontage is reached (PLAN.md 3.18c, user's own design, and it is the one
 # rule in it that is Japanese LAW rather than style). 接道義務 (Building Standards Act art. 43) says every
@@ -95,9 +107,11 @@ SLOT_STEP = 3.0        # how far along a row a rejected slot moves before trying
 # So the frontage row now leaves a gap every PASSAGE_EVERY metres, running from the footway back past the row,
 # and no lot may stand in it or grow into it. Dead ends are allowed and not worth avoiding: a Japanese alley is
 # very often a 袋小路, and fire access is satisfied by the frontage, not by a loop.
-PASSAGE_EVERY = 46.0   # along the frontage: about every third building
+PASSAGE_EVERY = 80.0   # along the frontage: about one per block side (user, 2026-09-26; was 46)
+BACK_ACCESS = 3.0      # a back-row lot must have a 路地 / lane / street within this (接道, the 旗竿地 strip)
 PASSAGE_W = 3.2        # wide enough for a scooter and two people to pass, the ordinary 路地
-PASSAGE_DEPTH = 34.0   # back from the footway: past the frontage row's lot, into the block
+PASSAGE_DEPTH = 34.0   # back from the footway: past the frontage row's lot, into the block (the least)
+PASSAGE_DEPTH_MAX = 80.0   # ...deeper where a district fills its blocks several rows deep (rows x pitch + 16)
 # R9 (PLAN.md 3.32/3.34): each cell carries ONE merged, vertex-coloured box per building (its HLOD), shown only
 # beyond HLOD_BEGIN of the cell's centre; every building's own Mesh has the HLOD as its `visibility_parent`, so
 # Godot shows the detail exactly while the HLOD is hidden for being near. One draw call per far cell instead of a
@@ -144,7 +158,7 @@ FACADE_MAT_RES = "res://assets/world_source/kits/quaternius_downtown_city/materi
 # real one has to Shinjuku: 雑居ビル packed shoulder to shoulder, no flats, and the same grey tone bias as the
 # working districts. It is inside downtown's box, so it must come FIRST to win the first-match rule.
 REGIONS = (
-    ("nightlife", (520.0, 180.0, 980.0, 560.0), 3, 20.0,
+    ("nightlife", (520.0, 180.0, 980.0, 560.0), 1, 20.0,
      {"PencilBuilding": 6, "ShopHouse": 3, "KonbiniS": 1, "OfficeMid": 0.8, "FamilyRestaurant": 0.5},
      0.0, "dark"),
     # RESIDENTIAL WRAPS THE CITY (user, 2026-09-21, drawn on the district plan: "add resident around city
@@ -159,26 +173,59 @@ REGIONS = (
     #          (x -828..-145): a box that claims the mountain costs nothing to the PLACEMENT, which only ever
     #          builds on frontage, but it makes the district plan read wrong and it makes the HUD announce
     #          "Residential West" while you stand on a 300 m peak, because `Places.regionAt` reads these boxes.
-    ("residential_north", (-330.0, 700.0, 1700.0, 960.0), 2, 20.0,
+    ("residential_north", (-330.0, 700.0, 1700.0, 960.0), 1, 20.0,
      {"Apartment": 3, "ShopHouse": 2, "Mansion": 1, "KonbiniS": 0.5, "KonbiniL": 0.4, "GasStation": 0.3},
      0.15, None),
     ("residential_west", (-900.0, -200.0, -150.0, 400.0), 1, 18.0,
      {"Apartment": 3, "ShopHouse": 1.5, "Mansion": 0.8, "KonbiniS": 0.3}, 0.3, None),
-    ("downtown", (150.0, 40.0, 1300.0, 720.0), 3, 24.0,
-     {"OfficeMid": 4, "PencilBuilding": 4, "Mansion": 2, "ShopHouse": 1.5, "KonbiniS": 1, "FamilyRestaurant": 0.3},
+    ("downtown", (150.0, 40.0, 1300.0, 720.0), 1, 24.0,
+     {"OfficeMid": 4, "OfficeBlock": 1.5, "OfficeTower": 1, "PencilBuilding": 4, "Mansion": 2, "ShopHouse": 1.5,
+      "KonbiniS": 1, "FamilyRestaurant": 0.3},
      0.0, None),
-    ("city", (-150.0, -330.0, 1700.0, 960.0), 2, 22.0,
-     {"Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "KonbiniS": 1, "OfficeMid": 0.5,
+    ("city", (-150.0, -330.0, 1700.0, 960.0), 1, 22.0,
+     {"Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "KonbiniS": 1, "OfficeMid": 0.5, "OfficeBlock": 0.3,
       "FamilyRestaurant": 0.6, "KonbiniL": 0.6, "GasStation": 0.5}, 0.05, None),
-    ("harbour", (-820.0, -2050.0, 250.0, -1040.0), 2, 30.0, {"Warehouse": 1}, 0.2, "dark"),
-    ("industry", (-1000.0, -1040.0, 200.0, -600.0), 2, 26.0,
-     {"Warehouse": 4, "OfficeMid": 1, "ShopHouse": 0.5, "KonbiniS": 0.4, "GasStation": 0.3}, 0.15, "dark"),
-    ("residential", (-1800.0, -1160.0, -150.0, -200.0), 2, 18.0,
+    # THE WEST SUB-CENTRE 副都心 (user, 2026-09-26: "combine the south-west with a CBD"): the second business district,
+    # round the Blue line's Residential station where the housing meets the 準工業 district -- the Kamata / Kawasaki
+    # shape: mid-rise offices and 雑居ビル on the station front, shops, flats over them. The main CBD stays inside C1.
+    # It must come before the 準工業 rows, whose boxes it overlaps, to win the first-match rule.
+    # ...and its 駅前商店街: the shopping street round the station itself -- shop-houses shoulder to shoulder, a konbini,
+    # a family restaurant -- with the station shopping centre (the `west_station_mall` site, island_sites) beside it
+    ("west_ekimae", (-900.0, -640.0, -560.0, -400.0), 1, 12.0,
+     {"ShopHouse": 5, "PencilBuilding": 2, "KonbiniS": 1, "FamilyRestaurant": 0.4}, 0.0, None),
+    ("west_centre", (-950.0, -700.0, -400.0, -380.0), 1, 22.0,
+     {"OfficeMid": 3, "OfficeBlock": 0.8, "PencilBuilding": 2.5, "ShopHouse": 2.5, "Mansion": 1.5, "KonbiniS": 1,
+      "FamilyRestaurant": 0.5,
+      "KonbiniL": 0.3}, 0.05, None),
+    ("harbour", (-820.0, -2050.0, 250.0, -1040.0), 1, 30.0, {"Warehouse": 1}, 0.2, "dark"),
+    # BAY PROCESSING 水産加工 (PLAN.md 3.30 v3, 2026-09-26): the bay's west shore -- processing sheds and the 市場食堂
+    # seafood diners along the quay. Existing types stand in (Warehouse = sheds, FamilyRestaurant = diners) until the
+    # market hall and diner models exist.
+    ("bay_processing", (150.0, -1000.0, 300.0, -600.0), 1, 26.0,
+     {"Warehouse": 3, "FamilyRestaurant": 1, "KonbiniS": 0.3}, 0.2, "dark"),
+    # THE 準工業 BELT (v7 item 2): ~140 m between industry and the housing, north of industry and along its west edge
+    # -- 町工場, trucking depots, used-car lots, coin laundries. Stand-ins: ShopHouse (a works with a flat over it),
+    # Warehouse (a depot), ParkingLot8 (a used-car lot), KonbiniS, GasStation.
+    ("light_industry", (-1400.0, -600.0, 300.0, -460.0), 1, 22.0,
+     {"ShopHouse": 2, "Warehouse": 2, "ParkingLot8": 0.5, "KonbiniS": 0.3, "GasStation": 0.2}, 0.3, "dark"),
+    # THE SOUTH-WEST 準工業 DISTRICT (user, 2026-09-26: "combine the south-west with the light industry"): the housing's
+    # industrial edge and the west third of the old industry box are ONE mixed district, the Ota / Kamata 町工場 town --
+    # small works with a flat over them, workers' flats, depots and a few used-car lots on block streets. It has TWO
+    # stations on two lines: Light Industry (the Blue line's terminus, x -665) on its west side and Industry (the
+    # Harbour line, x 185) past its east edge, so its commuters split instead of all changing at Bay.
+    ("light_industry_w", (-1450.0, -1040.0, -300.0, -600.0), 1, 20.0,
+     {"ShopHouse": 3, "Apartment": 2, "Warehouse": 1.5, "ParkingLot8": 0.3, "KonbiniS": 0.4, "GasStation": 0.2},
+     0.2, "dark"),
+    # INDUSTRY: fewer, bigger plots with yards between (v6: "a 200 m grid at 50%") -- one row, a wide pitch, half skipped
+    ("industry", (-1000.0, -1040.0, 200.0, -600.0), 1, 60.0,
+     {"Warehouse": 4, "OfficeMid": 1, "ShopHouse": 0.5, "KonbiniS": 0.4, "GasStation": 0.3}, 0.5, "dark"),
+    ("residential", (-1800.0, -1160.0, -150.0, -200.0), 1, 18.0,
      {"Apartment": 4, "ShopHouse": 2, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
       "KonbiniS": 0.4}, 0.15, None),
-    ("suburb", (850.0, -1060.0, 1800.0, -330.0), 2, 18.0,
+    # the SUBURB as a low-density beach resort (v3: "fewer, larger buildings ... 55% occupancy"): one row, wide pitch
+    ("suburb", (850.0, -1060.0, 1800.0, -330.0), 1, 30.0,
      {"Apartment": 4, "ShopHouse": 1.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4,
-      "FamilyRestaurant": 0.4}, 0.25, None),
+      "FamilyRestaurant": 0.4}, 0.45, None),
     ("farm", (350.0, 960.0, 1850.0, 1900.0), 1, 30.0, {"Apartment": 2, "Warehouse": 1, "KonbiniL": 0.2},
      0.65, None),
 )
@@ -194,21 +241,31 @@ PARKING = {"KonbiniL": "ParkingLot8"}
 SHOP_TYPES = {"KonbiniS", "KonbiniL", "FamilyRestaurant", "GasStation", "GasKiosk", "StationBuilding",
               "StationRural"}
 PUBLIC_BUILDINGS = (      # (Godot x, z, why, wanted TYPE, "", ROLE): a specific building that is always open
+    # The WEAPON COUNTER (user, 2026-09-26: "large store will have all weapons, small one only pistol/light"): the
+    # nearest LARGE konbini to the island's centre -- only a KonbiniL stocks the whole catalog. Resolved FIRST, so
+    # the safe house can be found beside it. Its pads live in World.tscn (`WeaponCounter`, always loaded).
+    (80.0, -3.0, "the konbini beside the safe house (every konbini sells weapons)", "KonbiniL", "", "armoury"),
     # The player's SAFE HOUSE (user, 2026-09-22): where a player starts and respawns -- `write` puts World.tscn's
-    # `PlayerSpawn`, the `Player` and the starting car at its front door. A shop-house (a flat over a shop) two
-    # doors along the street from a central city konbini, both fronting the same street.
-    (87.0, -3.0, "the player's safe house", "ShopHouse", "", "safehouse"),
-    # The WEAPON COUNTER: a row of `item.WeaponPad`s inside the konbini next door (free for now), which replaced
-    # the loose weapons that used to lie at the spawn point. `write` places the pads in the shop's own frame.
-    (66.0, -3.0, "the weapon counter (free for now)", "KonbiniS", "", "armoury"),
+    # `PlayerSpawn`, the `Player` and the starting car at its front door. A shop-house near that konbini.
+    # `None` = "beside the building the named role resolved to".
+    (None, "armoury", "the player's safe house", "ShopHouse", "", "safehouse"),
 )
-ROLE_PLACES = {"safehouse": ("Safehouse", 2), "armoury": ("Weapon Counter", 2)}
-# The counter's pads, in the SMALL KONBINI's own frame (KonbiniS: 12.74 x 18.2 m, front +Z at z 9.1): the clear
-# aisle between the right-hand gondola run (x <= 2.67) and the side wall (x 6.37), from the drink wall's front
-# (z -6.29) to the customer toilet room (z >= 1.82). 1.2 m apart, r 0.5.
-ARMOURY_PADS = (("PIS1", 3.7, -5.3), ("PIS2", 5.1, -5.3), ("REV1", 3.7, -4.1), ("DUP1", 5.1, -4.1),
-                ("SMG1", 3.7, -2.9), ("ASR1", 5.1, -2.9), ("ASR2", 3.7, -1.7), ("SHG1", 5.1, -1.7),
-                ("SNR1", 3.7, -0.5), ("ATL1", 5.1, -0.5), ("FRG1", 3.7, 0.7), ("MEW1", 5.1, 0.7))
+# every konbini is a weapon shop (user, 2026-09-26: "no need for a different weapon counter"), so the store beside
+# the safe house is on the map as an ordinary Convenience Store; `armoury` is only how the safe house finds its street
+ROLE_PLACES = {"safehouse": ("Safehouse", 2)}
+ARMOURY_REACH = 1200.0   # the weapon counter is the nearest large konbini, however far (there are only a few)
+# Every konbini sells weapons (free for now), each store in its OWN frame (front +Z):
+# * KonbiniS (12.74 x 18.2 m): the clear aisle between the right-hand gondola run (x <= 2.67) and the side wall
+#   (x 6.37), from the drink wall's front (z -6.29) to the customer toilet room (z >= 1.82) -- pistols and light
+#   weapons only;
+# * KonbiniL (21.84 m square): the clear floor between the gondola run at x 2.3 (<= 2.67) and the counter
+#   (x >= 9.08), south of the WC partition (z -3.64) -- the whole catalog, in a 3 x 4 grid.
+KONBINI_PADS = {
+    "KonbiniS": (("PIS1", 3.7, -5.3), ("PIS2", 5.1, -5.3), ("REV1", 3.7, -4.1), ("DUP1", 5.1, -4.1),
+                 ("SMG1", 3.7, -2.9), ("MEW1", 5.1, -2.9), ("FRG1", 3.7, -1.7)),
+    "KonbiniL": tuple((wid, 4.0 + 1.3 * (i % 3), -2.3 + 1.3 * (i // 3)) for i, wid in enumerate(
+        ("PIS1", "PIS2", "REV1", "DUP1", "SMG1", "ASR1", "ASR2", "SHG1", "SNR1", "ATL1", "FRG1", "MEW1"))),
+}
 PAD_SCRIPT = "res://src/main/java/com/openworld/item/WeaponPad.java"
 # (Godot x, z, why, wanted TYPE or "", the `Missions` child to move onto it or ""): locked until its mission
 # unlocks it, and wins over the two above.
@@ -252,7 +309,7 @@ SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: 
 ANCHOR_REACH = 250.0   # ... and the furthest a WANTED TYPE may be found from the wish
 SPACING = {"GasStation": 450.0, "KonbiniL": 250.0, "FamilyRestaurant": 350.0, "KonbiniS": 120.0}
 SKIP_ROADS = ("shuto_", "shrine_touge", "kaigan_dori", "airport_", "kuko_dori")
-TYPES = sorted({t for r in REGIONS for t in r[4]} | set(PARKING.values()))
+TYPES = sorted({t for r in REGIONS for t in r[4]} | set(PARKING.values()) | {"ParkingLot4"})   # + the safe house's car park
 
 # --- the ambient crowd (PLAN.md 3.6d). A pedestrian zone is derived from the SAME footways the buildings front,
 # on the SAME 252 m cell grid, so "where do people walk" has one owner. What a zone carries is a
@@ -269,7 +326,8 @@ SPAWN_UID = "uid://ctq8u5jyp6ijf"
 # and the cliff is Godot's catch-up spiral past 16.7 ms, so the number that matters is how many are in range at
 # once, which `peds` prints.
 PED_DENSITY = {"nightlife": 2.6, "downtown": 2.0, "city": 1.2, "residential": 0.8, "residential_north": 0.8,
-               "residential_west": 0.5, "suburb": 0.6, "industry": 0.5, "harbour": 0.4, "farm": 0.3, None: 0.5}
+               "residential_west": 0.5, "suburb": 0.6, "industry": 0.5, "harbour": 0.4, "farm": 0.3,
+               "light_industry": 0.6, "light_industry_w": 0.8, "west_centre": 1.6, "west_ekimae": 2.2, "bay_processing": 0.7, None: 0.5}
 PED_MAX = 40           # a single cell's crowd, however much footway it holds
 PED_LOAD = 300.0       # > the cell's own half-diagonal (178 m) and just over the 252 m cell pitch, so the four
                        # orthogonal neighbours stream too and a crowd exists before it is in view
@@ -499,6 +557,261 @@ def site_exclusions(text):
         # the Rainbow Bridge: its towers and anchorages along its own +Z over ~900 m, 60 m wide
         out.append((t[9], t[11], math.atan2(t[2], t[0]), 40.0 + SITE_CLEAR, 480.0 + SITE_CLEAR))
     return out
+
+
+RAIL_RESERVE = os.path.join(ROOT, "assets/world_source/buildings/IslandRailReserve.json")
+
+
+LANE_W = 4.0            # a block's THROUGH lane: the 4 m of a Japanese road (建築基準法 42), a fire truck's width
+LANE_BLOCK = (1500.0, 40000.0)   # m2: the blocks that get one (smaller is a single plot; larger is not a block)
+LANE_MIN = 40.0         # m: a lane shorter than this is not worth one (a thin block is all frontage)
+LANE_CELL = 4           # the block search's grid: this many 1 m cells
+
+
+def through_lanes(field):
+    """Each dense block's THROUGH LANE (user, 2026-09-26: "an opening for a car like an entrance on one side and an
+    exit on another side, for fire escape / other hazard"). A block is a 4-connected piece of land between roads
+    (`field.road`, water a wall too) whose area is in LANE_BLOCK and whose district fills its blocks at least two
+    rows deep; its lane is a straight LANE_W strip through its centre, from the road on
+    one side to the road on the other, square to the block's edges and across its SHORT side -- a vehicle drives in
+    one street and out the opposite one, with no dead end. It is
+    reserved like a 路地 (`field.passage`: no lot stands in it) before anything is placed. Returns the passage rows."""
+    np = field.np
+    import island_ground as ig
+    k = LANE_CELL
+    n = field.n // k
+    road = field.road[:n * k, :n * k].reshape(n, k, n, k).any(axis=(1, 3))
+    wet = field.blocked[:n * k, :n * k].reshape(n, k, n, k).all(axis=(1, 3))
+    lab, sizes = ig.components(~road & ~wet)
+    out = []
+    for c in range(1, len(sizes)):
+        area = sizes[c] * k * k
+        if not LANE_BLOCK[0] <= area <= LANE_BLOCK[1]:
+            continue
+        js, iss = np.nonzero(lab == c)
+        xs = (iss + 0.5) * k - HALF
+        zs = (js + 0.5) * k - HALF
+        cx, cz = float(xs.mean()), float(zs.mean())
+        reg = region_of(cx, -cz)
+        if reg is None or reg[2] < 2:
+            continue
+        # the lane runs SQUARE to the block's streets, across its SHORT side: the rotation of the block's tightest
+        # bounding rectangle gives its edges (a PCA axis goes diagonal on a near-square block)
+        best = None
+        for deg in range(0, 90, 3):
+            t = math.radians(deg)
+            u = (xs - cx) * math.cos(t) + (zs - cz) * math.sin(t)
+            w_ = -(xs - cx) * math.sin(t) + (zs - cz) * math.cos(t)
+            ext = (float(u.max() - u.min()), float(w_.max() - w_.min()))
+            if best is None or ext[0] * ext[1] < best[0]:
+                best = (ext[0] * ext[1], t, ext)
+        _a, t, ext = best
+        if ext[0] <= ext[1]:
+            ux, uz = math.cos(t), math.sin(t)                # across the short side
+        else:
+            ux, uz = -math.sin(t), math.cos(t)
+        ends = []
+        for sgn in (1.0, -1.0):
+            t, hit = 0.0, None
+            while t < 400.0:
+                x, z = cx + sgn * ux * t, cz + sgn * uz * t
+                i, j = field.idx(x, z)
+                if not (0 <= i < field.n and 0 <= j < field.n):
+                    break
+                if field.road[j, i]:
+                    hit = t
+                    break
+                if lab[min(j // k, n - 1), min(i // k, n - 1)] not in (c, 0):
+                    break
+                t += 1.0
+            ends.append(hit)
+        if ends[0] is None or ends[1] is None or ends[0] + ends[1] < LANE_MIN:
+            continue
+        a, b = ends[0] + 1.0, ends[1] + 1.0                   # a metre into each footway
+        mx, mz = cx + ux * (a - b) / 2.0, cz + uz * (a - b) / 2.0
+        L = a + b
+        yaw = math.atan2(ux, uz)
+        ii, jj = field.rect_points(mx, mz, yaw, -LANE_W / 2.0, -L / 2.0, LANE_W / 2.0, L / 2.0)
+        if not ii.size:
+            continue
+        hs = field.heights(ii, jj)
+        if float(hs.min()) <= LAND_Z:
+            continue
+        field.passage[jj, ii] = True
+        out.append({"pos": [round(mx, 3), round(float(np.median(hs)) + KERB_H, 3), round(mz, 3)],
+                    "yaw": round(math.degrees(yaw), 3), "size": [LANE_W, round(L, 2)], "kind": "through"})
+    print("island_buildings: %d block(s) given a %.0f m through lane (in one street, out another)"
+          % (len(out), LANE_W))
+    return out
+
+
+def rail_reserve(field):
+    """PLAN.md B10: no building stands on the rail corridor, a station's footprint or its car park
+    (`island_rail_layout.py --reserve`, record frame -> Godot x, z = x, -y). Absent -> nothing reserved."""
+    if not os.path.exists(RAIL_RESERVE):
+        return
+    d = json.load(open(RAIL_RESERVE))
+    half = d["corridor_half"]
+    for c in d["corridors"]:
+        P = [(q[0], -q[1]) for q in c["pts"]]
+        for a, b in zip(P, P[1:]):
+            field.block_capsule(a, b, half)
+    for bx in d["boxes"]:
+        # the box's local +Z runs along (ux, uy) in the record, i.e. (ux, -uy) in Godot x/z
+        field.block_box(bx["x"], -bx["y"], math.atan2(bx["ux"], -bx["uy"]), bx["h_across"], bx["h_along"])
+
+
+DIKE_JSON = os.path.join(ROOT, "assets/world_source/island_dike.json")
+
+
+def seawall_works(field):
+    """The seawall, its beach and the road fill in front of the old coast (`island_reshape.coastal_works`, its
+    "works" runs in island_dike.json, Godot x, z on the 2 m dump grid): land now, but nothing a building or a field
+    stands on. Absent -> nothing blocked."""
+    if not os.path.exists(DIKE_JSON):
+        return
+    doc = json.load(open(DIKE_JSON))
+    np = field.np
+    m2 = None
+    for key in ("works", "cells"):               # the beach works, and the ring-road dike's embankment
+        w = doc.get(key)
+        if not w:
+            continue
+        st = w["step"]
+        k = int(round(st / RES))
+        if m2 is None:
+            m2 = np.zeros((int(round(2 * HALF / st)) + 1,) * 2, dtype=bool)
+        oi, oj = int(round((w["x0"] + HALF) / st)), int(round((w["z0"] + HALF) / st))
+        for j, a, b in w["runs"]:
+            if 0 <= j + oj < m2.shape[0]:
+                m2[j + oj, max(0, a + oi):min(m2.shape[1], b + oi + 1)] = True
+    if m2 is None:
+        return
+    field.blocked |= np.repeat(np.repeat(m2[:-1, :-1], k, 0), k, 1)[:field.n, :field.n]
+    print("island_buildings: seawall works %.2f km2 kept clear" % (m2.sum() * st * st * 1e-6))
+
+
+def plan_reserves(field):
+    """island_plan.RESERVES: ground held for a later, regional pass (the military base, the waterfront park, the
+    resort hotels, the lighthouse, the 道の駅) -- no generated building stands on it."""
+    import island_plan as PL
+    for name, (x0, z0, x1, z1) in PL.RESERVES:
+        field.block_box((x0 + x1) / 2.0, (z0 + z1) / 2.0, 0.0, (x1 - x0) / 2.0, (z1 - z0) / 2.0)
+    print("island_buildings: %d reserve(s) held for later: %s" % (len(PL.RESERVES),
+                                                                ", ".join(n for n, _b in PL.RESERVES)))
+
+
+FIELD_BOX = (400.0, 700.0, 1300.0, 1570.0)   # record frame: the farm grid (island_plan's farm* street regions)
+FIELD_CHUNK, FIELD_CELLS = 50.0, 25          # must match world.CropField.CHUNK / CELLS
+FIELD_LEVEE = 1.5                              # m of levee (畦) kept clear of anything blocked round a field cell
+WHEAT_ONE_IN = 4                               # one paddy section in this many grows wheat, the rest rice
+
+
+FIELD_SEA_WINDOW = 300.0   # m round FIELD_BOX searched for the sea a field must not reach without crossing a road
+
+
+def _seaward(field):
+    """FARMLAND IS THE LAND INSIDE THE ROADS (user, 2026-09-26: "no farm on the coastal side of the street"). A 2 m
+    cell is SEAWARD when the sea reaches it without crossing a road: a flood from every sea cell through everything that
+    is not carriageway or footway. The strip between the coast road and the beach is seaward; a section enclosed by
+    farm roads is not. Returns a (x, z) -> bool test in the Godot frame."""
+    np = field.np
+    x0r, y0r, x1r, y1r = FIELD_BOX
+    gx0, gx1 = x0r - FIELD_SEA_WINDOW, x1r + FIELD_SEA_WINDOW
+    gz0, gz1 = -y1r - FIELD_SEA_WINDOW, -y0r + FIELD_SEA_WINDOW
+    s = int(round(DUMP_STEP / RES))
+    i0, j0 = field.idx(gx0, gz0)
+    i1, j1 = field.idx(gx1, gz1)
+    i0, j0 = max(0, i0 - i0 % s), max(0, j0 - j0 % s)
+    i1, j1 = min(field.n, i1 - i1 % s), min(field.n, j1 - j1 % s)
+    road = field.road[j0:j1, i0:i1]
+    road = road.reshape(road.shape[0] // s, s, road.shape[1] // s, s).any(axis=(1, 3))
+    a0, b0 = j0 // s, i0 // s
+    sea = field.h2[a0:a0 + road.shape[0], b0:b0 + road.shape[1]] <= LAND_Z
+    open_ = ~road
+    reach = sea & open_
+    while True:
+        grown = reach.copy()
+        grown[1:, :] |= reach[:-1, :]
+        grown[:-1, :] |= reach[1:, :]
+        grown[:, 1:] |= reach[:, :-1]
+        grown[:, :-1] |= reach[:, 1:]
+        grown &= open_
+        if (grown == reach).all():
+            break
+        reach = grown
+
+    def test(x, z):
+        i, j = field.idx(x, z)
+        a, b = j // s - a0, i // s - b0
+        if not (0 <= a < reach.shape[0] and 0 <= b < reach.shape[1]):
+            return True
+        return bool(reach[a, b])
+    return test
+
+
+def farm_fields(field):
+    """The PADDY FIELDS (user, 2026-09-25): every 2 m cell of the farm grid that is dry land with nothing blocked
+    (a road, the rail, a site, the sea) within FIELD_LEVEE of it. Returned as `world.CropField` chunks --
+    `{x0, z0, y, kind, mask}` in the Godot frame, one per 50 m chunk and crop, so a chunk straddling two sections
+    never spills one crop across the farm road between them -- and MARKED BLOCKED, so no building stands in a field.
+    A section's crop is a hash of its grid position: rice, with one section in WHEAT_ONE_IN wheat."""
+    import island_plan as PL
+    np = field.np
+    xs = sorted({v for r in PL.STREET_REGIONS if r[0].startswith("farm") for v in r[3]})
+    ys = sorted({v for r in PL.STREET_REGIONS if r[0].startswith("farm") for v in r[4]})
+    x0r, y0r, x1r, y1r = FIELD_BOX
+    xe, ye = [x0r] + xs + [x1r], [y0r] + ys + [y1r]
+
+    def section(x, y):
+        return (sum(1 for v in xe if v <= x), sum(1 for v in ye if v <= y))
+
+    def kind(sec):
+        return 1 if zlib.crc32(("field_%d_%d" % sec).encode()) % WHEAT_ONE_IN == 0 else 0
+
+    def free(x, z):
+        for dx, dz in ((0, 0), (FIELD_LEVEE, 0), (-FIELD_LEVEE, 0), (0, FIELD_LEVEE), (0, -FIELD_LEVEE)):
+            i, j = field.idx(x + dx, z + dz)
+            if not (0 <= i < field.n and 0 <= j < field.n) or field.blocked[j, i]:
+                return False
+        i2, j2 = int((x + HALF) / DUMP_STEP), int((z + HALF) / DUMP_STEP)
+        return float(field.h2[j2, i2]) > LAND_Z
+
+    seaward = _seaward(field)
+
+    cell = FIELD_CHUNK / FIELD_CELLS
+    chunks, cells = [], []
+    cx = math.floor(x0r / FIELD_CHUNK) * FIELD_CHUNK
+    while cx < x1r:
+        cz = math.floor(-y1r / FIELD_CHUNK) * FIELD_CHUNK
+        while cz < -y0r:
+            by_kind = {}
+            for row in range(FIELD_CELLS):
+                for col in range(FIELD_CELLS):
+                    x, z = cx + (col + 0.5) * cell, cz + (row + 0.5) * cell
+                    if not (x0r <= x <= x1r and y0r <= -z <= y1r) or seaward(x, z) or not free(x, z):
+                        continue
+                    k = kind(section(x, -z))
+                    by_kind.setdefault(k, set()).add(row * FIELD_CELLS + col)
+                    cells.append((x, z))
+            for k, bits in sorted(by_kind.items()):
+                n = FIELD_CELLS * FIELD_CELLS
+                word = "".join("1" if b in bits else "0" for b in range(n)) + "0" * (-n % 4)
+                hs = [float(field.h2[int((cz + (b // FIELD_CELLS + 0.5) * cell + HALF) / DUMP_STEP),
+                                     int((cx + (b % FIELD_CELLS + 0.5) * cell + HALF) / DUMP_STEP)]) for b in bits]
+                hs.sort()
+                chunks.append({"x0": cx, "z0": cz, "y": round(hs[len(hs) // 2], 3), "kind": k,
+                               "mask": "%0*x" % (len(word) // 4, int(word, 2))})
+            cz += FIELD_CHUNK
+        cx += FIELD_CHUNK
+    half = cell / 2.0
+    for x, z in cells:
+        ii, jj = field.rect_points(x, z, 0.0, -half, -half, half, half)
+        field.blocked[jj, ii] = True
+    area = len(cells) * cell * cell
+    print("island_buildings: %d field chunk(s), %.2f km2 of paddy (%d%% wheat)" % (
+        len(chunks), area / 1e6, round(100.0 * sum(1 for c in chunks if c["kind"] == 1) / max(1, len(chunks)))))
+    return chunks
 
 
 def offset_line(line, dist):
@@ -907,9 +1220,13 @@ def derive(heights_path):
             sidewalks += walk_lines(owner, cl, walk)
     for (cx, cz, yaw, hx, hz) in site_exclusions(text):
         field.block_box(cx, cz, yaw, hx, hz)
+    rail_reserve(field)
+    plan_reserves(field)
+    seawall_works(field)
+    fields = farm_fields(field)
     # --- the 路地 are reserved BEFORE anything is placed, so the frontage row grows round them rather than being
     # cut afterwards: a lot that has already claimed the ground cannot be asked to give it back.
-    passages = []
+    passages = through_lanes(field)
     for owner, line, gap, lanes, kerbed in frontage:
         for side in (1.0, -1.0):
             pts = resample(offset_line(line, side * gap), 1.0)
@@ -920,11 +1237,15 @@ def derive(heights_path):
             s = first
             while s < total - PASSAGE_EVERY * 0.35:
                 px, pz, nx, nz, py = pts[int(s)]
+                # deep enough to pass the district's back rows and reach the block's centre, where the lanes from
+                # the surrounding streets meet (user, 2026-09-26: "enter the centre from three sides")
+                reg_ = region_of(px, -pz)
+                depth = min(PASSAGE_DEPTH_MAX, max(PASSAGE_DEPTH, reg_[2] * reg_[3] + 16.0)) if reg_ else PASSAGE_DEPTH
                 # the corridor runs from the footway edge straight back into the block, along the frontage normal
-                cx_, cz_ = px - nx * (PASSAGE_DEPTH / 2.0), pz - nz * (PASSAGE_DEPTH / 2.0)
+                cx_, cz_ = px - nx * (depth / 2.0), pz - nz * (depth / 2.0)
                 yaw_ = math.atan2(nx, nz)
-                ii, jj = field.rect_points(cx_, cz_, yaw_, -PASSAGE_W / 2.0, -PASSAGE_DEPTH / 2.0,
-                                           PASSAGE_W / 2.0, PASSAGE_DEPTH / 2.0)
+                ii, jj = field.rect_points(cx_, cz_, yaw_, -PASSAGE_W / 2.0, -depth / 2.0,
+                                           PASSAGE_W / 2.0, depth / 2.0)
                 if ii.size:
                     hs = field.heights(ii, jj)
                     if float(hs.min()) > LAND_Z and not field.blocked[jj, ii].all():
@@ -937,7 +1258,7 @@ def derive(heights_path):
                         passages.append({"pos": [round(cx_, 3), round(py + (KERB_H if kerbed else 0.0), 3),
                                                  round(cz_, 3)],
                                          "yaw": round(math.degrees(yaw_), 3),
-                                         "size": [PASSAGE_W, PASSAGE_DEPTH]})
+                                         "size": [PASSAGE_W, depth]})
                 s += PASSAGE_EVERY
     print("island_buildings: %d 路地 reserved through the frontage rows" % len(passages))
 
@@ -951,21 +1272,35 @@ def derive(heights_path):
             return True
         return all((x - px) ** 2 + (z - pz) ** 2 >= d * d for px, pz in seen_kind.get(t, ()))
 
-    def try_place(t, px, pz, nx, nz, key, region, road_y, front_gap, kerbed, over_passage=False):
+    def try_place(t, px, pz, nx, nz, key, region, road_y, front_gap, kerbed, over_passage=False, back_row=False):
         x0, z0, x1, z1, hgt = aabbs[t]
         yaw = math.atan2(nx, nz)          # local +Z (the front) turned onto the road direction
         # the front face (local z1) on the row line
         cx, cz = px - nx * z1, pz - nz * z1
-        ii, jj = field.rect_points(cx, cz, yaw, x0 - ALLEY, z0 - ALLEY, x1 + ALLEY, z1)
+        al = alley_of(region)
+        ii, jj = field.rect_points(cx, cz, yaw, x0 - al, z0 - al, x1 + al, z1)
         if ii.size == 0:
             return None
         # a CAR PARK may stand over a 路地 reservation: it is open ground and keeps the access open, and a 21.8 m
         # lot beside a 21.8 m store otherwise straddles the next reserved passage every time (2026-09-25)
-        if field.blocked[jj, ii].any() or field.occupied[jj, ii].any() or \
-                (not over_passage and field.passage[jj, ii].any()):
+        if field.blocked[jj, ii].any():
+            REFUSED["blocked"] = REFUSED.get("blocked", 0) + 1
             return None
+        if field.occupied[jj, ii].any() or (not over_passage and field.passage[jj, ii].any()):
+            REFUSED["occupied/passage"] = REFUSED.get("occupied/passage", 0) + 1
+            return None
+        if back_row:
+            # 接道 (user, 2026-09-26: no "ring within ring" of buildings nobody can reach): a back-row building
+            # stands only where a 路地, a through lane or a street runs within BACK_ACCESS of its lot -- the flag-pole
+            # lot (旗竿地) of a Japanese block, whose strip reaches the road
+            ai, aj = field.rect_points(cx, cz, yaw, x0 - al - BACK_ACCESS, z0 - al - BACK_ACCESS,
+                                       x1 + al + BACK_ACCESS, z1 + BACK_ACCESS)
+            if ai.size and not (field.passage[aj, ai].any() or field.road[aj, ai].any()):
+                REFUSED["back row with no access"] = REFUSED.get("back row with no access", 0) + 1
+                return None
         hs = field.heights(ii, jj)
         if float(hs.max() - hs.min()) > RELIEF or float(hs.min()) <= LAND_Z:
+            REFUSED["relief/water"] = REFUSED.get("relief/water", 0) + 1
             return None
         # The LOT: a concrete slab at the sidewalk's height (the road's surface + the kerb; the carriageway's own
         # height where the road has no footway), under the building, its alleys and -- on the frontage row -- the
@@ -973,24 +1308,28 @@ def derive(heights_path):
         # The building stands on it, not on the heightmap. Refused where the ground stands above the slab (it would
         # bury it) or falls further below it than LOT_MAX_STEP (it would stand on a plinth).
         top = road_y + (KERB_H if kerbed else 0.0)
-        if float(hs.max()) > top + LOT_BURY_TOL or top - float(hs.min()) > LOT_MAX_STEP:
+        if float(hs.max()) > top + LOT_BURY_TOL:
+            REFUSED["ground above the slab"] = REFUSED.get("ground above the slab", 0) + 1
+            return None
+        if top - float(hs.min()) > LOT_MAX_STEP:
+            REFUSED["ground too far below"] = REFUSED.get("ground too far below", 0) + 1
             return None
         field.occupied[jj, ii] = True
         field.owner[jj, ii] = len(placed) + 1
         if front_gap > 0.0:
-            fi, fj = field.rect_points(cx, cz, yaw, x0 - ALLEY, z1, x1 + ALLEY, z1 + front_gap)
+            fi, fj = field.rect_points(cx, cz, yaw, x0 - al, z1, x1 + al, z1 + front_gap)
             free = field.owner[fj, fi] == 0
             field.owner[fj[free], fi[free]] = len(placed) + 1
         return {"type": t, "region": region[0], "key": key,
                 "pos": [round(cx, 3), round(top, 3), round(cz, 3)],
                 "yaw": round(math.degrees(yaw), 3),
                 # local rect of the slab and its bottom (below the lowest ground under it)
-                "lot": [round(x0 - ALLEY, 3), round(z0 - ALLEY, 3), round(x1 + ALLEY, 3), round(z1 + front_gap, 3)],
+                "lot": [round(x0 - al, 3), round(z0 - al, 3), round(x1 + al, 3), round(z1 + front_gap, 3)],
                 "lot_depth": round(top - float(hs.min()) + LOT_SKIRT, 3)}
 
     for owner, line, gap, lanes, kerbed in frontage:
         for side in (1.0, -1.0):
-            for row in range(3):
+            for row in range(max(r[2] for r in REGIONS)):
                 pts = resample(offset_line(line, side * gap), SLOT_STEP)
                 if not pts:
                     continue
@@ -1024,7 +1363,7 @@ def derive(heights_path):
                     for t in order:
                         # the row line is where the front stands; sample the lot's centre along the row
                         w = aabbs[t][2] - aabbs[t][0]
-                        adv = w / 2.0 + ALLEY
+                        adv = w / 2.0 + alley_of(reg)
                         j = k + int(round(adv / SLOT_STEP))
                         if j >= len(pts_rows):
                             continue
@@ -1032,9 +1371,9 @@ def derive(heights_path):
                         # the frontage row's slab reaches the footway (short of its edge, never over it)
                         got = try_place(t, cx_ - cnx * back, cz_ - cnz * back, cnx, cnz, key, reg, cy_,
                                         (KERB_GAP + 0.3 - LOT_FOOTWAY_GAP) if row == 0 else 0.0,
-                                        kerbed)
+                                        kerbed, back_row=row > 0)
                         if got:
-                            k = j + int(math.ceil((w / 2.0 + ALLEY) / SLOT_STEP))
+                            k = j + int(math.ceil((w / 2.0 + alley_of(reg)) / SLOT_STEP))
                             break
                     if got:
                         placed.append(got)
@@ -1048,7 +1387,7 @@ def derive(heights_path):
                             ws = aabbs[got["type"]][2] - aabbs[got["type"]][0]
                             # ROUNDED UP: rounding put the car park 0.84 m into the store's own alley, and every
                             # one of the first rebuild's seven KonbiniL stood alone (2026-09-25)
-                            step = int(math.ceil((ws / 2.0 + wp / 2.0 + 2 * ALLEY) / SLOT_STEP))
+                            step = int(math.ceil((ws / 2.0 + wp / 2.0 + 2 * alley_of(reg)) / SLOT_STEP))
                             jj0 = j
                             for jp in (jj0 + step, jj0 - step, jj0 + step + 1, jj0 - step - 1, jj0 + step + 2,
                                        jj0 - step - 2):
@@ -1062,10 +1401,14 @@ def derive(heights_path):
                                     parking_misses[0] += 1
                                 if lot:
                                     lot["with"] = len(placed) - 1
+                                    if row == 0 and kerbed:
+                                        # B9: the kerb line in the car park's own frame (its front face stands on the
+                                        # row line, `gap` past the carriageway's edge), where its 段差スロープ goes
+                                        lot["drive"] = round(aabbs[lot_t][3] + gap, 3)
                                     placed.append(lot)
                                     counts[lot_t] = counts.get(lot_t, 0) + 1
                                     if jp > jj0:
-                                        k = max(k, jp + int(math.ceil((wp / 2.0 + ALLEY) / SLOT_STEP)))
+                                        k = max(k, jp + int(math.ceil((wp / 2.0 + alley_of(reg)) / SLOT_STEP)))
                                     break
                     else:
                         k += 1
@@ -1088,12 +1431,14 @@ def derive(heights_path):
         by_region[b["region"]] = by_region.get(b["region"], 0) + 1
     doc = {"schema": 1, "source": "tools/island_buildings.py derive", "network_y": ny,
            "counts": dict(sorted(counts.items())), "regions": dict(sorted(by_region.items())),
-           "passages": passages, "anchored_missions": anchored, "roles": roles, "buildings": placed}
+           "passages": passages, "anchored_missions": anchored, "roles": roles, "fields": fields,
+           "buildings": placed}
     with open(OUT, "w") as f:
         json.dump(doc, f, indent=1)
         f.write("\n")
     write_sidewalks(sidewalks)
     write_places(placed, aabbs, text)
+    print("island_buildings: lots refused %s" % dict(sorted(REFUSED.items(), key=lambda kv: -kv[1])))
     print("island_buildings: %d buildings %s by region %s -> %s" % (len(placed), doc["counts"], doc["regions"],
                                                                     os.path.relpath(OUT, ROOT)))
 
@@ -1178,6 +1523,24 @@ def plinth_boxes(b):
     oz = b["pos"][2] - lx * s + lz * c
     oy = b["pos"][1] + top - depth / 2.0
     return (c, s), (sx, depth, sz), (ox, oy, oz)
+
+
+DRIVE_W = 5.0          # a 段差スロープ (kerb ramp): this wide along the kerb, in front of a car park's entrance...
+DRIVE_D = 0.8          # ...this deep into the gutter, rising to the kerb's own height at the kerb line (B9). The
+                       # Japanese answer to "a car must get over the kerb into the lot": a rubber or concrete wedge in
+                       # the gutter, so the road's kerb and footway stay one owner's, built before any lot exists
+
+
+def drive_ramp(b):
+    """(basis columns, world centre) of a car park's kerb ramp: a unit right-triangle PrismMesh (left_to_right 1, its
+    high side at +x) turned so +x points from the road back to the kerb, scaled DRIVE_D x KERB_H x DRIVE_W."""
+    a = math.radians(b["yaw"])
+    c, s = math.cos(a), math.sin(a)
+    kz = b["drive"] + DRIVE_D / 2.0
+    ox, oz = b["pos"][0] + s * kz, b["pos"][2] + c * kz
+    oy = b["pos"][1] - KERB_H + KERB_H / 2.0
+    # lot local x = (c, -s), local z (toward the road) = (s, c); prism x -> -local z, y -> up, z -> local x
+    return ((-s, 0.0, -c), (0.0, 1.0, 0.0), (c, 0.0, -s)), (ox, oy, oz)
 
 
 def scene_of(b):
@@ -1298,7 +1661,10 @@ def facade_surfaces(scene):
     return _FACADE_SURFACES[scene]
 
 
-def cell_scene(name, blds, passages=()):
+CROP_SCRIPT = "res://src/main/java/com/openworld/world/CropField.java"
+
+
+def cell_scene(name, blds, passages=(), fields=()):
     """One streamed cell: every building instanced, and its lot slabs as ONE MultiMesh (+ box collision).
 
     A 路地 is NOT drawn here (PLAN.md 3.18(c3a)): it is a RESERVATION (`field.passage`, 接道義務) and its ground is
@@ -1333,7 +1699,31 @@ def cell_scene(name, blds, passages=()):
         ext.append('[ext_resource type="Material" path="%s" id="lotmat"]\n' % LOT_MATERIAL)
     if blds:
         ext.append('[ext_resource type="ArrayMesh" path="%s/%s.res" id="hlod"]\n' % (HLOD_RES, name))
+    if fields:
+        ext.append('[ext_resource type="Script" path="%s" id="crop"]\n' % CROP_SCRIPT)
+    # every konbini sells weapons (user, 2026-09-26), the one beside the safe house included
+    shops = [b for b in blds if b["type"] in KONBINI_PADS]
+    if shops:
+        ext.append('[ext_resource type="Script" path="%s" id="pad"]\n' % PAD_SCRIPT)
     ext.append("\n")
+    for k, b in enumerate(shops):
+        a = math.radians(b["yaw"])
+        bs, bc = math.sin(a), math.cos(a)
+        px, py, pz = b["pos"]
+        holder = "Pads_%03d" % k
+        nodes.append('\n[node name="%s" type="Node3D" parent="."]\n' % holder)
+        for wid, lx, lz in KONBINI_PADS[b["type"]]:
+            nodes.append('\n[node name="Pad_%s" type="Area3D" parent="%s"]\n'
+                         'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, %.3f, %.3f, %.3f)\n'
+                         'script = ExtResource("pad")\nweapon_id = "%s"\n'
+                         % (wid, holder, px + lx * bc + lz * bs, py + LOT_RAISE + FLOOR_LIFT + 0.1,
+                            pz - lx * bs + lz * bc, wid))
+    if fields:
+        # the paddy (user, 2026-09-25): world.CropField builds the crop quads from these chunks at load
+        nodes.append('\n[node name="Crops" type="Node3D" parent="."]\nscript = ExtResource("crop")\n'
+                     'chunks = PackedFloat32Array(%s)\nmasks = PackedStringArray(%s)\n'
+                     % (", ".join("%.3f, %.3f, %.3f, %d" % (f["x0"], f["z0"], f["y"], f["kind"]) for f in fields),
+                        ", ".join('"%s"' % f["mask"] for f in fields)))
     if blds:
         nodes.append('\n[node name="HLOD" type="MeshInstance3D" parent="."]\nmesh = ExtResource("hlod")\n'
                  'cast_shadow = 0\nvisibility_range_begin = %.1f\nvisibility_range_begin_margin = %.1f\n'
@@ -1366,6 +1756,34 @@ def cell_scene(name, blds, passages=()):
             # the override is on the type's Mesh node, addressed by the surface index that type's own meta records
             nodes.append('\n[node name="Mesh" parent="./%s_%03d" index="0"]\n%s\n'
                          % (scene_of(b), k, "\n".join(lines)))
+    drives = [b for b in blds if "drive" in b]
+    if drives:
+        sub.append('[sub_resource type="StandardMaterial3D" id="DriveMat"]\nalbedo_color = Color(0.16, 0.16, 0.17, 1)\n'
+                   'roughness = 0.9\n\n')
+        sub.append('[sub_resource type="PrismMesh" id="DriveRamp"]\nleft_to_right = 1.0\n'
+                   'material = SubResource("DriveMat")\n\n')
+        buf = []
+        for b in drives:
+            (c0, c1, c2), (ox, oy, oz) = drive_ramp(b)
+            sx, sy, sz = DRIVE_D, KERB_H, DRIVE_W
+            buf += [c0[0] * sx, c1[0] * sy, c2[0] * sz, ox, c0[1] * sx, c1[1] * sy, c2[1] * sz, oy,
+                    c0[2] * sx, c1[2] * sy, c2[2] * sz, oz]
+        sub.append('[sub_resource type="MultiMesh" id="Drives"]\ntransform_format = 1\ninstance_count = %d\n'
+                   'mesh = SubResource("DriveRamp")\nbuffer = PackedFloat32Array(%s)\n\n'
+                   % (len(drives), ", ".join("%.4f" % v for v in buf)))
+        d2, h2, w2 = DRIVE_D / 2.0, KERB_H / 2.0, DRIVE_W / 2.0
+        sub.append('[sub_resource type="ConvexPolygonShape3D" id="DriveShape"]\npoints = PackedVector3Array(%s)\n\n'
+                   % ", ".join("%.3f, %.3f, %.3f" % q for q in
+                               [(-d2, -h2, -w2), (-d2, -h2, w2), (d2, -h2, -w2), (d2, -h2, w2), (d2, h2, -w2),
+                                (d2, h2, w2)]))
+        nodes.append('\n[node name="Drives" type="MultiMeshInstance3D" parent="."]\nmultimesh = SubResource("Drives")\n')
+        nodes.append('\n[node name="DriveCollision" type="StaticBody3D" parent="."]\ncollision_mask = 0\n')
+        for k, b in enumerate(drives):
+            (c0, c1, c2), (ox, oy, oz) = drive_ramp(b)
+            nodes.append('\n[node name="Drive%d" type="CollisionShape3D" parent="DriveCollision"]\n'
+                         'transform = Transform3D(%.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.6f, %.3f, %.3f, %.3f)\n'
+                         'shape = SubResource("DriveShape")\n'
+                         % (k, c0[0], c1[0], c2[0], c0[1], c1[1], c2[1], c0[2], c1[2], c2[2], ox, oy, oz))
     if lots:
         nodes.append('\n[node name="Plinths" type="MultiMeshInstance3D" parent="."]\nmultimesh = SubResource("Lots")\n')
         nodes.append('\n[node name="PlinthCollision" type="StaticBody3D" parent="."]\ncollision_mask = 0\n')
@@ -1470,6 +1888,34 @@ def patch_peds(text, cells, network_y):
     return itz.splice(sections, generated, sub, nodes, ext=added)
 
 
+HOME_PARK = "ParkingLot4"     # the safe house's own car park (user, 2026-09-26)
+HOME_PARK_KEEP = {"KonbiniS", "KonbiniL", "FamilyRestaurant", "GasStation", "GasKiosk", "StationBuilding",
+                  "StationRural", "ParkingLot4", "ParkingLot8", "ParkingLot14"}
+
+
+def home_park_neighbour(placed, b):
+    """The street-front neighbour of `b` that can become its car park: same street side, touching it along the row
+    (centres no further apart than the two half-widths + 3 m), a plain building whose lot is at least as wide as
+    the car park. None when there is none."""
+    pre = "|".join(b["key"].split("|")[:3]) + "|"
+    need = type_aabb(HOME_PARK)[2] - type_aabb(HOME_PARK)[0]
+    x0, _z0, x1, _z1, _h = type_aabb(b["type"])
+    best = None
+    for ob in placed:
+        # a car park this already made (a second `anchors` run) is the answer, not a reason to make another
+        if ob is not b and ob["type"] == HOME_PARK and ob.get("key", "").startswith(pre) \
+                and math.hypot(ob["pos"][0] - b["pos"][0], ob["pos"][2] - b["pos"][2]) <= (x1 - x0) / 2.0 + 12.0:
+            return ob
+        if ob is b or ob.get("role") or ob["type"] in HOME_PARK_KEEP or not ob.get("key", "").startswith(pre) \
+                or ob.get("key", "").endswith("|P") or "lot" not in ob:
+            continue
+        w = ob["lot"][2] - ob["lot"][0]
+        d = math.hypot(ob["pos"][0] - b["pos"][0], ob["pos"][2] - b["pos"][2])
+        if w + 1e-6 >= need and d <= (x1 - x0) / 2.0 + w / 2.0 + 3.0 and (best is None or d < best[0]):
+            best = (d, ob)
+    return best[1] if best else None
+
+
 def apply_anchors(placed):
     """Give each anchored building its variant (and role), from PUBLIC_BUILDINGS and OPEN_BUILDINGS. Returns
     ({mission node: pos}, {role: {pos, yaw, type}}). Shared by `derive` and `anchors`, so moving an anchor needs
@@ -1481,8 +1927,21 @@ def apply_anchors(placed):
             want = row[3] if len(row) > 3 else ""
             node = row[4] if len(row) > 4 else ""
             role = row[5] if len(row) > 5 else ""
-            pool = [b for b in placed if b["type"] == want] if want else placed
-            reach = ANCHOR_REACH if want else OPEN_MATCH
+            if ox is None:                 # beside the building another role resolved to
+                ref = roles.get(oz)
+                if ref is None:
+                    print("island_buildings: no %s resolved -- %s has nowhere to go" % (oz, why))
+                    continue
+                ox, oz = ref["pos"][0], ref["pos"][2]
+            # an anchored building must FRONT a street (user, 2026-09-26: the safe house had no door onto a street,
+            # so the player could not get out): only a frontage-row slot, never a back row or a lot's parking
+            pool = [b for b in placed if (b["type"] == want if want else True) and b is not None
+                    and b.get("key", "|||").split("|")[2] == "0" and not b.get("key", "").endswith("|P")
+                    and not b.get("role")]
+            if role == "safehouse":
+                # a safe house comes with its OWN car park beside it, where the starting car stands
+                pool = [b for b in pool if home_park_neighbour(placed, b) is not None]
+            reach = (ARMOURY_REACH if role == "armoury" else ANCHOR_REACH) if want else OPEN_MATCH
             near = min(pool, key=lambda b: (b["pos"][0] - ox) ** 2 + (b["pos"][2] - oz) ** 2, default=None)
             if near is None or math.hypot(near["pos"][0] - ox, near["pos"][2] - oz) > reach:
                 print("island_buildings: no %s within %.0f m of (%.0f, %.0f) -- %s"
@@ -1491,6 +1950,20 @@ def apply_anchors(placed):
             near["scene"] = near["type"] + suffix
             if node:
                 anchored[node] = [round(v, 3) for v in near["pos"]]
+            if role == "safehouse":
+                park = home_park_neighbour(placed, near)
+                if park["type"] == HOME_PARK:
+                    park["role"] = "home_park"
+                    print("island_buildings: the safe house keeps its car park")
+                # the neighbour BECOMES the car park: same row line (front on it), same lot, a new type
+                oa = math.radians(park["yaw"])
+                dz = type_aabb(park["type"])[3] - type_aabb(HOME_PARK)[3] if park["type"] != HOME_PARK else 0.0
+                park["pos"] = [round(park["pos"][0] + math.sin(oa) * dz, 3), park["pos"][1],
+                               round(park["pos"][2] + math.cos(oa) * dz, 3)]
+                if park["type"] != HOME_PARK:
+                    print("island_buildings: the %s beside the safe house becomes its car park" % park["type"])
+                park["type"], park["role"] = HOME_PARK, "home_park"
+                park.pop("scene", None)
             if role:
                 near["role"] = role
                 roles[role] = {"pos": [round(v, 3) for v in near["pos"]], "yaw": near["yaw"], "type": near["type"]}
@@ -1613,12 +2086,30 @@ def patch_start(text, doc):
                 return False
         return True
 
+    # the nearest car park first (within 250 m): a bay, nose in (ParkingLot8: bays 2.5 x 5 m, centres at
+    # x -8.75 + 2.5 k, z -3.87 in the lot's own frame, the front +Z on the street)
+    car_tf = None
+    best = (0.0,)
+    if shop is not None:
+        parks = [ob for ob in doc["buildings"] if ob.get("role") == "home_park"] or \
+                [ob for ob in doc["buildings"] if ob["type"] == "ParkingLot8"
+                 and math.hypot(ob["pos"][0] - hx, ob["pos"][2] - hz) < 250.0]
+        park = min(parks, key=lambda ob: math.hypot(ob["pos"][0] - hx, ob["pos"][2] - hz), default=None)
+        if park is not None:
+            pa = math.radians(park["yaw"])
+            ps, pc = math.sin(pa), math.cos(pa)
+            # a bay, nose in: ParkingLot8's centres x -8.75 + 2.5 k, ParkingLot4's -3.75 + 2.5 k, both at z -3.87
+            bx, bz = (-3.75 if park["type"] == "ParkingLot4" else -8.75), -3.87
+            wx, wz = park["pos"][0] + bx * pc + bz * ps, park["pos"][2] - bx * ps + bz * pc
+            # nose in: the car's forward (-Z) points to the lot's back (-Z)
+            crot = "%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f" % (math.cos(pa), math.sin(pa), -math.sin(pa), math.cos(pa))
+            car_tf = "Transform3D(%s, %.3f, %.3f, %.3f)" % (crot, wx, park["pos"][1] + LOT_RAISE + 0.6, wz)
+            best = (math.hypot(wx - sx, wz - sz),)
     home_lot = next((ob["lot"] for ob in doc["buildings"]
                      if math.hypot(ob["pos"][0] - hx, ob["pos"][2] - hz) < 0.5 and "lot" in ob), [0, 0, 0, z1])
-    car_tf = None
-    for step in range(0, 81):
+    for step in range(0 if car_tf is None else 161, 161):
         off = (step + 1) // 2 * 0.5 * (1 if step % 2 else -1)
-        for back in (0.2, 2.0, 4.0):
+        for back in (0.2, 2.0, 4.0, 6.0, 8.0, 10.0):
             lz = home_lot[3] - CAR_HZ - back
             wx, wz = hx + off * cs + lz * sn, hz - off * sn + lz * cs
             if car_ok(wx, wz):
@@ -1628,6 +2119,17 @@ def patch_start(text, doc):
                 break
         if car_tf:
             break
+    if car_tf is None and doc.get("passages"):
+        # the one-row blocks leave no forecourt: park nose-in at the mouth of the nearest 路地 (3.2 m of open ground
+        # off the street, out of every lane). A passage's centre is depth/2 back from its street end along -n.
+        pg = min(doc["passages"], key=lambda q: math.hypot(q["pos"][0] - hx, q["pos"][2] - hz))
+        qa = math.radians(pg["yaw"])
+        qn = (math.sin(qa), math.cos(qa))
+        back = pg["size"][1] / 2.0 - 3.5
+        wx, wz = pg["pos"][0] + qn[0] * back, pg["pos"][2] + qn[1] * back
+        crot = "%.6f, 0, %.6f, 0, 1, 0, %.6f, 0, %.6f" % (math.cos(qa), math.sin(qa), -math.sin(qa), math.cos(qa))
+        car_tf = "Transform3D(%s, %.3f, %.3f, %.3f)" % (crot, wx, pg["pos"][1] + LOT_RAISE + 0.6, wz)
+        best = (math.hypot(wx - sx, wz - sz),)
     if car_tf is None:
         print("island_buildings: no lot space beside the safe house fits a car -- the car is left where it is")
 
@@ -1646,24 +2148,10 @@ def patch_start(text, doc):
 
     sections = itz.split_sections(text)
     added = []
-    rid = itz.ext_resource_id(sections, PAD_SCRIPT)
-    if rid is None:
-        rid = "gen_%d" % itz.next_ext_id(sections)
-        added.append('[ext_resource type="Script" path="%s" id="%s"]\n\n' % (PAD_SCRIPT, rid))
+    # no pads here any more: the konbini beside the safe house carries its own in its streamed cell, like every
+    # other konbini. `generated` below still removes an old `WeaponCounter` block.
     nodes = ['[node name="PlayerSpawn" type="Node3D" parent="." unique_id=%d]\ntransform = %s\n\n'
              % (START_NODE_ID, spawn_tf)]
-    if shop is not None:
-        nodes.append('[node name="%s" type="Node3D" parent="." unique_id=%d]\n\n' % (START_HOLDER, START_NODE_ID + 1))
-        b = math.radians(shop["yaw"])
-        bs, bc = math.sin(b), math.cos(b)
-        px, py, pz = shop["pos"]
-        for i, (wid, lx, lz) in enumerate(ARMOURY_PADS):
-            wx, wz = px + lx * bc + lz * bs, pz - lx * bs + lz * bc
-            nodes.append('[node name="Pad_%s" type="Area3D" parent="%s" unique_id=%d]\n'
-                         'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, %.3f, %.3f, %.3f)\n'
-                         'script = ExtResource("%s")\nweapon_id = "%s"\n\n'
-                         % (wid, START_HOLDER, START_NODE_ID + 2 + i, wx, py + LOT_RAISE + FLOOR_LIFT + 0.1, wz,
-                            rid, wid))
 
     def generated(header):
         if not header.startswith("[node"):
@@ -1672,9 +2160,9 @@ def patch_start(text, doc):
         return ((parent == "." and name in ("PlayerSpawn", START_HOLDER, "Pickups"))
                 or parent in (START_HOLDER, "Pickups"))
     new = itz.splice(sections, generated, [], nodes, ext=added)
-    print("island_buildings: start at the safe house (%.1f, %.1f)%s; %d weapon pads"
+    print("island_buildings: start at the safe house (%.1f, %.1f)%s; the konbini beside it is %s"
           % (sx, sz, ", car parked off the street %.1f m away" % best[0] if car_tf else "",
-             len(ARMOURY_PADS) if shop else 0))
+             shop["type"] if shop else "missing"))
     return new
 
 
@@ -1687,6 +2175,12 @@ def write(check):
     for p in doc.get("passages", ()):
         pass_cells.setdefault(cell_of(p["pos"][0], p["pos"][2]), []).append(p)
     for k in pass_cells:
+        cells.setdefault(k, [])
+    field_cells = {}
+    half = FIELD_CHUNK / 2.0
+    for f in doc.get("fields", ()):
+        field_cells.setdefault(cell_of(f["x0"] + half, f["z0"] + half), []).append(f)
+    for k in field_cells:
         cells.setdefault(k, [])
     changed = []
     want = set()
@@ -1720,7 +2214,7 @@ def write(check):
         name = "Bld_island_%d_%d" % (gx, gz)
         path = os.path.join(CELL_DIR, name + ".tscn")
         want.add(name + ".tscn")
-        body = cell_scene(name, blds, pass_cells.get((gx, gz), ()))
+        body = cell_scene(name, blds, pass_cells.get((gx, gz), ()), field_cells.get((gx, gz), ()))
         if not os.path.exists(path) or open(path).read() != body:
             changed.append(path)
             if not check:

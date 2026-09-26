@@ -213,6 +213,7 @@ public class MinimapController extends Control {
             grid.queryRadius(origin, rangeMeters, near);
             for (Node n : near) {
                 if (n == player || !(n instanceof Node3D n3) || !(n instanceof NameplateTarget nt)) continue;
+                if (!RoadOverlay.worthABlip(player, n)) continue;
                 Vector2 c = worldToScreen(n3.getGlobalPosition(), origin, center, scale, rot);
                 if (distance(c, center) > radiusPx) continue;
                 drawCircle(c, blipRadius, nt.getNameplateColor(), true, -1f, true);

@@ -43,9 +43,9 @@ animation = "attack_jab_fist"
 damage = 10.0
 range = 1.3
 radius = 0.3
-windup = 0.08
+windup = 0.107
 active = 0.05
-recovery = 0.22
+recovery = 0.193
 hitstop = 0.04
 camera_kick = 0.8
 
@@ -55,9 +55,9 @@ animation = "attack_cross_fist"
 damage = 14.0
 range = 1.3
 radius = 0.3
-windup = 0.1
+windup = 0.049
 active = 0.05
-recovery = 0.28
+recovery = 0.331
 hitstop = 0.05
 camera_kick = 1.2
 
@@ -1248,41 +1248,41 @@ height = 1.132
 height = 0.616
 radius = 0.868
 
-[node name="CharacterVisuals" type="Node3D" unique_id=1167356057]
+[node name="CharacterVisuals" type="Node3D" unique_id=1712431567]
 script = ExtResource("1_svfov")
 mesh_config = SubResource("Resource_wgotm")
 
-[node name="MeshRoot" type="Node3D" parent="." unique_id=1412585682]
+[node name="MeshRoot" type="Node3D" parent="." unique_id=1024617731]
 
-[node name="Model" parent="MeshRoot" unique_id=1647424328 instance=ExtResource("3_jtcs7")]
+[node name="Model" parent="MeshRoot" unique_id=805715140 instance=ExtResource("3_jtcs7")]
 
-[node name="shino" parent="MeshRoot/Model" index="0" unique_id=661711301]
+[node name="shino" parent="MeshRoot/Model" index="0" unique_id=195097290]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 
-[node name="Skeleton3D" parent="MeshRoot/Model/shino" index="0" unique_id=300656822]
+[node name="Skeleton3D" parent="MeshRoot/Model/shino" index="0" unique_id=799096008]
 metadata/seated_motion_scale = 0.8204
 
-[node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/shino/Skeleton3D" index="3" unique_id=1732649091]
+[node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/shino/Skeleton3D" index="3" unique_id=354371743]
 transform = Transform3D(0.019175, -0.9781204, 0.2071529, 0.81450963, -0.104876176, -0.5705916, 0.5798331, 0.17966914, 0.7946773, -0.5415815, 1.2899894, 0.014316626)
 bone_name = "hand_r"
 bone_idx = 37
 
-[node name="SocketRifle" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=2071589754]
+[node name="SocketRifle" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=1364068655]
 transform = Transform3D(0.468983, 0.834203, 0.290106, 0.064067, 0.295472, -0.953201, -0.880881, 0.465621, 0.085126, -0.024207, 0.050861, 0.006307)
 
-[node name="SocketPistol" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=707162768]
+[node name="SocketPistol" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=1141263686]
 transform = Transform3D(0.749187, 0.657625, 0.079056, -0.113949, 0.24554, -0.962667, -0.652485, 0.712208, 0.258891, -0.016679, 0.040132, 0.010057)
 
-[node name="SocketLauncher" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=1417372202]
+[node name="SocketLauncher" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=1090682929]
 transform = Transform3D(0.833124, 0.525029, 0.173919, 0.019038, 0.287044, -0.957728, -0.552758, 0.801217, 0.229148, -0.013194, 0.056452, 0.005306)
 
-[node name="SocketMelee" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=1947655072]
+[node name="SocketMelee" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=1958366868]
 transform = Transform3D(0.66402, 0.253485, -0.703438, -0.154516, -0.873956, -0.460789, -0.731576, 0.414665, -0.541156, -0.008617, 0.020369, 0.019873)
 
-[node name="SocketThrowable" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=83423310]
+[node name="SocketThrowable" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=328836727]
 transform = Transform3D(0.66402, 0.253485, -0.703438, -0.154516, -0.873956, -0.460789, -0.731576, 0.414665, -0.541156, -0.008617, 0.020369, 0.019873)
 
-[node name="SocketFist" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=1367638903]
+[node name="SocketFist" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=925438297]
 transform = Transform3D(0.999083, 0.04217, -0.007392, -0.04124, 0.994295, 0.098369, 0.011498, -0.097974, 0.995123, 0, 0, 0)
 
 [node name="Fist" type="Node3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment/SocketFist" unique_id=100001001 instance=ExtResource("4_wubce")]
@@ -1318,10 +1318,10 @@ pickup_cooldown_after_drop = 0.5
 pickup_id = ""
 world_body_continuous_cd = false
 
-[node name="SocketShotgun" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=375115663]
+[node name="SocketShotgun" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/WeaponAttachment" unique_id=1050407288]
 transform = Transform3D(0.82072, 0.506493, -0.264356, -0.037693, -0.413693, -0.909636, -0.570087, 0.756521, -0.320434, -0.019156, 0.037291, 0.006724)
 
-[node name="SpineAimModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="4" unique_id=578173288]
+[node name="SpineAimModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="4" unique_id=105536428]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0
@@ -1355,7 +1355,7 @@ bore_blend_seconds = 0.15
 bore_during_one_shots = false
 weapon_bone = "hand_r"
 
-[node name="ShoulderAimModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="5" unique_id=635701827]
+[node name="ShoulderAimModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="5" unique_id=1832690589]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0
@@ -1389,51 +1389,51 @@ bore_blend_seconds = 0.15
 bore_during_one_shots = false
 weapon_bone = "hand_r"
 
-[node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/shino/Skeleton3D" index="6" unique_id=1835334615]
+[node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/shino/Skeleton3D" index="6" unique_id=632380960]
 transform = Transform3D(0.99999964, -1.480855e-07, 1.6020688e-07, 1.1721515e-07, 0.9172168, -0.39838848, -1.09749436e-07, 0.39838874, 0.9172166, -0.0003186483, 1.342869, -0.016466094)
 bone_name = "neck_01"
 bone_idx = 63
 
-[node name="MarkerFPSCamera" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/NeckAttachment" unique_id=810247950]
+[node name="MarkerFPSCamera" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/NeckAttachment" unique_id=761826615]
 transform = Transform3D(-0.999931, 0.000379, -0.011754, 0.005296, 0.9069, -0.421312, 0.010501, -0.421345, -0.90684, 1.5e-05, 0.158142, 0.027759)
 
-[node name="BackHolster" type="BoneAttachment3D" parent="MeshRoot/Model/shino/Skeleton3D" index="7" unique_id=1755328848]
+[node name="BackHolster" type="BoneAttachment3D" parent="MeshRoot/Model/shino/Skeleton3D" index="7" unique_id=705823188]
 transform = Transform3D(0.99999964, -1.9813245e-07, 9.131858e-08, 1.1721515e-07, 0.9998563, -0.01694116, -1.0974944e-07, 0.016941361, 0.99985635, -0.00031861593, 1.2282538, 0.016929572)
 bone_name = "spine_03"
 bone_idx = 6
 
-[node name="LongWeaponHolsterMaker1" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/BackHolster" unique_id=1966926521]
+[node name="LongWeaponHolsterMaker1" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/BackHolster" unique_id=455805954]
 transform = Transform3D(0, -0.93072, -0.365734, -0.016958, -0.365681, 0.930586, -0.999856, 0.006203, -0.015783, -0.126002, 0.180255, -0.228968)
 
-[node name="LongWeaponHolsterMaker2" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/BackHolster" unique_id=872658920]
+[node name="LongWeaponHolsterMaker2" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/BackHolster" unique_id=1492190218]
 transform = Transform3D(0, -0.93072, -0.365734, -0.016958, -0.365681, 0.930586, -0.999856, 0.006203, -0.015783, -0.027656, 0.11763, -0.417833)
 
-[node name="LongWeaponHolsterMaker3" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/BackHolster" unique_id=462780855]
+[node name="LongWeaponHolsterMaker3" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/BackHolster" unique_id=621450770]
 transform = Transform3D(-0.5, 0, -0.866025, 0, 0.999999, 0, 0.866025, 0, -0.5, 0.013821, 0.011478, -0.092012)
 
-[node name="LongWeaponHolsterMaker4" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/BackHolster" unique_id=1626265909]
+[node name="LongWeaponHolsterMaker4" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/BackHolster" unique_id=1043276860]
 transform = Transform3D(-0.48086, 0.005355, -0.87678, 0.024798, 0.999664, -0.007495, 0.876446, -0.025346, -0.480832, 0.013327, -0.053894, -0.092159)
 
-[node name="HipWeaponHolster" type="BoneAttachment3D" parent="MeshRoot/Model/shino/Skeleton3D" index="8" unique_id=2140900720]
+[node name="HipWeaponHolster" type="BoneAttachment3D" parent="MeshRoot/Model/shino/Skeleton3D" index="8" unique_id=872818706]
 transform = Transform3D(0.99999964, -1.5954154e-07, 1.4880209e-07, 1.1721518e-07, 0.9441975, -0.32937926, -1.0974945e-07, 0.32937947, 0.94419754, -0.00031857318, 0.98805094, 0.016635539)
 bone_name = "spine_01"
 bone_idx = 4
 
-[node name="ShortWeaponHolsterMaker1" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/HipWeaponHolster" unique_id=590318785]
+[node name="ShortWeaponHolsterMaker1" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/HipWeaponHolster" unique_id=395578653]
 transform = Transform3D(-0.939692, 0.296198, -0.17101, 0, 0.499999, 0.866025, 0.34202, 0.813796, -0.469846, 0.176035, 0.018161, -0.069648)
 
-[node name="ShortWeaponHolsterMaker2" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/HipWeaponHolster" unique_id=258430825]
+[node name="ShortWeaponHolsterMaker2" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/HipWeaponHolster" unique_id=1413236302]
 transform = Transform3D(-0.949646, -0.277208, 0.146034, -0.011467, 0.496519, 0.867949, -0.313111, 0.82257, -0.474697, -0.213575, 0.014234, -0.069344)
 
-[node name="ShortWeaponHolsterMaker3" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/HipWeaponHolster" unique_id=728746318]
+[node name="ShortWeaponHolsterMaker3" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/HipWeaponHolster" unique_id=770773885]
 transform = Transform3D(0.072784, -0.997343, -0.002927, -0.176616, -0.015777, 0.984153, -0.981583, -0.071114, -0.177296, 0.135515, -0.067464, -0.180653)
 
-[node name="ShortWeaponHolsterMaker4" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/HipWeaponHolster" unique_id=1301678672]
+[node name="ShortWeaponHolsterMaker4" type="Marker3D" parent="MeshRoot/Model/shino/Skeleton3D/HipWeaponHolster" unique_id=596291641]
 transform = Transform3D(0.241084, 0.970394, 0.014646, 0.379244, -0.108088, 0.918962, 0.893337, -0.215992, -0.394076, -0.100997, -0.076378, -0.15134)
 
-[node name="PhysicalBoneSimulator3D" type="PhysicalBoneSimulator3D" parent="MeshRoot/Model/shino/Skeleton3D" index="9" unique_id=589174945]
+[node name="PhysicalBoneSimulator3D" type="PhysicalBoneSimulator3D" parent="MeshRoot/Model/shino/Skeleton3D" index="9" unique_id=109167076]
 
-[node name="Physical Bone pelvis" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1550755108]
+[node name="Physical Bone pelvis" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=95944112]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1444,11 +1444,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone pelvis" unique_id=1591010738]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone pelvis" unique_id=745594422]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_0wid8")
 
-[node name="Physical Bone spine_01" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1444072260]
+[node name="Physical Bone spine_01" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1005333087]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1459,11 +1459,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_01" unique_id=1323635919]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_01" unique_id=225965031]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_drbyd")
 
-[node name="Physical Bone spine_02" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1306382193]
+[node name="Physical Bone spine_02" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=591076160]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1474,11 +1474,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_02" unique_id=1407163941]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_02" unique_id=155435365]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_vew73")
 
-[node name="Physical Bone spine_03" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=902131661]
+[node name="Physical Bone spine_03" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1107875617]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1489,11 +1489,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_03" unique_id=1870496206]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_03" unique_id=2075355846]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_q2d75")
 
-[node name="Physical Bone head_2" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1742407903]
+[node name="Physical Bone head_2" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1938103759]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1504,11 +1504,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone head_2" unique_id=244727348]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone head_2" unique_id=1358020564]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_534y0")
 
-[node name="Physical Bone upperarm_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=461276586]
+[node name="Physical Bone upperarm_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1952968977]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1519,11 +1519,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone upperarm_l" unique_id=469106671]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone upperarm_l" unique_id=1010458595]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_5xffg")
 
-[node name="Physical Bone lowerarm_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=186925857]
+[node name="Physical Bone lowerarm_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=2041679161]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1534,11 +1534,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone lowerarm_l" unique_id=212256387]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone lowerarm_l" unique_id=1877892510]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_bequ8")
 
-[node name="Physical Bone hand_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1231292557]
+[node name="Physical Bone hand_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=583986294]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1549,11 +1549,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone hand_l" unique_id=1288045625]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone hand_l" unique_id=1771613682]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_vfy58")
 
-[node name="Physical Bone upperarm_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=225732153]
+[node name="Physical Bone upperarm_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1001572210]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1564,11 +1564,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone upperarm_r" unique_id=1261424715]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone upperarm_r" unique_id=392830795]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_vmex7")
 
-[node name="Physical Bone lowerarm_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=182283016]
+[node name="Physical Bone lowerarm_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1388948318]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1579,11 +1579,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone lowerarm_r" unique_id=508535464]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone lowerarm_r" unique_id=1523178916]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_6u75k")
 
-[node name="Physical Bone hand_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=150383576]
+[node name="Physical Bone hand_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=546474702]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1594,11 +1594,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone hand_r" unique_id=1699446453]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone hand_r" unique_id=1128001931]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_at0qg")
 
-[node name="Physical Bone thigh_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=244368651]
+[node name="Physical Bone thigh_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1809458521]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1609,11 +1609,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone thigh_l" unique_id=1341025913]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone thigh_l" unique_id=315975865]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_8416k")
 
-[node name="Physical Bone calf_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=391408747]
+[node name="Physical Bone calf_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1836087572]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1624,11 +1624,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone calf_l" unique_id=1118143355]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone calf_l" unique_id=1095678980]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_pj4c0")
 
-[node name="Physical Bone foot_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=862114471]
+[node name="Physical Bone foot_l" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=752236201]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1639,11 +1639,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone foot_l" unique_id=1436518195]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone foot_l" unique_id=1002027630]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_xyoyw")
 
-[node name="Physical Bone thigh_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1171553201]
+[node name="Physical Bone thigh_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1204072937]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1654,11 +1654,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone thigh_r" unique_id=1174318487]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone thigh_r" unique_id=2055073305]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_25vm3")
 
-[node name="Physical Bone calf_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=525206489]
+[node name="Physical Bone calf_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=2068093254]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1669,11 +1669,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone calf_r" unique_id=35467051]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone calf_r" unique_id=1485895228]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_ndpf4")
 
-[node name="Physical Bone foot_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1791382904]
+[node name="Physical Bone foot_r" type="PhysicalBone3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D" unique_id=276479980]
 collision_layer = 8
 collision_mask = 0
 joint_type = 1
@@ -1684,11 +1684,11 @@ joint_constraints/bias = 0.3
 joint_constraints/damping = 1.0
 joint_constraints/impulse_clamp = 0.0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone foot_r" unique_id=2130534832]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/shino/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone foot_r" unique_id=634084990]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 shape = SubResource("CapsuleShape3D_c1uki")
 
-[node name="StockMountIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="10" unique_id=1688638228]
+[node name="StockMountIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="10" unique_id=877639652]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0
@@ -1716,7 +1716,7 @@ blend_seconds = 0.1
 max_weight = 1.0
 engaged = false
 
-[node name="WeaponRecoilModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="11" unique_id=483850375]
+[node name="WeaponRecoilModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="11" unique_id=1977299246]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0
@@ -1742,7 +1742,7 @@ max_back = 0.1
 max_pitch = 14.0
 rest_epsilon = 0.0005
 
-[node name="SupportHandIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="12" unique_id=325073953]
+[node name="SupportHandIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/shino/Skeleton3D" index="12" unique_id=2090441694]
 unique_name_in_owner = false
 process_mode = 0
 process_priority = 0
@@ -1773,7 +1773,7 @@ max_clavicle_deg = 40.0
 character_path = NodePath("")
 weapon_bone = "hand_r"
 
-[node name="AnimationTree" type="AnimationTree" parent="." unique_id=505906099]
+[node name="AnimationTree" type="AnimationTree" parent="." unique_id=2132195376]
 root_node = NodePath("../MeshRoot/Model/shino")
 libraries/ = ExtResource("12_em4bu")
 tree_root = SubResource("AnimationNodeBlendTree_vk0ns")
@@ -1843,25 +1843,25 @@ parameters/SwimTransition/current_index = -1
 parameters/SwimMovementBlend/blend_position = Vector2(0, 0)
 parameters/WeaponAimDrive/blend_position = 0.0
 
-[node name="StanceCollisions" type="Node3D" parent="." unique_id=845832611]
+[node name="StanceCollisions" type="Node3D" parent="." unique_id=1548683497]
 
-[node name="Upright" type="CollisionShape3D" parent="StanceCollisions" unique_id=452731872]
+[node name="Upright" type="CollisionShape3D" parent="StanceCollisions" unique_id=1758224104]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.822, 0)
 shape = SubResource("CapsuleShape3D_6ivjp")
 
-[node name="RayCast3D" type="RayCast3D" parent="StanceCollisions/Upright" unique_id=1332487205]
+[node name="RayCast3D" type="RayCast3D" parent="StanceCollisions/Upright" unique_id=1966001130]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.256, 0)
 target_position = Vector3(0, 1.079, 0)
 
-[node name="Crouch" type="CollisionShape3D" parent="StanceCollisions" unique_id=135133237]
+[node name="Crouch" type="CollisionShape3D" parent="StanceCollisions" unique_id=1410816455]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.566, 0)
 shape = SubResource("CapsuleShape3D_7nksx")
 disabled = true
 
-[node name="RayCast3D" type="RayCast3D" parent="StanceCollisions/Crouch" unique_id=335128562]
+[node name="RayCast3D" type="RayCast3D" parent="StanceCollisions/Crouch" unique_id=1586936192]
 target_position = Vector3(0, 0.566, 0)
 
-[node name="Crawl" type="CollisionShape3D" parent="StanceCollisions" unique_id=1245995342]
+[node name="Crawl" type="CollisionShape3D" parent="StanceCollisions" unique_id=334485379]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.308, 0)
 shape = SubResource("CylinderShape3D_6k6ic")
 disabled = true

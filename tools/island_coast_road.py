@@ -32,6 +32,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, "blender", "addons", "road_kit_authoring"))
 import point_model as pm              # noqa: E402
 import point_presets as ppr           # noqa: E402
+from island_roadgen import NET_Y      # noqa: E402
 
 ALIGNMENT = os.path.join(ROOT, "assets", "world_source", "pieces", "IslandCoastRoad.json")
 NAME = "kaigan_dori"
@@ -49,7 +50,7 @@ START_BACK = 0.0                      # the walk starts AT the corner
 # the dump
 N, X0, CELL = 1153, -2304.0, 4.0
 SEA_Z = 0.3                           # Godot height of the water line (sea level 0, the beach shelf starts under it)
-GODOT_TO_RECORD = -0.6                # the IslandRoads node stands at Y +0.6
+GODOT_TO_RECORD = -NET_Y              # the IslandRoads node stands at Y +NET_Y
 
 # the alignment
 D_TARGET = 17.0                       # centreline to the water line: half 10 + verge 6 = the band ends 1 m short of it

@@ -168,6 +168,9 @@ def _line_ok(net, ground, obst, kind, v, box, segs=None):
     sid = _site_hit((v, lo_) if kind == "x" else (lo_, v), (v, hi_) if kind == "x" else (hi_, v))
     if sid:
         return None, "runs through the site %s" % sid
+    ra = _rail_along(kind, v, lo_, hi_)
+    if ra > RAIL_ALONG:
+        return None, "runs along the rail for %.0f m" % ra
     if segs is not None:
         run = _parallel_run(segs, kind, v, min(along), max(along))
         if run > PARALLEL_RUN:
@@ -195,10 +198,119 @@ def _sites():
     return _SITES
 
 
+RAIL_ALONG = 40.0      # m: a street may not run along a rail corridor further than this (PLAN.md B10)
+_RAIL = None
+
+
+def _rail():
+    """The rail reserve (`IslandRailReserve.json`, written by `island_rail_layout.py --reserve`): a 32 m bucket index
+    of corridor samples [(x, y, ux, uy, cross)], and the station / car-park boxes as sites. Absent -> no rail."""
+    global _RAIL
+    if _RAIL is None:
+        path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandRailReserve.json")
+        _RAIL = {"half": 0.0, "grid": {}, "boxes": []}
+        if os.path.exists(path):
+            d = json.load(open(path))
+            _RAIL["half"] = d["corridor_half"]
+            for c in d["corridors"]:
+                P = c["pts"]
+                for i, q in enumerate(P):
+                    a, b = P[max(i - 1, 0)], P[min(i + 1, len(P) - 1)]
+                    ux, uy = b[0] - a[0], b[1] - a[1]
+                    ul = math.hypot(ux, uy) or 1.0
+                    _RAIL["grid"].setdefault((int(q[0] // 32), int(q[1] // 32)), []).append(
+                        (q[0], q[1], ux / ul, uy / ul, q[4]))
+            for bx in d["boxes"]:
+                if bx.get("street_under"):
+                    continue
+                _RAIL["boxes"].append((bx["id"], bx["x"], bx["y"], bx["ux"], bx["uy"],
+                                       bx["h_along"] + SITE_CLEAR, bx["h_across"] + SITE_CLEAR))
+    return _RAIL
+
+
+def _rail_near(x, y, r):
+    R = _rail()
+    k0, k1 = int((x - r) // 32), int((x + r) // 32)
+    j0, j1 = int((y - r) // 32), int((y + r) // 32)
+    for i in range(k0, k1 + 1):
+        for j in range(j0, j1 + 1):
+            for q in R["grid"].get((i, j), ()):
+                if math.hypot(q[0] - x, q[1] - y) < r:
+                    yield q
+
+
+def _rail_along(kind, v, lo, hi):
+    """The longest run (m) of the line `kind = v` that lies inside a rail corridor running PARALLEL to it."""
+    R = _rail()
+    if not R["grid"]:
+        return 0.0
+    ax = (0.0, 1.0) if kind == "x" else (1.0, 0.0)
+    best, run, t = 0.0, 0.0, lo
+    while t <= hi:
+        p = (v, t) if kind == "x" else (t, v)
+        par = any(abs(q[2] * ax[0] + q[3] * ax[1]) > 0.87 for q in _rail_near(p[0], p[1], R["half"] + SITE_CLEAR))
+        run = run + 5.0 if par else 0.0
+        best = max(best, run)
+        t += 5.0
+    return best
+
+
+_DIKE = None
+
+
+def _dike():
+    """The ring-road dike and the ramps onto it (`island_dike.CORRIDOR`, written by `island_dike.py raise` before the
+    streets are planned): a 32 m bucket index of segments (ax, ay, bx, by, clear). A block street keeps off the
+    embankment -- it ends at its last cross street instead of climbing 7-9 m onto the crest. Absent -> none."""
+    global _DIKE
+    if _DIKE is None:
+        _DIKE = {}
+        path = os.path.join(ROOT, "assets", "world_source", "island_dike_line.json")
+        if os.path.exists(path):
+            for ln in json.load(open(path))["lines"]:
+                P = ln["pts"]
+                for a, b in zip(P, P[1:]):
+                    c = max(a[2], b[2])
+                    for i in range(int((min(a[0], b[0]) - c) // 32), int((max(a[0], b[0]) + c) // 32) + 1):
+                        for j in range(int((min(a[1], b[1]) - c) // 32), int((max(a[1], b[1]) + c) // 32) + 1):
+                            _DIKE.setdefault((i, j), []).append((a[0], a[1], b[0], b[1], c))
+    return _DIKE
+
+
+def _dike_hit(x, y):
+    for ax, ay, bx, by, c in _dike().get((int(x // 32), int(y // 32)), ()):
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy or 1.0
+        t = min(max(((x - ax) * dx + (y - ay) * dy) / L2, 0.0), 1.0)
+        if math.hypot(ax + t * dx - x, ay + t * dy - y) < c:
+            return True
+    return False
+
+
+_HOLES = ()   # the region being planned's holes (island_plan.STREET_REGIONS' sixth element), record boxes
+
+
 def _site_hit(a, b):
-    """The id of the first site the segment a-b passes through, or None (sampled every 4 m)."""
+    """The id of the first site the segment a-b passes through, or None (sampled every 4 m). The rail reserve's
+    station and car-park boxes count as sites, and so does every corridor stretch a street may not cross ('no': a
+    ramp, or a multi-track at-grade band) -- so a street there is nudged clear or CUT, exactly as by a site."""
     L = math.hypot(b[0] - a[0], b[1] - a[1])
     n = max(1, int(L / 4.0))
+    R = _rail()
+    for k in range(n + 1):
+        x = a[0] + (b[0] - a[0]) * k / n
+        y = a[1] + (b[1] - a[1]) * k / n
+        if any(q[4] == "no" for q in _rail_near(x, y, R["half"] + SITE_CLEAR)):
+            return "rail"
+        if _dike_hit(x, y):
+            return "dike"
+        for hx0, hy0, hx1, hy1 in _HOLES:
+            if hx0 - SITE_CLEAR <= x <= hx1 + SITE_CLEAR and hy0 - SITE_CLEAR <= y <= hy1 + SITE_CLEAR:
+                return "hole"
+        for bid, cx, cy, ux, uy, ha, hc in R["boxes"]:
+            dx, dy = x - cx, y - cy
+            if abs(dx * ux + dy * uy) <= ha and abs(-dx * uy + dy * ux) <= hc:
+                return bid
     for sid, cx, cy, c, s_, hx, hy in _sites():
         for k in range(n + 1):
             x = a[0] + (b[0] - a[0]) * k / n - cx
@@ -282,23 +394,38 @@ def _line_values(box, kind, spec):
 def plan_region(net, ground, region):
     """The lines of one region that survive, each as [(point, road name or None)] from its first to last crossing. A
     line that fails is nudged up to 60 m either way before it is dropped."""
-    name, box, _preset, xs, ys = region
+    global _HOLES
+    name, box, _preset, xs, ys = region[:5]
+    _HOLES = tuple(region[5]) if len(region) > 5 else ()
     xs, ys = _line_values(box, "x", xs), _line_values(box, "y", ys)
     obst = _obstacles(net)
     segs = _Segs(net)
     kept, why = [], []
     for kind, vals in (("x", xs), ("y", ys)):
         for v0 in vals:
-            tried, site_only = [], True
+            # a line whose OWN course (no nudge) runs into a site and that no nudge rescues is CUT by it, not dropped
+            # -- even when a nudge failed for another reason (it crowded a junction). Requiring EVERY nudge to fail
+            # on a site dropped the rail-crossing streets of the whole city core (the rail reserve, 2026-09-25):
+            # a street ends at the corridor, the rest of it keeps its blocks.
+            # And a nudge is only taken over that cut when it keeps AT LEAST as many crossings: a nudge that clears
+            # the site by losing most of the street (y=-11 across the core became a 67 m stub of 2 crossings where
+            # the cut kept 8) is worse than the cut. A nudge that just moves a street off a site's face keeps all
+            # its crossings and still wins, which is what the nudge is for.
+            tried, site_hit, pieces = [], None, None
             for dv in (0.0, 30.0, -30.0, 60.0, -60.0):
                 nodes, last = _line_ok(net, ground, obst, kind, v0 + dv, box, segs)
                 if nodes:
+                    if pieces and sum(len(n) for n, _l in pieces) > len(nodes):
+                        tried.append("%+.0f: kept only %d crossing(s)" % (dv, len(nodes)))
+                        continue
                     kept.append([kind, v0 + dv, nodes, None])
                     break
                 tried.append("%+.0f: %s" % (dv, last))
-                site_only = site_only and last.startswith("runs through the site")
+                if site_hit is None:
+                    site_hit = last.startswith("runs through the site")
+                    pieces = _line_split(net, obst, kind, v0, box, segs) if site_hit else []
             else:
-                pieces = _line_split(net, obst, kind, v0, box, segs) if site_only else []
+                pieces = pieces or []
                 for nodes, lim in pieces:
                     kept.append([kind, v0, nodes, lim])
                 if pieces:
@@ -398,7 +525,7 @@ def plan_region(net, ground, region):
 
 def build_region(net, ground, region):
     lines, why = plan_region(net, ground, region)
-    rname, _box, preset, _xs, _ys = region
+    rname, _box, preset, _xs, _ys = region[:5]
     fixed = lines
     junctions = {}
     skipped = []
@@ -423,6 +550,8 @@ def build_region(net, ground, region):
                 add(p, mb)
                 cut.add(key)
     made = 0
+    segs_of = {}        # segments numbered per NAME: two pieces of one line cut by a site share a base name, and a
+    #                     counter per piece made the second piece's first road overwrite the first's (orphaned points)
     for kind, v, nodes in fixed:
         # a node whose junction could not be made is no longer an end this street may run to
         nodes = [n for n in nodes if (round(n[0][0], 1), round(n[0][1], 1)) not in dead]
@@ -430,7 +559,10 @@ def build_region(net, ground, region):
             continue
         stem = NAMES[rname][0 if kind == "x" else 1]
         base = "%s_%d" % (stem, int(round(abs(v))))
-        seg = 0
+        seg = segs_of.get(base, 0)
+        # a later pass (or region) may already have built a street of this name: carry on its numbering
+        while (base if seg == 0 else "%s__%d" % (base, seg + 1)) in net.roads:
+            seg += 1
         for (p, _r), (q, _s) in zip(nodes, nodes[1:]):
             dx, dy = q[0] - p[0], q[1] - p[1]
             L = math.hypot(dx, dy)
@@ -445,6 +577,7 @@ def build_region(net, ground, region):
             add(p, r.points[0])
             add(q, r.points[-1])
             made += 1
+        segs_of[base] = seg
     for c, mouths in junctions.items():
         make_junction(net, mouths, signal=(preset != "farm" and len(mouths) >= 4))
     if skipped:
@@ -452,10 +585,23 @@ def build_region(net, ground, region):
     return made, len(junctions), why
 
 
+PASSES = 2   # a district is planned again against its own first-pass streets (see `build`)
+
+
 def build(net, ground):
+    """Every region, planned PASSES times. A new line is kept only if it meets an EXISTING road, so a district whose
+    interior lines cross nothing but each other (industry, the port, the suburb) lost them all -- "meets no road" --
+    and was left with no block streets. The second pass plans the region against the network its first pass built:
+    a line that only met new lines now meets roads, and a line repeating a built street is refused by the ordinary
+    "runs alongside an existing road" rule."""
     report = []
     for region in REGIONS:
-        made, nj, why = build_region(net, ground, region)
+        made, nj, why = 0, 0, []
+        for _ in range(PASSES):
+            m, n, w = build_region(net, ground, region)
+            made, nj, why = made + m, nj + n, why + w
+            if not m:
+                break
         report.append((region[0], made, nj, why))
     return report
 

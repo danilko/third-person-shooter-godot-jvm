@@ -30,8 +30,8 @@ const SEABED := 3
 
 const DEEP := -12.0        # below this it is all seabed
 const SHORE := -1.0        # ...blending to sand by here
-const SAND_TOP := 5.0      # bare sand up to here
-const GRASS_TOP := 14.0    # ...fully grass by here
+const SAND_TOP := 3.5      # bare sand up to here (the beach tops at 3.0; the plain stands at 5.6 behind the seawall)
+const GRASS_TOP := 5.5     # ...fully grass by here
 const SLOPE_ROCK_MIN := 0.30   # 30% grade starts showing rock
 const SLOPE_ROCK_MAX := 0.85   # ...and it is bare rock by 85%
 

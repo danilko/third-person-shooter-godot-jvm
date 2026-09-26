@@ -28,6 +28,15 @@ func _weapons_under(n: Node, id: String, out: Array) -> void:
 	for c in n.get_children():
 		_weapons_under(c, id, out)
 
+func _pad_holders(n: Node) -> Array:
+	var out: Array = []
+	for c in n.get_children():
+		if str(c.name).begins_with("Pads_") and c.get_child_count() > 0:
+			out.append(c)
+		else:
+			out.append_array(_pad_holders(c))
+	return out
+
 func _initialize() -> void:
 	_run.call_deferred()
 
@@ -61,13 +70,22 @@ func _run() -> void:
 	await _tick(240)
 	if car != null:
 		var moved := Vector2(car.global_position.x - car0.x, car.global_position.z - car0.z).length()
+		# on the ground beside the player (the plain stands at 5.6 m since the land raise: not an absolute height)
 		_check("the starting car rests where it was parked (off the street)", moved < 0.5 and car.global_position.y > 0.3 \
-				and car.global_position.y < 2.0 and car.linear_velocity.length() < 0.5,
+				and absf(car.global_position.y - p.global_position.y) < 2.0 and car.linear_velocity.length() < 0.5,
 				"moved %.2f m, y %.2f, %.2f m/s" % [moved, car.global_position.y, car.linear_velocity.length()])
 	_check("the player stands there (on the ground, not fallen)", p.is_on_floor() and p.global_position.y > 0.3,
 			"y %.2f, on floor %s" % [p.global_position.y, p.is_on_floor()])
 
-	var counter := w.get_node_or_null("WeaponCounter")
+	# every konbini sells weapons (user, 2026-09-26): the store beside the safe house carries its pads in its own
+	# streamed cell like every other konbini, so the "counter" is the Pads_ holder nearest the spawn
+	var counter: Node = null
+	var best := 1e9
+	for h in _pad_holders(w):
+		var d := spawn.global_position.distance_to((h.get_child(0) as Node3D).global_position)
+		if d < best:
+			best = d
+			counter = h
 	var pads: Array = counter.get_children() if counter != null else []
 	var catalog: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://src/main/resources/com/openworld/weapon/weapon_catalog.json"))
 	var ids := {}
@@ -79,7 +97,8 @@ func _run() -> void:
 		var id := String(pad.get("weapon_id"))
 		ok = ok and ids.has(id) and not seen.has(id)
 		seen[id] = true
-	_check("the counter has one pad per weapon, each a catalog weapon", ok, "%d pads" % pads.size())
+	_check("the konbini beside the safe house sells every weapon, one pad each", ok and best < 80.0,
+			"%d pads, %.0f m from the spawn" % [pads.size(), best])
 
 	var pad := counter.get_node_or_null("Pad_ASR1") as Area3D
 	# stand on the pad (the shop's cell has had four seconds to stream in under the player's feet)
@@ -95,7 +114,9 @@ func _run() -> void:
 	if got.size() == 1:
 		got[0].set("magazine", 0)
 		got[0].set("reserve", 0)
-	p.global_position = pad.global_position + Vector3(-2.5, 0.3, 0)
+	# step OFF: out to the spawn point in the street (a fixed sideways step can land against a shelf or a wall,
+	# depending on which store is the counter, and then the player never leaves the pad)
+	p.global_position = spawn.global_position + Vector3(0, 0.3, 0)
 	await _tick(160)
 	p.global_position = pad.global_position + Vector3(0, 0.3, 0)
 	await _tick(30)

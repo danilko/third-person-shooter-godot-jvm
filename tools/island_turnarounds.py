@@ -43,14 +43,16 @@ FLAT = 3.0                        # the ground under a loop stays within this of
 CORNER_R = 15.0                   # every corner of the square: a 90 deg street corner, driven at a street's pace
 CLEAR = 30.0                      # a loop keeps this far from any other road's centreline
 SHORE = 13.0                      # ... and this far from the water: its paved half + the stamp's 6 m verge
-LAND_MIN = -0.3                   # ... and stays on ground at least this high (not over the sea)
+LAND_MIN = 0.3 - NET_Y            # ... and stays on ground at least this high (not over the sea): Godot y 0.3
 
 
 def open_ends(net):
     """[(uid, road name, unit direction OUT of the road)] for every end station that joins nothing."""
+    import island_site_access
+    access = island_site_access.access_roads()      # a site's access road ENDS at its car park on purpose
     out = []
     for name, r in net.roads.items():
-        if len(r.points) < 2:
+        if len(r.points) < 2 or name in access:
             continue
         for end, nxt in ((r.points[0], r.points[1]), (r.points[-1], r.points[-2])):
             p = net.points[end]

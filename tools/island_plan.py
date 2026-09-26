@@ -234,16 +234,62 @@ def trunk_lines():
 #: with the plan, plus the districts the final plan fills (v3-v7): residential north on 120 m, residential SW on 110 m
 #: (one row of houses a side needs more streets), industry and port logistics on big 200 / 220 m blocks, the suburb.
 STREET_REGIONS = (
-    ("city", (-85.0, -282.0, 1250.0, 410.0), "block", 150.0, 150.0),
-    ("sw", (-1560.0, -1150.0, -100.0, -280.0), "block", 110.0, 110.0),
-    ("farm", (850.0, 750.0, 1350.0, 1570.0), "farm", 260.0, 260.0),
+    # TIGHT BLOCKS (user, 2026-09-26: "no large vacancy ... tight rectangle blocks"): 64 m deep in the city (two
+    # frontage rows of 11-30 m buildings back to back, the 4 m back lane between), 44 m in the housing (two houses).
+    # ONE ROW EACH SIDE (user, 2026-09-26: "each building facing a street ... in rectangular blocks"): the city's
+    # blocks are 150 x 76 m -- two frontage rows back to back with the 路地 passages reaching the middle, which is the
+    # fire and delivery access into the block -- and the housing's 110/120 x 52 m, two houses back to back (Japan's
+    # 接道義務: every plot on a street, fire access from the street side). A 150 m square left a car park of empty
+    # ground in every block's middle.
+    ("city", (-85.0, -282.0, 1250.0, 410.0), "block", 150.0, 64.0),
+    # residential SW is the HOUSING only (2026-09-26): its box overlapped industry's and was planned first, so its
+    # 110 m residential grid took the industry's ground and crowded out industry's own 200 m lines (12 -> 0 streets).
+    # A sixth element is a region's HOLES (record boxes): a line running into one is CUT there, like a site, so each
+    # piece keeps its end on an arterial (splitting the box instead lost the west's lines: 105 -> 50 streets).
+    ("sw", (-1560.0, -1150.0, -100.0, -280.0), "block", 110.0, 44.0, ((-1000.0, -1040.0, 280.0, -640.0),)),
+    # the 準工業 district's part of the old industry box (user, 2026-09-26): block streets, a size between the
+    # housing's and the heavy industry's; the Blue line runs down x -665 through it (streets cross it at 踏切)
+    # boxes reach NORTH past the south-west grid's y -603 street / to wangan_dori: their other anchor was the ring road,
+    # which is the raised dike now and not a crossing (island_dike), so a line needs a street north as well as the 側道
+    ("koba", (-1000.0, -1040.0, -300.0, -590.0), "block", 130.0, 64.0),
+    # THE FARM IS JAPANESE PADDY SECTIONS (圃区, user 2026-09-25): 300 m east-west x 100 m north-south between farm
+    # roads, laid round FARM STATION (1110, 1320, the Main line's terminus). The station road is the east-west line
+    # y 1320, ending in a T on the station-front road x 1080; the 2 x 2 core is x 510..1080 x y 1220..1420, with a
+    # ring of 1 x 1 sections round it. No north-south road at x 1110: the Main line runs there at grade. NOTE for the
+    # rail build: the station's platform box straddles the coast ring (it crosses x 1110 at y ~1317).
+    # The farm's pond (ため池, x 620..920 x y 980..1140) lies in one tall section, y 920..1220: no row crosses it, and
+    # the x 810 road is two regions (south of it, north of it), because the planner drops a line that crosses water.
+    # The west farm road (x 510, nishi_dori -> kaigan_machi) is its own region and comes FIRST: a new line may only
+    # end on another new line inside that line's own extent, and the east-west lines meet no existing road at their
+    # west end, so the road they end on must already exist when they are planned.
+    # x 1080 is the STATION-FRONT road (駅前通り), just west of the track and clear of its corridor: the middle road
+    # y 1320 ends on it in a T right in front of Farm station, which is the user's sketch ("=====farm station").
+    ("farm_w", (400.0, 700.0, 1300.0, 1800.0), "farm", (510.0, 1080.0), ()),
+    ("farm", (400.0, 700.0, 1090.0, 1570.0), "farm", (), (920.0, 1220.0, 1320.0, 1395.0)),   # ends at the station-front road; 1395: the ring meets it at ~1454
+    ("farm_s", (700.0, 700.0, 1100.0, 925.0), "farm", (810.0,), ()),
+    ("farm_n", (700.0, 1215.0, 1300.0, 1570.0), "farm", (810.0,), ()),
     # residential north lies between C1 and the farm arterial -- where the C1 diamond comes down, so the ramps' band
     # (x 180..1020) is left out: a street under a descending ramp had 4.5 m of clearance
-    ("north", (-330.0, 560.0, 180.0, 810.0), "lane", 120.0, 120.0),
-    ("north_e", (1020.0, 560.0, 1250.0, 810.0), "lane", 120.0, 120.0),
-    ("industry", (-1000.0, -1040.0, 280.0, -640.0), "block", 200.0, 200.0),
+    ("north", (-330.0, 560.0, 180.0, 810.0), "lane", 120.0, 44.0),
+    ("north_e", (1020.0, 560.0, 1250.0, 810.0), "lane", 120.0, 44.0),
+    ("industry", (-300.0, -1040.0, 280.0, -410.0), "block", 200.0, 200.0),
     ("logistics", (-820.0, -1540.0, -60.0, -1040.0), "block", 220.0, 220.0),
-    ("suburb", (880.0, -1060.0, 1300.0, -330.0), "block", 150.0, 150.0),
+    # ONE ROW A SIDE (user, 2026-09-26): a 150 m square is two frontage rows and a car park of nothing in between
+    ("suburb", (880.0, -1060.0, 1300.0, -330.0), "block", 150.0, 64.0),
+)
+#: RESERVED GROUND (PLAN.md 3.30 L3/L4, user 2026-09-26: "the land-planning portion"): Godot-frame boxes
+#: (x0, z0, x1, z1) that no generated BUILDING may stand on -- their contents are placed later, by region, once
+#: their models exist. Streets are not kept out (a park may have a road through it; the base has its own).
+RESERVES = (
+    ("military_base", (-760.0, 1240.0, -440.0, 1540.0)),      # SW corner of the port (gate, apron, hangars, the
+                                                               # air base's small terminal and control tower)
+    ("military_airfield", (-1650.0, 1540.0, -440.0, 1760.0)),  # the runway strip: a 1 200 x 45 m runway + taxiway
+    ("waterfront_park", (760.0, 700.0, 1000.0, 960.0)),       # the Bay Quarter: park, Ferris wheel, arena
+    ("resort_hotel_1", (1030.0, 770.0, 1100.0, 830.0)),       # three resort hotels behind the dike
+    ("resort_hotel_2", (1130.0, 770.0, 1200.0, 830.0)),
+    ("resort_hotel_3", (1220.0, 760.0, 1290.0, 820.0)),
+    ("lighthouse", (1350.0, -1320.0, 1430.0, -1260.0)),       # the north-east headland
+    ("michi_no_eki", (385.0, -1720.0, 475.0, -1640.0)),       # the roadside station on the north coast road
 )
 #: Streets the plan REMOVES by hand (user, 2026-09-22, marked on `reference/island_plan_v16_2026-09-22-remove-too-small-
 #: street-blocks.png`): lines that cut a block too small for a building to be placed simply, so the grid stays larger
@@ -256,7 +302,9 @@ STREET_DROP = (
     ("industry", "x", -200.0),   # kojo_michi_200, a one-block stub
 )
 STREET_NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "farm": ("hata_michi", "hata_yoko"),
+                "farm_w": ("hata_michi_w", "hata_yoko_w"), "farm_s": ("hata_michi_s", "hata_yoko_s"), "farm_n": ("hata_michi_n", "hata_yoko_n"),
                 "north": ("kita_machi", "kita_cho"), "north_e": ("kita_machi_e", "kita_cho_e"), "industry": ("kojo_michi", "kojo_yoko"),
+                "koba": ("koba_machi", "koba_cho"),
                 "logistics": ("butsuryu_michi", "butsuryu_yoko"), "suburb": ("kogai_machi", "kogai_cho")}
 
 
@@ -281,20 +329,27 @@ SPUR_EAST_Y = -500.0                   # the spur runs south from the JCT, then 
 
 # ------------------------------------------------------------------ the Wangan (PLAN.md 3.30 L2)
 #: GODOT (x, z). The plan's orange line: from the spur JCT along the south waterfront offshore of the park, over the
-#: gulf and the ring's port-corner bend, then WEST along the port platform's north strip (40-60 m south of the ring,
-#: north of the container terminal) -- R6's "over the port's north edge" -- down to two T's on the ring there.
+#: gulf and the ring's port-corner bend, west along the port platform's north strip, then -- instead of stopping at the
+#: harbour (user, 2026-09-25) -- on PAST the port as ONE PAIR on a low sea viaduct round the south-west corner and up the
+#: west shore offshore, where each carriageway leaves the pair and comes ashore to its own T on the coast ring. The
+#: carriageways never part in mid-air over the water; the only split is the spur JCT at the east end, over land.
 #: The spur JCT is PARTIAL -- Wangan <-> airport only (the racing route, "off the airport spur"): the Wangan meets the
 #: spur's east leg from the south-west, where airport -> Wangan leaves spur_in to its own left and Wangan -> airport
 #: passes under both spur carriageways to join spur_out from its left. Wangan <-> C1 would need two loops.
-#: Not yet: its far-west run over the bay to the west coast (the port platform ends at x -760, and past it the ring IS
-#: the shore), and a port-corner interchange with ramps (keep-left puts the westbound exit on the wrong side of the
-#: line there); both are recorded in PLAN.md.
 WANGAN_S_X = 1000.0            # the spur station the two Wangan ramps leave / join (spur_in diverge, spur_out merge)
 WANGAN_J_X = 890.0             # a joint on spur_out before it: the loop JCT's acceleration lane and the Wangan's
                                # entrance are both on spur_out, and one run carries one aux slot
-WANGAN_CENTRE = [(-540.0, 1128.0), (-100.0, 1128.0), (120.0, 1060.0), (300.0, 900.0), (430.0, 800.0),
-                 (600.0, 800.0), (780.0, 585.0)]   # the shared corridor, west -> east
-WANGAN_RADII = [0.0, 160.0, 160.0, 160.0, 120.0, 120.0, 0.0]
-WANGAN_T_E = (-730.0, 1058.0)  # the ring point where the eastbound carriageway starts (a T from the port side)
-WANGAN_T_W = (-810.0, 1050.0)  # the ring point where the westbound carriageway ends (its own T)
-WANGAN_DECK_FROM_X = -520.0     # the deck is at full height east of this; west of it both carriageways come down
+WANGAN_CENTRE = [(-1320.0, 700.0), (-1320.0, 900.0), (-1180.0, 1110.0), (-900.0, 1128.0), (-100.0, 1128.0),
+                 (120.0, 1060.0), (300.0, 900.0), (430.0, 800.0), (600.0, 800.0),
+                 (780.0, 585.0)]   # the shared corridor, north-west end -> east
+WANGAN_RADII = [0.0, 160.0, 160.0, 160.0, 160.0, 160.0, 160.0, 120.0, 120.0, 0.0]
+WANGAN_T = (-1177.0, 755.0)    # the ONE west-coast ring point the Wangan meets, a T from the sea side (user, 2026-09-25:
+                               # one divided road like C1, not two carriageways each to its own T)
+WANGAN_JOIN_Z = 860.0          # the Wangan's approach from that T joins the corridor here (godot z, west shore)
+WANGAN_SPLIT_X = 520.0         # east of this the divided road parts into its two carriageways for the spur JCT: both
+                               # still on the 11 m deck, before the westbound climbs to spur_in and the eastbound dips
+WANGAN_LOW = 4.0               # the low sea viaduct: west of the port the Wangan crosses no road, so it need not fly
+WANGAN_LOW_FROM_X = -900.0     # west of this (the shoreline past the port platform) the deck is WANGAN_LOW; east of it
+                               # the pair holds a road's clearance over the platform while it comes down from 11 m
+WANGAN_DECK_FROM_X = -700.0     # the deck is at full height (11 m) east of this, over the whole port platform; west of it
+                                # both carriageways come down to WANGAN_LOW over the platform's west end

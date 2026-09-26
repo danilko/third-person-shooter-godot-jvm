@@ -41,7 +41,7 @@ GATES (`check`, exit 1 on any failure):
   * no LAND step over MAX_LAND_STEP metres between two neighbouring land cells;
   * every mountain coast within COAST_BAND of the sea is at most 45 deg (1:1) between any two land cells;
   * the snow (> 380 m) is about SNOW_KM2;
-  * the summit plateau is level (its crest samples within 0.5 m of PLATEAU_Z).
+  * the summit plateau is level (its crest samples within 0.5 m of PLATEAU_Z + RAISE).
 """
 import argparse
 import json
@@ -72,6 +72,11 @@ FLOOR_Z = 0.6                 # the city plain
 GULF_FILL = (300.0, 280.0, 900.0, 760.0)          # x0, z0, x1, z1: the gulf HEAD, filled
 HARBOUR_TRIM = (-820.0, 300.0)                    # x range of the harbour peninsula...
 HARBOUR_TRIM_Z = 1540.0                           # ...trimmed south of this
+# THE CONTAINER QUAY IS STRAIGHT (user, 2026-09-25: "straighten up the harbour, so it is square"). The base's east quay
+# ran from x 248 (z 1050) to x 204 (z 1500), 5.6 deg off north, and the terminal was fitted to it at yaw 85. Here it is a
+# straight seawall at x = 250, in line with the coast north of it (no step): land east of the line becomes quay water (at the seabed, a berth), water
+# west of it is filled to the city plain. The terminal stands square on it (IslandSites.json, yaw 90, east face 3.5 m in).
+HARBOUR_QUAY = (250.0, 940.0, 1538.0, 140.0, 320.0)   # quay x, z0, z1, and the x window the edit may touch
 EDGE_TRIM_M = 240.0                               # the far west and east coasts pulled in this far...
 EDGE_TRIM_MAX_Z = 40.0                            # ...on flat land only
 EAST_WALL = (1350.0, 80.0, 300.0)                 # x = a + b sin(z / c), north of z 420: the farm/city seawall
@@ -203,6 +208,14 @@ def reshape(base):
     sea0 = ~land0
     # 1. the coast edits, on the original coordinates
     fill = sea0 & box(xx, zz, GULF_FILL)
+    qx, qz0, qz1, qw0, qw1 = HARBOUR_QUAY
+    in_quay = (zz >= qz0) & (zz <= qz1) & (xx >= qw0) & (xx <= qw1)
+    qfill = sea0 & in_quay & (xx <= qx)
+    fill |= qfill
+    # the squared quay is filled to its own PLATFORM's height (the row's land inside the window), not the city floor:
+    # the port platform stands at 4.6 m, and a 0.6 m fill left a 4 m step inside the container terminal
+    qplat = np.where(land0 & in_quay, base, -np.inf).max(axis=1)[:, None]
+    qplat = np.where(np.isfinite(qplat), qplat, FLOOR_Z)
     # a trim either leaves a QUAY (a seawall straight into deep water: the harbour, the city's east seawall, the
     # airport's end) or a SHORE (the base's own shelving seabed, laid from the new coast: the west, the resort)
     quay = land0 & (xx >= HARBOUR_TRIM[0]) & (xx <= HARBOUR_TRIM[1]) & (zz >= HARBOUR_TRIM_Z)
@@ -212,10 +225,13 @@ def reshape(base):
     quay |= land0 & (xx > EAST_WALL[0] + EAST_WALL[1] * np.sin(zz / EAST_WALL[2])) & (zz < 420)
     shore |= land0 & (xx > RESORT_WALL[0] + RESORT_WALL[1] * np.sin(zz / RESORT_WALL[2])) & (zz >= 420) & (zz <= 1150)
     quay |= land0 & (xx > AIRPORT_END_X) & (zz >= 1050)
+    quay |= land0 & in_quay & (xx > qx)
     shore &= ~quay
     trim = quay | shore
     land = (land0 | fill) & ~trim
-    g = np.where(fill, FLOOR_Z, np.where(trim, SEABED, base)).astype(np.float64)
+    g = np.where(fill, np.where(qfill, qplat, FLOOR_Z), np.where(trim, SEABED, base)).astype(np.float64)
+    # ...and one level platform: a low cell the base carried inside it (a ditch left by the old coastline) comes up
+    g = np.where(in_quay & (xx <= qx) & ~trim, np.maximum(g, qplat), g)
     # 2. the farm block moves 150 m south
     g = shift_south(g, xx, SEABED)
     land = shift_south(land, xx, False)
@@ -274,8 +290,267 @@ def reshape(base):
     sea = np.where(quay, SEABED, np.where(newsea, prof, np.minimum(out, prof)))
     out = np.where(land, out, sea)
     out = slope_clamp(out, mass & land, COAST_SLOPE)
-    edits = {"fill": fill, "trim": trim | mcut}
+    out, dike, works = coastal_works(out, land, xx, zz)
+    # THE MILITARY BASE's two finger piers and its air base strip (PLAN.md 3.30 L3, user 2026-09-26), at the
+    # port platform's own height, vertical quay edges into the open deep water on every side
+    for x0, x1, z0, z1 in MILITARY_PIERS:
+        out = np.where((xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1), MILITARY_PIER_Z + RAISE, out)
+    edits = {"fill": fill, "trim": trim | mcut, "dike": dike, "works": works}
     return out.astype(np.float32), land, edits
+
+
+#: The base's finger piers (Godot x0, x1, z0, z1): 50 m wide, reaching 260 m WEST of the platform's west edge
+#: (x ~-760) into -24 m of water, 80 m apart so a ship berths between them. They were first drawn south, and the
+#: air base's runway strip (user, 2026-09-26: "a small airlane/terminal for standard fighter flight/landing") now
+#: takes that water.
+MILITARY_PIERS = ((-1020.0, -740.0, 1300.0, 1350.0), (-1020.0, -740.0, 1430.0, 1480.0),
+                  # the AIR BASE: a reclaimed strip off the south-west coast (Iwakuni / Naha are reclaimed too), its
+                  # north edge on the platform's south edge, 1 210 m long for a 1 200 x 45 m runway + a parallel
+                  # taxiway; the paving is reserved (island_plan.RESERVES) for a later regional pass
+                  (-1650.0, -440.0, 1540.0, 1760.0))
+MILITARY_PIER_Z = 4.6
+
+
+#: THE LAND IS RAISED AND THE COAST IS A SEAWALL WITH A BEACH IN FRONT (user, 2026-09-26: "the land height should
+#: overall increase ... the dike should follow 12 and 14.7 m from sea level, the Japan standard, inland raised 5 m or
+#: more, a beach on the ocean side with a slower slope into the ocean, except the harbour, which stays steep and
+#: higher to match a large cargo ship"). Three rules:
+#:  * EVERY land cell stands RAISE higher (the city plain FLOOR_Z + RAISE = 5.6 m above the sea), the massif included;
+#:    inland water keeps its level, so its banks fall at 1:BANK to it. The road network's node moves up by the same
+#:    RAISE (island_roadgen.NET_Y), so every road RECORD is unchanged: a record height is Godot height less NET_Y.
+#:  * a NATURAL SHELVING SHORE (open sea shallower than DIKE_SHELF_Z beside low land, out of every harbour-type zone)
+#:    gets a seawall (海岸堤防) on RECLAIMED shallow sea in front of today's coastline, so the coast roads behind it do
+#:    not move: from the old land edge a 1:DIKE_BACK back slope up from the raised plain to the crest, a DIKE_TOP crest,
+#:    a 1:DIKE_FACE seaward face down to the beach top BEACH_TOP, a 1:BEACH beach to the water line, then the shelf
+#:    (island_coast.shelf_target). The crest is DIKE_CREST_BAY (12.0 m) inside the bay and DIKE_CREST_OPEN (14.7 m,
+#:    the post-2011 Sanriku standard) where the sea round it is open ocean (EXPOSURE_R).
+#:  * a harbour / quay / seawall zone keeps its vertical edge into deep water, now RAISE higher: a quay deck ~5.6 m over
+#:    the sea (the port platform 9.6 m), the height a large ship berths against.
+#: Where a road stands too near for the wall (its band + DIKE_ROAD_CLEAR), the crest drops to the plain over
+#: DIKE_END_W and only the beach remains. DIKE_ACCESS are the openings to the sand: a DIKE_GAP-wide gap whose face
+#: eases to 1:DIKE_RAMP, recorded in island_dike.json for the stairs, gates (陸閘) or beach car parks a later pass puts
+#: there. The cells the works raised are recorded as runs too: "cells" the wall (painted concrete), "works" the wall
+#: and the beach (no building, no block fill, no field stands on them).
+RAISE = 5.0
+BANK = 2.0               # inland water's banks, horizontal per vertical
+DIKE_CREST_BAY = 12.0
+DIKE_CREST_OPEN = 14.7
+EXPOSURE_R = 1000.0      # m: the open-ocean fraction within this decides the crest
+EXPOSURE_OPEN = (0.50, 0.60)   # ...12.0 below the first, 14.7 above the second (measured at the coast: p10 0.33, median 0.58, p90 0.64)
+DIKE_TOP = 6.0
+DIKE_FACE = 2.0          # seaward face, horizontal per vertical
+DIKE_BACK = 1.5          # landward slope
+BEACH_TOP = 3.0          # the dry sand at the wall's toe
+BEACH = 25.0             # the beach, horizontal per vertical, down to the water line
+DIKE_LOW = 2.0           # only land lower than this (before the raise) gets a wall
+DIKE_ROAD_CLEAR = 8.0    # m past a road's half width (+ the stamp's 6 m verge + margin)
+DIKE_END_W = 60.0        # a wall's crest falls to the plain over this at every end
+DIKE_GAP = 10.0
+DIKE_ACCESS_SPACING = 150.0
+DIKE_RAMP = 8.0
+WATERLINE_WALL = False   # the wall at the waterline (superseded by the ring-road dike, island_dike.py)
+SHORE_BANK = 3.0         # outside the dike: the plain falls to the beach's top at 1:3
+#: (name, Godot x, z): the user's list, each laid at the nearest crest cell inside a run -- the suburb (the south-east
+#: resort beach's east end), the city's side (the same beach's west end), residential north-east (the north coast's east
+#: bend), the farmland (the north coast by the fields) and the west residential side, and the lighthouse side.
+DIKE_ACCESS = (("suburb", 1250.0, 880.0), ("city", 950.0, 880.0), ("residential_ne", 880.0, -1580.0),
+               ("farm", 700.0, -1650.0), ("residential_west", -1250.0, 640.0), ("lighthouse", 1330.0, -1330.0))
+#: The gulf's west bank beside the city is a harbour inlet, not a beach, just outside the gulf zone's box.
+DIKE_NOT_BOXES = ((230.0, 300.0, 380.0, 820.0),)
+DIKE_JSON = os.path.join(ROOT, "assets", "world_source", "island_dike.json")
+DIKE_SHELF_Z = -3.0      # open sea shallower than this beside the land is a shelving shore (a quay drops to -24 m)
+DIKE_NOT_ZONES = ("industrial_harbour", "gulf", "military_harbour", "airport_island", "fishing_port", "seawall")
+
+
+def open_sea(sea):
+    """The sea connected to the map's edge (a flood fill at 8 m, then back to 2 m): inland water is not a coast."""
+    k = 4
+    n = sea.shape[0] // k
+    c = sea[:n * k, :n * k].reshape(n, k, n, k).any(axis=(1, 3))
+    reach = np.zeros_like(c)
+    reach[0, :], reach[-1, :], reach[:, 0], reach[:, -1] = c[0, :], c[-1, :], c[:, 0], c[:, -1]
+    while True:
+        g = reach.copy()
+        g[1:, :] |= reach[:-1, :]
+        g[:-1, :] |= reach[1:, :]
+        g[:, 1:] |= reach[:, :-1]
+        g[:, :-1] |= reach[:, 1:]
+        g &= c
+        if (g == reach).all():
+            break
+        reach = g
+    full = np.zeros_like(sea)
+    full[:n * k, :n * k] = np.repeat(np.repeat(reach, k, 0), k, 1)
+    full[n * k:, :] = sea[n * k:, :]
+    full[:, n * k:] = sea[:, n * k:]
+    return full & sea
+
+
+def _road_near(cells, xx, zz, clear):
+    """Which of `cells` lie within a (non-expressway) road's half width + `clear` of the committed road record."""
+    near_all = np.zeros_like(cells)
+    js, is_ = np.nonzero(cells)
+    if not js.size:
+        return near_all
+    rec = json.load(open(os.path.join(ROOT, "assets", "world_source", "pieces", "IslandRoads.roads.json")))
+    pts = {p["uid"]: p["pos"] for p in rec["points"]}
+    wx, wz = xx[0, is_], zz[js, 0]
+    near = np.zeros(js.size, dtype=bool)
+    for r in rec["roads"]:
+        if r["name"].startswith("shuto_"):
+            continue
+        half = (14.5 if r.get("road_class") == "arterial" else 7.0) + clear
+        ps = [(pts[u][0], -pts[u][1]) for u in r["points"] if u in pts]
+        for (ax, az), (bx, bz) in zip(ps, ps[1:]):
+            if max(ax, bx) < wx.min() - half or min(ax, bx) > wx.max() + half:
+                continue
+            dx, dz = bx - ax, bz - az
+            L2 = dx * dx + dz * dz + 1e-9
+            t = np.clip(((wx - ax) * dx + (wz - az) * dz) / L2, 0.0, 1.0)
+            near |= np.hypot(ax + t * dx - wx, az + t * dz - wz) < half
+    near_all[js[near], is_[near]] = True
+    return near_all
+
+
+def _runs(mask):
+    runs = []
+    for j in np.nonzero(mask.any(axis=1))[0]:
+        row = np.concatenate(([0], mask[j].astype(np.int8), [0]))
+        edge = np.nonzero(np.diff(row))[0]
+        runs += [[int(j), int(a_), int(b_) - 1] for a_, b_ in zip(edge[0::2], edge[1::2])]
+    return runs
+
+
+def coastal_works(out, land, xx, zz):
+    """The RAISE, the seawall and the beach (see the note above RAISE). Returns (grid, wall mask, works mask)."""
+    import island_coast as IC
+    zones = json.load(open(os.path.join(ROOT, "assets", "world_source", "island_coast.json")))["zones"]
+    plain = FLOOR_Z + RAISE
+    # only what is really above water is land here: the farm's southward shift leaves some cells in the land MASK at a
+    # sea depth (the old coastline's shelf), and raised they surfaced as a sand shelf beside the wall
+    land = land & (out > LAND_Z)
+    ocean = open_sea(~land)
+    inland_water = ~land & ~ocean
+    # 1. the raise: every land cell, easing to nothing at inland water's edge (its banks fall at 1:BANK to it)
+    d_iw = distance_from(inland_water, RAISE * BANK + 4.0)
+    d_iw[~np.isfinite(d_iw)] = 1e6
+    new = np.where(land, out + RAISE * np.clip(d_iw / (RAISE * BANK), 0.0, 1.0), out)
+    # 2. which coast is a natural shelving shore
+    port = np.zeros_like(land)
+    for kind in DIKE_NOT_ZONES:
+        for x0, x1, z0, z1 in zones.get(kind, ()):
+            port |= (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+    for x0, x1, z0, z1 in DIKE_NOT_BOXES:
+        port |= (xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1)
+    shelf_sea = ocean & (out > DIKE_SHELF_Z)
+    near_shelf = distance_from(shelf_sea, 6.0) <= 6.0
+    edge = land & ~port & (out < DIKE_LOW) & near_shelf              # the old coastline the works stand in front of
+    other = land & ~edge
+    # the profile's widest reach: a 14.7 m wall, its beach and the whole shelf
+    bw = (DIKE_CREST_OPEN - plain) * DIKE_BACK
+    s3_max = bw + DIKE_TOP + (DIKE_CREST_OPEN - BEACH_TOP) * DIKE_RAMP + BEACH_TOP * BEACH
+    reach = s3_max + IC.SHELF_W + IC.DROP_W
+    # a road standing near the old coastline is not a reason to drop the wall: the wall moves SEAWARD of the road's
+    # reserve (half width + DIKE_ROAD_CLEAR, filled at plain level) and its back toe starts there, so the run stays
+    # continuous and at full height in front of the coast road
+    s0 = distance_from(edge, reach + 4.0)
+    road_res = _road_near((np.isfinite(s0) & ocean & ~port) | edge, xx, zz, DIKE_ROAD_CLEAR)
+    origin = edge | road_res
+    s = distance_from(origin, reach + 4.0)
+    so = distance_from(other & ~road_res, reach + 4.0)
+    take = ocean & np.isfinite(s) & (s <= so) & ~port
+    road_fill = take & road_res
+    # 3. the crest: exposure (open ocean round it) -> 12.0 or 14.7
+    k = 16
+    n = N // k
+    oc = ocean[:n * k, :n * k].reshape(n, k, n, k).mean(axis=(1, 3))
+    frac = box_mean(oc, int(EXPOSURE_R / (k * STEP)))
+    frac = np.repeat(np.repeat(frac, k, 0), k, 1)
+    fr = np.full(ocean.shape, float(frac.mean()))
+    fr[:n * k, :n * k] = frac
+    crest = DIKE_CREST_BAY + (DIKE_CREST_OPEN - DIKE_CREST_BAY) * ramp(fr, *EXPOSURE_OPEN)
+    # 4. every end tapers to the plain over DIKE_END_W. Since the ring road became the dike (island_dike.py, user
+    # 2026-09-26) there is NO wall at the waterline: the land outside the dike stays at the plain and falls to the
+    # beach down a 1:SHORE_BANK bank (WATERLINE_WALL False); the wall machinery is kept behind the flag
+    wall_ok = take & ~road_fill & WATERLINE_WALL
+    # a run ENDS where the coastline stops being a low shelving shore (a cliff, higher land, a quay) or at a port's water
+    coast = land & (distance_from(ocean, 6.0) <= 6.0)
+    end = distance_from((coast & ~edge) | (ocean & port), DIKE_END_W + 4.0)
+    end[~np.isfinite(end)] = 1e6
+    end_w = np.clip(end / DIKE_END_W, 0.0, 1.0)
+    # 5. the openings: a gap in the crest whose face eases to 1:DIKE_RAMP
+    access = []
+    gap_w = np.ones(out.shape)
+    cand = wall_ok & (end_w >= 1.0) & (s >= bw) & (s <= bw + DIKE_TOP)
+    cj, ci = np.nonzero(cand)
+    for name, gx, gz in (DIKE_ACCESS if WATERLINE_WALL else ()):
+        if not cj.size:
+            break
+        cost = (xx[0, ci] - gx) ** 2 + (zz[cj, 0] - gz) ** 2
+        for a in access:
+            cost = np.where((xx[0, ci] - a["x"]) ** 2 + (zz[cj, 0] - a["z"]) ** 2 < DIKE_ACCESS_SPACING ** 2,
+                            np.inf, cost)
+        if not np.isfinite(cost).any():
+            continue
+        kk = int(np.argmin(cost))
+        ax, az = float(xx[0, ci[kk]]), float(zz[cj[kk], 0])
+        r = np.hypot(xx - ax, zz - az)
+        gap_w = np.minimum(gap_w, np.clip((r - DIKE_GAP / 2.0) / 30.0, 0.0, 1.0))
+        access.append({"name": name, "x": round(ax, 1), "z": round(az, 1), "kind": "ramp",
+                       "note": "a gap in the seawall, its face eased to 1:%g down to the beach; stairs / a gate / a "
+                               "beach car park go here" % DIKE_RAMP})
+    # 6. the profile along s, with this cell's own crest and face
+    c = plain + (crest - plain) * end_w * gap_w * wall_ok
+    face = DIKE_FACE * gap_w + DIKE_RAMP * (1.0 - gap_w) if WATERLINE_WALL else np.full(out.shape, SHORE_BANK)
+    b0 = (c - plain) * DIKE_BACK
+    s1 = b0 + (DIKE_TOP if WATERLINE_WALL else 0.0)
+    s2 = s1 + (c - BEACH_TOP) * face
+    s3 = s2 + BEACH_TOP * BEACH
+    sv = np.where(np.isfinite(s), s, 1e6)
+    shelf = IC.shelf_target(np.maximum(sv - s3, 0.0))
+    shelf[~np.isfinite(shelf)] = SEABED
+    prof = np.where(sv < b0, plain + sv / DIKE_BACK,
+                    np.where(sv < s1, c,
+                             np.where(sv < s2, c - (sv - s1) / face,
+                                      np.where(sv < s3, BEACH_TOP - (sv - s2) / BEACH, shelf))))
+    # fade out approaching water the works do not take (a harbour, a cliff's sea), so no underwater wall at the edge
+    w = np.clip(distance_from(ocean & ~take, IC.HARD_FADE) / IC.HARD_FADE, 0.0, 1.0)
+    w[~np.isfinite(w)] = 1.0
+    prof = w * prof + (1.0 - w) * SEABED
+    prof = np.where(road_fill, plain, prof)          # a road's reserve is filled level, the wall stands beyond it
+    grid = np.where(take, np.maximum(new, prof), new)
+    # nothing the works laid stands more than 1:1 under the land or wall beside it: where a beach ends against land it
+    # does not front (a headland, higher ground) or a wall's end fades out, the sand banks up at 1:1 (the land's or the
+    # wall's height, falling STEP per cell) instead of ending in a cliff the height of the raise
+    # (and the dry-sand strip the sea profile leaves at every other shelving waterline, SHORE_TOP, which the raise
+    # would otherwise leave 5 m under the land it touches)
+    dom = take | (ocean & ~port & (grid > LAND_Z))
+    src = (land | take) & ~port
+    bank = np.where(src, grid, -np.inf)
+    for _ in range(int((DIKE_CREST_OPEN + RAISE) / STEP) + 2):
+        g2 = bank.copy()
+        g2[1:, :] = np.maximum(g2[1:, :], bank[:-1, :] - STEP)
+        g2[:-1, :] = np.maximum(g2[:-1, :], bank[1:, :] - STEP)
+        g2[:, 1:] = np.maximum(g2[:, 1:], bank[:, :-1] - STEP)
+        g2[:, :-1] = np.maximum(g2[:, :-1], bank[:, 1:] - STEP)
+        bank = np.where(dom | src, np.maximum(g2, np.where(src, grid, -np.inf)), -np.inf)
+    grid = np.where(dom & (grid > LAND_Z), np.maximum(grid, bank), grid)
+    works = take & (grid > LAND_Z) & (grid > new + 0.05)
+    wall = works & (grid > plain - 0.5) & (sv < s2)
+    json.dump({"schema": 2, "source": "tools/island_reshape.py (coastal_works)", "frame": "godot x, z",
+               "raise_m": RAISE, "crest_m": [DIKE_CREST_BAY, DIKE_CREST_OPEN], "access": access,
+               "cells": {"x0": float(xx[0, 0]), "z0": float(zz[0, 0]), "step": float(xx[0, 1] - xx[0, 0]),
+                         "runs": _runs(wall)},
+               "works": {"x0": float(xx[0, 0]), "z0": float(zz[0, 0]), "step": float(xx[0, 1] - xx[0, 0]),
+                         "runs": _runs(works)}},
+              open(DIKE_JSON, "w"), separators=(",", ":"))
+    hi = wall & (grid > DIKE_CREST_BAY - 0.2)
+    top = wall & (np.abs(sv - (b0 + s1) / 2.0) <= STEP / 2.0)      # one cell along the crest line: its length
+    print("island_reshape: raise %.1f m; seawall %.2f km2, crest line %.1f km (%.1f km >= 12 m, %.1f km >= 14.5 m), "
+          "works (wall + beach + road fill) %.2f km2, %d opening(s)"
+          % (RAISE, wall.sum() * 4e-6, top.sum() * STEP / 1e3, (top & (grid > DIKE_CREST_BAY - 0.2)).sum() * STEP / 1e3,
+             (top & (grid > DIKE_CREST_OPEN - 0.2)).sum() * STEP / 1e3, works.sum() * 4e-6, len(access)))
+    return grid, wall, works
 
 
 def slope_clamp(h, where, k, max_iter=400):
@@ -314,8 +589,8 @@ def report(base, out):
     rep["plateau_p90_slope"] = [round(float(np.percentile(slope(base)[pm], 90)), 3),
                                 round(float(np.percentile(slope(out)[pm], 90)), 3)]
     worst = 0.0
-    changed = np.abs(out - base) > 0.01                  # a step the SOURCE carries elsewhere (the airport's 8 m
-    for ax in (0, 1):                                    # platform edge) is not this tool's to judge
+    changed = np.abs(out - (base + RAISE * (base > LAND_Z))) > 0.01   # the raise is uniform; judge what else changed
+    for ax in (0, 1):                                    # (a step the SOURCE carries elsewhere is not this tool's)
         d = np.abs(np.diff(out, axis=ax))
         both = (land[1:, :] & land[:-1, :]) if ax == 0 else (land[:, 1:] & land[:, :-1])
         ch = (changed[1:, :] | changed[:-1, :]) if ax == 0 else (changed[:, 1:] | changed[:, :-1])
@@ -330,7 +605,7 @@ def report(base, out):
             (band[:, 1:] & land[:, :-1]) | (band[:, :-1] & land[:, 1:])
         worst_s = max(worst_s, float(d[pair].max()))
     rep["mountain_coast_max_slope"] = round(worst_s, 3)
-    rep["snow_km2"] = round(float((land & (out > SNOW_Z)).sum() * STEP * STEP / 1e6), 3)
+    rep["snow_km2"] = round(float((land & (out > SNOW_Z + RAISE)).sum() * STEP * STEP / 1e6), 3)
     A, B = crest()
     cs = [out[int(round((p[1] - Z0) / STEP)), int(round((p[0] - X0) / STEP))]
           for p in (A + (B - A) * t for t in np.linspace(0, 1, 9))]
@@ -345,7 +620,7 @@ def report(base, out):
           and worst <= MAX_LAND_STEP
           and rep["mountain_coast_max_slope"] <= COAST_SLOPE + 0.01
           and SNOW_KM2[0] <= rep["snow_km2"] <= SNOW_KM2[1]
-          and abs(rep["crest_z"][0] - PLATEAU_Z) < 0.5 and abs(rep["crest_z"][1] - PLATEAU_Z) < 0.5)
+          and abs(rep["crest_z"][0] - PLATEAU_Z - RAISE) < 0.5 and abs(rep["crest_z"][1] - PLATEAU_Z - RAISE) < 0.5)
     return rep, ok
 
 

@@ -137,8 +137,15 @@ def quay_line(g):
 
 
 def castle_site(g, net):
+    """CASTLE_CLEAR keeps the castle off a THROUGH road; its own access road (`island_site_access`, the 参道 to its
+    car park) ends beside it by design, so it is not counted -- a `--resite shuri_castle` after the approach exists
+    still finds the castle's patch."""
+    import island_site_access
+    own = island_site_access.access_roads()
     road = []
-    for r in net.roads.values():
+    for name, r in net.roads.items():
+        if name in own:
+            continue
         road += densify([net.points[v].pos[:2] for v in r.points], 10.0)
     grid = collections.defaultdict(list)
     for x, y in road:
@@ -415,11 +422,51 @@ def search(g, net, only=None):
             print("island_sites: Airport terminal at (%d, %d), ground %.1f-%.1f m" % (px, py, plo, phi))
             rows.append(dict(id="airport_terminal", scene="AirportTerminal_Shop", x=px, y=py, yaw=0.0,
                              size=[242.0, 170.0], load=AIRPORT_LOAD, ground="min"))
+    if want("west_station_mall"):
+        # THE STATION SHOPPING CENTRE (user, 2026-09-26): beside the Blue line's Residential station, the west
+        # sub-centre's anchor (a GRANDUO / Ito-Yokado beside a suburban station). DERIVED from the rail plan: MALL_OFF
+        # m east of the station (the platform box, then a 駅前広場 plaza), its entrances facing the station. The
+        # Harbour line's Industry station gets nothing of the kind: it stays an industrial / freight stop.
+        import island_rail_layout as RL
+        RL.use_layout(RAIL_LAYOUT)
+        _line, rx, ry = RL.STATIONS["Residential"][:3]
+        rows.append(dict(id="west_station_mall", scene="StationMall", x=rx + MALL_OFF, y=ry, yaw=yaw_to(-1.0, 0.0),
+                         size=[47.3, 40.0], load=900.0, ground="min"))
+    return rows
+
+
+RAIL_LAYOUT = "tokyo_straight"
+MALL_OFF = 65.0          # m east of the Residential station's centreline: 20 m of platform box, a 25 m plaza, half the
+                         # mall's 40 m depth
+
+
+def access_parking(net):
+    """Each site's visitor car park, DERIVED every run from its access road (`island_site_access.ACCESS`), never
+    frozen: it stands where the road ends, so it follows the road. `island_site_access` is the one owner of where it
+    stands and how high (`lot_frame`, `lot_top`: flat, at the highest ground under it, which the road climbs to); its
+    front (+Z, the entrance) faces back down the road. `level` makes the block-ground stage fill the terrain under it
+    up to that height, the way it does a building lot."""
+    import island_site_access as isa
+    rows = []
+    for a in isa.ACCESS:
+        r = net.roads.get(a["name"])
+        if r is None:
+            print("island_sites: NO access road %s yet -- %s has no car park" % (a["name"], a["site"]))
+            continue
+        e, p = net.points[r.points[-1]].pos, net.points[r.points[-2]].pos
+        dx, dy = e[0] - p[0], e[1] - p[1]
+        L = math.hypot(dx, dy)
+        u = (dx / L, dy / L)
+        c, w, d = isa.lot_frame(e, u, a)
+        rows.append(dict(id=a["site"] + "_parking", scene=a["parking"], x=c[0], y=c[1], yaw=yaw_to(-u[0], u[1]),
+                         size=[w, d], load=900.0, ground="road_end", level=e[2]))
     return rows
 
 
 def site_ground(g, row):
     """The height a frozen site stands at on TODAY's ground (record frame, network-relative)."""
+    if row["ground"] == "road_end":        # an access car park: its road climbs to it (island_site_access)
+        return row["level"]
     if row["ground"] == "centre":
         return g.z(row["x"], row["y"])
     if row["ground"] == "patch":           # castle_site's own measure: the axis-aligned patch, 20 m apart
@@ -481,14 +528,21 @@ def main(argv):
         h = site_ground(g, r)
         print("island_sites: %-18s at (%.0f, %.0f), ground %.2f m (frozen)" % (r["id"], r["x"], r["y"], h))
         sites.append((r["id"], r["scene"], (r["x"], r["y"], ny + h), r["yaw"], tuple(r["size"]), r["load"],
-                      scene_offset(r)))
+                      scene_offset(r), r["scene"], None))
+    for row in access_parking(net):
+        h = site_ground(g, row)
+        print("island_sites: %-18s at (%.0f, %.0f), ground %.2f m (at its access road's end)"
+              % (row["id"], row["x"], row["y"], h))
+        # a node per car park, named by its site (several sites may use one ParkingLot scene)
+        sites.append((row["id"], row["scene"], (row["x"], row["y"], ny + h), row["yaw"], tuple(row["size"]),
+                      row["load"], (0.0, 0.0), "Parking_" + row["id"], ny + h))
     sites = tuple(sites)
     import island_traffic_zones as itz
     sections = itz.split_sections(text)
     zone_ext = itz.ext_resource_id(sections, itz.ZONE_SCRIPT)
     marker_ext = itz.ext_resource_id(sections, itz.MARKER_SCRIPT)
     sub, nodes = [], ['[node name="%s" type="Node" parent="." unique_id=%d]\n\n' % (HOLDER, SITE_ID_BASE)]
-    for i, (zid, scene, pos, yaw, size, load, (ox, oy)) in enumerate(sites):
+    for i, (zid, scene, pos, yaw, size, load, (ox, oy), node, level) in enumerate(sites):
         # the RESERVE (godot x, z, yaw, half x, half z), read by island_buildings.site_exclusions: the scene may
         # stand off its reserve's centre (the central station), so the scene transform cannot say where it is
         reserve = "PackedFloat64Array(%.3f, %.3f, %.6f, %.3f, %.3f)" % (pos[0], -pos[1], math.radians(yaw),
@@ -503,15 +557,18 @@ def main(argv):
                    'geometry_path = "%s%s.tscn"\n'
                    'geometry_world_placed = true\n'
                    'geometry_world_transform = %s\n'
-                   'metadata/site_reserve = %s\n\n'
+                   'metadata/site_reserve = %s\n%s\n'
                    % (SUB_PREFIX, zid, zone_ext, zid, max(size), max(size), load, load + 300.0, BUILDINGS, scene,
-                      site_xf(spos, yaw), reserve))
+                      site_xf(spos, yaw), reserve,
+                      # a LEVELLED site (an access car park): the block-ground stage fills the terrain under it to this
+                      # Godot height, as it does a lot (island_ground.levelled_sites)
+                      "" if level is None else "metadata/site_level = %.3f\n" % level))
         nodes.append('[node name="%s" type="Node3D" parent="%s" unique_id=%d]\n'
                      'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, %.3f, %.3f, %.3f)\n'
                      'script = ExtResource("%s")\n'
                      'zone = SubResource("%s%s")\n'
                      'show_debug_volume = false\n\n'
-                     % (scene, HOLDER, SITE_ID_BASE + 1 + i, pos[0], pos[2], -pos[1], marker_ext, SUB_PREFIX, zid))
+                     % (node, HOLDER, SITE_ID_BASE + 1 + i, pos[0], pos[2], -pos[1], marker_ext, SUB_PREFIX, zid))
 
     def generated(header):
         if header.startswith("[sub_resource"):

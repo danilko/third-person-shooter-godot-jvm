@@ -360,15 +360,17 @@ def _profile(pts, anchors):
     return [(p[0], p[1], round(z, 2)) for p, z in zip(pts, out)]
 
 
+SPLIT_CLEAR = 15.0     # the unpiered span at the Wangan's split (m)
+
+
 def wangan_east(net, spur_out, spur_in, ground=None):
-    """THE WANGAN (PLAN.md 3.30 L2; `island_plan.WANGAN_*`): two one-way elevated carriageways, like the spur, from a
-    PARTIAL JCT on the spur's east leg along the south waterfront (offshore of the park), over the gulf and the ring's
-    port-corner bend, then west along the port platform's north strip, each coming down to its own T on the ring (two
-    parallel one-way arms on one pad is a pad no ring fits -- the airport end's rule).
+    """THE WANGAN (PLAN.md 3.30 L2; `island_plan.WANGAN_*`): ONE divided 2+2 expressway with C1's centre wall (user,
+    2026-09-25), from ONE T on the west-coast ring, offshore round the south-west corner and along the south
+    waterfront, parting at `WANGAN_SPLIT_X` into two one-way carriageways for a PARTIAL JCT on the spur's east leg:
 
     * airport -> Wangan: `shuto_wangan_w` LEAVES spur_in (westbound there) at S to its own left (south), descends
-      south-west into the corridor's south lane line, and runs west to its T;
-    * Wangan -> airport: `shuto_wangan_e` rises from its T, runs the corridor's north lane line, passes UNDER both
+      south-west into the corridor's south lane line, and runs west to the split;
+    * Wangan -> airport: `shuto_wangan_e` leaves the split, runs the corridor's north lane line, passes UNDER both
       spur carriageways west of S (the spur is ~26.6 m there, this ~19 m) and joins spur_out from its own left
       (north) at S. spur_out is cut at a joint J before S, because the loop JCT's acceleration lane is on spur_out too
       and one run carries one aux slot.
@@ -384,49 +386,88 @@ def wangan_east(net, spur_out, spur_in, ground=None):
     n = max(2, int(round(cum[-1] / 45.0)))
     cp = [at_s(cl, cum, cum[-1] * k / n, False) for k in range(n + 1)]
 
-    def off(i, side):
+    def off(i, side, d=SPUR_OFF):
         a_, b_ = cp[max(0, i - 1)], cp[min(len(cp) - 1, i + 1)]
         dx, dy = b_[0] - a_[0], b_[1] - a_[1]
         L = math.hypot(dx, dy)
-        return (cp[i][0] - dy / L * SPUR_OFF * side, cp[i][1] + dx / L * SPUR_OFF * side)
+        return (cp[i][0] - dy / L * d * side, cp[i][1] + dx / L * d * side)
     left = [off(i, 1) for i in range(len(cp))]          # eastbound lane line (north / north-west)
     right = [off(i, -1) for i in range(len(cp))]        # westbound lane line (south / south-east)
     deck = 11.0
+    low = PL.WANGAN_LOW
+    # cp runs from the corridor's north-west end (on the west shore), south, round the corner and east
     i_deck = min(i for i in range(len(cp)) if cp[i][0] >= PL.WANGAN_DECK_FROM_X)
+    i_low = min(i for i in range(len(cp)) if cp[i][0] >= PL.WANGAN_LOW_FROM_X)
+    k_j = min(i for i in range(len(cp)) if -cp[i][1] >= PL.WANGAN_JOIN_Z)
+    i_split = min(i for i in range(len(cp)) if cp[i][0] >= PL.WANGAN_SPLIT_X)
+    i600 = min(range(len(cp)), key=lambda i: abs(cp[i][0] - 600.0) + abs(cp[i][1] + 800.0))
     top = len(cp) - 1
-    # --- eastbound: its T on the ring -> the corridor -> under the spur -> the gore at S
-    te = PL.WANGAN_T_E
-    m_e = (te[0], -(te[1] + MOUTH))
-    e_plan = [m_e, (te[0] + 25.0, -(te[1] + MOUTH + 22.0))] + left
+    assert k_j < i_low < i_deck < i_split < i600 < top, (k_j, i_low, i_deck, i_split, i600, top)
+    # --- THE WANGAN ITSELF: one divided 2+2 road with C1's centre wall (user, 2026-09-25), from ONE T on the
+    # west-coast ring, offshore into the corridor, round the south-west corner and along the waterfront to the split
+    t = PL.WANGAN_T
+    m = (t[0] - MOUTH, -t[1])
+    c_plan = [m, (t[0] - MOUTH - 50.0, -(t[1] + 25.0))] + cp[k_j:i_split + 1]
+    c = _profile(c_plan, {0: gz(*m), 2: low, 2 + i_low - k_j: low, 2 + i_deck - k_j: deck, len(c_plan) - 1: deck})
+    wc = chain_road(net, PREFIX + "wangan", c)
+    a, b = cut_road(net, (t[0], -t[1]), "ring_", MOUTH)
+    make_junction(net, [a, b, wc.points[0]])
+    # --- THE SPLIT: a divided road's end station joined to two one-way roads, each starting HALF A MEDIAN to its own
+    # side. A one-way station lays its lanes out from itself outward with no median, so there each carriageway's
+    # lanes are exactly where the divided road's were and `point_export.wire_joints` hands every lane over with no
+    # gap. (Its tolerance is 4.5 m, so the wrong side would pass it 1 m off: `island_layout` asserts the gap.) Both
+    # then flare out to the pair's lines over one 45 m span to take their own ways to the JCT.
+    end = wc.points[-1]
+    half = net.resolved(end).median_width / 2.0
+    face = (cp[i_split + 1][0] - cp[i_split - 1][0], cp[i_split + 1][1] - cp[i_split - 1][1])
+    # --- eastbound: from the split -> the corridor's north lane line -> under the spur -> S
+    e_plan = [off(i_split, 1, half)] + left[i_split + 1:]
     k_top = len(e_plan) - 1
     e_plan += [(815.0, -512.0), (838.0, -478.0), (872.0, -464.0), (925.0, -463.0), (965.0, -472.0)]
     k_under = k_top + 1
     e_plan.append((PL.WANGAN_S_X, y_out[1] + 8.0))
-    e = _profile(e_plan, {0: gz(*m_e), 2 + i_deck: deck, k_top: 14.0, k_under: 18.5, k_under + 1: 19.0,
-                          len(e_plan) - 1: z_s})
+    e = _profile(e_plan, {0: deck, k_top: 14.0, k_under: 18.5, k_under + 1: 19.0, len(e_plan) - 1: z_s})
     we = chain_road(net, PREFIX + "wangan_e", e, one_way=True)
     for u in we.points:
         net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
     ro.make_ramp(net, u_out_s, we.points[-1], lanes=RAMP_LANES)
-    # --- westbound: off spur_in at S -> down into the corridor -> west -> its T
+    # --- westbound: off spur_in at S -> down into the corridor -> west -> the split
     _m, info = ro.branch_ramp(net, u_in_s, name=PREFIX + "wangan_w", aux_lanes=RAMP_LANES, carriageway="FWD",
                               length=90.0, spread=10.0, drop=-0.5)
     far = net.points[info["far"]].pos
-    tw = PL.WANGAN_T_W
-    m_w = (tw[0], -(tw[1] + MOUTH))
-    w_plan = [(far[0], far[1]), (872.0, -540.0)] + right[::-1] + [(tw[0] + 40.0, -(tw[1] + 70.0)),
-                                                                   (tw[0] + 10.0, -(tw[1] + 45.0)), m_w]
-    j_deck = 2 + (top - i_deck)
-    i600 = min(range(len(cp)), key=lambda i: abs(cp[i][0] - 600.0) + abs(cp[i][1] + 800.0))
-    w = _profile(w_plan, {0: far[2], 2: 21.5, 2 + (top - i600): deck, j_deck: deck, len(w_plan) - 1: gz(*m_w)})
+    rw = [right[i] for i in range(top, i_split, -1)]
+    w_plan = [(far[0], far[1]), (872.0, -540.0)] + rw + [off(i_split, -1, half)]
+    w = _profile(w_plan, {0: far[2], 2: 21.5, 2 + (top - i600): deck, len(w_plan) - 1: deck})
     extend(net, PREFIX + "wangan_w", w[1:])
     wr = net.roads[PREFIX + "wangan_w"]
     for u in wr.points[1:]:
         net.points[u].lanes_fwd, net.points[u].lanes_bwd = RAMP_LANES, 0
-    # --- the two T's on the ring along the port's north edge
-    for t, arm in ((te, we.points[0]), (tw, wr.points[-1])):
-        a, b = cut_road(net, (t[0], -t[1]), "ring_", MOUTH)
-        make_junction(net, [a, b, arm])
+    # it is born a RAMP (`branch_ramp`), so it never took the expressway preset's pier: stand its partner's. A plain
+    # box pillar is sized from the ground at the deck's centreline only, and on a steep seabed two stopped 19 m short
+    # of it (probe_road_ground); an asset pier founds each shaft vertex on the ground under itself.
+    wr.pillar_asset = we.pillar_asset
+    # the joint: both links, one facing on all three stations (a joint's stations must agree on it), and no pier on
+    # the first span of either carriageway -- three hammerheads would stand on top of each other at the split
+    for u in (we.points[0], wr.points[-1]):
+        net.link(end, u)
+    # a station's facing IS its forward direction, and a one-way road lays its lanes out from it: the westbound
+    # carriageway runs AGAINST the divided road, so its station faces the opposite way (frozen eastward like the
+    # others, its lanes landed beside the eastbound's and both its lanes were `broken`)
+    freeze(net, end, face)
+    freeze(net, we.points[0], face)
+    freeze(net, wr.points[-1], (-face[0], -face[1]))
+    # ...and ONLY a short first span: skipping the whole 45 m flare left the westbound deck 35 m up with no column
+    # within 25 m (probe_road_ground). A station SPLIT_CLEAR from the split ends the skipped span; the flare past it
+    # takes its own piers, by then far enough apart not to collide.
+    def lerp(u0, u1, d):
+        p0, p1 = net.points[u0].pos, net.points[u1].pos
+        L = math.hypot(p1[0] - p0[0], p1[1] - p0[1]) or 1.0
+        f = min(1.0, d / L)
+        return tuple(p0[k] + (p1[k] - p0[k]) * f for k in range(3))
+    insert_after(net, we, we.points[0], lerp(we.points[0], we.points[1], SPLIT_CLEAR))
+    net.points[we.points[0]].pillar_skip = True
+    qw = insert_after(net, wr, wr.points[-2], lerp(wr.points[-1], wr.points[-2], SPLIT_CLEAR))
+    net.points[qw].pillar_skip = True
     # --- the joint on spur_out between the loop JCT's merge and the Wangan's
     ro.split_at_joint(net, _nearest(net, spur_out, _g(PL.WANGAN_J_X, 494.0)), name=PREFIX + "spur_out_w")
 

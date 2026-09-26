@@ -584,7 +584,16 @@ func _build(b: Dictionary, variant: String) -> bool:
 		# one gets a single 片引き戸. Each leaf is its own `world.Door` with its own sensor, so nothing new was
 		# needed in the Door class -- `open_mode = "SLIDE"` and `slide_offset` have been there since I2.
 		var dn := 0
-		for op in _openings(b):
+		# ...and the INTERIOR doors (a staff room, a toilet): a hinged leaf in a `Wall_PartitionDoor`'s hole, which
+		# the layout records from a prop's `door` entry (user, 2026-09-26: only the street entrance slides)
+		var ops := _openings(b)
+		for idr in b.get("inner_doors", []):
+			var io := Vector3(idr["outward"][0], 0.0, idr["outward"][2])
+			ops.append({"xf": Transform3D(Basis(Vector3.UP, atan2(io.x, io.z)),
+					Vector3(idr["center"][0], idr["center"][1], idr["center"][2])),
+					"w": float(idr["width"]), "h": float(idr["height"]), "frame": false, "style": "swing",
+					"inner": true})
+		for op in ops:
 			# per OPENING: a SITE holds parts of different types, so its kiosk's 自動ドア and a back gate's
 			# swing door stand on one footprint (user-reported, PLAN.md 3.18f)
 			var slide := str(op.get("style", b.get("door_style", "swing"))) == "slide"
@@ -652,8 +661,11 @@ func _build(b: Dictionary, variant: String) -> bool:
 					# direction is the opening's own +X, away from the middle
 					var dir := oxf.basis.x.normalized() * (lw if li == 0 else -lw)
 					door.set("slide_offset", dir)
-				door.set("auto_open", shop)        # a shop's door is automatic; a mission's is MANUAL (press interact)
-				door.set("locked", not shop)       # a shop is always open; a mission's door until it unlocks it
+				var inner := bool(op.get("inner", false))
+				# a shop's door is automatic; a mission's is MANUAL (press interact); an interior door opens as you
+				# walk up and is never locked (once you are in, the rooms are yours)
+				door.set("auto_open", shop or inner)
+				door.set("locked", not shop and not inner)
 				door.set("breakable", false)
 				door.set("sensor_path", NodePath("Sensor"))
 	var di := 0

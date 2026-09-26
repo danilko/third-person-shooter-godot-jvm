@@ -9818,6 +9818,127 @@ batch. `tree_assets` is now **sakura** (`CommonTree_3`, with `MI_Leaves_NormalTr
 leaf mask) and **黒松** (`Pine_3`), two species instead of three interchangeable broadleaves. A GREEN CommonTree
 beside the pink one needs a per-asset material override, which is PLAN.md 3.16 step 3's own next step.
 
+## The rail is RESERVED before it is built: elevated in the core, 踏切 outside (PLAN.md B10, 2026-09-25)
+
+**User decision: the city core (C1's interior) is ELEVATED (連続立体交差), outside it the rail is AT GRADE with level
+crossings (踏切).** A road UNDERPASS cannot be built anywhere on this island: the world has ONE water box whose top
+is y 0 over the whole world, and the city plain is at 0.6 m, so a road dipped under the rail floods. The plan of
+record is `tools/island_rail_layout.py --layout tokyo_straight` (its `crossing: "level"` mode). Each line passes
+UNDER C1 at grade (C1's deck leaves no room for a viaduct) and climbs onto the viaduct ~250 m inside the ring at
+3.5 %: the profile lays a ramp on the LOWER form's side, so an "elev" breakpoint is set back from C1 by the ramp's
+length. An ARTERIAL is never closed: it passes under the viaduct in the core and takes a 踏切 outside (a WIDE one
+where two or three lines run side by side at the approach to Central). An oblique or near-junction arterial 踏切
+is a NOTE for the rail build, not a blocker.
+
+**The rail geometry is a later piece; what exists now is the RESERVE the derive reads.**
+`island_rail_layout.py --layout tokyo_straight --reserve` writes `assets/world_source/buildings/IslandRailReserve.json`
+(record frame), and `island_world.sh` runs it at the start of the `layout` stage, because the rail's profile follows
+the LAND.
+- `corridors`: each line sampled every 10 m with what a street may do there: `level` (a 踏切), `under` (the viaduct),
+  or `no`. `no` means a ramp too high to cross and too low to pass under, OR an at-grade sample with another line's
+  at-grade sample within 25 m (a multi-track 踏切 is down almost all day, 開かずの踏切). The multi-line test is taken
+  against the flags as they were BEFORE any is re-marked, or only one line of each pair is marked.
+- `boxes`: each station's platform box and its car park. An ELEVATED station (`street_under`: Central, Suburb,
+  Airport) keeps buildings off but lets a street pass under it.
+- `island_buildings.rail_reserve` keeps every building off all of it (0.18 km2).
+- `island_streets` treats car parks, non-elevated stations and `no` stretches as SITES (a street there is nudged or
+  cut), and refuses a street running ALONG a corridor for more than `RAIL_ALONG` (40 m). A street may cross a
+  single at-grade line (a 踏切) and pass under the viaduct. Nothing names a closure: the two block streets under the
+  core's ramps end at the corridor because the rule says so.
+
+**Three street-planner rules came with it, each a measured defect on the first rebuild** (the core's block streets
+went 14 -> 5 and the gate then failed with 10 orphaned points):
+- **A line whose OWN course hits a site and that no nudge rescues is CUT, not dropped**, even when a nudge failed
+  for another reason (crowding a junction). It used to need EVERY nudge to fail on a site.
+- **A nudge is taken over that cut only when it keeps at least as many crossings.** `y=-11` across the core had
+  become a 67 m stub of 2 crossings, where the cut kept 9. A nudge that only moves a street off a site's face keeps all
+  its crossings and still wins, which is what the nudge is for. The control (no reserve) is unchanged: city 14, SW 103.
+- **Segments are numbered per NAME, not per piece** (`build_region`'s `segs_of`). Two pieces of one cut line share a
+  base name, so a counter restarting per piece made the second piece's first road overwrite the first's. Its
+  points stayed in the record with no road (`point_orphan`). The flow report then came back empty, and
+  `island_layout` crashed on `None["open_end"]`.
+
+**EVERY EXPRESSWAY STOOD ON PLAIN BOXES: the preset named a pier the kit does not have** (found by
+`probe_road_ground` on the same rebuild). `point_presets`' expressway wrote `pillar_asset: "hammerhead"`, but the kit's
+pier is `RKA_PIER_hammerhead`, the name every other record uses. So `point_kit.resolve` found nothing and each of
+the island's 30 expressway roads (and both interchange templates) fell back to the plain `rka_pillar_w` box. The
+only report was a `missing_style` line in the build output that nothing read. It became visible on the Wangan's
+new west-end sea viaduct: a box is sized from the ground at the deck CENTRELINE only, so over a seabed falling 20 m
+in 8 m two boxes stopped 19 m short of it, where an asset pier founds each shaft vertex on the ground under itself.
+- The preset now names `RKA_PIER_hammerhead`, and **`point_presets`' self-test asserts that every style a preset
+  names resolves in the kit** (control: the old name fails, naming the pier).
+- The three records were rewritten through `point_model.save_network`. That is equivalent to regenerating them:
+  a template regeneration differs from the committed one only in freshly drawn point uids.
+- `shuto_wangan_w` is born a RAMP (`branch_ramp`) and takes no preset at all, so `island_expressway.wangan_east`
+  gives it its partner's pier explicitly. The diamond ramps keep box pillars; they stand on land.
+
+Measured: the core keeps 13 of its 14 block streets, the south-west residential 100 of 103, and 0 building centres
+stand on a corridor or in a station or car-park box.
+
+## The land-planning batch: divided Wangan, paddy grid + crops, coastal dike, districts and an air base (2026-09-26)
+
+User asks, one session, built by ONE rebuild from `land` so later district work can be a regional re-derive. Each
+item below is data or a generator; nothing is hand-edited in the output record.
+
+**The Wangan is ONE divided 2+2 road** (`island_expressway.wangan_east`, `island_plan.WANGAN_T/JOIN_Z/SPLIT_X`): from
+ONE T on the west-coast ring, offshore round the south-west corner, along the waterfront to `WANGAN_SPLIT_X`, where
+it parts into the two one-way carriageways the spur JCT needs. **The split is a JOINT, not a junction pad**: the
+divided road's end station is SEGMENT-linked to both one-way roads, each starting HALF A MEDIAN to its own side. A
+one-way station lays its lanes from itself outward with no median, so each carriageway's lanes are exactly where the
+divided road's were, and `point_export.wire_joints` hands every lane over with a 0.000 m gap (measured). Two traps:
+`wire_joints`' tolerance is 4.5 m, so the WRONG side passes it 1 m off (the flow is clean either way -- measure the
+gap); and **a station's facing IS its forward direction**, so the carriageway running against the divided road must
+be frozen facing the opposite way, or its lanes land beside the other carriageway's (both `broken`).
+`island_layout.joint_gaps` now REPORTS every cross-road hand-over's gap (not asserted: two older joints hand over
+3.4 m and 3.0 m sideways, `kaigan_machi`/`ring_kita` and `nishi_machi_1160`/`nishi_cho_495`).
+
+**The farm is Japanese paddy sections (圃区, 100 x 300 m)** round Farm station: `island_plan.STREET_REGIONS`
+`farm_w` (x 510 and the station-front road x 1080, planned FIRST), `farm` (rows y 920/1220/1320/1395, the station
+road 1320 ending in a T in front of the station), `farm_s`/`farm_n` (x 810, split round the pond, ため池). Three
+street-planner rules came with it and apply everywhere:
+- **A new line ends on another new line only inside that line's own extent**, which comes from EXISTING roads -- so
+  the road the others end on must be its own earlier region (`farm_w`).
+- **Every region is planned TWICE** (`island_streets.PASSES`): the second pass sees the first pass's streets as
+  roads. Industry went 0 -> 31 streets; names continue their numbering across passes (a reused name overwrote a road).
+- **A region may have HOLES** (a sixth element, record boxes): a line running into one is cut there like a site.
+  Residential SW's box overlapped industry's and its 110 m grid had taken industry's ground; the hole gives both
+  their own grid (splitting the box instead lost the west part's streets).
+
+**Paddy fields and crops.** `island_buildings.farm_fields` derives field cells (2 m) in the farm grid: dry land, and
+nothing blocked (road, rail, site, sea) within `FIELD_LEVEE` 1.5 m -- the levee. One section in `WHEAT_ONE_IN` (4)
+grows wheat, the rest rice, by a hash of its grid position. Fields are blocked for buildings, recorded as 50 m
+chunks with a hex bitmask, and written into the streamed building cells (a cell can now exist for fields alone).
+`world.CropField` (Java) builds each chunk's MultiMesh of billboard quads (~1 m tall) at load, one `setBuffer` call
+per chunk, with a 180 m view distance per chunk -- NOT stored as instance data (tens of MB of text). The crops are
+Binbun3D's **Godot Grass** (CC0, stated on its itch page; the pack ships no licence file), vendored in
+`assets/vfx/grass/` with `crop_rice.tres` / `crop_wheat.tres`. The ground under a field is painted **Soil**
+(`tools/make_soil_texture.py`, Terrain3D texture id 5, append-only) by a second `apply_paint_grid.gd` pass from
+`island_ground`'s `.soil.u8`.
+
+**The coastal dike (海岸堤防)**, `island_reshape.coastal_dike`: the city plain stays at 0.6 m (eastern Tokyo stands at
+sea level behind exactly this) and a ridge is built along every NATURAL SHELVING SHORE -- open sea (flood-filled from
+the map edge, so the farm pond is not a coast) shallower than -3 m beside the land, out of every harbour-type coast
+zone. 1:2 seaward face from the land edge up to a +3.5 m crest 4 m wide, 1:1.5 back to the plain; every end tapers;
+never within a road's band + 8 m (roads are DRAPED on the land grid, so a dike under one is a bump in it -- there the
+road embankment is the wall). The `beach` coast-zone boxes are STALE after the land redo (one lies over open sea) and
+are no longer read by it. Six openings (`DIKE_ACCESS`: suburb, city side, residential NE, farm, west residential,
+lighthouse), a 10 m gap with 1:8 ramps, at least `DIKE_ACCESS_SPACING` 150 m apart, recorded in
+`assets/world_source/island_dike.json` for the stairs / 陸閘 gates / beach car parks a later pass adds.
+
+**District land planning** (user: "the land-planning portion"; building types come later, by region):
+- **Military base** on the port platform's south-west third, gate road `kichi_mon_michi` (a dead end off the port road
+  `kichi_dori__2`); two finger piers west into deep water; an **air base**: a reclaimed strip x -1650..-440,
+  z 1540..1760 at 4.6 m for a 1 200 x 45 m runway + taxiway (`island_reshape.MILITARY_PIERS`), the paving reserved.
+- **Logistics road** `butsuryu_michi` (the port's interior lines meet no road at their quay end, so the planner cannot
+  make them). `island_site_access` now cuts its own T (`cut_road`) when the station it leaves is not a junction.
+- **Lighthouse** on the north-east headland (`todai_michi`) and a **道の駅** on the north coast road
+  (`michinoeki_michi`), each an access road + car park + reserved site.
+- **`island_plan.RESERVES`** (Godot boxes) keep generated BUILDINGS off ground whose contents come later: the base, the
+  airfield, the waterfront park (Ferris wheel, arena), three resort-hotel plots, the lighthouse, the 道の駅.
+- **Zoning rows**: `bay_processing` (水産加工), the `light_industry` 準工業 belt north and west of industry, industry
+  as fewer bigger plots (pitch 60, half skipped), the suburb as a low-density resort (pitch 30, 45% skipped).
+- Not done: the plan's suburb loop road (the suburb and `north_e` still get almost no block streets).
+
 ## Lots never overlap, arterials have a grade gate, the light crowd flees (2026-09-22, forty-eighth session)
 
 - **Two lot slabs never share plan area** (`island_buildings.separate_lots`, run by `derive` after `grow_lots`, and on
@@ -9846,6 +9967,43 @@ beside the pink one needs a per-asset material override, which is PLAN.md 3.16 s
   Not gated: the aimed-at half (it needs a Player's aim marker in a scope).
 - `probe_ped_crowd.gd`'s "the crowd added nothing to the characters group" had been failing on World.tscn since the
   traffic ring (3.32) streams 9 cars and their drivers round the stand; it now counts bodies on foot only.
+
+## One row of street-facing buildings a side, tight blocks, weapons in every konbini (user, 2026-09-26)
+
+- **A block holds ONE row per street side, every building facing its street** (user: "no several rows within a
+  block ... all building should face street, not face another building"). Every `island_buildings.REGIONS` row
+  count is 1. The block's middle is the back lane (`through_lanes`, 4 m, the fire / delivery access) and the 路地
+  (`PASSAGE_*`) reach it from the street. A back-row building would need 接道 (`BACK_ACCESS`: a 路地, lane or street
+  within 3 m -- the 旗竿地 strip); the rule stays in `try_place(back_row=)` for the day a region asks for rows again.
+- **Tight blocks instead of deep ones** (`island_plan.STREET_REGIONS`): city / suburb / koba 64 m
+  deep, the housing 44 m, so two frontage rows plus the back lane fill a block. **Open:** the band between C1's north
+  side and `nishi_dori` (record y ~570-760, x 280-990) has no block streets and the grid planner cannot make any --
+  C1 is elevated, so a line there meets only one ground road (measured: every line "meets one road"); it needs
+  authored streets (a trunk-grid style line). A lot grows up to `LOT_GROW_MAX` 20 m
+  back, so the building's own yard reaches the lane. A few large blocks remain for warehouses (industry 200 m,
+  logistics 220 m), which one building may take whole.
+- **Gaps**: outside the 防火地域 core a building keeps ~1 m to its neighbour (`REGION_ALLEY` 0.5 per side in city /
+  west_centre; housing 0.6-0.8); the core (downtown, nightlife, west_ekimae) stays 0.2-0.25.
+- **Anchored buildings front a street**: `apply_anchors` takes only a frontage-row slot (key row 0, not a car park).
+  The `armoury` role is only how the safe house finds its street: the nearest `KonbiniL` to the centre
+  (`ARMOURY_REACH` 1200 m, resolved first); the safe house is the nearest street-front ShopHouse to it that has a
+  plain neighbour wide enough to become its OWN car park (`HOME_PARK` = ParkingLot4, role `home_park`; a second
+  `anchors` run keeps it), and the starting car stands in a bay there, nose in. If none, the nearest ParkingLot8,
+  then the mouth of the nearest 路地.
+- **Every konbini sells weapons, free for now** (`KONBINI_PADS`): a KonbiniL the whole catalog (3 x 4 grid between
+  its gondolas and the counter), a KonbiniS pistols + SMG + knife + grenade. There is NO separate weapon counter
+  (user, 2026-09-26): every store's pads are in its streamed building cell (`Pads_NNN`), the one beside the safe
+  house included, and the map lists it as a Convenience Store. `WeaponPad` fades out past `drawDistance` (40 m),
+  turns its model only while on screen, and times its cooldown on the engine clock (a `_process` accumulator
+  stopped with the processing and the pad never re-armed).
+- **Doors**: only a shop's STREET entrance slides (`slide_sides`, default front); back / side exits are hinged, and a
+  `Wall_PartitionDoor` prop with a `door` entry gets a hinged, automatic, never-locked interior leaf (`inner_doors`;
+  the konbini staff room and toilets). How-to: `assets/world_source/buildings/README.md` "Doors".
+- **Map blips**: `RoadOverlay.worthABlip` is the one rule for both maps -- another player, anyone hostile to the local
+  player, and a car driven by either. Neutral pedestrians and ambient traffic get none (GTA). The full map draws the
+  player as the minimap's heading triangle (`RoadOverlay.drawHeading`).
+- **The full map prints no place names** (`WorldMapManager.showPlaceNames`, off): the typed squares and the legend
+  key say what each place is. The minimap is unchanged.
 
 ## The map shows the city: buildings, typed places, every grid code, north; one ground fill; square turnarounds (2026-09-22)
 

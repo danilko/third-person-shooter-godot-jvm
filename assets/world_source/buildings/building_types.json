@@ -155,6 +155,7 @@
     },
     {
      "piece": "library:Wall_PartitionDoor",
+     "door": {"w": 0.85, "h": 2.0},
      "at": [
       -3.64,
       -5.46
@@ -377,6 +378,7 @@
     },
     {
      "piece": "library:Wall_PartitionDoor",
+     "door": {"w": 0.85, "h": 2.0},
      "at": [
       4.55,
       2.73
@@ -522,6 +524,7 @@
     },
     {
      "piece": "library:Wall_PartitionDoor",
+     "door": {"w": 0.85, "h": 2.0},
      "at": [
       8.19,
       -5.46
@@ -659,6 +662,7 @@
     },
     {
      "piece": "library:Wall_PartitionDoor",
+     "door": {"w": 0.85, "h": 2.0},
      "at": [
       7.28,
       -4.55
@@ -991,6 +995,78 @@
    "parapet": "metal",
    "setback": {
     "storeys": 2,
+    "modules": 1
+   },
+   "roof_units": 4,
+   "door_style": "slide"
+  },
+  {
+   "id": "OfficeBlock",
+   "jp": {
+    "name": "大規模オフィスビル",
+    "frontage_m": 40.0,
+    "depth_m": 29.1,
+    "height_m": 33.7
+   },
+   "use": "the core's large office block (a Marunouchi / Nihonbashi street-front building): a glass lobby floor and eight office floors over a 40 m frontage",
+   "kit": "quaternius_downtown_city",
+   "modules": [
+    22,
+    16
+   ],
+   "floors": [
+    {
+     "count": 1,
+     "front": "lobby",
+     "sides": "metal_banded",
+     "back": "shop_back"
+    },
+    {
+     "count": 8,
+     "front": "curtain_wall",
+     "sides": "metal_windows",
+     "back": "curtain_wall"
+    }
+   ],
+   "parapet": "metal",
+   "setback": {
+    "storeys": 2,
+    "modules": 1
+   },
+   "roof_units": 8,
+   "door_style": "slide"
+  },
+  {
+   "id": "OfficeTower",
+   "jp": {
+    "name": "高層オフィスビル",
+    "frontage_m": 25.5,
+    "depth_m": 21.8,
+    "height_m": 58.2
+   },
+   "use": "a core high-rise: a glass lobby and fifteen office floors on a 25 m plot (the 60 m class)",
+   "kit": "quaternius_downtown_city",
+   "modules": [
+    14,
+    12
+   ],
+   "floors": [
+    {
+     "count": 1,
+     "front": "lobby",
+     "sides": "metal_banded",
+     "back": "shop_back"
+    },
+    {
+     "count": 15,
+     "front": "curtain_wall",
+     "sides": "curtain_wall",
+     "back": "curtain_wall"
+    }
+   ],
+   "parapet": "metal",
+   "setback": {
+    "storeys": 3,
     "modules": 1
    },
    "roof_units": 4,
@@ -1517,6 +1593,48 @@
    ],
    "door_style": "slide",
    "shop_band": "MI_ShopStripe_Red"
+  },
+  {
+   "id": "StationMall",
+   "jp": {
+    "name": "駅前ショッピングセンター",
+    "frontage_m": 47.3,
+    "depth_m": 40.0,
+    "height_m": 14.6
+   },
+   "use": "the station shopping centre (駅ビル / 駅前SC: a GRANDUO or Ito-Yokado beside a suburban station): a glass shopfront all round the ground floor, three sales floors over it, entrances facing the station",
+   "kit": "quaternius_downtown_city",
+   "modules": [
+    26,
+    22
+   ],
+   "floors": [
+    {
+     "count": 1,
+     "front": "shopfront",
+     "sides": "shopfront",
+     "back": "shop_back"
+    },
+    {
+     "count": 3,
+     "front": "curtain_wall",
+     "sides": "metal_banded",
+     "back": "metal_windows"
+    }
+   ],
+   "parapet": "metal",
+   "roof_units": 6,
+   "door_style": "slide",
+   "doors": {
+    "front": [
+     8,
+     17
+    ],
+    "back": [
+     12
+    ]
+   },
+   "shop_band": "MI_ShopStripe_Green"
   }
  ],
  "examples": [

@@ -41,7 +41,8 @@ STYLE = {"street": ((175, 175, 175), 2), "arterial": ((245, 245, 245), 4), "coas
 
 def font(size, bold=False):
     for f in ("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans%s.ttf" % ("-Bold" if bold else ""),
-              "/usr/share/fonts/truetype/dejavu/DejaVuSans%s.ttf" % ("-Bold" if bold else "")):
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans%s.ttf" % ("-Bold" if bold else ""),
+              "/usr/share/fonts/google-noto/NotoSans-%s.ttf" % ("Bold" if bold else "Regular")):
         if os.path.exists(f):
             return ImageFont.truetype(f, size)
     return ImageFont.load_default()
@@ -68,6 +69,7 @@ def main(argv):
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(ROOT, "assets/world_source/reference/island_plan_latest.png"))
     ap.add_argument("--no-grid", action="store_true")
+    ap.add_argument("--no-legend", action="store_true", help="leave the legend box off (a caller draws its own)")
     ap.add_argument("--title", default="ISLAND PLAN (derived) -- tools/island_plan_picture.py")
     a = ap.parse_args(argv)
     H = np.fromfile(os.path.join(ROOT, "assets/world_source/terrain/island_natural.f32"), "<f4").reshape(N, N)
@@ -141,6 +143,10 @@ def main(argv):
             if 0 < py < Hh:
                 dr.text((W - 30, py - 9), str(k), fill=(255, 255, 160), font=FB)
     x0t, y0t = 10, Hh - 190
+    if a.no_legend:
+        img.convert("RGB").save(a.out)
+        print("island_plan_picture: %s %dx%d" % (os.path.relpath(a.out, ROOT), W, Hh))
+        return
     dr.rectangle([x0t, y0t, 700, Hh - 10], fill=(0, 0, 0, 180))
     dr.text((x0t + 12, y0t + 8), a.title, fill=(255, 255, 255), font=FB)
     yy = y0t + 36

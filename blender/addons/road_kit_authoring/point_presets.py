@@ -26,7 +26,7 @@ import point_model as pm
 PRESETS = {
     "expressway": {
         "road": {"road_class": "expressway", "ped_access": False, "barrier_height": 1.1,
-                 "median_style": pm.MED_WALL, "pillar_asset": "hammerhead",
+                 "median_style": pm.MED_WALL, "pillar_asset": "RKA_PIER_hammerhead",
                  # the world is compressed (CLAUDE.md "The merge taper is the metric standard x taper_factor"):
                  # half the book's taper, so an interchange fits between two city blocks
                  "taper_factor": 0.5},
@@ -136,6 +136,12 @@ def self_test():
         res = net.resolved(net.roads["r"].points[1])
         assert res.lanes_fwd == spec["base"]["lanes_fwd"] and abs(res.lane_width - spec["base"]["lane_width"]) < 1e-9
         assert net.roads["r"].road_class == spec["road"]["road_class"]
+        # every style a preset names resolves in the KIT: the expressway preset wrote the bare "hammerhead" where the
+        # kit's pier is `RKA_PIER_hammerhead`, and every expressway on the island stood on plain boxes for it, reported
+        # only as a `missing_style` build line nobody read (2026-09-25)
+        import point_kit as pk
+        miss = pk.resolve(net.roads["r"], pk.load()).missing()
+        assert not miss, (name, miss)
         ok += 1
 
     # a T junction: a trunk road through, a block street ending on it

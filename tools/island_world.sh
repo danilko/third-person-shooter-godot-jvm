@@ -11,7 +11,7 @@
 #   land       island_reshape.py build + check              -> assets/world_source/terrain/island_land.f32
 #   layout     island_layout.py                             -> IslandRoads.roads.json (from the arterials INPUT)
 #   bridge     island_rainbow_bridge.py                     -> World.tscn's Rainbow Bridge on the plan's crossing
-#   natural    island_touges.py sculpt ; island_coast.py zones + shelf + check
+#   natural    island_touges.py sculpt ; island_coast.py zones ; island_dike.py sculpt (the ring-road dike)
 #                                                           -> assets/world_source/terrain/island_natural.f32
 #   terrain    apply_height_grid.gd (every vertex) ; the road stamp record, the natural-ground sidecar and the urban
 #              paint marker removed (none of them describes this ground) ; paint_terrain.gd
@@ -54,7 +54,10 @@ if want land; then
 fi
 if want layout; then
     echo "── layout"
-    python3 tools/island_layout.py | grep -E "^island_layout|^island_grades" | tail -6
+    # the rail reserve (PLAN.md B10) is a function of the LAND (its profile follows the ground), and the street
+    # planner and the building derive both read it -- so it is written here, after land and before anything else
+    python3 tools/island_rail_layout.py --layout tokyo_straight --reserve | tail -1
+    python3 tools/island_layout.py | grep -E "^island_layout|^island_grades|^island_dike|^island_streets" | tail -40
 fi
 if want bridge; then
     echo "── bridge"
@@ -64,8 +67,10 @@ if want natural; then
     echo "── natural"
     python3 tools/island_touges.py sculpt "$T/island_land.f32" "$P/IslandRoads.roads.json" "$TMP/sculpted.f32"
     python3 tools/island_coast.py zones
-    python3 tools/island_coast.py shelf "$TMP/sculpted.f32" "$T/island_natural.f32"
-    python3 tools/island_coast.py check "$T/island_natural.f32" "$TMP/sculpted.f32"
+    # the beach and its shelf are the land stage's now (island_reshape.coastal_works lays them in front of the seawall,
+    # with the raise); island_coast.py shelf judged "beach land under 3 m", which the raised plain no longer has
+    # the ring road's dike embankment and the ramps onto it (island_dike.py); writes its cells into island_dike.json
+    python3 tools/island_dike.py sculpt "$TMP/sculpted.f32" "$P/IslandRoads.roads.json" "$T/island_natural.f32"
 fi
 if want terrain; then
     echo "── terrain"
@@ -84,16 +89,26 @@ if want sites; then
 fi
 if want buildings; then
     echo "── buildings"
+    # the placement reads the STAMPED terrain; once the ground stage has laid the block ground over it every lot reads
+    # as buried (a `--from buildings` after a full run placed 92 buildings of 3 897) -- start from `terrain` instead
+    if [ -e assets/terrain3d/island/urban_paint.marker ]; then
+        echo "island_world: the terrain already carries the block ground (urban_paint.marker): run from 'terrain'"
+        exit 1
+    fi
     godot 900 tools/godot/dump_height_grid.gd -- "$TMP/stamped.f32" -2304 -2304 2305 2305 2 | tail -1
-    python3 tools/island_buildings.py derive "$TMP/stamped.f32" | tail -3
+    [ -n "${KEEP_DUMPS:-}" ] && cp "$TMP/stamped.f32" "$KEEP_DUMPS/" || true
+    python3 tools/island_buildings.py derive "$TMP/stamped.f32" | tail -4
     python3 tools/island_buildings.py write | tail -2
     godot 600 tools/godot/build_building_hlod.gd | tail -1      # R9: each cell's HLOD, from write's boxes
 fi
 if want ground; then
     echo "── ground"
     godot 900 tools/godot/dump_height_grid.gd -- "$TMP/before_ground.f32" -2304 -2304 2305 2305 2 | tail -1
+    [ -n "${KEEP_DUMPS:-}" ] && cp "$TMP/before_ground.f32" "$KEEP_DUMPS/" || true
     python3 tools/island_ground.py derive "$TMP/before_ground.f32" --out "$TMP/block" | tail -3
     godot 900 tools/godot/apply_height_grid.gd -- "$D" "$TMP/block.height.f32" -2304 -2304 2305 2305 2 | tail -1
     godot 900 tools/godot/apply_paint_grid.gd -- "$D" "$TMP/block.paint.u8" -2304 -2304 2305 2305 2 4 "$TMP/block.height.f32" | tail -2   # 4 = Urban
+    # 5 = Soil, the paddy fields (a second pass, no heights: it only paints, it leaves the block layer alone)
+    godot 900 tools/godot/apply_paint_grid.gd -- "$D" "$TMP/block.soil.u8" -2304 -2304 2305 2305 2 5 | tail -1
 fi
 echo "── done"

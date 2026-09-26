@@ -48,6 +48,26 @@ across kits: roads and street furniture take their categories from the same fold
   decide who owns a material's look. The Blender files show `MI_Trim_MetalConcrete` dark because its grey
   tint lives only in the Godot `.tres`.
 
+## Doors: which kind, and how to add one (user, 2026-09-26)
+
+A shop's STREET entrance is a sliding 自動ドア (two glass leaves); every other door is an ordinary HINGED door:
+the back / side staff exit and every interior door (staff room, toilet). All of it is data -- no door is modelled
+into a building.
+
+* **Exterior door**: list its module in the type's `doors` (`{"front": [5], "back": [5]}`). `door_style: "slide"`
+  makes the sides named in `slide_sides` (default `["front"]`) sliding; the rest get the kit's door frame and a
+  hinged leaf.
+* **Interior door**: place a `library:Wall_PartitionDoor` prop (the wall with the hole) and give it a `door`
+  entry -- `{"piece": "library:Wall_PartitionDoor", "at": [x, z], "yaw": 90.0, "door": {"w": 0.85, "h": 2.0}, ...}`.
+  The layout records it (`inner_doors`) and the scene builder hangs a hinged `world.Door` leaf in the hole
+  (automatic, never locked). `w`/`h` are the HOLE in the Blender piece; keep them equal if you remodel it.
+* **In Blender** (`kits/library/library.blend`): a doorway piece is modelled with its hole and nothing in it --
+  `Wall_PartitionDoor` is the example (0.85 x 2.0 m hole, jambs and a header). The LEAF is not in the piece: the
+  builder makes it (`build_building_scenes.gd`, `_door_leaf_mesh` for the kit frame, a plain panel otherwise). To
+  give interior doors a modelled leaf, add a `Door_Interior` piece (hinge edge at the origin, leaf along -X,
+  0.85 x 2.0 m) and point the builder's inner-door leaf at it.
+* Gate: `probe_buildings.gd` drives every door open and checks a sliding leaf SLIDES and a hinged one SWINGS.
+
 ## Japanese sizing
 
 The Downtown City MegaKit is authored on a 2 m plan module and a 3 m storey. `module_scale` 0.91 puts it on
