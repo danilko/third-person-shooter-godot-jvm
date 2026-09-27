@@ -9,7 +9,9 @@
 # (never edited in place), which is what makes it restorable: there is no stamp to undo, only a base to start from.
 #
 #   land       island_reshape.py build + check              -> assets/world_source/terrain/island_land.f32
-#   layout     island_layout.py                             -> IslandRoads.roads.json (from the arterials INPUT)
+#   layout     island_rail_layout.py --reserve ; island_layout.py ; island_rail_record.py
+#                                                           -> IslandRoads.roads.json (from the arterials INPUT),
+#                                                              IslandRail.roads.json (the rail, from the rail plan)
 #   bridge     island_rainbow_bridge.py                     -> World.tscn's Rainbow Bridge on the plan's crossing
 #   natural    island_touges.py sculpt ; island_coast.py zones ; island_dike.py sculpt (the ring-road dike)
 #                                                           -> assets/world_source/terrain/island_natural.f32
@@ -58,6 +60,11 @@ if want layout; then
     # planner and the building derive both read it -- so it is written here, after land and before anything else
     python3 tools/island_rail_layout.py --layout tokyo_straight --reserve | tail -1
     python3 tools/island_layout.py | grep -E "^island_layout|^island_grades|^island_dike|^island_streets" | tail -40
+    # the rail record (PLAN.md 3.25 R2): its level crossings take the ROADS' heights, so it follows the layout
+    python3 tools/island_rail_record.py | tail -3
+    # every street's real Japanese name (the signal plates, the minimap), and the font subset that draws them
+    python3 tools/island_street_names.py | tail -1
+    python3 tools/make_jp_font.py --check >/dev/null 2>&1 || python3 tools/make_jp_font.py | tail -1
 fi
 if want bridge; then
     echo "── bridge"
@@ -76,6 +83,7 @@ if want terrain; then
     echo "── terrain"
     godot 900 tools/godot/apply_height_grid.gd -- "$D" "$T/island_natural.f32" -2304 -2304 2305 2305 2 | tail -2
     rm -f "$P/IslandRoads.stamp.json" "$P/IslandRoads.ground.bin" "$P/IslandRoads.ground.json" \
+          "$P/IslandRail.stamp.json" "$P/IslandRail.ground.bin" "$P/IslandRail.ground.json" \
           assets/terrain3d/island/urban_paint.marker assets/terrain3d/island/urban_block.layer
     godot 900 tools/godot/paint_terrain.gd -- "$D" | tail -2
 fi

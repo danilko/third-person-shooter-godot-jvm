@@ -9875,6 +9875,171 @@ in 8 m two boxes stopped 19 m short of it, where an asset pier founds each shaft
 Measured: the core keeps 13 of its 14 block streets, the south-west residential 100 of 103, and 0 building centres
 stand on a corridor or in a station or car-park box.
 
+## The rail is a MODE of the Road Kit, built against the roads (PLAN.md 3.25 R1/R2, 2026-09-26)
+
+A rail line is a Road Kit road whose `road_class` is **`rail`** (the `rail` preset: 1 + 1 lanes whose centres are the
+track centres, 4.0 m apart, 1 m ballast shoulders, fenced, `RKA_PIER_hammerhead` when elevated, 80 km/h). So the
+carrier, the grades, the zone cut, the piers and the lanekit are the kit's own; only what is SWEPT differs
+(`point_mesh` "RAIL"): a ballast bed (`M_Ballast`, a `road_kit/materials` name) instead of asphalt, no markings, and
+two rails a track (1067 mm, 16 cm tall, `M_Rail`). `road_class` and not a network flag, because a road's class
+already decides everything per road.
+- **A level crossing is where the rail meets ANOTHER network's paved band at its own height** (`build(foreign=)`,
+  `roadkit_cli.py gltf --avoid <record>`, `CROSSING_DZ` 1 m): the road owns the ground there, so the rail's bed, fence,
+  car wall and their collision are cut out and the rails lie FLUSH in the road surface (a car must not meet a 16 cm
+  step); each crossing is reported (`crossings`) for the barrier props and the runtime. The cut is asked of the RAIL's
+  height at that plan point, never the triangle's (a 3 m car wall's top face is not "at road level"). Piers keep off
+  the foreign network's carriageways too (`pier_on_road` over both sets of bands).
+- **The game keeps a track out of traffic and the GPS**: a rail `PathLaneRoute` joins group `rail_track` and never
+  `ZoneManager.registerRoute` (so no car spawns on it and `LaneGraph` never hands a car onto a track at a crossing);
+  `RoadGraph` skips `road_class` "rail" lanes.
+- **`point_validate.check_rail`**: plan radius >= 160 m (WARN below, ERROR under 100 = a station throat's floor) and
+  grade 3.5 % (ERROR over 4 %), the radius read as heading change per length -- a circumradius under-reads at every
+  tangent point (a 200 m fillet read 128 m).
+- **`tools/island_rail_record.py`** writes `IslandRail.roads.json` from the rail PLAN (`island_rail_layout.py`):
+  stations ON the true arcs every <= 20 m (the plan's own polyline samples an arc coarsely: station to station it read
+  a 200 m curve as ~32 m), bed = rail head - 0.16, held at the road's surface +-12 m round every level crossing and
+  eased at 3.5 %, `pillar_skip` where the Rainbow Bridge's lower deck carries it; it adds World.tscn's `IslandRail`
+  network node (same frame as `IslandRoads`).
+- **Pipeline order** (`island_rebuild.sh`): the rail is grounded, zoned (`island_road_zones.py --network IslandRail
+  --prefix rail --holder RailZones --zone-prefix Zone_rail_ --marker-prefix Rail_ --node-id-base 910020000`), built
+  (against the road record) and STAMPED **before** the roads sample their ground, so to the roads the rail's embankment
+  is land and a road re-stamp never undoes it. **Trap:** a rail re-stamp after the roads WOULD fight the road stamp --
+  re-run from `terrain`. `island_ground` keeps the block fill off the rail reserve (a kerb-level fill would bury an
+  at-grade track), painting under an elevated stretch like under a deck.
+- **The ring road bridges a harbour line** (the 臨港線 pattern): the rail plan asks the ground WITHOUT the dike crest
+  (`island_roadgen.Ground(dike=False)`), `island_dike.rail_lifts` lifts the ring 7.5 m over every rail head that passes
+  UNDER it (never where the rail is elevated over the ring), eased at 5 %, and `sculpt` leaves the embankment open over
+  the corridor.
+- **The reserve closes streets by rule**: a generated street crossing at grade < 30 m from a junction or < 60 deg is
+  written `no` in `IslandRailReserve.json`, which `island_streets` and the dike's side road (`island_dike._rail_no`)
+  both obey; a site's ACCESS road is never closed (it stays a finding the route must answer).
+
+## Stations, 踏切 signals, working traffic lights and real street names (rail batch, 2026-09-26)
+
+Authored for the ONE rail rebuild (PLAN.md "the rail rebuild batch"); every piece below has its own check.
+
+- **A station's platforms are the rail's own cross-section** (`island_rail_record.PLATFORM_*`, R3): over each
+  station's platform length every station of the rail record is an OVERRIDE section whose footways ARE the two side
+  platforms (相対式), 1.26 m over the bed (1.1 m over the rail head), the carriageway narrowed to 3.0 m lanes with a
+  1.0 m median so the track centres stay at +-2.0 m and each platform edge is 1.5 m from its track. The kit sweeps,
+  kerbs, fences and collides them and they stream with the rail piece. A station at each platform END is inserted
+  only on a STRAIGHT span (on an arc a chord point reads as a kink). `check_tapers` skips rail roads (a platform
+  narrows the bed, no lane merges); `check_rail`'s ERROR has a 1 m tolerance (r0's authored 100 m throat).
+- **Station buildings and car parks derive from the rail RESERVE** (`island_rail_layout.reserve` writes a
+  `building:<Station>` box beside each platform box; `island_sites.rail_stations` places `StationBuilding_Shop` and a
+  `ParkingLot14/8` on the reserve boxes every run, never frozen). The SIDE is the one facing the town: the side whose
+  nearest at-grade ARTERIAL is reachable without crossing the dike (the arterials input, points on the dike crest
+  excluded), never the dike or the sea. Central gets none (Tokyo Station is its site).
+- **踏切 signals (R4)**: `library` piece `Rail_CrossingSignal` (警報機 + raised 遮断機, `library_procedural.
+  crossing_signal`); `point_mesh`'s crossing report now carries the rail and road directions and the road's paved half
+  widths, and `point_furniture.crossing_signals` stands one on the LEFT of each approach, `crossing_track_clear` 4.5 m
+  before the track (square to it). The rail build runs furniture now (`island_rebuild.sh` dropped `--no-furniture`);
+  `point_furniture.place` gives a RAIL road none of the street's furniture (a platform is a footway to the kit).
+- **The signal piece is Japanese IN its .blend** (user: "modify blender directly, so the artist can track the
+  changes"): `build_street_poles.py -- --japanize` (one-shot, refuses a file already done) baked the 4.7 m head scale
+  and the 2.5 m pedestrian lift into `TrafficLight_2_Japan.blend`, deleted the kit's "E 12 St" plate, and added
+  EMPTIES (collection `Markers`): `Lamp_Green/Yellow/Red`, `Lamp_Ped_Red/Green` (arrow = lens facing) and
+  `NamePlate` (custom props width/height). The build only verifies and exports, and writes the markers to
+  `TrafficLight_JP.lamps.json`. Exported mesh byte-identical to before.
+- **Japanese signalisation** (`point_furniture._signalised`, `signal_needs_major`): a crossing of two narrow streets
+  has no signal (the minor approach keeps its stop line); a signal needs an arm with `signal_major_lanes` (2)
+  arriving lanes or an arterial. Island (scratch): 89 of 120 junctions signalised. **Pedestrian signals** (library
+  `Signal_Pedestrian`, breakable like the poles) stand at each zebra end, facing across it, except where a vehicle
+  signal pole's own pedestrian head already serves that end (`ped_signal_share` 5 m).
+- **The signals WORK** (`world.TrafficSignals` AutoLoad + engine-free `world.SignalTiming`, `SignalTimingTest` 4):
+  `roadkit_cli gltf` writes `<network>.signals.json` (`point_furniture.signal_plan`: arms in phase groups -- an arm
+  and the one arm most head-on to it; stop distance; every lens and plate in world space with the POLE it hangs on).
+  Phases: green 22 / yellow 3 / all-red 2 s per group; a crosswalk WALKs while its road is red and another green,
+  flashing its last 4 s. Clock = the system clock (peers agree with no message); `game_clock` for `--fixed-fps`
+  probes. The traffic brain: `VehicleAIController.signalSpeedLimit` (sqrt(2 b d), b 3.5) in `CruiseState`; racing
+  cars ignore it. Lamps near the camera (160 m) are lit as small unshaded balls, only while their pole is streamed
+  in and standing (a knocked-down signal goes dark). Pedestrians do not cross streets yet: their lights are shown,
+  not obeyed. `enabled` off is the control.
+- **Real street names** (`tools/island_street_names.py` -> `world/IslandStreetNames.json`, `world.StreetNames`):
+  every road's base name gets kanji + romaji -- the arterials by a transliteration table, generated streets from
+  pools of real Japanese street names by hash (farm roads 農道, industry streets 産業道路 ...), unique on the island;
+  DebugRoads' four too. Font: `tools/make_jp_font.py` subsets Noto Sans CJK JP (OFL 1.1) to the characters used
+  (`ui/fonts/NotoSansJP-Signs.otf`, ~220 KB). Shown on a blue plate on each signal arm (the CROSSED street) and as
+  the kanji under the player on the minimap. Both run in `island_world.sh`'s layout stage.
+- **Speed by class**: a ramp exports at most 40 km/h (`point_export.RAMP_SPEED`); C1 is 60 (`island_expressway.
+  C1_SPEED`, set after the build so tapers stay sized for 80). `probe_road_launch --driver=standard` drives by the
+  traffic rules (lane limit, corner governor, junctions, eyes); the default stays the flat-out stress test.
+- **Streets**: `island_core_streets` gained `kojo_waku` (the industry frame: the ring became the dike and the
+  Harbour line took the east edge, so industry had 0 streets -> 6) and `kogai_loop` (a U off the ring through the
+  suburb's land outside the dike; its legs are dike ramps, so the suburb's buildings front the loop itself).
+- **Derive**: an `airport` region; the suburb box clipped to land; a `ekimae` 駅前 row (shop-houses) round every
+  station of the reserve (`EKIMAE_SKIP` Central/Airport/Residential/Harbour/Industry); **footprint variants**
+  (`building_types.json` `variants`, expanded by `layout_buildings.expand_variants`: `<Id>_<suffix>` with other
+  `modules` / `upper` / `doors`; `island_buildings.variant_pick` draws base-or-variant by a hash of the slot);
+  **parking by district** (`PARKING_BY_REGION`: none downtown / nightlife, larger further out) and **コインパーキング**
+  (`ParkingLot4` in the city / housing mixes).
+- Gates: `probe_rail_track.gd` (new, needs the rebuild), `probe_traffic_signals.gd` 6/6 on DebugWorld (plan
+  loaded, lamps lit, plates built, a car stops with its nose 0.17 m short of the line on red and drives on at green,
+  the minimap names the street in kanji; `--control` runs the red); `tools/godot/shot_signals.gd` (display) pictures.
+- **What the first rebuild's gates found (2026-09-26), each fixed in the rule:**
+  - **A 踏切 cut by triangle CENTROID left half a fence segment in the road.** A rail's fence, shoulder and car wall
+    are swept a sample span (~4 m) at a time, so `point_mesh.cut_crossings` now drops a triangle if ANY corner (or
+    its centroid) is inside the crossed road's band -- 11 road lanes had a fence post or shoulder in their outer lane.
+  - **Road furniture did not know the rail was there**: a street lamp stood 1 m off a track. The road build takes
+    `--keep-clear-lanekits <pieces>/Roads_IslandRail_` (a path PREFIX, so the shell never globs it) and
+    `point_furniture.place(keep_clear=)` adds those lanes to the one lane index every pole asks. The road piece
+    digest cannot see the rail: after a rail change, run the road build once WITHOUT `DIRTY_ONLY`.
+  - **Two station buildings stood on an arterial** (Bay on rinkai_dori, Waterpark on wangan_dori): the reserve's
+    side rule looked at reachability, never at the paved road right beside the platform. `island_rail_layout`
+    now tries the town side first, sliding the building + car park along the platform (0, +-10 ... +-45 m), then
+    the other side, and takes the first placement clear of every at-grade arterial's paved half width + 1 m. Five
+    stations moved (Bay, Waterpark, Suburb, City West, Castle Town).
+  - **A car waiting at a RED was reclaimed as `stalled`** (57 of 98 in-range reclaims): the 12 s stall timer predates
+    working lights, and a red lasts ~27 s. `VehicleAIController.waitingForSignal` (held at the stop line, or queued
+    behind a car that is -- read off the obstacle rays) resets the stall timer; `waiting_for_signal_now` is its
+    readout. `probe_traffic_spawn` runs the lights on game time (`game_clock`) and does not count a waiting car as idle.
+  - `probe_weapon_counter`'s refill case waits the pad's cooldown in WALL time (`WeaponPad` uses the engine clock
+    so an off-screen pad's cooldown still runs out; `--fixed-fps` is faster than real time).
+  - **Nothing solid in a train's gauge, and every track ends at a station** (user, 2026-09-26). `probe_rail_track`
+    checks 5 and 6: a 2.7 x 3.7 m box (0.5 m over the bed) swept every 2 m along every track must touch nothing on
+    WORLD / CAR_WALL -- road, rail, building-cell, site and landmark geometry all instanced -- and a track lane with
+    no successor must end inside a station's platform box (+15 m). The first sweep found, each fixed in its rule:
+    - **platform faces leaned 0.63 m into the track**: a kerb is swept centred on its edge line, half as thick as it
+      is tall. `point_mesh._edge_run` caps the half thickness at `KERB_HALF_MAX` (0.15) and, from
+      `PLATFORM_KERB_FROM` (0.2 m, flush by 0.3 m) tall, slides the prism outward so a platform face stands flush at the edge; road
+      kerbs (under 0.3 m) are byte-identical.
+    - **expressway piers on the tracks** (C1, the airport spur): the road build now takes `--avoid` the rail record
+      too, so `pier_on_road` keeps columns off the rail's bands.
+    - **a road's parapet across a 踏切**: a road built against the rail cuts its BARRIER and car wall (never its
+      kerb or footway) where it crosses a track at its own height.
+    - **Central's lines run 14 m apart** (Blue y 229, Main 215, Harbour 201): at 10 m the platform between two lines
+      could only be one shared island, which the Road Kit builds as two OVERLAPPING footways -- their fences ended
+      diagonally across the neighbour's track at the platform ends. At 14 m each line keeps its own 3 m side
+      platforms and fences clear of the next line's gauge. Platform edge 1.55 m from the track centre (was 1.5:
+      the kerb's mitre at a platform END stood 2-3 cm inside the gauge).
+    - **A 踏切 gets a LEVEL road**: a dike ramp ran on at 5 % across the tracks at nishi_dori__9, so the two tracks
+      4 m apart met the road 0.2 m apart in height and the road's footway stood in the east track's gauge.
+      `island_dike._level_at_crossings` pins every ramp station within `LX_HOLD` (15 m) of an at-grade rail sample to
+      the rail's height and brings the ramp down to it at up to `RAMP_STEEP` (8 %); `island_grades` holds every
+      station within `LX_HOLD` of an at-grade track by the same rule, so the smoother cannot re-slope it.
+    - **street trees** asked their own lane index, not the shared one with the rail's lanes (`--keep-clear`).
+    - **踏切 units swung onto the track**: `crossing_signals` measured `crossing_track_clear` ALONG the road and then
+      stepped the kerb-side offset sideways, which on a 45 deg road put both units 0.9 m from the rail's centreline;
+      a unit is now pushed out until it stands `clear` from the rail square to it.
+    - **station buildings on another line's track** (Bay, Harbour): the reserve's placement also keeps
+      `OTHER_TRACK_CLEAR` (7 m) from every other line.
+    - **a 踏切 through a platform** (City West on chuo_dori, Bay on rinkai_dori): the road owns the crossing's
+      ground, so the platform was missing there. Both stations slid along their lines (City West x -125, Bay y -140
+      with a 100 m platform between the viaduct ramp's foot and the crossing), and the layout check reports
+      `踏切 IN PLATFORM` (`LX_PLATFORM_CLEAR` 5 m past the platform end).
+    - **track ends**: the Main line ran 35 m past Farm and 65 m past Airport (now ~20 m buffer), the freight siding's
+      north end stopped in the open (now station tracks inside Harbour), and the Blue and Harbour lines ended beside
+      Central with no platform: a HUB or JUNCTION now gives a platform to every line within `HUB_SHARE` (25 m) of
+      it (`island_rail_record.platform_spans`), and a hub's platforms are 3 m -- the lines run 10 m apart, so the
+      platform between two of them is one shared island.
+  - Probes: `probe_rail_track` hung on an unregistered `ZoneManager` method (now `registered_lane_counts_now`) and
+    read crossing heights without the network node's Y; `probe_road_clear` skips `rail_track` lanes (a platform
+    1.5 m off a track is right; the train's gauge is `probe_rail_track`'s); `probe_road_stamp` judges only its own
+    network's pieces and reports (does not fail) a FILL-height sample that BRIDGES a rail line
+    (`island_dike.rail_lifts` leaves the corridor open by design); `probe_crops` stands a camera over a chunk,
+    because `CropField` builds only the chunks round the camera (headless reads every MultiMesh transform as
+    identity, so its placement check is counted "unreadable", not passed).
+
 ## The land-planning batch: divided Wangan, paddy grid + crops, coastal dike, districts and an air base (2026-09-26)
 
 User asks, one session, built by ONE rebuild from `land` so later district work can be a regional re-derive. Each
@@ -9903,6 +10068,17 @@ street-planner rules came with it and apply everywhere:
 - **A region may have HOLES** (a sixth element, record boxes): a line running into one is cut there like a site.
   Residential SW's box overlapped industry's and its 110 m grid had taken industry's ground; the hole gives both
   their own grid (splitting the box instead lost the west part's streets).
+
+**The farm's frame is AUTHORED, and a field is only ever on `farm` land** (2026-09-26). Since the ring became the
+12 m dike no farm line could end on it (a 240 m ramp) and the dike's 側道 is built only between two at-grade
+crossings, none along the farm's shore -- so the whole farm grid was dropped. `tools/island_core_streets.py` (run by
+`island_layout` BEFORE `island_streets`) holds the streets the grid planner cannot make: `nodo_waku`, the farm frame
+(west road x 510, the 農道 45 m inside the dike, the station-front road x 1080), whose legs the farm rows end on, and
+the core's two 裏通り behind C1 (`c1_ura_nishi` / `_higashi`). An end within 15 m of an existing junction mouth
+JOINS that junction; otherwise it is a T cut into the road. `island_streets`' second pass skips a line an earlier pass
+built (it used to nudge it into a parallel duplicate). `farm_fields` places a crop cell only where
+`region_of` says `farm`, and the seaward flood is seeded only from open sea on its window's border (seeded from every
+water cell, the farm pond flooded its whole section).
 
 **Paddy fields and crops.** `island_buildings.farm_fields` derives field cells (2 m) in the farm grid: dry land, and
 nothing blocked (road, rail, site, sea) within `FIELD_LEVEE` 1.5 m -- the levee. One section in `WHEAT_ONE_IN` (4)

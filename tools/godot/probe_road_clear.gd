@@ -148,6 +148,9 @@ func _initialize() -> void:
 			continue
 		for path3d in p.find_children("*", "Path3D", true, false):
 			var cv: Curve3D = path3d.curve
+			# a TRACK is a train's gauge, not a car's: a platform edge 1.5 m off it is right (probe_rail_track's job)
+			if (path3d.get_parent() as Node).is_in_group("rail_track"):
+				continue
 			if cv != null and cv.get_baked_length() >= STEP:
 				lanes.append([path3d, str(path3d.get_parent().name), str(p.name)])
 	check("the pieces carry exported lanes", lanes.size() > 0, "%d lane(s)" % lanes.size())

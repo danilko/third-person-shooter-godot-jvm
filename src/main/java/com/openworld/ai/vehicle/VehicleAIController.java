@@ -244,7 +244,11 @@ public class VehicleAIController extends Controller {
         if (next != currentState) transitionTo(next);
 
         // After the state tick, so routeProgress is this frame's.
-        if (routeProgress - stallProgressMark > STALL_PROGRESS) {
+        waitingForSignal = heldAtSignal || queuedBehindSignal();
+        if (routeProgress - stallProgressMark > STALL_PROGRESS || waitingForSignal) {
+            // a car waiting at a RED (or queued behind one that is) is not stalled: the light will let it go.
+            // Without this every car at a red for longer than the stall timeout was reclaimed (probe_traffic_spawn,
+            // 2026-09-26: 57 of 98 reclaims were cars waiting at lights).
             stallProgressMark = routeProgress;
             stallSeconds = 0.0;
         } else {
@@ -300,6 +304,52 @@ public class VehicleAIController extends Controller {
             return p.speedLimit / 3.6f;                 // km/h -> m/s
         }
         return cruiseSpeed;
+    }
+
+    /** Deceleration a car brakes to a red light's stop line with (m/s^2). */
+    public static final double SIGNAL_DECEL = 3.5;
+    private boolean heldAtSignal;
+
+    /**
+     * THE TRAFFIC LIGHT (user, 2026-09-26: "enable ... traffic light"): the fastest this car may be going now and
+     * still stop with its nose on the stop line of a red (or a yellow it can stop for) at the end of its lane,
+     * {@code sqrt(2 b d)}; {@link Float#MAX_VALUE} when the light lets it go, it is racing, or there is no plan.
+     * {@link TrafficSignals} owns the light; this only turns the distance into a speed.
+     */
+    public float signalSpeedLimit() {
+        heldAtSignal = false;
+        if (racing || route == null || !(route instanceof godot.api.Node rn)) return Float.MAX_VALUE;
+        com.openworld.world.TrafficSignals ts = com.openworld.world.TrafficSignals.get();
+        if (ts == null) return Float.MAX_VALUE;
+        double d = ts.stopDistance(rn.getName().toString(), routeProgress, route.total(), currentSpeed());
+        if (d < 0.0) return Float.MAX_VALUE;
+        heldAtSignal = true;
+        return (float) Math.sqrt(2.0 * SIGNAL_DECEL * Math.max(0.0, d - 0.3));
+    }
+
+    /** True while the last {@link #signalSpeedLimit} held this car for a light. */
+    public boolean heldAtSignal() { return heldAtSignal; }
+
+    private boolean waitingForSignal;
+
+    /** True while this car waits for a light: held at the stop line, or queued behind a car that is. */
+    public boolean waitingForSignal() { return waitingForSignal; }
+
+    /** Probe readout of {@link #waitingForSignal}. */
+    @Register
+    public boolean waitingForSignalNow() { return waitingForSignal; }
+
+    /** The car the obstacle rays see ahead is itself waiting for a light (last tick's answer: a queue resolves
+     *  one car per tick from the front, which is soon enough for a stall timer measured in seconds). */
+    private boolean queuedBehindSignal() {
+        RayCast3D[] all = {obstacleRay, flankRays[0], flankRays[1], flankRays[2], flankRays[3]};
+        for (RayCast3D r : all) {
+            if (r == null || !r.isColliding()) continue;
+            if (r.getCollider() instanceof com.openworld.carrier.vehicle.Vehicle v
+                    && v.getController() instanceof VehicleAIController ahead && ahead != this && ahead.waitingForSignal)
+                return true;
+        }
+        return false;
     }
 
     public boolean onTurnConnector() {
@@ -403,6 +453,7 @@ public class VehicleAIController extends Controller {
         b.append("lane=").append(route == null ? "none" : (route instanceof Node rn ? rn.getName().toString() : route.toString())).append(String.format(" at %.1f", routeProgress));
         b.append(" state=").append(currentState == null ? "?" : currentState.getClass().getSimpleName());
         if (shouldYield()) b.append(" yield");
+        if (heldAtSignal) b.append(" red-light");
         RayCast3D[] all = new RayCast3D[flankRays.length + 1];
         all[0] = obstacleRay;
         System.arraycopy(flankRays, 0, all, 1, flankRays.length);

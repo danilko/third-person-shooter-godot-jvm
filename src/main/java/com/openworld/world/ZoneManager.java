@@ -383,6 +383,15 @@ public class ZoneManager extends Node {
 	/** Every registered lane (live view). `LaneGraph` builds from this instead of walking the scene tree. */
 	public java.util.Collection<Lane> registeredLanes() { return routes.values(); }
 
+	/** Probe readout: how many registered lanes there are and how many of them are rail track ("total,rail"). */
+	@Register
+	public String registeredLaneCountsNow() {
+		int rail = 0;
+		for (Lane l : routes.values())
+			if (l instanceof Node n && n.isInGroup("rail_track")) rail++;
+		return routes.size() + "," + rail;
+	}
+
 	public void registerRoute(Lane route) {
 		if (route instanceof Node3D n) routes.put(n.getName().toString(), route);
 		LaneGraph.invalidate();

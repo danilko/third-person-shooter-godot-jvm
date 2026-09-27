@@ -1,4 +1,68 @@
 [gd_scene format=3]
 
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_W3.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_H3.tscn" id="2"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MidCool.tres" id="tone0_4"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_MidCool.tres" id="tone1_4"]
+[ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_11_2.res" id="hlod"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/CropField.java" id="crop"]
+
+[sub_resource type="BoxMesh" id="LotBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Lots"]
+transform_format = 1
+instance_count = 2
+mesh = SubResource("LotBox")
+buffer = PackedFloat32Array(-6.3099, 0.0000, 0.0000, 1003.0839, 0.0000, 0.4750, 0.0000, 5.4375, -0.0000, 0.0000, -13.7980, -1368.0511, 8.3779, 0.0000, 0.0000, 1007.0000, 0.0000, 0.4750, 0.0000, 5.4375, -0.0000, 0.0000, 11.7173, -1390.9086)
+
+[sub_resource type="BoxShape3D" id="LotShape0"]
+size = Vector3(6.310, 0.475, 13.798)
+
+[sub_resource type="BoxShape3D" id="LotShape1"]
+size = Vector3(8.378, 0.475, 11.717)
 
 [node name="Bld_island_11_2" type="Node3D"]
+
+[node name="Crops" type="Node3D" parent="."]
+script = ExtResource("crop")
+chunks = PackedFloat32Array(750.000, -1500.000, 5.600, 0, 750.000, -1450.000, 5.600, 0, 750.000, -1400.000, 5.600, 0, 750.000, -1350.000, 5.600, 0, 750.000, -1300.000, 5.600, 0, 800.000, -1500.000, 5.600, 0, 800.000, -1450.000, 5.600, 0, 800.000, -1400.000, 5.600, 0, 800.000, -1350.000, 5.600, 0, 800.000, -1300.000, 5.600, 0, 850.000, -1500.000, 5.600, 0, 850.000, -1450.000, 5.600, 0, 850.000, -1400.000, 5.600, 0, 850.000, -1350.000, 5.600, 0, 850.000, -1300.000, 5.600, 0, 900.000, -1500.000, 5.598, 0, 900.000, -1450.000, 5.598, 0, 900.000, -1400.000, 5.598, 0, 900.000, -1350.000, 5.598, 0, 900.000, -1300.000, 5.598, 0, 950.000, -1500.000, 5.598, 0, 950.000, -1450.000, 5.598, 0, 950.000, -1400.000, 5.598, 0, 950.000, -1350.000, 5.598, 0, 950.000, -1300.000, 5.598, 0)
+masks = PackedStringArray("fff8007fffc03ffffc1fffff0fffffc7fffffbfffffdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffefffffe7ffffc3ffffe000000000000000000000000000000000000007ffffc3ffffe1fffffcffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "00000780000040000000000000000000000000000000000000003e00403fe0303ffe181ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffff8", "c0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffff8", "c0ffff801fffc00fffe003fff001fff8001ffc000ffe00000000000000000000000000000000000000001ffc001ffe003fff003fff801fffc01ffff81ffffc0ffffe07ffff03ffff81ffffc0ffff8", "c0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffff8", "c0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffffe07ffff03ffff81ffffc0ffff8", "ffffe07ffffe0fffffe07ffff007fff8007ffc0003fe00003f0000038000000000000000000e000007e00003ff0001fff000ffff007ffff03fffff9fffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "fffffffffffffffffffffffffffffffffffffffffffe00000000000000000000000000000000000007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "0000000000000000001c00000fc00007fc0003ff8001fff800ffff803ffff803ffff003ffff003fff8001ffc0001fe00001f0000008000000000001000000f000007f80003ff8001fff800ffff800", "fffff87fffffbfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "fffffffffffffffffffffffffffffffffffffffffffe00000000000000000000000000000000000007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "000000000000000000000000000000000000000000000000000000000000000000000000000e000007e00003fe0001ffc000fffc001fffc001fffc000fffc000fff8000ffc0000fe0000070000000", "0000000000003000001f80000ff80007ff8003fffc01ffffc0fffffc7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "fffffffffffffffffffffffffffffffffffffffffffe00000000000000000000000000000000000007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8")
+
+[node name="HLOD" type="MeshInstance3D" parent="."]
+mesh = ExtResource("hlod")
+cast_shadow = 0
+visibility_range_begin = 450.0
+visibility_range_begin_margin = 40.0
+visibility_range_fade_mode = 1
+
+[node name="PencilBuilding_W3_000" parent="." instance=ExtResource("1")]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, 1003.000, 5.690, -1368.071)
+
+[node name="Mesh" parent="./PencilBuilding_W3_000" index="0"]
+surface_material_override/5 = ExtResource("tone0_4")
+surface_material_override/1 = ExtResource("tone1_4")
+visibility_parent = NodePath("../../HLOD")
+
+[node name="ShopHouse_H3_001" parent="." instance=ExtResource("2")]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1007.000, 5.690, -1391.019)
+
+[node name="Mesh" parent="./ShopHouse_H3_001" index="0"]
+surface_material_override/5 = ExtResource("tone0_4")
+surface_material_override/1 = ExtResource("tone1_4")
+visibility_parent = NodePath("../../HLOD")
+
+[node name="Plinths" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Lots")
+
+[node name="PlinthCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, 1003.084, 5.438, -1368.051)
+shape = SubResource("LotShape0")
+
+[node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1007.000, 5.438, -1390.909)
+shape = SubResource("LotShape1")

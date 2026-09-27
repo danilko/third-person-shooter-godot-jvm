@@ -1,0 +1,473 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/StationMall_Open_mesh.res" id="1_kllp8"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Door.java" id="2_dr32j"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/GlassLeaf_0850_2100_mesh.res" id="3_jdwy3"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_DoorLeaf_White.tres" id="4_xqwrb"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/DoorLeaf_mesh.res" id="5_2w514"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/GlassLeaf_0910_2002_mesh.res" id="6_fs8g2"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pm5ju"]
+size = Vector3(47.32, 11.83, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_kkplv"]
+size = Vector3(14.62, 3.64, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hdpay"]
+size = Vector3(1.7, 1.54, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6q8uv"]
+size = Vector3(14.68, 3.64, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_eri5q"]
+size = Vector3(1.7, 1.54, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8oj8w"]
+size = Vector3(14.62, 3.64, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fcu1q"]
+size = Vector3(0.2355, 15.47, 40.04)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_b4odr"]
+size = Vector3(47.32, 11.83, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_m55rl"]
+size = Vector3(22.295, 3.64, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_d8qiq"]
+size = Vector3(0.91, 1.638, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_i4hvu"]
+size = Vector3(24.115, 3.64, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_aun2y"]
+size = Vector3(0.2355, 15.47, 40.04)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_125eg"]
+size = Vector3(47.32, 0.1, 40.04)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5sbie"]
+size = Vector3(47.32, 0.2, 40.04)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_qx6d2"]
+size = Vector3(3.64, 3.64, 3.64)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3ybmq"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yjpgu"]
+size = Vector3(3.1, 2.3, 2.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6mkyu"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ecjvl"]
+size = Vector3(3.1, 2.3, 2.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xnndq"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rkup0"]
+size = Vector3(3.1, 2.3, 2.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_y0pwg"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_r1svn"]
+size = Vector3(3.1, 2.3, 2.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3ds46"]
+size = Vector3(0.91, 2.002, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_nl561"]
+size = Vector3(2.31, 2.202, 2.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_gf20e"]
+size = Vector3(0.91, 2.002, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_f6sxi"]
+size = Vector3(2.31, 2.202, 2.4)
+
+[node name="StationMall_Shop" type="Node3D" unique_id=574375379]
+metadata/building = {
+"aabb": [Vector3(-23.918896, -0.091, -20.279099), Vector3(47.83779, 18.291, 40.558197)],
+"door_style": "slide",
+"doors": [{
+"center": [-8.19, 0.0, 20.02],
+"height": 2.1,
+"module": 8.0,
+"outward": [0.0, 0.0, 1.0],
+"shopfront": {
+"module": 1.82,
+"storey": 3.64
+},
+"side": "front",
+"style": "slide",
+"width": 1.7
+}, {
+"center": [8.19, 0.0, 20.02],
+"height": 2.1,
+"module": 17.0,
+"outward": [0.0, 0.0, 1.0],
+"shopfront": {
+"module": 1.82,
+"storey": 3.64
+},
+"side": "front",
+"style": "slide",
+"width": 1.7
+}, {
+"center": [0.91, 0.0, -20.02],
+"height": 2.002,
+"module": 12.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "back",
+"style": "swing",
+"width": 0.91
+}],
+"doors_closed": false,
+"doors_locked": false,
+"doors_shop": true,
+"facade_surfaces": {
+"MI_Trim_MetalConcrete": 1
+},
+"footprint_m": [47.32, 40.04],
+"has_interior": false,
+"height_m": 18.2,
+"id": "StationMall",
+"jp": {
+"depth_m": 40.0,
+"frontage_m": 47.3,
+"height_m": 14.6,
+"name": "駅前ショッピングセンター"
+},
+"kit": "quaternius_downtown_city",
+"module_m": 1.82,
+"modules": [26.0, 22.0],
+"piece_count": 2704,
+"roofline_m": 16.38,
+"setback_m": 0.0,
+"shop_band": "MI_ShopStripe_Green",
+"solid_probes": [{
+"center": [-22.75, 0.0, 20.02],
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "front"
+}, {
+"center": [22.75, 0.0, -20.02],
+"module": 0.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "back"
+}],
+"stair_house": {
+"center": [-20.02, 14.56, -16.38],
+"size": [3.64, 3.64, 3.64]
+},
+"storeys": [3.64, 3.64, 3.64, 3.64],
+"terrace_m": null,
+"use": "the station shopping centre (駅ビル / 駅前SC: a GRANDUO or Ito-Yokado beside a suburban station): a glass shopfront all round the ground floor, three sales floors over it, entrances facing the station",
+"wall_top_m": 14.56
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1624894215]
+visibility_range_end = 518.4
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_kllp8")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=96519285]
+collision_mask = 0
+
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=1231956423]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.555, 19.90225)
+shape = SubResource("BoxShape3D_pm5ju")
+
+[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=2041997812]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.35, 1.82, 19.90225)
+shape = SubResource("BoxShape3D_kkplv")
+
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=1908597530]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.19, 2.87, 19.90225)
+shape = SubResource("BoxShape3D_hdpay")
+
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=872878011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.82, 19.90225)
+shape = SubResource("BoxShape3D_6q8uv")
+
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=734219246]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.19, 2.87, 19.90225)
+shape = SubResource("BoxShape3D_eri5q")
+
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=935154188]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.35, 1.82, 19.90225)
+shape = SubResource("BoxShape3D_8oj8w")
+
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=791190441]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.54225, 7.735, 0)
+shape = SubResource("BoxShape3D_fcu1q")
+
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=302907200]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9.555, -19.90225)
+shape = SubResource("BoxShape3D_b4odr")
+
+[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=45589542]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5125, 1.82, -19.90225)
+shape = SubResource("BoxShape3D_m55rl")
+
+[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=1431576957]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.91, 2.821, -19.90225)
+shape = SubResource("BoxShape3D_d8qiq")
+
+[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=1223716650]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.6025, 1.82, -19.90225)
+shape = SubResource("BoxShape3D_i4hvu")
+
+[node name="Box11" type="CollisionShape3D" parent="Collision" unique_id=717007498]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -23.54225, 7.735, 0)
+shape = SubResource("BoxShape3D_aun2y")
+
+[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=862790605]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_125eg")
+
+[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=344657625]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 14.46, 0)
+shape = SubResource("BoxShape3D_5sbie")
+
+[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=1319103295]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20.02, 16.38, -16.38)
+shape = SubResource("BoxShape3D_qx6d2")
+
+[node name="Doors" type="Node3D" parent="." unique_id=694242186]
+
+[node name="Door0" type="StaticBody3D" parent="Doors" unique_id=1721820274]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.3399997, 0, 20.02)
+collision_mask = 0
+script = ExtResource("2_dr32j")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0.85, 0, 0)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door0" unique_id=706835072]
+mesh = ExtResource("3_jdwy3")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0" unique_id=1069347884]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.425, 1.05, 0)
+shape = SubResource("BoxShape3D_3ybmq")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door0" unique_id=1787756781]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0/Sensor" unique_id=621511271]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 1.05, 0)
+shape = SubResource("BoxShape3D_yjpgu")
+
+[node name="Door1" type="StaticBody3D" parent="Doors" unique_id=276461488]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.19, 0, 20.02)
+collision_mask = 0
+script = ExtResource("2_dr32j")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(-0.85, 0, 0)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door1" unique_id=2035560653]
+mesh = ExtResource("3_jdwy3")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1" unique_id=203140929]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.425, 1.05, 0)
+shape = SubResource("BoxShape3D_6mkyu")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door1" unique_id=1116400250]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1/Sensor" unique_id=948611974]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+shape = SubResource("BoxShape3D_ecjvl")
+
+[node name="Door2" type="StaticBody3D" parent="Doors" unique_id=1437258371]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.04, 0, 20.02)
+collision_mask = 0
+script = ExtResource("2_dr32j")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0.85, 0, 0)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door2" unique_id=904439983]
+mesh = ExtResource("3_jdwy3")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2" unique_id=1548843589]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.425, 1.05, 0)
+shape = SubResource("BoxShape3D_xnndq")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door2" unique_id=1822069124]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2/Sensor" unique_id=947315258]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.85, 1.05, 0)
+shape = SubResource("BoxShape3D_rkup0")
+
+[node name="Door3" type="StaticBody3D" parent="Doors" unique_id=25306187]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.19, 0, 20.02)
+collision_mask = 0
+script = ExtResource("2_dr32j")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(-0.85, 0, 0)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door3" unique_id=873621273]
+mesh = ExtResource("3_jdwy3")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3" unique_id=408652227]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.425, 1.05, 0)
+shape = SubResource("BoxShape3D_y0pwg")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door3" unique_id=216704236]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3/Sensor" unique_id=1983702880]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+shape = SubResource("BoxShape3D_r1svn")
+
+[node name="Door4" type="StaticBody3D" parent="Doors" unique_id=1116733851]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.455, 0, -19.93)
+collision_mask = 0
+script = ExtResource("2_dr32j")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door4" unique_id=518254749]
+material_override = ExtResource("4_xqwrb")
+mesh = ExtResource("5_2w514")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door4" unique_id=1906169434]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.455, 1.001, 0)
+shape = SubResource("BoxShape3D_3ds46")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door4" unique_id=1102497787]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door4/Sensor" unique_id=661802882]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.455, 1.001, 0)
+shape = SubResource("BoxShape3D_nl561")
+
+[node name="Door5" type="StaticBody3D" parent="Doors" unique_id=1298626270]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20.475, 14.56, -14.650001)
+collision_mask = 0
+script = ExtResource("2_dr32j")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0.91, 0, 0)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door5" unique_id=1770888113]
+mesh = ExtResource("6_fs8g2")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door5" unique_id=794692041]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.455, 1.001, 0)
+shape = SubResource("BoxShape3D_gf20e")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door5" unique_id=1808221164]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door5/Sensor" unique_id=416161438]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.455, 1.001, 0)
+shape = SubResource("BoxShape3D_f6sxi")
+
+[node name="Door_front_8" type="Marker3D" parent="." unique_id=1588704301]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -8.19, 0, 20.02)
+
+[node name="Door_front_17" type="Marker3D" parent="." unique_id=633273614]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 8.19, 0, 20.02)
+
+[node name="Door_back_12" type="Marker3D" parent="." unique_id=860240826]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.91, 0, -20.02)

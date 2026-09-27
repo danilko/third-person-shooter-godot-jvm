@@ -1,0 +1,216 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Mansion_H8_mesh.res" id="1_fspd0"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_kgle4"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_y0575"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xbh6u"]
+size = Vector3(0.91, 2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_t5lgm"]
+size = Vector3(18.2, 3.64, 0.2255)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_u52pq"]
+size = Vector3(18.2, 19.11, 0.2255)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_w1tw0"]
+size = Vector3(9.16, 2.73, 0.2255)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1n6rm"]
+size = Vector3(1.7, 0.63, 0.2255)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0m7c2"]
+size = Vector3(7.34, 2.73, 0.2255)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_klcp3"]
+size = Vector3(0.2255, 3.64, 7.28)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1mvve"]
+size = Vector3(0.2255, 21.84, 9.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_vpcij"]
+size = Vector3(18.2, 3.64, 0.2255)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4o206"]
+size = Vector3(18.2, 21.84, 0.2255)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_jo125"]
+size = Vector3(0.2255, 3.64, 7.28)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ecdsj"]
+size = Vector3(0.2255, 21.84, 9.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_7makg"]
+size = Vector3(18.2, 0.91, 0.2255)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_46tim"]
+size = Vector3(0.2255, 0.91, 1.82)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1of0o"]
+size = Vector3(0.2255, 0.91, 1.82)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8wqyk"]
+size = Vector3(18.2, 0.1, 9.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_eqc3m"]
+size = Vector3(18.2, 0.2, 7.28)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tx5kq"]
+size = Vector3(18.2, 0.2, 1.82)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_d4srm"]
+size = Vector3(3.64, 3.64, 3.64)
+
+[node name="Mansion_H8" type="Node3D" unique_id=1120993665]
+metadata/building = {
+"aabb": [Vector3(-9.1, -0.091, -4.8489428), Vector3(18.2, 28.301, 9.506762)],
+"door_style": "slide",
+"doors": [{
+"center": [0.91, 0.0, 4.55],
+"height": 2.1,
+"module": 5.0,
+"outward": [0.0, 0.0, 1.0],
+"shopfront": {
+"module": 1.82,
+"storey": 2.73
+},
+"side": "front",
+"style": "slide",
+"width": 1.7
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"facade_surfaces": {
+"MI_Trim": 0,
+"MI_Trim_MetalConcrete": 2
+},
+"footprint_m": [18.2, 9.1],
+"has_interior": false,
+"height_m": 28.21,
+"id": "Mansion_H8",
+"jp": {
+"name": "マンション (RC集合住宅)"
+},
+"kit": "quaternius_downtown_city",
+"module_m": 1.82,
+"modules": [10.0, 5.0],
+"piece_count": 597,
+"roofline_m": 25.48,
+"setback_m": 1.82,
+"shop_band": "",
+"solid_probes": [{
+"center": [-8.19, 0.0, 4.55],
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "front"
+}],
+"stair_house": {
+"center": [-5.46, 24.57, -0.91],
+"size": [3.64, 3.64, 3.64]
+},
+"storeys": [2.73, 2.73, 2.73, 2.73, 2.73, 2.73, 2.73, 2.73, 2.73],
+"terrace_m": 21.84,
+"use": "residential: six storeys of flats, balconies to the street, corridor and units at the back",
+"wall_top_m": 24.57
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=994020980]
+visibility_range_end = 638.52
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_fspd0")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1326087653]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1951448235]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.335, 1.05, 4.55)
+shape = SubResource("BoxShape3D_kgle4")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=778245070]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.485, 1.05, 4.55)
+shape = SubResource("BoxShape3D_y0575")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1091113926]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.37, 25.57, 0.82000005)
+shape = SubResource("BoxShape3D_xbh6u")
+
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=215435981]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 23.66, 2.61725)
+shape = SubResource("BoxShape3D_t5lgm")
+
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=459704619]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12.285, 4.43725)
+shape = SubResource("BoxShape3D_u52pq")
+
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=1417110023]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.52, 1.365, 4.43725)
+shape = SubResource("BoxShape3D_w1tw0")
+
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=1870690074]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.91, 2.415, 4.43725)
+shape = SubResource("BoxShape3D_1n6rm")
+
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=610626948]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.43, 1.365, 4.43725)
+shape = SubResource("BoxShape3D_0m7c2")
+
+[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=1171013028]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.98725, 23.66, -0.91)
+shape = SubResource("BoxShape3D_klcp3")
+
+[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=1390353025]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.98725, 10.92, 0)
+shape = SubResource("BoxShape3D_1mvve")
+
+[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=806939255]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 23.66, -4.43725)
+shape = SubResource("BoxShape3D_vpcij")
+
+[node name="Box11" type="CollisionShape3D" parent="Collision" unique_id=1539125891]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10.92, -4.43725)
+shape = SubResource("BoxShape3D_4o206")
+
+[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=196496979]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.98725, 23.66, -0.91)
+shape = SubResource("BoxShape3D_jo125")
+
+[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=1666290532]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.98725, 10.92, 0)
+shape = SubResource("BoxShape3D_ecdsj")
+
+[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=793241193]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 22.295, 4.43725)
+shape = SubResource("BoxShape3D_7makg")
+
+[node name="Box15" type="CollisionShape3D" parent="Collision" unique_id=1877070284]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.98725, 22.295, 3.64)
+shape = SubResource("BoxShape3D_46tim")
+
+[node name="Box16" type="CollisionShape3D" parent="Collision" unique_id=1851288194]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.98725, 22.295, 3.64)
+shape = SubResource("BoxShape3D_1of0o")
+
+[node name="Box17" type="CollisionShape3D" parent="Collision" unique_id=1606908629]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_8wqyk")
+
+[node name="Box18" type="CollisionShape3D" parent="Collision" unique_id=1030287057]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 24.47, -0.91)
+shape = SubResource("BoxShape3D_eqc3m")
+
+[node name="Box19" type="CollisionShape3D" parent="Collision" unique_id=1296593861]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 21.74, 3.64)
+shape = SubResource("BoxShape3D_tx5kq")
+
+[node name="Box20" type="CollisionShape3D" parent="Collision" unique_id=2000706014]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.46, 26.39, -0.91)
+shape = SubResource("BoxShape3D_d4srm")
+
+[node name="Door_front_5" type="Marker3D" parent="." unique_id=878778787]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0.91, 0, 4.55)

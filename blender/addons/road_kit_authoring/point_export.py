@@ -53,6 +53,12 @@ TURN_WEIGHTS = {lm.TURN_S: 0.6, lm.TURN_L: 0.2, lm.TURN_R: 0.2, lm.TURN_U: 0.05}
 RAMP_WEIGHT = 0.2
 
 DEFAULT_SPEED = {"ramp": 40.0, "street": 40.0, "arterial": 60.0, "expressway": 80.0}
+#: km/h on a left / right turn connector (PLAN.md DRIVING (a)): the corner governor still brakes for the arc itself,
+#: this is the pace a Japanese driver takes a junction corner at.
+TURN_SPEED = 20.0
+#: km/h: a ramp is signed 40 in Japan whatever the mainline it leaves (PLAN.md "Speed by road class"); a ramp born by
+#: `branch_ramp` copies its mainline's section, design speed included, so the cap is applied at export
+RAMP_SPEED = 40.0
 
 
 def godot(p):
@@ -437,6 +443,8 @@ def build_run(net, road, uids, arm, n_runs):
     counts = {lp.FWD: max(int(p.lanes_fwd) + int(p.aux_fwd) for p in pts),
               lp.REV: max(int(p.lanes_bwd) + int(p.aux_bwd) for p in pts)}
     speed = road.base.design_speed or DEFAULT_SPEED.get(road.road_class, 50.0)
+    if road.road_class == "ramp":
+        speed = min(speed, RAMP_SPEED)
 
     total = samples[-1].s or 1.0
     grade = (samples[-1].pos[2] - samples[0].pos[2]) / total
@@ -694,7 +702,11 @@ def build_junctions(net, lanes_by_uid, all_lanes):
                         "zone_id": lane["zone_id"],
                         "road_class": lane["road_class"],
                         "road_name": lane["road_name"],
-                        "speed_limit": min(lane["speed_limit"], target["speed_limit"]),
+                        # a TURN is driven at turn speed, not at either road's limit (user, 2026-09-26: traffic spun
+                        # out in hard turns): Japanese practice is ~15-20 km/h round a corner; a straight-through
+                        # connector keeps the lower of its two roads' limits
+                        "speed_limit": min(lane["speed_limit"], target["speed_limit"],
+                                           TURN_SPEED if verdict.turn in ("L", "R") else 1e9),
                         "lane_index": lane["lane_index"],
                         "lane_width": lane["lane_width"],
                         "grade": 0.0, "banking": 0.0,

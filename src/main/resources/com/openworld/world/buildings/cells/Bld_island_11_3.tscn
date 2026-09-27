@@ -1,0 +1,88 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/KonbiniS_Shop.tscn" id="1"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_MidCool.tres" id="tone0_4"]
+[ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_11_3.res" id="hlod"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/CropField.java" id="crop"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/item/WeaponPad.java" id="pad"]
+
+[sub_resource type="BoxMesh" id="LotBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Lots"]
+transform_format = 1
+instance_count = 1
+mesh = SubResource("LotBox")
+buffer = PackedFloat32Array(13.4989, 0.0000, 0.0000, 1006.8706, 0.0000, 0.4750, 0.0000, 5.4375, -0.0000, 0.0000, 18.9973, -1234.5486)
+
+[sub_resource type="BoxShape3D" id="LotShape0"]
+size = Vector3(13.499, 0.475, 18.997)
+
+[node name="Bld_island_11_3" type="Node3D"]
+
+[node name="Pads_000" type="Node3D" parent="."]
+
+[node name="Pad_PIS1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1010.700, 5.790, -1239.959)
+script = ExtResource("pad")
+weapon_id = "PIS1"
+
+[node name="Pad_PIS2" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1012.100, 5.790, -1239.959)
+script = ExtResource("pad")
+weapon_id = "PIS2"
+
+[node name="Pad_REV1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1010.700, 5.790, -1238.759)
+script = ExtResource("pad")
+weapon_id = "REV1"
+
+[node name="Pad_DUP1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1012.100, 5.790, -1238.759)
+script = ExtResource("pad")
+weapon_id = "DUP1"
+
+[node name="Pad_SMG1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1010.700, 5.790, -1237.559)
+script = ExtResource("pad")
+weapon_id = "SMG1"
+
+[node name="Pad_MEW1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1012.100, 5.790, -1237.559)
+script = ExtResource("pad")
+weapon_id = "MEW1"
+
+[node name="Pad_FRG1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1010.700, 5.790, -1236.359)
+script = ExtResource("pad")
+weapon_id = "FRG1"
+
+[node name="Crops" type="Node3D" parent="."]
+script = ExtResource("crop")
+chunks = PackedFloat32Array(750.000, -1250.000, 5.600, 0, 750.000, -1200.000, 5.600, 0, 800.000, -1250.000, 5.600, 0, 800.000, -1250.000, 5.600, 1, 800.000, -1200.000, 5.600, 0, 800.000, -1200.000, 5.600, 1, 850.000, -1250.000, 5.600, 0, 850.000, -1250.000, 5.600, 1, 850.000, -1200.000, 5.600, 1, 850.000, -1150.000, 5.600, 1, 900.000, -1250.000, 5.598, 0, 900.000, -1250.000, 5.598, 1, 900.000, -1200.000, 5.598, 1, 900.000, -1150.000, 5.598, 1, 900.000, -1100.000, 5.598, 1, 900.000, -1050.000, 5.598, 1, 950.000, -1250.000, 5.598, 0, 950.000, -1250.000, 5.598, 1, 950.000, -1200.000, 5.598, 1, 950.000, -1150.000, 5.598, 1, 950.000, -1100.000, 5.598, 1, 950.000, -1050.000, 5.598, 1)
+masks = PackedStringArray("ffffffffffffffffffffffffffffffffffffffffffffffffffffffff7fffff3ffffe1fffff000000000000000000000000000000000000003ffffe1fffff0fffffc7ffffffffffffffffffffffff8", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff807fe0003000000000000000000000000000000000000000000000000000000000000000000000", "c0ffffe07ffff03ffff81ffffc0ffffe07fffc00fffe007fff001fff800fffc000ffe0007ff000000000000000000000000000000000000000000000000000000007c00003e00001f00000f800000", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffe000fff000fff83ffffc1ffffe0fffff07ffff8", "f800007c00003e00001f00000f800007c00003e00001f00000f800007c00003e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "07ffff83ffffc1ffffe0fffff07ffff83ffffc1ffffe0fffff07fffc03ff0001800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffefffff03ffff80ffffc03fffe00ffff003fff800fffc003ffe000fff0003ff8000ffc0007fe0001ff0000ff80003fc0000fe00007f00001f8", "00001f800007c00001e00000f000003800001c00000600000300000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffff7fffff9fffffc7ffffe3fffff0fffff87ffffc1ffffe0fffff03ffff80ffffc07fffe01ffff00ffff8", "007fff801fffc00fffe003fff001fff8007ffc003ffe000fff0003ff8001ffc0007fe0003ff0000ff80003fc0001fe00007f00003f80000fc00007e00001f000007800003c00000e0000070000018", "000000800000400000000000000000000000000000000000000000000000000000002000003000003800003c00003e00003f00003f80003fc0007fe0007ff000fff800fffc00fffe01ffff01ffff8", "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000000000000000000000", "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "fffffffffffffffffffffffff7fffffbfffffcfffffe7fffff7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8")
+
+[node name="HLOD" type="MeshInstance3D" parent="."]
+mesh = ExtResource("hlod")
+cast_shadow = 0
+visibility_range_begin = 450.0
+visibility_range_begin_margin = 40.0
+visibility_range_fade_mode = 1
+
+[node name="KonbiniS_Shop_000" parent="." instance=ExtResource("1")]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1007.000, 5.690, -1234.659)
+
+[node name="Mesh" parent="./KonbiniS_Shop_000" index="0"]
+surface_material_override/1 = ExtResource("tone0_4")
+visibility_parent = NodePath("../../HLOD")
+
+[node name="Plinths" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Lots")
+
+[node name="PlinthCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1006.871, 5.438, -1234.549)
+shape = SubResource("LotShape0")

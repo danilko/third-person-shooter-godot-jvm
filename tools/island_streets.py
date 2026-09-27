@@ -391,6 +391,9 @@ def _line_values(box, kind, spec):
     return tuple(mid + (k - n / 2.0) * float(spec) for k in range(n + 1))
 
 
+NUDGES = (0.0, 30.0, -30.0, 60.0, -60.0)     # a failing line is tried this far either way before it is dropped
+
+
 def plan_region(net, ground, region):
     """The lines of one region that survive, each as [(point, road name or None)] from its first to last crossing. A
     line that fails is nudged up to 60 m either way before it is dropped."""
@@ -411,8 +414,15 @@ def plan_region(net, ground, region):
             # the site by losing most of the street (y=-11 across the core became a 67 m stub of 2 crossings where
             # the cut kept 8) is worse than the cut. A nudge that just moves a street off a site's face keeps all
             # its crossings and still wins, which is what the nudge is for.
+            # a line an EARLIER pass already built (under its own coordinate or a nudge of it) is not planned again:
+            # the second pass exists for lines that failed the first, and re-planning a built one found it "alongside
+            # an existing road" -- itself -- and nudged it 60 m into a PARALLEL DUPLICATE (the farm's 1320 row came
+            # back as 1380 too, its x 810 road as 870)
+            stem = NAMES[name][0 if kind == "x" else 1]
+            if any("%s_%d" % (stem, int(round(abs(v0 + dv)))) in net.roads for dv in NUDGES):
+                continue
             tried, site_hit, pieces = [], None, None
-            for dv in (0.0, 30.0, -30.0, 60.0, -60.0):
+            for dv in NUDGES:
                 nodes, last = _line_ok(net, ground, obst, kind, v0 + dv, box, segs)
                 if nodes:
                     if pieces and sum(len(n) for n, _l in pieces) > len(nodes):

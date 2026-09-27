@@ -257,6 +257,21 @@ def road_mask(ib, grid_fn, text):
                             a[2] + ny - CLEARANCE, b[2] + ny - CLEARANCE)
         if len(pts) == 1:
             capsule_into(road, pts[0][:2], pts[0][:2], pts[0][3] + hard)
+    # THE RAIL CORRIDOR (PLAN.md 3.25 R2) is not a block either: an at-grade track's ballast bed stands ~0.15 m over
+    # the ground, UNDER the kerb-level fill a block raises round its lots, so a fill walking into the corridor would
+    # bury the track. Its reserve (the same record the placement keeps buildings off) goes into the road mask; an
+    # elevated stretch into `under` as well (painted with its block, never raised -- a viaduct's footprint).
+    rr = getattr(ib, "RAIL_RESERVE", "")
+    if rr and os.path.exists(rr):
+        import json as _json
+        doc = _json.load(open(rr))
+        half = float(doc["corridor_half"])
+        for c in doc["corridors"]:
+            P = [(q[0], -q[1], q[2] - q[3] > 1.0) for q in c["pts"]]
+            for a, b in zip(P, P[1:]):
+                capsule_into(road, a[:2], b[:2], half)
+                if a[2] and b[2]:
+                    capsule_into(under, a[:2], b[:2], half)
     # A SITE IS NOT A ROAD AND IT IS NOT A BLOCK EITHER. Its own scene carries whatever ground it has (a
     # terminal's apron, a station's platform), so nothing here may RAISE the terrain under it -- but leaving
     # it the colour of a beach is the defect this tool exists for, and Tokyo Station's forecourt is the

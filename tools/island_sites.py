@@ -463,6 +463,38 @@ def access_parking(net):
     return rows
 
 
+STATION_PARKING = {"park_and_ride": "ParkingLot14", "small_lot": "ParkingLot8"}   # a 立体駐車場 (Central) has no type yet
+
+
+def rail_stations():
+    """Every station's building and car park (PLAN.md R3), DERIVED every run from the rail reserve
+    (`IslandRailReserve.json`, `island_rail_layout.py --reserve`), never frozen: the rail plan is their owner, so a
+    moved station takes its building with it. Both face AWAY from the tracks (the reserve's `n`): the building's back
+    door is on the platform side, its front on the street; a car park's entrance faces the same way."""
+    import json
+    path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandRailReserve.json")
+    if not os.path.exists(path):
+        return []
+    boxes = {b["id"]: b for b in json.load(open(path))["boxes"]}
+    rows = []
+    for bid, b in sorted(boxes.items()):
+        kind, _c, name = bid.partition(":")
+        slug = name.lower().replace(" ", "_")
+        if kind == "building":
+            rows.append(dict(id="station_" + slug, scene="StationBuilding_Shop", x=b["x"], y=b["y"],
+                             yaw=yaw_to(b["nx"], -b["ny"]), size=[2 * b["h_along"] - 1.0, 2 * b["h_across"] - 1.0],
+                             load=900.0, ground="min", node="Station_" + slug))
+        elif kind == "parking" and b.get("kind") in STATION_PARKING:
+            st = boxes.get("building:" + name) or boxes.get("station:" + name)
+            n = (st.get("nx", 0.0), st.get("ny", 0.0)) if st else (0.0, 0.0)
+            if n == (0.0, 0.0):          # the reserve's own normal: -uy, ux
+                n = (-b["uy"], b["ux"])
+            rows.append(dict(id="station_" + slug + "_parking", scene=STATION_PARKING[b["kind"]], x=b["x"], y=b["y"],
+                             yaw=yaw_to(n[0], -n[1]), size=[2 * b["h_along"], 2 * b["h_across"]], load=900.0,
+                             ground="min", node="Parking_station_" + slug))
+    return rows
+
+
 def site_ground(g, row):
     """The height a frozen site stands at on TODAY's ground (record frame, network-relative)."""
     if row["ground"] == "road_end":        # an access car park: its road climbs to it (island_site_access)
@@ -529,6 +561,12 @@ def main(argv):
         print("island_sites: %-18s at (%.0f, %.0f), ground %.2f m (frozen)" % (r["id"], r["x"], r["y"], h))
         sites.append((r["id"], r["scene"], (r["x"], r["y"], ny + h), r["yaw"], tuple(r["size"]), r["load"],
                       scene_offset(r), r["scene"], None))
+    for row in rail_stations():
+        h = site_ground(g, row)
+        print("island_sites: %-28s at (%.0f, %.0f), ground %.2f m (from the rail reserve)"
+              % (row["id"], row["x"], row["y"], h))
+        sites.append((row["id"], row["scene"], (row["x"], row["y"], ny + h), row["yaw"], tuple(row["size"]),
+                      row["load"], (0.0, 0.0), row["node"], None))
     for row in access_parking(net):
         h = site_ground(g, row)
         print("island_sites: %-18s at (%.0f, %.0f), ground %.2f m (at its access road's end)"

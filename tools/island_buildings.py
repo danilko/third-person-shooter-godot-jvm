@@ -79,7 +79,7 @@ ALLEY = 1.5            # kept free on a building's sides and back (half the alle
 # side = a 1 m gap; the Civil Code asks 50 cm from the boundary, i.e. the same 1 m between two houses)
 REGION_ALLEY = {"downtown": 0.25, "nightlife": 0.2, "west_ekimae": 0.2, "west_centre": 0.5, "city": 0.5,
                 "residential": 0.6, "residential_north": 0.6, "residential_west": 0.8, "light_industry": 0.6,
-                "light_industry_w": 0.5, "bay_processing": 0.8}
+                "light_industry_w": 0.5, "bay_processing": 0.8, "ekimae": 0.25}
 
 
 def alley_of(reg):
@@ -173,8 +173,10 @@ REGIONS = (
     #          (x -828..-145): a box that claims the mountain costs nothing to the PLACEMENT, which only ever
     #          builds on frontage, but it makes the district plan read wrong and it makes the HUD announce
     #          "Residential West" while you stand on a 300 m peak, because `Places.regionAt` reads these boxes.
-    ("residential_north", (-330.0, 700.0, 1700.0, 960.0), 1, 20.0,
-     {"Apartment": 3, "ShopHouse": 2, "Mansion": 1, "KonbiniS": 0.5, "KonbiniL": 0.4, "GasStation": 0.3},
+    # (2026-09-26) its north edge is the farm's first row road, y 920: north of it is farmland (`farm` below)
+    ("residential_north", (-330.0, 700.0, 1700.0, 920.0), 1, 20.0,
+     {"Apartment": 3, "ShopHouse": 2, "Mansion": 1, "KonbiniS": 0.5, "KonbiniL": 0.4, "GasStation": 0.3,
+      "ParkingLot4": 0.3},
      0.15, None),
     ("residential_west", (-900.0, -200.0, -150.0, 400.0), 1, 18.0,
      {"Apartment": 3, "ShopHouse": 1.5, "Mansion": 0.8, "KonbiniS": 0.3}, 0.3, None),
@@ -184,7 +186,7 @@ REGIONS = (
      0.0, None),
     ("city", (-150.0, -330.0, 1700.0, 960.0), 1, 22.0,
      {"Mansion": 3, "ShopHouse": 3, "PencilBuilding": 2, "Apartment": 2, "KonbiniS": 1, "OfficeMid": 0.5, "OfficeBlock": 0.3,
-      "FamilyRestaurant": 0.6, "KonbiniL": 0.6, "GasStation": 0.5}, 0.05, None),
+      "FamilyRestaurant": 0.6, "KonbiniL": 0.6, "GasStation": 0.5, "ParkingLot4": 0.4}, 0.05, None),
     # THE WEST SUB-CENTRE 副都心 (user, 2026-09-26: "combine the south-west with a CBD"): the second business district,
     # round the Blue line's Residential station where the housing meets the 準工業 district -- the Kamata / Kawasaki
     # shape: mid-rise offices and 雑居ビル on the station front, shops, flats over them. The main CBD stays inside C1.
@@ -196,7 +198,7 @@ REGIONS = (
     ("west_centre", (-950.0, -700.0, -400.0, -380.0), 1, 22.0,
      {"OfficeMid": 3, "OfficeBlock": 0.8, "PencilBuilding": 2.5, "ShopHouse": 2.5, "Mansion": 1.5, "KonbiniS": 1,
       "FamilyRestaurant": 0.5,
-      "KonbiniL": 0.3}, 0.05, None),
+      "KonbiniL": 0.3, "ParkingLot4": 0.3}, 0.05, None),
     ("harbour", (-820.0, -2050.0, 250.0, -1040.0), 1, 30.0, {"Warehouse": 1}, 0.2, "dark"),
     # BAY PROCESSING 水産加工 (PLAN.md 3.30 v3, 2026-09-26): the bay's west shore -- processing sheds and the 市場食堂
     # seafood diners along the quay. Existing types stand in (Warehouse = sheds, FamilyRestaurant = diners) until the
@@ -219,21 +221,78 @@ REGIONS = (
     # INDUSTRY: fewer, bigger plots with yards between (v6: "a 200 m grid at 50%") -- one row, a wide pitch, half skipped
     ("industry", (-1000.0, -1040.0, 200.0, -600.0), 1, 60.0,
      {"Warehouse": 4, "OfficeMid": 1, "ShopHouse": 0.5, "KonbiniS": 0.4, "GasStation": 0.3}, 0.5, "dark"),
+    # THE AIRPORT ISLAND (PLAN.md 3.18(s), the rail batch): it had no region, so nothing but the terminal site stood on
+    # it. Record frame of island_sites.AIRPORT_BOX (Godot x 700..1500, z 1300..2304). Stand-ins until the hangar,
+    # cargo-shed and control-tower models exist: Warehouse = hangars and cargo sheds, OfficeMid = the airport offices
+    # and hotel; a gas station and a konbini for the staff. The runway / apron reserve keeps them off the airside.
+    ("airport", (700.0, -2304.0, 1500.0, -1300.0), 1, 40.0,
+     {"Warehouse": 3, "OfficeMid": 1, "GasStation": 0.4, "KonbiniL": 0.3, "FamilyRestaurant": 0.3}, 0.3, "dark"),
     ("residential", (-1800.0, -1160.0, -150.0, -200.0), 1, 18.0,
      {"Apartment": 4, "ShopHouse": 2, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
-      "KonbiniS": 0.4}, 0.15, None),
+      "KonbiniS": 0.4, "ParkingLot4": 0.3}, 0.15, None),
     # the SUBURB as a low-density beach resort (v3: "fewer, larger buildings ... 55% occupancy"): one row, wide pitch
-    ("suburb", (850.0, -1060.0, 1800.0, -330.0), 1, 30.0,
+    ("suburb", (850.0, -1000.0, 1320.0, -330.0), 1, 30.0,          # clipped to its land (east: the spur, the sea)
      {"Apartment": 4, "ShopHouse": 1.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4,
       "FamilyRestaurant": 0.4}, 0.45, None),
-    ("farm", (350.0, 960.0, 1850.0, 1900.0), 1, 30.0, {"Apartment": 2, "Warehouse": 1, "KonbiniL": 0.2},
+    ("farm", (350.0, 920.0, 1850.0, 1900.0), 1, 30.0, {"Apartment": 2, "Warehouse": 1, "KonbiniL": 0.2},
      0.65, None),
 )
+# 駅前 ROWS (PLAN.md tier-B "a 駅前 row round each NEW station"): a small shopping street of shop-houses round every
+# station of the rail reserve, the thing that makes a Japanese station read as one -- DERIVED from the reserve, so a
+# moved station takes its 駅前 with it. First-match, so they go IN FRONT of the district rows. Not round a station in a
+# district that is already a centre (downtown, nightlife, the west 駅前 which is authored) or a working one (the
+# harbour, industry, the port), nor at Central / Airport (their own sites).
+EKIMAE_HALF = 110.0
+EKIMAE_SKIP = {"Central", "Airport", "Residential", "Harbour", "Industry"}
+EKIMAE_MIX = {"ShopHouse": 4, "PencilBuilding": 1.5, "KonbiniS": 1, "FamilyRestaurant": 0.3}
+
+
+def _ekimae_rows():
+    path = os.path.join(HERE, "..", "assets", "world_source", "buildings", "IslandRailReserve.json")
+    if not os.path.exists(path):
+        return ()
+    rows = []
+    for b in json.load(open(path))["boxes"]:
+        kind, _c, name = b["id"].partition(":")
+        if kind != "station" or name in EKIMAE_SKIP:
+            continue
+        x, y = b["x"], b["y"]
+        rows.append(("ekimae", (x - EKIMAE_HALF, y - EKIMAE_HALF, x + EKIMAE_HALF, y + EKIMAE_HALF), 1, 12.0,
+                     dict(EKIMAE_MIX), 0.05, None))
+    return tuple(rows)
+
+
+REGIONS = _ekimae_rows() + REGIONS
 ARTERIAL_ONLY = {"GasStation", "KonbiniL", "FamilyRestaurant"}
 # THE CAR PARK IS AN ADDITION, NOT PART OF THE STORE (user, 2026-09-25: "extract the parking lot out as an addition
 # instead of the left-over konbini lot"). A type named here gets that car park placed BESIDE it on the same row when
 # the land allows -- to its right along the street, else its left -- and stands without one otherwise.
 PARKING = {"KonbiniL": "ParkingLot8"}
+# WHICH CAR PARK, BY DISTRICT (PLAN.md 3.24(c), the Japanese reality): a downtown or nightlife store has NONE (a
+# Shinjuku konbini is 駐車場なし, and a family restaurant there is on an upper floor); further out every store gets
+# one, larger the further out. Per region: {store type: car park type}. A region not named uses PARKING.
+PARKING_BY_REGION = {
+    "downtown": {}, "nightlife": {}, "west_ekimae": {},
+    "west_centre": {"KonbiniL": "ParkingLot4"},
+    "city": {"KonbiniL": "ParkingLot8", "KonbiniS": "ParkingLot4", "FamilyRestaurant": "ParkingLot8"},
+    "residential": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot8", "FamilyRestaurant": "ParkingLot14"},
+    "residential_north": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot8", "FamilyRestaurant": "ParkingLot14"},
+    "residential_west": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot8"},
+    "suburb": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot14", "FamilyRestaurant": "ParkingLot14"},
+    "farm": {"KonbiniL": "ParkingLot14", "KonbiniS": "ParkingLot14"},
+    "airport": {"KonbiniL": "ParkingLot14", "FamilyRestaurant": "ParkingLot14"},
+}
+
+
+def parking_for(t, reg):
+    """The car park placed beside a building of type `t` in region `reg` (a REGIONS row or None), or None."""
+    name = reg[0] if reg else None
+    return PARKING_BY_REGION.get(name, PARKING).get(t)
+
+
+CAR_PARKS = {"ParkingLot4", "ParkingLot8", "ParkingLot14"}
+# コインパーキング (PLAN.md 3.24(d)): a 4-bay ParkingLot4 in a region's MIX is a coin-parking plot on the street front --
+# the most Japanese use of a gap between two buildings (city, the housing, the west sub-centre).
 # Every building ships SHUT (user, 2026-09-19), with two exceptions, both placed as a variant of the same type:
 # * `<Type>_Shop` -- unlocked, automatic doors: the shops a player walks into as ordinary play (GTA's konbini, diner,
 #   petrol station, station hall) and the player's home base;
@@ -309,7 +368,29 @@ SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: 
 ANCHOR_REACH = 250.0   # ... and the furthest a WANTED TYPE may be found from the wish
 SPACING = {"GasStation": 450.0, "KonbiniL": 250.0, "FamilyRestaurant": 350.0, "KonbiniS": 120.0}
 SKIP_ROADS = ("shuto_", "shrine_touge", "kaigan_dori", "airport_", "kuko_dori")
-TYPES = sorted({t for r in REGIONS for t in r[4]} | set(PARKING.values()) | {"ParkingLot4"})   # + the safe house's car park
+def _variants():
+    """{base type: [its footprint variants]} (PLAN.md 3.19(c)), from the type table via the layout (one owner)."""
+    sys.path.insert(0, os.path.join(HERE, "building_kit"))
+    import layout_buildings as _lb
+    return _lb.variant_ids()
+
+
+VARIANTS = _variants()
+BASE_OF = {v: b for b, vs in VARIANTS.items() for v in vs}
+
+
+def variant_pick(t, key):
+    """The type actually built for a slot drawn as `t`: the base or one of its footprint variants, by a hash of the
+    slot's key, so an unchanged record rebuilds byte-identically and neighbours differ."""
+    vs = VARIANTS.get(t)
+    if not vs:
+        return t
+    h = zlib.crc32(("variant|%s|%s" % (key, t)).encode())
+    return ([t] + vs)[h % (len(vs) + 1)]
+
+
+TYPES = sorted({t for r in REGIONS for t in r[4]} | set(PARKING.values()) | CAR_PARKS
+               | {v for r in REGIONS for t in r[4] for v in VARIANTS.get(t, ())})   # + the safe house's car park
 
 # --- the ambient crowd (PLAN.md 3.6d). A pedestrian zone is derived from the SAME footways the buildings front,
 # on the SAME 252 m cell grid, so "where do people walk" has one owner. What a zone carries is a
@@ -327,7 +408,8 @@ SPAWN_UID = "uid://ctq8u5jyp6ijf"
 # once, which `peds` prints.
 PED_DENSITY = {"nightlife": 2.6, "downtown": 2.0, "city": 1.2, "residential": 0.8, "residential_north": 0.8,
                "residential_west": 0.5, "suburb": 0.6, "industry": 0.5, "harbour": 0.4, "farm": 0.3,
-               "light_industry": 0.6, "light_industry_w": 0.8, "west_centre": 1.6, "west_ekimae": 2.2, "bay_processing": 0.7, None: 0.5}
+               "light_industry": 0.6, "light_industry_w": 0.8, "west_centre": 1.6, "west_ekimae": 2.2, "bay_processing": 0.7, "airport": 0.4,
+               "ekimae": 1.8, None: 0.5}
 PED_MAX = 40           # a single cell's crowd, however much footway it holds
 PED_LOAD = 300.0       # > the cell's own half-diagonal (178 m) and just over the 252 m cell pitch, so the four
                        # orthogonal neighbours stream too and a crowd exists before it is in view
@@ -701,7 +783,7 @@ def plan_reserves(field):
                                                                 ", ".join(n for n, _b in PL.RESERVES)))
 
 
-FIELD_BOX = (400.0, 700.0, 1300.0, 1570.0)   # record frame: the farm grid (island_plan's farm* street regions)
+FIELD_BOX = (400.0, 920.0, 1300.0, 1700.0)   # record frame: the farm grid (island_plan's farm* street regions)
 FIELD_CHUNK, FIELD_CELLS = 50.0, 25          # must match world.CropField.CHUNK / CELLS
 FIELD_LEVEE = 1.5                              # m of levee (畦) kept clear of anything blocked round a field cell
 WHEAT_ONE_IN = 4                               # one paddy section in this many grows wheat, the rest rice
@@ -729,7 +811,11 @@ def _seaward(field):
     a0, b0 = j0 // s, i0 // s
     sea = field.h2[a0:a0 + road.shape[0], b0:b0 + road.shape[1]] <= LAND_Z
     open_ = ~road
-    reach = sea & open_
+    # seeded from OPEN SEA only -- the water on the window's border, where the sea comes in -- never from inland water:
+    # seeded from every water cell, the farm's ため池 flooded its whole section (and with no farm roads, the whole farm)
+    border = np.zeros_like(sea)
+    border[0, :] = border[-1, :] = border[:, 0] = border[:, -1] = True
+    reach = sea & open_ & border
     while True:
         grown = reach.copy()
         grown[1:, :] |= reach[:-1, :]
@@ -758,7 +844,10 @@ def farm_fields(field):
     A section's crop is a hash of its grid position: rice, with one section in WHEAT_ONE_IN wheat."""
     import island_plan as PL
     np = field.np
-    xs = sorted({v for r in PL.STREET_REGIONS if r[0].startswith("farm") for v in r[3]})
+    import island_core_streets as CS
+    frame = {st["name"]: st for st in CS.STREETS}["nodo_waku"]["corners"]
+    # the frame's two north-south legs (the west road and the station-front road) are section edges too
+    xs = sorted({v for r in PL.STREET_REGIONS if r[0].startswith("farm") for v in r[3]} | {frame[0][0], frame[-2][0]})
     ys = sorted({v for r in PL.STREET_REGIONS if r[0].startswith("farm") for v in r[4]})
     x0r, y0r, x1r, y1r = FIELD_BOX
     xe, ye = [x0r] + xs + [x1r], [y0r] + ys + [y1r]
@@ -790,6 +879,12 @@ def farm_fields(field):
                 for col in range(FIELD_CELLS):
                     x, z = cx + (col + 0.5) * cell, cz + (row + 0.5) * cell
                     if not (x0r <= x <= x1r and y0r <= -z <= y1r) or seaward(x, z) or not free(x, z):
+                        continue
+                    # FIELDS ARE ONLY ON FARMLAND (user, 2026-09-26: rice was growing in the north residential
+                    # district): the building region there must be `farm`, the same first-match answer the placement
+                    # and the HUD read
+                    reg = region_of(x, -z)
+                    if reg is None or reg[0] != "farm":
                         continue
                     k = kind(section(x, -z))
                     by_kind.setdefault(k, set()).add(row * FIELD_CELLS + col)
@@ -1361,6 +1456,7 @@ def derive(heights_path):
                         order.append(names.pop(pick))
                         weights.pop(pick)
                     for t in order:
+                        t = variant_pick(t, key)
                         # the row line is where the front stands; sample the lot's centre along the row
                         w = aabbs[t][2] - aabbs[t][0]
                         adv = w / 2.0 + alley_of(reg)
@@ -1378,8 +1474,9 @@ def derive(heights_path):
                     if got:
                         placed.append(got)
                         counts[got["type"]] = counts.get(got["type"], 0) + 1
-                        seen_kind.setdefault(got["type"], []).append((got["pos"][0], got["pos"][2]))
-                        lot_t = PARKING.get(got["type"])
+                        seen_kind.setdefault(BASE_OF.get(got["type"], got["type"]), []).append(
+                            (got["pos"][0], got["pos"][2]))
+                        lot_t = parking_for(got["type"], reg)
                         if lot_t:
                             # the car park BESIDE the store, on the same row line: right (further along the
                             # street) first, else left; the store stands alone when neither fits
@@ -1413,7 +1510,7 @@ def derive(heights_path):
                     else:
                         k += 1
     print("island_buildings: %d car park(s) placed beside their store, %d candidate spot(s) refused"
-          % (sum(1 for b in placed if b["type"] in PARKING.values()), parking_misses[0]))
+          % (sum(1 for b in placed if b["type"] in CAR_PARKS and b.get("with") is not None), parking_misses[0]))
     grow_lots(field, placed)
     separate_lots(placed, aabbs)
     assign_tones(placed)
@@ -1935,7 +2032,7 @@ def apply_anchors(placed):
                 ox, oz = ref["pos"][0], ref["pos"][2]
             # an anchored building must FRONT a street (user, 2026-09-26: the safe house had no door onto a street,
             # so the player could not get out): only a frontage-row slot, never a back row or a lot's parking
-            pool = [b for b in placed if (b["type"] == want if want else True) and b is not None
+            pool = [b for b in placed if (BASE_OF.get(b["type"], b["type"]) == want if want else True) and b is not None
                     and b.get("key", "|||").split("|")[2] == "0" and not b.get("key", "").endswith("|P")
                     and not b.get("role")]
             if role == "safehouse":
@@ -2197,7 +2294,7 @@ def write(check):
                 aabbs[t] = type_aabb(t)
             x0, z0, x1, z1, h = aabbs[t]
             tone = int(b.get("tone", 0))
-            rgb = HLOD_GLASS.get(t) or (levels[tone]["srgb"] if tone < len(levels) else (150.0, 150.0, 150.0))
+            rgb = HLOD_GLASS.get(BASE_OF.get(t, t)) or (levels[tone]["srgb"] if tone < len(levels) else (150.0, 150.0, 150.0))
             out.append([round(b["pos"][0], 3), round(b["pos"][1] + LOT_RAISE + FLOOR_LIFT, 3), round(b["pos"][2], 3),
                         round(b["yaw"], 3), x0, z0, x1, z1, h, [round(c / 255.0, 4) for c in rgb]])
         if out:

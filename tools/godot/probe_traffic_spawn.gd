@@ -122,6 +122,9 @@ func _initialize() -> void:
 		quit(2)
 		return
 	print("--- traffic spawn probe on '%s'" % which)
+	var ts := root.get_node_or_null("TrafficSignals")
+	if ts != null:
+		ts.set("game_clock", true)      # --fixed-fps game time is not wall time: the lights keep game time too
 	var w: Node = (load(WORLDS[which]) as PackedScene).instantiate()
 	root.add_child(w)
 	current_scene = w   # ZoneManager and LaneGraph both resolve the world through current_scene
@@ -161,9 +164,9 @@ func _initialize() -> void:
 			var c: Dictionary = cars[id]
 			c["dist"] += Vector2(p.x - c["last"].x, p.z - c["last"].z).length()
 			c["last"] = p
-			if p.distance_to(c["mark"]) > 1.0:
+			if p.distance_to(c["mark"]) > 1.0 or _waiting_for_signal(c["node"]):
 				c["mark"] = p
-				c["moved_frame"] = f
+				c["moved_frame"] = f     # a car waiting at a red is not standing for nothing
 		for id in cars.keys():
 			var c: Dictionary = cars[id]
 			if not is_instance_valid(c["node"]) or not (c["node"] as Node).is_inside_tree():
@@ -227,3 +230,11 @@ func _initialize() -> void:
 	_check("no car left standing", idle_max <= MAX_IDLE_S, "longest idle %.1f s" % idle_max)
 	print("RESULT: %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(1 if fails else 0)
+
+
+func _waiting_for_signal(car: Node) -> bool:
+	for ch in car.get_children():
+		var sc = ch.get_script()
+		if sc != null and str(sc.resource_path).ends_with("VehicleAIController.java"):
+			return bool(ch.call("waiting_for_signal_now"))
+	return false

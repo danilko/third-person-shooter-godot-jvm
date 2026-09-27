@@ -9,6 +9,8 @@ extends SceneTree
 ##       -- ... --park=x,z   put the (disabled) streaming player over (x, z) instead of PARK
 ##       -- ... --see-obstacles=1   let the brain BRAKE for other cars (it is blind by default): 0.7 cause 1 is
 ##       rear-ending ambient traffic at 45 m/s, which masks the road defects underneath it
+##       -- ... --driver=standard   drive by the traffic rules (lane limit, corner governor, junctions, eyes) instead
+##       of the default flat-out stress test -- how an ordinary car takes the road (PLAN.md DRIVING (a))
 ##       -- ... --follow=1   keep the streaming player 400 m over the car, for a drive longer than one zone
 ##       -- ... --wheel-sensor=1   drive with the sphere ground sensor (2 = tyre cylinder, 0 = the shipped rays);
 ##       the review measured all three equal in cost and sphere/cylinder 15x smoother over a kerb, so this is how
@@ -142,9 +144,17 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 	car = (load(VEHICLE) as PackedScene).instantiate()
 	ctrl = load(CTRL).new()
 	ctrl.set("cruise_speed", speed)
-	ctrl.set("cruise_throttle", 1.0)
-	ctrl.set("junction_throttle_scale", 1.0)
-	ctrl.set("turn_slowdown", 0.3)
+	# `--driver=standard` (PLAN.md DRIVING (a)): the TRAFFIC rules -- the lane's own speed limit (20 km/h on a turn
+	# connector), the corner governor, the junction throttle, and eyes for other cars -- i.e. how an ordinary driver
+	# takes this road. The default `stress` is the launch test: flat out at --speed, blind, no junction slowdown.
+	var standard := _arg("driver", "stress") == "standard"
+	if standard:
+		ctrl.set("ignore_speed_limit", false)
+		ctrl.set("see_obstacles", true)
+	else:
+		ctrl.set("cruise_throttle", 1.0)
+		ctrl.set("junction_throttle_scale", 1.0)
+		ctrl.set("turn_slowdown", 0.3)
 	# The edge cases mean "the car's OUTER WHEELS on the kerb line", and -3 m was that for the prototype's wheels at
 	# +-1.1 m. A narrower track needs the same wheels-on-the-kerb line, not the same number: at -3 m SPC-1 (wheels at
 	# +-0.82) was spawned 0.28 m further out, its body already in the kerb, and read that as launches and falls.
@@ -152,7 +162,7 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 		var track_half := absf((car.get_node("Wheels/FL") as Node3D).position.x)
 		offset += signf(offset) * (track_half - PROTOTYPE_TRACK_HALF)
 	ctrl.set("lateral_offset", offset)
-	if corner_accel >= 0.0:
+	if corner_accel >= 0.0 and not standard:
 		ctrl.set("corner_lateral_accel", corner_accel)
 	# Normally blind to other cars, so a launch run is not spoiled by traffic it did not mean to measure --
 	# but rear-ending an ambient car IS one of 0.7's causes, and it masks the rest, so it can be switched on.

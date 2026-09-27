@@ -12,7 +12,8 @@ The island's road record is two layers:
     1. `island_touges.py add`  -- the mountain road (shrine touge, the summit straight, the east descent; 3.30 L2).
        The trunk grid is no longer a step: since the land redo it is part of the arterial layer
        (`island_network.py`, `island_plan.trunk_lines`);
-    2. `island_streets.py`     -- the block streets and farm roads (step 4, 3.3);
+    2. `island_core_streets.py` -- the AUTHORED streets the grid cannot make (the farm's frame, the core's back streets);
+       `island_streets.py`     -- the block streets and farm roads (step 4, 3.3);
        `island_site_access.py` -- each site's access road to its visitor car park (3.23, B8), a declared dead end;
     3. `island_expressway.py`  -- C1, the airport JCT and spur, the diamond (step 2; after the streets, so its pier
                                   pass sees them);
@@ -115,6 +116,9 @@ def derive(out):
     # would stand on a road, column by column (`point_mesh.pier_on_road`)
     sys.stdout.write(run(os.path.join(HERE, "island_expressway.py"), out, "--from", tmp, "--fast"))
     os.remove(tmp)
+    # the AUTHORED streets the grid planner cannot make (the farm's frame, the core's 裏通り behind C1): before the
+    # planner, so its farm rows end on the frame's legs
+    sys.stdout.write(run(os.path.join(HERE, "island_core_streets.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_streets.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_site_access.py"), out))
     sys.stdout.write(run(os.path.join(HERE, "island_turnarounds.py"), out))

@@ -185,6 +185,19 @@ def corridors(net):
 GORE_MARGIN = 1.0     # the ramp holds its mainline's height until the two paved bands are this far apart
 GORE_GRADE = 0.07     # ...and leaves that height no steeper than this
 _GORE_HELD = set()    # uids `level_gores` fixed: anchors for `held_indices`
+_RAIL = None
+
+
+def _near_level_crossing(pos):
+    """Is this station within island_dike.LX_HOLD of an at-grade rail sample? Such a station is held: the dike pins
+    a ramp's to the rail's height there, and a smoothed road would climb across the tracks again."""
+    global _RAIL
+    if _RAIL is None:
+        import island_dike
+        _RAIL = (island_dike.LX_HOLD, island_dike._rail_grade_samples())
+    h, rail = _RAIL
+    return any(abs(q[0] - pos[0]) < h and abs(q[1] - pos[1]) < h and math.hypot(q[0] - pos[0], q[1] - pos[1]) < h
+               for q in rail)
 
 
 def _road_half(road):
@@ -340,6 +353,8 @@ def held_indices(nodes):
     deck = set()
     for i, ps in enumerate(nodes):
         if any(p.uid in _GORE_HELD for p in ps):          # level_gores: the ramp still shares its mainline's paving
+            held.add(i)
+        if any(_near_level_crossing(p.pos) for p in ps):   # a 踏切: the road is level at the rail (island_dike)
             held.add(i)
         if any(str(p.role) == "INTERSECTION" for p in ps):
             held.add(i)

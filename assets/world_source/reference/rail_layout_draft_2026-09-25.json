@@ -1,0 +1,256 @@
+{
+ "schema": 1,
+ "notes": "DRAFT rail layout (PLAN.md 3.25), written by tools/island_rail_layout.py; record frame (x east, y north).",
+ "lines": {
+  "Main line": {
+   "corners": [
+    [
+     1110.0,
+     1400.0
+    ],
+    [
+     1110.0,
+     215.0
+    ],
+    [
+     160.0,
+     215.0
+    ],
+    [
+     160.0,
+     -460.0
+    ],
+    [
+     1250.0,
+     -460.0
+    ],
+    [
+     1250.0,
+     -1480.0
+    ],
+    [
+     1300.0,
+     -1700.0
+    ],
+    [
+     1300.0,
+     -1960.0
+    ]
+   ],
+   "radius": 220.0,
+   "form": [
+    [
+     1110.0,
+     1400.0,
+     "grade"
+    ],
+    [
+     1110.0,
+     1030.0,
+     "elev"
+    ],
+    [
+     1250.0,
+     -560.0,
+     "bridge"
+    ],
+    [
+     1300.0,
+     -1700.0,
+     "elev"
+    ]
+   ],
+   "length_m": 5043.6
+  },
+  "West line": {
+   "corners": [
+    [
+     782.0,
+     215.0
+    ],
+    [
+     -150.0,
+     215.0
+    ],
+    [
+     -150.0,
+     -170.0
+    ],
+    [
+     -900.0,
+     -170.0
+    ],
+    [
+     -900.0,
+     -550.0
+    ],
+    [
+     0.0,
+     -550.0
+    ],
+    [
+     0.0,
+     -1040.0
+    ]
+   ],
+   "radius": 200.0,
+   "form": [
+    [
+     782.0,
+     215.0,
+     "elev"
+    ]
+   ],
+   "length_m": 3454.1
+  }
+ },
+ "stations": {
+  "Farm": {
+   "line": "Main line",
+   "s": 80.0,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "small",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus, at grade",
+   "x": 1110.0,
+   "y": 1320.0
+  },
+  "Residential North": {
+   "line": "Main line",
+   "s": 580.0,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated",
+   "x": 1110.0,
+   "y": 820.0
+  },
+  "Central": {
+   "line": "Main line",
+   "s": 1435.45,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "hub",
+   "platform_m": 300.0,
+   "platform_grade": 0.0,
+   "parking": "multistorey",
+   "note": "elevated; the hub: the North, South and West lines meet here",
+   "x": 782.0,
+   "y": 215.0
+  },
+  "Bay": {
+   "line": "Main line",
+   "s": 2367.78,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated",
+   "x": 160.0,
+   "y": -190.0
+  },
+  "Waterpark": {
+   "line": "Main line",
+   "s": 2853.11,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated; the south waterfront park",
+   "x": 470.0,
+   "y": -460.0
+  },
+  "Suburb": {
+   "line": "Main line",
+   "s": 3263.11,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "elevated",
+   "x": 880.0,
+   "y": -460.0
+  },
+  "Airport": {
+   "line": "Main line",
+   "s": 4933.59,
+   "off_line_m": 0.0,
+   "z": 16.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus, elevated",
+   "x": 1300.0,
+   "y": -1850.0
+  },
+  "Castle Town": {
+   "line": "West line",
+   "s": 1637.72,
+   "off_line_m": 0.0,
+   "z": 9.69,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "elevated; Shuri Castle 0.13 km up",
+   "x": -620.0,
+   "y": -170.0
+  },
+  "Residential": {
+   "line": "West line",
+   "s": 2330.25,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated",
+   "x": -720.0,
+   "y": -550.0
+  },
+  "Industry": {
+   "line": "West line",
+   "s": 2790.25,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated",
+   "x": -260.0,
+   "y": -550.0
+  },
+  "Harbour": {
+   "line": "West line",
+   "s": 3374.14,
+   "off_line_m": 0.0,
+   "z": 8.87,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus, elevated; freight yard beside it",
+   "x": 0.0,
+   "y": -960.0
+  }
+ },
+ "freight_yard": [
+  90.0,
+  -1020.0
+ ]
+}

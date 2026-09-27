@@ -34,7 +34,8 @@ S = 0.5                                                 # px per metre
 HALF, CELL, CELLS = 2304.0, 192.0, 24                   # world.PostalGrid
 COL = {"nightlife": (196, 64, 128), "downtown": (232, 96, 64), "city": (230, 150, 70), "industry": (150, 150, 165),
        "harbour": (110, 118, 140), "residential": (110, 176, 120), "residential_north": (120, 190, 130),
-       "residential_west": (100, 170, 110), "suburb": (150, 196, 130), "farm": (206, 196, 118)}
+       "residential_west": (100, 170, 110), "suburb": (150, 196, 130), "farm": (206, 196, 118),
+       "airport": (190, 190, 215)}
 STYLE = {"street": ((175, 175, 175), 2), "arterial": ((245, 245, 245), 4), "coast": ((120, 230, 220), 4),
          "touge": ((255, 120, 40), 3), "shuto": ((255, 170, 0), 5), "wangan": ((255, 60, 220), 6)}
 
@@ -70,6 +71,10 @@ def main(argv):
     ap.add_argument("--out", default=os.path.join(ROOT, "assets/world_source/reference/island_plan_latest.png"))
     ap.add_argument("--no-grid", action="store_true")
     ap.add_argument("--no-legend", action="store_true", help="leave the legend box off (a caller draws its own)")
+    ap.add_argument("--record", default=os.path.join(ROOT, "assets/world_source/pieces/IslandRoads.roads.json"),
+                    help="the road record to draw (a scratch derive, say)")
+    ap.add_argument("--no-rail", action="store_true", help="leave the rail reserve off")
+    ap.add_argument("--crop", default=None, help="x0,y0,x1,y1 record-frame window to cut the picture to")
     ap.add_argument("--title", default="ISLAND PLAN (derived) -- tools/island_plan_picture.py")
     a = ap.parse_args(argv)
     H = np.fromfile(os.path.join(ROOT, "assets/world_source/terrain/island_natural.f32"), "<f4").reshape(N, N)
@@ -110,7 +115,7 @@ def main(argv):
         name, (x0, _y0, _x1, y1) = r[0], r[1]
         q = P(x0, y1)
         dr.text((q[0] + 6, q[1] + 4), name.replace("_", " "), fill=COL.get(name, (220, 220, 220)), font=F)
-    rec = json.load(open(os.path.join(ROOT, "assets/world_source/pieces/IslandRoads.roads.json")))
+    rec = json.load(open(a.record))
     pts = {p["uid"]: p for p in rec["points"]}
     layers = {k: [] for k in STYLE}
     for rd in rec["roads"]:
@@ -121,6 +126,25 @@ def main(argv):
         col, w = STYLE[k]
         for line in layers[k]:
             dr.line([P(p[0], p[1]) for p in line], fill=col, width=w)
+    rpath = os.path.join(ROOT, "assets/world_source/buildings/IslandRailReserve.json")
+    if not a.no_rail and os.path.exists(rpath):
+        # the RAIL RESERVE (island_rail_layout.py --reserve): each corridor sample by what a street may do there --
+        # cyan 'level' (a 踏切), blue 'under' (the viaduct), red 'no' -- and every station / building / car-park box
+        rr = json.load(open(rpath))
+        rc = {"level": (80, 230, 255), "under": (60, 110, 255), "no": (255, 50, 50)}
+        for samp in (c_["pts"] for c_ in rr["corridors"]):
+            for q in samp:
+                c_ = P(q[0], q[1])
+                dr.ellipse([c_[0] - 2, c_[1] - 2, c_[0] + 2, c_[1] + 2], fill=rc.get(q[4], (255, 255, 255)))
+        for b in rr["boxes"]:
+            ux, uy = b["ux"], b["uy"]
+            nx, ny = -uy, ux
+            cs = [(b["x"] + ux * sa * b["h_along"] + nx * sc * b["h_across"],
+                   b["y"] + uy * sa * b["h_along"] + ny * sc * b["h_across"])
+                  for sa, sc in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+            col = (255, 255, 255) if b["id"].startswith("station") else (255, 220, 60) \
+                if b["id"].startswith("building") else (120, 255, 120)
+            dr.polygon([P(*q) for q in cs], outline=col)
     A, B = R.crest()
     dr.line([P(A[0], -A[1]), P(B[0], -B[1])], fill=(160, 40, 40), width=5)
     for st in json.load(open(os.path.join(ROOT, "assets/world_source/buildings/IslandSites.json")))["sites"]:
@@ -143,6 +167,13 @@ def main(argv):
             if 0 < py < Hh:
                 dr.text((W - 30, py - 9), str(k), fill=(255, 255, 160), font=FB)
     x0t, y0t = 10, Hh - 190
+    if a.crop:
+        cx0, cy0, cx1, cy1 = (float(v) for v in a.crop.split(","))
+        (l, t_), (r_, b_) = P(cx0, cy1), P(cx1, cy0)
+        img = img.crop((int(l), int(t_), int(r_), int(b_)))
+        img.convert("RGB").save(a.out)
+        print("island_plan_picture: %s (cropped)" % a.out)
+        return
     if a.no_legend:
         img.convert("RGB").save(a.out)
         print("island_plan_picture: %s %dx%d" % (os.path.relpath(a.out, ROOT), W, Hh))

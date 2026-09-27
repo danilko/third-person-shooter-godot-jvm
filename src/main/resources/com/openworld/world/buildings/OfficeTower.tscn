@@ -1,0 +1,218 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/OfficeTower_mesh.res" id="1_yrjd5"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_btq62"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ckbsm"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8k206"]
+size = Vector3(0.91, 2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4tfsi"]
+size = Vector3(25.48, 11.83, 0.2103)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0kyhx"]
+size = Vector3(25.48, 43.68, 0.2103)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tqjl5"]
+size = Vector3(12.8, 3.64, 0.2103)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cruh8"]
+size = Vector3(1.7, 1.54, 0.2103)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tgxde"]
+size = Vector3(10.98, 3.64, 0.2103)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_g2eqo"]
+size = Vector3(0.2103, 11.83, 20.02)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_igskt"]
+size = Vector3(0.2103, 47.32, 21.84)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ihp5i"]
+size = Vector3(25.48, 11.83, 0.2103)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1x01b"]
+size = Vector3(25.48, 47.32, 0.2103)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_i8qgt"]
+size = Vector3(0.2103, 11.83, 20.02)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_nxmoh"]
+size = Vector3(0.2103, 47.32, 21.84)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0e1ly"]
+size = Vector3(25.48, 0.91, 0.2103)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sguq0"]
+size = Vector3(0.2103, 0.91, 1.82)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4ionw"]
+size = Vector3(0.2103, 0.91, 1.82)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_he381"]
+size = Vector3(25.48, 0.1, 21.84)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ec3pr"]
+size = Vector3(25.48, 0.2, 20.02)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8rslw"]
+size = Vector3(25.48, 0.2, 1.82)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5vjir"]
+size = Vector3(3.64, 3.64, 3.64)
+
+[node name="OfficeTower" type="Node3D" unique_id=1010465455]
+metadata/building = {
+"aabb": [Vector3(-12.998897, -0.091, -11.14669), Vector3(25.965378, 61.971, 22.325788)],
+"door_style": "slide",
+"doors": [{
+"center": [0.91, 0.0, 10.92],
+"height": 2.1,
+"module": 7.0,
+"outward": [0.0, 0.0, 1.0],
+"shopfront": {
+"module": 1.82,
+"storey": 3.64
+},
+"side": "front",
+"style": "slide",
+"width": 1.7
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"facade_surfaces": {
+"MI_Trim_MetalConcrete": 0
+},
+"footprint_m": [25.48, 21.84],
+"has_interior": false,
+"height_m": 61.88,
+"id": "OfficeTower",
+"jp": {
+"depth_m": 21.8,
+"frontage_m": 25.5,
+"height_m": 58.2,
+"name": "高層オフィスビル"
+},
+"kit": "quaternius_downtown_city",
+"module_m": 1.82,
+"modules": [14.0, 12.0],
+"piece_count": 2355,
+"roofline_m": 60.06,
+"setback_m": 1.82,
+"shop_band": "",
+"solid_probes": [{
+"center": [-11.83, 0.0, 10.92],
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "front"
+}],
+"stair_house": {
+"center": [-9.1, 58.24, -7.28],
+"size": [3.64, 3.64, 3.64]
+},
+"storeys": [3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64, 3.64],
+"terrace_m": 47.32,
+"use": "a core high-rise: a glass lobby and fifteen office floors on a 25 m plot (the 60 m class)",
+"wall_top_m": 58.24
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=921042363]
+visibility_range_end = 900.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_yrjd5")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1343510819]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=225393151]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.335, 1.05, 10.92)
+shape = SubResource("BoxShape3D_btq62")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=219335768]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.485, 1.05, 10.92)
+shape = SubResource("BoxShape3D_ckbsm")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1020651727]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.01, 59.24, -5.55)
+shape = SubResource("BoxShape3D_8k206")
+
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=1690623098]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 53.235, 8.99485)
+shape = SubResource("BoxShape3D_4tfsi")
+
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=712813332]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25.48, 10.81485)
+shape = SubResource("BoxShape3D_0kyhx")
+
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=1868503709]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.34, 1.82, 10.81485)
+shape = SubResource("BoxShape3D_tqjl5")
+
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=411096729]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.91, 2.87, 10.81485)
+shape = SubResource("BoxShape3D_cruh8")
+
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=1722162960]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.25, 1.82, 10.81485)
+shape = SubResource("BoxShape3D_tgxde")
+
+[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=691522977]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.63485, 53.235, -0.91)
+shape = SubResource("BoxShape3D_g2eqo")
+
+[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=920346053]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.63485, 23.66, 0)
+shape = SubResource("BoxShape3D_igskt")
+
+[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=1546398650]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 53.235, -10.81485)
+shape = SubResource("BoxShape3D_ihp5i")
+
+[node name="Box11" type="CollisionShape3D" parent="Collision" unique_id=138451415]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 23.66, -10.81485)
+shape = SubResource("BoxShape3D_1x01b")
+
+[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=1715476569]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.63485, 53.235, -0.91)
+shape = SubResource("BoxShape3D_i8qgt")
+
+[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=969059501]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.63485, 23.66, 0)
+shape = SubResource("BoxShape3D_nxmoh")
+
+[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=1346565070]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 47.775, 10.81485)
+shape = SubResource("BoxShape3D_0e1ly")
+
+[node name="Box15" type="CollisionShape3D" parent="Collision" unique_id=2049576555]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.63485, 47.775, 10.01)
+shape = SubResource("BoxShape3D_sguq0")
+
+[node name="Box16" type="CollisionShape3D" parent="Collision" unique_id=311709223]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.63485, 47.775, 10.01)
+shape = SubResource("BoxShape3D_4ionw")
+
+[node name="Box17" type="CollisionShape3D" parent="Collision" unique_id=1147097961]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_he381")
+
+[node name="Box18" type="CollisionShape3D" parent="Collision" unique_id=1374643123]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 58.14, -0.91)
+shape = SubResource("BoxShape3D_ec3pr")
+
+[node name="Box19" type="CollisionShape3D" parent="Collision" unique_id=1166756849]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 47.22, 10.01)
+shape = SubResource("BoxShape3D_8rslw")
+
+[node name="Box20" type="CollisionShape3D" parent="Collision" unique_id=232268470]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.1, 60.06, -7.28)
+shape = SubResource("BoxShape3D_5vjir")
+
+[node name="Door_front_7" type="Marker3D" parent="." unique_id=1443716563]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0.91, 0, 10.92)

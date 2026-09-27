@@ -79,13 +79,23 @@ func _run() -> void:
 
 	# every konbini sells weapons (user, 2026-09-26): the store beside the safe house carries its pads in its own
 	# streamed cell like every other konbini, so the "counter" is the Pads_ holder nearest the spawn
+	# the ARMOURY is the full-catalog store the safe house was placed beside (the record's `roles.armoury`); any
+	# nearer small konbini sells only a short list, so "nearest to the spawn" is not the question
+	var anchor := spawn.global_position
+	var rec = JSON.parse_string(FileAccess.get_file_as_string("res://assets/world_source/buildings/IslandBuildings.json"))
+	if rec is Dictionary and rec.get("roles", {}).has("armoury"):
+		var ap: Array = rec["roles"]["armoury"]["pos"]
+		anchor = Vector3(float(ap[0]), float(ap[1]), float(ap[2]))
 	var counter: Node = null
 	var best := 1e9
+	var best_spawn := 1e9
 	for h in _pad_holders(w):
-		var d := spawn.global_position.distance_to((h.get_child(0) as Node3D).global_position)
+		var d := anchor.distance_to((h.get_child(0) as Node3D).global_position)
 		if d < best:
 			best = d
 			counter = h
+			best_spawn = spawn.global_position.distance_to((h.get_child(0) as Node3D).global_position)
+	best = best_spawn
 	var pads: Array = counter.get_children() if counter != null else []
 	var catalog: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://src/main/resources/com/openworld/weapon/weapon_catalog.json"))
 	var ids := {}
@@ -100,7 +110,12 @@ func _run() -> void:
 	_check("the konbini beside the safe house sells every weapon, one pad each", ok and best < 80.0,
 			"%d pads, %.0f m from the spawn" % [pads.size(), best])
 
-	var pad := counter.get_node_or_null("Pad_ASR1") as Area3D
+	var pad := counter.get_node_or_null("Pad_ASR1") as Area3D if counter != null else null
+	if pad == null:
+		_check("the armoury has an ASR1 pad", false)
+		print("RESULT FAIL (%d failures)" % fails)
+		quit(1)
+		return
 	# stand on the pad (the shop's cell has had four seconds to stream in under the player's feet)
 	p.global_position = pad.global_position + Vector3(0, 0.3, 0)
 	p.velocity = Vector3.ZERO
@@ -117,7 +132,12 @@ func _run() -> void:
 	# step OFF: out to the spawn point in the street (a fixed sideways step can land against a shelf or a wall,
 	# depending on which store is the counter, and then the player never leaves the pad)
 	p.global_position = spawn.global_position + Vector3(0, 0.3, 0)
-	await _tick(160)
+	await _tick(20)
+	# the pad's cooldown runs on the ENGINE clock (a pad off screen does not process), and --fixed-fps runs faster
+	# than real time: wait it out in wall time
+	var t_off := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t_off < int((float(pad.get("cooldown_seconds")) + 0.5) * 1000.0):
+		await physics_frame
 	p.global_position = pad.global_position + Vector3(0, 0.3, 0)
 	await _tick(30)
 	var again: Array = []

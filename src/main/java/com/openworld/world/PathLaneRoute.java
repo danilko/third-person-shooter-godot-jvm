@@ -6,6 +6,7 @@ import godot.annotation.Script;
 import godot.api.Curve3D;
 import godot.api.Node3D;
 import godot.api.Path3D;
+import godot.core.StringName;
 import godot.core.NodePath;
 import godot.core.PackedVector3Array;
 import godot.core.Vector3;
@@ -187,12 +188,27 @@ public class PathLaneRoute extends Node3D implements Lane {
         Path3D p3d = pathChild();
         if (p3d != null) curve = p3d.getCurve();
         ensureBaked();
+        // A RAIL lane (PLAN.md 3.25 R1: `road_class` "rail", a track of a Road Kit rail network) is a train's path,
+        // never a car's: it stays out of the traffic registry -- so no car is spawned on it and LaneGraph's
+        // proximity successors never hand a car from a street onto a track at a level crossing -- and joins the
+        // RAIL_GROUP the train system (tier D) reads instead.
+        if (isRail()) {
+            addToGroup(new StringName(RAIL_GROUP));
+            return;
+        }
         ZoneManager mgr = ZoneManager.get();
         if (mgr != null) mgr.registerRoute(this);
     }
 
+    /** The group every rail track lane joins instead of the traffic registry. */
+    public static final String RAIL_GROUP = "rail_track";
+    public static final String RAIL_CLASS = "rail";
+
+    public boolean isRail() { return RAIL_CLASS.equals(roadClass); }
+
     @Register
     public void _exitTree() {
+        if (isRail()) return;
         ZoneManager mgr = ZoneManager.get();
         if (mgr != null) mgr.unregisterRoute(this);
     }

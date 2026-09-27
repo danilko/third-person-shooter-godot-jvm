@@ -477,10 +477,64 @@ EDIT_NOTES = {
     "Harbour_Bollard": "Mooring bollard, the head leaning to the sea (-Y). Stood on the quay edge.",
     "Harbour_Fender": "Rubber fender, hangs BELOW the quay edge (Z -1.8..-0.3), face to the sea (-Y). Not in the "
                       "terminal yet (the site probe's height check); for a quay face piece.",
+    "Rail_CrossingSignal": "Placeholder 踏切 signal + barrier (boom up). Placed by point_furniture.crossing_signals, TWO per "
+    "level crossing (the left of each approach), facing the traffic (-Y); its collider is the post only "
+    "(furniture.json collide_pole). Keep the post at the origin.",
+    "Signal_Pedestrian": "Placeholder pedestrian signal. The two lenses' centres (red 3.025, green 2.675 m, 0.38 m in "
+    "front of the pole) are furniture.json `lamps` -- move a lens here, move it there. Faces -Y across the crosswalk.",
     "ShuriCastle": "Shuri castle (library_landmarks.shuri_castle): the Ryukyu-limestone platform is SH_PLAT_H (25 m) "
                    "tall because the measured site's ground rises 24 m under it (tools/island_sites.py); its top must "
                    "clear the uphill ground. The Seiden faces -Y (the front, towards downtown). Collider = its mesh.",
 }
+
+
+def crossing_signal(material):
+    """A level-crossing signal (踏切警報機) with its barrier (遮断機), for the road side of a 踏切 (PLAN.md R4). The
+    person / driver side faces -Y: the crossbuck (踏切警標, yellow and black) at the top, the two red flashing lamps
+    under it, a yellow-and-black striped post on a concrete plinth, and beside it the barrier machine with its boom
+    RAISED (a static prop: the barriers-down state machine is tier D, with the trains). The origin is the post's foot;
+    the boom stands at +X. Post 3.6 m, boom 4.0 m (a two-lane road's half: the far side has its own unit)."""
+    b = Builder("Rail_CrossingSignal", material)
+    b.box((-0.25, -0.25, 0.0), (0.25, 0.25, 0.2), "MI_ConcreteSmooth")
+    z, k = 0.2, 0
+    while z < 3.6 - 1e-6:                      # the post, 0.3 m bands (the 虎柄 of every Japanese crossing)
+        top = min(3.6, z + 0.3)
+        b.box((-0.06, -0.06, z), (0.06, 0.06, top), "MI_PaintYellow" if k % 2 == 0 else "MI_PlasticDark")
+        z, k = top, k + 1
+    # the crossbuck: two 1.0 m arms crossing at 3.35 m, in the post's front plane
+    for s_ in (-1.0, 1.0):
+        b.beam((-0.42, -0.09, 3.35 - s_ * 0.24), (0.42, -0.09, 3.35 + s_ * 0.24), 0.13, "MI_PaintYellow")
+    # the lamp bar with two red lamps and their black hoods
+    b.box((-0.45, -0.1, 2.55), (0.45, -0.04, 2.65), "MI_PlasticDark")
+    for x in (-0.36, 0.36):
+        b.box((x - 0.13, -0.12, 2.45), (x + 0.13, -0.06, 2.75), "MI_PlasticDark")
+        b.box((x - 0.1, -0.14, 2.48), (x + 0.1, -0.12, 2.72), "MI_CraneRed")
+    # the barrier machine and its boom, raised
+    b.box((0.18, -0.16, 0.2), (0.48, 0.16, 1.15), "MI_PaintYellow")
+    z, k = 1.15, 0
+    while z < 5.15 - 1e-6:
+        top = min(5.15, z + 0.5)
+        b.box((0.29, -0.04, z), (0.37, 0.04, top), "MI_PaintYellow" if k % 2 == 0 else "MI_PlasticDark")
+        z, k = top, k + 1
+    return "Rail_CrossingSignal", "station", b.mesh()
+
+
+def pedestrian_signal(material):
+    """A pedestrian signal (歩行者用信号機) for a crosswalk end (PLAN.md R4 / user 2026-09-26 "enable both pedestrian +
+    traffic light"): a 3.2 m grey pole, and at 2.5-3.2 m the Japanese two-lamp head -- red man above, green man below
+    -- facing -Y across the crosswalk, each lens behind a short hood. Lenses are dark here; world.TrafficSignals
+    lights them (their centres are `LENSES` below and `furniture.json`'s `lamps` for the asset). Origin: the pole's
+    foot."""
+    b = Builder("Signal_Pedestrian", material)
+    b.box((-0.18, -0.18, 0.0), (0.18, 0.18, 0.12), "MI_ConcreteSmooth")
+    b.box((-0.055, -0.055, 0.12), (0.055, 0.055, 3.25), "MI_PaintedMetal")
+    b.box((-0.08, -0.08, 3.25), (0.08, 0.08, 3.3), "MI_PaintedMetal")
+    b.box((-0.2, -0.36, 2.48), (0.2, -0.06, 3.22), "MI_PaintedMetalDark")        # the head body
+    b.box((-0.03, -0.1, 2.6), (0.03, 0.0, 3.1), "MI_PaintedMetal")                 # its bracket to the pole
+    for z0 in (2.52, 2.87):                                                         # two lenses + hoods
+        b.box((-0.16, -0.38, z0), (0.16, -0.36, z0 + 0.31), "MI_PlasticDark")
+        b.box((-0.18, -0.46, z0 + 0.29), (0.18, -0.36, z0 + 0.33), "MI_PaintedMetalDark")
+    return "Signal_Pedestrian", "station", b.mesh()
 
 
 def build_all(material):
@@ -508,6 +562,8 @@ def build_all(material):
         platform_shelter(material),
         name_board(material),
         track_module(material),
+        crossing_signal(material),
+        pedestrian_signal(material),
         apron_tile(material),
         parking_line(material),
         parking_stop(material),

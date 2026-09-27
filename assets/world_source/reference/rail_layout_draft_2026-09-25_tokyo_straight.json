@@ -1,0 +1,327 @@
+{
+ "schema": 1,
+ "notes": "DRAFT rail layout (PLAN.md 3.25), written by tools/island_rail_layout.py; record frame (x east, y north).",
+ "lines": {
+  "Main line": {
+   "corners": [
+    [
+     1110.0,
+     1400.0
+    ],
+    [
+     1110.0,
+     215.0
+    ],
+    [
+     205.0,
+     215.0
+    ],
+    [
+     205.0,
+     -475.0
+    ],
+    [
+     1250.0,
+     -475.0
+    ],
+    [
+     1250.0,
+     -1480.0
+    ],
+    [
+     1300.0,
+     -1700.0
+    ],
+    [
+     1300.0,
+     -1960.0
+    ]
+   ],
+   "radius": 220.0,
+   "form": [
+    [
+     1110.0,
+     1400.0,
+     "grade"
+    ],
+    [
+     1110.0,
+     300.0,
+     "elev"
+    ],
+    [
+     205.0,
+     140.0,
+     "grade"
+    ],
+    [
+     835.0,
+     -475.0,
+     "elev"
+    ],
+    [
+     1250.0,
+     -697.0,
+     "bridge"
+    ],
+    [
+     1300.0,
+     -1700.0,
+     "elev"
+    ]
+   ],
+   "length_m": 4979.3
+  },
+  "Blue line": {
+   "corners": [
+    [
+     782.0,
+     225.0
+    ],
+    [
+     -115.0,
+     225.0
+    ],
+    [
+     -115.0,
+     -160.0
+    ],
+    [
+     -665.0,
+     -160.0
+    ],
+    [
+     -665.0,
+     -597.0
+    ]
+   ],
+   "radius": 200.0,
+   "form": [
+    [
+     782.0,
+     225.0,
+     "elev"
+    ],
+    [
+     295.0,
+     225.0,
+     "grade"
+    ]
+   ],
+   "length_m": 2050.7
+  },
+  "Harbour line": {
+   "corners": [
+    [
+     782.0,
+     205.0
+    ],
+    [
+     185.0,
+     205.0
+    ],
+    [
+     185.0,
+     -1110.0
+    ]
+   ],
+   "radius": 200.0,
+   "form": [
+    [
+     782.0,
+     205.0,
+     "elev"
+    ],
+    [
+     185.0,
+     140.0,
+     "grade"
+    ]
+   ],
+   "length_m": 1825.9
+  },
+  "Freight siding": {
+   "corners": [
+    [
+     205.0,
+     -960.0
+    ],
+    [
+     205.0,
+     -1115.0
+    ]
+   ],
+   "radius": 200.0,
+   "form": [
+    [
+     205.0,
+     -960.0,
+     "grade"
+    ]
+   ],
+   "length_m": 155.0
+  }
+ },
+ "stations": {
+  "Farm": {
+   "line": "Main line",
+   "s": 80.0,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "small",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus",
+   "x": 1110.0,
+   "y": 1320.0
+  },
+  "Residential North": {
+   "line": "Main line",
+   "s": 580.0,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "",
+   "x": 1110.0,
+   "y": 820.0
+  },
+  "Central": {
+   "line": "Main line",
+   "s": 1435.45,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "hub",
+   "platform_m": 300.0,
+   "platform_grade": 0.0,
+   "parking": "multistorey",
+   "note": "the TERMINAL HUB: Main through; the Blue and Harbour lines start here",
+   "x": 782.0,
+   "y": 215.0
+  },
+  "Bay": {
+   "line": "Main line",
+   "s": 2322.78,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "junction",
+   "platform_m": 120.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "junction: Main and Harbour lines",
+   "x": 205.0,
+   "y": -190.0
+  },
+  "Waterpark": {
+   "line": "Main line",
+   "s": 2803.79,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "",
+   "x": 470.0,
+   "y": -475.0
+  },
+  "Suburb": {
+   "line": "Main line",
+   "s": 3213.79,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "elevated: the climb to the bridge",
+   "x": 880.0,
+   "y": -475.0
+  },
+  "Airport": {
+   "line": "Main line",
+   "s": 4869.27,
+   "off_line_m": 0.0,
+   "z": 16.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus",
+   "x": 1300.0,
+   "y": -1850.0
+  },
+  "City West": {
+   "line": "Blue line",
+   "s": 1027.36,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "",
+   "x": -115.0,
+   "y": 20.0
+  },
+  "Castle Town": {
+   "line": "Blue line",
+   "s": 1467.72,
+   "off_line_m": 0.0,
+   "z": 0.67,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "Shuri Castle 0.19 km up",
+   "x": -450.0,
+   "y": -160.0
+  },
+  "Residential": {
+   "line": "Blue line",
+   "s": 2003.73,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "terminus, towards the district's south",
+   "x": -665.0,
+   "y": -550.0
+  },
+  "Industry": {
+   "line": "Harbour line",
+   "s": 1395.89,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "large",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "a LARGE station (more tracks side by side; a platform fits the 4-car train): one stop for the industry and light-industry areas",
+   "x": 185.0,
+   "y": -680.0
+  },
+  "Harbour": {
+   "line": "Harbour line",
+   "s": 1777.89,
+   "off_line_m": 0.0,
+   "z": 3.49,
+   "kind": "large",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "ONE combined station at the container terminal's north gate: the passenger island platform, the E&S freight tracks beside it and the container handling apron",
+   "x": 185.0,
+   "y": -1062.0
+  }
+ },
+ "freight_yard": [
+  232.0,
+  -1117.0
+ ]
+}

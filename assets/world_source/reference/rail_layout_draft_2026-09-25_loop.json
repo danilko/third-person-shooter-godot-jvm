@@ -1,0 +1,315 @@
+{
+ "schema": 1,
+ "notes": "DRAFT rail layout (PLAN.md 3.25), written by tools/island_rail_layout.py; record frame (x east, y north).",
+ "lines": {
+  "Loop line": {
+   "corners": [
+    [
+     160.0,
+     215.0
+    ],
+    [
+     1110.0,
+     215.0
+    ],
+    [
+     1110.0,
+     -460.0
+    ],
+    [
+     160.0,
+     -460.0
+    ]
+   ],
+   "radius": 180.0,
+   "form": [
+    [
+     160.0,
+     215.0,
+     "elev"
+    ]
+   ],
+   "length_m": 2948.4
+  },
+  "North line": {
+   "corners": [
+    [
+     1110.0,
+     1400.0
+    ],
+    [
+     1110.0,
+     215.0
+    ],
+    [
+     600.0,
+     215.0
+    ]
+   ],
+   "radius": 180.0,
+   "form": [
+    [
+     1110.0,
+     1400.0,
+     "grade"
+    ],
+    [
+     1110.0,
+     1030.0,
+     "elev"
+    ]
+   ],
+   "length_m": 1617.5
+  },
+  "Airport line": {
+   "corners": [
+    [
+     700.0,
+     -460.0
+    ],
+    [
+     1250.0,
+     -460.0
+    ],
+    [
+     1250.0,
+     -1480.0
+    ],
+    [
+     1300.0,
+     -1700.0
+    ],
+    [
+     1300.0,
+     -1960.0
+    ]
+   ],
+   "radius": 220.0,
+   "form": [
+    [
+     700.0,
+     -460.0,
+     "elev"
+    ],
+    [
+     1250.0,
+     -697.0,
+     "bridge"
+    ],
+    [
+     1300.0,
+     -1700.0,
+     "elev"
+    ]
+   ],
+   "length_m": 1960.5
+  },
+  "West trunk": {
+   "corners": [
+    [
+     160.0,
+     -130.0
+    ],
+    [
+     160.0,
+     -770.0
+    ],
+    [
+     -900.0,
+     -770.0
+    ],
+    [
+     -900.0,
+     -170.0
+    ],
+    [
+     -500.0,
+     -170.0
+    ]
+   ],
+   "radius": 200.0,
+   "form": [
+    [
+     160.0,
+     -130.0,
+     "elev"
+    ]
+   ],
+   "length_m": 2450.2
+  },
+  "Harbour branch": {
+   "corners": [
+    [
+     0.0,
+     -770.0
+    ],
+    [
+     -445.0,
+     -770.0
+    ],
+    [
+     -445.0,
+     -1050.0
+    ]
+   ],
+   "radius": 200.0,
+   "form": [
+    [
+     0.0,
+     -770.0,
+     "elev"
+    ]
+   ],
+   "length_m": 670.5
+  }
+ },
+ "stations": {
+  "Industry Jn": {
+   "line": "West trunk",
+   "s": 863.89,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "junction",
+   "platform_m": 120.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated; the Y splits here: Harbour one way, Residential + Castle Town the other",
+   "x": -150.0,
+   "y": -770.0
+  },
+  "Residential": {
+   "line": "West trunk",
+   "s": 1827.78,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated",
+   "x": -900.0,
+   "y": -470.0
+  },
+  "Castle Town": {
+   "line": "West trunk",
+   "s": 2330.24,
+   "off_line_m": 0.0,
+   "z": 9.69,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus, elevated; Shuri Castle 0.13 km up",
+   "x": -620.0,
+   "y": -170.0
+  },
+  "Harbour": {
+   "line": "Harbour branch",
+   "s": 620.51,
+   "off_line_m": 0.0,
+   "z": 8.66,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus, elevated; freight yard beside it",
+   "x": -445.0,
+   "y": -1000.0
+  },
+  "Farm": {
+   "line": "North line",
+   "s": 80.0,
+   "off_line_m": 0.0,
+   "z": 0.3,
+   "kind": "small",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus, at grade",
+   "x": 1110.0,
+   "y": 1320.0
+  },
+  "Residential North": {
+   "line": "North line",
+   "s": 580.0,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated",
+   "x": 1110.0,
+   "y": 820.0
+  },
+  "Downtown": {
+   "line": "Loop line",
+   "s": 442.0,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "large",
+   "platform_m": 200.0,
+   "platform_grade": 0.0,
+   "parking": "multistorey",
+   "note": "elevated; a junction: the North line joins the loop here",
+   "x": 782.0,
+   "y": 215.0
+  },
+  "Central": {
+   "line": "Loop line",
+   "s": 2415.91,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "hub",
+   "platform_m": 170.0,
+   "platform_grade": 0.0,
+   "parking": "multistorey",
+   "note": "elevated; the HUB: the loop and the West Y meet here",
+   "x": 160.0,
+   "y": -215.0
+  },
+  "Waterpark": {
+   "line": "Loop line",
+   "s": 1929.91,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "small_lot",
+   "note": "elevated",
+   "x": 470.0,
+   "y": -460.0
+  },
+  "Suburb": {
+   "line": "Loop line",
+   "s": 1519.91,
+   "off_line_m": 0.0,
+   "z": 8.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "elevated; the Airport line leaves just east of it",
+   "x": 880.0,
+   "y": -460.0
+  },
+  "Airport": {
+   "line": "Airport line",
+   "s": 1850.48,
+   "off_line_m": 0.0,
+   "z": 16.0,
+   "kind": "standard",
+   "platform_m": 90.0,
+   "platform_grade": 0.0,
+   "parking": "park_and_ride",
+   "note": "terminus, elevated",
+   "x": 1300.0,
+   "y": -1850.0
+  }
+ },
+ "freight_yard": [
+  -445.0,
+  -1075.0
+ ]
+}

@@ -62,6 +62,8 @@ SOUND_WALL = 3.0        # a city expressway's sound walls (防音壁)
 # the farmland and the mountains and keeps the preset's 1.1 m barrier for the view, as do the ramps, the spur and the
 # bridge. C1's four roads are the cuts the ring already has (the JCT, both sides at y 300, the north overpass).
 SOUND_WALL_ROADS = (PREFIX + "c1", PREFIX + "c1__4")
+C1_SPEED = 60.0         # km/h: the inner ring is signed below the outer network's 80, as 首都高's C1 is (50-60 in the
+                        # core, 80 outside). Set AFTER the build, so the aux-slot tapers stay sized for 80 (longer)
 RAMP_LANES = 2          # every exit and entrance is two lanes wide (user, 3.13: a wider ramp for racing)
 JCT_X = PL.JCT_X       # the airport JCT on C1's south side
 SPUR_OFF = 5.5         # each spur carriageway's centre off the spur's centreline: its lanes run OUTWARD from it,
@@ -508,6 +510,8 @@ def main(argv):
             r.taper_factor = TAPER
         if name in SOUND_WALL_ROADS:
             r.barrier_height = SOUND_WALL      # the city side: 防音壁, sound walls, not a parapet
+        if name.startswith(PREFIX + "c1"):
+            r.base.design_speed = C1_SPEED
     # No pier stands on another road: the BUILD drops each column that would (`point_mesh.pier_on_road`). The
     # station-span pass this used to run (`island_roadgen.clear_piers`) could only switch off a whole span.
     for a_, b_ in net.aux_pairs():

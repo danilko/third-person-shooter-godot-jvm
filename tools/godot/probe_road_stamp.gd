@@ -21,6 +21,8 @@ extends SceneTree
 const Ground := preload("res://addons/road_kit/road_kit_ground.gd")
 const Stamp := preload("res://addons/road_kit/road_kit_stamp.gd")
 const Service := preload("res://addons/road_kit/road_kit_service.gd")
+const RAIL_RESERVE := "res://assets/world_source/buildings/IslandRailReserve.json"
+const RAIL_BRIDGE_REACH := 20.0     # plan distance from a track centreline a bridging span may cover
 const NetworkScript := preload("res://addons/road_kit/road_kit_network.gd")
 const STEP := 4.0
 const AT_GRADE_TOL := 0.40
@@ -71,7 +73,9 @@ func _initialize() -> void:
 	var pad_verts := []
 	for m in _markers(world):
 		var z = m.get("zone")
-		if z == null or not str(z.get("geometry_path")).contains("/Roads_"):
+		# this NETWORK's pieces only: another network (the rail, stamped on its own) sits under a road at a 踏切 by
+		# design, and its lanes are not this stamp's to judge
+		if z == null or not str(z.get("geometry_path")).contains("/Roads_%s" % net_name):
 			continue
 		var inst: Node3D = (load(str(z.get("geometry_path"))) as PackedScene).instantiate()
 		var xf: Transform3D = z.get("geometry_world_transform") if z.get("geometry_world_placed") else (m as Node3D).global_transform
@@ -99,6 +103,19 @@ func _initialize() -> void:
 	var fill_miss := ""
 	var fill_under := 0
 	var fill_abut := 0
+	var fill_rail := 0
+	# a road that BRIDGES a rail line (the ring over the harbour line, island_dike.rail_lifts) is open over the track
+	# by design -- `sculpt` leaves the corridor unfilled -- so a FILL-height sample over it is a short span, not a
+	# missing embankment. The rail reserve's corridor samples (record frame: x, y, rail z) say where.
+	var rail_cells := {}
+	var reserve = JSON.parse_string(FileAccess.get_file_as_string(RAIL_RESERVE)) if FileAccess.file_exists(RAIL_RESERVE) else null
+	if reserve is Dictionary:
+		for c in reserve.get("corridors", []):
+			for q in c["pts"]:
+				var key := Vector2i(int(floor(float(q[0]) / 32.0)), int(floor(float(q[1]) / 32.0)))
+				if not rail_cells.has(key):
+					rail_cells[key] = []
+				rail_cells[key].append(Vector3(float(q[0]), float(q[1]), float(q[2])))
 	var pier_n := 0
 	var pier_open := 0
 	var n := 0
@@ -144,6 +161,9 @@ func _initialize() -> void:
 				if _near_kind(from_world * w, "PIER", ABUTMENT_REACH):
 					fill_abut += 1
 					continue
+				if _over_rail(rail_cells, from_world * w):
+					fill_rail += 1
+					continue
 				fill_n += 1
 				if w.y - h <= AT_GRADE_TOL:
 					fill_ok += 1
@@ -171,6 +191,7 @@ func _initialize() -> void:
 				worst_at = "pad vertex (%.1f, %.1f, %.1f)" % [v.x, v.y, v.z]
 	print("  %d lane samples, %d pad vertices, %d FILL, %d clear PIER (%d ms)" % [n, pad_verts.size(), fill_n, pier_n, Time.get_ticks_msec() - t0])
 	print("  INFO  %d FILL-height samples stand over a road more than %.1f m below (carried by that road's cap, not judged)" % [fill_under, Stamp.UNDERPASS])
+	print("  INFO  %d FILL-height samples bridge a rail line (open over the track by design, not judged)" % fill_rail)
 	print("  INFO  %d FILL-height samples are ABUTMENTS (a PIER corridor point within %.0f m: the fill batter ends there, the lane stays above the ground)" % [fill_abut, ABUTMENT_REACH])
 	t0 = Time.get_ticks_msec()
 	check(proud == 0 and proud_pad == 0, "no ground proud of a road (%.2f m lanes, %.2f m pad mesh)" % [PROUD_TOL, PAD_PROUD_TOL], "%d + %d, highest %.3f m at %s" % [proud, proud_pad, worst, worst_at])
@@ -309,3 +330,18 @@ func _markers(n: Node) -> Array:
 	for c in n.get_children():
 		out.append_array(_markers(c))
 	return out
+
+
+## True when `local` (the network's frame, Godot axes: record x = x, record y = -z, record z = y) stands within
+## RAIL_BRIDGE_REACH of a rail corridor sample whose track runs more than 4 m BELOW it: a span over the line.
+func _over_rail(cells: Dictionary, local: Vector3) -> bool:
+	var rx := local.x
+	var ry := -local.z
+	var i0 := int(floor(rx / 32.0))
+	var j0 := int(floor(ry / 32.0))
+	for i in range(i0 - 1, i0 + 2):
+		for j in range(j0 - 1, j0 + 2):
+			for q in cells.get(Vector2i(i, j), []):
+				if Vector2(q.x - rx, q.y - ry).length() < RAIL_BRIDGE_REACH and q.z < local.y - 4.0:
+					return true
+	return false

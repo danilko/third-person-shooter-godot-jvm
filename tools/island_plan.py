@@ -264,8 +264,11 @@ STREET_REGIONS = (
     # west end, so the road they end on must already exist when they are planned.
     # x 1080 is the STATION-FRONT road (駅前通り), just west of the track and clear of its corridor: the middle road
     # y 1320 ends on it in a T right in front of Farm station, which is the user's sketch ("=====farm station").
-    ("farm_w", (400.0, 700.0, 1300.0, 1800.0), "farm", (510.0, 1080.0), ()),
-    ("farm", (400.0, 700.0, 1090.0, 1570.0), "farm", (), (920.0, 1220.0, 1320.0, 1395.0)),   # ends at the station-front road; 1395: the ring meets it at ~1454
+    # (2026-09-26, fifty-sixth session) the west road x 510, the station-front road x 1080 and the 農道 along the
+    # dike's foot are ONE authored road now, `nodo_waku` (island_core_streets.py): since the ring became the dike no
+    # farm line could end on it, and the whole grid was dropped. farm_w is gone; the rows end on the frame's legs, and
+    # the old 1395 row is dropped (the frame's north leg runs 23 m north of it at x 1080)
+    ("farm", (400.0, 700.0, 1090.0, 1570.0), "farm", (), (920.0, 1220.0, 1320.0)),   # ends at the station-front road
     ("farm_s", (700.0, 700.0, 1100.0, 925.0), "farm", (810.0,), ()),
     ("farm_n", (700.0, 1215.0, 1300.0, 1570.0), "farm", (810.0,), ()),
     # residential north lies between C1 and the farm arterial -- where the C1 diamond comes down, so the ramps' band

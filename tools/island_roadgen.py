@@ -50,7 +50,7 @@ class Ground(object):
     sidecar is still the fallback where no land grid exists (a checkout from before the redo), and `stem=` asks for
     it explicitly."""
 
-    def __init__(self, stem=None, grid=None):
+    def __init__(self, stem=None, grid=None, dike=True):
         import numpy as np
         self.np = np
         if stem is None and (grid or os.path.exists(TERRAIN_LAND)):
@@ -61,7 +61,9 @@ class Ground(object):
             self.g = (g[::-1, :] - NET_Y).astype("<f4")
             self.ox, self.oy = -2304.0, -2304.0
             self.step = 2.0
-            self._dike_crest()
+            # the rail plan asks WITHOUT the crest (PLAN.md 3.25 R0): the track passes UNDER the ring, which bridges it
+            if dike:
+                self._dike_crest()
             return
         stem = stem or os.path.join(PIECES, "IslandRoads")
         h = json.load(open(stem + ".ground.json"))

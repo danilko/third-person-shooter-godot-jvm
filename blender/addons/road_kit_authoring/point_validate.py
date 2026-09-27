@@ -300,6 +300,8 @@ def check_tapers(net, out):
         import point_solve as psolve                                         # noqa: E402
     for name in sorted(net.roads):
         r = net.roads[name]
+        if getattr(r, "road_class", "") == "rail":
+            continue        # no lane on a track is ever driven into another: a platform narrows the bed, not a lane
         pts = [net.resolved(u) for u in r.points if u in net.points]
         if len(pts) < 2:
             continue
@@ -851,9 +853,56 @@ def check_path_fidelity(net, out):
                     "there, not on the road. Add a station where the bend actually is." % dev))
 
 
+#: RAIL LIMITS (PLAN.md 3.25, R1): a road with `road_class` "rail" is a double track for a 20 m-car metro EMU --
+#: minimum plan radius `RAIL_R_MIN` on the line (`RAIL_R_THROAT` is refused outright: a station throat may be tight,
+#: a curve under it is not a railway), steepest grade `RAIL_GRADE_MAX` between stations. Measured over the STATIONS
+#: (the circumradius of three in plan), which is what the carrier is swept through.
+RAIL_R_MIN = 160.0
+RAIL_R_THROAT = 100.0
+RAIL_GRADE_MAX = 0.035
+
+
+def _turn_radius(a, b, c):
+    """The plan radius at `b`: the mean of its two spans over the heading change between them. Unlike a
+    circumradius, this never under-reads at a tangent point, where a straight span meets an arc (three stations
+    straddling a 200 m fillet's start read 128 m as a circumradius)."""
+    h0 = math.atan2(b[1] - a[1], b[0] - a[0])
+    h1 = math.atan2(c[1] - b[1], c[0] - b[0])
+    d = abs((h1 - h0 + math.pi) % (2.0 * math.pi) - math.pi)
+    return float("inf") if d < 1e-9 else 0.5 * (_dist_xy(a, b) + _dist_xy(b, c)) / d
+
+
+def check_rail(net, out):
+    """A rail road's curves and grades against the train's limits: ERROR under `RAIL_R_THROAT` or over 4 %, WARN
+    under `RAIL_R_MIN` or over `RAIL_GRADE_MAX` (a station throat is legitimately tight, a ramp's last metre steep)."""
+    for name in sorted(net.roads):
+        r = net.roads[name]
+        if getattr(r, "road_class", "") != "rail":
+            continue
+        ps_ = [net.points[u].pos for u in r.points if u in net.points]
+        worst_r, worst_g = float("inf"), 0.0
+        for a, b, c in zip(ps_, ps_[1:], ps_[2:]):
+            worst_r = min(worst_r, _turn_radius(a, b, c))
+        for a, b in zip(ps_, ps_[1:]):
+            d = _dist_xy(a, b)
+            if d > 1e-6:
+                worst_g = max(worst_g, abs(b[2] - a[2]) / d)
+        if worst_r < RAIL_R_THROAT - 1.0:      # a curve authored AT the floor reads a hair under it
+            out(Finding("rail_radius", ERROR, name, "a %.0f m curve (a train needs >= %.0f)" % (worst_r, RAIL_R_MIN)))
+        elif worst_r < RAIL_R_MIN - 1.0:
+            out(Finding("rail_radius", WARN, name, "a %.0f m curve, under the line's %.0f m (a station throat?)"
+                        % (worst_r, RAIL_R_MIN)))
+        if worst_g > 0.04:
+            out(Finding("rail_grade", ERROR, name, "a %.1f %% grade (the ruling grade is %.1f %%)"
+                        % (worst_g * 100.0, RAIL_GRADE_MAX * 100.0)))
+        elif worst_g > RAIL_GRADE_MAX + 1e-3:
+            out(Finding("rail_grade", WARN, name, "a %.1f %% grade, over the ruling %.1f %%"
+                        % (worst_g * 100.0, RAIL_GRADE_MAX * 100.0)))
+
+
 CHECKS = (check_identity, check_links, check_chains, check_meetings, check_tapers,
           check_taper_routes, check_junctions, check_mouth_clearance, check_pads, check_ramps,
-          check_aux_slots, check_support, check_path_fidelity, check_style, check_asset_width)
+          check_aux_slots, check_support, check_path_fidelity, check_style, check_asset_width, check_rail)
 
 
 def validate(net, checks=CHECKS):

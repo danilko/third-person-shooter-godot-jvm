@@ -200,7 +200,7 @@ def sidecar(zones, a, net_y: float) -> dict:
         cx, cy = cell_centre(gx, gz, a.cell, origin)
         # The marker stands at the network's own height, so its kit z in the network frame is 0.
         rows.append({"centre": [cx, cy, 0.0], "half": [a.cell / 2.0, a.cell / 2.0],
-                     "load_radius": float(load), "marker": f"Road_{gx}_{gz}",
+                     "load_radius": float(load), "marker": f"{a.marker_prefix}{gx}_{gz}",
                      "unload_radius": float(unload), "zone_id": z})
     return {"schema_ver": pz.SCHEMA_VER, "zones": rows}
 
@@ -228,11 +228,11 @@ def patch(text: str, zones, a) -> str:
     origin = a.cell * a.grid / 2.0
     stem = Path(a.record).name.replace(".roads.json", "")
 
-    sub, nodes = [], [f'[node name="{HOLDER}" type="Node" parent="." unique_id={NODE_ID_BASE}]\n\n']
+    sub, nodes = [], [f'[node name="{a.holder}" type="Node" parent="." unique_id={a.node_id_base}]\n\n']
     for i, (z, gx, gz, load, unload, _) in enumerate(zones):
         cx, cy = cell_centre(gx, gz, a.cell, origin)
         piece = pz.piece_name(f"Roads_{stem}", z)
-        sub.append(f'[sub_resource type="Resource" id="{ZONE_PREFIX}{gx}_{gz}"]\n'
+        sub.append(f'[sub_resource type="Resource" id="{a.zone_prefix}{gx}_{gz}"]\n'
                    f'script = ExtResource("{zone_ext}")\n'
                    f'zone_id = "{z}"\n'
                    f'size = Vector3({a.cell:g}, 600, {a.cell:g})\n'
@@ -241,21 +241,21 @@ def patch(text: str, zones, a) -> str:
                    f'geometry_path = "{PIECES_RES}/{piece}.tscn"\n'
                    f'geometry_world_placed = true\n'
                    f'geometry_world_transform = {xf}\n\n')
-        nodes.append(f'[node name="Road_{gx}_{gz}" type="Node3D" parent="{HOLDER}" '
-                     f'unique_id={NODE_ID_BASE + 1 + i}]\n'
+        nodes.append(f'[node name="{a.marker_prefix}{gx}_{gz}" type="Node3D" parent="{a.holder}" '
+                     f'unique_id={a.node_id_base + 1 + i}]\n'
                      f'transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, '
                      f'{cx + offset[0]:.3f}, {offset[1]:.3f}, {-cy + offset[2]:.3f})\n'
                      f'script = ExtResource("{marker_ext}")\n'
-                     f'zone = SubResource("{ZONE_PREFIX}{gx}_{gz}")\n'
+                     f'zone = SubResource("{a.zone_prefix}{gx}_{gz}")\n'
                      f'show_debug_volume = false\n\n')
 
     def generated(header: str) -> bool:
         if header.startswith("[sub_resource"):
             rid = itz.attr(header, "id") or ""
-            return rid.startswith(ZONE_PREFIX) or rid in a.legacy_sub
+            return rid.startswith(a.zone_prefix) or rid in a.legacy_sub
         if header.startswith("[node"):
             name, parent = itz.attr(header, "name"), itz.attr(header, "parent")
-            return name == HOLDER or parent == HOLDER or (parent == "." and name in a.legacy_node)
+            return name == a.holder or parent == a.holder or (parent == "." and name in a.legacy_node)
         return False
 
     return itz.splice(sections, generated, sub, nodes)
@@ -283,6 +283,11 @@ def main() -> int:
     ap.add_argument("record", help="<stem>.roads.json")
     ap.add_argument("scene", type=Path)
     ap.add_argument("--network", default="IslandRoads", help="the RoadKitNetwork node in the scene")
+    # a second network (the rail, PLAN.md 3.25 R2) streams in its own block, so the two never replace each other
+    ap.add_argument("--holder", default=HOLDER, help="the scene node the markers hang under")
+    ap.add_argument("--zone-prefix", dest="zone_prefix", default=ZONE_PREFIX, help="the Zone sub_resource id prefix")
+    ap.add_argument("--marker-prefix", dest="marker_prefix", default="Road_", help="the ZoneMarker node name prefix")
+    ap.add_argument("--node-id-base", dest="node_id_base", type=int, default=NODE_ID_BASE)
     ap.add_argument("--prefix", default="island", help="zone id prefix: <prefix>_<gx>_<gz>")
     ap.add_argument("--cell", type=float, default=geom.DISTRICT)
     ap.add_argument("--grid", type=int, default=geom.GRID_N, help="cells per side of the world square")

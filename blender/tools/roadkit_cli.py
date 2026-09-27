@@ -30,6 +30,7 @@ Exit code 0 unless the command itself failed (a red gate is a RESULT, reported i
 """
 import argparse
 import math
+import glob
 import json
 import os
 import sys
@@ -417,6 +418,13 @@ def cmd_gltf(a):
     grid = pg.load_ground(a.ground) if a.ground else None
     kit = pk.load()
     solved = ped.solve_all(net, grid)
+    # `--avoid <record>` (PLAN.md 3.25 R1): ANOTHER network this one is built against -- the rail against the roads.
+    # Its bands keep this network's piers off its carriageways, and a rail road crosses one at its own height as a
+    # level crossing (`point_mesh` "RAIL").
+    foreign = []
+    if getattr(a, "avoid", ""):
+        fground = pg.load_ground(a.avoid_ground) if getattr(a, "avoid_ground", "") else None
+        foreign = ped.solve_all(pm.load_network(a.avoid), fground)[3]
     only = {n for n in a.only.split(",") if n}
     report, pieces = {}, []
     # PLAN.md 3.6c: decals and street furniture. The lane-based marks read the lanekits `pieces` wrote (step 1 of
@@ -443,16 +451,28 @@ def cmd_gltf(a):
 
     # the lines stop at the stop line and the zebra: the same arm frames the marks below are placed from
     clear = pfu.clear_zones(table, lanes_doc)
+    # `--keep-clear-lanekits <path prefix>`: another network's lanes (the rail's tracks: `<pieces>/Roads_IslandRail_`)
+    # this one's furniture keeps out of. A PREFIX, not a glob, so a shell never expands it. The piece digest does not
+    # see these lanes: after a rail change, rebuild the road pieces without DIRTY_ONLY.
+    keep_clear = []
+    kc = getattr(a, "keep_clear_lanekits", "") or ""
+    for lk in sorted(glob.glob(glob.escape(kc) + "*.lanekit.json")) if kc else ():
+        with open(lk) as fh:
+            keep_clear += json.load(fh).get("lanes", [])
     for zone in sorted(part.pieces()):
         piece = pz.piece_name(a.prefix, zone)
         if only and piece not in only:
             continue
-        objs = pmsh.build(net, grid, part if zones else None, zone, kit, report, solved, clear)
+        n_cross = len(report.get("crossings", []))
+        objs = pmsh.build(net, grid, part if zones else None, zone, kit, report, solved, clear, foreign)
         fur = pfu.place(table, solved, lanes_doc,
                         (lambda l, z=zone: l.get("zone_id", pz.RESIDENT) == z) if zones else (lambda l: True),
                         (lambda s, z=zone: part.run_zone(s.uids) == z) if zones else (lambda s: True),
                         (lambda j, z=zone: part.pad_zone(j.uids) == z) if zones else (lambda j: True),
-                        mark_mat, grid)
+                        mark_mat, grid, keep_clear)
+        if table is not None:
+            # this piece's own level crossings (the rows its build just reported) get their signals (R4)
+            pfu.crossing_signals(fur, table, report.get("crossings", [])[n_cross:])
         for mat, tris in fur.paint.items():
             objs.setdefault(pfu.PAINT_OBJECT, {}).setdefault(mat, []).extend(tris)
         if fur.collision:
@@ -461,10 +481,21 @@ def cmd_gltf(a):
         row = dict(pgl.write(objs, kit, path, markers=fur.placements), zone=zone, piece=piece, gltf=path,
                    furniture=dict(sorted(fur.counts.items())))
         pieces.append(row)
-    gate.update({"written": True, "pieces": pieces, "kit_stale": kit.stale(), "kit": kit.path,
+    # the SIGNAL PLAN (world.TrafficSignals): the whole network's, every build, beside the lanekits
+    signals = None
+    if table is not None and lanes_doc["lanes"]:
+        plan = pfu.signal_plan(table, lanes_doc, grid)
+        signals = os.path.join(lanekit_dir, a.prefix + ".signals.json")
+        with open(signals, "w") as fh:
+            fh.write(json.dumps(plan, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
+        signals = {"path": signals, "junctions": len(plan["junctions"]),
+                   "lamps": sum(len(j["lamps"]) for j in plan["junctions"])}
+    gate.update({"written": True, "pieces": pieces, "kit_stale": kit.stale(), "kit": kit.path, "signals": signals,
                  "missing_style": sorted(set(tuple(m) for m in report.get("missing_style", []))),
                  "pier_overhang": sorted(set(tuple(m) for m in report.get("pier_overhang", []))),
                  "missing_lanekits": missing_lanekits,
+                 "crossings": sorted(set(tuple(m[:5]) for m in report.get("crossings", []))),
+                 "pier_on_road": sorted(set(tuple(m) for m in report.get("pier_on_road", []))),
                  "ms": round((time.time() - t0) * 1000.0, 1)})
     return gate
 
@@ -579,7 +610,10 @@ def main(argv=None):
     s = sub.add_parser("gltf"); s.add_argument("record"); s.add_argument("zones"); s.add_argument("out_dir")
     s.add_argument("prefix"); s.add_argument("--ground", default=""); s.add_argument("--only", default="")
     s.add_argument("--gated", action="store_true"); s.add_argument("--lanekits", default="")
-    s.add_argument("--no-furniture", action="store_true"); s.set_defaults(fn=cmd_gltf)
+    s.add_argument("--no-furniture", action="store_true")
+    s.add_argument("--avoid", default=""); s.add_argument("--avoid-ground", default="")
+    s.add_argument("--keep-clear-lanekits", default="")
+    s.set_defaults(fn=cmd_gltf)
     s = sub.add_parser("bands"); s.add_argument("record"); s.add_argument("--ground", default="")
     s.set_defaults(fn=cmd_bands)
     s = sub.add_parser("lanekit"); s.add_argument("record"); s.add_argument("out")

@@ -270,6 +270,8 @@ public final class RoadGraph {
             Object idObj = d.get("id");
             if (!(idObj instanceof String id) || lanes.containsKey(id)) continue;
             if (!(d.get("points") instanceof List<?> pts) || pts.size() < 2) continue;
+            // a rail track (PLAN.md 3.25 R1) is no road: the GPS never routes a car along it
+            if ("rail".equals(str(d.get("road_class")))) continue;
             int n = pts.size();
             double[] x = new double[n], y = new double[n], z = new double[n];
             int k = 0;

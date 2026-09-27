@@ -12,7 +12,7 @@
   "A lamp also stands ON a barrier (an elevated deck, a ramp, a bridge parapet) every barrier_lamp_spacing (0 turns it off). WHERE is derived, not authored: the shaft starts barrier_lamp_clear outboard of the inboard face of the car wall point_mesh builds on the barrier's line, so it can never stand in the carriageway (PLAN.md 0.8).",
   "signal / lamp / lamp_twin are the Japanese signal and road lighting poles built by blender/tools/build_street_poles.py from the Zombie Apocalypse kit (CC0). A junction is signalised when any mouth is authored traffic_light, or (signal_all_junctions) when signal_min_arms arms have arriving traffic.",
   "`breakable` {mass kg, break_speed m/s, respawn s} makes a collide_pole piece a knock-down pole (PLAN.md 3.11): it leaves the static collision proxy, and WorldBaker gives its batch a BreakableProps node that builds one collider per pole, knocks a pole down under a car at or above break_speed (the car keeps m_car / (m_car + mass) of its speed) and brings it back after respawn seconds where nobody sees it.",
-  "tree_a/b/c are street trees (\u8857\u8def\u6a39) from the Stylized Nature kit, placed like planters but ONE SPECIES PER STREET (chosen by a hash of the road's name, the Japanese convention), only on a footway at least tree_min_footway wide -- which on this island is the trunk/arterial network, block streets having 2 m. It stands AT THE KERB (tree_kerb_gap), the Japanese \u690d\u6a39\u5e2f position, which is also what keeps the trunk off the footway's own walk line that the ambient crowd walks. Their collider is the TRUNK (collide_pole), never the canopy.",
+  "tree_a/b/c are street trees (街路樹) from the Stylized Nature kit, placed like planters but ONE SPECIES PER STREET (chosen by a hash of the road's name, the Japanese convention), only on a footway at least tree_min_footway wide -- which on this island is the trunk/arterial network, block streets having 2 m. It stands AT THE KERB (tree_kerb_gap), the Japanese 植樹帯 position, which is also what keeps the trunk off the footway's own walk line that the ambient crowd walks. Their collider is the TRUNK (collide_pole), never the canopy.",
   "A per-asset visibility range was tried for the trees and REMOVED: a MultiMesh is ONE instance to the renderer, so the range is whole-batch, and a range shorter than the batch's own extent culls every instance at any camera distance (measured: a batch 803.7 m across, green pixels 20285 / 0 / 20285 / 20285 at range 0 / 350 / 700 / 1200). Cutting a piece's trees into several smaller batches is what would make one work.",
   "Edit and rebuild: the Road Kit digest salts this file and every piece it names, so a change here rebuilds every road piece."
  ],
@@ -107,7 +107,8 @@
    },
    "exclude_roads": [
     "shrine_touge*"
-   ]
+   ],
+   "lamps_file": "TrafficLight_JP.lamps.json"
   },
   "lamp": {
    "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
@@ -179,6 +180,64 @@
     "airport_*",
     "kuko_dori*"
    ]
+  },
+  "crossing_signal": {
+   "kit": "res://assets/world_source/kits/library/",
+   "piece": "pieces/station/Rail_CrossingSignal.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.12,
+    3.6
+   ]
+  },
+  "ped_signal": {
+   "kit": "res://assets/world_source/kits/library/",
+   "piece": "pieces/station/Signal_Pedestrian.gltf",
+   "lift": 0.0,
+   "collide_pole": [
+    0.06,
+    3.3
+   ],
+   "lamps": {
+    "pedestrian": [
+     {
+      "colour": "red",
+      "pos": [
+       0.0,
+       3.025,
+       0.39
+      ],
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "radius": 0.14
+     },
+     {
+      "colour": "green",
+      "pos": [
+       0.0,
+       2.675,
+       0.39
+      ],
+      "normal": [
+       0,
+       0,
+       1
+      ],
+      "radius": 0.14
+     }
+    ]
+   },
+   "exclude_roads": [
+    "shrine_touge*"
+   ],
+   "breakable": {
+    "mass": 80,
+    "break_speed": 2.5,
+    "respawn": 60
+   }
   }
  },
  "rules": {
@@ -234,6 +293,14 @@
   ],
   "tree_pit": 1.4,
   "tree_pit_material": "M_Dirt",
-  "tree_planter": true
+  "tree_planter": true,
+  "crossing_track_clear": 4.5,
+  "crossing_side": 0.6,
+  "signal_needs_major": true,
+  "signal_major_lanes": 2,
+  "ped_signal_share": 5.0,
+  "signal_green": 22.0,
+  "signal_yellow": 3.0,
+  "signal_all_red": 2.0
  }
 }

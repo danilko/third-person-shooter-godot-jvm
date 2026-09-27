@@ -23,6 +23,9 @@
 # last baked (`<record stem>.build.json`), or whose scene is missing. Nothing dirty: no Blender at all.
 # Without it every piece is rebuilt, and the manifest is rewritten either way.
 #
+# GLTF_EXTRA passes extra arguments to step 2 -- the rail build uses it to build against the roads:
+#   GLTF_EXTRA="--avoid <IslandRoads.roads.json> --avoid-ground <IslandRoads.ground.json>"
+#
 # Run by the Godot Road Kit plugin's Build button, or by hand. NO_SOLO=1 is set so the shared
 # SoloPiece.tscn host is not re-pointed by a plugin build.
 set -euo pipefail
@@ -89,7 +92,7 @@ if [ "${#NAMES[@]}" -gt 0 ]; then
   echo "── 2/3 meshes (python3, no Blender)${GROUND:+, over the sampled ground}: ${NAMES[*]}"
   GLTF_TABLE="$(mktemp)"
   python3 "$BP/tools/roadkit_cli.py" gltf "$RECORD" "${ZONES:-}" "$REPO/$RES_DIR" "$PIECE" --ground "${GROUND:-}" \
-      --only "$(IFS=,; echo "${NAMES[*]}")" --gated > "$GLTF_TABLE"
+      --only "$(IFS=,; echo "${NAMES[*]}")" --gated ${GLTF_EXTRA:-} > "$GLTF_TABLE"
   python3 - "$GLTF_TABLE" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -100,6 +103,10 @@ for p in d["pieces"]:
           % (p["piece"], p["objects"], p["triangles"], p["worst_normal_deg"], p["inverted_normals"]))
 for road, slot, kind, name in d.get("missing_style", []):
     print("   WARNING: road %s names %s %r for its %s slot and the kit has none -- built with the default" % (road, kind, name, slot))
+for c in d.get("crossings", []):
+    print("   level crossing: %s x %s at (%.1f, %.1f, %.1f)" % tuple(c))
+for run, n in d.get("pier_on_road", []):
+    print("   %s: %d column(s) dropped (they stood on a road)" % (run, n))
 for run, pier, over in d.get("pier_overhang", []):
     print("   WARNING: %s's pier %s reaches %.2f m past the deck edge -- pick a narrower pier" % (run, pier, over))
 if d.get("kit_stale"):

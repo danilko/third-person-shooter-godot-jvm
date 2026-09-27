@@ -240,9 +240,47 @@ public class MinimapController extends Control {
             drawString(RoadOverlay.mapFont(), at, postalText, godot.core.HorizontalAlignment.CENTER, w,
                     postalFontSize, new Color(1f, 1f, 1f, 0.95f));
         }
+        godot.api.FontFile jp = com.openworld.world.StreetNames.font();
+        if (showStreet && jp != null && !street(origin).isEmpty()) {
+            // inside the disc's bottom edge, over the postal code (the Control clips anything drawn outside it)
+            Vector2 at = new Vector2(0f, cy + radiusPx - 12f - postalFontSize);
+            float w = (float) size.getX();
+            drawStringOutline(jp, at, streetText, godot.core.HorizontalAlignment.CENTER, w, streetFontSize,
+                    HudPalette.OUTLINE_PX, HudPalette.OUTLINE);
+            drawString(jp, at, streetText, godot.core.HorizontalAlignment.CENTER, w, streetFontSize,
+                    new Color(1f, 1f, 1f, 0.95f));
+        }
     }
 
     private String postalText = "";
+
+    /** The street under the player, in kanji and romaji (user, 2026-09-26: "real street name"), above the postal code:
+     *  the nearest lane of the road graph within {@link #STREET_REACH} m, named by world.StreetNames. */
+    @Export public boolean showStreet = true;
+    @Export public int streetFontSize = 13;
+    public static final double STREET_REACH = 14.0;
+    private String streetText = "";
+    private double streetAge;
+
+    private String street(Vector3 at) {
+        // wall-clock throttle: a Control that only draws has no process delta to count down
+        double nowS = godot.api.Time.INSTANCE.getTicksMsec() / 1000.0;
+        if (nowS < streetAge) return streetText;
+        streetAge = nowS + 0.5;
+        streetText = "";
+        com.openworld.world.RoadGraph g = com.openworld.world.RoadMap.graph();
+        if (g == null) return streetText;
+        java.util.List<com.openworld.world.RoadGraph.Snap> s = g.snaps(at.getX(), at.getY(), at.getZ(), 1.0);
+        if (s == null || s.isEmpty() || s.get(0).distance > STREET_REACH) return streetText;
+        String road = s.get(0).lane.roadName;
+        String ja = com.openworld.world.StreetNames.ja(road);
+        if (ja != null) streetText = ja;            // the kanji only: the disc is 150 px, and the plates carry the romaji
+        return streetText;
+    }
+
+    /** The street line drawn on the last frame (probe readout). */
+    @Register
+    public String streetNow() { return streetText; }
 
     /** The postal readout drawn on the last frame (probe readout, PLAN.md 3.26). */
     @Register

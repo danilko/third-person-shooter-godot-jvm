@@ -48,6 +48,11 @@ EDGE = (("Curb", "deck", "kerb", "rka_curb_ol", 0.0, "rka_curb_hl", "rka_curb_tl
         ("Sidewalk", "band", "footway", "rka_walk_cl", 0.0, "rka_walk_zl", "rka_walk_hl", ""),
         ("Barrier", "deck", "barrier", "rka_wall_c", 0.0, "rka_wall_z", "rka_wall_hw", "rka_wall_h"))
 PILLAR_MIN_HEIGHT = 0.5
+#: a kerb's half thickness stops at this, and from PLATFORM_KERB_FROM tall (x2 fully) it slides outward to stand flush
+#: at the edge line: a platform's face is vertical over the track, never battered into it
+KERB_HALF_MAX = 0.15
+PLATFORM_KERB_FROM = 0.2          # every road kerb is 0.15 m: untouched
+PLATFORM_KERB_RAMP = 0.1          # flush by 0.3 m, well before a platform ramp's face reaches a train's gauge
 
 #: `point_build.ASSET_REQUIRE` / `ASSET_Z_ATTR`: what must be non-zero on a carrier for a slot's PROFILE ASSET to
 #: build, and the line its section's origin stands on (a kerb and a barrier are anchored by their FOOT).
@@ -467,6 +472,151 @@ def pillars(pts, values, lats, pier=None, ground=None, blocked=None):
     return out, over, dropped
 
 
+
+# ---------------------------------------------------------------------------------------------------------- RAIL
+#
+# RAIL IS A MODE OF THE ROAD KIT (PLAN.md 3.25 "Rail as a mode", R1): a road whose `road_class` is `rail` is a
+# DOUBLE TRACK -- a two-way road with one lane each way, the lane centre being the track centre -- so the carrier,
+# the grades, the zone cut, the piers and the lanekit (a `through` lane per track, `road_class` "rail", which the
+# game keeps OUT of the road graph and traffic) are all the kit's own. What rail changes is only what is SWEPT:
+#   * the bed is ballast (`RAIL_BED_MATERIAL`, a Godot material-library name like `M_TunnelLamp`), not asphalt,
+#     and no lane markings are painted on it;
+#   * two rails per track, `RAIL_GAUGE` apart (1067 mm, the Japanese metro / JR gauge), `RAIL_H` proud of the bed;
+#   * a LEVEL CROSSING (踏切) is where the rail meets ANOTHER network's paved band at its own height (`foreign`,
+#     within `CROSSING_DZ`): there the road owns the ground -- its carriageway runs through -- so the rail's bed,
+#     fence, car wall and collision are cut out, and the rails lie FLUSH in the road surface (a car must not meet a
+#     16 cm step). Each crossing is reported (`report["crossings"]`) for the barrier props and the runtime.
+#   * a pier is kept off the foreign network's carriageways too (`pier_on_road` over both sets of bands).
+RAIL_CLASS = "rail"
+RAIL_GAUGE = 1.067
+RAIL_HEAD_W = 0.07
+RAIL_H = 0.16
+RAIL_MATERIAL = "M_Rail"
+RAIL_BED_MATERIAL = "M_Ballast"
+#: A foreign band this close to the rail's own height is a level crossing; further below it is a road the rail
+#: passes OVER (a pier question), further above a road passing over the rail.
+CROSSING_DZ = 1.0
+
+
+def is_rail(road):
+    return getattr(road, "road_class", "") == RAIL_CLASS
+
+
+def track_offsets(road):
+    """Signed lateral offsets of the track centres from the carrier: the centre of each lane of a 1 + 1 road."""
+    b = road.base
+    c = 0.5 * float(getattr(b, "median_width", 0.0) or 0.0) + 0.5 * float(b.lane_width)
+    return (c, -c)
+
+
+def crossing_band(foreign, x, y, z):
+    """The foreign band a level crossing at (x, y, z) sits in, or None."""
+    for b in foreign or ():
+        if b.bbox_hit(x, y, 0.5) and ped._signed_depth(b.poly, x, y) > 0.0 \
+                and abs(b.lowest_surface_z(x, y) - z) < CROSSING_DZ:
+            return b
+    return None
+
+
+def crossing_frame(pts, k, band):
+    """What a level crossing's signals are placed from (PLAN.md R4), appended to its report row: the rail's unit
+    direction (tx, ty) at carrier sample `k`, the ROAD's unit direction (rx, ry) along the crossed band's spine, and
+    the band's paved half width to the road's LEFT and RIGHT of (rx, ry), measured across the band from the crossing
+    point. A crossing with no band reports zeros."""
+    a, b = pts[max(0, k - 1)], pts[min(len(pts) - 1, k + 1)]
+    tl = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+    tx, ty = (b[0] - a[0]) / tl, (b[1] - a[1]) / tl
+    if band is None or len(band.spine) < 2:
+        return (round(tx, 4), round(ty, 4), 0.0, 0.0, 0.0, 0.0)
+    p = pts[k]
+    sp = band.spine
+    j = min(range(len(sp) - 1), key=lambda i: (sp[i][0] - p[0]) ** 2 + (sp[i][1] - p[1]) ** 2
+            + (sp[i + 1][0] - p[0]) ** 2 + (sp[i + 1][1] - p[1]) ** 2)
+    rx, ry = sp[j + 1][0] - sp[j][0], sp[j + 1][1] - sp[j][1]
+    rl = math.hypot(rx, ry) or 1.0
+    rx, ry = rx / rl, ry / rl
+    lx, ly = -ry, rx
+
+    def reach(sgn):
+        d = 0.0
+        while d < 40.0 and ped._signed_depth(band.poly, p[0] + lx * sgn * (d + 0.25), p[1] + ly * sgn * (d + 0.25)) > 0.0:
+            d += 0.25
+        return d
+    return (round(tx, 4), round(ty, 4), round(rx, 4), round(ry, 4), reach(1.0), reach(-1.0))
+
+
+def _split_flagged(pts, flags):
+    """Contiguous runs of `pts` with one flag, each run sharing its boundary vertex with the next: [(flag, [pt])]."""
+    out = []
+    for i, p in enumerate(pts):
+        if not out or out[-1][0] != flags[i]:
+            if out:
+                out[-1][1].append(p)
+            out.append((flags[i], [p] if not out else [pts[i - 1], p]))
+        else:
+            out[-1][1].append(p)
+    return [(f, r) for f, r in out if len(r) >= 2]
+
+
+def rails(pts, lats, offsets, holes):
+    """Two rails per track at each of `offsets`, as closed prisms `RAIL_H` tall; inside a crossing (`holes[i]`) as a
+    flush strip. `[tri]`."""
+    out = []
+    for c in offsets:
+        for side in (-1.0, 1.0):
+            off = c + side * 0.5 * RAIL_GAUGE
+            vals = [{"o": off, "hw": 0.5 * RAIL_HEAD_W, "z": RAIL_H, "t": RAIL_H}] * len(pts)
+            idx = list(range(len(pts)))
+            for flush, run in _split_flagged(idx, holes):
+                rp = [pts[i] for i in run]
+                rl = [lats[i] for i in run]
+                rv = [vals[i] for i in run]
+                if flush:
+                    out += sweep(rp, rv, "band", "o", ps.PAINT_Z_BIAS, "", "hw", "", rl)
+                else:
+                    out += sweep(rp, rv, "deck", "o", 0.0, "z", "hw", "t", rl)
+    return out
+
+
+def _centroid(t):
+    return ((t[0][0] + t[1][0] + t[2][0]) / 3.0, (t[0][1] + t[1][1] + t[2][1]) / 3.0,
+            (t[0][2] + t[1][2] + t[2][2]) / 3.0)
+
+
+def cut_crossings(objs, names, foreign, pts):
+    """Drop every triangle of objects `names` whose plan position is inside a foreign band where the RAIL (its
+    carrier `pts`, nearest in plan) is at that band's height -- a level crossing: the road owns the ground there, so
+    the rail bed, its fence and car wall, and their collision go. Asked of the rail's height, never the triangle's:
+    a 3 m car wall's top face is not "at road level", but it stands on the rail that is."""
+    cell = 8.0
+    buckets = {}
+    for p in pts:
+        buckets.setdefault((int(math.floor(p[0] / cell)), int(math.floor(p[1] / cell))), []).append(p)
+
+    def rail_z(x, y):
+        i, j = int(math.floor(x / cell)), int(math.floor(y / cell))
+        for r in range(0, 64):
+            near = [p for di in range(-r, r + 1) for dj in range(-r, r + 1)
+                    if max(abs(di), abs(dj)) == r for p in buckets.get((i + di, j + dj), ())]
+            if near:
+                return min(near, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2)[2]
+        return min(pts, key=lambda p: (p[0] - x) ** 2 + (p[1] - y) ** 2)[2]
+    for n in names:
+        mats = objs.get(n)
+        if not mats:
+            continue
+        for mat in list(mats):
+            keep = []
+            for t in mats[mat]:
+                # ANY corner (or the centroid) inside the road cuts the triangle: a fence or shoulder segment is a
+                # sample span long (~4 m), and a centroid test left the half of one that reaches into the road
+                # standing in its outer lane (probe_road_clear, 2026-09-26)
+                if all(crossing_band(foreign, q[0], q[1], rail_z(q[0], q[1])) is None
+                       for q in (t[0], t[1], t[2], _centroid(t))):
+                    keep.append(t)
+            mats[mat] = keep
+
+
 def _add(objs, name, mat, tris):
     """File `tris` under object `name`, material NAME `mat`."""
     if tris:
@@ -542,13 +692,16 @@ def _collision(objs, surface_names, edge_names, name, ped_access):
         _add(objs, collision_name(name + "_" + kind, kind, ped), NO_MATERIAL, tris)
 
 
-def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=None, clear=None):
+def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=None, clear=None, foreign=None):
     """Every object `point_build.build_network` emits, as triangles: `{object: {material name: [tri]}}`, the KIT
     frame, collision proxies included (material `NO_MATERIAL`). Same solve, same cut (`part` + `zone` emit one
     piece of a zoned network, the WHOLE network still solved), same styles (`kit`, default `point_kit.load()`).
     `report`, a dict, collects `missing_style` rows. `solved`, `point_edges.solve_all(net, ground)` already run,
     saves re-solving the network for every piece of it. `clear` (`point_furniture.clear_zones`) is where lane and
-    centre lines stop at a junction mouth -- the stop line and the zebra -- which only the lane graph knows."""
+    centre lines stop at a junction mouth -- the stop line and the zebra -- which only the lane graph knows.
+    `foreign` is ANOTHER network's bands (`point_edges.solve_all(...)[3]`): piers keep off them too, and a RAIL road
+    (`is_rail`) crosses one at its own height as a level crossing (see "RAIL" above)."""
+    foreign = list(foreign or ())
     kit = kit if kit is not None else pk.load()
     solves, jsolves, gsolves, bands = solved if solved is not None else ped.solve_all(net, ground)
     styles = {n: pk.resolve(r, kit) for n, r in net.roads.items()}
@@ -575,7 +728,11 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
             pts, values = ps.carrier_points(s)
             lats = [_lateral(t) for t in poly_tangents(pts)]
             surf = name + "__surface"
+            rail = is_rail(s.road)
             for layer, kind, slot, oa, z, za, wa, ta in SURFACE:
+                if rail and slot == "surface":
+                    _add(objs, surf, RAIL_BED_MATERIAL, sweep(pts, values, kind, oa, z, za, wa, ta, lats))
+                    continue
                 _layer(objs, surf, style, med_slot if slot == "median" else slot, kind, oa, z, za, wa, ta,
                        pts, values, lats)
             # the median wall is a COLLIDER only: what is seen is the kit panel `point_furniture` tiles along it
@@ -588,7 +745,7 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 _add(objs, collision_name(name + "_shed", COL_ROAD, False), NO_MATERIAL, sh["concrete"])
             if any(float(v.get("rka_pillar_param", 0.0)) > 0.0 for v in values):
                 cols, over, dropped = pillars(pts, values, lats, style.pier(), ground,
-                                              blocked=lambda top, fwd, half: pier_on_road(bands, top, fwd, half))
+                                              blocked=lambda top, fwd, half: pier_on_road(list(bands) + foreign, top, fwd, half))
                 if dropped and report is not None:
                     report.setdefault("pier_on_road", []).append((name, dropped))
                 for mat, tris in cols.items():
@@ -599,6 +756,42 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
             for sfx, epts, walk, kerb, wall, sgn in ped.road_edge_runs(s, bands):
                 edge_names.append("%s__edges_%s" % (name, sfx))
                 _edge_run(objs, edge_names[-1], epts, walk, kerb, wall, sgn, style)
+            if foreign and not rail:
+                # a ROAD built against the rail (`--avoid` the rail record): where it crosses a track at its own
+                # height, its PARAPET and car wall stop -- they would stand across the track (a dike ramp's barrier
+                # did, probe_rail_track's gauge 2026-09-26). The kerb and footway stay: the rail cut its own bed there.
+                x0, x1 = min(p[0] for p in pts) - 30.0, max(p[0] for p in pts) + 30.0
+                y0, y1 = min(p[1] for p in pts) - 30.0, max(p[1] for p in pts) + 30.0
+                near = [b for b in foreign if b.x1 >= x0 and b.x0 <= x1 and b.y1 >= y0 and b.y0 <= y1]
+                if near:
+                    wall_mat = style.material("barrier")
+                    cut_crossings(objs, [collision_name(n + "_carwall", COL_CARWALL, False) for n in edge_names],
+                                  near, pts)
+                    for n in edge_names:
+                        mats = objs.get(n) or {}
+                        if wall_mat in mats:
+                            keep = {wall_mat: mats[wall_mat]}
+                            cut_crossings({n: keep}, [n], near, pts)
+                            mats[wall_mat] = keep[wall_mat]
+            if rail:
+                x0, x1 = min(p[0] for p in pts) - 30.0, max(p[0] for p in pts) + 30.0
+                y0, y1 = min(p[1] for p in pts) - 30.0, max(p[1] for p in pts) + 30.0
+                near = [b for b in foreign if b.x1 >= x0 and b.x0 <= x1 and b.y1 >= y0 and b.y0 <= y1]
+                holes = [crossing_band(near, p[0], p[1], p[2]) is not None for p in pts]
+                _add(objs, name + "__rails", RAIL_MATERIAL, rails(pts, lats, track_offsets(s.road), holes))
+                cut_crossings(objs, [surf] + edge_names + [collision_name(n + "_carwall", COL_CARWALL, False)
+                                                        for n in edge_names], near, pts)
+                if report is not None:
+                    for flush, run in _split_flagged(list(range(len(pts))), holes):
+                        if flush:
+                            k = run[len(run) // 2]
+                            mid = pts[k]
+                            b = crossing_band(near, mid[0], mid[1], mid[2])
+                            report.setdefault("crossings", []).append(
+                                (name, b.owner if b is not None else "", round(mid[0], 2), round(mid[1], 2),
+                                 round(mid[2], 2)) + crossing_frame(pts, k, b))
+                _collision(objs, [surf], edge_names, name, bool(s.road.ped_access))
+                continue
             for yellow in (False, True):
                 for r in (r for r in ps.solve_marks(s) if r.yellow is yellow):
                     for line in pfu.clip_outside(list(r.points), clear):
@@ -644,7 +837,13 @@ def _edge_run(objs, name, pts, walk, kerb, wall, sgn, style=None):
     values = []
     for k in range(len(kerb)):
         h, w, wl = float(kerb[k]), float(walk[k]), float(wall[k])
-        values.append({"rka_curb_ol": 0.0, "rka_curb_hl": h, "rka_curb_tl": h * ps.KERB_THICKNESS,
+        # a kerb is swept CENTRED on the edge line, half as thick as it is tall -- right for a 0.15 m road kerb, and a
+        # 1.26 m PLATFORM face leaning 0.63 m into the track (probe_rail_track's gauge, 2026-09-26). Past
+        # PLATFORM_KERB_FROM the half thickness stops growing and the prism slides OUTWARD until its inner face is
+        # the edge line itself; road kerbs (under 0.3 m) are byte-identical.
+        th = min(h * ps.KERB_THICKNESS, KERB_HALF_MAX)
+        slide = min(1.0, max(0.0, (h - PLATFORM_KERB_FROM) / PLATFORM_KERB_RAMP))
+        values.append({"rka_curb_ol": sgn * th * slide, "rka_curb_hl": h, "rka_curb_tl": th,
                        "rka_walk_cl": sgn * w, "rka_walk_hl": w, "rka_walk_zl": h, "rka_wall_h": wl,
                        "rka_wall_hw": half_t if wl > 0.0 else 0.0, "rka_wall_c": sgn * (2.0 * w + half_t),
                        "rka_wall_z": h + wl, "rka_wall_foot": h})
@@ -769,7 +968,57 @@ def self_test():
     print("OK: a column never stands on or within %.0f m of a road more than %.0f m below" % (PIER_ROAD_CLEAR, PIER_ROAD_DZ))
     print("OK: a rock shed: soffit %.1f m over the road, columns on the open side, wall + roof to the rock on the other"
           % ps.SHED_CLEAR)
-    return 6
+    # RAIL: a straight double track crossed at its own height by a street (a 踏切), and passed over a road 8 m below.
+    try:
+        from . import point_presets as ppr
+    except ImportError:
+        import point_presets as ppr                                          # noqa: E402
+
+    def straight(net, name, pts):
+        r = net.add_road(pm.RoadData(name, pm.PointData(uid=""), ()))
+        prev = None
+        for q in pts:
+            p = net.add_station(r, q)
+            if prev is not None:
+                net.link(prev.uid, p.uid)
+            prev = p
+        return r
+
+    rnet = pm.NetworkData()
+    straight(rnet, "line", [(0.0, 0.0, 0.3), (100.0, 0.0, 0.3), (200.0, 0.0, 0.3)])
+    ppr.apply_preset(rnet, "line", "rail")
+    fnet = pm.NetworkData()
+    straight(fnet, "street", [(100.0, -60.0, 0.3), (100.0, 0.0, 0.3), (100.0, 60.0, 0.3)])
+    straight(fnet, "under", [(170.0, -60.0, -8.0), (170.0, 0.0, -8.0), (170.0, 60.0, -8.0)])
+    ppr.apply_preset(fnet, "street", "block")
+    ppr.apply_preset(fnet, "under", "block")
+    foreign = ped.solve_all(fnet)[3]
+    rep = {}
+    o = build(rnet, report=rep, foreign=foreign)
+    rl = [t for ts in o["line__rails"].values() for t in ts]
+    ys = sorted({round(p[1], 3) for t in rl for p in t})
+    for c in track_offsets(rnet.roads["line"]):
+        for side in (-1.0, 1.0):
+            y = c + side * 0.5 * RAIL_GAUGE
+            assert any(abs(v - (y - 0.5 * RAIL_HEAD_W)) < 1e-3 for v in ys), (y, ys)
+    crossing_rail_top = max(p[2] for t in rl for p in t if abs(_centroid(t)[0] - 100.0) < 2.0)
+    open_rail_top = max(p[2] for t in rl for p in t if abs(_centroid(t)[0] - 40.0) < 2.0)
+    assert crossing_rail_top < 0.3 + 0.05 and abs(open_rail_top - (0.3 + RAIL_H)) < 1e-6, (crossing_rail_top, open_rail_top)
+    bed = [t for t in o["line__surface"].get(RAIL_BED_MATERIAL, [])]
+    assert bed and not any(abs(_centroid(t)[0] - 100.0) < 2.0 for t in bed), "the bed runs through the crossing"
+    assert [c[1] for c in rep.get("crossings", [])] == ["street"], rep.get("crossings")
+    cw = [t for n, m in o.items() if n.endswith("-carwall-noped-colonly") for t in m.get(NO_MATERIAL, [])]
+    assert cw and not any(abs(_centroid(t)[0] - 100.0) < 3.0 for t in cw), "a car wall stands across the crossing"
+    assert any(abs(_centroid(t)[0] - 170.0) < 3.0 for t in cw), "the car wall stops over the road 8 m below"
+    # control: with no foreign network there is no crossing, and the rails stand proud everywhere
+    rep2 = {}
+    o2 = build(rnet, report=rep2)
+    rl2 = [t for ts in o2["line__rails"].values() for t in ts]
+    assert not rep2.get("crossings") and \
+        max(p[2] for t in rl2 for p in t if abs(_centroid(t)[0] - 100.0) < 2.0) > 0.3 + RAIL_H - 1e-6
+    print("OK: rail -- two rails a track at %.3f m gauge, flush and bed/car wall cut out at a 踏切, proud elsewhere"
+          % RAIL_GAUGE)
+    return 7
 
 
 if __name__ == "__main__":

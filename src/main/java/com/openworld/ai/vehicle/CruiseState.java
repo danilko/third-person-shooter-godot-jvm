@@ -96,6 +96,15 @@ public class CruiseState implements VehicleAIState {
             cmd.motor *= Math.max(0f, 1f - (speed - corner));
             cmd.brake = speed > corner + 1f;
         }
+        // The traffic light (world.TrafficSignals): a red ahead is a speed that falls to zero at the stop line.
+        float light = ctrl.signalSpeedLimit();
+        if (light < 0.6f) {
+            cmd.motor = 0f;
+            cmd.brake = true;                       // held on the line until it turns green
+        } else if (speed > light) {
+            cmd.motor *= Math.max(0f, 1f - (speed - light));
+            cmd.brake = cmd.brake || speed > light + 0.5f;
+        }
         return this;
     }
 }

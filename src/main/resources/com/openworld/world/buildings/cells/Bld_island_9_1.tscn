@@ -1,4 +1,10 @@
 [gd_scene format=3]
 
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/CropField.java" id="crop"]
 
 [node name="Bld_island_9_1" type="Node3D"]
+
+[node name="Crops" type="Node3D" parent="."]
+script = ExtResource("crop")
+chunks = PackedFloat32Array(400.000, -1650.000, 6.000, 0, 400.000, -1600.000, 6.000, 0, 400.000, -1550.000, 6.000, 0, 450.000, -1700.000, 6.000, 0, 450.000, -1650.000, 6.000, 0, 450.000, -1600.000, 6.000, 0, 450.000, -1550.000, 6.000, 0)
+masks = PackedStringArray("00000000000000000000000000000000000003ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "0007ff8003ffc001ffe000fff0007ff8003ffc001ffe000fff0007ff8003ffc001ffe000fff0007ff8003ffc001ffe000fff0007ff8003ffc001ffe000fff0007ff8003ffc001ffe000fff0007ff8", "0007ff8003ffc001ffe000fff0007ff8007fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff8")

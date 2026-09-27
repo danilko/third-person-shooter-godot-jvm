@@ -19,6 +19,11 @@ CLAUDE.md "LANES ARE 4.5 m"):
   barriers both sides, the uphill face cut near vertical (`cut_batter` 10); 60 km/h. Rock sheds are per station
   (`PointData.shed`).
 
+* **rail** (PLAN.md 3.25, R1): a DOUBLE TRACK -- 1 + 1 lanes whose centres are the track centres, 4.0 m apart (the
+  Japanese 3.8-4.0 m), a 1 m ballast shoulder each side, no median / kerb / footway, fenced (`ped_access` off), on
+  the `hammerhead` pier when elevated; 80 km/h. `point_mesh` sweeps it as a ballast bed + two rails a track, cut out
+  at a level crossing; the lanekit carries `road_class` "rail", which the game keeps out of traffic and the GPS.
+
 Ramps are made by `point_record_ops.branch_ramp` / `make_ramp` (class `ramp`), not by a preset.
 """
 import point_model as pm
@@ -74,6 +79,14 @@ PRESETS = {
                  "shoulder_left_width": 0.75, "shoulder_right_width": 0.75,
                  "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,
                  "right_kerb_height": 0.0, "design_speed": 60.0},
+    },
+    "rail": {
+        "road": {"road_class": "rail", "ped_access": False, "barrier_height": 1.2, "median_style": pm.MED_NONE,
+                 "pillar_asset": "RKA_PIER_hammerhead"},
+        "base": {"lanes_fwd": 1, "lanes_bwd": 1, "lane_width": 4.0, "median_width": 0.0,
+                 "shoulder_left_width": 1.0, "shoulder_right_width": 1.0,
+                 "left_walk_width": 0.0, "right_walk_width": 0.0, "left_kerb_height": 0.0,
+                 "right_kerb_height": 0.0, "design_speed": 80.0},
     },
 }
 

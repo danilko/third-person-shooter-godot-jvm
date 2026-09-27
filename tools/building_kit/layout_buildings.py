@@ -621,9 +621,41 @@ def _project_root():
     return os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 
+def expand_variants(types):
+    """FOOTPRINT VARIANTS (PLAN.md 3.19(c): the pencil class was ONE box 582 times). A type's `variants` rows each
+    make a type of their own, id `<Id>_<suffix>`, a deep copy of the base with only what the row states changed:
+    `modules` (width x depth), `doors` (when the base's no longer fit), and/or `upper` (the top floor band's storey count). Everything else -- the kit, the
+    facade rows, doors, setback, style -- is the base's, so a variant can never drift from it. The declared `jp`
+    sizes are the BASE's measurements and do not describe a variant, so a variant drops them (the layout's size
+    check is the base's contract). `variants` itself is not copied. Returns the expanded list, bases first."""
+    out = []
+    for t in types:
+        out.append(t)
+        for v in t.get("variants", ()):
+            c = json.loads(json.dumps({k: val for k, val in t.items() if k != "variants"}))
+            c["id"] = "%s_%s" % (t["id"], v["suffix"])
+            c["variant_of"] = t["id"]
+            c["jp"] = {k: val for k, val in c.get("jp", {}).items() if k not in ("frontage_m", "depth_m", "height_m")}
+            if "modules" in v:
+                c["modules"] = list(v["modules"])
+            if "upper" in v:
+                c["floors"][-1]["count"] = int(v["upper"])
+            if "doors" in v:              # a narrower variant whose base doors no longer fit
+                c["doors"] = v["doors"]
+            out.append(c)
+    return out
+
+
+def variant_ids(types_path=None):
+    """{base id: [its variant ids]} -- what `island_buildings` draws a placement from."""
+    doc = json.load(open(types_path or TYPES_PATH))
+    return {t["id"]: ["%s_%s" % (t["id"], v["suffix"]) for v in t.get("variants", ())] for t in doc["types"]}
+
+
 def layout_all(types_path):
     root = KITS_DIR
     doc = json.load(open(types_path))
+    doc["types"] = expand_variants(doc["types"])
     ids = [t["id"] for t in doc["types"]] + [e["id"] for e in doc.get("examples", [])]
     if len(ids) != len(set(ids)):
         raise SystemExit("building ids must be unique")

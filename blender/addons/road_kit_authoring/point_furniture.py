@@ -563,15 +563,26 @@ def _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, 
                     fur.put(table, "bollard", pos, d)
 
 
-def _signalised(table, junction):
+def _signalised(table, junction, lanes=None):
     """A junction carries signals when any mouth is authored `traffic_light`, or -- `signal_all_junctions` -- when
-    at least `signal_min_arms` of its arms have traffic arriving (a Japanese arterial crossing is signalised; a
-    two-arm bend or a dead-end loop is not)."""
+    at least `signal_min_arms` of its arms have traffic arriving (a two-arm bend or a dead-end loop is not).
+    THE JAPANESE RULE (user, 2026-09-26: "traffic lights to japan flavour"; `signal_needs_major`): a crossing of two
+    narrow streets is NOT signalised in Japan -- the minor approach has a stop line and 止まれ, and that is all --
+    so a signal also needs one arm that is a major road: `signal_major_lanes` or more lanes arriving on it, or an
+    arterial. Asked of the lanes (`lanes`, the lanekit's), so without them the rule stands down."""
     arms = junction.get("arms", ())
     if any(a.get("traffic_light") for a in arms):
         return True
     r = table.rules
-    return bool(r.get("signal_all_junctions")) and sum(1 for a in arms if a.get("in_lanes")) >= r["signal_min_arms"]
+    if not (bool(r.get("signal_all_junctions")) and sum(1 for a in arms if a.get("in_lanes")) >= r["signal_min_arms"]):
+        return False
+    if not r.get("signal_needs_major") or lanes is None:
+        return True
+    for a in arms:
+        ins = [lanes[i] for i in a.get("in_lanes", ()) if i in lanes]
+        if len(ins) >= int(r.get("signal_major_lanes", 2)) or any(l.get("road_class") == "arterial" for l in ins):
+            return True
+    return False
 
 
 #: How far a pole may be stepped OUTBOARD to get out of a lane before it is dropped instead. A signal must
@@ -630,7 +641,7 @@ def _signals(fur, table, lanes, junctions, mine, ground, index=None):
     # anything the more Japanese placement: a signal pole stands AT the kerb, not out in the footway.
     off = float(r["signal_kerb_offset"])
     for arm in _arms(lanes, junctions):
-        if not _signalised(table, arm["junction"]):
+        if not _signalised(table, arm["junction"], lanes):
             continue
         ins = [w for w in arm["rows"] if w["arriving"]]
         outs = [w for w in arm["rows"] if not w["arriving"]]
@@ -680,7 +691,50 @@ def _signals(fur, table, lanes, junctions, mine, ground, index=None):
         pos = moved
         if not _grounded(ground, pos, r["max_above_ground"]):
             continue
-        fur.put(table, "signal", pos, fwd, lane.get("road_name", ""))
+        if fur.put(table, "signal", pos, fwd, lane.get("road_name", "")):
+            fur.placements[-1].update({"junction": arm["junction"]["id"], "arm": _arm_index(arm)})
+
+
+def _arm_index(arm):
+    """The arm's index in its junction's `arms` list (the lanekit's order: the runtime's key)."""
+    return next(k for k, a in enumerate(arm["junction"].get("arms", ())) if a is arm["arm"])
+
+
+def _ped_signals(fur, table, lanes, junctions, mine, ground, index=None):
+    """歩行者用信号 (user, 2026-09-26: "enable both pedestrian + traffic light"): at a signalised junction, a
+    pedestrian signal at EACH END of every zebra, on the footway `signal_kerb_offset` out from the kerb and level with
+    the zebra's middle, its head facing across the crosswalk at the far end's pedestrians. An end already served by
+    a vehicle signal pole's own pedestrian head (a pole within `ped_signal_share` m) gets none: Japan mounts the two
+    on one pole where they meet. Tagged with the junction and the arm whose crosswalk it serves."""
+    if "ped_signal" not in table.assets:
+        return
+    r = table.rules
+    off = float(r["signal_kerb_offset"])
+    b0, b1 = r["crosswalk_back"]
+    back = 0.5 * (b0 + b1)
+    share = float(r.get("ped_signal_share", 5.0))
+    for arm in _arms(lanes, junctions):
+        if not _signalised(table, arm["junction"], lanes) or not _has_zebra(table, arm) or not mine(arm["ins"][0]):
+            continue
+        fwd, left, anchor, rows = arm["fwd"], arm["left"], arm["anchor"], arm["rows"]
+        lo = min(w["lat"] - w["half"] for w in rows) - off
+        hi = max(w["lat"] + w["half"] for w in rows) + off
+        near = min(rows, key=lambda w: abs(w["lat"]))
+        z = near["sample"](min(back, near["length"]))[2]
+        for lat, face in ((lo, (left[0], left[1])), (hi, (-left[0], -left[1]))):
+            pos = (anchor[0] + left[0] * lat - fwd[0] * back, anchor[1] + left[1] * lat - fwd[1] * back, z)
+            if any(p.get("asset") == "signal" and math.hypot(p["pos"][0] - pos[0], p["pos"][1] - pos[1]) < share
+                   for p in fur.placements):
+                fur.counts["ped_signal_shared"] = fur.counts.get("ped_signal_shared", 0) + 1
+                continue
+            out = (-face[0], -face[1])
+            moved = _out_of_lane(index, table, r, "ped_signal", pos, out)
+            if moved is None:
+                fur.counts["ped_signal_in_lane"] = fur.counts.get("ped_signal_in_lane", 0) + 1
+                continue
+            # the piece's head faces -fwd (Godot +Z): toward the far end is `face`, so fwd is its opposite
+            if fur.put(table, "ped_signal", moved, out, arm["ins"][0].get("road_name", "")):
+                fur.placements[-1].update({"junction": arm["junction"]["id"], "arm": _arm_index(arm)})
 
 
 def _lamps(fur, table, solves, bands, mine_run, ground, index=None):
@@ -891,29 +945,187 @@ def _median_walls(fur, table, solves, mine_run):
             fur.put(table, "median_wall", (p[0], p[1], p[2] + mz), d, s.road.name)
 
 
-def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, ground=None):
+def place(table, solved, lanes_doc, mine_lane, mine_run, mine_pad, mark_mat, ground=None, keep_clear=None):
     """One piece's furniture. `solved` is `point_edges.solve_all`'s tuple; `lanes_doc` the WHOLE network's lanes and
     junctions (a mouth's connectors may stream with the pad's piece); `mine_*` say what belongs to this piece;
-    `mark_mat(lane)` is the paint material of that lane's road."""
+    `mark_mat(lane)` is the paint material of that lane's road. `keep_clear` is ANOTHER network's lanes (the rail's
+    tracks, 2026-09-26): nothing solid of this network stands in them, but nothing is placed FOR them either."""
     fur = Furniture()
     if table is None:
         return fur
     solves, jsolves, _gsolves, bands = solved
-    lanes = {l["id"]: l for l in lanes_doc.get("lanes", ())}
+    # a RAIL road (PLAN.md R1) carries none of the street's furniture: its platforms are footways to the kit (R3), and
+    # a platform must not grow street trees, planters or 10 m street lamps
+    solves = [sv for sv in solves if getattr(sv.road, "road_class", "") != "rail"]
+    lanes = {l["id"]: l for l in lanes_doc.get("lanes", ()) if l.get("road_class") != "rail"}
     junctions = {j["id"]: j for j in lanes_doc.get("junctions", ())}
     ordered = [junctions[k] for k in sorted(junctions)]
     _junction_marks(fur, table, lanes, ordered, mine_lane, mark_mat)
     # the signals first: every later solid prop (planter, bollard, lamp) keeps clear of a pole already standing
     # ONE lane index, shared: "may a solid thing stand here" is one question, and a functional pole that skips
     # it is how a signal came to stand in a turn connector and a median lamp in a neighbouring road's lane.
-    index = _LaneIndex(lanes)
+    index = _LaneIndex(dict(lanes, **{"~" + str(l["id"]): l for l in keep_clear or ()}))
     _signals(fur, table, lanes, ordered, mine_lane, ground, index)
+    _ped_signals(fur, table, lanes, ordered, mine_lane, ground, index)
     _lane_props(fur, table, dict(sorted(lanes.items())), mine_lane, ground)
     _edge_props(fur, table, solves, jsolves, bands, mine_run, mine_pad, ground, index)
     _lamps(fur, table, solves, bands, mine_run, ground, index)
-    _street_trees(fur, table, solves, bands, mine_run, ground, lanes)
+    # the trees ask the SAME lanes as every pole, the other network's tracks included (a tree and its pit stood 1.9 m
+    # off a rail track, probe_rail_track's gauge 2026-09-26)
+    _street_trees(fur, table, solves, bands, mine_run, ground, dict(lanes, **{"~" + str(l["id"]): l for l in keep_clear or ()}))
     _median_walls(fur, table, solves, mine_run)
     return fur
+
+
+def crossing_signals(fur, table, crossings):
+    """踏切 signals (PLAN.md R4): at each level crossing a `crossing_signal` (警報機 + 遮断機, boom up) on the LEFT of
+    each approach -- Japan drives on the left, so the unit a driver meets stands at their own kerb -- `crossing_track_
+    clear` m before the rail's centreline (measured square to the track, so an oblique road takes it further along
+    itself) and `crossing_side` m outside the road's paved edge, its lamps facing the traffic. `crossings` are
+    `point_mesh`'s report rows: (rail, road, x, y, z, tx, ty, rx, ry, left half, right half)."""
+    r = table.rules
+    if "crossing_signal" not in table.assets:
+        return
+    clear = float(r.get("crossing_track_clear", 4.5))
+    side = float(r.get("crossing_side", 0.6))
+    for c in crossings:
+        if len(c) < 11 or (c[7] == 0.0 and c[8] == 0.0):
+            continue
+        _rail, road, x, y, z, tx, ty, rx, ry, wl, wr = c[:11]
+        sin = abs(tx * ry - ty * rx)
+        along = clear / max(0.3, sin)
+        lx, ly = -ry, rx
+        for sgn, w in ((1.0, wl), (-1.0, wr)):
+            # approach heading sgn * r: it comes from -sgn * r, its left is sgn * l
+            pos = (x - sgn * rx * along + sgn * lx * (w + side), y - sgn * ry * along + sgn * ly * (w + side), z)
+            # the unit must stand `clear` from the rail's centreline SQUARE to the rail, whatever the road frame says:
+            # at a crossing beside a junction pad the band's spine is not the road's heading, and a pole landed
+            # 0.26 m from a track (probe_rail_track's gauge, 2026-09-26). Pushed on out along the rail's normal.
+            nx_, ny_ = -ty, tx
+            d = (pos[0] - x) * nx_ + (pos[1] - y) * ny_
+            want = clear
+            if abs(d) < want:
+                s_ = 1.0 if d >= 0.0 else -1.0
+                pos = (pos[0] + nx_ * s_ * (want - abs(d)), pos[1] + ny_ * s_ * (want - abs(d)), z)
+            if fur.put(table, "crossing_signal", pos, (sgn * rx, sgn * ry), road):
+                fur.counts["crossing_units"] = fur.counts.get("crossing_units", 0) + 1
+
+
+# ------------------------------------------------------------------------------------------- the signal plan
+
+def _asset_lamps(table, asset):
+    """An asset's lamp lenses and name plate in its GODOT piece frame: `lamps` inline in furniture.json, or
+    `lamps_file` (a JSON the piece's build writes from the markers in its .blend, e.g. TrafficLight_JP.lamps.json)."""
+    a = table.assets.get(asset) or {}
+    if a.get("lamps_file"):
+        path = os.path.join(os.path.dirname(a["file"]), a["lamps_file"])
+        if os.path.exists(path):
+            with open(path) as fh:
+                return json.load(fh)
+    return a.get("lamps") or {}
+
+
+def _piece_to_godot(pos, fwd, q):
+    """A point `q` of a piece (Godot piece frame: +X right, +Y up, forward -Z) placed at kit-frame `pos` facing kit
+    `fwd`, as a GODOT world point (the lanekit's frame: point_export.godot, no network transform)."""
+    fx, fy = fwd
+    ox, oy, oz = pos[0], pos[2], -pos[1]
+    # Xp = (fy, 0, fx), Yp = up, Zp = (-fx, 0, fy) -- the piece's -Z lands on fwd (godot (fx, 0, -fy))
+    return (ox + fy * q[0] - fx * q[2], oy + q[1], oz + fx * q[0] + fy * q[2])
+
+
+def _dir_to_godot(fwd, n):
+    fx, fy = fwd
+    return (fy * n[0] - fx * n[2], n[1], fx * n[0] + fy * n[2])
+
+
+def signal_plan(table, lanes_doc, ground=None):
+    """THE SIGNAL PLAN the runtime runs (world.TrafficSignals; user, 2026-09-26: "enable both pedestrian + traffic
+    light"): for every signalised junction of the WHOLE network (the same placement as the pieces, all of it, so a
+    DIRTY_ONLY build cannot leave the plan partial), in the lanekit's Godot frame:
+      * `arms`: each arm with arriving lanes -- its lane ids (a car on one of them obeys this arm's light), its phase
+        `group`, the distance back from the lane's end to stop at (the stop line's upstream edge), its road;
+      * `groups`: arms facing each other move together (a crossing's two axes; a T's through road and its stem);
+      * `lamps`: every lens of every vehicle and pedestrian signal standing for it, world position + facing, with
+        the arm it belongs to and its colour -- a pedestrian lens shows WALK while its crosswalk's road is RED;
+      * `plates`: each vehicle signal's name plate, with the road it stands over and the road it crosses.
+    Times: `signal_green`, `signal_yellow`, `signal_all_red` (s)."""
+    if table is None:
+        return {"junctions": []}
+    r = table.rules
+    lanes = {l["id"]: l for l in lanes_doc.get("lanes", ()) if l.get("road_class") != "rail"}
+    junctions = [j for _k, j in sorted((j["id"], j) for j in lanes_doc.get("junctions", ()))]
+    fur = Furniture()
+    index = _LaneIndex(lanes)
+    _signals(fur, table, lanes, junctions, lambda l: True, ground, index)
+    _ped_signals(fur, table, lanes, junctions, lambda l: True, ground, index)
+    veh_lamps, ped_lamps = _asset_lamps(table, "signal"), _asset_lamps(table, "ped_signal")
+    stop_back = float(r["stop_back"]) + float(r["stop_width"])
+    by_j = {}
+    for arm in _arms(lanes, junctions):
+        j = arm["junction"]
+        if not _signalised(table, j, lanes):
+            continue
+        by_j.setdefault(j["id"], (j, []))[1].append(arm)
+    out = []
+    for jid, (j, arms) in sorted(by_j.items()):
+        # the phase groups: an arm and the ONE arm coming at it most nearly head-on (fwd opposite within ~45 deg)
+        # move together; every other arm gets a phase of its own (a Y, a 5-arm pad)
+        group, g = {}, 0
+        for arm in arms:
+            k = _arm_index(arm)
+            if k in group:
+                continue
+            group[k] = g
+            best, bd = None, -0.7
+            for other in arms:
+                ko = _arm_index(other)
+                dot = arm["fwd"][0] * other["fwd"][0] + arm["fwd"][1] * other["fwd"][1]
+                if ko not in group and dot < bd:
+                    best, bd = ko, dot
+            if best is not None:
+                group[best] = g
+            g += 1
+        rows = []
+        for arm in arms:
+            k = _arm_index(arm)
+            rows.append({"index": k, "group": group[k], "in_lanes": [l["id"] for l in arm["ins"]],
+                         "road": arm["ins"][0].get("road_name", ""), "stop_back": round(stop_back, 3),
+                         "fwd": [round(arm["fwd"][0], 4), 0.0, round(-arm["fwd"][1], 4)]})
+        road_of = {a["index"]: a["road"] for a in rows}
+        lamps, plates = [], []
+        for p in fur.placements:
+            if p.get("junction") != jid:
+                continue
+            fwd = p["fwd"]
+            src = veh_lamps if p["asset"] == "signal" else ped_lamps
+            # the pole the lens hangs on (its base, where the baked MultiMesh instance stands): the runtime lights a
+            # lens only while that pole is streamed in and standing
+            pole = [round(v, 3) for v in (p["pos"][0], p["pos"][2], -p["pos"][1])]
+            for kind in ("vehicle", "pedestrian"):
+                for d in src.get(kind, ()):
+                    q = _piece_to_godot(p["pos"], fwd, d["pos"])
+                    n = _dir_to_godot(fwd, d["normal"])
+                    lamps.append({"kind": kind, "arm": p["arm"], "colour": d["colour"], "pole": pole,
+                                  "pos": [round(v, 3) for v in q], "normal": [round(v, 4) for v in n],
+                                  "radius": d.get("radius", 0.12)})
+            if p["asset"] == "signal" and src.get("plate"):
+                d = src["plate"]
+                own = road_of.get(p["arm"], "").split("__")[0]
+                others = [road_of[a["index"]] for a in rows if a["group"] != group.get(p["arm"])]
+                # the street being CROSSED: another group's road, preferring one that is not this road itself (a
+                # road bending through a T is both of its arms)
+                cross = next((n for n in others if n.split("__")[0] != own), others[0] if others else "")
+                plates.append({"arm": p["arm"], "road": road_of.get(p["arm"], ""), "cross": cross, "pole": pole,
+                               "pos": [round(v, 3) for v in _piece_to_godot(p["pos"], fwd, d["pos"])],
+                               "normal": [round(v, 4) for v in _dir_to_godot(fwd, d["normal"])],
+                               "size": d["size"]})
+        c = j.get("center") or [0.0, 0.0, 0.0]
+        out.append({"id": jid, "centre": c, "arms": rows, "groups": g, "lamps": lamps, "plates": plates})
+    return {"schema": 1, "green": float(r.get("signal_green", 22.0)), "yellow": float(r.get("signal_yellow", 3.0)),
+            "all_red": float(r.get("signal_all_red", 2.0)), "junctions": out,
+            "notes": "Written by roadkit_cli gltf (point_furniture.signal_plan); read by world.TrafficSignals. "
+                     "Godot frame of the lanekit (the network's own transform is applied at runtime)."}
 
 
 # ------------------------------------------------------------------------------------------- self-test
@@ -938,8 +1150,28 @@ def self_test():
     assert (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 0.0
     assert godot_to_kit((1.0, 2.0, 3.0)) == (1.0, -3.0, 2.0)
 
-    # a synthetic mouth: two arriving lanes heading +X into a junction at x = 50, one lane leaving -X beside them
+    # R4: a road along +Y crossing a rail along +X at the origin, 4.5 m of paving each side: one signal on the LEFT
+    # of each approach (Japan keeps left), before the track, facing the traffic
     table = load()
+    fx = Furniture()
+    crossing_signals(fx, table, [("rail", "street", 0.0, 0.0, 0.3, 1.0, 0.0, 0.0, 1.0, 4.5, 4.5)])
+    sig = sorted((p_["pos"][:2], p_["fwd"]) for p_ in fx.placements if p_["asset"] == "crossing_signal")
+    c_ = table.rules["crossing_track_clear"]
+    w_ = 4.5 + table.rules["crossing_side"]
+    assert sig == [((-w_, -c_), (0.0, 1.0)), ((w_, c_), (-0.0, -1.0))], sig
+    assert len(fx.collision) == 24, "each signal's post is a collider"
+    # an oblique road (45 deg) takes the clearance further along itself
+    fx = Furniture()
+    q = math.sqrt(0.5)
+    crossing_signals(fx, table, [("rail", "street", 0.0, 0.0, 0.3, 1.0, 0.0, q, q, 4.5, 4.5)])
+    # (the old rule measured `clear` ALONG the road and then stepped the kerb-side offset sideways, which on a 45 deg
+    # road put BOTH units 0.9 m from the rail's centreline, i.e. on the tracks)
+    # ... and NEITHER unit stands nearer the rail than `clear`, square to it: the kerb-side offset of an oblique road
+    # swings one unit back toward the track, and it is pushed out again (the pole 0.26 m off a track, 2026-09-26)
+    square = min(abs(p_["pos"][1]) for p_ in fx.placements)
+    assert square >= c_ - 1e-9, square
+    print("OK: 踏切 signals -- one on the left of each approach, %.1f m before the track, square or oblique" % c_)
+    # a synthetic mouth: two arriving lanes heading +X into a junction at x = 50, one lane leaving -X beside them
     assert table is not None, "no furniture table at %s" % TABLE_PATH
     for name, a in table.assets.items():
         assert os.path.exists(a["file"]), a["file"]
@@ -1036,7 +1268,7 @@ def self_test():
     solid.__dict__.update(table.__dict__)
     solid.assets = dict(table.assets, signal={k: v for k, v in table.assets["signal"].items() if k != "breakable"})
     f = place(solid, ([], [], [], []), kd, lambda l: True, lambda s: True, lambda j: True, lambda l: "M_LineW")
-    assert not [p for p in f.placements if p.get("breakable")]
+    assert not [p for p in f.placements if p.get("breakable") and p["asset"] == "signal"]
     xs = [v[0] for t in f.collision for v in t]
     assert xs and max(xs) - min(xs) < 0.5, xs and (min(xs), max(xs))
     # not signalised when only two arms carry traffic and none is authored
