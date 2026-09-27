@@ -79,6 +79,9 @@ public class ExplosionManager extends Node {
                                  String attackerName, String attackerFaction,
                                  String weaponDisplayName, Texture2D weaponIcon,
                                  Node excludeNode, PackedScene vfx, float vfxScale) {
+        // A LIGHT crowd ped has no body (world.PedCrowd): the ones in the blast become real bodies first, so the
+        // loop below damages and pushes them like anyone else (zb1). Budget-free, capped.
+        com.openworld.world.PedCrowd.promoteNear(center, center, radius, 12);
         for (Node node : getTree().getNodesInGroup("characters")) {
             if (node == excludeNode) continue;
             if (node instanceof Character c) {

@@ -1407,7 +1407,7 @@ public class ZoneManager extends Node {
 	 * SpawnConfig left, the pool exhausted), and the crowd then simply keeps walking it.
 	 */
 	boolean promoteSidewalkPed(Object zoneKey, PackedVector3Array path, double along, int dir) {
-		return promoteSidewalkPed(zoneKey, path, along, dir, false, "");
+		return promoteSidewalkPed(zoneKey, path, along, dir, false, "", 0.0);
 	}
 
 	/**
@@ -1415,7 +1415,7 @@ public class ZoneManager extends Node {
 	 * has to land on something, and the damage follows in the same frame. Null when the zone cannot take one.
 	 */
 	com.openworld.character.AICharacter promoteForShot(Object zoneKey, PackedVector3Array path, double along, int dir,
-			String body) {
+			String body, double panic) {
 		LoadedZone lz = loaded.get(zoneKey);
 		if (lz == null) return null;
 		ZoneMarker marker = (ZoneMarker) zoneKey;
@@ -1426,7 +1426,7 @@ public class ZoneManager extends Node {
 		}
 		Node container = charactersContainer();
 		if (cfg == null || container == null) return null;
-		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, false, body);
+		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, false, body, panic);
 	}
 
 	/** Every live promoted sidewalk body, and how many of them fight: the two budgets above. */
@@ -1449,7 +1449,7 @@ public class ZoneManager extends Node {
 	 * same person ("" = the default). Refused (false) past a budget; the ped then stays light.
 	 */
 	boolean promoteSidewalkPed(Object zoneKey, PackedVector3Array path, double along, int dir, boolean fighter,
-			String body) {
+			String body, double panic) {
 		int[] live = sidewalkBodies();
 		if (fighter ? (fighterBudget > 0 && live[1] >= fighterBudget)
 				: (walkerBudget > 0 && live[0] >= walkerBudget)) return false;
@@ -1464,13 +1464,13 @@ public class ZoneManager extends Node {
 		if (cfg == null) return false;
 		Node container = charactersContainer();
 		if (container == null) return false;
-		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, fighter, body) != null;
+		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, fighter, body, panic) != null;
 	}
 
 	/** The one place a full sidewalk walker is built, shared by a promotion and by nothing else today. */
 	private AICharacter spawnSidewalkWalker(LoadedZone lz, SpawnConfig cfg, Node container,
 											PackedVector3Array path, double along, int dir, boolean fighter,
-											String body) {
+											String body, double panic) {
 		SpawnPool sp = pool();
 		AICharacter ai = sp.acquire();
 		if (ai == null) return null;
@@ -1492,6 +1492,7 @@ public class ZoneManager extends Node {
 		container.addChild(ai);
 		com.openworld.ai.SidewalkWalkerController ctrl = new com.openworld.ai.SidewalkWalkerController();
 		ctrl.setup(path, along, dir);
+		ctrl.flee = Math.max(0.0, panic);   // a promotion does not change who runs (zb1)
 		ai.activateForSpawn(ctrl.pointAt(along).plus(new Vector3(0, 0.1, 0)));
 		if (fighter) {
 			// A fighter keeps the ordinary AI brain (AIController's FSM): it finds the nearest hostile itself.

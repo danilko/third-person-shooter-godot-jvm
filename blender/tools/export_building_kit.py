@@ -16,6 +16,13 @@ folder, i.e. the pieces the game builds from.
   `<kit>/materials/<name>.tres` by `tools/godot/build_building_scenes.gd`. Textures are referenced where they
   already are (`export_keep_originals`, a relative `../../textures/` uri), never copied.
 * Every UV map and colour attribute is exported (the kit's COLOR_0 is a wear mask a material may read).
+* A kit may span SEVERAL .blend files (kit.json `blends`, the station kit: one file per station form). Each file
+  writes only its own categories: the other files' pieces stay in `pieces.json` untouched, and only this file's
+  categories are bounds-checked and pruned.
+* What a piece carries besides its mesh is EMPTIES in its collection (the station kit's contract): `COL_*` (drawn as a
+  cube; location = box centre, scale = half size) become `collide_boxes` ([cx, cy, cz, sx, sy, sz], Godot axes, the
+  piece's own frame -- the shape `layout_buildings.place_props`' `collide: {boxes}` takes), and `GATE_*` (a ticket-gate
+  lane; its local +Z is the unpaid side) become `gates` ({pos, out, w, h}). Empties never go into the glTF.
 * `pieces.json` is measured by `normalize_kit.measure`, the same function that measured the downloaded pieces,
   so a size cannot differ depending on which tool wrote the file.
 * THE BOUNDS ARE THE KIT'S CONTRACT WITH THE LAYOUT (`layout_buildings.py` places every piece from them), so an
@@ -32,6 +39,7 @@ import sys
 import tempfile
 
 import bpy
+import mathutils
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "tools", "building_kit"))
@@ -54,11 +62,39 @@ manifest = nk.manifest_header(KIT, "blender/tools/export_building_kit.py")
 pieces = sorted((c for c in bpy.data.collections if c.get("bk_piece_path")), key=lambda c: c.name)
 if not pieces:
     raise SystemExit("export_building_kit: no piece collections (bk_piece_path) in %s" % bpy.data.filepath)
+MULTI = bool(KIT.get("blends"))
+OWN_CATS = {c["bk_category"] for c in pieces}
+
+
+def godot(v):
+    """Blender (x, y, z) -> Godot (x, z, -y), rounded."""
+    return [round(v[0], 5), round(v[2], 5), round(-v[1], 5)]
+
+
+def markers(col):
+    """The piece's COL_ and GATE_ Empties, in the piece's own frame (the grid offset removed), Godot axes."""
+    boxes, gates = [], []
+    for o in sorted(col.all_objects, key=lambda o: o.name):
+        if o.type != "EMPTY":
+            continue
+        loc = o.matrix_world.to_translation() - col.instance_offset
+        if o.name.startswith("COL_"):
+            sc = o.matrix_world.to_scale()
+            half = [abs(sc[0]) * o.empty_display_size, abs(sc[1]) * o.empty_display_size,
+                    abs(sc[2]) * o.empty_display_size]
+            boxes.append(godot(loc) + [round(2 * half[0], 5), round(2 * half[2], 5), round(2 * half[1], 5)])
+        elif o.name.startswith("GATE_"):
+            z = o.matrix_world.to_3x3() @ mathutils.Vector((0.0, 0.0, 1.0))
+            z.z = 0.0
+            z = z.normalized() if z.length > 1e-6 else mathutils.Vector((1.0, 0.0, 0.0))
+            gates.append({"pos": godot(loc), "out": godot(z), "w": float(o.get("w", 0.9)),
+                          "h": float(o.get("h", 1.0))})
+    return boxes, gates
 view_layer = bpy.context.view_layer
 for col in pieces:
     cat = col["bk_category"]
     name = col.name
-    objs = list(col.all_objects)
+    objs = [o for o in col.all_objects if o.type != "EMPTY"]
     if not objs:
         raise SystemExit("export_building_kit: piece %s has no objects" % name)
     off = col.instance_offset.copy()
@@ -90,6 +126,11 @@ for col in pieces:
         fh.write(json.dumps(gltf, indent=1) + "\n")
     lo, hi = nk.measure(gltf, blob)
     manifest["pieces"][name] = nk.manifest_entry(name, cat, gltf, lo, hi)
+    boxes, gates = markers(col)
+    if boxes:
+        manifest["pieces"][name]["collide_boxes"] = boxes
+    if gates:
+        manifest["pieces"][name]["gates"] = gates
 
 
 
@@ -113,13 +154,22 @@ def bounds_changes(old, new):
 
 old_path = os.path.join(OUT, "pieces.json")
 if os.path.exists(old_path):
-    changes = bounds_changes(json.load(open(old_path))["pieces"], manifest["pieces"])
+    old_pieces = json.load(open(old_path))["pieces"]
+    if MULTI:
+        # another .blend's pieces are that file's to export: keep them, and judge only this file's categories
+        for n, e in old_pieces.items():
+            if e["category"] not in OWN_CATS and n not in manifest["pieces"]:
+                manifest["pieces"][n] = e
+        old_pieces = {n: e for n, e in old_pieces.items() if e["category"] in OWN_CATS}
+    changes = bounds_changes(old_pieces, {n: e for n, e in manifest["pieces"].items()
+                                          if not MULTI or e["category"] in OWN_CATS})
     for n, what in changes:
         print("[export_building_kit] %s: %s" % (n, what))
     if changes and not ACCEPT:
         shutil.rmtree(STAGE)
         raise SystemExit("export_building_kit: %d piece(s) changed their bounds; nothing written. If that is "
                          "deliberate, re-run with -- --accept-bounds (ACCEPT_BOUNDS=1)." % len(changes))
+manifest["pieces"] = dict(sorted(manifest["pieces"].items()))
 with open(os.path.join(STAGE, "pieces.json"), "w") as fh:
     fh.write(json.dumps(manifest, indent=1) + "\n")
 # install: a file is rewritten only if its bytes changed; a piece no longer in the file is removed
@@ -138,6 +188,8 @@ keep = {os.path.relpath(os.path.join(d, f), STAGE) for d, _x, fs in os.walk(STAG
 for dirpath, _dirs, files in os.walk(os.path.join(OUT, "pieces")):
     for f in files:
         rel = os.path.relpath(os.path.join(dirpath, f), OUT)
+        if MULTI and os.path.basename(os.path.dirname(os.path.join(dirpath, f))) not in OWN_CATS:
+            continue
         if f.endswith((".gltf", ".bin")) and rel not in keep:
             os.remove(os.path.join(OUT, rel))
             print("[export_building_kit] removed %s" % rel)

@@ -279,6 +279,32 @@ func _run() -> void:
 		_put_player(FAR)
 		await _wait(1.0)
 
+	# A light ped has no body for a blast either (zb1: "a pedestrian under attack does not become an AI"):
+	# a grenade among them promotes the ones in its radius first, and they take its damage like anyone else.
+	if crowd and not _arg("control", false):
+		var at2: Vector3 = crowd.call("ped_positions_now")[0]
+		_put_player(at2 + Vector3(0, 1.0, 70))
+		await _wait(1.0)
+		at2 = crowd.call("ped_positions_now")[0]
+		var em: Node = load("res://src/main/java/com/openworld/world/manager/ExplosionManager.java").new()
+		w.add_child(em)
+		var helper: Node = load("res://src/main/java/com/openworld/debug/VehicleProbeHelper.java").new()
+		w.add_child(helper)
+		var peds_before := int(crowd.call("ped_count"))
+		helper.call("blast", em, at2 + Vector3(0, 0.3, 0), 3.0, 60.0)
+		await _wait(0.3)
+		var hurt := 0
+		for n in get_nodes_in_group("characters"):
+			if n is Node3D and (n as Node3D).global_position.distance_to(at2) < 4.0:
+				var h = n.get_node_or_null("Health")
+				if h != null and float(h.call("health_now")) < float(h.get("max_health")):
+					hurt += 1
+		check(int(crowd.call("ped_count")) < peds_before and hurt >= 1,
+			"a blast in the crowd 70 m out made the peds in it bodies and hurt them (%d -> %d peds, %d hurt)"
+			% [peds_before, int(crowd.call("ped_count")), hurt])
+		_put_player(FAR)
+		await _wait(1.0)
+
 	# Unload frees the crowd with the zone.
 	m.queue_free()
 	await _wait(3.0)

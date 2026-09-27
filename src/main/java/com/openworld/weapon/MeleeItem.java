@@ -366,6 +366,18 @@ public class MeleeItem extends WeaponItem {
     float range = Math.max(0.1f, st.range);
     Vector3 tip = chest.plus(dir.times(range));
 
+    // 0. A LIGHT crowd ped has no collider (world.PedCrowd): on the authoritative peer, the ones in reach become
+    // real bodies now and take this swing directly -- a body added this frame is not in the space query yet.
+    if (authoritative) {
+      for (com.openworld.character.AICharacter ai : com.openworld.world.PedCrowd.promoteNear(chest, tip, Math.max(0.05f, st.radius), 4)) {
+        long key = ai.getInstanceId();
+        if (hitSet.contains(key)) continue;
+        hitSet.add(key);
+        if (hitsOut != null) hitsOut.add(ai.getName().toString());
+        connect(im, new HitInfo(ai, ai.getGlobalPosition().plus(TORSO_OFFSET), dir.times(-1f)), st, true, feel);
+      }
+    }
+
     // 1. Everything in reach.
     PhysicsDirectSpaceState3D space = owningCharacter.getWorld3d().getDirectSpaceState();
     VariantArray<Dictionary<Object, Object>> overlaps = space.intersectShape(sweepQuery(chest, dir, range, st, ray), MAX_OVERLAPS);

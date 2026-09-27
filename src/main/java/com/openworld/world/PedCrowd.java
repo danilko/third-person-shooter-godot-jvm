@@ -384,7 +384,13 @@ public class PedCrowd extends Node3D {
 	}
 
 	private void tick(double delta) {
-		if (peds.isEmpty() || layers.length == 0) return;
+		if (layers.length == 0) return;
+		if (peds.isEmpty()) {
+			// Still upload: the promotion that emptied the crowd left its last instance in the GPU buffer, and
+			// returning here drew that ped for ever, animating in place beside the body it became (zb1).
+			if (dirty) upload();
+			return;
+		}
 		List<Player> players = PlayerRegistry.getPlayers();
 		int np = 0;
 		double[] px = new double[players.size()], pz = new double[players.size()];
@@ -424,13 +430,21 @@ public class PedCrowd extends Node3D {
 		if (promote != null) {
 			boolean fight = promote.wantsFight && promote.temper == TEMPER_FIGHT;
 			if (owner.promoteSidewalkPed(ownerZone, promote.path, promote.along, promote.dir, fight,
-					variants().get(promote.variant).body)) {
+					variants().get(promote.variant).body, panicLeft(promote))) {
 				removePed(promote);
 				promotedTotal++;
 			} else {
 				promote.wantsFight = false;        // refused (budget): it stays a ped and runs like the rest
 			}
 		}
+		upload();
+	}
+
+	/** True when the buffers changed since the last upload outside a tick (a promotion by a shot or a blast). */
+	private boolean dirty = false;
+
+	private void upload() {
+		dirty = false;
 		for (int v = 0; v < layers.length; v++) {
 			if (!GD.isInstanceValid(layers[v])) continue;
 			MultiMesh mm = layers[v].getMultimesh();
@@ -475,12 +489,48 @@ public class PedCrowd extends Node3D {
 	public com.openworld.character.AICharacter promoteHit(CrowdHit hit) {
 		if (!(hit.ped() instanceof Ped p) || owner == null || !authoritative() || !peds.contains(p)) return null;
 		com.openworld.character.AICharacter ai = owner.promoteForShot(ownerZone, p.path, p.along, p.dir,
-				variants().get(p.variant).body);
+				variants().get(p.variant).body, panicLeft(p));
 		if (ai != null) {
 			removePed(p);
 			promotedTotal++;
+			if (dirty) upload();   // outside this crowd's tick: do not draw the ped beside its body for a frame
 		}
 		return ai;
+	}
+
+	/** Seconds of running this ped still has (0 = calm): a promotion must not change who runs. */
+	private double panicLeft(Ped p) {
+		return p.state == FLEE ? Math.max(0.0, p.timer) : 0.0;   // a body has no cower yet: it walks
+	}
+
+	/**
+	 * Promote, NOW and whatever the budget, every light ped whose body comes within {@code radius} of the segment
+	 * {@code a}-{@code b} -- a melee swing's reach, or a blast (a == b). A light ped has no collider, so a fist, a
+	 * knife or a grenade could never reach it (zb1: "a pedestrian under attack does not become an AI"). At most
+	 * {@code max} over every crowd, nearest first. Authoritative peer only; the bodies are returned for the damage.
+	 */
+	public static List<com.openworld.character.AICharacter> promoteNear(Vector3 a, Vector3 b, double radius, int max) {
+		List<Object[]> found = new ArrayList<>();
+		for (PedCrowd c : LIVE) {
+			if (!GD.isInstanceValid(c) || c.owner == null || !c.authoritative()) continue;
+			for (Ped p : c.peds) {
+				if (p.hidden) continue;
+				Vector3 f = c.pointAt(p, p.along);
+				double d = CrowdShot.segmentToBody(a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ(),
+						f.getX(), f.getY(), f.getZ(), BODY_HEIGHT * p.scale);
+				if (d <= radius + BODY_RADIUS * p.scale) found.add(new Object[] { c, p, d });
+			}
+		}
+		found.sort((x, y) -> Double.compare((double) x[2], (double) y[2]));
+		List<com.openworld.character.AICharacter> out = new ArrayList<>();
+		for (Object[] o : found) {
+			if (out.size() >= max) break;
+			PedCrowd c = (PedCrowd) o[0];
+			Ped p = (Ped) o[1];
+			com.openworld.character.AICharacter ai = c.promoteHit(new CrowdHit(c, p, 0.0, c.pointAt(p, p.along)));
+			if (ai != null) out.add(ai);
+		}
+		return out;
 	}
 
 	/** Probe readout: shoot a ray at the crowds the way FirearmItem does. Returns where the hit ped's new body
@@ -583,6 +633,7 @@ public class PedCrowd extends Node3D {
 			}
 		}
 		peds.remove(p);
+		dirty = true;
 	}
 
 	/** True where this peer decides what exists: single player, or the host. */

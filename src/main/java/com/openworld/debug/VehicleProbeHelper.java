@@ -180,4 +180,12 @@ public class VehicleProbeHelper extends Node {
                 && car.getController() instanceof com.openworld.ai.vehicle.VehicleAIController brain
                 && brain.shouldYield();
     }
+
+    /** Stand a character at {@code at} and hand it {@code ctrl} (probe_walker_pass.gd: a promoted pedestrian). */
+    @Register
+    public void spawnWithController(Node c, godot.core.Vector3 at, Node ctrl) {
+        if (!(c instanceof com.openworld.character.AICharacter ai) || !(ctrl instanceof com.openworld.control.Controller k)) return;
+        ai.activateForSpawn(at);
+        ai.attachController(k);
+    }
 }

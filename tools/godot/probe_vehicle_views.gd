@@ -150,8 +150,13 @@ func _initialize() -> void:
 	d_bonnet  = car_cam.global_position.distance_to(bonnet.global_position)
 	_check("camera is at the BONNET mount", d_bonnet < 0.02,
 		"d(cockpit)=%.3f m  d(bonnet)=%.3f m" % [d_cockpit, d_bonnet])
-	_check("bonnet view shows the head", head.visible,
+	# The bumper view is the arcade front view: the car is not drawn (its mount is inside the bonnet), and a
+	# first-person carrier view never shows the driver's own head (2026-09-27).
+	_check("bonnet view hides the head", not head.visible,
 		"head.visible=%s" % head.visible)
+	var model := car.get_node_or_null("Model") as Node3D
+	_check("bonnet view hides the car's own model", model != null and not model.visible,
+		"model=%s visible=%s" % [model != null, model.visible if model else null])
 
 	await _press("view")
 	print("")
@@ -162,6 +167,9 @@ func _initialize() -> void:
 		"d(cockpit)=%.3f m  d(bonnet)=%.3f m" % [d_cockpit, d_bonnet])
 	_check("TPS view shows the head", head.visible,
 		"head.visible=%s" % head.visible)
+	var model3 := car.get_node_or_null("Model") as Node3D
+	_check("TPS view draws the car again", model3 == null or model3.visible,
+		"visible=%s" % (model3.visible if model3 else null))
 
 	# ...and round, back to where the cycle started.
 	await _press("view")

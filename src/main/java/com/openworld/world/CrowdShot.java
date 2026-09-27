@@ -40,4 +40,23 @@ public final class CrowdShot {
         }
         return t;
     }
+
+    /**
+     * Closest distance between the segment a-b and a ped's body, taken as the vertical line from ({@code fx},
+     * {@code fy}, {@code fz}) up {@code height}. Engine-free (PedCrowdShotTest).
+     */
+    public static double segmentToBody(double ax, double ay, double az, double bx, double by, double bz,
+                                       double fx, double fy, double fz, double height) {
+        // Sample the segment finely enough for melee / blast sizes: exact enough and cannot fail.
+        double best = Double.MAX_VALUE;
+        int n = 16;
+        for (int i = 0; i <= n; i++) {
+            double t = (double) i / n;
+            double x = ax + (bx - ax) * t, y = ay + (by - ay) * t, z = az + (bz - az) * t;
+            double dy = y < fy ? fy - y : y > fy + height ? y - (fy + height) : 0.0;
+            double d = Math.sqrt((x - fx) * (x - fx) + dy * dy + (z - fz) * (z - fz));
+            if (d < best) best = d;
+        }
+        return best;
+    }
 }

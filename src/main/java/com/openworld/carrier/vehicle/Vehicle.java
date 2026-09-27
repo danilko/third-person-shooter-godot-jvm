@@ -802,6 +802,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override
     public void _process(double delta) {
         refreshLights(delta);
+        refreshBumperView();
         damageVfxTimer -= delta;
         if (damageVfxTimer > 0.0) return;
         damageVfxTimer = DAMAGE_VFX_INTERVAL;
@@ -1510,7 +1511,43 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (c == null || camController == null) return false;
         if (occupant != c) return false;                       // driver seat only
         if (vehicleCamera == null || !vehicleCamera.isCurrent()) return false;
-        return camController.isCockpitView();
+        // EVERY first-person carrier view, not only the cockpit: a carrier with no cockpit mount (the motorcycle,
+        // the boat) falls back to its bonnet mount, which on a motorcycle sits under the rider's chin, and the
+        // head filled the view (user walk-test, 2026-09-27).
+        return camController.getCameraMode() == com.openworld.camera.CameraMode.FPS;
+    }
+
+    /** True while the local player drives this carrier in its BUMPER view (first person, not the cockpit). */
+    public boolean isBumperViewNow() {
+        return camController != null && vehicleCamera != null && vehicleCamera.isCurrent()
+                && camController.getCameraMode() == com.openworld.camera.CameraMode.FPS
+                && !camController.isCockpitView();
+    }
+
+    /** The carrier's own drawn parts, hidden in the bumper view. */
+    private static final String[] BUMPER_HIDDEN = { "Model", "BodyMesh", "Wheels" };
+    private boolean bumperHidden = false;
+
+    /**
+     * The bumper view is the ARCADE front view (Forza's bumper cam, GTA's hood-less first person): the camera is
+     * over the nose and the car itself is not drawn. Its mount sits in the bonnet, so drawing the model showed
+     * the inside of the engine bay (user walk-test, 2026-09-27). Visibility only -- collision and the wheels'
+     * physics are untouched -- and edge-driven, so it costs nothing while the view does not change.
+     */
+    private void showBumperHidden() {
+        bumperHidden = false;
+        for (String n : BUMPER_HIDDEN) {
+            if (getNodeOrNull(n) instanceof Node3D part) part.setVisible(true);
+        }
+    }
+
+    private void refreshBumperView() {
+        boolean hide = isBumperViewNow();
+        if (hide == bumperHidden) return;
+        bumperHidden = hide;
+        for (String n : BUMPER_HIDDEN) {
+            if (getNodeOrNull(n) instanceof Node3D part) part.setVisible(!hide);
+        }
     }
 
     // ── Seat accessors (multi-seat) ───────────────────────────────────────────
@@ -1848,6 +1885,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (wreck instanceof Node3D w) w.setGlobalTransform(getGlobalTransform());
         if (damageModel != null) {            // the panels blow off, and the wreck is this car burnt out
             damageModel.blowOff();
+            showBumperHidden();   // the burnt copy is made of the VISIBLE meshes: a bumper view must not empty it
             damageModel.dressWreck(wreck);
         }
         SceneTreeTimer t = getTree().createTimer(cfg.wreckDuration, true, false, false);
