@@ -18,7 +18,8 @@
 #   terrain    apply_height_grid.gd (every vertex) ; the road stamp record, the natural-ground sidecar and the urban
 #              paint marker removed (none of them describes this ground) ; paint_terrain.gd
 #   roads      island_rebuild.sh --no-layout (ground sidecar, zones, pieces, stamp, traffic zones, road map)
-#   sites      island_sites.py (the FROZEN sites; re-search by hand with --resite)
+#   sites      building_kit/build_stations.sh (the station scenes) ; island_sites.py (the FROZEN sites;
+#              re-search by hand with --resite)
 #   buildings  dump the stamped terrain ; island_buildings.py derive + write ; build_building_hlod.gd
 #   ground     dump ; island_ground.py derive ; apply_height_grid.gd + apply_paint_grid.gd
 #
@@ -93,6 +94,8 @@ if want roads; then
 fi
 if want sites; then
     echo "── sites"
+    # the station scenes first (PLAN.md step 3): each open-air station's layout reads the ends the rail reserve chose
+    tools/building_kit/build_stations.sh
     python3 tools/island_sites.py | tail -2
 fi
 if want buildings; then

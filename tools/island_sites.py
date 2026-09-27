@@ -480,7 +480,17 @@ def rail_stations():
     for bid, b in sorted(boxes.items()):
         kind, _c, name = bid.partition(":")
         slug = name.lower().replace(" ", "_")
-        if kind in ("building", "building_far"):
+        if kind == "station" and b.get("form") in ("open_air", "ground_hub"):
+            # AN OPEN-AIR STATION IS ONE SCENE (PLAN.md step 3): its platforms, sheds, fences and the two end buildings
+            # laid out by `station_layout` (`tools/building_kit/build_stations.sh`), placed at its frame -- the axis at
+            # the platform centre, at BED level (the track's own height, so the platform edge meets the train)
+            import station_layout as SL
+            ha = b["h_along"] - 1.0
+            rows.append(dict(id="station_" + slug, scene="Station_%s_Shop" % name.replace(" ", ""), x=b["x"],
+                             y=b["y"], yaw=math.degrees(SL.godot_yaw(b["ux"], b["uy"])),
+                             size=[2 * ha, 2 * (b["h_across"] - 1.0)], load=900.0, ground="bed", bed=b["bed"],
+                             node="Station_" + slug))
+        elif kind in ("building", "building_far"):
             # the far one is the far platform's OWN gated building (both sides of an open-air station, 2026-09-27)
             far = "_far" if kind == "building_far" else ""
             rows.append(dict(id="station_" + slug + far, scene="StationBuilding_Shop", x=b["x"], y=b["y"],
@@ -501,6 +511,8 @@ def site_ground(g, row):
     """The height a frozen site stands at on TODAY's ground (record frame, network-relative)."""
     if row["ground"] == "road_end":        # an access car park: its road climbs to it (island_site_access)
         return row["level"]
+    if row["ground"] == "bed":             # a station: its frame is the track bed's height (the rail reserve's)
+        return row["bed"]
     if row["ground"] == "centre":
         return g.z(row["x"], row["y"])
     if row["ground"] == "patch":           # castle_site's own measure: the axis-aligned patch, 20 m apart

@@ -1,0 +1,16 @@
+{
+  "id": "stations",
+  "title": "Station kit (our own): the three station forms from the 2026-09-27 layout sketches",
+  "author": "this project",
+  "licence": "MIT (ours)",
+  "notes": [
+    "One .blend per station FORM (Station_OpenAir.blend, Station_GroundHub.blend, Station_ElevatedHub.blend); each OWNS its pieces. blender/tools/build_station_blends.py generated them once and keeps a piece an artist has edited.",
+    "tools/station_layout.py is the one owner of which station takes which form and of every number a piece must keep (the platform edge, the platform height, the train's gauge).",
+    "Materials are the central library's palette: the scene builder resolves every surface to kits/library/materials/<name>.tres (materials_from)."
+  ],
+  "materials_from": "library",
+  "blends": ["Station_OpenAir.blend", "Station_GroundHub.blend", "Station_ElevatedHub.blend"],
+  "source_module_m": 5.0,
+  "source_storey_m": 4.2,
+  "module_scale": 1.0
+}

@@ -180,6 +180,58 @@ def platform_spans(res, line):
     return out
 
 
+def open_air_reach():
+    """How far past each end of an open-air station's platform its fence stands down: the end building
+    (`station_layout.BUILDING_LEN`) plus a metre, so the rail's fence resumes against the building's street face."""
+    import station_layout as SL
+    return SL.BUILDING_LEN + 1.0
+
+
+def _span_station(res, line, s0, s1):
+    """The station a platform span of `line` belongs to: the one whose centre is nearest the span's middle (a hub or a
+    junction gives a span to every line passing within HUB_SHARE, so it need not be the station's own line)."""
+    L = res["lines"][line]
+    x, y = point_at(L, 0.5 * (s0 + s1))[:2]
+    return min(res["stations"].items(), key=lambda kv: math.hypot(kv[1]["x"] - x, kv[1]["y"] - y))[0]
+
+
+def open_air_spans(res, line):
+    """[(s0, s1, kind, station, form)] -- `line`'s platform spans that belong to a station laid out from the STATION
+    KIT (`station_layout.KIT_FORMS`: the open-air form and the ground hub). Their platforms are the kit's, so the
+    record keeps the track only there."""
+    import station_layout as SL
+    forms = {n: st.form for n, st in SL.stations(res, ends={}, entrances={}).items()}
+    out = []
+    for s0, s1, kind in platform_spans(res, line):
+        n = _span_station(res, line, s0, s1)
+        if forms.get(n) in SL.KIT_FORMS:
+            out.append((s0, s1, kind, n, forms[n]))
+    return out
+
+
+def open_air_fence(res, line, s_):
+    """The sides ('left' / 'right' of the chain) whose rail fence stands down at arc length `s_`: both along a kit
+    station's platform; past each end of an OPEN-AIR platform only on the side whose END BUILDING stands there
+    (`station_layout`'s chosen `building_end`); elsewhere none. The platform-less end keeps its fence, so the bed is
+    not opened to the street (a ground hub has no end building: its fence resumes at both platform ends)."""
+    import station_layout as SL
+    reach = open_air_reach()
+    out = set()
+    sls = SL.stations(res)
+    for s0, s1, _k, n, form in open_air_spans(res, line):
+        # a station within a metre BEFORE the platform's start counts as its start: `with_platform_ends` does not insert
+        # a station that close to an existing one, and the one standing there holds the span the platform starts in
+        if s0 - 1.0 <= s_ < s1 - 1e-3:
+            out |= {"left", "right"}
+        if form != "open_air":
+            continue
+        for side in ("left", "right"):
+            end = sls[n].building_end.get(side, 1)
+            if (end > 0 and s1 - 1e-3 <= s_ < s1 + reach - 1e-3) or (end < 0 and s0 - reach - 1e-3 <= s_ < s0 - 1e-3):
+                out.add(side)
+    return out
+
+
 def _straight(idx, i):
     """The span idx[i-1] -> idx[i] and both its neighbours are one straight line: a station inserted on its chord is
     then ON the alignment (on an arc it would sit inside the curve and read as a kink)."""
@@ -258,7 +310,7 @@ def side_free(res, line, L, s_):
     return out
 
 
-def exit_plan(res, line, idx=None, svals=None):
+def exit_plan(res, line, idx=None, svals=None, spans=None):
     """[(s_centre, kind)] -- each platform of `line`'s exit centre: at the station building (the rail reserve's
     `building:<Station>` box, or for the hub its landmark site) projected onto the line, kept EXIT_W inside the
     platform."""
@@ -268,7 +320,7 @@ def exit_plan(res, line, idx=None, svals=None):
         boxes = {b["id"]: b for b in json.load(open(RESERVE_FILE))["boxes"]}
     L = res["lines"][line]
     out = []
-    for s0, s1, kind in platform_spans(res, line):
+    for s0, s1, kind in (platform_spans(res, line) if spans is None else spans):
         mid = 0.5 * (s0 + s1)
         st = min(res["stations"].items(), key=lambda kv: math.hypot(*(lambda p: (p[0] - kv[1]["x"], p[1] - kv[1]["y"]))(
             point_at(L, mid)[:2])))
@@ -354,10 +406,18 @@ def build(res):
         import island_rail_layout as R
         idx = true_alignment(R.LINES[line])
         svals = [R.project(L["pts"], L["cum"], x, y)[0] for x, y in idx]
-        spans = platform_spans(res, line)
-        exits = exit_plan(res, line, idx, svals)
+        # AN OPEN-AIR STATION'S PLATFORMS ARE ITS OWN SCENE (PLAN.md step 3: the station kit, `station_layout`): over
+        # its span the record keeps the TRACK only -- no platform section, no exits -- and stands its fence and car
+        # wall down from one end building to the other, where the kit's platforms and buildings take their place
+        oa = open_air_spans(res, line)
+        spans = [sp for sp in platform_spans(res, line) if not any(abs(sp[0] - o[0]) < 1e-6 for o in oa)]
+        exits = exit_plan(res, line, idx, svals, spans)
+        reach = open_air_reach()
+        oa_open = [(s0 - (reach if f == "open_air" else 1.0), s1 + (reach if f == "open_air" else 0.0))
+                   for s0, s1, _k, _n, f in oa]
         stations = with_platform_ends(idx, svals, spans,
-                                      [v for e, _k in exits for v in (e - EXIT_W / 2.0, e + EXIT_W / 2.0)])
+                                      [v for e, _k in exits for v in (e - EXIT_W / 2.0, e + EXIT_W / 2.0)]
+                                      + [v for o in oa_open for v in o] + [v for s0, s1, _k, _n, _f in oa for v in (s0, s1)])
         made = []
         for x, y, s_ in stations:
             p = net.add_station(road, (round(x, 3), round(y, 3), round(_at(L["cum"], bed, s_), 3)))
@@ -408,6 +468,14 @@ def build(res):
             if shut:
                 p.platform_open = side_enum(shut)
                 nopen += 1
+        nopen_oa = 0
+        for p, s_ in made:
+            if any(o0 - 1e-3 <= s_ < o1 - 1e-3 for o0, o1 in oa_open):
+                p.platform_open = side_enum(open_air_fence(res, line, s_))
+                nopen_oa += 1
+        if oa:
+            report.append("%-13s %d kit station(s): track only, fence down over %d span(s)"
+                          % (name, len(oa), nopen_oa))
         report.append("%-13s %d platform exit(s)%s, %d span(s) opened onto a neighbouring platform"
                       % (name, nexit, (" (SKIPPED, not on a straight: s %s)" % skipped) if skipped else "", nopen))
         nlx = sum(1 for c in L["crossings"] if c["form"] == "level crossing")

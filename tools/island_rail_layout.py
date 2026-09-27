@@ -1518,8 +1518,13 @@ def reserve(res, out):
                 d = math.hypot(px - q[0], py - q[1])
                 break
         return d + (1000.0 if gnd.z(px, py) < -1.0 else 0.0)    # record 0 is the city plain (NET_Y)
+    import station_layout as SL
+    sl_all = SL.stations(res, ends={}, entrances={})
     for n, st in res["stations"].items():
         L = res["lines"][st["line"]]
+        sl = sl_all[n]
+        open_air = sl.form == "open_air"
+        kit = sl.form in SL.KIT_FORMS
         i0 = min(range(len(L["cum"])), key=lambda k: abs(L["cum"][k] - (st["s"] - st["platform_m"] / 2)))
         i1 = min(range(len(L["cum"])), key=lambda k: abs(L["cum"][k] - (st["s"] + st["platform_m"] / 2)))
         (px, py), (qx, qy) = L["pts"][i0], L["pts"][i1]
@@ -1528,9 +1533,53 @@ def reserve(res, out):
         ux, uy = ux / ul, uy / ul
         nx, ny = -uy, ux
         hw = STATION_W[st["kind"]] / 2
+        ends = {}
+        door = None
+        def b_clear(cx, cy, ux_, uy_, ha, hc):
+            # an arterial's paved footprint carries a 1 m margin; a station building may stand at the footway's
+            # back edge (its street face IS on the pavement), so it keeps 0.5 m, not 1.5 (Waterpark's south
+            # platform: wangan_dori's footway 1 m past the building)
+            return (box_clear(cx, cy, ux_, uy_, ha, hc - 1.0, st["line"]) and gnd.z(cx, cy) > -1.0
+                    and not over_dike((sl.x, sl.y), (cx, cy)))
+        def e_cost(x, y):
+            # the street outside the door should be at the building's floor, the bed: a platform held level on a
+            # slope (Castle Town) has one end on its street and one a storey above it -- the step costs like
+            # 100 m of distance to the town per metre, so the level end wins unless it has no town at all
+            return side_cost(x, y) + 100.0 * abs(sl.bed - gnd.z(x, y))
+        if sl.form == "ground_hub":
+            # A GROUND HUB (橋上駅, PLAN.md step 4): the cap over the lanes and its entrance annex on ONE side -- the
+            # side whose street door is nearer the town, among the sides where the annex clears the arterials, the
+            # dike, the water, every other line's gauge and a freight branch's throat (`station_layout`)
+            door = SL.choose_entrance(sl, b_clear, e_cost)
+            if door is None:
+                print("reserve: %s -- neither side clears for its entrance annex" % n)
+            else:
+                x_, y_ = SL.to_record(sl, *SL.hub_entrance(sl, door))
+                if abs(sl.bed - gnd.z(x_, y_)) > SL.ENTRANCE_STEP:
+                    print("reserve: %s -- its entrance annex's door stands %.2f m off its street (over %.1f)"
+                          % (n, sl.bed - gnd.z(x_, y_), SL.ENTRANCE_STEP))
+            hw = max(hw, SL.extent(sl)[1] + 1.0)
+        if open_air:
+            # AN OPEN-AIR STATION (PLAN.md step 3, the 2026-09-27 sketch): each platform's OWN building stands in line
+            # with one of its ENDS, and the end is the one whose street entrance is nearer the town, among the ends
+            # where the building stands clear of every arterial, other line, the dike and the water
+            # (`station_layout.choose_ends`). Its box covers both ends and both buildings' outer reach.
+            ends = SL.choose_ends(sl, b_clear, e_cost)
+            for side, e in ends.items():
+                x_, y_ = SL.to_record(sl, *SL.entrance(sl, side, e))
+                if abs(sl.bed - gnd.z(x_, y_)) > SL.ENTRANCE_STEP:
+                    print("reserve: %s -- its %s building's door stands %.2f m off its street (over %.1f)"
+                          % (n, side, sl.bed - gnd.z(x_, y_), SL.ENTRANCE_STEP))
+            for side in ("left", "right"):
+                if side not in ends:
+                    print("reserve: %s -- no end of its %s platform clears for its building" % (n, side))
+            hw = max(hw, SL.extent(sl)[1] + 1.0)
         probe = hw + 40.0
         if side_cost(st["x"] - nx * probe, st["y"] - ny * probe) < side_cost(st["x"] + nx * probe, st["y"] + ny * probe):
             nx, ny = -nx, -ny
+        if door:
+            # a ground hub's car park goes on its entrance annex's side (the door the town uses)
+            nx, ny = (-uy, ux) if door == "left" else (uy, -ux)
         # the building and the car park must not stand on an arterial: slide them along the platform, then try the
         # other side; the town side at its centre is the preference, the first clear placement wins
         pw, ph = PARKING[st["parking"]]
@@ -1540,7 +1589,19 @@ def reserve(res, out):
         import island_rail_record as IRR
         boffs = (IRR.platform_outer(st["kind"]) + STATION_YARD + STATION_BUILDING[1] / 2, hw + 5.0)
         boff = boffs[-1]
-        if st["kind"] != "hub":
+        if kit:
+            # only the car park is placed here: slid along the platform, then the other side
+            span = max(0.0, ul / 2 - pw / 2)
+            for sg, d in [(sg, d) for sg in (1.0, -1.0) for d in (0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0)
+                          if abs(d) <= span + 1e-6]:
+                off = hw + 10 + ph / 2
+                if not pw or box_clear(st["x"] + sg * nx * off + ux * d, st["y"] + sg * ny * off + uy * d,
+                                       ux, uy, pw / 2, ph / 2, st["line"]):
+                    nx, ny, shift = sg * nx, sg * ny, d
+                    break
+            else:
+                print("reserve: %s -- no placement of its car park clears the arterials" % n)
+        elif st["kind"] != "hub":
             span = max(0.0, ul / 2 - STATION_BUILDING[0] / 2)
             tries = [(sg, bo, d) for sg in (1.0, -1.0) for bo in boffs
                      for d in (0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0, 45.0, -45.0) if abs(d) <= span + 1e-6]
@@ -1558,14 +1619,27 @@ def reserve(res, out):
                 print("reserve: %s -- no placement of its building/car park clears the arterials" % n)
         # an ELEVATED station (a road clears its deck) keeps buildings off but lets a street pass under it
         gi = min(range(len(L["cum"])), key=lambda k: abs(L["cum"][k] - st["s"]))
-        boxes.append({"id": "station:" + n, "x": round((px + qx) / 2, 2), "y": round((py + qy) / 2, 2),
-                      "ux": round(ux, 5), "uy": round(uy, 5), "h_along": round(ul / 2 + 5.0, 2), "h_across": hw,
-                      "z": round(st["z"], 2),
-                      "street_under": _cross_rule(st["z"] - L["ground"][gi]) == "under"})
+        sbox = {"id": "station:" + n, "x": round((px + qx) / 2, 2), "y": round((py + qy) / 2, 2),
+                "ux": round(ux, 5), "uy": round(uy, 5), "h_along": round(ul / 2 + 5.0, 2), "h_across": hw,
+                "z": round(st["z"], 2),
+                "street_under": _cross_rule(st["z"] - L["ground"][gi]) == "under"}
+        if kit:
+            # the station SCENE's frame (station_layout: origin on the axis at the platform centre, at bed level) and
+            # the ends its buildings stand at; `island_sites.rail_stations` places the scene, `station_layout` lays it out
+            sbox.update({"form": sl.form, "x": round(sl.x, 3), "y": round(sl.y, 3), "ux": round(sl.ux, 6),
+                         "uy": round(sl.uy, 6), "h_along": round(SL.extent(sl)[0] + 1.0, 2), "bed": round(sl.bed, 3),
+                         "nx": round(nx, 5), "ny": round(ny, 5)})
+            if open_air:
+                sbox["ends"] = ends
+            elif door:
+                x_, y_ = SL.to_record(sl, *SL.hub_entrance(sl, door))
+                sbox["entrance"] = door
+                sbox["door_step"] = round(max(0.0, sl.bed - gnd.z(x_, y_)), 3)
+        boxes.append(sbox)
         # THE STATION BUILDING (駅舎, PLAN.md R3): in the 10 m between the platform box and the car park, its back to
         # the platform fence and its front to the car park / street side. A hub's is its own site (Central: the
         # Tokyo Station building), so it gets none here. `island_sites.rail_stations` places it from THIS box.
-        if st["kind"] != "hub":
+        if st["kind"] != "hub" and not kit:
             boxes.append({"id": "building:" + n, "x": round(st["x"] + nx * boff + ux * shift, 2),
                           "y": round(st["y"] + ny * boff + uy * shift, 2), "ux": round(ux, 5), "uy": round(uy, 5),
                           "h_along": STATION_BUILDING[0] / 2 + 0.5, "h_across": STATION_BUILDING[1] / 2 + 0.5,
@@ -1575,7 +1649,7 @@ def reserve(res, out):
         # platform needs a footbridge to reach the gates -- the small-station layout (上下線で別改札). A hub is one
         # building over the whole rail with a bridge inside the paid area (3.36), so it gets neither. No car park on
         # the far side: the town side has it. Slid along the platform like the near one; none if nothing clears.
-        if st["kind"] != "hub":
+        if st["kind"] != "hub" and not kit:
             span = max(0.0, ul / 2 - STATION_BUILDING[0] / 2)
             for bo, d in [(bo, d) for bo in boffs for d in (shift, 0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0, 45.0,
                                                                -45.0)]:

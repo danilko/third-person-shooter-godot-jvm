@@ -87,7 +87,8 @@ func _initialize() -> void:
 			continue
 		if not _build(b, ""):
 			failed += 1
-		elif not (b.get("doors", []) as Array).is_empty():
+		elif not (b.get("doors", []) as Array).is_empty() or not (b.get("inner_doors", []) as Array).is_empty():
+			# (a STATION has no street door -- its entrance is open -- but its ticket-gate lanes are inner doors)
 			# ... and the two enterable variants: `_Open` (a mission's, doors LOCKED until it unlocks them) and
 			# `_Shop` (a shop or the player's home base: unlocked, automatic doors, GTA's always-open store)
 			if not _build(b, OPEN_VARIANT_SUFFIX):
@@ -365,6 +366,15 @@ func _kit_material(kit_res: String, mat: Material) -> Material:
 	var key := kit_res + "/" + name
 	if _materials.has(key):
 		return _materials[key]
+	# a kit may wear ANOTHER kit's materials (kit.json `materials_from`: the station kit wears the library palette)
+	var from := _materials_from(kit_res)
+	if from != "":
+		var fpath := "res://assets/world_source/kits/%s/materials/%s.tres" % [from, name]
+		if not ResourceLoader.exists(fpath):
+			push_error("%s: material %s is not in kit %s" % [kit_res, name, from])
+			return mat
+		_materials[key] = load(fpath)
+		return _materials[key]
 	var dir := kit_res + "/materials"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
 	var path := dir + "/" + name + ".tres"
@@ -383,6 +393,14 @@ func _kit_material(kit_res: String, mat: Material) -> Material:
 	var loaded: Material = load(path)
 	_materials[key] = loaded
 	return loaded
+
+
+var _mat_from_cache := {}
+func _materials_from(kit_res: String) -> String:
+	if not _mat_from_cache.has(kit_res):
+		var doc = JSON.parse_string(FileAccess.get_file_as_string(kit_res + "/kit.json"))
+		_mat_from_cache[kit_res] = str(doc.get("materials_from", "")) if doc is Dictionary else ""
+	return _mat_from_cache[kit_res]
 
 
 func _build(b: Dictionary, variant: String) -> bool:
