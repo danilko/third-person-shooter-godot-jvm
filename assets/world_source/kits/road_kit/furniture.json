@@ -191,53 +191,22 @@
    ]
   },
   "ped_signal": {
-   "kit": "res://assets/world_source/kits/library/",
-   "piece": "pieces/station/Signal_Pedestrian.gltf",
+   "kit": "res://assets/world_source/kits/quaternius_zombie_apocalypse/",
+   "piece": "pieces/props/PedSignal_JP.gltf",
    "lift": 0.0,
    "collide_pole": [
-    0.06,
-    3.3
+    0.2,
+    5.8
    ],
-   "lamps": {
-    "pedestrian": [
-     {
-      "colour": "red",
-      "pos": [
-       0.0,
-       3.025,
-       0.39
-      ],
-      "normal": [
-       0,
-       0,
-       1
-      ],
-      "radius": 0.14
-     },
-     {
-      "colour": "green",
-      "pos": [
-       0.0,
-       2.675,
-       0.39
-      ],
-      "normal": [
-       0,
-       0,
-       1
-      ],
-      "radius": 0.14
-     }
-    ]
+   "breakable": {
+    "mass": 250,
+    "break_speed": 4.0,
+    "respawn": 60
    },
    "exclude_roads": [
     "shrine_touge*"
    ],
-   "breakable": {
-    "mass": 80,
-    "break_speed": 2.5,
-    "respawn": 60
-   }
+   "lamps_file": "PedSignal_JP.lamps.json"
   }
  },
  "rules": {
@@ -298,9 +267,9 @@
   "crossing_side": 0.6,
   "signal_needs_major": true,
   "signal_major_lanes": 2,
-  "ped_signal_share": 5.0,
   "signal_green": 22.0,
   "signal_yellow": 3.0,
-  "signal_all_red": 2.0
+  "signal_all_red": 2.0,
+  "ped_signal_pole_clear": 1.2
  }
 }

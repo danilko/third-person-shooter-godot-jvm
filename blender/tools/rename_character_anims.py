@@ -12,10 +12,13 @@ have.
 """
 import bpy, json, sys
 
-ARM = "Godot_Chan_Stealth"
 cfg = json.load(open(sys.argv[sys.argv.index("--") + 1]))
 
-arm = bpy.data.objects.get(ARM)
+# The clip armature is the one that is NOT an Auto-Rig Pro rig (the reference body called it
+# Godot_Chan_Stealth; the clip source is shino.blend since W49, whose armature is `shino`).
+arm = next((o for o in bpy.data.objects if o.type == 'ARMATURE' and "arp_rig_type" not in o.keys()
+            and not o.name.endswith("_ANIM_TEMP")), None)
+ARM = arm.name if arm is not None else "(none)"
 if arm is None:
     raise SystemExit(f"no armature object {ARM!r}")
 if arm.animation_data is None:
@@ -60,6 +63,9 @@ for name in cfg["delete"]:
     if trk is not None:
         ad.nla_tracks.remove(trk)
     bpy.data.actions.remove(act)
+    rig_copy = bpy.data.actions.get("ARP_" + name)      # its Auto-Rig Pro copy (arp_clips.py), if any
+    if rig_copy is not None:
+        bpy.data.actions.remove(rig_copy)
     print(f"[naming] deleted {name!r}")
     changed += 1
 

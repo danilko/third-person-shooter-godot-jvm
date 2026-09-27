@@ -81,6 +81,11 @@ func _run() -> void:
 		player.get_node("Health").set("max_health", 1000000.0)
 		player.set_physics_process(false)
 		player.visible = false
+		# the Player's camera rigs rewrite the CURRENT camera every frame even with the player's own processing off
+		# (CLAUDE.md, the night-lights probe trap): switch them off, or every picture is taken from behind the player
+		# frozen whole: its camera rigs rewrite the CURRENT camera every frame even with its own processing off
+		# (CLAUDE.md, the night-lights probe trap), and its movement would carry it off the viewpoint
+		player.process_mode = Node.PROCESS_MODE_DISABLED
 	cam = Camera3D.new()
 	cam.far = 4000.0
 	cam.fov = float(str(_arg("fov", ["70"])[0]))
@@ -96,7 +101,15 @@ func _run() -> void:
 		# the streamer keys on the player, not on the camera
 		if player != null:
 			player.global_position = Vector3(look.x, look.y + 1.0, look.z)
+			# the game places the local player at its spawn a few frames after it is ready: place it again once that
+			# has happened, or the streamer loads the spawn's surroundings and the picture shows bare terrain
+			for i in 30:
+				await process_frame
+			player.global_position = Vector3(look.x, look.y + 1.0, look.z)
 		await _settle(40.0)
+		cam.make_current()
+		cam.global_position = at
+		cam.look_at(look, Vector3.UP)
 		await process_frame
 		await process_frame
 		RenderingServer.force_draw()

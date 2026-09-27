@@ -416,6 +416,19 @@ def place_props(props, out, root, footprint=None):
     {"boxes": [[cx, cy, cz, sx, sy, sz], ...]} -- boxes in the piece's OWN frame (Godot axes), turned and moved with it:
     for a piece whose bounds are mostly air, like a gantry crane a truck drives under."""
     for p in props:
+        if "piece" not in p:
+            # a DOOR-ONLY prop: an opening with no piece of its own -- a TICKET GATE's lane between two gate bodies
+            # (`door.kind = "gate"`, a pair of flaps built by the scene builder as `world.TicketGate`s). Its doorway
+            # is whatever the pieces beside it leave open, so it records the door and nothing else.
+            if not p.get("door"):
+                raise SystemExit(f"{out['id']}: a prop with no piece must be a door-only prop (give it `door`)")
+            a = math.radians(float(p.get("yaw", 0.0)))
+            out.setdefault("inner_doors", []).append({
+                "center": [round(p["at"][0], 5), round(float(p.get("y", 0.0)), 5), round(p["at"][1], 5)],
+                "outward": [round(math.sin(a), 6), 0, round(math.cos(a), 6)],
+                "width": float(p["door"].get("w", 0.85)), "height": float(p["door"].get("h", 2.0)),
+                "kind": str(p["door"].get("kind", "door"))})
+            continue
         path, entry, name = lib_piece(p["piece"], root)
         n, dx, dz = (p.get("repeat") or [1, 0.0, 0.0])
         for k in range(int(n)):

@@ -1,7 +1,11 @@
 """Build the LIGHT-PED body: one skinned mesh, one material, one atlas, two clips.
 
     blender -b --factory-startup --python blender/tools/build_ped_body.py -- --body shino
-        [--cell 256] [--gutter 16] [--decimate 0.0] [--keep-face]
+        [--cell 256] [--gutter 16] [--decimate 0.0] [--keep-face] [--no-clips]
+
+`--no-clips`: a body whose export carries no clips (every body but the clip source). The crowd plays the
+SHARED library through a vertex-animation bake (tools/godot/bake_ped_vat.gd), not clips of its own, so the
+ped body needs only the mesh, the atlas and the skeleton.
 
 reads   assets/characters/<body>/<body>.glb        (the SHIPPED export -- see below)
 writes  assets/characters/<body>/<body>_ped.glb
@@ -91,7 +95,7 @@ def argv():
             k = t[2:]
             if "=" in k:
                 k, v = k.split("=", 1)
-            elif k == "keep-face":
+            elif k in ("keep-face", "no-clips"):
                 v = "1"
             else:
                 i += 1
@@ -223,8 +227,10 @@ def main():
     for c in CLIPS:
         name = c if c in bpy.data.actions else (f"{c}-loop" if f"{c}-loop" in bpy.data.actions else None)
         (actions.append(name) if name else missing.append(c))
+    if missing and opt.get("no-clips"):
+        actions, missing = [], []
     if missing:
-        die(f"the source export has no clip(s) {missing} -- PedCrowd plays them")
+        die(f"the source export has no clip(s) {missing} -- PedCrowd plays them (or pass --no-clips)")
 
     # ---------------------------------------------------------------- 1. drop the sub-pixel detail
     dropped = []

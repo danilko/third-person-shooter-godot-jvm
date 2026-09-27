@@ -35,6 +35,11 @@ const SKELETON_NODE := "Skeleton3D"
 const SOURCE := "res://assets/characters/shino/shino.glb"
 const OUT_RES := "res://src/main/resources/com/openworld/character/anim/character_anims.res"
 const OUT_JSON := "res://src/main/resources/com/openworld/character/anim/character_anims.json"
+## Which walk each body plays: the male library is THE library above; every other gait is a second
+## library in which its derived clips (blender/tools/derive_gait.py, `f_<clip>`) stand under the base
+## names. The derived clips themselves are left out of every library -- they are sources, not clips.
+const GAITS := "res://src/main/resources/com/openworld/character/anim/character_gaits.json"
+const GAIT_PREFIXES := ["f_"]
 
 var _fail := 0
 
@@ -79,6 +84,7 @@ func _initialize() -> void:
 	var names := src_lib.get_animation_list()
 	names.sort()
 	var skipped: Array[String] = []
+	var gait_src := {}
 	for n in names:
 		var a: Animation = (src_lib.get_animation(n) as Animation).duplicate(true)
 		# A BODY CLIP ANIMATES BONES, NOT BLEND SHAPES. A VRoid body carries ~40 facial shape keys
@@ -142,8 +148,41 @@ func _initialize() -> void:
 						least_kept_bone = sub
 			else:
 				rot += 1
+		var derived := false
+		for pre in GAIT_PREFIXES:
+			if String(n).begins_with(pre): derived = true
+		if derived:
+			gait_src[String(n)] = a
+			continue
 		lib.add_animation(StringName(n), a)
 		clips.append(n)
+
+	# The gait libraries: a copy of the base with the gait's clips under the base names. An Animation is
+	# shared by reference, so the copy costs nothing but the derived clips themselves.
+	var gaits: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(GAITS))
+	var gait_libs := {}
+	for g in gaits["gaits"]:
+		var info: Dictionary = gaits["gaits"][g]
+		var gl: AnimationLibrary = lib if String(info["library"]) == OUT_RES else AnimationLibrary.new()
+		if gl != lib:
+			for c in clips:
+				gl.add_animation(StringName(c), lib.get_animation(StringName(c)))
+		for base in info["map"]:
+			var src_name := String(info["map"][base])
+			var anim: Animation = gait_src.get(src_name) if gait_src.has(src_name) else null
+			if anim == null and lib.has_animation(StringName(src_name)):
+				anim = lib.get_animation(StringName(src_name))
+			if anim == null:
+				_fail += 1
+				print("[anims] FAIL: gait %s maps %s to %s, which the source does not have" % [g, base, src_name])
+				continue
+			if gl.has_animation(StringName(base)):
+				gl.remove_animation(StringName(base))
+			gl.add_animation(StringName(base), anim)
+			if gl == lib and not (base in clips):
+				clips.append(base)
+		gait_libs[g] = [String(info["library"]), gl]
+	clips.sort()
 
 	var bone_list := bones.keys()
 	bone_list.sort()
@@ -179,6 +218,7 @@ func _initialize() -> void:
 		"rotation_tracks": rot,
 		"position_tracks": kept_pos,
 		"pos_eps": POS_EPS,
+		"gait_sources": gait_src.keys(),
 	}
 	var text := JSON.stringify(manifest, "  ") + "\n"
 
@@ -190,10 +230,14 @@ func _initialize() -> void:
 		else:
 			print("[anims] check: manifest up to date")
 	else:
-		var err := ResourceSaver.save(lib, OUT_RES, ResourceSaver.FLAG_COMPRESS)
-		if err != OK:
-			_fail += 1
-			print("[anims] FAIL: cannot save %s (%d)" % [OUT_RES, err])
+		for g in gait_libs:
+			var path: String = gait_libs[g][0]
+			var err := ResourceSaver.save(gait_libs[g][1], path, ResourceSaver.FLAG_COMPRESS)
+			if err != OK:
+				_fail += 1
+				print("[anims] FAIL: cannot save %s (%d)" % [path, err])
+			else:
+				print("[anims] gait %s -> %s" % [g, path])
 		var f := FileAccess.open(OUT_JSON, FileAccess.WRITE)
 		f.store_string(text)
 		f.close()

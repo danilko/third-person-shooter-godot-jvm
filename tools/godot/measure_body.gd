@@ -55,6 +55,11 @@ const BODIES := {
 	"godot_chan": "res://assets/characters/godot_chan/merged_animation.glb",
 	"shino": "res://assets/characters/shino/shino.glb",
 	"fumiriya": "res://assets/characters/fumiriya/fumiriya.glb",
+	# crowd bodies (user, 2026-09-27): VRoid samples, CC0 / VRoid Hub licence allowing everything -- CREDITS.md
+	"shibu": "res://assets/characters/shibu/shibu.glb",
+	"victoria": "res://assets/characters/victoria/victoria.glb",
+	"bibi": "res://assets/characters/bibi/bibi.glb",
+	"vita": "res://assets/characters/vita/vita.glb",
 }
 ## The reference's authored sockets, in `hand_r`'s local frame, exactly as
 ## CharacterVisuals_GodotChan.tscn holds them. They are an artist's placement of a grip in a fist --

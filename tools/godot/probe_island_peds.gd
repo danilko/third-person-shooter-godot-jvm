@@ -64,13 +64,17 @@ func _crowds() -> Array:
 
 
 func _peds() -> Array:
-	## Every light ped's node, over every loaded crowd.
+	## Every light ped's POSITION, over every loaded crowd (a crowd ped is Java state drawn by a MultiMesh:
+	## it has no node of its own -- PedCrowd.pedPositionsNow).
 	var out := []
 	for c in _crowds():
-		for p in c.get_children():
-			if p is Node3D:
-				out.append(p)
+		for v in c.call("ped_positions_now"):
+			out.append(v)
 	return out
+
+
+func _pos(b) -> Vector3:
+	return b if b is Vector3 else _pos(b)
 
 
 func _walkers() -> Array:
@@ -90,7 +94,7 @@ func _walkers() -> Array:
 func _near(list: Array, at: Vector3, r: float) -> int:
 	var n := 0
 	for b in list:
-		var p: Vector3 = (b as Node3D).global_position
+		var p: Vector3 = _pos(b)
 		if Vector2(p.x - at.x, p.z - at.z).length() <= r:
 			n += 1
 	return n
@@ -209,10 +213,16 @@ func _run() -> void:
 	check(ahead >= AHEAD_MIN,
 		"the streets ahead are already populated before the player reaches them (%d between %.0f and %.0f m)"
 		% [ahead, COVER_R, AHEAD_R])
-	check(walkers.size() > 0, "the player's arrival promoted pedestrians into real bodies (%d)" % walkers.size())
+	# A ped becomes a real body only when it must (PedCrowd.promoteDistance, 25 m): step next to one.
+	if walkers.is_empty() and not peds.is_empty():
+		player.global_position = (peds[0] as Vector3) + Vector3(2, 2, 0)
+		await _wait(2.0)
+		walkers = _walkers()
+		peds = _peds()
+	check(walkers.size() > 0, "a player stepping up to a pedestrian promotes a real body (%d)" % walkers.size())
 	var far_bodies := 0
 	for b in walkers:
-		var p: Vector3 = (b as Node3D).global_position
+		var p: Vector3 = _pos(b)
 		if Vector2(p.x - player.global_position.x, p.z - player.global_position.z).length() > 110.0:
 			far_bodies += 1
 	check(far_bodies == 0, "no full body is kept for a pedestrian out of reach (%d)" % far_bodies)
@@ -221,7 +231,7 @@ func _run() -> void:
 	var worst := 0.0
 	var off := 0
 	for b in peds:
-		var e := _footway_error((b as Node3D).global_position)
+		var e := _footway_error(_pos(b))
 		if e > 1.5:
 			off += 1
 		elif e < 1e8:
@@ -229,11 +239,12 @@ func _run() -> void:
 	check(off == 0, "every ped stands on a derived footway (%d off, worst %.2f m of height)" % [off, worst])
 	var before := []
 	for b in peds:
-		before.append((b as Node3D).global_position)
+		before.append(_pos(b))
 	await _wait(4.0)
+	var now := _peds()        # positions are values: read them again (same crowds, same order)
 	var moved := 0
-	for i in range(peds.size()):
-		if is_instance_valid(peds[i]) and (peds[i] as Node3D).global_position.distance_to(before[i]) > 1.0:
+	for i in range(mini(now.size(), before.size())):
+		if _pos(now[i]).distance_to(before[i]) > 1.0:
 			moved += 1
 	check(moved > peds.size() * 0.7, "the crowd walks (%d of %d peds moved)" % [moved, peds.size()])
 	var hostile := 0

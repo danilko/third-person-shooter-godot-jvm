@@ -109,6 +109,32 @@ public class Nameplate extends Node3D {
         refreshWeapon();
     }
 
+    // ── Shown only when relevant (NameplateTarget.isNameplateRelevant, user 2026-09-27) ────────────────
+    private static final double RELEVANCE_INTERVAL = 0.25;
+    private double relevanceTimer = 0.0;
+    private int shown = -1;            // -1 unknown, 0 hidden, 1 shown
+
+    @Register
+    @Override
+    public void _process(double delta) {
+        relevanceTimer -= delta;
+        if (relevanceTimer > 0.0 || target == null) return;
+        relevanceTimer = RELEVANCE_INTERVAL;
+        boolean own = getParent() instanceof com.openworld.character.Character c && c.isLocallyOwnedPlayer();
+        boolean show = !own && target.isNameplateRelevant();
+        if ((show ? 1 : 0) == shown) return;
+        shown = show ? 1 : 0;
+        setVisible(show);
+        // A hidden plate's SubViewport renders nothing: every body carried one that re-drew every frame.
+        if (getNodeOrNull("SubViewport") instanceof godot.api.SubViewport vp) {
+            vp.setUpdateMode(show ? godot.api.SubViewport.UpdateMode.WHEN_VISIBLE
+                                              : godot.api.SubViewport.UpdateMode.DISABLED);
+        }
+    }
+
+    /** Is the plate up right now (a probe readout)? */
+    @Register public boolean shownNow() { return shown == 1; }
+
     /** Health.healthChanged (fires on local damage/heal and replication). */
     @Register
     public void onHealthChanged(float currentHealth) {

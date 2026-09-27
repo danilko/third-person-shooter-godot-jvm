@@ -15,6 +15,8 @@ import godot.api.MeshInstance3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.api.QuadMesh;
+import godot.api.ImmediateMesh;
+import godot.api.Mesh;
 import godot.api.SphereMesh;
 import godot.api.StandardMaterial3D;
 import godot.api.Time;
@@ -51,7 +53,8 @@ import java.util.Set;
  * <ul>
  * <li>the traffic brain asks {@link #stopDistance} (VehicleAIController.signalSpeedLimit): a car on an arm's lane
  *     stops at the stop line on RED, and on YELLOW when it can still stop comfortably;</li>
- * <li>the LAMPS near the camera are lit ({@link #visualRadius}): a small glowing ball in each lit lens -- green
+ * <li>the LAMPS near the camera are lit ({@link #visualRadius}): the LENS MESH itself (TrafficLight_2_Japan.blend's lens
+ *     objects, via each piece's lamps.json; a ball only for a plan with no mesh) -- green
  *     (Japan's 青), yellow or red on the vehicle heads, the red and green man on the pedestrian heads, the green man
  *     flashing for its last {@link SignalTiming#PED_FLASH} s. Far junctions cost nothing: their nodes are freed;</li>
  * <li>the NAME PLATES (the kit's "E 12 St" is gone from the .blend): a blue plate on each vehicle signal's arm with
@@ -86,12 +89,13 @@ public class TrafficSignals extends Node3D {
 
     private static final class Arm { int index; int group; double stopBack; String road; }
     private static final class Lamp { boolean vehicle; int arm; int colour; Vector3 pos; double radius; Vector3 pole;
-                                      BreakableProps props; int poleIndex = -1; }
+                                      double yaw; int head; String lamps; BreakableProps props; int poleIndex = -1; }
     private static final class Plate { int arm; String cross; Vector3 pos; Vector3 normal; double w, h; Vector3 pole; boolean built; }
 
     private static final class Junction {
         String id;
         Vector3 centre;
+        Basis frame;
         int groups;
         double offset;
         final Map<Integer, Arm> arms = new HashMap<>();
@@ -109,7 +113,7 @@ public class TrafficSignals extends Node3D {
     private String signature = "";
     private long sceneId = -1;
     private double timer, loadTimer;
-    private int litNow;
+    private int litNow, litVehicleNow;
     private final StandardMaterial3D[] lit = new StandardMaterial3D[3];
     private StandardMaterial3D plateMat;
 
@@ -123,6 +127,7 @@ public class TrafficSignals extends Node3D {
     @Override
     public void _exitTree() {
         if (instance == this) instance = null;
+        LENS_CACHE.clear();
         clear();
     }
 
@@ -177,6 +182,7 @@ public class TrafficSignals extends Node3D {
             Map<String, Object> jm = (Map<String, Object>) jo;
             Junction j = new Junction();
             j.id = prefix + ":" + jm.get("id");
+            j.frame = b;
             j.centre = frame.times(vec(jm.get("centre")));
             j.groups = (int) num(jm.get("groups"), 1);
             j.offset = SignalTiming.offset(j.id, SignalTiming.cycle(j.groups, green, yellow, allRed));
@@ -202,6 +208,9 @@ public class TrafficSignals extends Node3D {
                 l.pos = frame.times(vec(lm.get("pos"))).plus(n.times(0.03));
                 l.radius = num(lm.get("radius"), 0.12);
                 l.pole = lm.containsKey("pole") ? frame.times(vec(lm.get("pole"))) : null;
+                l.yaw = num(lm.get("yaw"), 0.0);
+                l.head = (int) num(lm.get("head"), 0);
+                l.lamps = lm.containsKey("lamps") ? String.valueOf(lm.get("lamps")) : null;
                 j.lamps.add(l);
             }
             for (Object po : (List<Object>) jm.get("plates")) {
@@ -297,7 +306,7 @@ public class TrafficSignals extends Node3D {
         Vector3 c = cam.getGlobalPosition();
         double t = now();
         boolean blink = (t * 2.0) % 1.0 < 0.5;
-        int n = 0;
+        int n = 0, nv = 0;
         for (Junction j : junctions) {
             double dx = j.centre.getX() - c.getX(), dz = j.centre.getZ() - c.getZ();
             if (dx * dx + dz * dz > visualRadius * (double) visualRadius) {
@@ -324,9 +333,11 @@ public class TrafficSignals extends Node3D {
                 }
                 j.lampNodes.get(i).setVisible(on);
                 if (on) n++;
+                if (on && l.vehicle) nv++;
             }
         }
         litNow = n;
+        litVehicleNow = nv;
     }
 
     /** The baked pole (a BreakableProps instance) standing within 0.3 m of `base`, as {props, index}, or null. */
@@ -368,6 +379,61 @@ public class TrafficSignals extends Node3D {
         j.resolveAge = 1.0;
     }
 
+    /** Lens meshes by lamps file + kind + colour, built once from the file's triangles (Godot piece frame). */
+    private static final Map<String, Mesh> LENS_CACHE = new HashMap<>();
+    /** How far the lit lens stands proud of the baked (dark) one, along each face's own normal (m). */
+    private static final double LENS_PROUD = 0.004;
+
+    @SuppressWarnings("unchecked")
+    private static Mesh lensMesh(String file, boolean vehicle, int colour, int head) {
+        String key = file + "|" + vehicle + "|" + colour + "|" + head;
+        if (LENS_CACHE.containsKey(key)) return LENS_CACHE.get(key);
+        Mesh out = null;
+        try {
+            if (FileAccess.fileExists(file)) {
+                Map<String, Object> doc = (Map<String, Object>) MiniJson.parse(FileAccess.getFileAsString(file));
+                String want = colour == 0 ? "green" : colour == 1 ? "yellow" : "red";
+                for (Object o : (List<Object>) doc.get(vehicle ? "vehicle" : "pedestrian")) {
+                    Map<String, Object> d = (Map<String, Object>) o;
+                    if (!want.equals(d.get("colour")) || !(d.get("tris") instanceof List)
+                            || (int) num(d.get("head"), 0) != head) continue;
+                    List<Object> t = (List<Object>) d.get("tris");
+                    ImmediateMesh m = new ImmediateMesh();
+                    m.surfaceBegin(Mesh.PrimitiveType.TRIANGLES, null);
+                    for (int i = 0; i + 8 < t.size(); i += 9) {
+                        Vector3 a = new Vector3(num(t.get(i), 0), num(t.get(i + 1), 0), num(t.get(i + 2), 0));
+                        Vector3 b = new Vector3(num(t.get(i + 3), 0), num(t.get(i + 4), 0), num(t.get(i + 5), 0));
+                        Vector3 c = new Vector3(num(t.get(i + 6), 0), num(t.get(i + 7), 0), num(t.get(i + 8), 0));
+                        Vector3 n = b.minus(a).cross(c.minus(a));
+                        if (n.length() < 1e-9) continue;
+                        n = n.normalized();
+                        Vector3 up = n.times(LENS_PROUD);
+                        // glTF triangles are counter-clockwise; Godot's front face is clockwise
+                        m.surfaceSetNormal(n);
+                        m.surfaceAddVertex(a.plus(up));
+                        m.surfaceAddVertex(c.plus(up));
+                        m.surfaceAddVertex(b.plus(up));
+                    }
+                    m.surfaceEnd();
+                    out = m;
+                    break;
+                }
+            }
+        } catch (IllegalArgumentException | ClassCastException e) {
+            GD.printErr("TrafficSignals: " + file + ": " + e.getMessage());
+        }
+        LENS_CACHE.put(key, out);
+        return out;
+    }
+
+    /** Lamps drawn as the lens MESH (not the fallback ball) among the built views -- a probe readout. */
+    @Register public int lensLampsNow() {
+        int n = 0;
+        for (Junction j : junctions) for (MeshInstance3D mi : j.lampNodes)
+            if (GD.isInstanceValid(mi) && mi.getMesh() instanceof ImmediateMesh) n++;
+        return n;
+    }
+
     private StandardMaterial3D litMat(int colour) {
         if (lit[colour] == null) {
             StandardMaterial3D m = new StandardMaterial3D();
@@ -387,19 +453,28 @@ public class TrafficSignals extends Node3D {
         j.view.setAsTopLevel(true);
         addChild(j.view);
         j.lampNodes.clear();
+        Basis frame = j.frame;
         for (Lamp l : j.lamps) {
             MeshInstance3D mi = new MeshInstance3D();
-            SphereMesh s = new SphereMesh();
-            s.setRadius((float) (l.radius * 0.85));
-            s.setHeight((float) (l.radius * 1.7));
-            s.setRadialSegments(10);
-            s.setRings(5);
-            mi.setMesh(s);
+            Mesh lens = l.lamps != null && l.pole != null ? lensMesh(l.lamps, l.vehicle, l.colour, l.head) : null;
             mi.setMaterialOverride(litMat(l.colour));
             mi.setCastShadowsSetting(GeometryInstance3D.ShadowCastingSetting.OFF);
             mi.setVisible(false);
             j.view.addChild(mi);
-            mi.setGlobalPosition(l.pos);
+            if (lens != null) {
+                // the LENS itself (TrafficLight_2_Japan.blend's lens mesh, pushed a few mm proud of the baked dark one),
+                // placed as the pole's piece is: at its base, turned by its yaw, in the network's frame
+                mi.setMesh(lens);
+                mi.setGlobalTransform(new Transform3D(frame.times(new Basis(new Vector3(0, 1, 0), l.yaw)), l.pole));
+            } else {
+                SphereMesh sp = new SphereMesh();
+                sp.setRadius((float) (l.radius * 0.85));
+                sp.setHeight((float) (l.radius * 1.7));
+                sp.setRadialSegments(10);
+                sp.setRings(5);
+                mi.setMesh(sp);
+                mi.setGlobalPosition(l.pos);
+            }
             j.lampNodes.add(mi);
         }
         for (Plate p : j.plates) p.built = false;
@@ -463,6 +538,9 @@ public class TrafficSignals extends Node3D {
 
     /** Lamps lit this tick (near the camera). */
     @Register public int litLampsNow() { return litNow; }
+
+    /** Lit VEHICLE lenses (the heads over the carriageway) among them. */
+    @Register public int litVehicleLampsNow() { return litVehicleNow; }
 
     /** Junctions whose lamps are built (near the camera). */
     @Register public int viewsNow() {

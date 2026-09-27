@@ -3,145 +3,217 @@ package com.openworld.world;
 import com.openworld.character.Player;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.net.NetworkManager;
+import com.openworld.util.MiniJson;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.annotation.Visible;
-import godot.api.AnimationPlayer;
+import godot.api.Camera3D;
+import godot.api.FileAccess;
+import godot.api.GeometryInstance3D;
+import godot.api.Mesh;
+import godot.api.MultiMesh;
+import godot.api.MultiMeshInstance3D;
 import godot.api.Node;
 import godot.api.Node3D;
-import godot.api.PackedScene;
 import godot.api.ResourceLoader;
+import godot.api.Shader;
+import godot.api.ShaderMaterial;
+import godot.api.Texture2D;
+import godot.core.AABB;
+import godot.core.PackedFloat32Array;
 import godot.core.PackedVector3Array;
-import godot.core.StringName;
 import godot.core.Vector3;
 import godot.global.GD;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
- * The FAR tier of the ambient crowd (PLAN.md 3.6d): a lightweight pedestrian is a SCRIPT-FREE scene -- a skinned
- * mesh, a skeleton and an {@code AnimationPlayer}, nothing else -- whose transform this ONE node writes, so the
- * crowd costs no per-body JVM callback at all. It is the GTA pedestrian LOD: far peds are a moving picture, and a
- * ped near a player is PROMOTED to a real {@code AICharacter} (shootable, collidable, perceiving) by
- * {@link ZoneManager}, which owns every body that can be interacted with.
+ * The FAR tier of the ambient crowd: every pedestrian no player is dealing with. A ped here is PLAIN JAVA STATE
+ * -- a footway, a place on it, a pace, a clip -- and each body type is ONE {@link MultiMesh} animated in the
+ * vertex shader from a baked vertex-animation texture ({@code tools/godot/bake_ped_vat.gd},
+ * {@code assets/characters/crowd/ped_vat.gdshader}). So a ped costs no node, no skeleton, no AnimationPlayer and
+ * no draw call of its own: the crowd is one buffer write per body type per frame.
  *
- * <p><b>Why a new tier rather than more LOD on the body.</b> D2 already skips an AI's FSM and its AnimationTree
- * writes past 80 m, and a sidewalk walker beyond that GLIDES (its controller moves it directly and
- * MovementController stands down). Measured on {@code probe_city_perf.gd --crowd}, a glided walker still cost
- * ~0.06 ms per physics tick -- because what is left is not its behaviour, it is that a {@code Character} body is
- * ~10 JVM-scripted nodes and the engine calls into the JVM for each of them, every tick, forever. No flag on
- * those nodes removes that. Only having no scripted nodes does.
+ * <p><b>Measured</b> ({@code tools/godot/bench_crowd.gd}, this PC, 2026-09-27): the previous far tier -- one
+ * skinned body per ped with its own AnimationPlayer -- cost 4.8 / 18.4 / 61.2 ms a frame at 150 / 600 / 2000
+ * peds, all of it CPU animation and skinning; as VAT instances 0.45 / 0.57 / 1.48 ms and one draw call. It was
+ * also silently FROZEN: it stopped animating beyond 60 m and only ever existed beyond 80 m.
  *
- * <p><b>It is LOCAL to each peer and is never replicated</b>, the rule 3.11b set for the knocked-down poles:
- * cosmetic state costs no bandwidth. Each peer walks its own crowd from its own RNG, so two peers see different
- * ambient people 100 m away -- which nobody can tell, because nothing 100 m away can be interacted with. What IS
- * interactive is the promoted body, and that is a host-authoritative {@code AICharacter} spawn on the wire
- * already. <b>Accepted divergence:</b> a client does not promote (only the host may spawn an AI), so inside
- * {@link #promoteDistance} of the local player a client simply HIDES its own light peds and shows the host's
- * replicated walkers instead. At the boundary the two populations are not the same people.
+ * <p><b>Promotion is a decision, not a ring</b> (PLAN.md 3.32). A ped becomes a full {@code AICharacter} only when
+ * it must do what a light ped cannot: a player is within {@link #promoteDistance} (it can be bumped, looked at
+ * closely), a player is AIMING at it, or a FIGHTER is scared. At most one promotion a frame, nearest first, and
+ * {@link ZoneManager} holds the budgets -- a promotion is a few milliseconds of main-thread work (measured 3-4 ms),
+ * and an uncapped ring promoted dozens in a few frames when a car drove into downtown.
+ *
+ * <p><b>Temperament</b>, from the ped's own hash: most FLEE from a gunshot, an explosion or a weapon being drawn,
+ * some COWER where they stand, a few FIGHT back (promoted and armed by ZoneManager). Calm peds walk and now and
+ * then stop to idle, use a phone or talk.
+ *
+ * <p><b>Local to each peer, never replicated</b> (the rule 3.11b set for cosmetic state). A client may not promote,
+ * so inside {@link #promoteDistance} of its own player it HIDES its light peds and shows the host's replicated
+ * walkers instead. <b>Accepted divergence:</b> a ped the host could not promote (budget full) is hidden on the
+ * client and has no replicated body there.
  */
 @Script(className = "PedCrowd")
 public class PedCrowd extends Node3D {
 
-	/**
-	 * The script-free body every light ped instances: no MeshConfig and no modifiers.
-	 *
-	 * <p>It is the <b>LOD</b> body ({@code blender/tools/build_ped_body.py}), not the playable one. At the
-	 * nearest distance this tier is ever drawn -- {@link #promoteDistance}, 80 m -- a 1.65 m body is ~14 px tall
-	 * on a 1080p screen, so what costs anything is DRAW CALLS: the playable body is 3 {@code MeshInstance3D} but
-	 * <b>17 surfaces with 17 materials</b>, i.e. ~17 draws per light ped with ~100 of them in range downtown.
-	 * The LOD body is ONE surface over one atlas (and 2 clips instead of 173, so 2.0 MB against 48.8). It is
-	 * built FROM the shipped export and clones that body's own material, so it can never drift from what the
-	 * player sees -- gate {@code tools/godot/probe_ped_body.gd}.
-	 */
-	public static final String PED_SCENE = "res://assets/characters/shino/shino_ped.tscn";
-	private static final StringName WALK_CLIP = new StringName("upright_walk_forward");
-	private static final StringName RUN_CLIP = new StringName("upright_sprint_forward");
+	/** Where the per-body bakes are listed: every body of character_gaits.json that has a `<body>_vat.json`. */
+	private static final String GAITS = "res://src/main/resources/com/openworld/character/anim/character_gaits.json";
+	private static final String SHADER = "res://assets/characters/crowd/ped_vat.gdshader";
+	private static final int FLOATS = 20;   // per instance: 3x4 transform, colour, custom data
 
-	/** A walking pace (m/s). The same number {@code SidewalkWalkerController} glides at, so a promotion does not
-	 *  visibly change speed. */
+	/** A walking pace (m/s). The same number {@code SidewalkWalkerController} glides at. */
 	@Visible public double speed = 1.4;
 	/** How far above the footway line a ped's origin rides. */
 	@Visible public double lift = 0.02;
-	/**
-	 * Within this of a player a light ped is PROMOTED to a full body (host / single player) or HIDDEN (client).
-	 * It is D2's own ACTIVE boundary, deliberately: "is a player near" already has one owner and one number.
-	 */
-	@Visible public double promoteDistance = 80.0;
-	/** A full walker beyond this is handed back to the crowd. The gap is hysteresis, the Zone load/unload rule:
-	 *  one threshold makes a body that stands on it promote and demote every tick. */
-	@Visible public double demoteDistance = 100.0;
-	/** Beyond this a ped's AnimationPlayer is stopped: a frozen skeleton still skins, but costs no animation
-	 *  tick, and a walk cycle is not readable at this range. */
-	@Visible public double animateDistance = 60.0;
-	/**
-	 * How far a light ped is DRAWN (R9 follow-up, measured 2026-09-22 with probe_walk_perf.gd at the station: the light
-	 * crowd was ~1 100 of its ~4 000 draw calls, p50 13.3 ms with it against 6.9 without). A light ped is never nearer
-	 * than {@link #promoteDistance} (closer ones are real bodies), so it draws WITHOUT shadows and fades out at this
-	 * distance: a 1.6 m figure is ~10 px tall at 180 m. Set once per ped on its meshes (engine-side culling, no
-	 * per-frame cost). 0 = drawn to the zone's edge with shadows (the control).
-	 */
-	@Visible public double drawDistance = 180.0;
-	/** Peds are advanced in this many groups, one group per physics frame, each moved by the whole group's worth
-	 *  of time. A ped is a straight-line walker, so the coarser step is invisible and the per-frame cost is
-	 *  divided by it. */
-	@Visible public int updateGroups = 4;
-	/** Off = the control: every ped updated every frame with its animation running. */
-	@Visible public boolean staggerUpdates = true;
+	/** Within this of a player a ped is PROMOTED (host / single player) or HIDDEN (client). */
+	@Visible public double promoteDistance = 25.0;
+	/** A full walker beyond this is handed back to the crowd (ZoneManager reads it). Hysteresis over promote. */
+	@Visible public double demoteDistance = 40.0;
+	/** How far a ped is DRAWN (culled per ped on the CPU: a MultiMesh fades as a whole). 0 = no limit. */
+	@Visible public double drawDistance = 220.0;
+	/** Kept for the control: false = the whole crowd walks with no stops. */
+	@Visible public boolean idleStops = true;
 
-	/**
-	 * The light tier REACTS (PLAN.md 3.32): a ped that hears a gunshot or an explosion within {@link #panicRange}
-	 * (and inside the stimulus's own audible radius), or that a player is AIMING at from beyond the promote ring
-	 * (a scope), runs AWAY along its own footway for {@link #panicSeconds} and then walks again. It is the whole
-	 * of "the majority is startled and flees" and it costs no promotion: no body, no script, no physics -- one
-	 * clip change and a timer per ped. What a light ped cannot do (fight back, be carjacked, ragdoll) is what a
-	 * promotion is for. Off = the control: the crowd ignores everything.
-	 */
+	/** The light tier REACTS: a gunshot, an explosion or a weapon being DRAWN within {@link #panicRange} (and
+	 *  inside the stimulus's own radius), or a player aiming at it. Off = the control. */
 	@Visible public boolean reactions = true;
-	/** How far a light ped hears trouble, capped by each stimulus's own radius. */
 	@Visible public double panicRange = 120.0;
-	/** How long a startled ped runs before it calms down (a new scare restarts it). */
 	@Visible public double panicSeconds = 8.0;
-	/** A fleeing ped's pace (m/s), a run, and its walk cycle is replaced by {@code upright_sprint_forward}. */
+	/** A fleeing ped's pace (m/s): a run, on the sprint clip. */
 	@Visible public double fleeSpeed = 4.5;
 	/** A ped within this of a player's aim point, while that player is in combat, counts as aimed at. */
 	@Visible public double aimedAtRadius = 2.0;
+	/** Out of 100: how many peds cower instead of running, and how many fight back. The rest flee. */
+	@Visible public int cowerPercent = 12;
+	@Visible public int fightPercent = 5;
 
 	/** Metres walked by the whole crowd -- a probe readout, so "are they actually moving" is measurable. */
 	@Visible public double walkedTotal = 0.0;
 
-	/** One light pedestrian. Plain Java: no Godot object but the body node and its path, both value-ish. */
+	// ── the baked bodies (shared by every crowd) ──────────────────────────────────────────────────
+
+	static final class Clip {
+		final float row, frames, fps;
+		Clip(double row, double frames, double fps) { this.row = (float) row; this.frames = (float) frames; this.fps = (float) fps; }
+	}
+
+	static final class Variant {
+		String body;
+		double weight = 1.0;
+		Mesh mesh;
+		ShaderMaterial material;
+		Clip idle, walk, run, cower, phone, talk;
+	}
+
+	private static List<Variant> variants;
+	private static int liveCrowds = 0;
+
+	/** Every baked body, loaded once. Empty (and the crowd draws nothing) until one is baked. */
+	static synchronized List<Variant> variants() {
+		if (variants != null) return variants;
+		variants = new ArrayList<>();
+		Shader shader = ResourceLoader.INSTANCE.load(SHADER, "", ResourceLoader.CacheMode.REUSE) instanceof Shader s ? s : null;
+		Object gaits = MiniJson.parse(FileAccess.getFileAsString(GAITS));
+		if (shader == null || !(gaits instanceof Map<?, ?> g) || !(g.get("bodies") instanceof Map<?, ?> bodies)) {
+			GD.pushError("PedCrowd: no shader or no gait table");
+			return variants;
+		}
+		Map<?, ?> weights = g.get("crowd_weights") instanceof Map<?, ?> w ? w : Map.of();
+		List<String> names = new ArrayList<>();
+		for (Object k : bodies.keySet()) names.add(String.valueOf(k));
+		Collections.sort(names);                       // a stable order: a ped's variant is its hash mod the count
+		for (String body : names) {
+			String metaPath = "res://assets/characters/" + body + "/" + body + "_vat.json";
+			if (!FileAccess.fileExists(metaPath)) continue;
+			if (!(MiniJson.parse(FileAccess.getFileAsString(metaPath)) instanceof Map<?, ?> m)) continue;
+			Variant v = new Variant();
+			v.body = body;
+			if (weights.get(body) instanceof Number n) v.weight = Math.max(0.0, n.doubleValue());
+			v.mesh = ResourceLoader.INSTANCE.load(String.valueOf(m.get("mesh")), "", ResourceLoader.CacheMode.REUSE) instanceof Mesh me ? me : null;
+			Texture2D pos = ResourceLoader.INSTANCE.load(String.valueOf(m.get("positions")), "", ResourceLoader.CacheMode.REUSE) instanceof Texture2D t ? t : null;
+			Texture2D atlas = ResourceLoader.INSTANCE.load(String.valueOf(m.get("atlas")), "", ResourceLoader.CacheMode.REUSE) instanceof Texture2D t ? t : null;
+			if (v.mesh == null || pos == null || atlas == null) {
+				GD.pushError("PedCrowd: " + body + "'s VAT bake is incomplete -- run tools/godot/bake_ped_vat.gd");
+				continue;
+			}
+			v.material = new ShaderMaterial();
+			v.material.setShader(shader);
+			v.material.setShaderParameter("albedo_tex", atlas);
+			v.material.setShaderParameter("vat_pos", pos);
+			v.material.setShaderParameter("alpha_scissor", m.get("alpha_scissor") instanceof Number a ? a.doubleValue() : 0.5);
+			Map<?, ?> clips = (Map<?, ?>) m.get("clips");
+			v.idle = clip(clips, "idle");
+			v.walk = clip(clips, "walk");
+			v.run = clip(clips, "run");
+			v.cower = clip(clips, "cower");
+			v.phone = clip(clips, "phone");
+			v.talk = clip(clips, "talk");
+			if (v.walk == null) continue;
+			if (v.idle == null) v.idle = v.walk;
+			if (v.run == null) v.run = v.walk;
+			if (v.cower == null) v.cower = v.idle;
+			if (v.phone == null) v.phone = v.idle;
+			if (v.talk == null) v.talk = v.idle;
+			variants.add(v);
+		}
+		return variants;
+	}
+
+	private static Clip clip(Map<?, ?> clips, String key) {
+		if (clips == null || !(clips.get(key) instanceof Map<?, ?> c)) return null;
+		return new Clip(((Number) c.get("row")).doubleValue(), ((Number) c.get("frames")).doubleValue(),
+				((Number) c.get("fps")).doubleValue());
+	}
+
+	// ── the peds ──────────────────────────────────────────────────────────────────────────────────
+
+	private static final int WALK = 0, STOP = 1, FLEE = 2, COWER = 3;
+	private static final int TEMPER_FLEE = 0, TEMPER_COWER = 1, TEMPER_FIGHT = 2;
+
 	private static final class Ped {
-		Node3D body;
-		AnimationPlayer anim;
 		PackedVector3Array path;
+		Vector3[] pts;
 		double[] cum;
 		double along;
 		int dir;
-		boolean animating = true;
-		boolean hidden = false;
-		/** Seconds of panic left (0 = calm). */
-		double flee = 0.0;
-		/** Where the scare came from (world), so the ped keeps running away from it. */
-		Vector3 threat;
-		boolean running = false;
+		int variant;
+		int slot;
+		double pace;          // x speed, and x the walk clip's rate: stride and ground speed stay matched
+		double scale;
+		double start;         // shader time offset: every ped at its own place in its cycle
+		int temper;
+		int state = WALK;
+		double timer;         // seconds left in STOP / FLEE / COWER, or until the next stop while walking
+		Clip stopClip;
+		boolean hidden;
+		boolean wantsFight;
 	}
 
 	private final List<Ped> peds = new ArrayList<>();
-	private PackedScene pedScene;
-	private int group = 0;
-	/** The newest stimulus timestamp this crowd has already reacted to. */
-	private double heardUpTo = -1.0;
+	private final java.util.Random rng = new java.util.Random();
+	private MultiMeshInstance3D[] layers = new MultiMeshInstance3D[0];
+	private float[][] bufs = new float[0][];
+	private int[] counts = new int[0];
+	private final java.util.Set<StimulusManager.Stimulus> heard =
+			java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 	private int scaresTotal = 0;
+	private int promotedTotal = 0;
 
-	/** Set by {@link ZoneManager} so a promotion can be handed back to the one owner of AI spawning. */
 	private ZoneManager owner;
 	private Object ownerZone;
+
+	/** Every crowd in the tree, so a shot can ask them (a crowd ped has no collider). */
+	private static final List<PedCrowd> LIVE = new ArrayList<>();
 
 	@Register
 	@Override
 	public void _ready() {
+		LIVE.add(this);
+		liveCrowds++;
 		setProcessPriority(0);
 	}
 
@@ -157,50 +229,97 @@ public class PedCrowd extends Node3D {
 	@Register
 	public void addPed(PackedVector3Array path, double along, int dir) {
 		if (path.getSize() < 2) return;
-		if (pedScene == null) {
-			pedScene = (PackedScene) ResourceLoader.INSTANCE.load(PED_SCENE, "", ResourceLoader.CacheMode.REUSE);
-			if (pedScene == null) { GD.pushError("PedCrowd: cannot load " + PED_SCENE); return; }
-		}
-		Node n = pedScene.instantiate();
-		if (!(n instanceof Node3D body)) { if (n != null) n.queueFree(); return; }
+		List<Variant> vs = variants();
+		if (vs.isEmpty()) return;
+		ensureLayers(vs.size());
 		Ped p = new Ped();
-		p.body = body;
 		p.path = path;
+		p.pts = new Vector3[path.getSize()];
 		p.cum = new double[path.getSize()];
-		for (int i = 1; i < p.cum.length; i++) {
-			p.cum[i] = p.cum[i - 1] + path.get(i).distanceTo(path.get(i - 1));
-		}
+		for (int i = 0; i < p.pts.length; i++) p.pts[i] = path.get(i);
+		for (int i = 1; i < p.cum.length; i++) p.cum[i] = p.cum[i - 1] + p.pts[i].distanceTo(p.pts[i - 1]);
 		p.along = Math.max(0.5, Math.min(along, Math.max(0.5, length(p) - 0.5)));
 		p.dir = dir >= 0 ? 1 : -1;
-		addChild(body);
-		if (drawDistance > 0.0) {
-			for (Node g : body.findChildren("*", "GeometryInstance3D", true, false)) {
-				if (!(g instanceof godot.api.GeometryInstance3D gi)) continue;
-				gi.setCastShadowsSetting(godot.api.GeometryInstance3D.ShadowCastingSetting.OFF);
-				gi.setVisibilityRangeEnd((float) drawDistance);
-				gi.setVisibilityRangeEndMargin(20.0f);
-				gi.setVisibilityRangeFadeMode(godot.api.GeometryInstance3D.VisibilityRangeFadeMode.SELF);
-			}
-		}
-		p.anim = body.getNodeOrNull("AnimationPlayer") instanceof AnimationPlayer ap ? ap : null;
-		if (p.anim != null) {
-			// Every ped starts the same clip at its OWN offset, or a crowd marches in step.
-			p.anim.play(WALK_CLIP, -1.0, 1.0f, false);
-			double len = p.anim.currentAnimationLengthProperty();
-			if (len > 0.0) p.anim.seek(GD.randfRange(0.0f, (float) len), true, false);
-		}
-		place(p);
+		p.variant = pickVariant(vs);
+		p.pace = 0.9 + 0.2 * rng.nextDouble();
+		p.scale = 0.96 + 0.08 * rng.nextDouble();
+		p.start = -rng.nextDouble() * 10.0;
+		int t = rng.nextInt(100);
+		p.temper = t < fightPercent ? TEMPER_FIGHT : t < fightPercent + cowerPercent ? TEMPER_COWER : TEMPER_FLEE;
+		p.timer = 15.0 + rng.nextDouble() * 45.0;
+		p.slot = counts[p.variant]++;
 		peds.add(p);
+		growBuffer(p.variant);
+	}
+
+	/** A body by its crowd weight (character_gaits.json crowd_weights). */
+	private int pickVariant(List<Variant> vs) {
+		double total = 0.0;
+		for (Variant v : vs) total += v.weight;
+		double r = rng.nextDouble() * total;
+		for (int i = 0; i < vs.size(); i++) {
+			r -= vs.get(i).weight;
+			if (r < 0.0) return i;
+		}
+		return vs.size() - 1;
+	}
+
+	private void ensureLayers(int n) {
+		if (layers.length == n) return;
+		List<Variant> vs = variants();
+		layers = new MultiMeshInstance3D[n];
+		bufs = new float[n][0];
+		counts = new int[n];
+		for (int i = 0; i < n; i++) {
+			MultiMesh mm = new MultiMesh();
+			mm.setTransformFormat(MultiMesh.TransformFormat.TRANSFORM_3D);   // must precede instanceCount
+			mm.setUseColors(true);
+			mm.setUseCustomData(true);
+			mm.setMesh(vs.get(i).mesh);
+			MultiMeshInstance3D mmi = new MultiMeshInstance3D();
+			mmi.setMultimesh(mm);
+			mmi.setMaterialOverride(vs.get(i).material);
+			mmi.setCastShadowsSetting(GeometryInstance3D.ShadowCastingSetting.OFF);
+			mmi.setAsTopLevel(true);
+			addChild(mmi);
+			layers[i] = mmi;
+		}
+	}
+
+	/** Grow a variant's buffer to hold its instances (doubling), re-sizing the MultiMesh with it. */
+	private void growBuffer(int v) {
+		if (bufs[v].length >= counts[v] * FLOATS) return;
+		int cap = Math.max(8, Integer.highestOneBit(Math.max(1, counts[v] - 1)) << 1);
+		float[] nb = new float[cap * FLOATS];
+		System.arraycopy(bufs[v], 0, nb, 0, bufs[v].length);
+		bufs[v] = nb;
+		layers[v].getMultimesh().setInstanceCount(cap);
 	}
 
 	@Register public int pedCount() { return peds.size(); }
 
-	/** How many peds are drawn right now (a client hides the ring a host would have promoted). */
+	/** How many peds are drawn right now (hidden = a client's promote ring; beyond drawDistance counts too). */
 	@Register
 	public int visiblePedCount() {
 		int n = 0;
 		for (Ped p : peds) if (!p.hidden) n++;
 		return n;
+	}
+
+	/** Where every ped is (world), in order -- the probes' view of a crowd that has no nodes. */
+	@Register
+	public PackedVector3Array pedPositionsNow() {
+		PackedVector3Array out = new PackedVector3Array();
+		for (Ped p : peds) out.append(pointAt(p, p.along));
+		return out;
+	}
+
+	/** The baked bodies this crowd draws, by name (a probe readout). */
+	@Register
+	public String bodiesNow() {
+		StringBuilder sb = new StringBuilder();
+		for (Variant v : variants()) sb.append(sb.length() == 0 ? "" : ",").append(v.body);
+		return sb.toString();
 	}
 
 	@Register public double walkedTotalNow() { return walkedTotal; }
@@ -209,87 +328,261 @@ public class PedCrowd extends Node3D {
 	@Register
 	public int fleeingNow() {
 		int n = 0;
-		for (Ped p : peds) if (p.flee > 0.0) n++;
+		for (Ped p : peds) if (p.state == FLEE) n++;
 		return n;
 	}
 
-	/** Scares taken since the crowd was built (each ped counts once per scare). */
+	/** How many are cowering right now (a probe readout). */
+	@Register
+	public int coweringNow() {
+		int n = 0;
+		for (Ped p : peds) if (p.state == COWER) n++;
+		return n;
+	}
+
 	@Register public int scaresNow() { return scaresTotal; }
 
-	/** Remove and free every ped (zone unload). */
+	@Register public int promotedNow() { return promotedTotal; }
+
+	/** Roll every ped's temperament again from the current shares (probes set a share after the zone spawned). */
+	@Register
+	public void rerollTemperNow() {
+		for (Ped p : peds) {
+			int t = rng.nextInt(100);
+			p.temper = t < fightPercent ? TEMPER_FIGHT : t < fightPercent + cowerPercent ? TEMPER_COWER : TEMPER_FLEE;
+		}
+	}
+
+	/** Remove every ped (zone unload). */
 	@Register
 	public void clearPeds() {
-		for (Ped p : peds) {
-			if (GD.isInstanceValid(p.body)) { removeChild(p.body); p.body.queueFree(); }
-		}
 		peds.clear();
+		for (int v = 0; v < layers.length; v++) {
+			counts[v] = 0;
+			if (GD.isInstanceValid(layers[v])) layers[v].getMultimesh().setVisibleInstanceCount(0);
+		}
 	}
 
 	@Register
 	@Override
 	public void _exitTree() {
 		clearPeds();
+		LIVE.remove(this);
+		liveCrowds--;
+		// The baked bodies are static Godot resources: release them with the last crowd, or they are reported
+		// as resources still in use at exit (IconRegistry's rule).
+		if (liveCrowds <= 0) {
+			liveCrowds = 0;
+			synchronized (PedCrowd.class) { variants = null; }
+		}
 	}
 
 	@Register
 	@Override
 	public void _physicsProcess(double delta) {
-		if (peds.isEmpty()) return;
-		int groups = staggerUpdates ? Math.max(1, updateGroups) : 1;
-		double step = delta * groups;
+		tick(delta);
+	}
+
+	private void tick(double delta) {
+		if (peds.isEmpty() || layers.length == 0) return;
 		List<Player> players = PlayerRegistry.getPlayers();
+		int np = 0;
+		double[] px = new double[players.size()], pz = new double[players.size()];
+		for (Player pl : players) {
+			if (!GD.isInstanceValid(pl)) continue;
+			Vector3 q = pl.getGlobalPosition();
+			px[np] = q.getX();
+			pz[np] = q.getZ();
+			np++;
+		}
+		Camera3D cam = getViewport() != null ? getViewport().getCamera3d() : null;
+		Vector3 eye = cam != null ? cam.getGlobalPosition() : null;
 		boolean canPromote = owner != null && authoritative();
-		// Promotions are collected and applied AFTER the walk: removing from `peds` mid-loop shifts every
-		// later ped into a different group, so the stagger would silently stop being a partition.
-		List<Ped> promoted = null;
 		if (reactions) hear();
 		List<Vector3> aims = reactions ? aimPoints(players) : null;
-		for (int i = group; i < peds.size(); i += groups) {
-			Ped p = peds.get(i);
-			if (!GD.isInstanceValid(p.body)) continue;
-			if (aims != null && !aims.isEmpty()) {
-				Vector3 here = pointAt(p, p.along);
+
+		Ped promote = null;
+		double promoteD = Double.MAX_VALUE;
+		for (Ped p : peds) {
+			Vector3 here = pointAt(p, p.along);
+			if (aims != null) {
 				for (Vector3 a : aims) {
-					if (here.distanceTo(a) <= aimedAtRadius + 1.0) { scare(p, a); break; }
+					if (here.distanceTo(a) <= aimedAtRadius + 1.0) { scare(p, a); if (canPromote) p.wantsFight = true; break; }
 				}
 			}
-			if (p.flee > 0.0) p.flee = Math.max(0.0, p.flee - step);
-			advance(p, step);
-			double d = nearestPlayerDist(p, players);
-			if (d < promoteDistance) {
-				if (canPromote) {
-					// Hand the body over: the crowd never spawns an AICharacter itself, because every
-					// interactive body in the world is ZoneManager's to pool, arm and announce. A refusal
-					// (zone gone, pool empty) is not an error: the ped simply keeps walking.
-					if (owner.promoteSidewalkPed(ownerZone, p.path, p.along, p.dir)) {
-						if (promoted == null) promoted = new ArrayList<>();
-						promoted.add(p);
-						continue;
-					}
-				} else if (!p.hidden) {
-					p.hidden = true;
-					p.body.setVisible(false);
+			step(p, delta);
+			here = pointAt(p, p.along);
+			double d = nearest(here, px, pz, np);
+			boolean need = d < promoteDistance || (p.wantsFight && d < panicRange);
+			if (need && canPromote && d < promoteD) { promote = p; promoteD = d; }
+			boolean hide = !canPromote && d < promoteDistance;
+			if (!hide && drawDistance > 0.0 && eye != null && here.distanceTo(eye) > drawDistance) hide = true;
+			p.hidden = hide;
+			write(p, here);
+		}
+		// ONE promotion a frame, the nearest: a promotion is milliseconds of main-thread work.
+		if (promote != null) {
+			boolean fight = promote.wantsFight && promote.temper == TEMPER_FIGHT;
+			if (owner.promoteSidewalkPed(ownerZone, promote.path, promote.along, promote.dir, fight,
+					variants().get(promote.variant).body)) {
+				removePed(promote);
+				promotedTotal++;
+			} else {
+				promote.wantsFight = false;        // refused (budget): it stays a ped and runs like the rest
+			}
+		}
+		for (int v = 0; v < layers.length; v++) {
+			if (!GD.isInstanceValid(layers[v])) continue;
+			MultiMesh mm = layers[v].getMultimesh();
+			mm.setBuffer(new PackedFloat32Array(bufs[v]));
+			mm.setVisibleInstanceCount(counts[v]);
+		}
+	}
+
+	// ── Shot at from beyond the promote ring ────────────────────────────────────────────────────────
+
+	/** A light ped a shot hit: where, and how far along the ray. */
+	public record CrowdHit(PedCrowd crowd, Object ped, double distance, Vector3 point) { }
+
+	/** A ped's body for a shot: an upright capsule this wide and this tall (x its own scale). */
+	private static final double BODY_RADIUS = 0.28, BODY_HEIGHT = 1.62;
+
+	/**
+	 * The nearest light ped a ray from {@code origin} along unit {@code dir} passes through within
+	 * {@code maxDist}, over every crowd -- a crowd ped has no collider, so a shot asks the crowds itself.
+	 * Hidden peds (a client's promote ring) are skipped. Null = none.
+	 */
+	public static CrowdHit shoot(Vector3 origin, Vector3 dir, double maxDist) {
+		CrowdHit best = null;
+		for (PedCrowd c : LIVE) {
+			if (!GD.isInstanceValid(c)) continue;
+			for (Ped p : c.peds) {
+				if (p.hidden) continue;
+				Vector3 f = c.pointAt(p, p.along);
+				double t = rayCapsule(origin, dir, f, BODY_HEIGHT * p.scale, BODY_RADIUS * p.scale);
+				if (t >= 0.0 && t <= maxDist && (best == null || t < best.distance())) {
+					best = new CrowdHit(c, p, t, origin.plus(dir.times(t)));
 				}
-			} else if (p.hidden) {
-				p.hidden = false;
-				p.body.setVisible(true);
 			}
-			boolean wantAnim = !p.hidden && d < animateDistance;
-			boolean wantRun = p.flee > 0.0;
-			if (p.anim != null && (wantAnim != p.animating || (wantAnim && wantRun != p.running))) {
-				p.animating = wantAnim;
-				p.running = wantRun;
-				if (wantAnim) p.anim.play(wantRun ? RUN_CLIP : WALK_CLIP, 0.2, 1.0f, false); else p.anim.pause();
-			}
-			place(p);
 		}
-		if (promoted != null) {
-			for (Ped p : promoted) {
-				if (GD.isInstanceValid(p.body)) { removeChild(p.body); p.body.queueFree(); }
-			}
-			peds.removeAll(promoted);
+		return best;
+	}
+
+	/**
+	 * Promote the ped a shot hit, NOW (the budget is not asked: a shot has to land), and return its body for
+	 * the damage. Authoritative peer only; null when this crowd cannot promote.
+	 */
+	public com.openworld.character.AICharacter promoteHit(CrowdHit hit) {
+		if (!(hit.ped() instanceof Ped p) || owner == null || !authoritative() || !peds.contains(p)) return null;
+		com.openworld.character.AICharacter ai = owner.promoteForShot(ownerZone, p.path, p.along, p.dir,
+				variants().get(p.variant).body);
+		if (ai != null) {
+			removePed(p);
+			promotedTotal++;
 		}
-		group = (group + 1) % groups;
+		return ai;
+	}
+
+	/** Probe readout: shoot a ray at the crowds the way FirearmItem does. Returns where the hit ped's new body
+	 *  stands, or (0, -10000, 0) when nothing was hit. */
+	@Register
+	public Vector3 shootNow(Vector3 origin, Vector3 dir, double range) {
+		CrowdHit hit = shoot(origin, dir.normalized(), range);
+		com.openworld.character.AICharacter ai = hit != null ? hit.crowd().promoteHit(hit) : null;
+		return ai != null ? ai.getGlobalPosition() : new Vector3(0, -10000, 0);
+	}
+
+	private static double rayCapsule(Vector3 o, Vector3 d, Vector3 foot, double height, double radius) {
+		return CrowdShot.rayBody(o.getX(), o.getY(), o.getZ(), d.getX(), d.getY(), d.getZ(),
+				foot.getX(), foot.getY(), foot.getZ(), height, radius);
+	}
+
+	/** Advance one ped's state and place by dt. */
+	private void step(Ped p, double dt) {
+		double moved = 0.0;
+		switch (p.state) {
+			case WALK -> {
+				moved = speed * p.pace * dt;
+				p.timer -= dt;
+				if (idleStops && p.timer <= 0.0) {
+					p.state = STOP;
+					Variant v = variants().get(p.variant);
+					int k = rng.nextInt(3);
+					p.stopClip = k == 0 ? v.phone : k == 1 ? v.talk : v.idle;
+					p.timer = 4.0 + rng.nextDouble() * 8.0;
+				}
+			}
+			case STOP -> {
+				p.timer -= dt;
+				if (p.timer <= 0.0) { p.state = WALK; p.timer = 20.0 + rng.nextDouble() * 50.0; }
+			}
+			case FLEE -> {
+				moved = fleeSpeed * dt;
+				p.timer -= dt;
+				if (p.timer <= 0.0) { p.state = WALK; p.timer = 20.0 + rng.nextDouble() * 50.0; p.wantsFight = false; }
+			}
+			case COWER -> {
+				p.timer -= dt;
+				if (p.timer <= 0.0) { p.state = WALK; p.timer = 20.0 + rng.nextDouble() * 50.0; p.wantsFight = false; }
+			}
+			default -> { }
+		}
+		if (moved > 0.0) {
+			p.along += p.dir * moved;
+			walkedTotal += moved;
+			double L = length(p);
+			if (p.along >= L - 0.5) { p.along = Math.max(0.5, L - 0.5); p.dir = -1; }
+			if (p.along <= 0.5) { p.along = 0.5; p.dir = 1; }
+		}
+	}
+
+	/** One ped's instance: transform (facing its travel), tint, and the clip it plays. */
+	private void write(Ped p, Vector3 here) {
+		float[] b = bufs[p.variant];
+		int o = p.slot * FLOATS;
+		if (p.hidden) {
+			for (int i = 0; i < 12; i++) b[o + i] = 0f;   // a zero basis draws nothing
+			return;
+		}
+		Vector3 ahead = pointAt(p, p.along + p.dir * 1.0);
+		double dx = ahead.getX() - here.getX();
+		double dz = ahead.getZ() - here.getZ();
+		double yaw = (Math.abs(dx) + Math.abs(dz) < 1e-6) ? 0.0 : Math.atan2(-dx, -dz);
+		float c = (float) (Math.cos(yaw) * p.scale), s = (float) (Math.sin(yaw) * p.scale), k = (float) p.scale;
+		// row-major 3x4: [xx xy xz ox | yx yy yz oy | zx zy zz oz] for a yaw about +Y
+		b[o] = c;   b[o + 1] = 0f; b[o + 2] = s;  b[o + 3] = (float) here.getX();
+		b[o + 4] = 0f; b[o + 5] = k; b[o + 6] = 0f; b[o + 7] = (float) (here.getY() + lift);
+		b[o + 8] = -s; b[o + 9] = 0f; b[o + 10] = c; b[o + 11] = (float) here.getZ();
+		b[o + 12] = 1f; b[o + 13] = 1f; b[o + 14] = 1f; b[o + 15] = 0f;
+		Variant v = variants().get(p.variant);
+		Clip clip;
+		float rate = 1f;
+		switch (p.state) {
+			case STOP -> clip = p.stopClip;
+			case FLEE -> clip = v.run;
+			case COWER -> clip = v.cower;
+			default -> { clip = v.walk; rate = (float) p.pace; }
+		}
+		b[o + 16] = clip.row;
+		b[o + 17] = clip.frames;
+		b[o + 18] = (float) p.start;
+		b[o + 19] = clip.fps * rate;
+	}
+
+	/** A promoted ped leaves the buffer: the last instance of its body type moves into its slot. */
+	private void removePed(Ped p) {
+		int v = p.variant;
+		int last = --counts[v];
+		if (p.slot != last) {
+			for (Ped q : peds) {
+				if (q.variant == v && q.slot == last) {
+					System.arraycopy(bufs[v], last * FLOATS, bufs[v], p.slot * FLOATS, FLOATS);
+					q.slot = p.slot;
+					break;
+				}
+			}
+		}
+		peds.remove(p);
 	}
 
 	/** True where this peer decides what exists: single player, or the host. */
@@ -301,25 +594,34 @@ public class PedCrowd extends Node3D {
 
 	private double length(Ped p) { return p.cum.length == 0 ? 0.0 : p.cum[p.cum.length - 1]; }
 
-	/** React to every stimulus newer than the last frame's: each ped in range starts (or restarts) running. */
+	/**
+	 * React to every stimulus not yet heard. By IDENTITY, not by timestamp: StimulusManager stamps with a clock
+	 * that advances in _process, so when two physics ticks run in one frame a stimulus posted between them can
+	 * carry the same timestamp as one already heard, and "newer than the last" would skip it.
+	 */
 	private void hear() {
 		StimulusManager sm = StimulusManager.get();
 		if (sm == null) return;
-		double newest = heardUpTo;
-		for (StimulusManager.Stimulus st : sm.getStimuli()) {
-			if (st.timestamp <= heardUpTo) continue;
-			newest = Math.max(newest, st.timestamp);
-			if (st.type != StimulusManager.Type.GUNSHOT && st.type != StimulusManager.Type.EXPLOSION) continue;
+		List<StimulusManager.Stimulus> live = sm.getStimuli();
+		for (StimulusManager.Stimulus st : live) {
+			if (!heard.add(st)) continue;
+			if (st.type != StimulusManager.Type.GUNSHOT && st.type != StimulusManager.Type.EXPLOSION
+					&& st.type != StimulusManager.Type.WEAPON_DRAWN) continue;
 			double r = Math.min(panicRange, st.radius);
 			for (Ped p : peds) {
 				if (pointAt(p, p.along).distanceTo(st.origin) <= r) scare(p, st.origin);
 			}
 		}
-		heardUpTo = newest;
+		if (heard.size() > live.size()) heard.retainAll(java.util.Collections.newSetFromMap(identity(live)));
 	}
 
-	/** Where each player in combat is aiming (their aim marker), beyond the promote ring only by construction:
-	 *  a nearer ped is a real body that reacts through its own brain. */
+	private static java.util.IdentityHashMap<StimulusManager.Stimulus, Boolean> identity(List<StimulusManager.Stimulus> l) {
+		java.util.IdentityHashMap<StimulusManager.Stimulus, Boolean> m = new java.util.IdentityHashMap<>();
+		for (StimulusManager.Stimulus st : l) m.put(st, Boolean.TRUE);
+		return m;
+	}
+
+	/** Where each player in combat is aiming. */
 	private List<Vector3> aimPoints(List<Player> players) {
 		List<Vector3> out = new ArrayList<>();
 		for (Player pl : players) {
@@ -329,41 +631,26 @@ public class PedCrowd extends Node3D {
 		return out;
 	}
 
-	/** Start (or restart) a ped's panic, heading along its footway AWAY from {@code from}. */
+	/** Scared: run AWAY along the footway, or cower where it stands, or (a fighter) ask to be promoted. */
 	private void scare(Ped p, Vector3 from) {
-		if (p.flee <= 0.0) scaresTotal++;
-		p.flee = panicSeconds;
-		p.threat = from;
-		double a = pointAt(p, p.along + 1.0).distanceTo(from);
-		double b = pointAt(p, p.along - 1.0).distanceTo(from);
-		p.dir = a >= b ? 1 : -1;
-	}
-
-	private void advance(Ped p, double dt) {
-		double moved = (p.flee > 0.0 ? fleeSpeed : speed) * dt;
-		p.along += p.dir * moved;
-		walkedTotal += moved;
-		double L = length(p);
-		if (p.along >= L - 0.5) { p.along = Math.max(0.5, L - 0.5); p.dir = -1; }
-		if (p.along <= 0.5) { p.along = 0.5; p.dir = 1; }
-	}
-
-	/** ONE engine write per ped per update: position and facing in a single transform. */
-	private void place(Ped p) {
-		Vector3 here = pointAt(p, p.along);
-		Vector3 ahead = pointAt(p, p.along + p.dir * 1.0);
-		double dx = ahead.getX() - here.getX();
-		double dz = ahead.getZ() - here.getZ();
-		double yaw = (Math.abs(dx) + Math.abs(dz) < 1e-6) ? 0.0 : Math.atan2(-dx, -dz);
-		p.body.setGlobalPosition(new Vector3(here.getX(), here.getY() + lift, here.getZ()));
-		p.body.setGlobalRotation(new Vector3(0.0, yaw, 0.0));
+		if (p.state != FLEE && p.state != COWER) scaresTotal++;
+		if (p.temper == TEMPER_COWER) {
+			p.state = COWER;
+		} else {
+			p.state = FLEE;
+			double a = pointAt(p, p.along + 1.0).distanceTo(from);
+			double b = pointAt(p, p.along - 1.0).distanceTo(from);
+			p.dir = a >= b ? 1 : -1;
+			if (p.temper == TEMPER_FIGHT) p.wantsFight = true;
+		}
+		p.timer = panicSeconds;
 	}
 
 	private Vector3 pointAt(Ped p, double s) {
 		int n = p.cum.length;
 		if (n == 0) return Vector3.Companion.getZERO();
-		if (s <= 0) return p.path.get(0);
-		if (s >= p.cum[n - 1]) return p.path.get(n - 1);
+		if (s <= 0) return p.pts[0];
+		if (s >= p.cum[n - 1]) return p.pts[n - 1];
 		int lo = 0, hi = n - 1;
 		while (hi - lo > 1) {
 			int mid = (lo + hi) >>> 1;
@@ -371,18 +658,15 @@ public class PedCrowd extends Node3D {
 		}
 		double seg = p.cum[hi] - p.cum[lo];
 		double f = seg < 1e-9 ? 0.0 : (s - p.cum[lo]) / seg;
-		return p.path.get(lo).lerp(p.path.get(hi), f);
+		Vector3 a = p.pts[lo], b = p.pts[hi];
+		return new Vector3(a.getX() + (b.getX() - a.getX()) * f, a.getY() + (b.getY() - a.getY()) * f,
+				a.getZ() + (b.getZ() - a.getZ()) * f);
 	}
 
-	private double nearestPlayerDist(Ped p, List<Player> players) {
-		if (players.isEmpty()) return Double.MAX_VALUE;
-		Vector3 here = pointAt(p, p.along);
+	private static double nearest(Vector3 here, double[] px, double[] pz, int np) {
 		double best = Double.MAX_VALUE;
-		for (Player pl : players) {
-			if (!GD.isInstanceValid(pl)) continue;
-			Vector3 q = pl.getGlobalPosition();
-			double dx = q.getX() - here.getX();
-			double dz = q.getZ() - here.getZ();
+		for (int i = 0; i < np; i++) {
+			double dx = px[i] - here.getX(), dz = pz[i] - here.getZ();
 			double d = Math.sqrt(dx * dx + dz * dz);
 			if (d < best) best = d;
 		}

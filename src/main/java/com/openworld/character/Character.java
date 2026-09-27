@@ -615,6 +615,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     public boolean isCombat() { return combat; }
 
+
     /** Setter half of the exported {@code combat} property. */
     public void setCombat(boolean value) {
         this.combat = value;
@@ -875,10 +876,27 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         if (debugSwim) updateSwimDebug(sw, waterDepth, swimming);
 
         // ── Weapon switch / unequip ────────────────────────────────────────
-        if (input.wantUnequip) {
-            setWeapon(-1);
-        } else if (input.desiredWeapon >= 0) {
-            setWeapon(input.desiredWeapon);
+        // HOLSTER (user, 2026-09-27): a body walks with its hands empty until it chooses to fight. The
+        // slot-0 key (0; also `wantUnequip`) toggles it -- a real weapon goes away and the hands drop; with the hands empty it
+        // raises the fists; with the fists up it drops them. Choosing any weapon draws it. Holstered, a body
+        // cannot fight (WeaponController.onWeaponFire). The same in first and third person. An AI has no key:
+        // an unarmed AI holsters its fists whenever it is not fighting and draws them when it engages.
+        if (weaponController != null) {
+            if (input.wantUnequip || input.desiredWeapon == 0) {
+                if (weaponController.getWeapon() > 0) {
+                    setWeapon(0);
+                    weaponController.setHolstered(true);
+                } else {
+                    weaponController.setHolstered(!weaponController.isHolstered());
+                }
+            } else if (input.desiredWeapon >= 0) {
+                weaponController.setHolstered(false);
+                setWeapon(input.desiredWeapon);
+            }
+            if (!(getController() instanceof com.openworld.control.PlayerController)
+                    && weaponController.getWeapon() == 0 && !weaponController.isWeaponTransitioning()) {
+                weaponController.setHolstered(!effectiveCombat);
+            }
         }
     }
 
@@ -1422,6 +1440,20 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
     @Override
     public String getNameplateText() {
         return characterInfo != null ? characterInfo.displayName : "";
+    }
+
+    /** Seconds a plate stays up after this body was hurt. */
+    public static final double PLATE_AFTER_HURT_SECONDS = 10.0;
+
+    /**
+     * A plate only where one means something (NameplateTarget.isNameplateRelevant): another PLAYER (a teammate
+     * or an opponent), or anyone hurt in the last {@link #PLATE_AFTER_HURT_SECONDS}. AICharacter adds mission
+     * characters and hostiles in a fight. An ambient pedestrian walking by has none.
+     */
+    @Override
+    public boolean isNameplateRelevant() {
+        if (this instanceof Player) return true;
+        return healthNode != null && healthNode.hurtWithin(PLATE_AFTER_HURT_SECONDS);
     }
 
     @Override

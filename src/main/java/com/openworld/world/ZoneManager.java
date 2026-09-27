@@ -158,6 +158,24 @@ public class ZoneManager extends Node {
 	 * tick (3.6), so the budget is what bounds the frame. 0 = unlimited (the control).
 	 */
 	@Export public int trafficBudget = 20;
+
+	/**
+	 * How many promoted SIDEWALK bodies may exist at once, across every zone (user, 2026-09-27). A crowd ped is
+	 * promoted only when it must be a real body (PedCrowd: a player within 25 m, aimed at, a fighter scared), one
+	 * a frame; this is the ceiling. Past it a ped simply stays a light ped. 0 = no ceiling (the control).
+	 */
+	@Export public int walkerBudget = 12;
+	/** Of those, how many may be FIGHTERS (armed, turned on the player). Past it a fighter flees like the rest. */
+	@Export public int fighterBudget = 6;
+	/** A promoted sidewalk body is not handed back to the crowd for this long after its promotion. */
+	private static final long DEMOTE_AFTER_MSEC = 10_000;
+	private final java.util.Map<Long, Long> promotedAtMsec = new java.util.HashMap<>();
+	/** What a fighter pulls, picked by hash: a pistol, a knife, or the fists (empty). */
+	private static final String[] FIGHTER_WEAPONS = {
+		"res://src/main/resources/com/openworld/weapon/PIS1.tscn",
+		"res://src/main/resources/com/openworld/weapon/MEW1.tscn", "" };
+	/** The faction a fighter turns to: not neutral, so FactionRules makes it hostile to every other faction. */
+	public static final String FIGHTER_FACTION = "vigilante";
 	/**
 	 * WHERE A CAR MAY NOT BE BORN (user, 2026-09-22: "a vehicle spawns right in front of me while driving, and I crash
 	 * into it, especially at high speed"). The gate used to ask only "is a player within the ring" and "is the spot
@@ -1389,6 +1407,52 @@ public class ZoneManager extends Node {
 	 * SpawnConfig left, the pool exhausted), and the crowd then simply keeps walking it.
 	 */
 	boolean promoteSidewalkPed(Object zoneKey, PackedVector3Array path, double along, int dir) {
+		return promoteSidewalkPed(zoneKey, path, along, dir, false, "");
+	}
+
+	/**
+	 * A light ped was SHOT (PedCrowd.promoteHit): give it its body now, whatever the walker budget -- a shot
+	 * has to land on something, and the damage follows in the same frame. Null when the zone cannot take one.
+	 */
+	com.openworld.character.AICharacter promoteForShot(Object zoneKey, PackedVector3Array path, double along, int dir,
+			String body) {
+		LoadedZone lz = loaded.get(zoneKey);
+		if (lz == null) return null;
+		ZoneMarker marker = (ZoneMarker) zoneKey;
+		if (!GD.isInstanceValid(marker) || marker.zone == null) return null;
+		SpawnConfig cfg = null;
+		for (SpawnConfig c : marker.zone.spawnConfigs) {
+			if (c != null && SpawnConfig.BEHAVIOR_SIDEWALK.equals(c.behavior)) { cfg = c; break; }
+		}
+		Node container = charactersContainer();
+		if (cfg == null || container == null) return null;
+		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, false, body);
+	}
+
+	/** Every live promoted sidewalk body, and how many of them fight: the two budgets above. */
+	private int[] sidewalkBodies() {
+		int walkers = 0, fighters = 0;
+		for (LoadedZone lz : loaded.values()) {
+			for (AICharacter ai : lz.pooled) {
+				if (!GD.isInstanceValid(ai) || ai.isDead()) continue;
+				if (ai.getController() instanceof com.openworld.ai.SidewalkWalkerController) walkers++;
+				else if (ai.characterInfo != null && FIGHTER_FACTION.equals(ai.characterInfo.faction)) fighters++;
+			}
+		}
+		return new int[] { walkers, fighters };
+	}
+
+	/**
+	 * A light ped must become a real body (PedCrowd decides when). {@code fighter}: it is scared and fights
+	 * back -- it keeps the ordinary AI brain, is armed from {@link #FIGHTER_WEAPONS} and turns to
+	 * {@link #FIGHTER_FACTION}. {@code body}: the baked body it was drawn as, so the promoted character is the
+	 * same person ("" = the default). Refused (false) past a budget; the ped then stays light.
+	 */
+	boolean promoteSidewalkPed(Object zoneKey, PackedVector3Array path, double along, int dir, boolean fighter,
+			String body) {
+		int[] live = sidewalkBodies();
+		if (fighter ? (fighterBudget > 0 && live[1] >= fighterBudget)
+				: (walkerBudget > 0 && live[0] >= walkerBudget)) return false;
 		LoadedZone lz = loaded.get(zoneKey);
 		if (lz == null) return false;
 		ZoneMarker marker = (ZoneMarker) zoneKey;
@@ -1400,12 +1464,13 @@ public class ZoneManager extends Node {
 		if (cfg == null) return false;
 		Node container = charactersContainer();
 		if (container == null) return false;
-		return spawnSidewalkWalker(lz, cfg, container, path, along, dir) != null;
+		return spawnSidewalkWalker(lz, cfg, container, path, along, dir, fighter, body) != null;
 	}
 
 	/** The one place a full sidewalk walker is built, shared by a promotion and by nothing else today. */
 	private AICharacter spawnSidewalkWalker(LoadedZone lz, SpawnConfig cfg, Node container,
-											PackedVector3Array path, double along, int dir) {
+											PackedVector3Array path, double along, int dir, boolean fighter,
+											String body) {
 		SpawnPool sp = pool();
 		AICharacter ai = sp.acquire();
 		if (ai == null) return null;
@@ -1413,18 +1478,33 @@ public class ZoneManager extends Node {
 		CharacterInfo info = new CharacterInfo();
 		info.characterId = UUID.randomUUID().toString();
 		info.displayName = cfg.faction + " walker";
-		info.faction = cfg.faction;
+		info.faction = fighter ? FIGHTER_FACTION : cfg.faction;
 		ai.characterInfo = info;
 		if (cfg.behaviorConfig != null) ai.behaviorConfig = cfg.behaviorConfig;
+		// The same PERSON the crowd drew: the body is chosen before _ready, which is what instances it.
+		if (!recycled && body != null && !body.isEmpty()) {
+			String vis = "res://src/main/resources/com/openworld/character/CharacterVisuals_" + titleCase(body) + ".tscn";
+			if (ResourceLoader.INSTANCE.exists(vis, "")
+					&& ResourceLoader.INSTANCE.load(vis, "", ResourceLoader.CacheMode.REUSE) instanceof PackedScene ps) {
+				ai.characterVisuals = ps;
+			}
+		}
 		container.addChild(ai);
 		com.openworld.ai.SidewalkWalkerController ctrl = new com.openworld.ai.SidewalkWalkerController();
 		ctrl.setup(path, along, dir);
 		ai.activateForSpawn(ctrl.pointAt(along).plus(new Vector3(0, 0.1, 0)));
-		ai.attachController(ctrl);
-		if ((!recycled || !isArmed(ai)) && cfg.weaponScenePath != null && !cfg.weaponScenePath.isEmpty()) {
+		if (fighter) {
+			// A fighter keeps the ordinary AI brain (AIController's FSM): it finds the nearest hostile itself.
+			String w = FIGHTER_WEAPONS[Math.floorMod(info.characterId.hashCode(), FIGHTER_WEAPONS.length)];
+			if (!w.isEmpty()) equipWeapon(ai, w, container);
+		} else {
+			ai.attachController(ctrl);
+		}
+		if (!fighter && (!recycled || !isArmed(ai)) && cfg.weaponScenePath != null && !cfg.weaponScenePath.isEmpty()) {
 			equipWeapon(ai, cfg.weaponScenePath, container);
 		}
 		lz.pooled.add(ai);
+		promotedAtMsec.put(ai.getInstanceId(), godot.api.Time.getTicksMsec());
 		NetworkManager net = networkManager();
 		if (net != null) net.announceSpawn(ai);
 		return ai;
@@ -1446,6 +1526,12 @@ public class ZoneManager extends Node {
 				if (!GD.isInstanceValid(ai) || ai.isDead()) continue;
 				if (!(ai.getController() instanceof com.openworld.ai.SidewalkWalkerController w)) continue;
 				if (nearestPlayerDistXZ(ai.getGlobalPosition()) <= crowd.demoteDistance) continue;
+				// A body stays a body for a while: one promoted a moment ago (a shot from 70 m, a fighter's
+				// scare) or hurt recently is exactly what a player is dealing with, wherever they stand.
+				Long at = promotedAtMsec.get(ai.getInstanceId());
+				if (at != null && godot.api.Time.getTicksMsec() - at < DEMOTE_AFTER_MSEC) continue;
+				if (ai.getNodeOrNull("Health") instanceof com.openworld.character.Health hh && hh.hurtWithin(20.0)) continue;
+				promotedAtMsec.remove(ai.getInstanceId());
 				crowd.addPed(w.path, w.along, w.dir);
 				lz.pooled.remove(i);
 				if (net != null && ai.characterInfo != null) net.announceDespawn(ai.characterInfo.characterId);
@@ -1453,6 +1539,15 @@ public class ZoneManager extends Node {
 				ai.queueFree();
 			}
 		}
+	}
+
+	private static String titleCase(String body) {
+		StringBuilder sb = new StringBuilder();
+		for (String part : body.split("_")) {
+			if (part.isEmpty()) continue;
+			sb.append(java.lang.Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+		}
+		return sb.toString();
 	}
 
 	/** One named story AI (extracted from the old synchronous load loop, one work item). */

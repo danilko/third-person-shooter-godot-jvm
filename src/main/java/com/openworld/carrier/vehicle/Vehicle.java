@@ -1217,6 +1217,15 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     @Override
     public Signal0 getNameplateChangedSignal() { return nameplateChanged; }
 
+    /** A car's plate follows its driver's (a player or a hostile), or shows for a while after it was hit. */
+    @Override
+    public boolean isNameplateRelevant() {
+        if (occupant != null && GD.isInstanceValid(occupant) && occupant.isNameplateRelevant()) return true;
+        Node h = getNodeOrNull("Health");
+        return h instanceof com.openworld.character.Health health
+                && health.hurtWithin(com.openworld.character.Character.PLATE_AFTER_HURT_SECONDS);
+    }
+
     // ── Enter / Exit ──────────────────────────────────────────────────────────
     //
     // Round 11 N3: networked enter/exit is HOST-ARBITRATED. requestEnter/requestExit are

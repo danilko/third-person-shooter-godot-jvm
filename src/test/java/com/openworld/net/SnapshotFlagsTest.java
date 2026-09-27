@@ -67,4 +67,21 @@ class SnapshotFlagsTest {
         assertEquals(0, NetMessageCodec.unpackActiveSlot(flags), "step overflowed into the weapon slot");
         assertTrue(NetMessageCodec.packSnapshotFlags(false, 0, 0, 0, 99) <= 0xFFFF, "step overflowed the word");
     }
+
+    /** Bit 12: holstered (hands empty). Its own bit. */
+    @Test
+    void handsDownIsItsOwnBit() {
+        int widest = NetMessageCodec.packSnapshotFlags(true, 0b111, 0b111, 0b11, 0b111, true);
+        assertTrue(widest <= 0xFFFF, "flags word overflowed u16");
+        assertEquals(0b0001111111111111, widest, "unexpected bit layout: " + Integer.toBinaryString(widest));
+        int down = NetMessageCodec.packSnapshotFlags(true, 5, 3, 2, 4, true);
+        assertTrue(NetMessageCodec.unpackHandsDown(down));
+        assertTrue(NetMessageCodec.unpackCombat(down));
+        assertEquals(5, NetMessageCodec.unpackStance(down));
+        assertEquals(3, NetMessageCodec.unpackActiveSlot(down));
+        assertEquals(2, NetMessageCodec.unpackMovementType(down));
+        assertEquals(4, NetMessageCodec.unpackFireStep(down));
+        assertTrue(!NetMessageCodec.unpackHandsDown(NetMessageCodec.packSnapshotFlags(true, 5, 3, 2, 4)),
+                "the old packer must mean not holstered");
+    }
 }

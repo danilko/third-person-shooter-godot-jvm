@@ -700,19 +700,38 @@ def _arm_index(arm):
     return next(k for k, a in enumerate(arm["junction"].get("arms", ())) if a is arm["arm"])
 
 
+#: The vehicle signal pieces. ONE since 2026-09-27: the vehicle pole carries no pedestrian head (see
+#: `_ped_signals`), so there are no corner-pole variants.
+SIGNAL_ASSETS = ("signal",)
+
+
+def _clear_of_signal(fur, table, pos, back):
+    """`pos` stepped back along `back` (a unit vector away from the junction) until no vehicle signal pole stands within
+    `ped_signal_pole_clear` of it (at most 3 m), so a crosswalk end's own pole never stands in the vehicle pole."""
+    clear = float(table.rules.get("ped_signal_pole_clear", 1.2))
+    for k in range(13):
+        q = (pos[0] + back[0] * 0.25 * k, pos[1] + back[1] * 0.25 * k, pos[2])
+        if not any(p.get("asset") in SIGNAL_ASSETS and math.hypot(p["pos"][0] - q[0], p["pos"][1] - q[1]) < clear
+                   for p in fur.placements):
+            return q
+    return None
+
+
 def _ped_signals(fur, table, lanes, junctions, mine, ground, index=None):
     """歩行者用信号 (user, 2026-09-26: "enable both pedestrian + traffic light"): at a signalised junction, a
     pedestrian signal at EACH END of every zebra, on the footway `signal_kerb_offset` out from the kerb and level with
-    the zebra's middle, its head facing across the crosswalk at the far end's pedestrians. An end already served by
-    a vehicle signal pole's own pedestrian head (a pole within `ped_signal_share` m) gets none: Japan mounts the two
-    on one pole where they meet. Tagged with the junction and the arm whose crosswalk it serves."""
+    the zebra's middle, its head facing across the crosswalk at the far end's pedestrians. ALWAYS its own pole
+    (`PedSignal_JP`), ONE head per crosswalk end and direction (user, 2026-09-27: "avoid 2 formats / 2 pedestrian
+    lights for the same direction"): Japan mounts a pedestrian head on the vehicle-signal pole only where that pole
+    stands AT the crosswalk end, and ours stand at the far-side corner, so the vehicle pole carries none. A pole that
+    would stand on a vehicle pole steps back from the junction (`_clear_of_signal`). Tagged with the junction and the
+    arm whose crosswalk it serves."""
     if "ped_signal" not in table.assets:
         return
     r = table.rules
     off = float(r["signal_kerb_offset"])
     b0, b1 = r["crosswalk_back"]
     back = 0.5 * (b0 + b1)
-    share = float(r.get("ped_signal_share", 5.0))
     for arm in _arms(lanes, junctions):
         if not _signalised(table, arm["junction"], lanes) or not _has_zebra(table, arm) or not mine(arm["ins"][0]):
             continue
@@ -723,9 +742,9 @@ def _ped_signals(fur, table, lanes, junctions, mine, ground, index=None):
         z = near["sample"](min(back, near["length"]))[2]
         for lat, face in ((lo, (left[0], left[1])), (hi, (-left[0], -left[1]))):
             pos = (anchor[0] + left[0] * lat - fwd[0] * back, anchor[1] + left[1] * lat - fwd[1] * back, z)
-            if any(p.get("asset") == "signal" and math.hypot(p["pos"][0] - pos[0], p["pos"][1] - pos[1]) < share
-                   for p in fur.placements):
-                fur.counts["ped_signal_shared"] = fur.counts.get("ped_signal_shared", 0) + 1
+            pos = _clear_of_signal(fur, table, pos, (-fwd[0], -fwd[1]))
+            if pos is None:
+                fur.counts["ped_signal_on_signal"] = fur.counts.get("ped_signal_on_signal", 0) + 1
                 continue
             out = (-face[0], -face[1])
             moved = _out_of_lane(index, table, r, "ped_signal", pos, out)
@@ -1014,15 +1033,30 @@ def crossing_signals(fur, table, crossings):
 # ------------------------------------------------------------------------------------------- the signal plan
 
 def _asset_lamps(table, asset):
-    """An asset's lamp lenses and name plate in its GODOT piece frame: `lamps` inline in furniture.json, or
-    `lamps_file` (a JSON the piece's build writes from the markers in its .blend, e.g. TrafficLight_JP.lamps.json)."""
+    """An asset's lamp lenses and name plates in its GODOT piece frame: `lamps` inline in furniture.json, or
+    `lamps_file` (a JSON the piece's build writes from its .blend, e.g. TrafficLight_JP.lamps.json, whose lenses also
+    carry their MESH -- `tris` -- which the runtime lights). `res` is that file's res:// path (None when inline)."""
     a = table.assets.get(asset) or {}
     if a.get("lamps_file"):
         path = os.path.join(os.path.dirname(a["file"]), a["lamps_file"])
         if os.path.exists(path):
             with open(path) as fh:
-                return json.load(fh)
+                d = json.load(fh)
+            d["res"] = a["kit"] + os.path.dirname(a["piece"]) + "/" + a["lamps_file"]
+            return d
     return a.get("lamps") or {}
+
+
+def _plates(src):
+    """A lamps record's name plates: `plates` (a list, one per side of the arm), or the older single `plate`."""
+    if src.get("plates"):
+        return src["plates"]
+    return [src["plate"]] if src.get("plate") else []
+
+
+def _yaw(fwd):
+    """The Godot Y rotation that puts a piece's -Z on kit direction `fwd` (the basis `_piece_to_godot` applies)."""
+    return math.atan2(-fwd[0], fwd[1])
 
 
 def _piece_to_godot(pos, fwd, q):
@@ -1059,7 +1093,7 @@ def signal_plan(table, lanes_doc, ground=None):
     index = _LaneIndex(lanes)
     _signals(fur, table, lanes, junctions, lambda l: True, ground, index)
     _ped_signals(fur, table, lanes, junctions, lambda l: True, ground, index)
-    veh_lamps, ped_lamps = _asset_lamps(table, "signal"), _asset_lamps(table, "ped_signal")
+    lamps_of = {a: _asset_lamps(table, a) for a in SIGNAL_ASSETS + ("ped_signal",)}
     stop_back = float(r["stop_back"]) + float(r["stop_width"])
     by_j = {}
     for arm in _arms(lanes, junctions):
@@ -1098,28 +1132,38 @@ def signal_plan(table, lanes_doc, ground=None):
             if p.get("junction") != jid:
                 continue
             fwd = p["fwd"]
-            src = veh_lamps if p["asset"] == "signal" else ped_lamps
+            src = lamps_of.get(p["asset"]) or {}
             # the pole the lens hangs on (its base, where the baked MultiMesh instance stands): the runtime lights a
             # lens only while that pole is streamed in and standing
             pole = [round(v, 3) for v in (p["pos"][0], p["pos"][2], -p["pos"][1])]
+            yaw = round(_yaw(fwd), 5)
             for kind in ("vehicle", "pedestrian"):
                 for d in src.get(kind, ()):
                     q = _piece_to_godot(p["pos"], fwd, d["pos"])
                     n = _dir_to_godot(fwd, d["normal"])
-                    lamps.append({"kind": kind, "arm": p["arm"], "colour": d["colour"], "pole": pole,
-                                  "pos": [round(v, 3) for v in q], "normal": [round(v, 4) for v in n],
-                                  "radius": d.get("radius", 0.12)})
-            if p["asset"] == "signal" and src.get("plate"):
-                d = src["plate"]
+                    # a pedestrian head serves the crosswalk it was matched to (`ped_arm0` / `ped_arm1`, the second
+                    # head of a corner pole); a vehicle lens, its own arm
+                    a_k = p["arm"] if kind == "vehicle" else p.get("ped_arm%d" % d.get("head", 0), p["arm"])
+                    row = {"kind": kind, "arm": a_k, "colour": d["colour"], "head": d.get("head", 0), "pole": pole,
+                           "yaw": yaw,
+                           "pos": [round(v, 3) for v in q], "normal": [round(v, 4) for v in n],
+                           "radius": d.get("radius", 0.12)}
+                    if d.get("tris") and src.get("res"):
+                        # the lens MESH: the runtime lights the lens itself (its triangles, in the piece frame of
+                        # `lamps`, placed at `pole` turned `yaw`), not a ball in front of it
+                        row["lamps"] = src["res"]
+                    lamps.append(row)
+            if p["asset"] in SIGNAL_ASSETS:
                 own = road_of.get(p["arm"], "").split("__")[0]
                 others = [road_of[a["index"]] for a in rows if a["group"] != group.get(p["arm"])]
                 # the street being CROSSED: another group's road, preferring one that is not this road itself (a
                 # road bending through a T is both of its arms)
                 cross = next((n for n in others if n.split("__")[0] != own), others[0] if others else "")
-                plates.append({"arm": p["arm"], "road": road_of.get(p["arm"], ""), "cross": cross, "pole": pole,
-                               "pos": [round(v, 3) for v in _piece_to_godot(p["pos"], fwd, d["pos"])],
-                               "normal": [round(v, 4) for v in _dir_to_godot(fwd, d["normal"])],
-                               "size": d["size"]})
+                for d in _plates(src):
+                    plates.append({"arm": p["arm"], "road": road_of.get(p["arm"], ""), "cross": cross, "pole": pole,
+                                   "pos": [round(v, 3) for v in _piece_to_godot(p["pos"], fwd, d["pos"])],
+                                   "normal": [round(v, 4) for v in _dir_to_godot(fwd, d["normal"])],
+                                   "size": d["size"]})
         c = j.get("center") or [0.0, 0.0, 0.0]
         out.append({"id": jid, "centre": c, "arms": rows, "groups": g, "lamps": lamps, "plates": plates})
     return {"schema": 1, "green": float(r.get("signal_green", 22.0)), "yellow": float(r.get("signal_yellow", 3.0)),
@@ -1306,6 +1350,15 @@ def self_test():
             row.put(table, "bollard", pos, (1.0, 0.0))
     assert row.counts.get("bollard") == 5, row.counts
     assert not row.clear_of((0.5, 0.0, 0.0), table.rules["pole_clearance"])
+    # ONE pedestrian head per crosswalk end, always on its own pole: a crosswalk end that falls on a vehicle signal
+    # pole steps back from the junction until it clears it
+    t2 = load()
+    f2 = Furniture()
+    assert f2.put(t2, "signal", (0.0, 0.0, 0.0), (1.0, 0.0))
+    q = _clear_of_signal(f2, t2, (0.3, 0.0, 0.0), (-1.0, 0.0))
+    assert q is not None and math.hypot(q[0], q[1]) >= t2.rules["ped_signal_pole_clear"] - 1e-9, q
+    assert _clear_of_signal(f2, t2, (5.0, 0.0, 0.0), (-1.0, 0.0))[0] == 5.0
+    print("OK: every crosswalk end has its own pedestrian pole, clear of the vehicle signal pole")
     print("point_furniture self-test OK")
 
 

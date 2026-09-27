@@ -1,0 +1,1911 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/CharacterVisuals.java" id="1_w2w0m"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/MeshConfig.java" id="2_ac1ws"]
+[ext_resource type="PackedScene" path="res://assets/characters/victoria/victoria.glb" id="3_pn6ut"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/weapon/Fist.tscn" id="4_pmofq"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FistItem.java" id="5_2iibl"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/MeleeAttackStep.java" id="6_yabf3"]
+[ext_resource type="Resource" path="res://src/main/resources/com/openworld/weapon/stats/Fist.tres" id="7_g5ch7"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/ShoulderAimModifier.java" id="8_nwty2"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/StockMountIKModifier.java" id="9_m6wr0"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/WeaponRecoilModifier.java" id="10_vatgp"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/character/SupportHandIKModifier.java" id="11_b46p3"]
+[ext_resource type="AnimationLibrary" path="res://src/main/resources/com/openworld/character/anim/character_anims_f.res" id="12_1kgp6"]
+
+[sub_resource type="Resource" id="Resource_127y3"]
+script = ExtResource("2_ac1ws")
+animation_tree_path = NodePath("AnimationTree")
+physical_bone_simulator_path = NodePath("MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D")
+weapon_attachment_path = NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment")
+aim_spine_modifier_path = NodePath("MeshRoot/Model/victoria/Skeleton3D/SpineAimModifier")
+shoulder_aim_modifier_path = NodePath("MeshRoot/Model/victoria/Skeleton3D/ShoulderAimModifier")
+stock_mount_modifier_path = NodePath("MeshRoot/Model/victoria/Skeleton3D/StockMountIKModifier")
+recoil_modifier_path = NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponRecoilModifier")
+fps_camera_marker_path = NodePath("MeshRoot/Model/victoria/Skeleton3D/NeckAttachment/MarkerFPSCamera")
+mesh_root_path = NodePath("MeshRoot")
+head_mesh_paths = Array[NodePath]([NodePath("MeshRoot/Model/victoria/Skeleton3D/Face"), NodePath("MeshRoot/Model/victoria/Skeleton3D/Hair001")])
+socket_paths = Array[NodePath]([NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment/SocketRifle"), NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment/SocketPistol"), NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment/SocketLauncher"), NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment/SocketMelee"), NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment/SocketThrowable"), NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment/SocketFist"), NodePath("MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment/SocketShotgun"), NodePath("MeshRoot/Model/victoria/Skeleton3D/BackHolster/LongWeaponHolsterMaker1"), NodePath("MeshRoot/Model/victoria/Skeleton3D/BackHolster/LongWeaponHolsterMaker2"), NodePath("MeshRoot/Model/victoria/Skeleton3D/BackHolster/LongWeaponHolsterMaker3"), NodePath("MeshRoot/Model/victoria/Skeleton3D/BackHolster/LongWeaponHolsterMaker4"), NodePath("MeshRoot/Model/victoria/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker1"), NodePath("MeshRoot/Model/victoria/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker2"), NodePath("MeshRoot/Model/victoria/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker3"), NodePath("MeshRoot/Model/victoria/Skeleton3D/HipWeaponHolster/ShortWeaponHolsterMaker4")])
+stance_collider_paths = {
+"Crawl": NodePath("StanceCollisions/Crawl"),
+"Crouch": NodePath("StanceCollisions/Crouch"),
+"Upright": NodePath("StanceCollisions/Upright")
+}
+stance_raycast_paths = {
+"Crouch": NodePath("StanceCollisions/Crouch/RayCast3D"),
+"Upright": NodePath("StanceCollisions/Upright/RayCast3D")
+}
+bone_hit_multipliers = Dictionary[String, float]({})
+
+[sub_resource type="Resource" id="MeleeAttackStep_Fist_0"]
+script = ExtResource("6_yabf3")
+animation = "attack_jab_fist"
+damage = 10.0
+range = 1.3
+radius = 0.3
+windup = 0.107
+active = 0.05
+recovery = 0.193
+hitstop = 0.04
+camera_kick = 0.8
+
+[sub_resource type="Resource" id="MeleeAttackStep_Fist_1"]
+script = ExtResource("6_yabf3")
+animation = "attack_cross_fist"
+damage = 14.0
+range = 1.3
+radius = 0.3
+windup = 0.049
+active = 0.05
+recovery = 0.331
+hitstop = 0.05
+camera_kick = 1.2
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_5yk40"]
+radius = 0.129
+height = 0.259
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_g061h"]
+radius = 0.1213
+height = 0.2436
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_cdmr6"]
+radius = 0.0915
+height = 0.184
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ys0ew"]
+radius = 0.1026
+height = 0.2062
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_lraqa"]
+radius = 0.0993
+height = 0.2154
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_jpe5y"]
+radius = 0.0446
+height = 0.2193
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_bdjtv"]
+radius = 0.039
+height = 0.2143
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_m1oe1"]
+radius = 0.0297
+height = 0.0668
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_g0p3n"]
+radius = 0.0445
+height = 0.2193
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ej0m3"]
+radius = 0.0391
+height = 0.2143
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_q33ik"]
+radius = 0.0297
+height = 0.0668
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_lrh7n"]
+radius = 0.0749
+height = 0.3865
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ynx4c"]
+radius = 0.0382
+height = 0.4418
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1vndi"]
+radius = 0.0719
+height = 0.1448
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_j545l"]
+radius = 0.073
+height = 0.3865
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_wlt5x"]
+radius = 0.0387
+height = 0.4418
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_hr760"]
+radius = 0.0719
+height = 0.1448
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_q0x55"]
+xfade_time = 0.15
+input_0/name = "Default"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = false
+input_1/name = "Crouch"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = false
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_rm8nk"]
+xfade_time = 0.15
+input_0/name = "Default"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = false
+input_1/name = "Crawl"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = false
+input_2/name = "Crouch"
+input_2/auto_advance = false
+input_2/break_loop_at_end = false
+input_2/reset = false
+input_3/name = "Drive"
+input_3/auto_advance = false
+input_3/break_loop_at_end = false
+input_3/reset = false
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_jrcpq"]
+filters = ["Skeleton3D:pelvis"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_tetft"]
+animation = &"air_jump"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_qkc0d"]
+animation = &"tpose"
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_xtatt"]
+filter_enabled = true
+filters = ["Skeleton3D:clavicle_l", "Skeleton3D:clavicle_r", "Skeleton3D:hand_l", "Skeleton3D:hand_r", "Skeleton3D:head_2", "Skeleton3D:index_01_l", "Skeleton3D:index_01_r", "Skeleton3D:index_02_l", "Skeleton3D:index_02_r", "Skeleton3D:index_03_l", "Skeleton3D:index_03_r", "Skeleton3D:lowerarm_l", "Skeleton3D:lowerarm_r", "Skeleton3D:middle_01_l", "Skeleton3D:middle_01_r", "Skeleton3D:middle_02_l", "Skeleton3D:middle_02_r", "Skeleton3D:middle_03_l", "Skeleton3D:middle_03_r", "Skeleton3D:neck_01", "Skeleton3D:pinky_01_l", "Skeleton3D:pinky_01_r", "Skeleton3D:pinky_02_l", "Skeleton3D:pinky_02_r", "Skeleton3D:pinky_03_l", "Skeleton3D:pinky_03_r", "Skeleton3D:ring_01_l", "Skeleton3D:ring_01_r", "Skeleton3D:ring_02_l", "Skeleton3D:ring_02_r", "Skeleton3D:ring_03_l", "Skeleton3D:ring_03_r", "Skeleton3D:spine_03", "Skeleton3D:thumb_01_l", "Skeleton3D:thumb_01_r", "Skeleton3D:thumb_02_l", "Skeleton3D:thumb_02_r", "Skeleton3D:thumb_03_l", "Skeleton3D:thumb_03_r", "Skeleton3D:upperarm_l", "Skeleton3D:upperarm_r"]
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_l6a84"]
+input_0/name = "attack_stab_mw1"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = true
+input_1/name = "attack_slash_mw1"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = true
+input_2/name = "attack_swing_mw2"
+input_2/auto_advance = false
+input_2/break_loop_at_end = false
+input_2/reset = true
+input_3/name = "attack_chop_mw2"
+input_3/auto_advance = false
+input_3/break_loop_at_end = false
+input_3/reset = true
+input_4/name = "attack_jab_fist"
+input_4/auto_advance = false
+input_4/break_loop_at_end = false
+input_4/reset = true
+input_5/name = "attack_cross_fist"
+input_5/auto_advance = false
+input_5/break_loop_at_end = false
+input_5/reset = true
+input_6/name = "attack_throw"
+input_6/auto_advance = false
+input_6/break_loop_at_end = false
+input_6/reset = true
+
+[sub_resource type="AnimationNodeTimeScale" id="AnimationNodeTimeScale_7bquo"]
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_v62yi"]
+input_0/name = "Combat"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = true
+input_1/name = "NoCombat"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = true
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_sf113"]
+animation = &"crawl_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_b6xoj"]
+animation = &"crawl_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_7f3hr"]
+animation = &"crawl_back"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_02i5t"]
+animation = &"crawl_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_p0deq"]
+animation = &"crawl_right"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_i6ktn"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_sf113")
+blend_point_0/pos = Vector2(0, 1)
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_b6xoj")
+blend_point_1/pos = Vector2(0, 0)
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_7f3hr")
+blend_point_2/pos = Vector2(0, -1)
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_02i5t")
+blend_point_3/pos = Vector2(-1, 0)
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_p0deq")
+blend_point_4/pos = Vector2(1, 0)
+blend_point_4/name = &"4"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_gf0h4"]
+animation = &"crouch_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_g80dr"]
+animation = &"crouch_walk_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_fsyxp"]
+animation = &"crouch_walk_right"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_0a7qi"]
+animation = &"crouch_walk_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_6v24u"]
+animation = &"crouch_walk_back"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ovybm"]
+animation = &"crouch_walk_forward_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_np8lv"]
+animation = &"crouch_walk_forward_right"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_c2lbi"]
+animation = &"crouch_walk_back_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xcvxj"]
+animation = &"crouch_walk_back_right"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_pl47u"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_gf0h4")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_g80dr")
+blend_point_1/pos = Vector2(-1, 0)
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_fsyxp")
+blend_point_2/pos = Vector2(1, 0)
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_0a7qi")
+blend_point_3/pos = Vector2(0, 1)
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_6v24u")
+blend_point_4/pos = Vector2(0, -1)
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_ovybm")
+blend_point_5/pos = Vector2(-1, 1)
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_np8lv")
+blend_point_6/pos = Vector2(1, 1)
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_c2lbi")
+blend_point_7/pos = Vector2(-1, -1)
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_xcvxj")
+blend_point_8/pos = Vector2(1, -1)
+blend_point_8/name = &"8"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_w5krd"]
+animation = &"drive_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_3eosy"]
+animation = &"drive_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_6f4gx"]
+animation = &"drive_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_lm7ib"]
+animation = &"drive_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_vbn7a"]
+animation = &"drive_idle"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_ehw75"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_w5krd")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_3eosy")
+blend_point_1/pos = Vector2(0, 1)
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_6f4gx")
+blend_point_2/pos = Vector2(-1, 0)
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_lm7ib")
+blend_point_3/pos = Vector2(0, -1)
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_vbn7a")
+blend_point_4/pos = Vector2(1, 0)
+blend_point_4/name = &"4"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ftvt4"]
+animation = &"falling"
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_u0asc"]
+filters = ["Skeleton3D:pelvis"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_t6tww"]
+animation = &"jump"
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_5xtq0"]
+filter_enabled = true
+filters = ["Skeleton3D:head_2", "Skeleton3D:neck_01", "Skeleton3D:spine_01", "Skeleton3D:spine_02", "Skeleton3D:spine_03"]
+fadein_time = 0.05
+fadeout_time = 0.15
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_jwr7e"]
+input_0/name = "hit_chest"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = true
+input_1/name = "hit_head"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = true
+
+[sub_resource type="AnimationNodeTimeScale" id="AnimationNodeTimeScale_hcq7o"]
+
+[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_7k10g"]
+filter_enabled = true
+filters = ["Skeleton3D:head_2", "Skeleton3D:neck_01"]
+
+[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_itgf2"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_qeo4k"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_bpql5"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_811un"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_0snea"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_o1vqu"]
+animation = &"sit_idle"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_ry5lw"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_qeo4k")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_bpql5")
+blend_point_1/pos = Vector2(0, 1)
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_811un")
+blend_point_2/pos = Vector2(-1, 0)
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_0snea")
+blend_point_3/pos = Vector2(0, -1)
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_o1vqu")
+blend_point_4/pos = Vector2(1, 0)
+blend_point_4/name = &"4"
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_3031l"]
+xfade_time = 0.25
+input_0/name = "Raised"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = false
+input_1/name = "Relaxed"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = false
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_fi46e"]
+filter_enabled = true
+filters = ["Skeleton3D:clavicle_l", "Skeleton3D:clavicle_r", "Skeleton3D:hand_l", "Skeleton3D:hand_r", "Skeleton3D:head_2", "Skeleton3D:index_01_l", "Skeleton3D:index_01_r", "Skeleton3D:index_02_l", "Skeleton3D:index_02_r", "Skeleton3D:index_03_l", "Skeleton3D:index_03_r", "Skeleton3D:lowerarm_l", "Skeleton3D:lowerarm_r", "Skeleton3D:middle_01_l", "Skeleton3D:middle_01_r", "Skeleton3D:middle_02_l", "Skeleton3D:middle_02_r", "Skeleton3D:middle_03_l", "Skeleton3D:middle_03_r", "Skeleton3D:neck_01", "Skeleton3D:pinky_01_l", "Skeleton3D:pinky_01_r", "Skeleton3D:pinky_02_l", "Skeleton3D:pinky_02_r", "Skeleton3D:pinky_03_l", "Skeleton3D:pinky_03_r", "Skeleton3D:ring_01_l", "Skeleton3D:ring_01_r", "Skeleton3D:ring_02_l", "Skeleton3D:ring_02_r", "Skeleton3D:ring_03_l", "Skeleton3D:ring_03_r", "Skeleton3D:spine_03", "Skeleton3D:thumb_01_l", "Skeleton3D:thumb_01_r", "Skeleton3D:thumb_02_l", "Skeleton3D:thumb_02_r", "Skeleton3D:thumb_03_l", "Skeleton3D:thumb_03_r", "Skeleton3D:upperarm_l", "Skeleton3D:upperarm_r"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_w4iym"]
+animation = &"reload"
+
+[sub_resource type="AnimationNodeTimeScale" id="AnimationNodeTimeScale_mbnyo"]
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_cmnuv"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_tmkjr"]
+animation = &"roll"
+use_custom_timeline = true
+timeline_length = 1.0
+stretch_time_scale = true
+start_offset = 0.0
+loop_mode = 0
+
+[sub_resource type="Curve" id="Curve_qii1d"]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_ek33b"]
+xfade_time = 0.15
+xfade_curve = SubResource("Curve_qii1d")
+input_0/name = "Upright"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = true
+input_1/name = "Crouch"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = true
+input_2/name = "Crawl"
+input_2/auto_advance = false
+input_2/break_loop_at_end = false
+input_2/reset = true
+input_3/name = "DriveCarrier"
+input_3/auto_advance = false
+input_3/break_loop_at_end = false
+input_3/reset = true
+input_4/name = "Passenger"
+input_4/auto_advance = false
+input_4/break_loop_at_end = false
+input_4/reset = true
+input_5/name = "Swim"
+input_5/auto_advance = false
+input_5/break_loop_at_end = false
+input_5/reset = true
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_isarb"]
+animation = &"swim_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_27uoo"]
+animation = &"swim_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_28b2h"]
+animation = &"swim_back"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_qan23"]
+animation = &"swim_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_57yyq"]
+animation = &"swim_right"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_v8pmc"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_isarb")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_27uoo")
+blend_point_1/pos = Vector2(0, 1)
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_28b2h")
+blend_point_2/pos = Vector2(0, -1)
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_qan23")
+blend_point_3/pos = Vector2(-1, 0)
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_57yyq")
+blend_point_4/pos = Vector2(1, 0)
+blend_point_4/name = &"4"
+
+[sub_resource type="AnimationNodeTransition" id="AnimationNodeTransition_bl750"]
+xfade_time = 0.4
+input_0/name = "Tread"
+input_0/auto_advance = false
+input_0/break_loop_at_end = false
+input_0/reset = true
+input_1/name = "Stroke"
+input_1/auto_advance = false
+input_1/break_loop_at_end = false
+input_1/reset = true
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_mybd6"]
+animation = &"upright_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_x748h"]
+animation = &"upright_run_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_yo1cm"]
+animation = &"upright_walk_back_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_saypt"]
+animation = &"upright_run_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_dha17"]
+animation = &"upright_walk_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_4ptlw"]
+animation = &"upright_walk_right"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_0h4rm"]
+animation = &"upright_walk_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ao0gs"]
+animation = &"upright_walk_back"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_h2ywx"]
+animation = &"upright_walk_forward_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_snu7b"]
+animation = &"upright_walk_forward_right"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1v4v5"]
+animation = &"upright_walk_back_right"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_t1san"]
+min_space = Vector2(-1, -2)
+max_space = Vector2(1, 2)
+snap = Vector2(1, 1)
+blend_point_0/node = SubResource("AnimationNodeAnimation_mybd6")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_x748h")
+blend_point_1/pos = Vector2(0, 2)
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_saypt")
+blend_point_2/pos = Vector2(0, -2)
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_dha17")
+blend_point_3/pos = Vector2(-1, 0)
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_4ptlw")
+blend_point_4/pos = Vector2(1, 0)
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_0h4rm")
+blend_point_5/pos = Vector2(0, 1)
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_ao0gs")
+blend_point_6/pos = Vector2(0, -1)
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_h2ywx")
+blend_point_7/pos = Vector2(-1, 1)
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_snu7b")
+blend_point_8/pos = Vector2(1, 1)
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_1v4v5")
+blend_point_9/pos = Vector2(1, -1)
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_yo1cm")
+blend_point_10/pos = Vector2(-1, -1)
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_n1tb0"]
+animation = &"upright_idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_322bx"]
+animation = &"upright_walk_relaxed"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ypuon"]
+animation = &"upright_run_forward"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_v01ca"]
+min_space = 0.0
+max_space = 2.0
+blend_point_0/node = SubResource("AnimationNodeAnimation_n1tb0")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_322bx")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_ypuon")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xk3an"]
+animation = &"upright_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_es504"]
+animation = &"upright_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_a7f1e"]
+animation = &"upright_aim_shotgun"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_idgsu"]
+animation = &"upright_aim_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_82adp"]
+animation = &"upright_aim_dual_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_d1fvl"]
+animation = &"upright_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_vcmdw"]
+animation = &"upright_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_oiy81"]
+animation = &"upright_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_fwsrk"]
+animation = &"upright_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_dtgcv"]
+animation = &"upright_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_0181c"]
+animation = &"upright_aim_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_c7ohm"]
+min_space = 0.0
+max_space = 10.0
+blend_point_0/node = SubResource("AnimationNodeAnimation_xk3an")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_es504")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_idgsu")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_82adp")
+blend_point_3/pos = 3.0
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_d1fvl")
+blend_point_4/pos = 4.0
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_vcmdw")
+blend_point_5/pos = 5.0
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_oiy81")
+blend_point_6/pos = 6.0
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_fwsrk")
+blend_point_7/pos = 7.0
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_dtgcv")
+blend_point_8/pos = 8.0
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_0181c")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_a7f1e")
+blend_point_10/pos = 10.0
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jxexn"]
+animation = &"crawl_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_yxr2l"]
+animation = &"crawl_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_r0ag8"]
+animation = &"crawl_aim_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jadrw"]
+animation = &"crawl_aim_dual_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_dydiv"]
+animation = &"crawl_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_25v3n"]
+animation = &"crawl_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ula7d"]
+animation = &"crawl_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_lcxye"]
+animation = &"crawl_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_8r2l6"]
+animation = &"crawl_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_8piwb"]
+animation = &"crawl_aim_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_diycb"]
+max_space = 10.0
+snap = 1.0
+value_label = "weapon"
+blend_point_0/node = SubResource("AnimationNodeAnimation_jxexn")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_yxr2l")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_r0ag8")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_jadrw")
+blend_point_3/pos = 3.0
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_dydiv")
+blend_point_4/pos = 4.0
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_25v3n")
+blend_point_5/pos = 5.0
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_ula7d")
+blend_point_6/pos = 6.0
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_lcxye")
+blend_point_7/pos = 7.0
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_8r2l6")
+blend_point_8/pos = 8.0
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_8piwb")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_yxr2l")
+blend_point_10/pos = 10.0
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_0yn3o"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_lok3i"]
+animation = &"crouch_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_4011s"]
+animation = &"crouch_aim_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_lfakm"]
+animation = &"crouch_aim_dual_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ntqqy"]
+animation = &"crouch_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_opcmo"]
+animation = &"crouch_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jnhqv"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_m68j3"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_qcvfo"]
+animation = &"crouch_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kouvq"]
+animation = &"crouch_aim_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_vsf61"]
+max_space = 10.0
+snap = 1.0
+value_label = "weapon"
+blend_point_0/node = SubResource("AnimationNodeAnimation_0yn3o")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_lok3i")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_4011s")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_lfakm")
+blend_point_3/pos = 3.0
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_ntqqy")
+blend_point_4/pos = 4.0
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_opcmo")
+blend_point_5/pos = 5.0
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_jnhqv")
+blend_point_6/pos = 6.0
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_m68j3")
+blend_point_7/pos = 7.0
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_qcvfo")
+blend_point_8/pos = 8.0
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_kouvq")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_lok3i")
+blend_point_10/pos = 10.0
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_24roe"]
+animation = &"drive_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_btkuh"]
+animation = &"drive_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_8a8tl"]
+animation = &"drive_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_r0gur"]
+animation = &"drive_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_4klv4"]
+animation = &"upright_aim_dual_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1jad5"]
+animation = &"upright_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xd2ca"]
+animation = &"upright_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_u4vk0"]
+animation = &"drive_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_rjlqf"]
+animation = &"drive_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_2bqtp"]
+animation = &"upright_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_q4hob"]
+animation = &"drive_aim_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_junr4"]
+max_space = 10.0
+snap = 1.0
+value_label = "weapon"
+blend_point_0/node = SubResource("AnimationNodeAnimation_24roe")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_btkuh")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_r0gur")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_4klv4")
+blend_point_3/pos = 3.0
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_1jad5")
+blend_point_4/pos = 4.0
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_xd2ca")
+blend_point_5/pos = 5.0
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_u4vk0")
+blend_point_6/pos = 6.0
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_rjlqf")
+blend_point_7/pos = 7.0
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_2bqtp")
+blend_point_8/pos = 8.0
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_q4hob")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_8a8tl")
+blend_point_10/pos = 10.0
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_1y5o0"]
+min_space = 0.0
+max_space = 10.0
+blend_point_0/node = SubResource("AnimationNodeAnimation_xk3an")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_es504")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_idgsu")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_82adp")
+blend_point_3/pos = 3.0
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_d1fvl")
+blend_point_4/pos = 4.0
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_vcmdw")
+blend_point_5/pos = 5.0
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_oiy81")
+blend_point_6/pos = 6.0
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_fwsrk")
+blend_point_7/pos = 7.0
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_dtgcv")
+blend_point_8/pos = 8.0
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_0181c")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_a7f1e")
+blend_point_10/pos = 10.0
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1f0mi"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_iqteg"]
+animation = &"crouch_aim_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_nvd7a"]
+animation = &"crouch_aim_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_14ysc"]
+animation = &"crouch_aim_dual_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_8xmwv"]
+animation = &"crouch_aim_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_vo4pa"]
+animation = &"crouch_aim_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_sfyva"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_f81cd"]
+animation = &"crouch_aim_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_s0dc7"]
+animation = &"crouch_aim_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_yuad3"]
+animation = &"crouch_aim_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_y3qxn"]
+max_space = 10.0
+snap = 1.0
+value_label = "weapon"
+blend_point_0/node = SubResource("AnimationNodeAnimation_1f0mi")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_iqteg")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_nvd7a")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_14ysc")
+blend_point_3/pos = 3.0
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_8xmwv")
+blend_point_4/pos = 4.0
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_vo4pa")
+blend_point_5/pos = 5.0
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_sfyva")
+blend_point_6/pos = 6.0
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_f81cd")
+blend_point_7/pos = 7.0
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_s0dc7")
+blend_point_8/pos = 8.0
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_yuad3")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_iqteg")
+blend_point_10/pos = 10.0
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_ni32x"]
+filter_enabled = true
+filters = ["Skeleton3D:clavicle_l", "Skeleton3D:clavicle_r", "Skeleton3D:hand_l", "Skeleton3D:hand_r", "Skeleton3D:index_01_l", "Skeleton3D:index_01_r", "Skeleton3D:index_02_l", "Skeleton3D:index_02_r", "Skeleton3D:index_03_l", "Skeleton3D:index_03_r", "Skeleton3D:lowerarm_l", "Skeleton3D:lowerarm_r", "Skeleton3D:middle_01_l", "Skeleton3D:middle_01_r", "Skeleton3D:middle_02_l", "Skeleton3D:middle_02_r", "Skeleton3D:middle_03_l", "Skeleton3D:middle_03_r", "Skeleton3D:pinky_01_l", "Skeleton3D:pinky_01_r", "Skeleton3D:pinky_02_l", "Skeleton3D:pinky_02_r", "Skeleton3D:pinky_03_l", "Skeleton3D:pinky_03_r", "Skeleton3D:ring_01_l", "Skeleton3D:ring_01_r", "Skeleton3D:ring_02_l", "Skeleton3D:ring_02_r", "Skeleton3D:ring_03_l", "Skeleton3D:ring_03_r", "Skeleton3D:thumb_01_l", "Skeleton3D:thumb_01_r", "Skeleton3D:thumb_02_l", "Skeleton3D:thumb_02_r", "Skeleton3D:thumb_03_l", "Skeleton3D:thumb_03_r", "Skeleton3D:upperarm_l", "Skeleton3D:upperarm_r"]
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_w4say"]
+filter_enabled = true
+filters = ["Skeleton3D:clavicle_l", "Skeleton3D:clavicle_r", "Skeleton3D:hand_l", "Skeleton3D:hand_r", "Skeleton3D:head_2", "Skeleton3D:index_01_l", "Skeleton3D:index_01_r", "Skeleton3D:index_02_l", "Skeleton3D:index_02_r", "Skeleton3D:index_03_l", "Skeleton3D:index_03_r", "Skeleton3D:lowerarm_l", "Skeleton3D:lowerarm_r", "Skeleton3D:middle_01_l", "Skeleton3D:middle_01_r", "Skeleton3D:middle_02_l", "Skeleton3D:middle_02_r", "Skeleton3D:middle_03_l", "Skeleton3D:middle_03_r", "Skeleton3D:neck_01", "Skeleton3D:pinky_01_l", "Skeleton3D:pinky_01_r", "Skeleton3D:pinky_02_l", "Skeleton3D:pinky_02_r", "Skeleton3D:pinky_03_l", "Skeleton3D:pinky_03_r", "Skeleton3D:ring_01_l", "Skeleton3D:ring_01_r", "Skeleton3D:ring_02_l", "Skeleton3D:ring_02_r", "Skeleton3D:ring_03_l", "Skeleton3D:ring_03_r", "Skeleton3D:spine_03", "Skeleton3D:thumb_01_l", "Skeleton3D:thumb_01_r", "Skeleton3D:thumb_02_l", "Skeleton3D:thumb_02_r", "Skeleton3D:thumb_03_l", "Skeleton3D:thumb_03_r", "Skeleton3D:upperarm_l", "Skeleton3D:upperarm_r"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_kvn1k"]
+animation = &"weapon_switch_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_pkwuq"]
+animation = &"weapon_switch_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_oirte"]
+animation = &"weapon_switch_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_pyfsq"]
+animation = &"weapon_switch_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_mmo8v"]
+animation = &"weapon_switch_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hthtr"]
+animation = &"weapon_switch_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_8lci2"]
+animation = &"weapon_switch_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_pjd0p"]
+animation = &"weapon_switch_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xtk78"]
+animation = &"weapon_switch_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_501tg"]
+animation = &"weapon_switch_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_exphy"]
+min_space = 0.0
+max_space = 10.0
+blend_point_0/node = SubResource("AnimationNodeAnimation_kvn1k")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_pkwuq")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_oirte")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_pyfsq")
+blend_point_3/pos = 3.0
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_mmo8v")
+blend_point_4/pos = 4.0
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_hthtr")
+blend_point_5/pos = 5.0
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_8lci2")
+blend_point_6/pos = 6.0
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_pjd0p")
+blend_point_7/pos = 7.0
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_xtk78")
+blend_point_8/pos = 8.0
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_501tg")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_pkwuq")
+blend_point_10/pos = 10.0
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeTimeScale" id="AnimationNodeTimeScale_0av0u"]
+
+[sub_resource type="AnimationNodeTimeSeek" id="AnimationNodeTimeSeek_5hrdl"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1adru"]
+animation = &"upright_hold_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_3xddo"]
+animation = &"upright_hold_rifle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_l44vx"]
+animation = &"upright_hold_launcher"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_w7bqf"]
+animation = &"upright_hold_dual_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_s4gkv"]
+animation = &"upright_hold_melee"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1f7rf"]
+animation = &"upright_hold_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_vvddf"]
+animation = &"upright_hold_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_fble0"]
+animation = &"upright_hold_pistol"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ypkix"]
+animation = &"upright_hold_throwable"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_w7hwt"]
+animation = &"upright_hold_rifle"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_pwrk4"]
+min_space = 0.0
+max_space = 10.0
+blend_point_0/node = SubResource("AnimationNodeAnimation_1adru")
+blend_point_0/pos = 0.0
+blend_point_0/name = &"0"
+blend_point_1/node = SubResource("AnimationNodeAnimation_3xddo")
+blend_point_1/pos = 1.0
+blend_point_1/name = &"1"
+blend_point_2/node = SubResource("AnimationNodeAnimation_l44vx")
+blend_point_2/pos = 2.0
+blend_point_2/name = &"2"
+blend_point_3/node = SubResource("AnimationNodeAnimation_w7bqf")
+blend_point_3/pos = 3.0
+blend_point_3/name = &"3"
+blend_point_4/node = SubResource("AnimationNodeAnimation_s4gkv")
+blend_point_4/pos = 4.0
+blend_point_4/name = &"4"
+blend_point_5/node = SubResource("AnimationNodeAnimation_1f7rf")
+blend_point_5/pos = 5.0
+blend_point_5/name = &"5"
+blend_point_6/node = SubResource("AnimationNodeAnimation_vvddf")
+blend_point_6/pos = 6.0
+blend_point_6/name = &"6"
+blend_point_7/node = SubResource("AnimationNodeAnimation_fble0")
+blend_point_7/pos = 7.0
+blend_point_7/name = &"7"
+blend_point_8/node = SubResource("AnimationNodeAnimation_ypkix")
+blend_point_8/pos = 8.0
+blend_point_8/name = &"8"
+blend_point_9/node = SubResource("AnimationNodeAnimation_w7hwt")
+blend_point_9/pos = 9.0
+blend_point_9/name = &"9"
+blend_point_10/node = SubResource("AnimationNodeAnimation_3xddo")
+blend_point_10/pos = 10.0
+blend_point_10/name = &"10"
+
+[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_6kffd"]
+filter_enabled = true
+filters = ["Skeleton3D:head_2", "Skeleton3D:neck_01", "Skeleton3D:spine_03"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1bwtc"]
+animation = &"attack_chop_mw2"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_aqmcs"]
+animation = &"attack_cross_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_d4m26"]
+animation = &"attack_jab_fist"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_17aku"]
+animation = &"attack_slash_mw1"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_qtu4f"]
+animation = &"attack_stab_mw1"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_cjrji"]
+animation = &"attack_swing_mw2"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jiugw"]
+animation = &"attack_throw"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_byslt"]
+animation = &"hit_chest"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_f6lq5"]
+animation = &"hit_head"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ln2tt"]
+animation = &"swim_forward"
+
+[sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_1pnle"]
+nodes/output/position = Vector2(2740, 140)
+nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_t1san")
+nodes/UprightMovementBlend/position = Vector2(-260, -120)
+nodes/CrawlMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_i6ktn")
+nodes/CrawlMovementBlend/position = Vector2(-260, 360)
+nodes/CrouchMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_pl47u")
+nodes/CrouchMovementBlend/position = Vector2(-260, 100)
+nodes/AirJumpAnimation/node = SubResource("AnimationNodeAnimation_tetft")
+nodes/AirJumpAnimation/position = Vector2(1000, 420)
+nodes/StanceTransition/node = SubResource("AnimationNodeTransition_ek33b")
+nodes/StanceTransition/position = Vector2(80, 80)
+nodes/Falling/node = SubResource("AnimationNodeAnimation_ftvt4")
+nodes/Falling/position = Vector2(320, -40)
+nodes/MovementAnimSpeed/node = SubResource("AnimationNodeTimeScale_hcq7o")
+nodes/MovementAnimSpeed/position = Vector2(260, 240)
+nodes/OnFloorBlend/node = SubResource("AnimationNodeBlend2_itgf2")
+nodes/OnFloorBlend/position = Vector2(560, 80)
+nodes/GroundJump/node = SubResource("AnimationNodeOneShot_u0asc")
+nodes/GroundJump/position = Vector2(780, 80)
+nodes/AirJump/node = SubResource("AnimationNodeOneShot_jrcpq")
+nodes/AirJump/position = Vector2(1020, 80)
+nodes/GroundJumpAnimation/node = SubResource("AnimationNodeAnimation_t6tww")
+nodes/GroundJumpAnimation/position = Vector2(780, 420)
+nodes/Roll/node = SubResource("AnimationNodeOneShot_cmnuv")
+nodes/Roll/position = Vector2(1600, 100)
+nodes/RollAnimation/node = SubResource("AnimationNodeAnimation_tmkjr")
+nodes/RollAnimation/position = Vector2(1600, 420)
+nodes/WeaponBlend/node = SubResource("AnimationNodeBlend2_ni32x")
+nodes/WeaponBlend/position = Vector2(1380, 100)
+nodes/WeaponTorsoBlend/node = SubResource("AnimationNodeBlend2_6kffd")
+nodes/WeaponTorsoBlend/position = Vector2(1490, 300)
+nodes/WeaponAimTorso/node = SubResource("AnimationNodeBlendSpace1D_1y5o0")
+nodes/WeaponAimTorso/position = Vector2(1280, 440)
+nodes/WeaponAimTorsoCrouch/node = SubResource("AnimationNodeBlendSpace1D_y3qxn")
+nodes/WeaponAimTorsoCrouch/position = Vector2(1280, 220)
+nodes/AimStanceTorsoTransition/node = SubResource("AnimationNodeTransition_q0x55")
+nodes/AimStanceTorsoTransition/position = Vector2(1460, 440)
+nodes/WeaponAim/node = SubResource("AnimationNodeBlendSpace1D_c7ohm")
+nodes/WeaponAim/position = Vector2(1020, 620)
+nodes/WeaponAimCrawl/node = SubResource("AnimationNodeBlendSpace1D_diycb")
+nodes/WeaponAimCrawl/position = Vector2(1020, 1060)
+nodes/WeaponAimCrouch/node = SubResource("AnimationNodeBlendSpace1D_vsf61")
+nodes/WeaponAimCrouch/position = Vector2(1020, 1280)
+nodes/AimStanceTransition/node = SubResource("AnimationNodeTransition_rm8nk")
+nodes/AimStanceTransition/position = Vector2(1200, 620)
+nodes/WeaponHold/node = SubResource("AnimationNodeBlendSpace1D_pwrk4")
+nodes/WeaponHold/position = Vector2(1020, 840)
+nodes/CombatTransition/node = SubResource("AnimationNodeTransition_v62yi")
+nodes/CombatTransition/position = Vector2(1280, 620)
+nodes/NeckFront/node = SubResource("AnimationNodeBlend2_7k10g")
+nodes/NeckFront/position = Vector2(2220, 120)
+nodes/Attack/node = SubResource("AnimationNodeOneShot_xtatt")
+nodes/Attack/position = Vector2(2120, -80)
+nodes/AttackScale/node = SubResource("AnimationNodeTimeScale_7bquo")
+nodes/AttackScale/position = Vector2(2120, -280)
+nodes/AttackClip/node = SubResource("AnimationNodeTransition_l6a84")
+nodes/AttackClip/position = Vector2(1900, -480)
+nodes/attack_stab_mw1/node = SubResource("AnimationNodeAnimation_qtu4f")
+nodes/attack_stab_mw1/position = Vector2(1600, -700)
+nodes/attack_slash_mw1/node = SubResource("AnimationNodeAnimation_17aku")
+nodes/attack_slash_mw1/position = Vector2(1600, -820)
+nodes/attack_swing_mw2/node = SubResource("AnimationNodeAnimation_cjrji")
+nodes/attack_swing_mw2/position = Vector2(1600, -940)
+nodes/attack_chop_mw2/node = SubResource("AnimationNodeAnimation_1bwtc")
+nodes/attack_chop_mw2/position = Vector2(1600, -1060)
+nodes/attack_jab_fist/node = SubResource("AnimationNodeAnimation_d4m26")
+nodes/attack_jab_fist/position = Vector2(1600, -1180)
+nodes/attack_cross_fist/node = SubResource("AnimationNodeAnimation_aqmcs")
+nodes/attack_cross_fist/position = Vector2(1600, -1300)
+nodes/AnimWeaponAimation/node = SubResource("AnimationNodeAnimation_qkc0d")
+nodes/AnimWeaponAimation/position = Vector2(2240, 380)
+nodes/ReloadScale/node = SubResource("AnimationNodeTimeScale_mbnyo")
+nodes/ReloadScale/position = Vector2(1800, 440)
+nodes/ReloadAnimation/node = SubResource("AnimationNodeAnimation_w4iym")
+nodes/ReloadAnimation/position = Vector2(1800, 660)
+nodes/Reload/node = SubResource("AnimationNodeOneShot_fi46e")
+nodes/Reload/position = Vector2(1820, 120)
+nodes/WeaponChange/node = SubResource("AnimationNodeOneShot_w4say")
+nodes/WeaponChange/position = Vector2(2020, 120)
+nodes/WeaponChangeScale/node = SubResource("AnimationNodeTimeScale_0av0u")
+nodes/WeaponChangeScale/position = Vector2(2020, 420)
+nodes/WeaponChangeAnimation/node = SubResource("AnimationNodeBlendSpace1D_exphy")
+nodes/WeaponChangeAnimation/position = Vector2(2040, 800)
+nodes/WeaponChangeSeek/node = SubResource("AnimationNodeTimeSeek_5hrdl")
+nodes/WeaponChangeSeek/position = Vector2(2020, 600)
+nodes/DriveCarrierMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_ehw75")
+nodes/DriveCarrierMovementBlend/position = Vector2(-320, 640)
+nodes/PassengerMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_ry5lw")
+nodes/PassengerMovementBlend/position = Vector2(-320, 800)
+nodes/attack_throw/node = SubResource("AnimationNodeAnimation_jiugw")
+nodes/attack_throw/position = Vector2(1600, -1180)
+nodes/HitReact/node = SubResource("AnimationNodeOneShot_5xtq0")
+nodes/HitReact/position = Vector2(2480, 140)
+nodes/HitReactClip/node = SubResource("AnimationNodeTransition_jwr7e")
+nodes/HitReactClip/position = Vector2(2260, 360)
+nodes/hit_chest/node = SubResource("AnimationNodeAnimation_byslt")
+nodes/hit_chest/position = Vector2(2020, 340)
+nodes/hit_head/node = SubResource("AnimationNodeAnimation_f6lq5")
+nodes/hit_head/position = Vector2(2020, 460)
+nodes/SwimTransition/node = SubResource("AnimationNodeTransition_bl750")
+nodes/SwimTransition/position = Vector2(-120, 1000)
+nodes/SwimMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_v8pmc")
+nodes/SwimMovementBlend/position = Vector2(-360, 960)
+nodes/swim_stroke/node = SubResource("AnimationNodeAnimation_ln2tt")
+nodes/swim_stroke/position = Vector2(-360, 1100)
+nodes/WeaponAimDrive/node = SubResource("AnimationNodeBlendSpace1D_junr4")
+nodes/WeaponAimDrive/position = Vector2(1020, 1500)
+nodes/RelaxedTransition/node = SubResource("AnimationNodeTransition_3031l")
+nodes/RelaxedTransition/position = Vector2(-40, -120)
+nodes/UprightRelaxedBlend/node = SubResource("AnimationNodeBlendSpace1D_v01ca")
+nodes/UprightRelaxedBlend/position = Vector2(-260, -260)
+node_connections = [&"output", 0, &"HitReact", &"StanceTransition", 0, &"RelaxedTransition", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"StanceTransition", 3, &"DriveCarrierMovementBlend", &"StanceTransition", 4, &"PassengerMovementBlend", &"StanceTransition", 5, &"SwimTransition", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"GroundJumpAnimation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"AirJumpAnimation", &"Roll", 0, &"WeaponTorsoBlend", &"Roll", 1, &"RollAnimation", &"WeaponBlend", 0, &"AirJump", &"WeaponBlend", 1, &"CombatTransition", &"WeaponTorsoBlend", 0, &"WeaponBlend", &"WeaponTorsoBlend", 1, &"AimStanceTorsoTransition", &"AimStanceTorsoTransition", 0, &"WeaponAimTorso", &"AimStanceTorsoTransition", 1, &"WeaponAimTorsoCrouch", &"AimStanceTransition", 0, &"WeaponAim", &"AimStanceTransition", 1, &"WeaponAimCrawl", &"AimStanceTransition", 2, &"WeaponAimCrouch", &"AimStanceTransition", 3, &"WeaponAimDrive", &"CombatTransition", 0, &"AimStanceTransition", &"CombatTransition", 1, &"WeaponHold", &"NeckFront", 0, &"Attack", &"NeckFront", 1, &"AnimWeaponAimation", &"Attack", 0, &"WeaponChange", &"Attack", 1, &"AttackScale", &"AttackScale", 0, &"AttackClip", &"AttackClip", 0, &"attack_stab_mw1", &"AttackClip", 1, &"attack_slash_mw1", &"AttackClip", 2, &"attack_swing_mw2", &"AttackClip", 3, &"attack_chop_mw2", &"AttackClip", 4, &"attack_jab_fist", &"AttackClip", 5, &"attack_cross_fist", &"AttackClip", 6, &"attack_throw", &"ReloadScale", 0, &"ReloadAnimation", &"Reload", 0, &"Roll", &"Reload", 1, &"ReloadScale", &"WeaponChange", 0, &"Reload", &"WeaponChange", 1, &"WeaponChangeScale", &"WeaponChangeScale", 0, &"WeaponChangeSeek", &"WeaponChangeSeek", 0, &"WeaponChangeAnimation", &"HitReact", 0, &"NeckFront", &"HitReact", 1, &"HitReactClip", &"HitReactClip", 0, &"hit_chest", &"HitReactClip", 1, &"hit_head", &"SwimTransition", 0, &"SwimMovementBlend", &"SwimTransition", 1, &"swim_stroke", &"RelaxedTransition", 0, &"UprightMovementBlend", &"RelaxedTransition", 1, &"UprightRelaxedBlend"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_ewvvw"]
+radius = 0.257
+height = 1.732
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gyx3v"]
+radius = 0.257
+height = 1.19
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_kjkij"]
+height = 0.642
+radius = 0.932
+
+[node name="CharacterVisuals" type="Node3D" unique_id=1145724446]
+script = ExtResource("1_w2w0m")
+mesh_config = SubResource("Resource_127y3")
+
+[node name="MeshRoot" type="Node3D" parent="." unique_id=1103710025]
+
+[node name="Model" parent="MeshRoot" unique_id=1162339846 instance=ExtResource("3_pn6ut")]
+
+[node name="victoria" parent="MeshRoot/Model" index="0" unique_id=716109429]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="Skeleton3D" parent="MeshRoot/Model/victoria" index="2" unique_id=675533575]
+motion_scale = 1.0798
+metadata/seated_motion_scale = 0.8204
+
+[node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="3" unique_id=266195113]
+transform = Transform3D(0.019172376, -0.9781204, 0.20715483, 0.8145113, -0.10487897, -0.57058895, 0.57983077, 0.17966941, 0.79467905, -0.5417501, 1.3678215, 0.01561976)
+bone_name = "hand_r"
+bone_idx = 47
+
+[node name="SocketRifle" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment" unique_id=178542626]
+transform = Transform3D(0.833123, 0.52503, 0.173919, 0.019037, 0.287045, -0.957728, -0.552759, 0.801216, 0.229149, -0.013194, 0.056452, 0.005306)
+
+[node name="SocketPistol" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment" unique_id=2143262602]
+transform = Transform3D(0.749186, 0.657626, 0.079056, -0.11395, 0.245541, -0.962667, -0.652485, 0.712207, 0.258893, -0.016679, 0.040132, 0.010057)
+
+[node name="SocketLauncher" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment" unique_id=1028916798]
+transform = Transform3D(0.833123, 0.52503, 0.173919, 0.019037, 0.287045, -0.957728, -0.552759, 0.801216, 0.229149, -0.013194, 0.056452, 0.005306)
+
+[node name="SocketMelee" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment" unique_id=1496176856]
+transform = Transform3D(0.664019, 0.253485, -0.703439, -0.154517, -0.873956, -0.460789, -0.731577, 0.414666, -0.541154, -0.008617, 0.020369, 0.019873)
+
+[node name="SocketThrowable" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment" unique_id=145168333]
+transform = Transform3D(0.664019, 0.253485, -0.703439, -0.154517, -0.873956, -0.460789, -0.731577, 0.414666, -0.541154, -0.008617, 0.020369, 0.019873)
+
+[node name="SocketFist" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment" unique_id=1699148112]
+transform = Transform3D(0.999083, 0.04217, -0.00739, -0.04124, 0.994295, 0.098371, 0.011497, -0.097976, 0.995122, 0, 0, 0)
+
+[node name="Fist" type="Node3D" parent="MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment/SocketFist" unique_id=100001001 instance=ExtResource("4_pmofq")]
+script = ExtResource("5_2iibl")
+attack_steps = Array[ExtResource("6_yabf3")]([SubResource("MeleeAttackStep_Fist_0"), SubResource("MeleeAttackStep_Fist_1")])
+combo_reset_seconds = 0.6
+input_buffer_seconds = 0.2
+weapon_id = "fist"
+weapon_name = "Fist"
+slot_type = 5
+is_droppable = false
+is_infinite_ammo = true
+auto_equip_on_pickup = false
+weapon_archetype = "fist"
+weapon_icon = null
+grip_point = "GripPoint"
+holster_point = ""
+weapon_animator_path = NodePath("Model/AnimationPlayer")
+fire_animation = ""
+reload_animation = ""
+hold_socket = ""
+holster_sockets = PackedStringArray()
+stats = ExtResource("7_g5ch7")
+magazine = 40
+reserve = 40
+fire_audio = null
+reload_audio = null
+auto_reload_on_empty = true
+remove_on_pickup = false
+pause_on_pickup = false
+require_interact = false
+pickup_cooldown_after_drop = 0.5
+pickup_id = ""
+world_body_continuous_cd = false
+
+[node name="SocketShotgun" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/WeaponAttachment" unique_id=1221173595]
+transform = Transform3D(0.833123, 0.52503, 0.173919, 0.019037, 0.287045, -0.957728, -0.552759, 0.801216, 0.229149, -0.013194, 0.056452, 0.005306)
+
+[node name="SpineAimModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="4" unique_id=968871479]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
+script = ExtResource("8_nwty2")
+target_node = NodePath("")
+reference_bone = "spine_03"
+driven_bones = Array[String](["spine_03"])
+driven_weights = Array[float]([])
+head_bone = "neck_01"
+head_forward_bone = "head_2"
+yaw_limit_degrees = 80.0
+pitch_limit_max = 45.0
+pitch_limit_min = -65.0
+body_forward_node = NodePath("")
+aim_held_weapon = true
+weapon_posed = true
+bore_blend_seconds = 0.15
+bore_during_one_shots = false
+weapon_bone = "hand_r"
+
+[node name="ShoulderAimModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="5" unique_id=237022194]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
+script = ExtResource("8_nwty2")
+target_node = NodePath("")
+reference_bone = "spine_03"
+driven_bones = Array[String](["clavicle_l", "clavicle_r", "neck_01"])
+driven_weights = Array[float]([])
+head_bone = "neck_01"
+head_forward_bone = "head_2"
+yaw_limit_degrees = 80.0
+pitch_limit_max = 45.0
+pitch_limit_min = -65.0
+body_forward_node = NodePath("")
+aim_held_weapon = true
+weapon_posed = true
+bore_blend_seconds = 0.15
+bore_during_one_shots = false
+weapon_bone = "hand_r"
+
+[node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="6" unique_id=1686485000]
+transform = Transform3D(1.0000001, 1.8429964e-07, -9.981555e-09, -1.2120334e-07, 0.91721636, -0.39838958, -5.014485e-08, 0.39838958, 0.9172162, -0.00048711995, 1.4207013, -0.015163019)
+bone_name = "neck_01"
+bone_idx = 77
+
+[node name="MarkerFPSCamera" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/NeckAttachment" unique_id=1922413959]
+transform = Transform3D(-0.999931, 0.000379, -0.011755, 0.005296, 0.9069, -0.421312, 0.010501, -0.421345, -0.906839, 1.9e-05, 0.160177, 0.027215)
+
+[node name="BackHolster" type="BoneAttachment3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="7" unique_id=1122173386]
+transform = Transform3D(1.0000001, 1.7408313e-07, 6.1327334e-08, -1.2120334e-07, 0.9998564, -0.016941667, -5.014485e-08, 0.016941741, 0.9998562, -0.0004871347, 1.3060861, 0.018232599)
+bone_name = "spine_03"
+bone_idx = 12
+
+[node name="LongWeaponHolsterMaker1" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/BackHolster" unique_id=1220946144]
+transform = Transform3D(-1e-06, -0.930719, -0.365734, -0.016958, -0.365681, 0.930586, -0.999856, 0.006202, -0.015783, -0.152983, 0.182167, -0.276417)
+
+[node name="LongWeaponHolsterMaker2" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/BackHolster" unique_id=703328420]
+transform = Transform3D(-1e-06, -0.930719, -0.365734, -0.016958, -0.365681, 0.930586, -0.999856, 0.006202, -0.015783, -0.031426, 0.11821, -0.484369)
+
+[node name="LongWeaponHolsterMaker3" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/BackHolster" unique_id=1701731793]
+transform = Transform3D(-0.5, 0, -0.866025, 0, 0.999999, 0, 0.866025, 0, -0.5, 0.013821, 0.011478, -0.092012)
+
+[node name="LongWeaponHolsterMaker4" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/BackHolster" unique_id=679320930]
+transform = Transform3D(-0.48086, 0.005355, -0.87678, 0.024798, 0.999664, -0.007495, 0.876446, -0.025346, -0.480832, 0.013327, -0.053894, -0.092159)
+
+[node name="HipWeaponHolster" type="BoneAttachment3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="8" unique_id=242984944]
+transform = Transform3D(1.0000001, 1.8453278e-07, 3.6924703e-09, -1.2120336e-07, 0.94419754, -0.32937983, -5.014485e-08, 0.32937983, 0.9441973, -0.00048718264, 1.062655, 0.018293245)
+bone_name = "spine_01"
+bone_idx = 10
+
+[node name="ShortWeaponHolsterMaker1" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/HipWeaponHolster" unique_id=1197875454]
+transform = Transform3D(-0.939691, 0.296198, -0.17101, 0, 0.499999, 0.866025, 0.34202, 0.813796, -0.469846, 0.223948, 0.014905, -0.082339)
+
+[node name="ShortWeaponHolsterMaker2" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/HipWeaponHolster" unique_id=2030485257]
+transform = Transform3D(-0.949646, -0.277207, 0.146033, -0.011467, 0.496519, 0.867949, -0.313111, 0.82257, -0.474697, -0.286453, 0.008239, -0.085362)
+
+[node name="ShortWeaponHolsterMaker3" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/HipWeaponHolster" unique_id=1525232718]
+transform = Transform3D(0.072784, -0.997342, -0.002927, -0.176616, -0.015777, 0.984152, -0.981582, -0.071114, -0.177296, 0.179143, -0.085623, -0.234114)
+
+[node name="ShortWeaponHolsterMaker4" type="Marker3D" parent="MeshRoot/Model/victoria/Skeleton3D/HipWeaponHolster" unique_id=489162745]
+transform = Transform3D(0.241084, 0.970394, 0.014646, 0.379243, -0.108088, 0.918962, 0.893336, -0.215992, -0.394076, -0.14156, -0.098612, -0.212683)
+
+[node name="PhysicalBoneSimulator3D" type="PhysicalBoneSimulator3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="9" unique_id=65212681]
+
+[node name="Physical Bone pelvis" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=759189747]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.0538)
+body_offset = Transform3D(1, 0, 0, 0, 0.6789944, 0.73414344, 0, -0.73414344, 0.6789944, 0, -0.019748459, -0.018264951)
+bone_name = "pelvis"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone pelvis" unique_id=652951309]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_5yk40")
+
+[node name="Physical Bone spine_01" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=279949191]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.1149)
+body_offset = Transform3D(-1, 0, 0, 0, 0.21039467, 0.97761655, 0, 0.97761655, -0.21039467, 0, -0.05616407, 0.012087174)
+bone_name = "spine_01"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_01" unique_id=622153854]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_g061h")
+
+[node name="Physical Bone spine_02" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=244906121]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.1302)
+body_offset = Transform3D(-1, 0, 0, 0, 0.24146943, 0.9704083, 0, 0.9704083, -0.24146943, 0, -0.063173585, 0.01571966)
+bone_name = "spine_02"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_02" unique_id=369159354]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_cdmr6")
+
+[node name="Physical Bone spine_03" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=495774098]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.1194)
+body_offset = Transform3D(-1, 0, 0, 0, 0.2959671, 0.95519817, 0, 0.95519817, -0.2959671, 0, -0.057025332, 0.017669236)
+bone_name = "spine_03"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone spine_03" unique_id=1907376130]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_ys0ew")
+
+[node name="Physical Bone head_2" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1091894682]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.2154)
+body_offset = Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, 0, -0.1077, 0)
+bone_name = "head_2"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone head_2" unique_id=570586394]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_lraqa")
+
+[node name="Physical Bone upperarm_l" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1246974472]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.2193)
+body_offset = Transform3D(0.61437255, -0.7882317, 0.035174143, 0, 0.04457975, 0.99900585, -0.78901607, -0.6137618, 0.027388578, -0.0038568447, -0.10954099, -0.0030031577)
+bone_name = "upperarm_l"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone upperarm_l" unique_id=1634944911]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_jpe5y")
+
+[node name="Physical Bone lowerarm_l" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=520103873]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.2143)
+body_offset = Transform3D(0.9980602, 0.06181752, -0.007372804, 0, 0.118427895, 0.9929626, 0.062255636, -0.9910365, 0.11819817, 0.00078999595, -0.106395945, -0.012664935)
+bone_name = "lowerarm_l"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone lowerarm_l" unique_id=697905765]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_bdjtv")
+
+[node name="Physical Bone hand_l" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=430362503]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.0668)
+body_offset = Transform3D(-0.8698001, 0.47741508, -0.12459011, 0, 0.25251117, 0.9675939, 0.4934044, 0.8416133, -0.21963422, 0.0041613095, -0.032317635, 0.007335783)
+bone_name = "hand_l"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone hand_l" unique_id=1855248014]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_m1oe1")
+
+[node name="Physical Bone upperarm_r" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1998481090]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.2193)
+body_offset = Transform3D(0.6144222, 0.7881932, -0.035169106, 0, 0.044575557, 0.99900603, 0.78897744, -0.6138115, 0.02738821, 0.0038562925, -0.109541014, -0.0030031172)
+bone_name = "upperarm_r"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone upperarm_r" unique_id=526232909]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_g0p3n")
+
+[node name="Physical Bone lowerarm_r" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=269676975]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.2143)
+body_offset = Transform3D(0.99805766, -0.061858956, 0.007377508, 0, 0.11842413, 0.9929631, -0.062297337, -0.9910344, 0.11819411, -0.0007905, -0.106396, -0.0126645)
+bone_name = "lowerarm_r"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone lowerarm_r" unique_id=237624121]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_ej0m3")
+
+[node name="Physical Bone hand_r" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=31437642]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.0668)
+body_offset = Transform3D(-0.8698255, -0.47737306, 0.12457358, 0, 0.25250062, 0.96759677, -0.4933595, 0.84164035, -0.21963148, -0.0041607576, -0.03231773, 0.0073356912)
+bone_name = "hand_r"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone hand_r" unique_id=819531868]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_q33ik")
+
+[node name="Physical Bone thigh_l" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1220633947]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.3865)
+body_offset = Transform3D(0.97223574, 0.23173146, -0.032530706, 0, 0.13901792, 0.9902898, 0.23400368, -0.96279514, 0.1351582, 0.006286559, -0.19137351, -0.026119322)
+bone_name = "thigh_l"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone thigh_l" unique_id=983596457]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_lrh7n")
+
+[node name="Physical Bone calf_l" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1210279356]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.4418)
+body_offset = Transform3D(0.29236862, 0.95584494, -0.02968093, 0, 0.031037074, 0.9995182, 0.9563057, -0.29222777, 0.009074266, 0.0065565174, -0.22079358, -0.0020045054)
+bone_name = "calf_l"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone calf_l" unique_id=2089436802]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_ynx4c")
+
+[node name="Physical Bone foot_l" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=328419017]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.1287)
+body_offset = Transform3D(0.7865963, 0.61624026, -0.03891306, 0, 0.06302041, 0.99801224, 0.61746764, -0.78503275, 0.049571615, 0.0025040554, -0.06422209, -0.0031899335)
+bone_name = "foot_l"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone foot_l" unique_id=2128578901]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_1vndi")
+
+[node name="Physical Bone thigh_r" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=716182849]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.3865)
+body_offset = Transform3D(0.97223574, -0.23173146, 0.032530706, 0, 0.13901792, 0.9902898, -0.23400368, -0.96279514, 0.1351582, -0.006286559, -0.19137351, -0.026119322)
+bone_name = "thigh_r"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone thigh_r" unique_id=1913906863]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_j545l")
+
+[node name="Physical Bone calf_r" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=1044409497]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.4418)
+body_offset = Transform3D(0.29234824, -0.95585114, 0.02968319, 0, 0.031039234, 0.99951816, -0.95631194, -0.29220736, 0.009074265, -0.0065570166, -0.22079356, -0.0020045051)
+bone_name = "calf_r"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone calf_r" unique_id=1663188031]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_wlt5x")
+
+[node name="Physical Bone foot_r" type="PhysicalBone3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D" unique_id=219388118]
+collision_layer = 8
+collision_mask = 0
+joint_type = 1
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.1287)
+body_offset = Transform3D(0.7865963, -0.61624026, 0.03891306, 0, 0.06302041, 0.99801224, -0.61746764, -0.78503275, 0.049571615, -0.0025040554, -0.06422209, -0.0031899335)
+bone_name = "foot_r"
+joint_constraints/bias = 0.3
+joint_constraints/damping = 1.0
+joint_constraints/impulse_clamp = 0.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="MeshRoot/Model/victoria/Skeleton3D/PhysicalBoneSimulator3D/Physical Bone foot_r" unique_id=2035847941]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+shape = SubResource("CapsuleShape3D_hr760")
+
+[node name="StockMountIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="10" unique_id=1404614697]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
+script = ExtResource("9_m6wr0")
+upper_bone = "upperarm_r"
+lower_bone = "lowerarm_r"
+end_bone = "hand_r"
+pocket_bone = "clavicle_r"
+mount_markers = Array[String](["StockPoint", "ShoulderRestPoint"])
+mount_offsets = Array[Vector3]([Vector3(-0.026819, -0.04656, 0.10648), Vector3(0.042804, 0.018093, -0.000147)])
+blend_seconds = 0.1
+max_weight = 1.0
+engaged = false
+
+[node name="WeaponRecoilModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="11" unique_id=261356781]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
+script = ExtResource("10_vatgp")
+upper_bone = "upperarm_r"
+lower_bone = "lowerarm_r"
+end_bone = "hand_r"
+weight = 1.0
+max_back = 0.1
+max_pitch = 14.0
+rest_epsilon = 0.0005
+
+[node name="SupportHandIKModifier" type="SkeletonModifier3D" parent="MeshRoot/Model/victoria/Skeleton3D" index="12" unique_id=869637632]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
+script = ExtResource("11_b46p3")
+upper_bone = "upperarm_l"
+lower_bone = "lowerarm_l"
+end_bone = "hand_l"
+support_point_name = "SupportPoint"
+grip_bone = "middle_01_l"
+grip_fraction = 0.75
+keep_hand_rotation = true
+weight = 1.0
+shoulder_bone = "clavicle_l"
+max_clavicle_deg = 40.0
+character_path = NodePath("")
+weapon_bone = "hand_r"
+
+[node name="AnimationTree" type="AnimationTree" parent="." unique_id=36580887]
+root_node = NodePath("../MeshRoot/Model/victoria")
+libraries/ = ExtResource("12_1kgp6")
+tree_root = SubResource("AnimationNodeBlendTree_1pnle")
+parameters/UprightMovementBlend/blend_position = Vector2(1, 0)
+parameters/CrawlMovementBlend/blend_position = Vector2(1, 0)
+parameters/CrouchMovementBlend/blend_position = Vector2(1, 0)
+parameters/StanceTransition/current_state = "Upright"
+parameters/StanceTransition/transition_request = ""
+parameters/StanceTransition/current_index = 0
+parameters/MovementAnimSpeed/scale = 1.0
+parameters/OnFloorBlend/blend_amount = 1.0
+parameters/GroundJump/active = false
+parameters/GroundJump/internal_active = false
+parameters/GroundJump/request = 0
+parameters/AirJump/active = false
+parameters/AirJump/internal_active = false
+parameters/AirJump/request = 0
+parameters/Roll/active = false
+parameters/Roll/internal_active = false
+parameters/Roll/request = 0
+parameters/WeaponBlend/blend_amount = 1.0
+parameters/WeaponTorsoBlend/blend_amount = 0.0
+parameters/WeaponAimTorso/blend_position = 0.0
+parameters/WeaponAimTorsoCrouch/blend_position = 0.0
+parameters/AimStanceTorsoTransition/current_state = ""
+parameters/AimStanceTorsoTransition/transition_request = ""
+parameters/AimStanceTorsoTransition/current_index = -1
+parameters/WeaponAim/blend_position = 0.0
+parameters/WeaponAimCrawl/blend_position = 0.0
+parameters/WeaponAimCrouch/blend_position = 0.0
+parameters/AimStanceTransition/current_state = ""
+parameters/AimStanceTransition/transition_request = ""
+parameters/AimStanceTransition/current_index = -1
+parameters/WeaponHold/blend_position = 0.0
+parameters/CombatTransition/current_state = "Combat"
+parameters/CombatTransition/transition_request = ""
+parameters/CombatTransition/current_index = 0
+parameters/NeckFront/blend_amount = 0.0
+parameters/Attack/active = false
+parameters/Attack/internal_active = false
+parameters/Attack/request = 0
+parameters/AttackScale/scale = 1.0
+parameters/AttackClip/current_state = ""
+parameters/AttackClip/transition_request = ""
+parameters/AttackClip/current_index = -1
+parameters/ReloadScale/scale = 1.0
+parameters/Reload/active = false
+parameters/Reload/internal_active = false
+parameters/Reload/request = 0
+parameters/WeaponChange/active = false
+parameters/WeaponChange/internal_active = false
+parameters/WeaponChange/request = 0
+parameters/WeaponChangeScale/scale = 1.0
+parameters/WeaponChangeAnimation/blend_position = 0.0
+parameters/WeaponChangeSeek/seek_request = -1.0
+parameters/DriveCarrierMovementBlend/blend_position = Vector2(0, 0)
+parameters/PassengerMovementBlend/blend_position = Vector2(0, 0)
+parameters/HitReact/active = false
+parameters/HitReact/internal_active = false
+parameters/HitReact/request = 0
+parameters/HitReactClip/current_state = ""
+parameters/HitReactClip/transition_request = ""
+parameters/HitReactClip/current_index = -1
+parameters/SwimTransition/current_state = ""
+parameters/SwimTransition/transition_request = ""
+parameters/SwimTransition/current_index = -1
+parameters/SwimMovementBlend/blend_position = Vector2(0, 0)
+parameters/WeaponAimDrive/blend_position = 0.0
+parameters/RelaxedTransition/current_state = ""
+parameters/RelaxedTransition/transition_request = ""
+parameters/RelaxedTransition/current_index = -1
+parameters/UprightRelaxedBlend/blend_position = 0.0
+
+[node name="StanceCollisions" type="Node3D" parent="." unique_id=21162668]
+
+[node name="Upright" type="CollisionShape3D" parent="StanceCollisions" unique_id=2078430630]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.866, 0)
+shape = SubResource("CapsuleShape3D_ewvvw")
+
+[node name="RayCast3D" type="RayCast3D" parent="StanceCollisions/Upright" unique_id=659140675]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.271, 0)
+target_position = Vector3(0, 1.137, 0)
+
+[node name="Crouch" type="CollisionShape3D" parent="StanceCollisions" unique_id=1970097308]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.595, 0)
+shape = SubResource("CapsuleShape3D_gyx3v")
+disabled = true
+
+[node name="RayCast3D" type="RayCast3D" parent="StanceCollisions/Crouch" unique_id=300797002]
+target_position = Vector3(0, 0.595, 0)
+
+[node name="Crawl" type="CollisionShape3D" parent="StanceCollisions" unique_id=1482277756]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.321, 0)
+shape = SubResource("CylinderShape3D_kjkij")
+disabled = true
+
+[editable path="MeshRoot/Model"]

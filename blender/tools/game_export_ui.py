@@ -111,6 +111,7 @@ def export_to_game(root=None, update_godot=True):
         return False, "this .blend is not inside the game repository (no project.godot above it)"
     # export_character.py itself bakes the ARP clips and switches the rig off and back -- one path for
     # the button and the command line alike
+    _preview_off()                         # an active game action would export twice
     baked = [a.name[4:] for a in bpy.data.actions if a.name.startswith("ARP_")]
     try:
         runpy.run_path(os.path.join(root, "blender", "tools", "export_character.py"), run_name="__main__")
@@ -196,6 +197,79 @@ def _show_on_rig(context, arp_mod, clip):
     context.window_manager.ow_editing = clip
 
 
+def _preview_off(context=None, force=False):
+    """Leave PREVIEW: the game armature's active action goes back to None (an active action that is also
+    an NLA strip would export twice -- export_character.py's own rule) and the rig drives the body again."""
+    wm = (context or bpy.context).window_manager
+    if not force and not getattr(wm, "ow_preview", False):
+        return
+    try:
+        mod = load_arp_clips()
+        rig, game = mod.rigs()
+        mod._bind(game, None)
+        mod._drive(rig, 1.0)
+    except Exception as exc:
+        print("[game-export] preview off: %s" % exc)
+    wm["ow_preview"] = False
+
+
+def _preview_on(context, clip):
+    """PREVIEW = what the GAME plays: the rig switched off and the game clip itself on the body. Without it
+    the body copies the rig, and the rig shows whichever ARP_ clip was last on it -- which is why every clip
+    looked like `upright_aim_rifle` in the upper body (measured 2026-09-27: the file had been saved with the
+    rig on and ARP_upright_aim_rifle-loop active)."""
+    act = bpy.data.actions.get(clip)
+    if act is None:
+        return "no game clip named %s (it becomes one at the next Export)" % clip
+    mod = load_arp_clips()
+    rig, game = mod.rigs()
+    mod._drive(rig, 0.0)
+    mod._bind(game, act)
+    sc = context.scene
+    sc.frame_start, sc.frame_end = int(act.frame_range[0]), int(act.frame_range[1])
+    sc.frame_set(sc.frame_start)
+    context.window_manager["ow_preview"] = True
+    return None
+
+
+def _on_clip_picked(self, context):
+    """Picking a clip SHOWS it: in preview the game clip, otherwise its rig copy (if it has one)."""
+    clip = self.ow_clip
+    if not clip:
+        return
+    try:
+        if self.ow_preview:
+            err = _preview_on(context, clip)
+            if err:
+                self.ow_last_export = err
+            return
+        mod = load_arp_clips()
+        if (mod.PREFIX + clip) in bpy.data.actions:
+            _show_on_rig(context, mod, clip)
+    except Exception as exc:
+        print("[game-export] showing %s: %s" % (clip, exc))
+
+
+def _on_preview_toggled(self, context):
+    if self.ow_preview:
+        err = _preview_on(context, self.ow_clip) if self.ow_clip else "pick a clip first"
+        if err:
+            self.ow_last_export = err
+            self["ow_preview"] = False
+    else:
+        _preview_off(context, force=True)  # the property already reads False here
+        _on_clip_picked(self, context)
+
+
+def rig_showing():
+    """The clip the ARP rig is posed by right now, by its plain name (or None)."""
+    for ob in bpy.data.objects:
+        if ob.type == 'ARMATURE' and "arp_rig_type" in ob.keys():
+            a = ob.animation_data.action if ob.animation_data else None
+            return a.name[4:] if a is not None and a.name.startswith("ARP_") else (a.name if a else None)
+    return None
+
+
 class OW_OT_edit_clip(bpy.types.Operator):
     """Load the chosen clip on the Auto-Rig Pro controls, ready to pose. A clip that is not on the rig yet
     is copied there first (exact, in FK). The game clip changes only when you Export"""
@@ -211,6 +285,8 @@ class OW_OT_edit_clip(bpy.types.Operator):
         if not clip:
             self.report({'ERROR'}, "pick a clip first")
             return {'CANCELLED'}
+        _preview_off(context)
+        context.window_manager["ow_preview"] = False
         mod = load_arp_clips(self.repo or None)
         if (mod.PREFIX + clip) not in bpy.data.actions:
             try:
@@ -308,6 +384,11 @@ class OW_PT_game_export(bpy.types.Panel):
         box = self.layout.box()
         box.label(text="Clips (every clip is edited on the rig)", icon='ARMATURE_DATA')
         box.prop(wm, "ow_clip", text="Clip")
+        box.prop(wm, "ow_preview", text="Preview as the game plays it", icon='PLAY')
+        if wm.ow_preview:
+            box.label(text="Previewing the GAME clip (rig off) -- Edit on Rig to change it", icon='HIDE_OFF')
+        else:
+            box.label(text="Rig shows: %s" % (rig_showing() or "(nothing)"), icon='POSE_HLT')
         row = box.row(align=True)
         op = row.operator(OW_OT_edit_clip.bl_idname, icon='POSE_HLT')
         op.clip = wm.ow_clip
@@ -343,6 +424,7 @@ def keep_arp_clips(*_):
     clip that is not on the rig at that moment uses nothing -- measured, `ARP_upright_aim_shotgun-loop`
     was lost that way when the rifle clip was put back on the rig and the file saved. Every `ARP_*`
     action gets a fake user before each save."""
+    _preview_off()                         # the file is never saved with a game clip active on the body
     for a in bpy.data.actions:
         if a.name.startswith("ARP_") and not a.use_fake_user:
             a.use_fake_user = True
@@ -362,7 +444,9 @@ _RETIRED = ("OW_OT_move_clip_to_arp", "OW_OT_edit_arp_clip")
 def register():
     bpy.types.WindowManager.ow_last_export = bpy.props.StringProperty(default="")
     bpy.types.WindowManager.ow_update_godot = bpy.props.BoolProperty(default=True)
-    bpy.types.WindowManager.ow_clip = bpy.props.EnumProperty(items=_game_clips, name="Clip")
+    bpy.types.WindowManager.ow_clip = bpy.props.EnumProperty(items=_game_clips, name="Clip",
+                                                             update=_on_clip_picked)
+    bpy.types.WindowManager.ow_preview = bpy.props.BoolProperty(default=False, update=_on_preview_toggled)
     bpy.types.WindowManager.ow_editing = bpy.props.StringProperty(default="")
     for name in _RETIRED:
         old = getattr(bpy.types, name, None)

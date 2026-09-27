@@ -97,6 +97,12 @@ func _initialize() -> void:
 		await process_frame
 	_check(int(ts.call("lit_lamps_now")) > 0 or control, "lamps are lit near the junction (%d lit, %d junction(s) built)"
 			% [ts.call("lit_lamps_now"), ts.call("views_now")])
+	# the vehicle heads light too (user, 2026-09-26: "the upper traffic light seem never work")
+	_check(int(ts.call("lit_vehicle_lamps_now")) > 0 or control, "the vehicle heads are lit (%d vehicle lens(es))"
+			% ts.call("lit_vehicle_lamps_now"))
+	# the lit lamps are the LENS meshes of TrafficLight_2_Japan.blend (lamps.json), never the fallback ball
+	_check(int(ts.call("lens_lamps_now")) > 0 or control, "the lamps are the lens meshes (%d lens node(s))"
+			% ts.call("lens_lamps_now"))
 	_check(int(ts.call("plates_now")) > 0 or control, "name plates are built (%d label(s))" % ts.call("plates_now"))
 
 	# 3. wait for a red long enough for the approach, then drive the lane

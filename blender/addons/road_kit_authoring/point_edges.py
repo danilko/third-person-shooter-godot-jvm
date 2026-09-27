@@ -95,10 +95,13 @@ class Band(object):
     """One paved footprint: a closed XY polygon, plus the centreline it came from so the test can
     ask "and how high is that surface here?" without a 3D containment test."""
 
-    __slots__ = ("owner", "poly", "spine", "members", "carries_edge", "x0", "y0", "x1", "y1", "tris")
+    __slots__ = ("owner", "poly", "spine", "members", "carries_edge", "x0", "y0", "x1", "y1", "tris", "walk")
 
-    def __init__(self, owner, poly, spine, members=(), carries_edge=False, tris=()):
+    def __init__(self, owner, poly, spine, members=(), carries_edge=False, tris=(), walk=0.0):
         self.owner = owner
+        #: How far the road's FOOTWAY reaches past this paved footprint (its widest side, metres; 0 = none). A level
+        #: crossing opens the rail's fence over it too, so a pedestrian crosses beside the cars (user, 2026-09-27).
+        self.walk = float(walk)
         #: The footprint's own surface TRIANGLES where it has them (a pad's fan) -- the height a
         #: corridor must follow is read off these, never re-derived (`_pad_corridors`).
         self.tris = list(tris)
@@ -211,7 +214,9 @@ def band_of(solve):
     edges at all rather than letting this module re-derive them."""
     poly = [(p[0], p[1]) for p in solve.edges_left]
     poly += [(p[0], p[1]) for p in reversed(solve.edges_right)]
-    return Band(solve.road.name, poly, [tuple(s.pos) for s in solve.samples])
+    walk = max([2.0 * max(float(v.get("rka_walk_hl", 0.0)), float(v.get("rka_walk_hr", 0.0)))
+                for v in (solve.values or ())] or [0.0])
+    return Band(solve.road.name, poly, [tuple(s.pos) for s in solve.samples], walk=walk)
 
 
 def band_of_junction(jsolve):
@@ -473,6 +478,26 @@ def step_walls(points, walk, kerb, wall):
     return pts, wk, kb, wl
 
 
+def exit_bit(side, stairs_only=False):
+    """`rka_exit`'s bits for `side`: 1 / 2 an exit with a stair, 4 / 8 open with none."""
+    b = 1 if side == "left" else 2
+    return b if stairs_only else b | (b << 2)
+
+
+def exit_open(values, side, stairs_only=False):
+    """Per sample: is the fence on `side` open for a PLATFORM EXIT here? The exit is held from its station to the NEXT
+    (`rka_exit`), so the sample AT that next station reads none -- it is open too, or `step_walls` (which errs toward
+    more fence) would close almost the whole span. The gap is exactly the station-to-station span."""
+    bit = exit_bit(side, stairs_only)
+    on = [bool(int(round(float(v.get("rka_exit", 0.0)))) & bit) for v in values]
+    return [on[i] or (i > 0 and on[i - 1]) for i in range(len(values))]
+
+
+def exit_walls(values, side):
+    """Each sample's barrier height on `side`, 0 where a platform exit opens it."""
+    return [0.0 if o else v["rka_wall_h"] for o, v in zip(exit_open(values, side), values)]
+
+
 def road_edge_runs(solve, bands):
     """`[(suffix, points, walk, kerb, wall, sgn)]` -- one road run's kerb/footway carriers, over the
     OPEN runs only. THE one enumeration of edge runs: `point_build.build_edges` sweeps these and
@@ -480,6 +505,7 @@ def road_edge_runs(solve, bands):
     kerb stops. `sgn` is which side of the polyline the furniture stands on (+1 = its left)."""
     out = []
     runs = kerb_runs(solve, bands)
+    walls = {side: exit_walls(solve.values, side) for side in ("left", "right")}
     for side, edge in (("left", solve.edges_left), ("right", solve.edges_right)):
         kerb_key = "rka_curb_hl" if side == "left" else "rka_curb_hr"
         walk_key = "rka_walk_hl" if side == "left" else "rka_walk_hr"
@@ -488,8 +514,8 @@ def road_edge_runs(solve, bands):
             if len(pts) < 2:
                 continue
             vals = run_values(solve.values, run)
-            pts, walk, kerb, wall = step_walls(pts, [v[walk_key] for v in vals],
-                                               [v[kerb_key] for v in vals], [v["rka_wall_h"] for v in vals])
+            pts, walk, kerb, wall = step_walls(pts, [v[walk_key] for v in vals], [v[kerb_key] for v in vals],
+                                               run_values(walls[side], run))
             out.append(("%s_%d" % (side, n), pts, walk, kerb, wall, 1.0 if side == "left" else -1.0))
     return out
 

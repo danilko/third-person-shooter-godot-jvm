@@ -436,6 +436,16 @@ public class FirearmItem extends WeaponItem {
 	  digest += (i + 1) * (d[0] + 3 * d[1] + 7 * d[2]);
 	  Vector3 dir = new Vector3(d[0], d[1], d[2]);
 	  TraceHit hit = trace(ray, origin, dir, range);
+	  if (applyDamage) {
+		// A light crowd ped has no collider (world.PedCrowd): ask the crowds, and promote the one this pellet
+		// reaches before anything solid, so the damage lands on a real body in this same frame.
+		double reached = hit != null ? hit.point.minus(origin).length() : range;
+		var crowdHit = com.openworld.world.PedCrowd.shoot(origin, dir, reached);
+		if (crowdHit != null) {
+		  var body = crowdHit.crowd().promoteHit(crowdHit);
+		  if (body != null) hit = new TraceHit(body, crowdHit.point(), dir.times(-1.0));
+		}
+	  }
 	  hits.add(hit != null && hit.node != null ? hit.node.getName().toString() : "-");
 	  if (hit != null) {
 		SurfaceType s = im != null ? im.surfaceOf(hit.node) : SurfaceType.DEFAULT;

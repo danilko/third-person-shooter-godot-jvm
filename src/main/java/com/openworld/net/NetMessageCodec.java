@@ -79,6 +79,8 @@ public final class NetMessageCodec {
     // putSnapshotEntry have to agree byte for byte or MTU chunking mis-sizes every frame.
     private static final int SNAPSHOT_FIRE_STEP_SHIFT   = 9;
     private static final int SNAPSHOT_FIRE_STEP_MASK    = 0b111;
+    // HOLSTERED: the hands are empty (WeaponController.isHolstered). Bit 12, the next spare one.
+    private static final int SNAPSHOT_FLAG_HANDS_DOWN   = 1 << 12;
 
     /**
      * The flags word, packed and unpacked in ONE place so a new field cannot silently overlap an
@@ -99,16 +101,24 @@ public final class NetMessageCodec {
     public static int unpackActiveSlot(int flags)    { return (flags >> SNAPSHOT_WEAPON_SLOT_SHIFT) & SNAPSHOT_WEAPON_SLOT_MASK; }
     public static int unpackMovementType(int flags)  { return (flags >> SNAPSHOT_MOVE_TYPE_SHIFT) & SNAPSHOT_MOVE_TYPE_MASK; }
     public static int unpackFireStep(int flags)      { return (flags >> SNAPSHOT_FIRE_STEP_SHIFT) & SNAPSHOT_FIRE_STEP_MASK; }
+    public static boolean unpackHandsDown(int flags) { return (flags & SNAPSHOT_FLAG_HANDS_DOWN) != 0; }
+
+    /** {@link #packSnapshotFlags} plus the hands-down bit. */
+    public static int packSnapshotFlags(boolean combat, int stanceOrdinal, int activeSlotIndex,
+            int movementTypeOrdinal, int fireStep, boolean handsDown) {
+        return packSnapshotFlags(combat, stanceOrdinal, activeSlotIndex, movementTypeOrdinal, fireStep)
+                | (handsDown ? SNAPSHOT_FLAG_HANDS_DOWN : 0);
+    }
 
     public static PackedByteArray encodeSnapshot(int msgType, String characterId, long tick, Vector3 position,
             Vector3 velocity, Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq, int fireStep) {
+            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown) {
         StreamPeerBuffer buf = new StreamPeerBuffer();
         buf.put8(msgType);
         putSnapshotEntry(buf, characterId, tick, position, velocity, aimTarget, combat, stanceOrdinal,
                 activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine,
-                reloadSeq, fireStep);
+                reloadSeq, fireStep, handsDown);
         return buf.getDataArray();
     }
 
@@ -137,7 +147,7 @@ public final class NetMessageCodec {
     public record DecodedSnapshot(String characterId, long tick, Vector3 position, Vector3 velocity,
             Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq, int fireStep) { }
+            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown) { }
 
     /** One tick's worth of every replicated character's state, sent as a single broadcast frame. */
     public static PackedByteArray encodeSnapshotBatch(int msgType, java.util.List<DecodedSnapshot> entries) {
@@ -148,7 +158,7 @@ public final class NetMessageCodec {
             putSnapshotEntry(buf, e.characterId(), e.tick(), e.position(), e.velocity(), e.aimTarget(),
                     e.combat(), e.stanceOrdinal(), e.activeSlotIndex(), e.movementTypeOrdinal(),
                     e.yaw(), e.currentHealth(), e.senderTimeMs(), e.fireSeq(), e.activeMagazine(), e.reloadSeq(),
-                    e.fireStep());
+                    e.fireStep(), e.handsDown());
         }
         return buf.getDataArray();
     }
@@ -164,13 +174,13 @@ public final class NetMessageCodec {
     private static void putSnapshotEntry(StreamPeerBuffer buf, String characterId, long tick, Vector3 position,
             Vector3 velocity, Vector3 aimTarget, boolean combat, int stanceOrdinal, int activeSlotIndex,
             int movementTypeOrdinal, float yaw, float currentHealth, int senderTimeMs, int fireSeq,
-            int activeMagazine, int reloadSeq, int fireStep) {
+            int activeMagazine, int reloadSeq, int fireStep, boolean handsDown) {
         buf.putUtf8String(characterId);
         buf.put64(tick);
         putVector3(buf, position);
         putVector3(buf, velocity);
         putVector3(buf, aimTarget);
-        buf.put16(packSnapshotFlags(combat, stanceOrdinal, activeSlotIndex, movementTypeOrdinal, fireStep));
+        buf.put16(packSnapshotFlags(combat, stanceOrdinal, activeSlotIndex, movementTypeOrdinal, fireStep, handsDown));
         buf.putFloat(yaw);
         buf.putFloat(currentHealth);
         buf.put32(senderTimeMs);
@@ -203,7 +213,7 @@ public final class NetMessageCodec {
         int reloadSeq = buf.getU8();
         return new DecodedSnapshot(characterId, tick, position, velocity, aimTarget, combat, stanceOrdinal,
                 activeSlotIndex, movementTypeOrdinal, yaw, currentHealth, senderTimeMs, fireSeq, activeMagazine,
-                reloadSeq, fireStep);
+                reloadSeq, fireStep, unpackHandsDown(flags));
     }
 
     // ── MSG_IDENTIFY ──────────────────────────────────────────────────────────

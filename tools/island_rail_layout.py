@@ -645,6 +645,7 @@ NOTES = ["Central (the old Tokyo Station site) is the hub.", "The West line runs
 # neighbouring plot (drawn as its footprint).
 STATION_W = {"hub": 70.0, "large": 40.0, "junction": 30.0, "standard": 20.0, "small": 16.0}
 STATION_BUILDING = (12.74, 7.28)     # the StationBuilding type's footprint (along the track, across it)
+STATION_YARD = 3.8                   # the paid yard between a platform's outer edge and its building's back wall
 PARKING = {"park_and_ride": (70.0, 35.0), "small_lot": (40.0, 25.0), "multistorey": (40.0, 30.0), "none": (0, 0)}
 
 # ------------------------------------------------------------------------------------------ geometry
@@ -1534,19 +1535,24 @@ def reserve(res, out):
         # other side; the town side at its centre is the preference, the first clear placement wins
         pw, ph = PARKING[st["parking"]]
         shift = 0.0
+        # the building's back stands STATION_YARD behind its platform's outer edge (the paid yard its stair lands in),
+        # else where the reserve always put it, at the station box's edge
+        import island_rail_record as IRR
+        boffs = (IRR.platform_outer(st["kind"]) + STATION_YARD + STATION_BUILDING[1] / 2, hw + 5.0)
+        boff = boffs[-1]
         if st["kind"] != "hub":
             span = max(0.0, ul / 2 - STATION_BUILDING[0] / 2)
-            tries = [(sg, d) for sg in (1.0, -1.0) for d in (0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0, 45.0, -45.0)
-                     if abs(d) <= span + 1e-6]
-            for sg, d in tries:
-                bx, by = st["x"] + sg * nx * (hw + 5.0) + ux * d, st["y"] + sg * ny * (hw + 5.0) + uy * d
+            tries = [(sg, bo, d) for sg in (1.0, -1.0) for bo in boffs
+                     for d in (0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0, 45.0, -45.0) if abs(d) <= span + 1e-6]
+            for sg, bo, d in tries:
+                bx, by = st["x"] + sg * nx * bo + ux * d, st["y"] + sg * ny * bo + uy * d
                 ok = box_clear(bx, by, ux, uy, STATION_BUILDING[0] / 2 + 0.5, STATION_BUILDING[1] / 2 + 0.5, st["line"])
                 if ok and pw:
                     off = hw + 10 + ph / 2
                     ok = box_clear(st["x"] + sg * nx * off + ux * d, st["y"] + sg * ny * off + uy * d,
                                    ux, uy, pw / 2, ph / 2, st["line"])
                 if ok:
-                    nx, ny, shift = sg * nx, sg * ny, d
+                    nx, ny, shift, boff = sg * nx, sg * ny, d, bo
                     break
             else:
                 print("reserve: %s -- no placement of its building/car park clears the arterials" % n)
@@ -1560,10 +1566,31 @@ def reserve(res, out):
         # the platform fence and its front to the car park / street side. A hub's is its own site (Central: the
         # Tokyo Station building), so it gets none here. `island_sites.rail_stations` places it from THIS box.
         if st["kind"] != "hub":
-            boxes.append({"id": "building:" + n, "x": round(st["x"] + nx * (hw + 5.0) + ux * shift, 2),
-                          "y": round(st["y"] + ny * (hw + 5.0) + uy * shift, 2), "ux": round(ux, 5), "uy": round(uy, 5),
+            boxes.append({"id": "building:" + n, "x": round(st["x"] + nx * boff + ux * shift, 2),
+                          "y": round(st["y"] + ny * boff + uy * shift, 2), "ux": round(ux, 5), "uy": round(uy, 5),
                           "h_along": STATION_BUILDING[0] / 2 + 0.5, "h_across": STATION_BUILDING[1] / 2 + 0.5,
                           "nx": round(nx, 5), "ny": round(ny, 5)})
+        # ...and ONE ON THE FAR SIDE (user, 2026-09-27: "station on both side of rail rather than just one side due
+        # to gating"): an open-air station's two side platforms each have their OWN gated building, so neither
+        # platform needs a footbridge to reach the gates -- the small-station layout (上下線で別改札). A hub is one
+        # building over the whole rail with a bridge inside the paid area (3.36), so it gets neither. No car park on
+        # the far side: the town side has it. Slid along the platform like the near one; none if nothing clears.
+        if st["kind"] != "hub":
+            span = max(0.0, ul / 2 - STATION_BUILDING[0] / 2)
+            for bo, d in [(bo, d) for bo in boffs for d in (shift, 0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0, 45.0,
+                                                               -45.0)]:
+                if abs(d) > span + 1e-6:
+                    continue
+                bx, by = st["x"] - nx * bo + ux * d, st["y"] - ny * bo + uy * d
+                if box_clear(bx, by, ux, uy, STATION_BUILDING[0] / 2 + 0.5, STATION_BUILDING[1] / 2 + 0.5,
+                             st["line"]) and not over_dike((st["x"], st["y"]), (bx, by)) and gnd.z(bx, by) > -1.0:
+                    boxes.append({"id": "building_far:" + n, "x": round(bx, 2), "y": round(by, 2),
+                                  "ux": round(ux, 5), "uy": round(uy, 5),
+                                  "h_along": STATION_BUILDING[0] / 2 + 0.5, "h_across": STATION_BUILDING[1] / 2 + 0.5,
+                                  "nx": round(-nx, 5), "ny": round(-ny, 5)})
+                    break
+            else:
+                print("reserve: %s -- no far-side station building clears (its far platform has no gates)" % n)
         w, h = PARKING[st["parking"]]
         if w:
             off = hw + 10 + h / 2           # the same place the picture draws it

@@ -146,6 +146,17 @@ CARRIER_ATTRS = (
     # A ROCK SHED over this sample (PLAN.md 3.15, `point_model.SHEDS`): 0 none, 1 open on the left (the columns there,
     # the wall against the rock on the right), 2 open on the right. `point_mesh.sheds` builds it.
     Attr("rka_shed",    "code", 0.0, "rock shed: 0 none, 1 open left, 2 open right"),
+    # A PLATFORM EXIT over this sample (`point_model.PLATFORM_EXITS`), a bit mask: 1 the left side, 2 the right -- the
+    # barrier on that side stands down (`point_edges.road_edge_runs`) and `point_mesh.platform_stairs` builds a stair;
+    # 4 / 8 the same sides from `platform_open`: the barrier stands down and no stair is built.
+    Attr("rka_exit",    "code", 0.0, "platform exit: bit 1 left, 2 right (a stair); bit 4 left, 8 right (open only)"),
+    # the paid area at a platform exit (held with `rka_exit`): yard depth and building shift per side, and bit 1 of
+    # rka_fbridge a footbridge over the tracks from the exit side to a platform with no building
+    Attr("rka_yard_l",  "m", 0.0, "paid yard depth left of the chain (0 = none)"),
+    Attr("rka_yard_r",  "m", 0.0, "paid yard depth right of the chain (0 = none)"),
+    Attr("rka_ysh_l",   "m", 0.0, "left station building's along-chain offset from the exit centre"),
+    Attr("rka_ysh_r",   "m", 0.0, "right station building's along-chain offset from the exit centre"),
+    Attr("rka_fbridge", "code", 0.0, "1 = a footbridge over the tracks at this exit"),
 )
 
 #: A rock shed's inside: the roof's SOFFIT stands this high over the carriageway (Japanese 建築限界 is 4.5 m; a shed
@@ -154,6 +165,7 @@ SHED_CLEAR = 5.5
 SHED_ROOF = 1.0
 SHED_COL_SPACING = 8.0
 SHED_CODE = {pm.SHED_NONE: 0.0, pm.SHED_OPEN_LEFT: 1.0, pm.SHED_OPEN_RIGHT: 2.0}
+EXIT_CODE = {pm.EXIT_NONE: 0.0, pm.EXIT_LEFT: 1.0, pm.EXIT_RIGHT: 2.0, pm.EXIT_BOTH: 3.0}
 
 ATTR_NAMES = tuple(a.name for a in CARRIER_ATTRS)
 ATTR_DEFAULTS = {a.name: a.default for a in CARRIER_ATTRS}
@@ -601,6 +613,13 @@ def solve_road(net, road, uids=None, ground_fn=None):
 
         i_st = sm.at_station if sm.at_station is not None else sm.seg
         v["rka_shed"] = SHED_CODE.get(getattr(points[i_st], "shed", pm.SHED_NONE), 0.0)
+        v["rka_exit"] = (EXIT_CODE.get(getattr(points[i_st], "platform_exit", pm.EXIT_NONE), 0.0)
+                         + 4.0 * EXIT_CODE.get(getattr(points[i_st], "platform_open", pm.EXIT_NONE), 0.0))
+        v["rka_yard_l"] = float(getattr(points[i_st], "yard_left", 0.0))
+        v["rka_yard_r"] = float(getattr(points[i_st], "yard_right", 0.0))
+        v["rka_ysh_l"] = float(getattr(points[i_st], "yard_shift_left", 0.0))
+        v["rka_ysh_r"] = float(getattr(points[i_st], "yard_shift_right", 0.0))
+        v["rka_fbridge"] = 1.0 if getattr(points[i_st], "footbridge", False) else 0.0
 
         # ---- the barrier. One rule, both cases: a road nobody may walk on is fenced along its
         # whole length, and a road they may walk on is fenced only where it is off the ground.

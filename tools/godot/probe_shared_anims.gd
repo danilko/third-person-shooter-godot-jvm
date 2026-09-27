@@ -76,6 +76,10 @@ func _initialize() -> void:
 		if man is Dictionary:
 			for n in (man.get("skipped", []) as Array):
 				skipped[String(n)] = true
+			# GAIT sources (derive_gait.py's f_* clips) are not library clips: a gait library stands them
+			# under the base names instead (character_gaits.json).
+			for n in (man.get("gait_sources", []) as Array):
+				skipped[String(n)] = true
 	var missing: PackedStringArray = []
 	for n in names:
 		if skipped.has(String(n)): continue

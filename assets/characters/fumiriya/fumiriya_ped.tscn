@@ -1,0 +1,12 @@
+[gd_scene format=3]
+
+; The LIGHT-PED body of fumiriya (the crowd's far tier, baked into a vertex-animation texture by
+; tools/godot/bake_ped_vat.gd), built by blender/tools/build_ped_body.py --no-clips from the shipped
+; fumiriya.glb. Like shino_ped.tscn it exists to state the armature's 180-degree turn (W41).
+
+[ext_resource type="PackedScene" path="res://assets/characters/fumiriya/fumiriya_ped.glb" id="1_ped"]
+
+[node name="fumiriya_ped_body" instance=ExtResource("1_ped")]
+
+[node name="fumiriya" parent="." index="0"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)

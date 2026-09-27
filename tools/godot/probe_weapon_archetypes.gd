@@ -57,6 +57,9 @@ func _initialize() -> void:
 	world.add_child(p)
 	p.position = Vector3(0, 1.2, 0)
 	await _tick(40)
+	# A body starts HOLSTERED (hands empty: the weapon pose is blended out), so every archetype would read
+	# the same walk arms. Draw the fists, as the 0 key does.
+	p.get_node("WeaponController").call("set_holstered", false)
 
 	var tree: AnimationTree = _find(p, "AnimationTree") as AnimationTree
 	var hand: Node3D = _find(p, "WeaponAttachment") as Node3D

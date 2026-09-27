@@ -513,7 +513,22 @@ def main():
         imported = {a[:-5] if a.endswith("-loop") else a for a in rig.anim}
         refs = sorted(set(re.findall(r'^animation = &"([^"]+)"',
                                      open(TSCN).read(), re.M)))
+        # GAIT clips (character_gaits.json): a name the libraries make, not an export clip -- the male
+        # library aliases it to an existing clip, a female body's library to a derive_gait.py source. It
+        # is satisfied when every gait maps it to something that IS exported; those sources count as used.
+        gaits = {}
+        gpath = os.path.join(ROOT, "src/main/resources/com/openworld/character/anim/character_gaits.json")
+        if os.path.exists(gpath):
+            for g in json.load(open(gpath))["gaits"].values():
+                for base, src in g["map"].items():
+                    gaits.setdefault(base, set()).add(src)
+        gait_sources = {src for srcs in gaits.values() for src in srcs}
         for r in refs:
+            if r not in imported and r in gaits:
+                missing = sorted(src for src in gaits[r] if src not in imported)
+                if missing:
+                    err("tree_refs", f"gait clip {r!r} maps to {missing}, absent from the export.")
+                continue
             if r not in imported:
                 err("tree_refs", f"AnimationTree references clip {r!r}, absent from the export.")
         print(f"  tree_refs: {len(refs)} clips referenced by the AnimationTree")
@@ -561,7 +576,7 @@ def main():
         # WeaponBlend's filter takes from the aim branch) are bit-identical to the upright clip's,
         # so the AnimationTree's single upright WeaponAim blendspace loses nothing by ignoring
         # them. WARN, not ERROR: an unused clip is a normal state for work in progress.
-        orphans = sorted(imported - set(refs))
+        orphans = sorted(imported - set(refs) - gait_sources)
         if orphans:
             warn("orphan_clips",
                  f"{len(orphans)} exported clip(s) referenced by no AnimationTree node, so "

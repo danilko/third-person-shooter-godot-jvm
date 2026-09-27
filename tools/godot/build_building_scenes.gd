@@ -29,6 +29,9 @@ const OCCLUDER_TYPES := ["Mansion", "OfficeMid", "PencilBuilding", "ShopHouse", 
 const OPEN_VARIANT_SUFFIX := "_Open"
 const SHOP_VARIANT_SUFFIX := "_Shop"
 const DOOR_SCRIPT := "res://src/main/java/com/openworld/world/Door.java"
+const GATE_SCRIPT := "res://src/main/java/com/openworld/world/TicketGate.java"
+const GATE_FLAP_LO := 0.45       # a ticket gate's flap: its visible panel (the collider reaches the floor)
+const GATE_FLAP_HI := 0.95
 const DOOR_LEAF := "res://assets/world_source/kits/quaternius_downtown_city/pieces/doors/Door_1.gltf"
 const GLASS_T := 0.06        # a shopfront pane's thickness (its frame reads, not its glass)
 const FRAME_T := 0.04        # the slim aluminium stile/rail of a Japanese automatic door
@@ -148,6 +151,65 @@ func _panels(b: Dictionary, op: Dictionary) -> int:
 	if str(op.get("style", b.get("door_style", "swing"))) != "slide":
 		return 1
 	return 2 if float(op["w"]) >= 1.2 else 1
+
+## A TICKET GATE's lane (PLAN.md P3 "the paid area"): two flaps, one hinged on each gate body, meeting in the middle
+## of the lane, each a `world.TicketGate` (a Door that swings aside for a character walking the lane, fare-free for
+## now). The collider reaches the floor so nobody crawls under; the visible panel is the flap band a real gate has.
+func _add_gate(root: Node3D, doors_root: Node3D, op: Dictionary, dn: int) -> int:
+	var oxf: Transform3D = op["xf"]
+	var w := float(op["w"])
+	var h := float(op["h"])
+	var lw := w / 2.0
+	# ONE sensor for the lane, beside the flaps and NOT under either: a sensor that is a flap's child swings away with
+	# it, loses the body in the lane, shuts the flap, swings back and finds it again -- the gate chattered at 36 deg
+	var sensor := Area3D.new()
+	sensor.name = "GateSensor%d" % dn
+	sensor.collision_layer = 0
+	sensor.collision_mask = 2          # CollisionLayers.CHARACTER
+	sensor.transform = oxf
+	var scs := CollisionShape3D.new()
+	scs.name = "CollisionShape3D"
+	var sbox := BoxShape3D.new()
+	sbox.size = Vector3(w, 2.0, 3.0)   # the LANE only: somebody beside the gate body opens nothing
+	scs.shape = sbox
+	scs.position = Vector3(0.0, 1.0, 0.0)
+	sensor.add_child(scs)
+	doors_root.add_child(sensor)
+	sensor.owner = root
+	scs.owner = root
+	for li in range(2):
+		var door := StaticBody3D.new()
+		door.set_script(load(GATE_SCRIPT))
+		door.name = "Gate%d" % dn
+		dn += 1
+		# the node is the HINGE on the gate body; its leaf spans local -X toward the lane's middle
+		var turn := Basis.IDENTITY if li == 0 else Basis(Vector3.UP, PI)
+		door.transform = oxf * Transform3D(turn, Vector3(w / 2.0 if li == 0 else -w / 2.0, 0.0, 0.0))
+		door.collision_layer = 1
+		door.collision_mask = 0
+		doors_root.add_child(door)
+		door.owner = root
+		var leaf := MeshInstance3D.new()
+		leaf.name = "IntactVisual"
+		var lm := BoxMesh.new()
+		lm.size = Vector3(lw, GATE_FLAP_HI - GATE_FLAP_LO, 0.03)
+		leaf.mesh = lm
+		leaf.material_override = _lib_material("MI_CraneRed")
+		leaf.position = Vector3(-lw / 2.0, (GATE_FLAP_LO + GATE_FLAP_HI) / 2.0, 0.0)
+		door.add_child(leaf)
+		leaf.owner = root
+		var lcs := CollisionShape3D.new()
+		lcs.name = "CollisionShape3D"
+		var lshape := BoxShape3D.new()
+		lshape.size = Vector3(lw + LEAF_MEET, h, 0.06)
+		lcs.shape = lshape
+		lcs.position = Vector3(-lw / 2.0, h / 2.0, 0.0)
+		door.add_child(lcs)
+		lcs.owner = root
+		door.set("sensor_path", NodePath("../%s" % sensor.name))
+		door.set("locked", false)
+		door.set("breakable", false)
+	return dn
 
 ## A library material by name (the palette owns its look: `assets/world_source/kits/library/palette.json`).
 func _lib_material(name: String) -> Material:
@@ -591,9 +653,12 @@ func _build(b: Dictionary, variant: String) -> bool:
 			var io := Vector3(idr["outward"][0], 0.0, idr["outward"][2])
 			ops.append({"xf": Transform3D(Basis(Vector3.UP, atan2(io.x, io.z)),
 					Vector3(idr["center"][0], idr["center"][1], idr["center"][2])),
-					"w": float(idr["width"]), "h": float(idr["height"]), "frame": false, "style": "swing",
-					"inner": true})
+					"w": float(idr["width"]), "h": float(idr["height"]), "frame": false,
+					"style": "gate" if str(idr.get("kind", "door")) == "gate" else "swing", "inner": true})
 		for op in ops:
+			if str(op.get("style", "")) == "gate":
+				dn = _add_gate(root, doors_root, op, dn)
+				continue
 			# per OPENING: a SITE holds parts of different types, so its kiosk's 自動ドア and a back gate's
 			# swing door stand on one footprint (user-reported, PLAN.md 3.18f)
 			var slide := str(op.get("style", b.get("door_style", "swing"))) == "slide"

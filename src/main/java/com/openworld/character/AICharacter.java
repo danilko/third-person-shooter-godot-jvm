@@ -97,6 +97,14 @@ public class AICharacter extends Character {
      */
     @Export public boolean storyCharacter = false;
 
+    /** A mission character, or a hostile that is fighting, always has a plate; otherwise Character's rule. */
+    @Override
+    public boolean isNameplateRelevant() {
+        if (storyCharacter) return true;
+        if (isCombat() && characterInfo != null && Faction.areHostile(characterInfo.faction, Faction.PLAYER)) return true;
+        return super.isNameplateRelevant();
+    }
+
     /** Runtime squad — shared group awareness (E3). Null = solo. Accessed via {@link #activeSquad()}. */
     private AISquad squad;
 

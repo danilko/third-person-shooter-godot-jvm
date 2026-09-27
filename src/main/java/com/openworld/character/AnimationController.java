@@ -3,6 +3,7 @@ package com.openworld.character;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
@@ -165,6 +166,8 @@ public class AnimationController extends Node {
     AICharacter ai = lodBody();
     if (ai != null && ai.getLodLevel() != AILodLevel.ACTIVE) return;
 
+    updateHands(delta);
+
     // Landing edge: a jump/fall OneShot plays its FULL clip once fired, so after touchdown the
     // multi-second jump/falling pose keeps blending on top of locomotion — the "still airborne while
     // already running" lag. Fade those OneShots out the moment we regain the floor so walk/run shows.
@@ -239,15 +242,48 @@ public class AnimationController extends Node {
     updateAnimationBlend(movementState);
   }
 
+  // ── Hands down: the relaxed carry (user, 2026-09-27) ─────────────────────────────────────────
+  //
+  // HOLSTERED (WeaponController.isHolstered: hands empty, cannot fight), a body walks on the WALK's own
+  // arms: WeaponBlend eases to 0, and nothing aims (no spine/shoulder look-at, no T-pose neck, no aim
+  // branch), in first and third person alike. Before this every unarmed body -- the player, every
+  // pedestrian -- strolled in `upright_hold_fist`, the boxing guard (PLAN.md 3.18 z1), and a first-person
+  // view was permanently framed by two fists. Drawing the fists (the 0 key) brings the guard up over
+  // handsBlendSeconds.
+  //
+  // A real weapon is unchanged: out of combat it hangs in its archetype's HOLD pose, in combat it aims.
+
+  /** Seconds the fists take to come up (or go down). */
+  @Visible public double handsBlendSeconds = 0.15;
+  private boolean handsDown = false;
+  private boolean holsterOverride = false;
+  private double weaponBlend = 1.0;
+
+  /** True while this body walks with its hands down (a probe readout). */
+  @Register public boolean handsDownNow() { return handsDown; }
+
+  private boolean aiming() { return combat && !handsDown; }
+
+  private void updateHands(double delta) {
+    Character body = liveBody() instanceof Character c ? c : null;
+    boolean down = body != null && body.weaponController != null && body.weaponController.isHolstered();
+    if (down != handsDown) {
+      handsDown = down;
+      applyAimState();
+    }
+    double target = (holsterOverride || handsDown) ? 0.0 : 1.0;
+    if (weaponBlend != target) {
+      double step = handsBlendSeconds <= 0.0 ? 1.0 : delta / handsBlendSeconds;
+      weaponBlend = weaponBlend < target ? Math.min(target, weaponBlend + step) : Math.max(target, weaponBlend - step);
+      animationTree.set("parameters/WeaponBlend/blend_amount", weaponBlend);
+    }
+  }
+
   /**
-   * Story/cutscene hook: forces WeaponBlend to 0 (no weapon pose) or restores it to 1.
-   * Not called during normal slot switching — all weapons including fist use WeaponBlend = 1.
+   * Story/cutscene hook: forces WeaponBlend to 0 (no weapon pose) or restores it. Eased like the hands.
    */
   public void setHolster(boolean holster) {
-    if (animationTree == null) return;
-    // blend_amount: WeaponBlend is a Blend2. This wrote `blend_position` (a BlendSpace parameter),
-    // which AnimationTree.set ignores silently, so the hook had never done anything.
-    animationTree.set("parameters/WeaponBlend/blend_amount", holster ? 0 : 1);
+    holsterOverride = holster;
   }
 
   /**
@@ -431,13 +467,30 @@ public class AnimationController extends Node {
   public void onSetCombatState(CombatState combatState) {
     if (animationTree == null) return;
     combat = combatState.isCombat();
-    animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
-    animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
     // Combat decides the swim posture (a swimmer who aims treads), so re-derive it now, not on the
-    // next movement change.
-    if (SWIM_KEY.equals(currentStanceName)) updateAnimationBlend(currentMovementState);
+    // next movement change -- and the relaxed walk too (it is the out-of-combat walk).
+    if (currentMovementState != null) updateAnimationBlend(currentMovementState);
+    applyAimState();
+  }
+
+  /** Everything "is this body aiming" decides: combat, less a body walking with its hands down. */
+  private void applyAimState() {
+    if (animationTree == null) return;
+    boolean aim = aiming();
+    animationTree.set("parameters/CombatTransition/transition_request", aim ? "Combat" : "NoCombat");
+    // The neck follows COMBAT, not the hands: NeckFront holds it steady for the first-person camera that
+    // rides it, and a holstered first-person walk is still in combat (measured: keyed on the hands, the
+    // view lagged a crouch by 0.155 m against probe_fps_camera's 0.12 m limit).
+    animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
+    // Out of combat the body faces its travel and strolls on the RELAXED walk (a female body's has a
+    // gentle upper-body sway, blender/tools/derive_gait.py). Anything that faces the aim -- which is all
+    // a gun ever sees -- walks the steady ring. A tree without the branch ignores the request.
+    animationTree.set(RELAXED_REQUEST, combat ? "Raised" : "Relaxed");
     updateAimModifiers();
   }
+
+  private static final String RELAXED_REQUEST = "parameters/RelaxedTransition/transition_request";
+  private static final NodePath RELAXED_BLEND = new NodePath("parameters/UprightRelaxedBlend/blend_position");
 
   /**
    * One shot's visible weapon kick (PLAN.md A3). Called by {@code WeaponController} at the two sites
@@ -468,8 +521,12 @@ public class AnimationController extends Node {
     // target, the shoulders then compute a delta of ~0 and add nothing.) That is what makes a
     // seated aim reach past what collarbones alone can sell: `Stance.aimYawLimit` is the TOTAL
     // reach and `Stance.spineAimYawLimit` is the torso's share of it.
+    // The CHEST follows combat even with the hands holstered: facing the view does not raise the arms,
+    // and the first-person camera rides the neck above it (measured: with the spine look-at off, the view
+    // lagged a crouch 0.161 m against probe_fps_camera's 0.12 m). The shoulders, the stock mount, the torso
+    // layer and the aim branch are the HANDS' and follow aiming().
     boolean spine = combat && currentStance.isSpineAimEnabled();
-    boolean shoulder = combat && currentStance.isShoulderAimEnabled();
+    boolean shoulder = aiming() && currentStance.isShoulderAimEnabled();
     boolean staged = spine && shoulder;
     // Staged: the spine is capped at the torso's share and the shoulders carry the total, so the
     // remainder — and only the remainder — lands on the collarbones and neck. Single-modifier
@@ -480,9 +537,9 @@ public class AnimationController extends Node {
     // The stock mount eases itself in and out (and does nothing for a weapon with no StockPoint), so
     // it only needs to know whether this is a shouldered aim at all.
     if (stockMountModifier != null) {
-      stockMountModifier.setEngaged(combat && weaponPosed && currentStance.isStockMountEnabled());
+      stockMountModifier.setEngaged(aiming() && weaponPosed && currentStance.isStockMountEnabled());
     }
-    torsoLayerTarget = (combat && currentStance.isWeaponTorsoLayer()) ? 1.0 : 0.0;
+    torsoLayerTarget = (aiming() && currentStance.isWeaponTorsoLayer()) ? 1.0 : 0.0;
   }
 
   private void applyAimLimits(ShoulderAimModifier m, boolean active, Stance stance, float yawLimit) {
@@ -596,6 +653,10 @@ public class AnimationController extends Node {
     NodePath blendPath = blendPathCache.computeIfAbsent(currentStanceName,
         name -> new NodePath("parameters/" + name + "MovementBlend/blend_position"));
     tween.tweenProperty(animationTree, blendPath, animationDirection, animationBlendDuration);
+    if (!combat) {
+      // The relaxed walk: idle 0, walk 1, run 2 -- the same movement id the ring's forward axis takes.
+      tween.parallel().tweenProperty(animationTree, RELAXED_BLEND, (double) movementState.getId(), animationBlendDuration);
+    }
     tween.parallel().tweenProperty(animationTree, ANIM_SPEED_PATH, movementState.animationSpeed, animationSpeedDuration);
   }
 }

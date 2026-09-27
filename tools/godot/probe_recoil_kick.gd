@@ -82,6 +82,9 @@ func _attach(sk: Skeleton3D, bone: String) -> BoneAttachment3D:
 ## Spawn a Player, drop `weapon_id` on it (auto-pickup) and bring it to the hand. [player, gun] or [].
 func _armed_player(world: Node3D, weapon_id: String, at: Vector3) -> Array:
 	var p: Node3D = (load(PLAYER) as PackedScene).instantiate() as Node3D
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--visuals="):     # another body: `-- --visuals=res://...CharacterVisuals_X.tscn`
+			p.set("character_visuals", load(a.substr("--visuals=".length())))
 	world.add_child(p)
 	p.position = at
 	await _tick(40)

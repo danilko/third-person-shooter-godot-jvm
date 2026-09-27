@@ -144,6 +144,10 @@ func _run() -> void:
 		quit(1)
 		return
 	player.get_node("Health").set("max_health", 1000000.0)
+	# Invulnerable, not just a big max: parked at FAR the player was killed (max_health does not raise the
+	# CURRENT health), game-over PAUSED the tree, and every crowd stopped ticking -- which read as "the crowd
+	# does not hear a gunshot".
+	player.get_node("Health").set("invulnerable", true)
 	player.set_physics_process(false)     # the probe teleports it; nothing here tests movement
 	_put_player(FAR)
 	await _wait(3.0)
@@ -177,19 +181,18 @@ func _run() -> void:
 	var ys := []
 	var p0 := []
 	if crowd:
-		for c in crowd.get_children():
-			if c is Node3D:
-				p0.append((c as Node3D).global_position)
+		for v in crowd.call("ped_positions_now"):
+			p0.append(v)
 	await _wait(4.0)
 	var walked1: float = crowd.call("walked_total_now") if crowd else 0.0
 	var moved := 0
 	var i := 0
 	if crowd:
-		for c in crowd.get_children():
-			if c is Node3D and i < p0.size():
-				if (c as Node3D).global_position.distance_to(p0[i]) > 1.0:
+		for v in crowd.call("ped_positions_now"):
+			if i < p0.size():
+				if (v as Vector3).distance_to(p0[i]) > 1.0:
 					moved += 1
-				ys.append((c as Node3D).global_position.y)
+				ys.append((v as Vector3).y)
 				i += 1
 	check(walked1 - walked0 > peds * 2.0,
 		"the crowd walked (%.0f m in 4 s over %d peds)" % [walked1 - walked0, peds])
@@ -205,7 +208,7 @@ func _run() -> void:
 	# Promotion: stand next to the crowd.
 	var target := AT
 	if crowd and crowd.get_child_count() > 0:
-		target = (crowd.get_child(0) as Node3D).global_position
+		target = crowd.call("ped_positions_now")[0]
 	_put_player(target + Vector3(0, 1.0, 0))
 	await _wait(4.0)
 	var peds_near := _ped_total()
@@ -216,14 +219,65 @@ func _run() -> void:
 	check(peds_near + walkers_near >= peds - 2,
 		"nobody was lost in the swap (%d + %d vs %d)" % [peds_near, walkers_near, peds])
 
-	# Demotion: walk away again.
+	# Demotion: walk away again. A promoted body is held for 10 s after its promotion (ZoneManager
+	# DEMOTE_AFTER_MSEC: a body a player just dealt with stays one), so wait past that.
 	_put_player(FAR)
-	await _wait(5.0)
+	await _wait(12.0)
 	var peds_far := _ped_total()
 	var walkers_far := _walkers().size()
 	print("  after walking away: %d light peds, %d full walkers" % [peds_far, walkers_far])
 	check(walkers_far == 0, "every promoted body was handed back (%d left)" % walkers_far)
 	check(peds_far >= peds_near, "the crowd took them back (%d -> %d)" % [peds_near, peds_far])
+
+	# Fight back: every ped a fighter, a gunshot 60 m from the crowd, the player 70 m off (outside the 25 m
+	# promote ring, inside the 120 m panic range). Exactly the FIGHTER BUDGET are promoted -- armed or fists,
+	# turned `vigilante` (ZoneManager.FIGHTER_FACTION), keeping the ordinary AI brain -- and no more.
+	if crowd and not _arg("control", false):
+		crowd.set("fight_percent", 100)
+		crowd.set("cower_percent", 0)
+		var here: Vector3 = crowd.call("ped_positions_now")[0]
+		_put_player(here + Vector3(70, 1.0, 0))
+		await _wait(1.0)
+		var sm := root.get_node_or_null("StimulusManager")
+		# temperament is rolled when a ped is added, so re-roll it from the shares just set
+		crowd.call("reroll_temper_now")
+		sm.call("post_noise", 0, here, 150.0)
+		await _wait(3.0)
+		var fighters := 0
+		var armed := 0
+		for n in get_nodes_in_group("characters"):
+			var info = n.get("character_info")
+			if info != null and str(info.get("faction")) == "vigilante":
+				fighters += 1
+				var wc = n.get_node_or_null("WeaponController")
+				if wc != null and int(wc.call("active_slot_now")) > 0: armed += 1
+		var budget := int(zm.get("fighter_budget"))
+		print("  a gunshot by a crowd of fighters: %d promoted to fight (%d with a weapon), budget %d" % [fighters, armed, budget])
+		check(fighters == budget, "exactly the fighter budget turned to fight (%d of %d)" % [fighters, budget])
+		check(int(crowd.call("promoted_now")) >= budget, "the crowd handed them over (%d promoted)" % int(crowd.call("promoted_now")))
+		_put_player(FAR)
+		await _wait(1.0)
+
+	# A light ped has no collider: a shot asks the crowds (PedCrowd.shoot) and the ped it reaches becomes a
+	# real body at once, whatever the budget, so the damage lands (FirearmItem.resolvePellets).
+	if crowd and not _arg("control", false):
+		var shot_at: Vector3 = crowd.call("ped_positions_now")[0]
+		_put_player(shot_at + Vector3(0, 1.0, 70))
+		await _wait(1.0)
+		shot_at = crowd.call("ped_positions_now")[0]
+		var before := int(crowd.call("ped_count"))
+		var from := shot_at + Vector3(0, 1.2, 30)
+		var at: Vector3 = crowd.call("shoot_now", from, (shot_at + Vector3(0, 1.2, 0)) - from, 100.0)
+		var ok := at.y > -1000.0
+		await _wait(0.5)
+		var near := 0
+		for n in get_nodes_in_group("characters"):
+			if ok and n is Node3D and (n as Node3D).global_position.distance_to(at) < 3.0: near += 1
+		check(ok and int(crowd.call("ped_count")) == before - 1 and near >= 1,
+			"a shot at a light ped 70 m out made it a real body where it stood (%s, %d -> %d peds, %d body)"
+			% [ok, before, int(crowd.call("ped_count")), near])
+		_put_player(FAR)
+		await _wait(1.0)
 
 	# Unload frees the crowd with the zone.
 	m.queue_free()

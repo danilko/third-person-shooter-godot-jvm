@@ -181,6 +181,34 @@ def sweep(pts, values, kind, offset_attr, z, z_attr, width_attr, thickness_attr,
     return top + bottom + walls
 
 
+#: A RAISED median's kerb stones: this wide along each edge of the island, the rest is footway fill between them.
+MEDIAN_KERB_W = 0.15
+
+
+def raised_median(pts, values, lats=None):
+    """A RAISED (or WALL) median as a KERBED ISLAND: `(fill [tri], kerbs [tri])`. Each edge is a kerb stone prism
+    `MEDIAN_KERB_W` wide from the road surface to the island's top (`rka_med_z`), and between them a prism of the
+    same height topped like a footway. Separate prisms, never one block with a band on it, so no two top faces share
+    a plane (z-fighting). An island narrower than two kerbs is all kerb."""
+    if not any(float(v.get("rka_med_h", 0.0)) > 1e-6 and float(v.get("rka_med_z", 0.0)) > 1e-6 for v in values):
+        return [], []
+    kv, fv = [], []
+    for v in values:
+        h, zt = float(v.get("rka_med_h", 0.0)), float(v.get("rka_med_z", 0.0))
+        if zt <= 1e-6:
+            h = 0.0
+        kw = min(MEDIAN_KERB_W, h)
+        fill = max(0.0, h - kw)
+        d = dict(v)
+        d["_mf_h"], d["_mf_z"], d["_mf_t"] = fill, zt, zt
+        d["_mkl_c"], d["_mkr_c"], d["_mk_h"] = h - kw / 2.0, -(h - kw / 2.0), kw / 2.0
+        fv.append(d)
+    kerbs = sweep(pts, fv, "deck", "_mkl_c", 0.0, "_mf_z", "_mk_h", "_mf_t", lats) + \
+        sweep(pts, fv, "deck", "_mkr_c", 0.0, "_mf_z", "_mk_h", "_mf_t", lats)
+    fill = sweep(pts, fv, "deck", "", 0.0, "_mf_z", "_mf_h", "_mf_t", lats)
+    return fill, kerbs
+
+
 #: A `WALL` median's barrier: this wide (clamped to the island), the road's `barrier_height` tall, on the island's top.
 MEDIAN_WALL_HALF = 0.3
 
@@ -493,6 +521,50 @@ RAIL_HEAD_W = 0.07
 RAIL_H = 0.16
 RAIL_MATERIAL = "M_Rail"
 RAIL_BED_MATERIAL = "M_Ballast"
+# JAPANESE TRACK (user, 2026-09-27: "rebuild the rail track according to japan rail standard ... with additional
+# bearing for earthquakes"). What differs from a Western track, and what is modelled:
+#   * the RAIL is a 50N-proportioned I-section (JIS E 1101: head 65 mm, web ~15 mm, foot 127 mm) inside the kit's
+#     RAIL_H envelope (50N is 153 mm; RAIL_H stays 0.16 because every platform and gauge is measured from the head);
+#   * AT GRADE: ballasted track on JR 3号 PC (prestressed concrete) sleepers -- never timber on a main line -- 2.0 m
+#     long, 0.19 m across the top, at the 1級線 density of 39 per 25 m rail (0.641 m), their tops just proud of the
+#     ballast (Japanese ballast is dressed to the sleeper top);
+#   * ON A VIADUCT OR BRIDGE (any sample on a PIER deck, `rka_deck_h` > 0): SLAB TRACK (スラブ軌道): no ballast, no
+#     sleepers -- a precast track slab under each track (在来線 slab 4.93 x 2.22 m, 0.19 m + 50 mm CA mortar), a
+#     70 mm joint between slabs, and at every joint a CYLINDRICAL STOPPER (円柱形突起, Ø0.40 m) on the track centre:
+#     the earthquake restraint that stops the slabs sliding off along or across the deck; the deck surface between is
+#     roadbed concrete. A DERAILMENT-PREVENTION GUARD (脱線防止ガード, an angle 0.12 m inside the INNER rail of the
+#     curve -- the left rail on a straight) runs the whole slab span, as fitted to Japanese viaducts since 2004;
+#   * every rail PIER's cap carries two SEISMIC SIDE STOPPERS (横変位拘束構造 / 落橋防止): concrete blocks flanking
+#     the girder, so a quake cannot push the deck sideways off the pier (`rail_pier_stoppers`).
+# None of it collides except the stoppers on the pier (the bed proxy carries a character; a sleeper is 2 cm high).
+RAIL_FOOT_W, RAIL_FOOT_T = 0.127, 0.03
+RAIL_WEB_W = 0.016
+RAIL_HEAD_T = 0.045
+SLEEPER_SPACING = 25.0 / 39.0
+SLEEPER_HALF_LEN = 0.095
+SLEEPER_HALF_W = 1.0
+SLEEPER_TOP = 0.02
+SLEEPER_DEPTH = 0.17
+SLEEPER_MATERIAL = "M_Concrete"
+SLAB_LEN = 4.93
+SLAB_GAP = 0.07
+SLAB_HALF_W = 1.11
+SLAB_TOP = 0.03
+SLAB_DEPTH = 0.24
+SLAB_MATERIAL = "M_TrackSlab"
+SLAB_BED_MATERIAL = "M_Concrete"
+STOPPER_R = 0.20
+STOPPER_TOP = 0.09
+GUARD_INSET = 0.12
+GUARD_HALF = 0.012
+GUARD_TOP = 0.13
+PIER_STOPPER_HALF_LEN, PIER_STOPPER_HALF_W, PIER_STOPPER_H = 0.5, 0.3, 0.9
+PIER_STOPPER_GAP = 0.05
+
+
+def slab_span(v):
+    """A carrier sample on a viaduct / bridge deck: slab track there."""
+    return float(v.get("rka_deck_h", 0.0)) > 0.0
 #: A foreign band this close to the rail's own height is a level crossing; further below it is a road the rail
 #: passes OVER (a pier question), further above a road passing over the rail.
 CROSSING_DZ = 1.0
@@ -509,10 +581,13 @@ def track_offsets(road):
     return (c, -c)
 
 
-def crossing_band(foreign, x, y, z):
-    """The foreign band a level crossing at (x, y, z) sits in, or None."""
+def crossing_band(foreign, x, y, z, footways=False):
+    """The foreign band a level crossing at (x, y, z) sits in, or None. `footways`: count the road's FOOTWAYS as the
+    crossing too (`Band.walk` past its paved edge) -- where the rail's fence and car wall are cut, so a pedestrian
+    crosses on the footway beside the cars rather than meeting a wall at the kerb (user, 2026-09-27)."""
     for b in foreign or ():
-        if b.bbox_hit(x, y, 0.5) and ped._signed_depth(b.poly, x, y) > 0.0 \
+        reach = b.walk if footways else 0.0
+        if b.bbox_hit(x, y, 0.5 + reach) and ped._signed_depth(b.poly, x, y) > -reach \
                 and abs(b.lowest_surface_z(x, y) - z) < CROSSING_DZ:
             return b
     return None
@@ -559,22 +634,505 @@ def _split_flagged(pts, flags):
 
 
 def rails(pts, lats, offsets, holes):
-    """Two rails per track at each of `offsets`, as closed prisms `RAIL_H` tall; inside a crossing (`holes[i]`) as a
-    flush strip. `[tri]`."""
+    """Two 50N-section rails per track at each of `offsets` (a foot, a web, a head, each a closed prism: the rail head
+    stands `RAIL_H` over the bed); inside a crossing (`holes[i]`) as a flush strip. `[tri]`."""
     out = []
+    parts = ((RAIL_FOOT_W / 2.0, RAIL_FOOT_T, RAIL_FOOT_T),
+             (RAIL_WEB_W / 2.0, RAIL_H - RAIL_HEAD_T, RAIL_H - RAIL_HEAD_T - RAIL_FOOT_T),
+             (RAIL_HEAD_W / 2.0, RAIL_H, RAIL_HEAD_T))
     for c in offsets:
         for side in (-1.0, 1.0):
             off = c + side * 0.5 * RAIL_GAUGE
-            vals = [{"o": off, "hw": 0.5 * RAIL_HEAD_W, "z": RAIL_H, "t": RAIL_H}] * len(pts)
             idx = list(range(len(pts)))
             for flush, run in _split_flagged(idx, holes):
                 rp = [pts[i] for i in run]
                 rl = [lats[i] for i in run]
-                rv = [vals[i] for i in run]
                 if flush:
+                    rv = [{"o": off, "hw": 0.5 * RAIL_HEAD_W}] * len(rp)
                     out += sweep(rp, rv, "band", "o", ps.PAINT_Z_BIAS, "", "hw", "", rl)
-                else:
+                    continue
+                for hw, z, t in parts:
+                    rv = [{"o": off, "hw": hw, "z": z, "t": t}] * len(rp)
                     out += sweep(rp, rv, "deck", "o", 0.0, "z", "hw", "t", rl)
+    return out
+
+
+def sleepers(pts, offsets, holes, spacing=SLEEPER_SPACING):
+    """A PC sleeper every `spacing` m of arc length across each track at `offsets`, square to the track; none on a
+    span that touches `holes[i]` (a crossing -- the road owns the ground -- or slab track). `[tri]`."""
+    out = []
+    if len(pts) < 2:
+        return out
+    s0 = spacing / 2.0
+    run = 0.0
+    for i in range(len(pts) - 1):
+        a, b = pts[i], pts[i + 1]
+        seg = math.dist(a, b)
+        if seg < 1e-9:
+            continue
+        fl = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+        fwd = ((b[0] - a[0]) / fl, (b[1] - a[1]) / fl)
+        lat = (-fwd[1], fwd[0])
+        while s0 <= run + seg:
+            t = (s0 - run) / seg
+            s0 += spacing
+            if holes[i] or holes[i + 1]:
+                continue
+            p = (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t)
+            for c in offsets:
+                top = (p[0] + lat[0] * c, p[1] + lat[1] * c, p[2] + SLEEPER_TOP)
+                out += [tr for tr in _obox(top, fwd, SLEEPER_HALF_LEN, SLEEPER_HALF_W, SLEEPER_DEPTH)
+                        if _up(tr) >= -1e-9]
+        run += seg
+    return out
+
+
+#: A PLATFORM EXIT's stair (`point_model.PLATFORM_EXITS`, `point_edges.exit_open`): risers of at most `STAIR_RISE`
+#: on `STAIR_TREAD` treads (the Japanese station stair: 0.16-0.18 m on 0.30 m), SOLID from the ground up (a stair is a
+#: concrete flight, and nothing hangs in the air). A drop up to `STAIR_PERP_MAX` (an at-grade platform, ~1.3 m) runs
+#: STRAIGHT OUT from the platform's outer edge, across the exit span, to the station building behind it; a higher
+#: one (an elevated station, 8-16 m) is a landing outside the exit and a flight `STAIR_W` wide running ALONG the
+#: platform, outside its fence, toward the platform's middle, with a parapet on its open side.
+STAIR_RISE = 0.18
+STAIR_TREAD = 0.30
+STAIR_W = 2.4
+STAIR_PERP_MAX = 2.5
+STAIR_BURY = 0.3
+STAIR_PARAPET_H = 1.1
+STAIR_PARAPET_HALF = 0.075
+STAIR_MATERIAL = "M_Concrete"
+
+
+def platform_stairs(solve, ground=None):
+    """The stairs of every platform exit on one run (`solve`, a `point_solve.RoadSolve` of a RAIL road): `([tri],
+    [report row])`, the rows `(side, drop, "straight"|"along", steps)`. The platform on a side is its footway -- the
+    paved edge out to twice its `rka_walk_h*` -- and its top the edge's height plus the kerb's."""
+    out, rows = [], []
+    vals = solve.values
+    if not vals:
+        return out, rows
+
+    def g(x, y, k):
+        z = ground(x, y) if ground is not None else None
+        return float(vals[k].get("rka_ground_z", 0.0)) if z is None else z
+    for side, edge, sgn in (("left", solve.edges_left, 1.0), ("right", solve.edges_right, -1.0)):
+        walk_key = "rka_walk_hl" if side == "left" else "rka_walk_hr"
+        kerb_key = "rka_curb_hl" if side == "left" else "rka_curb_hr"
+        opened = ped.exit_open(vals, side, stairs_only=True)
+        i = 0
+        while i < len(vals):
+            if not opened[i]:
+                i += 1
+                continue
+            i0 = i
+            while i + 1 < len(vals) and opened[i + 1]:
+                i += 1
+            i1 = i
+            i += 1
+            if i1 <= i0 or float(vals[i0][walk_key]) < 0.5:
+                continue
+            ea, eb = edge[i0], edge[i1]
+            ul = math.hypot(eb[0] - ea[0], eb[1] - ea[1])
+            if ul < 0.5:
+                continue
+            u = ((eb[0] - ea[0]) / ul, (eb[1] - ea[1]) / ul)
+            o = (-u[1] * sgn, u[0] * sgn)                      # outward, away from the track
+            wa, wb = 2.0 * float(vals[i0][walk_key]), 2.0 * float(vals[i1][walk_key])
+            a = (ea[0] + o[0] * wa, ea[1] + o[1] * wa)
+            b = (eb[0] + o[0] * wb, eb[1] + o[1] * wb)
+            top = 0.5 * (ea[2] + float(vals[i0][kerb_key]) + eb[2] + float(vals[i1][kerb_key]))
+            mid = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)
+            k_mid = (i0 + i1) // 2
+
+            def box(cx, cy, fwd, half_len, half_wid, z_top):
+                zb = g(cx, cy, k_mid) - STAIR_BURY
+                if z_top - zb < 0.02:
+                    return []
+                return _obox((cx, cy, z_top), fwd, half_len, half_wid, z_top - zb)
+            straight_foot = (mid[0] + o[0] * 2.0, mid[1] + o[1] * 2.0)
+            drop = top - g(straight_foot[0], straight_foot[1], k_mid)
+            if drop < 0.2:
+                continue
+            n = max(1, int(math.ceil(drop / STAIR_RISE - 1e-6)))
+            rise = drop / n
+            if drop <= STAIR_PERP_MAX:
+                # straight out: n - 1 steps (the n-th is the ground), each the exit's whole width
+                for k in range(n - 1):
+                    d = STAIR_TREAD * (k + 0.5)
+                    out += box(mid[0] + o[0] * d, mid[1] + o[1] * d, u, ul / 2.0, STAIR_TREAD / 2.0,
+                               top - (k + 1) * rise)
+                rows.append((side, round(drop, 2), "straight", n - 1))
+                continue
+            # along the platform: toward its middle (the run of samples whose footway on this side is a platform)
+            j0, j1 = i0, i1
+            while j0 > 0 and float(vals[j0 - 1][walk_key]) >= 0.5:
+                j0 -= 1
+            while j1 + 1 < len(vals) and float(vals[j1 + 1][walk_key]) >= 0.5:
+                j1 += 1
+            ahead = 1.0 if (i0 + i1) < (j0 + j1) else -1.0
+            start = b if ahead > 0 else a
+            f = (u[0] * ahead, u[1] * ahead)
+            wc = STAIR_W / 2.0
+            out += box(mid[0] + o[0] * wc, mid[1] + o[1] * wc, u, ul / 2.0, wc, top)          # the landing
+            # the landing's parapets: its open side, and its end away from the flight
+            lp = STAIR_W + STAIR_PARAPET_HALF
+            out += box(mid[0] + o[0] * lp, mid[1] + o[1] * lp, u, ul / 2.0, STAIR_PARAPET_HALF, top + STAIR_PARAPET_H)
+            back = a if ahead > 0 else b
+            out += box(back[0] + o[0] * wc - f[0] * STAIR_PARAPET_HALF, back[1] + o[1] * wc - f[1] * STAIR_PARAPET_HALF,
+                       f, STAIR_PARAPET_HALF, wc, top + STAIR_PARAPET_H)
+            for k in range(n - 1):
+                d = STAIR_TREAD * (k + 0.5)
+                cx, cy = start[0] + f[0] * d, start[1] + f[1] * d
+                zt = top - (k + 1) * rise
+                out += box(cx + o[0] * wc, cy + o[1] * wc, f, STAIR_TREAD / 2.0, wc, zt)
+                out += box(cx + o[0] * lp, cy + o[1] * lp, f, STAIR_TREAD / 2.0, STAIR_PARAPET_HALF, zt + STAIR_PARAPET_H)
+            rows.append((side, round(drop, 2), "along", n - 1))
+    return out, rows
+
+
+#: THE PAID AREA (PLAN.md P3, user 2026-09-27): a station's platforms are closed to the street; the only way on is
+#: through the ticket gates inside a station building (`world.TicketGate`). The rail kit closes what it owns:
+#:   * a YARD at each platform exit: a fence from the platform's outer edge out to the station building's back wall
+#:     (`rka_yard_*` deep) at both ends of the yard, and along its far side wherever the building's wall is not --
+#:     so a stair's foot lands in a pen whose one other way out is the building's back door. Along, the yard spans
+#:     the exit, the building (`rka_ysh_*` from the exit centre, `YARD_BUILDING_HALF` either way) and an elevated
+#:     station's along-the-platform flight; at an elevated station its inner side is fenced too, at ground level
+#:     under the platform edge, where the ground under the viaduct is open to the street.
+#:   * a FOOTBRIDGE (跨線橋, `rka_fbridge`) where the far platform has no building of its own: a flight up the
+#:     outboard strip of each platform and a deck over both tracks clearing the train's gauge, inside the paid area.
+#:   * a FENCE ACROSS EACH PLATFORM END (ホーム端の柵), where the platform stops being full width: the taper down to
+#:     the bed is no way on.
+PAID_FENCE_H = 1.2
+PAID_FENCE_HALF = 0.04
+PAID_FENCE_SEG = 2.0
+YARD_BUILDING_HALF = 6.37        # the StationBuilding type's half frontage (12.74 m along the track)
+FB_CLEAR = 4.6                   # footbridge soffit over the bed (a train's gauge tops out at 4.2)
+FB_DECK = 0.35
+FB_W = 1.5                       # a footbridge flight's width, in the platform's outboard strip
+FB_DECK_ALONG = 2.0
+FB_GAP = 2.0                     # between the exit's end and a footbridge flight's foot
+
+
+def _fence(a, b, zfn, top_over=PAID_FENCE_H):
+    """A thin fence from plan point `a` to `b`, standing on `zfn(x, y)` (buried 0.3 m), in <= PAID_FENCE_SEG lengths."""
+    L = math.hypot(b[0] - a[0], b[1] - a[1])
+    if L < 0.05:
+        return []
+    f = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+    n = max(1, int(math.ceil(L / PAID_FENCE_SEG)))
+    out = []
+    for k in range(n):
+        cx = a[0] + f[0] * L * (k + 0.5) / n
+        cy = a[1] + f[1] * L * (k + 0.5) / n
+        z = zfn(cx, cy)
+        out += _obox((cx, cy, z + top_over), f, L / n / 2.0, PAID_FENCE_HALF, top_over + 0.3)
+    return out
+
+
+def _side_geom(solve, side):
+    """(edge points, walk key, kerb key, outward sign) of one side of a rail run."""
+    if side == "left":
+        return solve.edges_left, "rka_walk_hl", "rka_curb_hl", 1.0
+    return solve.edges_right, "rka_walk_hr", "rka_curb_hr", -1.0
+
+
+def paid_areas(solve, ground=None):
+    """The paid area's fences and footbridges on one RAIL run (see "THE PAID AREA"): `(fence [tri], bridge [tri],
+    [report row])`, rows `("yard"|"footbridge"|"end_fence"|"footbridge_skipped", side, ...)`. The fences stop people;
+    the footbridge is walked on."""
+    fence, bridge, rows = [], [], []
+    vals = solve.values
+    if not vals:
+        return fence, bridge, rows
+
+    def g(x, y, k=0):
+        z = ground(x, y) if ground is not None else None
+        return float(vals[k].get("rka_ground_z", 0.0)) if z is None else z
+
+    def platform_runs(side):
+        edge, wk, kb, sg = _side_geom(solve, side)
+        full = [float(v[wk]) >= 0.5 for v in vals]
+        runs, i = [], 0
+        while i < len(vals):
+            if not full[i]:
+                i += 1
+                continue
+            j = i
+            while j + 1 < len(vals) and full[j + 1]:
+                j += 1
+            runs.append((i, j))
+            i = j + 1
+        return runs
+
+    # -- the fence across each platform end: at the last sample still at the run's FULL width
+    for side in ("left", "right"):
+        edge, wk, kb, sg = _side_geom(solve, side)
+        for i0, i1 in platform_runs(side):
+            wmax = max(float(vals[k][wk]) for k in range(i0, i1 + 1))
+            fulls = [k for k in range(i0, i1 + 1) if float(vals[k][wk]) >= wmax - 0.05]
+            for k, inward in ((fulls[0], 1), (fulls[-1], -1)):
+                if (inward > 0 and k == 0) or (inward < 0 and k == len(vals) - 1):
+                    continue                            # the network ends here: nothing tapers past it
+                a, b = edge[max(0, k - 1)], edge[min(len(edge) - 1, k + 1)]
+                ul = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+                u = ((b[0] - a[0]) / ul, (b[1] - a[1]) / ul)
+                o = (-u[1] * sg, u[0] * sg)
+                w = 2.0 * float(vals[k][wk])
+                e = edge[k]
+                top = e[2] + float(vals[k][kb])
+                p0 = (e[0] + o[0] * 0.05, e[1] + o[1] * 0.05)
+                p1 = (e[0] + o[0] * (w - 0.05), e[1] + o[1] * (w - 0.05))
+                fence += _fence(p0, p1, lambda x, y, t=top: t + 0.3, PAID_FENCE_H)
+                rows.append(("end_fence", side, k))
+
+    # -- the yards and footbridges, per exit
+    for side in ("left", "right"):
+        edge, wk, kb, sg = _side_geom(solve, side)
+        opened = ped.exit_open(vals, side, stairs_only=True)
+        yk, sk = ("rka_yard_l", "rka_ysh_l") if side == "left" else ("rka_yard_r", "rka_ysh_r")
+        i = 0
+        while i < len(vals):
+            if not opened[i]:
+                i += 1
+                continue
+            i0 = i
+            while i + 1 < len(vals) and opened[i + 1]:
+                i += 1
+            i1 = i
+            i += 1
+            if i1 <= i0 or float(vals[i0][wk]) < 0.5:
+                continue
+            ea, eb = edge[i0], edge[i1]
+            ul = math.hypot(eb[0] - ea[0], eb[1] - ea[1])
+            if ul < 0.5:
+                continue
+            u = ((eb[0] - ea[0]) / ul, (eb[1] - ea[1]) / ul)
+            o = (-u[1] * sg, u[0] * sg)
+            w = 2.0 * float(vals[i0][wk])
+            em = ((ea[0] + eb[0]) / 2.0, (ea[1] + eb[1]) / 2.0)
+            M = (em[0] + o[0] * w, em[1] + o[1] * w)            # the exit's centre on the platform's outer edge
+            top = 0.5 * (ea[2] + float(vals[i0][kb]) + eb[2] + float(vals[i1][kb]))
+            k_mid = (i0 + i1) // 2
+
+            def P(a, lat):
+                return (M[0] + u[0] * a + o[0] * lat, M[1] + u[1] * a + o[1] * lat)
+            drop = top - g(*P(0.0, 2.0), k_mid)
+            depth = float(vals[i0].get(yk, 0.0))
+            if depth > 0.3:
+                sh = float(vals[i0].get(sk, 0.0))
+                a0 = min(-ul / 2.0, sh - YARD_BUILDING_HALF) - 0.1
+                a1 = max(ul / 2.0, sh + YARD_BUILDING_HALF) + 0.1
+                elevated = drop > STAIR_PERP_MAX
+                if elevated:
+                    # the flight runs along the platform toward its middle (platform_stairs' own rule)
+                    j0, j1 = i0, i1
+                    while j0 > 0 and float(vals[j0 - 1][wk]) >= 0.5:
+                        j0 -= 1
+                    while j1 + 1 < len(vals) and float(vals[j1 + 1][wk]) >= 0.5:
+                        j1 += 1
+                    ahead = 1.0 if (i0 + i1) < (j0 + j1) else -1.0
+                    run = math.ceil(drop / STAIR_RISE) * STAIR_TREAD + 0.5
+                    if ahead > 0:
+                        a1 = max(a1, ul / 2.0 + run)
+                    else:
+                        a0 = min(a0, -ul / 2.0 - run)
+                gz = lambda x, y: g(x, y, k_mid)
+                fence += _fence(P(a0, 0.0), P(a0, depth), gz)
+                fence += _fence(P(a1, 0.0), P(a1, depth), gz)
+                fence += _fence(P(a0, depth), P(max(a0, sh - YARD_BUILDING_HALF), depth), gz)
+                fence += _fence(P(min(a1, sh + YARD_BUILDING_HALF), depth), P(a1, depth), gz)
+                if elevated:
+                    fence += _fence(P(a0, -0.1), P(a1, -0.1), gz)
+                rows.append(("yard", side, round(depth, 2), round(a1 - a0, 1), "elevated" if elevated else "grade"))
+            if float(vals[i0].get("rka_fbridge", 0.0)) > 0.5:
+                b, row = footbridge(solve, side, i0, i1, u, ul)
+                bridge += b
+                rows.append(row)
+    return fence, bridge, rows
+
+
+def footbridge(solve, side, i0, i1, u, ul):
+    """A 跨線橋 at the exit samples `i0..i1` on `side`: a flight up each platform's outboard strip (`FB_W`) and a deck
+    over both tracks, soffit `FB_CLEAR` over the bed. Placed `FB_GAP` past the exit's end, whichever way both
+    platforms still run full width far enough. `([tri], report row)`."""
+    vals = solve.values
+    sides = {}
+    for sd in ("left", "right"):
+        edge, wk, kb, sg = _side_geom(solve, sd)
+        sides[sd] = (edge, wk, kb, sg)
+    em = tuple((solve.edges_left[k][c] + solve.edges_right[k][c]) / 2.0 for k in (i0, i1) for c in (0, 1))
+    C = ((em[0] + em[2]) / 2.0, (em[1] + em[3]) / 2.0)      # the line's centre at the exit
+    nl = (-u[1], u[0])
+    kk = (i0 + i1) // 2
+    bed = 0.5 * (solve.edges_left[kk][2] + solve.edges_right[kk][2])
+    zd = bed + FB_CLEAR + FB_DECK
+
+    def along(p):
+        return (p[0] - C[0]) * u[0] + (p[1] - C[1]) * u[1]
+    geo = {}
+    for sd, (edge, wk, kb, sg) in sides.items():
+        full = [k for k in range(len(vals)) if float(vals[k][wk]) >= 0.5]
+        if not full:
+            return [], ("footbridge_skipped", side, "no platform on the %s" % sd)
+        # the contiguous full-width run through the exit
+        lo = hi = kk
+        while lo > 0 and float(vals[lo - 1][wk]) >= 0.5:
+            lo -= 1
+        while hi + 1 < len(vals) and float(vals[hi + 1][wk]) >= 0.5:
+            hi += 1
+        e = edge[kk]
+        lat_edge = abs((e[0] - C[0]) * nl[0] + (e[1] - C[1]) * nl[1])
+        w = 2.0 * float(vals[kk][wk])
+        top = e[2] + float(vals[kk][kb])
+        geo[sd] = (sg, lat_edge + w, top, along(edge[lo]), along(edge[hi]))
+    rise = zd - max(v[2] for v in geo.values())
+    n = max(2, int(math.ceil(rise / STAIR_RISE - 1e-6)))
+    run = (n - 1) * STAIR_TREAD
+    need = FB_GAP + run + FB_DECK_ALONG + 1.0
+    placed = None
+    for d in (1.0, -1.0):
+        foot = d * (ul / 2.0 + FB_GAP)
+        far = foot + d * (run + FB_DECK_ALONG + 1.0)
+        if all(min(g_[3], g_[4]) - 0.5 <= min(foot, far) and max(foot, far) <= max(g_[3], g_[4]) + 0.5
+               for g_ in geo.values()):
+            placed = (d, foot)
+            break
+    if placed is None:
+        return [], ("footbridge_skipped", side, "the platforms do not run %.0f m past the exit" % need)
+    d, foot = placed
+    f = (u[0] * d, u[1] * d)
+    out = []
+
+    def P(a, lat):
+        return (C[0] + u[0] * a + nl[0] * lat, C[1] + u[1] * a + nl[1] * lat)
+    for sd, (sg, outer, top, _a, _b) in geo.items():
+        lane_c = sg * (outer - FB_W / 2.0)
+        lane_in = sg * (outer - FB_W - STAIR_PARAPET_HALF)
+        lane_out = sg * (outer + STAIR_PARAPET_HALF)
+        r = (zd - top) / n
+        for k in range(n - 1):
+            a = foot + d * STAIR_TREAD * (k + 0.5)
+            zt = top + (k + 1) * r
+            c = P(a, lane_c)
+            out += _obox((c[0], c[1], zt), f, STAIR_TREAD / 2.0, FB_W / 2.0, zt - top + 0.02)
+            for lat in (lane_in, lane_out):
+                q = P(a, lat)
+                out += _obox((q[0], q[1], zt + STAIR_PARAPET_H), f, STAIR_TREAD / 2.0, STAIR_PARAPET_HALF,
+                             STAIR_PARAPET_H)
+        # the landing under the deck on this platform: solid down to the platform
+        ad = foot + d * (run + FB_DECK_ALONG / 2.0)
+        c = P(ad, lane_c)
+        out += _obox((c[0], c[1], zd), f, FB_DECK_ALONG / 2.0, FB_W / 2.0, zd - top + 0.02)
+    # the deck over the tracks, lane to lane, and its parapets
+    (sa, oa, *_r), (sb, ob, *_r2) = geo["left"], geo["right"]
+    ad = foot + d * (run + FB_DECK_ALONG / 2.0)
+    lat_c = (sa * oa + sb * ob) / 2.0
+    half = (sa * oa - sb * ob) / 2.0
+    c = P(ad, lat_c)
+    out += _obox((c[0], c[1], zd), f, FB_DECK_ALONG / 2.0, half + STAIR_PARAPET_HALF, FB_DECK)
+    lat_axis = (nl[0], nl[1])
+    for a_edge, lat_lo, lat_hi in ((ad + d * (FB_DECK_ALONG / 2.0), sb * ob, sa * oa),                  # far end: full
+                                   (ad - d * (FB_DECK_ALONG / 2.0), sb * (ob - FB_W), sa * (oa - FB_W))):  # stairs' end
+        q = P(a_edge, (lat_lo + lat_hi) / 2.0)
+        out += _obox((q[0], q[1], zd + STAIR_PARAPET_H), lat_axis, abs(lat_hi - lat_lo) / 2.0, STAIR_PARAPET_HALF,
+                     STAIR_PARAPET_H)
+    for lat in (sa * (oa + STAIR_PARAPET_HALF), sb * (ob + STAIR_PARAPET_HALF)):
+        q = P(ad, lat)
+        out += _obox((q[0], q[1], zd + STAIR_PARAPET_H), f, FB_DECK_ALONG / 2.0, STAIR_PARAPET_HALF, STAIR_PARAPET_H)
+    return out, ("footbridge", side, n - 1, round(zd - bed, 2))
+
+
+def _cylinder(c, r, z0, z1, n=8):
+    """A vertical n-gon prism (sides + top) standing at plan point `c`. `[tri]`."""
+    ring = [(c[0] + r * math.cos(2 * math.pi * k / n), c[1] + r * math.sin(2 * math.pi * k / n)) for k in range(n)]
+    out = []
+    for k in range(n):
+        a, b = ring[k], ring[(k + 1) % n]
+        out += [((a[0], a[1], z0), (b[0], b[1], z0), (b[0], b[1], z1)), ((a[0], a[1], z0), (b[0], b[1], z1), (a[0], a[1], z1))]
+        out.append(((c[0], c[1], z1), (a[0], a[1], z1), (b[0], b[1], z1)))
+    return out
+
+
+def slab_track(pts, offsets, skip):
+    """SLAB TRACK over the samples not `skip`ped (see "JAPANESE TRACK"): per track a precast slab every
+    SLAB_LEN + SLAB_GAP of arc length, laid on the chord of its own length, and a cylindrical stopper in each joint.
+    `(slabs [tri], stoppers [tri])`; a slab or stopper touching a skipped sample is left out."""
+    slabs, stops = [], []
+    if len(pts) < 2:
+        return slabs, stops
+    acc = [0.0]
+    for i in range(len(pts) - 1):
+        acc.append(acc[-1] + math.dist(pts[i], pts[i + 1]))
+
+    def at(s):
+        j = max(0, min(len(pts) - 2, next((k for k in range(len(acc) - 1) if acc[k + 1] >= s), len(acc) - 2)))
+        seg = acc[j + 1] - acc[j]
+        u = (s - acc[j]) / seg if seg > 1e-9 else 0.0
+        a, b = pts[j], pts[j + 1]
+        return (a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u), j
+
+    def clear(s0, s1):
+        return not any(skip[k] for k in range(len(pts)) if s0 - 1e-6 <= acc[k] <= s1 + 1e-6) and \
+            not skip[at(s0)[1]] and not skip[min(len(pts) - 1, at(s1)[1] + 1)]
+    pitch = SLAB_LEN + SLAB_GAP
+    s0 = 0.0
+    while s0 + SLAB_LEN <= acc[-1]:
+        s1 = s0 + SLAB_LEN
+        if clear(s0, s1):
+            a, _ = at(s0)
+            b, _ = at(s1)
+            fl = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+            fwd = ((b[0] - a[0]) / fl, (b[1] - a[1]) / fl)
+            lat = (-fwd[1], fwd[0])
+            m = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0, (a[2] + b[2]) / 2.0)
+            for c in offsets:
+                slabs += _obox((m[0] + lat[0] * c, m[1] + lat[1] * c, m[2] + SLAB_TOP), fwd, fl / 2.0, SLAB_HALF_W,
+                               SLAB_DEPTH)
+            if s1 + SLAB_GAP <= acc[-1] and clear(s1, s1 + SLAB_GAP):
+                g, _ = at(s1 + SLAB_GAP / 2.0)
+                for c in offsets:
+                    stops += _cylinder((g[0] + lat[0] * c, g[1] + lat[1] * c), STOPPER_R, g[2] - SLAB_DEPTH,
+                                       g[2] + STOPPER_TOP)
+        s0 += pitch
+    return slabs, stops
+
+
+def guards(pts, lats, offsets, on):
+    """The derailment-prevention guard (脱線防止ガード) over each run of samples `on`: an angle GUARD_INSET inside the
+    INNER rail of the run's curve (the left rail where the run turns left or runs straight, else the right). `[tri]`."""
+    out = []
+    for flag, run in _split_flagged(list(range(len(pts))), on):
+        if not flag or len(run) < 2:
+            continue
+        turn = 0.0
+        for i in run[1:]:
+            a, b = lats[i - 1], lats[i]
+            turn += a[0] * b[1] - a[1] * b[0]
+        inner = 1.0 if turn >= 0.0 else -1.0
+        rp, rl = [pts[i] for i in run], [lats[i] for i in run]
+        for c in offsets:
+            off = c + inner * (0.5 * RAIL_GAUGE - GUARD_INSET)
+            rv = [{"o": off, "hw": GUARD_HALF, "z": GUARD_TOP, "t": GUARD_TOP}] * len(rp)
+            out += sweep(rp, rv, "deck", "o", 0.0, "z", "hw", "t", rl)
+    return out
+
+
+def rail_pier_stoppers(pts, values, lats, pier=None, blocked=None):
+    """Two SEISMIC SIDE STOPPERS on every rail pier cap that stands (the placements `pillars` keeps): concrete blocks
+    on the cap flanking the girder, PIER_STOPPER_GAP off each deck edge, where the cap reaches that far. `[tri]`."""
+    out = []
+    zb, half = pier_extent(pier) if pier is not None else (0.0, 0.0)
+    for top, h, w, fwd, deck_half in pier_placements(pts, values, lats):
+        if blocked is not None and blocked(top, fwd, half if pier is not None else w / 2.0):
+            continue
+        reach = deck_half + PIER_STOPPER_GAP + 2.0 * PIER_STOPPER_HALF_W
+        if pier is None or reach > half + 1e-6:
+            continue
+        lat = (-fwd[1], fwd[0])
+        d = deck_half + PIER_STOPPER_GAP + PIER_STOPPER_HALF_W
+        for sg in (1.0, -1.0):
+            c = (top[0] + lat[0] * d * sg, top[1] + lat[1] * d * sg, top[2] + PIER_STOPPER_H)
+            out += _obox(c, fwd, PIER_STOPPER_HALF_LEN, PIER_STOPPER_HALF_W, PIER_STOPPER_H)
     return out
 
 
@@ -611,7 +1169,7 @@ def cut_crossings(objs, names, foreign, pts):
                 # ANY corner (or the centroid) inside the road cuts the triangle: a fence or shoulder segment is a
                 # sample span long (~4 m), and a centroid test left the half of one that reaches into the road
                 # standing in its outer lane (probe_road_clear, 2026-09-26)
-                if all(crossing_band(foreign, q[0], q[1], rail_z(q[0], q[1])) is None
+                if all(crossing_band(foreign, q[0], q[1], rail_z(q[0], q[1]), footways=True) is None
                        for q in (t[0], t[1], t[2], _centroid(t))):
                     keep.append(t)
             mats[mat] = keep
@@ -731,7 +1289,20 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
             rail = is_rail(s.road)
             for layer, kind, slot, oa, z, za, wa, ta in SURFACE:
                 if rail and slot == "surface":
-                    _add(objs, surf, RAIL_BED_MATERIAL, sweep(pts, values, kind, oa, z, za, wa, ta, lats))
+                    # ballast at grade, roadbed concrete under the slab track of a viaduct
+                    slab = [slab_span(v) for v in values]
+                    for flag, run in _split_flagged(list(range(len(pts))), slab):
+                        _add(objs, surf, SLAB_BED_MATERIAL if flag else RAIL_BED_MATERIAL,
+                             sweep([pts[i] for i in run], [values[i] for i in run], kind, oa, z, za, wa, ta,
+                                   [lats[i] for i in run]))
+                    continue
+                if slot == "median" and med_slot == "median" and style.asset("median") is None:
+                    # a RAISED median is a KERBED ISLAND paved like the footway (user, 2026-09-27: "instead of the
+                    # green pad, use the sidewalk kerb for the edge and fill it with sidewalk on top") -- and a solid
+                    # one: the flat band it replaced had no sides at all, a sheet hanging 0.15 m over the asphalt
+                    fill, kerbs = raised_median(pts, values, lats)
+                    _add(objs, surf, style.material("footway"), fill)
+                    _add(objs, surf, style.material("kerb"), kerbs)
                     continue
                 _layer(objs, surf, style, med_slot if slot == "median" else slot, kind, oa, z, za, wa, ta,
                        pts, values, lats)
@@ -779,6 +1350,35 @@ def build(net, ground=None, part=None, zone=None, kit=None, report=None, solved=
                 near = [b for b in foreign if b.x1 >= x0 and b.x0 <= x1 and b.y1 >= y0 and b.y0 <= y1]
                 holes = [crossing_band(near, p[0], p[1], p[2]) is not None for p in pts]
                 _add(objs, name + "__rails", RAIL_MATERIAL, rails(pts, lats, track_offsets(s.road), holes))
+                offs = track_offsets(s.road)
+                slab = [slab_span(v) for v in values]
+                _add(objs, name + "__sleepers", SLEEPER_MATERIAL,
+                     sleepers(pts, offs, [h or sl for h, sl in zip(holes, slab)]))
+                sb, stp = slab_track(pts, offs, [h or not sl for h, sl in zip(holes, slab)])
+                _add(objs, name + "__slab", SLAB_MATERIAL, sb)
+                _add(objs, name + "__slab", SLEEPER_MATERIAL, stp)
+                _add(objs, name + "__rails", RAIL_MATERIAL, guards(pts, lats, offs, [sl and not h for h, sl in zip(holes, slab)]))
+                ps_ = rail_pier_stoppers(pts, values, lats, style.pier(),
+                                         lambda top, fwd, half: pier_on_road(list(bands) + foreign, top, fwd, half))
+                if ps_:
+                    _add(objs, surf, style.material("deck"), ps_)
+                pf, pb, pa_rows = paid_areas(s, ground)
+                if pf:
+                    _add(objs, name + "__paid", style.material("barrier"), pf)
+                    _add(objs, collision_name(name + "_paid", COL_ROAD, False), NO_MATERIAL, pf)
+                if pb:
+                    _add(objs, name + "__footbridge", STAIR_MATERIAL, pb)
+                    edge_names.append(name + "__footbridge")
+                if report is not None:
+                    for r in pa_rows:
+                        report.setdefault("paid_area", []).append((name,) + r)
+                st, st_rows = platform_stairs(s, ground)
+                if st:
+                    _add(objs, name + "__stairs", STAIR_MATERIAL, st)
+                    edge_names.append(name + "__stairs")          # walked on: the walk proxy carries it
+                    if report is not None:
+                        for r in st_rows:
+                            report.setdefault("platform_exits", []).append((name,) + r)
                 cut_crossings(objs, [surf] + edge_names + [collision_name(n + "_carwall", COL_CARWALL, False)
                                                         for n in edge_names], near, pts)
                 if report is not None:
@@ -878,6 +1478,18 @@ def self_test():
     assert abs(up - 120.0) < 1e-6 and abs(down - 120.0) < 1e-6, (up, down)
     assert min(p[2] for t in deck for p in t) == 4.0 and max(p[2] for t in deck for p in t) == 5.0
     print("OK: an extruded layer is a CLOSED prism (top 120 m2 up, bottom 120 m2 down)")
+    # A raised median: kerb stones at both edges and a footway fill between, solid to the road, no shared top plane.
+    mv = [{"rka_med_h": 1.5, "rka_med_z": 0.15}] * 3
+    fill, kerbs = raised_median([(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (20.0, 0.0, 0.0)], mv)
+    ftop = sum(_up(t) for t in fill if _up(t) > 0) / 2.0
+    ktop = sum(_up(t) for t in kerbs if _up(t) > 0) / 2.0
+    assert abs(ftop - 20.0 * 2.7) < 1e-6 and abs(ktop - 20.0 * 0.3) < 1e-6, (ftop, ktop)
+    assert min(p[2] for t in fill + kerbs for p in t) == 0.0 and max(p[2] for t in fill + kerbs for p in t) == 0.15
+    assert max(abs(p[1]) for t in kerbs for p in t) == 1.5 and max(abs(p[1]) for t in fill for p in t) == 1.35
+    assert raised_median([(0.0, 0.0, 0.0), (10.0, 0.0, 0.0)], [{"rka_med_h": 1.5, "rka_med_z": 0.0}] * 2) == ([], [])
+    objs_m = build(net)
+    assert not any("M_Median" in m for m in objs_m.values()), "a raised median wears the footway, not M_Median"
+    print("OK: a raised median is a kerbed island paved like the footway (kerbs 0.15 m at each edge, solid to the road)")
     # A pier: the cap rigid, the shaft's foot exactly `height` below the soffit, turned onto the road's heading.
     cap_z = -1.0
     pier = {"stretch_z": cap_z, "tris": {"M_Concrete": [[-3.0, -0.5, 0.0, 3.0, -0.5, 0.0, 3.0, 0.5, cap_z],
@@ -1007,18 +1619,149 @@ def self_test():
     bed = [t for t in o["line__surface"].get(RAIL_BED_MATERIAL, [])]
     assert bed and not any(abs(_centroid(t)[0] - 100.0) < 2.0 for t in bed), "the bed runs through the crossing"
     assert [c[1] for c in rep.get("crossings", [])] == ["street"], rep.get("crossings")
+    sl = [t for t in o["line__sleepers"][SLEEPER_MATERIAL]]
+    n_sl = len(sl) // 10
+    assert abs(n_sl - 2 * 200.0 / SLEEPER_SPACING) < 2 * 30.0 / SLEEPER_SPACING, n_sl     # two tracks, less the 踏切
+    assert not any(abs(_centroid(t)[0] - 100.0) < 2.0 for t in sl), "a sleeper in the crossing"
+    assert abs(max(p[2] for t in sl for p in t) - (0.3 + SLEEPER_TOP)) < 1e-6
+    for c in track_offsets(rnet.roads["line"]):
+        assert any(abs(p[1] - (c + SLEEPER_HALF_W)) < 1e-6 for t in sl for p in t), c
     cw = [t for n, m in o.items() if n.endswith("-carwall-noped-colonly") for t in m.get(NO_MATERIAL, [])]
     assert cw and not any(abs(_centroid(t)[0] - 100.0) < 3.0 for t in cw), "a car wall stands across the crossing"
     assert any(abs(_centroid(t)[0] - 170.0) < 3.0 for t in cw), "the car wall stops over the road 8 m below"
+    # ...and over the road's FOOTWAYS: a trunk road's 4 m footways cross the tracks with no wall across them
+    tnet = pm.NetworkData()
+    straight(tnet, "trunk", [(100.0, -60.0, 0.3), (100.0, 0.0, 0.3), (100.0, 60.0, 0.3)])
+    ppr.apply_preset(tnet, "trunk", "trunk")
+    tfor = ped.solve_all(tnet)[3]
+    sb = next(b for b in tfor if b.owner == "trunk")
+    assert sb.walk > 3.0, sb.walk
+    ot = build(rnet, foreign=tfor)
+    walls = [t for n, m in ot.items() if "__edges" in n for ts in m.values() for t in ts]
+    assert walls and not any(ped._signed_depth(sb.poly, *_centroid(t)[:2]) > -sb.walk + 0.3 for t in walls), \
+        "the rail's fence / car wall stands across the road's footway at the 踏切"
     # control: with no foreign network there is no crossing, and the rails stand proud everywhere
     rep2 = {}
     o2 = build(rnet, report=rep2)
     rl2 = [t for ts in o2["line__rails"].values() for t in ts]
     assert not rep2.get("crossings") and \
         max(p[2] for t in rl2 for p in t if abs(_centroid(t)[0] - 100.0) < 2.0) > 0.3 + RAIL_H - 1e-6
-    print("OK: rail -- two rails a track at %.3f m gauge, flush and bed/car wall cut out at a 踏切, proud elsewhere"
+    print("OK: rail -- two rails a track at %.3f m gauge, flush and bed/fence/car wall cut out over a 踏切 and its footways, proud elsewhere"
           % RAIL_GAUGE)
-    return 7
+    # JAPANESE TRACK: at grade PC sleepers on ballast; on a viaduct slab track -- slabs, a cylindrical stopper in every
+    # joint, a derailment guard inside a rail, no sleepers -- and seismic side stoppers on each pier cap.
+    vnet = pm.NetworkData()
+    straight(vnet, "line", [(0.0, 0.0, 9.0), (100.0, 0.0, 9.0), (200.0, 0.0, 9.0)])
+    ppr.apply_preset(vnet, "line", "rail")
+    ov = build(vnet, ground=lambda x, y: 0.0)
+    assert not ov.get("line__sleepers"), "sleepers on a viaduct"
+    slabs = ov["line__slab"][SLAB_MATERIAL]
+    n_slab = len(slabs) // 12
+    assert abs(n_slab - 2 * int(200.0 / (SLAB_LEN + SLAB_GAP))) <= 2, n_slab
+    stops = ov["line__slab"][SLEEPER_MATERIAL]
+    assert stops and all(abs(abs(_centroid(t)[1]) - 2.0) < STOPPER_R + 1e-6 for t in stops)
+    rails_v = [t for t in ov["line__rails"][RAIL_MATERIAL]]
+    assert any(abs(_centroid(t)[1] - (2.0 + 0.5 * RAIL_GAUGE - GUARD_INSET)) < 0.02 for t in rails_v), "no guard"
+    assert SLAB_BED_MATERIAL in ov["line__surface"] and RAIL_BED_MATERIAL not in ov["line__surface"]
+    deck_top = [p[2] for t in ov["line__surface"].get(pk.resolve(vnet.roads["line"], pk.load()).material("deck"), [])
+                for p in t]
+    assert any(abs(z - (9.0 - 0.8 + PIER_STOPPER_H)) < 0.3 for z in deck_top), "no seismic stopper on a pier cap"
+    assert o["line__sleepers"] and not o.get("line__slab"), "slab track at grade"
+    print("OK: Japanese track -- PC sleepers on ballast at grade; slab track, joint stoppers, a derailment guard and "
+          "pier side stoppers on a viaduct")
+    # PLATFORM EXITS: a double track with a 3 m platform both sides (kerb 1.26 m), a LEFT exit over x 50..53. The left
+    # fence opens over exactly that span (the right one does not), and a stair runs from the platform's outer edge
+    # down to the ground; elevated 8 m over the ground, the stair is a landing + a flight ALONG the platform.
+    def platform_line(z, exit_at=50.0):
+        n = pm.NetworkData()
+        r = straight(n, "line", [(0.0, 0.0, z), (exit_at, 0.0, z), (exit_at + 3.0, 0.0, z), (200.0, 0.0, z)])
+        ppr.apply_preset(n, "line", "rail")
+        for side in ("left", "right"):
+            setattr(r.base, side + "_walk_width", 3.0)
+            setattr(r.base, side + "_kerb_height", 1.26)
+        n.points[r.points[1]].platform_exit = pm.EXIT_LEFT
+        return n
+    rep = {}
+    o = build(platform_line(0.3), report=rep, ground=lambda x, y: 0.3)
+    bar_mat = pk.resolve(platform_line(0.3).roads["line"], pk.load()).material("barrier")
+    def fence(side):
+        # a fence that STANDS: the sweep leaves zero-height slivers where the wall is 0
+        return [_centroid(t) for n, m in o.items() if n.startswith("line__edges_" + side) for t in m.get(bar_mat, [])
+                if max(p[2] for p in t) > 0.3 + 1.26 + 0.2]
+    assert fence("left") and not any(50.2 < c[0] < 52.8 for c in fence("left")), "the left fence stands in the exit"
+    assert any(50.2 < c[0] < 52.8 for c in fence("right")), "the right fence opened too"
+    st = o["line__stairs"][STAIR_MATERIAL]
+    assert rep.get("platform_exits") and rep["platform_exits"][0][1:4] == ("left", 1.26, "straight"), rep
+    sv = ped.solve_all(platform_line(0.3))[0][0]
+    k = next(i for i, v in enumerate(sv.values) if abs(sv.edges_left[i][0] - 51.5) < 2.5)
+    outer = sv.edges_left[k][1] + 2.0 * sv.values[k]["rka_walk_hl"]
+    assert min(p[1] for t in st for p in t) >= outer - 1e-6, (min(p[1] for t in st for p in t), outer)
+    assert abs(max(p[2] for t in st for p in t) - (0.3 + 1.26 - 1.26 / 7)) < 1e-6
+    assert any(len(o[n].get(NO_MATERIAL, [])) >= len(st) for n in o if "walk" in n and "colonly" in n), \
+        "the stair is not in the walk collision"
+    rep = {}
+    o = build(platform_line(8.3), report=rep, ground=lambda x, y: 0.0)
+    kind = rep["platform_exits"][0]
+    assert kind[3] == "along" and kind[4] == int(math.ceil((8.3 + 1.26) / STAIR_RISE - 1e-6)) - 1, kind
+    st = o["line__stairs"][STAIR_MATERIAL]
+    xs = [p[0] for t in st for p in t]
+    assert max(xs) > 53.0 + kind[4] * STAIR_TREAD - 0.5, max(xs)       # the flight runs on past the exit, +x
+    print("OK: a platform exit opens its side's fence and builds a stair to the ground (straight at grade, along "
+          "the platform when elevated)")
+    # THE PAID AREA: the same line with a 3.8 m yard on the exit side and a footbridge to the far platform
+    def paid_line(z):
+        n = platform_line(z)
+        q = n.points[n.roads["line"].points[1]]
+        q.yard_left, q.yard_shift_left, q.footbridge = 3.8, 4.0, True
+        return n
+    rep = {}
+    o = build(paid_line(0.3), report=rep, ground=lambda x, y: 0.3)
+    rows = [r[1:] for r in rep.get("paid_area", [])]
+    assert any(r[0] == "yard" and r[1] == "left" and r[2] == 3.8 and r[4] == "grade" for r in rows), rows
+    assert any(r[0] == "footbridge" for r in rows), rows
+    pf = [_centroid(t) for t in o["line__paid"][bar_mat]]
+    # the yard's far fence stands 3.8 m out from the platform's outer edge, beyond the building's span only
+    far = [c for c in pf if abs(c[1] - (outer + 3.8)) < 0.1]
+    assert far and not any(51.5 + 4.0 - YARD_BUILDING_HALF + 0.2 < c[0] < 51.5 + 4.0 + YARD_BUILDING_HALF - 0.2
+                           for c in far), "the far fence stands across the building's back wall"
+    assert any(abs(c[1] - (outer + 1.9)) < 1.2 for c in pf), "no end fence across the yard"
+    fb = o["line__footbridge"][STAIR_MATERIAL]
+    # nothing below the soffit stands inside the platforms' outboard stair lanes' inner line (the gauge is clear), and
+    # the deck is there, spanning both platforms
+    low = [p for t in fb for p in t if p[2] < 0.3 + FB_CLEAR - 1e-6]
+    assert low and min(abs(p[1]) for p in low) >= outer - FB_W - 2.0 * STAIR_PARAPET_HALF - 1e-6, \
+        min(abs(p[1]) for p in low)
+    deck = [p for t in fb for p in t if abs(p[2] - (0.3 + FB_CLEAR)) < 1e-6]
+    assert deck and min(p[1] for p in deck) < -outer + 0.2 and max(p[1] for p in deck) > outer - 0.2
+    assert collision_name("line_paid", COL_ROAD, False) in o
+    assert any(len(o[n].get(NO_MATERIAL, [])) >= len(fb) for n in o if "walk" in n and "colonly" in n), \
+        "the footbridge is not in the walk collision"
+    rep = {}
+    o = build(paid_line(8.3), report=rep, ground=lambda x, y: 0.0)
+    rows = [r[1:] for r in rep.get("paid_area", [])]
+    assert any(r[0] == "yard" and r[4] == "elevated" for r in rows), rows
+    inner = [_centroid(t) for t in o["line__paid"][bar_mat] if abs(_centroid(t)[1] - (outer - 0.1)) < 0.1]
+    assert inner and max(c[2] for c in inner) < 2.0, "no ground-level fence under an elevated platform's edge"
+    # ...and a fence across each platform END where the platform tapers to the bed (4: two ends, two sides)
+    n = pm.NetworkData()
+    r = straight(n, "line", [(0.0, 0.0, 0.3), (40.0, 0.0, 0.3), (100.0, 0.0, 0.3), (160.0, 0.0, 0.3),
+                             (200.0, 0.0, 0.3)])
+    ppr.apply_preset(n, "line", "rail")
+    for u_ in r.points[1:4]:
+        q = n.points[u_]
+        q.profile_mode = pm.OVERRIDE
+        for f_ in ("lanes_fwd", "lanes_bwd", "lane_width", "median_width", "design_speed", "deck_thickness",
+                   "shoulder_left_width", "shoulder_right_width"):
+            setattr(q, f_, getattr(r.base, f_))
+        q.left_walk_width = q.right_walk_width = 3.0
+        q.left_kerb_height = q.right_kerb_height = 1.26
+    rep = {}
+    build(n, report=rep, ground=lambda x, y: 0.3)
+    ends = [r_ for r_ in rep.get("paid_area", []) if r_[1] == "end_fence"]
+    assert len(ends) == 4, ends
+    print("OK: the paid area -- a yard fenced from platform to building, a footbridge clearing the gauge, a ground fence "
+          "under an elevated platform, and a fence across every platform end")
+    return 8
 
 
 if __name__ == "__main__":

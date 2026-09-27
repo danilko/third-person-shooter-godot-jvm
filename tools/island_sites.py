@@ -480,10 +480,12 @@ def rail_stations():
     for bid, b in sorted(boxes.items()):
         kind, _c, name = bid.partition(":")
         slug = name.lower().replace(" ", "_")
-        if kind == "building":
-            rows.append(dict(id="station_" + slug, scene="StationBuilding_Shop", x=b["x"], y=b["y"],
+        if kind in ("building", "building_far"):
+            # the far one is the far platform's OWN gated building (both sides of an open-air station, 2026-09-27)
+            far = "_far" if kind == "building_far" else ""
+            rows.append(dict(id="station_" + slug + far, scene="StationBuilding_Shop", x=b["x"], y=b["y"],
                              yaw=yaw_to(b["nx"], -b["ny"]), size=[2 * b["h_along"] - 1.0, 2 * b["h_across"] - 1.0],
-                             load=900.0, ground="min", node="Station_" + slug))
+                             load=900.0, ground="min", node="Station_" + slug + far))
         elif kind == "parking" and b.get("kind") in STATION_PARKING:
             st = boxes.get("building:" + name) or boxes.get("station:" + name)
             n = (st.get("nx", 0.0), st.get("ny", 0.0)) if st else (0.0, 0.0)

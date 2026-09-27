@@ -35,4 +35,12 @@ public interface NameplateTarget {
      * Health and ammo refresh independently via the sibling Health/WeaponController node signals.
      */
     Signal0 getNameplateChangedSignal();
+
+    /**
+     * Is this worth a plate RIGHT NOW (user, 2026-09-27)? Games draw no plate over an ambient pedestrian or a
+     * passing car: information appears once something is a threat, a target or a teammate. The plate polls
+     * this (ui.Nameplate, 4 Hz) and, when false, hides AND stops rendering its SubViewport. Default true, so a
+     * target that does not answer keeps the old always-on plate.
+     */
+    default boolean isNameplateRelevant() { return true; }
 }

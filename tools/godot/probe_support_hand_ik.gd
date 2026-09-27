@@ -91,6 +91,9 @@ func _initialize() -> void:
 	# silently fail. The character spawns holding `Fist`, so the support point is given to that:
 	# it exercises controller resolution, held-weapon lookup and marker lookup, and leaves the
 	# grip-alignment question to probe_weapon_sockets.gd where it belongs.
+	# A body starts HOLSTERED, and a holstered hand is not posed on any weapon: draw the fists (the 0 key).
+	p.get_node("WeaponController").call("set_holstered", false)
+	await physics_frame
 	var held: Node3D = _find(p, "Fist") as Node3D
 	if held == null:
 		print("FAIL: nothing held (expected the default Fist)")

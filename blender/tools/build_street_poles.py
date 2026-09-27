@@ -11,16 +11,18 @@ Writes `assets/world_source/kits/quaternius_zombie_apocalypse/pieces/props/<Piec
     signal on the pole. It is the OWNER of the signal's shape; edit it there and re-run this.
   * `blends/StreetLights.blend` -- the download's, untouched (copied out of `source/` so the download can go).
 
-What the SIGNAL is, and why (Japanese road standards) -- made IN `TrafficLight_2_Japan.blend` (2026-09-26, user:
-"modify blender directly, so the artist can track the changes"), by the one-shot `-- --japanize`; the build only
-verifies it (`build_signal`) and reads its markers:
+What the SIGNAL is, and why (Japanese road standards) -- all of it IN `TrafficLight_2_Japan.blend`, where the artist
+tracks it (the build only verifies and joins):
 
-  * SIGNAL: scaled uniformly so the vehicle head's LOWER edge is `SIGNAL_HEAD_BOTTOM` (4.7 m). Japan requires a
-    vehicle signal over the carriageway to clear 4.5 m; the download's head sat at 4.28 m. The pedestrian
-    signal lifted to put its lower edge at `PED_BOTTOM` (2.5 m, the Japanese minimum for a pedestrian head). The
-    download's "E 12 St" name plate deleted. EMPTIES (collection `Markers`): `Lamp_Green/Yellow/Red` and
-    `Lamp_Ped_Red/Green` on the lenses (arrow = the way the lens faces), `NamePlate` where the runtime draws the
-    street's Japanese name plate (custom props width/height). Move a marker in the .blend and re-run this.
+  * the vehicle head's LOWER edge ~`SIGNAL_HEAD_BOTTOM` (4.7 m; Japan: >= 4.5 m over a carriageway), the pedestrian
+    head's at 2.5 m (the Japanese minimum), no "E 12 St" plate;
+  * the parts are SEPARATE objects (2026-09-26): `Pole`, `TrafficLight` (arm + vehicle head), `PedLight` and each
+    LENS (`TrafficLight_Lamp_Green/Yellow/Red` -- double-faced, the head serves both approaches of its phase --
+    and `Lamp_Ped_Red/Green`); two pieces are joined from them (`build_signals`): `TrafficLight_JP` (pole + arm +
+    vehicle head, NO pedestrian head -- see SECOND_HEAD's note) and `PedSignal_JP` (pole + pedestrian head, one at
+    every crosswalk end). Each piece's `<Piece>.lamps.json`
+    carries its lens MESHES (world.TrafficSignals lights the lens itself) and its name plates (`NamePlateSide1/2`
+    Empties, custom props width/height: the street's Japanese name, one each side of the arm).
   Built HERE from the other download (no authored file to edit):
   * STREET LAMP: the SHAFT is stretched (the base, the collar, the arm and the luminaire stay rigid) so the
     luminaire hangs at ~`LAMP_HEIGHT` (10 m), the usual mounting height of Japanese arterial road lighting; the
@@ -32,6 +34,7 @@ The piece frame is the kit's (`furniture.json`): metres, +Y up, forward -Z, i.e.
   * signal: pole at the origin, the arm reaching +X (to the RIGHT of forward), the heads facing -Y (back
     against forward). `point_furniture` passes the APPROACH direction as forward, so the arm reaches over the
     arriving lanes from a pole on their left kerb -- keep-left, the far-side corner.
+  * pedestrian signal: pole at the origin, the head facing -Y (Godot +Z), toward the crosswalk's far end.
   * lamp: pole at the origin, the arm reaching FORWARD (+Y). `point_furniture` passes the direction from the pole
     toward the road.
   * median lamp: arms reach +-X, forward is along the road.
@@ -108,164 +111,171 @@ def components(bm):
     return out
 
 
-def build_signal():
-    """The Japanese signal as the .blend holds it. The scale to the 4.7 m head, the 2.5 m pedestrian head and the
-    removal of the kit's "E 12 St" plate are made IN `TrafficLight_2_Japan.blend` (`japanize_signal_blend`, run once
-    on 2026-09-26 at the user's ask: "modify blender directly, so the artist can track the changes") -- so what the
-    artist opens is what ships, and this build only VERIFIES it and exports. The lamp lenses and the name-plate
-    anchor are EMPTIES in the same file (`LAMP_MARKERS`, `PLATE_MARKER`): move one there and the runtime lights /
-    plates follow on the next build."""
+#: The objects of TrafficLight_2_Japan.blend (the artist's split, 2026-09-26: "split the ped object / ped signals /
+#: traffic pole"): the POLE, the ARM with the vehicle head, the PEDESTRIAN head, and each LENS as its own mesh, so the
+#: runtime lights the lens itself instead of a ball in front of it. Two pieces are made of them:
+#:   * TrafficLight_JP -- pole + arm + vehicle head + pedestrian head (a signalised junction's far-side pole);
+#:   * PedSignal_JP   -- pole + pedestrian head only (a crosswalk end no vehicle pole serves), turned so its head
+#:     faces the piece's -Y (Godot +Z), the convention point_furniture places a pedestrian signal by.
+POLE, ARM, PED = "Pole", "TrafficLight", "PedLight"
+LENSES = {"TrafficLight_Lamp_Green": ("vehicle", "green"), "TrafficLight_Lamp_Yellow": ("vehicle", "yellow"),
+          "TrafficLight_Lamp_Red": ("vehicle", "red"), "Lamp_Ped_Red": ("pedestrian", "red"),
+          "Lamp_Ped_Green": ("pedestrian", "green")}
+PLATES = ("NamePlateSide1", "NamePlateSide2")
+#: The material the baked (unlit) lenses wear: dark glass, so an OFF lens does not read as lit
+#: (`materials/MI_SignalLens.tres`; the lit one is the runtime's, world.TrafficSignals).
+LENS_OFF = "MI_SignalLens"
+#: PedSignal_JP's turn about Z: the pedestrian head faces +X in the .blend, the piece wants it facing -Y.
+PED_TURN = -math.pi / 2.0
+#: ONE PEDESTRIAN HEAD PER CROSSWALK END, ON ITS OWN POLE (user, 2026-09-27: "avoid 2 formats / 2 pedestrian lights
+#: for the same direction"). Japan mounts a pedestrian head on the vehicle-signal pole (共架) only where that pole
+#: stands AT the crosswalk end; ours stands at the far-side corner, metres past it, so its own head doubled the
+#: standalone one. So the vehicle signal carries NO pedestrian head, and every crosswalk end gets a PedSignal_JP. The
+#: corner-pole variants (a second head at 90 degrees) went with it.
+SECOND_HEAD = {}
+
+
+def second_turn(name):
+    return SECOND_HEAD.get(name, 0.0)
+
+
+def load_signal_objects():
+    """Every object of the signal .blend, appended, transforms applied (the model is the size)."""
     fresh()
-    o = append_mesh(SIGNAL_SRC)
-    head = [v for v in verts(o) if v.x > SIGNAL_HEAD_MIN_X]
-    bottom = min(v.z for v in head)
-    if abs(bottom - SIGNAL_HEAD_BOTTOM) > 0.01:
-        raise SystemExit("build_street_poles: %s's vehicle head bottom is %.3f m, not %.1f -- run "
-                         "`-- --japanize` once on it (see japanize_signal_blend)" % (SIGNAL_SRC, bottom,
-                                                                                  SIGNAL_HEAD_BOTTOM))
-    o.name = o.data.name = "TrafficLight_JP"
-    lamps = read_markers(SIGNAL_SRC)
-    with open(os.path.join(OUT, "TrafficLight_JP.lamps.json"), "w") as fh:
-        fh.write(json.dumps(lamps, indent=1, sort_keys=True) + "\n")
-    return o, {"head_bottom": round(bottom, 4), "markers": len(lamps["vehicle"]) + len(lamps["pedestrian"]) + 1}
-
-
-#: The markers in TrafficLight_2_Japan.blend (Empties, Blender frame, their -Y / +X arrow the lens's facing):
-#: name -> (group, colour). The runtime (world.TrafficSignals) reads them from TrafficLight_JP.lamps.json.
-LAMP_MARKERS = {"Lamp_Green": ("vehicle", "green"), "Lamp_Yellow": ("vehicle", "yellow"),
-                "Lamp_Red": ("vehicle", "red"), "Lamp_Ped_Red": ("pedestrian", "red"),
-                "Lamp_Ped_Green": ("pedestrian", "green")}
-PLATE_MARKER = "NamePlate"
-
-
-def read_markers(path):
-    """The lamp and plate EMPTIES of `path`, in the GODOT piece frame (x, z, -y)."""
-    # append_mesh has appended every object of the file already (the markers with the mesh)
-    got = {n: bpy.data.objects[n] for n in list(LAMP_MARKERS) + [PLATE_MARKER] if n in bpy.data.objects}
-    missing = [n for n in list(LAMP_MARKERS) + [PLATE_MARKER] if n not in got]
+    with bpy.data.libraries.load(SIGNAL_SRC, link=False) as (src, dst):
+        dst.objects = [n for n in src.objects]
+    got = {o.name: o for o in dst.objects if o is not None}
+    need = [POLE, ARM, PED] + list(LENSES) + list(PLATES)
+    missing = [n for n in need if n not in got]
     if missing:
-        raise SystemExit("build_street_poles: %s has no marker(s) %s" % (path, missing))
+        raise SystemExit("build_street_poles: %s has no object(s) %s" % (SIGNAL_SRC, missing))
+    for o in got.values():
+        if o.parent is not None:
+            raise SystemExit("build_street_poles: %s is parented in %s" % (o.name, SIGNAL_SRC))
+        if o.type == "MESH":
+            o.data = o.data.copy()
+            o.data.transform(o.matrix_basis)
+            o.matrix_basis = Matrix.Identity(4)
+    return got
+
+
+def join_piece(name, parts, lens_names, turn=0.0):
+    """One mesh object named `name` from copies of `parts` (an object, or `(object, turn about Z)` for a turned copy --
+    a second pedestrian head), the faces of `lens_names` re-materialled LENS_OFF, the whole turned `turn` about Z."""
+    off = bpy.data.materials.get(LENS_OFF)
+    if off is None:
+        off = bpy.data.materials.new(LENS_OFF)
+        off.diffuse_color = (0.04, 0.045, 0.05, 1.0)
+        off.use_nodes = True
+        bsdf = next(n for n in off.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+        bsdf.inputs["Base Color"].default_value = (0.04, 0.045, 0.05, 1.0)
+        bsdf.inputs["Roughness"].default_value = 0.5
+    objs = []
+    for o in parts:
+        o, own = o if isinstance(o, tuple) else (o, 0.0)
+        c = o.copy()
+        c.data = o.data.copy()
+        if own:
+            c.data.transform(Matrix.Rotation(own, 4, "Z"))
+        if o.name in lens_names:
+            c.data.materials.clear()
+            c.data.materials.append(off)
+            for poly in c.data.polygons:
+                poly.material_index = 0
+        bpy.context.scene.collection.objects.link(c)
+        objs.append(c)
+    for sc in bpy.data.scenes:
+        for ob in list(sc.objects):
+            ob.select_set(ob in objs)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    o = bpy.context.view_layer.objects.active
+    if turn:
+        o.data.transform(Matrix.Rotation(turn, 4, "Z"))
+    o.name = o.data.name = name
+    return o
+
+
+def lens_record(o, turn, head=0):
+    """One lens in the GODOT piece frame (x, z, -y): its triangles (for the runtime's lit copy), the centre and
+    facing of its FRONT lens (the faces whose normal points most nearly the way the lens looks), a radius."""
+    rot = Matrix.Rotation(turn, 4, "Z")
+    me = o.data
+    me.calc_loop_triangles()
 
     def g(v):
         return [round(v[0], 4), round(v[2], 4), round(-v[1], 4)]
-    out = {"vehicle": [], "pedestrian": [],
-           "notes": "Written by blender/tools/build_street_poles.py from the EMPTIES in TrafficLight_2_Japan.blend "
-                    "(Lamp_*, NamePlate): TrafficLight_JP's lamp lenses and name plate in the Godot piece frame; "
-                    "read by world.TrafficSignals."}
-    for n, (grp, colour) in LAMP_MARKERS.items():
-        e = got[n]
-        m = e.matrix_basis              # unparented, and an appended object is in no scene: basis = world
-        fwd = (m.to_3x3() @ Vector((0.0, 0.0, 1.0))).normalized()       # an Empty's arrow is its local +Z
-        out[grp].append({"colour": colour, "pos": g(m.translation), "normal": g(fwd),
-                         "radius": round(float(e.get("radius", 0.12)), 4)})
-    p = got[PLATE_MARKER]
-    fwd = (p.matrix_basis.to_3x3() @ Vector((0.0, 0.0, 1.0))).normalized()
-    out["plate"] = {"pos": g(p.matrix_basis.translation), "normal": g(fwd),
-                    "size": [round(float(p.get("width", 1.4)), 4), round(float(p.get("height", 0.4)), 4)]}
+    tris = []
+    for t in me.loop_triangles:
+        for i in t.vertices:
+            tris.extend(g(rot @ me.vertices[i].co))
+    # the lens faces: the largest group of near-parallel normals (a double-faced vehicle head has two, front and
+    # back: the FRONT is the one facing -Y in the .blend, or +X for a pedestrian lens)
+    want = Vector((1.0, 0.0, 0.0)) if LENSES[o.name][0] == "pedestrian" else Vector((0.0, -1.0, 0.0))
+    front = [p for p in me.polygons if p.normal.dot(want) > 0.8]
+    if not front:
+        raise SystemExit("build_street_poles: %s has no face looking %s" % (o.name, tuple(want)))
+    area = sum(p.area for p in front)
+    c = sum((p.center * p.area for p in front), Vector()) / area
+    r = max((me.vertices[i].co - c).length for p in front for i in p.vertices)
+    n = (rot.to_3x3() @ want).normalized()
+    return {"colour": LENSES[o.name][1], "mesh": o.name, "pos": g(rot @ c), "normal": g(n),
+            "radius": round(r, 4), "tris": tris, "head": head}
+
+
+def plate_record(e):
+    m = e.matrix_basis
+    fwd = (m.to_3x3() @ Vector((0.0, 0.0, 1.0))).normalized()
+    return {"marker": e.name, "pos": [round(m.translation[0], 4), round(m.translation[2], 4),
+                                      round(-m.translation[1], 4)],
+            "normal": [round(fwd[0], 4), round(fwd[2], 4), round(-fwd[1], 4)],
+            "size": [round(float(e.get("width", 1.4)), 4), round(float(e.get("height", 0.4)), 4)]}
+
+
+def write_lamps(name, lenses, plates, turn, second=None):
+    out = {"vehicle": [], "pedestrian": [], "plates": [plate_record(p) for p in plates],
+           "notes": "Written by blender/tools/build_street_poles.py from TrafficLight_2_Japan.blend: %s's lenses "
+                    "(the lens MESHES, triangles in the Godot piece frame, lit by world.TrafficSignals) and its "
+                    "name plates (the NamePlateSide* Empties)." % name}
+    for o in lenses:
+        out[LENSES[o.name][0]].append(lens_record(o, turn))
+    for o in (second or ()):                 # the second pedestrian head: its lenses turned with it, `head` 1
+        out["pedestrian"].append(lens_record(o, second_turn(name), head=1))
     for k in ("vehicle", "pedestrian"):
-        out[k].sort(key=lambda d: ("green", "yellow", "red").index(d["colour"]))
+        out[k].sort(key=lambda d: (d.get("head", 0), ("green", "yellow", "red").index(d["colour"])))
+    with open(os.path.join(OUT, name + ".lamps.json"), "w") as fh:
+        fh.write(json.dumps(out, indent=1, sort_keys=True) + "\n")
     return out
 
 
-def japanize_signal_blend():
-    """ONE-SHOT, run on `TrafficLight_2_Japan.blend` itself (`-- --japanize`), which it then SAVES: the edits the
-    build used to make in memory, now visible to the artist in the file. Refuses a file already done.
-      * scaled so the vehicle head's lower edge is SIGNAL_HEAD_BOTTOM (Japan: >= 4.5 m over a carriageway);
-      * the pedestrian head lifted to PED_BOTTOM (Japan: >= 2.5 m);
-      * the download's "E 12 St" name plate deleted (a Manhattan street); a NamePlate EMPTY marks where the runtime
-        draws the Japanese plate -- the street's real name in kanji and romaji (world.TrafficSignals);
-      * EMPTIES on the three front lenses of the vehicle head and the two of the pedestrian head (Lamp_*), each
-        arrow pointing the way the lens faces: where the runtime lights them."""
-    bpy.ops.wm.open_mainfile(filepath=SIGNAL_SRC)
-    meshes = [o for o in bpy.data.objects if o.type == "MESH"]
-    if len(meshes) != 1 or any(n in bpy.data.objects for n in LAMP_MARKERS):
-        raise SystemExit("build_street_poles: %s is already japanized (or has %d meshes)" % (SIGNAL_SRC, len(meshes)))
-    o = meshes[0]
-    o.data.transform(o.matrix_basis)
-    o.matrix_basis = Matrix.Identity(4)
-    head = [v.co for v in o.data.vertices if v.co.x > SIGNAL_HEAD_MIN_X]
-    s = SIGNAL_HEAD_BOTTOM / min(v.z for v in head)
-    o.data.transform(Matrix.Scale(s, 4))
-    bm = bmesh.new()
-    bm.from_mesh(o.data)
-    bm.verts.ensure_lookup_table()
-    lo_band, hi_band = PED_BAND[0] * s, PED_BAND[1] * s
-    ped = [p for p in components(bm)
-           if min(v.co.z for v in p) > lo_band and max(v.co.z for v in p) < hi_band
-           and max(math.hypot(v.co.x, v.co.y) for v in p) > 0.25]
-    lift = PED_BOTTOM - min(v.co.z for p in ped for v in p)
-    for p in ped:
-        for v in p:
-            v.co.z += lift
-    plate = [p for p in components(bm)
-             if min(v.co.x for v in p) > PLATE_X[0] and max(v.co.x for v in p) < PLATE_X[1]
-             and min(v.co.z for v in p) > head_z_of(bm) - 0.3]
-    pb = [(min(v.co[i] for p in plate for v in p), max(v.co[i] for p in plate for v in p)) for i in range(3)]
-    lamps = lamp_positions(bm, ped)
-    bmesh.ops.delete(bm, geom=list({f for p in plate for v in p for f in v.link_faces}), context="FACES")
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
-    bm.to_mesh(o.data)
-    bm.free()
-    o.data.update()
-    col = bpy.data.collections.get("Markers") or bpy.data.collections.new("Markers")
-    if col.name not in bpy.context.scene.collection.children:
-        bpy.context.scene.collection.children.link(col)
-
-    def empty(name, pos, aim, props):
-        e = bpy.data.objects.new(name, None)
-        e.empty_display_type = "SINGLE_ARROW"
-        e.empty_display_size = 0.3
-        e.location = pos
-        e.rotation_euler = Vector(aim).to_track_quat("Z", "Y").to_euler()
-        for k, v in props.items():
-            e[k] = v
-        col.objects.link(e)
-    for name, (grp, colour) in LAMP_MARKERS.items():
-        d = next(d for d in lamps[grp] if d["colour"] == colour)
-        empty(name, d["pos"], d["aim"], {"radius": d["radius"]})
-    empty(PLATE_MARKER, ((pb[0][0] + pb[0][1]) / 2, pb[1][0] - 0.01, (pb[2][0] + pb[2][1]) / 2), (0.0, -1.0, 0.0),
-          {"width": 1.4, "height": 0.4})
-    bpy.ops.wm.save_mainfile()
-    print("build_street_poles: japanized %s (scale %.4f, pedestrian head +%.3f m, %d plate parts deleted, %d markers)"
-          % (SIGNAL_SRC, s, lift, len(plate), len(LAMP_MARKERS) + 1))
-
-
-PLATE_X = (2.3, 3.9)          # m, the plate's span along the arm (after scaling): parts wholly inside it go
-
-
-def head_z_of(bm):
-    """The vehicle head's lower edge (the arm's height at its end)."""
-    return min(v.co.z for v in bm.verts if v.co.x > SIGNAL_HEAD_MIN_X)
-
-
-def lamp_positions(bm, ped):
-    """The lenses, measured off the geometry (Blender frame), for japanize_signal_blend's markers: the three FRONT
-    hoods of the vehicle head (it faces -Y: green, yellow, red from the left as a driver sees them -- ascending x),
-    each lens at its hood's back rim; the pedestrian head's two lenses (red man above, green man below) on its +X
-    face."""
-    parts = components(bm)
-    hoods = sorted((p for p in parts if min(v.co.x for v in p) > SIGNAL_HEAD_MIN_X and len(p) == 48
-                    and max(v.co.y for v in p) < 0.0), key=lambda p: min(v.co.x for v in p))
-    if len(hoods) != 3:
-        raise SystemExit("build_street_poles: expected 3 front hoods on the vehicle head, found %d" % len(hoods))
-    veh = []
-    for colour, p in zip(("green", "yellow", "red"), hoods):
-        cx = sum(v.co.x for v in p) / len(p)
-        cz = (min(v.co.z for v in p) + max(v.co.z for v in p)) / 2
-        lens_y = max(v.co.y for v in p) - 0.02
-        r = (max(v.co.x for v in p) - min(v.co.x for v in p)) / 2 * 0.8
-        veh.append({"colour": colour, "pos": (cx, lens_y, cz), "aim": (0.0, -1.0, 0.0), "radius": round(r, 4)})
-    boxes = sorted((p for p in ped if len(p) == 32), key=lambda p: -min(v.co.z for v in p))
-    if len(boxes) != 2:
-        raise SystemExit("build_street_poles: expected 2 pedestrian lamp boxes, found %d" % len(boxes))
-    pl = []
-    for colour, p in zip(("red", "green"), boxes):
-        x1 = max(v.co.x for v in p) + 0.01
-        cy = (min(v.co.y for v in p) + max(v.co.y for v in p)) / 2
-        cz = (min(v.co.z for v in p) + max(v.co.z for v in p)) / 2
-        half = (max(v.co.z for v in p) - min(v.co.z for v in p)) / 2 * 0.8
-        pl.append({"colour": colour, "pos": (x1, cy, cz), "aim": (1.0, 0.0, 0.0), "radius": round(half, 4)})
-    return {"vehicle": veh, "pedestrian": pl}
+def build_signals():
+    """The two signal pieces as TrafficLight_2_Japan.blend holds them (every shape edit is made IN the .blend, where
+    the artist tracks it; this only verifies, joins and exports), plus each piece's lamps.json."""
+    got = load_signal_objects()
+    head = [v.co for v in got[ARM].data.vertices if v.co.x > SIGNAL_HEAD_MIN_X]
+    bottom = min(v.z for v in head)
+    if abs(bottom - SIGNAL_HEAD_BOTTOM) > 0.15:
+        raise SystemExit("build_street_poles: %s's vehicle head bottom is %.3f m, not ~%.1f"
+                         % (SIGNAL_SRC, bottom, SIGNAL_HEAD_BOTTOM))
+    ped_bottom = min(v.co.z for v in got[PED].data.vertices)
+    veh = [got[n] for n in LENSES if LENSES[n][0] == "vehicle"]
+    ped = [got[n] for n in LENSES if LENSES[n][0] == "pedestrian"]
+    plates = [got[n] for n in PLATES]
+    out = []
+    full = write_lamps("TrafficLight_JP", veh, plates, 0.0)
+    o = join_piece("TrafficLight_JP", [got[POLE], got[ARM]] + veh, set(LENSES))
+    out.append((o, {"head_bottom": round(bottom, 4), "ped_bottom": round(ped_bottom, 4),
+                    "lenses": len(full["vehicle"]) + len(full["pedestrian"]), "plates": len(full["plates"])}))
+    for var, t2 in SECOND_HEAD.items():
+        v = write_lamps(var, veh + ped, plates, 0.0, second=ped)
+        o = join_piece(var, [got[POLE], got[ARM], got[PED], (got[PED], t2)] + veh + ped + [(q, t2) for q in ped],
+                       set(LENSES))
+        out.append((o, {"head_bottom": round(bottom, 4), "ped_bottom": round(ped_bottom, 4),
+                        "lenses": len(v["vehicle"]) + len(v["pedestrian"]), "plates": len(v["plates"])}))
+    only = write_lamps("PedSignal_JP", ped, [], PED_TURN)
+    o = join_piece("PedSignal_JP", [got[POLE], got[PED]] + ped, set(LENSES), PED_TURN)
+    out.append((o, {"ped_bottom": round(ped_bottom, 4), "lenses": len(only["pedestrian"])}))
+    return out
 
 
 def stretch_lamp(o):
@@ -342,10 +352,8 @@ def main():
     for f in (SIGNAL_SRC, LAMP_SRC, TEXTURE):
         if not os.path.exists(f):
             raise SystemExit("build_street_poles: missing %s" % f)
-    if "--japanize" in sys.argv:
-        japanize_signal_blend()
-        return
-    export(*build_signal())
+    for o, info in build_signals():
+        export(o, info)
     export(*build_lamp(twin=False))
     export(*build_lamp(twin=True))
 

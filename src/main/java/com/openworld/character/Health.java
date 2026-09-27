@@ -175,6 +175,7 @@ public class Health extends Node {
                              String attackerName, String attackerFaction, Vector3 attackerPos, String attackerId) {
         if (invulnerable) return;
         currentHealth = Math.max(0.0f, currentHealth - damage);
+        lastHurtMsec = godot.api.Time.getTicksMsec();
         hit.emit(damage);
         if (currentHealth > 0) playHitReaction(headshot);
         emitCharacterHealthChanged();
@@ -318,8 +319,17 @@ public class Health extends Node {
     public void applyReplicatedHealth(float health) {
         float clamped = Math.max(0.0f, Math.min(maxHealth, health));
         if (clamped == currentHealth) return;
+        if (clamped < currentHealth) lastHurtMsec = godot.api.Time.getTicksMsec();   // a replicated hit counts
         currentHealth = clamped;
         emitCharacterHealthChanged();
+    }
+
+    /** When this was last hurt (engine msec; -1 = never) -- what makes a plate relevant for a while. */
+    private long lastHurtMsec = -1;
+
+    /** Hurt within the last {@code seconds}? Local damage and replicated health drops alike. */
+    public boolean hurtWithin(double seconds) {
+        return lastHurtMsec >= 0 && godot.api.Time.getTicksMsec() - lastHurtMsec <= (long) (seconds * 1000.0);
     }
 
     public float getCurrentHealth() {

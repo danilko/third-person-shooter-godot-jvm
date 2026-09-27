@@ -55,7 +55,10 @@ PLATFORM_H = 1.1 + 0.16      # platform top over the BED: 1.1 m over the rail he
                              # standard), the rail standing RAIL_H on the bed
 #: a HUB's lines run 14 m apart (island_rail_layout, Central), so each line's two 3 m side platforms and their back
 #: fences stand clear of the neighbour's gauge (at 10 m apart they overlapped: probe_rail_track, 2026-09-26)
-PLATFORM_W = {"small": 3.0, "standard": 4.0, "large": 5.0, "junction": 5.0, "hub": 3.0}
+#: a HUB's platforms are 3.45 m: its lines run 14 m apart (HUB_SPACING), so two neighbouring platforms meet edge to
+#: edge at the mid line (1.55 + 2.0 + 3.45 = 7.0) and their fences come down there (`platform_open`): one island
+#: platform serving both lines, walked straight across
+PLATFORM_W = {"small": 3.0, "standard": 4.0, "large": 5.0, "junction": 5.0, "hub": 3.45}
 PLATFORM_LANE_W = 3.1
 PLATFORM_MEDIAN = 0.9
 PLATFORM_EDGE = 1.55             # 1.5 left the kerb's mitre at a platform END 2-3 cm inside a 2.7 m train gauge
@@ -177,19 +180,27 @@ def platform_spans(res, line):
     return out
 
 
-def with_platform_ends(idx, svals, spans):
-    """`idx` (the alignment's stations, with their plan arc lengths `svals`) plus a station at each platform END, so a
-    platform is exactly its length: [(x, y, s)]."""
-    ends = sorted({round(v, 3) for s0, s1, _k in spans for v in (s0, s1)})
-
+def _straight(idx, i):
+    """The span idx[i-1] -> idx[i] and both its neighbours are one straight line: a station inserted on its chord is
+    then ON the alignment (on an arc it would sit inside the curve and read as a kink)."""
     def heading(a, b):
         return math.atan2(b[1] - a[1], b[0] - a[0])
+    hs = [heading(idx[k - 1], idx[k]) for k in (i - 1, i, i + 1) if 1 <= k < len(idx)]
+    return all(abs((h - hs[0] + math.pi) % (2.0 * math.pi) - math.pi) < math.radians(0.2) for h in hs)
+
+
+def on_straight(idx, svals, a, b):
+    """[a, b] (plan arc length) lies inside one straight span of the alignment."""
+    return any(_straight(idx, i) and svals[i - 1] + 1.0 < a and b < svals[i] - 1.0 for i in range(1, len(idx)))
+
+
+def with_platform_ends(idx, svals, spans, cuts=()):
+    """`idx` (the alignment's stations, with their plan arc lengths `svals`) plus a station at each platform END, so a
+    platform is exactly its length, and at each of `cuts` (an exit's two edges): [(x, y, s)]."""
+    ends = sorted({round(v, 3) for s0, s1, _k in spans for v in (s0, s1)} | {round(v, 3) for v in cuts})
 
     def straight(i):
-        """The span idx[i-1] -> idx[i] and both its neighbours are one straight line: a station inserted on its
-        chord is then ON the alignment (on an arc it would sit inside the curve and read as a kink)."""
-        hs = [heading(idx[k - 1], idx[k]) for k in (i - 1, i, i + 1) if 1 <= k < len(idx)]
-        return all(abs((h - hs[0] + math.pi) % (2.0 * math.pi) - math.pi) < math.radians(0.2) for h in hs)
+        return _straight(idx, i)
     out = []
     for i, (q, sq) in enumerate(zip(idx, svals)):
         if i and straight(i):
@@ -200,6 +211,122 @@ def with_platform_ends(idx, svals, spans):
                     out.append((px + (q[0] - px) * t, py + (q[1] - py) * t, e))
         out.append((q[0], q[1], sq))
     return out
+
+
+#: A PLATFORM EXIT (point_model.PLATFORM_EXITS): the fence opens over EXIT_W of platform and a stair goes down to the
+#: ground there (point_mesh.platform_stairs) -- how a player gets from the station building onto the train
+#: (user, 2026-09-26: "character cannot walk up to connect to train"). One per station, at its building's position
+#: along the platform (the platform's middle where it has none), on each platform whose outside is free: a side
+#: with another line's platform within NEIGHBOUR_REACH is OPENED instead (`platform_open`, no stair), a hub's island.
+EXIT_W = 3.0
+NEIGHBOUR_REACH = 9.0
+RESERVE_FILE = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandRailReserve.json")
+
+
+def point_at(L, s):
+    """(x, y, tx, ty) of line `L` at plan arc length `s`."""
+    pts, cum = L["pts"], L["cum"]
+    s = max(0.0, min(cum[-1], s))
+    i = max(1, next((k for k in range(1, len(cum)) if cum[k] >= s), len(cum) - 1))
+    a, b = pts[i - 1], pts[i]
+    seg = (cum[i] - cum[i - 1]) or 1e-9
+    t = (s - cum[i - 1]) / seg
+    tl = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+    return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / tl, (b[1] - a[1]) / tl
+
+
+def neighbour_platform(res, line, x, y):
+    """Another line whose PLATFORM stands within NEIGHBOUR_REACH of plan point (x, y)."""
+    import island_rail_layout as R
+    for other, L in res["lines"].items():
+        if other == line:
+            continue
+        s_, d = R.project(L["pts"], L["cum"], x, y)
+        if d <= NEIGHBOUR_REACH and any(s0 <= s_ <= s1 for s0, s1, _k in platform_spans(res, other)):
+            return other
+    return None
+
+
+def side_free(res, line, L, s_):
+    """{'left': bool, 'right': bool}: which of `line`'s platforms at `s_` have their outside free (no neighbouring
+    line's platform just beyond the fence). Left is the left of the line's chain direction."""
+    x, y, tx, ty = point_at(L, s_)
+    out = {}
+    for side, sg in (("left", 1.0), ("right", -1.0)):
+        nx, ny = -ty * sg, tx * sg
+        out[side] = neighbour_platform(res, line, x + nx * 8.0, y + ny * 8.0) is None
+    return out
+
+
+def exit_plan(res, line, idx=None, svals=None):
+    """[(s_centre, kind)] -- each platform of `line`'s exit centre: at the station building (the rail reserve's
+    `building:<Station>` box, or for the hub its landmark site) projected onto the line, kept EXIT_W inside the
+    platform."""
+    import island_rail_layout as R
+    boxes = {}
+    if os.path.exists(RESERVE_FILE):
+        boxes = {b["id"]: b for b in json.load(open(RESERVE_FILE))["boxes"]}
+    L = res["lines"][line]
+    out = []
+    for s0, s1, kind in platform_spans(res, line):
+        mid = 0.5 * (s0 + s1)
+        st = min(res["stations"].items(), key=lambda kv: math.hypot(*(lambda p: (p[0] - kv[1]["x"], p[1] - kv[1]["y"]))(
+            point_at(L, mid)[:2])))
+        b = boxes.get("building:" + st[0])
+        s_ = R.project(L["pts"], L["cum"], b["x"], b["y"])[0] if b else mid
+        s_ = max(s0 + EXIT_W, min(s1 - EXIT_W, s_))
+        if idx is not None and not on_straight(idx, svals, s_ - EXIT_W / 2.0, s_ + EXIT_W / 2.0):
+            # on a curve a station cannot be inserted without a kink: slide the exit along its platform to the
+            # nearest straight stretch
+            cand = [s_ + sg * d for d in range(1, int(s1 - s0)) for sg in (1.0, -1.0)]
+            s_ = next((c for c in cand if s0 + EXIT_W <= c <= s1 - EXIT_W
+                       and on_straight(idx, svals, c - EXIT_W / 2.0, c + EXIT_W / 2.0)), s_)
+        out.append((s_, kind))
+    return out
+
+
+BUILDING_HALF_DEPTH = 7.28 / 2.0      # the StationBuilding type's depth across the track, halved
+YARD_MAX = 10.0                       # a building further than this behind a platform is not that platform's
+
+
+def platform_outer(kind):
+    """How far a platform's outer edge stands from the line's centre (make_platform's section)."""
+    return PLATFORM_MEDIAN / 2.0 + PLATFORM_LANE_W + PLATFORM_W.get(kind, PLATFORM_W["standard"])
+
+
+def paid_yards(res, line, L, s_, kind):
+    """{side: (yard depth, building shift)} for the station buildings (`building:` / `building_far:` in the reserve)
+    beside `line`'s platform at arc length `s_`: the yard reaches from the platform's outer edge to the building's
+    back wall, and the building's centre stands `shift` along the chain from the exit's centre."""
+    import island_rail_layout as R
+    if not os.path.exists(RESERVE_FILE):
+        return {}
+    boxes = json.load(open(RESERVE_FILE))["boxes"]
+    x, y, tx, ty = point_at(L, s_)
+    st = min(res["stations"].items(), key=lambda kv: math.hypot(x - kv[1]["x"], y - kv[1]["y"]))[0]
+    out = {}
+    for b in boxes:
+        kind_, _c, nm = b["id"].partition(":")
+        if kind_ not in ("building", "building_far") or nm != st:
+            continue
+        across = (b["x"] - x) * -ty + (b["y"] - y) * tx
+        side = "left" if across > 0 else "right"
+        depth = abs(across) - BUILDING_HALF_DEPTH - platform_outer(kind)
+        if depth < 0.5:
+            print("rail record: %s's %s building stands on its platform (yard %.2f m)" % (st, side, depth))
+            continue
+        if depth > YARD_MAX:
+            # another line's building (a junction's platforms serve two lines; the building stands behind the
+            # station's OWN line) -- a yard to it would cross that line's tracks
+            continue
+        shift = R.project(L["pts"], L["cum"], b["x"], b["y"])[0] - s_
+        out[side] = (depth, shift)
+    return out
+
+
+def side_enum(sides):
+    left, right = "left" in sides, "right" in sides
+    return pm.EXIT_BOTH if left and right else pm.EXIT_LEFT if left else pm.EXIT_RIGHT if right else pm.EXIT_NONE
 
 
 def make_platform(net, road, p, kind):
@@ -228,7 +355,9 @@ def build(res):
         idx = true_alignment(R.LINES[line])
         svals = [R.project(L["pts"], L["cum"], x, y)[0] for x, y in idx]
         spans = platform_spans(res, line)
-        stations = with_platform_ends(idx, svals, spans)
+        exits = exit_plan(res, line, idx, svals)
+        stations = with_platform_ends(idx, svals, spans,
+                                      [v for e, _k in exits for v in (e - EXIT_W / 2.0, e + EXIT_W / 2.0)])
         made = []
         for x, y, s_ in stations:
             p = net.add_station(road, (round(x, 3), round(y, 3), round(_at(L["cum"], bed, s_), 3)))
@@ -243,6 +372,44 @@ def build(res):
             if k is not None:
                 make_platform(net, road, p, k)
                 nplat += 1
+        # the exits: a stair on each platform whose outside is free; the fence OPENED (no stair) on a side that meets a
+        # neighbouring line's platform, along the whole platform
+        nexit, nopen, skipped = 0, 0, []
+        for e, k_ in exits:
+            first = next((p for p, s_ in made if abs(s_ - (e - EXIT_W / 2.0)) < 0.01), None)
+            last = next((p for p, s_ in made if abs(s_ - (e + EXIT_W / 2.0)) < 0.01), None)
+            free = side_free(res, line, L, e)
+            if first is None or last is None:
+                skipped.append(round(e))
+                continue
+            # THE PAID AREA: a side whose station building stands beside it gets the stair, into a fenced yard up to
+            # the building's back door (the gates are inside it); a free side with NO building of its own gets no
+            # stair -- it is reached by a footbridge from the side that has one. A station with no buildings at all
+            # (the hub: 3.36) keeps a stair on every free side.
+            yards = paid_yards(res, line, L, e, k_)
+            if yards:
+                stair = [sd for sd in yards if free.get(sd)]
+                first.platform_exit = side_enum(stair)
+                for sd, (depth, shift) in yards.items():
+                    setattr(first, "yard_" + sd, round(depth, 3))
+                    setattr(first, "yard_shift_" + sd, round(shift, 3))
+                first.footbridge = bool(stair) and any(ok and sd not in yards for sd, ok in free.items())
+                report.append("%-13s exit at s %.0f: building %s%s" % (name, e, "+".join(sorted(yards)),
+                                                                    ", footbridge" if first.footbridge else ""))
+            else:
+                first.platform_exit = side_enum([sd for sd, ok in free.items() if ok])
+            nexit += 1
+        for i, (p, s_) in enumerate(made[:-1]):
+            if not any(s0 - 1e-3 <= s_ <= s1 + 1e-3 for s0, s1, _k in spans) or \
+                    not any(s0 - 1e-3 <= made[i + 1][1] <= s1 + 1e-3 for s0, s1, _k in spans):
+                continue
+            free = side_free(res, line, L, 0.5 * (s_ + made[i + 1][1]))
+            shut = [sd for sd, ok in free.items() if not ok]
+            if shut:
+                p.platform_open = side_enum(shut)
+                nopen += 1
+        report.append("%-13s %d platform exit(s)%s, %d span(s) opened onto a neighbouring platform"
+                      % (name, nexit, (" (SKIPPED, not on a straight: s %s)" % skipped) if skipped else "", nopen))
         nlx = sum(1 for c in L["crossings"] if c["form"] == "level crossing")
         report.append("%-13s %6.0f m  %3d stations  %2d level crossing(s)  %d platform(s) over %d station(s)"
                       % (name, L["length_m"], len(stations), nlx, len(spans), nplat))

@@ -32,9 +32,8 @@ func _initialize() -> void:
 
 func _xs() -> Array:
 	var out := []
-	for c in crowd.get_children():
-		if c is Node3D:
-			out.append(c.global_position.x)
+	for v in crowd.call("ped_positions_now"):
+		out.append((v as Vector3).x)
 	return out
 
 
@@ -53,6 +52,11 @@ func _run() -> void:
 	await process_frame
 	crowd.set("panic_seconds", 3.0)
 	crowd.set("reactions", not control)
+	# Temperament is random per ped (PedCrowd: some cower, a few fight). This probe measures the FLEE rule, so
+	# every ped is a runner; the other two are asserted by probe_crowd_vat.gd.
+	crowd.set("cower_percent", 0)
+	crowd.set("fight_percent", 0)
+	crowd.set("idle_stops", false)
 	var path := PackedVector3Array()
 	for i in 41:
 		path.append(Vector3(-200.0 + i * 10.0, 0.0, 0.0))

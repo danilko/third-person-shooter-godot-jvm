@@ -155,7 +155,7 @@ public class Door extends Breakable {
         sensor.connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_sensor_body_exited"));
         // Seed counts from anything already overlapping (e.g. a body spawned inside the zone).
         for (Node3D b : sensor.getOverlappingBodies()) {
-            if (!isCharacterBody(b)) continue;
+            if (!isCharacterBody(b) || !admits(b)) continue;
             sensorOccupants++;
             if (isLocalPlayerBody(b)) localPlayerInSensor = true;
         }
@@ -164,7 +164,7 @@ public class Door extends Breakable {
 
     @Register
     public void onSensorBodyEntered(Node3D body) {
-        if (!isCharacterBody(body)) return;
+        if (!isCharacterBody(body) || !admits(body)) return;
         sensorOccupants++;
         noteOpenerSide(body);
         wake();
@@ -182,11 +182,18 @@ public class Door extends Breakable {
 
     @Register
     public void onSensorBodyExited(Node3D body) {
-        if (!isCharacterBody(body)) return;
+        if (!isCharacterBody(body) || !admits(body)) return;
         sensorOccupants = Math.max(0, sensorOccupants - 1);
         wake();
         if (isLocalPlayerBody(body)) { localPlayerInSensor = false; if (!autoOpen) emitPrompt(false); }
     }
+
+    /**
+     * Whether this door opens for {@code body} at all. Every door admits every character; a {@link TicketGate} is the
+     * door that may one day refuse one (a fare). Asked on BOTH the enter and the exit, so the occupancy count stays
+     * balanced whatever the answer is -- it must therefore not change while the body is inside the sensor.
+     */
+    protected boolean admits(Node3D body) { return true; }
 
     private boolean isCharacterBody(Node3D body) {
         return body instanceof Character || body.getOwner() instanceof Character;

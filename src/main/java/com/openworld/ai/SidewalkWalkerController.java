@@ -103,6 +103,42 @@ public class SidewalkWalkerController extends Controller {
         return getParent() instanceof AICharacter ai && ai.getLodLevel() != AILodLevel.ACTIVE;
     }
 
+    // ── Scared: the same rule as the light crowd (world.PedCrowd), so a promotion does not change who runs ──
+    /** How far a walker hears trouble (capped by each stimulus's own radius), how long it runs. */
+    public static final double PANIC_RANGE = 120.0;
+    public static final double PANIC_SECONDS = 8.0;
+    private static final double HEAR_INTERVAL = 0.25;
+    /** Seconds of running left (0 = calm) -- probe readout. */
+    @Visible public double flee = 0.0;
+    private double hearTimer = 0.0;
+    /** Heard by IDENTITY (PedCrowd.hear: the stimulus clock can repeat a timestamp across physics ticks). */
+    private final java.util.Set<com.openworld.world.StimulusManager.Stimulus> heard =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
+    /** A gunshot, an explosion or a weapon drawn nearby: run along the footway, away from it. */
+    private void hear(Node3D body, double delta) {
+        hearTimer -= delta;
+        if (hearTimer > 0.0) return;
+        hearTimer = HEAR_INTERVAL;
+        com.openworld.world.StimulusManager sm = com.openworld.world.StimulusManager.get();
+        if (sm == null) return;
+        Vector3 here = body.getGlobalPosition();
+        java.util.List<com.openworld.world.StimulusManager.Stimulus> live = sm.getStimuli();
+        for (com.openworld.world.StimulusManager.Stimulus st : live) {
+            if (!heard.add(st)) continue;
+            if (st.source == body) continue;
+            if (st.type != com.openworld.world.StimulusManager.Type.GUNSHOT
+                    && st.type != com.openworld.world.StimulusManager.Type.EXPLOSION
+                    && st.type != com.openworld.world.StimulusManager.Type.WEAPON_DRAWN) continue;
+            if (here.distanceTo(st.origin) > Math.min(PANIC_RANGE, st.radius)) continue;
+            flee = PANIC_SECONDS;
+            double a = pointAt(along + 1.0).distanceTo(st.origin);
+            double b = pointAt(along - 1.0).distanceTo(st.origin);
+            dir = a >= b ? 1 : -1;
+        }
+        if (heard.size() > 64) heard.retainAll(new java.util.HashSet<>(live));
+    }
+
     @Override
     public UserCommand gatherInput(double delta) {
         UserCommand cmd = new UserCommand();
@@ -110,10 +146,13 @@ public class SidewalkWalkerController extends Controller {
         cmd.movementType = MovementType.IDLE;
         cmd.movementDirection = Vector3.Companion.getZERO();
         if (!(getParent() instanceof Node3D body) || cum.length < 2) return cmd;
+        hear(body, delta);
+        if (flee > 0.0) flee = Math.max(0.0, flee - delta);
         if (gliding()) {
             double L = length();
-            along += dir * GLIDE_SPEED * delta;
-            walked += GLIDE_SPEED * delta;
+            double pace = flee > 0.0 ? 4.5 : GLIDE_SPEED;   // PedCrowd.fleeSpeed
+            along += dir * pace * delta;
+            walked += pace * delta;
             if (along >= L - 0.5) { along = L - 0.5; dir = -1; }
             if (along <= 0.5) { along = 0.5; dir = 1; }
             Vector3 p = pointAt(along);
@@ -150,7 +189,7 @@ public class SidewalkWalkerController extends Controller {
         double d = Math.hypot(dx, dz);
         if (d < 1e-3) return cmd;
         cmd.movementDirection = new Vector3(dx / d, 0.0, dz / d);
-        cmd.movementType = MovementType.WALK;
+        cmd.movementType = flee > 0.0 ? MovementType.SPRINT : MovementType.WALK;
         return cmd;
     }
 }

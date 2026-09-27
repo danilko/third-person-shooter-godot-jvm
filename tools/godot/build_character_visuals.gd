@@ -24,6 +24,8 @@ const REFERENCE_SCENE := "res://src/main/resources/com/openworld/character/Chara
 const OUT_DIR := "res://src/main/resources/com/openworld/character/"
 const FIST := "res://src/main/resources/com/openworld/weapon/Fist.tscn"
 const ANIM_LIB := "res://src/main/resources/com/openworld/character/anim/character_anims.res"
+## Which walk a body plays (male = ANIM_LIB; a female body its own library, same clip names).
+const GAITS := "res://src/main/resources/com/openworld/character/anim/character_gaits.json"
 const S_VISUALS := "res://src/main/java/com/openworld/character/CharacterVisuals.java"
 const S_MESHCFG := "res://src/main/java/com/openworld/character/MeshConfig.java"
 const S_SHOULDER := "res://src/main/java/com/openworld/character/ShoulderAimModifier.java"
@@ -59,6 +61,15 @@ func _initialize() -> void:
 		quit(1); return
 	var facts: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(facts_path))
 	_build(facts)
+
+func _gait_library() -> String:
+	var g: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(GAITS))
+	var gait := String(g["bodies"].get(_body, "m"))
+	if not g["gaits"].has(gait):
+		push_error("body %s names gait %s, which character_gaits.json does not have" % [_body, gait])
+		return ANIM_LIB
+	print("[visuals] %s walks gait %s" % [_body, gait])
+	return String(g["gaits"][gait]["library"])
 
 func _title(body: String) -> String:
 	var out := ""
@@ -102,7 +113,7 @@ func _build(f: Dictionary) -> void:
 	root3.add_child(tree)
 	_made_node(tree)
 	tree.tree_root = (ref_tree.tree_root as AnimationRootNode).duplicate(true)
-	tree.add_animation_library(&"", load(ANIM_LIB))
+	tree.add_animation_library(&"", load(_gait_library()))
 	tree.root_node = NodePath("../MeshRoot/Model/%s" % armature.name)
 	for p in ref_tree.get_property_list():
 		var n: String = p["name"]

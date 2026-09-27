@@ -8835,6 +8835,84 @@ read as flat ovals, no brows or mouth). At **80 m**, the nearest a light ped is 
 indistinguishable and the mip bleeding is not visible.
 
 
+## The crowd: a GPU-animated far tier, promotion on need, six bodies, a holster, a female walk (2026-09-27, user-asked)
+
+Supersedes the section above on how the far tier is DRAWN (its LOD-body rules still apply: the bake reads that body).
+
+**What was measured first** (bare stand, this PC): a skinned light ped cost ~26 us of CPU a frame for its
+AnimationPlayer + skinning, even hidden (600 walking: 18.9 ms, the GPU under 1 ms). The old tier was also FROZEN:
+`animateDistance` (60 m) < `promoteDistance` (80 m), so a light ped never animated. And a promotion to a full
+`AICharacter` (125 nodes) costs 3-4 ms on the main thread with no per-frame cap -- driving into downtown crossed
+dozens of 80 m rings in a few frames. Navigation was NOT the crowd's cost: the walkers follow the footway polyline
+and their `NavigationAgent3D` is idle.
+
+**The far tier is a vertex-animation texture.** `tools/godot/bake_ped_vat.gd -- --body=<b>` bakes a body's light-ped
+mesh (`<b>_ped.tscn`, simplified by Godot's own LOD generator to ~5k vertices; `BODY_VERTS` overrides -- Fumiriya's
+trousers tore below 8k) under the SHARED library clips of its GAIT (idle / walk / run / cower / phone / talk, 15 fps)
+into `<b>_vat_mesh.res` + `<b>_vat_pos.res` (RGBAH, one texel per vertex, one row per frame) + `<b>_vat.json`.
+`assets/characters/crowd/ped_vat.gdshader` plays it by `VERTEX_ID` (unshaded, alpha scissor, like the VRoid body).
+`world.PedCrowd` is now plain Java state per ped and ONE `MultiMesh` per body type, one `setBuffer` a frame.
+`tools/godot/bench_crowd.gd` (display): 150 / 600 / 2000 peds = 4.76 / 18.44 / 61.2 ms skinned against
+**0.45 / 0.57 / 1.48 ms**, one draw call. Island walk (`probe_walk_perf.gd`): the crowd now costs ~0.6 ms downtown
+and ~1.2 ms at the station (`--no-peds` the control). A ped stops now and then (idle/phone/talk), keeps its own pace
+(+-10%, stride matched) and height (+-4%).
+
+**Promotion is a decision** (PLAN.md 3.32): a ped becomes a real body only within `promoteDistance` 25 m, when aimed
+at, when a FIGHTER is scared, or when SHOT (`PedCrowd.shoot` -- an upright cylinder per ped, engine-free
+`world.CrowdShot` + `PedCrowdShotTest`; `FirearmItem.resolvePellets` asks the crowds on the authoritative path and the
+hit ped is promoted at once, budget ignored, damage through `ImpactManager.processHit`). One promotion a frame,
+nearest first; `ZoneManager.walkerBudget` 12, `fighterBudget` 6; a body is held 10 s after promotion and while hurt
+in the last 20 s. The promoted character wears the SAME body (`characterVisuals` = `CharacterVisuals_<Body>.tscn`).
+**Temperament** from each ped's roll: ~83% flee, 12% cower (`crouch_idle`), 5% fight -- a fighter keeps the ordinary
+AIController brain, is armed from PIS1 / MEW1 / fists, and turns to `ZoneManager.FIGHTER_FACTION` "vigilante".
+Accepted divergence: a client hides its peds inside 25 m and cannot promote; the crowd stays local per peer.
+
+**Six bodies**: Shino, Fumiriya, and the imported Shibu, Victoria, Bibi, Vita (all female; the only male body is
+Fumiriya, weighted 3 in `character_gaits.json` `crowd_weights`). Each went `import_vrm_body.py` ->
+`measure_body.gd` (BODIES) -> `build_character_visuals.gd` -> `build_ped_body.py --no-clips --keep-face` ->
+`bake_ped_vat.gd`. Licence in CREDITS.md.
+
+**A HOLSTER, not a raised state** (user decision). Hands EMPTY (`WeaponController.isHolstered`, the fist slot's second
+state; a body starts holstered): the walk's own arms (WeaponBlend eased to 0 over 0.15 s), no shoulder aim / stock
+mount / torso layer / aim branch, and fire does nothing -- the same in FPS and TPS. The 0 key (`weapon_slot_0`)
+toggles it (with a real weapon out it puts the weapon away); any weapon slot draws. An AI holsters its fists when not
+fighting. The CHEST look-at and `NeckFront` still follow combat (the FPS camera rides the neck: keyed on the hands,
+the view lagged a crouch 0.161 m against `probe_fps_camera`'s 0.12). Replicated as bit 12 of the snapshot flags word.
+Drawing posts `StimulusManager.Type.WEAPON_DRAWN` (10 m fists, 30 m a weapon): the crowd and the promoted walkers
+(`SidewalkWalkerController` now runs from gunshots, blasts and drawn weapons) react. Both listen by IDENTITY, not by
+timestamp (the stimulus clock advances in _process, so two physics ticks can repeat a timestamp).
+
+**One walk, two gaits** (user). The walk is `upright_walk_forward` for everyone -- it turns the hips 23/12 deg with
+the chest still, so it aims well. `blender/tools/derive_gait.py` writes the FEMALE copies into `shino.blend` as
+`f_<clip>` (forward, the two forward diagonals, back): planted feet 46% narrower (9.3 -> 5.0 cm), a weight shift over
+the standing foot (4.4 cm), hip drop x1.15, and `spine_03`'s world transform held exactly (0.00 deg, <= 2 mm), so aim
+is untouched. Plus `f_upright_walk_relaxed` (chest counter-roll 2.5 deg, a wider arm swing) that only the RELAXED
+branch plays: `RelaxedTransition` on the Upright stance input (`tools/patch_tree_relaxed.py`), Relaxed out of combat
+(idle / `upright_walk_relaxed` / run by movement id), Raised otherwise. `character_gaits.json` maps base names to the
+gait's clips; `build_character_anims.gd` writes `character_anims.res` (male, with `upright_walk_relaxed` aliased to
+the walk) and `character_anims_f.res`; a body's gait picks its library in `build_character_visuals.gd`.
+`upright_walk_casual` / `_formal` / `_carry` are deleted (naming table `delete`, retarget rows removed).
+
+**Plates by relevance** (`NameplateTarget.isNameplateRelevant`): another Player, a story character, a hostile in
+combat, anyone hurt in the last 10 s, a car whose driver is relevant or that was hit. A hidden plate's SubViewport
+is set to DISABLED. Gate `tools/godot/probe_nameplate_relevance.gd` 6/6 (`--control` fails 2).
+
+**The Blender clip preview** (`game_export_ui.py`): shino.blend opens with the ARP rig driving the body, and the rig
+had been saved on `ARP_upright_aim_rifle-loop` -- so every clip showed the aim in the upper body. Picking a clip now
+loads it on the rig, the panel says what the rig shows, and "Preview as the game plays it" switches the rig off and
+plays the GAME clip (never saved or exported that way).
+
+**No tint** (user): clothing / car colour variety is dropped -- no extra materials or masks; the shader's COLOR tint
+stays at strength 0. **Open bugs** (PLAN.md zb1/zb2): a pedestrian under attack sometimes not promoted or seemingly
+duplicated; promoted walkers stuck face to face.
+
+**Gates**: `probe_ped_crowd` 15/15 (fighters = budget, a shot at 70 m promotes, the 10 s hold), `probe_ped_panic`,
+`probe_melee` (holster: starts holstered, 0 draws), `probe_fps_camera`, `probe_nameplate_relevance`, `SnapshotFlagsTest`
+(bit 12), `PedCrowdShotTest`, `derive_gait.py --check`-style asserts on every run, AimDebugAuto 40/40,
+`probe_weapon_fit`, `check_character_anim` (gait aliases understood). **Not green, not this work:**
+`probe_island_peds` segfaults on World after a teleport, with the light crowd switched OFF too (headless streaming,
+the world mid-rebuild); `probe_recoil_kick`'s ASR1 checks fail by a hair per body (rifle path, untouched here).
+
 ## Street trees are ROAD FURNITURE, one species per street (PLAN.md 3.16 step 4, 2026-09-20)
 
 The first half of 3.16 step 4. A 街路樹 is placed by **`point_furniture._street_trees`**, beside the planters,
@@ -9935,24 +10013,65 @@ Authored for the ONE rail rebuild (PLAN.md "the rail rebuild batch"); every piec
   widths, and `point_furniture.crossing_signals` stands one on the LEFT of each approach, `crossing_track_clear` 4.5 m
   before the track (square to it). The rail build runs furniture now (`island_rebuild.sh` dropped `--no-furniture`);
   `point_furniture.place` gives a RAIL road none of the street's furniture (a platform is a footway to the kit).
-- **The signal piece is Japanese IN its .blend** (user: "modify blender directly, so the artist can track the
-  changes"): `build_street_poles.py -- --japanize` (one-shot, refuses a file already done) baked the 4.7 m head scale
-  and the 2.5 m pedestrian lift into `TrafficLight_2_Japan.blend`, deleted the kit's "E 12 St" plate, and added
-  EMPTIES (collection `Markers`): `Lamp_Green/Yellow/Red`, `Lamp_Ped_Red/Green` (arrow = lens facing) and
-  `NamePlate` (custom props width/height). The build only verifies and exports, and writes the markers to
-  `TrafficLight_JP.lamps.json`. Exported mesh byte-identical to before.
+- **The track is built to JAPANESE practice** (user, 2026-09-27: "japan rail standard ... additional bearing for
+  earthquakes"; and "Japan always uses concrete ties"). `point_mesh` "JAPANESE TRACK": a 50N-proportioned I-section
+  rail (foot 127 / web 16 / head 65 mm inside the kit's 0.16 m RAIL_H, so no platform or gauge moves); AT GRADE
+  ballasted track on JR 3号 PC sleepers (`M_Concrete`, 2.0 m, 39 per 25 m = 0.641 m, tops 2 cm proud of the
+  ballast); ON A VIADUCT / BRIDGE (any `rka_deck_h` > 0 sample) SLAB TRACK -- precast slabs (`M_TrackSlab`,
+  4.93 x 2.22 m, 70 mm joints) on roadbed concrete, a CYLINDRICAL STOPPER (円柱形突起 Ø0.40 m, the earthquake
+  restraint) in every joint, no ballast or sleepers, and a DERAILMENT GUARD (脱線防止ガード) 0.12 m inside the
+  curve's inner rail; and two SEISMIC SIDE STOPPERS (横変位拘束構造 / 落橋防止) on every rail pier cap flanking the
+  girder (only where the cap reaches; in the road collision). None of it is in a 踏切. ~607k visible tris over the
+  island's rail, streamed per zone. Licence: the measurements are the published Japanese standards; StationRural's
+  `Track_Module` (the first reference) is ours, built in code, MIT -- nothing third-party is in the rail.
+- **Stations are WALKABLE: platform exits** (user: "character cannot walk up to connect to train due to train wall").
+  Station fields `platform_exit` and `platform_open` (both `NONE/LEFT/RIGHT/BOTH`, APPEND-ONLY, held station -> next;
+  solved into `rka_exit` bits 1/2 exit, 4/8 open): on that side the platform fence (and its car wall) stands down
+  over the span -- `point_edges.exit_open` opens the END station too, or `step_walls` would re-close it -- and for an
+  EXIT `point_mesh.platform_stairs` builds a solid concrete stair (<= 0.18 m risers on 0.30 m treads, in the walk
+  collision) from the platform's outer edge to the ground: STRAIGHT out when the drop is <= 2.5 m (at grade, 7 steps
+  toward the station building), else a landing + a flight ALONG the platform outside its fence, toward the
+  platform's middle, with a parapet (elevated: 9.1 m / 17.1 m at Airport, 95 steps). `island_rail_record.exit_plan`
+  puts ONE 3 m exit per platform at the station building's position (the reserve's `building:` box; the middle
+  where there is none), slid to the nearest straight stretch, on every side whose outside is free; a side with
+  another line's platform within 9 m is `platform_open` along the platform instead. A HUB's platforms are 3.45 m, so
+  at Central (lines 14 m apart) neighbouring platforms meet edge to edge and are walked across as island platforms;
+  Central's two outer sides get the stairs. Report: `platform_exits` (16 exits, 28 stairs on today's record).
+  **Not yet:** a footbridge / concourse (to cross a line's own two tracks you walk over them at a platform end),
+  Tokyo Station's own connection (3.36), and trains (tier D).
+- **The signal is SPLIT in its .blend, and the runtime lights the LENS itself** (user, 2026-09-26: "split the ped
+  object / ped signals / traffic pole ... use the lamp objects for the signal instead of a round object").
+  `TrafficLight_2_Japan.blend` holds `Pole`, `TrafficLight` (arm + vehicle head), `PedLight` and each lens as its own
+  mesh (`TrafficLight_Lamp_Green/Yellow/Red`, double-faced: the head serves both approaches of its phase group;
+  `Lamp_Ped_Red/Green`), plus `NamePlateSide1/2` Empties (a plate each side of the arm). `build_street_poles.py`
+  (the old `--japanize` one-shot and the `Lamp_*` marker Empties are GONE) joins two pieces from them:
+  `TrafficLight_JP` (pole + arm + vehicle head) and `PedSignal_JP` (pole + pedestrian head, turned so the head faces Godot +Z) -- the
+  `ped_signal` asset now, at every crosswalk end (the library's
+  `Signal_Pedestrian` placeholder is no longer placed). The baked lenses wear `MI_SignalLens` (dark glass, so an OFF
+  lens reads off). Each piece's `<Piece>.lamps.json` carries its lens MESHES (`tris`, Godot piece frame) and plates;
+  the signal plan hands each lamp its pole, the pole's `yaw` and that file (`lamps`), and `TrafficSignals` draws the
+  lit lens as that same mesh, emissive, `LENS_PROUD` 4 mm out along each face's normal. A baked lens is one instance of
+  a shared MultiMesh, so its material cannot be swapped per signal -- drawing the same mesh lit over it IS the lens
+  changing colour. A plan with no mesh falls back to the old ball. Probe: `lens_lamps_now`, `lit_vehicle_lamps_now`.
+  **ONE pedestrian head per crosswalk end, ALWAYS on its own pole** (user, 2026-09-27: a crossing showed two ped
+  lights for one direction -- "avoid 2 formats"). Japan mounts a ped head on the vehicle-signal pole (共架) only where
+  that pole stands AT the crosswalk end; ours stand at the far-side corner metres past it, so the vehicle pole's own
+  head doubled the crosswalk's. `TrafficLight_JP` is therefore pole + arm + vehicle head ONLY, and
+  `point_furniture._ped_signals` puts a `PedSignal_JP` at every crosswalk end, stepped back from the junction if it
+  would stand within `ped_signal_pole_clear` (1.2 m) of a vehicle pole. (A corner-pole variant with a second head at
+  90 deg was built and retired the same day for the same reason.)
 - **Japanese signalisation** (`point_furniture._signalised`, `signal_needs_major`): a crossing of two narrow streets
   has no signal (the minor approach keeps its stop line); a signal needs an arm with `signal_major_lanes` (2)
-  arriving lanes or an arterial. Island (scratch): 89 of 120 junctions signalised. **Pedestrian signals** (library
-  `Signal_Pedestrian`, breakable like the poles) stand at each zebra end, facing across it, except where a vehicle
-  signal pole's own pedestrian head already serves that end (`ped_signal_share` 5 m).
+  arriving lanes or an arterial. Island (scratch): 89 of 120 junctions signalised. **Pedestrian signals**
+  (`PedSignal_JP`, breakable like the poles) stand at EVERY zebra end, facing across it, on their own pole -- see "ONE
+  pedestrian head per crosswalk end" above.
 - **The signals WORK** (`world.TrafficSignals` AutoLoad + engine-free `world.SignalTiming`, `SignalTimingTest` 4):
   `roadkit_cli gltf` writes `<network>.signals.json` (`point_furniture.signal_plan`: arms in phase groups -- an arm
   and the one arm most head-on to it; stop distance; every lens and plate in world space with the POLE it hangs on).
   Phases: green 22 / yellow 3 / all-red 2 s per group; a crosswalk WALKs while its road is red and another green,
   flashing its last 4 s. Clock = the system clock (peers agree with no message); `game_clock` for `--fixed-fps`
   probes. The traffic brain: `VehicleAIController.signalSpeedLimit` (sqrt(2 b d), b 3.5) in `CruiseState`; racing
-  cars ignore it. Lamps near the camera (160 m) are lit as small unshaded balls, only while their pole is streamed
+  cars ignore it. Lamps near the camera (160 m) are lit (the lens mesh, above), only while their pole is streamed
   in and standing (a knocked-down signal goes dark). Pedestrians do not cross streets yet: their lights are shown,
   not obeyed. `enabled` off is the control.
 - **Real street names** (`tools/island_street_names.py` -> `world/IslandStreetNames.json`, `world.StreetNames`):
@@ -10039,6 +10158,51 @@ Authored for the ONE rail rebuild (PLAN.md "the rail rebuild batch"); every piec
     (`island_dike.rail_lifts` leaves the corridor open by design); `probe_crops` stands a camera over a chunk,
     because `CropField` builds only the chunks round the camera (headless reads every MultiMesh transform as
     identity, so its placement check is counted "unreadable", not passed).
+
+## The paid area: ticket gates, a station building each side, yards, footbridges, platform-end fences (2026-09-27)
+
+A station's platforms are a closed PAID AREA: street -> station building -> ticket gates -> yard -> stair -> platform.
+User decisions: an open-air station has a gated building on BOTH sides (上下線で別改札), so neither platform needs a
+footbridge; a hub (Central / Tokyo Station, 3.36) is one building over the whole rail with a bridge inside the paid area.
+
+- **`world.TicketGate`** (extends `Door`): two flaps meeting mid-lane, fast (open_speed 8), swing away from the walker,
+  fare-free. `Door.admits(body)` is the one fare hook (asked on sensor enter AND exit, so the count stays balanced).
+  Built by `build_building_scenes.gd._add_gate` from a DOOR-ONLY prop (`{"door": {"kind": "gate", w, h}, "at"}`, no
+  `piece`; `layout_buildings.place_props` records it as an inner door). **The lane's sensor is NOT a child of a flap**:
+  as a child it swung away with the flap, lost the walker, shut, swung back -- the gate chattered at 36 deg.
+  `StationBuilding` has one 0.9 m lane between two `Station_TicketGate` bodies and a 1.2 m railing (`Platform_Fence`
+  x6) across the rest of the building at z -1.6: unpaid hall at the street door, paid side at the back door.
+  Gate `tools/godot/probe_ticket_gate.gd` 9/9 (`--control`: manual flaps, fails the 2 lane checks).
+- **Reserve** (`island_rail_layout`): each non-hub station gets `building:` (town side, with the car park) AND
+  `building_far:` (the far side, no car park), each placed with its back `STATION_YARD` (3.8 m) behind its own
+  platform's outer edge (`island_rail_record.platform_outer`), else at the old station-box edge, slid along like the
+  near one. Bay (the Harbour line 20 m beside it), Waterpark (an arterial) and Harbour (its siding) have no far building.
+  `island_sites.rail_stations` places both (`Station_<slug>` / `Station_<slug>_far`).
+- **Rail kit fields** (`point_model`, append): `yard_left/right` (the yard's depth), `yard_shift_left/right` (the
+  building's centre along the chain from the exit's centre), `footbridge` (bool); solved into `rka_yard_l/r`,
+  `rka_ysh_l/r`, `rka_fbridge`, held with `rka_exit`. `island_rail_record.paid_yards` writes them from the reserve; a
+  building more than `YARD_MAX` (10 m) behind a platform is another line's (a junction's second line keeps its old
+  open stairs, as does the hub). A free side with no building gets NO stair, and a footbridge from the side that has one.
+- **`point_mesh.paid_areas`** (objects `<run>__paid` in the barrier material + a `-noped` road proxy; `<run>__footbridge`
+  in the walk proxy; report rows `paid_area`):
+  - the YARD: end fences from the platform's outer edge out to the building, and a far fence wherever the building's
+    back wall is not; an elevated station's yard also covers its along-the-platform flight and gets a ground fence
+    under the platform edge (the ground under a viaduct is open to the street);
+  - a FOOTBRIDGE (跨線橋): a flight up each platform's outboard 1.5 m strip, a deck over both tracks with its soffit
+    `FB_CLEAR` 4.6 m over the bed (a train's gauge tops out at 4.2), parapets; placed `FB_GAP` past the exit's end,
+    whichever way both platforms run far enough;
+  - a FENCE ACROSS EVERY PLATFORM END where the platform stops being full width (not at a network end).
+- **The track corridor itself is NOT closed**: nothing may stand in a train's gauge, so a trespasser can walk the bed
+  from a 踏切 (as in reality). The closure is the platform: its face is 1.26 m over the bed and its ends are fenced.
+- Gate **`tools/godot/probe_station_paid.gd`**: streams each station in on World.tscn and flood-fills every walkable
+  surface (0.25 m cells, multi-level, 0.4 m steps, a 0.2 m capsule standing): from the street in front of each building
+  and from the bed past a platform end no platform is reached with the flaps shut; with them open the street reaches
+  the platform. Auto doors are treated open. `--control` opens the flaps for the negative cases.
+- **Also in this batch** (user, 2026-09-27): at a 踏切 the rail's fence, car wall and bed are cut over the road's
+  FOOTWAYS too (`Band.walk`, `crossing_band(footways=True)`), so a pedestrian crosses beside the cars; and a RAISED
+  (or WALL) median is a KERBED ISLAND (`point_mesh.raised_median`: kerb stones `MEDIAN_KERB_W` 0.15 m each edge in the
+  kerb material, footway fill between, both solid to the road) instead of the flat green `M_Median` band, which had no
+  sides at all. The `median` style slot's material is no longer read (a median PROFILE ASSET still is).
 
 ## The land-planning batch: divided Wangan, paddy grid + crops, coastal dike, districts and an air base (2026-09-26)
 

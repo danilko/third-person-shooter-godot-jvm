@@ -164,6 +164,7 @@ public class NetworkController extends Controller {
 
         godot.api.Node weaponNode = c.getNodeOrNull(new godot.core.NodePath("WeaponController"));
         if (weaponNode instanceof WeaponController wc) {
+            wc.setHolstered(snapshot.handsDown());     // the owner's holster; a draw posts WEAPON_DRAWN here too
             // Only switch when the puppet actually HAS a weapon in the replicated slot.
             // Until the reliable pickup event (MSG_PICKUP_TAKEN) equips it, the slot is
             // empty here and onSetWeapon would silently no-op — retrying it every

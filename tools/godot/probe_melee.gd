@@ -182,6 +182,16 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	# ── holster: a body starts with its hands empty and cannot fight until it draws (the 0 key) ──
+	print("")
+	print("=== holster ===")
+	_check("holster: the player starts holstered", wc.call("holstered_now"), "holstered %s" % wc.call("holstered_now"))
+	Input.action_press("weapon_slot_0")
+	await _tick(2)
+	Input.action_release("weapon_slot_0")
+	await _tick(2)
+	_check("holster: the 0 key draws the fists", not wc.call("holstered_now"), "holstered %s" % wc.call("holstered_now"))
+
 	# ── 0. every authored step names a clip the tree can play ──────────────────────────────────
 	print("")
 	print("=== 0. every step's clip resolves ===")

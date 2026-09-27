@@ -88,6 +88,17 @@ SHED_OPEN_LEFT = 'OPEN_LEFT'
 SHED_OPEN_RIGHT = 'OPEN_RIGHT'
 SHEDS = (SHED_NONE, SHED_OPEN_LEFT, SHED_OPEN_RIGHT)
 
+#: A PLATFORM EXIT (駅の出口): the fence along a rail platform's outer edge is left out over this station's span, on
+#: the named side (against the chain-FWD direction, like `shed`), and a stair is built from the platform down to the
+#: ground there (`point_mesh.platform_stairs`). Held from the station that declares it to the next. APPEND-ONLY.
+EXIT_NONE = 'NONE'
+EXIT_LEFT = 'LEFT'
+EXIT_RIGHT = 'RIGHT'
+EXIT_BOTH = 'BOTH'
+PLATFORM_EXITS = (EXIT_NONE, EXIT_LEFT, EXIT_RIGHT, EXIT_BOTH)
+#: `platform_open` (same values): the fence on that side is left out with NO stair -- two platforms side by side (a
+#: hub's lines 14 m apart) meet edge to edge there and are walked across as one island platform.
+
 #: The four fields a station may change while still INHERITing the road's base profile -- "what
 #: actually varies along a road" (1.2a). Everything else is whole-profile INHERIT or OVERRIDE,
 #: deliberately one bit rather than a 30-field mask nobody can hold in their head.
@@ -137,6 +148,17 @@ POINT_FIELDS = (
     ("pillar_skip",    'b',  False),
     ("pillar_offset",  'f',  0.0),
     ("shed",           SHEDS, SHED_NONE),
+    ("platform_exit",  PLATFORM_EXITS, EXIT_NONE),
+    ("platform_open",  PLATFORM_EXITS, EXIT_NONE),
+    # THE PAID AREA (PLAN.md P3, 2026-09-27), on the station that declares a `platform_exit`: how deep the fenced
+    # YARD between that side's platform and its station building's back door is (m out from the platform's outer
+    # edge; 0 = no yard), and how far along the chain the building's centre stands from the exit's centre. A side with
+    # no building of its own takes a `footbridge` (跨線橋) over both tracks to the side that has one.
+    ("yard_left",        'f', 0.0),
+    ("yard_right",       'f', 0.0),
+    ("yard_shift_left",  'f', 0.0),
+    ("yard_shift_right", 'f', 0.0),
+    ("footbridge",       'b', False),
     ("ground_z",       'f',  0.0),
     ("has_ground_z",   'b',  False),
 
@@ -390,7 +412,8 @@ def resolve_point(point, road):
     # Shape, structure sampling and junction state are per-station facts, not profile: a base
     # profile has no business overwriting where a corner is or what the terrain height was.
     for n in ("tangent_mode", "handle_in", "handle_out", "roll",
-              "ground_z", "has_ground_z", "pillar_skip", "pillar_offset", "shed",
+              "ground_z", "has_ground_z", "pillar_skip", "pillar_offset", "shed", "platform_exit", "platform_open",
+              "yard_left", "yard_right", "yard_shift_left", "yard_shift_right", "footbridge",
               "fillet_radius", "allow_cross", "allow_uturn", "traffic_light",
               "setback_solved", "setback_locked"):
         setattr(out, n, getattr(point, n))

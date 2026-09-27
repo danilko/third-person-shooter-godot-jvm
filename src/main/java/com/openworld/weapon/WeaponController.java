@@ -5,6 +5,7 @@ import com.openworld.net.NetworkManager;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.*;
 import godot.core.Callable;
 import godot.core.MethodCallable;
@@ -182,6 +183,43 @@ public class WeaponController extends Node {
   public int activeSlotNow() { return getReplicatedActiveSlot(); }
 
   public int getReplicatedActiveSlot() { return isWeaponTransitioning() ? pendingSlotIndex : activeSlotIndex; }
+
+  // ── Holster (user, 2026-09-27) ─────────────────────────────────────────────────────────────
+  //
+  // Hands EMPTY: the body walks on the walk's own arms (AnimationController), cannot fight, and nothing
+  // aims. It is the fist slot's second state -- slot 0 is "hands", and the fists are up only when
+  // unholstered -- so it needs no slot of its own and no timing rule: the 0 key toggles it
+  // (Character.applyInput), choosing any weapon draws. A body starts holstered. Replicated in the
+  // snapshot's flags word (NetMessageCodec bit 12). Drawing POSTS a WEAPON_DRAWN stimulus, so the crowd
+  // and any AI that listens can react to a weapon coming out -- on every peer, since the crowd is local.
+
+  /** Hands empty (see above). */
+  private boolean holstered = true;
+  /** How far drawing the fists is heard (m) -- a raised guard a few steps away. */
+  @Visible public double drawFistsRadius = 10.0;
+  /** How far drawing a real weapon is heard (m). */
+  @Visible public double drawWeaponRadius = 30.0;
+
+  public boolean isHolstered() { return holstered && activeSlotIndex == 0 && !isWeaponTransitioning(); }
+
+  @Register public boolean holsteredNow() { return isHolstered(); }
+
+  /** Holster / draw. Drawing (true -> false) posts WEAPON_DRAWN at the body. */
+  @Register
+  public void setHolstered(boolean value) {
+    if (holstered == value) return;
+    holstered = value;
+    if (!value && getParent() instanceof Node3D body) {
+      com.openworld.world.StimulusManager sm = com.openworld.world.StimulusManager.get();
+      if (sm != null) {
+        boolean real = activeSlotIndex > 0 || pendingSlotIndex > 0;
+        String faction = body instanceof com.openworld.character.Character c && c.characterInfo != null
+            ? c.characterInfo.faction : "";
+        sm.post(com.openworld.world.StimulusManager.Type.WEAPON_DRAWN, body.getGlobalPosition(),
+            (float) (real ? drawWeaponRadius : drawFistsRadius), body, faction);
+      }
+    }
+  }
 
   /** True when a real weapon (slot > 0) is active. False when fist is active. */
   public boolean isArmed() { return activeSlotIndex > 0; }
@@ -820,6 +858,7 @@ public class WeaponController extends Node {
     long frame = Engine.INSTANCE.getPhysicsFrames();
     freshPress = frame > lastFireCallFrame + 1;
     lastFireCallFrame = frame;
+    if (isHolstered()) return;             // hands empty: nothing to fight with (choose a weapon or press 0)
     if (reloadTimer.getTimeLeft() > 0 || isWeaponTransitioning()) return;
     if (fireTimer.getTimeLeft() > 0) { rememberBlockedPress(); return; }
     WeaponItem w = getCurrentWeaponItem();
@@ -1049,6 +1088,7 @@ public class WeaponController extends Node {
     if (slotIndex == activeSlotIndex) { sockets.showWeapon(activeSlotIndex); return false; }
 
     pendingSlotIndex = slotIndex;
+    if (slotIndex > 0) setHolstered(false); // a real weapon coming out is a draw (puppets included)
     sockets.showWeapon(activeSlotIndex);   // keep the OLD weapon up through the holster phase
     transitionTimer.setWaitTime(1.0 / weapons[pendingSlotIndex].getSwitchSpeed());
     transitionTimer.start();
