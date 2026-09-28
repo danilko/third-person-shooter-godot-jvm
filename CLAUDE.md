@@ -10204,6 +10204,46 @@ footbridge; a hub (Central / Tokyo Station, 3.36) is one building over the whole
   kerb material, footway fill between, both solid to the road) instead of the flat green `M_Median` band, which had no
   sides at all. The `median` style slot's material is no longer read (a median PROFILE ASSET still is).
 
+## Station lifts: a through car beside every hub stair, and balustrades on every stair (2026-09-27, user-asked)
+
+Every elevated-hub and ground-hub platform has a LIFT; `station_layout.py` owns where (`LIFT_GAP` 3 m beyond the stair's
+TOP end, the stair's width square, in the stair's band: `eh_lift`, `hub_lift`, `lift_door_w`). The ground hub's annex
+has one too (street -> concourse, in the paid strip), so the whole route is step-free.
+- **The shaft is ART, the car is RUNTIME.** `build_station_blends.lift_shaft` models glass walls on metal posts with a
+  door opening in both X faces (along the track, never the rail side) at each stop, and drops a `LIFT_` Empty (w, d,
+  rise, door_w, door_h). It flows through `pieces.json` `lifts`, a `{lift}` prop, and the layout's `lifts`, into a
+  `world.Elevator` node that `build_building_scenes.gd` puts in EVERY variant (a lift is not a door).
+- **`world.Elevator`** builds an `AnimatableBody3D` car (a character standing in it rides it). Each face gets a two-leaf
+  centre-opening sliding door on the car and at each landing (the leaves part to both sides), plus CALL / DOORWAY / RIDE
+  sensors. A leaf's collider is off only while the doors stand open at the car's stop. Its behaviour is engine-free
+  `world.ElevatorRules` (`ElevatorRulesTest` 5). There are no buttons: a call is somebody ARRIVING at a landing (an
+  event, so a person waiting does not cycle the doors). Somebody boarding rides to the other stop, and the doors never
+  shut on a body in the doorway. A rider who stays on does not ride back. `inService` off = neither opens nor moves.
+  Local per peer (the `Door` rule).
+- **Every stair has a balustrade on both long sides** (`stair_rail`: a glass panel and a handrail stepped with the
+  flight, a collider on each open side, a handrail only against a wall). The elevated stair's open side is fenced
+  only below the platform slab, whose face is the fence above it (`clip_runs`).
+- **The elevated hub's F1 is a PAID BOX ringed by the unpaid hall** (user's larger-station plan, same day). The box is
+  centred on the station (`eh_modules`: gate module | lift | the stair's four | gate module, snapped to the 5 m
+  grid) and holds both stairs and both lifts. The unpaid hall is two single-storey WINGS, `EH_WING` 5 m past each
+  rail wall with a roof 4.6 m up, with four street entrances second from each end, plus the hall's two ends. The
+  wings take the building from 20.7 m to 30.7 m wide; `extent()` carries it into the rail reserve, which now reports
+  an elevated building that does not clear. Fare lines close all four sides:
+  - `EH_FloorGate` across the hall, turned 180 deg (hands swapped) at the low end so its unpaid side faces out;
+  - `EH_FareSide` / `EH_FareSideGate` along each long side, in the rail wall's line, whose F1 storey is a column per
+    module under a beam at the ceiling.
+  
+  A lowered CEILING at `EH_CEIL` 3.8 m (visual only) hides the viaduct soffit and the seam between the rail deck and
+  the station's slabs; it is open over the stairs, with a bulkhead above each stair's balustrade. The layout meta
+  carries `paid_box` / `outer` / `rail_wall`. The generator now RETIRES a generated piece the form no longer makes
+  (removed if untouched, reported if edited), and the exporter removes a retired piece's `.import`. Pictures:
+  `tools/godot/shot_station_hall.gd` (display). Central (step 6) takes the same four-sided box.
+- Gates: `tools/godot/probe_elevator.gd [--scene= --lift=N] [--control]` 10/10: a real Player calls it, rides 9.1 m up
+  (0.00 m off the platform), steps out, and the car stays. Control: 6 fail. `probe_station_paid` is unchanged on all
+  12 stations. Pictures: `tools/godot/shot_lift.gd` (display). Trap met: a `@Register` method renamed in Java is
+  invisible to Godot until `./gradlew build`, and `MethodCallable.createUnsafe` with the stale name connects to nothing,
+  silently.
+
 ## The land-planning batch: divided Wangan, paddy grid + crops, coastal dike, districts and an air base (2026-09-26)
 
 User asks, one session, built by ONE rebuild from `land` so later district work can be a regional re-derive. Each
@@ -10735,3 +10775,115 @@ that `probe_road_clear` or the layout gates measured.
   which is **empty for plain node paths** — NOT the path string. Use `nodePath.getPath()`
   (the Kotlin `path` property) whenever a path string is needed, e.g. `getPath().getPath()`
   on a Node. `StringName.toString()` is unaffected (it calls the native string operator).
+
+## Central is the elevated hub over three lanes; every station is a kit station (PLAN.md step 6, 2026-09-27)
+
+`station_layout.Station.kit` is every form now. A multi-lane elevated hub reuses the one-lane side pieces OUTSIDE its
+two outermost lanes (`eh_span`) and puts an ISLAND platform between each pair (`eh_islands`: its stair and lift on the
+island's centre line, in the gap between the two lanes' viaduct decks, `EH_ISLAND_SW` 2.5 m; refused when the decks
+leave no room). Whole-building pieces are named for the lane set (`eh_core`: `EH_Floor_345_3x14`); the one-lane names
+are unchanged and regenerate byte-identical. A station >= `EH_LONG` (150 m) gets entrances beside its paid box too.
+- **A lane must run the whole platform** (`station_layout.check`, `Lane.cover`): the Blue and Harbour lines STARTED at
+  Central's centre (x 782) and the Blue line ENDED 15 m inside Light Industry's platform. Both fixed in the rail plan
+  (`island_rail_layout`: `CENTRAL_END_X` 952; the Blue line to y -1017, short of the dike's back slope).
+- **The reserve**: `box_clear(own_line=)` takes every lane of the station (a station's own tracks are not a foreign
+  line), and a station car park keeps off every frozen site (`site_clear`) at a 10 / 5 / 2 m gap.
+- `probe_station_paid.gd` stand mode now requires EVERY platform to be reached through the open gates, not just one.
+
+## The open-air station building: restrooms both sides, a service counter, and a smooth entry slope (2026-09-27)
+
+User's layout sketches, PLAN.md step 6b. The end building is 22 m along x 9.5 m deep from the platform's track edge,
+its whole FLOOR AT THE PLATFORM TOP (the platform runs straight in). From the platform: the paid hall and a restroom
+block; the fare line (2 gate lanes by the track wall and the SERVICE COUNTER, the staffed wide gate); the unpaid hall
+with a second restroom block and the ticket / ATM / vending machines; the 4 m door. The restroom block is the
+standard modern-station set (men 1 stall + 2 urinals + 3 sinks, women 3 stalls + 3 sinks, an accessible room;
+`WC_L` x `WC_D` 8.6 x 5 m; `build_station_blends.restroom_block`, reusable in any frame via `Frame`).
+- **The entry** (`OA_Entry_<n>_<hand>`, or `OA_EntryOut_*` where the front has no room): a landing, a stair of n
+  risers, and a SMOOTH 1:15 slope with a landing every 0.75 m of rise. n comes from the reserve's measured
+  `entry_rise` (door sill over the street). A slope's collider is its own wedge. **Convex colliders are new in the kit
+  pipeline:** a `HULL_<n>` Empty (points in its `pts` custom property) -> `pieces.json` `collide_hulls` -> the
+  layout's `hull_points` -> a `ConvexPolygonShape3D`. Axis-aligned `COL_` boxes can only make a slope into steps.
+- **The ground hub's entrance annex** (15.5 m deep: paid 8 m, unpaid 7.5 m) carries the same set: a restroom block each
+  side of its fare line (the paid one under the mezzanine landing), the machines by the street wall, the service
+  counter on the line beside 2 gate lanes, and `GH_Entry_<n>` (the entry piece, stair + slope) where the street is
+  below the door. **A gate lane's yaw is the unpaid side's direction** (`p.gates` 4th element, default +X): a fare line
+  along X needs 90, or the flaps stand edge-on in the lane. `probe_station_paid.gd --trace` prints a leak's route.
+- **The elevated hub's amenities fit its F1 as it is (the wings are NOT widened: a wider building grows the reserve).**
+  `EH_Restroom` stands free under the MIDDLE lane between its deck's F1 column rows (faces +-4.1 m), one in the paid box
+  over the stair span and one in the unpaid end hall 1 m outside the low fare line (`station_layout.eh_restrooms`);
+  each end fare line ends in the service counter 0.6 m short of the long side's gate bank; the machines are in
+  `EH_WingMachines_*`, the wing beside each gate module. `shot_station_hall.gd` has `wc_paid` / `wc_unpaid` views.
+- 9.5 m deep is what fits every site. **Waterpark is a one-lane ground hub** (`station_layout.FORM_OVERRIDE`): the
+  wangan_dori trunk road is ~6.5 m from its south platform.
+- `probe_station_paid.gd` stand mode checks every platform from EVERY entrance. An open-air station must also have a
+  STEP-FREE route (<= 6 cm per 0.25 m cell) from each entrance to each platform. That check found a variable-shadowing
+  bug that laid one platform 8 modules long.
+
+## Shop interiors are a kit of .blend files, one per store (2026-09-27, user-asked)
+
+The konbini (small, large) and the family restaurant were re-planned from the user's sketches and moved to the
+station's Blender -> Godot shape so an artist can adjust them. `assets/world_source/kits/shops/` (`ARTIST_NOTES.md`)
+holds `Shop_<Id>.blend`, each ONE piece `<Id>_Interior`: every fitting a separate object (a copy of the library mesh),
+`COL_` Empties the colliders, `DOOR_` Empties the interior doors (arrow OUT of the room; `w`, `h`, `style` swing |
+slide, `slide_dir` +1/-1 = right/left seen from the arrow's side), and a `Reference (not exported)` collection drawing
+the shell's walls. The shell (outer walls, shopfront, roof, street entrance, outer doors) is still the downtown kit laid
+by `building_types.json`; the type's props are the fascia plus `{"piece": "shops:<Id>_Interior", "collide": "piece"}`.
+- **Seed**: `tools/building_kit/shop_interiors.py` (the plans as library props) -> `blender/tools/build_shop_blends.py`
+  lays them out ONCE; a regenerate keeps a hand-edited piece (`sh_generated` fingerprint; `--force=<Id>_Interior`).
+- **Export**: `export_building_kit.py` gained `DOOR_` -> `doors`; `build_buildings.sh` now exports a kit's `blends`
+  list too (the station kit opts out with `own_build`: it has build_stations.sh). `place_props`' `collide: "piece"`
+  takes the piece's own boxes/hulls, and a piece's `doors` become `inner_doors`.
+- **Doors**: store/staff rooms and offices are hinged; every restroom has a SOLID SLIDING leaf
+  (`build_building_scenes.gd`: an inner door with `style: slide` is one opaque leaf hung 0.11 m proud of the wall on
+  its outward face, running `slide_dir` along the wall). `layout_buildings.check_inner_doors_clear` refuses a store
+  whose interior door has something within 1.1 m on either side, or on a sliding leaf's run.
+- **Plans**: every store has at least one ACCESSIBLE restroom (1.0 m `Wall_PartitionDoorWide`, toilet, `WC_GrabRail`,
+  basin + mirror, `WC_BabyTable`). Small konbini: one (customers + staff); large: two (customer back-left, staff in the
+  back-of-house row off a closed staff aisle behind the counter), plus a store room with a delivery door behind the
+  walk-in's fulfilment corridor; restaurant: kitchen across the back (`Kitchen_Fridge/Sink/PrepTable/Fryer`, grills),
+  `Wall_PassWindow` over the service counter, store/staff/staff-WC column, customer accessible/women/men block.
+  New library placeholders in `library_procedural.py`: those above plus `Wall_PartitionHalf`.
+- **Second round (2026-09-28, from a review of the user's hand edits, which were folded into the seed and then
+  regenerated with `--force`):** the cooler is a ROOM (drink doors = its front wall,
+  `Shop_FridgeDoor` has no back panel now), `Shop_OpenCase` (bento, no door), `Shop_FreezerCase` (replaces the ice
+  freezer), `Shop_CigaretteCase`, `Shop_CoffeeStation` (2 machines), `Shop_BinStation` (3 sorted bins),
+  `Shop_EatInCounter` (wall-mounted, one seat per 0.91 m unit) + `Shop_Stool`; staff exit only through the staff
+  aisle (KonbiniS back [0], KonbiniL back [2]; the aisle behind a hinged door); vending machines OUTSIDE (2 small,
+  3 large); the restaurant has TWO accessible customer restrooms + bins, ticket machines and an ATM. A type records
+  `forecourt_m` (props past the front wall) and probe_buildings lets the mesh be that much deeper. The generator
+  reloads library meshes on a regenerate and folds `MI_x.001` material copies; the scene builder also strips `.NNN`.
+- **Third round (2026-09-28):** `WC_Toilet` is a code-built Japanese WASHLET (rounded one-piece bowl, tank/washlet
+  housing, seat + lid, control panel on the right of the seat; 0.75 m deep, so every toilet sits 0.385 m off its wall)
+  and `WC_Basin` a plain square wall-hung basin; both left `extract.json` (one owner). The large konbini's staff aisle
+  now runs the whole staff block to z 0 with its hinged door there, the staff restroom opens INTO it, and the counter
+  moved forward with two registers.
+- Weapon pads (`island_buildings.KONBINI_PADS`) moved onto free sales floor. Gates: `probe_buildings.gd` (an interior
+  door may be `inner_slide`, asserted by movement) 310/310 on the three types; `probe_weapon_counter.gd` PASS.
+
+## The large hubs: six-bay roller-shutter entrances and shops along the side (PLAN.md step 6b, 2026-09-28)
+
+**Every station entrance is a roller-shutter opening** (user): no door leaf, open all day, and NO post in between --
+only its frame at each side (user, 2026-09-28; the generator's `shutter(..., posts=False)`: one shutter, a guide rail
+each side, the housing over it). Station stores have no shutter at all (a glass front, below). Ordinary entrances are 4 m; a LARGE hub's (`is_large`: every hub form but a `FORM_OVERRIDE` station, i.e. all
+but Waterpark) is 11.8 m (`LARGE_ENTRANCE_W`, sized as six 1.8 m bays). A shutter that comes down at night is a later runtime item.
+- **Ground hubs** (Bay, Industry, Harbour): `GH_AnnexLarge_*` (opening at a 2.6..14.4) and ONE store,
+  `GH_AnnexStore_*`, past the annex's +X end (user, 2026-09-28): it opens ONLY into the unpaid hall, through a sliding
+  glass door in the annex's +X end wall (the paid strip's part of that wall stays solid), shows display glass to the
+  street, and its floor is the hall's. `GH_EntryWide_*` spans the whole opening. `annex_span` is the annex with its
+  store, and `choose_entrance` clears that.
+- **Every station store's door is a SLIDING GLASS door** (`store_front` in the generator: fixed glass either side, a
+  `DOOR_` Empty of style `slide_glass` that the scene builder hangs as automatic glass leaves in the wall's plane; two
+  leaves where the front is >= 4 m, else one -- `station_layout.store_door_w`).
+- **Elevated hubs**: an entrance is THREE wing modules (`EH_WingEntrance_*`; `eh_modules` roles `entrance` and
+  `entrance_flank`, which gets no wing piece); every other wing module but the machines is `EH_WingShop_*`, a 2.4 m
+  shop against the outer wall whose glazed front and glass door face the HALL (user's choice), leaving a 2.3 m walkway. An elevated hub needs 65 m.
+- **The restroom block's fixtures are the konbini's LIBRARY restroom kit** (user, 2026-09-28): washlet `WC_Toilet`,
+  square `WC_Basin` + `WC_Mirror`, `WC_Partition` stall sides, `WC_GrabRail`, `WC_BabyTable`, and the accessible room's
+  SOLID SLIDING door (the konbini's 引き戸, a `DOOR_` of style `slide`). A kit piece may now carry `PROP_` Empties: a
+  LIBRARY fixture (custom props `piece` = `library:<Name>`, `collide`), shown in the station .blend as an instance of
+  the LINKED library collection; `export_building_kit.markers` writes them to the manifest's `props`, and
+  `layout_buildings.place_props` places them with the piece, so a library edit reaches every station on the next
+  build. A mirrored hand turns a fixture by `180 - yaw` (it keeps its own hand). The export skips LINKED collections
+  (they carry `bk_piece_path` too, and are their own kit's). Urinals are still the generator's boxes (the library has
+  none). Pictures: `shot_station_hall.gd` views `wc_in_men` / `wc_in_women` / `wc_in_acc`.
+- The generator retires untouched pieces the form no longer makes (`EH_Wing_*`, `EH_WingDoor_*`, `GH_AnnexShops_*` went this way).

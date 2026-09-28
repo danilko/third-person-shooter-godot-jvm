@@ -1,0 +1,16 @@
+{
+  "id": "shops",
+  "title": "Shop interiors (our own): the konbini (small, large) and the family restaurant, one .blend per store",
+  "author": "this project",
+  "licence": "MIT (ours)",
+  "notes": [
+    "One .blend per store TYPE (Shop_KonbiniS.blend, Shop_KonbiniL.blend, Shop_FamilyRestaurant.blend); each OWNS its interior piece <Id>_Interior. blender/tools/build_shop_blends.py laid them out once from tools/building_kit/shop_interiors.py and keeps a piece an artist has edited.",
+    "The shell (outer walls, shopfront, roof, the street entrance) is still the downtown kit's modules, laid by tools/building_kit/layout_buildings.py from building_types.json; the interior piece stands at the footprint centre on the floor.",
+    "Materials are the central library's palette: the scene builder resolves every surface to kits/library/materials/<name>.tres (materials_from)."
+  ],
+  "materials_from": "library",
+  "blends": ["Shop_KonbiniS.blend", "Shop_KonbiniL.blend", "Shop_FamilyRestaurant.blend"],
+  "source_module_m": 1.82,
+  "source_storey_m": 2.73,
+  "module_scale": 1.0
+}

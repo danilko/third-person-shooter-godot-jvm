@@ -22,7 +22,7 @@
  "nodes": [
   {
    "extras": {
-    "edit_note": "The cap's bay over an island platform: the stair down on the platform's centre line, columns beside it."
+    "edit_note": "The cap's bay over an island platform: the stair down on the platform's centre line (a balustrade each side), the LIFT beside it on the same line, columns beside them."
    },
    "mesh": 0,
    "name": "GH_CapIsland_129"
@@ -150,6 +150,39 @@
     "metallicFactor": 0.30000001192092896,
     "roughnessFactor": 0.699999988079071
    }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_PlasticDark",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.11999999731779099,
+     0.11999999731779099,
+     0.12999999523162842,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.6000000238418579
+   }
+  },
+  {
+   "doubleSided": true,
+   "emissiveFactor": [
+    0.0600000032782555,
+    0.15000000596046448,
+    0.30000001192092896
+   ],
+   "name": "MI_Sign",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.11999999731779099,
+     0.30000001192092896,
+     0.550000011920929,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
   }
  ],
  "meshes": [
@@ -219,6 +252,22 @@
      },
      "indices": 22,
      "material": 7
+    },
+    {
+     "attributes": {
+      "POSITION": 23,
+      "NORMAL": 24
+     },
+     "indices": 25,
+     "material": 8
+    },
+    {
+     "attributes": {
+      "POSITION": 26,
+      "NORMAL": 27
+     },
+     "indices": 28,
+     "material": 9
     }
    ]
   }
@@ -227,7 +276,7 @@
   {
    "bufferView": 0,
    "componentType": 5126,
-   "count": 572,
+   "count": 628,
    "max": [
     15,
     6.199999809265137,
@@ -243,13 +292,13 @@
   {
    "bufferView": 1,
    "componentType": 5126,
-   "count": 572,
+   "count": 628,
    "type": "VEC3"
   },
   {
    "bufferView": 2,
    "componentType": 5123,
-   "count": 1116,
+   "count": 1224,
    "type": "SCALAR"
   },
   {
@@ -367,7 +416,7 @@
   {
    "bufferView": 15,
    "componentType": 5126,
-   "count": 48,
+   "count": 1536,
    "max": [
     14.949999809265137,
     8.800000190734863,
@@ -375,7 +424,7 @@
    ],
    "min": [
     -14.949999809265137,
-    7.099999904632568,
+    1.2100000381469727,
     -6.449999809265137
    ],
    "type": "VEC3"
@@ -383,13 +432,13 @@
   {
    "bufferView": 16,
    "componentType": 5126,
-   "count": 48,
+   "count": 1536,
    "type": "VEC3"
   },
   {
    "bufferView": 17,
    "componentType": 5123,
-   "count": 72,
+   "count": 2304,
    "type": "SCALAR"
   },
   {
@@ -417,175 +466,267 @@
   {
    "bufferView": 20,
    "componentType": 5126,
-   "count": 592,
+   "count": 2144,
    "max": [
     11.300000190734863,
-    7.300000190734863,
-    1.5499999523162842
+    9,
+    1.559999942779541
    ],
    "min": [
     -11.300000190734863,
-    1.2599999904632568,
-    -1.5499999523162842
+    1.2100000381469727,
+    -1.559999942779541
    ],
    "type": "VEC3"
   },
   {
    "bufferView": 21,
    "componentType": 5126,
-   "count": 592,
+   "count": 2144,
    "type": "VEC3"
   },
   {
    "bufferView": 22,
    "componentType": 5123,
-   "count": 900,
+   "count": 3300,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 23,
+   "componentType": 5126,
+   "count": 256,
+   "max": [
+    -4.809999942779541,
+    8.420000076293945,
+    0.6700000166893005
+   ],
+   "min": [
+    -7.849999904632568,
+    1.2599999904632568,
+    -0.6700000166893005
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 24,
+   "componentType": 5126,
+   "count": 256,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 25,
+   "componentType": 5123,
+   "count": 432,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 26,
+   "componentType": 5126,
+   "count": 96,
+   "max": [
+    -4.800000190734863,
+    7.449999809265137,
+    -0.75
+   ],
+   "min": [
+    -7.860000133514404,
+    2.259999990463257,
+    -0.8700000047683716
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 27,
+   "componentType": 5126,
+   "count": 96,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 28,
+   "componentType": 5123,
+   "count": 144,
    "type": "SCALAR"
   }
  ],
  "bufferViews": [
   {
    "buffer": 0,
-   "byteLength": 6864,
+   "byteLength": 7536,
    "byteOffset": 0,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 6864,
-   "byteOffset": 6864,
+   "byteLength": 7536,
+   "byteOffset": 7536,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 2232,
-   "byteOffset": 13728,
+   "byteLength": 2448,
+   "byteOffset": 15072,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 7776,
-   "byteOffset": 15960,
+   "byteOffset": 17520,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 7776,
-   "byteOffset": 23736,
+   "byteOffset": 25296,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 1944,
-   "byteOffset": 31512,
+   "byteOffset": 33072,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 33456,
+   "byteOffset": 35016,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 33744,
+   "byteOffset": 35304,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 72,
-   "byteOffset": 34032,
+   "byteOffset": 35592,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 34104,
+   "byteOffset": 35664,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 34392,
+   "byteOffset": 35952,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 72,
-   "byteOffset": 34680,
+   "byteOffset": 36240,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 1152,
-   "byteOffset": 34752,
+   "byteOffset": 36312,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 1152,
-   "byteOffset": 35904,
+   "byteOffset": 37464,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 37056,
+   "byteOffset": 38616,
    "target": 34963
   },
   {
    "buffer": 0,
-   "byteLength": 576,
-   "byteOffset": 37344,
+   "byteLength": 18432,
+   "byteOffset": 38904,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 576,
-   "byteOffset": 37920,
+   "byteLength": 18432,
+   "byteOffset": 57336,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 144,
-   "byteOffset": 38496,
+   "byteLength": 4608,
+   "byteOffset": 75768,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 38640,
+   "byteOffset": 80376,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 38928,
+   "byteOffset": 80664,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 7104,
-   "byteOffset": 39216,
+   "byteLength": 25728,
+   "byteOffset": 80952,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 7104,
-   "byteOffset": 46320,
+   "byteLength": 25728,
+   "byteOffset": 106680,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 1800,
-   "byteOffset": 53424,
+   "byteLength": 6600,
+   "byteOffset": 132408,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 3072,
+   "byteOffset": 139008,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 3072,
+   "byteOffset": 142080,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 864,
+   "byteOffset": 145152,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 1152,
+   "byteOffset": 146016,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 1152,
+   "byteOffset": 147168,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 148320,
    "target": 34963
   }
  ],
  "buffers": [
   {
-   "byteLength": 55224,
+   "byteLength": 148608,
    "uri": "GH_CapIsland_129.bin"
   }
  ]

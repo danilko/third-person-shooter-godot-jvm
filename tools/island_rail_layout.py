@@ -569,6 +569,7 @@ ACCEPT_GAPS = set()      # (a, b) station pairs closer than STATION_MIN_GAP that
 #      station's SOUTH forecourt with its car park, and the castle is a walk up from the north exit -- the rail never
 #      crosses the approach (a Japanese 城下町 station).
 import copy as _copy
+CENTRAL_END_X = 952.0                # the Blue and Harbour lines' buffer stops, past Central's east end
 _TS = LAYOUTS["tokyo_straight"]
 _R0 = _copy.deepcopy(_TS)
 _R0["lines"]["Main line"] = dict(_TS["lines"]["Main line"],
@@ -593,6 +594,14 @@ _R0["lines"]["Blue line"]["form"] = [(782.0, 229.0, "elev")] + _R0["lines"]["Blu
 _R0["lines"]["Harbour line"] = dict(_TS["lines"]["Harbour line"],
     corners=[(782.0, 201.0), (185.0, 201.0), (185.0, -1110.0)],
     form=[(782.0, 201.0, "elev")] + _TS["lines"]["Harbour line"]["form"][1:])
+# CENTRAL'S LANES RUN THROUGH ITS BUILDING (PLAN.md step 6, 2026-09-27): the Blue and Harbour lines used to START at
+# Central's centre (x 782), so their tracks served only the west half of its 300 m platforms -- the station kit's hub
+# (the user's elevated-hub sketch: every lane through the building) would have stood platforms beside a missing deck
+# in the east half. Both now start ~20 m past Central's east platform end (x 932), a buffer stop like the Main line's
+# termini; the Main line only starts curving north at x 930, so it is 8 m clear of the Blue line's gauge there.
+for _ln, _y in (("Blue line", 229.0), ("Harbour line", 201.0)):
+    _R0["lines"][_ln]["corners"] = [(CENTRAL_END_X, _y)] + _R0["lines"][_ln]["corners"]
+    _R0["lines"][_ln]["form"] = [(CENTRAL_END_X, _y, "elev")] + _R0["lines"][_ln]["form"][1:]
 _R0["stations"] = dict(_TS["stations"])
 _R0["stations"]["City West"] = ("Blue line", -100.0, -160.0, "standard", 90.0, "small_lot",
                                 "at grade on the westbound leg, between chuo_dori and nishi_dori")
@@ -603,6 +612,11 @@ _R0["stations"]["Waterpark"] = ("Main line", 470.0, -400.0) + tuple(_TS["station
 _R0["stations"]["Suburb"] = ("Main line", 880.0, -400.0) + tuple(_TS["stations"]["Suburb"][3:])
 _R0["stations"]["Residential"] = ("Blue line", -800.0, -520.0) + tuple(_TS["stations"]["Residential"][3:])
 _R0["stations"]["Light Industry"] = ("Blue line", -800.0, -960.0) + tuple(_TS["stations"]["Light Industry"][3:])
+# ...and the Blue line runs on to a buffer stop 12 m past Light Industry's platform (y -1005; the coastal dike's back
+# slope starts at y -1020), like every terminus:
+# it ended at y -990, 15 m INSIDE the platform, which left the kit station's south platform end beside no track
+# (station_layout's cover check, 2026-09-27)
+_R0["lines"]["Blue line"]["corners"] = _R0["lines"]["Blue line"]["corners"][:-1] + [(-800.0, -1017.0)]
 # NO 踏切 THROUGH A PLATFORM (probe_rail_track, 2026-09-26): City West's platform was cut by chuo_dori's level crossing
 # 36 m from its centre and Bay's by rinkai_dori's 16 m from its centre -- the road owns a crossing's ground, so the
 # platform was simply missing there. Each slides along its own line until the crossing is ~10 m past its platform
@@ -1488,7 +1502,9 @@ def reserve(res, out):
 
     def box_clear(cx, cy, ux, uy, ha, hc, own_line=None):
         """No arterial's paved edge, and no other rail line's track, inside the box (centre, along-axis, half along,
-        half across)."""
+        half across). `own_line`: a line, or a collection of them, whose tracks the box may hold (a station's own lanes:
+        Central's three lines all run through its building)."""
+        own = {own_line} if isinstance(own_line, str) or own_line is None else set(own_line)
         nxb, nyb = -uy, ux
         for i in range(-int(ha // 2), int(ha // 2) + 1):
             for j in range(-int(hc // 2), int(hc // 2) + 1):
@@ -1497,9 +1513,32 @@ def reserve(res, out):
                     for gj in (int(y // 50) - 1, int(y // 50), int(y // 50) + 1):
                         if any(math.hypot(q[0] - x, q[1] - y) < q[2] for q in art_paved.get((gi, gj), ())):
                             return False
-                        if any(q[3] != own_line and math.hypot(q[0] - x, q[1] - y) < q[2]
+                        if any(q[3] not in own and math.hypot(q[0] - x, q[1] - y) < q[2]
                                for q in rail_paved.get((gi, gj), ())):
                             return False
+        return True
+
+    # the frozen SITES (IslandSites.json: Tokyo Station's building beside Central, the castle, ...): a station's car
+    # park must not be laid over one (2026-09-27: once Central became a kit station its car park landed on Tokyo
+    # Station's building). Each as (x, y, sin yaw, cos yaw, half along, half across) of its RESERVE.
+    sites = []
+    _sp = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandSites.json")
+    if os.path.exists(_sp):
+        for r_ in json.load(open(_sp))["sites"]:
+            a_ = math.radians(r_["yaw"])
+            sites.append((r_["x"], r_["y"], math.cos(a_), math.sin(a_), r_["size"][0] / 2, r_["size"][1] / 2))
+
+    def site_clear(cx, cy, ux_, uy_, ha, hc):
+        """No frozen site's reserve rectangle holds any of the box's sample points (corners, edges, centre)."""
+        for i in (-1.0, -0.5, 0.0, 0.5, 1.0):
+            for j in (-1.0, -0.5, 0.0, 0.5, 1.0):
+                x = cx + ux_ * ha * i - uy_ * hc * j
+                y = cy + uy_ * ha * i + ux_ * hc * j
+                for sx, sy, ca, sa, sha, shc in sites:
+                    # a site's scene +X is (cos yaw, -sin yaw) in the record frame (Godot's plan is (x, -y))
+                    dx, dy = x - sx, y - sy
+                    if abs(dx * ca - dy * sa) < sha and abs(dx * sa + dy * ca) < shc:
+                        return False
         return True
 
     def over_dike(a_, b_):
@@ -1519,12 +1558,12 @@ def reserve(res, out):
                 break
         return d + (1000.0 if gnd.z(px, py) < -1.0 else 0.0)    # record 0 is the city plain (NET_Y)
     import station_layout as SL
-    sl_all = SL.stations(res, ends={}, entrances={})
+    sl_all = SL.stations(res, ends={}, entrances={}, rises={})
     for n, st in res["stations"].items():
         L = res["lines"][st["line"]]
         sl = sl_all[n]
         open_air = sl.form == "open_air"
-        kit = sl.form in SL.KIT_FORMS
+        kit = sl.kit
         i0 = min(range(len(L["cum"])), key=lambda k: abs(L["cum"][k] - (st["s"] - st["platform_m"] / 2)))
         i1 = min(range(len(L["cum"])), key=lambda k: abs(L["cum"][k] - (st["s"] + st["platform_m"] / 2)))
         (px, py), (qx, qy) = L["pts"][i0], L["pts"][i1]
@@ -1539,7 +1578,8 @@ def reserve(res, out):
             # an arterial's paved footprint carries a 1 m margin; a station building may stand at the footway's
             # back edge (its street face IS on the pavement), so it keeps 0.5 m, not 1.5 (Waterpark's south
             # platform: wangan_dori's footway 1 m past the building)
-            return (box_clear(cx, cy, ux_, uy_, ha, hc - 1.0, st["line"]) and gnd.z(cx, cy) > -1.0
+            return (box_clear(cx, cy, ux_, uy_, ha, hc - 1.0, [ln.line for ln in sl.lanes] or st["line"])
+                    and gnd.z(cx, cy) > -1.0
                     and not over_dike((sl.x, sl.y), (cx, cy)))
         def e_cost(x, y):
             # the street outside the door should be at the building's floor, the bed: a platform held level on a
@@ -1554,10 +1594,17 @@ def reserve(res, out):
             if door is None:
                 print("reserve: %s -- neither side clears for its entrance annex" % n)
             else:
-                x_, y_ = SL.to_record(sl, *SL.hub_entrance(sl, door))
-                if abs(sl.bed - gnd.z(x_, y_)) > SL.ENTRANCE_STEP:
-                    print("reserve: %s -- its entrance annex's door stands %.2f m off its street (over %.1f)"
-                          % (n, sl.bed - gnd.z(x_, y_), SL.ENTRANCE_STEP))
+                # the street below the door, measured where the entry (stair + slope) lands -- which depends on the
+                # step itself, so twice; the station's extent then covers the entry too
+                sl.entrance = door
+                for _k in range(2):
+                    x_, y_ = SL.to_record(sl, *SL.hub_entrance(sl, door))
+                    sl.door_step = round(max(0.0, sl.bed - gnd.z(x_, y_)), 3)
+                # the entry carries a street BELOW the door (up to its tallest piece); nothing carries one above it
+                dz = sl.bed - gnd.z(x_, y_)
+                if dz < -0.2 or dz > (SL.ENTRY_N[1] + 0.5) * SL.ENTRY_RISE:
+                    print("reserve: %s -- its entrance annex's door stands %.2f m over its street (the entry pieces "
+                          "carry 0 .. %.2f)" % (n, dz, SL.ENTRY_N[1] * SL.ENTRY_RISE))
             hw = max(hw, SL.extent(sl)[1] + 1.0)
         if open_air:
             # AN OPEN-AIR STATION (PLAN.md step 3, the 2026-09-27 sketch): each platform's OWN building stands in line
@@ -1565,15 +1612,28 @@ def reserve(res, out):
             # where the building stands clear of every arterial, other line, the dike and the water
             # (`station_layout.choose_ends`). Its box covers both ends and both buildings' outer reach.
             ends = SL.choose_ends(sl, b_clear, e_cost)
+            rises = {}
             for side, e in ends.items():
                 x_, y_ = SL.to_record(sl, *SL.entrance(sl, side, e))
-                if abs(sl.bed - gnd.z(x_, y_)) > SL.ENTRANCE_STEP:
-                    print("reserve: %s -- its %s building's door stands %.2f m off its street (over %.1f)"
-                          % (n, side, sl.bed - gnd.z(x_, y_), SL.ENTRANCE_STEP))
+                # the door's sill is the platform top; its stair and slope (OA_Entry*) come down to the street
+                rises[side] = round(sl.bed + SL.PLATFORM_H - gnd.z(x_, y_), 3)
+                lo_, hi_ = (k_ * SL.ENTRY_RISE for k_ in SL.ENTRY_N)
+                if not lo_ - SL.ENTRY_RISE / 2 <= rises[side] <= hi_ + SL.ENTRY_RISE / 2:
+                    print("reserve: %s -- its %s building's door sill stands %.2f m over its street (the entry pieces "
+                          "carry %.2f .. %.2f)" % (n, side, rises[side], lo_, hi_))
             for side in ("left", "right"):
                 if side not in ends:
                     print("reserve: %s -- no end of its %s platform clears for its building" % (n, side))
             hw = max(hw, SL.extent(sl)[1] + 1.0)
+        if kit and sl.form == "elevated_hub":
+            # AN ELEVATED HUB (PLAN.md step 5): its F1 building fills the ground under the platforms, so no street passes
+            # under it (the reserve box is a site to the street planner) and the box covers its outer walls -- since
+            # 2026-09-27 its WINGS too (EH_WING past each rail wall), which must clear the arterials like any building
+            ha, hc = SL.extent(sl)
+            if not b_clear(sl.x, sl.y, sl.ux, sl.uy, ha, hc):
+                print("reserve: %s -- its F1 building (%.1f m wide with its wings) does not clear the arterials / "
+                      "dike / water" % (n, 2 * hc))
+            hw = max(hw, hc + 1.0)
         probe = hw + 40.0
         if side_cost(st["x"] - nx * probe, st["y"] - ny * probe) < side_cost(st["x"] + nx * probe, st["y"] + ny * probe):
             nx, ny = -nx, -ny
@@ -1583,7 +1643,8 @@ def reserve(res, out):
         # the building and the car park must not stand on an arterial: slide them along the platform, then try the
         # other side; the town side at its centre is the preference, the first clear placement wins
         pw, ph = PARKING[st["parking"]]
-        shift = 0.0
+        shift, pgap = 0.0, 10.0
+        hwp = hw
         # the building's back stands STATION_YARD behind its platform's outer edge (the paid yard its stair lands in),
         # else where the reserve always put it, at the station box's edge
         import island_rail_record as IRR
@@ -1592,15 +1653,22 @@ def reserve(res, out):
         if kit:
             # only the car park is placed here: slid along the platform, then the other side
             span = max(0.0, ul / 2 - pw / 2)
-            for sg, d in [(sg, d) for sg in (1.0, -1.0) for d in (0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0)
-                          if abs(d) <= span + 1e-6]:
-                off = hw + 10 + ph / 2
-                if not pw or box_clear(st["x"] + sg * nx * off + ux * d, st["y"] + sg * ny * off + uy * d,
-                                       ux, uy, pw / 2, ph / 2, st["line"]):
-                    nx, ny, shift = sg * nx, sg * ny, d
+            # the gap to the station box: 10 m first, then tighter (a car park may stand right beside the station --
+            # Castle Town's has the castle's site on one side and nishi_dori 45 m off the other)
+            # an open-air station's end buildings stand past its platform ENDS: a car park no longer than the platform
+            # stands beside the platform itself, so it keeps clear of the platform's outer fence, not of the buildings
+            if open_air:
+                hwp = max(abs(v) for c0, c1, _f in SL.platforms(sl) for v in (c0, c1)) + 1.0
+            for sg, gap, d in [(sg, gap, d) for sg in (1.0, -1.0) for gap in (10.0, 5.0, 2.0)
+                               for d in (0.0, 10.0, -10.0, 20.0, -20.0, 30.0, -30.0) if abs(d) <= span + 1e-6]:
+                off = hwp + gap + ph / 2
+                px_, py_ = st["x"] + sg * nx * off + ux * d, st["y"] + sg * ny * off + uy * d
+                if not pw or (box_clear(px_, py_, ux, uy, pw / 2, ph / 2, st["line"])
+                              and site_clear(px_, py_, ux, uy, pw / 2, ph / 2)):
+                    nx, ny, shift, pgap = sg * nx, sg * ny, d, gap
                     break
             else:
-                print("reserve: %s -- no placement of its car park clears the arterials" % n)
+                print("reserve: %s -- no placement of its car park clears the arterials and the sites" % n)
         elif st["kind"] != "hub":
             span = max(0.0, ul / 2 - STATION_BUILDING[0] / 2)
             tries = [(sg, bo, d) for sg in (1.0, -1.0) for bo in boffs
@@ -1622,7 +1690,8 @@ def reserve(res, out):
         sbox = {"id": "station:" + n, "x": round((px + qx) / 2, 2), "y": round((py + qy) / 2, 2),
                 "ux": round(ux, 5), "uy": round(uy, 5), "h_along": round(ul / 2 + 5.0, 2), "h_across": hw,
                 "z": round(st["z"], 2),
-                "street_under": _cross_rule(st["z"] - L["ground"][gi]) == "under"}
+                "street_under": _cross_rule(st["z"] - L["ground"][gi]) == "under"
+                and not (kit and sl.form == "elevated_hub")}
         if kit:
             # the station SCENE's frame (station_layout: origin on the axis at the platform centre, at bed level) and
             # the ends its buildings stand at; `island_sites.rail_stations` places the scene, `station_layout` lays it out
@@ -1631,10 +1700,11 @@ def reserve(res, out):
                          "nx": round(nx, 5), "ny": round(ny, 5)})
             if open_air:
                 sbox["ends"] = ends
+                sbox["entry_rise"] = rises
+                sbox["entry_kind"] = {sd: sl.entry_kind.get(sd, "side") for sd in ends}
             elif door:
-                x_, y_ = SL.to_record(sl, *SL.hub_entrance(sl, door))
                 sbox["entrance"] = door
-                sbox["door_step"] = round(max(0.0, sl.bed - gnd.z(x_, y_)), 3)
+                sbox["door_step"] = sl.door_step
         boxes.append(sbox)
         # THE STATION BUILDING (駅舎, PLAN.md R3): in the 10 m between the platform box and the car park, its back to
         # the platform fence and its front to the car park / street side. A hub's is its own site (Central: the
@@ -1667,7 +1737,7 @@ def reserve(res, out):
                 print("reserve: %s -- no far-side station building clears (its far platform has no gates)" % n)
         w, h = PARKING[st["parking"]]
         if w:
-            off = hw + 10 + h / 2           # the same place the picture draws it
+            off = hwp + pgap + h / 2        # where the placement above found room (the picture draws it there too)
             boxes.append({"id": "parking:" + n, "x": round(st["x"] + nx * off + ux * shift, 2),
                           "y": round(st["y"] + ny * off + uy * shift, 2),
                           "ux": round(ux, 5), "uy": round(uy, 5), "h_along": w / 2, "h_across": h / 2,

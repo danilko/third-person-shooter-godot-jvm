@@ -61,6 +61,33 @@ class Builder:
             face = self.bm.faces.new([vs[i] for i in f])
             face.material_index = mi
 
+    def rounded(self, cx, cy, rx, ry_front, ry_back, z0, z1, mat, segs=24, shrink=0.0):
+        """A solid from z0 to z1 whose plan is a half-ellipse at the FRONT (-Y, `ry_front` deep) and a half-ellipse
+        (or, with `ry_back` 0, a straight edge) at the back: a toilet bowl, a seat. `shrink` narrows the top ring by
+        that fraction (a tapered pedestal)."""
+        mi = self._mi(mat)
+        ring = []
+        for k in range(segs + 1):                                   # front half: angle pi .. 2 pi
+            a = math.pi + math.pi * k / segs
+            ring.append((cx + rx * math.cos(a), cy + ry_front * math.sin(a)))
+        if ry_back > 0:
+            for k in range(1, segs):
+                a = math.pi * k / segs
+                ring.append((cx + rx * math.cos(a), cy + ry_back * math.sin(a)))
+        # the ring runs counter-clockwise seen from above (left, round the front, right): top faces up, sides out
+        s = 1.0 - shrink
+        lo = [self.bm.verts.new((x, y, z0)) for x, y in ring]
+        hi = [self.bm.verts.new((cx + (x - cx) * s, cy + (y - cy) * s, z1)) for x, y in ring]
+        f = self.bm.faces.new(lo[::-1])
+        f.material_index = mi
+        f = self.bm.faces.new(hi)
+        f.material_index = mi
+        n = len(ring)
+        for i in range(n):
+            j = (i + 1) % n
+            f = self.bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+            f.material_index = mi
+
     def beam(self, p0, p1, w, mat):
         """A square beam `w` wide from point p0 to point p1 (cables, legs, hangers)."""
         import mathutils
@@ -97,7 +124,9 @@ def fridge_door(material):
     b = Builder("Shop_FridgeDoor", material)
     w, d, h = 0.91, 0.8, 2.1
     x0, x1, y0, y1 = -w / 2, w / 2, -d / 2, d / 2
-    b.box((x0, y1 - 0.05, 0), (x1, y1, h), "MI_PaintedMetal")              # back
+    # NO back panel (user, 2026-09-28): the bank is the front wall of the walk-in cooler ROOM, and staff restock
+    # every door at once from behind; the back is a sill rail only
+    b.box((x0, y1 - 0.05, 0), (x1, y1, 0.12), "MI_PaintedMetal")
     b.box((x0, y0, 0), (x0 + 0.04, y1, h), "MI_PaintedMetal")               # sides
     b.box((x1 - 0.04, y0, 0), (x1, y1, h), "MI_PaintedMetal")
     b.box((x0, y0, 0), (x1, y1, 0.12), "MI_PaintedMetalDark")               # plinth
@@ -124,6 +153,115 @@ def coffee_machine(material):
     b.box((-0.12, -d / 2 - 0.02, 0.5), (0.12, -d / 2 - 0.01, 0.62), "MI_Light")
     b.box((-0.1, -d / 2, 0.03), (0.1, -d / 2 + 0.2, 0.05), "MI_Steel")       # the drip tray in the niche
     return "Shop_CoffeeMachine", "interior", b.mesh()
+
+
+# ── konbini sales floor, second round (user, 2026-09-28): PLACEHOLDERS for an artist ────────────────────────────
+
+def open_case(material):
+    """An OPEN multideck chiller (オープンケース) for bento, onigiri and sandwiches: one ken long, 0.85 m deep, 2.0 m tall,
+    NO door and no glass -- the goods are taken straight off the shelves. The chilled air curtain is the top canopy."""
+    b = Builder("Shop_OpenCase", material)
+    x0, x1, y0, y1, h = -0.91, 0.91, -0.425, 0.425, 2.0
+    b.box((x0, y1 - 0.08, 0), (x1, y1, h), "MI_PaintedMetal")               # back
+    b.box((x0, y0, 0), (x0 + 0.04, y1, h), "MI_PaintedMetal")               # end panels
+    b.box((x1 - 0.04, y0, 0), (x1, y1, h), "MI_PaintedMetal")
+    b.box((x0, y0, 0), (x1, y1, 0.45), "MI_PaintedMetalDark")               # the low deck's base
+    b.box((x0, y0 + 0.2, h - 0.2), (x1, y1, h), "MI_PaintedMetal")          # canopy
+    b.box((x0 + 0.05, y0 + 0.22, h - 0.22), (x1 - 0.05, y0 + 0.3, h - 0.2), "MI_Light")
+    for k, (z, dy) in enumerate(((0.45, 0.0), (0.85, 0.12), (1.2, 0.22), (1.52, 0.3))):
+        b.box((x0 + 0.04, y0 + dy, z), (x1 - 0.04, y1 - 0.08, z + 0.03), "MI_Steel")
+        b.box((x0 + 0.06, y0 + dy + 0.04, z + 0.03), (x1 - 0.06, y1 - 0.12, z + 0.2), "MI_Goods")
+    b.box((x0, y0 - 0.01, 0.42), (x1, y0 + 0.02, 0.5), "MI_Sign")            # price rail
+    return "Shop_OpenCase", "interior", b.mesh()
+
+
+def cigarette_case(material):
+    """The cigarette wall behind the counter (たばこ棚): one ken, 0.45 m deep, 2.1 m tall; a closed cabinet to 0.9 m and a
+    glass-fronted display above it, numbered rows of packs."""
+    b = Builder("Shop_CigaretteCase", material)
+    x0, x1, y0, y1, h = -0.91, 0.91, -0.225, 0.225, 2.1
+    b.box((x0, y0, 0), (x1, y1, 0.9), "MI_PaintedMetalDark")
+    b.box((x0, y1 - 0.05, 0.9), (x1, y1, h), "MI_PaintedMetal")
+    b.box((x0, y0, 0.9), (x0 + 0.04, y1, h), "MI_PaintedMetal")
+    b.box((x1 - 0.04, y0, 0.9), (x1, y1, h), "MI_PaintedMetal")
+    b.box((x0, y0, h - 0.1), (x1, y1, h), "MI_PaintedMetal")
+    for k in range(5):
+        z = 0.95 + k * 0.2
+        b.box((x0 + 0.04, y0 + 0.05, z), (x1 - 0.04, y1 - 0.05, z + 0.02), "MI_Steel")
+        b.box((x0 + 0.06, y0 + 0.08, z + 0.02), (x1 - 0.06, y1 - 0.1, z + 0.13), "MI_Goods")
+    b.box((x0 + 0.04, y0, 0.92), (x1 - 0.04, y0 + 0.02, h - 0.1), "MI_GlassClear")
+    return "Shop_CigaretteCase", "interior", b.mesh()
+
+
+def bin_station(material):
+    """A sorted bin station (分別ゴミ箱): 1.2 x 0.55 x 1.0 m, three bins in one cabinet -- burnable (燃えるゴミ, red),
+    cans and bottles (缶・びん, blue), PET bottles (ペットボトル, yellow) -- each with its shaped opening."""
+    b = Builder("Shop_BinStation", material)
+    b.box((-0.6, -0.275, 0), (0.6, 0.275, 1.0), "MI_PlasticWhite")
+    for k, mat in enumerate(("MI_FabricRed", "MI_Sign", "MI_PaintYellow")):
+        x = -0.4 + 0.4 * k
+        b.box((x - 0.18, -0.285, 0.72), (x + 0.18, -0.275, 0.95), mat)        # the coloured label band
+        b.box((x - 0.08, -0.29, 0.78), (x + 0.08, -0.28, 0.86), "MI_PlasticDark")   # the opening
+        b.box((x - 0.17, -0.285, 0.05), (x + 0.17, -0.278, 0.68), "MI_PlasticWhite")  # the bin's door
+    return "Shop_BinStation", "interior", b.mesh()
+
+
+def eat_in_counter(material):
+    """One SEAT of an eat-in counter (イートイン): 0.91 m of worktop 0.45 m deep at 0.95 m, fixed to the wall at +Y on
+    two brackets -- no legs. Repeat it along a wall, one stool (Shop_Stool) per unit."""
+    b = Builder("Shop_EatInCounter", material)
+    b.box((-0.455, -0.225, 0.92), (0.455, 0.225, 0.95), "MI_Wood")
+    for x in (-0.4, 0.4):
+        b.box((x - 0.015, 0.0, 0.6), (x + 0.015, 0.225, 0.92), "MI_PaintedMetal")
+    b.box((-0.455, 0.2, 0.9), (0.455, 0.225, 0.92), "MI_PaintedMetal")      # the wall rail
+    return "Shop_EatInCounter", "interior", b.mesh()
+
+
+def stool(material):
+    """A counter stool: a 0.38 m round-ish seat at 0.72 m on one post and a foot ring."""
+    b = Builder("Shop_Stool", material)
+    b.frustum(0, 0, 0.0, 0.03, 0.2, 0.2, 0.2, 0.2, "MI_PaintedMetalDark")     # base
+    b.box((-0.025, -0.025, 0.03), (0.025, 0.025, 0.69), "MI_Steel")          # post
+    b.box((-0.17, -0.17, 0.3), (0.17, 0.17, 0.32), "MI_Steel")               # foot ring
+    b.frustum(0, 0, 0.69, 0.75, 0.19, 0.19, 0.18, 0.18, "MI_Fabric")        # seat
+    return "Shop_Stool", "interior", b.mesh()
+
+
+def freezer_case(material):
+    """An upright reach-in FREEZER (リーチインフリーザー) for ice cream and frozen food: one ken, two glass doors,
+    0.85 m deep, 2.1 m tall, a cold-white light. It replaces the open chest freezer."""
+    b = Builder("Shop_FreezerCase", material)
+    x0, x1, y0, y1, h = -0.91, 0.91, -0.425, 0.425, 2.1
+    b.box((x0, y1 - 0.05, 0), (x1, y1, h), "MI_PlasticWhite")
+    b.box((x0, y0, 0), (x0 + 0.05, y1, h), "MI_PlasticWhite")
+    b.box((x1 - 0.05, y0, 0), (x1, y1, h), "MI_PlasticWhite")
+    b.box((x0, y0, 0), (x1, y1, 0.15), "MI_PaintedMetalDark")
+    b.box((x0, y0, h - 0.25), (x1, y1, h), "MI_PlasticWhite")
+    b.box((x0 + 0.08, y0 - 0.01, h - 0.22), (x1 - 0.08, y0, h - 0.08), "MI_Sign")
+    for k in range(5):
+        z = 0.2 + k * 0.32
+        b.box((x0 + 0.05, y0 + 0.08, z), (x1 - 0.05, y1 - 0.05, z + 0.02), "MI_Steel")
+        b.box((x0 + 0.08, y0 + 0.12, z + 0.02), (x1 - 0.08, y1 - 0.12, z + 0.22), "MI_Goods")
+    for x in (x0 + 0.05, 0.0):
+        b.box((x, y0, 0.15), (x + 0.86, y0 + 0.02, h - 0.25), "MI_GlassClear")
+        b.box((x + 0.02, y0 - 0.05, 0.9), (x + 0.05, y0 - 0.01, 1.5), "MI_Steel")
+    b.box((-0.02, y0 - 0.01, 0.15), (0.02, y0 + 0.03, h - 0.25), "MI_PlasticWhite")
+    return "Shop_FreezerCase", "interior", b.mesh()
+
+
+def coffee_station(material):
+    """The self-serve coffee corner (セルフコーヒー): one ken of 0.9 m counter, 0.6 m deep, with TWO coffee machines,
+    a cup and lid rack between them and a waste slot."""
+    b = Builder("Shop_CoffeeStation", material)
+    b.box((-0.91, -0.3, 0), (0.91, 0.3, 0.88), "MI_PlasticWhite")
+    b.box((-0.91, -0.3, 0.88), (0.91, 0.3, 0.9), "MI_Wood")
+    for cx in (-0.55, 0.55):                                                 # the two machines, as Shop_CoffeeMachine
+        b.box((cx - 0.225, -0.25, 0.9), (cx + 0.225, 0.25, 1.6), "MI_PlasticWhite")
+        b.box((cx - 0.195, -0.26, 1.2), (cx + 0.195, -0.25, 1.56), "MI_PlasticDark")
+        b.box((cx - 0.12, -0.27, 1.4), (cx + 0.12, -0.26, 1.52), "MI_Light")
+    b.box((-0.2, 0.0, 0.9), (0.2, 0.28, 1.25), "MI_PaintedMetal")           # cups and lids
+    b.box((-0.15, -0.301, 0.6), (0.15, -0.3, 0.7), "MI_PlasticDark")         # waste slot
+    return "Shop_CoffeeStation", "interior", b.mesh()
 
 
 # ── konbini back of house and the rest of the store (PLAN.md C0, 2026-09-25): PLACEHOLDERS for an artist ─────────
@@ -242,12 +380,166 @@ def fascia(material, name, mat, h, d):
     return name, "facade", b.mesh()
 
 
+def washlet_toilet(material):
+    """A Japanese toilet with a WASHLET (温水洗浄便座, user 2026-09-28): a smooth ROUNDED one-piece bowl, no exposed
+    plumbing, a low tank / washlet housing at the back, a seat and a closed lid, and the control panel on the RIGHT side
+    of the seat (the armrest-style remote). 0.40 m wide (0.52 with the panel), 0.75 m deep, seat at 0.42 m. The user
+    sits facing -Y; the back (+Y) goes against the wall."""
+    b = Builder("WC_Toilet", material)
+    yb, yf = 0.375, -0.375
+    # the one-piece bowl: a rounded pedestal tapering in to the floor, the bowl above it
+    b.rounded(0.0, 0.0, 0.17, 0.33, 0.0, 0.0, 0.18, "MI_PlasticWhite", shrink=-0.12)
+    b.rounded(0.0, 0.0, 0.19, 0.37, 0.0, 0.18, 0.38, "MI_PlasticWhite")
+    # the back: tank + washlet housing, one rounded-top block from the bowl to the wall
+    b.box((-0.2, 0.0, 0.0), (0.2, yb, 0.38), "MI_PlasticWhite")
+    b.box((-0.2, 0.17, 0.38), (0.2, yb, 0.72), "MI_PlasticWhite")
+    b.rounded(0.0, 0.27, 0.2, 0.1, 0.1, 0.72, 0.8, "MI_PlasticWhite")
+    # seat and closed lid (a slightly smaller rounded slab each)
+    b.rounded(0.0, -0.02, 0.19, 0.34, 0.0, 0.38, 0.41, "MI_PlasticWhite")
+    b.rounded(0.0, -0.03, 0.18, 0.33, 0.0, 0.41, 0.44, "MI_PlasticWhite")
+    b.box((-0.18, 0.02, 0.38), (0.18, 0.17, 0.46), "MI_PlasticWhite")       # the washlet unit under the lid hinge
+    # the control panel on the right side of the seat, its buttons on top
+    b.box((0.2, -0.12, 0.40), (0.3, 0.12, 0.47), "MI_PlasticWhite")
+    b.box((0.21, -0.1, 0.47), (0.29, 0.08, 0.475), "MI_PlasticDark")
+    for k, mat in enumerate(("MI_Sign", "MI_FabricRed", "MI_Light")):
+        b.box((0.23, -0.08 + k * 0.05, 0.475), (0.27, -0.05 + k * 0.05, 0.48), mat)
+    # the flush lever on the tank's side
+    b.box((-0.22, 0.28, 0.66), (-0.2, 0.34, 0.68), "MI_Steel")
+    return "WC_Toilet", "fixtures", b.mesh()
+
+
+def square_basin(material):
+    """A plain SQUARE wall-hung wash basin (user 2026-09-28: square and simple): a flat rim at 0.84 m, the underside
+    sloping back up into the wall, a recessed bowl and a single-lever tap at the back. 0.65 x 0.566 m, wall at +Y."""
+    b = Builder("WC_Basin", material)
+    x0, x1, y0, y1 = -0.325, 0.325, -0.283, 0.283
+    # the body: a wedge -- deep at the wall, thin at the front (the sloping underside)
+    mi = b._mi("MI_PlasticWhite")
+    p = [(x0, y0, 0.80), (x1, y0, 0.80), (x1, y1, 0.72), (x0, y1, 0.72),
+         (x0, y0, 0.84), (x1, y0, 0.84), (x1, y1, 0.84), (x0, y1, 0.84)]
+    vs = [b.bm.verts.new(q) for q in p]
+    for f in ((0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)):
+        face = b.bm.faces.new([vs[i] for i in f])
+        face.material_index = mi
+    b.box((x0 + 0.05, y0 + 0.05, 0.842), (x1 - 0.05, y1 - 0.12, 0.845), "MI_TileWhite")   # the bowl's opening
+    b.box((-0.02, y1 - 0.1, 0.84), (0.02, y1 - 0.06, 1.0), "MI_Steel")                      # the tap
+    b.box((-0.02, y1 - 0.2, 0.97), (0.02, y1 - 0.06, 1.0), "MI_Steel")
+    b.box((-0.01, y1 - 0.08, 1.0), (0.01, y1 - 0.02, 1.08), "MI_Steel")                     # its lever
+    return "WC_Basin", "fixtures", b.mesh()
+
+
 def wc_partition(material):
     b = Builder("WC_Partition", material)
     b.box((-0.015, -0.75, 0.12), (0.015, 0.75, 2.02), "MI_PlasticWhite")
     b.box((-0.03, -0.75, 0), (0.03, -0.69, 0.12), "MI_Steel")                 # the two feet
     b.box((-0.03, 0.69, 0), (0.03, 0.75, 0.12), "MI_Steel")
     return "WC_Partition", "fixtures", b.mesh()
+
+
+# ── rooms: restrooms, back of house and a restaurant kitchen (user, 2026-09-27): PLACEHOLDERS for an artist ───────
+# Sizes are Japanese: an accessible toilet (多機能トイレ) wants a 1.0 m clear doorway with a SLIDING door and a room
+# of ~2 x 2 m; a commercial kitchen is stainless at 0.85 m worktop height.
+
+def partition_half(material):
+    """HALF a ken (0.91 m) of interior wall, so a room can be a ken and a half wide."""
+    b = Builder("Wall_PartitionHalf", material)
+    b.box((-0.455, -PARTITION_T / 2, 0), (0.455, PARTITION_T / 2, PARTITION_H), "MI_Plaster")
+    b.box((-0.455, -PARTITION_T / 2 - 0.01, 0), (0.455, PARTITION_T / 2 + 0.01, 0.08), "MI_PaintedMetalDark")
+    return "Wall_PartitionHalf", "interior", b.mesh()
+
+
+def partition_door_wide(material):
+    """One ken of interior wall with a 1.0 x 2.0 m DOORWAY in the middle: the accessible toilet's (a wheelchair
+    needs 0.85 m clear, 1.0 m with the leaf's own edge). Its SLIDING leaf is built by the scene builder
+    (`door.style = "slide"`) and runs along the wall beside it, so the wall must continue that side."""
+    b = Builder("Wall_PartitionDoorWide", material)
+    t, w, h = PARTITION_T / 2, 0.5, 2.0
+    b.box((-0.91, -t, 0), (-w, t, PARTITION_H), "MI_Plaster")
+    b.box((w, -t, 0), (0.91, t, PARTITION_H), "MI_Plaster")
+    b.box((-w, -t, h), (w, t, PARTITION_H), "MI_Plaster")
+    for x in (-w, w):
+        b.box((x - 0.03, -t - 0.01, 0), (x + 0.03, t + 0.01, h), "MI_PaintedMetal")
+    b.box((-w, -t - 0.01, h), (w, t + 0.01, h + 0.05), "MI_PaintedMetal")
+    return "Wall_PartitionDoorWide", "interior", b.mesh()
+
+
+def pass_window(material):
+    """One ken of the kitchen's serving wall (パントリー / 料理受け渡し口): a lower wall, a stainless pass shelf at
+    0.95 m reaching out both sides, an open slot to 1.45 m for the plates, then a glass panel to 2.1 m and wall above."""
+    b = Builder("Wall_PassWindow", material)
+    t = PARTITION_T / 2
+    b.box((-0.91, -t, 0), (0.91, t, 0.95), "MI_Plaster")
+    b.box((-0.91, -0.3, 0.95), (0.91, 0.3, 1.0), "MI_Steel")
+    for x in (-0.91, 0.87):
+        b.box((x, -t, 1.0), (x + 0.04, t, 2.1), "MI_PaintedMetal")
+    b.box((-0.87, -t, 1.45), (0.87, t, 1.49), "MI_PaintedMetal")
+    b.box((-0.87, -0.01, 1.49), (0.87, 0.01, 2.1), "MI_GlassClear")
+    b.box((-0.91, -t, 2.1), (0.91, t, PARTITION_H), "MI_Plaster")
+    return "Wall_PassWindow", "interior", b.mesh()
+
+
+def grab_rail(material):
+    """An L-shaped grab rail beside an accessible toilet, on the wall at +Y: 0.7 m along, up from 0.7 to 1.5 m."""
+    b = Builder("WC_GrabRail", material)
+    b.box((-0.35, -0.08, 0.68), (0.35, -0.04, 0.72), "MI_Steel")
+    b.box((0.31, -0.08, 0.7), (0.35, -0.04, 1.5), "MI_Steel")
+    for x in (-0.35, 0.31):
+        b.box((x, -0.04, 0.68), (x + 0.04, 0.0, 0.72), "MI_Steel")
+    return "WC_GrabRail", "fixtures", b.mesh()
+
+
+def baby_table(material):
+    """A fold-down baby changing table (ベビーシート), folded against the wall at +Y: 0.85 x 0.12 x 0.55 m."""
+    b = Builder("WC_BabyTable", material)
+    b.box((-0.425, -0.12, 0.8), (0.425, 0.0, 1.35), "MI_PlasticWhite")
+    b.box((-0.15, -0.13, 1.15), (0.15, -0.12, 1.25), "MI_Sign")
+    return "WC_BabyTable", "fixtures", b.mesh()
+
+
+def kitchen_sink(material):
+    """A stainless two-bowl sink (シンク), 1.8 x 0.75 x 0.85 m, a backsplash at +Y."""
+    b = Builder("Kitchen_Sink", material)
+    b.box((-0.9, -0.375, 0), (0.9, 0.375, 0.82), "MI_Steel")
+    b.box((-0.9, -0.375, 0.82), (0.9, 0.375, 0.85), "MI_Steel")
+    for x in (-0.45, 0.35):
+        b.box((x - 0.3, -0.25, 0.84), (x + 0.3, 0.2, 0.851), "MI_PaintedMetalDark")
+    b.box((-0.9, 0.345, 0.85), (0.9, 0.375, 1.1), "MI_Steel")
+    b.box((-0.05, 0.25, 0.85), (0.05, 0.33, 1.15), "MI_Steel")               # the tap
+    return "Kitchen_Sink", "interior", b.mesh()
+
+
+def prep_table(material):
+    """A stainless worktable (作業台), 1.8 x 0.75 x 0.85 m, an undershelf."""
+    b = Builder("Kitchen_PrepTable", material)
+    b.box((-0.9, -0.375, 0.81), (0.9, 0.375, 0.85), "MI_Steel")
+    b.box((-0.87, -0.345, 0.15), (0.87, 0.345, 0.18), "MI_Steel")
+    for x in (-0.87, 0.84):
+        for y in (-0.345, 0.315):
+            b.box((x, y, 0), (x + 0.03, y + 0.03, 0.81), "MI_Steel")
+    b.box((-0.7, -0.25, 0.18), (0.6, 0.25, 0.45), "MI_Goods")
+    return "Kitchen_PrepTable", "interior", b.mesh()
+
+
+def fryer(material):
+    """A twin-basket fryer (フライヤー), 0.6 x 0.75 x 0.9 m."""
+    b = Builder("Kitchen_Fryer", material)
+    b.box((-0.3, -0.375, 0), (0.3, 0.375, 0.88), "MI_Steel")
+    b.box((-0.26, -0.3, 0.88), (0.26, 0.25, 0.9), "MI_PaintedMetalDark")
+    b.box((-0.3, 0.3, 0.88), (0.3, 0.375, 1.15), "MI_Steel")
+    b.box((-0.25, -0.38, 0.6), (0.25, -0.375, 0.78), "MI_PlasticDark")
+    return "Kitchen_Fryer", "interior", b.mesh()
+
+
+def kitchen_fridge(material):
+    """A reach-in stainless refrigerator (業務用冷蔵庫), 1.2 x 0.8 x 1.9 m, two doors facing -Y."""
+    b = Builder("Kitchen_Fridge", material)
+    b.box((-0.6, -0.4, 0), (0.6, 0.4, 1.9), "MI_Steel")
+    for x in (-0.59, 0.01):
+        b.box((x, -0.41, 0.12), (x + 0.58, -0.4, 1.85), "MI_Steel")
+        b.box((x + 0.5 if x > 0 else x + 0.05, -0.45, 0.9), (x + 0.53 if x > 0 else x + 0.08, -0.41, 1.5),
+              "MI_PaintedMetalDark")
+    b.box((-0.2, -0.411, 1.7), (0.2, -0.41, 1.8), "MI_Light")
+    return "Kitchen_Fridge", "interior", b.mesh()
 
 
 # ── gas station ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -459,6 +751,12 @@ def harbour_apron(material):
 EDIT_NOTE_DEFAULT = ("Placeholder, ours (CC0). Keep the frame: Z up, origin at the footprint centre on the ground, the side "
                      "a person uses facing -Y; real size in metres. After editing: tools/building_kit/build_buildings.sh.")
 EDIT_NOTES = {
+    "Wall_PartitionDoorWide": "Placeholder accessible doorway: one ken, a 1.0 x 2.0 m hole in the middle. The SLIDING "
+                              "leaf is built at runtime and runs 1.0 m along the wall on the prop's `slide_dir` side "
+                              "(building_types.json), so the wall must continue there. Its collider is the jamb boxes "
+                              "in building_types.json.",
+    "Wall_PassWindow": "Placeholder kitchen serving wall, one ken: lower wall to 0.95, pass shelf, open slot to 1.45, "
+                       "glass to 2.1. Its collider is the boxes in building_types.json (lower wall + glass and above).",
     "Wall_Partition": "Placeholder interior wall, ONE KEN (1.82 m) long along X, 0.12 m thick, 2.7 m tall. Konbini back "
                       "of house and washroom rooms are rows of these (building_types.json props). Keep the length.",
     "Wall_PartitionDoor": "Placeholder interior wall with a 0.85 x 2.0 m doorway, no leaf. Its COLLIDER is the jambs and "
@@ -541,6 +839,13 @@ def build_all(material):
     return [
         fridge_door(material),
         coffee_machine(material),
+        open_case(material),
+        cigarette_case(material),
+        bin_station(material),
+        eat_in_counter(material),
+        stool(material),
+        freezer_case(material),
+        coffee_station(material),
         fascia(material, "Fascia_Shop", "MI_FasciaKonbini", 0.9, 0.12),
         partition(material),
         partition_door(material),
@@ -553,6 +858,17 @@ def build_all(material):
         magazine_rack(material),
         copier(material),
         wc_partition(material),
+        washlet_toilet(material),
+        square_basin(material),
+        partition_half(material),
+        partition_door_wide(material),
+        pass_window(material),
+        grab_rail(material),
+        baby_table(material),
+        kitchen_sink(material),
+        prep_table(material),
+        fryer(material),
+        kitchen_fridge(material),
         gas_canopy(material),
         gas_column(material),
         gas_island(material),

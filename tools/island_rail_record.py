@@ -197,15 +197,15 @@ def _span_station(res, line, s0, s1):
 
 def open_air_spans(res, line):
     """[(s0, s1, kind, station, form)] -- `line`'s platform spans that belong to a station laid out from the STATION
-    KIT (`station_layout.KIT_FORMS`: the open-air form and the ground hub). Their platforms are the kit's, so the
+    KIT (`station_layout.Station.kit`: since PLAN.md step 6, every station -- Central included). Their platforms are the kit's, so the
     record keeps the track only there."""
     import station_layout as SL
-    forms = {n: st.form for n, st in SL.stations(res, ends={}, entrances={}).items()}
+    sts = SL.stations(res, ends={}, entrances={})
     out = []
     for s0, s1, kind in platform_spans(res, line):
         n = _span_station(res, line, s0, s1)
-        if forms.get(n) in SL.KIT_FORMS:
-            out.append((s0, s1, kind, n, forms[n]))
+        if n in sts and sts[n].kit:
+            out.append((s0, s1, kind, n, sts[n].form))
     return out
 
 
@@ -398,6 +398,7 @@ def make_platform(net, road, p, kind):
 def build(res):
     net = pm.NetworkData()
     report = []
+    eh_skip = []
     for line, L in res["lines"].items():
         name = NAMES.get(line, "rail_" + line.lower().replace(" ", "_"))
         bed = bed_profile(L)
@@ -473,6 +474,10 @@ def build(res):
             if any(o0 - 1e-3 <= s_ < o1 - 1e-3 for o0, o1 in oa_open):
                 p.platform_open = side_enum(open_air_fence(res, line, s_))
                 nopen_oa += 1
+        # AN ELEVATED KIT STATION CARRIES THE VIADUCT ITSELF (its F1 building's columns): no rail pier stands inside it
+        for p, s_ in made:
+            if any(f == "elevated_hub" and s0 - 1e-3 <= s_ < s1 - 1e-3 for s0, s1, _k, _n, f in oa):
+                eh_skip.append(p)
         if oa:
             report.append("%-13s %d kit station(s): track only, fence down over %d span(s)"
                           % (name, len(oa), nopen_oa))
@@ -483,6 +488,9 @@ def build(res):
                       % (name, L["length_m"], len(stations), nlx, len(spans), nplat))
     skipped = bridge_skip(net)
     report.append("pillar_skip on %d station(s) the Rainbow Bridge carries" % skipped)
+    for p in eh_skip:
+        p.pillar_skip = True
+    report.append("pillar_skip on %d station(s) inside an elevated station's building" % len(eh_skip))
     return net, report
 
 

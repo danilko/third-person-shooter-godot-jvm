@@ -36,13 +36,14 @@ func _door_style(meta: Dictionary, at: Vector3) -> String:
 		if dist < bd:
 			bd = dist
 			best = str(d.get("style", meta.get("door_style", "swing")))
-	# an INTERIOR door (a staff room, a toilet: user 2026-09-26) is always hinged
+	# an INTERIOR door: hinged (a staff room, a store room: user 2026-09-26), or a SOLID sliding door (a restroom,
+	# user 2026-09-27) -- "inner" / "inner_slide"
 	for d in meta.get("inner_doors", []):
 		var c := Vector3(d["center"][0], at.y, d["center"][2])
 		var dist := c.distance_to(Vector3(at.x, at.y, at.z))
 		if dist < bd:
 			bd = dist
-			best = "inner"
+			best = "inner_slide" if str(d.get("style", "swing")) == "slide" else "inner"
 	return best if best != "" else str(meta.get("door_style", "swing"))
 
 
@@ -100,7 +101,9 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var fp: Array = meta["footprint_m"]
 	var example: bool = meta.get("example", false)
 	var tol := 0.01 if example else PLAN_TOL
-	_check(absf(aabb.size.x - fp[0]) <= tol and absf(aabb.size.z - fp[1]) <= tol
+	# a forecourt (vending machines, bins in front of the wall) makes the mesh deeper on the street side only
+	var fc := float(meta.get("forecourt_m", 0.0))
+	_check(absf(aabb.size.x - fp[0]) <= tol and absf(aabb.size.z - fp[1] - fc) <= tol
 		and absf(aabb.size.y - float(meta["height_m"])) <= HEIGHT_TOL,
 		"%s size %.2f x %.2f x %.2f m (declared %.2f x %.2f, height %.2f)" % [id, aabb.size.x, aabb.size.z, aabb.size.y,
 		fp[0], fp[1], meta["height_m"]])
@@ -197,7 +200,7 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var want_locked: bool = not shop
 	for d in doors.get_children():
 		# an interior door is never locked and opens as you walk up, in a mission shop as in any other
-		var inner := _door_style(meta, d.position) == "inner"
+		var inner := _door_style(meta, d.position).begins_with("inner")
 		_check(bool(d.get("locked")) == (want_locked and not inner), "%s %s starts %s" % [id, d.name,
 			"LOCKED" if want_locked and not inner else "unlocked (a shop or an interior door)"])
 		_check(bool(d.get("auto_open")) == (shop or inner), "%s %s is %s" % [id, d.name,
@@ -219,7 +222,7 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var want := {}
 	for d in doors.get_children():
 		want[d.name] = _door_style(meta, d.position)
-		var s: bool = want[d.name] == "slide"
+		var s: bool = want[d.name] == "slide" or want[d.name] == "inner_slide"
 		_check((str(d.get("open_mode")) == "SLIDE") == s, "%s %s is a %s door" % [
 			id, d.name, "sliding" if s else "hinged"])
 	var before := {}
@@ -231,10 +234,11 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 	for d in doors.get_children():
 		var moved: float = (d.position - (before[d.name][0] as Vector3)).length()
 		var turned: float = absf(d.rotation.y - float(before[d.name][1]))
-		if want[d.name] == "slide":
+		if want[d.name] == "slide" or want[d.name] == "inner_slide":
 			_check(moved > 0.3 and turned < 0.05, "%s %s slid %.2f m and turned %.1f deg" % [
 				id, d.name, moved, rad_to_deg(turned)])
-			slid_dirs.append((d.position - (before[d.name][0] as Vector3)).normalized())
+			if want[d.name] == "slide":
+				slid_dirs.append((d.position - (before[d.name][0] as Vector3)).normalized())
 		else:
 			_check(turned > 0.5 and moved < 0.05, "%s %s swung %.0f deg and slid %.2f m" % [
 				id, d.name, rad_to_deg(turned), moved])

@@ -320,9 +320,11 @@ ARMOURY_REACH = 1200.0   # the weapon counter is the nearest large konbini, howe
 # * KonbiniL (21.84 m square): the clear floor between the gondola run at x 2.3 (<= 2.67) and the counter
 #   (x >= 9.08), south of the WC partition (z -3.64) -- the whole catalog, in a 3 x 4 grid.
 KONBINI_PADS = {
-    "KonbiniS": (("PIS1", 3.7, -5.3), ("PIS2", 5.1, -5.3), ("REV1", 3.7, -4.1), ("DUP1", 5.1, -4.1),
-                 ("SMG1", 3.7, -2.9), ("MEW1", 5.1, -2.9), ("FRG1", 3.7, -1.7)),
-    "KonbiniL": tuple((wid, 4.0 + 1.3 * (i % 3), -2.3 + 1.3 * (i // 3)) for i, wid in enumerate(
+    # on free sales floor in front of the gondolas (the interiors were re-planned 2026-09-27: the counter, the staff
+    # aisle and the back-of-house rooms are where the pads used to be)
+    "KonbiniS": tuple((wid, 1.0 + 1.2 * (i % 2), -2.0 + 1.3 * (i // 2)) for i, wid in enumerate(
+        ("PIS1", "PIS2", "REV1", "DUP1", "SMG1", "MEW1", "FRG1"))),
+    "KonbiniL": tuple((wid, -1.5 + 1.3 * (i % 4), (2.8, 4.1, 7.4)[i // 4]) for i, wid in enumerate(
         ("PIS1", "PIS2", "REV1", "DUP1", "SMG1", "ASR1", "ASR2", "SHG1", "SNR1", "ATL1", "FRG1", "MEW1"))),
 }
 PAD_SCRIPT = "res://src/main/java/com/openworld/item/WeaponPad.java"

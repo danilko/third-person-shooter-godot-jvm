@@ -30,6 +30,7 @@ const OPEN_VARIANT_SUFFIX := "_Open"
 const SHOP_VARIANT_SUFFIX := "_Shop"
 const DOOR_SCRIPT := "res://src/main/java/com/openworld/world/Door.java"
 const GATE_SCRIPT := "res://src/main/java/com/openworld/world/TicketGate.java"
+const LIFT_SCRIPT := "res://src/main/java/com/openworld/world/Elevator.java"
 const GATE_FLAP_LO := 0.45       # a ticket gate's flap: its visible panel (the collider reaches the floor)
 const GATE_FLAP_HI := 0.95
 const DOOR_LEAF := "res://assets/world_source/kits/quaternius_downtown_city/pieces/doors/Door_1.gltf"
@@ -149,7 +150,7 @@ var _lib_mats := {}
 ## "two door panel, and open on both side"); a hinged door, and a slide too narrow to halve, is one. ONE owner,
 ## because the shut mesh and the Door nodes must agree about what the door is.
 func _panels(b: Dictionary, op: Dictionary) -> int:
-	if str(op.get("style", b.get("door_style", "swing"))) != "slide":
+	if not str(op.get("style", b.get("door_style", "swing"))) in ["slide", "slide_glass"]:
 		return 1
 	return 2 if float(op["w"]) >= 1.2 else 1
 
@@ -360,6 +361,9 @@ func _kit_material(kit_res: String, mat: Material) -> Material:
 	if mat == null:
 		return null
 	var name := mat.resource_name
+	# Blender names a second copy of a material MI_x.001 (an appended or duplicated piece): it is still MI_x
+	var dup := RegEx.create_from_string("\\.\\d{3}$")
+	name = dup.sub(name, "")
 	if name.is_empty():
 		push_error("a piece surface has an unnamed material")
 		return mat
@@ -620,6 +624,19 @@ func _build(b: Dictionary, variant: String) -> bool:
 		hs.shape = hull
 		body.add_child(hs)
 		hs.owner = root
+	for hp in b.get("hull_points", []):
+		# a convex collider given by its points (a station entry's smooth slope)
+		var hpts := PackedVector3Array()
+		for q in hp:
+			hpts.append(Vector3(q[0], q[1], q[2]))
+		var hsh := ConvexPolygonShape3D.new()
+		hsh.points = hpts
+		var hcs := CollisionShape3D.new()
+		hcs.name = "Hull%d" % hi
+		hi += 1
+		hcs.shape = hsh
+		body.add_child(hcs)
+		hcs.owner = root
 	if b.get("collision", "") == "trimesh":
 		# the collider is the building's own shell (the first `trimesh_pieces` placed pieces), never its cladding or
 		# furniture: a clad facade is ~100k visual vertices a physics server has no business testing
@@ -651,6 +668,31 @@ func _build(b: Dictionary, variant: String) -> bool:
 		body.add_child(cs)
 		cs.owner = root
 
+	# the LIFTS (a station's platform lifts, user 2026-09-27): in every variant -- a lift is not a door. The shaft is
+	# already in the merged mesh; world.Elevator builds its car, sliding leaves and sensors at _ready.
+	var lifts: Array = b.get("lifts", [])
+	if not lifts.is_empty():
+		var lifts_root := Node3D.new()
+		lifts_root.name = "Lifts"
+		root.add_child(lifts_root)
+		lifts_root.owner = root
+		for li in lifts.size():
+			var lf: Dictionary = lifts[li]
+			var node := Node3D.new()
+			node.set_script(load(LIFT_SCRIPT))
+			node.name = "Lift%d" % li
+			node.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(lf["yaw"]))),
+					Vector3(lf["center"][0], lf["center"][1], lf["center"][2]))
+			node.set("shaft_width", float(lf["w"]))
+			node.set("shaft_depth", float(lf["d"]))
+			node.set("rise", float(lf["rise"]))
+			node.set("door_width", float(lf["door_w"]))
+			node.set("door_height", float(lf["door_h"]))
+			node.set("frame_material", _lib_material("MI_PaintedMetal"))
+			node.set("glass_material", _lib_material("MI_GlassClear"))
+			node.set("floor_material", _lib_material("MI_Terrazzo"))
+			lifts_root.add_child(node)
+			node.owner = root
 	if open_variant:
 		# one `world.Door` per frame: the node sits at the HINGE edge (the leaf spans its local -X), MANUAL (the
 		# player presses interact) and LOCKED, so only a mission's unlock lets anyone in.
@@ -672,14 +714,18 @@ func _build(b: Dictionary, variant: String) -> bool:
 			ops.append({"xf": Transform3D(Basis(Vector3.UP, atan2(io.x, io.z)),
 					Vector3(idr["center"][0], idr["center"][1], idr["center"][2])),
 					"w": float(idr["width"]), "h": float(idr["height"]), "frame": false,
-					"style": "gate" if str(idr.get("kind", "door")) == "gate" else "swing", "inner": true})
+					"style": "gate" if str(idr.get("kind", "door")) == "gate" else str(idr.get("style", "swing")),
+					"slide_dir": float(idr.get("slide_dir", 1.0)), "inner": true})
 		for op in ops:
 			if str(op.get("style", "")) == "gate":
 				dn = _add_gate(root, doors_root, op, dn)
 				continue
 			# per OPENING: a SITE holds parts of different types, so its kiosk's 自動ドア and a back gate's
 			# swing door stand on one footprint (user-reported, PLAN.md 3.18f)
-			var slide := str(op.get("style", b.get("door_style", "swing"))) == "slide"
+			# `slide_glass`: an INTERIOR sliding GLASS door (a station store's front, user 2026-09-28), glass leaves in
+			# the wall's plane like a shop entrance, automatic, never locked
+			var style := str(op.get("style", b.get("door_style", "swing")))
+			var slide := style in ["slide", "slide_glass"]
 			var oxf: Transform3D = op["xf"]
 			var w := float(op["w"])
 			var h := float(op["h"])
@@ -693,15 +739,23 @@ func _build(b: Dictionary, variant: String) -> bool:
 				door.set_script(load(DOOR_SCRIPT))
 				door.name = "Door%d" % dn
 				dn += 1
+				# an INTERIOR slide is a solid leaf hung on the wall's face (+Z, 上吊り引き戸), not glass in the plane
+				var solid_slide := style == "slide" and bool(op.get("inner", false))
 				door.transform = oxf * Transform3D(Basis.IDENTITY,
-						Vector3(edge, 0.0, -0.09 if op["frame"] else 0.0))
+						Vector3(edge, 0.0, -0.09 if op["frame"] else (0.11 if solid_slide else 0.0)))
 				door.collision_layer = 1
 				door.collision_mask = 0
 				doors_root.add_child(door)
 				door.owner = root
 				var leaf := MeshInstance3D.new()
 				leaf.name = "IntactVisual"
-				if slide:
+				if solid_slide:
+					var sm := BoxMesh.new()
+					sm.size = Vector3(lw + 0.08, h + 0.04, 0.04)
+					leaf.mesh = sm
+					leaf.material_override = _door_material(b)
+					leaf.position = Vector3(-lw / 2.0, (h + 0.04) / 2.0, 0.0)
+				elif slide:
 					# full glass in a slim frame, the Japanese shop entrance; it already spans local -X from 0
 					leaf.mesh = _glass_leaf_mesh(lw, h)
 				elif op["frame"] and panels == 1:
@@ -742,7 +796,7 @@ func _build(b: Dictionary, variant: String) -> bool:
 					door.set("open_mode", "SLIDE")
 					# slide_offset is in the door's PARENT frame (Door adds it to its own position), so the
 					# direction is the opening's own +X, away from the middle
-					var dir := oxf.basis.x.normalized() * (lw if li == 0 else -lw)
+					var dir := oxf.basis.x.normalized() * (lw if li == 0 else -lw) * float(op.get("slide_dir", 1.0))
 					door.set("slide_offset", dir)
 				var inner := bool(op.get("inner", false))
 				# a shop's door is automatic; a mission's is MANUAL (press interact); an interior door opens as you
@@ -766,6 +820,7 @@ func _build(b: Dictionary, variant: String) -> bool:
 	meta.erase("pieces")
 	meta.erase("boxes")
 	meta.erase("hulls")
+	meta.erase("hull_points")
 	meta["piece_count"] = b["pieces"].size()
 	meta["doors_closed"] = not open_variant
 	meta["doors_locked"] = open_variant and not shop

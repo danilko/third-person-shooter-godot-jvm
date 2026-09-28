@@ -74,6 +74,24 @@ func _run() -> void:
 		var meta: Dictionary = inst.get_meta("building")
 		var fp: Array = meta["footprint_m"]
 		var h: float = meta["height_m"]
+		# a STATION's origin is its track bed: an elevated hub's street lies `street` below it, so it is lifted onto the
+		# ground, and the rail's own viaduct deck (not in the scene) is drawn along each lane so the picture reads
+		var lift := 0.0
+		var extra: Array = []
+		if meta.has("station"):
+			var sm: Dictionary = meta["station"]
+			lift = -float(sm.get("street", 0.0))
+			inst.position.y = lift
+			var dk: Array = sm.get("deck", [])
+			if dk.size() == 2:
+				for ln in sm["lanes"]:
+					var dm := MeshInstance3D.new()
+					var bm := BoxMesh.new()
+					bm.size = Vector3(float(sm["length"]) + 80.0, float(dk[1]), 2.0 * float(dk[0]))
+					dm.mesh = bm
+					dm.position = Vector3(0, lift - float(dk[1]) / 2.0 - 0.01, -float(ln[1]))
+					root.add_child(dm)
+					extra.append(dm)
 		var man := MeshInstance3D.new()
 		var cap := CapsuleMesh.new()
 		cap.radius = 0.25
@@ -89,6 +107,10 @@ func _run() -> void:
 				door = c.position
 				outward = -(c as Marker3D).transform.basis.z
 				break
+		if meta.has("station") and (meta["station"]["entrances"] as Array).size() > 0:
+			var en: Array = meta["station"]["entrances"][0]
+			door = Vector3(en[0], 0.0, en[2] * 0.7)
+			outward = Vector3(0, 0, signf(en[2]))
 		man.position = door + outward * 1.2 + outward.cross(Vector3.UP) * 0.9 + Vector3(0, 0.745, 0)
 		root.add_child(man)
 		var r: float = max(fp[0], fp[1], h) * 1.35 + 6.0
@@ -108,6 +130,9 @@ func _run() -> void:
 			"back":
 				cam.position = Vector3(0.55 * r, 0.45 * h + 3.0, -0.85 * r)
 				cam.look_at(Vector3(0, 0.4 * h, 0))
+			"near":
+				cam.position = door + outward * 22.0 + outward.cross(Vector3.UP) * 25.0 + Vector3(0, 9.0, 0)
+				cam.look_at(Vector3(door.x - 10.0, 0.35 * h, 0))
 			"door":
 				cam.position = door + outward * 6.0 + outward.cross(Vector3.UP) * -2.5 + Vector3(0, 1.4, 0)
 				cam.look_at(door + Vector3(0, 1.2, 0))
@@ -119,5 +144,7 @@ func _run() -> void:
 		print("SHOT ", path)
 		inst.queue_free()
 		man.queue_free()
+		for x in extra:
+			x.queue_free()
 		await process_frame
 	quit(0)

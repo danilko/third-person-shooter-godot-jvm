@@ -22,7 +22,7 @@
  "nodes": [
   {
    "extras": {
-    "edit_note": "The cap's bay over a side platform (hand R): the concourse (top 6.20 m over the bed) with the stair down to the platform against the cap wall. Nothing below 5.90 m may reach past the platform's track edge (-Y face for L): the train passes under the concourse."
+    "edit_note": "The cap's bay over a side platform (hand R): the concourse (top 6.20 m over the bed) with the stair down to the platform against the cap wall, and the LIFT beside it (LIFT_0: doors on its X faces at the platform and the concourse). Nothing below 5.90 m may reach past the platform's track edge (-Y face for L): the train passes under the concourse."
    },
    "mesh": 0,
    "name": "GH_CapPlatform_5_R"
@@ -150,6 +150,39 @@
     "metallicFactor": 0.30000001192092896,
     "roughnessFactor": 0.699999988079071
    }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_PlasticDark",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.11999999731779099,
+     0.11999999731779099,
+     0.12999999523162842,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.6000000238418579
+   }
+  },
+  {
+   "doubleSided": true,
+   "emissiveFactor": [
+    0.0600000032782555,
+    0.15000000596046448,
+    0.30000001192092896
+   ],
+   "name": "MI_Sign",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.11999999731779099,
+     0.30000001192092896,
+     0.550000011920929,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
   }
  ],
  "meshes": [
@@ -219,6 +252,22 @@
      },
      "indices": 22,
      "material": 7
+    },
+    {
+     "attributes": {
+      "POSITION": 23,
+      "NORMAL": 24
+     },
+     "indices": 25,
+     "material": 8
+    },
+    {
+     "attributes": {
+      "POSITION": 26,
+      "NORMAL": 27
+     },
+     "indices": 28,
+     "material": 9
     }
    ]
   }
@@ -227,7 +276,7 @@
   {
    "bufferView": 0,
    "componentType": 5126,
-   "count": 556,
+   "count": 596,
    "max": [
     15,
     6.199999809265137,
@@ -243,13 +292,13 @@
   {
    "bufferView": 1,
    "componentType": 5126,
-   "count": 556,
+   "count": 596,
    "type": "VEC3"
   },
   {
    "bufferView": 2,
    "componentType": 5123,
-   "count": 1080,
+   "count": 1152,
    "type": "SCALAR"
   },
   {
@@ -367,7 +416,7 @@
   {
    "bufferView": 15,
    "componentType": 5126,
-   "count": 48,
+   "count": 1536,
    "max": [
     14.949999809265137,
     8.800000190734863,
@@ -375,7 +424,7 @@
    ],
    "min": [
     -14.949999809265137,
-    7.099999904632568,
+    1.2100000381469727,
     -2.5
    ],
    "type": "VEC3"
@@ -383,13 +432,13 @@
   {
    "bufferView": 16,
    "componentType": 5126,
-   "count": 48,
+   "count": 1536,
    "type": "VEC3"
   },
   {
    "bufferView": 17,
    "componentType": 5123,
-   "count": 72,
+   "count": 2304,
    "type": "SCALAR"
   },
   {
@@ -417,15 +466,15 @@
   {
    "bufferView": 20,
    "componentType": 5126,
-   "count": 376,
+   "count": 1940,
    "max": [
     11.25,
-    7.300000190734863,
+    9,
     2.5299999713897705
    ],
    "min": [
     -11.25,
-    1.2599999904632568,
+    1.2100000381469727,
     0.2199999988079071
    ],
    "type": "VEC3"
@@ -433,159 +482,251 @@
   {
    "bufferView": 21,
    "componentType": 5126,
-   "count": 376,
+   "count": 1940,
    "type": "VEC3"
   },
   {
    "bufferView": 22,
    "componentType": 5123,
-   "count": 576,
+   "count": 2982,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 23,
+   "componentType": 5126,
+   "count": 256,
+   "max": [
+    -4.809999942779541,
+    8.420000076293945,
+    1.9850000143051147
+   ],
+   "min": [
+    -7.050000190734863,
+    1.2599999904632568,
+    0.8149999976158142
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 24,
+   "componentType": 5126,
+   "count": 256,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 25,
+   "componentType": 5123,
+   "count": 432,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 26,
+   "componentType": 5126,
+   "count": 96,
+   "max": [
+    -4.800000190734863,
+    7.449999809265137,
+    2.184999942779541
+   ],
+   "min": [
+    -7.059999942779541,
+    2.259999990463257,
+    2.065000057220459
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 27,
+   "componentType": 5126,
+   "count": 96,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 28,
+   "componentType": 5123,
+   "count": 144,
    "type": "SCALAR"
   }
  ],
  "bufferViews": [
   {
    "buffer": 0,
-   "byteLength": 6672,
+   "byteLength": 7152,
    "byteOffset": 0,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 6672,
-   "byteOffset": 6672,
+   "byteLength": 7152,
+   "byteOffset": 7152,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 2160,
-   "byteOffset": 13344,
+   "byteLength": 2304,
+   "byteOffset": 14304,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 7776,
-   "byteOffset": 15504,
+   "byteOffset": 16608,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 7776,
-   "byteOffset": 23280,
+   "byteOffset": 24384,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 1944,
-   "byteOffset": 31056,
+   "byteOffset": 32160,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 33000,
+   "byteOffset": 34104,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 33288,
+   "byteOffset": 34392,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 72,
-   "byteOffset": 33576,
+   "byteOffset": 34680,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 33648,
+   "byteOffset": 34752,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 33936,
+   "byteOffset": 35040,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 72,
-   "byteOffset": 34224,
+   "byteOffset": 35328,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 1152,
-   "byteOffset": 34296,
+   "byteOffset": 35400,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 1152,
-   "byteOffset": 35448,
+   "byteOffset": 36552,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 36600,
+   "byteOffset": 37704,
    "target": 34963
   },
   {
    "buffer": 0,
-   "byteLength": 576,
-   "byteOffset": 36888,
+   "byteLength": 18432,
+   "byteOffset": 37992,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 576,
-   "byteOffset": 37464,
+   "byteLength": 18432,
+   "byteOffset": 56424,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 144,
-   "byteOffset": 38040,
+   "byteLength": 4608,
+   "byteOffset": 74856,
    "target": 34963
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 38184,
+   "byteOffset": 79464,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 288,
-   "byteOffset": 38472,
+   "byteOffset": 79752,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 4512,
-   "byteOffset": 38760,
+   "byteLength": 23280,
+   "byteOffset": 80040,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 4512,
-   "byteOffset": 43272,
+   "byteLength": 23280,
+   "byteOffset": 103320,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 5964,
+   "byteOffset": 126600,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 3072,
+   "byteOffset": 132564,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 3072,
+   "byteOffset": 135636,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 864,
+   "byteOffset": 138708,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 1152,
+   "byteOffset": 139572,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 1152,
-   "byteOffset": 47784,
+   "byteOffset": 140724,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 141876,
    "target": 34963
   }
  ],
  "buffers": [
   {
-   "byteLength": 48936,
+   "byteLength": 142164,
    "uri": "GH_CapPlatform_5_R.bin"
   }
  ]

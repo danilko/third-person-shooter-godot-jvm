@@ -64,16 +64,74 @@ SHED_CLEAR = 3.0                   # shed soffit over the platform top
 SHED_T = 0.25
 FENCE_H = 1.8                      # the platform's back fence (駅の柵), over the platform top
 FENCE_T = 0.1
-BUILDING_LEN = 9.0                 # an open-air end building, along the track
-BUILDING_OUT = 3.0                 # how far an end building reaches past its platform's outer edge
-BUILDING_H = 4.2                   # its wall height over the STREET (the floor)
-ENTRANCE_STEP = 0.8               # an end building's floor (the bed) may stand this far off the street outside its door
-GATE_LANES = 2                     # ticket-gate lanes across an end building
+# THE OPEN-AIR END BUILDING (user, 2026-09-27: "increase the length and width of the station, opposite of rail facing,
+# to accommodate restrooms and a service area"). Its whole floor is at PLATFORM level, so the platform runs straight
+# in; outside the street door a stair and an accessible SLOPE come down to the sidewalk (`OA_Entry_*`). Inside, from
+# the platform: the paid hall with its restroom block, the fare line (GATE_LANES lanes and the station staff's
+# service counter on it), the unpaid hall with its restroom block and the ticket / ATM / vending machines, the door.
+BUILDING_LEN = 22.0                # along the track, from the platform's end to the street face
+BUILDING_D = 9.5                   # across, from the platform's track edge outward (away from the rail): the gate lanes
+                                   # (4.3 m with two) and the restroom block (WC_D) side by side; 9.5 is what fits
+                                   # Waterpark, whose south platform has wangan_dori's paved edge ~10 m off it
+BUILDING_H = 3.4                   # the hall's height over its floor (the platform top)
+BUILDING_T = 0.2                   # its walls
+GATE_X = 11.0                      # the fare line, from the platform-end face
+GATE_LANES = 2                     # ticket-gate lanes across an end building (user: "at least 2"); the service
+                                   # counter's window beside them is the staffed (wide) gate
 GATE_W = 0.9                       # one lane (world.TicketGate)
+DOOR_OFF = 3.0                     # the street door's centre, across from the track-side wall
+DOOR_W = 4.0                       # its opening: two roller-shutter bays (see SHUTTER_*)
+ENTRANCE_STEP = 0.8               # the street outside a door may stand this far off the bed (the stair + slope take it)
+# THE RESTROOM BLOCK (駅のトイレ, the standard modern-station set; user: "3 stalls, or 1 stall + 2 urinals + 3 sinks"):
+# men (1 stall, 2 urinals, 3 sinks), women (3 stalls, 3 sinks) and an accessible room (多機能トイレ, 2.2 m wide), one
+# block inside the gates and one outside. WC_L along its open (hall) face, WC_D deep.
+WC_L = 8.6
+WC_D = 5.0
+COUNTER_L = 3.0                    # the service counter's box (有人改札 / 駅務室 window), along the fare line's axis
+# THE ENTRANCE STAIR + SLOPE (`OA_Entry_<n>_<hand>`): a landing outside the door, a stair of n risers straight out, and
+# a smooth 1:15 slope (its collider the wedge itself) along the building's front AWAY from the rail, a 1.5 m landing every 0.75 m of rise (the barrier-free
+# standard). One piece per riser count; the layout picks the count nearest the street's real height.
+ENTRY_RISE = 0.165                 # one riser of an entry piece
+ENTRY_N = (3, 14)                  # the riser counts the kit carries (0.5 .. 2.3 m)
+ENTRY_KINDS = ("side", "out")      # the slope ALONG the front away from the rail, or straight OUT beside the stair
+ENTRY_LAND = 2.0                   # the landing outside the door, out from the street face
+RAMP_W = 1.5
+RAMP_SLOPE = 15.0                  # 1:15, the Japanese OUTDOOR barrier-free guideline (1:12 is the most any ramp may
+                                   # be; user, 2026-09-27: "ideally 1/20 or gentler for a long, busy public path" --
+                                   # 1:20 would run a typical station's slope ~29 m, more than most fronts hold)
+RAMP_SEG_RISE = 0.75
+RAMP_LAND = 1.5
+
+# EVERY STATION ENTRANCE IS A ROLLER-SHUTTER OPENING (user, 2026-09-27): no swing or slide door, open all day, one
+# shutter rolled up into a housing over it (modelled rolled up; one that comes down between the last and first trains
+# is a later runtime item). An ENTRANCE has no post in between, only its frame at each side (user, 2026-09-28); its
+# width is still sized as bays (DOOR_BAYS, LARGE_BAYS; `shutter_bays`). A STORE has no shutter: a glass front with a
+# sliding glass door (STORE_DOOR_*).
+SHUTTER_POST = 0.2                 # a post between two bays (the shutters' guide rails run in it)
+SHUTTER_H = 2.6                    # the bays' clear height (the housing sits over it, in the header)
+DOOR_BAYS = 2                      # an ordinary station's entrance (DOOR_W): two bays
+# THE LARGE HUBS (user, 2026-09-27: "all the larger hubs" -- every hub but a standard-size station squeezed onto a hub
+# form, FORM_OVERRIDE): a SIX-BAY entrance (~11.8 m: Japan sets only barrier-free minimums, a doorway >= 0.9 m and a
+# passage >= 1.4 m; an operator sizes a big station's entrance from peak flow, so six bays is a design choice) and
+# SHOPS along the building's side.
+LARGE_BAYS = 6
+LARGE_BAY_W = 1.8
+LARGE_ENTRANCE_W = LARGE_BAYS * LARGE_BAY_W + (LARGE_BAYS - 1) * SHUTTER_POST
+SHOP_UNIT = 5.0                    # one shop's frontage (a module)
+SHOP_H = 4.0                       # a ground hub's single-storey shop row, its roof's top over its floor
 
 FORMS = ("open_air", "ground_hub", "elevated_hub")
-#: the forms whose station is laid out from the station kit (the rest still use the rail record's own platforms)
-KIT_FORMS = ("open_air", "ground_hub")
+#: a station whose site does not take its natural form. WATERPARK (2026-09-27): its south platform has wangan_dori (a
+#: 3+3 trunk road) ~6.5 m off it, no room for an open-air end building with gates and restrooms (BUILDING_D), so it is a
+#: one-lane GROUND HUB (橋上駅) -- the concourse over the track, the entrance annex on the open north side.
+FORM_OVERRIDE = {"Waterpark": "ground_hub"}
+#: the forms whose station is laid out from the station kit (the rest still use the rail record's own platforms); an
+#: elevated hub is a kit station only with ONE lane for now (Suburb, Airport) -- Central's three is PLAN.md step 6
+KIT_FORMS = ("open_air", "ground_hub", "elevated_hub")
+#: a station whose site does not take its natural form. WATERPARK (2026-09-27): its south platform has wangan_dori (a
+#: 3+3 trunk road) ~6.5 m off it, no room for an open-air end building with gates and restrooms (BUILDING_D), so it is a
+#: one-lane GROUND HUB (橋上駅) -- the concourse over the track, the entrance annex on the open north side.
+FORM_OVERRIDE = {"Waterpark": "ground_hub"}
 
 # the ground hub's dimensions (橋上駅: a walled CAP over the passenger lanes carrying the airbridge concourse)
 CAP_LEN = 30.0                     # the cap along the track: a whole number of MODULEs, centred on the platform centre
@@ -82,16 +140,74 @@ AF_T = 0.3
 ROOF = 9.6                         # the cap's roof slab, underside over the bed
 ROOF_T = 0.25
 WALL_T = 0.3                       # the cap's outer side walls
-ANNEX_D = 8.5                      # the entrance annex, across, outside the cap wall: paid strip, gate line, unpaid
-ANNEX_PAID = 4.2                   # the annex's paid strip (the stair up to the airbridge), next to the cap wall
+ANNEX_D = 15.5                     # the entrance annex, across, outside the cap wall: paid strip, gate line, unpaid
+ANNEX_PAID = 8.0                   # the annex's paid strip next to the cap wall: the stair up to the airbridge, the lift,
+#                                    and under the mezzanine landing a RESTROOM BLOCK (WC_D deep) with a walkway past it;
+#                                    the unpaid strip (ANNEX_D - ANNEX_PAID) holds the other restroom block and the machines
+ANNEX_GATES = 8.3                  # the fare line's gate lanes, their centre along the axis (the SERVICE COUNTER stands
+#                                    on the line beyond them, to the annex's +a end wall)
 STAIR_RISE = 0.18                  # the most a riser may be (both stairs round their count up to keep under it)
 STAIR_RUN = 0.29
 CAP_STAIR_X = 6.0                  # a platform stair's foot, along the axis from the station centre (rises toward -a)
 ANNEX_STAIR_X = 13.5               # the annex stair's foot (rises toward -a)
-ANNEX_DOOR = (9.0, 13.0)           # the annex's street door, along the axis
+ANNEX_DOOR = (9.0, 13.0)           # the annex's street door (DOOR_W, two shutter bays), along the axis
+ANNEX_DOOR_LARGE = (2.6, 2.6 + LARGE_ENTRANCE_W)   # a large hub's six-bay entrance: from past the machines to 0.3 m
+                                   # short of the +X end wall
+ANNEX_STORE = 2 * SHOP_UNIT        # a large ground hub's ONE store, past the annex's +X end along the track (user,
+                                   # 2026-09-28): it opens INTO the annex's unpaid hall through the annex's end wall
+                                   # (a glass sliding door; that wall's paid part stays solid), display glass on the
+                                   # street, its floor the annex floor
+# A STATION STORE's door is a SLIDING GLASS door (user, 2026-09-28): two leaves parting from the middle where the front
+# is wide enough (STORE_DOOR_W2), else one (STORE_DOOR_W1); never a shutter
+STORE_DOOR_W1 = 0.9
+STORE_DOOR_W2 = 1.6
+STORE_DOOR_H = 2.2
+STORE_FRONT_2 = 4.0                # a front at least this wide gets the two-leaf door
 WALL_DOOR = (-8.0, -2.0)
-DOOR_STEPS_MAX = 8                 # the most exterior steps down from an annex door (GH_DoorSteps_<n> pieces)
-PLINTH = 1.6                       # how far a hub's annex floor and cap walls reach below the bed (they stand on it)           # the cap wall's opening from the annex landing onto the airbridge, along the axis
+CAP_SW_SIDE = 2.2                  # a side platform's stair down from the concourse (and its lift), against the cap wall
+CAP_SW_ISLAND = 3.0                # an island platform's stair (and its lift), on its centre line
+PLINTH = 1.6                       # how far a hub's annex floor and cap walls reach below the bed (they stand on it)
+
+# the ELEVATED hub's dimensions (高架駅: the F1 building fills the ground floor under the viaduct up to the deck)
+EH_LIFT = 7.84                     # the bed over the ground at every elevated station: the rail plan's ELEVATED_Z (8.0
+#                                    rail head over the ground) less the 0.16 m rail; the pieces are built at it
+EH_LIFT_TOL = 0.05
+EH_DECK_HALF = 5.0                 # the rail's own viaduct deck, half width (the `rail` preset: a 4.0 m lane + 1.0 m
+#                                    shoulder); the station's slabs meet it there
+EH_DECK_T = 0.8                    # its depth (point_model deck_thickness): the F1 ceiling and the slabs' underside
+EH_SW = 2.5                        # the stair band between a platform's outer edge and the outer rail wall
+EH_WALL_T = 0.3
+EH_FLIGHTS = 3                     # the stair from F1 to the platform: three flights with two landings
+EH_LAND = 1.5
+EH_STAIR_LEN = 20.0                # the stair piece, along the axis (four modules)
+EH_STAIR_FOOT = 9.5                # its foot, along the piece from its centre (the stair rises toward -a)
+EH_GATE_LANES = 4                  # the gate lanes across the hall at each end of the paid box
+EH_SIDE_GATE_LANES = 2             # the lanes of a gate bank in a long side's fare line (in half a module)
+EH_SIDE_GATE_CAB = 0.2             # its cabinets
+EH_WING = 5.0                      # the F1 wing past each rail wall: the unpaid hall along the long side
+EH_WING_H = 4.6                    # its roof's top over the street
+EH_CEIL = 3.8                      # the F1 hall's lowered ceiling over the street (the deck's underside is ~7 m up)
+EH_COL = 0.4                       # a column in the rail wall's line at F1, at each module's -X end
+
+# the LIFT (エレベーター) beside every platform stair of a hub (user, 2026-09-27): a square shaft as wide as the stair it
+# serves, in the stair's own band, LIFT_GAP beyond the stair's TOP end so its doors never open into the stair's queue.
+# Its doors face ALONG the track (both ends, a through car: in at one end, out at the other), never the rail side, and
+# each is a two-leaf centre-opening SLIDE. The shaft is the kit piece's; the car, its doors and the landing doors are
+# built at runtime by `world.Elevator` from the piece's `LIFT_` Empty.
+LIFT_GAP = 3.0                     # from the stair's top end to the lift's nearer face, along the axis
+LIFT_WALL_T = 0.12                 # the shaft's walls (the square is the stair's width OUTSIDE these)
+LIFT_DOOR_W = 1.1                  # the clear door opening (a wheelchair and a suitcase: Japan's barrier-free >= 0.9)
+LIFT_DOOR_H = 2.1
+LIFT_HEAD = 2.6                    # the shaft rises this far over its top stop (the car, machine-room-less)
+EH_ISLAND_SW = 2.5                 # an island platform's stair (and lift), on its centre line in the gap between decks
+EH_LONG = 150.0                    # a station at least this long gets street entrances beside its paid box too
+EH_LIFT_MODULE = 5.0               # an elevated hub's lift stands in its own 5 m module, beyond the stair piece
+EH_WC_EDGE = 4.05                  # an elevated hub's restroom block stands under the MIDDLE lane, between the deck's
+                                   # two column rows (their faces at +-4.1): its back this far to one side of the lane,
+                                   # its open face WC_D back toward the other, a 3.2 m walkway before it
+EH_WC_CLEAR = 1.0                  # the unpaid block's inner end, this far outside the low gate module
+EH_COUNTER_WALL = 0.6              # the service counter on an end fare line stops this far short of the rail wall's
+                                   # line (the long side's gate cabinets reach 0.45 m inside it)
 
 
 
@@ -99,6 +215,7 @@ PLINTH = 1.6                       # how far a hub's annex floor and cap walls r
 class Lane:
     line: str
     c: float                      # the lane's centreline, across the station axis
+    cover: tuple = None           # (a0, a1): where the lane's own platform span runs along the axis (None: whole)
 
     def tracks(self):
         return (self.c - TRACK_HALF, self.c + TRACK_HALF)
@@ -137,12 +254,71 @@ class Station:
     building_end: dict = field(default_factory=dict)  # {"left"/"right": +1 | -1}: which end its building stands at
     entrance: str = ""            # a ground hub's entrance annex: "left" / "right" of the axis ("" = not chosen yet)
     door_step: float = 0.0        # how far the street outside that door lies below the annex's floor (the bed)
+    lift: float = 0.0             # the bed over the ground under the station centre (an elevated station's F1 height)
+    entry_rise: dict = field(default_factory=dict)  # {"left"/"right": the open-air door sill over its street, m}
+    entry_kind: dict = field(default_factory=dict)  # {"left"/"right": "side" | "out"}: which way its slope runs
+
+    @property
+    def kit(self):
+        """Laid out from the station kit (PLAN.md): every station -- since step 6 (Central, three lanes) the elevated hub
+        over any number of lanes too."""
+        return self.form in KIT_FORMS
 
     @property
     def form(self):
         if self.elevated:
             return "elevated_hub"
+        if self.name in FORM_OVERRIDE:
+            return FORM_OVERRIDE[self.name]
         return "open_air" if len(self.lanes) == 1 and self.kind in ("small", "standard") else "ground_hub"
+
+
+def shutter_bays(u0, u1, n):
+    """[(b0, b1)] of the n roller-shutter bays of an opening from u0 to u1: equal bays, SHUTTER_POST between two."""
+    w = (u1 - u0 - (n - 1) * SHUTTER_POST) / n
+    if w < 0.9:
+        raise SystemExit("an opening %.2f m wide holds no %d shutter bays of 0.9 m" % (u1 - u0, n))
+    return [(u0 + k * (w + SHUTTER_POST), u0 + k * (w + SHUTTER_POST) + w) for k in range(n)]
+
+
+def is_large(st):
+    """A LARGE hub (six-bay entrance, shops): every hub form but a standard-size station squeezed onto one."""
+    return st.form in ("ground_hub", "elevated_hub") and st.name not in FORM_OVERRIDE
+
+
+def annex_door(st):
+    """(a0, a1): the annex's street opening along the axis."""
+    return ANNEX_DOOR_LARGE if is_large(st) else ANNEX_DOOR
+
+
+def annex_span(st):
+    """(a0, a1): the annex along the axis, a large hub's store (past its +X end) included."""
+    return -CAP_LEN / 2.0, CAP_LEN / 2.0 + (ANNEX_STORE if is_large(st) else 0.0)
+
+
+def store_door_w(front):
+    """A station store's sliding glass door for a front `front` wide: 2 leaves when it is wide enough, else 1."""
+    return STORE_DOOR_W2 if front >= STORE_FRONT_2 else STORE_DOOR_W1
+
+
+def entry_n(rise):
+    """The entry piece (`OA_Entry_<n>`) whose n risers of ENTRY_RISE come nearest `rise` (the door sill over the
+    street): within half a riser, which the piece's plinth absorbs."""
+    return max(ENTRY_N[0], min(ENTRY_N[1], int(round(rise / ENTRY_RISE))))
+
+
+def ramp_segments(n):
+    """[(run, rise)] of the entry slope for an n-riser entry, the door end first: 1:RAMP_SLOPE, no segment rising more
+    than RAMP_SEG_RISE (a RAMP_LAND landing between two)."""
+    rise = n * ENTRY_RISE
+    k = int(math.ceil(rise / RAMP_SEG_RISE - 1e-9))
+    return [(RAMP_SLOPE * rise / k, rise / k)] * k
+
+
+def ramp_len(n):
+    """The slope's whole length along the front, from the door landing's edge (segments and the landings between)."""
+    segs = ramp_segments(n)
+    return sum(r for r, _h in segs) + RAMP_LAND * (len(segs) - 1)
 
 
 def godot_yaw(ux, uy):
@@ -182,6 +358,8 @@ def elements(st: Station):
     silently ships a half station."""
     if st.form == "ground_hub":
         return hub_elements(st)
+    if st.form == "elevated_hub":
+        return eh_elements(st)
     if st.form != "open_air":
         raise NotImplementedError("%s: the %s form is not laid out yet" % (st.name, st.form))
     half = st.length / 2.0
@@ -199,17 +377,34 @@ def elements(st: Station):
         end = st.building_end.get(side, 1)
         fa = (-half, -half + FENCE_T) if end > 0 else (half - FENCE_T, half)
         out.append(Box("fence", fa[0], fa[1], min(c0, c1), max(c0, c1), top, top + FENCE_H, side + "_end"))
-        # the end building: in line with the platform, from the platform's end outward, and past its outer edge
+        # the end building: in line with the platform, from the platform's end outward, BUILDING_D across from the
+        # platform's track edge (away from the rail)
         ba = (half, half + BUILDING_LEN) if end > 0 else (-half - BUILDING_LEN, -half)
-        bc = sorted((inner, outer + sg * BUILDING_OUT))
-        out.append(Box("building", ba[0], ba[1], bc[0], bc[1], 0.0, BUILDING_H, side))
-        # the gate lanes cross the building mid-depth; their line is what splits unpaid (street) from paid (platform)
-        mid = 0.5 * (ba[0] + ba[1])
-        span = bc[1] - bc[0]
+        bc = sorted((inner, inner + sg * BUILDING_D))
+        out.append(Box("building", ba[0], ba[1], bc[0], bc[1], top, top + BUILDING_H, side))
+        # the gate lanes cross it GATE_X in from the platform-end face, near the track-side wall; their line is what
+        # splits unpaid (street) from paid (platform)
+        ga = end * (half + GATE_X)
         for i in range(GATE_LANES):
-            cc = bc[0] + span * (i + 1) / (GATE_LANES + 1)
-            out.append(Box("gate", mid - 0.05, mid + 0.05, cc - GATE_W / 2, cc + GATE_W / 2, 0.0, 1.0,
+            cc = inner + sg * (BUILDING_T + 0.8 + (i + 0.5) * (GATE_W + 0.25))
+            out.append(Box("gate", ga - 0.05, ga + 0.05, cc - GATE_W / 2, cc + GATE_W / 2, top, top + 1.0,
                            "%s_%d" % (side, i)))
+        # the entry outside the door: the landing and stair straight out, the slope along the front away from the rail
+        rise = st.entry_rise.get(side, PLATFORM_H)
+        n = entry_n(rise)
+        a_door = end * (half + BUILDING_LEN)
+        dc = inner + sg * DOOR_OFF
+        a_out = a_door + end * (ENTRY_LAND + (n - 1) * STAIR_RUN)
+        out.append(Box("entry", *sorted((a_door, a_out)), *sorted((dc - DOOR_W / 2, dc + DOOR_W / 2)),
+                       top - n * ENTRY_RISE, top, side))
+        r0 = dc + sg * DOOR_W / 2
+        if st.entry_kind.get(side, "side") == "out":
+            out.append(Box("entry", *sorted((a_door, a_door + end * (ENTRY_LAND + ramp_len(n)))),
+                           *sorted((r0 + sg * 0.2, r0 + sg * (0.2 + RAMP_W))), top - n * ENTRY_RISE, top,
+                           side + "_ramp"))
+        else:
+            out.append(Box("entry", *sorted((a_door, a_door + end * (RAMP_W + 0.2))),
+                           *sorted((r0, r0 + sg * ramp_len(n))), top - n * ENTRY_RISE, top, side + "_ramp"))
     return out
 
 
@@ -227,6 +422,21 @@ def stair_steps(rise):
     return n, rise / n
 
 
+def lift_door_w(inner_d):
+    """A lift door's clear opening in a shaft `inner_d` wide inside (across the door): LIFT_DOOR_W, or less where the
+    shaft is too narrow to pocket a two-leaf centre-opening door (each leaf slides beside the opening, so the opening
+    is at most half the inside)."""
+    return round(min(LIFT_DOOR_W, inner_d / 2.0 - 0.05), 3)
+
+
+def hub_lift(sw):
+    """(x0, x1) of a ground hub platform's lift along its cap piece (the stair's foot at CAP_STAIR_X rises toward -x;
+    the lift is LIFT_GAP beyond the stair's top end, as wide as the stair `sw` along x too: a square)."""
+    n, _r = stair_steps(AF - PLATFORM_H)
+    x_top = CAP_STAIR_X - (n - 1) * STAIR_RUN
+    return x_top - LIFT_GAP - sw, x_top - LIFT_GAP
+
+
 def hub_band(st: Station):
     """(lo, hi): the across extent of the platforms, i.e. the cap's inside."""
     pl = platforms(st)
@@ -240,22 +450,29 @@ def annex_band(st: Station, side):
     return lo - WALL_T - ANNEX_D, lo - WALL_T
 
 
-def door_steps(st: Station):
-    """(n, riser): the flight outside the annex door down to the street, or (0, 0) when the street is at the floor."""
+def annex_entry_n(st: Station):
+    """The risers of the entry (stair + smooth slope, `GH_Entry_<n>`) outside the annex door down to the street, or 0
+    when the street is at the floor (under 0.2 m: the door's sill takes it)."""
     if st.door_step < 0.2:
-        return 0, 0.0
-    n = int(round(st.door_step / STAIR_RISE + 0.49))
-    if n > DOOR_STEPS_MAX:
-        raise SystemExit("%s: the street is %.2f m below its entrance annex's door (over %d steps)"
-                         % (st.name, st.door_step, DOOR_STEPS_MAX))
-    return n, st.door_step / n
+        return 0
+    if st.door_step > (ENTRY_N[1] + 0.5) * ENTRY_RISE:
+        raise SystemExit("%s: the street is %.2f m below its entrance annex's door (the entry pieces carry %.2f)"
+                         % (st.name, st.door_step, ENTRY_N[1] * ENTRY_RISE))
+    return entry_n(st.door_step)
+
+
+def annex_entry_depth(st: Station):
+    """How far the entry reaches out from the annex's street face (its landing and its stair), 0 with none."""
+    n = annex_entry_n(st)
+    return ENTRY_LAND + (n - 1) * STAIR_RUN if n else 0.0
 
 
 def hub_entrance(st: Station, side):
     """(a, c) of the street 3 m outside the annex's door (past its steps down to the street, if any)."""
     c0, c1 = annex_band(st, side)
-    out = 3.0 + door_steps(st)[0] * STAIR_RUN
-    return (0.5 * (ANNEX_DOOR[0] + ANNEX_DOOR[1]), c1 + out if side == "left" else c0 - out)
+    out = 3.0 + annex_entry_depth(st)
+    d0, d1 = annex_door(st)
+    return (0.5 * (d0 + d1), c1 + out if side == "left" else c0 - out)
 
 
 def hub_elements(st: Station):
@@ -274,6 +491,15 @@ def hub_elements(st: Station):
                 out.append(Box("fence", a0, a1, fc[0], fc[1], PLATFORM_H, PLATFORM_H + FENCE_H, tag))
         for a0 in (-half, half - FENCE_T):
             out.append(Box("fence", a0, a0 + FENCE_T, c0, c1, PLATFORM_H, PLATFORM_H + FENCE_H, tag + "_end"))
+        # the lift beside this platform's stair (the cap piece's own; `hub_lift`), against the cap wall on a side
+        # platform, on the centre line on an island
+        sw = CAP_SW_ISLAND if len(faces) == 2 else CAP_SW_SIDE
+        lx0, lx1 = hub_lift(sw)
+        if len(faces) == 2:
+            lc = ((c0 + c1) / 2 - sw / 2, (c0 + c1) / 2 + sw / 2)
+        else:
+            lc = (c1 - sw, c1) if c0 > 0 else (c0, c0 + sw)
+        out.append(Box("lift", lx0, lx1, lc[0], lc[1], PLATFORM_H, AF + LIFT_HEAD, tag))
     out.append(Box("concourse", -hc, hc, lo, hi, AF - AF_T, AF, "cap"))
     out.append(Box("roof", -hc, hc, lo - WALL_T, hi + WALL_T, ROOF, top, "cap"))
     out.append(Box("wall", -hc, hc, hi, hi + WALL_T, 0.0, top, "left"))
@@ -281,6 +507,8 @@ def hub_elements(st: Station):
     if st.entrance:
         c0, c1 = annex_band(st, st.entrance)
         out.append(Box("annex", -hc, hc, c0, c1, 0.0, top, st.entrance))
+        if is_large(st):
+            out.append(Box("store", hc, annex_span(st)[1], c0, c1, 0.0, SHOP_H, st.entrance))
     return out
 
 
@@ -329,14 +557,24 @@ def hub_props(st: Station):
     for side, c in (("left", hi + WALL_T / 2), ("right", lo - WALL_T / 2)):
         out += _piece_props("GH_CapWall_Door" if side == st.entrance else "GH_CapWall", 0.0, c, 0.0, 0.0)
     c0, c1 = annex_band(st, st.entrance)
-    out += _piece_props("GH_Annex_" + ("L" if st.entrance == "left" else "R"), 0.0, 0.5 * (c0 + c1), 0.0, 0.0)
-    n, _r = door_steps(st)
+    left = st.entrance == "left"
+    hand = "L" if left else "R"
+    large = is_large(st)
+    out += _piece_props("GH_%s_%s" % ("AnnexLarge" if large else "Annex", hand), 0.0, 0.5 * (c0 + c1), 0.0, 0.0)
+    if large:
+        # the ONE store past the annex's +X end, its floor the annex's: it opens into the unpaid hall through the
+        # annex's end wall (the glass door is GH_AnnexLarge's), display glass toward the street
+        out += _piece_props("GH_AnnexStore_" + hand, hc + ANNEX_STORE / 2.0, 0.5 * (c0 + c1), 0.0, 0.0)
+    n = annex_entry_n(st)
     if n:
-        # the steps down to the street, from the door's sill outward (the piece descends along its +Y: yaw 0 on the
-        # left, 180 on the right)
-        c = c1 if st.entrance == "left" else c0
-        out += _piece_props("GH_DoorSteps_%d" % n, 0.5 * (ANNEX_DOOR[0] + ANNEX_DOOR[1]), c, 0.0,
-                            0.0 if st.entrance == "left" else 180.0)
+        # the entry down to the street (the open-air form's stair + smooth 1:15 slope): its origin on the door's centre
+        # at the floor, its +X turned out to the street (yaw 90 on the left, -90 on the right), so its slope runs
+        # along the annex's front toward -a, away from the door's end of the annex. A large hub's stair spans its
+        # whole six-bay opening (`GH_EntryWide_*`)
+        c = c1 if left else c0
+        d0, d1 = annex_door(st)
+        out += _piece_props("GH_%s_%d_%s" % ("EntryWide" if large else "Entry", n, hand), 0.5 * (d0 + d1), c,
+                            0.0, 90.0 if left else -90.0)
     return out
 
 
@@ -347,8 +585,9 @@ def choose_entrance(st: Station, clear, cost):
     best = None
     for side in ("left", "right"):
         c0, c1 = annex_band(st, side)
-        cx, cy = to_record(st, 0.0, 0.5 * (c0 + c1))
-        if not clear(cx, cy, st.ux, st.uy, CAP_LEN / 2.0 + 0.5, ANNEX_D / 2.0 + 0.5):
+        a0, a1 = annex_span(st)
+        cx, cy = to_record(st, 0.5 * (a0 + a1), 0.5 * (c0 + c1))
+        if not clear(cx, cy, st.ux, st.uy, 0.5 * (a1 - a0) + 0.5, ANNEX_D / 2.0 + 0.5):
             continue
         was, st.entrance = st.entrance, side
         bad = check(st)
@@ -359,6 +598,309 @@ def choose_entrance(st: Station, clear, cost):
         if best is None or k < best[0]:
             best = (k, side)
     return best[1] if best else None
+
+
+# ── the ELEVATED HUB (高架駅) ───────────────────────────────────────────────────────────────────────────────────────
+# One two-way lane on the rail's own viaduct deck (EH_DECK_HALF either side of the lane, EH_DECK_T deep, carried over
+# the station by the building itself: the rail record puts no pier there). Across, from the lane outward on each side:
+# the platform (on the deck and on the building's roof slab), the STAIR BAND (a slab at platform level beside it, with
+# the stair opening), and the outer RAIL WALL, which rises from the ground past the deck to carry the shed roof over
+# platform and band. Under all of it, the F1 building fills the ground floor end to end, its floor at the street
+# (EH_LIFT below the bed), and reaches EH_WING past each rail wall in a single-storey WING (user, 2026-09-27: the
+# larger-station plan). F1 is a PAID BOX in the middle -- both stairs and both lifts inside it -- ringed by the unpaid
+# hall: the wings along the long sides (a street entrance in each near both ends: four) and the ends of the hall. The
+# box is closed by FARE LINES on all four sides: across the hall at each end (`EH_FloorGate`), and along each long side
+# in the line of the rail wall, whose F1 storey is columns and a railing (`EH_FareSide`) with a GATE BANK at each
+# corner (`EH_FareSideGate`); along the stair the rail wall comes down to the floor (the stair's own wall). A lowered
+# CEILING (EH_CEIL) closes the hall under the viaduct deck, open over the stairs.
+
+def eh_band(st: Station):
+    """(P0, P1, B1, W1): across from the lane's centre, the platform's track edge, its outer edge, the stair band's
+    outer edge (the rail wall's inner face) and the wall's outer face."""
+    w = PLATFORM_W.get(st.kind, PLATFORM_W["standard"])
+    p0 = TRACK_HALF + PLATFORM_EDGE
+    p1 = p0 + w
+    return p0, p1, p1 + EH_SW, p1 + EH_SW + EH_WALL_T
+
+
+def eh_outer(st: Station):
+    """The F1 wing's outer face, across from the lane's centre."""
+    return eh_band(st)[3] + EH_WING
+
+
+def eh_span(st: Station):
+    """(lo, hi): the outermost lanes' centres, across. The outer side structure (platform, stair band, rail wall, wing)
+    stands outside each of them (`eh_band` measured from it); between two lanes the platform is an ISLAND."""
+    cs = sorted(ln.c for ln in st.lanes)
+    return cs[0], cs[-1]
+
+
+def eh_mid(st: Station):
+    """The across centre of the lanes: the origin of the pieces that span the whole building (`EH_Floor*`,
+    `EH_EndWall`)."""
+    lo, hi = eh_span(st)
+    return 0.5 * (lo + hi)
+
+
+def eh_islands(st: Station):
+    """[(c0, c1, cm)]: each ISLAND platform between two neighbouring lanes -- its two track edges and its centre line,
+    where its stair and lift stand in the gap between the two lanes' viaduct decks (EH_ISLAND_SW wide: a stairwell cut
+    through the platform). Refused when the decks leave no room for them."""
+    cs = sorted(ln.c for ln in st.lanes)
+    p0 = TRACK_HALF + PLATFORM_EDGE
+    out = []
+    for a, b in zip(cs, cs[1:]):
+        gap = (b - a) - 2 * EH_DECK_HALF
+        if gap < EH_ISLAND_SW + 0.4:
+            raise SystemExit("%s: lanes %.1f m apart leave %.2f m between their decks, under the %.1f m an island "
+                             "platform's stair needs" % (st.name, b - a, gap, EH_ISLAND_SW + 0.4))
+        if (b - a) - 2 * p0 > ISLAND_MAX:
+            raise SystemExit("%s: lanes %.1f m apart are too far for one island platform" % (st.name, b - a))
+        out.append((a + p0, b - p0, 0.5 * (a + b)))
+    return out
+
+
+def eh_core(st: Station):
+    """The name suffix of the whole-building pieces: the platform width, and for more than one lane the lane count and
+    spacing (`EH_Floor_345_3x14`), since those pieces are as wide as the building."""
+    w = PLATFORM_W.get(st.kind, PLATFORM_W["standard"])
+    if len(st.lanes) == 1:
+        return _wname(w)
+    cs = sorted(ln.c for ln in st.lanes)
+    sp = {round(b - a, 3) for a, b in zip(cs, cs[1:])}
+    if len(sp) != 1:
+        raise SystemExit("%s: an elevated hub's lanes must be evenly spaced (%s)" % (st.name, sorted(sp)))
+    return "%s_%dx%s" % (_wname(w), len(cs), _wname(sp.pop()))
+
+
+def eh_stairs():
+    """[(x front, z top)] of every step of the F1 -> platform stair in its piece's frame (x along from the piece's
+    centre, z over the bed), the lowest first, and x_top (where the platform-level floor begins): EH_FLIGHTS flights of
+    equal risers under STAIR_RISE, an EH_LAND landing between two, rising toward -x from EH_STAIR_FOOT."""
+    z0, z1 = -EH_LIFT, PLATFORM_H
+    n = int(math.ceil((z1 - z0) / STAIR_RISE - 1e-9))
+    n += (-n) % EH_FLIGHTS
+    r, nf = (z1 - z0) / n, n // EH_FLIGHTS
+    x, z, out = EH_STAIR_FOOT, z0, []
+    for f in range(EH_FLIGHTS):
+        for k in range(nf):
+            z += r
+            if f == EH_FLIGHTS - 1 and k == nf - 1:
+                break
+            out.append((x, z))
+            x -= EH_LAND if k == nf - 1 else STAIR_RUN
+    return out, x
+
+
+def eh_lift():
+    """(x0, x1) of an elevated hub's lift in ITS module's frame (the module just beyond the stair piece, toward -a):
+    LIFT_GAP beyond the stair's top end, EH_SW square."""
+    _s, x_top = eh_stairs()
+    face = x_top - LIFT_GAP + EH_STAIR_LEN / 2 + EH_LIFT_MODULE / 2      # its +x face, in the module's frame
+    return face - EH_SW, face
+
+
+EH_ENTRANCE_MODULES = 3            # a wing's six-bay ENTRANCE spans three modules (LARGE_ENTRANCE_W in 15 m)
+
+
+def eh_modules(st: Station):
+    """({a centre: role}, stair centre): the station's 5 m modules along the axis. The PAID BOX, centred on the
+    station: 'gate_lo' | 'lift' | the stair piece's four | 'gate_hi' (a gate module's fare line across the hall is
+    at its centre, its side gate banks in its inner half); an ENTRANCE (the wings' six-bay street openings) of three
+    modules at each end of the station -- 'entrance' its centre (the piece's), 'entrance_flank' the two beside it
+    (no wing piece of their own); everything else 'plain' (its wing a SHOP)."""
+    half = st.length / 2.0
+    n = st.length / MODULE
+    if abs(n - round(n)) > 1e-6:
+        raise SystemExit("%s: platform %.2f m is not a whole number of %.0f m modules" % (st.name, st.length, MODULE))
+    ew = EH_ENTRANCE_MODULES * MODULE
+    if st.length < 2 * ew + EH_STAIR_LEN + 3 * MODULE:
+        raise SystemExit("%s: an elevated hub needs a %.0f m platform at least (%.0f)"
+                         % (st.name, 2 * ew + EH_STAIR_LEN + 3 * MODULE, st.length))
+    # the box spans [s0 - 10, s0 + 25] (gate, lift, the stair's four modules, gate): centred, snapped to the grid
+    s0 = -half + MODULE * round((half - 7.5) / MODULE)
+    stair_c = s0 + EH_STAIR_LEN / 2
+    roles = {s0 - 7.5: "gate_lo", s0 - 2.5: "lift", s0 + EH_STAIR_LEN + 2.5: "gate_hi"}
+    ents = [-half + ew / 2, half - ew / 2]
+    if st.length >= EH_LONG:
+        # a long station (Central, 300 m) also has entrances right outside each end of its paid box, so nobody walks
+        # the length of the building in the unpaid hall to reach the gates (user, 2026-09-27: "several entrances")
+        ents += [s0 - 10.0 - ew / 2, s0 + EH_STAIR_LEN + 5.0 + ew / 2]
+    for e in ents:
+        roles[e] = "entrance"
+        for f in (e - MODULE, e + MODULE):
+            roles[f] = "entrance_flank"
+    out = {}
+    for k in range(int(round(n))):
+        a = -half + MODULE * (k + 0.5)
+        if s0 < a < s0 + EH_STAIR_LEN:
+            continue
+        out[a] = next((r for c, r in roles.items() if abs(a - c) < 1e-6), "plain")
+    vals = list(out.values())
+    if vals.count("entrance") != len(ents) or vals.count("entrance_flank") != 2 * len(ents) \
+            or vals.count("gate_lo") != 1 or vals.count("gate_hi") != 1 or vals.count("lift") != 1:
+        raise SystemExit("%s: %.0f m is too short for the paid box and its entrances" % (st.name, st.length))
+    return out, stair_c
+
+
+def eh_box(st: Station):
+    """(a0, a1): the paid box along the axis, between the two end fare lines (the gate modules' centres)."""
+    mods, _sc = eh_modules(st)
+    return (next(a for a, r in mods.items() if r == "gate_lo"), next(a for a, r in mods.items() if r == "gate_hi"))
+
+
+def eh_restrooms(st: Station):
+    """[(a, c, role)]: the two restroom blocks of an elevated hub (PLAN.md step 6b), each WC_L along the axis under the
+    MIDDLE lane, between its deck's column rows, back EH_WC_EDGE to the +c side and open toward -c: 'paid' centred on
+    the stair span inside the paid box, 'unpaid' in the end hall just outside the low fare line. Neither widens the
+    building: the F1 under the lane is otherwise an open hall."""
+    mods, stair_c = eh_modules(st)
+    lanes = sorted(ln.c for ln in st.lanes)
+    c = lanes[len(lanes) // 2] + EH_WC_EDGE - WC_D / 2.0
+    ga = next(a for a, r in mods.items() if r == "gate_lo")
+    ua = ga - MODULE / 2.0 - EH_WC_CLEAR - WC_L / 2.0
+    if ua - WC_L / 2.0 < -st.length / 2.0 + 1.0:
+        raise SystemExit("%s: no room for the unpaid restroom block before the low end wall" % st.name)
+    return [(stair_c, c, "paid"), (ua, c, "unpaid")]
+
+
+def eh_elements(st: Station):
+    half = st.length / 2.0
+    lo, hi = eh_span(st)
+    p0, p1, b1, w1 = eh_band(st)
+    wo = eh_outer(st)
+    sh = PLATFORM_H + SHED_CLEAR
+    f1 = -EH_LIFT
+    out = [Box("floor", -half, half, lo - wo, hi + wo, f1 - 0.3, f1, "f1")]
+    ba0, ba1 = eh_box(st)
+    for sg, tag, base in ((1.0, "left", hi), (-1.0, "right", lo)):
+        def band(u0, u1):
+            return sorted((base + sg * u0, base + sg * u1))
+        out.append(Box("platform", -half, half, *band(p0, p1), 0.0, PLATFORM_H, tag))
+        out.append(Box("roof", -half, half, *band(EH_DECK_HALF, p1), -EH_DECK_T, 0.0, tag))
+        out.append(Box("band", -half, half, *band(p1, b1), -EH_DECK_T, PLATFORM_H, tag))
+        out.append(Box("wall", -half, half, *band(b1, w1), f1 + EH_CEIL, sh, tag))
+        out.append(Box("shed", -half, half, *band(p0 + 0.2, w1), sh, sh + SHED_T, tag))
+        out.append(Box("wing", -half, half, *band(w1, wo), f1, f1 + EH_WING_H, tag))
+        out.append(Box("fare", ba0, ba1, *band(b1, w1), f1, f1 + 1.1, tag))
+        for a0 in (-half, half - FENCE_T):
+            out.append(Box("fence", a0, a0 + FENCE_T, *band(p0, b1), PLATFORM_H, PLATFORM_H + FENCE_H, tag + "_end"))
+    for i, (c0, c1, cm) in enumerate(eh_islands(st)):
+        tag = "island_%d" % i
+        g = 0.5 * (c1 - c0) - (EH_DECK_HALF - TRACK_HALF - PLATFORM_EDGE)       # half the gap between the decks
+        out.append(Box("platform", -half, half, c0, c1, 0.0, PLATFORM_H, tag))
+        out.append(Box("roof", -half, half, cm - g, cm + g, -EH_DECK_T, 0.0, tag))
+        out.append(Box("shed", -half, half, c0 + 0.2, c1 - 0.2, sh, sh + SHED_T, tag))
+        for a0 in (-half, half - FENCE_T):
+            out.append(Box("fence", a0, a0 + FENCE_T, c0, c1, PLATFORM_H, PLATFORM_H + FENCE_H, tag + "_end"))
+    for a in (ba0, ba1):
+        out.append(Box("fare", a - 0.05, a + 0.05, lo - b1, hi + b1, f1, f1 + 1.1, "end"))
+    for a0 in (-half, half - 0.3):
+        out.append(Box("wall", a0, a0 + 0.3, lo - wo, hi + wo, f1, -EH_DECK_T, "end"))
+    out.append(Box("ceiling", -half, half, lo - wo, hi + wo, f1 + EH_CEIL, f1 + EH_CEIL + 0.05, "f1"))
+    mods, _sc = eh_modules(st)
+    la = next(a for a, r in mods.items() if r == "lift")
+    lx0, lx1 = eh_lift()
+    for sg, tag, base in ((1.0, "left", hi), (-1.0, "right", lo)):
+        cc = sorted((base + sg * p1, base + sg * b1))
+        out.append(Box("lift", la + lx0, la + lx1, cc[0], cc[1], -EH_LIFT, PLATFORM_H + LIFT_HEAD, tag))
+    for i, (_c0, _c1, cm) in enumerate(eh_islands(st)):
+        out.append(Box("lift", la + lx0, la + lx1, cm - EH_ISLAND_SW / 2, cm + EH_ISLAND_SW / 2, -EH_LIFT,
+                       PLATFORM_H + LIFT_HEAD, "island_%d" % i))
+    for a, c, role in eh_restrooms(st):
+        out.append(Box("restroom", a - WC_L / 2, a + WC_L / 2, c - WC_D / 2, c + WC_D / 2, f1, f1 + EH_CEIL - 0.02,
+                       role))
+    return out
+
+
+def eh_entrances(st: Station):
+    """[(a, c, h)] of the street 3 m outside each wing entrance (both long sides, at every 'entrance' module)."""
+    mods, _ = eh_modules(st)
+    wo = eh_outer(st)
+    lo, hi = eh_span(st)
+    return [(a, (hi + wo + 3.0) if sg > 0 else (lo - wo - 3.0), -EH_LIFT) for a, r in sorted(mods.items())
+            if r == "entrance" for sg in (1.0, -1.0)]
+
+
+def eh_props(st: Station):
+    if abs(st.lift - EH_LIFT) > EH_LIFT_TOL:
+        raise SystemExit("%s: its bed stands %.2f m over the ground; the elevated hub's pieces are built for %.2f"
+                         % (st.name, st.lift, EH_LIFT))
+    half = st.length / 2.0
+    lo, hi = eh_span(st)
+    mid = eh_mid(st)
+    side_c = {"L": hi, "R": lo}                   # the side structure stands outside the outermost lane on its side
+    w = PLATFORM_W.get(st.kind, PLATFORM_W["standard"])
+    ws = _wname(w)
+    core = eh_core(st)
+    islands = eh_islands(st)
+    p0, p1, b1, _w1 = eh_band(st)
+    mods, stair_c = eh_modules(st)
+    out = []
+    for a, role in mods.items():
+        gate = role.startswith("gate")
+        # a gate module's fare line across the hall has its UNPAID side (+X of the piece) facing out of the box, and
+        # its side gate banks in its inner half (-X): turned 180 at the low end, where the hands swap sides
+        yaw = 180.0 if role == "gate_lo" else 0.0
+        out += _piece_props("EH_FloorGate_" + core if gate else "EH_Floor_" + core, a, mid, 0.0, yaw)
+        for hand in ("L", "R"):
+            h2 = hand if yaw == 0.0 else {"L": "R", "R": "L"}[hand]
+            c = side_c[hand]
+            out += _piece_props("EH_%s_%s_%s" % ("SideLift" if role == "lift" else "Side", ws, h2), a, c, 0.0, yaw)
+            # the wing: a six-bay ENTRANCE (its piece spans the flanks too), the machines beside each end fare line,
+            # and everywhere else a SHOP facing the hall (the large hubs' shops along the side, user 2026-09-27)
+            wing = {"entrance": "WingEntrance", "entrance_flank": None}.get(
+                role, "WingMachines" if gate else "WingShop")
+            if wing:
+                out += _piece_props("EH_%s_%s_%s" % (wing, ws, h2), a, c, 0.0, yaw)
+            if gate:
+                out += _piece_props("EH_FareSideGate_%s_%s" % (ws, h2), a, c, 0.0, yaw)
+            elif role == "lift":
+                out += _piece_props("EH_FareSide_%s_%s" % (ws, h2), a, c, 0.0, yaw)
+        for c0, c1, cm in islands:
+            wi = _wname(round(c1 - c0, 3))
+            out += _piece_props("EH_%s_%s" % ("IslandLift" if role == "lift" else "Island", wi), a, cm, 0.0, 0.0)
+    for hand in ("L", "R"):
+        out += _piece_props("EH_SideStair_%s_%s" % (ws, hand), stair_c, side_c[hand], 0.0, 0.0)
+    for c0, c1, cm in islands:
+        out += _piece_props("EH_IslandStair_" + _wname(round(c1 - c0, 3)), stair_c, cm, 0.0, 0.0)
+    for k in range(int(round(EH_STAIR_LEN / MODULE))):
+        ak = stair_c - EH_STAIR_LEN / 2 + MODULE * (k + 0.5)
+        out += _piece_props("EH_Floor_" + core, ak, mid, 0.0, 0.0)
+        for hand in ("L", "R"):
+            out += _piece_props("EH_WingShop_%s_%s" % (ws, hand), ak, side_c[hand], 0.0, 0.0)
+    for sg, base in ((1.0, hi), (-1.0, lo)):
+        cc = base + sg * (p0 + p1) / 2.0
+        yaw = 0.0 if sg > 0 else 180.0
+        for k in range(int(round(st.length / MODULE))):
+            out += _piece_props("EH_Platform_" + ws, -half + MODULE * (k + 0.5), cc, 0.0, yaw)
+        ce = base + sg * (p0 + b1) / 2.0
+        for se in (1.0, -1.0):
+            out += _piece_props("EH_EndFence_" + ws, se * (half - FENCE_T / 2), ce, PLATFORM_H, 0.0)
+    for c0, c1, cm in islands:
+        for se in (1.0, -1.0):
+            out += _piece_props("EH_IslandEndFence_" + _wname(round(c1 - c0, 3)), se * (half - FENCE_T / 2), cm,
+                                PLATFORM_H, 0.0)
+    out += _piece_props("EH_EndWall_" + core, half, mid, 0.0, 0.0)
+    out += _piece_props("EH_EndWall_" + core, -half, mid, 0.0, 180.0)
+    for a, c, _role in eh_restrooms(st):
+        out += _piece_props("EH_Restroom", a, c, 0.0, 0.0)
+    return out
+
+
+def eh_kit(sts):
+    """[(platform w, [island widths], core suffix, lane offsets from the core's centre)]: every elevated hub's piece
+    set (the generator makes one per entry, `blender/tools/build_station_blends.py`)."""
+    out = {}
+    for st in sts.values():
+        if st.form != "elevated_hub":
+            continue
+        mid = eh_mid(st)
+        key = eh_core(st)
+        out[key] = (PLATFORM_W.get(st.kind, PLATFORM_W["standard"]),
+                    sorted({round(c1 - c0, 3) for c0, c1, _cm in eh_islands(st)}), key,
+                    [round(ln.c - mid, 3) for ln in sorted(st.lanes, key=lambda ln: ln.c)])
+    return [out[k] for k in sorted(out)]
 
 
 # ── the layout the scene builder reads ─────────────────────────────────────────────────────────────────────────
@@ -377,13 +919,17 @@ def _piece_props(ref, a, c, h, yaw):
     import layout_buildings as LB
     _path, entry, _name = LB.lib_piece(KIT + ":" + ref, KITS)
     x, y, z = to_godot_local(a, c, h)
-    out = [{"piece": KIT + ":" + ref, "at": [x, z], "y": y, "yaw": yaw,
-            "collide": {"boxes": entry.get("collide_boxes", [])} if entry.get("collide_boxes") else "none"}]
+    col = {k: entry[src] for k, src in (("boxes", "collide_boxes"), ("hulls", "collide_hulls")) if entry.get(src)}
+    out = [{"piece": KIT + ":" + ref, "at": [x, z], "y": y, "yaw": yaw, "collide": col or "none"}]
     for g in entry.get("gates", ()):
         gx, gz = LB.rot_xz(yaw, g["pos"][0], g["pos"][2])
         ox, oz = LB.rot_xz(yaw, g["out"][0], g["out"][2])
         out.append({"at": [x + gx, z + gz], "y": y + g["pos"][1], "yaw": math.degrees(math.atan2(ox, oz)),
                     "door": {"kind": "gate", "w": g["w"], "h": g["h"]}})
+    for lf in entry.get("lifts", ()):
+        lx, lz = LB.rot_xz(yaw, lf["pos"][0], lf["pos"][2])
+        out.append({"at": [x + lx, z + lz], "y": y + lf["pos"][1], "yaw": yaw,
+                    "lift": {k: lf[k] for k in ("w", "d", "rise", "door_w", "door_h")}})
     return out
 
 
@@ -391,6 +937,8 @@ def props(st: Station):
     """The station as layout_buildings props (see `elements` for the same plan as boxes)."""
     if st.form == "ground_hub":
         return hub_props(st)
+    if st.form == "elevated_hub":
+        return eh_props(st)
     if st.form != "open_air":
         raise NotImplementedError("%s: the %s form is not laid out yet" % (st.name, st.form))
     n = st.length / MODULE
@@ -418,8 +966,14 @@ def props(st: Station):
         # is a hand turned 180 deg (L <-> R swap sides when turned), so the platform always comes in its -X face
         hand = "L" if left == (end > 0) else "R"
         byaw = 0.0 if end > 0 else 180.0
-        bc = cc + (1.0 if left else -1.0) * BUILDING_OUT / 2.0
+        sg = 1.0 if left else -1.0
+        inner = c0 if left else c1
+        bc = inner + sg * BUILDING_D / 2.0
         out += _piece_props("OA_Building_%s_%s" % (ws, hand), end * (half + BUILDING_LEN / 2.0), bc, 0.0, byaw)
+        risers = entry_n(st.entry_rise.get(side, PLATFORM_H))
+        kind = "Entry" if st.entry_kind.get(side, "side") == "side" else "EntryOut"
+        out += _piece_props("OA_%s_%d_%s" % (kind, risers, hand), end * (half + BUILDING_LEN), inner + sg * DOOR_OFF,
+                            PLATFORM_H, byaw)
     return out
 
 
@@ -434,11 +988,13 @@ def layout(st: Station):
     entr, bed = [], []
     if st.form == "ground_hub":
         entr.append(list(to_godot_local(*hub_entrance(st, st.entrance), -st.door_step)))
+    if st.form == "elevated_hub":
+        entr += [list(to_godot_local(*e)) for e in eh_entrances(st)]
     for c0, c1, _f in (platforms(st) if st.form == "open_air" else ()):
         side = "left" if c0 > 0 else "right"
         end = st.building_end.get(side, 1)
-        bc = (c0 + c1) / 2.0 + (1.0 if c0 > 0 else -1.0) * BUILDING_OUT / 2.0
-        entr.append(list(to_godot_local(end * (half + BUILDING_LEN + 3.0), bc, 0.0)))
+        a, c = entrance(st, side, end)
+        entr.append(list(to_godot_local(a, c, PLATFORM_H - entry_n(st.entry_rise.get(side, PLATFORM_H)) * ENTRY_RISE)))
     for sg in (1.0, -1.0):
         for ln in st.lanes:
             bed.append(list(to_godot_local(sg * (half + BUILDING_LEN + 12.0), ln.c, 0.0)))
@@ -446,7 +1002,21 @@ def layout(st: Station):
            "station": {"form": st.form, "name": st.name, "length": st.length,
                        "lanes": [[ln.line, ln.c] for ln in st.lanes],
                        "platforms": [[-c1, -c0] for c0, c1, _f in platforms(st)],   # Godot z band of each
-                       "platform_top": PLATFORM_H, "entrances": entr, "bed_points": bed}}
+                       "platform_top": PLATFORM_H, "entrances": entr, "bed_points": bed,
+                       # the street below the bed, and (an elevated hub) the rail's own viaduct deck the station stands
+                       # in: [half width, depth] -- a stand probe builds both, since the scene holds neither
+                       "street": -EH_LIFT if st.form == "elevated_hub" else 0.0,
+                       "deck": [EH_DECK_HALF, EH_DECK_T] if st.form == "elevated_hub" else [],
+                       # an elevated hub's F1: the paid box along the axis (Godot x) and the wings' outer face
+                       "paid_box": list(eh_box(st)) if st.form == "elevated_hub" else [],
+                       # its restroom blocks: [Godot x of the centre, Godot z of the door face, role]
+                       "restrooms": [[a, -(c - WC_D / 2.0), r] for a, c, r in eh_restrooms(st)]
+                       if st.form == "elevated_hub" else [],
+                       # across the axis on the LEFT side (+c): the wing's outer face and the rail wall's two faces,
+                       # measured from the axis (the outermost lane on that side carries them)
+                       "outer": eh_span(st)[1] + eh_outer(st) if st.form == "elevated_hub" else 0.0,
+                       "rail_wall": [eh_span(st)[1] + v for v in eh_band(st)[2:]] if st.form == "elevated_hub"
+                       else []}}
     LB.place_props(props(st), out, KITS)
     out["boxes"] = LB.merge_boxes(out["boxes"])
     xs = [abs(b["center"][0]) + b["size"][0] / 2 for b in out["boxes"]]
@@ -462,23 +1032,36 @@ def to_record(st: Station, a, c):
     return (st.x + st.ux * a - st.uy * c, st.y + st.uy * a + st.ux * c)
 
 
-def end_building(st: Station, side, end):
+def end_building(st: Station, side, end, kind=None):
     """(centre a, centre c, half along, half across) of `side`'s end building standing at end `end` (+1 / -1)."""
     half = st.length / 2.0
     for c0, c1, _f in platforms(st):
         if ("left" if c0 > 0 else "right") != side:
             continue
         sg = 1.0 if side == "left" else -1.0
-        inner, outer = (c0, c1) if side == "left" else (c1, c0)
-        bc = sorted((inner, outer + sg * BUILDING_OUT))
-        return (end * (half + BUILDING_LEN / 2.0), 0.5 * (bc[0] + bc[1]), BUILDING_LEN / 2.0, 0.5 * (bc[1] - bc[0]))
+        inner = c0 if side == "left" else c1
+        # the building AND its entry (stair out from the door, the slope along the front) -- the whole of what must
+        # clear the roads; the slope is taken at a typical rise (PLATFORM_H over the street)
+        kind = kind or st.entry_kind.get(side, "side")
+        n = entry_n(st.entry_rise.get(side, PLATFORM_H + 0.14))
+        if kind == "out":
+            along = BUILDING_LEN + ENTRY_LAND + max((n - 1) * STAIR_RUN, ramp_len(n))
+            across = BUILDING_D
+        else:
+            along = BUILDING_LEN + ENTRY_LAND + (n - 1) * STAIR_RUN
+            across = max(BUILDING_D, DOOR_OFF + DOOR_W / 2 + ramp_len(n))
+        bc = sorted((inner, inner + sg * across))
+        return (end * (half + along / 2.0), 0.5 * (bc[0] + bc[1]), along / 2.0, 0.5 * (bc[1] - bc[0]))
     raise KeyError(side)
 
 
-def entrance(st: Station, side, end):
-    """(a, c) of the street outside `side`'s end building at end `end`: 3 m out from its street door."""
-    a, c, ha, _hc = end_building(st, side, end)
-    return (a + end * (ha + 3.0), c)
+def entrance(st: Station, side, end, kind=None):
+    """(a, c) of the street outside `side`'s end building at end `end`: on its door's centre line, 3 m past the foot
+    of its entry stair."""
+    a, _c, ha, _hc = end_building(st, side, end, kind)
+    inner = next((c0 if side == "left" else c1) for c0, c1, _f in platforms(st) if ("left" if c0 > 0 else "right")
+                 == side)
+    return (a + end * (ha + 3.0), inner + (1.0 if side == "left" else -1.0) * DOOR_OFF)
 
 
 def extent(st: Station):
@@ -486,28 +1069,36 @@ def extent(st: Station):
     hub: whichever side its entrance annex stands on)."""
     if st.form == "ground_hub":
         lo, hi = hub_band(st)
-        return st.length / 2.0, max(-lo, hi) + WALL_T + ANNEX_D
-    hc = max(abs(v) for c0, c1, _f in platforms(st) for v in (c0, c1)) + BUILDING_OUT
-    return st.length / 2.0 + BUILDING_LEN, hc
+        return st.length / 2.0, max(-lo, hi) + WALL_T + ANNEX_D + annex_entry_depth(st)
+    if st.form == "elevated_hub":
+        return st.length / 2.0, max(abs(ln.c) for ln in st.lanes) + eh_outer(st)
+    hc = max(abs(end_building(st, sd, 1)[1]) + end_building(st, sd, 1)[3] for sd in ("left", "right"))
+    return st.length / 2.0 + 2 * end_building(st, "left", 1)[2], hc
 
 
 def choose_ends(st: Station, clear, cost):
     """{side: +1 | -1}: for each platform, the end its building stands at -- among the ends where `clear(cx, cy, ux,
-    uy, half along, half across)` (record frame) says the building stands clear, the one whose street entrance has the
-    lower `cost(x, y)` (the town is nearer). A side with no clear end is left out, and the caller reports it."""
+    uy, half along, half across)` (record frame) says the building AND its entry stand clear, the one whose street
+    entrance has the lower `cost(x, y)` (the town is nearer). The entry's slope runs along the front ('side') if it
+    fits anywhere, else straight out beside the stair ('out'); the kind chosen is written to `st.entry_kind`. A side
+    with no clear end is left out, and the caller reports it."""
     out = {}
     for side in ("left", "right"):
         best = None
-        for end in (1, -1):
-            a, c, ha, hc = end_building(st, side, end)
-            cx, cy = to_record(st, a, c)
-            if not clear(cx, cy, st.ux, st.uy, ha + 0.5, hc + 0.5):
-                continue
-            k = cost(*to_record(st, *entrance(st, side, end)))
-            if best is None or k < best[0]:
-                best = (k, end)
+        for kind in ENTRY_KINDS:
+            for end in (1, -1):
+                a, c, ha, hc = end_building(st, side, end, kind)
+                cx, cy = to_record(st, a, c)
+                if not clear(cx, cy, st.ux, st.uy, ha + 0.5, hc + 0.5):
+                    continue
+                k = cost(*to_record(st, *entrance(st, side, end, kind)))
+                if best is None or k < best[0]:
+                    best = (k, end, kind)
+            if best is not None:
+                break
         if best is not None:
             out[side] = best[1]
+            st.entry_kind[side] = best[2]
     return out
 
 
@@ -559,6 +1150,12 @@ def check(st: Station, els=None):
             if abs(edge - PLATFORM_EDGE) > 1e-6:
                 bad.append("%s: a platform's edge is %.3f m from its track (%.2f)" % (st.name, edge, PLATFORM_EDGE))
     half = st.length / 2.0
+    for ln in st.lanes:
+        # every lane runs the platform's whole length: a lane whose track ends inside the station (Central's Blue and
+        # Harbour lines until 2026-09-27) would leave the kit's platforms beside a missing deck
+        if ln.cover and (ln.cover[0] > -half + 1.0 or ln.cover[1] < half - 1.0):
+            bad.append("%s: the %s's track covers only a %+.1f..%+.1f of the %.0f m platform"
+                       % (st.name, ln.line, ln.cover[0], ln.cover[1], st.length))
     for line, (a_end, _c) in st.branches:
         if -half < a_end < half:
             bad.append("%s: the %s branch leaves inside the platform (a %.1f)" % (st.name, line, a_end))
@@ -570,7 +1167,7 @@ def kit_widths(sts):
     piece per width, `blender/tools/build_station_blends.py`)."""
     out = {"side": set(), "island": set()}
     for st in sts.values():
-        if st.form not in KIT_FORMS:
+        if not st.kit:
             continue
         for c0, c1, faces in platforms(st):
             out["island" if len(faces) == 2 else "side"].add(round(c1 - c0, 3))
@@ -591,6 +1188,24 @@ def reserve_ends(path=RESERVE):
             if b["id"].startswith("station:") and "ends" in b}
 
 
+def reserve_rises(path=RESERVE):
+    """{station name: {side: rise}} -- how far each open-air door's sill (the platform top) stands over its street, as
+    the rail reserve measured it (the entry piece's riser count comes from it)."""
+    import json
+    if not os.path.exists(path):
+        return {}
+    return {b["id"].partition(":")[2]: b["entry_rise"] for b in json.load(open(path))["boxes"]
+            if b["id"].startswith("station:") and "entry_rise" in b}
+
+
+def reserve_kinds(path=RESERVE):
+    import json
+    if not os.path.exists(path):
+        return {}
+    return {b["id"].partition(":")[2]: b["entry_kind"] for b in json.load(open(path))["boxes"]
+            if b["id"].startswith("station:") and "entry_kind" in b}
+
+
 def reserve_entrances(path=RESERVE):
     """{station name: ('left' | 'right', door step)} -- the ground hubs' entrance sides the rail reserve chose."""
     import json
@@ -600,12 +1215,14 @@ def reserve_entrances(path=RESERVE):
             if b["id"].startswith("station:") and "entrance" in b}
 
 
-def stations(res, ends=None, entrances=None):
+def stations(res, ends=None, entrances=None, rises=None):
     """{name: Station} from `island_rail_layout.analyse()`'s result; `ends` ({name: {side: end}}, the reserve's
     choice) says which end each open-air building stands at."""
     import island_rail_layout as R
     chosen = reserve_ends() if ends is None else ends
     doors = reserve_entrances() if entrances is None else entrances
+    risen = reserve_rises() if rises is None else rises
+    kinds = reserve_kinds() if rises is None else {}
     out = {}
     for name, sd in res["stations"].items():
         L = res["lines"][sd["line"]]
@@ -617,19 +1234,25 @@ def stations(res, ends=None, entrances=None):
                 continue
             x2, y2, _, _ = IRR.point_at(L2, s2)
             c = (x2 - x) * -ty + (y2 - y) * tx
-            stops = any(a - 5.0 <= s2 <= b + 5.0 for a, b, _k in IRR.platform_spans(res, ln))
-            if stops:
-                lanes.append(Lane(ln, round(c, 3)))
+            span = next(((a, b) for a, b, _k in IRR.platform_spans(res, ln) if a - 5.0 <= s2 <= b + 5.0), None)
+            if span:
+                # the span along THIS station's axis (the lines run parallel through a station: measured by projection)
+                ends = [IRR.point_at(L2, v)[:2] for v in span]
+                aa = sorted((ex - x) * tx + (ey - y) * ty for ex, ey in ends)
+                lanes.append(Lane(ln, round(c, 3), (round(aa[0], 2), round(aa[1], 2))))
             else:
                 # a line passing without stopping: its end nearest the station is a branch end (the turnout's side)
                 ends = [(L2["pts"][0], 0), (L2["pts"][-1], -1)]
                 (ex, ey), _ = min(ends, key=lambda e: math.hypot(e[0][0] - x, e[0][1] - y))
                 branches.append((ln, ((ex - x) * tx + (ey - y) * ty, round(c, 3))))
         z = sd.get("z", 0.0)
+        gi = min(range(len(L["cum"])), key=lambda k: abs(L["cum"][k] - sd["s"]))
+        lift = (z - 0.16) - L["ground"][gi] if "ground" in L else 0.0
         out[name] = Station(name, sd["kind"], x, y, tx, ty, z - 0.16, sd["platform_m"],
                             elevated=z > 4.0, lanes=lanes, branches=branches,
                             building_end=dict(chosen.get(name, {})), entrance=doors.get(name, ("", 0.0))[0],
-                            door_step=doors.get(name, ("", 0.0))[1])
+                            door_step=doors.get(name, ("", 0.0))[1], lift=round(lift, 3),
+                            entry_rise=dict(risen.get(name, {})), entry_kind=dict(kinds.get(name, {})))
     return out
 
 
@@ -652,7 +1275,7 @@ def self_test():
     assert len(isl) == 1 and abs(isl[0][1] - isl[0][0] - 12.9) < 1e-9, platforms(st2)
     # a freight branch ending 60 m past the platform on the left: an open-air end building there stands in its
     # throat, so that platform's building must go to the other end
-    st3 = Station("Frt", "standard", 0, 0, 1, 0, 0, 90.0, False, [Lane("L", 0.0)], branches=[("F", (50.0, 20.0))])
+    st3 = Station("Frt", "standard", 0, 0, 1, 0, 0, 90.0, False, [Lane("L", 0.0)], branches=[("F", (50.0, 35.0))])
     st3.building_end = {"left": 1, "right": 1}
     assert any("throat" in f for f in check(st3)), check(st3)
     st3.building_end = {"left": -1, "right": 1}
@@ -694,6 +1317,132 @@ def self_test():
     assert choose_entrance(st7, lambda *a_: True, lambda x, y: -y) == "right"   # the left side is cheaper, but blocked
     st7.entrance = ""
     assert stair_steps(AF)[1] <= STAIR_RISE and stair_steps(AF - PLATFORM_H)[1] <= STAIR_RISE
+    # THE LARGE HUBS (step 6b): every entrance is roller-shutter bays; a large hub's is six of them in ~11.8 m, inside
+    # its annex's street wall and clear of the machines; its shop rows stand beside the platforms, out of every gauge;
+    # a standard station squeezed onto the hub form is not large
+    bays = shutter_bays(*ANNEX_DOOR_LARGE, LARGE_BAYS)
+    assert len(bays) == 6 and all(abs((b1 - b0) - LARGE_BAY_W) < 1e-9 for b0, b1 in bays), bays
+    assert abs(bays[-1][1] - ANNEX_DOOR_LARGE[1]) < 1e-9 and ANNEX_DOOR_LARGE[1] <= CAP_LEN / 2 - 0.3 + 1e-9
+    assert all(abs((b1 - b0) - (DOOR_W - SHUTTER_POST) / 2) < 1e-9 for b0, b1 in shutter_bays(0.0, DOOR_W, DOOR_BAYS))
+    st6.entrance = "left"
+    assert is_large(st6) and annex_span(st6)[1] == CAP_LEN / 2 + ANNEX_STORE and check(st6) == [], check(st6)
+    shops = [e for e in hub_elements(st6) if e.kind == "store"]
+    assert len(shops) == 1 and shops[0].a0 >= CAP_LEN / 2 - 1e-9, shops
+    assert annex_span(st6)[1] <= st6.length / 2, "the store reaches past the platform"
+    assert store_door_w(5.0) == STORE_DOOR_W2 and store_door_w(3.0) == STORE_DOOR_W1
+    assert not is_large(Station("Waterpark", "standard", 0, 0, 1, 0, 0, 90.0, False, [Lane("L", 0.0)]))
+    # control: a shop row pulled over the platform stands in the gauge
+    els = hub_elements(st6)
+    sh = next(e for e in els if e.kind == "store")
+    sh.c0 -= 12.0
+    assert any("store" in f and "gauge" in f for f in check(st6, els)), check(st6, els)
+    st6.entrance = "left"
+    # every platform is laid its whole length on both sides (a riser count once shadowed the module count, and the
+    # second platform came out 8 modules long)
+    st_oa = Station("OA", "standard", 0, 0, 1, 0, 0, 90.0, False, [Lane("L", 0.0)])
+    st_oa.building_end = {"left": 1, "right": 1}
+    real = globals()["_piece_props"]
+    globals()["_piece_props"] = lambda ref, a, c, h, yaw: [{"piece": ref, "at": [a, -c]}]
+    try:
+        plats = [p_ for p_ in props(st_oa) if p_["piece"].startswith("OA_Platform_")]
+    finally:
+        globals()["_piece_props"] = real
+    assert len(plats) == 2 * 18, len(plats)
+    # the elevated hub: one lane on the viaduct, its contract kept; the stair fits its piece and reaches the platform
+    import island_rail_layout as R
+    assert abs(EH_LIFT - (R.ELEVATED_Z - 0.16)) < 1e-9, "EH_LIFT is not the rail plan's elevated bed"
+    st8 = Station("Elev", "standard", 0, 0, 1, 0, EH_LIFT, 90.0, True, [Lane("M", 0.0)], lift=EH_LIFT)
+    assert st8.form == "elevated_hub" and st8.kit
+    assert check(st8) == [], check(st8)
+    steps, x_top = eh_stairs()
+    rises = [b[1] - a[1] for a, b in zip([(0, -EH_LIFT)] + steps, steps + [(x_top, PLATFORM_H)])]
+    assert max(rises) <= STAIR_RISE + 1e-9 and abs(sum(rises) - (EH_LIFT + PLATFORM_H)) < 1e-9, rises
+    assert x_top > -EH_STAIR_LEN / 2 + 1.0, x_top
+    assert eh_band(st8)[0] - GAUGE_HALF - TRACK_HALF > 0.1
+    mods, sc = eh_modules(st8)
+    vals = list(mods.values())
+    assert vals.count("gate_lo") == 1 and vals.count("gate_hi") == 1 and vals.count("entrance") == 2, mods
+    # the paid box holds the stair and the lift, roughly centred, and the four entrances are outside it, in the wings
+    ba0, ba1 = eh_box(st8)
+    assert ba0 < sc - EH_STAIR_LEN / 2 - EH_LIFT_MODULE and sc + EH_STAIR_LEN / 2 < ba1, (ba0, ba1, sc)
+    assert abs((ba0 + ba1) / 2) <= 5.0, (ba0, ba1)
+    ents = eh_entrances(st8)
+    assert len(ents) == 4 and all(abs(c) > eh_outer(st8) and not ba0 <= a <= ba1 for a, c, _h in ents), ents
+    # each entrance's three modules stay outside the paid box, and every other wing module is a shop or machines
+    for a, r in mods.items():
+        if r.startswith("entrance"):
+            assert a + MODULE / 2 <= ba0 - MODULE / 2 + 1e-9 or a - MODULE / 2 >= ba1 + MODULE / 2 - 1e-9, (a, r)
+    for n60 in (65.0, 75.0, 90.0, 120.0):
+        eh_modules(Station("L", "standard", 0, 0, 1, 0, EH_LIFT, n60, True, [Lane("M", 0.0)], lift=EH_LIFT))
+    # control: a stair band's slab pulled in over the track stands in the gauge
+    els = eh_elements(st8)
+    wl = next(e for e in els if e.kind == "band" and e.tag == "left")
+    wl.c0 = 3.0
+    assert any("gauge" in f for f in check(st8, els))
+    # the LIFTS (user, 2026-09-27): beside each stair, LIFT_GAP beyond its TOP end so the doors never open into the
+    # stair's queue, inside the paid area, doors wide enough for a wheelchair
+    mods, sc = eh_modules(st8)
+    gate_a = next(a for a, r in mods.items() if r == "gate_hi")
+    lifts = [e for e in eh_elements(st8) if e.kind == "lift"]
+    assert len(lifts) == 2, lifts
+    stair_top_a = sc + x_top
+    for e in lifts:
+        assert abs((stair_top_a - e.a1) - LIFT_GAP) < 1e-6, (stair_top_a, e.a1)
+        assert ba0 < e.a0 and e.a1 < gate_a and abs((e.a1 - e.a0) - EH_SW) < 1e-9 and abs((e.c1 - e.c0) - EH_SW) < 1e-9
+    n, _r = stair_steps(AF - PLATFORM_H)
+    for sw in (CAP_SW_SIDE, CAP_SW_ISLAND):
+        x0, x1 = hub_lift(sw)
+        assert abs((CAP_STAIR_X - (n - 1) * STAIR_RUN) - x1 - LIFT_GAP) < 1e-9 and x0 > -CAP_LEN / 2 + 1.0
+        assert lift_door_w(sw - 2 * LIFT_WALL_T) >= 0.8, sw
+    st6.entrance = "left"
+    assert sum(1 for e in hub_elements(st6) if e.kind == "lift") == len(platforms(st6))
+    assert check(st6) == [], check(st6)
+    # CENTRAL's shape (PLAN.md step 6): three lanes 14 m apart over a 300 m F1 -- two side platforms outside the
+    # outer lanes, two ISLAND platforms between them with their stair and lift in the gap between the decks; one paid
+    # box holds every stair and lift; entrances beside the box as well as near the ends
+    st9 = Station("C", "hub", 0, 0, 1, 0, EH_LIFT, 300.0, True, [Lane("A", -14.0), Lane("B", 0.0), Lane("H", 14.0)],
+                  lift=EH_LIFT)
+    assert st9.kit and st9.form == "elevated_hub"
+    assert check(st9) == [], check(st9)
+    isl = eh_islands(st9)
+    assert len(isl) == 2 and all(abs((c1 - c0) - 6.9) < 1e-9 for c0, c1, _m in isl), isl
+    assert eh_core(st9) == "345_3x14", eh_core(st9)
+    els = eh_elements(st9)
+    ba0, ba1 = eh_box(st9)
+    lifts = [e for e in els if e.kind == "lift"]
+    assert len(lifts) == 4 and all(ba0 < e.a0 and e.a1 < ba1 for e in lifts), lifts
+    for c0, c1, cm in isl:             # the stairwell and the lift stand between the decks, never over a track
+        assert cm - EH_ISLAND_SW / 2 > c0 - PLATFORM_EDGE + (EH_DECK_HALF - TRACK_HALF) - 1e-9
+        assert (cm - EH_ISLAND_SW / 2) - c0 >= 1.5 and c1 - (cm + EH_ISLAND_SW / 2) >= 1.5   # 1.5 m beside the well
+    ents = eh_entrances(st9)
+    assert len(ents) == 8 and all(not ba0 <= a <= ba1 for a, _c, _h in ents), ents
+    assert min(abs(a - ba0) for a, _c, _h in ents) <= 10.0 + 1e-9, "no entrance beside the paid box"
+    # the AMENITIES (step 6b): a restroom block inside the paid box and one outside it, both under the middle lane
+    # between its deck's column rows (faces at +-4.1 m) and clear of every stair and lift; neither widens the building
+    for stx in (st8, st9):
+        els = eh_elements(stx)
+        ba0, ba1 = eh_box(stx)
+        wcs = {e.tag: e for e in els if e.kind == "restroom"}
+        assert set(wcs) == {"paid", "unpaid"}, wcs
+        assert ba0 + MODULE / 2 < wcs["paid"].a0 and wcs["paid"].a1 < ba1 - MODULE / 2, (ba0, ba1, wcs["paid"])
+        assert wcs["unpaid"].a1 < ba0 - MODULE / 2 and wcs["unpaid"].a0 > -stx.length / 2, wcs["unpaid"]
+        mc = sorted(ln.c for ln in stx.lanes)[len(stx.lanes) // 2]
+        for e in wcs.values():
+            assert mc - (EH_DECK_HALF - 0.9) < e.c0 and e.c1 < mc + (EH_DECK_HALF - 0.9), e
+            for o in els:
+                if o.kind in ("lift", "band", "wall", "wing", "fare", "floor", "ceiling") and o is not e:
+                    assert o.kind in ("floor", "ceiling") or not e.overlaps(o), (e, o)
+    assert eh_outer(st8) == eh_band(st8)[3] + EH_WING
+    # control: a lane whose track stops at the station's centre (the old Blue line) is refused
+    st9.lanes[0].cover = (-150.0, 0.0)
+    assert any("covers only" in f for f in check(st9)), check(st9)
+    st9.lanes[0].cover = None
+    # control: lanes too close for a stair between the decks are refused
+    try:
+        eh_islands(Station("X", "hub", 0, 0, 1, 0, EH_LIFT, 300.0, True, [Lane("A", 0.0), Lane("B", 12.0)]))
+        raise AssertionError("an island with no room for its stair was accepted")
+    except SystemExit:
+        pass
     print("station_layout: self-test OK")
 
 
@@ -715,7 +1464,7 @@ def main(argv):
     only = {n for n in a.only.split(",") if n}
     if a.write:
         import json
-        done = [layout(st) for st in sts.values() if (not only or st.name in only) and st.form in KIT_FORMS]
+        done = [layout(st) for st in sts.values() if (not only or st.name in only) and st.kit]
         json.dump({"buildings": done}, open(a.write, "w"), indent=1)
         print("station_layout: %d station(s) -> %s" % (len(done), a.write))
     for st in sts.values():
@@ -723,7 +1472,7 @@ def main(argv):
         br = ", ".join("%s end a%+.0f c%+.0f" % (b[0], b[1][0], b[1][1]) for b in st.branches)
         print("%-18s %-12s %-9s %5.0f m  bed %5.2f  lanes [%s]%s" % (st.name, st.form, st.kind, st.length, st.bed,
                                                                    lanes, ("  branches [%s]" % br) if br else ""))
-        if st.form in KIT_FORMS:
+        if st.kit:
             for f in check(st):
                 print("   FINDING " + f)
                 bad += 1

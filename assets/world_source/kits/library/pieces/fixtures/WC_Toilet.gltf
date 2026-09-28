@@ -7,6 +7,9 @@
    "module_scale": 1.0
   }
  },
+ "extensionsUsed": [
+  "KHR_materials_emissive_strength"
+ ],
  "scene": 0,
  "scenes": [
   {
@@ -18,6 +21,9 @@
  ],
  "nodes": [
   {
+   "extras": {
+    "edit_note": "Placeholder, ours (CC0). Keep the frame: Z up, origin at the footprint centre on the ground, the side a person uses facing -Y; real size in metres. After editing: tools/building_kit/build_buildings.sh."
+   },
    "mesh": 0,
    "name": "WC_Toilet"
   }
@@ -36,20 +42,143 @@
     "metallicFactor": 0,
     "roughnessFactor": 0.30000001192092896
    }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_PlasticDark",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.11999999731779099,
+     0.11999999731779099,
+     0.12999999523162842,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.6000000238418579
+   }
+  },
+  {
+   "doubleSided": true,
+   "emissiveFactor": [
+    0.0600000032782555,
+    0.15000000596046448,
+    0.30000001192092896
+   ],
+   "name": "MI_Sign",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.11999999731779099,
+     0.30000001192092896,
+     0.550000011920929,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_FabricRed",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.44999998807907104,
+     0.07999999821186066,
+     0.07000000029802322,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "emissiveFactor": [
+    1,
+    0.9800000190734863,
+    0.9399999976158142
+   ],
+   "extensions": {
+    "KHR_materials_emissive_strength": {
+     "emissiveStrength": 2
+    }
+   },
+   "name": "MI_Light",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1,
+     1,
+     0.9700000286102295,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
+  },
+  {
+   "doubleSided": true,
+   "name": "MI_Steel",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.5726980566978455,
+     0.5820889472961426,
+     0.5955169796943665,
+     1
+    ],
+    "roughnessFactor": 0.699999988079071
+   }
   }
  ],
  "meshes": [
   {
-   "name": "WC_Toilet",
+   "name": "WC_Toilet.001",
    "primitives": [
     {
      "attributes": {
       "POSITION": 0,
-      "NORMAL": 1,
-      "TEXCOORD_0": 2
+      "NORMAL": 1
      },
-     "indices": 3,
+     "indices": 2,
      "material": 0
+    },
+    {
+     "attributes": {
+      "POSITION": 3,
+      "NORMAL": 4
+     },
+     "indices": 5,
+     "material": 1
+    },
+    {
+     "attributes": {
+      "POSITION": 6,
+      "NORMAL": 7
+     },
+     "indices": 5,
+     "material": 2
+    },
+    {
+     "attributes": {
+      "POSITION": 8,
+      "NORMAL": 9
+     },
+     "indices": 5,
+     "material": 3
+    },
+    {
+     "attributes": {
+      "POSITION": 10,
+      "NORMAL": 11
+     },
+     "indices": 5,
+     "material": 4
+    },
+    {
+     "attributes": {
+      "POSITION": 12,
+      "NORMAL": 13
+     },
+     "indices": 5,
+     "material": 5
     }
    ]
   }
@@ -58,67 +187,237 @@
   {
    "bufferView": 0,
    "componentType": 5126,
-   "count": 284,
+   "count": 980,
    "max": [
-    0.19170141220092773,
+    0.30000001192092896,
     0.800000011920929,
-    0.3152122497558594
+    0.3700000047683716
    ],
    "min": [
-    -0.19170236587524414,
+    -0.20000000298023224,
     0,
-    -0.31521129608154297
+    -0.375
    ],
    "type": "VEC3"
   },
   {
    "bufferView": 1,
    "componentType": 5126,
-   "count": 284,
+   "count": 980,
    "type": "VEC3"
   },
   {
    "bufferView": 2,
-   "componentType": 5126,
-   "count": 284,
-   "type": "VEC2"
+   "componentType": 5123,
+   "count": 1860,
+   "type": "SCALAR"
   },
   {
    "bufferView": 3,
+   "componentType": 5126,
+   "count": 24,
+   "max": [
+    0.28999999165534973,
+    0.4749999940395355,
+    0.10000000149011612
+   ],
+   "min": [
+    0.20999999344348907,
+    0.4699999988079071,
+    -0.07999999821186066
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 5,
    "componentType": 5123,
-   "count": 582,
+   "count": 36,
    "type": "SCALAR"
+  },
+  {
+   "bufferView": 6,
+   "componentType": 5126,
+   "count": 24,
+   "max": [
+    0.27000001072883606,
+    0.47999998927116394,
+    0.07999999821186066
+   ],
+   "min": [
+    0.23000000417232513,
+    0.4749999940395355,
+    0.05000000074505806
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 7,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 8,
+   "componentType": 5126,
+   "count": 24,
+   "max": [
+    0.27000001072883606,
+    0.47999998927116394,
+    0.029999999329447746
+   ],
+   "min": [
+    0.23000000417232513,
+    0.4749999940395355,
+    0
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 9,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 10,
+   "componentType": 5126,
+   "count": 24,
+   "max": [
+    0.27000001072883606,
+    0.47999998927116394,
+    -0.019999999552965164
+   ],
+   "min": [
+    0.23000000417232513,
+    0.4749999940395355,
+    -0.05000000074505806
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 11,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 12,
+   "componentType": 5126,
+   "count": 24,
+   "max": [
+    -0.20000000298023224,
+    0.6800000071525574,
+    -0.2800000011920929
+   ],
+   "min": [
+    -0.2199999988079071,
+    0.6600000262260437,
+    -0.3400000035762787
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 13,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
   }
  ],
  "bufferViews": [
   {
    "buffer": 0,
-   "byteLength": 3408,
+   "byteLength": 11760,
    "byteOffset": 0,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 3408,
-   "byteOffset": 3408,
+   "byteLength": 11760,
+   "byteOffset": 11760,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 2272,
-   "byteOffset": 6816,
-   "target": 34962
-  },
-  {
-   "buffer": 0,
-   "byteLength": 1164,
-   "byteOffset": 9088,
+   "byteLength": 3720,
+   "byteOffset": 23520,
    "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 27240,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 27528,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 72,
+   "byteOffset": 27816,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 27888,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 28176,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 28464,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 28752,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 29040,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 29328,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 29616,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 29904,
+   "target": 34962
   }
  ],
  "buffers": [
   {
-   "byteLength": 10252,
+   "byteLength": 30192,
    "uri": "WC_Toilet.bin"
   }
  ]

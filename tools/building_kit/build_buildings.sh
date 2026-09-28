@@ -4,7 +4,7 @@
 #     tools/building_kit/build_buildings.sh [--only=Id,Id]
 #
 # 0. build_library_palette.py --check  kits/library/palette.json -> materials/MI_*.tres (edit the json, not a .tres)
-# 1. export_building_kit.py  each kit's .blend -> pieces/ + pieces.json (the .blend OWNS the pieces, PLAN.md
+# 1. export_building_kit.py  each kit's .blend (or kit.json `blends`) -> pieces/ + pieces.json (the .blend OWNS the pieces, PLAN.md
 #                       3.6b step 1; refuses a piece whose bounds moved unless ACCEPT_BOUNDS=1)
 # 2. godot --import     so new or changed pieces and textures are importable
 # 3. layout_buildings.py building_types.json -> piece placements, collision boxes, doors (self-tested first)
@@ -23,11 +23,18 @@ BLENDER="${BLENDER:-blender}"
 python3 tools/building_kit/build_library_palette.py --check | tail -1
 for kit in assets/world_source/kits/*/kit.json; do
     dir="$(dirname "$kit")"
-    blend="$dir/$(basename "$dir").blend"
-    [ -f "$blend" ] || continue          # a kit with no .blend yet (not a building kit, or not initialised)
-    "$BLENDER" -b "$blend" --python-exit-code 1 --python blender/tools/export_building_kit.py > "$TMP/export.log" 2>&1 \
-        || { grep -E "export_building_kit|Error" "$TMP/export.log"; exit 1; }
-    grep "\[export_building_kit\]" "$TMP/export.log"
+    # a kit is one <kit>.blend, or several (kit.json `blends`: the shop kit, one .blend per store). A kit with its own
+    # build (`own_build`: the station kit, tools/building_kit/build_stations.sh) is exported there, not here.
+    blends="$(python3 -c "import json,sys;k=json.load(open(sys.argv[1]));print('' if k.get('own_build') else ' '.join(k.get('blends') or []))" "$kit")"
+    [ -n "$blends" ] || blends="$(basename "$dir").blend"
+    python3 -c "import json,sys;sys.exit(1 if json.load(open(sys.argv[1])).get('own_build') else 0)" "$kit" || continue
+    for b in $blends; do
+        blend="$dir/$b"
+        [ -f "$blend" ] || continue      # a kit with no .blend yet (not a building kit, or not initialised)
+        "$BLENDER" -b "$blend" --python-exit-code 1 --python blender/tools/export_building_kit.py > "$TMP/export.log" 2>&1 \
+            || { grep -E "export_building_kit|Error" "$TMP/export.log"; exit 1; }
+        grep "\[export_building_kit\]" "$TMP/export.log"
+    done
 done
 timeout -k 5 900 "$GODOT" --headless --path . --import > "$TMP/import.log" 2>&1 || { tail -20 "$TMP/import.log"; exit 1; }
 python3 tools/building_kit/layout_buildings.py --self-test | tail -1

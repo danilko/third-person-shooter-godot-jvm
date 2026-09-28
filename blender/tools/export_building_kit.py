@@ -22,7 +22,11 @@ folder, i.e. the pieces the game builds from.
 * What a piece carries besides its mesh is EMPTIES in its collection (the station kit's contract): `COL_*` (drawn as a
   cube; location = box centre, scale = half size) become `collide_boxes` ([cx, cy, cz, sx, sy, sz], Godot axes, the
   piece's own frame -- the shape `layout_buildings.place_props`' `collide: {boxes}` takes), and `GATE_*` (a ticket-gate
-  lane; its local +Z is the unpaid side) become `gates` ({pos, out, w, h}). Empties never go into the glTF.
+  lane; its local +Z is the unpaid side) become `gates` ({pos, out, w, h}), and `LIFT_*` (a lift's shaft floor at its
+  low stop, props w/d/rise/door_w/door_h) become `lifts`, and `DOOR_*` (an INTERIOR door in a wall piece's hole: a
+  single arrow on the floor at the doorway's centre pointing OUT of the room; props w, h, style "swing" | "slide",
+  slide_dir +1 / -1 = the sliding leaf runs to the RIGHT / LEFT seen from where the arrow points) become `doors`.
+  Empties never go into the glTF.
 * `pieces.json` is measured by `normalize_kit.measure`, the same function that measured the downloaded pieces,
   so a size cannot differ depending on which tool wrote the file.
 * THE BOUNDS ARE THE KIT'S CONTRACT WITH THE LAYOUT (`layout_buildings.py` places every piece from them), so an
@@ -33,6 +37,7 @@ folder, i.e. the pieces the game builds from.
   self-test and `probe_buildings.gd`, which is what `build_buildings.sh` does next anyway.
 """
 import json
+import math
 import os
 import shutil
 import sys
@@ -59,7 +64,9 @@ s = float(KIT["module_scale"])
 # what a kit's header says -- including a props kit that has no module and no storey.
 manifest = nk.manifest_header(KIT, "blender/tools/export_building_kit.py")
 
-pieces = sorted((c for c in bpy.data.collections if c.get("bk_piece_path")), key=lambda c: c.name)
+# a LINKED collection (another kit's piece, shown here by a PROP_ instance) is that kit's to export, never this one's
+pieces = sorted((c for c in bpy.data.collections if c.get("bk_piece_path") and c.library is None),
+                key=lambda c: c.name)
 if not pieces:
     raise SystemExit("export_building_kit: no piece collections (bk_piece_path) in %s" % bpy.data.filepath)
 MULTI = bool(KIT.get("blends"))
@@ -72,8 +79,8 @@ def godot(v):
 
 
 def markers(col):
-    """The piece's COL_ and GATE_ Empties, in the piece's own frame (the grid offset removed), Godot axes."""
-    boxes, gates = [], []
+    """The piece's COL_, GATE_ and LIFT_ Empties, in the piece's own frame (the grid offset removed), Godot axes."""
+    boxes, gates, lifts, hulls, doors, props = [], [], [], [], [], []
     for o in sorted(col.all_objects, key=lambda o: o.name):
         if o.type != "EMPTY":
             continue
@@ -89,7 +96,29 @@ def markers(col):
             z = z.normalized() if z.length > 1e-6 else mathutils.Vector((1.0, 0.0, 0.0))
             gates.append({"pos": godot(loc), "out": godot(z), "w": float(o.get("w", 0.9)),
                           "h": float(o.get("h", 1.0))})
-    return boxes, gates
+        elif o.name.startswith("DOOR_"):
+            z = o.matrix_world.to_3x3() @ mathutils.Vector((0.0, 0.0, 1.0))
+            z.z = 0.0
+            z = z.normalized() if z.length > 1e-6 else mathutils.Vector((0.0, -1.0, 0.0))
+            doors.append({"pos": godot(loc), "out": godot(z), "w": float(o.get("w", 0.85)),
+                          "h": float(o.get("h", 2.0)), "style": str(o.get("style", "swing")),
+                          "slide_dir": 1.0 if float(o.get("slide_dir", 1.0)) >= 0 else -1.0})
+        elif o.name.startswith("PROP_"):
+            # a LIBRARY fixture placed with the piece (a station restroom's washlet toilet, basin, ...): the game places
+            # the library piece `piece` here, turned by the Empty's Z rotation (Blender's Z turn is Godot's yaw)
+            yaw = math.degrees(o.matrix_world.to_euler().z)
+            props.append({"piece": str(o["piece"]), "pos": godot(loc), "yaw": round(yaw % 360.0, 4),
+                          "collide": str(o.get("collide", "none"))})
+        elif o.name.startswith("HULL_"):
+            # a CONVEX collider (a ramp's smooth slope): its points, relative to the Empty, in its custom property
+            pts = list(o["pts"])
+            hulls.append([godot(loc + mathutils.Vector(pts[i:i + 3])) for i in range(0, len(pts), 3)])
+        elif o.name.startswith("LIFT_"):
+            # a lift (world.Elevator): the shaft floor's centre at the low stop; w along the piece's X, d along its
+            # Y (Godot Z), its doors on the two X faces
+            lifts.append({"pos": godot(loc), "w": float(o["w"]), "d": float(o["d"]), "rise": float(o["rise"]),
+                          "door_w": float(o.get("door_w", 1.1)), "door_h": float(o.get("door_h", 2.1))})
+    return boxes, gates, lifts, hulls, doors, props
 view_layer = bpy.context.view_layer
 for col in pieces:
     cat = col["bk_category"]
@@ -126,7 +155,15 @@ for col in pieces:
         fh.write(json.dumps(gltf, indent=1) + "\n")
     lo, hi = nk.measure(gltf, blob)
     manifest["pieces"][name] = nk.manifest_entry(name, cat, gltf, lo, hi)
-    boxes, gates = markers(col)
+    boxes, gates, lifts, hulls, doors, props = markers(col)
+    if props:
+        manifest["pieces"][name]["props"] = props
+    if doors:
+        manifest["pieces"][name]["doors"] = doors
+    if hulls:
+        manifest["pieces"][name]["collide_hulls"] = hulls
+    if lifts:
+        manifest["pieces"][name]["lifts"] = lifts
     if boxes:
         manifest["pieces"][name]["collide_boxes"] = boxes
     if gates:
@@ -192,6 +229,9 @@ for dirpath, _dirs, files in os.walk(os.path.join(OUT, "pieces")):
             continue
         if f.endswith((".gltf", ".bin")) and rel not in keep:
             os.remove(os.path.join(OUT, rel))
+            print("[export_building_kit] removed %s" % rel)
+        elif f.endswith(".gltf.import") and rel[:-len(".import")] not in keep:
+            os.remove(os.path.join(OUT, rel))     # Godot's import record of a piece that is gone
             print("[export_building_kit] removed %s" % rel)
 shutil.rmtree(STAGE)
 print("[export_building_kit] %d pieces, %d files written -> %s" % (len(pieces), written, OUT))

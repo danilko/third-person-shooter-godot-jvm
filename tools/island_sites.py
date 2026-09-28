@@ -480,7 +480,7 @@ def rail_stations():
     for bid, b in sorted(boxes.items()):
         kind, _c, name = bid.partition(":")
         slug = name.lower().replace(" ", "_")
-        if kind == "station" and b.get("form") in ("open_air", "ground_hub"):
+        if kind == "station" and b.get("form") in ("open_air", "ground_hub", "elevated_hub"):
             # AN OPEN-AIR STATION IS ONE SCENE (PLAN.md step 3): its platforms, sheds, fences and the two end buildings
             # laid out by `station_layout` (`tools/building_kit/build_stations.sh`), placed at its frame -- the axis at
             # the platform centre, at BED level (the track's own height, so the platform edge meets the train)

@@ -368,7 +368,12 @@ def layout_type(t, root):
     out["has_interior"] = bool(t.get("props"))
     place_props(t.get("props", []), out, root, (W, D))
     check_doors_clear(out)
+    check_inner_doors_clear(out)
     out["boxes"] = merge_boxes(out["boxes"])
+    # the FORECOURT: how far props stand out past the front wall (a konbini's vending machines and bins, user
+    # 2026-09-28) -- the mesh is that much deeper than the footprint, on the street side only
+    front = max([b["center"][2] + b["size"][2] / 2 for b in out["boxes"]] + [D / 2])
+    out["forecourt_m"] = round(max(0.0, front - D / 2), 4)
 
     jp = t.get("jp", {})
     for key, got, tol in (("frontage_m", W, m), ("depth_m", D, m), ("height_m", total, storey)):  # roofline
@@ -414,8 +419,17 @@ def place_props(props, out, root, footprint=None):
     """Place library pieces: each prop is {piece, at: [x, z], y, yaw, collide, repeat: [n, dx, dz]}. `collide` is
     `box` (the default: the piece's turned bounds), `hull` (a convex hull of its mesh: a ramp), `none`, or
     {"boxes": [[cx, cy, cz, sx, sy, sz], ...]} -- boxes in the piece's OWN frame (Godot axes), turned and moved with it:
-    for a piece whose bounds are mostly air, like a gantry crane a truck drives under."""
+    for a piece whose bounds are mostly air, like a gantry crane a truck drives under; or `piece` -- the piece's OWN
+    COL_/HULL_ Empties from its .blend (a shop's interior). A piece's DOOR_ Empties become interior doors either way."""
     for p in props:
+        if "piece" not in p and p.get("lift"):
+            # a LIFT (world.Elevator: the car, its doors and the landing doors are built at runtime; the shaft is the
+            # piece beside it): the shaft floor's centre at the low stop, turned with the piece that carries it
+            lf = p["lift"]
+            out.setdefault("lifts", []).append({
+                "center": [round(p["at"][0], 5), round(float(p.get("y", 0.0)), 5), round(p["at"][1], 5)],
+                "yaw": float(p.get("yaw", 0.0)), **{k: float(lf[k]) for k in ("w", "d", "rise", "door_w", "door_h")}})
+            continue
         if "piece" not in p:
             # a DOOR-ONLY prop: an opening with no piece of its own -- a TICKET GATE's lane between two gate bodies
             # (`door.kind = "gate"`, a pair of flaps built by the scene builder as `world.TicketGate`s). Its doorway
@@ -445,8 +459,34 @@ def place_props(props, out, root, footprint=None):
                 out.setdefault("inner_doors", []).append({
                     "center": [round(pos[0], 5), round(pos[1], 5), round(pos[2], 5)],
                     "outward": [round(math.sin(a), 6), 0, round(math.cos(a), 6)],
-                    "width": float(p["door"].get("w", 0.85)), "height": float(p["door"].get("h", 2.0))})
+                    "width": float(p["door"].get("w", 0.85)), "height": float(p["door"].get("h", 2.0)),
+                    # `style: "slide"` is a SOLID sliding leaf (an accessible toilet's 引き戸, user 2026-09-27), hung
+                    # on the prop's +Z face and running `slide_dir` (+1 / -1 along the piece's own X) beside the hole
+                    "style": str(p["door"].get("style", "swing")),
+                    "slide_dir": 1.0 if float(p["door"].get("slide_dir", 1.0)) >= 0 else -1.0})
+            # a kit piece's LIBRARY FIXTURES (PROP_ Empties, export_building_kit.py: a station restroom's washlet
+            # toilet, basin, mirror ...), turned and moved with it and placed as ordinary props
+            kids = []
+            for pr in entry.get("props", ()):
+                px, pz = rot_xz(yaw, pr["pos"][0], pr["pos"][2])
+                kids.append({"piece": pr["piece"], "at": [pos[0] + px, pos[2] + pz], "y": pos[1] + pr["pos"][1],
+                             "yaw": (yaw + float(pr.get("yaw", 0.0))) % 360.0, "collide": pr.get("collide", "none")})
+            if kids:
+                place_props(kids, out, root)
+            for dd in entry.get("doors", ()):
+                # a kit piece's own INTERIOR doors (DOOR_ Empties, export_building_kit.py: a shop's interior .blend),
+                # turned and moved with it
+                dx_, dz_ = rot_xz(yaw, dd["pos"][0], dd["pos"][2])
+                ox_, oz_ = rot_xz(yaw, dd["out"][0], dd["out"][2])
+                out.setdefault("inner_doors", []).append({
+                    "center": [round(pos[0] + dx_, 5), round(pos[1] + dd["pos"][1], 5), round(pos[2] + dz_, 5)],
+                    "outward": [round(ox_, 6), 0, round(oz_, 6)], "width": float(dd["w"]), "height": float(dd["h"]),
+                    "style": str(dd.get("style", "swing")), "slide_dir": float(dd.get("slide_dir", 1.0))})
             kind = p.get("collide", "box")
+            if kind == "piece":
+                # the piece's OWN colliders (COL_ / HULL_ Empties in its .blend): what an artist moved there
+                kind = {k: entry[src] for k, src in (("boxes", "collide_boxes"), ("hulls", "collide_hulls"))
+                        if entry.get(src)} or "none"
             if kind == "box":
                 c, sz = turned_box(entry["min"], entry["max"], yaw, pos)
                 out["boxes"].append({"center": c, "size": sz})
@@ -458,6 +498,13 @@ def place_props(props, out, root, footprint=None):
                     hi = [b[0] + b[3] / 2, b[1] + b[4] / 2, b[2] + b[5] / 2]
                     c, sz = turned_box(lo, hi, yaw, pos)
                     out["boxes"].append({"center": c, "size": sz})
+                for h in kind.get("hulls", ()):
+                    # a convex collider given by its points in the piece's own frame (a ramp's smooth slope)
+                    pts = []
+                    for q in h:
+                        rx, rz = rot_xz(yaw, q[0], q[2])
+                        pts.append([round(pos[0] + rx, 5), round(pos[1] + q[1], 5), round(pos[2] + rz, 5)])
+                    out.setdefault("hull_points", []).append(pts)
             elif kind != "none":
                 raise SystemExit(f"{out['id']}: prop {name}: collide must be box, hull, none or {{boxes}}")
             if footprint is not None:
@@ -517,6 +564,36 @@ def check_doors_clear(out):
                         if all(abs(p[i] - bx["center"][i]) < bx["size"][i] / 2 - 1e-6 for i in range(3)):
                             raise SystemExit(f"{out['id']}: {d['side']} door {d['module']} is blocked "
                                              f"{depth} m in by the box at {bx['center']} size {bx['size']}")
+
+
+def check_inner_doors_clear(out):
+    """Every INTERIOR door (a staff room, a restroom) keeps the capsule's corridor clear on BOTH sides, and a SLIDING
+    leaf's run beside the hole is free of anything a prop added (the leaf would slide into it). Gates are skipped:
+    their lane is the gap the gate bodies leave."""
+    pts = []
+    for d in out.get("inner_doors", []):
+        if d.get("kind", "door") == "gate":
+            continue
+        o = d["outward"]
+        side = [o[2], 0, -o[0]]                       # the door's own +X (the piece's X, turned with it)
+        for sgn in (1, -1):
+            for depth in (0.25, 0.6, 1.1):
+                for lat in (-0.3, 0.0, 0.3):
+                    pts.append((d, "in front" if sgn > 0 else "behind", [
+                        d["center"][0] + o[0] * depth * sgn + side[0] * lat, None,
+                        d["center"][2] + o[2] * depth * sgn + side[2] * lat]))
+        if d.get("style") == "slide":
+            w = d["width"]
+            for a in (w / 2 + 0.3, w / 2 + w - 0.1):
+                a *= d.get("slide_dir", 1.0)
+                pts.append((d, "on the slide run", [d["center"][0] + o[0] * 0.11 + side[0] * a, None,
+                                                    d["center"][2] + o[2] * 0.11 + side[2] * a]))
+    for d, where, p in pts:
+        for y in (0.5, 1.2):
+            for bx in out["boxes"]:
+                if all(abs((y if i == 1 else p[i]) - bx["center"][i]) < bx["size"][i] / 2 - 1e-6 for i in range(3)):
+                    raise SystemExit(f"{out['id']}: interior door at {d['center']} is blocked {where} at "
+                                     f"({p[0]:.2f}, {y}, {p[2]:.2f}) by the box at {bx['center']} size {bx['size']}")
 
 
 def layout_composite(c, built, root):
@@ -590,6 +667,7 @@ def layout_composite(c, built, root):
     out["height_m"] = round(max(height, out.get("props_top_m", 0.0)), 4)
     out["roofline_m"] = out["height_m"]
     check_doors_clear(out)
+    check_inner_doors_clear(out)
     out["boxes"] = merge_boxes(out["boxes"])
     return out
 
