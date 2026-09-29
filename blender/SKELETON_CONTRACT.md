@@ -364,3 +364,56 @@ back to the clip's pose the moment influence dropped.
 shoulder the solver had swung 0.12 m read 0.9 deg — read the EVALUATED pose), and a limb's reach is
 the two JOINT-TO-JOINT distances, not the two bone lengths (a bone's tail need not sit on its
 child's head; the lengths under-measured this arm by 4 cm).
+
+## 11. Male or female: the body's GAIT (2026-09-28)
+
+A body's sex is not in its mesh or its skeleton -- the contract above is the same for everyone. It is
+ONE row in `src/main/resources/com/openworld/character/anim/character_gaits.json`:
+
+```json
+"bodies": { "shino": "f", "fumiriya": "m", ... }
+```
+
+`"m"` or `"f"` picks which WALK the body plays. A body with no row is male. Nothing else changes: aim,
+weapons, reloads, melee, the crowd behaviour and every other clip are shared.
+
+**The walks are ordinary clips in `assets/characters/shino/shino.blend`**, listed in the Game sidebar and
+edited on the rig like any other, so what you see in Blender is what the game plays:
+
+| clip | what it is |
+|---|---|
+| `male_upright_walk`, `female_upright_walk` | the NORMAL walk, hands empty |
+| `male_upright_walk_forward` / `_forward_left` / `_forward_right` / `_back` (and `female_...`) | the walk ring with a weapon up (the arms then come from the weapon hold) |
+
+The game asks for the BASE names (`upright_walk`, `upright_walk_forward`, ...); each gait's library puts
+that gait's clips under them (`character_gaits.json` `gaits.<m|f>.map`). The plain `upright_walk_forward`
+ring in the file is only the shared source the two were seeded from -- neither sex plays it: it drops the
+hips 20.5 deg, never turns the pelvis, and holds the elbows bent 41 deg with the arms swinging only behind
+the body, which read feminine on Fumiriya.
+
+How they were seeded (`blender/tools/derive_gait.py`, run ONCE; the numbers are its `PROFILES`):
+
+| gait | lower body | arms |
+|---|---|---|
+| male | hips mostly still: drop x0.45 (20.5 -> 9.2 deg), 1 deg pelvic turn each way; feet 35% wider (9.3 -> 12.6 cm) | nearly straight (elbow 10 deg, 24 as the arm comes forward), 13 deg out from the body, swinging from the shoulder front and back (-17..+10 deg), collarbone following 3 deg; the normal walk turns the shoulder line 3 deg with them |
+| female | feet 46% narrower, 2.2 cm weight shift over the standing foot, hip drop x1.15 | the normal walk only: softer elbows (20-30 deg), close to the body, swinging -16..+4 deg, a gentle chest counter-roll; the weapon ring keeps the source arms |
+
+Every clip keeps `spine_03` (chest, head, weapon socket) where the source has it, except the normal walks,
+so aiming is identical between the sexes.
+
+**To make a new body male or female:**
+1. Import and build it as in section 7.
+2. Add its row to `character_gaits.json` `bodies` (and a `crowd_weights` entry if it should be more or
+   less common in the street).
+3. `tools/godot/build_character_visuals.gd -- --body=<b>` (points its AnimationTree at the gait's library)
+   and `tools/godot/bake_ped_vat.gd -- --body=<b>` (the far crowd bakes the gait's normal walk).
+
+**To change how a gait walks:** open `shino.blend`, pick the clip in the Game sidebar, edit it on the rig,
+press Export to Game. Then rebuild the libraries and the crowd bakes:
+```
+godot --headless --path . --script res://tools/godot/build_character_anims.gd
+godot --headless --path . --script res://tools/godot/bake_ped_vat.gd -- --body=<each body>
+```
+`derive_gait.py` never overwrites a clip that exists (it prints KEPT); `--force=<clip>` re-seeds one from
+the source walk and LOSES its edits. A new gait (say an elderly walk) is a new `PROFILES` row, a new `gaits`
+entry pointing at its own library, and its prefix in `build_character_anims.gd`'s `GAIT_PREFIXES`.

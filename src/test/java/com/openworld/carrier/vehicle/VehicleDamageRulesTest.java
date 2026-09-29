@@ -129,4 +129,40 @@ class VehicleDamageRulesTest {
         for (int i = 0; i < 600; i++) { double[] r = stepHinge(a, v, 0.0, 4.0, 1.2, 0.3, 1 / 60.0); a = r[0]; v = r[1]; }
         assertEquals(0.0, v, 1e-3);
     }
+
+    @Test
+    void ordinaryGlassStopsOneLightRoundAndArmourIsAPool() {
+        // ordinary glass: a pistol round (10) or an SMG round stops in it and breaks it
+        assertEquals(0.0, carriedThrough(0, 0, 10), 1e-9);
+        assertEquals(OFF, paneStateFor(10, 0));
+        assertEquals(OFF, paneStateFor(1, 0));                  // a melee blow, a crash: broken too
+        // a rifle round (20) and up go straight through at full damage
+        assertEquals(20.0, carriedThrough(0, 0, 20), 1e-9);
+        assertEquals(150.0, carriedThrough(0, 0, 150), 1e-9);
+        // armoured glass (40): pistol rounds chip it, the fourth uses it up, a sniper round carries 110
+        assertEquals(0.0, carriedThrough(0, 40, 10), 1e-9);
+        assertEquals(DENTED, paneStateFor(30, 40));
+        assertEquals(0.0, carriedThrough(30, 40, 10), 1e-9);
+        assertEquals(OFF, paneStateFor(40, 40));
+        assertEquals(110.0, carriedThrough(0, 40, 150), 1e-9);
+        assertEquals(OK, paneStateFor(0, 40));
+        assertEquals(slotOf("win_lf"), paneSlotOf("door_lf"));
+        assertEquals(slotOf("win_body"), paneSlotOf("chassis"));
+        assertEquals(slotOf("windscreen"), paneSlotOf("windscreen"));
+        assertEquals(-1, paneSlotOf("bonnet"));
+        assertEquals(16, SLOTS.length);                          // the mask is full: 2 bits x 16 in an int
+        assertEquals(10, slotOf("windscreen"));                  // append-only: the old slots did not move
+    }
+
+    @Test
+    void aRayMeetsATriangleFromEitherSideAndLeavesABox() {
+        double[] a = {0, 0, 0}, b = {1, 0, 0}, c = {0, 1, 0};
+        assertEquals(2.0, rayTriangle(new double[]{0.2, 0.2, 2}, new double[]{0, 0, -1}, a, b, c), 1e-9);
+        assertEquals(2.0, rayTriangle(new double[]{0.2, 0.2, -2}, new double[]{0, 0, 1}, a, b, c), 1e-9);
+        assertEquals(-1, rayTriangle(new double[]{0.8, 0.8, 2}, new double[]{0, 0, -1}, a, b, c), 1e-9);
+        assertEquals(-1, rayTriangle(new double[]{0.2, 0.2, 2}, new double[]{0, 0, 1}, a, b, c), 1e-9);   // behind
+        double[] min = {-1, -1, -2}, max = {1, 1, 2};
+        assertEquals(1.5, boxExit(new double[]{-0.5, 0, 0}, new double[]{1, 0, 0}, min, max), 1e-9);
+        assertEquals(0.0, boxExit(new double[]{-5, 5, 0}, new double[]{1, 0, 0}, min, max), 1e-9);
+    }
 }

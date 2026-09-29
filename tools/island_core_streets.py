@@ -59,8 +59,11 @@ STREETS = [
     # straight reach, clear of its 28-32 m corridor; the north-west corner is squared off rather than following the
     # coast's diagonal, which made a 140 deg hairpin -- the triangle beyond it stays field), then the STATION-FRONT road x 1080 (駅前通り, 30 m west of the
     # Main line at x 1110) back south to the nishi_dori x teibo_sokudo junction, which it makes a crossroads.
-    dict(name="nodo_waku", first="nishi_dori", corners=[(510.0, 762.0), (510.0, 1590.0), (1080.0, 1417.0),
-                                                        (1082.0, 820.0), (1088.0, 762.0)],
+    # (2026-09-28) the station-front leg moved x 1080 -> 1045: the kit stations' buildings and car parks reach x 1057
+    # at Farm and Residential North (IslandRailReserve.json), and x 1080 ran through both (probe_road_clear). It now
+    # meets nishi_dori in a T west of Residential North's building instead of at the teibo_sokudo junction.
+    dict(name="nodo_waku", first="nishi_dori", corners=[(510.0, 762.0), (510.0, 1590.0), (1045.0, 1417.0),
+                                                        (1045.0, 820.0), (1046.0, 762.0)],
          last="nishi_dori"),
     # THE INDUSTRY'S FRAME (2026-09-26, the rail batch): the industry grid (island_plan `industry`, 200 m plots) had
     # two anchors, chuo_dori on the west and the coast ring on the east -- and the ring is the 12 m dike now, no
@@ -78,6 +81,16 @@ STREETS = [
     dict(name="kogai_loop", first="ring_kita", corners=[(886.0, -672.0), (886.0, -800.0), (1160.0, -800.0),
                                                        (1161.0, -610.0)],
          last="ring_kita"),
+    # THE CENTRAL STATION'S 駅前ロータリー (user, 2026-09-28: the Tokyo Station placeholder is retired -- Central is the
+    # kit's elevated hub -- and its forecourt gets "parking entrance / bus stop etc like a Japanese central hub"). A
+    # ONE-WAY loop, two lanes, clockwise (Japan keeps left, so a rotary turns clockwise): in from ekimae_dori at x 690,
+    # north, east along y 150 in front of the station, south, out at x 880. A one-way road lays its lanes on the LEFT
+    # of its stations, so the stations are the loop's INNER edge and the 4 m outer footway is the kerb the buses and
+    # taxis stop at (the bus berths on the station side, the taxi rank on the east leg). The inner island and the
+    # plaza, car park and koban round it are the CentralForecourt composite (island_sites.forecourt_site).
+    dict(name="ekimae_rotary", first="ekimae_dori", corners=[(690.0, 100.0), (690.0, 150.0), (880.0, 150.0),
+                                                            (880.0, 100.0)],
+         last="ekimae_dori", one_way=True, lanes=2, walks=(4.0, 2.0), spacing=10.0),
     # (north_e has no authored street: the strip between the Main line and the ring is 120 m wide and every road
     # into it lands on the ring's dike ramp -- an L off nishi_dori at x 1170 made a 43 % pad on the ramp.)
 ]
@@ -134,9 +147,17 @@ def add(net, s, ground):
     tail = _mouth_head(net, t2, c[-2])
     plan = rg.rounded_polygon([head] + list(c[1:-1]) + [tail], CORNER_R, closed=False)
     # the fillet samples its arc every ARC_STEP (30 m): resample the straights too, so a 90 deg corner is not a chord
-    pts = _resample(plan, SPACING) if len(plan) < 4 else _resample(rg.densify(plan, 4.0), SPACING)
+    step = s.get("spacing", SPACING)
+    pts = _resample(plan, step) if len(plan) < 4 else _resample(rg.densify(plan, 4.0), step)
     pts3 = [(x, y, max(0.0, ground.z(x, y) or 0.0)) for x, y in pts]
-    road = chain_road(net, s["name"], pts3, preset="block")
+    road = chain_road(net, s["name"], pts3, preset="block", one_way=s.get("one_way", False))
+    if s.get("one_way"):
+        # a ONE-WAY street (the station rotary): all its lanes run with the chain, on every station (a station's lane
+        # counts are its own, not the base's), and its outer (left) footway is the kerb a bus stops at
+        road.base.lanes_fwd, road.base.lanes_bwd = s.get("lanes", 2), 0
+        road.base.left_walk_width, road.base.right_walk_width = s.get("walks", (4.0, 2.0))
+        for u in road.points:
+            net.points[u].lanes_fwd, net.points[u].lanes_bwd = s.get("lanes", 2), 0
     make_junction(net, t1 + [road.points[0]])
     make_junction(net, t2 + [road.points[-1]])
     for u in road.points:

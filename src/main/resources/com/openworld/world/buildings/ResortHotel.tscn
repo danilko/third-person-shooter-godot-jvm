@@ -1,0 +1,712 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ResortHotel_mesh.res" id="1_oys02"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ResortHotel_collision.res" id="2_ko3in"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_hhgik"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_lrxb6"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_r2kxm"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_vjbra"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_udj8t"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pgk3g"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_605it"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_a3yyb"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_krmai"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_gw5gb"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6dm7n"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_8i6rg"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[node name="ResortHotel" type="Node3D" unique_id=862785456]
+metadata/building = {
+"aabb": [Vector3(-24, -1.2, -19.5), Vector3(48, 18.300001, 39)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [-14.5, 0.0, 3.4],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [0.0, 0.0, 3.4],
+"height": 2.1,
+"module": 1.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [-10.0, 0.0, 3.4],
+"height": 2.1,
+"module": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [3.0, 0.0, -12.4],
+"height": 2.1,
+"module": 3.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "slide",
+"width": 2.4
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [48.0, 39.0],
+"height_m": 18.3,
+"id": "ResortHotel",
+"inner_doors": [{
+"center": [20.63, 14.1, -7.46],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-18.16, 0.0, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-10.0, 0.0, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [11.7, 0.0, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [18.16, 0.0, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-19.4, 4.5, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-13.4, 4.5, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-7.4, 4.5, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-1.4, 4.5, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [4.6, 4.5, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [10.6, 4.5, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [16.6, 4.5, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [22.6, 4.5, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-21.6, 4.5, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-15.6, 4.5, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-9.6, 4.5, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-3.6, 4.5, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [2.4, 4.5, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [8.4, 4.5, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [14.4, 4.5, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [20.4, 4.5, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-18.16, 4.5, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-10.0, 4.5, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [11.7, 4.5, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [18.16, 4.5, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-19.4, 7.7, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-13.4, 7.7, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-7.4, 7.7, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-1.4, 7.7, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [4.6, 7.7, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [10.6, 7.7, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [16.6, 7.7, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [22.6, 7.7, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-21.6, 7.7, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-15.6, 7.7, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-9.6, 7.7, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-3.6, 7.7, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [2.4, 7.7, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [8.4, 7.7, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [14.4, 7.7, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [20.4, 7.7, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-18.16, 7.7, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-10.0, 7.7, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [11.7, 7.7, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [18.16, 7.7, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-19.4, 10.9, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-13.4, 10.9, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-7.4, 10.9, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-1.4, 10.9, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [4.6, 10.9, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [10.6, 10.9, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [16.6, 10.9, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [22.6, 10.9, -5.7],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-21.6, 10.9, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-15.6, 10.9, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-9.6, 10.9, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-3.6, 10.9, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [2.4, 10.9, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [8.4, 10.9, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [14.4, 10.9, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [20.4, 10.9, -4.45],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}, {
+"center": [-18.16, 10.9, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-10.0, 10.9, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [11.7, 10.9, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [18.16, 10.9, -7.5],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [-1.0, 0.0, -8.61],
+"d": 1.8,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 10.9,
+"stops": "0,4.5,7.7,10.9",
+"w": 1.8,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [-3.0, 10.9, -0.1],
+"props": {
+"kind": "objective",
+"note": "the top-floor room (a target / a witness)"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [10.0, 0.0, 15.5],
+"props": {
+"kind": "spawn",
+"team": "guest"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-2.5, 0.0, 1.4],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [-6.0, 4.5, -6.6],
+"props": {
+"kind": "spawn",
+"team": "guest"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [-6.0, 7.7, -6.6],
+"props": {
+"kind": "spawn",
+"team": "guest"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_spawn_05",
+"pos": [-6.0, 10.9, -6.6],
+"props": {
+"kind": "spawn",
+"team": "guest"
+},
+"yaw": 90.0
+}],
+"piece_count": 1,
+"probe_xz": [0.0, -2.5],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "リゾートホテル: four storeys 48 x 16 m, 24 sea-view rooms (balconies and the pool terrace on the FRONT, the scene's +Z), restaurant, lobby, lounge-bar, kitchen, lift, two stairs; the porte-cochère on the land side. Sited on the resort reserves (island_sites.py). kits/interiors/ResortHotel.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 14.1
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=41771978]
+visibility_range_end = 505.2
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_oys02")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1283515034]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1609030490]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.05, 1.05, 3.4)
+shape = SubResource("BoxShape3D_udj8t")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1494728026]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.95, 1.05, 3.4)
+shape = SubResource("BoxShape3D_pgk3g")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=989398463]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 1.05, 3.4)
+shape = SubResource("BoxShape3D_605it")
+
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=247937772]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 3.4)
+shape = SubResource("BoxShape3D_a3yyb")
+
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=1276325757]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.55, 1.05, 3.4)
+shape = SubResource("BoxShape3D_krmai")
+
+[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=815529240]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.45, 1.05, 3.4)
+shape = SubResource("BoxShape3D_gw5gb")
+
+[node name="DoorLeaf6" type="CollisionShape3D" parent="Collision" unique_id=487011849]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 2.4, 1.05, -12.4)
+shape = SubResource("BoxShape3D_6dm7n")
+
+[node name="DoorLeaf7" type="CollisionShape3D" parent="Collision" unique_id=1299585732]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 3.6, 1.05, -12.4)
+shape = SubResource("BoxShape3D_8i6rg")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1274629838]
+shape = ExtResource("2_ko3in")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=2070581239]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=429014142]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1, 0, -8.61)
+script = ExtResource("3_hhgik")
+shaft_width = 1.8
+shaft_depth = 1.8
+rise = 10.9
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_lrxb6")
+glass_material = ExtResource("5_r2kxm")
+floor_material = ExtResource("6_vjbra")
+in_service = true
+stop_heights = "0,4.5,7.7,10.9"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=381344003]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -14.5, 0, 3.4)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=856345666]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 3.4)
+
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=1909253863]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -10, 0, 3.4)
+
+[node name="Door_exit_3" type="Marker3D" parent="." unique_id=987048067]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, -12.4)
+
+[node name="Markers" type="Node3D" parent="." unique_id=787055503]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=759929524 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 10.9, -0.1)
+metadata/note = "the top-floor room (a target / a witness)"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1872031125 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 15.5)
+metadata/team = "guest"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1675276348 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.5, 0, 1.4)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=488375888 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 4.5, -6.6)
+metadata/team = "guest"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=1552726959 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 7.7, -6.6)
+metadata/team = "guest"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=112167103 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -6, 10.9, -6.6)
+metadata/team = "guest"
+metadata/kind = "spawn"

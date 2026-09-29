@@ -23,8 +23,10 @@
 # last baked (`<record stem>.build.json`), or whose scene is missing. Nothing dirty: no Blender at all.
 # Without it every piece is rebuilt, and the manifest is rewritten either way.
 #
-# GLTF_EXTRA passes extra arguments to step 2 -- the rail build uses it to build against the roads:
+# GLTF_EXTRA passes extra arguments to steps 1 and 2 -- the rail build uses it to build against the roads:
 #   GLTF_EXTRA="--avoid <IslandRoads.roads.json> --avoid-ground <IslandRoads.ground.json>"
+# and step 1 hashes what of that other network lies near each piece into the piece's digest
+# (`point_digest.context_of`), so DIRTY_ONLY stays correct across the two networks.
 #
 # Run by the Godot Road Kit plugin's Build button, or by hand. NO_SOLO=1 is set so the shared
 # SoloPiece.tscn host is not re-pointed by a plugin build.
@@ -51,7 +53,8 @@ mkdir -p "$PIECES"
 echo "── 1/3 lane graph (python3)${ZONES:+, cut by zone}"
 TABLE="$(mktemp)"
 trap 'rm -f "$TABLE"' EXIT
-python3 "$BP/tools/roadkit_cli.py" pieces "$RECORD" "${ZONES:-}" "$PIECES" "$PIECE" --ground "${GROUND:-}" > "$TABLE"
+# GLTF_EXTRA goes to `pieces` too: the other network this one is built against is part of each piece's digest
+python3 "$BP/tools/roadkit_cli.py" pieces "$RECORD" "${ZONES:-}" "$PIECES" "$PIECE" --ground "${GROUND:-}" ${GLTF_EXTRA:-} > "$TABLE"
 python3 - "$TABLE" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))

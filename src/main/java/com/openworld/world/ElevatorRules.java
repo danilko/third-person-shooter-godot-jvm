@@ -14,6 +14,10 @@ package com.openworld.world;
  *       close, so they never shut on a body.</li>
  *   <li>Doors shut with somebody who BOARDED on board: the car goes to the next stop. A rider who stays on after
  *       arriving does NOT ride back (no ping-pong); they walk out and in again, or step into the doorway.</li>
+ *   <li>MORE THAN TWO STOPS (an office, a hospital; user 2026-09-28): with no buttons, the car SWEEPS. A boarded
+ *       rider is taken to the next stop in the car's direction, and a rider still aboard when the doors shut again
+ *       is carried on to the next one -- up to the last stop, where the sweep ends (it never turns round with
+ *       somebody standing in it). Step out at the floor you want. Two stops keep the rule above exactly.</li>
  *   <li><b>MOVING</b>: a trapezoid, {@code speed} top, {@code accel} both ends, landing exactly on the stop.</li>
  * </ul>
  * A call is an EVENT (somebody arriving at a landing), not a level: somebody who stays standing at a landing after
@@ -42,6 +46,10 @@ public final class ElevatorRules {
     public final boolean[] call;
     /** the number of trips completed (probe readout) */
     public int trips;
+    /** the sweep's direction: +1 up the stop list, -1 down */
+    public int dir = 1;
+    /** a rider was aboard when the car arrived here (so, with more than two stops, the sweep may carry them on) */
+    public boolean carried;
 
     public ElevatorRules(double[] stops) {
         if (stops.length < 2) throw new IllegalArgumentException("a lift needs two stops");
@@ -74,7 +82,14 @@ public final class ElevatorRules {
         return -1;
     }
 
+    /** The stop a boarded rider is taken to: the next one in the sweep's direction, turning at an end. */
+    private int nextInSweep() {
+        if (stop + dir < 0 || stop + dir >= stops.length) dir = -dir;
+        return stop + dir;
+    }
+
     private void depart(int to) {
+        if (to != stop) dir = to > stop ? 1 : -1;
         target = to;
         boarded = false;
         v = 0;
@@ -117,7 +132,10 @@ public final class ElevatorRules {
                 door = Math.max(0.0, door - dt / doorSeconds);
                 if (door <= 0.0) {
                     if (boarded && riders > 0) {
-                        depart((stop + 1) % stops.length);
+                        depart(nextInSweep());
+                    } else if (carried && riders > 0 && stops.length > 2
+                            && stop + dir >= 0 && stop + dir < stops.length) {
+                        depart(stop + dir);        // still aboard: carried on to the next floor, never back
                     } else {
                         boarded = false;
                         int s = nextCalled();
@@ -141,6 +159,7 @@ public final class ElevatorRules {
                     v = 0;
                     stop = target;
                     trips++;
+                    carried = riders > 0;
                     phase = Phase.OPENING;
                 } else {
                     y += dir * stepLen;

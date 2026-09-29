@@ -1,14 +1,25 @@
-"""Derive the FEMALE walk from the one walk, in the clip .blend (user, 2026-09-27).
+"""SEED the male and female walks from the one walk, in the clip .blend -- once (user, 2026-09-27/28).
 
-    blender -b assets/characters/shino/shino.blend --python blender/tools/derive_gait.py -- [--save] [--check]
+    blender -b assets/characters/shino/shino.blend --python blender/tools/derive_gait.py -- [--save]
+        [--gait=male|m,f] [--force | --force=<clip>,...]
 
-There is ONE walk in the library (`upright_walk_forward` and its ring). Men walk it as it is. A female
-body plays a DERIVED copy, written here as `f_<clip>`, so an edit to the walk flows into both by
-re-running this. `tools/godot/build_character_anims.gd` then writes a second library in which the `f_`
-clips stand under the base names (`blender/tools/character_gaits.json` is the table), and a body's
-`body.json` `gait` picks its library.
+The source walk (`upright_walk_forward` and its ring) drops the hips 20.5 deg with no pelvic rotation and
+carries the arms bent and behind, so neither sex plays it raw. This writes, INTO shino.blend, ordinary
+clips that an artist sees in the Game sidebar and edits on the rig like any other:
 
-What the derivation changes, each measured on the source first (Shino, 2026-09-27):
+    male_upright_walk_forward, _forward_left, _forward_right, _back, male_upright_walk
+    female_upright_walk_forward, _forward_left, _forward_right, _back, female_upright_walk
+
+`<gait>_upright_walk` is the NORMAL walk, hands empty (the AnimationTree's out-of-combat branch plays it);
+the `_forward` ring is the walk with a weapon up. `character_gaits.json` says which body plays which, and
+`tools/godot/build_character_anims.gd` puts each gait's clips under the BASE names in its own library.
+
+It is a SEED, not a build step: a clip already in the file is KEPT, because it may hold an artist's edit.
+`--force` (or `--force=<clip>`) derives it again from the source walk and loses that edit. Each new clip is
+moved onto the Auto-Rig Pro controls (arp_clips.move_to_arp, FK, proved exact by an unedited bake).
+
+What the FEMALE derivation changes, each measured on the source first (Shino, 2026-09-27); the male one
+uses the same steps with less hip drop, a small pelvic turn and the feet pushed WIDER, and re-carries the arms:
   * FEET: the planted feet are 9.3 cm apart and nothing about them reads female. Each foot is moved
     toward the line under the pelvis by `NARROW` -- fully while it is planted, not at all at the top of
     its swing, so the swinging foot still passes AROUND the standing one -- and the leg is re-solved by
@@ -22,8 +33,9 @@ What the derivation changes, each measured on the source first (Shino, 2026-09-2
     head, the weapon socket -- has precisely the transform it had. That is what keeps aim unchanged:
     the aim modifiers correct DIRECTION, never the chest moving under the gun.
 
-A second, RELAXED clip (`f_upright_walk_relaxed-loop`) adds what a feminine walk does above the waist:
-a gentle chest counter-roll and counter-yaw and a wider arm swing. It is played ONLY while no weapon is
+The NORMAL walk (`<prefix>upright_walk-loop`) adds what each walk does above the waist:
+the female a gentle chest counter-roll, the male a shoulder-line turn with his arms; each profile's `arms`
+block re-carries the arms (see PROFILES). It is played ONLY while no weapon is
 raised (AnimationController's relaxed branch), so the steady clips above are what any aim sees.
 
 `--check` re-evaluates the written clips and fails (exit 1) on: spine_03 more than 0.5 deg / 5 mm off the
@@ -43,25 +55,79 @@ import arp_clips  # noqa: E402  (the rig switch and the slotted-action bind have
 SOURCES = ["upright_walk_forward-loop", "upright_walk_forward_left-loop",
            "upright_walk_forward_right-loop", "upright_walk_back-loop"]
 RELAXED_SOURCE = "upright_walk_forward-loop"
-RELAXED_OUT = "f_upright_walk_relaxed-loop"
-PREFIX = "f_"
+NORMAL_WALK = "upright_walk-loop"          # the hands-down walk (the AnimationTree's Relaxed branch plays it)
+LEGACY_PREFIXES = ("f_", "m_")               # the first, regenerated-every-time names; removed on sight
 
-NARROW = 0.46         # fraction of the clip's own planted step width taken out: forward 9.3 cm -> ~5.0 cm.
-                      # A fraction, not metres: the diagonals already plant narrower (6.1-8.1 cm), and a fixed
-                      # 2.15 cm per foot put forward_right's feet 1.8 cm apart, i.e. crossing.
-SHIFT = 0.022          # m the pelvis moves over the standing foot at mid-stance
-ROLL_GAIN = 1.15       # the clip's own hip drop x this (1.35 left the standing leg short of the ground)
+# ONE GAIT PER PROFILE (2026-09-28). The source walk is neither: measured on Shino it drops the hips 20.5 deg
+# peak-to-peak with NO pelvic rotation at all -- a catwalk sway, which is what read wrong on Fumiriya. So a
+# male body plays a derived `m_` copy too; the source clip is only the shared pose the two are made from.
+#   narrow    fraction of the planted step width taken out (female 9.3 cm -> ~5.0 cm); NEGATIVE widens
+#             (male 9.3 cm -> ~12.6 cm)
+#             A fraction, not metres: the diagonals already plant narrower (6.1-8.1 cm), and a fixed
+#             2.15 cm per foot put forward_right's feet 1.8 cm apart, i.e. crossing.
+#   shift     m the pelvis moves over the standing foot at mid-stance
+#   roll_gain the clip's own hip drop x this (1.35 left the standing leg short of the ground)
+#   yaw_deg   peak pelvic ROTATION about the vertical, the hip on the swing side coming forward with its leg
+#   relaxed   whether the gait gets its own relaxed (hands-down) clip; if not, the gait table maps the
+#             relaxed walk onto the gait's forward clip
+#   chest_roll_deg / chest_yaw_deg  relaxed only: the chest's counter-roll against the hip drop, and its
+#             counter-yaw against the ARM swing (the shoulder of the forward-swinging arm comes forward)
+#   arms      the ARM CARRIAGE, or None to keep the source's. The source holds both elbows bent a fixed 41 deg
+#             and swings the upper arm only BEHIND the body (-22..-2 deg), with still shoulders -- a feminine
+#             carriage, and the whole of why the first male walk still read female. Each field:
+#               mean     deg, the upper arm's centre of swing (+ = forward of hanging straight down)
+#               gain     x the source's own swing amplitude (the source's phase is kept)
+#               out      deg the upper arm hangs out from the body
+#               elbow    deg of elbow bend at the back of the swing ...
+#               elbow_fwd  ... plus this much more as the arm comes fully forward
+#               clav_deg deg the collarbone protracts/retracts with its arm's swing (the SHOULDER drives it)
+#               relaxed_only  apply only in the relaxed clip (female: user, the steady walk stays as it is)
+#             The hand keeps its own local pose, so it simply follows the forearm (no extra wrist roll).
+PROFILES = {
+    "f": {"prefix": "female_", "narrow": 0.46, "shift": 0.022, "roll_gain": 1.15, "yaw_deg": 0.0, "relaxed": True,
+          "chest_roll_deg": 2.5, "chest_yaw_deg": 0.0,
+          "arms": {"mean": -6.0, "gain": 1.0, "out": 8.0, "elbow": 20.0, "elbow_fwd": 10.0, "clav_deg": 1.0,
+                   "relaxed_only": True}},
+    # male (user, 2026-09-28): hips mostly still -- barely any turn, a small drop -- and a WIDER stance; the
+    # arms hang nearly straight and swing from the shoulder, evenly in front and behind, a little out from
+    # the body; in the relaxed walk the shoulder line turns a few degrees with the arms.
+    "m": {"prefix": "male_", "narrow": -0.35, "shift": 0.010, "roll_gain": 0.45, "yaw_deg": 1.0, "relaxed": True,
+          "chest_roll_deg": 0.0, "chest_yaw_deg": 3.0,
+          "arms": {"mean": -4.0, "gain": 1.4, "out": 13.0, "elbow": 10.0, "elbow_fwd": 14.0, "clav_deg": 3.0,
+                   "relaxed_only": False}},
+}
+ARMS = None
+NARROW = SHIFT = ROLL_GAIN = YAW_DEG = 0.0   # set from the profile being derived (_use)
+PREFIX = "female_"
+
+
+def _use(profile):
+    global NARROW, SHIFT, ROLL_GAIN, YAW_DEG, PREFIX, ARMS, CHEST_ROLL_DEG, CHEST_YAW_DEG
+    p = PROFILES[profile]
+    ARMS, CHEST_ROLL_DEG, CHEST_YAW_DEG = p.get("arms"), p.get("chest_roll_deg", 0.0), p.get("chest_yaw_deg", 0.0)
+    NARROW, SHIFT, ROLL_GAIN, YAW_DEG, PREFIX = p["narrow"], p["shift"], p["roll_gain"], p["yaw_deg"], p["prefix"]
+    return p
+
 # relaxed-only, above the waist
-CHEST_ROLL_DEG = 2.5   # peak counter-roll of the chest against the hip drop
+CHEST_ROLL_DEG = 0.0   # set per profile (_use)
+CHEST_YAW_DEG = 0.0
 CHEST_YAW_GAIN = 0.25  # chest counter-yaw against the pelvis yaw
-ARM_SWING_GAIN = 1.3   # upper-arm swing about the shoulder
 
 SIDE = Vector((1.0, 0.0, 0.0))       # armature space: +X is the body's LEFT
 FWD = Vector((0.0, -1.0, 0.0))       # -Y is forward
 UP = Vector((0.0, 0.0, 1.0))
 
 KEYED = ["pelvis", "spine_01", "spine_03", "thigh_l", "calf_l", "foot_l", "thigh_r", "calf_r", "foot_r"]
-RELAX_KEYED = KEYED + ["upperarm_l", "upperarm_r"]
+ARM_KEYED = ["clavicle_l", "clavicle_r", "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r"]
+
+
+def _arm_angles(P, s):
+    """(swing, out, elbow) in degrees, armature space: swing + = upper arm forward of straight down."""
+    sg = 1.0 if s == "l" else -1.0
+    sh, el, wr = (P[b + "_" + s][0].translation for b in ("upperarm", "lowerarm", "hand"))
+    u, f = el - sh, wr - el
+    return (math.degrees(math.atan2(-u.y, -u.z)), math.degrees(math.atan2(sg * u.x, -u.z)),
+            math.degrees(u.angle(f)))
 
 
 def _arm():
@@ -183,11 +249,20 @@ def derive(game, src_name, out_name, relaxed=False):
         m = sum(a[:cyc]) / cyc
         swing[s] = [v - m for v in a]
     roll_peak = max(1e-6, max(abs(r - roll_mean) for r in rolls[:cyc]))
+    arm_sw = {s: [_arm_angles(P, s)[0] for P in S] for s in ("l", "r")}
+    arm_mean = {s: sum(arm_sw[s][:cyc]) / cyc for s in arm_sw}
+    arm_peak = max(1e-6, max(abs(v - arm_mean[s]) for s in arm_sw for v in arm_sw[s][:cyc]))
+    do_arms = ARMS is not None and (relaxed or not ARMS["relaxed_only"])
+    # Pelvic rotation: the hip on the side whose foot is FORWARD leads (-Y is forward), peaking at heel strike.
+    lead = [P["foot_r"][0].translation.y - P["foot_l"][0].translation.y for P in S]
+    lead_mean = sum(lead[:cyc]) / cyc
+    lead_peak = max(1e-6, max(abs(v - lead_mean) for v in lead[:cyc]))
+    pyaw = [-math.radians(YAW_DEG) * (v - lead_mean) / lead_peak for v in lead]
 
     act = src.copy()
     act.name = out_name
     act.use_fake_user = False
-    keyed = RELAX_KEYED if relaxed else KEYED
+    keyed = KEYED + (ARM_KEYED if do_arms else [])
     # drop the source's curves for the bones rewritten here; every frame is keyed below
     bag = act.layers[0].strips[0].channelbags[0] if getattr(act, "layers", None) else None
     curves = bag.fcurves if bag is not None else act.fcurves
@@ -203,7 +278,7 @@ def derive(game, src_name, out_name, relaxed=False):
         # 1. pelvis: weight shift over the standing foot + more hip drop, about its own head
         ph = W["pelvis"].translation.copy()
         extra = (ROLL_GAIN - 1.0) * (rolls[i] - roll_mean)
-        R = Quaternion(FWD, extra)             # more of the clip's own hip drop (the check measures that it grew)
+        R = Quaternion(UP, pyaw[i]) @ Quaternion(FWD, extra)   # hip drop scaled, plus the pelvic rotation
         Wp = _about(W["pelvis"], ph, R)
         Wp = Matrix.Translation(SIDE * shift[i]) @ Wp
         # 2. the spine: spine_01 bends so spine_03's head returns; spine_03 keeps its world transform
@@ -218,6 +293,9 @@ def derive(game, src_name, out_name, relaxed=False):
         if relaxed:
             dr = math.radians(CHEST_ROLL_DEG) * (rolls[i] - roll_mean) / roll_peak
             dy = -CHEST_YAW_GAIN * (yaws[i] - yaw_mean)
+            # the shoulder of the forward-swinging arm comes forward (+X is left, -Y forward: a negative turn)
+            dy -= math.radians(CHEST_YAW_DEG) * ((arm_sw["l"][i] - arm_mean["l"]) - (arm_sw["r"][i] - arm_mean["r"])) \
+                / (2 * arm_peak)
             Rc = Quaternion(UP, dy) @ Quaternion(FWD, dr)
             W3 = _about(W3, W3.translation, Rc)
         # 3. legs: each foot toward the centre line while planted, the leg re-solved to reach it
@@ -227,8 +305,13 @@ def derive(game, src_name, out_name, relaxed=False):
             Wc = _fk(game, "calf_" + s, Wt, B["calf_" + s])
             Wf = _fk(game, "foot_" + s, Wc, B["foot_" + s])
             ankle_goal = W["foot_" + s].translation.copy()
-            ankle_goal.x += (mid_x - ankle_goal.x) * min(1.0, narrow / max(1e-6, abs(ankle_goal.x - mid_x))) \
-                * plant[s][i]
+            if narrow >= 0:
+                ankle_goal.x += (mid_x - ankle_goal.x) * min(1.0, narrow / max(1e-6, abs(ankle_goal.x - mid_x))) \
+                    * plant[s][i]
+            else:
+                # WIDEN each foot out on its OWN side (+X is the body's left). Pushing away from the midline
+                # instead flips sign when a diagonal walk's planted foot crosses it, and the foot slides 2 cm.
+                ankle_goal.x += sign * (-narrow) * plant[s][i]
             hip = Wt.translation
             pole = W["calf_" + s].translation - SIDE * (sign * narrow * plant[s][i]) + FWD * 0.3
             knee = _two_bone(hip, Wc.translation, Wf.translation, ankle_goal, pole)
@@ -241,14 +324,31 @@ def derive(game, src_name, out_name, relaxed=False):
             Wf_new = W["foot_" + s].copy()
             Wf_new.translation = _fk(game, "foot_" + s, Wc, B["foot_" + s]).translation
             Wl[s] = (Wt, Wc, Wf_new)
-        # 4. relaxed: a wider arm swing about each shoulder, in the travel plane
+        # 4. the arm carriage: collarbone with its arm's swing, then the upper arm aimed at its new swing/out,
+        #    then the elbow opened to its new bend in the arm's own plane; the hand follows in its own pose
         arms = {}
-        if relaxed:
-            for s in ("l", "r"):
+        if do_arms:
+            A = ARMS
+            for s, sg in (("l", 1.0), ("r", -1.0)):
+                ph = (arm_sw[s][i] - arm_mean[s]) / arm_peak               # -1 back .. +1 forward
                 Wcl = _fk(game, "clavicle_" + s, W3, B["clavicle_" + s])
+                Wcl = _about(Wcl, Wcl.translation, Quaternion(UP, -sg * math.radians(A["clav_deg"]) * ph))
                 Wu = _fk(game, "upperarm_" + s, Wcl, B["upperarm_" + s])
-                Ra = Quaternion(SIDE, (ARM_SWING_GAIN - 1.0) * swing[s][i])
-                arms[s] = (Wcl, _about(Wu, Wu.translation, Ra))
+                Wlo = _fk(game, "lowerarm_" + s, Wu, B["lowerarm_" + s])
+                sw = math.radians(A["mean"] + A["gain"] * (arm_sw[s][i] - arm_mean[s]))
+                out = math.radians(A["out"])
+                t = Vector((sg * math.tan(out), -math.tan(sw), -1.0)).normalized()
+                Wu = _about(Wu, Wu.translation, _arc(Wlo.translation - Wu.translation, t))
+                Wlo = _fk(game, "lowerarm_" + s, Wu, B["lowerarm_" + s])
+                Wh = _fk(game, "hand_" + s, Wlo, B["hand_" + s])
+                u = Wlo.translation - Wu.translation
+                fv = Wh.translation - Wlo.translation
+                bend = math.degrees(u.angle(fv))
+                goal = A["elbow"] + A["elbow_fwd"] * max(0.0, ph)
+                axis = fv.cross(u)
+                if axis.length > 1e-6:
+                    Wlo = _about(Wlo, Wlo.translation, Quaternion(axis.normalized(), math.radians(bend - goal)))
+                arms[s] = (Wcl, Wu, Wlo)
         # 5. write the bases, keyed on this frame
         pbs = game.pose.bones
         pbs["pelvis"].matrix_basis = _basis(game, "pelvis", Wp, W["Root"])
@@ -259,9 +359,11 @@ def derive(game, src_name, out_name, relaxed=False):
             pbs["thigh_" + s].matrix_basis = _basis(game, "thigh_" + s, Wt, Wp)
             pbs["calf_" + s].matrix_basis = _basis(game, "calf_" + s, Wc, Wt)
             pbs["foot_" + s].matrix_basis = _basis(game, "foot_" + s, Wf, Wc)
-            if relaxed:
-                Wcl, Wu = arms[s]
+            if do_arms:
+                Wcl, Wu, Wlo = arms[s]
+                pbs["clavicle_" + s].matrix_basis = _basis(game, "clavicle_" + s, Wcl, W3)
                 pbs["upperarm_" + s].matrix_basis = _basis(game, "upperarm_" + s, Wu, Wcl)
+                pbs["lowerarm_" + s].matrix_basis = _basis(game, "lowerarm_" + s, Wlo, Wu)
         for b in keyed:
             pb = pbs[b]
             pb.keyframe_insert("rotation_quaternion", frame=f, group=b)
@@ -289,7 +391,7 @@ def derive(game, src_name, out_name, relaxed=False):
     return act
 
 
-def check(game, src_name, out_name, relaxed=False):
+def check(game, src_name, out_name, relaxed=False, profile="f"):
     """Fail on anything that would reach the aim or read as a broken walk."""
     src, out = bpy.data.actions[src_name], bpy.data.actions[out_name]
     f0, f1 = int(round(src.frame_range[0])), int(round(src.frame_range[1]))
@@ -314,8 +416,10 @@ def check(game, src_name, out_name, relaxed=False):
     def planted_width(S):
         return S[lowest["l"]]["foot_l"][0].translation.x - S[lowest["r"]]["foot_r"][0].translation.x
     wa, wb = planted_width(A), planted_width(B)
-    if not wb < wa - 0.02:
+    if NARROW > 0 and not wb < wa - 0.02:
         errs.append("planted feet %.3f m apart, source %.3f: not narrower" % (wb, wa))
+    if NARROW < 0 and not wb > wa + 0.015:
+        errs.append("planted feet %.3f m apart, source %.3f: not wider" % (wb, wa))
 
     def slide(S, s):
         pts = [S[i]["foot_" + s][0].translation for i in planted[s]]
@@ -326,39 +430,92 @@ def check(game, src_name, out_name, relaxed=False):
     side = [P["pelvis"][0].translation.x for P in B]
     ra = [_hip_roll(P) for P in A]; rb = [_hip_roll(P) for P in B]
     roll_a, roll_b = math.degrees(max(ra) - min(ra)), math.degrees(max(rb) - min(rb))
-    if not relaxed and not roll_b > roll_a * 1.08:
+    if not relaxed and ROLL_GAIN > 1 and not roll_b > roll_a * 1.08:
         errs.append("hip drop %.1f deg, source %.1f: not larger" % (roll_b, roll_a))
+    if not relaxed and ROLL_GAIN < 1 and not roll_b < roll_a * (ROLL_GAIN + 0.15):
+        errs.append("hip drop %.1f deg, source %.1f: not reduced to ~x%.2f" % (roll_b, roll_a, ROLL_GAIN))
+    ya = [_pelvis_yaw(P) for P in A]; yb = [_pelvis_yaw(P) for P in B]
+    yaw_b = math.degrees(max(yb) - min(yb))
+    if YAW_DEG > 0 and not yaw_b < math.degrees(max(ya) - min(ya)) + 2 * YAW_DEG + 1.0:
+        errs.append("pelvic rotation %.1f deg peak-to-peak, wanted at most ~%.1f" % (yaw_b, 2 * YAW_DEG))
+    arm_b = [_arm_angles(P, "l") for P in B]
+    arm_txt = " | arm swing %.0f..%.0f out %.0f elbow %.0f..%.0f" % (
+        min(x[0] for x in arm_b), max(x[0] for x in arm_b), sum(x[1] for x in arm_b) / len(arm_b),
+        min(x[2] for x in arm_b), max(x[2] for x in arm_b))
     upper = max(abs(math.degrees(a["upperarm_l"][0].to_quaternion().rotation_difference(
         b["upperarm_l"][0].to_quaternion()).angle)) for a, b in zip(A, B))
     print("[gait] %-34s spine_03 %.2f deg %.4f m | feet %.3f -> %.3f m | pelvis side %.3f m | hip drop %.1f -> %.1f deg"
-          " | arm %.1f deg%s" % (out_name, worst_rot, worst_pos, wa, wb, max(side) - min(side), roll_a, roll_b, upper, " (relaxed)" if relaxed else ""))
+          " | hip rotation %.1f -> %.1f deg | arm %.1f deg%s" % (out_name, worst_rot, worst_pos, wa, wb, max(side) - min(side), roll_a, roll_b,
+          math.degrees(max(ya) - min(ya)), yaw_b, upper, (" (relaxed)" if relaxed else "") + arm_txt))
     return errs
 
 
+def _drop(name):
+    """Remove a clip: its game action, its NLA track and its rig copy."""
+    _, game = _arm()
+    ad = game.animation_data
+    for t in list(ad.nla_tracks):
+        if t.name == name or any(st.action is not None and st.action.name == name for st in t.strips):
+            ad.nla_tracks.remove(t)
+    for n in (name, arp_clips.PREFIX + name):
+        if n in bpy.data.actions:
+            bpy.data.actions.remove(bpy.data.actions[n])
+
+
 def main():
+    """A ONE-TIME SEED (user, 2026-09-28: "bake into the master blend, so an artist sees it in Blender"):
+    each gait clip is written ONCE, moved onto the Auto-Rig Pro controls like every other clip, and from
+    then on it is an ordinary clip in shino.blend -- listed in the Game sidebar, edited on the rig, exported
+    by the Export button. A clip that already exists is KEPT (it may carry an artist's edit); `--force`
+    (or `--force=<clip>,...`) derives it again from the source walk, throwing that edit away."""
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     rig, game = _arm()
+    only = next(([{"male": "m", "female": "f"}.get(x, x) for x in a.split("=", 1)[1].split(",")]
+                 for a in argv if a.startswith("--gait=")), list(PROFILES))
+    force_arg = next((a for a in argv if a.startswith("--force")), None)
+    force_all = force_arg == "--force"
+    force_some = set(force_arg.split("=", 1)[1].split(",")) if force_arg and "=" in force_arg else set()
+    for old in [a.name for a in bpy.data.actions if a.name.startswith(LEGACY_PREFIXES)
+                or a.name.startswith(tuple(arp_clips.PREFIX + p for p in LEGACY_PREFIXES))]:
+        if old in bpy.data.actions:
+            name = old[len(arp_clips.PREFIX):] if old.startswith(arp_clips.PREFIX) else old
+            _drop(name)
+            print("[gait] removed the old generated clip %s" % name)
+
     arp_clips._drive(rig, 0.0)                 # the body plays its own clips, not the rig
     use_nla, game.animation_data.use_nla = game.animation_data.use_nla, False
-    made = []
-    for name in SOURCES:
-        if name not in bpy.data.actions:
-            print("[gait] no %s -- skipped" % name)
-            continue
-        out = PREFIX + name
-        if out in bpy.data.actions:
-            bpy.data.actions.remove(bpy.data.actions[out])
-        derive(game, name, out)
-        made.append((name, out, False))
-    if RELAXED_OUT in bpy.data.actions:
-        bpy.data.actions.remove(bpy.data.actions[RELAXED_OUT])
-    derive(game, RELAXED_SOURCE, RELAXED_OUT, relaxed=True)
-    made.append((RELAXED_SOURCE, RELAXED_OUT, True))
-    errs = []
-    for src, out, rel in made:
-        errs += ["%s: %s" % (out, e) for e in check(game, src, out, rel)]
+    made, kept, errs = [], [], []
+    for g in only:
+        p = _use(g)
+        jobs = [(name, PREFIX + name, False) for name in SOURCES if name in bpy.data.actions]
+        if p["relaxed"]:
+            jobs.append((RELAXED_SOURCE, PREFIX + NORMAL_WALK, True))
+        for src, out, rel in jobs:
+            short = out[:-5] if out.endswith("-loop") else out
+            exists = out in bpy.data.actions or (arp_clips.PREFIX + out) in bpy.data.actions
+            if exists and not (force_all or out in force_some or short in force_some):
+                kept.append(out)
+                continue
+            _drop(out)
+            derive(game, src, out, relaxed=rel)
+            errs += ["%s: %s" % (out, e) for e in check(game, src, out, rel, g)]
+            made.append(out)
     game.animation_data.use_nla = use_nla
     arp_clips._bind(game, None)
+    for out in kept:
+        print("[gait] KEPT %s (already in the file -- it may hold an edit; --force=%s to derive it again)" % (out, out))
+    for e in errs:
+        print("[gait] FAIL " + e)
+    if errs:
+        arp_clips._drive(rig, 1.0)
+        sys.exit(1)
+    # onto the rig, like every clip: an unedited bake must write 0 keys, i.e. the rig reproduces it exactly
+    for out in made:
+        arp_clips.move_to_arp(out, to_ik=False)
+        n = arp_clips.bake_to_game(out, force=True)
+        print("[gait] %s on the rig: %s" % (out, "exact" if n == 0 else "%d keys differ" % n))
+        if n != 0:
+            errs.append("%s: the rig does not reproduce it (%d keys)" % (out, n))
     arp_clips._drive(rig, 1.0)                 # the file opens in ARP (game_export_ui's rule)
     for e in errs:
         print("[gait] FAIL " + e)
@@ -367,7 +524,7 @@ def main():
     if "--save" in argv:
         bpy.ops.wm.save_mainfile()
         print("[gait] saved %s" % bpy.data.filepath)
-    print("[gait] PASS %d clip(s)" % len(made))
+    print("[gait] PASS %d clip(s) derived, %d kept" % (len(made), len(kept)))
 
 
 if __name__ == "__main__":

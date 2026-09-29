@@ -9,7 +9,8 @@
 # (never edited in place), which is what makes it restorable: there is no stamp to undo, only a base to start from.
 #
 #   land       island_reshape.py build + check              -> assets/world_source/terrain/island_land.f32
-#   layout     island_rail_layout.py --reserve ; island_layout.py ; island_rail_record.py
+#   layout     island_rail_layout.py --reserve ; island_layout.py (each generator step replayed from
+#              tools/layout_cache.py when its input, code and data are unchanged) ; island_rail_record.py ; the civic-plot check
 #                                                           -> IslandRoads.roads.json (from the arterials INPUT),
 #                                                              IslandRail.roads.json (the rail, from the rail plan)
 #   bridge     island_rainbow_bridge.py                     -> World.tscn's Rainbow Bridge on the plan's crossing
@@ -18,8 +19,9 @@
 #   terrain    apply_height_grid.gd (every vertex) ; the road stamp record, the natural-ground sidecar and the urban
 #              paint marker removed (none of them describes this ground) ; paint_terrain.gd
 #   roads      island_rebuild.sh --no-layout (ground sidecar, zones, pieces, stamp, traffic zones, road map)
-#   sites      building_kit/build_stations.sh (the station scenes) ; island_sites.py (the FROZEN sites;
-#              re-search by hand with --resite)
+#   sites      building_kit/build_stations.sh (the station scenes; only the stations whose layout or kit changed
+#              since their last passing build, station_digest.py) ; island_sites.py (the FROZEN sites; re-search by
+#              hand with --resite)
 #   buildings  dump the stamped terrain ; island_buildings.py derive + write ; build_building_hlod.gd
 #   ground     dump ; island_ground.py derive ; apply_height_grid.gd + apply_paint_grid.gd
 #
@@ -50,29 +52,37 @@ idx() { local i; for i in "${!STAGES[@]}"; do [[ ${STAGES[$i]} == "$1" ]] && { e
 LO=$(idx "$FROM"); HI=$(idx "$TO")
 want() { local i; i=$(idx "$1"); (( i >= LO && i <= HI )); }
 godot() { timeout -k 5 "$1" stdbuf -oL "$G" --headless --path . --script "${@:2}"; }
+# every stage prints how long the one before it took, so a slow iteration can be traced to its stage
+T0=$SECONDS; LAST=""
+stage() { [ -n "$LAST" ] && printf "   (%s: %d s)\n" "$LAST" $((SECONDS - T0)); T0=$SECONDS; LAST=$1; echo "── $1"; }
 
 if want land; then
-    echo "── land"
+    stage land
     python3 tools/island_reshape.py build | tail -2
 fi
 if want layout; then
-    echo "── layout"
+    stage layout
     # the rail reserve (PLAN.md B10) is a function of the LAND (its profile follows the ground), and the street
     # planner and the building derive both read it -- so it is written here, after land and before anything else
     python3 tools/island_rail_layout.py --layout tokyo_straight --reserve | tail -1
     python3 tools/island_layout.py | grep -E "^island_layout|^island_grades|^island_dike|^island_streets" | tail -40
     # the rail record (PLAN.md 3.25 R2): its level crossings take the ROADS' heights, so it follows the layout
     python3 tools/island_rail_record.py | tail -3
+    # the civic plots (user, 2026-09-28) must still front a road and have no road through them on the new layout
+    python3 tools/island_civic_sites.py --check || echo "WARNING: a civic plot lost its road -- re-site it (--resite=<id>)"
+    # the station forecourt's composite is derived from the rotary and its reserve: it must match them
+    python3 tools/building_kit/site_central_forecourt.py --check || echo "WARNING: CentralForecourt is stale -- run tools/building_kit/site_central_forecourt.py and build_buildings.sh"
+    python3 tools/building_kit/site_airport_forecourt.py --check || echo "WARNING: AirportForecourt is stale -- run tools/building_kit/site_airport_forecourt.py and build_buildings.sh"
     # every street's real Japanese name (the signal plates, the minimap), and the font subset that draws them
     python3 tools/island_street_names.py | tail -1
     python3 tools/make_jp_font.py --check >/dev/null 2>&1 || python3 tools/make_jp_font.py | tail -1
 fi
 if want bridge; then
-    echo "── bridge"
+    stage bridge
     python3 tools/island_rainbow_bridge.py | tail -2
 fi
 if want natural; then
-    echo "── natural"
+    stage natural
     python3 tools/island_touges.py sculpt "$T/island_land.f32" "$P/IslandRoads.roads.json" "$TMP/sculpted.f32"
     python3 tools/island_coast.py zones
     # the beach and its shelf are the land stage's now (island_reshape.coastal_works lays them in front of the seawall,
@@ -81,7 +91,7 @@ if want natural; then
     python3 tools/island_dike.py sculpt "$TMP/sculpted.f32" "$P/IslandRoads.roads.json" "$T/island_natural.f32"
 fi
 if want terrain; then
-    echo "── terrain"
+    stage terrain
     godot 900 tools/godot/apply_height_grid.gd -- "$D" "$T/island_natural.f32" -2304 -2304 2305 2305 2 | tail -2
     rm -f "$P/IslandRoads.stamp.json" "$P/IslandRoads.ground.bin" "$P/IslandRoads.ground.json" \
           "$P/IslandRail.stamp.json" "$P/IslandRail.ground.bin" "$P/IslandRail.ground.json" \
@@ -89,17 +99,17 @@ if want terrain; then
     godot 900 tools/godot/paint_terrain.gd -- "$D" | tail -2
 fi
 if want roads; then
-    echo "── roads"
+    stage roads
     tools/island_rebuild.sh --no-layout
 fi
 if want sites; then
-    echo "── sites"
+    stage sites
     # the station scenes first (PLAN.md step 3): each open-air station's layout reads the ends the rail reserve chose
     tools/building_kit/build_stations.sh
     python3 tools/island_sites.py | tail -2
 fi
 if want buildings; then
-    echo "── buildings"
+    stage buildings
     # the placement reads the STAMPED terrain; once the ground stage has laid the block ground over it every lot reads
     # as buried (a `--from buildings` after a full run placed 92 buildings of 3 897) -- start from `terrain` instead
     if [ -e assets/terrain3d/island/urban_paint.marker ]; then
@@ -110,10 +120,12 @@ if want buildings; then
     [ -n "${KEEP_DUMPS:-}" ] && cp "$TMP/stamped.f32" "$KEEP_DUMPS/" || true
     python3 tools/island_buildings.py derive "$TMP/stamped.f32" | tail -4
     python3 tools/island_buildings.py write | tail -2
+    # no building stands on a road band at any height -- under C1's deck included (2026-09-29)
+    python3 tools/island_buildings.py roads || echo "WARNING: a building stands on a road -- see the list above"
     godot 600 tools/godot/build_building_hlod.gd | tail -1      # R9: each cell's HLOD, from write's boxes
 fi
 if want ground; then
-    echo "── ground"
+    stage ground
     godot 900 tools/godot/dump_height_grid.gd -- "$TMP/before_ground.f32" -2304 -2304 2305 2305 2 | tail -1
     [ -n "${KEEP_DUMPS:-}" ] && cp "$TMP/before_ground.f32" "$KEEP_DUMPS/" || true
     python3 tools/island_ground.py derive "$TMP/before_ground.f32" --out "$TMP/block" | tail -3
@@ -122,4 +134,4 @@ if want ground; then
     # 5 = Soil, the paddy fields (a second pass, no heights: it only paints, it leaves the block layer alone)
     godot 900 tools/godot/apply_paint_grid.gd -- "$D" "$TMP/block.soil.u8" -2304 -2304 2305 2305 2 5 | tail -1
 fi
-echo "── done"
+stage done

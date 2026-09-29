@@ -19,6 +19,14 @@ extends SceneTree
 ## `-- --control` puts a 0.5 m box across the first crossing: check 3 must FAIL there.
 
 const WORLD := "res://src/main/resources/com/openworld/world/World.tscn"
+## -- --world=debug: DebugWorld's DebugRail line (tools/debug_world_layout.py), its stations from the layout file
+const DEBUG_WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
+const DEBUG_LAYOUT := "res://assets/world_source/debug_world_layout.json"
+var debug := false
+var rail_prefix := "Roads_IslandRail_"
+var road_prefix := "Roads_IslandRoads_island_"
+var roads_node_name := "IslandRoads"
+var rail_node_name := "IslandRail"
 const PIECES := "res://assets/world_source/pieces/%s.lanekit.json"
 const RESERVE := "res://assets/world_source/buildings/IslandRailReserve.json"
 const WORLD_MASK := 1
@@ -45,8 +53,28 @@ func _ray_down(at: Vector3) -> Dictionary:
 	var q := PhysicsRayQueryParameters3D.create(at + Vector3(0, 6, 0), at - Vector3(0, 6, 0), WORLD_MASK)
 	return w.get_world_3d().direct_space_state.intersect_ray(q)
 
+## The stations as the reserve's boxes: {id, x, y (record), z (rail head over the network), ux, uy, h_along, h_across}.
+func _station_boxes() -> Array:
+	if not debug:
+		var res = JSON.parse_string(FileAccess.get_file_as_string(RESERVE))
+		return (res["boxes"] as Array).filter(func(b): return str(b["id"]).begins_with("station:"))
+	var out := []
+	var lay = JSON.parse_string(FileAccess.get_file_as_string(DEBUG_LAYOUT))
+	for st in lay["stations"]:
+		var yaw := deg_to_rad(float(st["yaw_deg"]))
+		# a scene yaw t sends local +X to (cos t, 0, -sin t): the record axis is (cos t, sin t)
+		out.append({"id": "station:" + str(st["name"]), "x": float(st["pos"][0]), "y": -float(st["pos"][2]),
+				"z": float(st["pos"][1]) + 0.16, "ux": cos(yaw), "uy": sin(yaw), "h_along": 45.0, "h_across": 10.0})
+	return out
+
 func _initialize() -> void:
-	w = (load(WORLD) as PackedScene).instantiate()
+	debug = "--world=debug" in OS.get_cmdline_user_args()
+	if debug:
+		rail_prefix = "Roads_DebugRail_"
+		road_prefix = "Roads_DebugRoads_"
+		roads_node_name = "DebugRoads"
+		rail_node_name = "DebugRail"
+	w = (load(DEBUG_WORLD if debug else WORLD) as PackedScene).instantiate()
 	var control := "--control" in OS.get_cmdline_user_args()
 	var markers := []
 	_collect(w, "ZoneMarker.java", markers)
@@ -59,9 +87,9 @@ func _initialize() -> void:
 			continue
 		var gp := str(z.get("geometry_path"))
 		var file := gp.get_file()
-		if file.begins_with("Roads_IslandRail_"):
+		if file.begins_with(rail_prefix):
 			rail_pieces.append([gp, z.get("geometry_world_transform")])
-		elif file.begins_with("Roads_IslandRoads_island_"):
+		elif file.begins_with(road_prefix):
 			road_pieces.append([gp, z.get("geometry_world_transform")])
 		elif gp != "" and gp != "<null>" and ResourceLoader.exists(gp):
 			# building cells, sites, landmarks: the train's gauge must be clear of them too (check 5)
@@ -170,7 +198,7 @@ func _initialize() -> void:
 	print("probe_rail_track: %d crossing(s) found at %d ms" % [crossings.size(), Time.get_ticks_msec()])
 	# the lanekit heights are in the NETWORK's frame: the road network node's own Y lifts them into the world
 	var rn_y := 0.0
-	var roads_node := w.get_node_or_null("IslandRoads") as Node3D
+	var roads_node := w.get_node_or_null(roads_node_name) as Node3D
 	if roads_node != null:
 		rn_y = roads_node.position.y
 	var proud := []
@@ -183,16 +211,14 @@ func _initialize() -> void:
 			"%d crossing(s) %s" % [crossings.size(), str(proud.slice(0, 4))])
 
 	# 4. platforms
-	var res = JSON.parse_string(FileAccess.get_file_as_string(RESERVE))
-	var ny := 5.6
-	var rn := w.get_node_or_null("IslandRail") as Node3D
+	var boxes := _station_boxes()
+	var ny := 0.0 if debug else 5.6
+	var rn := w.get_node_or_null(rail_node_name) as Node3D
 	if rn != null:
 		ny = rn.position.y
 	var bad := []
 	var nst := 0
-	for bx in res["boxes"]:
-		if not str(bx["id"]).begins_with("station:"):
-			continue
+	for bx in boxes:
 		nst += 1
 		var ux := float(bx["ux"])
 		var uy := float(bx["uy"])
@@ -210,14 +236,33 @@ func _initialize() -> void:
 	check("every station has a platform each side, 1.1-1.4 m over the bed", nst > 0 and bad.is_empty(),
 			"%d station(s) %s" % [nst, str(bad.slice(0, 6))])
 	# 5. THE TRAIN'S GAUGE (user, 2026-09-26: "no tree/lamp/other in the middle of the rail"): along every track, every
-	# 2 m, a box the size of a train (2.7 m wide, 0.5-4.2 m over the bed, the platforms' edges 1.5 m out stay clear)
+	# 2 m, a box the size of a train (3.0 m wide, 0.5-4.25 m over the bed; the platforms' edges 1.55 m out stay clear)
 	# must touch nothing solid -- a pole, a tree trunk, a building, a road's barrier or pier.
 	var rail_y := ny
-	var gauge := BoxShape3D.new()
-	gauge.size = Vector3(2.7, 3.7, 1.6)
-	var gq := PhysicsShapeQueryParameters3D.new()
-	gq.shape = gauge
-	gq.collision_mask = WORLD_MASK | 32
+	# the gauge is the TRAIN's (blender/tools/make_train.py's EMU1, the largest standard 1067 mm car): its width over
+	# the doors and its height to the folded pantograph, rounded up to 5 cm (3.0 x 4.25 m over the bed; was 2.7 x 3.7)
+	var tr = JSON.parse_string(FileAccess.get_file_as_string("res://assets/vehicles/trains/EMU1.train.json"))
+	# the gauge follows the CAR'S PROFILE (EMU1.train.json `profile`: half width by height over the rail head), in
+	# two bands: BELOW the platform line (platform top + 0.1 m) the car is only as wide as its profile there -- 1.44 m
+	# a side at the sill, 0.11 m inside a platform edge 1.55 m from its track -- and ABOVE it the full width over the
+	# doors (1.49 m). One box at the door width from 0.5 m up touched every island platform at Central along its whole
+	# length (the real train, probe_train_fit, clears them by 0.11 m).
+	var pline := 1.26 + 0.1                       # station_layout.PLATFORM_H over the bed, + 0.1 m
+	var low_half := 0.0
+	for pr in tr["profile"]:
+		if float(pr[1]) + 0.16 <= pline + 0.05:
+			low_half = maxf(low_half, float(pr[0]))
+	var g_top := ceilf((float(tr["height_m"]) + 0.16) * 20.0) / 20.0
+	var bands := [[2.0 * low_half, 0.5, pline], [2.0 * float(tr["half_width_m"]), pline, g_top]]
+	var gqs := []
+	for bd in bands:
+		var gb := BoxShape3D.new()
+		gb.margin = 0.001
+		gb.size = Vector3(float(bd[0]), float(bd[2]) - float(bd[1]), 1.6)
+		var q := PhysicsShapeQueryParameters3D.new()
+		q.shape = gb
+		q.collision_mask = WORLD_MASK | 32
+		gqs.append([q, (float(bd[1]) + float(bd[2])) / 2.0])
 	var in_gauge := {}
 	var gauge_samples := 0
 	for l in rail_ids:
@@ -233,9 +278,12 @@ func _initialize() -> void:
 			var steps := int(ceil(a.distance_to(b) / 2.0))
 			for k in steps:
 				var p := a.lerp(b, float(k) / max(1, steps))
-				gq.transform = Transform3D(Basis(Vector3.UP, yaw), p + Vector3(0, 0.5 + 1.85, 0))
 				gauge_samples += 1
-				for hit in w.get_world_3d().direct_space_state.intersect_shape(gq, 4):
+				var hits := []
+				for g in gqs:
+					(g[0] as PhysicsShapeQueryParameters3D).transform = Transform3D(Basis(Vector3.UP, yaw), p + Vector3(0, g[1], 0))
+					hits.append_array(w.get_world_3d().direct_space_state.intersect_shape(g[0], 4))
+				for hit in hits:
 					var col = hit["collider"]
 					var owner_name := str(col.name)
 					var n := col as Node
@@ -243,7 +291,14 @@ func _initialize() -> void:
 						n = n.get_parent()
 					var key := "%s/%s" % [str(n.name) if n != null else "?", owner_name]
 					if not in_gauge.has(key):
-						in_gauge[key] = "%s @ (%.0f, %.1f, %.0f)" % [l["id"], p.x, p.y, p.z]
+						# name the SHAPE too, and where it stands: a building's one "Collision" body holds hundreds
+						var so := ""
+						if col is CollisionObject3D:
+							var ow = (col as CollisionObject3D).shape_owner_get_owner(
+								(col as CollisionObject3D).shape_find_owner(int(hit["shape"])))
+							if ow is Node3D:
+								so = " shape %s at %s" % [ow.name, str((ow as Node3D).global_position.snapped(Vector3(0.1, 0.1, 0.1)))]
+						in_gauge[key] = "%s @ (%.0f, %.1f, %.0f)%s" % [l["id"], p.x, p.y, p.z, so]
 	var gl := []
 	for k in in_gauge:
 		gl.append("%s [%s]" % [k, in_gauge[k]])
@@ -253,10 +308,7 @@ func _initialize() -> void:
 
 	# 6. every track END is at a station: a lane with no successor must stop inside a station's platform box (its
 	# buffer stop), never out on open track
-	var stations := []
-	for bx in res["boxes"]:
-		if str(bx["id"]).begins_with("station:"):
-			stations.append(bx)
+	var stations := boxes
 	var loose := []
 	for l in rail_ids:
 		if not (l.get("next", []) as Array).is_empty():

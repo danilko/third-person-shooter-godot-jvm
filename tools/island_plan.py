@@ -86,7 +86,8 @@ NEW_ROADS_GODOT = [
                                     (-1300, 700), (-1380, 480), (-1420, 330)]),
     # the bay (v1): the bay trunk E-W, the quay road, the Central -> Bay avenue, the suburb loop, the castle approach
     ("wangan_dori", "trunk", True, [(-160, 420), (300, 430), (880, 430), (1120, 560)]),
-    ("hatoba_dori", "block", True, [(320, 735), (860, 735)]),
+    # hatoba_dori (320, 735) -> (860, 735) was removed 2026-09-28 (user: no clear job, a hill between the two dike
+    # stretches; tools/island_remove_hatoba.py took it out of the arterials input)
     ("eki_minami_dori", "trunk", True, [(580, -300), (580, 760)]),
     ("kogai_michi", "block", True, [(930, 420), (1000, 700), (1200, 850)]),
     ("jokamachi_dori", "block", False, [(-610, 20), (-610, 360)]),     # the castle (frozen at (-600, 40)) south to nishi_dori
@@ -267,7 +268,8 @@ STREET_REGIONS = (
     # (2026-09-26, fifty-sixth session) the west road x 510, the station-front road x 1080 and the 農道 along the
     # dike's foot are ONE authored road now, `nodo_waku` (island_core_streets.py): since the ring became the dike no
     # farm line could end on it, and the whole grid was dropped. farm_w is gone; the rows end on the frame's legs, and
-    # the old 1395 row is dropped (the frame's north leg runs 23 m north of it at x 1080)
+    # the old 1395 row is dropped (the frame's north leg runs 23 m north of it at x 1080). The station-front leg is at
+    # x 1045 since 2026-09-28 (clear of the stations' buildings and car parks).
     ("farm", (400.0, 700.0, 1090.0, 1570.0), "farm", (), (920.0, 1220.0, 1320.0)),   # ends at the station-front road
     ("farm_s", (700.0, 700.0, 1100.0, 925.0), "farm", (810.0,), ()),
     ("farm_n", (700.0, 1215.0, 1300.0, 1570.0), "farm", (810.0,), ()),
@@ -284,15 +286,53 @@ STREET_REGIONS = (
 #: (x0, z0, x1, z1) that no generated BUILDING may stand on -- their contents are placed later, by region, once
 #: their models exist. Streets are not kept out (a park may have a road through it; the base has its own).
 RESERVES = (
-    ("military_base", (-760.0, 1240.0, -440.0, 1540.0)),      # SW corner of the port (gate, apron, hangars, the
-                                                               # air base's small terminal and control tower)
-    ("military_airfield", (-1650.0, 1540.0, -440.0, 1760.0)),  # the runway strip: a 1 200 x 45 m runway + taxiway
+    # the COMPACT air/naval base (user, 2026-09-28): the core at the platform's south-west corner, its gate on the east
+    # side facing the gate road (kichi_mon_michi, x -460), the runway along the platform's own south band abutting the
+    # core's apron, the one pier (with its berth) at the core's west edge -- everything within ~300 m
+    ("military_base", (-760.0, 1250.0, -475.0, 1480.0)),
+    ("military_airfield", (-1260.0, 1485.0, -720.0, 1535.0)),   # offshore, west of the base (island_reshape)
+    ("military_pier", (-1020.0, 1301.0, -740.0, 1371.0)),     # the pier (z 1300..1350) + the ship's berth south of it
+                                                               # (centred on z 1336: the MilitaryPier composite's frame)
     ("waterfront_park", (760.0, 700.0, 1000.0, 960.0)),       # the Bay Quarter: park, Ferris wheel, arena
-    ("resort_hotel_1", (1030.0, 770.0, 1100.0, 830.0)),       # three resort hotels behind the dike
-    ("resort_hotel_2", (1130.0, 770.0, 1200.0, 830.0)),
-    ("resort_hotel_3", (1220.0, 760.0, 1290.0, 820.0)),
+    # three resort hotels INSIDE the suburb loop (kogai_loop: legs x 886 / 1160, its bottom leg along z 800), fronting
+    # that leg -- the flat ground there is 78 m deep. (2026-09-28: they had been laid across the loop's bottom leg and
+    # #3 across the elevated Main line at x 1250; street sites now, so no street is planned through them)
+    ("resort_hotel_1", (905.0, 727.0, 975.0, 787.0)),
+    ("resort_hotel_2", (990.0, 727.0, 1060.0, 787.0)),
+    ("resort_hotel_3", (1075.0, 727.0, 1145.0, 787.0)),
+    # THE LOGISTICS HUB (user, 2026-09-28: "fill the empty middle with a logistics park ... restrict to 1, or 2 if it
+    # makes sense, for level design"): the port platform's middle, between the base's gate road (kichi_mon_michi, x -460)
+    # and the container terminal, south of the port road (kichi_dori, z 1230). ONE truck terminal west of the logistics
+    # road (butsuryu_michi, x -280) and ONE distribution centre east of it, both gated onto it. Street sites.
+    ("logistics_truck_terminal", (-445.0, 1245.0, -295.0, 1470.0)),
+    ("logistics_distribution", (-265.0, 1245.0, -25.0, 1470.0)),
     ("lighthouse", (1350.0, -1320.0, 1430.0, -1260.0)),       # the north-east headland
     ("michi_no_eki", (385.0, -1720.0, 475.0, -1640.0)),       # the roadside station on the north coast road
+    # 2026-09-28 (the step 7 rebuild): ground kept for what the batch did not author, so filling it later needs no road
+    # rebuild. Each is already reached by a road: the ring / dike side road, the airport's own loop roads, yamate_dori.
+    # (The bay MARKET needs no reserve: the gulf head between wangan_dori and the ring's dike is one 84 m block fronting
+    # both, and Waterpark station's 駅前 row already lines it with shop-houses -- the market's types replace them there.)
+    ("fish_market", (300.0, 676.0, 716.0, 775.0)),             # the 魚市場 + small-boat quay outside the dike, reached
+                                                               # from the ring / dike side road (hatoba_dori is gone)
+                                                               # (3.18(h), the Tsukiji/Toyosu pattern)
+    # the airport's AIRSIDE (user, 2026-09-29: the runway "on a different side from the bridge"): behind the terminal,
+    # the apron against its airside face (boarding bridges to z 1811.6), then the taxiway and the 540 x 45 m runway
+    # along the island's SOUTH edge (the island reaches z 2040 for it, island_reshape AIRPORT_SOUTH). It stood between
+    # the bridge's landing and the terminal, under the spur and the rail.
+    ("airport_airfield", (940.0, 1812.0, 1480.0, 1972.5)),
+    # the airport's FORECOURT (user, 2026-09-29: "forecourt like central station"): the one-way loop kuko_rotary
+    # (island_expressway FORE_BOX) with its lanes and footways, between the Airport station's west wall and the
+    # terminal's curb canopy; the AirportForecourt composite dresses it (tools/building_kit/site_airport_forecourt.py)
+    ("airport_forecourt", (1045.0, 1611.0, 1233.0, 1727.0)),
+    ("tokyo_tower_parking", (728.0, -345.0, 792.0, -297.0)),  # the Tower's car park on yamate_dori, beside its east
+                                                               # face (B9 kerb ramp); it has no car park of its own yet
+    # THE CENTRAL STATION'S 駅前広場 (user, 2026-09-28): the ground between ekimae_dori (z -100, its paved edge -118.5)
+    # and the station's south face (z -180), from naka_hondori's paved edge (x 619) to higashi_hondori's (x 956). The
+    # one-way ekimae_rotary (island_core_streets) runs through it; everything else is the CentralForecourt composite
+    # (the multistorey car park, the bus berths under a covered walk, the taxi rank, the koban, bike parking, the clock
+    # island). A street site, and a LEVELLED site (island_sites.reserve_sites): the block ground is filled to footway
+    # level round the rotary.
+    ("central_forecourt", (619.0, -180.0, 956.0, -119.0)),
 )
 #: Streets the plan REMOVES by hand (user, 2026-09-22, marked on `reference/island_plan_v16_2026-09-22-remove-too-small-
 #: street-blocks.png`): lines that cut a block too small for a building to be placed simply, so the grid stays larger
@@ -318,7 +358,13 @@ STREET_NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "f
 C1_CORNERS = [(25.0, -110.0), (1175.0, -110.0), (1175.0, 570.0), (25.0, 570.0)]
 C1_SIDE_CUT_Y = 150.0              # C1 is cut into roads half way up each side (pre-redo y 300)
 JCT_X = 655.0
-DIAMOND_X = {"d_bwd_off": 220.0, "d_fwd_on": 340.0, "d_bwd_on": 860.0, "d_fwd_off": 980.0}
+# THE DIAMOND IS SYMMETRIC (user, 2026-09-29: "top of the c1 highway should be much simplified between both ways ...
+# equivalent lanes on both ways and similar exit behaviour"). The ramps stood at 220 / 340 / 860 / 980: each carriageway
+# exited 380 m before the crossing and entered 260 m after, so the two carriageways' aux lanes lay over DIFFERENT
+# stretches (the westbound one 4 lanes where the eastbound was 2, and the other way round at the far end). Now each end
+# has its two ramps together -- an exit on one carriageway and an entrance on the other, 10 m apart (one ramp per
+# station) -- so both carriageways widen over the same stretch, 345-355 m either side of naka_hondori.
+DIAMOND_X = {"d_bwd_off": 245.0, "d_fwd_on": 255.0, "d_bwd_on": 945.0, "d_fwd_off": 955.0}
 DIAMOND_ROAD = ("naka_hondori", 600.0)
 DIAMOND_J = (465.0, 665.0)
 
@@ -349,8 +395,13 @@ WANGAN_RADII = [0.0, 160.0, 160.0, 160.0, 160.0, 160.0, 160.0, 120.0, 120.0, 0.0
 WANGAN_T = (-1177.0, 755.0)    # the ONE west-coast ring point the Wangan meets, a T from the sea side (user, 2026-09-25:
                                # one divided road like C1, not two carriageways each to its own T)
 WANGAN_JOIN_Z = 860.0          # the Wangan's approach from that T joins the corridor here (godot z, west shore)
-WANGAN_SPLIT_X = 520.0         # east of this the divided road parts into its two carriageways for the spur JCT: both
-                               # still on the 11 m deck, before the westbound climbs to spur_in and the eastbound dips
+WANGAN_SPLIT_X = 740.0         # east of this the divided road parts into its two carriageways for the spur JCT --
+                               # where they REALLY go different ways (user, 2026-09-28: at shuto_wangan_e point 7 /
+                               # shuto_wangan_w point 5; at 520 they ran as two ramp-looking roads side by side for
+                               # ~250 m). Past it the eastbound climbs under the spur and the westbound up to spur_in.
+WANGAN_RISE_X = 560.0          # the divided road leaves its 11 m deck here and climbs to WANGAN_SPLIT_Z at the split
+WANGAN_SPLIT_Z = 14.5          # the split's deck height: both carriageways leave it level (a divided road is one deck);
+                               # the westbound then climbs ~12 m to spur_in over ~185 m (~6.7 %)
 WANGAN_LOW = 4.0               # the low sea viaduct: west of the port the Wangan crosses no road, so it need not fly
 WANGAN_LOW_FROM_X = -900.0     # west of this (the shoreline past the port platform) the deck is WANGAN_LOW; east of it
                                # the pair holds a road's clearance over the platform while it comes down from 11 m

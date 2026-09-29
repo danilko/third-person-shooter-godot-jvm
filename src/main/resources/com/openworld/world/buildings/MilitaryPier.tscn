@@ -1,0 +1,112 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/MilitaryPier_mesh.res" id="1_ssj7f"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="2_caj0d"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1jyw1"]
+size = Vector3(36.06, 20.4, 20.03)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_avuwr"]
+size = Vector3(3.2, 30.3, 3.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_oycm1"]
+size = Vector3(3.2, 30.3, 3.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_olydf"]
+size = Vector3(3.2, 30.3, 3.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_152ee"]
+size = Vector3(3.2, 30.3, 3.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fleuu"]
+size = Vector3(12.03, 27, 85)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_74wvm"]
+size = Vector3(50, 0.1, 251.4)
+
+[node name="MilitaryPier" type="Node3D" unique_id=980793021]
+metadata/building = {
+"aabb": [Vector3(-35.36, -12.6, -126.03), Vector3(70.36, 42.9, 251.38)],
+"clear_probes": [],
+"composite": true,
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"facade_surfaces": {},
+"footprint_m": [70.3, 251.4],
+"has_interior": true,
+"height_m": 42.9,
+"id": "MilitaryPier",
+"jp": {
+"name": "基地の港湾ターミナル (placeholder)"
+},
+"kit": "library",
+"marks": [{
+"name": "MARK_vehicle_WOB1_0",
+"pos": [22.0, -9.6, -80.0],
+"props": {
+"faction": "military",
+"kind": "vehicle",
+"vehicle": "WOB1"
+},
+"yaw": 0.0
+}],
+"piece_count": 30,
+"probe_xz": [0.0, 0.0],
+"props_top_m": 30.3,
+"roofline_m": 42.9,
+"solid_probes": [],
+"use": "the base's one pier: the harbour terminal at the root (-Z), bollards down both edges, light masts, a patrol ship berthed along its +X side (its waterline 9.6 m under the pier deck -- the pier's land height). PLACEHOLDER",
+"wall_top_m": 0.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=289501098]
+visibility_range_end = 663.60004
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_ssj7f")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1542602542]
+collision_mask = 0
+
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=35297653]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 10.2, -116.015)
+shape = SubResource("BoxShape3D_1jyw1")
+
+[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=657487785]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 15.15, -60)
+shape = SubResource("BoxShape3D_avuwr")
+
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=204391285]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 15.15, -60)
+shape = SubResource("BoxShape3D_oycm1")
+
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=194036234]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 15.15, 40)
+shape = SubResource("BoxShape3D_olydf")
+
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=2137513994]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 15.15, 40)
+shape = SubResource("BoxShape3D_152ee")
+
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=1962821599]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.985, 0.9, 32.5)
+shape = SubResource("BoxShape3D_fleuu")
+
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=1204913969]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, -0.05, 0)
+shape = SubResource("BoxShape3D_74wvm")
+
+[node name="Markers" type="Node3D" parent="." unique_id=1119965722]
+
+[node name="MARK_vehicle_WOB1_0" type="Node3D" parent="Markers" unique_id=866251433 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, -9.6, -80)
+script = ExtResource("2_caj0d")
+vehicle_id = "WOB1"
+faction = "military"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "WOB1"
+metadata/faction = "military"

@@ -39,6 +39,12 @@ import java.util.List;
  * <p>Frame: the origin is the shaft floor's centre at the LOW stop; +X is along the track (the door faces), +Z across.
  * {@link #rise} is the top stop over the low one. Placed by the scene builder from the piece's {@code LIFT_} Empty.
  *
+ * <p>A BUILDING's lift (user, 2026-09-28: an office, a hospital, a hotel) has more than two stops and usually one
+ * door face: {@link #stopHeights} lists every stop's floor over the low one ("0,4.2,8,11.8"; empty = the two stops
+ * 0 and {@link #rise}) and {@link #faces} says which X faces have doors (1 = -X, 2 = +X, 3 = both). The landing
+ * sensors are POLLED while the lift is awake (a body entering any of them wakes it), so any number of stops needs no
+ * method per stop.
+ *
  * <p><b>Networking:</b> local per peer, the {@link Door} rule: each peer runs its own lift for its own bodies. A
  * remote player's puppet rides the snapshot, so on another peer they may be seen standing in a shaft whose car is
  * elsewhere -- cosmetic, and cleared when they step out.
@@ -61,6 +67,10 @@ public class Elevator extends Node3D {
     @Export public Material floorMaterial;
     /** An out-of-service lift neither opens nor moves (a story beat, a blackout; the probe's control). */
     @Export public boolean inService = true;
+    /** Every stop's floor over the low one, comma separated; empty = {0, rise}. */
+    @Export public String stopHeights = "";
+    /** Which X faces have doors: 1 = -X, 2 = +X, 3 = both (a station lift). */
+    @Export public int faces = 3;
 
     private static final double CAR_CLEAR = 0.05;       // each side between the car and the shaft wall
     private static final double CAR_H = 2.35;
@@ -73,25 +83,42 @@ public class Elevator extends Node3D {
     private final List<CollisionShape3D> carLeafShapes = new ArrayList<>();
     private final List<List<Node3D>> landingLeaves = new ArrayList<>();  // per stop
     private final List<List<CollisionShape3D>> landingShapes = new ArrayList<>();
+    private final List<List<Area3D>> callZones = new ArrayList<>();       // per stop
+    private final List<List<Area3D>> doorways = new ArrayList<>();        // per stop
     private int[] doorway;
+    private int[] waiting;
+    private double[] heights;
     private int riders;
 
     @Register
     @Override
     public void _ready() {
-        rules = new ElevatorRules(new double[]{0.0, rise});
+        heights = parseStops();
+        rules = new ElevatorRules(heights);
         rules.speed = speed;
         rules.doorSeconds = doorSeconds;
         rules.dwellSeconds = dwellSeconds;
-        doorway = new int[2];
+        doorway = new int[heights.length];
+        waiting = new int[heights.length];
         if (frameMaterial == null) frameMaterial = plain(new Color(0.55, 0.57, 0.6, 1.0));
         if (glassMaterial == null) glassMaterial = plain(new Color(0.7, 0.85, 0.9, 0.35));
         if (floorMaterial == null) floorMaterial = plain(new Color(0.35, 0.35, 0.36, 1.0));
         buildCar();
-        for (int s = 0; s < 2; s++) buildLanding(s);
+        for (int s = 0; s < heights.length; s++) buildLanding(s);
         apply();
         setPhysicsProcess(true);
     }
+
+    private double[] parseStops() {
+        if (stopHeights == null || stopHeights.isBlank()) return new double[]{0.0, rise};
+        String[] parts = stopHeights.split(",");
+        double[] out = new double[parts.length];
+        for (int i = 0; i < parts.length; i++) out[i] = Double.parseDouble(parts[i].trim());
+        if (out.length < 2) return new double[]{0.0, rise};
+        return out;
+    }
+
+    private boolean face(int f) { return (faces & (f == 0 ? 1 : 2)) != 0; }
 
     private static Material plain(Color c) {
         StandardMaterial3D m = new StandardMaterial3D();
@@ -147,6 +174,12 @@ public class Elevator extends Node3D {
         for (int f = 0; f < 2; f++) {                            // the two door faces, -X then +X
             double sx = f == 0 ? -1 : 1;
             double x = sx * (cw / 2 - 0.025);
+            if (!face(f)) {                                      // no door this side: a glass wall
+                Vector3 at = new Vector3(x, CAR_H / 2, 0);
+                shape(car, new Vector3(0.05, CAR_H, cd), at);
+                box(car, new Vector3(0.03, CAR_H, cd), at, glassMaterial);
+                continue;
+            }
             for (double sz : new double[]{-1, 1}) {
                 Vector3 at = new Vector3(x, CAR_H / 2, sz * (dw / 2 + jamb / 2));
                 shape(car, new Vector3(0.05, CAR_H, jamb), at);
@@ -195,7 +228,7 @@ public class Elevator extends Node3D {
     }
 
     private void buildLanding(int s) {
-        double y = s == 0 ? 0.0 : rise;
+        double y = heights[s];
         double x = shaftWidth / 2 + 0.03, dw = dw();
         StaticBody3D body = new StaticBody3D();
         body.setName(new StringName("Landing" + s));
@@ -203,22 +236,28 @@ public class Elevator extends Node3D {
         body.setCollisionMask(0);
         List<Node3D> leaves = new ArrayList<>();
         List<CollisionShape3D> shapes = new ArrayList<>();
+        List<Area3D> calls = new ArrayList<>();
+        List<Area3D> ways = new ArrayList<>();
         for (int f = 0; f < 2; f++) {
+            if (!face(f)) continue;
             double sx = f == 0 ? -1 : 1;
             shapes.add(shape(body, new Vector3(LEAF_T, doorHeight, dw), new Vector3(sx * x, y + doorHeight / 2, 0)));
             for (int l = 0; l < 2; l++) leaves.add(leaf(body, sx * x, y));
             Area3D call = sensor(this, new Vector3(CALL_DEPTH, 1.8, dw + 0.8),
                     new Vector3(sx * (x + 0.1 + CALL_DEPTH / 2), y + 1.0, 0));
             call.setName(new StringName("Call" + s + (f == 0 ? "W" : "E")));
-            call.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_call_" + (s == 0 ? "low" : "high")));
+            call.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_sensor_entered"));
+            calls.add(call);
             Area3D way = sensor(this, new Vector3(0.7, 1.8, dw), new Vector3(sx * x, y + 1.0, 0));
             way.setName(new StringName("Doorway" + s + (f == 0 ? "W" : "E")));
-            way.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_way_entered_" + (s == 0 ? "low" : "high")));
-            way.connect(new StringName("body_exited"), MethodCallable.createUnsafe(this, "on_way_exited_" + (s == 0 ? "low" : "high")));
+            way.connect(new StringName("body_entered"), MethodCallable.createUnsafe(this, "on_sensor_entered"));
+            ways.add(way);
         }
         addChild(body);
         landingLeaves.add(leaves);
         landingShapes.add(shapes);
+        callZones.add(calls);
+        doorways.add(ways);
     }
 
     // ── sensors ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -228,12 +267,28 @@ public class Elevator extends Node3D {
 
     private void wake() { setPhysicsProcess(true); }
 
-    @Register public void onCallLow(Node3D b) { if (isCharacter(b)) { rules.call(0); wake(); } }
-    @Register public void onCallHigh(Node3D b) { if (isCharacter(b)) { rules.call(1); wake(); } }
-    @Register public void onWayEnteredLow(Node3D b) { if (isCharacter(b)) { doorway[0]++; wake(); } }
-    @Register public void onWayEnteredHigh(Node3D b) { if (isCharacter(b)) { doorway[1]++; wake(); } }
-    @Register public void onWayExitedLow(Node3D b) { if (isCharacter(b)) doorway[0] = Math.max(0, doorway[0] - 1); }
-    @Register public void onWayExitedHigh(Node3D b) { if (isCharacter(b)) doorway[1] = Math.max(0, doorway[1] - 1); }
+    /** Any landing sensor: wake up; the tick counts who is where. */
+    @Register public void onSensorEntered(Node3D b) { if (isCharacter(b)) wake(); }
+
+    private static int characters(List<Area3D> zones) {
+        int n = 0;
+        for (Area3D a : zones) {
+            for (Object o : a.getOverlappingBodies()) {
+                if (o instanceof Node3D nd && isCharacter(nd)) n++;
+            }
+        }
+        return n;
+    }
+
+    /** Count the landings: a CALL is somebody ARRIVING in a call zone (an edge, never a level). */
+    private void pollLandings() {
+        for (int s = 0; s < heights.length; s++) {
+            int w = characters(callZones.get(s));
+            if (w > waiting[s]) rules.call(s);
+            waiting[s] = w;
+            doorway[s] = characters(doorways.get(s));
+        }
+    }
 
     @Register
     public void onRideEntered(Node3D b) {
@@ -256,10 +311,13 @@ public class Elevator extends Node3D {
             setPhysicsProcess(false);
             return;
         }
+        pollLandings();
         boolean blocked = rules.phase != ElevatorRules.Phase.MOVING && doorway[rules.stop] > 0;
         rules.step(delta, riders, blocked);
         apply();
-        if (rules.resting() && rules.door == 0.0 && doorway[0] == 0 && doorway[1] == 0) setPhysicsProcess(false);
+        boolean nobody = true;
+        for (int d : doorway) nobody &= d == 0;
+        if (rules.resting() && rules.door == 0.0 && nobody) setPhysicsProcess(false);
     }
 
     private void apply() {
@@ -267,7 +325,7 @@ public class Elevator extends Node3D {
         double open = rules.phase == ElevatorRules.Phase.MOVING ? 0.0 : rules.door;
         slideLeaves(carLeaves, open);
         for (CollisionShape3D cs : carLeafShapes) cs.setDisabled(open > 0.9);
-        for (int s = 0; s < 2; s++) {
+        for (int s = 0; s < heights.length; s++) {
             double o = s == rules.stop ? open : 0.0;
             slideLeaves(landingLeaves.get(s), o);
             for (CollisionShape3D cs : landingShapes.get(s)) cs.setDisabled(rules.landingOpen(s));
@@ -293,4 +351,5 @@ public class Elevator extends Node3D {
     @Register public int tripsNow() { return rules.trips; }
     @Register public int ridersNow() { return riders; }
     @Register public void callStop(int s) { rules.call(s); wake(); }
+    @Register public int stopCountNow() { return heights.length; }
 }

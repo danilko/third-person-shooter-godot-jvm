@@ -192,6 +192,10 @@ public class ExplosionManager extends Node {
         double dist = distanceToBody(rb, center);
         float t = BlastFalloff.strength(radius, dist);
         if (t <= 0f) return;
+        // a car's windows near the blast break (the people inside are hit by the blast as characters)
+        if (rb instanceof com.openworld.carrier.vehicle.Vehicle v && v.getDamageModel() != null) {
+            v.getDamageModel().blastPanes(center, radius, maxDamage);
+        }
         Node h = rb.getNodeOrNull(new NodePath("Health"));
         if (h instanceof Health health && !health.isDead()) {
             float damage = BlastFalloff.damage(maxDamage, radius, dist) * health.explosionDamageMultiplier;

@@ -186,13 +186,24 @@ def layout_type(t, root):
                 c = at(gm, i)
                 if i in door_idx and side in slide_sides:
                     continue                      # a glazed shopfront: the builder fills the whole module
-                name = row["door"] if i in door_idx else row["pieces"][i % len(row["pieces"])]
+                # a floor group's `modules_rows` (user, 2026-09-28: the restaurant's side walls behind the staff
+                # aisle, the kitchen and the restrooms are SOLID, not shop glass): {side: [[i0, i1, row], ...]},
+                # modules i0..i1 inclusive of that side take another row of the same banding
                 rname = row_for(g, side)
+                if side not in attached:
+                    for i0, i1, rn in g.get("modules_rows", {}).get(side, ()):
+                        if i0 <= i <= i1:
+                            if bool(rows[rn].get("band")) != bool(row.get("band")):
+                                raise SystemExit(f"{t['id']}: modules_rows {rn} on {side} does not match the "
+                                                 f"storey's banding")
+                            rname = rn
+                mrow = rows[rname]
+                name = mrow["door"] if i in door_idx else mrow["pieces"][i % len(mrow["pieces"])]
                 put(name, (c[0], base, c[1]), yaw, rname)
-                if row.get("band"):
-                    put(row["band"], (c[0], base + storey, c[1]), yaw, rname)
-                if row.get("rail"):
-                    put(row["rail"], (c[0], base, c[1]), yaw, rname)
+                if mrow.get("band"):
+                    put(mrow["band"], (c[0], base + storey, c[1]), yaw, rname)
+                if mrow.get("rail"):
+                    put(mrow["rail"], (c[0], base, c[1]), yaw, rname)
             if row.get("corner"):
                 put(row["corner"], (gm[2][0], base, gm[2][1]), 0.0, row_for(g, side))
         base += h
@@ -365,14 +376,36 @@ def layout_type(t, root):
     # Does this building have a ROOM to see into? Derived, not authored: a type that places interior fittings
     # has one, and the four that do are exactly the four shops. It decides whether the shopfront's glass keeps
     # the kit's fake-interior card (right for a tower with nothing modelled behind it) or is really glazed.
-    out["has_interior"] = bool(t.get("props"))
-    place_props(t.get("props", []), out, root, (W, D))
+    # (a FACADE prop -- a lantern, a sign, `"facade": true` -- is street dressing, not an interior)
+    out["has_interior"] = any(not p.get("facade") for p in t.get("props", []))
+    # a prop may stand ON THE ROOF: `"y": "roof"` is the roofline (a rooftop billboard, 秋葉原)
+    # ...and a FACADE prop may be placed against the building's own size, so it follows every variant: `front`
+    # (its z is the front face), `right: d` / `left: d` (its x is d in from that side)
+    def _resolve(p):
+        p = dict(p)
+        if p.get("y") == "roof":
+            p["y"] = out["roofline_m"]
+        at = list(p.get("at", [0.0, 0.0]))
+        if p.get("front"):
+            at[1] = D / 2
+        if "right" in p:
+            at[0] = W / 2 - float(p["right"])
+        if "left" in p:
+            at[0] = -W / 2 + float(p["left"])
+        p["at"] = at
+        return p
+    t = dict(t, props=[_resolve(p) for p in t.get("props", [])])
+    place_props(t["props"], out, root, (W, D))
+    # a prop on the roof (a billboard) stands above the roofline: it is part of the mesh's height
+    out["height_m"] = round(max(out["height_m"], out.get("props_top_m", 0.0)), 4)
     check_doors_clear(out)
     check_inner_doors_clear(out)
     out["boxes"] = merge_boxes(out["boxes"])
     # the FORECOURT: how far props stand out past the front wall (a konbini's vending machines and bins, user
     # 2026-09-28) -- the mesh is that much deeper than the footprint, on the street side only
-    front = max([b["center"][2] + b["size"][2] / 2 for b in out["boxes"]] + [D / 2])
+    front = max([b["center"][2] + b["size"][2] / 2 for b in out["boxes"]] + [D / 2]
+                + [p["at"][1] + lib_piece(p["piece"], root)[1]["max"][2] for p in t.get("props", [])
+                   if p.get("facade") and not p.get("yaw")])
     out["forecourt_m"] = round(max(0.0, front - D / 2), 4)
 
     jp = t.get("jp", {})
@@ -426,9 +459,23 @@ def place_props(props, out, root, footprint=None):
             # a LIFT (world.Elevator: the car, its doors and the landing doors are built at runtime; the shaft is the
             # piece beside it): the shaft floor's centre at the low stop, turned with the piece that carries it
             lf = p["lift"]
-            out.setdefault("lifts", []).append({
-                "center": [round(p["at"][0], 5), round(float(p.get("y", 0.0)), 5), round(p["at"][1], 5)],
-                "yaw": float(p.get("yaw", 0.0)), **{k: float(lf[k]) for k in ("w", "d", "rise", "door_w", "door_h")}})
+            rec = {"center": [round(p["at"][0], 5), round(float(p.get("y", 0.0)), 5), round(p["at"][1], 5)],
+                   "yaw": float(p.get("yaw", 0.0)), **{k: float(lf[k]) for k in ("w", "d", "rise", "door_w", "door_h")}}
+            # a building's lift (kits/interiors): every stop's floor, and which faces have doors
+            if lf.get("stops"):
+                rec["stops"] = str(lf["stops"])
+            if "faces" in lf:
+                rec["faces"] = int(lf["faces"])
+            out.setdefault("lifts", []).append(rec)
+            continue
+        if "piece" not in p and p.get("vehicle"):
+            # a PARKED VEHICLE (a composite's truck at its dock): a mission marker naming a vehicle model, spawned by
+            # world.ParkedVehicle; `yaw` 0 = the vehicle's nose toward -Z (its default), 180 = toward the street (+Z)
+            out.setdefault("marks", []).append({
+                "name": "MARK_vehicle_%s_%d" % (p["vehicle"], len(out.get("marks", []))),
+                "pos": [round(p["at"][0], 5), round(float(p.get("y", 0.0)), 5), round(p["at"][1], 5)],
+                "yaw": float(p.get("yaw", 0.0)), "props": dict({"kind": "vehicle", "vehicle": str(p["vehicle"])},
+                                                        **({"faction": p["faction"]} if p.get("faction") else {}))})
             continue
         if "piece" not in p:
             # a DOOR-ONLY prop: an opening with no piece of its own -- a TICKET GATE's lane between two gate bodies
@@ -473,6 +520,13 @@ def place_props(props, out, root, footprint=None):
                              "yaw": (yaw + float(pr.get("yaw", 0.0))) % 360.0, "collide": pr.get("collide", "none")})
             if kids:
                 place_props(kids, out, root)
+            for mk in entry.get("marks", ()):
+                # a kit piece's MISSION MARKERS (MARK_ Empties: a weapon spot in a supermarket's back office ...)
+                mx, mz = rot_xz(yaw, mk["pos"][0], mk["pos"][2])
+                out.setdefault("marks", []).append({
+                    "name": mk["name"], "pos": [round(pos[0] + mx, 5), round(pos[1] + mk["pos"][1], 5),
+                                               round(pos[2] + mz, 5)],
+                    "yaw": round((yaw + float(mk.get("yaw", 0.0))) % 360.0, 4), "props": mk.get("props", {})})
             for dd in entry.get("doors", ()):
                 # a kit piece's own INTERIOR doors (DOOR_ Empties, export_building_kit.py: a shop's interior .blend),
                 # turned and moved with it
@@ -619,14 +673,25 @@ def layout_composite(c, built, root):
         def turn(v):
             x, z = rot_xz(yaw, v[0], v[2])
             return [round(x, 5), v[1], round(z, 5)]
+        n0 = len(out["pieces"])
         for pc in b["pieces"]:
             out["pieces"].append({**pc, "pos": mv(pc["pos"]), "yaw": (pc["yaw"] + yaw) % 360.0})
+        if b.get("collision") == "trimesh":
+            # a WHOLE-BUILDING part (kits/interiors: a hangar, an HQ, a terminal): its collider is its own mesh, so its
+            # first `trimesh_pieces` pieces go into the site's trimesh (the scene builder's `trimesh_idx`)
+            out.setdefault("trimesh_idx", []).extend(range(n0, n0 + int(b.get("trimesh_pieces", len(b["pieces"])))))
+        for dd in b.get("inner_doors", []):
+            out.setdefault("inner_doors", []).append({**dd, "center": mv(dd["center"]), "outward": turn(dd["outward"])})
+        for lf in b.get("lifts", []):
+            out.setdefault("lifts", []).append({**lf, "center": mv(lf["center"]), "yaw": (lf["yaw"] + yaw) % 360.0})
         for bx in b["boxes"]:
             sz = bx["size"]
             sx, sz_ = (sz[2], sz[0]) if round(yaw) % 180 == 90 else (sz[0], sz[2])
             out["boxes"].append({"center": mv(bx["center"]), "size": [round(sx, 5), sz[1], round(sz_, 5)]})
         for h in b.get("hulls", []):
             out["hulls"].append({**h, "pos": mv(h["pos"]), "yaw": (h["yaw"] + yaw) % 360.0})
+        for mk in b.get("marks", []):
+            out.setdefault("marks", []).append({**mk, "pos": mv(mk["pos"]), "yaw": (mk.get("yaw", 0.0) + yaw) % 360.0})
         for d in b["doors"]:
             # A door's STYLE is a fact about the building it belongs to, not about the site it stands on: a
             # composite that took its own `door_style` gave the gas station's kiosk a swing door while the same
@@ -644,6 +709,10 @@ def layout_composite(c, built, root):
         rects.append((ox - fw / 2, ox + fw / 2, oz - fd / 2, oz + fd / 2))
         height = max(height, b["height_m"])
     out["has_interior"] = bool(c.get("props")) or out.get("has_interior", False)
+    if c.get("reserve"):
+        # the footprint is a RESERVE the site dresses (a station forecourt round its roads), not a paved slab the
+        # mesh fills: the probe's size rule does not apply (probe_buildings.gd)
+        out["reserve"] = True
     place_props(c.get("props", []), out, root, (W, D))
     # the apron: paving tiles over the footprint, except under a part (whose own floor is there)
     if c.get("apron"):
@@ -656,7 +725,15 @@ def layout_composite(c, built, root):
                 if any(r[0] - 0.01 <= x <= r[1] + 0.01 and r[2] - 0.01 <= z <= r[3] + 0.01 for r in rects):
                     continue
                 out["pieces"].append({"piece": name, "path": path, "pos": [round(x, 5), 0.0, round(z, 5)], "yaw": 0.0})
-    out["boxes"].append({"center": [0, -0.05, 0], "size": [round(W, 5), 0.1, round(D, 5)]})
+    gb = c.get("ground_box")
+    if isinstance(gb, list):
+        # `ground_box: [x0, z0, x1, z1]` -- the paved ground's collider over part of the footprint only (a pier's
+        # deck, not the water beside it where its ship lies)
+        out["boxes"].append({"center": [round((gb[0] + gb[2]) / 2, 5), -0.05, round((gb[1] + gb[3]) / 2, 5)],
+                             "size": [round(gb[2] - gb[0], 5), 0.1, round(gb[3] - gb[1], 5)]})
+    elif c.get("apron") or gb:
+        # the paved ground's collider (`ground_box`: a site paved with its own tiles, an airfield's runway)
+        out["boxes"].append({"center": [0, -0.05, 0], "size": [round(W, 5), 0.1, round(D, 5)]})
     px, pz = c.get("probe_xz", [0.3, 0.3])
     tops = [bx["center"][1] + bx["size"][1] / 2 for bx in out["boxes"]
             if abs(px - bx["center"][0]) <= bx["size"][0] / 2 and abs(pz - bx["center"][2]) <= bx["size"][2] / 2]
@@ -664,8 +741,10 @@ def layout_composite(c, built, root):
     # points that must stay OPEN (the capsule fits): under a crane's portal, a truck lane
     out["clear_probes"] = [list(map(float, q)) for q in c.get("clear_probes", [])]
     out["wall_top_m"] = round(max(tops), 4)
-    out["height_m"] = round(max(height, out.get("props_top_m", 0.0)), 4)
+    out["height_m"] = round(float(c.get("height_m", max(height, out.get("props_top_m", 0.0)))), 4)
     out["roofline_m"] = out["height_m"]
+    # a prop on the roof (a billboard) stands above the roofline: it is part of the mesh's height
+    out["height_m"] = round(max(out["height_m"], out.get("props_top_m", 0.0)), 4)
     check_doors_clear(out)
     check_inner_doors_clear(out)
     out["boxes"] = merge_boxes(out["boxes"])
@@ -682,12 +761,19 @@ def layout_example(e, root):
     p = pieces["pieces"][e["piece"]]
     res = "res://" + os.path.relpath(kit_dir, _project_root()).replace(os.sep, "/")
     lo, hi = p["min"], p["max"]
-    pos = [-(lo[0] + hi[0]) / 2, 0.0 if (e.get("doors") or e.get("keep_origin")) else -lo[1], -(lo[2] + hi[2]) / 2]
+    pos = [-(lo[0] + hi[0]) / 2, 0.0 if (e.get("doors") or e.get("keep_origin") or p.get("exits")) else -lo[1],
+           -(lo[2] + hi[2]) / 2]
+    if e.get("plot_origin"):
+        # a CIVIC building (island_civic_sites.py): the piece's origin is its PLOT's centre, and the placement puts
+        # the scene's origin on the plot centre -- so the piece is not re-centred on its own bounds
+        pos = [0.0, pos[1], 0.0]
     out = {"id": e["id"], "kit": e["kit"], "use": e.get("use", "kit example (re-scaled only)"), "example": True,
            "landmark": bool(e.get("landmark", False)),
            "pieces": [{"piece": e["piece"], "path": res + "/" + p["path"],
                        "pos": [round(v, 5) for v in pos], "yaw": 0.0}],
-           "footprint_m": [p["size"][0], p["size"][2]], "height_m": p["size"][1], "wall_top_m": p["size"][1],
+           # `wall_top_m`: a building's ROOF level when a mast or a stair house stands above it (kits/interiors)
+           "footprint_m": [p["size"][0], p["size"][2]], "height_m": p["size"][1],
+           "wall_top_m": float(e.get("wall_top_m", p["size"][1])),
            "door_style": e.get("door_style", "swing"),
            "boxes": [], "hulls": [], "doors": [], "solid_probes": [], "collision": "trimesh",
            "trimesh_pieces": 1}
@@ -699,7 +785,44 @@ def layout_example(e, root):
         q["at"] = [pr["at"][0] + pos[0], pr["at"][1] + pos[2]]
         q["collide"] = "none"
         moved.append(q)
-    place_props(moved, out, root)
+    place_props(moved, out, root, (1e9, 1e9))
+    # a WHOLE BUILDING's piece (kits/interiors, 2026-09-28): its own interior doors (DOOR_), outer doors (EXIT_),
+    # lifts (LIFT_), library fixtures (PROP_) and mission markers (MARK_) come from the piece's .blend -- the artist
+    # moves them there. The trimesh collider is the piece's mesh (walls, floors, stairs, furniture).
+    for dd in p.get("doors", ()):
+        out.setdefault("inner_doors", []).append({
+            "center": [round(pos[0] + dd["pos"][0], 5), round(pos[1] + dd["pos"][1], 5),
+                       round(pos[2] + dd["pos"][2], 5)],
+            "outward": [dd["out"][0], 0, dd["out"][2]], "width": float(dd["w"]), "height": float(dd["h"]),
+            "style": str(dd.get("style", "swing")), "slide_dir": float(dd.get("slide_dir", 1.0))})
+    for i, dd in enumerate(p.get("exits", ())):
+        out["doors"].append({"side": dd.get("name", "exit"), "module": i,
+                             "center": [round(pos[0] + dd["pos"][0], 5), round(pos[1] + dd["pos"][1], 5),
+                                        round(pos[2] + dd["pos"][2], 5)],
+                             "outward": [dd["out"][0], 0, dd["out"][2]], "width": float(dd["w"]),
+                             "height": float(dd["h"]), "style": str(dd.get("style", out["door_style"]))})
+    for lf in p.get("lifts", ()):
+        rec = {"center": [round(pos[0] + lf["pos"][0], 5), round(pos[1] + lf["pos"][1], 5),
+                          round(pos[2] + lf["pos"][2], 5)],
+               "yaw": float(lf.get("yaw", 0.0)), **{k: float(lf[k]) for k in ("w", "d", "rise", "door_w", "door_h")}}
+        if lf.get("stops"):
+            rec["stops"] = str(lf["stops"])
+        if "faces" in lf:
+            rec["faces"] = int(lf["faces"])
+        out.setdefault("lifts", []).append(rec)
+    kids = [{"piece": pr["piece"], "at": [pos[0] + pr["pos"][0], pos[2] + pr["pos"][2]], "y": pos[1] + pr["pos"][1],
+             "yaw": float(pr.get("yaw", 0.0)), "collide": "none"} for pr in p.get("props", ())]
+    if kids:
+        place_props(kids, out, root, (1e9, 1e9))
+    for mk in p.get("marks", ()):
+        out.setdefault("marks", []).append({
+            "name": mk["name"], "pos": [round(pos[0] + mk["pos"][0], 5), round(pos[1] + mk["pos"][1], 5),
+                                       round(pos[2] + mk["pos"][2], 5)],
+            "yaw": float(mk.get("yaw", 0.0)), "props": mk.get("props", {})})
+    # (the doors' clearance is asserted by the generator against the furniture, blender/tools/interior_plans.py:
+    # a trimesh building has no boxes for check_inner_doors_clear to read)
+    # props that stand taller than the piece (a park's trees) are part of what the building IS
+    out["height_m"] = round(float(e.get("height_m", max(out["height_m"], out.get("props_top_m", 0.0)))), 4)
     for i, d in enumerate(e.get("doors", [])):
         out["doors"].append({"side": d.get("name", "door"), "module": i,
                              "center": [round(d["at"][0] + pos[0], 5), 0.0, round(d["at"][1] + pos[2], 5)],
@@ -754,11 +877,11 @@ def layout_all(types_path):
     if len(ids) != len(set(ids)):
         raise SystemExit("building ids must be unique")
     types = [layout_type(t, root) for t in doc["types"]]
-    built = {b["id"]: b for b in types}
+    customs = [layout_example(e, root) for e in doc.get("custom", [])]
+    built = {b["id"]: b for b in types + customs}        # a site may take a whole custom building as a part
     comps = [layout_composite(c, built, root) for c in doc.get("composites", [])]
     return {"generated_by": "tools/building_kit/layout_buildings.py",
-            "buildings": types + comps + [layout_example(e, root) for e in doc.get("custom", [])] +
-                         [layout_example(e, root) for e in doc.get("examples", [])]}
+            "buildings": types + comps + customs + [layout_example(e, root) for e in doc.get("examples", [])]}
 
 
 def self_test():
@@ -858,11 +981,14 @@ def self_test():
     check(g.get("composite") and len(g["doors"]) == 1 and g["doors"][0]["side"].startswith("GasKiosk"),
           "the gas station carries its kiosk's door")
     check(abs(g["wall_top_m"] - 5.6) < 0.01, f"the gas station's probe spot is under the canopy top ({g['wall_top_m']})")
-    st = by["StationRural"]
-    check(len(st["hulls"]) == 2, "the station's two platform ramps collide as hulls, not boxes")
-    backs = [d for d in st["doors"] if d["side"].endswith("_back")]
-    check(backs and abs(backs[0]["center"][2] - 0.91) < 1e-3 and backs[0]["outward"][2] == -1,
-          f"the station building's back door faces the platform at z 0.91 ({backs[0]['center'] if backs else None})")
+    # a kit station's piece carries its own colliders: the open-air ENTRY RAMP (a smooth 1:15 slope in two legs)
+    # collides as convex HULLS (a slope is a wedge, never a staircase of boxes), and the end building its gate lanes
+    st = {"id": "StationSelfTest", "pieces": [], "boxes": [], "doors": []}
+    place_props([{"piece": "stations:OA_Ramp_5", "at": [0.0, 0.0], "collide": "piece"}], st, KITS_DIR)
+    nh = len(st.get("hull_points", []))
+    check(nh == 2 and st["boxes"], f"a kit station's entry ramp collides as hulls ({nh}) beside its landing and rails' boxes")
+    _p, ob, _n = lib_piece("stations:OA_Building_4_L", KITS_DIR)
+    check(len(ob.get("gates", ())) == 2, "the open-air end building declares its two ticket-gate lanes")
     print("RESULT", "PASS" if ok else "FAIL")
     return ok
 

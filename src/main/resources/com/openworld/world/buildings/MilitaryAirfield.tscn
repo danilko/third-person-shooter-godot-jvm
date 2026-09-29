@@ -1,0 +1,47 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/MilitaryAirfield_mesh.res" id="1_06th4"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hof4t"]
+size = Vector3(540, 0.1, 45)
+
+[node name="MilitaryAirfield" type="Node3D" unique_id=1558758520]
+metadata/building = {
+"aabb": [Vector3(-270, -0.05, -27.500002), Vector3(540, 0.060000002, 45.000004)],
+"clear_probes": [],
+"composite": true,
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"facade_surfaces": {},
+"footprint_m": [540.0, 45.0],
+"has_interior": true,
+"height_m": 0.06,
+"id": "MilitaryAirfield",
+"jp": {
+"name": "基地の滑走路 (compact placeholder)"
+},
+"kit": "library",
+"piece_count": 9,
+"probe_xz": [0.0, 0.0],
+"props_top_m": 0.01,
+"roofline_m": 0.06,
+"solid_probes": [],
+"use": "the base's runway: 540 x 45 m on a reclaimed strip running WEST from the base into the sea (user, 2026-09-29: fully inside the military area, like the pier), its east end beside the base's apron. 540 m matches the civilian airport; FIJ1 lifts off after ~130 m",
+"wall_top_m": 0.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=656683241]
+visibility_range_end = 620.9359
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_06th4")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1507110150]
+collision_mask = 0
+
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=1750318275]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_hof4t")

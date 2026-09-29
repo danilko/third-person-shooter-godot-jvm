@@ -145,6 +145,19 @@ def cmd_lanekit(a):
     return gate
 
 
+def _context(a):
+    """`(foreign bands, keep-clear lanes)` from `--avoid [--avoid-ground]` and `--keep-clear-lanekits`."""
+    foreign, keep_clear = [], []
+    if getattr(a, "avoid", ""):
+        fground = pg.load_ground(a.avoid_ground) if getattr(a, "avoid_ground", "") else None
+        foreign = ped.solve_all(pm.load_network(a.avoid), fground)[3]
+    kc = getattr(a, "keep_clear_lanekits", "") or ""
+    for lk in sorted(glob.glob(glob.escape(kc) + "*.lanekit.json")) if kc else ():
+        with open(lk) as fh:
+            keep_clear += json.load(fh).get("lanes", [])
+    return foreign, keep_clear
+
+
 def cmd_pieces(a):
     """B6: cut ONE network into a piece per zone (`point_zones`). Writes `<out_dir>/<piece>.lanekit.json`
     per piece and reports the table the build script and the plugin's marker wiring both read -- so
@@ -163,7 +176,11 @@ def cmd_pieces(a):
         cross = []   # an unzoned doc's zone_id is the legacy per-road tag, not a cut
     counts = part.pieces()
     # B10.6: what each piece EMITS, hashed -- a build skips a piece whose digest is the one it last baked.
-    digests = pdg.piece_digests(net, zones, pg.load_ground(a.ground) if a.ground else None) if not gate["errors"] else {}
+    # the OTHER network this one is built against (the same `--avoid` / `--keep-clear-lanekits` the gltf step takes)
+    # is part of each piece's digest -- only what reaches that piece (`point_digest.context_of`)
+    foreign, keep_clear = _context(a)
+    digests = (pdg.piece_digests(net, zones, pg.load_ground(a.ground) if a.ground else None, foreign, keep_clear)
+               if not gate["errors"] else {})
     pieces = []
     for zone in sorted(counts):
         sub = pz.split_doc(doc, zone) if zones else doc
@@ -452,8 +469,8 @@ def cmd_gltf(a):
     # the lines stop at the stop line and the zebra: the same arm frames the marks below are placed from
     clear = pfu.clear_zones(table, lanes_doc)
     # `--keep-clear-lanekits <path prefix>`: another network's lanes (the rail's tracks: `<pieces>/Roads_IslandRail_`)
-    # this one's furniture keeps out of. A PREFIX, not a glob, so a shell never expands it. The piece digest does not
-    # see these lanes: after a rail change, rebuild the road pieces without DIRTY_ONLY.
+    # this one's furniture keeps out of. A PREFIX, not a glob, so a shell never expands it. `pieces` takes the same
+    # argument and hashes the lanes near each piece into its digest, so DIRTY_ONLY rebuilds the pieces they reach.
     keep_clear = []
     kc = getattr(a, "keep_clear_lanekits", "") or ""
     for lk in sorted(glob.glob(glob.escape(kc) + "*.lanekit.json")) if kc else ():
@@ -623,6 +640,8 @@ def main(argv=None):
     s = sub.add_parser("pieces"); s.add_argument("record"); s.add_argument("zones")
     s.add_argument("out_dir"); s.add_argument("prefix"); s.add_argument("--dry-run", action="store_true")
     s.add_argument("--ground", default="")
+    s.add_argument("--avoid", default=""); s.add_argument("--avoid-ground", default="")
+    s.add_argument("--keep-clear-lanekits", default="")
     s.set_defaults(fn=cmd_pieces)
     s = sub.add_parser("merge"); s.add_argument("record"); s.add_argument("uids")
     s.add_argument("--keep", default=""); s.add_argument("--at-keep", action="store_true")

@@ -252,14 +252,32 @@ func _index_meshes(piece: Node) -> void:
 				var h: float = terrain.data.get_height(w)
 				if is_nan(h):
 					continue
+				# the BUILD's founding rule (point_mesh.FOOT_REACH): a shaft vertex stands on the lowest ground within
+				# 1.5 m of it -- over a vertical quay that is the seabed at the wall's toe, metres under the ground
+				# directly beneath the vertex (the Wangan's west viaduct, 2026-09-28). Judge the foot by the same rule
+				var hr := _ground_reach(w)
 				var k := _key(w.x, w.z)
-				if absf(w.y - h) <= FOOT_TOL:
+				if absf(w.y - h) <= FOOT_TOL or absf(w.y - hr.x) <= FOOT_TOL:
 					if not feet.has(k):
 						feet[k] = []
 					feet[k].append(w)
 				if not below.has(k):
 					below[k] = []
-				below[k].append(Vector4(w.x, w.y, w.z, h))
+				below[k].append(Vector4(w.x, w.y, w.z, maxf(h, hr.y)))
+
+const FOOT_REACH := 1.5     # point_mesh.FOOT_REACH
+
+## (lowest, highest) terrain within FOOT_REACH of `w` (a centre, four sides and four diagonals).
+func _ground_reach(w: Vector3) -> Vector2:
+	var lo := INF
+	var hi := -INF
+	for o in [Vector2.ZERO, Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1),
+			Vector2(0.7071, 0.7071), Vector2(-0.7071, 0.7071), Vector2(0.7071, -0.7071), Vector2(-0.7071, -0.7071)]:
+		var h: float = terrain.data.get_height(Vector3(w.x + o.x * FOOT_REACH, 0.0, w.z + o.y * FOOT_REACH))
+		if not is_nan(h):
+			lo = minf(lo, h)
+			hi = maxf(hi, h)
+	return Vector2(lo, hi)
 
 ## A vertex within `reach` (XZ) of `w`, at least `under` metres below it, that sits on the terrain.
 func _foot_near(w: Vector3, reach: float, under: float) -> bool:

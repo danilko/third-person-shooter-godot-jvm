@@ -295,6 +295,36 @@ def reshape(base):
     # port platform's own height, vertical quay edges into the open deep water on every side
     for x0, x1, z0, z1 in MILITARY_PIERS:
         out = np.where((xx >= x0) & (xx <= x1) & (zz >= z0) & (zz <= z1), MILITARY_PIER_Z + RAISE, out)
+    # THE AIRPORT ISLAND REACHES 60 m FURTHER SOUTH (user, 2026-09-29: "the airport's runway/island may need to extend,
+    # or change side -- the runway may hit the bridge"): the runway moved to the island's SOUTH edge, behind the terminal,
+    # away from the bridge, and at the old coast (z 1980) its paved strip stood 4 m from the water. A reclaimed strip at
+    # the airport platform's own height, as wide as the island is at its south end, with a quay edge into the sea.
+    x0, x1, z0, z1 = AIRPORT_SOUTH
+    plat = (zz >= z0 - 50.0) & (zz <= z0 - 15.0) & (xx >= x0) & (xx <= x1) & (out > LAND_Z)
+    if plat.any():
+        # only the columns where the platform is at its full height: the west end's beach is lower, and a strip laid
+        # beside it stood an 8 m step (the report's max_land_step)
+        top = float(np.median(out[plat]))
+        rows = np.where(((zz >= z0 - 50.0) & (zz <= z0 - 15.0))[:, 0])[0]
+        full = (out[rows, :] >= top - 0.25).all(axis=0) & ((xx >= x0) & (xx <= x1))[0]
+        cols = np.where(full)[0]
+        lo, hi = float(xx[0, cols].min()), float(xx[0, cols].max())
+        strip = (zz > z0 - 15.0) & (zz <= z1) & (xx >= lo) & (xx <= hi)
+        out = np.where(strip, top, out)
+        land = land | strip
+        # the island's west end is a terraced beach (5.4 m, then 0.3 m): carry the row above the strip's terrace on
+        # south along the new edge, or the platform stands an 8 m wall over the old beach's corner
+        ref = int(round((z0 - 20.0 - Z0) / STEP))
+        c_lo = int(round((lo - X0) / STEP))
+        srows = np.where(((zz > z0 - 15.0) & (zz <= z1))[:, 0])[0]
+        # (the terrace's top step, platform -> 5.4 m, is itself 8.2 m in the source: here it is eased over 4 cells)
+        mid = next((out[ref, c] for c in range(c_lo - 1, max(0, c_lo - 12), -1) if out[ref, c] < top - 0.25), top)
+        for c in range(max(0, c_lo - 12), c_lo):
+            k = c_lo - c
+            v = top + (mid - top) * k / 4.0 if k <= 4 else out[ref, c]
+            if out[ref, c] > LAND_Z:
+                out[srows, c] = v
+                land[srows, c] = True
     edits = {"fill": fill, "trim": trim | mcut, "dike": dike, "works": works}
     return out.astype(np.float32), land, edits
 
@@ -303,12 +333,20 @@ def reshape(base):
 #: (x ~-760) into -24 m of water, 80 m apart so a ship berths between them. They were first drawn south, and the
 #: air base's runway strip (user, 2026-09-26: "a small airlane/terminal for standard fighter flight/landing") now
 #: takes that water.
-MILITARY_PIERS = ((-1020.0, -740.0, 1300.0, 1350.0), (-1020.0, -740.0, 1430.0, 1480.0),
-                  # the AIR BASE: a reclaimed strip off the south-west coast (Iwakuni / Naha are reclaimed too), its
-                  # north edge on the platform's south edge, 1 210 m long for a 1 200 x 45 m runway + a parallel
-                  # taxiway; the paving is reserved (island_plan.RESERVES) for a later regional pass
-                  (-1650.0, -440.0, 1540.0, 1760.0))
+MILITARY_PIERS = ((-1020.0, -740.0, 1300.0, 1350.0),
+                  (-1265.0, -740.0, 1478.0, 1540.0))     # the RUNWAY strip (below)
+# THE RUNWAY IS OFFSHORE, FROM THE BASE INTO THE SEA (user, 2026-09-29: "the military's runway should be fully covered
+# by the military ... start the military base into the ocean like the pier"; Iwakuni / Haneda D are the precedent). The
+# second rectangle is a reclaimed strip 525 x 62 m running WEST from the base's south-west corner, the platform's
+# height, 110 m south of the pier's berth. 540 m of runway is plenty: FIJ1 lifts off after ~130 m (probe_craft.gd), and
+# it matches the civilian airport's 540 m.
+# COMPACT BASE (user, 2026-09-28: "so the player does not need to wander around, but still has every component"):
+# ONE pier (a finger pier berths a ship each side); the runway was on the platform's own south band until 2026-09-29. The 1 210 m reclaimed strip off the south-west coast and the second pier
+# are gone -- 1.4 km of empty paving between the pier and the runway's far end.
 MILITARY_PIER_Z = 4.6
+#: the airport island's south extension (Godot x0, x1, z0, z1): the strip south of the old coast (z ~1980) to z1, over
+#: the island's own width there (x0..x1 only bound the search). See `reshape`.
+AIRPORT_SOUTH = (700.0, AIRPORT_END_X, 1980.0, 2040.0)
 
 
 #: THE LAND IS RAISED AND THE COAST IS A SEAWALL WITH A BEACH IN FRONT (user, 2026-09-26: "the land height should

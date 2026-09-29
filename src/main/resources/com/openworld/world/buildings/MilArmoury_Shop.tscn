@@ -1,0 +1,450 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/MilArmoury_Open_mesh.res" id="1_65iew"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/MilArmoury_Open_collision.res" id="2_xs02t"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Door.java" id="3_sas38"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_DoorLeaf_White.tres" id="4_pukgh"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_2nagp"]
+size = Vector3(1.6, 2.4, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_a22vw"]
+size = Vector3(1.6, 2.4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yelvy"]
+size = Vector3(3, 2.6, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_uyrwb"]
+size = Vector3(0.9, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rd7vp"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_uyjh8"]
+size = Vector3(2.3, 2.3, 2.4)
+
+[node name="MilArmoury_Shop" type="Node3D" unique_id=103764828]
+metadata/building = {
+"aabb": [Vector3(-12.5, -0.2, -8.5), Vector3(25, 5.3999996, 17)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [0.0, 0.0, 7.75],
+"height": 2.4,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "swing",
+"width": 1.6
+}],
+"doors_closed": false,
+"doors_locked": false,
+"doors_shop": true,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [25.0, 17.0],
+"height_m": 5.4,
+"id": "MilArmoury",
+"inner_doors": [{
+"center": [-6.0, 0.0, 4.0],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}],
+"kit": "interiors",
+"landmark": false,
+"marks": [{
+"name": "MARK_spawn_01",
+"pos": [2.0, 0.0, 3.3],
+"props": {
+"kind": "spawn",
+"note": "the armourer, behind the cage",
+"team": "soldier"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_01",
+"pos": [-10.4, 0.0, 2.4],
+"props": {
+"kind": "weapon",
+"weapon": "ASR1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_02",
+"pos": [10.4, 0.0, 2.4],
+"props": {
+"kind": "weapon",
+"weapon": "SHG1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_03",
+"pos": [-10.4, 0.0, 0.3],
+"props": {
+"kind": "weapon",
+"weapon": "ASR1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_04",
+"pos": [10.4, 0.0, 0.3],
+"props": {
+"kind": "weapon",
+"weapon": "SNR1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_05",
+"pos": [-10.4, 0.0, -1.8],
+"props": {
+"kind": "weapon",
+"weapon": "ASR2"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_06",
+"pos": [10.4, 0.0, -1.8],
+"props": {
+"kind": "weapon",
+"weapon": "ATL1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_07",
+"pos": [-10.4, 0.0, -3.9],
+"props": {
+"kind": "weapon",
+"weapon": "SMG1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_08",
+"pos": [10.4, 0.0, -3.9],
+"props": {
+"kind": "weapon",
+"weapon": "ATL1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_09",
+"pos": [-10.4, 0.0, -6.0],
+"props": {
+"kind": "weapon",
+"weapon": "SMG1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_10",
+"pos": [10.4, 0.0, -6.0],
+"props": {
+"kind": "weapon",
+"weapon": "SHG1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_11",
+"pos": [-4.4, 0.0, -6.3],
+"props": {
+"kind": "weapon",
+"weapon": "PIS1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_12",
+"pos": [-3.5, 0.0, -6.3],
+"props": {
+"kind": "weapon",
+"weapon": "PIS2"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_13",
+"pos": [-2.6, 0.0, -6.3],
+"props": {
+"kind": "weapon",
+"weapon": "REV1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_14",
+"pos": [-1.7, 0.0, -6.3],
+"props": {
+"kind": "weapon",
+"weapon": "DUP1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_15",
+"pos": [-1.2, 0.0, 1.4],
+"props": {
+"kind": "weapon",
+"weapon": "FRG1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_16",
+"pos": [1.2, 0.0, 1.4],
+"props": {
+"kind": "weapon",
+"weapon": "FRG1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_17",
+"pos": [-1.2, 0.0, 0.1],
+"props": {
+"kind": "weapon",
+"weapon": "PIB1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_18",
+"pos": [1.2, 0.0, 0.1],
+"props": {
+"kind": "weapon",
+"weapon": "FLA1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_19",
+"pos": [-1.2, 0.0, -1.2],
+"props": {
+"kind": "weapon",
+"weapon": "SMO1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_20",
+"pos": [1.2, 0.0, -1.2],
+"props": {
+"kind": "weapon",
+"weapon": "REC1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_21",
+"pos": [-1.2, 0.0, -2.5],
+"props": {
+"kind": "weapon",
+"weapon": "MEW1"
+},
+"yaw": 0.0
+}],
+"piece_count": 1,
+"probe_xz": [0.0, -6.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "武器庫 (armoury bunker): 24 x 16 m, 0.5 m walls, an issue cage and the COMPLETE military armoury on MARK_weapon markers. A part of the MilitaryBase site. kits/interiors/MilArmoury.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 4.6
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=524047878]
+visibility_range_end = 365.1162
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_65iew")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=683538625]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1508489690]
+shape = ExtResource("2_xs02t")
+
+[node name="Doors" type="Node3D" parent="." unique_id=110451759]
+
+[node name="Door0" type="StaticBody3D" parent="Doors" unique_id=886939077]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0, 7.75)
+collision_mask = 0
+script = ExtResource("3_sas38")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door0" unique_id=1695406713]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 1.2, 0)
+material_override = ExtResource("4_pukgh")
+mesh = SubResource("BoxMesh_2nagp")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0" unique_id=1208359306]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 1.2, 0)
+shape = SubResource("BoxShape3D_a22vw")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door0" unique_id=449655355]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0/Sensor" unique_id=56603818]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 1.2, 0)
+shape = SubResource("BoxShape3D_yelvy")
+
+[node name="Door1" type="StaticBody3D" parent="Doors" unique_id=1410914082]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -6.45, 0, 4)
+collision_mask = 0
+script = ExtResource("3_sas38")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door1" unique_id=467671051]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+material_override = ExtResource("4_pukgh")
+mesh = SubResource("BoxMesh_uyrwb")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1" unique_id=882526080]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_rd7vp")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door1" unique_id=47334266]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1/Sensor" unique_id=77077878]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_uyjh8")
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=650355289]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 7.75)
+
+[node name="Markers" type="Node3D" parent="." unique_id=514880677]
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1008662600 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 2, 0, 3.3)
+metadata/team = "soldier"
+metadata/note = "the armourer, behind the cage"
+metadata/kind = "spawn"
+
+[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=755014951 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -10.4, 0, 2.4)
+metadata/weapon = "ASR1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=349670144 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 10.4, 0, 2.4)
+metadata/weapon = "SHG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_03" type="Marker3D" parent="Markers" unique_id=166927745 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -10.4, 0, 0.3)
+metadata/weapon = "ASR1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_04" type="Marker3D" parent="Markers" unique_id=677147769 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 10.4, 0, 0.3)
+metadata/weapon = "SNR1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_05" type="Marker3D" parent="Markers" unique_id=1179242227 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -10.4, 0, -1.8)
+metadata/weapon = "ASR2"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_06" type="Marker3D" parent="Markers" unique_id=1917012774 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 10.4, 0, -1.8)
+metadata/weapon = "ATL1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_07" type="Marker3D" parent="Markers" unique_id=1482745011 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -10.4, 0, -3.9)
+metadata/weapon = "SMG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_08" type="Marker3D" parent="Markers" unique_id=1308540105 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 10.4, 0, -3.9)
+metadata/weapon = "ATL1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_09" type="Marker3D" parent="Markers" unique_id=2012526891 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -10.4, 0, -6)
+metadata/weapon = "SMG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_10" type="Marker3D" parent="Markers" unique_id=620414963 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 10.4, 0, -6)
+metadata/weapon = "SHG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_11" type="Marker3D" parent="Markers" unique_id=534422946 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -4.4, 0, -6.3)
+metadata/weapon = "PIS1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_12" type="Marker3D" parent="Markers" unique_id=854390944 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -3.5, 0, -6.3)
+metadata/weapon = "PIS2"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_13" type="Marker3D" parent="Markers" unique_id=982986584 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.6, 0, -6.3)
+metadata/weapon = "REV1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_14" type="Marker3D" parent="Markers" unique_id=347530046 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.7, 0, -6.3)
+metadata/weapon = "DUP1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_15" type="Marker3D" parent="Markers" unique_id=985273066 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 0, 1.4)
+metadata/weapon = "FRG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_16" type="Marker3D" parent="Markers" unique_id=569250219 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0, 1.4)
+metadata/weapon = "FRG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_17" type="Marker3D" parent="Markers" unique_id=1926202184 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 0, 0.1)
+metadata/weapon = "PIB1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_18" type="Marker3D" parent="Markers" unique_id=1159744380 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0, 0.1)
+metadata/weapon = "FLA1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_19" type="Marker3D" parent="Markers" unique_id=278396838 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 0, -1.2)
+metadata/weapon = "SMO1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_20" type="Marker3D" parent="Markers" unique_id=1215301031 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 0, -1.2)
+metadata/weapon = "REC1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_21" type="Marker3D" parent="Markers" unique_id=1111144903 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 0, -2.5)
+metadata/weapon = "MEW1"
+metadata/kind = "weapon"

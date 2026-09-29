@@ -180,8 +180,8 @@ class Frame:
 
 def restroom_block(p, f, top):
     """THE RESTROOM BLOCK (駅のトイレ, the standard set of a modern Japanese station) in frame `f`: u 0..WC_L along its
-    OPEN face (v 0, the hall), v 0..WC_D back from it, floor at z 0, walls to `top`. Men (u 0..3.0): one stall, two
-    urinals, three sinks; women (u 3.0..6.4): three stalls, three sinks; the accessible room (多機能, u 6.4..WC_L). Each
+    OPEN face (v 0, the hall), v 0..WC_D back from it, floor at z 0, walls to `top`. Men (u 0..3.0): one stall, one
+    urinal, one basin; women (u 3.0..6.4): two stalls, two basins; the accessible room (多機能, u 6.4..WC_L). Each
     room's door is in the hall face behind a privacy screen; a pictogram sign over each."""
     L, D, t = SL.WC_L, SL.WC_D, 0.15
     f.box(p, (0, 0, 0), (L, D, 0.01), "MI_TileWhite", collide=False)
@@ -204,26 +204,35 @@ def restroom_block(p, f, top):
 
     # THE FIXTURES are the konbini's LIBRARY restroom kit (user, 2026-09-28): the washlet toilet (WC_Toilet), the square
     # basin with a mirror over it (WC_Basin, WC_Mirror), the stall partitions (WC_Partition), the grab rail and the baby
-    # table -- PROP_ markers the game places as library pieces, so an edit to the library reaches every station
+    # table -- PROP_ markers the game places as library pieces, so an edit to the library reaches every station.
+    # A SMALL station's set (user, 2026-09-28): men one stall + one urinal + one basin, women two stalls + two basins.
+    # Every stall has a real hinged door (a DOOR_, 0.65 m) that swings either way: inward it clears the toilet's front
+    # (0.75 m of stall in front of it), outward it clears every basin, which stand well away from the stall fronts.
+    out = (-f.v[0], -f.v[1])
+    SV, SDW = 3.35, 0.65                                  # the stall front line, the stall door's width
+
     def stall(u0, u1):
-        f.box(p, (u0, 3.35, 0), (u1, 3.4, 2.0), "MI_PaintedMetalDark")        # the door (shut; a placeholder)
-        f.prop(p, "WC_Partition", u1 - 0.015, 3.35 + 0.75, 0.0, (0.0, -1.0), "box")
-        f.prop(p, "WC_Toilet", (u0 + u1) / 2, D - t - 0.375, 0.0, (0.0, -1.0), "box")
+        uc = (u0 + u1) / 2
+        f.box(p, (u0, SV, 0), (uc - SDW / 2, SV + 0.05, 2.0), "MI_PaintedMetalDark")
+        f.box(p, (uc + SDW / 2, SV, 0), (u1, SV + 0.05, 2.0), "MI_PaintedMetalDark")
+        p.doors.append((f.pt(uc, SV + 0.025, 0.0), out, SDW, 2.0, "swing", 1.0))
+        f.prop(p, "WC_Partition", u1 - 0.015, SV + 0.75, 0.0, (0.0, -1.0), "box")
+        f.prop(p, "WC_Toilet", uc, D - t - 0.375, 0.0, (0.0, -1.0), "box")
 
     def basins(u_wall, face, vs):
         for v in vs:
             f.prop(p, "WC_Basin", u_wall + face * 0.283, v, 0.0, (face, 0.0))
             f.prop(p, "WC_Mirror", u_wall + face * 0.025, v, 0.0, (face, 0.0))
-    # men: one stall at the back of the far end, two urinals on the back wall, three basins along the end wall
+    # men: one stall in the back corner, one urinal on the back wall, one basin on the end wall by the entrance
     stall(t, 1.15)
-    for uc in (1.7, 2.45):
+    for uc in (2.0,):
         f.box(p, (uc - 0.2, D - t - 0.35, 0.35), (uc + 0.2, D - t, 1.05), "MI_PlasticWhite")
         f.box(p, (uc + 0.33, D - t - 0.45, 0.5), (uc + 0.36, D - t, 1.5), "MI_PaintedMetalDark", collide=False)
-    basins(t, 1.0, (1.55, 2.25, 2.95))
-    # women: three stalls along the back, three basins along the accessible room's wall
-    for k in range(3):
+    basins(t, 1.0, (1.5,))
+    # women: two stalls along the back, two basins on the accessible room's wall, clear of the stall doors
+    for k in range(2):
         stall(3.0 + t / 2 + k * 1.07, 3.0 + t / 2 + (k + 1) * 1.07)
-    basins(6.4 - t / 2, -1.0, (1.3, 2.0, 2.7))
+    basins(6.4 - t / 2, -1.0, (1.4, 2.1))
     # accessible (多機能トイレ): the toilet in the back corner, the grab rail on the end wall beside it, a basin and
     # mirror on the partition wall, the baby table on the back wall; its doorway a SOLID SLIDING door (引き戸, the
     # konbini's), hung on the hall face and running over the wall toward the women's room
@@ -231,7 +240,6 @@ def restroom_block(p, f, top):
     f.prop(p, "WC_GrabRail", L - t, D - t - 0.45, 0.0, (-1.0, 0.0))
     basins(6.4 + t / 2, 1.0, (2.85,))
     f.prop(p, "WC_BabyTable", 6.95, D - t, 0.0, (0.0, -1.0))
-    out = (-f.v[0], -f.v[1])
     run = (-f.u[0], -f.u[1])
     left = (-out[1], out[0])
     p.doors.append((f.pt(7.3, t / 2, 0.0), out, 1.2, 2.2, "slide",
@@ -338,7 +346,7 @@ def machines(p, f):
 def building(w, hand):
     """An open-air station's END BUILDING, in line with its platform (the user's 2026-09-27 plan): its whole floor is
     at PLATFORM level (the platform comes straight in through the -X face); the street door is in the +X face, where
-    the entry piece (`OA_Entry_*`) brings a stair and a slope down to the street. Inside, from the platform: the paid
+    the entry ramp (`OA_Ramp_*`) brings one straight slope down to the street. Inside, from the platform: the paid
     hall with its restroom block against the far wall, the FARE LINE across the hall (GATE_LANES lanes by the
     track-side wall, the SERVICE COUNTER on the line), the unpaid hall with the other restroom block and the ticket /
     ATM / vending machines, the entrance (two roller-shutter bays, open all day). Origin: footprint centre at BED level.
@@ -388,7 +396,7 @@ def building(w, hand):
     if hand == "R":
         mirror_y(p)
     p.note = ("An open-air station's end building (hand %s): the whole floor is at the platform top; the -X face is where "
-              "the platform comes in, the +X face the street door (the OA_Entry_* piece brings the stair and slope down "
+              "the platform comes in, the +X face the street door (the OA_Ramp_* piece brings the slope straight down "
               "to the street). The track-side wall stands ON the platform edge line (the gauge is 0.2 m beyond it) -- "
               "never move it toward the track. The GATE_ Empties are the ticket-gate lanes: keep one between each pair "
               "of cabinets, and keep the fare line closed from the track wall to the service counter. The other hand "
@@ -421,41 +429,6 @@ def wedge_x_col(p, x0, x1, y0, y1, z0, z_at_x0, z_at_x1, mat):
         face = bm.faces.new([vs[i] for i in fc])
         face.material_index = mi
     p.hulls.append(q)
-
-
-def entry_out(n, hand):
-    """The OTHER entrance (the user's 'stair ^ | slope ^'): the slope runs straight OUT beside the stair instead of
-    along the front -- for a front with no room beside the door (the reserve tries the along-the-front one first).
-    Same origin and landing as `entry`; the slope starts at the landing's +Y side (away from the rail for hand L)."""
-    p = Piece("OA_EntryOut_%d_%s" % (n, hand), "open_air")
-    rise, r = n * SL.ENTRY_RISE, SL.ENTRY_RISE
-    dw, land, run = SL.DOOR_W, SL.ENTRY_LAND, SL.STAIR_RUN
-    zb = -rise - SL.PLINTH
-    ya, yb = dw / 2 + 0.2, dw / 2 + 0.2 + SL.RAMP_W
-    p.solid((0.0, -dw / 2, zb), (land, yb, 0.0), "MI_Terrazzo")
-    for k in range(1, n):
-        x = land + (k - 1) * run
-        p.solid((land, -dw / 2, zb), (x + run, dw / 2, -k * r), "MI_ConcreteSmooth")
-        p.b.box((x + run - 0.04, -dw / 2, -k * r), (x + run, dw / 2, -k * r + 0.004), "MI_PaintYellow")
-    xs = land + (n - 1) * run
-    p.b.beam((land, -dw / 2, 0.9), (xs, -dw / 2, -rise + r + 0.9), 0.05, "MI_Steel")
-    p.solid((land, dw / 2, zb), (max(xs, land + 0.3), ya, 0.9 - rise), "MI_ConcreteSmooth")   # stair | slope wall
-    x, z = land, 0.0
-    segs = SL.ramp_segments(n)
-    for i, (sr, sh) in enumerate(segs):
-        wedge_x_col(p, x, x + sr, ya, yb, zb, z, z - sh, "MI_ConcreteSmooth")
-        p.b.beam((x, yb + 0.05, z + 0.85), (x + sr, yb + 0.05, z - sh + 0.85), 0.05, "MI_Steel")
-        p.col((x, yb, z - sh), (x + sr, yb + 0.1, z + 0.9))
-        x, z = x + sr, z - sh
-        if i < len(segs) - 1:
-            p.solid((x, ya, zb), (x + SL.RAMP_LAND, yb, z), "MI_ConcreteSmooth")
-            x += SL.RAMP_LAND
-    if hand == "R":
-        mirror_y(p)
-    p.note = ("The entrance stair + slope (hand %s, %d risers, %.2f m), the slope running STRAIGHT OUT beside the "
-              "stair. Keep it 1:%g with a landing every %.2f m of rise." % (hand, n, rise, SL.RAMP_SLOPE,
-                                                                        SL.RAMP_SEG_RISE))
-    return p
 
 
 def entry(n, hand, pre="OA", cat="open_air", dw=None, kind="Entry"):
@@ -498,6 +471,46 @@ def entry(n, hand, pre="OA", cat="open_air", dw=None, kind="Entry"):
     return p
 
 
+def ramp(n):
+    """THE OPEN-AIR ENTRANCE RAMP (user, 2026-09-28: "remove the stairs, and have the slope in line with the entrance,
+    so the station can move close to the sidewalk"): one straight slope out of the street door, as wide as the door,
+    for a sill n x ENTRY_RISE over the street. Origin: the door's centre on the street face, at FLOOR level (the
+    platform top); +X out to the street. A RAMP_LAND landing at the sill, then 1:RAMP_SLOPE legs with a RAMP_LAND
+    landing every RAMP_SEG_RISE of rise, a handrail on each side on a low kerb wall (the wall is the collider, so
+    nobody steps off). Each leg's collider is its own wedge -- the slope is smooth underfoot. Solid down to the street
+    and PLINTH past it, so it stands in the ground however it lies. Symmetric, so no hand."""
+    p = Piece("OA_Ramp_%d" % n, "open_air")
+    rise = n * SL.ENTRY_RISE
+    dw = SL.DOOR_W
+    zb = -rise - SL.PLINTH
+    y0, y1 = -dw / 2, dw / 2
+    x, z = SL.RAMP_LAND, 0.0
+    p.solid((0.0, y0, zb), (x, y1, 0.0), "MI_Terrazzo")                      # the landing at the sill
+    segs = SL.ramp_segments(n)
+    for i, (sr, sh) in enumerate(segs):
+        wedge_x_col(p, x, x + sr, y0, y1, zb, z, z - sh, "MI_ConcreteSmooth")
+        for yy, sg in ((y0, -1.0), (y1, 1.0)):
+            p.b.beam((x, yy + sg * 0.05, z + 0.85), (x + sr, yy + sg * 0.05, z - sh + 0.85), 0.05, "MI_Steel")
+            lo, hi = sorted((yy, yy + sg * 0.1))
+            p.col((x, lo, z - sh), (x + sr, hi, z + 0.9))                   # the rail: nobody steps off
+        x, z = x + sr, z - sh
+        if i < len(segs) - 1:
+            p.solid((x, y0, zb), (x + SL.RAMP_LAND, y1, z), "MI_ConcreteSmooth")
+            for yy, sg in ((y0, -1.0), (y1, 1.0)):
+                p.b.beam((x, yy + sg * 0.05, z + 0.85), (x + SL.RAMP_LAND, yy + sg * 0.05, z + 0.85), 0.05, "MI_Steel")
+                lo, hi = sorted((yy, yy + sg * 0.1))
+                p.col((x, lo, z), (x + SL.RAMP_LAND, hi, z + 0.9))
+            x += SL.RAMP_LAND
+    # the tactile strip (点字ブロック) across the foot and at the top, where the level changes
+    p.b.box((x - 0.4, y0, z), (x - 0.1, y1, z + 0.004), "MI_PaintYellow")
+    p.b.box((0.1, y0, 0.0), (0.4, y1, 0.004), "MI_PaintYellow")
+    p.note = ("The open-air station's entrance ramp: %d rise steps (%.2f m) from the door sill straight down to the "
+              "street, as wide as the door. Keep it 1:%g with a landing every %.2f m of rise: it is the only way in. "
+              "The layout picks the rise nearest each station's street, and its foot stops %.1f m short of the "
+              "street's footway." % (n, rise, SL.RAMP_SLOPE, SL.RAMP_SEG_RISE, SL.FOOT_GAP))
+    return p
+
+
 def mirror_y(p):
     """Mirror a piece across y = 0 (the other hand), fixing the face winding the mirror turns inside out."""
     import bmesh
@@ -518,7 +531,7 @@ def open_air_pieces():
     out = [fence()]
     for w in WIDTHS:
         out += [platform(w), shed(w), end_fence(w), building(w, "L"), building(w, "R")]
-    out += [f(n, h) for f in (entry, entry_out) for n in range(SL.ENTRY_N[0], SL.ENTRY_N[1] + 1) for h in ("L", "R")]
+    out += [ramp(n) for n in range(SL.ENTRY_N[0], SL.ENTRY_N[1] + 1)]
     return out
 
 
@@ -1460,8 +1473,8 @@ def preview(pieces_by_name, w=4.0, length=90.0):
         inst("OA_EndFence_" + ws, (-length / 2 + SL.FENCE_T / 2, cy, SL.PLATFORM_H), 0.0)
         inst("OA_Building_%s_%s" % (ws, side), (length / 2 + SL.BUILDING_LEN / 2, sg * (edge + SL.BUILDING_D / 2), 0.0),
              0.0)
-        inst("OA_Entry_%d_%s" % (SL.entry_n(SL.PLATFORM_H), side), (length / 2 + SL.BUILDING_LEN,
-                                                                  sg * (edge + SL.DOOR_OFF), SL.PLATFORM_H), 0.0)
+        inst("OA_Ramp_%d" % SL.entry_n(SL.PLATFORM_H), (length / 2 + SL.BUILDING_LEN, sg * (edge + SL.DOOR_OFF),
+                                                        SL.PLATFORM_H), 0.0)
     for tc in (-SL.TRACK_HALF, SL.TRACK_HALF):      # the track centres, as thin rails, so the gap reads
         e = bpy.data.objects.new("pv_track", None)
         e.empty_display_type = "PLAIN_AXES"

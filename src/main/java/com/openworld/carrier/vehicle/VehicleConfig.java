@@ -418,6 +418,14 @@ public class VehicleConfig extends Resource {
     @Export public double seatDrop = 0.0;
 
     /**
+     * Armour of EACH window, in weapon damage (VehicleDamageRules "windows"). 0 = ordinary glass, every car: it takes
+     * one light round, a melee blow, a crash or a blast and breaks, and a rifle-class round or heavier goes straight
+     * through. Above 0 (a SPECIAL armoured vehicle only) the window soaks rounds until that much damage has hit it, and
+     * the round that breaks it carries on with what it had left. Set per car in tools/build_vehicle_scenes.py's TUNING.
+     */
+    @Export public double glassArmor = 0.0;
+
+    /**
      * Beyond this heading magnitude the body KEEPS the side it is already turned to, degrees.
      *
      * <p>The only latch left, and it exists for one unavoidable discontinuity: directly behind, +179

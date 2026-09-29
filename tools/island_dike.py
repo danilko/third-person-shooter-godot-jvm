@@ -250,6 +250,7 @@ def ramps(net, dike):
 RAIL_RESERVE = os.path.join(rg.ROOT, "assets", "world_source", "buildings", "IslandRailReserve.json")
 RAIL_OVER = 1.5 + 6.0     # the ring's surface over a rail head where it bridges the track: deck + a train's catenary
 RAIL_GAP = 4.0            # m past the rail corridor's half width left unfilled under the ring's span
+RAIL_OPEN = 80.0          # m along the track either side of the crossing the embankment stays open
 
 
 def rail_crossings(net):
@@ -280,7 +281,10 @@ def rail_crossings(net):
                     if hit[2] >= a[2] + (b[2] - a[2]) * u:
                         continue
                 L = math.hypot(*d1) or 1.0
-                out.append((hit[0], hit[1], hit[2], half, d1[0] / L, d1[1] / L))
+                # the corridor's own samples within RAIL_OPEN of the crossing: the opening follows the TRACK (a curve
+                # left a straight strip 30 m along -- the Main line's approach to the bridge, 2026-09-29)
+                near = [(q_[0], q_[1]) for q_ in c["pts"] if math.hypot(q_[0] - hit[0], q_[1] - hit[1]) < RAIL_OPEN]
+                out.append((hit[0], hit[1], hit[2], half, d1[0] / L, d1[1] / L, near))
     return out
 
 
@@ -299,6 +303,189 @@ def _rail_no(x, y):
     return any(abs(x - qx) < h and abs(y - qy) < h and math.hypot(x - qx, y - qy) < h for qx, qy, h in _RAIL_NO)
 
 
+_STATION_BOXES = None
+STATION_CLEAR = 7.0      # m a street keeps from a station's building or car park (its half width + a verge)
+
+
+def _in_station(x, y):
+    """Is (x, y) (record) inside a station's box or its car park (the reserve's `boxes`), grown by STATION_CLEAR? The
+    側道 ran straight through Light Industry's kit station (probe_road_clear, 2026-09-28)."""
+    global _STATION_BOXES
+    if _STATION_BOXES is None:
+        _STATION_BOXES = []
+        if os.path.exists(RAIL_RESERVE):
+            for b in json.load(open(RAIL_RESERVE)).get("boxes", []):
+                if str(b["id"]).split(":")[0] in ("station", "parking"):
+                    # an open-air station's ramps and its street-front car park meet a street crossing the line
+                    # (island_rail_layout STATION_FRONT): along the axis the side road may pass right by them
+                    front = b.get("form") == "open_air" or bool(b.get("entrance"))
+                    # and a side road pushed out along the axis lands ON the station's street line: its paved edge
+                    # FOOT_GAP past the ramps' feet (the box ends a metre past that gap), or on a car park's entrance
+                    esc = (FRONT_ESCAPE_PARK if b.get("entrance") else FRONT_ESCAPE) if front else STATION_ESCAPE
+                    _STATION_BOXES.append((b["x"], b["y"], b["ux"], b["uy"],
+                                           b["h_along"] + (0.0 if front else STATION_CLEAR),
+                                           b["h_across"] + STATION_CLEAR, esc))
+    for cx, cy, ux, uy, ha, hc, _e in _STATION_BOXES:
+        dx, dy = x - cx, y - cy
+        if abs(dx * ux + dy * uy) <= ha and abs(-dx * uy + dy * ux) <= hc:
+            return True
+    return False
+
+
+STATION_ESCAPE = 3.0    # m past the grown box's edge a detour clears it (the simplify and the 5 m sampling cut a corner)
+STATION_BLEND = 40.0     # m over which a detour round a station eases back onto the side road's own line
+FRONT_ESCAPE = 5.5       # m past an OPEN-AIR station's box end a side road's centre lands (block half 6.5 - the box's
+                         # 1 m past the FOOT_GAP apron): its paved edge exactly FOOT_GAP past the entrance ramps' feet
+FRONT_ESCAPE_PARK = 6.8  # m past a street-front car park's entrance face (0.3 m short of the paved edge + half 6.5)
+
+
+SIDE_RAIL_CLEAR = 35.0   # m a side road keeps from an at-grade rail track it runs ALONGSIDE (its centreline)
+_RAIL_ALONG = None
+
+
+def keep_off_rail(line):
+    """The side road's line pushed out to SIDE_RAIL_CLEAR from every at-grade rail track it runs PARALLEL to (within
+    30 deg), one clean shift per run eased back over STATION_BLEND, the way `round_stations` bends it round a station.
+    A side road squeezed against a track T'd into the arterial 27 m from the arterial's own 踏切 (2026-09-28: Residential
+    North's box used to hold it off by accident; the station's entrance ramps made that box narrow). A road that
+    CROSSES the track is left alone -- only a parallel stretch is pushed."""
+    from shapely.geometry import LineString, Point
+    global _RAIL_ALONG
+    if _RAIL_ALONG is None:
+        _RAIL_ALONG = []
+        if os.path.exists(RAIL_RESERVE):
+            for c in json.load(open(RAIL_RESERVE))["corridors"]:
+                P = c["pts"]
+                for i, q in enumerate(P):
+                    if q[4] == "under":                       # the viaduct: a road passes beneath
+                        continue
+                    a, b = P[max(i - 1, 0)], P[min(i + 1, len(P) - 1)]
+                    L = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+                    _RAIL_ALONG.append((q[0], q[1], (b[0] - a[0]) / L, (b[1] - a[1]) / L))
+    if not _RAIL_ALONG:
+        return line
+    dens = [line.interpolate(t) for t in np.arange(0.0, line.length, 2.0)] + [Point(line.coords[-1])]
+    P = [(q.x, q.y) for q in dens]
+    push = [None] * len(P)
+    for i, (x, y) in enumerate(P):
+        a, b = P[max(i - 1, 0)], P[min(i + 1, len(P) - 1)]
+        tl = math.hypot(b[0] - a[0], b[1] - a[1]) or 1.0
+        tx, ty = (b[0] - a[0]) / tl, (b[1] - a[1]) / tl
+        best = None
+        for qx, qy, ux, uy in _RAIL_ALONG:
+            if abs(qx - x) > SIDE_RAIL_CLEAR or abs(qy - y) > SIDE_RAIL_CLEAR:
+                continue
+            if abs(tx * ux + ty * uy) < 0.87:
+                continue
+            c = -(x - qx) * uy + (y - qy) * ux                 # signed offset across the track
+            if abs(c) < SIDE_RAIL_CLEAR and (best is None or abs(c) < abs(best[0])):
+                best = (c, ux, uy)
+        if best:
+            c, ux, uy = best
+            e = SIDE_RAIL_CLEAR - abs(c) + STATION_ESCAPE
+            sg = 1.0 if c >= 0 else -1.0
+            push[i] = (-uy * e * sg, ux * e * sg)
+    if not any(push):
+        return line
+    out = []
+    runs, i = [], 0
+    while i < len(P):
+        if push[i] is None:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(P) and push[j + 1] is not None:
+            j += 1
+        runs.append((i, j, max(push[i:j + 1], key=lambda v: math.hypot(*v))))
+        i = j + 1
+    for k, (x, y) in enumerate(P):
+        vx = vy = 0.0
+        for i0, j0, (bx, by) in runs:
+            if i0 <= k <= j0:
+                w = 1.0
+            else:
+                d = 2.0 * (i0 - k if k < i0 else k - j0)
+                w = 0.5 * (1.0 + math.cos(math.pi * d / STATION_BLEND)) if d < STATION_BLEND else 0.0
+            if w * math.hypot(bx, by) > math.hypot(vx, vy):
+                vx, vy = w * bx, w * by
+        out.append((x + vx, y + vy))
+    return LineString(out).simplify(1.0)
+
+
+def round_stations(line):
+    """The side road's line (a shapely LineString) bent round every station box it runs through: each point inside is
+    pushed out past the box's NEAREST edge (+STATION_ESCAPE), every point of one run inside by the largest push that run needs
+    (so the detour is one clean shift, not a ripple), eased back to the line over STATION_BLEND either side. Dropping
+    the whole piece instead lost the west shore's 側道 -- ~1 km, the only road eight civic plots front (2026-09-28)
+    -- for 68 m that clipped Light Industry's north end. Returns the line unchanged when it touches no station."""
+    from shapely.geometry import LineString, Point
+    _in_station(0.0, 0.0)                                  # load the boxes
+    dens = [line.interpolate(t) for t in np.arange(0.0, line.length, 2.0)] + [Point(line.coords[-1])]
+    P = [(q.x, q.y) for q in dens]
+    push = [None] * len(P)
+    for i, (x, y) in enumerate(P):
+        for cx, cy, ux, uy, ha, hc, esc in _STATION_BOXES:
+            dx, dy = x - cx, y - cy
+            a, c = dx * ux + dy * uy, -dx * uy + dy * ux
+            if abs(a) <= ha and abs(c) <= hc:
+                ea, ec = ha - abs(a) + esc, hc - abs(c) + STATION_ESCAPE
+                front = esc != STATION_ESCAPE
+                if front:
+                    # a road running ACROSS a front box (an open-air station's end, a street-front car park) is its
+                    # street: it goes out along the axis, onto the street line, point by point (`exact`)
+                    pa, pb = P[max(i - 1, 0)], P[min(i + 1, len(P) - 1)]
+                    tl = math.hypot(pb[0] - pa[0], pb[1] - pa[1]) or 1.0
+                    across = abs((pb[0] - pa[0]) * ux + (pb[1] - pa[1]) * uy) / tl < 0.6
+                    if across:
+                        sg = 1.0 if a >= 0 else -1.0
+                        push[i] = (ux * ea * sg, uy * ea * sg, True)
+                        break
+                if ea <= ec:
+                    sg = 1.0 if a >= 0 else -1.0
+                    push[i] = (ux * ea * sg, uy * ea * sg)
+                else:
+                    sg = 1.0 if c >= 0 else -1.0
+                    push[i] = (-uy * ec * sg, ux * ec * sg)
+                break
+    if not any(push):
+        return line
+    # one run inside -> one shift: the largest push of the run, in its direction -- except a run across a FRONT box,
+    # which is pushed point by point onto the street line (every point to the same along-axis distance: straight)
+    push = [v if v is None or len(v) == 3 else (v[0], v[1], False) for v in push]
+    i = 0
+    runs = []
+    while i < len(P):
+        if push[i] is None:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(P) and push[j + 1] is not None:
+            j += 1
+        if all(push[k][2] for k in range(i, j + 1)):
+            for k in range(i, j + 1):
+                runs.append((k, k, push[k][:2]))
+        else:
+            big = max((v[:2] for v in push[i:j + 1]), key=lambda v: math.hypot(*v))
+            runs.append((i, j, big))
+        i = j + 1
+    out = []
+    for k, (x, y) in enumerate(P):
+        if push[k] is not None and push[k][2]:
+            out.append((x + push[k][0], y + push[k][1]))     # on a front box's street line, exactly
+            continue
+        vx = vy = 0.0
+        for i0, j0, (bx, by) in runs:
+            if i0 <= k <= j0:
+                w = 1.0
+            else:
+                d = 2.0 * (i0 - k if k < i0 else k - j0)
+                w = 0.5 * (1.0 + math.cos(math.pi * d / STATION_BLEND)) if d < STATION_BLEND else 0.0
+            if w * math.hypot(bx, by) > math.hypot(vx, vy):
+                vx, vy = w * bx, w * by
+        out.append((x + vx, y + vy))
+    return LineString(out).simplify(0.5)
+
+
 def rail_lifts(net, dike):
     """Lift every dike station near a rail crossing so the ring clears the track by RAIL_OVER, eased at RAMP_GRADE
     along the road (never lowered). Returns [(x, y, crest z needed)]."""
@@ -308,10 +495,10 @@ def rail_lifts(net, dike):
             continue
         for p in net.chain(r):
             want = max((z + RAIL_OVER - RAMP_GRADE * max(0.0, math.dist(p.pos[:2], (x, y)) - h - RAIL_GAP)
-                        for x, y, z, h, _ux, _uy in xs), default=-1e9)
+                        for x, y, z, h, _ux, _uy, _near in xs), default=-1e9)
             if want > p.pos[2]:
                 p.pos = (p.pos[0], p.pos[1], round(want, 3))
-    return [(x, y, z + RAIL_OVER) for x, y, z, _h, _ux, _uy in xs]
+    return [(x, y, z + RAIL_OVER) for x, y, z, _h, _ux, _uy, _near in xs]
 
 
 MEET_SKIP = 250.0         # m of an expressway's own approach to a T on the ring: a ramp, not a crossing
@@ -523,6 +710,9 @@ def sokudo(net, ground):
         line = LineString([off[i] for i in keep]).simplify(2.0)
         if not line.is_simple or line.length < SIDE_MIN:
             continue
+        line = round_stations(keep_off_rail(line))
+        if not line.is_simple:
+            continue
         # dry, low land only: cut the line where it leaves it
         cum = [0.0]
         dens = [line.interpolate(t) for t in np.arange(0.0, line.length, 5.0)] + [Point(line.coords[-1])]
@@ -530,7 +720,7 @@ def sokudo(net, ground):
         for q in dens:
             g = ground.z(q.x, q.y)
             # and not where the rail reserve closes a street (a 踏切 too near a junction, a ramp: PLAN.md 3.25 R0)
-            good.append(g is not None and -0.3 < g < 3.0 and not _rail_no(q.x, q.y))
+            good.append(g is not None and -0.3 < g < 3.0 and not _rail_no(q.x, q.y) and not _in_station(q.x, q.y))
         # crossings with the targets
         hits = []
         for name, a, b in targets:
@@ -560,6 +750,13 @@ def sokudo(net, ground):
             i0, i1 = int(s0 // 5.0), min(int(s1 // 5.0), len(good) - 1)
             if all(good[i0:i1 + 1]):
                 pieces.append((s0, n0, p0, s1, n1, p1))
+            elif os.environ.get("SOKUDO_DEBUG"):
+                for ii in range(i0, i1 + 1):
+                    if not good[ii]:
+                        q = dens[ii]
+                        g = ground.z(q.x, q.y)
+                        print("SOKUDO_DEBUG %s..%s bad at s %.0f (%.0f, %.0f) ground %s rail_no %s station %s" % (
+                            n0, n1, ii * 5.0, q.x, q.y, g, _rail_no(q.x, q.y), _in_station(q.x, q.y)))
         # each crossing is cut ONCE; two pieces meeting there share its pad (a 4-way)
         cuts = {}
         for s0, n0, p0, s1, n1, p1 in pieces:
@@ -695,12 +892,10 @@ def sculpt(H, net):
         # quay wall), never a 1:2 face reclaiming the gulf 70 m out
         target = np.where((H[j0:j1, i0:i1] <= RS.LAND_Z) & ((over > 0) | (along > 0)), -np.inf, target)
         # the RAIL passes under the ring here (`rail_lifts`): no embankment over its corridor -- the ring is a bridge
-        for rx, ry, _rz, rh, ux, uy in rails:
-            # Godot (x, z) = record (x, -y); the track's direction likewise (ux, -uy)
-            ex, ez = x - rx, z + ry
-            along_r = ex * ux - ez * uy
-            across_r = np.abs(ex * uy + ez * ux)
-            target = np.where((across_r < rh + RAIL_GAP) & (np.abs(along_r) < 80.0), -np.inf, target)
+        for rx, ry, _rz, rh, ux, uy, near in rails:
+            # Godot (x, z) = record (x, -y): a disc per corridor sample (10 m apart), so the opening bends with the track
+            for px, py in near:
+                target = np.where(np.hypot(x - px, z + py) < rh + RAIL_GAP + 5.0, -np.inf, target)
         win = out[j0:j1, i0:i1]
         np.maximum(win, target, out=win)
     raised = out > H + 0.05

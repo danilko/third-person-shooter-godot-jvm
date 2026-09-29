@@ -26,6 +26,11 @@ folder, i.e. the pieces the game builds from.
   low stop, props w/d/rise/door_w/door_h) become `lifts`, and `DOOR_*` (an INTERIOR door in a wall piece's hole: a
   single arrow on the floor at the doorway's centre pointing OUT of the room; props w, h, style "swing" | "slide",
   slide_dir +1 / -1 = the sliding leaf runs to the RIGHT / LEFT seen from where the arrow points) become `doors`.
+  A whole BUILDING's piece (kits/interiors, 2026-09-28) adds two more: `EXIT_*` (an OUTER door, the same arrow and
+  props as a DOOR_, pointing out of the building) become `exits`, and `MARK_*` (a MISSION MARKER for the level
+  designer: a weapon spot, a spawn point, a cover point -- props `kind`, and optionally `weapon` / `team` / any other
+  string) become `marks` ({name, pos, yaw, props}). A LIFT_ may carry `stops` (a comma list of floor heights over its
+  low stop: a building's multi-storey lift) and `faces` (1 = -X, 2 = +X, 3 = both); its Z turn is its `yaw`.
   Empties never go into the glTF.
 * `pieces.json` is measured by `normalize_kit.measure`, the same function that measured the downloaded pieces,
   so a size cannot differ depending on which tool wrote the file.
@@ -81,6 +86,7 @@ def godot(v):
 def markers(col):
     """The piece's COL_, GATE_ and LIFT_ Empties, in the piece's own frame (the grid offset removed), Godot axes."""
     boxes, gates, lifts, hulls, doors, props = [], [], [], [], [], []
+    exits, marks = [], []
     for o in sorted(col.all_objects, key=lambda o: o.name):
         if o.type != "EMPTY":
             continue
@@ -96,11 +102,11 @@ def markers(col):
             z = z.normalized() if z.length > 1e-6 else mathutils.Vector((1.0, 0.0, 0.0))
             gates.append({"pos": godot(loc), "out": godot(z), "w": float(o.get("w", 0.9)),
                           "h": float(o.get("h", 1.0))})
-        elif o.name.startswith("DOOR_"):
+        elif o.name.startswith(("DOOR_", "EXIT_")):
             z = o.matrix_world.to_3x3() @ mathutils.Vector((0.0, 0.0, 1.0))
             z.z = 0.0
             z = z.normalized() if z.length > 1e-6 else mathutils.Vector((0.0, -1.0, 0.0))
-            doors.append({"pos": godot(loc), "out": godot(z), "w": float(o.get("w", 0.85)),
+            (exits if o.name.startswith("EXIT_") else doors).append({"pos": godot(loc), "out": godot(z), "w": float(o.get("w", 0.85)),
                           "h": float(o.get("h", 2.0)), "style": str(o.get("style", "swing")),
                           "slide_dir": 1.0 if float(o.get("slide_dir", 1.0)) >= 0 else -1.0})
         elif o.name.startswith("PROP_"):
@@ -116,9 +122,21 @@ def markers(col):
         elif o.name.startswith("LIFT_"):
             # a lift (world.Elevator): the shaft floor's centre at the low stop; w along the piece's X, d along its
             # Y (Godot Z), its doors on the two X faces
-            lifts.append({"pos": godot(loc), "w": float(o["w"]), "d": float(o["d"]), "rise": float(o["rise"]),
-                          "door_w": float(o.get("door_w", 1.1)), "door_h": float(o.get("door_h", 2.1))})
-    return boxes, gates, lifts, hulls, doors, props
+            lf = {"pos": godot(loc), "w": float(o["w"]), "d": float(o["d"]), "rise": float(o["rise"]),
+                  "door_w": float(o.get("door_w", 1.1)), "door_h": float(o.get("door_h", 2.1)),
+                  "yaw": round(math.degrees(o.matrix_world.to_euler().z) % 360.0, 4)}
+            if o.get("stops"):
+                lf["stops"] = str(o["stops"])
+            if "faces" in o:
+                lf["faces"] = int(o["faces"])
+            lifts.append(lf)
+        elif o.name.startswith("MARK_"):
+            # a MISSION MARKER (a level designer's hook: a weapon spot, a spawn point); every string prop rides along
+            extra = {k: (o[k] if isinstance(o[k], (int, float, str)) else str(o[k])) for k in o.keys()
+                     if k not in ("edit_note",) and not k.startswith("_")}
+            marks.append({"name": o.name, "pos": godot(loc),
+                          "yaw": round(math.degrees(o.matrix_world.to_euler().z) % 360.0, 4), "props": extra})
+    return boxes, gates, lifts, hulls, doors, props, exits, marks
 view_layer = bpy.context.view_layer
 for col in pieces:
     cat = col["bk_category"]
@@ -155,7 +173,11 @@ for col in pieces:
         fh.write(json.dumps(gltf, indent=1) + "\n")
     lo, hi = nk.measure(gltf, blob)
     manifest["pieces"][name] = nk.manifest_entry(name, cat, gltf, lo, hi)
-    boxes, gates, lifts, hulls, doors, props = markers(col)
+    boxes, gates, lifts, hulls, doors, props, exits, marks = markers(col)
+    if exits:
+        manifest["pieces"][name]["exits"] = exits
+    if marks:
+        manifest["pieces"][name]["marks"] = marks
     if props:
         manifest["pieces"][name]["props"] = props
     if doors:

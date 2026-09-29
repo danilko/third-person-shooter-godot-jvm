@@ -1,183 +1,505 @@
 [gd_scene format=3]
 
-[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/AirportTerminal_mesh.res" id="1_pduc0"]
-[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/AirportTerminal_collision.res" id="2_k4ui6"]
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_5y8f7"]
-size = Vector3(2.04, 3.5, 0.14)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_50bye"]
-size = Vector3(2.04, 3.5, 0.14)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_6bgeb"]
-size = Vector3(2.04, 3.5, 0.14)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_2e3fq"]
-size = Vector3(2.04, 3.5, 0.14)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_5rg4w"]
-size = Vector3(2.04, 3.5, 0.14)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_gxaxp"]
-size = Vector3(2.04, 3.5, 0.14)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_acsu6"]
-size = Vector3(2.04, 3.5, 0.14)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_sxd06"]
-size = Vector3(2.04, 3.5, 0.14)
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/AirportTerminal_mesh.res" id="1_6bgeb"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/AirportTerminal_collision.res" id="2_2e3fq"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_5rg4w"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_gxaxp"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_acsu6"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_sxd06"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_etvc6"]
-size = Vector3(4.04, 4, 0.14)
+size = Vector3(1.24, 2.1, 0.14)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hiw25"]
-size = Vector3(4.04, 4, 0.14)
+size = Vector3(1.24, 2.1, 0.14)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_st8am"]
-size = Vector3(4.04, 4, 0.14)
+size = Vector3(1.24, 2.1, 0.14)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_sbbh4"]
-size = Vector3(4.04, 4, 0.14)
+size = Vector3(1.24, 2.1, 0.14)
 
-[node name="AirportTerminal" type="Node3D" unique_id=2020987571]
+[sub_resource type="BoxShape3D" id="BoxShape3D_j6kp8"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bgp4j"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2lgg2"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_odrnq"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ltgnh"]
+size = Vector3(3, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5agib"]
+size = Vector3(1.2, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_v8yu4"]
+size = Vector3(1.8, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_c6pm2"]
+size = Vector3(1.8, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xyowr"]
+size = Vector3(1.8, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_n7pd2"]
+size = Vector3(1.8, 2.1, 0.14)
+
+[node name="AirportTerminal" type="Node3D" unique_id=1417202984]
 metadata/building = {
-"aabb": [Vector3(-121, -0.1, -85), Vector3(242, 47.1, 170)],
+"aabb": [Vector3(-75.01, -1.2, -42.3), Vector3(150.02, 14.5, 84.6)],
 "collision": "trimesh",
-"door_style": "slide",
+"door_style": "swing",
 "doors": [{
-"center": [-45.0, 0.0, 65.0],
-"height": 3.5,
+"center": [-45.0, 0.0, 33.2],
+"height": 2.1,
 "module": 0.0,
 "outward": [0.0, 0.0, 1.0],
-"side": "departures",
-"width": 4.0
+"side": "exit",
+"style": "slide",
+"width": 2.4
 }, {
-"center": [-15.0, 0.0, 65.0],
-"height": 3.5,
+"center": [-15.0, 0.0, 33.2],
+"height": 2.1,
 "module": 1.0,
 "outward": [0.0, 0.0, 1.0],
-"side": "departures",
-"width": 4.0
+"side": "exit",
+"style": "slide",
+"width": 2.4
 }, {
-"center": [15.0, 0.0, 65.0],
-"height": 3.5,
+"center": [15.0, 0.0, 33.2],
+"height": 2.1,
 "module": 2.0,
 "outward": [0.0, 0.0, 1.0],
-"side": "departures",
-"width": 4.0
+"side": "exit",
+"style": "slide",
+"width": 2.4
 }, {
-"center": [45.0, 0.0, 65.0],
-"height": 3.5,
+"center": [45.0, 0.0, 33.2],
+"height": 2.1,
 "module": 3.0,
 "outward": [0.0, 0.0, 1.0],
-"side": "departures",
-"width": 4.0
+"side": "exit",
+"style": "slide",
+"width": 2.4
 }, {
-"center": [-40.0, 0.0, 5.0],
-"height": 4.0,
+"center": [-55.0, 0.0, -16.6],
+"height": 2.1,
 "module": 4.0,
 "outward": [0.0, 0.0, -1.0],
-"side": "airside",
-"width": 8.0
+"side": "exit",
+"style": "swing",
+"width": 3.0
 }, {
-"center": [40.0, 0.0, 5.0],
-"height": 4.0,
+"center": [50.0, 0.0, -16.6],
+"height": 2.1,
 "module": 5.0,
 "outward": [0.0, 0.0, -1.0],
-"side": "airside",
-"width": 8.0
+"side": "exit",
+"style": "swing",
+"width": 1.2
+}, {
+"center": [-52.0, 6.0, -16.6],
+"height": 2.1,
+"module": 6.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 1.8
+}, {
+"center": [-17.0, 6.0, -16.6],
+"height": 2.1,
+"module": 7.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 1.8
+}, {
+"center": [17.0, 6.0, -16.6],
+"height": 2.1,
+"module": 8.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 1.8
+}, {
+"center": [52.0, 6.0, -16.6],
+"height": 2.1,
+"module": 9.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 1.8
 }],
 "doors_closed": true,
 "doors_locked": false,
 "doors_shop": false,
 "example": true,
-"facade_surfaces": {
-"MI_Trim_MetalConcrete": 10
-},
-"footprint_m": [242.0, 170.0],
-"height_m": 47.1,
+"facade_surfaces": {},
+"footprint_m": [150.02, 84.6],
+"height_m": 14.5,
 "id": "AirportTerminal",
-"kit": "library",
+"inner_doors": [{
+"center": [-40.0, 0.0, -11.7],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-26.0, 0.0, -11.7],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}],
+"kit": "interiors",
 "landmark": true,
-"piece_count": 1048,
-"probe_xz": [0.3, 37.0],
+"lifts": [{
+"center": [0.0, 0.0, 29.3],
+"d": 2.0,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 6.0,
+"stops": "0,6",
+"w": 2.0,
+"yaw": 0.0
+}, {
+"center": [0.0, 0.0, -11.7],
+"d": 2.0,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 6.0,
+"stops": "0,6",
+"w": 2.0,
+"yaw": 0.0
+}],
+"marks": [{
+"name": "MARK_cover_01",
+"pos": [0.0, 0.0, 3.8],
+"props": {
+"kind": "cover",
+"note": "between the carousels"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_01",
+"pos": [-17.0, 6.0, -11.7],
+"props": {
+"kind": "objective",
+"note": "gate 2"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [-8.0, 0.0, 18.3],
+"props": {
+"kind": "spawn",
+"note": "arrivals hall",
+"team": "civilian"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-60.0, 0.0, -9.7],
+"props": {
+"kind": "spawn",
+"note": "baggage handlers",
+"team": "worker"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [-33.0, 0.0, -10.7],
+"props": {
+"kind": "spawn",
+"note": "the airport police box",
+"team": "police"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [0.0, 6.0, 6.3],
+"props": {
+"kind": "spawn",
+"note": "the security line",
+"team": "police"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_05",
+"pos": [20.0, 6.0, 24.3],
+"props": {
+"kind": "spawn",
+"note": "check-in hall",
+"team": "civilian"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_06",
+"pos": [-49.0, 6.0, -9.7],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_07",
+"pos": [-14.0, 6.0, -9.7],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_08",
+"pos": [20.0, 6.0, -9.7],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_09",
+"pos": [55.0, 6.0, -9.7],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_01",
+"pos": [-28.0, 0.0, -15.3],
+"props": {
+"kind": "weapon",
+"weapon": "PIS1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_02",
+"pos": [-29.0, 0.0, -15.3],
+"props": {
+"kind": "weapon",
+"weapon": "SMG1"
+},
+"yaw": 180.0
+}],
+"piece_count": 1,
+"probe_xz": [10.0, -10.0],
 "solid_probes": [],
 "trimesh_pieces": 1.0,
-"use": "the island's airport terminal, GTA scale: a hollow furnished departure hall behind clear glass, its sides and the concourse's apron face clad with the downtown kit's metal and glass modules; runways from Airport_Runway / Airport_RunwayEnd",
-"wall_top_m": 47.1
+"use": "空港ターミナル: a regional terminal, 150 x 50 m, two 6 m storeys: F1 arrivals (baggage hall with two carousels, car hire, konbini, the airport police box with light arms), F2 departures (check-in islands, self check-in, the security line, the airside lounge, four gates on boarding bridges with a stair down to the apron); the curb canopy landside (+Z), the apron airside (-Z). kits/interiors/AirportTerminal.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 12.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=520877129]
-mesh = ExtResource("1_pduc0")
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1040223276]
+mesh = ExtResource("1_6bgeb")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1683845972]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=873312053]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1465898808]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44, 1.75, 65)
-shape = SubResource("BoxShape3D_5y8f7")
-
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1006631859]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 1.75, 65)
-shape = SubResource("BoxShape3D_50bye")
-
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=638478489]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 1.75, 65)
-shape = SubResource("BoxShape3D_6bgeb")
-
-[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=311881090]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 1.75, 65)
-shape = SubResource("BoxShape3D_2e3fq")
-
-[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=270517982]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 1.75, 65)
-shape = SubResource("BoxShape3D_5rg4w")
-
-[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=1306143732]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 1.75, 65)
-shape = SubResource("BoxShape3D_gxaxp")
-
-[node name="DoorLeaf6" type="CollisionShape3D" parent="Collision" unique_id=1563740122]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 46, 1.75, 65)
-shape = SubResource("BoxShape3D_acsu6")
-
-[node name="DoorLeaf7" type="CollisionShape3D" parent="Collision" unique_id=128364326]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 1.75, 65)
-shape = SubResource("BoxShape3D_sxd06")
-
-[node name="DoorLeaf8" type="CollisionShape3D" parent="Collision" unique_id=1820019974]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -42, 2, 5.0000005)
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=939722548]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44.399998, 1.05, 33.2)
 shape = SubResource("BoxShape3D_etvc6")
 
-[node name="DoorLeaf9" type="CollisionShape3D" parent="Collision" unique_id=1658930594]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -38, 2, 5)
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=41957858]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45.6, 1.05, 33.2)
 shape = SubResource("BoxShape3D_hiw25")
 
-[node name="DoorLeaf10" type="CollisionShape3D" parent="Collision" unique_id=1632245136]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 38, 2, 5.0000005)
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1124133084]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.400001, 1.05, 33.2)
 shape = SubResource("BoxShape3D_st8am")
 
-[node name="DoorLeaf11" type="CollisionShape3D" parent="Collision" unique_id=1006283029]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 42, 2, 5)
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=1562327940]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.6, 1.05, 33.2)
 shape = SubResource("BoxShape3D_sbbh4")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=136180197]
-shape = ExtResource("2_k4ui6")
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=1291686080]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.6, 1.05, 33.2)
+shape = SubResource("BoxShape3D_j6kp8")
 
-[node name="Door_departures_0" type="Marker3D" parent="." unique_id=528913832]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -45, 0, 65)
+[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=1434801784]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.4, 1.05, 33.2)
+shape = SubResource("BoxShape3D_bgp4j")
 
-[node name="Door_departures_1" type="Marker3D" parent="." unique_id=203274908]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -15, 0, 65)
+[node name="DoorLeaf6" type="CollisionShape3D" parent="Collision" unique_id=252585648]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.600002, 1.05, 33.2)
+shape = SubResource("BoxShape3D_2lgg2")
 
-[node name="Door_departures_2" type="Marker3D" parent="." unique_id=1218728847]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 15, 0, 65)
+[node name="DoorLeaf7" type="CollisionShape3D" parent="Collision" unique_id=1054406767]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.4, 1.05, 33.2)
+shape = SubResource("BoxShape3D_odrnq")
 
-[node name="Door_departures_3" type="Marker3D" parent="." unique_id=1471511914]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 45, 0, 65)
+[node name="DoorLeaf8" type="CollisionShape3D" parent="Collision" unique_id=613979804]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -55, 1.05, -16.6)
+shape = SubResource("BoxShape3D_ltgnh")
 
-[node name="Door_airside_4" type="Marker3D" parent="." unique_id=1974299730]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 5)
+[node name="DoorLeaf9" type="CollisionShape3D" parent="Collision" unique_id=275394889]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 50, 1.05, -16.6)
+shape = SubResource("BoxShape3D_5agib")
 
-[node name="Door_airside_5" type="Marker3D" parent="." unique_id=1158355263]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 5)
+[node name="DoorLeaf10" type="CollisionShape3D" parent="Collision" unique_id=77051279]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -52, 7.05, -16.6)
+shape = SubResource("BoxShape3D_v8yu4")
+
+[node name="DoorLeaf11" type="CollisionShape3D" parent="Collision" unique_id=82927419]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -17, 7.05, -16.6)
+shape = SubResource("BoxShape3D_c6pm2")
+
+[node name="DoorLeaf12" type="CollisionShape3D" parent="Collision" unique_id=2033530656]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 17, 7.05, -16.6)
+shape = SubResource("BoxShape3D_xyowr")
+
+[node name="DoorLeaf13" type="CollisionShape3D" parent="Collision" unique_id=1541234140]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 52, 7.05, -16.6)
+shape = SubResource("BoxShape3D_n7pd2")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=259909553]
+shape = ExtResource("2_2e3fq")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=1380432312]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=1533548333]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 29.3)
+script = ExtResource("3_5rg4w")
+shaft_width = 2.0
+shaft_depth = 2.0
+rise = 6.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_gxaxp")
+glass_material = ExtResource("5_acsu6")
+floor_material = ExtResource("6_sxd06")
+in_service = true
+stop_heights = "0,6"
+faces = 1
+
+[node name="Lift1" type="Node3D" parent="Lifts" unique_id=1023565492]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -11.7)
+script = ExtResource("3_5rg4w")
+shaft_width = 2.0
+shaft_depth = 2.0
+rise = 6.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_gxaxp")
+glass_material = ExtResource("5_acsu6")
+floor_material = ExtResource("6_sxd06")
+in_service = true
+stop_heights = "0,6"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=147326495]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -45, 0, 33.2)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1062351828]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -15, 0, 33.2)
+
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=579032207]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 15, 0, 33.2)
+
+[node name="Door_exit_3" type="Marker3D" parent="." unique_id=954547847]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 45, 0, 33.2)
+
+[node name="Door_exit_4" type="Marker3D" parent="." unique_id=41054307]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -55, 0, -16.6)
+
+[node name="Door_exit_5" type="Marker3D" parent="." unique_id=1458080861]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0, -16.6)
+
+[node name="Door_exit_6" type="Marker3D" parent="." unique_id=774918386]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, 6, -16.6)
+
+[node name="Door_exit_7" type="Marker3D" parent="." unique_id=1163393250]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 6, -16.6)
+
+[node name="Door_exit_8" type="Marker3D" parent="." unique_id=244978819]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 6, -16.6)
+
+[node name="Door_exit_9" type="Marker3D" parent="." unique_id=766717199]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52, 6, -16.6)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1152895091]
+
+[node name="MARK_cover_01" type="Marker3D" parent="Markers" unique_id=389237629 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.8)
+metadata/note = "between the carousels"
+metadata/kind = "cover"
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=381889114 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 6, -11.7)
+metadata/note = "gate 2"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=810020935 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -8, 0, 18.3)
+metadata/team = "civilian"
+metadata/note = "arrivals hall"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1076483651 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0, -9.7)
+metadata/team = "worker"
+metadata/note = "baggage handlers"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1236411411 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -33, 0, -10.7)
+metadata/team = "police"
+metadata/note = "the airport police box"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=1871808703 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 6, 6.3)
+metadata/team = "police"
+metadata/note = "the security line"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=1641078015 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 20, 6, 24.3)
+metadata/team = "civilian"
+metadata/note = "check-in hall"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_06" type="Marker3D" parent="Markers" unique_id=1430849992 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49, 6, -9.7)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_07" type="Marker3D" parent="Markers" unique_id=1616908163 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 6, -9.7)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_08" type="Marker3D" parent="Markers" unique_id=961067092 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 6, -9.7)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_09" type="Marker3D" parent="Markers" unique_id=1211712164 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55, 6, -9.7)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=1226719419 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -28, 0, -15.3)
+metadata/weapon = "PIS1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=1452306752 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -29, 0, -15.3)
+metadata/weapon = "SMG1"
+metadata/kind = "weapon"

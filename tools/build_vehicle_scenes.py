@@ -40,13 +40,38 @@ TUNING = {
              # a low coupe: a deep bucket seat so the tallest body's head clears the roof (measured by
              # probe_component_car: Fumiriya's crown 0.006 m through the roof on the plain seat)
              "seat_drop": 0.07},
-    "PIT1": {"name": "PIT-1", "mass": 1900, "rest": 0.45, "spring": 16000, "damping": 6500, "over": 0.25,
-             "max_speed": 40.0, "accel": 13000.0, "crash_hp": 5.0, "health": 650, "paint": "car",
-             # Vehicle.tscn has four seats and an inherited scene cannot delete one: a single-cab pickup's other two
-             # ride in the BED (GTA's answer), sitting on its floor - measured flat at 0.855 m, 0.9-2.1 m aft.
-             "extra_seats": [[-0.45, 0.855, 1.5], [0.45, 0.855, 1.5]]},
+    # The Japanese traffic set (2026-09-28), all PLACEHOLDER block models from blender/tools/make_placeholder_cars.py.
+    # Kei class tops out near 140 km/h; the truck is governed. A two-seat cab's other two seats ride on the load
+    # (Vehicle.tscn has four and an inherited scene cannot delete one), in Godot model space.
+    "KET1": {"name": "KET-1", "mass": 750, "rest": 0.30, "spring": 9000, "damping": 3200, "over": 0.2,
+             "max_speed": 33.0, "accel": 6000.0, "crash_hp": 6.0, "health": 380, "paint": "car",
+             "extra_seats": [[-0.40, 0.65, 0.90], [0.40, 0.65, 0.90]]},
+    "MPC1": {"name": "MPC-1", "mass": 820, "rest": 0.30, "spring": 9500, "damping": 3400, "over": 0.2,
+             "max_speed": 38.0, "accel": 6500.0, "crash_hp": 6.0, "health": 420, "paint": ""},
     "POC1": {"name": "POC-1", "mass": 1700, "rest": 0.38, "spring": 16000, "damping": 6000, "over": 0.2,
              "max_speed": 50.0, "accel": 12000.0, "crash_hp": 5.0, "health": 600, "paint": ""},
+    "CLC1": {"name": "CLC-1", "mass": 950, "rest": 0.32, "spring": 11000, "damping": 4000, "over": 0.2,
+             "max_speed": 50.0, "accel": 9500.0, "crash_hp": 6.0, "health": 450, "paint": "car"},
+    "KEC1": {"name": "KEC-1", "mass": 950, "rest": 0.30, "spring": 10000, "damping": 3600, "over": 0.2,
+             "max_speed": 38.0, "accel": 7000.0, "crash_hp": 6.0, "health": 420, "paint": "car"},
+    "TAX1": {"name": "TAX-1", "mass": 1450, "rest": 0.36, "spring": 14000, "damping": 5200, "over": 0.2,
+             "max_speed": 45.0, "accel": 10500.0, "crash_hp": 5.0, "health": 550, "paint": ""},
+    "CRT1": {"name": "CRT-1", "mass": 7500, "rest": 0.45, "spring": 60000, "damping": 22000, "over": 0.25,
+             "max_speed": 25.0, "accel": 45000.0, "crash_hp": 3.0, "health": 1500, "paint": "",
+             "extra_seats": [[-0.50, 3.10, 1.50], [0.50, 3.10, 1.50]]},
+    # the emergency vehicles of the mission buildings (user, 2026-09-28): placeholder blocks, real sizes and weights
+    "AMB1": {"name": "AMB-1", "mass": 3200, "rest": 0.40, "spring": 28000, "damping": 10000, "over": 0.2,
+             "max_speed": 38.0, "accel": 20000.0, "crash_hp": 4.0, "health": 900, "paint": ""},
+    "FIE1": {"name": "FIE-1", "mass": 7000, "rest": 0.45, "spring": 56000, "damping": 20000, "over": 0.25,
+             "max_speed": 30.0, "accel": 42000.0, "crash_hp": 3.0, "health": 1400, "paint": "",
+             "extra_seats": [[-0.45, 1.55, 1.30], [0.45, 1.55, 1.30]]},
+    # a container truck: tractor + 20 ft chassis made rigid, loaded (user, 2026-09-29); governed like the crate truck
+    "COT1": {"name": "COT-1", "mass": 16000, "rest": 0.50, "spring": 120000, "damping": 44000, "over": 0.25,
+             "max_speed": 24.0, "accel": 85000.0, "crash_hp": 2.5, "health": 2200, "paint": "car",
+             "extra_seats": [[-0.50, 3.85, 1.00], [0.50, 3.85, 1.00]]},
+    "LAT1": {"name": "LAT-1", "mass": 13000, "rest": 0.48, "spring": 100000, "damping": 36000, "over": 0.25,
+             "max_speed": 24.0, "accel": 70000.0, "crash_hp": 2.5, "health": 2000, "paint": "",
+             "extra_seats": [[-0.50, 3.10, 1.55], [0.50, 3.10, 1.55]]},
 }
 WHEELS = {"RR": "wheel_rb", "RL": "wheel_lb", "FR": "wheel_rf", "FL": "wheel_lf"}
 SEAT_ORDER = ["seat_front_l", "seat_front_r", "seat_rear_l", "seat_rear_r"]   # Seat0 = the driver, left
@@ -83,6 +108,13 @@ def build(vid):
     lamp_y = LAMP_UP * hi[1] + MODEL_Y
     head = (lamp_x, lamp_y, lo[2])
     tail = (lamp_x, lamp_y + 0.05, hi[2])
+    # a model that AUTHORS its lamps (faces wearing front.lamp.light / back.lamp.light, measured by build_vehicle.py)
+    # puts the lights where those lamps are instead
+    lamps = d.get("lamps", {})
+    if "head" in lamps:
+        head = (lamps["head"][0], lamps["head"][1] + MODEL_Y, lamps["head"][2])
+    if "tail" in lamps:
+        tail = (lamps["tail"][0], lamps["tail"][1] + MODEL_Y, lamps["tail"][2])
 
     cfg = f"""[gd_resource type="Resource" script_class="VehicleConfig" format=3]
 
@@ -112,6 +144,7 @@ explosion_vfx = ExtResource("4_blast")
 headlight_offset = Vector3({f(head[0])}, {f(head[1])}, {f(head[2])})
 taillight_offset = Vector3({f(tail[0])}, {f(tail[1])}, {f(tail[2])})
 seat_drop = {f(t.get("seat_drop", 0.0))}
+glass_armor = {f(t.get("glass_armor", 0.0))}
 """
     hull = ", ".join(f"{f(x)}, {f(y + MODEL_Y)}, {f(z)}" for x, y, z in d["hull"])
     nodes = [f"""[gd_scene format=3]

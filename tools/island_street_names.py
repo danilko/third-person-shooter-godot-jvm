@@ -35,10 +35,12 @@ OUT = os.path.join(ROOT, "src/main/resources/com/openworld/world/IslandStreetNam
 
 #: base road name -> (kanji, romaji, kind). kind: expressway / arterial / street / farm / access
 NAMED = {
-    "loop": ("環状通り", "Kanjo-dori", "arterial"),
+    # DebugWorld (tools/debug_world_layout.py)
+    "w_ring": ("西環状通り", "Nishi-kanjo-dori", "arterial"),
+    "e_ring": ("東環状通り", "Higashi-kanjo-dori", "arterial"),
+    "w_ns": ("南北通り", "Nanboku-dori", "street"),
+    "w_ew": ("東西通り", "Tozai-dori", "street"),
     "link": ("連絡橋通り", "Renraku-kyo-dori", "arterial"),
-    "east": ("東通り", "Higashi-dori", "arterial"),
-    "spur": ("支線通り", "Shisen-dori", "street"),
     "chuo_dori": ("中央通り", "Chuo-dori", "arterial"),
     "nishi_dori": ("西通り", "Nishi-dori", "arterial"),
     "rinkai_dori": ("臨海通り", "Rinkai-dori", "arterial"),
@@ -46,7 +48,6 @@ NAMED = {
     "kaigan_dori": ("海岸通り", "Kaigan-dori", "arterial"),
     "kaigan_machi": ("海岸町通り", "Kaigan-machi-dori", "arterial"),
     "wangan_dori": ("湾岸通り", "Wangan-dori", "arterial"),
-    "hatoba_dori": ("波止場通り", "Hatoba-dori", "street"),
     "eki_minami_dori": ("駅南通り", "Eki-minami-dori", "arterial"),
     "ekimae_dori": ("駅前通り", "Ekimae-dori", "arterial"),
     "yamate_dori": ("山手通り", "Yamate-dori", "arterial"),

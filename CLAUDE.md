@@ -2553,8 +2553,11 @@ implements `NameplateTarget`:
   (same node names as on `Character`).
 - emits `nameplateChanged` in `tryEnter`/`tryExit`; both run on **every peer** (host-arbitrated seat
   change), so the tint re-derives everywhere with no new message — occupancy already replicates.
-- **A defeated driver stays in the seat, GTA-style, and the car coasts (PLAN.md 0.2, 2026-09-14; user
-  decision: "stay seated", not eject).** An ambient car's brain is on the VEHICLE (Design B), so killing the
+- **A defeated driver stays in the seat, GTA-style, and the car BRAKES to a stop (PLAN.md 0.2, 2026-09-14; user
+  decision: "stay seated", not eject — confirmed again 2026-09-28, after a fall-out-of-the-door version was built and
+  dropped as more to replicate and test for no gain). Since 2026-09-28 `Vehicle.hasDefeatedDriver` holds the brake
+  (no throttle or steer) until 0.3 m/s, then lets the car park: 22.7 m/s to rest in 2.3 s over 25 m, where coasting
+  took far longer.** An ambient car's brain is on the VEHICLE (Design B), so killing the
   AI at the wheel used to change nothing. `Vehicle.watchDriverDefeat` (top of `_physicsProcess`, an EDGE on
   every peer so the plate re-tints everywhere; `Health.died` fires only where damage is applied) emits
   `nameplateChanged` and, where a `VehicleAIController` is present (the simulating peer), frees it: no
@@ -6872,7 +6875,8 @@ rewritten.
 
 `blender/VEHICLE_AUTHORING.md` is the how-to. Three cars ship in the component standard: **SPC-1** (sports coupe, the
 project author's model), **PIT-1** (pickup) and **POC-1** (police car, Japanese black-and-white), the last two
-cut out of elbolilloduro's "Vegetation" pack (models CC0; its textures are NOT used; credited). Ids follow the weapon
+cut out of elbolilloduro's "Vegetation" pack -- **REMOVED 2026-09-28: PIT-1/POC-1 are now same-size placeholder
+blocks** (`blender/tools/replace_pack_vehicles.py`; provenance not confirmable). Ids follow the weapon
 rule (3-letter type code + series). DebugWorld parks all three behind `VehicleRoot`.
 
 - **Pipeline**: `<ID>.blend` → `blender/tools/build_vehicle.py` → `<ID>.glb` + MEASURED `<ID>.vehicle.json` →
@@ -6926,6 +6930,28 @@ rule (3-letter type code + series). DebugWorld parks all three behind `VehicleRo
 - **Traffic draws from a pool**: `VehicleSpawnConfig.vehicleScenePath` empty (the default) = `VehicleModels
   .trafficScene(faction)` — police drive POC-1, everyone else SPC-1 / PIT-1 (60/40), chosen on the host; clients get
   the model index. An explicit path still forces one model.
+- **Car glass gives ONE hit of protection; a heavy round goes straight through** (2026-09-28, user). Each glass
+  surface of a door (`win_lf/rf/lr/rr`), the chassis (`win_body`) and the windscreen is a PANE (`VehicleDamageModel`,
+  rules `VehicleDamageRules.paneStateFor / carriedThrough`). Ordinary glass (every car, `VehicleConfig.glassArmor` 0):
+  a pistol / SMG round, a melee blow (`MeleeItem.smashGlass` -> `strikePane`), a crash (`crashPanes`) or a blast
+  (`ExplosionManager.applyToRigidBody` -> `blastPanes`, quadratic falloff inside the radius) breaks it and stops
+  there; after that everything goes through the opening. A round of at least `PANE_PIERCE_AT` 20 (rifles, PIS2, REV1,
+  SNR1) breaks it and carries on at FULL damage; a shotgun at close range puts its first pellet into the glass and the
+  rest through. Blast damage reaches the occupants as characters, as before. `glassArmor` > 0 is kept for a future
+  SPECIAL armoured vehicle only (none ships): a pool of weapon damage, the round that uses it up carries the rest on
+  (`TraceHit.damage`, applied by `FirearmItem.resolvePellets`). A car's hull is one convex collider with no openings,
+  so NO collider is added: a shot that already hit a car (`WeaponItem.throughGlass`, every peer) asks the part mesh's
+  own glass triangles whether it struck glass within 0.35 m of the hull point, then continues without the hull to the
+  hull box's far side. Only the host breaks glass; a client predicts from the replicated part mask (16/16 slots,
+  APPEND-ONLY). Visuals built in code (`carrier/vehicle/Glass`). `shootThroughGlass` (weapon, `@Visible`) is the
+  control. Gate `tools/godot/probe_vehicle_glass.gd -- --car=<id> [--front]` 17/17 on SPC1/CRT1 (pistol, rifle,
+  sniper, shotgun, a blast); `--control` = nothing reaches the occupant. Not gated: the melee path. Not done: a round
+  that entered through a broken window stops in the far side; building glass.
+- **A player cannot shove a parked car** (2026-09-28, user). `MovementController.stepUpLedge` refuses to step onto a
+  `RigidBody3D` (a car's sloped nose): the capsule stood on the hull while walking into it, and a sprint into SPC-1's
+  bumper pushed the 1300 kg car 20 m. Gate `tools/godot/probe_car_push.gd` (nose, corner, tail, side, started 2 m clear
+  of each car's own body): 0.00-0.03 m on SPC1/KEC1/KET1/CRT1; `--control` (`step_pushes_bodies` back on) 20 m. Probe
+  trap: set a Player's position BEFORE `add_child` -- one frame at the origin inside a car launches the car at 30 m/s.
 - **The collision hull is a GAME body**: `build_vehicle.py` raises its floor to `HULL_FLOOR` (0.32 m) and pulls points
   past the body's width (the side mirrors) in to it. The visual sill height (0.18 m on SPC-1) hit a 0.15 m kerb at
   35 m/s and climbed it (`probe_road_launch`, 4.3 m/s); with the game hull 0 launches, worst rise 0.74 m/s.
@@ -6951,6 +6977,75 @@ rule (3-letter type code + series). DebugWorld parks all three behind `VehicleRo
   wall, so it is the car's response, not the sensor reading the wall). Drift and high-speed feel are the tyre force
   model's (grip curves, drift grip, yaw torque), not the ground sensor's. The extra fore/aft rays were cast twice a
   step (enabled AND forced); they are forced only now.
+
+### The Japanese traffic set, lamps that signal, and what the freezes were (2026-09-28)
+
+- **Cars.** KET1 kei truck, MPC1 mini patrol car (ミニパト), POC1 patrol car (Crown class), CLC1 classic coupe (AE86
+  size), KEC1 kei car, TAX1 taxi, CRT1 crate truck: BLOCK placeholders in component form, generated from real
+  dimensions by `blender/tools/make_placeholder_cars.py` (the size table is its docstring; it never overwrites a
+  .blend it did not write). PIT1 (elbolilloduro pickup) is deleted; wire index 5 is KET1 now, 7-11 are appended.
+  Traffic: `VehicleModels` CIVILIAN (kei cars most, then SPC1, kei trucks, taxis, classics, the odd crate truck),
+  POLICE (3 patrol : 1 mini), `military` -> CRT1. A placeholder's BUMPER must not stand proud of the body: the lamp
+  offsets are derived from the bounds, and an 18 cm bumper left every lamp floating in the air.
+- **Lamps** (`Vehicle.refreshLights`, 20 Hz, only within 140 m of the camera): the MODEL's own lamp faces, found by
+  material name (`front.lamp.light`, `back.lamp.light`, optional `back.lamp.reverse`; blender/VEHICLE_AUTHORING.md
+  "Lamps and glass"), off = the authored material, lit = a glowing copy of it shared per model and state (user: keep
+  the material, fewer materials); the code-built lens boxes are GONE. Beams stand at the lamp centres
+  `build_vehicle.py` measures (`vehicle.json` `lamps`); a lamp whose part fell off lights nothing. With no reversing
+  face the tail lamp lights while reversing (SPC1). Placeholders carry lamp faces, seats and see-through glass
+  (alpha 0.4, SPC1's). SPC1.blend objects renamed to say what they are (steering.wheel, side.mirror, door.front,
+  windscreen, back.quarter, ...). Previously: HEAD + TAIL light at night (DayNight). STOP lights day and night while braking: the brake
+  input, throttle against the rolling direction, or -- for a puppet, which has no command (a network puppet, or any
+  FROZEN body) -- the snapshot's brake bit or a deceleration past 2.5 m/s². REVERSE (a white lens inboard of each
+  tail lamp) lights day and night while rolling backward, read from MOTION so a puppet shows it with no message.
+  One shared material per lamp state. Gate **`tools/godot/probe_vehicle_lights.gd`** 13/13 on all eight cars (a
+  real seated Player driving through Input; a frozen car moved kinematically for the puppet cases).
+- `probe_component_car.gd` runs the bullet and door-swing cases BEFORE the crash case: on a cab-over or a kei wagon
+  the front doors stand right behind the nose, so a head-on crash rightly dents them. All eight cars pass; `--control`
+  fails its 7 damage checks.
+- **The freezes while walking / driving were FIRST-USE LOADS, not the architecture.** Measured with the new
+  **`tools/godot/probe_hitch_route.gd`** (display; `ZM_TRACE=1` and a GC log via `JAVA_TOOL_OPTIONS=-Xlog:gc:file=...`
+  line each spike up with its cause): a spawn done before costs 3-10 ms, but the FIRST promotion of each crowd body
+  loaded its `CharacterVisuals_<Body>.tscn` + `.glb` on the main thread (145-190 ms), the first of each car 97 ms
+  (+42 ms instantiate, +~200 ms on its first drawn frame), the AI scene 133 ms, and a konbini cell's weapon pads each
+  weapon scene. `ZoneManager.loadWarmSet` loads all of them once on the first tick (1.1 s, skipped headless).
+  Downtown drive: 47 frames over 33 ms -> 6, worst 222 -> 130 ms, p99 20.1 -> 15.7 ms; walk: worst 40 ms. GC is not
+  a cause (worst young pause 7.7 ms, no full GC). Also fixed: `PedCrowd.hear` threw on EVERY tick of EVERY crowd once
+  a stimulus had expired (`Collections.newSetFromMap` of a non-empty map) -- the crowd stopped updating and printed
+  ~29 000 stack traces in one run, which is itself a freeze in the editor's Output panel. Left: a ~130 ms frame after
+  a building cell unloads and a ~110 ms first-seen frame at a corner (likely pipeline compile).
+
+### DebugWorld is DERIVED: two ringed islands, a konbini, and a two-station curved rail line (2026-09-28)
+
+User: "redo debug world ... remove the manual placeholder, the traffic circle around the island square-like, a konbini,
+and train stations on the west, expanded to fit two stations with a curved rail between them to test enter / exit and
+the zone behaviour". **`tools/debug_world_rebuild.sh`** rebuilds all of it (~5 min); nothing in it is hand-edited.
+- **`tools/debug_world_layout.py`** is the one owner: the terrain grid (`terrain/debug_world.f32`, flat plain at
+  5.6 m -- the big island's plain and `paint_terrain`'s grass line -- beaches, a hill inside the east ring, and a
+  CAUSEWAY on each island out to a quay so the bridge lands on flat ground and spans only water), the
+  `DebugRoads` record (an arterial rounded-square RING round each island, an inner N-S and E-W street on the west
+  crossing at a signalised junction, the E-W street carried over the west ring and the channel as the level
+  bridge `link`), the `DebugRail` record (station A on an east-running straight, a 160 m curve, station B on a
+  south-running straight; level crossings on both inner streets at 79 and 72 deg; a JOINT mid-curve so the line
+  streams as zones `rail_a` / `rail_b`), both zones files, and `debug_world_layout.json`.
+- **`tools/debug_world_scene.py`** writes that into DebugWorld.tscn BY NODE NAME (idempotent): the hand-placed CSG
+  blockout and the navmesh baked over it are gone; stations are the kit's open-air `Station_Farm_Shop` scene reused
+  (`Stations/DebugStationA|B`, placed at the rail bed along the line, fence stood down over each station span via
+  `platform_open`); the konbini is `KonbiniS_Shop` with the island's own `KONBINI_PADS` (`KonbiniPads`).
+- **A closed road ends ON its first station** (a coincident JOINT): linking two stations a span apart across the seam
+  exported as two dead ends. And the seam must not be where a junction goes (`cut_road` refuses within its gap).
+- **No train exists yet** -- the line, stations, gates, lifts and crossings are there for it; riding and "the train
+  crosses a zone boundary" wait for the train runtime.
+- **Test it in seconds:** `probe_rail_track.gd -- --world=debug` (8/8: both level crossings flush, both platforms,
+  the gauge clear along the curve, both track ends at a station) and `probe_weapon_counter.gd -- --world=debug`
+  (5/5: grant once, nothing while standing, refill after the cooldown).
+- Gates moved with it: `RoadGraphTest`'s DebugWorld cases and `probe_gps_route` route over the bridge into the east
+  ring; `probe_road_launch`'s GATE_CASES drive the bridge parapets, the N-S street's 1.8 m embankment (the stamp's FILL
+  fixture too -- the level causeway bridge has none) and two ring straights; `probe_dead_driver` uses the east ring
+  (its control lane runs 845 m before a signal, and it waits 90 s for a coasting car on the flat ring);
+  `probe_ai_stops` waits for a ring lane and holds its blocker's MovementController (the AI walked off the lane).
+- **Open, not layout:** `probe_ai_stops`' "person at the edge of the car's width" case -- the flank ray first catches
+  them at ~27 m where the car needs ~25 m, and it touches at ~4 m/s (same on the inner and the kerb lane).
 
 ## Godot-JVM Specifics
 
@@ -8298,10 +8393,20 @@ furniture and street/station props (CC0, ours). No `jp_` prefix anywhere: the wh
   textures mix Textures.com and Pexels images that may not be redistributed. The base meshes were cut out once,
   resized, re-textured with our palette, credited (CREDITS.md), and the downloads deleted; `.gitignore` refuses
   `kits/elbolilloduro*/`. Pexels/Unsplash are NOT CC0; ambientCG and Poly Haven are.
+- **FLAT TOON MATERIALS (user, 2026-09-28).** `retone_downtown_kit.FLAT`: every downtown-kit building material
+(the PLATEAU facade tones, trims, doors, interiors, concrete) drops its photo albedo and ORM and wears ONE flat
+colour, keeping only its normal map; brick, asphalt, dirt, decals and glass keep their textures. The library's photo
+sets (plaster, tiles, steel, wood, fabric, corrugated, smooth concrete) are `albedo_tex: false` at their measured
+mean. `FLAT = False` restores the textured look.
 - **`palette.json` owns every library material's look.** `tools/building_kit/build_library_palette.py` writes
   `materials/MI_*.tres` (world-space triplanar, so a foreign mesh needs no UVs) and our generated textures
   (`T_Goods`, two brand-neutral fascia bands); `--check` runs first in `build_buildings.sh`. ambientCG CC0 sets
-  are listed in `textures/SOURCES.md`. The toon/anime look the game is heading for (PLAN.md 6.x) will change these
+  are listed in `textures/SOURCES.md`.
+- **2026-09-28: every elbolilloduro-derived piece is GONE** (owner: keep only sources we can confirm). The 21 base
+  meshes (and their copies in `kits/shops/Shop_*.blend`) are same-size PLACEHOLDER BOXES
+  (`blender/tools/replace_removed_meshes.py`, one-shot), listed with a modelling brief in
+  `kits/library/placeholders.json`; `extract.json` and `build_library.py --extract/--reframe` are deleted. A file-level
+  audit found no elbolilloduro texture anywhere (`assets/LICENCE_AUDIT.md`, "Audit 2026-09-28"). The toon/anime look the game is heading for (PLAN.md 6.x) will change these
   to flat colours + a shared palette atlas; the palette file is where that change lands.
 - **Generic names** where the piece is not specific: `Shop_Counter`, `Shop_Register`, `Shop_Gondola`,
   `Shop_FridgeDoor`, `Shop_IceFreezer`, `Fascia_Shop`; `Rest_*`, `Kitchen_*`, `WC_*`, `Gas_*`, `Station_*`,
@@ -8882,8 +8987,7 @@ Drawing posts `StimulusManager.Type.WEAPON_DRAWN` (10 m fists, 30 m a weapon): t
 (`SidewalkWalkerController` now runs from gunshots, blasts and drawn weapons) react. Both listen by IDENTITY, not by
 timestamp (the stimulus clock advances in _process, so two physics ticks can repeat a timestamp).
 
-**One walk, two gaits** (user). The walk is `upright_walk_forward` for everyone -- it turns the hips 23/12 deg with
-the chest still, so it aims well. `blender/tools/derive_gait.py` writes the FEMALE copies into `shino.blend` as
+**One walk, two gaits** (user, 2026-09-27/28). The walks are ORDINARY CLIPS on the rig in `shino.blend`: `male_upright_walk` / `female_upright_walk` (the NORMAL walk, hands empty; the tree's clip is `upright_walk`, formerly `upright_walk_relaxed`) and `male_/female_upright_walk_forward/_forward_left/_forward_right/_back` (the ring with a weapon up). `derive_gait.py` SEEDED them once from the source walk and never overwrites one (`--force=<clip>` re-seeds); edit them on the rig like any clip. Neither sex plays the source `upright_walk_forward` ring (it drops the hips 20.5 deg with no pelvic turn and carries the elbows bent 41 deg, arms swinging only behind: it read feminine on Fumiriya). Male: drop -> 9.2 deg, 1 deg pelvic turn, feet 9.3 -> 12.6 cm (each pushed out on its OWN side: pushing away from the midline flipped when a diagonal's planted foot crossed it), arms nearly straight, 13 deg out, swinging from the shoulder with the collarbone following. Female: as below, plus softer arms in the normal walk. The chest is held exactly in every weapon-up clip, so aim is identical. How an artist makes a body male or female: `blender/SKELETON_CONTRACT.md` section 11. HISTORIC (the first version): `blender/tools/derive_gait.py` writes the FEMALE copies into `shino.blend` as
 `f_<clip>` (forward, the two forward diagonals, back): planted feet 46% narrower (9.3 -> 5.0 cm), a weight shift over
 the standing foot (4.4 cm), hip drop x1.15, and `spine_03`'s world transform held exactly (0.00 deg, <= 2 mm), so aim
 is untouched. Plus `f_upright_walk_relaxed` (chest counter-roll 2.5 deg, a wider arm swing) that only the RELAXED
@@ -9996,18 +10100,10 @@ already decides everything per road.
 
 Authored for the ONE rail rebuild (PLAN.md "the rail rebuild batch"); every piece below has its own check.
 
-- **A station's platforms are the rail's own cross-section** (`island_rail_record.PLATFORM_*`, R3): over each
-  station's platform length every station of the rail record is an OVERRIDE section whose footways ARE the two side
-  platforms (相対式), 1.26 m over the bed (1.1 m over the rail head), the carriageway narrowed to 3.0 m lanes with a
-  1.0 m median so the track centres stay at +-2.0 m and each platform edge is 1.5 m from its track. The kit sweeps,
-  kerbs, fences and collides them and they stream with the rail piece. A station at each platform END is inserted
-  only on a STRAIGHT span (on an arc a chord point reads as a kink). `check_tapers` skips rail roads (a platform
-  narrows the bed, no lane merges); `check_rail`'s ERROR has a 1 m tolerance (r0's authored 100 m throat).
-- **Station buildings and car parks derive from the rail RESERVE** (`island_rail_layout.reserve` writes a
-  `building:<Station>` box beside each platform box; `island_sites.rail_stations` places `StationBuilding_Shop` and a
-  `ParkingLot14/8` on the reserve boxes every run, never frozen). The SIDE is the one facing the town: the side whose
-  nearest at-grade ARTERIAL is reachable without crossing the dike (the arterials input, points on the dike crest
-  excluded), never the dike or the sea. Central gets none (Tokyo Station is its site).
+- **RETIRED by PLAN.md step 7 (2026-09-28): the rail record's own platforms, station buildings and platform exits.**
+  Every station is one kit scene now (`Station_<Name>_Shop`, see "Step 7" below); the record keeps the TRACK only over
+  a station span. What survives from here is `island_rail_record`'s platform CONTRACT (`PLATFORM_EDGE` 1.55 m from a
+  track centre, `PLATFORM_H` 1.26 m over the bed, `PLATFORM_W` by kind), which `station_layout` reads.
 - **踏切 signals (R4)**: `library` piece `Rail_CrossingSignal` (警報機 + raised 遮断機, `library_procedural.
   crossing_signal`); `point_mesh`'s crossing report now carries the rail and road directions and the road's paved half
   widths, and `point_furniture.crossing_signals` stands one on the LEFT of each approach, `crossing_track_clear` 4.5 m
@@ -10022,23 +10118,8 @@ Authored for the ONE rail rebuild (PLAN.md "the rail rebuild batch"); every piec
   restraint) in every joint, no ballast or sleepers, and a DERAILMENT GUARD (脱線防止ガード) 0.12 m inside the
   curve's inner rail; and two SEISMIC SIDE STOPPERS (横変位拘束構造 / 落橋防止) on every rail pier cap flanking the
   girder (only where the cap reaches; in the road collision). None of it is in a 踏切. ~607k visible tris over the
-  island's rail, streamed per zone. Licence: the measurements are the published Japanese standards; StationRural's
-  `Track_Module` (the first reference) is ours, built in code, MIT -- nothing third-party is in the rail.
-- **Stations are WALKABLE: platform exits** (user: "character cannot walk up to connect to train due to train wall").
-  Station fields `platform_exit` and `platform_open` (both `NONE/LEFT/RIGHT/BOTH`, APPEND-ONLY, held station -> next;
-  solved into `rka_exit` bits 1/2 exit, 4/8 open): on that side the platform fence (and its car wall) stands down
-  over the span -- `point_edges.exit_open` opens the END station too, or `step_walls` would re-close it -- and for an
-  EXIT `point_mesh.platform_stairs` builds a solid concrete stair (<= 0.18 m risers on 0.30 m treads, in the walk
-  collision) from the platform's outer edge to the ground: STRAIGHT out when the drop is <= 2.5 m (at grade, 7 steps
-  toward the station building), else a landing + a flight ALONG the platform outside its fence, toward the
-  platform's middle, with a parapet (elevated: 9.1 m / 17.1 m at Airport, 95 steps). `island_rail_record.exit_plan`
-  puts ONE 3 m exit per platform at the station building's position (the reserve's `building:` box; the middle
-  where there is none), slid to the nearest straight stretch, on every side whose outside is free; a side with
-  another line's platform within 9 m is `platform_open` along the platform instead. A HUB's platforms are 3.45 m, so
-  at Central (lines 14 m apart) neighbouring platforms meet edge to edge and are walked across as island platforms;
-  Central's two outer sides get the stairs. Report: `platform_exits` (16 exits, 28 stairs on today's record).
-  **Not yet:** a footbridge / concourse (to cross a line's own two tracks you walk over them at a platform end),
-  Tokyo Station's own connection (3.36), and trains (tier D).
+  island's rail, streamed per zone. Licence: the measurements are the published Japanese standards, built in code,
+  MIT -- nothing third-party is in the rail.
 - **The signal is SPLIT in its .blend, and the runtime lights the LENS itself** (user, 2026-09-26: "split the ped
   object / ped signals / traffic pole ... use the lamp objects for the signal instead of a round object").
   `TrafficLight_2_Japan.blend` holds `Pole`, `TrafficLight` (arm + vehicle head), `PedLight` and each lens as its own
@@ -10159,45 +10240,26 @@ Authored for the ONE rail rebuild (PLAN.md "the rail rebuild batch"); every piec
     because `CropField` builds only the chunks round the camera (headless reads every MultiMesh transform as
     identity, so its placement check is counted "unreadable", not passed).
 
-## The paid area: ticket gates, a station building each side, yards, footbridges, platform-end fences (2026-09-27)
+## The paid area: ticket gates (2026-09-27; the interim yards and footbridges retired by step 7)
 
-A station's platforms are a closed PAID AREA: street -> station building -> ticket gates -> yard -> stair -> platform.
-User decisions: an open-air station has a gated building on BOTH sides (上下線で別改札), so neither platform needs a
-footbridge; a hub (Central / Tokyo Station, 3.36) is one building over the whole rail with a bridge inside the paid area.
+A station's platforms are a closed PAID AREA: street -> station building -> ticket gates -> stair / lift -> platform.
+The interim version (a yard + a `StationBuilding` beside each platform, footbridges, platform-end fences swept by the
+rail kit) was replaced by the three kit station forms and deleted in PLAN.md step 7 (below).
 
 - **`world.TicketGate`** (extends `Door`): two flaps meeting mid-lane, fast (open_speed 8), swing away from the walker,
   fare-free. `Door.admits(body)` is the one fare hook (asked on sensor enter AND exit, so the count stays balanced).
   Built by `build_building_scenes.gd._add_gate` from a DOOR-ONLY prop (`{"door": {"kind": "gate", w, h}, "at"}`, no
   `piece`; `layout_buildings.place_props` records it as an inner door). **The lane's sensor is NOT a child of a flap**:
   as a child it swung away with the flap, lost the walker, shut, swung back -- the gate chattered at 36 deg.
-  `StationBuilding` has one 0.9 m lane between two `Station_TicketGate` bodies and a 1.2 m railing (`Platform_Fence`
-  x6) across the rest of the building at z -1.6: unpaid hall at the street door, paid side at the back door.
-  Gate `tools/godot/probe_ticket_gate.gd` 9/9 (`--control`: manual flaps, fails the 2 lane checks).
-- **Reserve** (`island_rail_layout`): each non-hub station gets `building:` (town side, with the car park) AND
-  `building_far:` (the far side, no car park), each placed with its back `STATION_YARD` (3.8 m) behind its own
-  platform's outer edge (`island_rail_record.platform_outer`), else at the old station-box edge, slid along like the
-  near one. Bay (the Harbour line 20 m beside it), Waterpark (an arterial) and Harbour (its siding) have no far building.
-  `island_sites.rail_stations` places both (`Station_<slug>` / `Station_<slug>_far`).
-- **Rail kit fields** (`point_model`, append): `yard_left/right` (the yard's depth), `yard_shift_left/right` (the
-  building's centre along the chain from the exit's centre), `footbridge` (bool); solved into `rka_yard_l/r`,
-  `rka_ysh_l/r`, `rka_fbridge`, held with `rka_exit`. `island_rail_record.paid_yards` writes them from the reserve; a
-  building more than `YARD_MAX` (10 m) behind a platform is another line's (a junction's second line keeps its old
-  open stairs, as does the hub). A free side with no building gets NO stair, and a footbridge from the side that has one.
-- **`point_mesh.paid_areas`** (objects `<run>__paid` in the barrier material + a `-noped` road proxy; `<run>__footbridge`
-  in the walk proxy; report rows `paid_area`):
-  - the YARD: end fences from the platform's outer edge out to the building, and a far fence wherever the building's
-    back wall is not; an elevated station's yard also covers its along-the-platform flight and gets a ground fence
-    under the platform edge (the ground under a viaduct is open to the street);
-  - a FOOTBRIDGE (跨線橋): a flight up each platform's outboard 1.5 m strip, a deck over both tracks with its soffit
-    `FB_CLEAR` 4.6 m over the bed (a train's gauge tops out at 4.2), parapets; placed `FB_GAP` past the exit's end,
-    whichever way both platforms run far enough;
-  - a FENCE ACROSS EVERY PLATFORM END where the platform stops being full width (not at a network end).
+  Gate `tools/godot/probe_ticket_gate.gd` 7/7 on `Station_Farm_Shop.tscn` (`--scene=` any station; each lane's frame is
+  its sensor's: origin mid-lane, +Z the unpaid side); `--control` (manual flaps) fails the 2 lane checks.
 - **The track corridor itself is NOT closed**: nothing may stand in a train's gauge, so a trespasser can walk the bed
   from a 踏切 (as in reality). The closure is the platform: its face is 1.26 m over the bed and its ends are fenced.
-- Gate **`tools/godot/probe_station_paid.gd`**: streams each station in on World.tscn and flood-fills every walkable
-  surface (0.25 m cells, multi-level, 0.4 m steps, a 0.2 m capsule standing): from the street in front of each building
-  and from the bed past a platform end no platform is reached with the flaps shut; with them open the street reaches
-  the platform. Auto doors are treated open. `--control` opens the flaps for the negative cases.
+- Gate **`tools/godot/probe_station_paid.gd`**: streams each station in on World.tscn (or `--scene=` one station on
+  a stand) and flood-fills every walkable surface (0.25 m cells, multi-level, 0.4 m steps, a 0.2 m capsule standing):
+  from every street entrance and from the bed past a platform end no platform is reached with the flaps shut; with
+  them open the street reaches every platform. Auto doors are treated open. `--control` opens the flaps for the
+  negative cases.
 - **Also in this batch** (user, 2026-09-27): at a 踏切 the rail's fence, car wall and bed are cut over the road's
   FOOTWAYS too (`Band.walk`, `crossing_band(footways=True)`), so a pedestrian crosses beside the cars; and a RAISED
   (or WALL) median is a KERBED ISLAND (`point_mesh.raised_median`: kerb stones `MEDIAN_KERB_W` 0.15 m each edge in the
@@ -10790,19 +10852,41 @@ are unchanged and regenerate byte-identical. A station >= `EH_LONG` (150 m) gets
   line), and a station car park keeps off every frozen site (`site_clear`) at a 10 / 5 / 2 m gap.
 - `probe_station_paid.gd` stand mode now requires EVERY platform to be reached through the open gates, not just one.
 
-## The open-air station building: restrooms both sides, a service counter, and a smooth entry slope (2026-09-27)
+## The open-air station building: restrooms both sides, a service counter, and a straight entry ramp (2026-09-27/28)
 
 User's layout sketches, PLAN.md step 6b. The end building is 22 m along x 9.5 m deep from the platform's track edge,
 its whole FLOOR AT THE PLATFORM TOP (the platform runs straight in). From the platform: the paid hall and a restroom
 block; the fare line (2 gate lanes by the track wall and the SERVICE COUNTER, the staffed wide gate); the unpaid hall
 with a second restroom block and the ticket / ATM / vending machines; the 4 m door. The restroom block is the
-standard modern-station set (men 1 stall + 2 urinals + 3 sinks, women 3 stalls + 3 sinks, an accessible room;
-`WC_L` x `WC_D` 8.6 x 5 m; `build_station_blends.restroom_block`, reusable in any frame via `Frame`).
-- **The entry** (`OA_Entry_<n>_<hand>`, or `OA_EntryOut_*` where the front has no room): a landing, a stair of n
-  risers, and a SMOOTH 1:15 slope with a landing every 0.75 m of rise. n comes from the reserve's measured
-  `entry_rise` (door sill over the street). A slope's collider is its own wedge. **Convex colliders are new in the kit
-  pipeline:** a `HULL_<n>` Empty (points in its `pts` custom property) -> `pieces.json` `collide_hulls` -> the
-  layout's `hull_points` -> a `ConvexPolygonShape3D`. Axis-aligned `COL_` boxes can only make a slope into steps.
+small-station set (user, 2026-09-28: men 1 stall + 1 urinal + 1 basin, women 2 stalls + 2 basins, an accessible
+room; `WC_L` x `WC_D` 8.6 x 5 m; `build_station_blends.restroom_block`, reusable in any frame via `Frame`). Every stall
+has a real hinged 0.65 m door (a `DOOR_`) that swings clear of the toilet inward and of every basin outward; the basins
+stand away from the stall fronts.
+- **The entry is ONE straight ramp, no stair** (`OA_Ramp_<n>`, user 2026-09-28): out of the door, as wide as it and in
+  line with it, a 1.5 m landing at the sill, then 1:15 legs with a landing every 0.75 m of rise (`ramp_run(n)`, ~23 m
+  for the usual 1.4 m). n comes from the reserve's `entry_rise`, measured at the ramp's foot. Its foot stops
+  `FOOT_GAP` (1.5 m) short of the street's paved edge; the 踏切's warning unit stands in that apron. A slope's collider
+  is its own wedge. **Convex colliders:** a `HULL_<n>` Empty (points in its `pts` custom property) -> `pieces.json`
+  `collide_hulls` -> the layout's `hull_points` -> a `ConvexPolygonShape3D`. Axis-aligned `COL_` boxes can only make a
+  slope into steps. The rail's fence stands down past the building AND the ramp (`island_rail_record.open_air_reach`).
+- **Every open-air station meets its street** (`island_rail_layout.STATION_FRONT`: the end its buildings stand at,
+  the street as a record polyline, the street's half width). Each station SLID along its line until the ramps' feet
+  land at a street crossing the line there, the small Japanese station beside its 踏切: Farm 2 m, Residential 9,
+  Light Industry 15 (the Blue line's buffer stop moved to y -1023), Castle Town 32, Residential North 46 and City
+  West 46. Where no street crossed near, the street is an access road across the line (`island_site_access`):
+  `ekimae_farm`, and the castle's `jokamachi_sando`, now straight north over the Blue line to the castle's car park.
+  The reserve re-measures every foot against its street and reports one that lands more than 12 m short or past the
+  kerb.
+  - **The car park fronts the street**, beside the town-side building (or the `park` side), its entrance ON the
+    street's paved edge, sized by its scene, LEVEL with the road (`island_sites.rail_stations`: a levelled site, so the
+    block ground is filled to it). It used to stand in the middle of the field at the lowest ground under it, the fill
+    showing through it, with no way in.
+  - **Along its axis an open-air station box and a street-front car park keep NO clearance** (`island_streets._rail`,
+    `island_dike._in_station`), so a street may pass right by the front. A dike side road that runs across one is
+    bent out ONTO the street line point by point (`FRONT_ESCAPE`: its paved edge exactly FOOT_GAP past the feet),
+    which is what makes Light Industry's street. `island_dike.keep_off_rail` keeps a side road 35 m off an at-grade
+    track it runs alongside (the old wide station boxes had done that by accident; without it, Residential North's side
+    road T'd into nishi_dori 27 m from the 踏切).
 - **The ground hub's entrance annex** (15.5 m deep: paid 8 m, unpaid 7.5 m) carries the same set: a restroom block each
   side of its fare line (the paid one under the mezzanine landing), the machines by the street wall, the service
   counter on the line beside 2 gate lanes, and `GH_Entry_<n>` (the entry piece, stair + slope) where the street is
@@ -10860,6 +10944,33 @@ by `building_types.json`; the type's props are the fascia plus `{"piece": "shops
 - Weapon pads (`island_buildings.KONBINI_PADS`) moved onto free sales floor. Gates: `probe_buildings.gd` (an interior
   door may be `inner_slide`, asserted by movement) 310/310 on the three types; `probe_weapon_counter.gd` PASS.
 
+## EMU1: the measuring train, and what it says about the platforms (2026-09-29, user-asked)
+
+User: "the platform seems narrower than the railway's wall ... a real train has some width, not sure it fits; generate
+a Japan rail/metro train and use it on the rail to measure (assume the largest)". `blender/tools/make_train.py`
+writes `assets/vehicles/trains/EMU1.blend` (the owner once written; `--force` to regenerate), `EMU1_Tc.glb` (cab car),
+`EMU1_M.glb` (middle car, pantograph) and `EMU1.train.json`, every size MEASURED off the built mesh. It is a generic
+20 m, 4-door, WIDE-BODY commuter car on the 1067 mm gauge (the JR E231/E233 envelope, no livery copied): body 2.95 m at
+the waist, 2.80 m at the sill, 2.98 m over the doors, floor 1.13 m over the rail head, roof 3.62, pantograph folded
+4.05, bogie centres 13.8 m -- the largest standard conventional-line car (a subway car is 2.8-2.85 m), so what fits it
+fits any.
+- **`tools/godot/probe_train_fit.gd`** is the gate. `--stations` (or `--scene=`): a 4-car set on every track of every
+  station, touching nothing, the platform edge found by a ray at every door, the gap measured to the car at the
+  platform's top, and the step up to the floor. `--world=island|debug`: the set driven along every rail lane on its
+  bogie centres (so a curve's overhang is the real car's), touching nothing; it also reports the nearest thing beside
+  the car. `--control` widens the car 0.3 m a side and fails.
+- **Measured: every station fits, and the platforms must NOT move out.** All 13 stations: gap **0.11 m** at every
+  door, step **0.03 m**, nothing touched (Japan's straight-platform gap is ~0.05-0.10 m). The platform edge stands
+  1.55 m from the track centre; the rail corridor's walls stand 3.16 m out, 1.67 m past a car's side. That is why a
+  platform looks "narrower than the rail's walls". Moving the platforms out to the walls would leave a 1.7 m gap
+  between train and platform.
+- **The gauge is the train's now**: `station_layout.GAUGE_HALF/GAUGE_H` and `probe_rail_track.gd` check 5 read
+  `EMU1.train.json` (3.0 x 4.25 m over the bed, was 2.7 x 3.7). It found DebugWorld's station A's east building and
+  ramp standing where the line had begun to curve; `debug_world_layout` now starts the curve at x -275 with A at -365
+  (the train then runs the whole line clear, nearest object 0.06 m past its side: the station's track wall).
+- Pictures: `tools/godot/shot_train_station.gd` (display) -- the set at a station's platforms from the platform, along
+  the tracks and from above.
+
 ## The large hubs: six-bay roller-shutter entrances and shops along the side (PLAN.md step 6b, 2026-09-28)
 
 **Every station entrance is a roller-shutter opening** (user): no door leaf, open all day, and NO post in between --
@@ -10887,3 +10998,367 @@ but Waterpark) is 11.8 m (`LARGE_ENTRANCE_W`, sized as six 1.8 m bays). A shutte
   (they carry `bk_piece_path` too, and are their own kit's). Urinals are still the generator's boxes (the library has
   none). Pictures: `shot_station_hall.gd` views `wc_in_men` / `wc_in_women` / `wc_in_acc`.
 - The generator retires untouched pieces the form no longer makes (`EH_Wing_*`, `EH_WingDoor_*`, `GH_AnnexShops_*` went this way).
+
+## Civic plots and placeholder public buildings (2026-09-28, user-asked)
+
+**Ground is held BEFORE the streets are planned** (user: "leave enough space for fire / police stations, hospital,
+clinics, a water resort, the fish market ... so later updates need less rebuild"). `tools/island_civic_sites.py`
+searches once and FREEZES 33 plots into `assets/world_source/buildings/IslandCivicSites.json` (the IslandSites rule:
+an ordinary run never moves one; `--resite[=id]` searches again; `--check` asserts every plot still fronts a road and
+has no road through it, and runs in `island_world.sh`'s layout stage). A plot fronts a road that exists before the
+street planner (arterial, trunk, ring, dike side road -- never a generated block street, an expressway, the touge or
+the cliff road), at grade, `FRONT_GAP` 1.5 m past its paved edge, flat within 1.5 m, clear of every other road's paved
+edge (4 m, exact segment distance -- `IS.road_index` is a square box test), the rail corridor and stations, the frozen
+sites, `island_plan.RESERVES`, the dike and other plots; the nearest to its target wins. `island_streets._sites` treats
+a plot as a site (SITE_CLEAR 10 m); `island_buildings.civic_plots` blocks it and places the plot's BUILDING on it
+(`CIVIC_TYPES`, facing its road), which is then a map place even though it is shut (`CIVIC_LABELS`); `island_ground`
+paves it like a lot. Sizes (PLATEAU p50, 7 central wards): 警察署 30 x 45 m / 7 st; 交番 5 x 7 / 2; 消防署 23 x 42 / 5;
+出張所 15 x 23 / 3; 総合病院 52 x 83 / 8; 小学校 46 x 80 / 4 (18 m); 区役所 48 x 85 / 14; 寺 24 x 32 / 16 m.
+
+**A street could run through a site** (found on the first run): `_line_ok` checks a line against sites only between
+its crossings with EXISTING roads, and a crossing with another NEW street could then extend it past that span. Such a
+crossing is refused now when the extension runs through a site (`plan_region`, where `cross` is built) -- for every
+site, not only the plots.
+
+**The placeholders** are `blender/tools/library_civic.py` (Builder massings in `library.blend`, flat palette
+materials; `kits/library/ARTIST_NOTES.md` "Civic placeholders" is the replace-by-hand list, and each piece carries its
+`edit_note`): Civic_PoliceStation / Koban / FireStation (red bay shutters, 訓練塔) / FireBranch / PostOffice(Small) /
+WardOffice / Hospital (podium + ward tower + helipad + 救急) / HospitalSmall / Clinic / SchoolElementary /
+SchoolJuniorHigh (校舎, 体育館, pool, 校庭, fence), Shrine, Temple, Park (+ nature-kit trees), WaterResort,
+ResortHotel, FishMarket; the air base (Mil_HQ, Mil_Barracks, Mil_Hangar, Mil_ControlTower, Mil_FighterJet, Mil_Fence,
+Mil_Gate); airside (Airport_Hangar, Airport_Airliner, Airport_Taxiway, Airport_Apron); signage (Sign_AkibaVertical,
+Sign_AkibaBillboard, Sign_Sodekanban, Sign_ShopVertical, Prop_Chochin, Prop_Noren); the 一戸建て (House_Detached, _B).
+A civic piece's origin is its PLOT centre (`plot_origin` on the custom row keeps it; a custom is otherwise re-centred on
+its bounds). Types: the civic `custom` rows; composites `MilitaryBase` (320 x 300: gate north, apron + hangars with jets
+south), `MilitaryAirfield` (1 200 m runway + taxiway + a link to the base), `AirportAirside` (540 m runway, taxiway,
+apron with three airliners, a hangar holding a fourth); kit types `AkibaElectric` (glass front, two 袖看板 stacks,
+rooftop billboard) and `YokochoRow` (2-module izakaya: 赤提灯, 暖簾, sign); `PencilBuilding` now wears a 袖看板;
+`DetachedHouse(B)`. Reserves become streamed sites through `island_sites.RESERVE_SITES`.
+- **The military base is COMPACT** (user, 2026-09-28: "so the player does not need to wander around, but every
+  component for missions"; one runway + one pier is the standard for a small base -- a finger pier berths a ship each
+  side, one runway serves a squadron). Land stage: the 1 210 m reclaimed runway strip off the south-west coast and the
+  second pier are GONE (`island_reshape.MILITARY_PIERS` is one pier). `MilitaryBase` (reserve x -760..-475, z
+  1250..1480, yaw 90: the gate faces the gate road `kichi_mon_michi` at x -460) holds the gate, HQ, barracks, parade
+  ground, motor pool + trucks, fuel depot, armoury bunker, helipad, control tower, one hangar (two jets) and an apron
+  row (two jets) on its south side; `MilitaryAirfield` is a ~780 m runway on the platform's own south band
+  (z 1480..1535) abutting that apron; `MilitaryPier` (reserve centred on z 1336, yaw 270) is the terminal, bollards,
+  masts and a berthed Mil_PatrolShip (its waterline 9.6 m under the deck). The west fence has a gap onto the pier;
+  everything is within ~300 m. The military reserves are street SITES too (`island_streets._sites`).
+  `ground_box` may be a rectangle `[x0, z0, x1, z1]` (the pier's deck, not the water where the ship lies).
+- **The container terminal already fronts the bay**: its quay (+X) drops straight to the -24 m seabed with open water
+  > 700 m out, so it needs no harbour of its own. Two things it lacks: a ship at berth, and a believable quay height
+  (the quay top is 9.6 m above the water, the land stage's raised plain; a real one stands ~3-5 m).
+- A plot re-sited AFTER the streets were planned uses `island_civic_sites.py --resite=<id> --avoid-streets` (it keeps
+  off the finished block streets too, so no layout pass is needed); the water resort was re-sited that way when the
+  dike side road it fronted moved.
+- **New layout rules**: a type prop may be `"y": "roof"`, and `front` / `right: d` / `left: d` place it against the
+  type's (or its variant's) own size; `"facade": true` marks street dressing (it does not make the building "have an
+  interior", and it counts toward the forecourt depth); a custom or composite may state `height_m`; a composite may ask
+  for `ground_box` (the paved ground's collider without an apron).
+- **A lot never GROWS into held ground** (found by `lots --check` after the civic plots): `grow_lots` stopped only at
+  roads, passages and other lots, so a neighbour's lot grew into civic plots, sites and reserves. `Field.block_box(...,
+  hold=True)` also marks the cells owner -1 (nobody's lot), for sites, reserves and civic plots.
+- `probe_station_paid.gd`'s island mode freezes the WHOLE player (`process_mode` DISABLED): MovementController is its
+  own node and kept moving the teleported body, which fell through unstreamed ground and died, and every station after
+  that never streamed. 13/13 on the island since.
+- **A building's fade distance covers its own plan** (`build_building_scenes.gd`: at least half its diagonal past the
+  minimum): a 1.2 km runway faded out by height while you stood on its end.
+- New palette materials: MI_Window (opaque dark glazing for closed placeholders), MI_Dirt, MI_PoolWater, MI_Grass,
+  MI_JetGrey, MI_Olive, MI_TileBeige, MI_TileBrown, MI_PostRed, MI_NorenNavy, MI_Sign{Red,Green,Yellow,Pink,Cyan}.
+
+## Sliding doors: one leaf for a restroom, a sensor that stays on the doorway, and a probe that stands in front (2026-09-28)
+
+User-reported on the station's accessible restroom: "keeps trying to open but immediately slides back", "the sliding
+logic seems wrong (should be one door)", "should be a white block like the restroom wall". Three defects, all in
+`build_building_scenes.gd`:
+- **A 1.2 m interior slide was split into TWO leaves** (`_panels` split any slide >= 1.2 m). With the mirrored hand's
+  `slide_dir` -1 both leaves slid ACROSS each other and the doorway stayed shut. An interior solid slide (`style:
+  slide`, inner) is one leaf now, and `slide_dir` only steers a SINGLE leaf (a pair always parts from the middle).
+- **A sliding leaf carried its own sensor**, so a long leaf slid the sensor off the person who opened it, shut, came
+  back and found them again: the chatter. A slide's sensor is a sibling on the DOORWAY (`Doors/Sensor<n>`,
+  `sensor_path = ../Sensor<n>`): the ticket gate's rule.
+- The interior solid leaf wears the restroom wall's `MI_Plaster` (`_plaster_material`).
+Gates: **`tools/godot/probe_slide_doors.gd`** stands a real AICharacter 0.8 m in front of every automatic sliding door
+and asserts it opens its full slide within 1.5 s and STAYS open for 1 s (all stations, both konbini). A disabled
+CollisionObject leaves the physics space, so the probe body keeps `disable_mode = KEEP_ACTIVE`. `probe_buildings.gd`
+now also probes a station's doors (it stopped at the station's missing `wall_top_m`, so no station door had ever been
+driven), classifies `slide_glass` as sliding, and asserts every interior sliding doorway takes the capsule once open.
+A station's declared footprint is its reserve, so the size rule is skipped for it (the 39 "size" failures).
+
+## The logistics hub, resort hotels in the suburb loop, and five gate findings fixed (2026-09-28)
+
+User: "fill the empty middle with a logistics park ... restrict to 1, or 2 if it makes sense, for level design ...
+compact, not repeated, but have all industry / military / other services".
+- **ONE logistics hub** on the port platform's middle (`island_plan.RESERVES` `logistics_*`, street sites): a
+  トラックターミナル west of `butsuryu_michi` (x -445..-295, composite `LogisticsTruckTerminal` 225 x 150, yaw 90) and a
+  物流センター east of it (x -265..-25, `LogisticsDistributionCentre` 225 x 240, yaw 270), both gated onto that road,
+  south of the port road, beside the container terminal. Pieces `Logi_*` in `library_civic.py` (cross-dock shed with
+  docks both sides, DC with 16 docks, box truck, tractor-trailer, gate house, fence bay, yard slabs); the two big
+  buildings collide by explicit boxes (their bounds would wall off the dock bays). Generic `Warehouse` is now a
+  MINORITY in every district mix (the harbour region places port offices, a konbini and lorry parks instead).
+- **Resort hotels**: three `ResortHotel` sites INSIDE the suburb loop (`kogai_loop`), fronting its bottom leg (they
+  had been laid across that leg and across the Main line). Resort and logistics reserves are street sites.
+- **A station stands on a straight**: `island_rail_layout`'s check reports a station whose platform + 15 m
+  (`STATION_STRAIGHT_PAD`, the kit building's overhang) bows > 5 cm; Castle Town moved -560 -> -540 (its wall stood
+  in the Blue line's curve gauge). `ACCEPT_CURVES` names Central on the Main line (its pad only).
+- **Streets keep off station boxes**: the farm frame's station-front leg moved x 1080 -> 1045
+  (`island_core_streets`), and the dike side road skips a station box or car park (+7 m, `island_dike._in_station`).
+- **Two mouths' caps may not overlap** (`check_mouth_sides`): a minor mouth whose cap (paved half, footway included)
+  touches another mouth's moves out; a road that changes its NAME through a pad (ring_kita -> kaigan_dori) now counts
+  as a through road (two free mouths leaving it within 35 deg of head-on). The one finding was rinkai_dori's mouth
+  inside the ring's cap.
+- **`probe_road_ground` judges a column foot by the build's founding rule** (lowest ground within
+  `point_mesh.FOOT_REACH` 1.5 m): a Wangan column at a vertical quay face stands on the seabed at the wall's toe.
+- **Plinths never overlap** (`island_buildings.fit_plinths`): the plinth is what renders since the lot slab went; each
+  overlapping pair shrinks the margins of the sides facing each other (a per-building `plinth` in the record), a
+  corner clash of two frontage rows drops the smaller building, and the safe house's car park slides along the row to
+  clear the house. `lots --check` fails on plinths; lot rectangles are record data (the few rotated pairs no rectangle
+  can separate are reported). Civic lots are separated too (the pass runs after they join).
+- DebugWorld's road tests follow the redesigned DebugRoads (12 runs, 6 pads, footways, 7 cross-zone successors, no
+  open end) and pick the DebugRoads network by record path (DebugWorld also carries `DebugRail`).
+
+## Central's 駅前広場 replaces the Tokyo Station placeholder; one facing per joint; stage timings (2026-09-28)
+
+- **The Tokyo Station placeholder is RETIRED** (user): Central is the rail kit's elevated hub, and the old site stood a
+  second station building in front of it. Gone: the `tokyo_station` frozen site and its search
+  (`island_sites.station_site`), the `TokyoStation` custom type and its three scenes, the map label (Central's own
+  station scene is "Central Station"). The library model `TokyoStation` stays in `library.blend`, unplaced.
+- **The forecourt is a Road Kit loop plus a composite.** `ekimae_rotary` (`island_core_streets.STREETS`, now with
+  `one_way` / `lanes` / `walks` / `spacing` keys): ONE-WAY, 2 lanes, clockwise (Japan keeps left), in from ekimae_dori at
+  x 690, along y 150 in front of the station, out at x 880; a one-way road lays its lanes LEFT of its stations, so the
+  stations are the loop's inner edge and the 4 m outer footway is the kerb buses and taxis stop at. The ground between
+  ekimae_dori and the station is the `central_forecourt` RESERVE (`island_plan.RESERVES`): a street site, a LEVELLED
+  site (`island_sites.LEVELLED_RESERVES`: level = the rotary's highest station + 0.15, so `island_ground` fills it to
+  footway height like a lot, never over the road cells), and it carries `CentralForecourt`
+  (`tools/building_kit/site_central_forecourt.py`, DERIVED from the reserve and the rotary's corners; `--check` runs in
+  the layout stage): four bus berths with shelters + signs on the station-side kerb under a covered walk, the taxi rank
+  on the east leg, a 立体駐車場 in the west zone with its mouth on the west leg (a left turn in), the 交番 and two 駐輪場
+  in the east zone, the clock and benches on the plaza, trees on the inner island. Every prop is refused if it touches
+  the rotary's paved bands. A composite `reserve: true` skips probe_buildings' size rule (its footprint is ground it
+  dresses, not a slab). New library placeholders (`library_civic.py`): `Parking_Multistorey`, `Plaza_Clock`,
+  `Plaza_BikeRack`, `Taxi_Sign`, `Plaza_Canopy`. Central's `multistorey` rail car-park box is gone (it stood on
+  yamate_dori and nothing was placed in it). Map: "Central Bus Terminal".
+- **A joint's two stations share ONE FACING** (`island_layout.weld_joints`, run last): two AUTO halves meeting at a bend
+  cut their sections on different planes and hand each lane over sideways. Both are frozen on the bisector of their
+  chords, each facing its own road's forward direction; a joint a generator already froze is left alone. It took every
+  cross-road hand-over under 0.25 m, including the old `kaigan_machi -> ring_kita` 3.42 m.
+- **The dike's side roads detour round a station box** (`island_dike.round_stations`: a run that enters a station or
+  car-park box, grown 7 m, is shifted 3 m past its nearest edge with a 40 m cosine ease), instead of the whole piece
+  being dropped -- which had cost 9 civic plots their frontage.
+- **Stand probe (`probe_station_paid.gd`)**: the stand's ground is TILTED between an open-air station's entrances'
+  street heights (a flat stand read the slope as a step), the flood's bound includes every collision shape, and a
+  surface ray that grazes a cell edge asks a second ray 3 cm over.
+- **A road corridor is centred on its BAND, not its spine** (`point_edges.band_corridors`): half = half the distance
+  between the two paved edges, centre = their midpoint. A one-way road's spine is its inner EDGE, so the old
+  `max(left, right)` about the spine claimed a carriageway's width of ground on the side with none -- the stamp, the
+  building placer and the block fill (`island_ground.road_mask`) all saw the rotary 9 m wider inside, and the island
+  kept an unfilled grass strip. Two-way roads are unchanged (their midpoint is the spine).
+- **The castle's approach ends WEST of Castle Town station** (`island_site_access` jokamachi_sando end (-628, -208)):
+  the station moved east and its car park (placed at the approach's end) stood on the station's front, the approach's
+  lane in its entrance (probe_road_clear).
+- **Where a rebuild's time goes** (island_world.sh prints each stage's seconds, island_rebuild.sh each step's,
+  island_layout each generator's): `--from layout` 60 min = layout 24 min + roads 31 min (16 rail + 40 road pieces
+  baked) + sites 4 + buildings 0.5 + ground 0.6. A layout run re-derives the whole island, so every road zone's
+  digest changes and `DIRTY_ONLY` skips nothing.
+- **What skips now (2026-09-28, user: "build only the affected region")** -- four of the five measured proposals:
+  * **Cross-network context in the piece digest** (`point_digest.context_of`, `CONTEXT_REACH` 40 m): a piece's digest
+    also hashes the FOREIGN bands (`--avoid`) and keep-clear lanes (`--keep-clear-lanekits`) within reach of its own
+    box, added only when there are any, so a piece nothing foreign touches keeps its old digest. `roadkit_cli.py
+    pieces` takes those flags (`build_roads_piece.sh` passes `GLTF_EXTRA`), so the RAIL build is `DIRTY_ONLY=1` in
+    `island_rebuild.sh` too, and a road piece no longer needs a full rebuild after a rail change. Self-test: a foreign
+    band / keep-clear lane dirties only the piece it touches, and moving it re-dirties.
+  * **Stations skip when unchanged** (`tools/building_kit/station_digest.py`, manifest
+    `assets/world_source/kits/stations/build.json` -- commit with the scenes): per station, its layout entry + a salt
+    of the station kit, the library, the scene builder, the layout, the probe and the door/gate/lift classes. Only
+    dirty stations are built and stand-probed, and only a stand PASS is recorded; `FORCE=1` does all. 4m21 -> 39 s.
+  * **`island_layout.py` caches each generator step** (`tools/layout_cache.py`, `$XDG_CACHE_HOME/openworld_island_layout`,
+    last 400; `--no-cache` / `LAYOUT_CACHE=0`): key = the argv with every input file's bytes, the step's Python import
+    closure, the `DATA` files and the `VOLATILE` state; a hit replays the output and stdout. Editing `island_streets.py`
+    re-runs streets onward only. Also: `tidy` ran the WHOLE gate for one finding (291 s); it runs
+    `check_mouth_clearance` alone now (0.1 s). Derive 347 s -> 58 s cold, 2 s warm (verified identical modulo point
+    uids, which are random per run); the checks after it (~190 s: flow 99, validate 50) still run on a changed output.
+  * **Incremental stamp** (`road_kit_stamp.dirty_corridors`): a re-stamp re-derives only vertices reachable from
+    corridors that changed (old and new), when the stamp record's rule md5 / clearance / verge match; else full
+    (`stamp_roadkit_terrain.gd --full`). Verified: a station raised 1 m re-stamps 312 vertices, 0 different from a
+    full stamp.
+  * Not built: `--region` for `island_streets` -- it runs in ~1 s, so a region option buys nothing.
+  * **The first build after this rebuilds every road and rail piece once** (the builder salt includes
+    `point_digest.py` and `roadkit_cli.py`).
+
+## Mission buildings with interiors, parked vehicles, flyable/sailable craft, and the offshore military runway (2026-09-28/29, user-asked)
+
+**`assets/world_source/kits/interiors/`** holds one `.blend` per mission building, each ONE piece `<Id>` (shell, floors,
+stairs, lift shafts, rooms, fittings) at its real Japanese size: `Koban` (1 storey, light arms), `PoliceStation` (2,
+the complete armoury, cells, interrogation), `FireBranch` (1) / `FireStation` (2), `Hospital` (3 + helipad, ER, ORs,
+wards), `OfficeHQ` (4, open offices, server room, strong room), `ResortHotel`, `WarehouseYard`; the military base's
+`MilHQ`, `MilBarracks`, `MilArmoury` (the complete military armoury), `MilHangar` (two FIJ1), `MilControlTower` (cab at
+20 m); `AirportTerminal` (F1 arrivals, F2 departures, security, four gates on boarding bridges), `AirportHangar` (one
+airliner + a LIP1); `CargoShip` (a static walkable feeder, origin on the waterline, not placed). Plus shops
+(`kits/shops/Shop_Supermarket.blend` + `SupermarketSite`, the re-planned `Shop_FamilyRestaurant.blend`).
+- **Seed**: `blender/tools/interior_plans.py` (plans in a small DSL, `interior_kit.py`: slab / wall / door / ustair /
+  lift / mark) -> `blender/tools/build_interior_blends.py` lays each out ONCE; a hand-edited piece is KEPT
+  (`ib_generated` fingerprint, `--force=<Id>`). The generator refuses a plan with a fitting within 1.1 m of a door.
+- **Empties the game reads** (`export_building_kit.py`): `DOOR_` interior doors, `EXIT_` outer doors, `LIFT_` a lift
+  (`stops` "0,4.2,8", `faces`), `MARK_<kind>_` mission markers (weapon / spawn / cover / objective / vehicle ->
+  `Markers` node, group `mission_marker`), `COL_`, `PROP_`. A new piece needs `ACCEPT_BOUNDS=1` on its first export.
+- **Rows**: `building_types.json` `custom` rows (kit `interiors`); a composite may take a custom row as a PART (its
+  trimesh goes into the site's collider, `trimesh_idx`); the MilitaryBase / AirportAirside library blocks were replaced
+  this way. Artist list: `kits/interiors/ARTIST_NOTES.md`.
+- **Multi-stop lifts**: `world.Elevator` takes `stopHeights` / `faces`; `ElevatorRules` sweeps (a boarded rider goes on
+  in the car's direction). Gate `probe_building_lift.gd`.
+- **Parked vehicles**: a `MARK_vehicle` (or a composite `{"vehicle": id, "faction"}` prop) becomes a
+  `world.ParkedVehicle`: host-only, spawns ONE drivable vehicle from `VehicleModels.sceneOfId` into the current scene
+  (not the streamed building), remembered by position so a cell streaming back in spawns no second one. New models
+  AMB1 (ambulance), FIE1 (pumper), LAT1 (ladder) (`make_placeholder_cars.py`), index 12-14. Gate
+  `probe_parked_vehicles.gd`.
+- **Craft**: FIJ1 fighter, LIP1 light plane, WOB1 work boat, FIB1 fishing boat (`blender/tools/make_placeholder_craft.py`
+  -> `tools/build_craft_scenes.py`, inherited Airplane / Boat scenes, VehicleModels 15-18). Lift is sized so it reaches
+  its 1.3 x weight cap just past take-off (FIJ1 60 m/s, ~130 m roll; LIP1 37 m/s). Gate `probe_craft.gd` (a pilot's
+  rotation: stick back to ~15 deg nose-up, then neutral -- holding it loops the plane); `--control` fails 4. Placed:
+  jets and trucks at the base, a LIP1 in the airport hangar, a WOB1 at the military pier, two FIB1 at the fish market.
+- **The military runway is OFFSHORE** (user, 2026-09-29): it had run 820 m along the port platform's south band to the
+  container terminal's corner. Now a 540 m runway (the civilian airport's length; FIJ1 needs ~130 m) on a reclaimed
+  strip running WEST from the base into the sea (`island_reshape.MILITARY_PIERS`' second rectangle, `island_plan`
+  `military_airfield` x -1260..-720). The airport island needs no widening.
+- `probe_buildings.gd` now tests a door at its own floor height (`center[1]`), so an upper-floor exit (a gate, a ship's
+  deck door) is probed where it is.
+
+## The airport behind the bridge: one divided spur, the rail under it, the station against the terminal, the runway south; every hub station has its street (2026-09-29, user-asked)
+
+User: "station land in middle of street ... let the train below the bridge rather than split the bridge into two one-way
+roads ... the station at airport combine with the air terminal, or at least direct connection ... the runway on a
+different side from the bridge"; "top of C1 should be similar lane count and exit behaviour both ways"; "the rail must
+clear the large train"; "use the latest Blender-authored pieces, not the old placeholders".
+
+- **Why the open-air stations stood in the street**: `World.tscn` still had their PRE-SLIDE positions (City West at
+  x −125 where the rail plan puts it at −171.4, Residential North 46 m off, ...); the rail plan and the reserve were
+  right, and any rebuild's `sites` stage re-places them. Checked on the plan: every ramp foot lands 1.5–11 m short of
+  its street.
+- **The Rainbow Bridge decks moved 8 m down** (`library_landmarks.RB_ROAD_LOWER/UPPER` 16 / 24; the towers keep 107.3 m):
+  the lower deck is the rail at 16 m = the airport island's ground 8 + `ELEVATED_Z`, so the Main line comes off the
+  bridge LEVEL straight into the station. The spur's upper deck (24 m) sits 8 m over the rail head: the EMU1 gauge
+  (4.25 m over the bed) clears its 0.8 m deck's soffit by ~3 m (probe_rail_track's gauge sweep is the gate).
+  `island_rainbow_bridge.DECK_MIN_Z` 14 (both decks), `island_rail_layout.BRIDGE_DECK_Z` 16, `island_expressway.BRIDGE_Z` 24.
+- **The spur is ONE divided road across the bridge** (`island_expressway`: `shuto_spur`). The two one-way carriageways
+  (needed by the loop JCT's merge and the Wangan's two ramps) run from C1 past the Wangan's junction S (x 1000),
+  converge from `SPUR_OFF` 5.5 to half the median (0.5) over the straight to `SPUR_JOINT_X` 1130, and hand over at a
+  JOINT (the Wangan split's rule: each one-way station half a median to its own side, one facing, spur_in faced west).
+  They keep a hump (`SPUR_HUMP_Z` 27.5) over wangan_e's underpass, which needs 5.5 m. On the island the divided road
+  holds 24 m for `PEEL_HOLD` past the bridge end (off the rail), peels WEST along y −1590, descends to 8 m, U-turns
+  at x 870 and ends at `FORE_J`, the middle of the west side of `kuko_rotary`, a one-way two-lane clockwise loop
+  (`FORE_BOX`) whose east leg's kerb runs beside the station's west entrances and whose south leg's kerb is under the
+  terminal's curb canopy. The old airport roads (`airport_dori*`, `AIR_A/B/P`) are gone.
+- **The station against the terminal.** Airport (elevated hub) at (1250, −1670) on the bridge axis. The terminal is the Blender-authored `kits/interiors/AirportTerminal.blend` (150 × 50 m, canopy to
+  local +34, bridges to −50.6), DERIVED by `island_sites.terminal_site()` from the reserve: past the terminus end, its
+  landside (+Z) facing the station 12 m from the station building's end (`TERMINAL_GAP`), its landside door at local
+  x −15 on the station's axis → (1235, −1769.3) yaw 180. The track's buffer stop is 3 m past the platform: at 10 m it ran
+  into the terminal's collider at the canopy edge (probe_rail_track's EMU1 gauge sweep). **A custom building is
+  RE-CENTRED on its piece's bounds**, so the terminal's canopy (+34 in its piece) stands at +42.3 in its scene:
+  `island_sites.terminal_reach()` reads it from `kits/interiors/pieces.json` (a typed 34 put the canopy over the
+  loop's lanes, probe_road_clear). The old flat-ground search and its 242 × 170 placeholder size
+  are gone.
+- **The airside is south** (`island_plan` `airport_airfield` (940, 1812, 1480, 1972.5), `AirportAirside` yaw 180): the
+  apron against the terminal's airside face, the taxiway, the 540 m runway along the island's south edge, away from the
+  bridge. `island_reshape.AIRPORT_SOUTH` extends the airport island 60 m south (to z 2040) at the platform's height,
+  its west-end beach terrace eased over 4 cells (an unchanged terrace next to a changed cell reads as an 8.2 m step).
+- **`AirportForecourt`** (`tools/building_kit/site_airport_forecourt.py`, derived from the loop and the
+  `airport_forecourt` reserve, levelled like Central's): bus stops on the terminal kerb, the taxi rank on the station
+  kerb, the inner island planted.
+- **Every hub station has its street** (`island_rail_layout.HUB_ACCESS`, one owner): a door stood 25–320 m from any
+  at-grade street. Each row is a street built by `island_site_access` (`station_access()`, a declared dead end
+  `ekimae_<station>`, `via` corners supported) whose END comes from the station itself (`station_layout.hub_entrance`),
+  and the station's car park placed ON it (the reserve's box with `entrance` + `street_at`, as the open-air stations'):
+  Harbour off the ring's low stretch under the Wangan; Industry's annex turned WEST (`side`) with a street off
+  kojo_waku; Waterpark along its north face; Suburb along its south face off wangan_dori's diagonal; Bay (no room for
+  a T between two junctions 67 m apart) keeps its 28 m apron to nishi_hondori, its car park moved onto that street
+  (`mode: "street"`). `island_site_access` now joins an existing junction only when its CENTRE is within 15 m of `at`
+  (Bay's first try became a skewed 5th arm).
+- **The C1 diamond is symmetric** (`island_plan.DIAMOND_X` 245 / 255 / 945 / 955): each end has its exit on one
+  carriageway and its entrance on the other 10 m apart (one ramp per station), so both carriageways widen over the same
+  stretch; they stood at 220 / 340 / 860 / 980, which put the extra aux lanes on DIFFERENT stretches of each side.
+- **No building stands on a road band at any height**: `island_buildings.py roads` (in the `buildings` stage) checks
+  every placed footprint against every solved band in plan (shapely), elevated decks included — the user saw tall
+  buildings under C1's deck at the higashi_hondori crossing.
+
+## More enterable buildings, Japanese convention (2026-09-29, user-asked)
+
+`blender/tools/interior_plans_jp.py` (seed plans; `build_interior_blends.py` now merges its `PLANS` with
+`interior_plans.py`'s) adds 18 kits/interiors buildings, each a `custom` row in `building_types.json` with the usual
+three variants (shut / `_Open` locked / `_Shop` open) and `probe_buildings.gd` PASS: `SafeHouseSmall` /
+`SafeHouseLarge` (residential houses), `SafeHouseCitySmall` (3-storey 狭小住宅) / `SafeHouseCityLarge` (5-storey
+雑居ビル with a penthouse over a front company) for downtown, `Izakaya`, `MaidCafe`, `AdultServices` (non-explicit
+風俗ビル), `BankSmall` / `BankLarge` (ATM corner, 風除室, counters, back office, vault), `ParkingGarage` (自走式,
+stacked 15 % ramps: up west, down east), `AirportControlTower` (civil, lift to a 36 m cab), `FashionBuilding` /
+`DepartmentStore` (one `mall()` generator: escalator atriums, lift banks, 4 stairs, a floor programme),
+`CivicCenter` (downtown 区民センター), `OnsenRyokan` (snow, 男湯 / 女湯 + 露天風呂), `SecureMansion` (walled estate,
+詰所 checkpoint, panic room). `Hospital` gained a 風除室 main entrance and a separate, signed emergency side
+(ambulance lane, 救急搬入口 vestibule, walk-in 救急外来); `PoliceStation` stands in a fenced compound (public gate +
+立番 booth, barrier vehicle gate + booth, cameras, the 護送口 to the 留置場). None is placed on the island yet.
+- **Japanese conventions baked in:** a house's raised 0.45 m floor over a 基礎, the genkan doma one step up from the
+  street and the 0.30 agarikamachi, 下足箱; the WC its own room apart from the 洗面所 / unit bath; tatami (flush,
+  1.2 cm -- a 和室 floor is sunk for it), 押入れ, 床の間; 風除室 at busy entrances; car ramps <= 17 %, bays 2.5 x 5.0.
+- **Helpers** (`interior_plans_jp.py`): `zakkyo()` (a narrow multi-tenant core: back stair to the roof, a lift, a
+  lobby strip, a WC per floor; `core_y()` gives the side fire exit's position), `mall()`, `gable()`, `sstair()`
+  (a straight flight; tread 0.4 = an escalator placeholder), `ramp()`, `perimeter()` / `fence()`, `guard_post()`,
+  `vault()`, `vestibule()`, `genkan()`, `tatami()`. `interior_plans.openings` takes an optional 7th element, the
+  doorway's sill above the wall's z (a door onto a raised floor in a wall that starts at the ground).
+- **Rules the probe taught** (each a failure first): the character capsule (r 0.35) must fit at the door's own
+  floor -- an exit into a raised floor needs its sill, a garage door off a raised hall needs a doma pocket; interior
+  doors are >= 0.8 m; nothing (a kitchen run, tatami thicker than 2 cm, a slab edge) may stand within 0.35 m of a
+  doorway at floor height; a slab's edge flush with the facade z-fights (slabs stop 2 cm inside); `probe_xz` must be
+  a spot whose top-down ray hits the roof at `wall_top_m` and whose floor ray hits 0 -- under a porch or hood for a
+  pitched roof.
+- **Fast loop:** `tools/building_kit/build_interiors_only.sh <Id> ...` (export those .blends, import, layout, build
+  ONLY those scenes, probe ONLY them + their variants; `ACCEPT_BOUNDS=1` for a new piece). `probe_buildings.gd
+  --only=` no longer demands 10 scenes, and names a blocked interior sliding door's centre.
+  `shot_buildings.gd --plan-z=<m>` sets the plan camera height (the default 3.2 m sits inside a house's F2 slab).
+- **Not verified:** a car actually driving the car park's ramps (only the geometry is gated), the escalators as
+  moving walkways (they are static steps).
+- **Follow-ups (same day):** every bank floor has restrooms -- `wc_block()` (男子 / 女子 / 多目的, sliding doors,
+  toilets facing their doors) on each of BankLarge's floors, a customer 多目的トイレ off BankSmall's lobby. **A lift
+  beside a stair in every multi-floor public building**: added to FireStation, MilHQ, MilBarracks, MilControlTower
+  (in the tower shaft, to the cab) and ParkingGarage (beside the stair tower, a bridge to each deck); houses and the
+  izakaya stay stair-only. **Water is a marker, not geometry:** a `MARK_water_` Empty (props `w`, `d`, `material`)
+  becomes a non-colliding quad in `build_building_scenes.gd` (`WATER_MATERIALS`: `onsen` ->
+  `assets/vfx/water/material/water_onsen.tres`, on `assets/vfx/water/onsen.gdshader` -- the Binbun3D water body with
+  no displacement, pale jade, a short depth fade so the stone floor shows); the ryokan's tubs and outdoor pools are
+  SUNK (bottom at the ground under a 0.2 m rim, a 0.25 m seat ledge) so a body wades in. **COT1, the container
+  truck** (`VehicleModels` index 19, APPEND-ONLY): `make_placeholder_cars.py` shape `tractor` -- a cab-over tractor
+  and a 20 ft skeletal chassis made ONE rigid 4-wheel body (wb 7.8 m) carrying the container terminal's own 20 ft ISO
+  box (6.058 x 2.438 x 2.591, top 3.79 m); a rigid 40 ft rig would have a 13 m wheelbase and could not turn at a
+  junction. `probe_component_car.gd --car=COT1` PASS. Parked (MARK_vehicle / composite `vehicle` props) at the
+  WarehouseYard's docks and in the ContainerTerminal's truck lanes. **Nothing may span a lift shaft above the bottom stop** -- a
+  thin tatami layer over the ryokan's shaft and the airport tower cab's solid underside each scraped the rider off
+  the rising car (`probe_building_lift.gd` read it as "the rider N m off the top stop" while the car's own run
+  passed); `slab()`'s holes are not enough, every box laid over a room must miss the shaft too.
+- **Findings the island probes surfaced on this rebuild, fixed** (each first seen now: the island had not been
+  rebuilt since the previous session's station slides):
+  - `probe_station_paid`'s island mode bounded its flood 40 m past the platform ends, and an open-air entry ramp puts
+    the street ~48 m out: every open-air station "failed" at a start outside the flood's own box. The bound now reaches
+    past every entrance; `--` failures print what blocks the start (`_blockers`) and the floors round it. 13/13.
+  - `probe_rail_track`'s gauge is the EMU1's PROFILE in two bands (below the platform line the car is 1.44 m a side,
+    above it 1.49 m over the doors), margin 0.001: one box at the door width touched every island platform at Central
+    (the real train clears them by 0.11 m). A hit now names its SHAPE and where it stands.
+  - The castle approach `jokamachi_sando` ramped straight from its junction to a car park against the castle wall
+    and crossed the Blue line 1.5 m ABOVE it (the rail plan read "street closed" while the road was built anyway). It
+    now follows the ground (a level 踏切 beside Castle Town station) and ends 10 m past the track with no lot of its
+    own; drivers use the station's car park south of the track. `island_site_access.rail_crossings` keeps any access
+    road with a lot level over an at-grade track (`LX_HOLD` past it) before it climbs.
+  - The dike's opening under the ring where it bridges the Main line was a straight strip along the track's tangent;
+    on the curved approach to the bridge the embankment stood in the viaduct 30 m along. It now follows the corridor's
+    own samples (`island_dike.RAIL_OPEN`, a disc per 10 m sample).
+  - **A road stamp never raises ground over a rail corridor** (`road_kit_stamp.guard_corridors` / `guard_cap`). With
+    the natural ground open, the RING's own 1:1.5 fill batter (it is lifted 7 m over the Main line there) still spilled
+    8 m up onto the elevated track (`probe_rail_track`: Terrain3D in the gauge at (1171, 449)). A road stamp reads every
+    sibling network whose record's roads are all `road_class` "rail" (their stamp record: the rail is stamped first)
+    and caps its result, never below the natural ground, at the rail surface - CLEARANCE out to the rail band's edge +
+    `GUARD_MARGIN` (0.5 m), rising 1:1 beyond. After: gauge 10 064 samples clean, `probe_road_stamp` PASS (idempotent,
+    restore exact).
+- **Open, not from this change**: `ring_kita__6_F1` meets a junction footway on the dike where `kogai_loop` leaves the
+  ring nearly parallel to its southbound arm (probe_road_clear); 18 of 13 007 PIER samples on the Wangan's west sea
+  viaduct (-899, 1131) have no column foot within 25 m (probe_road_ground). Final gate state on this rebuild:
+  `probe_rail_track` PASS, `probe_station_paid` 13/13, `probe_road_stamp` PASS, and those two.
+- **Civic plots and streets are planned round each other**, so a re-site can move the streets under another plot:
+  after the re-sites here `water_resort` went 746 m away (its old plot cut by the dike side road `teibo_sokudo_3`),
+  and one more layout + `--resite=water_resort --avoid-streets` found it a plot 117 m from Waterpark station on
+  wangan_dori. Re-run `island_civic_sites.py --check` after every layout and re-site what it names.

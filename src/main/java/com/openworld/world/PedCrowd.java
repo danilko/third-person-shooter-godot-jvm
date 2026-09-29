@@ -663,7 +663,7 @@ public class PedCrowd extends Node3D {
 				if (pointAt(p, p.along).distanceTo(st.origin) <= r) scare(p, st.origin);
 			}
 		}
-		if (heard.size() > live.size()) heard.retainAll(java.util.Collections.newSetFromMap(identity(live)));
+		if (heard.size() > live.size()) heard.retainAll(identity(live).keySet());   // an IdentityHashMap key set: contains() by identity
 	}
 
 	private static java.util.IdentityHashMap<StimulusManager.Stimulus, Boolean> identity(List<StimulusManager.Stimulus> l) {

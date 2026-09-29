@@ -1,0 +1,434 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/WarehouseYard_Open_mesh.res" id="1_8f2f2"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/WarehouseYard_Open_collision.res" id="2_njpyh"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Door.java" id="3_pt11b"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_DoorLeaf_White.tres" id="4_fjbyn"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="5_nfbxr"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_524s4"]
+size = Vector3(0.9, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2ylqx"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_nnj3r"]
+size = Vector3(2.3, 2.3, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_k4gwt"]
+size = Vector3(0.9, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_e3jlg"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_vd8hs"]
+size = Vector3(2.3, 2.3, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_s8jt5"]
+size = Vector3(0.9, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_a3eqd"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yvmer"]
+size = Vector3(2.3, 2.3, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_xp8ne"]
+size = Vector3(0.9, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_23v21"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_cjdir"]
+size = Vector3(2.3, 2.3, 2.4)
+
+[node name="WarehouseYard_Open" type="Node3D" unique_id=1140621691]
+metadata/building = {
+"aabb": [Vector3(-22, -0.2, -25.005001), Vector3(44, 9.8, 50.010002)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [13.0, 0.0, -1.095],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-15.0, 0.0, -24.895],
+"height": 2.1,
+"module": 1.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}],
+"doors_closed": false,
+"doors_locked": true,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [44.0, 50.01],
+"height_m": 9.8,
+"id": "WarehouseYard",
+"inner_doors": [{
+"center": [15.4, 0.0, -16.995],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [13.6, 4.0, -16.995],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}],
+"kit": "interiors",
+"landmark": false,
+"marks": [{
+"name": "MARK_cover_01",
+"pos": [13.0, 0.0, 7.005],
+"props": {
+"kind": "cover"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_cover_02",
+"pos": [-8.0, 0.0, -12.495],
+"props": {
+"kind": "cover"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_cover_03",
+"pos": [0.35, 0.0, -12.495],
+"props": {
+"kind": "cover"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_objective_01",
+"pos": [12.0, 4.0, -23.595],
+"props": {
+"kind": "objective",
+"note": "the yard office's safe"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [4.2, 0.0, 22.805],
+"props": {
+"kind": "spawn",
+"team": "guard"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-10.0, 0.0, -17.495],
+"props": {
+"kind": "spawn",
+"team": "worker"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [17.0, 4.0, -19.995],
+"props": {
+"kind": "spawn",
+"team": "worker"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_01",
+"pos": [-12.0, 0.0, 5.305],
+"props": {
+"kind": "vehicle",
+"note": "a container truck at the dock",
+"vehicle": "COT1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_02",
+"pos": [-4.0, 0.0, 5.305],
+"props": {
+"kind": "vehicle",
+"note": "a container truck at the dock",
+"vehicle": "COT1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_03",
+"pos": [4.0, 0.0, 6.505],
+"props": {
+"kind": "vehicle",
+"vehicle": "CRT1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_04",
+"pos": [15.0, 0.0, 17.005],
+"props": {
+"kind": "vehicle",
+"vehicle": "KET1"
+},
+"yaw": 0.0
+}],
+"piece_count": 1,
+"probe_xz": [-10.5, -2.99],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "倉庫 + ヤード: a 40 x 24 x 9 m warehouse (pallet racks, forklifts, three open docks, a two-storey corner office up a stair) on a 44 x 26 m fenced yard with a trailer, a truck and a guard booth. Not placed on the island: a level designer's building. kits/interiors/WarehouseYard.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 9.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=710050109]
+visibility_range_end = 415.2
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_8f2f2")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1148436342]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=907313704]
+shape = ExtResource("2_njpyh")
+
+[node name="Doors" type="Node3D" parent="." unique_id=1390525214]
+
+[node name="Door0" type="StaticBody3D" parent="Doors" unique_id=1488060094]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.45, 0, -1.095)
+collision_mask = 0
+script = ExtResource("3_pt11b")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = false
+sensor_path = NodePath("Sensor")
+locked = true
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door0" unique_id=1179866737]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+material_override = ExtResource("4_fjbyn")
+mesh = SubResource("BoxMesh_524s4")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0" unique_id=526867855]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_2ylqx")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door0" unique_id=517167023]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0/Sensor" unique_id=14308607]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_nnj3r")
+
+[node name="Door1" type="StaticBody3D" parent="Doors" unique_id=1688220125]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -15.45, 0, -24.895)
+collision_mask = 0
+script = ExtResource("3_pt11b")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = false
+sensor_path = NodePath("Sensor")
+locked = true
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door1" unique_id=65725374]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+material_override = ExtResource("4_fjbyn")
+mesh = SubResource("BoxMesh_k4gwt")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1" unique_id=1991638934]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_e3jlg")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door1" unique_id=999935751]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1/Sensor" unique_id=676024157]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_vd8hs")
+
+[node name="Door2" type="StaticBody3D" parent="Doors" unique_id=990416364]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.849999, 0, -16.995)
+collision_mask = 0
+script = ExtResource("3_pt11b")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door2" unique_id=1810087274]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+material_override = ExtResource("4_fjbyn")
+mesh = SubResource("BoxMesh_s8jt5")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2" unique_id=1449907388]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_a3eqd")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door2" unique_id=660789540]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2/Sensor" unique_id=1993676169]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_yvmer")
+
+[node name="Door3" type="StaticBody3D" parent="Doors" unique_id=606383727]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.05, 4, -16.995)
+collision_mask = 0
+script = ExtResource("3_pt11b")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door3" unique_id=1291547589]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+material_override = ExtResource("4_fjbyn")
+mesh = SubResource("BoxMesh_xp8ne")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3" unique_id=1342020602]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_23v21")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door3" unique_id=1386487068]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3/Sensor" unique_id=353168118]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 0)
+shape = SubResource("BoxShape3D_cjdir")
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=702179347]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 13, 0, -1.095)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=726994636]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0, -24.895)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1266280435]
+
+[node name="MARK_cover_01" type="Marker3D" parent="Markers" unique_id=2118623509 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0, 7.005)
+metadata/kind = "cover"
+
+[node name="MARK_cover_02" type="Marker3D" parent="Markers" unique_id=1245846767 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -8, 0, -12.495)
+metadata/kind = "cover"
+
+[node name="MARK_cover_03" type="Marker3D" parent="Markers" unique_id=1311837 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.35, 0, -12.495)
+metadata/kind = "cover"
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=772936099 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 12, 4, -23.595)
+metadata/note = "the yard office's safe"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1952122971 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 4.2, 0, 22.805)
+metadata/team = "guard"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=2083879163 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, -17.495)
+metadata/team = "worker"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=136401188 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 17, 4, -19.995)
+metadata/team = "worker"
+metadata/kind = "spawn"
+
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=1172532277 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -12, 0, 5.305)
+script = ExtResource("5_nfbxr")
+vehicle_id = "COT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "COT1"
+metadata/note = "a container truck at the dock"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=1454715496 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -4, 0, 5.305)
+script = ExtResource("5_nfbxr")
+vehicle_id = "COT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "COT1"
+metadata/note = "a container truck at the dock"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_03" type="Node3D" parent="Markers" unique_id=1199962584 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 4, 0, 6.505)
+script = ExtResource("5_nfbxr")
+vehicle_id = "CRT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "CRT1"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_04" type="Node3D" parent="Markers" unique_id=57435333 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, 17.005)
+script = ExtResource("5_nfbxr")
+vehicle_id = "KET1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "KET1"
+metadata/kind = "vehicle"

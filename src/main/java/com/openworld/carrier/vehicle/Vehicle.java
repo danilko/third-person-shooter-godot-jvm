@@ -377,6 +377,16 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             cmd.desiredWeapon = currentCmd.desiredWeapon;
         }
 
+        // The driver was killed (watchSeatDeaths): nobody is at the wheel, so the car brakes to a stop in a
+        // short slide instead of coasting on. Released just short of rest so it can park and sleep.
+        if (hasDefeatedDriver()) {
+            cmd.motor = 0;
+            cmd.steering = 0;
+            cmd.boost = false;
+            cmd.fire = false;
+            cmd.brake = getLinearVelocity().length() > DEFEATED_BRAKE_UNTIL;
+        }
+
         if (cmd.handbrake) {
             slipping    = true;
             handBraking = true;
@@ -575,26 +585,26 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
     }
 
-    // ── A defeated driver (PLAN.md 0.2) ───────────────────────────────────────
+    // ── A defeated driver (PLAN.md 0.2; braking since 2026-09-28) ─────────────────
 
     /** Whether the seat-0 occupant was alive last tick -- the edge {@link #watchDriverDefeat} acts on. */
     private boolean driverWasAlive = true;
+    /** The driver was killed and nobody has taken the wheel since: the car brakes to a stop. */
+    private boolean abandonedByDeath = false;
+    /** A driverless car brakes until it is this slow, then lets go so it can park and sleep (m/s). */
+    private static final double DEFEATED_BRAKE_UNTIL = 0.3;
 
     /**
-     * The driver died in the seat. An ambient car's brain is on the VEHICLE (Design B), so killing
-     * the person at the wheel used to change nothing: the car drove on down its lane with a corpse
-     * in it. Now the brain goes with the driver -- the car coasts (no throttle, no brake, no steer),
-     * rolls to rest and parks, and ZoneManager reclaims it out of sight. The body stays in the seat
-     * (GTA's model; {@code CharacterRagdoll.enableSeatedDeath}), so the car is still AI-OCCUPIED and
-     * a player takes it by the carjack path, which pulls the corpse out.
+     * The driver died in the seat. The body STAYS in the seat, slumped (GTA's model; a frozen pose, no simulation:
+     * {@code CharacterRagdoll.enableSeatedDeath}), and the car BRAKES to a stop in a short slide
+     * ({@link #hasDefeatedDriver}) instead of driving on. An ambient car's brain is on the VEHICLE (Design B), so it
+     * goes with the driver. The car is still AI-OCCUPIED, so a player takes it by the carjack path, which pulls the
+     * corpse out as a ragdoll. (A version that threw the body out of the door was built and dropped, user
+     * 2026-09-28: simpler, nothing to replicate.)
      *
-     * <p>Detected as an EDGE on every peer, because the nameplate tint re-derives from the occupant's
-     * health everywhere and needs a signal to do it; {@code Health.died} fires only where damage is
-     * applied. Only the simulating peer holds a brain to drop, so the car's behaviour stays
-     * host-authoritative with no new message -- the replicated body is what clients see.
-     *
-     * <p>A PLAYER driver is deliberately not touched here: a dead player's controller belongs to the
-     * death and respawn flow, not to the car.
+     * <p>Detected as an EDGE on every peer, because the nameplate tint re-derives from the occupant's health
+     * everywhere; {@code Health.died} fires only where damage is applied. Only the simulating peer holds a brain to
+     * drop or brakes, so the car's behaviour stays host-authoritative with no new message.
      */
     private void watchDriverDefeat() {
         Character d = occupant;
@@ -605,11 +615,12 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
         if (!driverWasAlive) return;
         driverWasAlive = false;
+        abandonedByDeath = true;
         nameplateChanged.emit();
         if (isAiDriven()) {
             removeAiDriverBrain();
             GD.print("[Vehicle] " + (characterInfo != null ? characterInfo.displayName : getName())
-                    + ": driver defeated -- coasting to rest");
+                    + ": driver defeated -- braking to a stop");
         }
     }
 
@@ -618,9 +629,14 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         return occupant != null && GD.isInstanceValid(occupant) ? occupant : null;
     }
 
-    /** True when the driver seat holds a dead body (the car coasts, and is reclaimable at rest). */
+    /**
+     * True when the driver was killed and nobody has taken the wheel since (the body may still be in the seat for
+     * the moment before it falls out): the car brakes to a stop, and ZoneManager reclaims it at rest out of sight.
+     */
     public boolean hasDefeatedDriver() {
-        return occupant != null && GD.isInstanceValid(occupant) && !occupant.isAlive();
+        Character d = occupant != null && GD.isInstanceValid(occupant) ? occupant : null;
+        if (d != null && d.isAlive()) abandonedByDeath = false;   // someone took the wheel
+        return abandonedByDeath && (d == null || !d.isAlive());
     }
 
     // ── Locomotion hook (carrier-type seam) ───────────────────────────────────
@@ -821,33 +837,155 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     // beam is not.
 
     private static final double LIGHT_VIEW_DISTANCE = 140.0;   // beyond this a beam is a few pixels
-    private static final double LIGHT_TICK = 0.25;
+    private static final double LIGHT_TICK = 0.05;              // brake and reverse must answer within a few frames
+    /** Forward speed (m/s) below which a car rolling backward shows its reverse lamps. */
+    private static final double REVERSE_SPEED = 0.3;
+    /** A puppet decelerating harder than this (m/s²) is braking, whatever its snapshot's brake bit says. */
+    private static final double BRAKE_DECEL = 2.5;
 
     private SpotLight3D headLeft, headRight;
-    private OmniLight3D tailLeft, tailRight;
+    private OmniLight3D tailLeft, tailRight, reverseLight;
+    /** The model's OWN lamp faces, found by material name ({@link #LAMP_SURFACE_HEAD} ...): lit in place of a lens. */
+    private final ArrayList<LampSurface> headSurf = new ArrayList<>(), tailSurf = new ArrayList<>(), revSurf = new ArrayList<>();
+    private record LampSurface(MeshInstance3D mesh, int surface) {}
+    /** Material names a vehicle model gives its lamp faces (blender/VEHICLE_AUTHORING.md "Lamps"). */
+    public static final String LAMP_SURFACE_HEAD = "front.lamp.light", LAMP_SURFACE_TAIL = "back.lamp.light",
+            LAMP_SURFACE_REVERSE = "back.lamp.reverse";
     private double lightTimer;
-    private boolean lightsOn;
+    private boolean lightsOn, brakeLit, reverseLit;
+    private Vector3 lastLightPos;
+    private double lastForward;
 
     /** Are this car's lamps lit right now? (Probe readout, and what a future dashboard would read.) */
     @Register public boolean headlightsOnNow() { return lightsOn; }
+    /** Are the brake lamps lit (any time of day)? */
+    @Register public boolean brakeLightsOnNow() { return brakeLit; }
+    /** Are the reversing lamps lit (any time of day)? */
+    @Register public boolean reverseLightsOnNow() { return reverseLit; }
 
+    /*
+     * Three signals, one rule each (user, 2026-09-28: "front / back light raised in late night, while stop / back
+     * signal day and night"):
+     *  - HEAD + TAIL: on when DayNight says it is dark. The lenses glow and the beams / tail glow are lit.
+     *  - STOP: the tail lenses go bright and the tail lights come on, DAY AND NIGHT, while the car is braking: the
+     *    brake input, throttle against the rolling direction (S at speed is how a player brakes), or, on a puppet
+     *    that has no command, the snapshot's brake bit or a hard deceleration.
+     *  - REVERSE: DAY AND NIGHT while the car rolls backward, a white light on the ground behind it and a lit
+     *    reversing lamp: the model's `back.lamp.reverse` faces if it has them, else its tail lamp glows as it does
+     *    for a stop, else a code-built white lens inboard of each tail lamp.
+     * All of it is derived every tick from what the car is doing, so it needs no message and a puppet shows it too.
+     * A model that AUTHORS its lamps (faces wearing `front.lamp.light` / `back.lamp.light`) is lit on those very
+     * faces; a model that does not gets lenses built in code at the config's DERIVED lamp offsets.
+     */
     private void refreshLights(double delta) {
         lightTimer -= delta;
         if (lightTimer > 0.0) return;
+        double dt = LIGHT_TICK - lightTimer;
         lightTimer = LIGHT_TICK;
         VehicleConfig cfg = getConfig();
-        boolean want = com.openworld.world.DayNight.lightsWanted()
-                && !(cfg.headlightOffset.getX() == 0.0 && cfg.headlightOffset.getZ() == 0.0)
-                && (healthNode == null || !healthNode.isDead())
-                && nearCamera();
-        if (want && headRight == null) buildLights(cfg);
-        if (headRight == null) return;
-        if (want == lightsOn) return;
-        lightsOn = want;
-        headLeft.setVisible(want);
-        headRight.setVisible(want);
-        if (tailLeft != null) tailLeft.setVisible(want);
-        if (tailRight != null) tailRight.setVisible(want);
+        boolean hasLamps = !(cfg.headlightOffset.getX() == 0.0 && cfg.headlightOffset.getZ() == 0.0);
+        boolean alive = healthNode == null || !healthNode.isDead();
+        boolean near = nearCamera();
+        if (!hasLamps || !near) {
+            lastLightPos = null;
+            if (headRight != null && (lightsOn || brakeLit || reverseLit)) applyLights(false, false, false);
+            return;
+        }
+        if (headRight == null) buildLights(cfg);
+        // forward speed from MOTION, so a frozen puppet reads the same as the simulating car
+        Vector3 pos = getGlobalPosition();
+        Vector3 fwd = getGlobalBasis().getZ().times(-1.0);
+        double forward = lastLightPos != null && dt > 1e-4 ? pos.minus(lastLightPos).dot(fwd) / dt : 0.0;
+        double decel = lastLightPos != null && dt > 1e-4 ? (Math.abs(lastForward) - Math.abs(forward)) / dt : 0.0;
+        lastLightPos = pos;
+        lastForward = forward;
+        boolean braking;
+        // a FROZEN body is the puppet mechanism (it moves kinematically and has no command): judge it by its motion
+        if (isLocallySimulated() && !isFreezeEnabled()) {
+            braking = this.braking || handBraking || (cmd.motor * forward < 0.0 && Math.abs(forward) > 0.5);
+        } else {
+            Node n = getNodeOrNull("VehicleNetworkController");
+            braking = (n instanceof com.openworld.net.VehicleNetworkController vnc && vnc.getLastBrake())
+                    || (decel > BRAKE_DECEL && Math.abs(forward) > 0.5);
+        }
+        boolean reversing = forward < -REVERSE_SPEED;
+        applyLights(alive && com.openworld.world.DayNight.lightsWanted(), alive && braking, alive && reversing);
+    }
+
+    private void applyLights(boolean night, boolean brake, boolean reverse) {
+        if (night == lightsOn && brake == brakeLit && reverse == reverseLit) return;
+        lightsOn = night;
+        brakeLit = brake;
+        reverseLit = reverse;
+        // a lamp whose part has come off (the bumper is lying in the road) lights nothing
+        boolean headIntact = intact(headSurf), tailIntact = intact(tailSurf);
+        headLeft.setVisible(night && headIntact);
+        headRight.setVisible(night && headIntact);
+        String head = night ? LAMP_HEAD_ON : LAMP_HEAD_OFF;
+        paintLamp(headSurf, head);
+        // no reversing lamp of its own: the tail lamp glows while reversing, as it does for a stop
+        boolean tailBright = brake || (reverse && revSurf.isEmpty());
+        String tail = tailBright ? LAMP_TAIL_BRAKE : night ? LAMP_TAIL_NIGHT : LAMP_TAIL_OFF;
+        paintLamp(tailSurf, tail);
+        for (OmniLight3D l : new OmniLight3D[] {tailLeft, tailRight}) {
+            if (l == null) continue;
+            l.setVisible((night || tailBright) && tailIntact);
+            l.setParam(Light3D.Param.ENERGY, tailBright ? 3.0f : 1.2f);
+            l.setParam(Light3D.Param.RANGE, tailBright ? 4.0f : 2.5f);
+        }
+        paintLamp(revSurf, reverse ? LAMP_REV_ON : LAMP_REV_OFF);
+        if (reverseLight != null) reverseLight.setVisible(reverse && tailIntact);
+    }
+
+    private static void paintLamp(ArrayList<LampSurface> surfaces, String state) {
+        for (LampSurface ls : surfaces)
+            if (GD.isInstanceValid(ls.mesh()))
+                ls.mesh().setSurfaceOverrideMaterial(ls.surface(), litVariant(ls.mesh().getMesh().surfaceGetMaterial(ls.surface()), state));
+    }
+
+    /** Is at least one of these lamp faces still on the car (an empty list = no face, nothing to lose)? */
+    private static boolean intact(ArrayList<LampSurface> surfaces) {
+        if (surfaces.isEmpty()) return true;
+        for (LampSurface ls : surfaces)
+            if (GD.isInstanceValid(ls.mesh()) && ls.mesh().isVisibleInTree()) return true;
+        return false;
+    }
+
+    /** Every surface of the car's model wearing a lamp material, by its material's name. */
+    private void findLampSurfaces() {
+        headSurf.clear(); tailSurf.clear(); revSurf.clear();
+        Node model = getNodeOrNull("Model");
+        if (model == null) return;
+        ArrayList<Node> stack = new ArrayList<>();
+        stack.add(model);
+        while (!stack.isEmpty()) {
+            Node n = stack.remove(stack.size() - 1);
+            for (Node c : n.getChildren()) stack.add(c);
+            if (!(n instanceof MeshInstance3D mi) || mi.getMesh() == null) continue;
+            Mesh mesh = mi.getMesh();
+            for (int s = 0; s < mesh.getSurfaceCount(); s++) {
+                Material m = mesh.surfaceGetMaterial(s);
+                if (m == null) continue;
+                String name = m.getName();
+                if (LAMP_SURFACE_HEAD.equals(name)) headSurf.add(new LampSurface(mi, s));
+                else if (LAMP_SURFACE_TAIL.equals(name)) tailSurf.add(new LampSurface(mi, s));
+                else if (LAMP_SURFACE_REVERSE.equals(name)) revSurf.add(new LampSurface(mi, s));
+            }
+        }
+    }
+
+    /** Is this lamp's authored face lit (glowing) right now? head, tail or reverse; false with no authored face. */
+    @Register public boolean lampFaceLitNow(String lamp) {
+        ArrayList<LampSurface> l = switch (lamp) { case "head" -> headSurf; case "tail" -> tailSurf; default -> revSurf; };
+        if (l.isEmpty() || !GD.isInstanceValid(l.get(0).mesh())) return false;
+        Material m = l.get(0).mesh().getSurfaceOverrideMaterial(l.get(0).surface());
+        return m instanceof BaseMaterial3D bm && bm.getFeature(BaseMaterial3D.Feature.EMISSION);
+    }
+
+    /** How many lamp faces this car's model authors, per lamp (probe readout: head, tail, reverse). */
+    @Register public String lampSurfacesNow() {
+        if (headRight == null) buildLights(getConfig());
+        return headSurf.size() + "," + tailSurf.size() + "," + revSurf.size();
     }
 
     private boolean nearCamera() {
@@ -857,14 +995,73 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     }
 
     private void buildLights(VehicleConfig cfg) {
+        findLampSurfaces();
         Vector3 h = cfg.headlightOffset;
         headRight = buildBeam(cfg, "HeadlightR", new Vector3(h.getX(), h.getY(), h.getZ()));
         headLeft  = buildBeam(cfg, "HeadlightL", new Vector3(-h.getX(), h.getY(), h.getZ()));
+        paintLamp(headSurf, LAMP_HEAD_OFF);
         Vector3 t = cfg.taillightOffset;
         if (t.getX() != 0.0 || t.getZ() != 0.0) {
             tailRight = buildTail("TaillightR", new Vector3(t.getX(), t.getY(), t.getZ()));
             tailLeft  = buildTail("TaillightL", new Vector3(-t.getX(), t.getY(), t.getZ()));
+            paintLamp(tailSurf, LAMP_TAIL_OFF);
+            paintLamp(revSurf, LAMP_REV_OFF);
+            reverseLight = new OmniLight3D();
+            reverseLight.setName(new StringName("ReverseLight"));
+            reverseLight.setParam(Light3D.Param.RANGE, 5.0f);
+            reverseLight.setParam(Light3D.Param.ENERGY, 1.5f);
+            reverseLight.setColor(new Color(1.0, 1.0, 0.95, 1.0));
+            reverseLight.setShadow(false);
+            reverseLight.setTransform(new Transform3D(new Basis(), new Vector3(0, t.getY(), t.getZ() + 0.3)));
+            reverseLight.setVisible(false);
+            addChild(reverseLight);
         }
+    }
+
+    private static final String LAMP_HEAD_OFF = "head_off", LAMP_HEAD_ON = "head_on", LAMP_TAIL_OFF = "tail_off",
+            LAMP_TAIL_NIGHT = "tail_night", LAMP_TAIL_BRAKE = "tail_brake", LAMP_REV_OFF = "rev_off", LAMP_REV_ON = "rev_on";
+    /**
+     * A lamp face KEEPS its model's own material (user, 2026-09-28: "stay with the same material colour"): off is that
+     * material untouched (no override at all; a copy with its glow switched off if it was authored glowing), and lit is a glowing COPY of it, made once per source material and
+     * state and shared by every car of that model. The glow is the material's own colour when it has one; a black or
+     * grey lamp (an emissive-white Blender lamp under a cover) glows in the lamp's usual colour: warm white ahead,
+     * red behind, white reversing.
+     */
+    private static final java.util.Map<String, Material> LAMP_MATS = new java.util.HashMap<>();
+    private static Material litVariant(Material source, String state) {
+        double energy = switch (state) {
+            case LAMP_HEAD_ON, LAMP_REV_ON -> 4.0;
+            case LAMP_TAIL_NIGHT -> 1.5;
+            case LAMP_TAIL_BRAKE -> 6.0;
+            default -> 0.0;
+        };
+        if (!(source instanceof BaseMaterial3D base)) return null;
+        // off: the authored material itself - unless it glows on its own (a Blender Emission lamp), then a dark copy
+        if (energy == 0.0 && !base.getFeature(BaseMaterial3D.Feature.EMISSION)) return null;
+        String key = source.getInstanceId() + ":" + (energy == 0.0 ? "off" : state);
+        if (energy == 0.0) return LAMP_MATS.computeIfAbsent(key, k -> {
+            BaseMaterial3D dark = (BaseMaterial3D) base.duplicate();
+            dark.setFeature(BaseMaterial3D.Feature.EMISSION, false);
+            return dark;
+        });
+        return LAMP_MATS.computeIfAbsent(key, k -> {
+            BaseMaterial3D lit = (BaseMaterial3D) base.duplicate();
+            Color a = base.getAlbedo();
+            boolean coloured = Math.max(a.getR(), Math.max(a.getG(), a.getB())) - Math.min(a.getR(), Math.min(a.getG(), a.getB())) > 0.15;
+            Color glow = coloured ? a
+                    : state.startsWith("tail") ? new Color(1, 0.08, 0.05, 1)
+                    : state.equals(LAMP_HEAD_ON) ? new Color(1, 0.97, 0.88, 1) : new Color(1, 1, 0.95, 1);
+            lit.setFeature(BaseMaterial3D.Feature.EMISSION, true);
+            lit.setEmission(glow);
+            lit.setEmissionEnergyMultiplier((float) energy);
+            if (!coloured && state.startsWith("tail")) lit.setAlbedo(new Color(0.6, 0.05, 0.04, 1));
+            return lit;
+        });
+    }
+
+    /** Engine-owned statics: dropped when the game closes (GameManager._exitTree), the IconRegistry rule. */
+    public static void clearLampCaches() {
+        LAMP_MATS.clear();
     }
 
     private SpotLight3D buildBeam(VehicleConfig cfg, String name, Vector3 at) {

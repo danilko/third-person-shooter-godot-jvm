@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/SchoolJuniorHigh_mesh.res" id="1_roouh"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/SchoolJuniorHigh_collision.res" id="2_nyp0p"]
+
+[node name="SchoolJuniorHigh" type="Node3D" unique_id=1750959712]
+metadata/building = {
+"aabb": [Vector3(-54.54, 0, -64.54), Vector3(109.08, 20.82, 129.44)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [109.08, 129.44],
+"height_m": 20.82,
+"id": "SchoolJuniorHigh",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"probe_xz": [-21.0, -54.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "junior high school, 110 x 130 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+"wall_top_m": 20.82
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=209152315]
+visibility_range_end = 549.83997
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_roouh")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=2114375407]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=205167175]
+shape = ExtResource("2_nyp0p")

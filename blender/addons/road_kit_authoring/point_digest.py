@@ -97,9 +97,39 @@ def builder_salt():
     return h.hexdigest()
 
 
-def piece_digests(net, zones, ground=None):
+#: How far past a piece's own paving another network can still change what the piece builds: a pier kept off a
+#: foreign carriageway, a level crossing's signals 4.5 m before the track, furniture kept off a foreign lane.
+CONTEXT_REACH = 40.0
+
+
+def _grow(box, x, y):
+    return (min(box[0], x), min(box[1], y), max(box[2], x), max(box[3], y))
+
+
+def context_of(box, foreign=(), keep_clear=()):
+    """What of ANOTHER network a piece whose plan box is `box` (x0, y0, x1, y1, record frame) is built against: the
+    foreign bands (`--avoid`, the rail against the roads) and keep-clear lanes (`--keep-clear-lanekits`, the roads
+    against the rail) within `CONTEXT_REACH` of it. Part of the piece's digest, so an edit to one network rebuilds only
+    the other's pieces it reaches -- and a piece nothing reaches stays clean (`DIRTY_ONLY`)."""
+    x0, y0, x1, y1 = box[0] - CONTEXT_REACH, box[1] - CONTEXT_REACH, box[2] + CONTEXT_REACH, box[3] + CONTEXT_REACH
+    bands = [{"owner": str(b.owner), "poly": b.poly, "spine": b.spine, "walk": b.walk, "edge": b.carries_edge,
+              "tris": b.tris}
+             for b in foreign if b.x1 >= x0 and b.x0 <= x1 and b.y1 >= y0 and b.y0 <= y1]
+    lanes = []
+    for l in keep_clear:
+        pts = l.get("points") or ()
+        # a lanekit point is Godot (x, height, z): record (x, y) = (x, -z)
+        if any(x0 <= p[0] <= x1 and y0 <= -p[2] <= y1 for p in pts):
+            lanes.append([l.get("id"), l.get("width"), pts])
+    bands.sort(key=lambda d: (d["owner"], json.dumps(_canon(d["poly"]))))
+    lanes.sort(key=lambda r: str(r[0]))
+    return {"foreign": bands, "keep_clear": lanes}
+
+
+def piece_digests(net, zones, ground=None, foreign=(), keep_clear=()):
     """`{zone_id: sha1}` for every piece `point_zones.partition(net, zones)` cuts (the resident piece is
-    `point_zones.RESIDENT`). Without zones the network is one piece, keyed `point_zones.RESIDENT`."""
+    `point_zones.RESIDENT`). Without zones the network is one piece, keyed `point_zones.RESIDENT`.
+    `foreign` / `keep_clear`: the other network this one is built against (`context_of`)."""
     part = pz.partition(net, zones)
     solves, jsolves, gsolves, bands = ped.solve_all(net, ground)
     doc = pe.export_network(net)
@@ -107,12 +137,18 @@ def piece_digests(net, zones, ground=None):
         pz.stamp_lanes(doc, part, net)
     roads = {r["name"]: r for r in pm.network_to_dict(net)["roads"]}
     salt = builder_salt()
-    per = {z: {"runs": [], "pads": [], "gores": [], "roads": set()} for z in part.pieces()}
+    per = {z: {"runs": [], "pads": [], "gores": [], "roads": set(), "box": None} for z in part.pieces()}
+
+    def reach(z, pts):
+        for p in pts:
+            b = per[z]["box"]
+            per[z]["box"] = _grow(b, p[0], p[1]) if b else (p[0], p[1], p[0], p[1])
     for s in solves:
         z = part.run_zone(s.uids)
         if z not in per:
             continue
         per[z]["roads"].add(s.road.name)
+        reach(z, [sm.pos for sm in s.samples])
         per[z]["runs"].append({
             "road": s.road.name, "uids": list(s.uids),
             "samples": [tuple(sm.pos) for sm in s.samples], "values": s.values,
@@ -120,6 +156,7 @@ def piece_digests(net, zones, ground=None):
     for j in jsolves:
         z = part.pad_zone(j.uids)
         if z in per:
+            reach(z, j.boundary)
             per[z]["pads"].append({"uids": list(j.uids), "boundary": j.boundary, "fan": j.fan,
                                    "edges": ped.junction_edge_runs(j)})
             per[z]["roads"].update(r.name for r in (net.road_of(u) for u in j.uids) if r is not None)
@@ -139,6 +176,9 @@ def piece_digests(net, zones, ground=None):
         body = {"salt": salt, "runs": content["runs"], "pads": content["pads"], "gores": content["gores"],
                 "roads": [roads[n] for n in sorted(content["roads"]) if n in roads], "lanekit": sub,
                 "successor_turns": succ}
+        ctx = context_of(content["box"], foreign, keep_clear) if (foreign or keep_clear) and content["box"] else None
+        if ctx and (ctx["foreign"] or ctx["keep_clear"]):
+            body["context"] = ctx          # nothing near: the same digest as with no other network at all
         out[z] = hashlib.sha1(json.dumps(_canon(body), sort_keys=True).encode()).hexdigest()
     return out
 
@@ -168,7 +208,24 @@ def self_test():
     far.pos = (far.pos[0], far.pos[1] - 3.0, far.pos[2])
     assert piece_digests(net, zones) == before, "moving it back restores every digest"
     print("OK: undoing the edit restores the digests")
-    return 3
+    # context: another network's band near the EAST piece dirties it and not the west one; a lane kept clear of
+    # likewise. `Band` needs only its polygon and spine here.
+    try:
+        from . import point_edges as pe2
+    except ImportError:
+        import point_edges as pe2                                            # noqa: E402
+    x, y = mp[5].pos[0], mp[5].pos[1]
+    band = pe2.Band("foreign", [(x - 5, y - 30), (x + 5, y - 30), (x + 5, y + 30), (x - 5, y + 30)],
+                    [(x, y - 30, 0.0), (x, y + 30, 0.0)])
+    ctx = piece_digests(net, zones, foreign=[band])
+    assert ctx["east"] != before["east"] and ctx["west"] == before["west"], "a foreign band reaches one piece only"
+    moved = pe2.Band("foreign", [(p[0], p[1] + 2.0) for p in band.poly], band.spine)
+    assert piece_digests(net, zones, foreign=[moved])["east"] != ctx["east"], "moving the foreign band dirties it"
+    lane = {"id": "t_F0", "width": 4.0, "points": [[x, 0.0, -y], [x + 5.0, 0.0, -y]]}
+    kc = piece_digests(net, zones, keep_clear=[lane])
+    assert kc["east"] != before["east"] and kc["west"] == before["west"], "a keep-clear lane reaches one piece only"
+    print("OK: another network's band or lane dirties only the piece it is near")
+    return 4
 
 
 if __name__ == "__main__":

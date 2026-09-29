@@ -52,6 +52,8 @@ public class VehicleDamageModel extends Node {
     @Export public float airLift = 0.05f;
     /** Seconds a fallen part lies before it is removed. */
     @Export public float debrisLifetime = 25f;
+    /** Material names of the glass surfaces (comma-separated): each one in a part is a window that breaks. */
+    @Export public String glassMaterials = "window,glass";
     /** Control knob for probes: off = the car never changes (parts, dents, debris), as before this node existed. */
     @Visible public boolean damageEnabled = true;
 
@@ -78,6 +80,21 @@ public class VehicleDamageModel extends Node {
         Vector3 boxCentre;              // mesh-local centre of the part's box
     }
 
+    /**
+     * A window: the glass surfaces of one part (a door's window, the body's glass, the windscreen), GTA III / SA
+     * style. The first bullet cracks it, a second (or one heavy round) shatters it, and a broken window lets bullets
+     * through to whoever sits behind it. Its triangles are the mesh's own, read once per mesh: no collider is added,
+     * a shot that hits the car's hull asks the triangles instead ({@link #paneOnRay}).
+     */
+    private static final class Pane {
+        Part part; int slot; int[] surfaces; float[] tris;   // tris: mesh-local, 9 floats a triangle
+        double damage; int state = OK;
+        boolean windscreen() { return part.kind == Kind.WINDSCREEN; }
+    }
+
+    /** A window a ray meets: which, and where (world). */
+    public record GlassHit(java.lang.Object pane, Vector3 point) {}
+
     /** The enter/exit door: opens this far, over OPEN s, holds until HOLD s, and is shut again by END s. */
     private static final double DOOR_OPEN_DEG = 65.0, DOOR_OPEN = 0.25, DOOR_HOLD = 0.75, DOOR_END = 1.05;
     /**
@@ -91,6 +108,9 @@ public class VehicleDamageModel extends Node {
     private Vehicle vehicle;
     private Node3D model;
     private final List<Part> parts = new ArrayList<>();
+    private final List<Pane> panes = new ArrayList<>();
+    private Vector3 glassStopPoint = null;           // the point a bullet just stopped in a window (applyHit skips it)
+    private double[] hullMin, hullMax;               // the hull's box, vehicle-local (where a bullet leaves the car)
     private Part chassis;
     private int mask = 0;
     private boolean painted = false;
@@ -167,6 +187,76 @@ public class VehicleDamageModel extends Node {
             if (kind == Kind.CHASSIS) chassis = p; else parts.add(p);
         }
         lastPos = vehicle.getGlobalPosition();
+        findPanes();
+        findHull();
+    }
+
+    private void findPanes() {
+        java.util.Set<String> glass = new java.util.HashSet<>();
+        for (String g : glassMaterials.split(",")) if (!g.isBlank()) glass.add(g.trim());
+        List<Part> all = new ArrayList<>(parts);
+        if (chassis != null) all.add(chassis);
+        for (Part p : all) {
+            int slot = paneSlotOf(p.name);
+            Mesh mesh = p.mesh.getMesh();
+            if (slot < 0 || mesh == null) continue;
+            List<Integer> surf = new ArrayList<>();
+            for (int s = 0; s < mesh.getSurfaceCount(); s++) {
+                Material m = mesh.surfaceGetMaterial(s);
+                if (m != null && glass.contains(m.getName().replaceAll("\\.\\d+$", ""))) surf.add(s);
+            }
+            if (surf.isEmpty()) continue;
+            Pane pane = new Pane();
+            pane.part = p;
+            pane.slot = slot;
+            pane.surfaces = surf.stream().mapToInt(Integer::intValue).toArray();
+            pane.tris = trianglesOf(mesh, pane.surfaces);
+            panes.add(pane);
+        }
+    }
+
+    /** The triangles of some surfaces of a mesh (mesh-local), read once per mesh and shared by every car. */
+    private static final java.util.Map<String, float[]> TRIS = new java.util.HashMap<>();
+
+    /** Engine-free statics, but keyed by engine instance ids: dropped with the rest at close. */
+    public static void clearCaches() { TRIS.clear(); }
+
+    private static float[] trianglesOf(Mesh mesh, int[] surfaces) {
+        String key = mesh.getInstanceId() + ":" + java.util.Arrays.toString(surfaces);
+        return TRIS.computeIfAbsent(key, k -> {
+            List<Float> out = new ArrayList<>();
+            for (int s : surfaces) {
+                VariantArray<java.lang.Object> arr = mesh.surfaceGetArrays(s);
+                if (!(arr.get(0) instanceof PackedVector3Array pv)) continue;
+                Vector3[] v = pv.toVector3Array();
+                int[] idx = arr.get(12) instanceof PackedInt32Array pi ? pi.toIntArray() : null;
+                int n = idx != null && idx.length > 0 ? idx.length : v.length;
+                for (int i = 0; i + 2 < n; i += 3) {
+                    for (int c = 0; c < 3; c++) {
+                        Vector3 q = v[idx != null && idx.length > 0 ? idx[i + c] : i + c];
+                        out.add((float) q.getX()); out.add((float) q.getY()); out.add((float) q.getZ());
+                    }
+                }
+            }
+            float[] f = new float[out.size()];
+            for (int i = 0; i < f.length; i++) f[i] = out.get(i);
+            return f;
+        });
+    }
+
+    private void findHull() {
+        hullMin = new double[]{1e9, 1e9, 1e9};
+        hullMax = new double[]{-1e9, -1e9, -1e9};
+        for (Node c : vehicle.getChildren()) {
+            if (!(c instanceof CollisionShape3D cs) || !(cs.getShape() instanceof ConvexPolygonShape3D cp)) continue;
+            Transform3D t = cs.getTransform();
+            for (Vector3 q : cp.getPoints().toVector3Array()) {
+                Vector3 w = t.times(q);
+                double[] a = {w.getX(), w.getY(), w.getZ()};
+                for (int k = 0; k < 3; k++) { hullMin[k] = Math.min(hullMin[k], a[k]); hullMax[k] = Math.max(hullMax[k], a[k]); }
+            }
+        }
+        if (hullMin[0] > hullMax[0]) { hullMin = null; hullMax = null; }
     }
 
     // ── inputs ──────────────────────────────────────────────────────────────────────────────────────
@@ -186,6 +276,10 @@ public class VehicleDamageModel extends Node {
     /** A bullet (or melee) hit at a world point: the part under it takes points. Host / single player. */
     public void applyHit(Vector3 worldPoint, float damage) {
         if (!damageEnabled || vehicle == null || worldPoint == null) return;
+        if (glassStopPoint != null && glassStopPoint.distanceTo(worldPoint) < 0.01) {
+            glassStopPoint = null;                                  // the window took this bullet, not the panel
+            return;
+        }
         Vector3 l = vehicle.getGlobalTransform().affineInverse().times(worldPoint);
         double[] p = {l.getX(), l.getY(), l.getZ()};
         Part best = null;
@@ -206,6 +300,14 @@ public class VehicleDamageModel extends Node {
             if (want > p.state) {
                 p.damage = Math.max(p.damage, damageFor(p.kind, want));
                 advance(p);
+            }
+        }
+        for (Pane pane : panes) {
+            if (pane.windscreen()) continue;                        // its part's slot, merged above
+            int want = stateAt(remote, pane.slot);
+            if (want > pane.state) {
+                pane.damage = Math.max(pane.damage, want >= OFF ? glassArmor() + 1.0 : 1.0);
+                setPane(pane, want, null);
             }
         }
     }
@@ -245,6 +347,7 @@ public class VehicleDamageModel extends Node {
                 double s = share(p.min, p.max, crashPoint);
                 if (s > 0.0) addDamage(p, points * s);
             }
+            crashPanes(points);
             VehicleConfig cfg = vehicle.getConfig();
             if (cfg.crashHealthPerDv > 0f && vehicle.getNodeOrNull("Health") instanceof Health h) {
                 float dmg = (float) Math.max(0.0, crashDv - MIN_IMPACT_DV) * cfg.crashHealthPerDv;
@@ -252,6 +355,27 @@ public class VehicleDamageModel extends Node {
             }
         }
         crashDv = 0.0;
+    }
+
+    /**
+     * A crash reaches the windows near it: ordinary glass cracks at a dent's worth of crash points and shatters at a
+     * loose door's; armoured glass needs {@code 1 + armour / 40} times that (police glass twice, the truck's four
+     * times). The windscreen follows its own part's damage already.
+     */
+    private void crashPanes(double points) {
+        double scale = 1.0 + glassArmor() / 40.0;
+        for (Pane pane : panes) {
+            if (pane.windscreen() || pane.state >= OFF) continue;
+            double s = share(pane.part.min, pane.part.max, crashPoint);
+            double got = points * s;
+            if (got >= PANE_CRASH_AT * scale) {
+                pane.damage = Math.max(pane.damage, glassArmor() + 1.0);
+                setPane(pane, OFF, null);
+            } else if (got >= DENT_AT * scale) {
+                pane.damage = Math.max(pane.damage, 1.0);
+                setPane(pane, DENTED, null);
+            }
+        }
     }
 
     private void addDamage(Part p, double points) {
@@ -269,6 +393,11 @@ public class VehicleDamageModel extends Node {
         if (next == OFF) detach(p, Vector3.Companion.getZERO());
         p.state = next;
         mask = withState(mask, p.slot, next);
+        for (Pane pane : panes) {
+            if (pane.part != p) continue;
+            if (pane.windscreen()) setPane(pane, next, null);         // the windscreen IS its part
+            else if (next >= LOOSE) setPane(pane, OFF, null);         // a door wrenched loose loses its window
+        }
     }
 
     private void trackMotion(double delta) {
@@ -415,6 +544,7 @@ public class VehicleDamageModel extends Node {
                 mask = withState(mask, p.slot, OFF);
             }
         }
+        for (Pane pane : panes) setPane(pane, OFF, null);
     }
 
     /**
@@ -496,6 +626,159 @@ public class VehicleDamageModel extends Node {
         }
     }
 
+    // ── windows ─────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * The window a shot meets where it struck the hull at {@code hullPoint}: the nearest glass triangle along the ray
+     * within {@link #GLASS_REACH} of that point (glass sits on or just inside the hull). Null when the shot hit
+     * paint, not glass. Every peer can ask it; it changes nothing.
+     */
+    public GlassHit paneOnRay(Vector3 from, Vector3 dir, Vector3 hullPoint) {
+        if (vehicle == null || panes.isEmpty()) return null;
+        double tHull = hullPoint.minus(from).length();
+        Pane best = null;
+        double bestT = Double.MAX_VALUE;
+        for (Pane pane : panes) {
+            if (pane.tris.length == 0) continue;
+            Transform3D inv = pane.part.mesh.getGlobalTransform().affineInverse();
+            Vector3 o = inv.times(from), d = inv.getBasis().xform(dir);
+            double[] oo = {o.getX(), o.getY(), o.getZ()}, dd = {d.getX(), d.getY(), d.getZ()};
+            float[] t = pane.tris;
+            for (int i = 0; i + 8 < t.length; i += 9) {
+                double h = rayTriangle(oo, dd, new double[]{t[i], t[i + 1], t[i + 2]},
+                        new double[]{t[i + 3], t[i + 4], t[i + 5]}, new double[]{t[i + 6], t[i + 7], t[i + 8]});
+                if (h >= 0 && Math.abs(h - tHull) <= GLASS_REACH && h < bestT) { bestT = h; best = pane; }
+            }
+        }
+        return best == null ? null : new GlassHit(best, from.plus(dir.times(bestT)));
+    }
+
+    /** How far from the hull's surface (m) a window may lie and still be the thing a shot hit there. */
+    public static final double GLASS_REACH = 0.35;
+
+    /** True when a bullet passes this window: it is broken, or the part holding it is gone. */
+    public boolean paneOpen(GlassHit g) {
+        return g != null && g.pane() instanceof Pane p && (p.state >= OFF || !p.part.mesh.isVisibleInTree());
+    }
+
+    /** This car's window armour (VehicleConfig.glassArmor): 0 is ordinary glass. */
+    public double glassArmor() {
+        return vehicle != null && vehicle.getConfig() != null ? Math.max(0.0, vehicle.getConfig().glassArmor) : 0.0;
+    }
+
+    /**
+     * The damage a round of {@code damage} carries through this window, read off its armour and what it has already
+     * taken; 0 = the glass stops it. Changes nothing (a client's prediction reads this).
+     */
+    public float carriedThrough(GlassHit g, float damage) {
+        if (!(g != null && g.pane() instanceof Pane p)) return damage;
+        if (p.state >= OFF || !p.part.mesh.isVisibleInTree()) return damage;
+        return (float) VehicleDamageRules.carriedThrough(p.damage, glassArmor(), damage);
+    }
+
+    /**
+     * A bullet meets a whole window (host): it takes the window's armour down by the round's damage, cracking it, and
+     * the round that exhausts the armour shatters it. Returns the damage the round carries on with (0 = stopped in
+     * the glass, which then takes the hit instead of the panel behind it).
+     */
+    public float hitPane(GlassHit g, float damage, Vector3 dir) {
+        if (!(g != null && g.pane() instanceof Pane p)) return damage;
+        if (p.state >= OFF || !p.part.mesh.isVisibleInTree()) return damage;
+        float carry = carriedThrough(g, damage);
+        if (!damageEnabled) return carry;
+        if (carry <= 0f) glassStopPoint = g.point();
+        p.damage += Math.max(damage, 1f);
+        breakPane(p, paneStateFor(p.damage, glassArmor()), dir);
+        return carry;
+    }
+
+    /** Brings a window (the windscreen through its part) up to {@code st}. */
+    private void breakPane(Pane p, int st, Vector3 dir) {
+        if (st <= p.state) return;
+        if (p.windscreen()) {
+            Part w = p.part;
+            w.damage = Math.max(w.damage, st >= OFF ? GLASS_OFF_AT : DENT_AT);
+            if (st >= OFF) shatterEffects(p, dir);
+            advance(w);
+        } else {
+            setPane(p, st, dir);
+        }
+    }
+
+    /**
+     * A melee blow on a window (host): ordinary glass breaks and the blow stops in it, the way one light round does;
+     * armoured glass takes the blow's damage off its pool and never lets a blow through. Returns true when a window
+     * took the blow, so the panel behind it does not.
+     */
+    public boolean strikePane(GlassHit g, float damage, Vector3 dir) {
+        if (!(g != null && g.pane() instanceof Pane p)) return false;
+        if (p.state >= OFF || !p.part.mesh.isVisibleInTree()) return false;
+        if (!damageEnabled) return true;
+        glassStopPoint = g.point();
+        p.damage += Math.max(damage, 1f);
+        breakPane(p, paneStateFor(p.damage, glassArmor()), dir);
+        return true;
+    }
+
+    /**
+     * A blast (host): every window whose centre is inside {@code radius} of {@code centre} takes the blast's damage
+     * at that distance (quadratic falloff, the one {@code ExplosionManager} uses), so ordinary glass near a blast
+     * breaks and armoured glass loses that much of its pool. The people inside are hit by the blast itself.
+     */
+    public void blastPanes(Vector3 centre, float radius, float maxDamage) {
+        if (!damageEnabled || radius <= 0f) return;
+        for (Pane p : panes) {
+            if (p.state >= OFF || !p.part.mesh.isVisibleInTree()) continue;
+            Vector3 c = paneCentre(p);
+            if (c == null) continue;
+            double d = c.distanceTo(centre);
+            if (d > radius) continue;
+            double f = 1.0 - d / radius;
+            p.damage += Math.max(1.0, maxDamage * f * f);
+            breakPane(p, paneStateFor(p.damage, glassArmor()), c.minus(centre).normalized());
+        }
+    }
+
+    /** A window's centre in the world (the mean of its triangles), or null if it has none. */
+    private Vector3 paneCentre(Pane p) {
+        if (p.tris.length < 9) return null;
+        double[] c = new double[3];
+        int n = p.tris.length / 3;
+        for (int i = 0; i < p.tris.length; i += 3) for (int k = 0; k < 3; k++) c[k] += p.tris[i + k];
+        return p.part.mesh.getGlobalTransform().times(new Vector3(c[0] / n, c[1] / n, c[2] / n));
+    }
+
+    /** Where a shot that went through a window leaves the car again: the far side of the hull's box. */
+    public double exitDistance(Vector3 from, Vector3 dir) {
+        if (hullMin == null) return 3.0;
+        Transform3D inv = vehicle.getGlobalTransform().affineInverse();
+        Vector3 o = inv.times(from), d = inv.getBasis().xform(dir);
+        return boxExit(new double[]{o.getX(), o.getY(), o.getZ()}, new double[]{d.getX(), d.getY(), d.getZ()},
+                hullMin, hullMax);
+    }
+
+    /** Brings a window up to {@code state}: its look, its mask slot, and on shattering the shards and the sound. */
+    private void setPane(Pane p, int state, Vector3 dir) {
+        if (state <= p.state) return;
+        boolean shatter = state >= OFF;
+        p.state = state;
+        if (!p.windscreen()) mask = withState(mask, p.slot, state);
+        MeshInstance3D mi = p.part.mesh;
+        Mesh mesh = mi.getMesh();
+        for (int s : p.surfaces) {
+            mi.setSurfaceOverrideMaterial(s, shatter ? Glass.hidden() : Glass.cracked(mesh.surfaceGetMaterial(s)));
+        }
+        if (shatter && !p.windscreen()) shatterEffects(p, dir);
+    }
+
+    private void shatterEffects(Pane p, Vector3 dir) {
+        if (!p.part.mesh.isVisibleInTree() || !isInsideTree() || p.tris.length < 9) return;
+        Node scene = getTree().getCurrentScene();
+        if (scene == null) return;
+        Vector3 at = paneCentre(p);
+        Glass.shatter(scene, at, dir != null ? dir : at.minus(vehicle.getGlobalPosition()).normalized(), lastVel);
+    }
+
     // ── probe readouts ──────────────────────────────────────────────────────────────────────────────
 
     @Register public int partStateNow(String name) {
@@ -514,6 +797,19 @@ public class VehicleDamageModel extends Node {
     }
 
     @Register public int partMaskNow() { return mask; }
+
+    /** A window's state by its slot name ("win_lf", "win_body", "windscreen"): 0 whole, 1 cracked, 3 broken; -1 none. */
+    @Register public int paneStateNow(String slotName) {
+        for (Pane p : panes) if (SLOTS[p.slot].equals(slotName)) return p.state;
+        return -1;
+    }
+
+    /** The windows this car has, as slot names (probe). */
+    @Register public String panesNow() {
+        StringBuilder b = new StringBuilder();
+        for (Pane p : panes) b.append(b.length() > 0 ? "," : "").append(SLOTS[p.slot]).append('/').append(p.tris.length / 9);
+        return b.toString();
+    }
 
     /** True while the named door's own collider is solid (probe). */
     @Register public boolean doorColliderSolidNow(String name) {

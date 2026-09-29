@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/WaterResort_mesh.res" id="1_men4b"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/WaterResort_collision.res" id="2_apnow"]
+
+[node name="WaterResort" type="Node3D" unique_id=2126774200]
+metadata/building = {
+"aabb": [Vector3(-74.54, 0, -59.54), Vector3(149.08, 16.066845, 119.08)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [149.08, 119.08],
+"height_m": 16.0668,
+"id": "WaterResort",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"probe_xz": [0.0, 30.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "indoor spa + pool hall, outdoor wave pool, lazy river, slide tower, 150 x 120 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+"wall_top_m": 16.0668
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1760044501]
+visibility_range_end = 492.80212
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_men4b")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1003181860]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=562291952]
+shape = ExtResource("2_apnow")

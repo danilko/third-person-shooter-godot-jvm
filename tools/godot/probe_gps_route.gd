@@ -16,7 +16,7 @@ extends SceneTree
 ##   - the route is a chain of LEGAL movements (each lane an authored `next` or a lane change of the
 ##     one before, read independently here from the same sidecars), it ends on the lane nearest the
 ##     waypoint, and it is longer than the straight line;
-##   - on DebugWorld it crosses the junction between the two zones (link -> connector -> spur);
+##   - on DebugWorld it crosses the bridge between the two zones (w_ew_e -> link -> e_ring);
 ##   - the arrow's target lies ON the route, about LOOKAHEAD metres ahead of the body;
 ##   - with the body well off the road, the arrow points at the road rather than at the waypoint
 ##     (the control -- follow_roads off -- fails exactly this and the "about 30 m ahead" check);
@@ -80,8 +80,9 @@ func _initialize() -> void:
 	var start: Vector3
 	var goal: Vector3
 	if which == "debugworld":
-		start = _at("link_F0", 0.5)
-		goal = _at("spur_R0", 0.95)
+		# DebugWorld (tools/debug_world_layout.py): from the west's E-W street, over the bridge, round the east ring
+		start = _at("w_ew_e_F0", 0.5)
+		goal = _at("e_ring_F0", 0.5)
 	else:
 		var longest := ""
 		for id in lanes:
@@ -181,11 +182,11 @@ func _initialize() -> void:
 	_check("the route is longer than the straight line", length > straight,
 		"%.0f m vs %.0f m" % [length, straight])
 	if which == "debugworld" and ids.size() > 0:
-		var crosses := ids[0].begins_with("link_F") and ids[ids.size() - 1].begins_with("spur_R")
+		var crosses := ids[0].begins_with("w_ew_e_F") and ids[ids.size() - 1].begins_with("e_ring")
 		var via := false
 		for id in ids:
-			via = via or id.contains("__spur_R")
-		_check("it crosses the junction into the next zone (link -> connector -> spur)", crosses and via, "")
+			via = via or id.begins_with("link_F")
+		_check("it crosses the bridge into the next zone (w_ew_e -> link -> e_ring)", crosses and via, str(ids))
 
 	# ── 4. the arrow points along the route ──────────────────────────────────────────────────
 	var on_route := _dist_to_route(ids, target)
@@ -317,7 +318,8 @@ func _check_places(which: String) -> void:
 	# implementations disagree on a .x5 boundary, which read as 4 shops that do not exist.
 	var enterable: Array[Vector2] = []
 	for b in bdoc["buildings"]:
-		if b.get("scene", b["type"]) != b["type"]:
+		# ...or a CIVIC building (island_civic_sites.py): shut, but the map names it by design (police, hospital ...)
+		if b.get("scene", b["type"]) != b["type"] or b.has("civic"):
 			enterable.append(Vector2(b["pos"][0], b["pos"][2]))
 	var orphans := 0
 	var sites := 0

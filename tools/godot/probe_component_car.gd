@@ -1,7 +1,7 @@
 extends SceneTree
 ## SPC-1, the component-damage car (assets/vehicles/SPC1.blend -> SPC1.glb -> SPC1.tscn, VehicleDamageModel).
 ##
-##   godot --headless --path . --script tools/godot/probe_component_car.gd [-- --car=SPC1|PIT1|POC1] [--visuals=res://.../CharacterVisuals_X.tscn] [--control]
+##   godot --headless --path . --script tools/godot/probe_component_car.gd [-- --car=SPC1|KET1|MPC1|POC1|CLC1|KEC1|TAX1|CRT1] [--visuals=res://.../CharacterVisuals_X.tscn] [--control]
 ##
 ## 1. the scene agrees with the MEASURED model facts (assets/vehicles/SPC1.vehicle.json, written by
 ##    blender/tools/build_vehicle.py): wheel mounts, hull, the model offset;
@@ -136,25 +136,9 @@ func _initialize() -> void:
 	_check("set down 0.3 m high, it settles at its rest height", absf(dropped.global_position.y - ride_h) < 0.03,
 			"body %.3f m, rest %.3f" % [dropped.global_position.y, ride_h])
 
-	print("-- 3. crashes")
-	var bump: MeshInstance3D = model.get_node("bump_front")
-	var hp0: float = car.get_node("Health").call("health_now")
-	dm.call("crash_at", Vector3(0, -0.4, nose + 0.05), 7.0)
-	await _tick(4)
-	_check("7 m/s front crash dents the front bumper", int(dm.call("part_state_now", "bump_front")) >= 1 and _blend(bump) > 0.1,
-			"state %d, dam %.2f" % [dm.call("part_state_now", "bump_front"), _blend(bump)])
-	_check("…and leaves the rear bumper alone", int(dm.call("part_state_now", "bump_rear")) == 0,
-			"bump_rear state %d" % dm.call("part_state_now", "bump_rear"))
-	var debris0: int = dm.call("debris_count_now")
-	dm.call("crash_at", Vector3(0, -0.4, nose + 0.05), 14.0)
-	await _tick(4)
-	_check("14 m/s takes the bumper off", int(dm.call("part_state_now", "bump_front")) == 3 and not bump.visible
-			and int(dm.call("debris_count_now")) > debris0,
-			"state %d, visible %s, debris %d" % [dm.call("part_state_now", "bump_front"), bump.visible, dm.call("debris_count_now")])
-	var hp1: float = car.get_node("Health").call("health_now")
-	_check("crashes cost the car health", hp1 < hp0, "%.0f -> %.0f" % [hp0, hp1])
-
 	print("-- 4. bullets")
+	# BEFORE the crashes (case 3): on a short-nosed car (a cab-over kei truck, a kei wagon) the front doors stand right
+	# behind the nose, so a head-on crash rightly dents them, and these door cases must start from clean doors.
 	var door: MeshInstance3D = model.get_node("door_lf")
 	var aabb := door.get_aabb()
 	var at := door.global_transform * (aabb.position + aabb.size * 0.5)
@@ -176,6 +160,24 @@ func _initialize() -> void:
 		widest = maxf(widest, dm.call("part_angle_now", "door_lf"))
 	_check("accelerating right swings the left door open", widest > 15.0, "%.1f deg" % widest)
 	(car as RigidBody3D).freeze = false
+
+	print("-- 3. crashes")
+	var bump: MeshInstance3D = model.get_node("bump_front")
+	var hp0: float = car.get_node("Health").call("health_now")
+	dm.call("crash_at", Vector3(0, -0.4, nose + 0.05), 7.0)
+	await _tick(4)
+	_check("7 m/s front crash dents the front bumper", int(dm.call("part_state_now", "bump_front")) >= 1 and _blend(bump) > 0.1,
+			"state %d, dam %.2f" % [dm.call("part_state_now", "bump_front"), _blend(bump)])
+	_check("…and leaves the rear bumper alone", int(dm.call("part_state_now", "bump_rear")) == 0,
+			"bump_rear state %d" % dm.call("part_state_now", "bump_rear"))
+	var debris0: int = dm.call("debris_count_now")
+	dm.call("crash_at", Vector3(0, -0.4, nose + 0.05), 14.0)
+	await _tick(4)
+	_check("14 m/s takes the bumper off", int(dm.call("part_state_now", "bump_front")) == 3 and not bump.visible
+			and int(dm.call("debris_count_now")) > debris0,
+			"state %d, visible %s, debris %d" % [dm.call("part_state_now", "bump_front"), bump.visible, dm.call("debris_count_now")])
+	var hp1: float = car.get_node("Health").call("health_now")
+	_check("crashes cost the car health", hp1 < hp0, "%.0f -> %.0f" % [hp0, hp1])
 
 	print("-- 6. the part mask reproduces the car on another peer")
 	var twin: Node3D = (load(CAR) as PackedScene).instantiate() as Node3D

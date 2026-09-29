@@ -21,35 +21,38 @@ cd "$(dirname "$0")/.."
 G=${GODOT:-/data/danilko/bin/Godot_v4.7.2-stable_linux.x86_64}
 P=assets/world_source/pieces
 W=src/main/resources/com/openworld/world/World.tscn
+# each step prints how long the one before took (tools/island_world.sh does the same per stage)
+T0=$SECONDS; LAST=""
+step() { [ -n "$LAST" ] && printf "   (%s: %d s)\n" "$LAST" $((SECONDS - T0)); T0=$SECONDS; LAST=$1; echo "── $1"; }
 if [[ "${1:-}" != "--no-layout" ]]; then
-    echo "── 1/7 layout"
+    step "1/7 layout"
     python3 tools/island_layout.py
 fi
 if [ -f "$P/IslandRail.roads.json" ]; then
-    echo "── R rail: ground, zones, pieces, stamp"
+    step "R rail: ground, zones, pieces, stamp"
     timeout -k 5 900 stdbuf -oL "$G" --headless --path . --script tools/godot/write_roadkit_ground.gd -- "$W" IslandRail \
         | grep -E "^(ground|GROUND)"
     python3 tools/island_road_zones.py "$P/IslandRail.roads.json" "$W" --split --network IslandRail --prefix rail \
         --holder RailZones --zone-prefix Zone_rail_ --marker-prefix Rail_ --node-id-base 910020000 | tail -1
     AVOID_GROUND=""; [ -f "$P/IslandRoads.ground.json" ] && AVOID_GROUND="--avoid-ground $P/IslandRoads.ground.json"
-    # NOT DIRTY_ONLY: the rail's digest does not see the ROAD record it is built against, and a road change moves
-    # its crossings and its dropped piers
+    # DIRTY_ONLY: each rail piece's digest includes the road bands near it (point_digest.context_of), so a road
+    # change rebuilds only the rail pieces it reaches (its crossings, its dropped piers)
     # furniture ON: a rail road carries none of the street's (point_furniture.place skips it), only the 踏切
     # signals its level crossings get (R4, point_furniture.crossing_signals)
-    GLTF_EXTRA="--avoid $P/IslandRoads.roads.json $AVOID_GROUND" NAV_FIT=1 \
+    GLTF_EXTRA="--avoid $P/IslandRoads.roads.json $AVOID_GROUND" NAV_FIT=1 DIRTY_ONLY=1 \
         blender/tools/build_roads_piece.sh "$P/IslandRail.roads.json" Roads_IslandRail \
         "$P/IslandRail.zones.json" "$P/IslandRail.ground.json" | grep -E "gate:|level crossing|^── 3/3|FAIL|ERROR" || true
     timeout -k 5 1800 stdbuf -oL "$G" --headless --path . --script tools/godot/stamp_roadkit_terrain.gd -- "$W" IslandRail \
         | grep -viE "^ZoneManager|^$" | tail -3
 fi
-echo "── 2/7 ground"
+step "2/7 ground"
 timeout -k 5 900 stdbuf -oL "$G" --headless --path . --script tools/godot/write_roadkit_ground.gd -- "$W" IslandRoads \
     | grep -E "^(ground|GROUND)"
-echo "── 3/7 zones"
+step "3/7 zones"
 python3 tools/island_road_zones.py "$P/IslandRoads.roads.json" "$W" --split | tail -1
-echo "── 4/7 build"
-# the road furniture keeps out of the rail's tracks (`--keep-clear-lanekits`); the digest cannot see the rail, so a
-# rail change needs this step run once without DIRTY_ONLY
+step "4/7 build"
+# the road furniture keeps out of the rail's tracks (`--keep-clear-lanekits`); each road piece's digest includes the
+# rail lanes and bands near it, so a rail change rebuilds only the road pieces it reaches
 # and its PIERS keep off the rail's tracks (`--avoid` the rail record: point_mesh.pier_on_road over its bands too --
 # a C1 column stood on the Main line where it passes under the ring, probe_rail_track's gauge 2026-09-26)
 RAIL_AVOID=""; [ -f "$P/IslandRail.roads.json" ] && RAIL_AVOID="--avoid $P/IslandRail.roads.json"
@@ -75,10 +78,11 @@ for net, pref in (("IslandRoads", "island_"), ("IslandRail", "rail_")):
                 os.remove(g)
             print("pruned stale piece " + stem)
 PY
-echo "── 5/7 stamp"
+step "5/7 stamp"
 timeout -k 5 1800 stdbuf -oL "$G" --headless --path . --script tools/godot/stamp_roadkit_terrain.gd -- "$W" IslandRoads \
     | grep -viE "^ZoneManager|^$" | tail -5
-echo "── 6/7 traffic zones"
+step "6/7 traffic zones"
 python3 tools/island_traffic_zones.py $P/Roads_IslandRoads_island_*.lanekit.json "$W" --load 1150 --unload 1550 | tail -3
-echo "── 7/7 road map"
+step "7/7 road map"
 timeout -k 5 900 stdbuf -oL "$G" --headless --path . --script tools/godot/bake_road_map.gd -- --world=island | tail -3
+step done

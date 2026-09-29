@@ -1,0 +1,345 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/MilBarracks_mesh.res" id="1_nls52"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/MilBarracks_collision.res" id="2_8tbtn"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_excab"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_lu23s"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_pqena"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_nd0ik"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_552h5"]
+size = Vector3(1.8, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_srldm"]
+size = Vector3(1.2, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_kh74i"]
+size = Vector3(1.2, 2.1, 0.14)
+
+[node name="MilBarracks" type="Node3D" unique_id=1377139367]
+metadata/building = {
+"aabb": [Vector3(-24.01, -1.2, -8.005), Vector3(48.02, 10.5, 16.01)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [-12.0, 0.0, 7.895],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "swing",
+"width": 1.8
+}, {
+"center": [-23.9, 0.0, -1.005],
+"height": 2.1,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 1.2
+}, {
+"center": [23.9, 0.0, -1.005],
+"height": 2.1,
+"module": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 1.2
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [48.02, 16.01],
+"height_m": 10.5,
+"id": "MilBarracks",
+"inner_doors": [{
+"center": [5.0, 0.0, -0.205],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [17.0, 0.0, -0.205],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [0.0, 0.0, 2.995],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-22.4, 0.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-17.0, 0.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-9.0, 0.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-2.0, 0.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [6.0, 0.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [15.0, 0.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [22.4, 0.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-17.9, 4.0, -0.205],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-6.0, 4.0, -0.205],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [6.0, 4.0, -0.205],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [17.9, 4.0, -0.205],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-22.4, 4.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-17.0, 4.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-9.0, 4.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-2.0, 4.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [6.0, 4.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [15.0, 4.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [22.4, 4.0, -1.805],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [19.9, 0.0, -2.68],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 4.0,
+"stops": "0,4",
+"w": 1.6,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_spawn_01",
+"pos": [-12.0, 0.0, 0.995],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-19.9, 4.0, 3.395],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [-8.0, 4.0, 3.395],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [4.0, 4.0, 3.395],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_05",
+"pos": [15.9, 4.0, 3.395],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}],
+"piece_count": 1,
+"probe_xz": [-12.0, -4.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "隊舎 (barracks): 48 x 16 m, two storeys: the mess hall, kitchen and recreation room; four 8-bunk rooms upstairs. A part of the MilitaryBase site. kits/interiors/MilBarracks.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 8.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=590658306]
+visibility_range_end = 411.6
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_nls52")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=325670081]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1571371135]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1.05, 7.895)
+shape = SubResource("BoxShape3D_552h5")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=873241529]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -23.9, 1.05, -1.005)
+shape = SubResource("BoxShape3D_srldm")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1106766570]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 23.9, 1.05, -1.005)
+shape = SubResource("BoxShape3D_kh74i")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=478362438]
+shape = ExtResource("2_8tbtn")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=1699636815]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=519731265]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 19.9, 0, -2.68)
+script = ExtResource("3_excab")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 4.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_lu23s")
+glass_material = ExtResource("5_pqena")
+floor_material = ExtResource("6_nd0ik")
+in_service = true
+stop_heights = "0,4"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1359270935]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -12, 0, 7.895)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=738234182]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -23.9, 0, -1.005)
+
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=942966702]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 23.9, 0, -1.005)
+
+[node name="Markers" type="Node3D" parent="." unique_id=855480757]
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1907865620 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, 0.995)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1730138339 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.9, 4, 3.395)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1387602906 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 4, 3.395)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=431081171 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 4, 3.395)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=487616117 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.9, 4, 3.395)
+metadata/team = "soldier"
+metadata/kind = "spawn"

@@ -181,10 +181,13 @@ func _spawn(lane_name: String, speed: float, offset: float, corner_accel: float 
 ## Control: the pieces built before `point_edges.step_walls` launch on both edge cases every lap.
 const PROTOTYPE_TRACK_HALF := 1.1     # the wheel track the edge offsets were written for
 
+# DebugWorld (tools/debug_world_layout.py): the bridge's outer lanes along its parapets over the channel, the
+# embanked south half of the N-S street (a 1.8 m crest at speed), and two ring straights beside the kerb
 const GATE_CASES := [
-	["link_F1", 35.0, -3.0, 6.0], ["link_R1", 35.0, -3.0, 6.0],
-	["link_F1", 35.0, 0.0, 8.0], ["link_R1", 35.0, 3.0, 6.0],
-	["east_R1", 35.0, 3.0, 8.0], ["east_R1", 35.0, -3.0, 8.0],
+	["link_F1", 35.0, -3.0, 3.2], ["link_R1", 35.0, -3.0, 3.2],
+	["link_F1", 35.0, 0.0, 3.2], ["link_R1", 35.0, 3.0, 3.2],
+	["w_ns__x1_F0", 30.0, 0.0, 5.5], ["w_ns__x1_R0", 30.0, -2.0, 5.5],
+	["w_ring__x2_R1", 35.0, 3.0, 4.3], ["w_ring__x2__x1_F1", 35.0, -3.0, 4.3],
 ]
 
 func _initialize() -> void:

@@ -1,19 +1,19 @@
 extends SceneTree
-## The station building's fare barrier (PLAN.md P3 "the paid area", 2026-09-27): the street door opens onto the
-## UNPAID hall, a railing runs across the building, and the only way to the back (platform) door is the ticket-gate
-## lane, whose two `world.TicketGate` flaps open for a character in the lane and shut behind them.
-##   stdbuf -oL <godot> --headless --path . --script tools/godot/probe_ticket_gate.gd [-- --control]
+## A station's fare barrier (PLAN.md "the paid area"; since step 7a on a KIT station, `Station_Farm_Shop.tscn`):
+## the street door opens onto the UNPAID hall, and the only way to the platform is a ticket-gate lane, whose two
+## `world.TicketGate` flaps open for a character in the lane and shut behind them.
+##   stdbuf -oL <godot> --headless --path . --script tools/godot/probe_ticket_gate.gd [-- --control] [-- --scene=<tscn>]
 ##
-##   1. the gate scene carries two TicketGate flaps;
-##   2. with nobody near, the lane is SHUT (a ray down the lane hits a flap);
-##   3. the railing beside the gates blocks the hall from the paid side;
-##   4. a player standing in the lane opens both flaps and the lane is CLEAR;
+##   1. the station carries its gate lanes, two TicketGate flaps each;
+##   2. with nobody near, the first lane is SHUT (a ray down it hits a flap);
+##   3. the gate bodies beside the lane block it (a ray down each side hits something);
+##   4. a player standing in the lane on its unpaid side opens both flaps and the lane is CLEAR;
 ##   5. the player walking away shuts them again.
-## `--control` makes the flaps manual (auto_open false): case 4 fails.
+## Each lane's frame is its sensor's (`build_building_scenes.gd _add_gate`): origin mid-lane, +Z the unpaid side, the
+## lane `w` wide along X. `--control` makes the flaps manual (auto_open false): case 4 fails.
 
-const SCENE := "res://src/main/resources/com/openworld/world/buildings/StationBuilding_Shop.tscn"
+const DEFAULT_SCENE := "res://src/main/resources/com/openworld/world/buildings/Station_Farm_Shop.tscn"
 const PLAYER := "res://src/main/resources/com/openworld/character/Player.tscn"
-const GATE_Z := -1.6
 var fails := 0
 var world: Node3D
 
@@ -52,50 +52,59 @@ func _run() -> void:
 	floor.add_child(cs)
 	world.add_child(floor)
 	floor.position = Vector3(0, -0.1, 0)
-	var b: Node3D = (load(SCENE) as PackedScene).instantiate()
+	var scene_path := DEFAULT_SCENE
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--scene="):
+			scene_path = a.substr(8)
+	var b: Node3D = (load(scene_path) as PackedScene).instantiate()
 	world.add_child(b)
 	await _tick(2)
 	var gates: Array = []
 	_gates(b, gates)
-	_check("the gate lane has two TicketGate flaps", gates.size() == 2, "%d" % gates.size())
-	if gates.size() != 2:
+	var sensors: Array = []
+	for n in b.find_child("Doors", true, false).get_children():
+		if str(n.name).begins_with("GateSensor"):
+			sensors.append(n)
+	_check("the station has gate lanes of two TicketGate flaps each",
+		sensors.size() >= 1 and gates.size() == 2 * sensors.size(), "%d lanes, %d flaps" % [sensors.size(), gates.size()])
+	if sensors.is_empty():
 		print("RESULT FAIL")
 		quit(1)
 		return
+	# the first lane and its two flaps (the ones whose sensor_path names it)
+	var sensor: Area3D = sensors[0]
+	var xf: Transform3D = sensor.global_transform
+	var mine: Array = gates.filter(func(g): return str(g.get("sensor_path")).ends_with(str(sensor.name)))
+	var w := ((sensor.get_child(0) as CollisionShape3D).shape as BoxShape3D).size.x
 	if control:
 		for g in gates:
 			g.set("auto_open", false)
-	var yaw0: Array = gates.map(func(g): return (g as Node3D).rotation.y)
-	var lane_a := Vector3(0, 0.6, -0.4)
-	var lane_b := Vector3(0, 0.6, -2.9)
-	var hit := _ray(lane_a, lane_b, [])
+	var yaw0: Array = mine.map(func(g): return (g as Node3D).global_rotation.y)
+	var L := func(x: float, z: float) -> Vector3: return xf * Vector3(x, 0.6, z)
+	var hit := _ray(L.call(0.0, 1.2), L.call(0.0, -1.2), [])
 	_check("nobody near: the lane is shut (a ray down it hits a flap)",
-		not hit.is_empty() and str(hit["collider"].name).begins_with("Gate"),
+		mine.size() == 2 and not hit.is_empty() and str(hit["collider"].name).begins_with("Gate"),
 		str(hit.get("collider", null)))
-	for x in [2.5, 4.5, -2.5, -4.5]:
-		var fh := _ray(Vector3(x, 0.6, -0.4), Vector3(x, 0.6, -2.9), [])
-		_check("the railing at x %.1f blocks the hall from the paid side" % x, not fh.is_empty(),
-			str(fh.get("collider", null)))
+	for x in [w / 2.0 + 0.3, -(w / 2.0 + 0.3)]:
+		var fh := _ray(L.call(x, 1.2), L.call(x, -1.2), [])
+		_check("beside the lane at x %+.2f the way is blocked" % x, not fh.is_empty(), str(fh.get("collider", null)))
 	var p: CharacterBody3D = (load(PLAYER) as PackedScene).instantiate()
 	world.add_child(p)
-	p.global_position = Vector3(0, 0.05, -0.6)
+	p.global_position = xf * Vector3(0, 0.05, 0.9)
 	p.set_physics_process(false)
-	for k in range(8):
-		await _tick(5)
-		if OS.get_cmdline_user_args().has("--verbose"):
-			print("   t%d yaw %.1f %.1f speed %s angle %s" % [k * 5, rad_to_deg((gates[0] as Node3D).rotation.y), rad_to_deg((gates[1] as Node3D).rotation.y), gates[0].get("open_speed"), gates[0].get("open_angle_deg")])
+	await _tick(40)
 	var turned: Array = []
-	for i in range(2):
-		turned.append(rad_to_deg(absf(angle_difference((gates[i] as Node3D).rotation.y, yaw0[i]))))
-	var clear := _ray(Vector3(0, 0.6, -1.0), lane_b, [p.get_rid()])
-	_check("a player in the lane opens both flaps", turned[0] > 80.0 and turned[1] > 80.0,
-		"turned %.1f / %.1f deg" % [turned[0], turned[1]])
+	for i in range(mine.size()):
+		turned.append(rad_to_deg(absf(angle_difference((mine[i] as Node3D).global_rotation.y, yaw0[i]))))
+	var clear := _ray(L.call(0.0, 0.6), L.call(0.0, -1.5), [p.get_rid()])
+	_check("a player in the lane opens both flaps", turned.size() == 2 and turned[0] > 80.0 and turned[1] > 80.0,
+		"turned %s deg" % str(turned))
 	_check("...and the lane is clear to the paid side", clear.is_empty(), str(clear.get("collider", null)))
-	p.global_position = Vector3(0, 0.05, 6.0)
+	p.global_position = xf * Vector3(0, 0.05, 8.0)
 	await _tick(40)
 	var back := true
-	for i in range(2):
-		back = back and absf(angle_difference((gates[i] as Node3D).rotation.y, yaw0[i])) < 0.01
+	for i in range(mine.size()):
+		back = back and absf(angle_difference((mine[i] as Node3D).global_rotation.y, yaw0[i])) < 0.01
 	_check("walking away shuts them again", back)
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0 if fails == 0 else 1)

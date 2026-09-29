@@ -435,7 +435,7 @@ public class FirearmItem extends WeaponItem {
 	  double[] d = SpreadPattern.direction(aim.getX(), aim.getY(), aim.getZ(), spreadDeg * 0.5, seed, i);
 	  digest += (i + 1) * (d[0] + 3 * d[1] + 7 * d[2]);
 	  Vector3 dir = new Vector3(d[0], d[1], d[2]);
-	  TraceHit hit = trace(ray, origin, dir, range);
+	  TraceHit hit = throughGlass(ray, origin, dir, trace(ray, origin, dir, range), applyDamage, damage);
 	  if (applyDamage) {
 		// A light crowd ped has no collider (world.PedCrowd): ask the crowds, and promote the one this pellet
 		// reaches before anything solid, so the damage lands on a real body in this same frame.
@@ -457,7 +457,8 @@ public class FirearmItem extends WeaponItem {
 	  if (hit != null && im != null) {
 		HitInfo info = new HitInfo(hit.node, hit.point, hit.normal);
 		if (applyDamage) {
-		  im.processHit(info, damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
+		  float dealt = hit.damage >= 0f ? hit.damage : damage;              // a window's armour took the rest
+		  im.processHit(info, dealt, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
 						resolveAttackerPosition(), resolveAttackerId());
 		} else {
 		  im.processVisualHit(info);

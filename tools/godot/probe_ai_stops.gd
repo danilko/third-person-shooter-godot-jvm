@@ -40,7 +40,21 @@ func _lanes() -> Array:
 
 ## A lane with `need` m of straight ahead of `from_s`, as [lane, path].
 func _pick_lane(need: float) -> Array:
+	# ring lanes first: on DebugWorld (tools/debug_world_layout.py) the inner streets carry level crossings and
+	# signalised junctions inside 90 m, where the car SHOULD stop; never a rail track
+	var ordered := []
 	for lane in _lanes():
+		if lane.is_in_group("rail_track"):
+			continue
+		if str(lane.name).begins_with("w_ring") or str(lane.name).begins_with("e_ring"):
+			# the INNER lane (index 0, beside the median) before the kerb lane
+			if str(lane.name).ends_with("0"):
+				ordered.push_front(lane)
+			else:
+				ordered.insert(0 if ordered.is_empty() else 1, lane)
+		else:
+			ordered.push_back(lane)
+	for lane in ordered:
 		var path: Path3D = lane.get_node_or_null("Path3D")
 		if path == null or path.curve == null or path.curve.get_baked_length() < need + 80.0:
 			continue
@@ -71,6 +85,11 @@ func _run(path: Path3D, lane_name, blocker_side) -> Dictionary:
 		person.global_position = at + side * float(blocker_side) + Vector3(0, 0.1, 0)
 		for i in 10:
 			await physics_frame
+		# ... but a person who STANDS: the AI's own brain walks it off the lane (on DebugWorld the road pieces give it
+		# a navmesh), so its movement is switched off -- the body, its capsule and its stance stay live
+		var mc := person.get_node_or_null("MovementController")
+		if mc != null:
+			mc.process_mode = Node.PROCESS_MODE_DISABLED
 		person.global_position = at + side * float(blocker_side) + Vector3(0, 0.1, 0)
 		var shapes := 0
 		for n in person.find_children("*", "CollisionShape3D", true, false):
@@ -132,7 +151,12 @@ func _initialize() -> void:
 	var player: Node3D = world.get_node("Characters/Player")
 	player.process_mode = Node.PROCESS_MODE_DISABLED
 	var waited := 0
-	while _pick_lane(90.0).is_empty() and waited < 60 * 30:
+	# a streamed piece enters its children over several frames: wait for a RING lane (see `_pick_lane`), and only
+	# after 10 s take whatever straight lane there is
+	while waited < 60 * 30:
+		var p0 := _pick_lane(90.0)
+		if not p0.is_empty() and (str(p0[0].name).contains("_ring") or waited > 60 * 10):
+			break
 		await physics_frame
 		waited += 1
 	var picked := _pick_lane(90.0)

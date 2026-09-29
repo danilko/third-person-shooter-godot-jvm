@@ -34,6 +34,11 @@ A hand edit made to the OUTPUT in the editor is lost on the next run: make it in
 owns the road. After this: sample the ground (`write_roadkit_ground.gd`), `island_road_zones.py --split`, build, stamp,
 the traffic zones and the road map (PLAN.md "Road Kit gate"). `--dry` derives into a temp dir and writes nothing; `--check` derives nothing and runs the asserts on the
 committed output.
+
+Each generator step is replayed from a content-addressed cache when its input record, its code (the script and every
+module it imports) and its data are what they were last time (`tools/layout_cache.py`): edit island_streets.py and the
+coast road, touge, dike and expressway steps before it replay in seconds. `--no-cache` (or LAYOUT_CACHE=0) runs every
+step.
 """
 import json
 import math
@@ -41,6 +46,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 import sys
 import tempfile
 
@@ -88,12 +94,37 @@ def arterial_grades(path, names):
     return sorted(out, reverse=True)
 
 
+TIMES = {}     # step -> seconds, summed over the run (printed by main: which generator a slow layout is waiting on)
+
+
+CACHE = os.environ.get("LAYOUT_CACHE", "1") != "0"     # `--no-cache` clears it (main); see tools/layout_cache.py
+HITS = []
+
+
 def run(*cmd):
+    """One generator step, replayed from `layout_cache` when its record, its code and its data are what they were the
+    last time it ran (a step's output record is its first `.json` argument; a read-only step restores the same
+    bytes)."""
+    t0 = time.monotonic()
+    step = os.path.basename(cmd[0]).replace(".py", "") + ("" if len(cmd) < 2 or "/" in cmd[1] else " " + cmd[1])
+    out = next((a for a in cmd[1:] if a.endswith(".json")), None)
+    k = None
+    if CACHE:
+        import layout_cache as LC
+        k = LC.key(cmd, out)
+        hit = LC.get(k, out)
+        if hit is not None:
+            HITS.append(step)
+            TIMES[step + " (cached)"] = TIMES.get(step + " (cached)", 0.0) + time.monotonic() - t0
+            return hit
     r = subprocess.run([sys.executable] + list(cmd), capture_output=True, text=True)
+    TIMES[step] = TIMES.get(step, 0.0) + time.monotonic() - t0
     if r.returncode:
         sys.stdout.write(r.stdout)
         sys.stderr.write(r.stderr)
         raise SystemExit("island_layout: %s failed" % os.path.basename(cmd[0]))
+    if k:
+        LC.put(k, out, r.stdout)
     return r.stdout
 
 
@@ -155,10 +186,14 @@ def derive(out):
         print("island_layout: WARN %d mouth(s) still held short of their setback: %s"
               % (len(moved["clamped"]), [(c["uid"], round(c["placed"], 1), round(c["solved"], 1))
                                          for c in moved["clamped"]][:8]))
+    t0 = time.monotonic()
     print("island_layout: " + tidy(out))
+    TIMES["tidy (in-process)"] = time.monotonic() - t0
     sys.stdout.write(run(os.path.join(HERE, "island_grades.py"), "smooth", out))
     sys.stdout.write(run(os.path.join(HERE, "island_dike.py"), "raise", out))     # the crest back after smoothing
+    t0 = time.monotonic()
     print("island_layout: " + weld_joints(out))
+    TIMES["weld (in-process)"] = time.monotonic() - t0
 
 
 def joint_pairs(net):
@@ -196,8 +231,43 @@ def weld_joints(path):
             b.pos = (b.pos[0], b.pos[1], m)
             n += 1
             worst = max(worst, dz)
+    # ...AND ONE FACING. A joint station takes its own road's chord, so two AUTO halves meeting at a bend (a side road
+    # detoured round a station box put a 14 deg bend on teibo_sokudo_4's joint) cut their sections on different
+    # planes and hand each lane over sideways (0.54 m, joint_gaps). Both are frozen on the bisector of their two
+    # chords, each facing its OWN road's forward direction (a station's facing is its road's direction of travel).
+    # A joint a generator already froze (the expressway's, the Wangan's split) is left as it is.
+    import math
+    road_of = {q: nm for nm, r in net.roads.items() for q in r.points}
+    faced = 0
+    for u, v in joint_pairs(net):
+        a, b = net.points[u], net.points[v]
+        if a.tangent_mode == pm.MANUAL or b.tangent_mode == pm.MANUAL:
+            continue
+        ds = []
+        for q in (u, v):
+            ch = net.roads[road_of[q]].points
+            if len(ch) < 2:
+                break
+            i = ch.index(q)
+            p0, p1 = (net.points[ch[i - 1]].pos, net.points[q].pos) if i == len(ch) - 1 else \
+                (net.points[q].pos, net.points[ch[i + 1]].pos)
+            L = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+            ds.append((((p1[0] - p0[0]) / L, (p1[1] - p0[1]) / L)) if L > 1e-6 else None)
+        if len(ds) < 2 or None in ds:
+            continue
+        (ax, ay), (bx, by) = ds
+        s = 1.0 if ax * bx + ay * by >= 0.0 else -1.0
+        tx, ty = ax + s * bx, ay + s * by
+        L = math.hypot(tx, ty)
+        if L < 1e-6:
+            continue
+        tx, ty = tx / L, ty / L
+        a.tangent_mode, a.tangent = pm.MANUAL, (tx, ty, 0.0)
+        b.tangent_mode, b.tangent = pm.MANUAL, (s * tx, s * ty, 0.0)
+        faced += 1
     pm.save_network(net, path)
-    return "weld: %d joint(s) brought to one height (worst %.3f m apart)" % (n, worst)
+    return ("weld: %d joint(s) brought to one height (worst %.3f m apart), %d given one facing"
+            % (n, worst, faced))
 
 
 UNCLAMP_MAX = 40.0    # m: only a mouth whose solved setback is an ordinary one is freed (see `unclamp`)
@@ -312,7 +382,9 @@ def tidy(path):
         joints += 1
     road_of = {q: n for n, r in net.roads.items() for q in r.points}
     dropped = 0
-    for f in pv.validate(net):
+    # only the check that reports it: the whole gate (`pv.validate`) spent 139 of tidy's 149 s fitting every lane's
+    # curve (check_path_fidelity) for a finding it then threw away
+    for f in pv.validate(net, checks=[pv.check_mouth_clearance]):
         if f.code != "station_crowds_mouth" or f.obj not in net.points:
             continue
         r = net.roads[road_of[f.obj]]
@@ -383,12 +455,17 @@ def chain_folds(path):
 
 
 def main(argv):
+    global CACHE
+    if "--no-cache" in argv:
+        CACHE = False
     if "--dry" in argv:
         d = tempfile.mkdtemp()
         try:
             out = os.path.join(d, "IslandRoads.roads.json")
             derive(out)
             print("island_layout: derived %s" % out)
+            print("island_layout: time " + ", ".join("%s %.0f s" % kv for kv in sorted(TIMES.items(), key=lambda kv: -kv[1])))
+            print("island_layout: %d step(s) replayed from the cache" % len(HITS))
         finally:
             shutil.rmtree(d)
         return
@@ -411,13 +488,17 @@ def main(argv):
     # every road over another clears it, measured on the built surface (roadkit_interchange.crossings)
     sys.path.insert(0, HERE)
     import roadkit_interchange as ri
+    t0 = time.monotonic()
     cross = ri.crossings(OUTPUT)
+    TIMES["check: crossings"] = time.monotonic() - t0
     low = [c for c in cross if c[0] < ri.CLEARANCE]
     print("island_layout: %d grade-separated crossings, tightest %.1f m (%s over %s)%s"
           % (len(cross), cross[0][0], cross[0][1], cross[0][2], "" if not low else "; %d BELOW %.1f m: %s"
              % (len(low), ri.CLEARANCE, low)))
     names = arterial_names()
+    t0 = time.monotonic()
     grades = arterial_grades(OUTPUT, names)
+    TIMES["check: arterial grades"] = time.monotonic() - t0
     steep = [g for g in grades if g[0] > ARTERIAL_GRADE]
     print("island_layout: %d arterial road(s), steepest %.1f %% (%s at %s)%s"
           % (len(grades), grades[0][0] * 100, grades[0][1], grades[0][2], "" if not steep else
@@ -429,14 +510,20 @@ def main(argv):
             roads = [owner.get(u, u) for u in re.findall(r"p_[0-9a-f]{8}", f["message"])]
             if any(r.split("__")[0] in names for r in roads):
                 print("island_layout: pad_grade on an arterial pad (%s): %s" % (" / ".join(roads), f["message"][:60]))
+    t0 = time.monotonic()
     folds = chain_folds(OUTPUT)
+    TIMES["check: folds"] = time.monotonic() - t0
     print("island_layout: %d road(s) folding back on themselves%s" % (len(folds), "" if not folds else ": " + ", ".join(
         "%s at %s (%.0f deg)" % f for f in folds)))
+    t0 = time.monotonic()
     gaps = joint_gaps(OUTPUT)
+    TIMES["check: joint gaps"] = time.monotonic() - t0
     wide = [g for g in gaps if g[0] > JOINT_GAP]
     print("island_layout: %d lane hand-over(s) across a joint, worst %.3f m%s" % (
         len(gaps), gaps[0][0] if gaps else 0.0, "" if not wide else "; %d OVER %.2f m: %s" % (
             len(wide), JOINT_GAP, ", ".join("%s -> %s %.2f m" % (a, b, g) for g, a, b in wide[:6]))))
+    print("island_layout: time " + ", ".join("%s %.0f s" % kv for kv in sorted(TIMES.items(), key=lambda kv: -kv[1])))
+    print("island_layout: %d step(s) replayed from the cache%s" % (len(HITS), "" if not HITS else " (%s)" % ", ".join(HITS)))
     if rep["errors"] or any(bad.values()) or low or steep or folds:
         sys.exit(1)
 

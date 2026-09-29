@@ -14,9 +14,26 @@ One `.blend` per store type, each holding ONE piece, `<Id>_Interior` (everything
   accessible restroom back left, the walk-in cooler ROOM behind ten drink doors, the store room with the delivery
   door; open bento cases along the back and the aisle wall, a self-serve row (coffee station with 2 machines, hot
   cases), the cigarette wall, a 3-seat eat-in counter, the bin station; 3 vending machines outside.
-* `Shop_FamilyRestaurant.blend` -- the kitchen across the back (cooking line, prep, sinks, cold store), the pass
-  window and service counter, a store room / staff room / staff accessible restroom column with the staff exit, TWO
-  customer accessible restrooms, the bin station, and meal-ticket machines + ATM by the entrance.
+* `Shop_FamilyRestaurant.blend` -- YOUR hand layout (2026-09-28), kept: the kitchen across the back-left (4 grills,
+  4 fryers, 3 prep islands, 3 sinks, fridges), the pass window over the service counter with a swing door beside it
+  onto the service floor, the walk-in COOLER / supply room behind the kitchen, the manager's office (safe), staff room
+  and staff accessible restroom off the STAFF AISLE -- which is also the delivery corridor: the back door opens into
+  the aisle and the corridor behind the kitchen and cooler, never into the kitchen (the kitchen has its own swing door
+  onto that corridor); two customer accessible restrooms, the bin station, meal-ticket machines + ATM. The building's
+  side walls along the kitchen, the back of house and the restrooms are SOLID (`building_types.json` `modules_rows`),
+  the dining room keeps its glass.
+* `Shop_Supermarket.blend` -- the food supermarket (食品スーパー, 32.8 x 40 m), a konbini and a kitchen in one: the
+  sales floor (produce along the left wall, six gondola runs, a frozen island, dairy / drinks open cases on the right
+  wall, the deli counters fed through the deli kitchen's pass windows, meat & fish open cases, six checkout lanes and
+  bagging tables, the konbini corner -- service counter with two registers, hot snacks, coffee, ATM, copier, an eat-in
+  counter along the glass -- and two customer accessible restrooms by the left entrance); the BACKYARD (バックヤード):
+  receiving (荷受け) at the two delivery doors, the back corridor to every room, the walk-in cooler behind the drink
+  doors, the freezer, meat & fish prep, the deli kitchen where the food is made, and the staff block (office with the
+  safe, lockers, staff accessible restroom) off the STAFF AISLE with its own exit. The loading yard (荷捌き場: a truck at
+  a covered dock, roll cages, pallets) is the `SupermarketSite` composite in `building_types.json`.
+* New fittings (checkout lane, bagging table, produce table, cart row, deli counter, roll cage ...) are library
+  PLACEHOLDERS (`blender/tools/library_interiors.py`, listed in `kits/library/PIECES.md`): replace them in
+  `library.blend`.
 
 The shell -- outer walls, shopfront glass, roof, the street entrance and the outer back/side doors -- is NOT in these
 files: it is the downtown kit's modules, laid by `tools/building_kit/layout_buildings.py` from `building_types.json`.

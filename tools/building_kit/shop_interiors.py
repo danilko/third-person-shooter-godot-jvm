@@ -229,10 +229,134 @@ def restaurant():
     return p
 
 
+def run_x(z, x0, x1, doors=None, yaw=0.0):
+    """A partition along X at z from x0 to x1 in 1.82 m pieces (a half piece for the rest, the last one overlapping
+    back to x1). `doors` = {x: prop}: a door prop (built by `swing` / `slide`) replaces the piece centred there."""
+    out, x = [], x0
+    doors = dict(doors or {})
+    while x1 - x > 0.05:
+        d = next((k for k in doors if x - 0.01 <= k - 0.91 <= x + 0.01), None)
+        if d is not None:
+            out.append(doors.pop(d))
+            x += 1.82
+        elif x1 - x >= 1.82:
+            out.append(wall(x + 0.91, z, yaw))
+            x += 1.82
+        else:
+            out.append(half(max(x + 0.455, x1 - 0.455), z, yaw))
+            x += 0.91
+    if doors:
+        raise SystemExit("run_x: door(s) at %s are off the 1.82 m grid of the run %.2f .. %.2f" % (sorted(doors), x0, x1))
+    return out
 
-PLANS = {"KonbiniS": konbini_s, "KonbiniL": konbini_l, "FamilyRestaurant": restaurant}
+
+def run_z(x, z0, z1, doors=None):
+    """A partition along Z at x from z0 to z1 (see run_x)."""
+    out, z = [], z0
+    doors = dict(doors or {})
+    while z1 - z > 0.05:
+        d = next((k for k in doors if z - 0.01 <= k - 0.91 <= z + 0.01), None)
+        if d is not None:
+            out.append(doors.pop(d))
+            z += 1.82
+        elif z1 - z >= 1.82:
+            out.append(wall(x, z + 0.91, 90))
+            z += 1.82
+        else:
+            out.append(half(x, max(z + 0.455, z1 - 0.455), 90))
+            z += 0.91
+    if doors:
+        raise SystemExit("run_z: door(s) at %s are off the 1.82 m grid of the run %.2f .. %.2f" % (sorted(doors), z0, z1))
+    return out
+
+
+def supermarket():
+    """食品スーパー (user, 2026-09-28: "a larger market that combines kitchen and konbini features, the food made in
+    the kitchen, larger supplies, a larger backyard for fulfilment"): 32.76 x 40.04 m, interior +-16.2 x +-19.84. The
+    front is the SALES floor, the back 10.7 m the バックヤード (backyard). Entrances front modules 4 and 13 (x -+8.19);
+    receiving doors back modules 13-14 (x -8.19, -10.01) into the 荷受け (receiving) area; the staff exit back module 0
+    (x 15.47) at the end of the STAFF AISLE. The loading yard (荷捌き場) is outside, the SupermarketSite composite."""
+    p = []
+    ZB = -9.1                       # the backyard's front wall
+    ZC = -17.84                     # the back corridor's wall (supplies: receiving -> the corridor -> every room)
+    # ── the backyard: rooms between the corridor and the sales floor
+    p += run_x(ZC, -7.28, 14.56, {-4.55: swing(-4.55, ZC, 180), -0.91: swing(-0.91, ZC, 180),
+                                  2.73: swing(2.73, ZC, 180), 8.19: swing(8.19, ZC, 180)}, 180)
+    for x in (-7.28, -3.64, 0.0, 5.46, 10.92):
+        p += run_z(x, ZC, ZB)
+    p += [swing(14.56, -16.93, 90), wall(14.56, -15.11, 90), swing(14.56, -13.29, 90), half(14.56, -11.925, 90),
+          slide(14.56, -10.56, 90, 1, wide=True), half(14.56, -9.555, 90)]
+    # the backyard's front wall onto the sales floor: receiving (a wide swing door) | the cooler's drink doors |
+    # freezer | meat & fish behind its open cases | the deli kitchen's pass windows and door | the staff block
+    p += run_x(ZB, -16.2, -7.28, {-11.65: P("Wall_PartitionDoorWide", -11.65, ZB, 0, door={"w": 1.0, "h": 2.0},
+                                            collide={"boxes": WIDE_BOXES})})
+    p += [P("Shop_FridgeDoor", -6.825, ZB + 0.4, 180, repeat=[4, 0.91, 0])]
+    p += run_x(ZB, -3.64, 5.46)
+    p += [P("Wall_PassWindow", x, ZB, collide={"boxes": PASS_BOXES}) for x in (6.37, 8.19)]
+    p += [swing(10.01, ZB)]
+    p += run_x(ZB, 10.92, 14.56)
+    p += [swing(15.38, ZB)]                                                     # the staff aisle onto the floor
+    # receiving (荷受け・検品): roll cages, pallets, the check-in desk, shelves
+    p += [P("Warehouse_RollCage", -15.6, -18.8, 0, repeat=[4, 0.95, 0]),
+          P("Warehouse_Pallet", -15.4, -13.2, 0, repeat=[2, 0, 1.5]),
+          P("Shop_StockShelf", -15.85, -16.2, 90), P("Office_Desk", -9.5, -12.6, 90)]
+    # the walk-in cooler (its front is the drink doors) and freezer
+    p += [P("Shop_StockShelf", -6.85, -13.5, 90), P("Kitchen_Fridge", -3.95, -12.5, 270),
+          P("Shop_FreezerCase", -2.2, -17.3, 180), P("Shop_StockShelf", -1.82, -10.55, 0)]
+    # 精肉・鮮魚 (meat and fish): prep, sinks, a fridge; the open cases on the floor side
+    p += [P("Kitchen_PrepTable", 1.3, -13.5, 90), P("Kitchen_PrepTable", 4.1, -13.5, 90),
+          P("Kitchen_Sink", 4.3, -17.2, 180), P("Kitchen_Fridge", 0.7, -17.35, 180)]
+    p += [P("Shop_OpenCase", x, ZB + 0.5, 0) for x in (0.91, 2.73, 4.55)]
+    # 惣菜 (the deli kitchen: the food is made here, handed through the pass windows to the deli counters)
+    p += [P("Kitchen_Grill", x, -17.45, 180) for x in (5.95, 7.15)]
+    p += [P("Kitchen_Fryer", x, -17.45, 180) for x in (9.6, 10.25)]
+    p += [P("Kitchen_PrepTable", 7.3, -13.3, 0), P("Kitchen_PrepTable", 7.3, -12.4, 180),
+          P("Kitchen_Sink", 10.5, -13.3, 270), P("Kitchen_Fridge", 5.95, -13.0, 90)]
+    p += [P("Shop_DeliCounter", x, ZB + 0.55, 0) for x in (6.37, 8.19)]
+    # the staff block off the staff aisle: office (safe), lockers, the staff accessible restroom
+    p += run_x(-14.8, 10.92, 14.56) + run_x(-11.95, 10.92, 14.56)
+    p += [P("Office_Desk", 12.5, -17.3, 180), P("Office_Safe", 11.3, -15.2, 0), P("Office_Cabinet", 13.9, -17.5, 180)]
+    p += [P("Office_Locker", 11.4, -12.35, 180, repeat=[3, 0.95, 0])]
+    p += accessible_wc(11.3, -10.0, 90, (11.0, -11.85, 0), (13.9, -9.6, 0, 13.9, -9.25), (11.0, -9.25, 180))
+    # ── the sales floor
+    # produce (青果) along the left wall and two islands
+    p += [P("Shop_ProduceTable", -15.6, z, 90) for z in (-6.5, -4.6, -2.7, -0.8, 1.1, 3.0)]
+    p += [P("Shop_ProduceTable", -12.0, z, 0) for z in (-3.5, -0.5)]
+    # gondola runs (a 2.5 m aisle), the frozen island, open cases (dairy, drinks) along the right wall
+    p += [P("Shop_Gondola", x, -5.5, 90, repeat=[3, 0, 2.88]) for x in (-8.5, -5.3, -2.1, 1.1, 4.3, 7.5)]
+    p += [P("Shop_FreezerCase", 11.2, 0.0, 90), P("Shop_FreezerCase", 12.12, 0.0, 270)]
+    p += [P("Shop_OpenCase", 15.77, z, 270) for z in (-5.3, -3.48, -1.66, 0.16, 1.98)]
+    # the konbini corner (front right): the service counter with two registers, hot snacks, coffee, ATM, copier,
+    # an eat-in counter along the glass
+    p += [P("Shop_Counter", 14.0, 7.5, 270),
+          P("Shop_Register", 14.05, 6.2, 270, y=1.0, collide="none"),
+          P("Shop_Register", 14.05, 8.8, 270, y=1.0, collide="none"),
+          P("Shop_HotCase", 11.4, 5.3, 0), P("Shop_HotCase", 12.3, 5.3, 0),
+          P("Shop_CoffeeStation", 12.0, 12.0, 90),
+          P("Shop_ATM", 15.7, 12.8, 270), P("Shop_Copier", 15.75, 14.5, 270)]
+    p += [P("Shop_EatInCounter", 10.9 + 0.91 * k, 19.4, 180) for k in range(4)]
+    p += [P("Shop_Stool", 10.9 + 0.91 * k, 18.8) for k in range(4)]
+    # the checkouts (six lanes), the bagging tables after them, the carts by the left entrance
+    p += [P("Shop_Checkout", -5.5 + 2.2 * k, 11.5) for k in range(6)]
+    p += [P("Shop_BaggingTable", x, 14.9) for x in (-4.4, -1.1, 2.2)]
+    p += [P("Shop_CartRow", -9.95, 16.9)]
+    # the customer restrooms (two accessible rooms) in the front-left corner, behind solid front modules
+    # (two rooms 2.73 wide; each sliding leaf runs over the solid half between the two doors)
+    p += [slide(-15.29, 15.2, 180, -1, wide=True), half(-13.925, 15.2, 180), half(-13.015, 15.2, 180),
+          slide(-11.65, 15.2, 180, 1, wide=True)]
+    p += run_z(-13.47, 15.2, 19.84) + run_z(-10.74, 15.2, 19.84)
+    p += accessible_wc(-15.84, 19.2, 90, (-15.3, 19.84, 0), (-14.6, 19.56, 180, -14.6, 19.8), (-13.53, 17.3, 270))
+    p += accessible_wc(-11.1, 19.2, 270, (-11.7, 19.84, 0), (-12.4, 19.56, 180, -12.4, 19.8), (-13.41, 17.3, 90))
+    # outside: two vending machines and the sorted bins by the right entrance
+    p += [outside("Station_VendingMachine", 12.0, 20.4, repeat=[2, 1.1, 0]), outside("Shop_BinStation", 4.0, 20.3)]
+    return p
+
+
+
+PLANS = {"KonbiniS": konbini_s, "KonbiniL": konbini_l, "FamilyRestaurant": restaurant, "Supermarket": supermarket}
 #: the exterior doors each plan was drawn for (building_types.json `doors`): a door moved there must stay clear of
 #: the rooms, which the layout's door check asserts
 DOORS = {"KonbiniS": {"front": [5], "back": [0]},
          "KonbiniL": {"front": [7], "back": [2], "left": [8]},
-         "FamilyRestaurant": {"front": [5], "back": [0]}}
+         "FamilyRestaurant": {"front": [5], "back": [0]},
+         "Supermarket": {"front": [4, 13], "back": [0, 13, 14]}}

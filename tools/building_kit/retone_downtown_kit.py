@@ -78,7 +78,6 @@ PLAN = {
 # left alone on purpose, and why
 KEEP = {"MI_RedBrick": "brick is red, and the user asked for red",
         "MI_RedBrick_Pale": "ditto, pale",
-        "MI_Concrete": "already neutral (R-B +5.3)",
         "MI_Asphalt": "already neutral (R-B +2.4)",
         "MI_Glass": "a tint, not a texture",
         "MI_Dirt": "ground, warm is correct",
@@ -163,6 +162,51 @@ def tint(stem, target):
         lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
         return (t[0] / lum, t[1] / lum, t[2] / lum)
     return (t[0] / r, t[1] / g, t[2] / b)
+
+
+# --- FLAT, TOON COLOURS (user, 2026-09-28: "flat toon color will be great, or pick from Japan PLATEAU for the
+# buildings"). The weathering the neutral copies above still carry -- rust blotches as grey, panel wear, the
+# kit's photographic grain -- read as a rusty American downtown, and the game's look is toon (Persona / gacha).
+# So every building material here drops its photo ALBEDO and its ORM map and wears ONE flat colour: the facade
+# tones are PLATEAU's measured wall colours outright (`tone_levels`), every other row its own target grey. The
+# NORMAL map stays -- tile joints, panel lines and brick courses are relief, not rust -- and roughness is one
+# number. FLAT = False puts the textured version back (the tints above then apply as before).
+FLAT = True
+FLAT_ROUGHNESS = 0.8
+
+
+def flatten(text, rgb):
+    """The material with no albedo / ORM texture: `rgb` (sRGB 0..255) as a flat colour, the normal map kept."""
+    for key in ("albedo_texture", "metallic_texture", "metallic_texture_channel", "roughness_texture",
+                "roughness_texture_channel"):
+        text = re.sub(r"^%s = .*\n" % key, "", text, flags=re.M)
+    text = re.sub(r"^metallic = .*\n", "", text, flags=re.M)
+    text = re.sub(r"^roughness = .*\n", "", text, flags=re.M)
+    line = "albedo_color = Color(%.4f, %.4f, %.4f, 1)" % tuple(c / 255.0 for c in rgb)
+    if re.search(r"^albedo_color = .*$", text, re.M):
+        text = re.sub(r"^albedo_color = .*$", line, text, count=1, flags=re.M)
+    else:
+        text = re.sub(r"^(\[resource\]\n)", r"\1" + line + "\n", text, count=1, flags=re.M)
+    text = re.sub(r"^(albedo_color = .*\n)", r"\1metallic = 0.0\nroughness = %.2f\n" % FLAT_ROUGHNESS, text,
+                  count=1, flags=re.M)
+    # an ext_resource nothing references any more is dropped (the normal map's stays)
+    for m in re.finditer(r'^\[ext_resource [^\]]*id="([^"]+)"\]\n', text, re.M):
+        if 'ExtResource("%s")' % m.group(1) not in text:
+            text = text.replace(m.group(0), "")
+    return text
+
+
+def grey(target):
+    t = tuple(target) if isinstance(target, (tuple, list)) else (target, target, target)
+    return t
+
+
+# hand-written kit materials that are flat too (their textured recipe lived only in the .tres): sRGB 0..255
+FLAT_EXTRA = {
+    "MI_DoorLeaf_White": ((232, 234, 234), "white painted steel 玄関ドア"),
+    "MI_DoorLeaf_Wood":  ((150, 105, 65), "wood-grain door, as a flat warm brown"),
+    "MI_Concrete":       ((150, 148, 144), "exposed concrete, neutral"),
+}
 
 
 def texture_stem(stem):
@@ -297,6 +341,8 @@ def write_tones(check):
             names.append(name)
             path = os.path.join(MATS, name + ".tres")
             body = patch(src, stem, tint(stem, rgb))
+            if FLAT:
+                body = flatten(body, rgb)
             body = re.sub(r'^resource_name = .*$', 'resource_name = "%s"' % name, body, count=1, flags=re.M)
             if not os.path.exists(path) or open(path).read() != body:
                 changed.append(name)
@@ -404,10 +450,23 @@ def main(argv):
         print("%-24s %-18s %7.0f  (%.3f %.3f %.3f) -> %5.1f %5.1f %5.1f   %s"
               % (name, stem, target, col[0], col[1], col[2], got[0], got[1], got[2], why))
         body = patch(open(path).read(), stem, col)
+        if FLAT:
+            body = flatten(body, grey(target))
         if body != open(path).read():
             changed.append(name)
             if not check:
                 open(path, "w").write(body)
+    if FLAT:
+        print()
+        print("flat (no photo texture):")
+        for name, (rgb, why) in sorted(FLAT_EXTRA.items()):
+            path = os.path.join(MATS, name + ".tres")
+            body = flatten(open(path).read(), rgb)
+            print("  %-22s (%d %d %d)  %s" % (name, *rgb, why))
+            if body != open(path).read():
+                changed.append(name)
+                if not check:
+                    open(path, "w").write(body)
     print()
     print("the shop window's privacy strip:")
     changed += write_shop_band(check)

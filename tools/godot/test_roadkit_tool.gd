@@ -179,7 +179,7 @@ func _initialize() -> void:
 	var terrain: Node = world.find_children("*", "Terrain3D", true, false)[0]
 	var dnet: Node3D = null
 	for c in world.find_children("*", "Node3D", true, false):
-		if c.get_script() == NetworkScript:
+		if c.get_script() == NetworkScript and str(c.get("record_path")).contains("DebugRoads"):
 			dnet = c
 	dnet.load_record()
 	await process_frame

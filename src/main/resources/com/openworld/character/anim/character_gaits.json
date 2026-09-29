@@ -1,21 +1,24 @@
 {
-  "_comment": "Which walk each body plays (user, 2026-09-27). ONE walk exists; a female body plays the copies blender/tools/derive_gait.py writes as f_<clip>, under the BASE names, in its own library. tools/godot/build_character_anims.gd writes the libraries; tools/godot/build_character_visuals.gd points each body's AnimationTree at its gait's. `relaxed` is the clip the relaxed branch plays (AnimationController): a male body strolls on the ordinary walk.",
-  "relaxed_clip": "upright_walk_relaxed",
+  "_comment": "Which walk each body plays (user, 2026-09-27/28). The walks are ordinary clips in assets/characters/shino/shino.blend, edited on the rig like any other: male_upright_walk_* and female_upright_walk_* (seeded once by blender/tools/derive_gait.py from the one source walk, which neither sex plays raw). Each gait's library holds its clips under the BASE names the AnimationTree asks for; tools/godot/build_character_anims.gd writes the libraries and tools/godot/build_character_visuals.gd points each body at its gait's. `upright_walk` is the NORMAL walk, hands empty. A body with no row here is male.",
   "gaits": {
     "m": {
       "library": "res://src/main/resources/com/openworld/character/anim/character_anims.res",
       "map": {
-        "upright_walk_relaxed": "upright_walk_forward"
+        "upright_walk_forward": "male_upright_walk_forward",
+        "upright_walk_forward_left": "male_upright_walk_forward_left",
+        "upright_walk_forward_right": "male_upright_walk_forward_right",
+        "upright_walk_back": "male_upright_walk_back",
+        "upright_walk": "male_upright_walk"
       }
     },
     "f": {
       "library": "res://src/main/resources/com/openworld/character/anim/character_anims_f.res",
       "map": {
-        "upright_walk_forward": "f_upright_walk_forward",
-        "upright_walk_forward_left": "f_upright_walk_forward_left",
-        "upright_walk_forward_right": "f_upright_walk_forward_right",
-        "upright_walk_back": "f_upright_walk_back",
-        "upright_walk_relaxed": "f_upright_walk_relaxed"
+        "upright_walk_forward": "female_upright_walk_forward",
+        "upright_walk_forward_left": "female_upright_walk_forward_left",
+        "upright_walk_forward_right": "female_upright_walk_forward_right",
+        "upright_walk_back": "female_upright_walk_back",
+        "upright_walk": "female_upright_walk"
       }
     }
   },
@@ -30,5 +33,6 @@
   "crowd_weights": {
     "_comment": "How often each body appears in the crowd (default 1). Fumiriya is the only male body so far, so he is weighted up to keep the street roughly 3 men in 8.",
     "fumiriya": 3
-  }
+  },
+  "normal_walk_clip": "upright_walk"
 }

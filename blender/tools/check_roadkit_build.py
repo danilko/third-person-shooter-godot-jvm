@@ -79,7 +79,9 @@ def styled(tmp):
           "no normal inverted, none past the smoothing angle",
           "%d inverted, worst %.2f deg" % (piece["inverted_normals"], piece["worst_normal_deg"]))
     objs = gltf_tris.load(piece["gltf"])
-    for obj, mat in (("demo_main_0__surface", "M_Brick"), ("demo_main_0__surface", "M_Leaf"),
+    # (no median style: since the raised median became a kerbed island paved like the footway (point_mesh
+    # raised_median, 2026-09-27) its `median` style slot is not read -- the M_Leaf the demo names does not appear)
+    for obj, mat in (("demo_main_0__surface", "M_Brick"),
                      ("demo_main_0__marks_w", "M_Neon"), ("demo_hwy__surface", "M_Steel"),
                      ("demo_hwy__edges_left_0", "M_Red"), ("demo_cross_0__marks_y", "M_Accent"),
                      ("demo_ramp__surface", "M_Dirt"), ("demo_cross_0__edges_left_0", __import__("point_kit").DEFAULT_MATERIAL["footway"])):  # a missing footway_mat falls back to the default

@@ -36,10 +36,10 @@ const SOURCE := "res://assets/characters/shino/shino.glb"
 const OUT_RES := "res://src/main/resources/com/openworld/character/anim/character_anims.res"
 const OUT_JSON := "res://src/main/resources/com/openworld/character/anim/character_anims.json"
 ## Which walk each body plays: the male library is THE library above; every other gait is a second
-## library in which its derived clips (blender/tools/derive_gait.py, `f_<clip>`) stand under the base
+## library in which its own clips (`male_<clip>` / `female_<clip>`, seeded by derive_gait.py) stand under the base
 ## names. The derived clips themselves are left out of every library -- they are sources, not clips.
 const GAITS := "res://src/main/resources/com/openworld/character/anim/character_gaits.json"
-const GAIT_PREFIXES := ["f_"]
+const GAIT_PREFIXES := ["male_", "female_"]
 
 var _fail := 0
 

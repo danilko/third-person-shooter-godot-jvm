@@ -1,12 +1,14 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Warehouse.tscn" id="1"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Warehouse_W14.tscn" id="2"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool.tres" id="tone1_1"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_WhiteWarm.tres" id="tone2_2"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_MidWarm.tres" id="tone0_6"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/KonbiniS_Shop.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/OfficeMid_H11.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/OfficeMid_W10.tscn" id="3"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone2_3"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_WhiteWarm2.tres" id="tone0_5"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_CharcoalCool.tres" id="tone1_7"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_7_12.res" id="hlod"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/item/WeaponPad.java" id="pad"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -15,18 +17,55 @@ material = ExtResource("lotmat")
 transform_format = 1
 instance_count = 3
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(26.0195, 0.0000, 0.2990, -247.1132, 0.0000, 0.6360, 0.0000, 9.5130, -0.4151, 0.0000, 18.7404, 1212.6114, -36.9388, 0.0000, -0.3266, -206.9758, 0.0000, 0.6260, 0.0000, 9.4830, 0.5390, 0.0000, -22.3804, 1251.5936, -17.2932, 0.0000, -14.0056, -164.6066, 0.0000, 0.6560, 0.0000, 9.5310, 19.4456, 0.0000, -12.4553, 1231.7707)
+buffer = PackedFloat32Array(22.8232, 0.0000, 0.2138, -250.0790, 0.0000, 0.6360, 0.0000, 9.5130, -0.3139, 0.0000, 15.5443, 1214.2744, 19.1512, 0.0000, -0.9282, -213.6221, 0.0000, 0.6300, 0.0000, 9.4860, 1.1455, 0.0000, 15.5181, 1216.3532, -4.2864, 0.0000, -18.4702, -148.3756, 0.0000, 0.6690, 0.0000, 9.6165, 12.8003, 0.0000, -6.1850, 1202.3198)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(26.023, 0.636, 18.743)
+size = Vector3(22.825, 0.636, 15.546)
 
 [sub_resource type="BoxShape3D" id="LotShape1"]
-size = Vector3(36.943, 0.626, 22.383)
+size = Vector3(19.185, 0.630, 15.546)
 
 [sub_resource type="BoxShape3D" id="LotShape2"]
-size = Vector3(26.023, 0.656, 18.743)
+size = Vector3(13.499, 0.669, 19.478)
 
 [node name="Bld_island_7_12" type="Node3D"]
+
+[node name="Pads_000" type="Node3D" parent="."]
+
+[node name="Pad_PIS1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -146.505, 10.066, 1204.137)
+script = ExtResource("pad")
+weapon_id = "PIS1"
+
+[node name="Pad_PIS2" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -146.886, 10.066, 1205.275)
+script = ExtResource("pad")
+weapon_id = "PIS2"
+
+[node name="Pad_REV1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -147.738, 10.066, 1203.725)
+script = ExtResource("pad")
+weapon_id = "REV1"
+
+[node name="Pad_DUP1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -148.119, 10.066, 1204.862)
+script = ExtResource("pad")
+weapon_id = "DUP1"
+
+[node name="Pad_SMG1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -148.970, 10.066, 1203.312)
+script = ExtResource("pad")
+weapon_id = "SMG1"
+
+[node name="Pad_MEW1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -149.352, 10.066, 1204.450)
+script = ExtResource("pad")
+weapon_id = "MEW1"
+
+[node name="Pad_FRG1" type="Area3D" parent="Pads_000"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150.203, 10.066, 1202.899)
+script = ExtResource("pad")
+weapon_id = "FRG1"
 
 [node name="HLOD" type="MeshInstance3D" parent="."]
 mesh = ExtResource("hlod")
@@ -35,25 +74,25 @@ visibility_range_begin = 450.0
 visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
-[node name="Warehouse_W14_000" parent="." instance=ExtResource("2")]
-transform = Transform3D(0.999873, 0, 0.015952, 0, 1, 0, -0.015952, 0, 0.999873, -247.106, 9.846, 1212.604)
+[node name="OfficeMid_H11_000" parent="." instance=ExtResource("2")]
+transform = Transform3D(0.999905, 0, 0.013753, 0, 1, 0, -0.013753, 0, 0.999905, -250.063, 9.846, 1214.258)
 
-[node name="Mesh" parent="./Warehouse_W14_000" index="0"]
-surface_material_override/0 = ExtResource("tone0_6")
+[node name="Mesh" parent="./OfficeMid_H11_000" index="0"]
+surface_material_override/0 = ExtResource("tone0_5")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Warehouse_001" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.999894, 0, -0.014590, 0, 1, 0, 0.014590, 0, -0.999894, -206.983, 9.811, 1251.601)
+[node name="OfficeMid_W10_001" parent="." instance=ExtResource("3")]
+transform = Transform3D(0.998216, 0, -0.059707, 0, 1, 0, 0.059707, 0, 0.998216, -213.605, 9.816, 1216.338)
 
-[node name="Mesh" parent="./Warehouse_001" index="0"]
-surface_material_override/0 = ExtResource("tone1_1")
+[node name="Mesh" parent="./OfficeMid_W10_001" index="0"]
+surface_material_override/0 = ExtResource("tone1_7")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="Warehouse_W14_002" parent="." instance=ExtResource("2")]
-transform = Transform3D(-0.664539, 0, -0.747253, 0, 1, 0, 0.747253, 0, -0.664539, -164.606, 9.874, 1231.781)
+[node name="KonbiniS_Shop_002" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.317536, 0, -0.948246, 0, 1, 0, 0.948246, 0, -0.317536, -148.084, 9.966, 1202.554)
 
-[node name="Mesh" parent="./Warehouse_W14_002" index="0"]
-surface_material_override/0 = ExtResource("tone2_2")
+[node name="Mesh" parent="./KonbiniS_Shop_002" index="0"]
+surface_material_override/1 = ExtResource("tone2_3")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Plinths" type="MultiMeshInstance3D" parent="."]
@@ -63,13 +102,13 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.999873, 0, 0.015952, 0, 1, 0, -0.015952, 0, 0.999873, -247.113, 9.513, 1212.611)
+transform = Transform3D(0.999905, 0, 0.013753, 0, 1, 0, -0.013753, 0, 0.999905, -250.079, 9.513, 1214.274)
 shape = SubResource("LotShape0")
 
 [node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.999894, 0, -0.014590, 0, 1, 0, 0.014590, 0, -0.999894, -206.976, 9.483, 1251.594)
+transform = Transform3D(0.998216, 0, -0.059707, 0, 1, 0, 0.059707, 0, 0.998216, -213.622, 9.486, 1216.353)
 shape = SubResource("LotShape1")
 
 [node name="Plinth2" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.664539, 0, -0.747253, 0, 1, 0, 0.747253, 0, -0.664539, -164.607, 9.531, 1231.771)
+transform = Transform3D(-0.317536, 0, -0.948246, 0, 1, 0, 0.948246, 0, -0.317536, -148.376, 9.616, 1202.320)
 shape = SubResource("LotShape2")

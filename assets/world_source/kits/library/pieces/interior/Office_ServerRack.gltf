@@ -1,0 +1,196 @@
+{
+ "asset": {
+  "generator": "Khronos glTF Blender I/O v5.2.40",
+  "version": "2.0",
+  "extras": {
+   "exported_by": "blender/tools/export_building_kit.py",
+   "module_scale": 1.0
+  }
+ },
+ "extensionsUsed": [
+  "KHR_materials_emissive_strength"
+ ],
+ "scene": 0,
+ "scenes": [
+  {
+   "name": "library",
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "extras": {
+    "edit_note": "Interior PLACEHOLDER (blender/tools/library_interiors.py), ours (CC0): replace by hand, keeping the frame (Z up, origin at the footprint centre on the floor, the side a person uses facing -Y) and the size, which the buildings' layouts assume. Copies of this mesh live in kits/shops/*.blend and kits/interiors/*.blend: re-run blender/tools/build_interior_blends.py / build_shop_blends.py only for a building nobody edited."
+   },
+   "mesh": 0,
+   "name": "Office_ServerRack"
+  }
+ ],
+ "materials": [
+  {
+   "doubleSided": true,
+   "name": "MI_PlasticDark",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0.11999999731779099,
+     0.11999999731779099,
+     0.12999999523162842,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.6000000238418579
+   }
+  },
+  {
+   "doubleSided": true,
+   "emissiveFactor": [
+    1,
+    0.9800000190734863,
+    0.9399999976158142
+   ],
+   "extensions": {
+    "KHR_materials_emissive_strength": {
+     "emissiveStrength": 2
+    }
+   },
+   "name": "MI_Light",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     1,
+     1,
+     0.9700000286102295,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 0.699999988079071
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Office_ServerRack",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1
+     },
+     "indices": 2,
+     "material": 0
+    },
+    {
+     "attributes": {
+      "POSITION": 3,
+      "NORMAL": 4
+     },
+     "indices": 5,
+     "material": 1
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 24,
+   "max": [
+    0.30000001192092896,
+    2,
+    0.5
+   ],
+   "min": [
+    -0.30000001192092896,
+    0,
+    -0.5
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 24,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5123,
+   "count": 36,
+   "type": "SCALAR"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5126,
+   "count": 240,
+   "max": [
+    0.25,
+    1.7300000190734863,
+    0.5099999904632568
+   ],
+   "min": [
+    -0.25,
+    0.15000000596046448,
+    0.5
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 4,
+   "componentType": 5126,
+   "count": 240,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 5,
+   "componentType": 5123,
+   "count": 360,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 0,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 288,
+   "byteOffset": 288,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 72,
+   "byteOffset": 576,
+   "target": 34963
+  },
+  {
+   "buffer": 0,
+   "byteLength": 2880,
+   "byteOffset": 648,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 2880,
+   "byteOffset": 3528,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 720,
+   "byteOffset": 6408,
+   "target": 34963
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 7128,
+   "uri": "Office_ServerRack.bin"
+  }
+ ]
+}

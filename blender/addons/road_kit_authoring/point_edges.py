@@ -478,17 +478,17 @@ def step_walls(points, walk, kerb, wall):
     return pts, wk, kb, wl
 
 
-def exit_bit(side, stairs_only=False):
-    """`rka_exit`'s bits for `side`: 1 / 2 an exit with a stair, 4 / 8 open with none."""
+def exit_bit(side):
+    """`rka_exit`'s bits for `side`: 4 / 8 the fence stands down (`platform_open`), 1 / 2 a retired platform exit."""
     b = 1 if side == "left" else 2
-    return b if stairs_only else b | (b << 2)
+    return b | (b << 2)
 
 
-def exit_open(values, side, stairs_only=False):
-    """Per sample: is the fence on `side` open for a PLATFORM EXIT here? The exit is held from its station to the NEXT
+def exit_open(values, side):
+    """Per sample: is the rail fence on `side` stood down here (a kit station's platform)? The exit is held from its station to the NEXT
     (`rka_exit`), so the sample AT that next station reads none -- it is open too, or `step_walls` (which errs toward
     more fence) would close almost the whole span. The gap is exactly the station-to-station span."""
-    bit = exit_bit(side, stairs_only)
+    bit = exit_bit(side)
     on = [bool(int(round(float(v.get("rka_exit", 0.0)))) & bit) for v in values]
     return [on[i] or (i > 0 and on[i - 1]) for i in range(len(values))]
 
@@ -619,7 +619,12 @@ def band_corridors(bands, owners=False):
         for i, (sx, sy, sz) in enumerate(spine):
             lx, ly = poly[i][0], poly[i][1]
             rx, ry = poly[2 * m - 1 - i][0], poly[2 * m - 1 - i][1]
-            half = max(math.hypot(lx - sx, ly - sy), math.hypot(rx - sx, ry - sy))
+            # THE CORRIDOR IS CENTRED ON THE BAND, not on the spine (2026-09-28). A ONE-WAY road's spine is its
+            # inner EDGE (its lanes lie left of its stations), so `max(left, right)` about the spine claimed a
+            # carriageway's width of ground on the side that has none -- the station rotary's island came out with
+            # an 11 m strip the block ground was kept off. For a two-way road the midpoint IS the spine.
+            sx, sy = (lx + rx) / 2.0, (ly + ry) / 2.0
+            half = math.hypot(lx - rx, ly - ry) / 2.0
             # `sz` is the spine's OWN height, not `band.surface_z(sx, sy)` -- which is a
             # nearest-sample lookup over this very list and would answer with the same number by a
             # longer route, or with a neighbour's where two samples land close together.

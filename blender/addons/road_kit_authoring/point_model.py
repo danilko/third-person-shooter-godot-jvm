@@ -88,16 +88,16 @@ SHED_OPEN_LEFT = 'OPEN_LEFT'
 SHED_OPEN_RIGHT = 'OPEN_RIGHT'
 SHEDS = (SHED_NONE, SHED_OPEN_LEFT, SHED_OPEN_RIGHT)
 
-#: A PLATFORM EXIT (駅の出口): the fence along a rail platform's outer edge is left out over this station's span, on
-#: the named side (against the chain-FWD direction, like `shed`), and a stair is built from the platform down to the
-#: ground there (`point_mesh.platform_stairs`). Held from the station that declares it to the next. APPEND-ONLY.
+#: A PLATFORM EXIT (駅の出口): RETIRED (PLAN.md step 7, 2026-09-28) -- every station is a kit station now, whose
+#: platforms, stairs and gates are its own scene. The field stays READABLE (the schema is append-only) and still stands
+#: the fence down, but nothing writes it and no stair is built. Held from the station that declares it to the next.
 EXIT_NONE = 'NONE'
 EXIT_LEFT = 'LEFT'
 EXIT_RIGHT = 'RIGHT'
 EXIT_BOTH = 'BOTH'
 PLATFORM_EXITS = (EXIT_NONE, EXIT_LEFT, EXIT_RIGHT, EXIT_BOTH)
-#: `platform_open` (same values): the fence on that side is left out with NO stair -- two platforms side by side (a
-#: hub's lines 14 m apart) meet edge to edge there and are walked across as one island platform.
+#: `platform_open` (same values): the rail's fence and car wall on that side stand down -- a kit station's platform
+#: (or its end building) stands there (`island_rail_record.open_air_fence`).
 
 #: The four fields a station may change while still INHERITing the road's base profile -- "what
 #: actually varies along a road" (1.2a). Everything else is whole-profile INHERIT or OVERRIDE,
@@ -150,10 +150,8 @@ POINT_FIELDS = (
     ("shed",           SHEDS, SHED_NONE),
     ("platform_exit",  PLATFORM_EXITS, EXIT_NONE),
     ("platform_open",  PLATFORM_EXITS, EXIT_NONE),
-    # THE PAID AREA (PLAN.md P3, 2026-09-27), on the station that declares a `platform_exit`: how deep the fenced
-    # YARD between that side's platform and its station building's back door is (m out from the platform's outer
-    # edge; 0 = no yard), and how far along the chain the building's centre stands from the exit's centre. A side with
-    # no building of its own takes a `footbridge` (跨線橋) over both tracks to the side that has one.
+    # RETIRED (PLAN.md step 7): the interim paid area's yard / footbridge. Kept readable (append-only schema); nothing
+    # writes or reads them since every station became a kit station.
     ("yard_left",        'f', 0.0),
     ("yard_right",       'f', 0.0),
     ("yard_shift_left",  'f', 0.0),

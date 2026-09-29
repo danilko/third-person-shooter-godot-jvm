@@ -1,0 +1,475 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/OfficeHQ_mesh.res" id="1_yf6op"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/OfficeHQ_collision.res" id="2_2w4qp"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_anqvn"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_mleub"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_t3sjf"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_6jqaa"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xrnyi"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pm2cg"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5getg"]
+size = Vector3(1, 2.1, 0.14)
+
+[node name="OfficeHQ" type="Node3D" unique_id=821616515]
+metadata/building = {
+"aabb": [Vector3(-14, -1.2, -13), Vector3(28, 19.800001, 26)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [0.0, 0.0, 6.9],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [-11.9, 0.0, -1.4],
+"height": 2.1,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 1.0
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [28.0, 26.0],
+"height_m": 19.8,
+"id": "OfficeHQ",
+"inner_doors": [{
+"center": [0.9, 15.6, -2.26],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-10.4, 0.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-7.5, 0.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-4.5, 0.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [0.9, 0.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [4.65, 0.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [9.4, 0.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-6.2, 4.2, -0.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [7.2, 4.2, -0.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-10.4, 4.2, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-7.5, 4.2, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-4.5, 4.2, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [0.9, 4.2, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [4.65, 4.2, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [9.4, 4.2, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-6.2, 8.0, -0.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [7.2, 8.0, -0.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-10.4, 8.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-7.5, 8.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-4.5, 8.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [0.9, 8.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [4.65, 8.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [9.4, 8.0, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-7.4, 11.8, -0.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [0.0, 11.8, -0.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [7.4, 11.8, -0.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-3.0, 11.8, 3.0],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [3.0, 11.8, 3.0],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-10.4, 11.8, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-7.5, 11.8, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-4.5, 11.8, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [0.9, 11.8, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [4.65, 11.8, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [9.4, 11.8, -2.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [-1.75, 0.0, -3.41],
+"d": 1.8,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 11.8,
+"stops": "0,4.2,8,11.8",
+"w": 1.8,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_cover_01",
+"pos": [2.8, 4.2, 3.2],
+"props": {
+"kind": "cover"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_cover_02",
+"pos": [2.8, 8.0, 3.2],
+"props": {
+"kind": "cover"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_objective_01",
+"pos": [4.65, 8.0, -8.0],
+"props": {
+"kind": "objective",
+"note": "the server room"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_02",
+"pos": [3.5, 11.8, -9.0],
+"props": {
+"kind": "objective",
+"note": "the strong room (金庫室)"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [4.5, 0.0, 0.8],
+"props": {
+"kind": "spawn",
+"team": "guard"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-2.0, 0.0, 1.0],
+"props": {
+"kind": "spawn",
+"team": "guard"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [-1.8, 4.2, 3.2],
+"props": {
+"kind": "spawn",
+"team": "worker"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [-1.8, 8.0, 3.2],
+"props": {
+"kind": "spawn",
+"team": "worker"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_05",
+"pos": [8.4, 11.8, 4.8],
+"props": {
+"kind": "spawn",
+"note": "the president",
+"team": "vip"
+},
+"yaw": 180.0
+}],
+"piece_count": 1,
+"probe_xz": [-1.5, 4.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "オフィスビル: four storeys 24 x 18 m on its entrance plaza -- lobby and security, a lift to every floor, two stairs (A to the roof), 島型 open offices, meeting rooms, the server room (F3), the president, boardroom and strong room (F4). Not placed on the island: a level designer's building. kits/interiors/OfficeHQ.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 15.6
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1344713287]
+visibility_range_end = 523.2
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_yf6op")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=600012470]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1494246969]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 1.05, 6.9)
+shape = SubResource("BoxShape3D_xrnyi")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1106615271]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 6.9)
+shape = SubResource("BoxShape3D_pm2cg")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1408359940]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -11.9, 1.05, -1.4)
+shape = SubResource("BoxShape3D_5getg")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=282759829]
+shape = ExtResource("2_2w4qp")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=265326467]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=234573260]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1.75, 0, -3.41)
+script = ExtResource("3_anqvn")
+shaft_width = 1.8
+shaft_depth = 1.8
+rise = 11.8
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_mleub")
+glass_material = ExtResource("5_t3sjf")
+floor_material = ExtResource("6_6jqaa")
+in_service = true
+stop_heights = "0,4.2,8,11.8"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=2061852413]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 6.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1844620567]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.9, 0, -1.4)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1042922271]
+
+[node name="MARK_cover_01" type="Marker3D" parent="Markers" unique_id=1846553502 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.8, 4.2, 3.2)
+metadata/kind = "cover"
+
+[node name="MARK_cover_02" type="Marker3D" parent="Markers" unique_id=215489757 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.8, 8, 3.2)
+metadata/kind = "cover"
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=934464559 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.65, 8, -8)
+metadata/note = "the server room"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1440037119 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 11.8, -9)
+metadata/note = "the strong room (金庫室)"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1441391410 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 4.5, 0, 0.8)
+metadata/team = "guard"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=349273977 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 1)
+metadata/team = "guard"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=221358084 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8, 4.2, 3.2)
+metadata/team = "worker"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=955086975 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8, 8, 3.2)
+metadata/team = "worker"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=1269312909 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 8.4, 11.8, 4.8)
+metadata/team = "vip"
+metadata/note = "the president"
+metadata/kind = "spawn"

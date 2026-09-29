@@ -362,6 +362,46 @@ public class ZoneManager extends Node {
 		instance = this;
 	}
 
+	/**
+	 * Scenes a first spawn would otherwise load ON THE MAIN THREAD mid-play (2026-09-28, measured): the first
+	 * promotion of each crowd body loaded its `CharacterVisuals_<Body>.tscn` + `.glb` in 145-190 ms, the first
+	 * SPC-1 97 ms (+42 ms to instantiate), the AI scene 133 ms -- and a drive meets six bodies, three cars and a
+	 * dozen weapon-pad models for the first time, which WAS the "freeze every 2-3 blocks". A spawn that has been
+	 * done before costs 3-10 ms. So everything a spawn can need is loaded ONCE, when the world starts (the loading
+	 * moment a player expects), and held for the session. Skipped headless (see `threadedLoads`): a probe stand
+	 * never streams a city and should not pay a second of loading it does not use.
+	 */
+	private boolean warmSetLoaded = false;
+	private final List<Resource> warmSet = new ArrayList<>();
+
+	private void loadWarmSet() {
+		if (warmSetLoaded) return;
+		warmSetLoaded = true;
+		if (!threadedLoads()) return;
+		long t0 = System.nanoTime();
+		List<String> paths = new ArrayList<>();
+		paths.add(AI_SCENE_PATH);
+		String visDir = "res://src/main/resources/com/openworld/character/";
+		godot.api.DirAccess dir = godot.api.DirAccess.open(visDir);
+		if (dir != null) {
+			for (String f : dir.getFiles()) {
+				String name = f.endsWith(".remap") ? f.substring(0, f.length() - 6) : f;
+				if (name.startsWith("CharacterVisuals_") && name.endsWith(".tscn")) paths.add(visDir + name);
+			}
+		}
+		paths.addAll(com.openworld.carrier.vehicle.VehicleModels.SCENES);
+		for (var row : com.openworld.weapon.WeaponCatalog.rows().values()) {
+			if (row.scene() != null && !row.scene().isEmpty()) paths.add(row.scene());
+		}
+		for (String p : paths) {
+			if (!ResourceLoader.INSTANCE.exists(p, "")) continue;
+			Resource r = GD.load(p);
+			if (r != null) warmSet.add(r);
+		}
+		if (debugLog) GD.print(String.format("ZoneManager: warm set %d scenes loaded in %.0f ms",
+				warmSet.size(), (System.nanoTime() - t0) / 1e6));
+	}
+
 	@Register
 	@Override
 	public void _exitTree() {
@@ -556,6 +596,7 @@ public class ZoneManager extends Node {
 	@Override
 	public void _physicsProcess(double delta) {
 		detectSceneReload();
+		loadWarmSet();            // once, on the first tick: see its doc
 		cullFinishedVehicles();   // every frame (anti-jam) — a DESPAWN car must not idle at the lane end
 		processStreamTasks();     // every frame — the time-sliced streaming pipeline
 

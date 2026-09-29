@@ -63,20 +63,61 @@ in `tools/build_vehicle_scenes.py`.
 ## The two source layouts
 
 * **An artist's authoring layout** (SPC1): the file is the artist's, with their own object names
-  (`door.003`, `front.side`, …). `build_vehicle.py` NEVER writes it: it splits the car in memory by the table
+  (`door.front`, `front.side`, `side.mirror`, …; renamed 2026-09-28 to say what each is). `build_vehicle.py` NEVER writes it: it splits the car in memory by the table
   `SOURCE_GROUPS` / `SPLIT_BY_SIDE` and exports. A new object in the file fails the build until it is added to the
   table. The honeycomb grilles ship as a placeholder plane each (`PLACEHOLDER_PLANES`) — a baked alpha-cut
   honeycomb texture is the planned replacement.
 * **Component form** (PIT1, POC1): the .blend already holds the named parts and seat Empties;
   `build_vehicle.py` only places hinges and adds `dam` keys.
 
-## Pack cars and licences
+## Lamps and glass are MATERIAL NAMES (2026-09-28)
 
-PIT1 and POC1 come from elbolilloduro's "Vegetation" pack via `blender/tools/import_pack_vehicles.py` (one-time).
-The pack licenses **the models** as CC0 and says nothing about its textures, and this author's packs mix textures
-that may not be redistributed — so only the meshes are taken, re-materialed with flat colours, and the download
-stays out of the repo (`.gitignore`, `.gdignore`). Credited in `CREDITS.md`. Delete the download once the extraction
-is final.
+A lamp is any faces wearing one of these materials, on any part (a lamp on a bumper falls off with it):
+
+| material | lit when | glows |
+|---|---|---|
+| `front.lamp.light` | dark (DayNight) | warm white |
+| `back.lamp.light` | dark (dim), braking day and night (bright); also reversing if the car has no reversing face | red |
+| `back.lamp.reverse` (optional) | rolling backward, day and night | white |
+
+The game finds these faces by name (`Vehicle.findLampSurfaces`) and lights THEM: off, the face wears its own
+material unchanged (an authored Emission lamp is shown with its glow switched off); lit, a glowing copy of that same
+material, made once per material and state and shared by every car of the model. The glow is the material's own
+colour when it is coloured, else the lamp's usual colour above. `build_vehicle.py` measures the right-hand lamp's
+centre into `<ID>.vehicle.json` `lamps`, and the beams and tail lights stand there. Covers
+(`front.lamp.cover`, `back.lamp.cover`) and holders are ordinary materials; a Transparent BSDF cover becomes clear
+glass (alpha 0.2) at export, a Translucent window alpha 0.4 glass (the placeholders' `glass` is the same).
+If a lamp face's part comes off, that lamp's beam goes out. Gate `tools/godot/probe_vehicle_lights.gd -- --car=<ID>`.
+
+## Windows break, and a broken one is shot through (2026-09-28)
+
+A window is the faces wearing the glass material (`window` or `glass`, `VehicleDamageModel.glassMaterials`) in
+one of these parts, and each is one breakable pane with its own slot on the wire:
+
+| glass in part | pane |
+|---|---|
+| `door_lf` / `door_rf` / `door_lr` / `door_rr` | that door's window (`win_lf` ...) |
+| `chassis` | the body's glass: rear window and quarter lights (`win_body`) |
+| `windscreen` | the windscreen (its part's own slot) |
+
+So keep each door's window in the DOOR part and the rest of the side and rear glass in the chassis. The pane is found
+on the mesh's own triangles, so it needs no collider and no Empty.
+
+Every car's glass gives one hit of protection: a pistol or SMG round, a melee blow, a crash or a nearby blast
+breaks it and stops there, and a rifle-class round or heavier breaks it and goes straight through. A door wrenched
+loose loses its window. `glass_armor` in `tools/build_vehicle_scenes.py`'s TUNING (-> `VehicleConfig.glassArmor`) is
+only for a special armoured vehicle: the weapon damage each window soaks before it breaks. Gate
+`tools/godot/probe_vehicle_glass.gd -- --car=<ID> [--front]`.
+
+## The Japanese traffic set is placeholders (2026-09-28)
+
+KET1 kei truck, MPC1 mini patrol car, POC1 patrol car, CLC1 classic coupe (AE86 size), KEC1 kei car, TAX1 taxi and
+CRT1 crate truck are BLOCK MODELS generated from real dimensions by `blender/tools/make_placeholder_cars.py` (the
+table of sizes is at its top), already in component form. The earlier PIT1 pickup and POC1 patrol car were cut from
+elbolilloduro's "Vegetation" pack; the owner removed them (provenance not confirmable, `assets/LICENCE_AUDIT.md`).
+To model a real car: replace each named part in `<ID>.blend` keeping the names and the `seat_*` Empties (the script
+never overwrites a .blend it did not write), then `build_vehicle.py -- <ID>`, `tools/build_vehicle_scenes.py <ID>`,
+and `tools/godot/probe_component_car.gd -- --car=<ID>`.
 
 ## The wheel sensor
 

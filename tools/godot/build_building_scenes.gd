@@ -27,10 +27,14 @@ const OCCLUDER_TYPES := ["Mansion", "OfficeMid", "PencilBuilding", "ShopHouse", 
 # a city you cannot walk into, and an interior is authored content. A building a MISSION needs entered is placed as
 # its `<Id>_Open` variant instead, whose doors are real `world.Door` nodes, LOCKED until the mission unlocks them.
 const OPEN_VARIANT_SUFFIX := "_Open"
+# MARK_water_ markers' materials by name (a pool's `material` prop)
+const WATER_MATERIALS := {"onsen": "res://assets/vfx/water/material/water_onsen.tres",
+		"pool": "res://assets/vfx/water/material/water_basic/water_basic_01.tres"}
 const SHOP_VARIANT_SUFFIX := "_Shop"
 const DOOR_SCRIPT := "res://src/main/java/com/openworld/world/Door.java"
 const GATE_SCRIPT := "res://src/main/java/com/openworld/world/TicketGate.java"
 const LIFT_SCRIPT := "res://src/main/java/com/openworld/world/Elevator.java"
+const PARKED_SCRIPT := "res://src/main/java/com/openworld/world/ParkedVehicle.java"
 const GATE_FLAP_LO := 0.45       # a ticket gate's flap: its visible panel (the collider reaches the floor)
 const GATE_FLAP_HI := 0.95
 const DOOR_LEAF := "res://assets/world_source/kits/quaternius_downtown_city/pieces/doors/Door_1.gltf"
@@ -152,6 +156,10 @@ var _lib_mats := {}
 func _panels(b: Dictionary, op: Dictionary) -> int:
 	if not str(op.get("style", b.get("door_style", "swing"))) in ["slide", "slide_glass"]:
 		return 1
+	# an INTERIOR solid slide (a restroom's 引き戸) is ONE leaf running over the wall, whatever its width (user,
+	# 2026-09-28: the station's 1.2 m accessible door came out as two leaves that slid across each other)
+	if str(op.get("style", "")) == "slide" and bool(op.get("inner", false)):
+		return 1
 	return 2 if float(op["w"]) >= 1.2 else 1
 
 ## A TICKET GATE's lane (PLAN.md P3 "the paid area"): two flaps, one hinged on each gate body, meeting in the middle
@@ -265,6 +273,12 @@ func _door_material(b := {}) -> Material:
 		m = null if sf.is_empty() else _kit_material(_kit_res(DOOR_LEAF), sf[0][3])
 	_lib_mats[path] = m
 	return m
+
+func _plaster_material() -> Material:
+	var path := "res://assets/world_source/kits/library/materials/MI_Plaster.tres"
+	if not _lib_mats.has(path):
+		_lib_mats[path] = load(path) if ResourceLoader.exists(path) else _door_material()
+	return _lib_mats[path]
 
 func _door_leaf_mesh() -> ArrayMesh:
 	## The kit's own door leaf as one mesh, shared by every Door node (written once).
@@ -555,7 +569,11 @@ func _build(b: Dictionary, variant: String) -> bool:
 	# R11 (PLAN.md review): NOT a landmark. Tokyo Tower faded out at 900 m while its zone loads at 3 km, so the one
 	# thing the skyline is for vanished from the expressway; a landmark is drawn as far as it is streamed.
 	if not bool(b.get("landmark", false)):
-		mi.visibility_range_end = clampf(VIS_BASE_M + VIS_PER_HEIGHT * mesh.get_aabb().end.y, VIS_MIN_M, VIS_MAX_M)
+		# ...and at least half the plan's diagonal past the minimum: a range is measured from the CENTRE, so a flat
+		# site 1.2 km long (an airfield, a fish market's quay) faded out while you stood on its own runway end
+		var ab := mesh.get_aabb()
+		var reach := 0.5 * Vector2(ab.size.x, ab.size.z).length() + VIS_MIN_M
+		mi.visibility_range_end = maxf(clampf(VIS_BASE_M + VIS_PER_HEIGHT * ab.end.y, VIS_MIN_M, VIS_MAX_M), reach)
 		mi.visibility_range_end_margin = VIS_FADE_M
 		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	root.add_child(mi)
@@ -637,6 +655,27 @@ func _build(b: Dictionary, variant: String) -> bool:
 		hcs.shape = hsh
 		body.add_child(hcs)
 		hcs.owner = root
+	if b.has("trimesh_idx"):
+		# a SITE with whole-building parts (kits/interiors): those parts' pieces are one trimesh, beside the site's boxes
+		var tfaces := PackedVector3Array()
+		for pi in b["trimesh_idx"]:
+			var tp: Dictionary = b["pieces"][int(pi)]
+			var tpos: Array = tp["pos"]
+			var txf := Transform3D(Basis(Vector3.UP, deg_to_rad(float(tp["yaw"]))), Vector3(tpos[0], tpos[1], tpos[2]))
+			for sf in _surfaces(tp["path"]):
+				var st3 := SurfaceTool.new()
+				st3.append_from(sf[0], sf[1], txf * (sf[2] as Transform3D))
+				for v in st3.commit().get_faces():
+					tfaces.append(v)
+		var tcps := ConcavePolygonShape3D.new()
+		tcps.set_faces(tfaces)
+		var tpath := "%s/%s_collision.res" % [OUT_DIR, id + (OPEN_VARIANT_SUFFIX if open_variant else "")]
+		ResourceSaver.save(tcps, tpath, ResourceSaver.FLAG_COMPRESS)
+		var tcs := CollisionShape3D.new()
+		tcs.name = "Trimesh"
+		tcs.shape = load(tpath)
+		body.add_child(tcs)
+		tcs.owner = root
 	if b.get("collision", "") == "trimesh":
 		# the collider is the building's own shell (the first `trimesh_pieces` placed pieces), never its cladding or
 		# furniture: a clad facade is ~100k visual vertices a physics server has no business testing
@@ -688,6 +727,11 @@ func _build(b: Dictionary, variant: String) -> bool:
 			node.set("rise", float(lf["rise"]))
 			node.set("door_width", float(lf["door_w"]))
 			node.set("door_height", float(lf["door_h"]))
+			# a building's lift (kits/interiors, 2026-09-28): every stop, and the faces that have doors
+			if lf.has("stops"):
+				node.set("stop_heights", str(lf["stops"]))
+			if lf.has("faces"):
+				node.set("faces", int(lf["faces"]))
 			node.set("frame_material", _lib_material("MI_PaintedMetal"))
 			node.set("glass_material", _lib_material("MI_GlassClear"))
 			node.set("floor_material", _lib_material("MI_Terrazzo"))
@@ -753,7 +797,8 @@ func _build(b: Dictionary, variant: String) -> bool:
 					var sm := BoxMesh.new()
 					sm.size = Vector3(lw + 0.08, h + 0.04, 0.04)
 					leaf.mesh = sm
-					leaf.material_override = _door_material(b)
+					# a plain white block, the same plaster as the restroom wall it hangs on (user, 2026-09-28)
+					leaf.material_override = _plaster_material()
 					leaf.position = Vector3(-lw / 2.0, (h + 0.04) / 2.0, 0.0)
 				elif slide:
 					# full glass in a slim frame, the Japanese shop entrance; it already spans local -X from 0
@@ -789,14 +834,27 @@ func _build(b: Dictionary, variant: String) -> bool:
 				# the sensor covers the WHOLE doorway whichever leaf this is, so both leaves open together
 				scs.position = Vector3((w / 2.0) - edge - (w / 2.0), h / 2.0, 0.0)
 				sensor.add_child(scs)
-				door.add_child(sensor)
+				if slide:
+					# a SLIDING leaf must not carry its sensor: it would slide the sensor off the person who opened it,
+					# the door would shut, slide back, find them again and chatter (user, 2026-09-28: the station's
+					# accessible door "keeps trying to open but immediately slides back"). The sensor stays on the
+					# DOORWAY, beside the leaf -- the ticket gate's rule.
+					sensor.name = "Sensor%d" % (dn - 1)
+					sensor.transform = door.transform
+					doors_root.add_child(sensor)
+				else:
+					door.add_child(sensor)
 				sensor.owner = root
 				scs.owner = root
 				if slide:
 					door.set("open_mode", "SLIDE")
 					# slide_offset is in the door's PARENT frame (Door adds it to its own position), so the
 					# direction is the opening's own +X, away from the middle
-					var dir := oxf.basis.x.normalized() * (lw if li == 0 else -lw) * float(op.get("slide_dir", 1.0))
+					# two leaves part from the middle, each toward its own side; `slide_dir` only chooses which way a
+					# SINGLE leaf runs (applied to a pair it sent both leaves across each other, and the door never
+					# opened)
+					var dir := oxf.basis.x.normalized() * (lw if li == 0 else -lw) \
+							* (float(op.get("slide_dir", 1.0)) if panels == 1 else 1.0)
 					door.set("slide_offset", dir)
 				var inner := bool(op.get("inner", false))
 				# a shop's door is automatic; a mission's is MANUAL (press interact); an interior door opens as you
@@ -804,7 +862,7 @@ func _build(b: Dictionary, variant: String) -> bool:
 				door.set("auto_open", shop or inner)
 				door.set("locked", not shop and not inner)
 				door.set("breakable", false)
-				door.set("sensor_path", NodePath("Sensor"))
+				door.set("sensor_path", NodePath("../" + str(sensor.name)) if slide else NodePath("Sensor"))
 	var di := 0
 	for d in b["doors"]:
 		var mk := Marker3D.new()
@@ -816,11 +874,62 @@ func _build(b: Dictionary, variant: String) -> bool:
 		mk.owner = root
 		di += 1
 
+	# MISSION MARKERS (kits/interiors MARK_ Empties, 2026-09-28): a level designer's hooks in every variant -- a
+	# weapon spot in an armoury, a spawn point, a cover point. Each is a Marker3D in group `mission_marker` carrying its
+	# props as metadata (`kind`, `weapon`, `team`, ...); -Z of the marker is the way it faces. Nothing spawns from them
+	# by itself: a mission (or a level designer's scene) reads them.
+	var marks: Array = b.get("marks", [])
+	if not marks.is_empty():
+		var marks_root := Node3D.new()
+		marks_root.name = "Markers"
+		root.add_child(marks_root)
+		marks_root.owner = root
+		for mkd in marks:
+			var props0: Dictionary = mkd.get("props", {})
+			# a WATER marker (kits/interiors MARK_water_: an onsen's tub, a pool) is a water SURFACE, never solid --
+			# a quad w x d at the marker in its material (props `material`: onsen -> water_onsen.tres), no collider,
+			# no shadow. The basin under it is the piece's own geometry (user, 2026-09-29: the hot spring on the
+			# water shader, clearer and less blue than the sea).
+			if str(props0.get("kind", "")) == "water":
+				var wm := MeshInstance3D.new()
+				var pm := PlaneMesh.new()
+				pm.size = Vector2(float(props0.get("w", 1.0)), float(props0.get("d", 1.0)))
+				pm.subdivide_width = 4
+				pm.subdivide_depth = 4
+				wm.mesh = pm
+				var wmat := str(props0.get("material", "onsen"))
+				wm.material_override = load(WATER_MATERIALS.get(wmat, WATER_MATERIALS["onsen"]))
+				wm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				wm.name = str(mkd["name"]).replace(".", "_")
+				var wp: Array = mkd["pos"]
+				wm.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(mkd.get("yaw", 0.0)))), Vector3(wp[0], wp[1], wp[2]))
+				marks_root.add_child(wm)
+				wm.owner = root
+				continue
+			# a VEHICLE marker that names a model is a parked, drivable vehicle (world.ParkedVehicle spawns it on the
+			# authoritative peer; user, 2026-09-28: the fire engines, the ambulance, the patrol cars, the yard truck)
+			var m3: Node3D = Marker3D.new()
+			if str(props0.get("kind", "")) == "vehicle" and str(props0.get("vehicle", "")) != "":
+				m3 = Node3D.new()
+				m3.set_script(load(PARKED_SCRIPT))
+				m3.set("vehicle_id", str(props0["vehicle"]))
+				m3.set("faction", str(props0.get("faction", "neutral")))
+			m3.name = str(mkd["name"]).replace(".", "_")
+			var mp: Array = mkd["pos"]
+			m3.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(mkd.get("yaw", 0.0)))), Vector3(mp[0], mp[1], mp[2]))
+			var props: Dictionary = mkd.get("props", {})
+			for pk in props:
+				m3.set_meta(StringName(str(pk)), props[pk])
+			m3.add_to_group("mission_marker", true)
+			marks_root.add_child(m3)
+			m3.owner = root
+
 	var meta := b.duplicate(true)
 	meta.erase("pieces")
 	meta.erase("boxes")
 	meta.erase("hulls")
 	meta.erase("hull_points")
+	meta.erase("trimesh_idx")
 	meta["piece_count"] = b["pieces"].size()
 	meta["doors_closed"] = not open_variant
 	meta["doors_locked"] = open_variant and not shop

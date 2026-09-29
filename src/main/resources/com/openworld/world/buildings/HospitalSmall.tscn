@@ -1,0 +1,581 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/HospitalSmall_mesh.res" id="1_mswg8"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/HospitalSmall_collision.res" id="2_3khar"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_0jdq4"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_k4x1e"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_wv1gq"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_xoqsh"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="7_g544f"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6vj5v"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rimir"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_h316b"]
+size = Vector3(1.2, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3pg12"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lqpku"]
+size = Vector3(1.24, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tvr00"]
+size = Vector3(1, 2.1, 0.14)
+
+[node name="HospitalSmall" type="Node3D" unique_id=1915462111]
+metadata/building = {
+"aabb": [Vector3(-27.5, -1.2, -30), Vector3(55, 16.95, 60)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [-14.0, 0.0, 11.9],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 2.4
+}, {
+"center": [-21.9, 0.0, 2.05],
+"height": 2.1,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 1.2
+}, {
+"center": [21.9, 0.0, 7.6],
+"height": 2.1,
+"module": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"side": "exit",
+"style": "slide",
+"width": 2.4
+}, {
+"center": [21.9, 0.0, 2.05],
+"height": 2.1,
+"module": 3.0,
+"outward": [1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 1.0
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [55.0, 60.0],
+"height_m": 16.95,
+"id": "HospitalSmall",
+"inner_doors": [{
+"center": [3.9, 12.5, 0.74],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [1.0, 12.5, 3.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.2
+}, {
+"center": [-3.5, 0.0, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [1.5, 0.0, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [6.5, 0.0, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [11.5, 0.0, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [17.9, 0.0, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.6
+}, {
+"center": [-20.4, 0.0, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.2
+}, {
+"center": [-15.5, 0.0, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-9.0, 0.0, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [-4.65, 0.0, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [-1.95, 0.0, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [3.9, 0.0, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.2
+}, {
+"center": [9.5, 0.0, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [17.9, 0.0, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.6
+}, {
+"center": [-18.0, 4.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [-10.5, 4.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.6
+}, {
+"center": [-3.5, 4.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.6
+}, {
+"center": [5.0, 4.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.6
+}, {
+"center": [16.0, 4.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [-20.4, 4.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.2
+}, {
+"center": [-15.5, 4.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-9.0, 4.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [-4.65, 4.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [-1.95, 4.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [3.9, 4.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.2
+}, {
+"center": [9.5, 4.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [17.9, 4.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-18.6, 8.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [-12.2, 8.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [-5.8, 8.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [0.6, 8.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [5.6, 8.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [9.2, 8.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [12.8, 8.5, 3.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.2
+}, {
+"center": [-20.4, 8.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.2
+}, {
+"center": [-9.0, 8.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-4.65, 8.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [-1.95, 8.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [3.9, 8.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.2
+}, {
+"center": [9.5, 8.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [17.9, 8.5, 0.7],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [1.0, 0.0, -0.95],
+"d": 1.9,
+"door_h": 2.1,
+"door_w": 1.2,
+"faces": 1.0,
+"rise": 12.5,
+"stops": "0,4.5,8.5,12.5",
+"w": 2.8,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [-3.5, 4.5, 8.2],
+"props": {
+"kind": "objective",
+"note": "an operating table (a VIP patient)"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_02",
+"pos": [5.0, 8.5, 9.5],
+"props": {
+"kind": "objective",
+"note": "a private room: the protected / wanted patient"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [-14.0, 0.0, 7.0],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-3.5, 0.0, 8.0],
+"props": {
+"kind": "spawn",
+"team": "doctor"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [18.5, 0.0, 8.0],
+"props": {
+"kind": "spawn",
+"team": "doctor"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [-10.5, 4.5, 6.5],
+"props": {
+"kind": "spawn",
+"team": "doctor"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_05",
+"pos": [-15.5, 8.5, -2.6],
+"props": {
+"kind": "spawn",
+"team": "nurse"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_01",
+"pos": [-11.0, 12.5, 4.0],
+"props": {
+"kind": "vehicle",
+"note": "helipad: a helicopter lands here"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_02",
+"pos": [24.8, 0.0, 7.5],
+"props": {
+"kind": "vehicle",
+"vehicle": "AMB1"
+},
+"yaw": 180.0
+}],
+"piece_count": 1,
+"probe_xz": [-14.0, 8.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "the island's second hospital plot (55 x 60): the same one hospital type as `Hospital` (user, 2026-09-28: one type, medium / large). kits/interiors/Hospital.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 12.5
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=515879577]
+visibility_range_end = 489.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_mswg8")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1308296962]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1665006254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.400001, 1.05, 11.9)
+shape = SubResource("BoxShape3D_6vj5v")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1412381115]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.6, 1.05, 11.9)
+shape = SubResource("BoxShape3D_rimir")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1803017959]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -21.9, 1.05, 2.05)
+shape = SubResource("BoxShape3D_h316b")
+
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=2132900054]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 21.9, 1.05, 6.9999995)
+shape = SubResource("BoxShape3D_3pg12")
+
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=822754148]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 21.9, 1.05, 8.2)
+shape = SubResource("BoxShape3D_lqpku")
+
+[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=216433456]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 21.9, 1.05, 2.05)
+shape = SubResource("BoxShape3D_tvr00")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1132731731]
+shape = ExtResource("2_3khar")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=59881793]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=528317078]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1, 0, -0.95)
+script = ExtResource("3_0jdq4")
+shaft_width = 2.8
+shaft_depth = 1.9
+rise = 12.5
+door_width = 1.2
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_k4x1e")
+glass_material = ExtResource("5_wv1gq")
+floor_material = ExtResource("6_xoqsh")
+in_service = true
+stop_heights = "0,4.5,8.5,12.5"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1992918432]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -14, 0, 11.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1827886023]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -21.9, 0, 2.05)
+
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=679950910]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 21.9, 0, 7.6)
+
+[node name="Door_exit_3" type="Marker3D" parent="." unique_id=1934309806]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 21.9, 0, 2.05)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1608459490]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=1125709137 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 4.5, 8.2)
+metadata/note = "an operating table (a VIP patient)"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=663494206 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 8.5, 9.5)
+metadata/note = "a private room: the protected / wanted patient"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1439336193 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 7)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1918767398 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, 8)
+metadata/team = "doctor"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=559060221 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 18.5, 0, 8)
+metadata/team = "doctor"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=697278779 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -10.5, 4.5, 6.5)
+metadata/team = "doctor"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=625946086 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -15.5, 8.5, -2.6)
+metadata/team = "nurse"
+metadata/kind = "spawn"
+
+[node name="MARK_vehicle_01" type="Marker3D" parent="Markers" unique_id=942897962 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 12.5, 4)
+metadata/note = "helipad: a helicopter lands here"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=1836465646 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 24.8, 0, 7.5)
+script = ExtResource("7_g544f")
+vehicle_id = "AMB1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "AMB1"
+metadata/kind = "vehicle"

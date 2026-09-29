@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/WardOffice_mesh.res" id="1_6wrgh"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/WardOffice_collision.res" id="2_f0hqg"]
+
+[node name="WardOffice" type="Node3D" unique_id=1337303203]
+metadata/building = {
+"aabb": [Vector3(-28, 0, -20), Vector3(56, 47.32, 50)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [56.0, 50.0],
+"height_m": 47.32,
+"id": "WardOffice",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "ward office: a 10-storey tower on a counter podium, 60 x 60 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+"wall_top_m": 47.32
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1713823550]
+visibility_range_end = 867.83997
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_6wrgh")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1641112813]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1206596659]
+shape = ExtResource("2_f0hqg")

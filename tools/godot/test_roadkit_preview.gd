@@ -36,9 +36,10 @@ func _initialize() -> void:
 	var scene: Node = (load(WORLD) as PackedScene).instantiate()
 	var net: Node3D = null
 	for c in scene.find_children("*", "Node3D", true, false):
-		if c.get_script() == NetworkScript:
+		if c.get_script() == NetworkScript and str(c.get("record_path")).contains("DebugRoads"):
 			net = c
-	var markers := Zones.markers_in(scene)
+	# DebugWorld also carries the DebugRail network and its two rail zones; this gate is about the ROAD network's
+	var markers := Zones.markers_in(scene).filter(func(m): return not str(m.get("zone").get("zone_id")).begins_with("rail"))
 	check(net != null and markers.size() == 2, "DebugWorld has the DebugRoads network and 2 markers", "%d marker(s)" % markers.size())
 
 	var r := Preview.build(scene, net, markers)
@@ -84,8 +85,8 @@ func _initialize() -> void:
 	var zones_of_runs := {}
 	for run in data.get("runs", []):
 		zones_of_runs[run.get("zone", "?")] = true
-	check(counts["runs"] == 4 and zones_of_runs.size() == 2 and not zones_of_runs.has(""), "every run is drawn in one of the two zones' colours", "%s, zones %s" % [counts, zones_of_runs.keys()])
-	check(counts["zones"] == 2 and counts["cross"] == 10, "both markers' boxes + rings, the 10 cross-zone successors", "zones %d cross %d" % [counts["zones"], counts["cross"]])
+	check(counts["runs"] == 12 and zones_of_runs.size() == 2 and not zones_of_runs.has(""), "every run is drawn in one of the two zones' colours", "%s, zones %s" % [counts, zones_of_runs.keys()])
+	check(counts["zones"] == 2 and counts["cross"] == 7, "both markers' boxes + rings, the 7 cross-zone successors", "zones %d cross %d" % [counts["zones"], counts["cross"]])
 
 	check(not _in_pack(scene, Preview.NAME) and not _in_pack(scene, "_RoadKitOverlay"), "saving the scene writes neither the preview nor the overlay")
 	holder.owner = scene

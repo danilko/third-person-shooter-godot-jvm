@@ -38,12 +38,13 @@ func _door_style(meta: Dictionary, at: Vector3) -> String:
 			best = str(d.get("style", meta.get("door_style", "swing")))
 	# an INTERIOR door: hinged (a staff room, a store room: user 2026-09-26), or a SOLID sliding door (a restroom,
 	# user 2026-09-27) -- "inner" / "inner_slide"
+	# (a station's store front is an interior `slide_glass`; a station is several storeys, so the height counts)
 	for d in meta.get("inner_doors", []):
-		var c := Vector3(d["center"][0], at.y, d["center"][2])
+		var c := Vector3(d["center"][0], d["center"][1], d["center"][2])
 		var dist := c.distance_to(Vector3(at.x, at.y, at.z))
 		if dist < bd:
 			bd = dist
-			best = "inner_slide" if str(d.get("style", "swing")) == "slide" else "inner"
+			best = "inner_slide" if str(d.get("style", "swing")) in ["slide", "slide_glass"] else "inner"
 	return best if best != "" else str(meta.get("door_style", "swing"))
 
 
@@ -88,7 +89,7 @@ func _run() -> void:
 		await _probe(id, inst, meta)
 		inst.queue_free()
 		await physics_frame
-	_check(probed >= 10, "%d building scenes probed" % probed)
+	_check(probed >= (10 if only.is_empty() else only.size()), "%d building scenes probed" % probed)
 	if only.is_empty():
 		_probe_cell_tones()
 	print("RESULT %s (%d passed, %d failed)" % ["PASS" if _fails == 0 else "FAIL", _passes, _fails])
@@ -103,7 +104,10 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var tol := 0.01 if example else PLAN_TOL
 	# a forecourt (vending machines, bins in front of the wall) makes the mesh deeper on the street side only
 	var fc := float(meta.get("forecourt_m", 0.0))
-	_check(absf(aabb.size.x - fp[0]) <= tol and absf(aabb.size.z - fp[1] - fc) <= tol
+	# a station's declared footprint is its RESERVE (platforms, car park), not its mesh, so the size rule does not
+	# apply to it (the 39 station "size" failures this probe carried were that, not a defect)
+	# ...nor does it to a composite whose footprint is a reserve it only dresses (the station forecourt)
+	if not meta.has("station") and not meta.has("reserve"): _check(absf(aabb.size.x - fp[0]) <= tol and absf(aabb.size.z - fp[1] - fc) <= tol
 		and absf(aabb.size.y - float(meta["height_m"])) <= HEIGHT_TOL,
 		"%s size %.2f x %.2f x %.2f m (declared %.2f x %.2f, height %.2f)" % [id, aabb.size.x, aabb.size.z, aabb.size.y,
 		fp[0], fp[1], meta["height_m"]])
@@ -134,6 +138,13 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 		_check(faked and not surf_names.has("MI_ShopBand"),
 			"%s: glazing that is not a shop window keeps its lit fake interior and gets no strip" % id)
 
+	# a STATION is a kit scene (its own .blend) with no wall top, roof or solid probes; what is asked of it here is
+	# its DOORS (user, 2026-09-28: the accessible restroom's sliding door never opened, and nothing had ever driven
+	# a station's doors because this probe stopped at the missing wall top)
+	if meta.has("station"):
+		if meta.get("doors_locked", false) or meta.get("doors_shop", false):
+			await _probe_unlock(id, inst, meta)
+		return
 	var space := inst.get_world_3d().direct_space_state
 	var o := inst.global_position
 	var top := float(meta["wall_top_m"])
@@ -157,7 +168,7 @@ func _probe(id: String, inst: Node3D, meta: Dictionary) -> void:
 		var at := o + Vector3(float(q[0]), 0.0, float(q[1]))
 		_check(not _capsule_hits(space, at), "%s open at (%.1f, %.1f): the capsule fits (a crane's portal)" % [id, q[0], q[1]])
 	for d in meta["doors"]:
-		var c := o + Vector3(d["center"][0], 0, d["center"][2])
+		var c := o + Vector3(d["center"][0], float(d["center"][1]), d["center"][2])
 		var out := Vector3(d["outward"][0], 0, d["outward"][2])
 		var at := c - out * 0.09
 		var blocked := _capsule_hits(space, at)
@@ -198,7 +209,12 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 		return
 	var shop: bool = meta.get("doors_shop", false)
 	var want_locked: bool = not shop
+	# only the Door nodes: a ticket gate's lane sensor is an Area3D beside its flaps, in the same holder
+	var leaves := []
 	for d in doors.get_children():
+		if d.get("locked") != null:
+			leaves.append(d)
+	for d in leaves:
 		# an interior door is never locked and opens as you walk up, in a mission shop as in any other
 		var inner := _door_style(meta, d.position).begins_with("inner")
 		_check(bool(d.get("locked")) == (want_locked and not inner), "%s %s starts %s" % [id, d.name,
@@ -220,18 +236,18 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 	# belongs to no meta door (a roof stair house's frame) takes the building's own style.
 	var slide_want: bool = str(meta.get("door_style", "swing")) == "slide"
 	var want := {}
-	for d in doors.get_children():
+	for d in leaves:
 		want[d.name] = _door_style(meta, d.position)
 		var s: bool = want[d.name] == "slide" or want[d.name] == "inner_slide"
 		_check((str(d.get("open_mode")) == "SLIDE") == s, "%s %s is a %s door" % [
 			id, d.name, "sliding" if s else "hinged"])
 	var before := {}
-	for d in doors.get_children():
+	for d in leaves:
 		before[d.name] = [d.position, d.rotation.y]
 	for i in 90:
 		await physics_frame
 	var slid_dirs := []
-	for d in doors.get_children():
+	for d in leaves:
 		var moved: float = (d.position - (before[d.name][0] as Vector3)).length()
 		var turned: float = absf(d.rotation.y - float(before[d.name][1]))
 		if want[d.name] == "slide" or want[d.name] == "inner_slide":
@@ -255,7 +271,7 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 			# a leaf's width clear of its own doorway, which is the point of it
 			var dc := Vector2(d["center"][0], d["center"][2])
 			var n2 := 0
-			for leaf in doors.get_children():
+			for leaf in leaves:
 				var cp: Vector3 = before[leaf.name][0]
 				if Vector2(cp.x, cp.z).distance_to(dc) <= float(d["width"]) / 2.0 + 0.05:
 					n2 += 1
@@ -266,7 +282,7 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 				% [id, slid_dirs[0].dot(slid_dirs[1])])
 		var glassy := 0
 		var sliders := 0
-		for d in doors.get_children():
+		for d in leaves:
 			if want[d.name] != "slide":
 				continue
 			sliders += 1
@@ -283,13 +299,31 @@ func _probe_unlock(id: String, inst: Node3D, meta: Dictionary) -> void:
 	var o := inst.global_position
 	var opened := 0
 	for d in meta["doors"]:
-		var c := o + Vector3(d["center"][0], 0, d["center"][2])
+		var c := o + Vector3(d["center"][0], float(d["center"][1]), d["center"][2])
 		var out := Vector3(d["outward"][0], 0, d["outward"][2])
 		if not _capsule_hits(space, c - out * 0.09):
 			opened += 1
 	_check(opened == (meta["doors"] as Array).size(), "%s %s: the capsule fits %d of %d doorways" % [
 		id, "opened" if meta.get("doors_shop", false) else "unlocked and opened", opened,
 		(meta["doors"] as Array).size()])
+	# an interior SLIDING door (a restroom's 引き戸) must clear its OWN doorway once open (user, 2026-09-28: the
+	# station's accessible door was two leaves sliding across each other and never opened). The capsule stands in
+	# the wall's plane, where the leaf's own collider was.
+	var inner_open := 0
+	var inner_n := 0
+	var inner_shut := []
+	for d in meta.get("inner_doors", []):
+		if str(d.get("style", "swing")) != "slide":
+			continue
+		inner_n += 1
+		var c := o + Vector3(d["center"][0], d["center"][1], d["center"][2])
+		if float(d["width"]) < 0.75 or not _capsule_hits(space, c):
+			inner_open += 1
+		else:
+			inner_shut.append("(%.2f, %.2f, %.2f)" % [d["center"][0], d["center"][1], d["center"][2]])
+	if inner_n > 0:
+		_check(inner_open == inner_n, "%s: the capsule fits %d of %d interior sliding doorways once open %s" % [
+			id, inner_open, inner_n, "" if inner_shut.is_empty() else "(blocked at " + ", ".join(inner_shut) + ")"])
 
 
 func _ray(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> Dictionary:

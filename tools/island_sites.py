@@ -68,40 +68,33 @@ CASTLE_LOAD = 2000.0                 # a landmark on a hill is seen from across 
 
 # --- THE LANDMARKS THAT WERE BUILT AND NEVER PLACED (user, 2026-09-21: "for downtown, assume will combine to
 # put some landmark such as tokyo tower ... bigger train station ... train/airport terminals seem missing").
-# They were right: `TokyoTower`, `TokyoStation` and `AirportTerminal` have shipped as built scenes since 3.12c
+# They were right: `TokyoTower`, `TokyoStation` (retired 2026-09-28) and `AirportTerminal` have shipped as built scenes since 3.12c
 # and nothing in World.tscn instanced any of them, which is that item's own open follow-up.
 #
 # Each is sited by the same measured search as the castle -- a patch flat enough, clear of roads, inside the
 # region it belongs to -- with the one constraint that makes it that landmark:
 #   * the tower stands in DOWNTOWN and wants nothing but flat ground and room (a 334 m tower is seen from
 #     everywhere, so the score is simply how central it is);
-#   * the station stands ALONG `ekimae_dori`, which is named 駅前通り -- "the street in front of the station" --
-#     so the road the trunk grid already laid says where it goes and which way it faces;
 #   * the terminal stands on the AIRPORT ISLAND (`island_coast.json`'s own box), on its flattest clear ground.
 TOWER_HALF = 55.0                    # TokyoTower is 94.6 m across; leave room round its legs
 TOWER_RELIEF = 3.0
 TOWER_CLEAR = 70.0
 TOWER_LOAD = 3000.0                  # 334 m: it is the skyline
-STATION_L, STATION_D = 320.0, 29.8   # the station BUILDING scene (TokyoStation*), 320 x 29.8 m
-STATION_ROAD = "ekimae_dori"         # 駅前通り: the street the station fronts
-# The central station's RESERVE (PLAN.md B4 / 3.36, user 2026-09-25: "use Tokyo Station ... from PLATEAU for
-# data/sizing; an artist rebuilds the models later"). Measured with tools/plateau2json/measure_stations.py on
-# Chiyoda-ku 2025: the whole complex is ~430 m along the rail x ~250 m across it -- the Marunouchi building band
-# 62 m (the building itself 58.7 x 316.7 m, 35.5 m tall) and the JR + Shinkansen platform canopies 21-33 m wide x
-# 420-433 m long over ~200 m. This world compresses it to the building's own length and ONE block's depth:
-# forecourt (the 駅前ロータリー, B8) + building + platform band. The reserve is what the roads, the block streets and
-# the building placer keep clear of; the scene is only the building, standing at the reserve's front.
-STATION_RESERVE_D = 130.0
-STATION_FORECOURT = 30.0             # reserve front edge -> the building's front face (the rotary's room)
-STATION_FRONT_GAP = 4.0              # the station road's own paved edge -> the reserve's front edge
-STATION_ROAD_HALF = 18.5             # a trunk road's half width (point_presets "trunk": 3 x 4.5 + 1 + 4)
-STATION_ROAD_CLEAR = 2.0             # no road's PAVED EDGE (block streets aside) within this of the reserve
-STATION_LOAD = 1200.0
-TERMINAL_HALF = (121.0, 85.0)        # AirportTerminal is 242 x 170
-TERMINAL_RELIEF = 4.0
-TERMINAL_CLEAR = 40.0
-AIRPORT_BOX = (700.0, 1500.0, 1300.0, 2304.0)    # island_coast.json `airport_island`, GODOT (x0, x1, z0, z1); the island
-                                                 # ends at x 1500 since the land redo (island_reshape.AIRPORT_END_X)
+# (2026-09-28, user) the Tokyo Station placeholder and its reserve are RETIRED: Central is the rail kit's elevated hub
+# (island_sites.rail_stations), and its forecourt is the `central_forecourt` reserve (island_plan.RESERVES) round the
+# one-way ekimae_rotary, filled by the CentralForecourt composite (reserve_sites).
+def terminal_reach():
+    """How far the AirportTerminal SCENE reaches landside (+Z) of its origin: its piece's bounds from
+    kits/interiors/pieces.json -- a custom building is RE-CENTRED on its piece's bounds (layout_buildings), so the
+    canopy edge the piece has at +34 stands at half its depth, +42.3, in the scene. A typed 34 put the building 8.3 m
+    closer than planned: its canopy over the forecourt loop's lanes (probe_road_clear, 2026-09-29)."""
+    import json
+    pj = json.load(open(os.path.join(ROOT, "assets", "world_source", "kits", "interiors", "pieces.json")))
+    p = pj.get("pieces", pj)["AirportTerminal"]
+    return (float(p["max"][2]) - float(p["min"][2])) / 2.0
+TERMINAL_GAP = 12.0                  # from the Airport station building's end to the canopy edge (a covered walk; the
+                                     # track's buffer stop 3 m past the platform stays 9 m clear of the terminal)
+TERMINAL_DOOR_X = -15.0              # the landside door (of -45 / -15 / 15 / 45) that faces the station's end exit
 AIRPORT_LOAD = 1500.0
 # the region boxes the placement uses, so a landmark cannot be sited outside the district it belongs to
 REGION_BOX = {"downtown": (25.0, -110.0, 1175.0, 570.0)}   # inside C1 (island_plan.C1_CORNERS)
@@ -253,87 +246,9 @@ def is_block_street(name):
     return any(name == st or name.startswith(st + "_") for st in stems)
 
 
-def station_site(g, net, near=None):
-    """The central station's RESERVE along `ekimae_dori`, as (reserve centre x, y, lowest ground, yaw).
-
-    Derived from the road, not from a coordinate, because the road is named for the station (駅前通り) -- so if
-    the trunk grid moves, the station moves with it. The reserve (STATION_L x STATION_RESERVE_D) stands beside the
-    street, its front edge STATION_FRONT_GAP past the street's paved edge, and must be CLEAR of every road except a
-    block street: the first version checked only that the street was straight and the land flat, and put the
-    station across `naka_hondori`, blocking three of its lanes (PLAN.md 0.10(d) / B4)."""
-    # THE STREET IS MANY ROADS, NOT ONE. `island_road_zones.py --split` cuts a long run at every 504 m zone
-    # boundary (PLAN.md 3.10), so `ekimae_dori` is `ekimae_dori`, `__2`, `__x1`, ... Re-joining the pieces by name
-    # prefix and walking them along the street's own principal axis is recovering the street.
-    parts = [r for k, r in net.roads.items() if str(k) == STATION_ROAD or str(k).startswith(STATION_ROAD + "_")]
-    if not parts:
-        return None
-    pts = []
-    for r in parts:
-        pts += densify([net.points[v].pos[:2] for v in r.points], 10.0)
-    if len(pts) < 2:
-        return None
-    span_x = max(p[0] for p in pts) - min(p[0] for p in pts)
-    span_y = max(p[1] for p in pts) - min(p[1] for p in pts)
-    pts.sort(key=lambda p: p[0] if span_x >= span_y else p[1])
-    # candidates every 5 m along the JOINED line, across the junction gaps between the pieces too: the one place a
-    # 320 m reserve fits between two trunk roads can be where a cross street meets the station street (measured:
-    # east of naka_hondori it is x 780-795, and ekimae_dori is broken at x 777-808 by machi_792's junction)
-    fine = [pts[0]]
-    for a, b in zip(pts, pts[1:]):
-        L = math.dist(a, b)
-        if L > 80.0:                       # not a junction gap: two unrelated stretches
-            fine.append(b)
-            continue
-        n = max(1, int(L / 5.0))
-        fine += [(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n) for k in range(1, n + 1)]
-    pts = fine
-    clear = road_index(net, widths=True,
-                       skip=lambda n: is_block_street(n) or n == STATION_ROAD or n.startswith(STATION_ROAD + "_"))
-    street = road_index(net, skip=lambda n: not (n == STATION_ROAD or n.startswith(STATION_ROAD + "_")))
-    off = STATION_ROAD_HALF + STATION_FRONT_GAP + STATION_RESERVE_D / 2
-    best = None
-    for i in range(1, len(pts) - 1):
-        (ax, ay), (bx, by) = pts[i - 1], pts[i + 1]
-        ux, uy = bx - ax, by - ay
-        L = math.hypot(ux, uy)
-        if L < 1e-6:
-            continue
-        ux, uy = ux / L, uy / L
-        mx, my = pts[i]
-        for sgn in (1.0, -1.0):
-            nx, ny = -uy * sgn, ux * sgn
-            cx, cy = mx + nx * off, my + ny * off
-            ok, zs = True, []
-            for ti in range(17):
-                for di in range(8):
-                    t = -STATION_L / 2 + STATION_L * ti / 16.0
-                    d = -STATION_RESERVE_D / 2 + STATION_RESERVE_D * di / 7.0
-                    x, y = cx + ux * t + nx * d, cy + uy * t + ny * d
-                    z = g.z(x, y)
-                    if z is None or clear(x, y, STATION_ROAD_CLEAR):
-                        ok = False
-                        break
-                    zs.append(z)
-                if not ok:
-                    break
-            if not ok:
-                continue
-            # ...and the station street runs along the WHOLE front, not past one end of it
-            if not all(street(mx + ux * t, my + uy * t, 15.0) for t in range(-int(STATION_L / 2), int(STATION_L / 2) + 1, 40)):
-                continue
-            lo, hi = min(zs), max(zs)
-            if lo < -0.3 or hi - lo > 2.5:     # record frame: the city plain is ~0.00 m
-                continue
-            score = (hi - lo) * 100.0 + math.hypot(cx - DOWNTOWN[0], cy - DOWNTOWN[1]) * 0.01
-            if best is None or score < best[0]:
-                # the station's front (+Z) looks back at the road it is named for
-                best = (score, cx, cy, lo, yaw_to(-nx, ny))
-    return None if best is None else best[1:]
-
-
 def scene_offset(row):
-    """The record-frame (dx, dy) from a site's reserve centre to where its SCENE stands. A site whose reserve is its
-    scene has none; the central station's building stands at the FRONT of its reserve."""
+    """The record-frame (dx, dy) from a site's reserve centre to where its SCENE stands (`scene_front` m along its
+    +Z). A site whose reserve is its scene has none (every site today)."""
     f = row.get("scene_front", 0.0)
     if not f:
         return 0.0, 0.0
@@ -399,29 +314,21 @@ def search(g, net, only=None):
             print("island_sites: Tokyo Tower at (%d, %d), ground %.1f-%.1f m" % (tx, ty, tlo, thi))
             rows.append(dict(id="tokyo_tower", scene="TokyoTower", x=tx, y=ty, yaw=0.0, size=[94.6, 94.6],
                              load=TOWER_LOAD, ground="min"))
-    if want("tokyo_station"):
-        st = station_site(g, net)
-        if st is None:
-            print("island_sites: NO station site along %s (no %.0f x %.0f m reserve beside it, flat and clear of "
-                  "every road but a block street)" % (STATION_ROAD, STATION_L, STATION_RESERVE_D))
-        else:
-            sx, sy, slo, s_yaw = st
-            print("island_sites: Tokyo Station at (%d, %d), along %s (yaw %.0f)" % (sx, sy, STATION_ROAD, s_yaw))
-            rows.append(dict(id="tokyo_station", scene="TokyoStation_Shop", x=sx, y=sy, yaw=s_yaw,
-                             size=[STATION_L, STATION_RESERVE_D], load=STATION_LOAD, ground="min",
-                             scene_front=STATION_RESERVE_D / 2 - STATION_FORECOURT - STATION_D / 2))
     if want("airport_terminal"):
-        ax0, ax1, az0, az1 = AIRPORT_BOX                 # godot (x0, x1, z0, z1) -> record (x0, y0, x1, y1)
-        apt = flat_site(g, near, (ax0, -az1, ax1, -az0), TERMINAL_HALF, TERMINAL_RELIEF, TERMINAL_CLEAR,
-                        ((ax0 + ax1) / 2, -(az0 + az1) / 2), zmax=12.0, step=25.0)
+        # THE TERMINAL BEHIND THE AIRPORT STATION (user, 2026-09-29: "combine with the air terminal, or at least a
+        # direct connection"): DERIVED from the rail reserve -- past the station's terminus end, its landside (+Z, the
+        # curb canopy) facing the station TERMINAL_GAP from the station building's end, and its landside door at local
+        # x TERMINAL_DOOR_X on the station's axis, so the station's end exit walks straight in under the canopy. The
+        # piece is `kits/interiors/AirportTerminal.blend` (150 x 50 m, the canopy to local z +34, the boarding bridges
+        # to -50.6), not the 242 x 170 placeholder it replaced.
+        apt = terminal_site()
         if apt is None:
-            print("island_sites: NO terminal site on the airport island (flat within %.0f m, %.0f m clear)"
-                  % (TERMINAL_RELIEF, TERMINAL_CLEAR))
+            print("island_sites: NO Airport station in the rail reserve: the terminal is not sited")
         else:
-            px, py, plo, phi = apt
-            print("island_sites: Airport terminal at (%d, %d), ground %.1f-%.1f m" % (px, py, plo, phi))
-            rows.append(dict(id="airport_terminal", scene="AirportTerminal_Shop", x=px, y=py, yaw=0.0,
-                             size=[242.0, 170.0], load=AIRPORT_LOAD, ground="min"))
+            print("island_sites: Airport terminal at (%.0f, %.0f) yaw %.0f, behind the station" % apt)
+            rows.append(dict(id="airport_terminal", scene="AirportTerminal_Shop", x=round(apt[0], 1),
+                             y=round(apt[1], 1), yaw=round(apt[2], 1), size=[152.0, 102.0], load=AIRPORT_LOAD,
+                             ground="min"))
     if want("west_station_mall"):
         # THE STATION SHOPPING CENTRE (user, 2026-09-26): beside the Blue line's Residential station, the west
         # sub-centre's anchor (a GRANDUO / Ito-Yokado beside a suburban station). DERIVED from the rail plan: MALL_OFF
@@ -449,6 +356,8 @@ def access_parking(net):
     import island_site_access as isa
     rows = []
     for a in isa.ACCESS:
+        if not a.get("parking"):
+            continue
         r = net.roads.get(a["name"])
         if r is None:
             print("island_sites: NO access road %s yet -- %s has no car park" % (a["name"], a["site"]))
@@ -463,14 +372,38 @@ def access_parking(net):
     return rows
 
 
-STATION_PARKING = {"park_and_ride": "ParkingLot14", "small_lot": "ParkingLot8"}   # a 立体駐車場 (Central) has no type yet
+STATION_PARKING = {"park_and_ride": "ParkingLot14", "small_lot": "ParkingLot8"}   # Central's 立体駐車場 is in its forecourt
 
 
-def rail_stations():
-    """Every station's building and car park (PLAN.md R3), DERIVED every run from the rail reserve
-    (`IslandRailReserve.json`, `island_rail_layout.py --reserve`), never frozen: the rail plan is their owner, so a
-    moved station takes its building with it. Both face AWAY from the tracks (the reserve's `n`): the building's back
-    door is on the platform side, its front on the street; a car park's entrance faces the same way."""
+def terminal_site():
+    """(x, y, yaw deg) of the airport terminal, record frame, from the rail reserve's Airport station (`island_sites`
+    want("airport_terminal")), or None."""
+    import json
+    path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandRailReserve.json")
+    if not os.path.exists(path):
+        return None
+    doc = json.load(open(path))
+    st = next((b for b in doc["boxes"] if b["id"] == "station:Airport"), None)
+    line = next((c for c in doc["corridors"] if c["line"] == "Main line"), None)
+    if st is None or line is None:
+        return None
+    ux, uy = st["ux"], st["uy"]
+    end = line["pts"][-1]
+    if (end[0] - st["x"]) * ux + (end[1] - st["y"]) * uy < 0:
+        ux, uy = -ux, -uy                                  # the axis toward the terminus
+    reach = st["h_along"] - 1.0                            # the station building's half length (station_layout.extent)
+    d = reach + TERMINAL_GAP + terminal_reach()
+    gx, gz = st["x"] + ux * d, -(st["y"] + uy * d)         # GODOT: the door's point on the axis, set back
+    th = math.atan2(-ux, uy)                               # local +Z (landside) -> toward the station
+    cx, cz = gx - TERMINAL_DOOR_X * math.cos(th), gz + TERMINAL_DOOR_X * math.sin(th)
+    return (cx, -cz, math.degrees(th) % 360.0)
+
+
+def rail_stations(net=None):
+    """Every station's scene and car park, DERIVED every run from the rail reserve (`IslandRailReserve.json`,
+    `island_rail_layout.py --reserve`), never frozen: the rail plan is their owner, so a moved station takes its scene
+    with it. Every station is a KIT station (`Station_<Name>_Shop`, PLAN.md steps 1-7); a car park's entrance faces away
+    from the tracks (the reserve's `n`)."""
     import json
     path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandRailReserve.json")
     if not os.path.exists(path):
@@ -490,20 +423,76 @@ def rail_stations():
                              y=b["y"], yaw=math.degrees(SL.godot_yaw(b["ux"], b["uy"])),
                              size=[2 * ha, 2 * (b["h_across"] - 1.0)], load=900.0, ground="bed", bed=b["bed"],
                              node="Station_" + slug))
-        elif kind in ("building", "building_far"):
-            # the far one is the far platform's OWN gated building (both sides of an open-air station, 2026-09-27)
-            far = "_far" if kind == "building_far" else ""
-            rows.append(dict(id="station_" + slug + far, scene="StationBuilding_Shop", x=b["x"], y=b["y"],
-                             yaw=yaw_to(b["nx"], -b["ny"]), size=[2 * b["h_along"] - 1.0, 2 * b["h_across"] - 1.0],
-                             load=900.0, ground="min", node="Station_" + slug + far))
         elif kind == "parking" and b.get("kind") in STATION_PARKING:
-            st = boxes.get("building:" + name) or boxes.get("station:" + name)
+            st = boxes.get("station:" + name)
             n = (st.get("nx", 0.0), st.get("ny", 0.0)) if st else (0.0, 0.0)
             if n == (0.0, 0.0):          # the reserve's own normal: -uy, ux
                 n = (-b["uy"], b["ux"])
-            rows.append(dict(id="station_" + slug + "_parking", scene=STATION_PARKING[b["kind"]], x=b["x"], y=b["y"],
-                             yaw=yaw_to(n[0], -n[1]), size=[2 * b["h_along"], 2 * b["h_across"]], load=900.0,
-                             ground="min", node="Parking_station_" + slug))
+            row = dict(id="station_" + slug + "_parking", scene=STATION_PARKING[b["kind"]], x=b["x"], y=b["y"],
+                       yaw=yaw_to(n[0], -n[1]), size=[2 * b["h_along"], 2 * b["h_across"]], load=900.0,
+                       ground="min", node="Parking_station_" + slug)
+            if b.get("entrance"):
+                # A CAR PARK ON ITS STATION'S STREET (island_rail_layout STATION_FRONT, 2026-09-28): its entrance
+                # faces the street and it stands LEVEL with the street's footway at the entrance, the ground filled
+                # to it (a levelled site) -- it used to stand at the lowest ground under it, the block ground fill
+                # rising through it (the flicker), with no way in
+                e = b["entrance"]
+                row["yaw"] = yaw_to(e[0], -e[1])
+                row["size"] = [2 * b["h_across"], 2 * b["h_along"]]
+                if net is not None and b.get("street_at"):
+                    sx, sy = b["street_at"]
+                    zs = min(((math.hypot(q.pos[0] - sx, q.pos[1] - sy), q.pos[2]) for q in net.points.values()
+                              if abs(q.pos[0] - sx) < 60.0 and abs(q.pos[1] - sy) < 60.0), default=None)
+                    if zs is not None:
+                        row.update(ground="road_end", level=zs[1] + KERB_H)
+            rows.append(row)
+    return rows
+
+
+# the RESERVES that carry a building now (user, 2026-09-28): island_plan.RESERVES name -> (scene, yaw deg, load m). The
+# scene is centred on the reserve's box; a yaw of 0 puts its front (+Z) to the south.
+RESERVE_SITES = {
+    "resort_hotel_1": ("ResortHotel", 0.0, 1200.0),       # the sea-view side (its front) south, to the loop's leg
+    "resort_hotel_2": ("ResortHotel", 0.0, 1200.0),
+    "resort_hotel_3": ("ResortHotel", 0.0, 1200.0),
+    "logistics_truck_terminal": ("LogisticsTruckTerminal", 90.0, 1200.0),     # the gate (front) east to butsuryu_michi
+    "logistics_distribution": ("LogisticsDistributionCentre", 270.0, 1200.0),  # the gate west to butsuryu_michi
+    "fish_market": ("FishMarket", 0.0, 1200.0),          # the quay (its front) to the sea, south of the dike
+    "military_base": ("MilitaryBase", 90.0, 1200.0),      # the gate (its front) east to the gate road, apron south
+    "military_pier": ("MilitaryPier", 270.0, 1000.0),     # its +Z (the pier head) west, the terminal at the root
+    "military_airfield": ("MilitaryAirfield", 0.0, 1500.0),
+    "airport_airfield": ("AirportAirside", 180.0, 1500.0),  # the apron north by the terminal, the runway south
+    "central_forecourt": ("CentralForecourt", 0.0, 1200.0),
+    "airport_forecourt": ("AirportForecourt", 0.0, 1500.0),  # round the kuko_rotary loop, beside the Airport station  # the 駅前広場: its front (+Z) south to ekimae_dori
+}
+#: reserves whose ground is LEVELLED to footway height round the road running through them (the block-ground stage
+#: fills the terrain under them like a lot, `island_ground.levelled_sites`): reserve -> the road whose stations set it
+LEVELLED_RESERVES = {"central_forecourt": "ekimae_rotary", "airport_forecourt": "kuko_rotary"}
+KERB_H = 0.15          # a footway's top over its carriageway (island_buildings.KERB_H)
+
+
+def reserve_sites(net=None):
+    """A site per reserve that has a building (RESERVE_SITES), DERIVED every run from `island_plan.RESERVES`. A
+    LEVELLED reserve (the station forecourt) stands at its road's highest station + KERB_H, footway level."""
+    import island_plan as PL
+    rows = []
+    for name, (x0, z0, x1, z1) in PL.RESERVES:
+        if name not in RESERVE_SITES:
+            continue
+        scene, yaw, load = RESERVE_SITES[name]
+        w, d = x1 - x0, z1 - z0
+        if round(yaw) % 180 == 90:
+            w, d = d, w
+        row = dict(id=name, scene=scene, x=(x0 + x1) / 2.0, y=-(z0 + z1) / 2.0, yaw=yaw, size=[w, d],
+                   load=load, ground="centre", node="Reserve_" + name)
+        road = LEVELLED_RESERVES.get(name)
+        if road and net is not None:
+            r = net.roads.get(road)
+            if r is None:
+                print("island_sites: NO %s yet -- %s stands on its natural ground, unlevelled" % (road, name))
+            else:
+                row.update(ground="road_end", level=max(net.points[u].pos[2] for u in r.points) + KERB_H)
+        rows.append(row)
     return rows
 
 
@@ -575,12 +564,18 @@ def main(argv):
         print("island_sites: %-18s at (%.0f, %.0f), ground %.2f m (frozen)" % (r["id"], r["x"], r["y"], h))
         sites.append((r["id"], r["scene"], (r["x"], r["y"], ny + h), r["yaw"], tuple(r["size"]), r["load"],
                       scene_offset(r), r["scene"], None))
-    for row in rail_stations():
+    for row in rail_stations(net):
         h = site_ground(g, row)
         print("island_sites: %-28s at (%.0f, %.0f), ground %.2f m (from the rail reserve)"
               % (row["id"], row["x"], row["y"], h))
         sites.append((row["id"], row["scene"], (row["x"], row["y"], ny + h), row["yaw"], tuple(row["size"]),
-                      row["load"], (0.0, 0.0), row["node"], None))
+                      row["load"], (0.0, 0.0), row["node"], ny + h if "level" in row else None))
+    for row in reserve_sites(net):
+        h = site_ground(g, row)
+        print("island_sites: %-28s at (%.0f, %.0f), ground %.2f m (a reserve's building)"
+              % (row["id"], row["x"], row["y"], h))
+        sites.append((row["id"], row["scene"], (row["x"], row["y"], ny + h), row["yaw"], tuple(row["size"]),
+                      row["load"], (0.0, 0.0), row["node"], ny + h if "level" in row else None))
     for row in access_parking(net):
         h = site_ground(g, row)
         print("island_sites: %-18s at (%.0f, %.0f), ground %.2f m (at its access road's end)"

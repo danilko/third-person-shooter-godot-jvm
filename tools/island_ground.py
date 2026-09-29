@@ -318,7 +318,8 @@ def build(heights_path, area=None):
 
     lot = np.zeros((N, N), bool)
     lot_top = np.full((N, N), np.nan)
-    for b in doc["buildings"]:
+    # the civic plots (island_civic_sites.py) are lots with no building yet: paved at the footway's level all the same
+    for b in doc["buildings"] + doc.get("civic", []):
         top = b["pos"][1] + ib.LOT_RAISE
         rect_into(lot, b["pos"][0], b["pos"][2], b["yaw"], *b["lot"], heights=lot_top, h=top)
     for p in doc.get("passages", ()):

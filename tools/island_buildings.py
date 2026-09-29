@@ -158,8 +158,15 @@ FACADE_MAT_RES = "res://assets/world_source/kits/quaternius_downtown_city/materi
 # real one has to Shinjuku: 雑居ビル packed shoulder to shoulder, no flats, and the same grey tone bias as the
 # working districts. It is inside downtown's box, so it must come FIRST to win the first-match rule.
 REGIONS = (
+    # 秋葉原 ELECTRIC TOWN (user, 2026-09-28; PLAN.md 3.18(w)): east of Central, where the signage pieces now exist
+    # (Sign_AkibaVertical / Sign_AkibaBillboard on the AkibaElectric type) -- narrow electronics and hobby buildings
+    # shoulder to shoulder, with a 横丁 row between them. First, so it wins over `downtown`'s box.
+    ("akiba", (960.0, 100.0, 1200.0, 400.0), 1, 16.0,
+     {"AkibaElectric": 5, "PencilBuilding": 2, "YokochoRow": 1, "KonbiniS": 0.5},
+     0.0, None),
     ("nightlife", (520.0, 180.0, 980.0, 560.0), 1, 20.0,
-     {"PencilBuilding": 6, "ShopHouse": 3, "KonbiniS": 1, "OfficeMid": 0.8, "FamilyRestaurant": 0.5},
+     {"PencilBuilding": 6, "ShopHouse": 3, "KonbiniS": 1, "OfficeMid": 0.8, "FamilyRestaurant": 0.5,
+      "YokochoRow": 2},
      0.0, "dark"),
     # RESIDENTIAL WRAPS THE CITY (user, 2026-09-21, drawn on the district plan: "add resident around city
     # before castle/farmland"). Both bands are MEASURED, because a region only does anything where there is
@@ -176,10 +183,11 @@ REGIONS = (
     # (2026-09-26) its north edge is the farm's first row road, y 920: north of it is farmland (`farm` below)
     ("residential_north", (-330.0, 700.0, 1700.0, 920.0), 1, 20.0,
      {"Apartment": 3, "ShopHouse": 2, "Mansion": 1, "KonbiniS": 0.5, "KonbiniL": 0.4, "GasStation": 0.3,
-      "ParkingLot4": 0.3},
+      "ParkingLot4": 0.3, "DetachedHouse": 2, "DetachedHouseB": 2},
      0.15, None),
     ("residential_west", (-900.0, -200.0, -150.0, 400.0), 1, 18.0,
-     {"Apartment": 3, "ShopHouse": 1.5, "Mansion": 0.8, "KonbiniS": 0.3}, 0.3, None),
+     {"Apartment": 3, "ShopHouse": 1.5, "Mansion": 0.8, "KonbiniS": 0.3, "DetachedHouse": 2.5, "DetachedHouseB": 2.5},
+     0.3, None),
     ("downtown", (150.0, 40.0, 1300.0, 720.0), 1, 24.0,
      {"OfficeMid": 4, "OfficeBlock": 1.5, "OfficeTower": 1, "PencilBuilding": 4, "Mansion": 2, "ShopHouse": 1.5,
       "KonbiniS": 1, "FamilyRestaurant": 0.3},
@@ -194,47 +202,53 @@ REGIONS = (
     # ...and its 駅前商店街: the shopping street round the station itself -- shop-houses shoulder to shoulder, a konbini,
     # a family restaurant -- with the station shopping centre (the `west_station_mall` site, island_sites) beside it
     ("west_ekimae", (-900.0, -640.0, -560.0, -400.0), 1, 12.0,
-     {"ShopHouse": 5, "PencilBuilding": 2, "KonbiniS": 1, "FamilyRestaurant": 0.4}, 0.0, None),
+     {"ShopHouse": 5, "PencilBuilding": 2, "KonbiniS": 1, "FamilyRestaurant": 0.4, "YokochoRow": 1}, 0.0, None),
     ("west_centre", (-950.0, -700.0, -400.0, -380.0), 1, 22.0,
      {"OfficeMid": 3, "OfficeBlock": 0.8, "PencilBuilding": 2.5, "ShopHouse": 2.5, "Mansion": 1.5, "KonbiniS": 1,
       "FamilyRestaurant": 0.5,
       "KonbiniL": 0.3, "ParkingLot4": 0.3}, 0.05, None),
-    ("harbour", (-820.0, -2050.0, 250.0, -1040.0), 1, 30.0, {"Warehouse": 1}, 0.2, "dark"),
+    # THE PORT (2026-09-28): the logistics function is ONE hub (island_plan.RESERVES logistics_*: a truck terminal and a
+    # distribution centre beside the container terminal), not a sheds-on-every-frontage port -- the user's "compact,
+    # not repeated": what fronts the port's roads is port offices, a konbini for the drivers and lorry parks
+    ("harbour", (-820.0, -2050.0, 250.0, -1040.0), 1, 30.0,
+     {"OfficeMid": 1, "KonbiniS": 0.4, "ParkingLot8": 0.8}, 0.5, "dark"),
     # BAY PROCESSING 水産加工 (PLAN.md 3.30 v3, 2026-09-26): the bay's west shore -- processing sheds and the 市場食堂
     # seafood diners along the quay. Existing types stand in (Warehouse = sheds, FamilyRestaurant = diners) until the
     # market hall and diner models exist.
     ("bay_processing", (150.0, -1000.0, 300.0, -600.0), 1, 26.0,
-     {"Warehouse": 3, "FamilyRestaurant": 1, "KonbiniS": 0.3}, 0.2, "dark"),
+     {"Warehouse": 1, "FamilyRestaurant": 1, "KonbiniS": 0.3}, 0.2, "dark"),
     # THE 準工業 BELT (v7 item 2): ~140 m between industry and the housing, north of industry and along its west edge
     # -- 町工場, trucking depots, used-car lots, coin laundries. Stand-ins: ShopHouse (a works with a flat over it),
     # Warehouse (a depot), ParkingLot8 (a used-car lot), KonbiniS, GasStation.
     ("light_industry", (-1400.0, -600.0, 300.0, -460.0), 1, 22.0,
-     {"ShopHouse": 2, "Warehouse": 2, "ParkingLot8": 0.5, "KonbiniS": 0.3, "GasStation": 0.2}, 0.3, "dark"),
+     {"ShopHouse": 2, "Warehouse": 0.4, "ParkingLot8": 0.5, "KonbiniS": 0.3, "GasStation": 0.2}, 0.3, "dark"),
     # THE SOUTH-WEST 準工業 DISTRICT (user, 2026-09-26: "combine the south-west with the light industry"): the housing's
     # industrial edge and the west third of the old industry box are ONE mixed district, the Ota / Kamata 町工場 town --
     # small works with a flat over them, workers' flats, depots and a few used-car lots on block streets. It has TWO
     # stations on two lines: Light Industry (the Blue line's terminus, x -665) on its west side and Industry (the
     # Harbour line, x 185) past its east edge, so its commuters split instead of all changing at Bay.
     ("light_industry_w", (-1450.0, -1040.0, -300.0, -600.0), 1, 20.0,
-     {"ShopHouse": 3, "Apartment": 2, "Warehouse": 1.5, "ParkingLot8": 0.3, "KonbiniS": 0.4, "GasStation": 0.2},
+     {"ShopHouse": 3, "Apartment": 2, "Warehouse": 0.3, "ParkingLot8": 0.3, "KonbiniS": 0.4, "GasStation": 0.2},
      0.2, "dark"),
-    # INDUSTRY: fewer, bigger plots with yards between (v6: "a 200 m grid at 50%") -- one row, a wide pitch, half skipped
+    # INDUSTRY: fewer, bigger plots with yards between (v6: "a 200 m grid at 50%") -- one row, a wide pitch, half skipped.
+    # Warehouses are a MINORITY everywhere since 2026-09-28: the island's logistics is the one hub on the port platform
     ("industry", (-1000.0, -1040.0, 200.0, -600.0), 1, 60.0,
-     {"Warehouse": 4, "OfficeMid": 1, "ShopHouse": 0.5, "KonbiniS": 0.4, "GasStation": 0.3}, 0.5, "dark"),
+     {"Warehouse": 1, "OfficeMid": 1, "ShopHouse": 0.5, "KonbiniS": 0.4, "GasStation": 0.3}, 0.5, "dark"),
     # THE AIRPORT ISLAND (PLAN.md 3.18(s), the rail batch): it had no region, so nothing but the terminal site stood on
     # it. Record frame of island_sites.AIRPORT_BOX (Godot x 700..1500, z 1300..2304). Stand-ins until the hangar,
     # cargo-shed and control-tower models exist: Warehouse = hangars and cargo sheds, OfficeMid = the airport offices
     # and hotel; a gas station and a konbini for the staff. The runway / apron reserve keeps them off the airside.
     ("airport", (700.0, -2304.0, 1500.0, -1300.0), 1, 40.0,
-     {"Warehouse": 3, "OfficeMid": 1, "GasStation": 0.4, "KonbiniL": 0.3, "FamilyRestaurant": 0.3}, 0.3, "dark"),
+     {"Warehouse": 0.5, "OfficeMid": 1, "GasStation": 0.4, "KonbiniL": 0.3, "FamilyRestaurant": 0.3}, 0.3, "dark"),
     ("residential", (-1800.0, -1160.0, -150.0, -200.0), 1, 18.0,
      {"Apartment": 4, "ShopHouse": 2, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4, "FamilyRestaurant": 0.3,
-      "KonbiniS": 0.4, "ParkingLot4": 0.3}, 0.15, None),
+      "KonbiniS": 0.4, "ParkingLot4": 0.3, "DetachedHouse": 3, "DetachedHouseB": 3}, 0.15, None),
     # the SUBURB as a low-density beach resort (v3: "fewer, larger buildings ... 55% occupancy"): one row, wide pitch
     ("suburb", (850.0, -1000.0, 1320.0, -330.0), 1, 30.0,          # clipped to its land (east: the spur, the sea)
      {"Apartment": 4, "ShopHouse": 1.5, "Mansion": 1, "KonbiniL": 0.6, "GasStation": 0.4,
-      "FamilyRestaurant": 0.4}, 0.45, None),
-    ("farm", (350.0, 920.0, 1850.0, 1900.0), 1, 30.0, {"Apartment": 2, "Warehouse": 1, "KonbiniL": 0.2},
+      "FamilyRestaurant": 0.4, "DetachedHouse": 2, "DetachedHouseB": 2}, 0.45, None),
+    ("farm", (350.0, 920.0, 1850.0, 1900.0), 1, 30.0, {"Apartment": 2, "Warehouse": 0.5, "KonbiniL": 0.2,
+                                                        "DetachedHouse": 2, "DetachedHouseB": 2},
      0.65, None),
 )
 # 駅前 ROWS (PLAN.md tier-B "a 駅前 row round each NEW station"): a small shopping street of shop-houses round every
@@ -297,8 +311,7 @@ CAR_PARKS = {"ParkingLot4", "ParkingLot8", "ParkingLot14"}
 # * `<Type>_Shop` -- unlocked, automatic doors: the shops a player walks into as ordinary play (GTA's konbini, diner,
 #   petrol station, station hall) and the player's home base;
 # * `<Type>_Open` -- `world.Door` nodes LOCKED until a MISSION unlocks them (KonbiniMission does).
-SHOP_TYPES = {"KonbiniS", "KonbiniL", "FamilyRestaurant", "GasStation", "GasKiosk", "StationBuilding",
-              "StationRural"}
+SHOP_TYPES = {"KonbiniS", "KonbiniL", "FamilyRestaurant", "GasStation", "GasKiosk"}
 PUBLIC_BUILDINGS = (      # (Godot x, z, why, wanted TYPE, "", ROLE): a specific building that is always open
     # The WEAPON COUNTER (user, 2026-09-26: "large store will have all weapons, small one only pistol/light"): the
     # nearest LARGE konbini to the island's centre -- only a KonbiniL stocks the whole catalog. Resolved FIRST, so
@@ -356,20 +369,31 @@ PLACE_KINDS = {
     "FamilyRestaurant": ("Diner", 1),
     "GasStation":       ("Petrol Station", 1),
     "GasKiosk":         ("Petrol Station", 1),
-    "StationBuilding":  ("Station", 2),
-    "StationRural":     ("Station", 2),
 }
 SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: always drawn)
     "ContainerTerminal": ("Container Terminal", 2),
     "ShuriCastle":       ("Shuri Castle", 2),
     "RainbowBridge":     ("Rainbow Bridge", 2),
     "TokyoTower":        ("Tower", 2),
-    "TokyoStation_Shop": ("Central Station", 2),
     "AirportTerminal_Shop": ("Airport", 2),
+    "StationMall":       ("Station Mall", 2),
+    # the reserves' buildings (island_sites.RESERVE_SITES, user 2026-09-28)
+    "Reserve_military_base": ("Air Base", 2),
+    "Reserve_fish_market": ("Fish Market", 2),
+    "Reserve_airport_airfield": ("Airport Apron", 2),
+    "Reserve_military_airfield": ("Air Base Runway", 2),
+    "Reserve_military_pier": ("Base Harbour Terminal", 2),
+    "Reserve_resort_hotel_1": ("Resort Hotel", 2),
+    "Reserve_resort_hotel_2": ("Resort Hotel", 2),
+    "Reserve_resort_hotel_3": ("Resort Hotel", 2),
+    "Reserve_logistics_truck_terminal": ("Truck Terminal", 2),
+    "Reserve_logistics_distribution": ("Distribution Centre", 2),
+    "Reserve_central_forecourt": ("Central Bus Terminal", 2),
+    "Reserve_airport_forecourt": ("Airport Bus & Taxi", 2),   # the 駅前広場 (the station is "Central Station")
 }
 ANCHOR_REACH = 250.0   # ... and the furthest a WANTED TYPE may be found from the wish
 SPACING = {"GasStation": 450.0, "KonbiniL": 250.0, "FamilyRestaurant": 350.0, "KonbiniS": 120.0}
-SKIP_ROADS = ("shuto_", "shrine_touge", "kaigan_dori", "airport_", "kuko_dori")
+SKIP_ROADS = ("shuto_", "shrine_touge", "kaigan_dori", "airport_", "kuko_")
 def _variants():
     """{base type: [its footprint variants]} (PLAN.md 3.19(c)), from the type table via the layout (one owner)."""
     sys.path.insert(0, os.path.join(HERE, "building_kit"))
@@ -408,7 +432,7 @@ SPAWN_UID = "uid://ctq8u5jyp6ijf"
 # against `tools/godot/probe_city_perf.gd --crowd` (a display), never by eye. A crowd's cost is per PHYSICS TICK
 # and the cliff is Godot's catch-up spiral past 16.7 ms, so the number that matters is how many are in range at
 # once, which `peds` prints.
-PED_DENSITY = {"nightlife": 2.6, "downtown": 2.0, "city": 1.2, "residential": 0.8, "residential_north": 0.8,
+PED_DENSITY = {"akiba": 2.4, "nightlife": 2.6, "downtown": 2.0, "city": 1.2, "residential": 0.8, "residential_north": 0.8,
                "residential_west": 0.5, "suburb": 0.6, "industry": 0.5, "harbour": 0.4, "farm": 0.3,
                "light_industry": 0.6, "light_industry_w": 0.8, "west_centre": 1.6, "west_ekimae": 2.2, "bay_processing": 0.7, "airport": 0.4,
                "ekimae": 1.8, None: 0.5}
@@ -554,10 +578,13 @@ class Field(object):
         d2 = (X - a[0] - t * dx) ** 2 + (Z - a[1] - t * dz) ** 2
         (self.blocked if target is None else target)[j0:j1 + 1, i0:i1 + 1] |= d2 <= r * r
 
-    def block_box(self, cx, cz, yaw, hx, hz):
-        """A rotated box, half sizes hx (local x) and hz (local z)."""
+    def block_box(self, cx, cz, yaw, hx, hz, hold=False):
+        """A rotated box, half sizes hx (local x) and hz (local z). `hold`: the ground is HELD (a site, a reserve, a
+        civic plot) -- no lot may GROW into it either (`grow_lots` stops at another owner; -1 is nobody's lot)."""
         pts = self.rect_points(cx, cz, yaw, -hx, -hz, hx, hz)
         self.blocked[pts[1], pts[0]] = True
+        if hold:
+            self.owner[pts[1], pts[0]] = -1
 
     def rect_points(self, cx, cz, yaw, x0, z0, x1, z1):
         """Mask indices (i array, j array) of the cells whose centres lie in the local rect [x0,x1] x [z0,z1] of a
@@ -780,9 +807,63 @@ def plan_reserves(field):
     resort hotels, the lighthouse, the 道の駅) -- no generated building stands on it."""
     import island_plan as PL
     for name, (x0, z0, x1, z1) in PL.RESERVES:
-        field.block_box((x0 + x1) / 2.0, (z0 + z1) / 2.0, 0.0, (x1 - x0) / 2.0, (z1 - z0) / 2.0)
+        field.block_box((x0 + x1) / 2.0, (z0 + z1) / 2.0, 0.0, (x1 - x0) / 2.0, (z1 - z0) / 2.0, hold=True)
     print("island_buildings: %d reserve(s) held for later: %s" % (len(PL.RESERVES),
                                                                 ", ".join(n for n, _b in PL.RESERVES)))
+
+
+def civic_plots(field, frontage):
+    """The CIVIC PLOTS (`tools/island_civic_sites.py`, IslandCivicSites.json -- a police / fire station, a hospital, a
+    school, a clinic, a 交番, ...): ground held until their building types exist. No generated building stands on one,
+    and each becomes a LOT at the footway's level (its nearest at-grade road's surface + the kerb), which
+    `island_ground.py` paves like any lot. Returned as the building record's `civic` list."""
+    path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandCivicSites.json")
+    if not os.path.exists(path):
+        return []
+    out = []
+    for p in json.load(open(path)).get("plots", []):
+        cx, cz = p["x"], -p["y"]
+        # Godot frame: local +Z points AWAY from the road (the plot's back), local X along it
+        nx, nz = -p["nx"], p["ny"]
+        yaw = math.atan2(nx, nz)
+        ha, hc = p["size"][0] / 2.0, p["size"][1] / 2.0
+        field.block_box(cx, cz, yaw, ha, hc, hold=True)
+        fx, fz = cx - nx * hc, cz - nz * hc            # the front edge's middle
+        best = None
+        for _owner, cl, _gap, _lanes, kerbed in frontage:
+            for x, z, _half, y in cl:
+                d = (x - fx) ** 2 + (z - fz) ** 2
+                if best is None or d < best[0]:
+                    best = (d, y + (KERB_H if kerbed else 0.0))
+        top = best[1] if best else 0.75
+        # the building faces its road: its local +Z (the street side) is (p.nx, -p.ny) in Godot axes
+        byaw = math.degrees(math.atan2(p["nx"], -p["ny"]))
+        out.append({"id": p["id"], "kind": p["kind"], "jp": p["jp"], "type": civic_type(p),
+                    "pos": [round(cx, 3), round(top, 3), round(cz, 3)], "yaw": round(byaw, 3),
+                    "lot": [round(-ha, 3), round(-hc, 3), round(ha, 3), round(hc, 3)]})
+    print("island_buildings: %d civic plot(s): %s" % (len(out), ", ".join(sorted({c["type"] for c in out}))))
+    return out
+
+
+# what stands on each civic plot (the placeholder types in building_types.json `custom`, blender/tools/library_civic.py)
+CIVIC_TYPES = {"police_station": "PoliceStation", "koban": "Koban", "fire_station": "FireStation",
+               "fire_branch": "FireBranch", "ward_office": "WardOffice", "clinic": "Clinic",
+               "elementary_school": "SchoolElementary", "junior_high_school": "SchoolJuniorHigh",
+               "water_resort": "WaterResort", "shrine": "Shrine", "temple": "Temple", "park": "Park"}
+CIVIC_LABELS = {"PoliceStation": ("Police Station", 1), "Koban": ("Police Box", 1), "FireStation": ("Fire Station", 1),
+                "FireBranch": ("Fire Station", 1), "PostOffice": ("Post Office", 1),
+                "PostOfficeSmall": ("Post Office", 1), "WardOffice": ("Ward Office", 1), "Hospital": ("Hospital", 1),
+                "HospitalSmall": ("Hospital", 1), "Clinic": ("Clinic", 1), "SchoolElementary": ("School", 1),
+                "SchoolJuniorHigh": ("School", 1), "WaterResort": ("Water Resort", 2), "Shrine": ("Shrine", 1),
+                "Temple": ("Temple", 1), "Park": ("Park", 1)}
+
+
+def civic_type(p):
+    if p["kind"] == "hospital":
+        return "Hospital" if p["size"][0] >= 80.0 else "HospitalSmall"
+    if p["kind"] == "post_office":
+        return "PostOffice" if p["size"][0] >= 30.0 else "PostOfficeSmall"
+    return CIVIC_TYPES[p["kind"]]
 
 
 FIELD_BOX = (400.0, 920.0, 1300.0, 1700.0)   # record frame: the farm grid (island_plan's farm* street regions)
@@ -1095,19 +1176,29 @@ def separate_lots(placed, aabbs):
             best = None
             for k, other in ((i, j), (j, i)):
                 b = placed[k]
+                if b.get("civic"):
+                    continue          # a civic plot is held ground: the neighbour gives way
                 fx0, fz0, fx1, fz1, _h = aabbs[b["type"]]
                 q = lot_polygon(placed[other])
-                for side, limit in ((0, fx0), (1, fz0), (2, fx1), (3, fz1)):
+                lim = (fx0, fz0, fx1, fz1)
+                # one side, else two ADJACENT sides together: two lots rotated against each other meet at a CORNER,
+                # which no single side's cut clears without crossing the building's own footprint (43 pairs,
+                # 2026-09-28)
+                for sides in ((0,), (1,), (2,), (3,), (0, 1), (1, 2), (2, 3), (3, 0)):
                     lot = list(b["lot"])
                     cut = 0.0
                     while overlap_area(lot_polygon(b, lot), q) > LOT_OVERLAP_TOL:
                         cut += LOT_SEPARATE_STEP
-                        lot[side] = b["lot"][side] + (cut if side < 2 else -cut)
-                        if (side < 2 and lot[side] > limit) or (side >= 2 and lot[side] < limit):
+                        bad = False
+                        for side in sides:
+                            lot[side] = b["lot"][side] + (cut if side < 2 else -cut)
+                            bad = bad or (side < 2 and lot[side] > lim[side]) or (side >= 2 and lot[side] < lim[side])
+                        if bad:
                             cut = None
                             break
-                    if cut is not None and (best is None or cut < best[0]):
-                        best = (cut, k, lot)
+                    cost = None if cut is None else cut * len(sides)
+                    if cost is not None and (best is None or cost < best[0]):
+                        best = (cost, k, lot)
             if best is None:
                 stuck.add((i, j))
                 continue
@@ -1168,9 +1259,10 @@ def write_places(placed, aabbs, text):
     places = []
     for b in placed:
         scene = scene_of(b)
-        if scene == b["type"]:
-            continue                       # shut: not a place
-        label, tier = ROLE_PLACES.get(b.get("role", ""), PLACE_KINDS.get(b["type"], ("", 0)))
+        if scene == b["type"] and b["type"] not in CIVIC_LABELS:
+            continue                       # shut: not a place (a civic building is one anyway: the map names it)
+        label, tier = ROLE_PLACES.get(b.get("role", ""), PLACE_KINDS.get(b["type"], CIVIC_LABELS.get(b["type"],
+                                                                                                      ("", 0))))
         if not label:
             continue
         x0, z0, x1, z1, _h = aabbs[b["type"]]
@@ -1181,7 +1273,12 @@ def write_places(placed, aabbs, text):
                        "go": [round(b["pos"][0] + sn * z1, 2), round(b["pos"][1], 2),
                               round(b["pos"][2] + c * z1, 2)]})
     for name, x, z in site_places(text):
+        if name.startswith("Parking_"):
+            continue                       # a site's car park is part of the site, not a place of its own
         label, tier = SITE_PLACES.get(name, (name, 2))
+        if name.startswith("Station_") and name not in SITE_PLACES:
+            # a rail station's kit scene (`island_sites.rail_stations`, node Station_<slug>): "Farm Station"
+            label = name[len("Station_"):].replace("_", " ").title() + " Station"
         places.append({"name": label, "kind": name, "tier": tier,
                        "at": [round(x, 2), 0.0, round(z, 2)], "go": [round(x, 2), 0.0, round(z, 2)]})
     regions = [{"name": r[0], "box": [r[1][0], -r[1][3], r[1][2], -r[1][1]]} for r in REGIONS]   # record -> godot
@@ -1215,7 +1312,7 @@ def places_only(check):
     """Rebuild only `IslandPlaces.json`, from the buildings record and the scene. A label or a tier is a fact
     about the MAP, so editing one must not need a terrain dump and a two-minute re-derive."""
     doc = json.load(open(OUT))
-    aabbs = {t: type_aabb(t) for t in TYPES}
+    aabbs = {t: type_aabb(t) for t in set(TYPES) | {b["type"] for b in doc["buildings"]}}
     before = open(PLACES).read() if os.path.exists(PLACES) else ""
     write_places(doc["buildings"], aabbs, open(SCENE).read())
     after = open(PLACES).read()
@@ -1224,6 +1321,53 @@ def places_only(check):
         print("island_buildings: %s is STALE" % os.path.basename(PLACES))
         return 1
     return 0
+
+
+def roads_check():
+    """NO BUILDING STANDS ON A ROAD, AT ANY HEIGHT (user, 2026-09-29: tall buildings stood under C1's deck and pierced
+    it -- "please fix the building placement on the highway"). Measured from the other side of the pipeline: every
+    placed building's footprint (its type's AABB, placed) against every solved road band -- ground, dike and elevated
+    alike, pads and gores included -- in plan. A building whose footprint overlaps a band by more than 1 m2 is reported;
+    exit 1 if any does."""
+    from shapely.geometry import Polygon
+    from shapely.strtree import STRtree
+    for p_ in (os.path.join(ROOT, "blender", "lib"), os.path.join(ROOT, "blender", "addons", "road_kit_authoring")):
+        if p_ not in sys.path:
+            sys.path.insert(0, p_)
+    import point_edges as ped
+    net = pm.load_network(RECORD)
+    cors = ped.band_corridors(ped.solve_all(net, None)[3], owners=True)     # plan only: no ground needed
+    quads = []
+    for line, _h, owner in cors:
+        pts = [(x, -y, half) for (x, y, _z, half) in line]
+        for (x0, z0, h0), (x1, z1, h1) in zip(pts, pts[1:]):
+            dx, dz = x1 - x0, z1 - z0
+            L = math.hypot(dx, dz)
+            if L < 1e-6:
+                continue
+            nx, nz = -dz / L, dx / L
+            quads.append((Polygon([(x0 + nx * h0, z0 + nz * h0), (x1 + nx * h1, z1 + nz * h1),
+                                   (x1 - nx * h1, z1 - nz * h1), (x0 - nx * h0, z0 - nz * h0)]), str(owner)))
+    tree = STRtree([q for q, _o in quads])
+    doc = json.load(open(OUT))
+    aabbs = {t: type_aabb(t) for t in {b["type"] for b in doc["buildings"]}}
+    bad = []
+    for b in doc["buildings"]:
+        x0, z0, x1, z1, _h = aabbs[b["type"]]
+        a = math.radians(b["yaw"])
+        c, sn = math.cos(a), math.sin(a)
+        cx, cz = b["pos"][0], b["pos"][2]
+        fp = Polygon([(cx + lx * c + lz * sn, cz - lx * sn + lz * c)
+                      for lx, lz in ((x0, z0), (x1, z0), (x1, z1), (x0, z1))])
+        for i in tree.query(fp):
+            area = fp.intersection(quads[i][0]).area
+            if area > 1.0:
+                bad.append((round(area, 1), b["type"], [round(cx), round(cz)], quads[i][1]))
+                break
+    bad.sort(reverse=True)
+    print("island_buildings: %d of %d building(s) stand on a road band%s"
+          % (len(bad), len(doc["buildings"]), "" if not bad else ": " + str(bad[:12])))
+    return 1 if bad else 0
 
 
 def sidewalks_only(check):
@@ -1316,9 +1460,10 @@ def derive(heights_path):
             frontage.append((owner, cl, walk + KERB_GAP + 0.3, lanes, walk > 0.0))
             sidewalks += walk_lines(owner, cl, walk)
     for (cx, cz, yaw, hx, hz) in site_exclusions(text):
-        field.block_box(cx, cz, yaw, hx, hz)
+        field.block_box(cx, cz, yaw, hx, hz, hold=True)
     rail_reserve(field)
     plan_reserves(field)
+    civic = civic_plots(field, frontage)
     seawall_works(field)
     fields = farm_fields(field)
     # --- the 路地 are reserved BEFORE anything is placed, so the frontage row grows round them rather than being
@@ -1360,6 +1505,7 @@ def derive(heights_path):
     print("island_buildings: %d 路地 reserved through the frontage rows" % len(passages))
 
     aabbs = {t: type_aabb(t) for t in TYPES}
+    aabbs.update({c["type"]: type_aabb(c["type"]) for c in civic})
     placed, counts, seen_kind = [], {}, {}
     parking_misses = [0]
 
@@ -1514,7 +1660,6 @@ def derive(heights_path):
     print("island_buildings: %d car park(s) placed beside their store, %d candidate spot(s) refused"
           % (sum(1 for b in placed if b["type"] in CAR_PARKS and b.get("with") is not None), parking_misses[0]))
     grow_lots(field, placed)
-    separate_lots(placed, aabbs)
     assign_tones(placed)
     shops = 0
     for b in placed:
@@ -1524,6 +1669,29 @@ def derive(heights_path):
     print("island_buildings: %d shops are always open (%s)" % (shops, ", ".join(sorted(SHOP_TYPES))))
     anchored, roles = apply_anchors(placed)
     report_cover(field)
+    # the CIVIC buildings stand on their plots (their plots were blocked for everything else above)
+    for c in civic:
+        reg = region_of(c["pos"][0], -c["pos"][2])
+        placed.append({"type": c["type"], "region": reg[0] if reg else "civic", "key": "civic|" + c["id"],
+                       "civic": c["id"], "pos": list(c["pos"]), "yaw": c["yaw"], "lot": list(c["lot"]),
+                       "lot_depth": 0.5})
+    # ...and only THEN are lots separated: a neighbour's rectangle can overhang a civic plot's edge exactly as it can a
+    # neighbour's (38 pairs, 175 m2 when this pass ran before the civic buildings joined, 2026-09-28)
+    separate_lots(placed, aabbs)
+    # two frontage rows meeting at a block CORNER can stand footprints into each other (the cell test sees centres,
+    # not corners): of each such pair the smaller building goes -- never a civic, anchored or car-park one
+    for i, j in fit_plinths(placed):
+        a, b = placed[i], placed[j]
+        cand = [x for x in (a, b) if not (x.get("civic") or x.get("role") or x.get("with") is not None)]
+        if cand:
+            area = {id(x): (lambda q: (q[2] - q[0]) * (q[3] - q[1]))(type_aabb(x["type"])) for x in cand}
+            cand.sort(key=lambda x: area[id(x)])
+            cand[0]["drop"] = True
+    dropped = sum(1 for b in placed if b.get("drop"))
+    placed[:] = [b for b in placed if not b.get("drop")]
+    if dropped:
+        print("island_buildings: %d building(s) dropped at block corners (footprints into a neighbour's)" % dropped)
+        fit_plinths(placed)
     placed.sort(key=lambda b: (b["pos"][0], b["pos"][2]))
     by_region = {}
     for b in placed:
@@ -1531,7 +1699,7 @@ def derive(heights_path):
     doc = {"schema": 1, "source": "tools/island_buildings.py derive", "network_y": ny,
            "counts": dict(sorted(counts.items())), "regions": dict(sorted(by_region.items())),
            "passages": passages, "anchored_missions": anchored, "roles": roles, "fields": fields,
-           "buildings": placed}
+           "civic": civic, "buildings": placed}
     with open(OUT, "w") as f:
         json.dump(doc, f, indent=1)
         f.write("\n")
@@ -1611,7 +1779,8 @@ def plinth_boxes(b):
     if t not in _AABBS:
         _AABBS[t] = type_aabb(t)
     x0, z0, x1, z1, _h = _AABBS[t]
-    x0, z0, x1, z1 = x0 - PLINTH_MARGIN, z0 - PLINTH_MARGIN, x1 + PLINTH_MARGIN, z1 + PLINTH_MARGIN
+    m = b.get("plinth") or [PLINTH_MARGIN] * 4          # per side (x0, z0, x1, z1), `fit_plinths` shrinks a side
+    x0, z0, x1, z1 = x0 - m[0], z0 - m[1], x1 + m[2], z1 + m[3]
     top = LOT_RAISE + PLINTH_LIFT
     depth = b.get("lot_depth", 0.5) + top
     sx, sz = x1 - x0, z1 - z0
@@ -1622,6 +1791,48 @@ def plinth_boxes(b):
     oz = b["pos"][2] - lx * s + lz * c
     oy = b["pos"][1] + top - depth / 2.0
     return (c, s), (sx, depth, sz), (ox, oy, oz)
+
+
+def _plinth_poly(b):
+    from shapely.geometry import Polygon
+    (c, s), (sx, _sy, sz), (ox, _oy, oz) = plinth_boxes(b)
+    hx, hz = sx / 2.0, sz / 2.0
+    return Polygon([(ox + x * c + z * s, oz - x * s + z * c) for x, z in ((-hx, -hz), (hx, -hz), (hx, hz), (-hx, hz))])
+
+
+def fit_plinths(placed):
+    """No two PLINTHS overlap (2026-09-28): the plinth is what renders since the lot slab went (a building stands on
+    its footprint + PLINTH_MARGIN, over the block's private ground), and two coplanar plinths z-fight -- 48 pairs,
+    69 m2 measured. Each overlapping pair shrinks the margin of the side of each building that faces the other, a
+    step at a time, down to the footprint itself; a pair whose FOOTPRINTS overlap is reported."""
+    from shapely.strtree import STRtree
+    for b in placed:
+        b.pop("plinth", None)
+    for _round in range(6):
+        polys = [_plinth_poly(b) for b in placed]
+        tree = STRtree(polys)
+        pairs = [(i, int(j)) for i, p in enumerate(polys) for j in tree.query(p)
+                 if int(j) > i and p.intersection(polys[int(j)]).area > 0.01]
+        if not pairs:
+            break
+        for i, j in pairs:
+            for k, o in ((i, j), (j, i)):
+                b, other = placed[k], placed[o]
+                a = math.radians(b["yaw"])
+                c, sn = math.cos(a), math.sin(a)
+                dx, dz = other["pos"][0] - b["pos"][0], other["pos"][2] - b["pos"][2]
+                lx, lz = dx * c - dz * sn, dx * sn + dz * c          # the other building in b's own frame
+                side = (2 if lx > 0 else 0) if abs(lx) >= abs(lz) else (3 if lz > 0 else 1)
+                m = b.get("plinth") or [PLINTH_MARGIN] * 4
+                m[side] = round(max(0.0, m[side] - 0.05), 3)
+                b["plinth"] = m
+    polys = [_plinth_poly(b) for b in placed]
+    tree = STRtree(polys)
+    left = [(i, int(j)) for i, p in enumerate(polys) for j in tree.query(p)
+            if int(j) > i and p.intersection(polys[int(j)]).area > 0.01]
+    print("island_buildings: plinths fitted; %d buildings trimmed, %d pair(s) still overlap%s"
+          % (sum(1 for b in placed if b.get("plinth")), len(left), " -- footprints clash" if left else ""))
+    return left
 
 
 DRIVE_W = 5.0          # a 段差スロープ (kerb ramp): this wide along the kerb, in front of a car park's entrance...
@@ -1698,13 +1909,18 @@ def lots_record(check):
     before = [list(b["lot"]) for b in doc["buildings"]]
     aabbs = {t: type_aabb(t) for t in {b["type"] for b in doc["buildings"]}}
     left = separate_lots(doc["buildings"], aabbs)
+    pbefore = [b.get("plinth") for b in doc["buildings"]]
+    pleft = fit_plinths(doc["buildings"])
     changed = sum(1 for a, b in zip(before, doc["buildings"]) if a != b["lot"])
+    changed += sum(1 for a, b in zip(pbefore, doc["buildings"]) if a != b.get("plinth"))
     print("island_buildings: %d of %d lots trimmed" % (changed, len(before)))
     if changed and not check:
         with open(OUT, "w") as f:
             json.dump(doc, f, indent=1)
             f.write("\n")
-    return 1 if (check and (changed or left)) else 0
+    # the gate is the PLINTHS (what renders); a lot rect is record data since the lot slab went, and the few lots rotated
+    # against each other that no rectangle can separate are reported, not failed
+    return 1 if (check and (changed or pleft)) else 0
 
 
 def retone_record(check):
@@ -1988,8 +2204,8 @@ def patch_peds(text, cells, network_y):
 
 
 HOME_PARK = "ParkingLot4"     # the safe house's own car park (user, 2026-09-26)
-HOME_PARK_KEEP = {"KonbiniS", "KonbiniL", "FamilyRestaurant", "GasStation", "GasKiosk", "StationBuilding",
-                  "StationRural", "ParkingLot4", "ParkingLot8", "ParkingLot14"}
+HOME_PARK_KEEP = {"KonbiniS", "KonbiniL", "FamilyRestaurant", "GasStation", "GasKiosk",
+                  "ParkingLot4", "ParkingLot8", "ParkingLot14"}
 
 
 def home_park_neighbour(placed, b):
@@ -2063,6 +2279,17 @@ def apply_anchors(placed):
                     print("island_buildings: the %s beside the safe house becomes its car park" % park["type"])
                 park["type"], park["role"] = HOME_PARK, "home_park"
                 park.pop("scene", None)
+                # ...and slides along the row until it clears the house: the car park is wider than the building
+                # it replaced, and stood 5.4 m2 into the safe house's plinth (2026-09-28)
+                ux, uz = math.cos(oa), -math.sin(oa)                  # the row: the park's local +X
+                along = (park["pos"][0] - near["pos"][0]) * ux + (park["pos"][2] - near["pos"][2]) * uz
+                hx0, _a, hx1, _b, _h = type_aabb(near["type"])
+                px0, _c, px1, _d, _h2 = type_aabb(HOME_PARK)
+                want_d = (hx1 - hx0) / 2.0 + (px1 - px0) / 2.0 + 2.0 * PLINTH_MARGIN + 0.1
+                if abs(along) < want_d:
+                    k = math.copysign(want_d - abs(along), along or 1.0)
+                    park["pos"] = [round(park["pos"][0] + ux * k, 3), park["pos"][1], round(park["pos"][2] + uz * k, 3)]
+                    print("island_buildings: the safe house's car park slides %.1f m along the row to clear it" % k)
             if role:
                 near["role"] = role
                 roles[role] = {"pos": [round(v, 3) for v in near["pos"]], "yaw": near["yaw"], "type": near["type"]}
@@ -2550,6 +2777,8 @@ def main(argv):
         return anchors_only("--check" in argv)
     if argv[:1] == ["places"]:
         return places_only("--check" in argv)
+    if argv[:1] == ["roads"]:
+        return roads_check()
     if argv[:1] == ["sidewalks"]:
         return sidewalks_only("--check" in argv)
     if argv[:1] == ["clearance"]:

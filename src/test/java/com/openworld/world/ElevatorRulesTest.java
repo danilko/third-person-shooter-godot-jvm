@@ -87,4 +87,38 @@ class ElevatorRulesTest {
             }
         }
     }
+
+    @Test
+    void withFourStopsARiderIsSweptUpAFloorAtATimeAndNeverTurnedRound() {
+        ElevatorRules r = new ElevatorRules(new double[]{0.0, 4.2, 8.0, 11.8});
+        r.call(0);
+        run(r, 1.5, 0, false);
+        r.board();
+        run(r, 10.0, 1, false);                    // taken to the next floor
+        assertEquals(1, r.stop);
+        run(r, 60.0, 1, false);                    // stays aboard: carried on, up to the top, and no further
+        assertEquals(3, r.stop);
+        assertEquals(11.8, r.y, 1e-9);
+        assertEquals(3, r.trips);
+        run(r, 30.0, 1, false);
+        assertEquals(3, r.stop);                   // the sweep ends at the top: no ride back down with them in it
+        r.call(3);                                 // they step out and in again: now it goes down
+        run(r, 1.5, 1, false);
+        r.board();
+        run(r, 10.0, 1, false);
+        assertEquals(2, r.stop);
+    }
+
+    @Test
+    void withFourStopsARiderWhoStepsOutIsNotCarriedOn() {
+        ElevatorRules r = new ElevatorRules(new double[]{0.0, 4.2, 8.0, 11.8});
+        r.call(0);
+        run(r, 1.5, 0, false);
+        r.board();
+        run(r, 10.0, 1, false);
+        assertEquals(1, r.stop);
+        run(r, 30.0, 0, false);                    // got off at floor 1: the car waits there
+        assertEquals(1, r.stop);
+        assertEquals(ElevatorRules.Phase.IDLE, r.phase);
+    }
 }

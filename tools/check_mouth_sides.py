@@ -33,6 +33,16 @@ def half(road):
     return max(b.lanes_fwd, b.lanes_bwd) * b.lane_width + b.median_width / 2.0      # the CARRIAGEWAY's half
 
 
+def deck_half(road):
+    """The PAVED half: carriageway + the wider footway -- the half width of a mouth's CAP (its stop line, kerb and
+    footway ends)."""
+    b = road.base
+    return half(road) + max(getattr(b, "left_walk_width", 0.0), getattr(b, "right_walk_width", 0.0))
+
+
+HEAD_ON = math.cos(math.radians(145.0))   # two mouths leaving a pad this close to opposite ways are ONE through road
+
+
 def base(n):
     return n.split("__")[0]
 
@@ -59,14 +69,66 @@ def _outward(net, road, u, c):
     return ((p[0] - c[0]) / d, (p[1] - c[1]) / d), ch
 
 
+CAP_GAP = 0.5         # m two mouths' caps keep between them
+
+
+def _cap(net, road_of, u, c, at=None):
+    """A mouth's cap as a segment, at `at` (default: where it is): square to its road's outward direction, the road's
+    paved half each side."""
+    r = net.roads[road_of[u]]
+    (ox, oy), _ch = _outward(net, r, u, c)
+    p = at or net.points[u].pos
+    h = deck_half(r)
+    return (p[0] - oy * h, p[1] + ox * h), (p[0] + oy * h, p[1] - ox * h)
+
+
+def _seg_dist(a, b, c, d):
+    def cross(o, p, q):
+        return (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0])
+    if (cross(a, b, c) > 0) != (cross(a, b, d) > 0) and (cross(c, d, a) > 0) != (cross(c, d, b) > 0):
+        return 0.0
+
+    def pt(p, q, r):
+        dx, dy = r[0] - q[0], r[1] - q[1]
+        L2 = dx * dx + dy * dy or 1e-9
+        t = max(0.0, min(1.0, ((p[0] - q[0]) * dx + (p[1] - q[1]) * dy) / L2))
+        return math.hypot(p[0] - q[0] - dx * t, p[1] - q[1] - dy * t)
+    return min(pt(a, c, d), pt(b, c, d), pt(c, a, b), pt(d, a, b))
+
+
+def _caps_touch(net, road_of, u, v, c, at=None):
+    return _seg_dist(*_cap(net, road_of, u, c, at), *_cap(net, road_of, v, c)) < CAP_GAP
+
+
+def _through(net, cl, c, road_of):
+    """[([mouth, mouth], paved half)]: the roads running THROUGH this pad -- two mouths of one road name, or two
+    otherwise unpaired mouths leaving it close to head-on (a road that changes its name at the pad)."""
+    by = {}
+    for u in cl:
+        by.setdefault(base(road_of[u]), []).append(u)
+    thru = [(ms, half(net.roads[road_of[ms[0]]])) for ms in by.values() if len(ms) == 2]
+    # a through road may change its NAME at the pad (ring_kita__12__x1 -> kaigan_dori__8): any two otherwise
+    # unpaired mouths leaving it close to head-on are one road through it
+    paired = {q for ms, _h in thru for q in ms}
+    free = [u for u in cl if u not in paired and len(net.roads[road_of[u]].points) >= 2]
+    outs = {u: _outward(net, net.roads[road_of[u]], u, c)[0] for u in free}
+    best = None
+    for i, u in enumerate(free):
+        for v in free[i + 1:]:
+            dot = outs[u][0] * outs[v][0] + outs[u][1] * outs[v][1]
+            if dot < HEAD_ON and (best is None or dot < best[0]):
+                best = (dot, u, v)
+    if best is not None:
+        _d, u, v = best
+        thru.append(([u, v], min(half(net.roads[road_of[u]]), half(net.roads[road_of[v]]))))
+    return thru
+
+
 def findings(net):
     """[(uid, road, why, needed distance from the pad centre, godot (x, z))]."""
     out = []
     for cl, c, road_of in _pads(net):
-        by = {}
-        for u in cl:
-            by.setdefault(base(road_of[u]), []).append(u)
-        thru = [(ms, half(net.roads[road_of[ms[0]]])) for ms in by.values() if len(ms) == 2]
+        thru = _through(net, cl, c, road_of)
         for u in cl:
             r = net.roads[road_of[u]]
             if len(r.points) < 2:
@@ -92,7 +154,7 @@ def findings(net):
                     why = why or "inside %s's carriageway (%.1f of %.1f m)" % (road_of[ms[0]], d, hw)
                     need = max(need, hw + MARGIN)
                 # ...and on ITS OWN ROAD'S side of it: a lopsided pad (eki_minami_dori's mouth 11.7 m PAST the ring
-                # road, while hatoba_dori's mouths 63 m south dragged the pad centre past it) hides an overshoot from
+                # road, while a quay street's mouths 63 m south dragged the pad centre past it) hides an overshoot from
                 # the "heads back into the pad" test
                 ch = r.points if r.points[0] == u else r.points[::-1]
                 far = None
@@ -106,6 +168,19 @@ def findings(net):
                     if sf * sd < 0:
                         why = why or "past %s's centreline (%.1f m on the far side)" % (road_of[ms[0]], d)
                         need = max(need, hw + MARGIN)
+            # TWO MOUTHS' CAPS OVERLAP: a minor road's stop line laid across a through road's kerb and footway (rinkai_dori
+            # into ring_kita's cap where the ring bends through the pad, probe_road_clear 2026-09-28). The minor mouth
+            # moves out; of two minor mouths, the one nearer the centre.
+            if not why and u not in {q for ms, _h in thru for q in ms}:
+                for v in cl:
+                    if v == u:
+                        continue
+                    if _caps_touch(net, road_of, u, v, c):
+                        vmin = v not in {q for ms, _h in thru for q in ms}
+                        if not vmin or math.dist(p[:2], c) <= math.dist(net.points[v].pos[:2], c):
+                            why = "its cap overlaps %s's cap" % road_of[v]
+                            need = max(need, math.dist(p[:2], c) + 4.0)
+                            break
             if why:
                 out.append((u, road_of[u], why, max(need, MOUTH), (round(p[0]), round(-p[1]))))
     return out
@@ -131,15 +206,14 @@ def fix(net, lock=False):
         # out along its own road until it clears every through road's carriageway by MARGIN (the pad centre of a T is
         # not on the through road's centreline, so a distance from the centre alone can fall short)
         lines = []
-        by = {}
         road_of = {q: n for n, rr in net.roads.items() for q in rr.points}
         for cl, cc, _ro in _pads(net):
-            if u in cl:
-                for q in cl:
-                    by.setdefault(base(road_of[q]), []).append(q)
-        # the side of each through line this road comes from: its first station OUT_MIN off that line
-        for nm, ms in by.items():
-            if len(ms) == 2 and u not in ms:
+            if u not in cl:
+                continue
+            # the side of each through line this road comes from: its first station OUT_MIN off that line
+            for ms, hw in _through(net, cl, cc, road_of):
+                if u in ms:
+                    continue
                 a, b = net.points[ms[0]].pos, net.points[ms[1]].pos
                 dx, dy = b[0] - a[0], b[1] - a[1]
                 L = math.hypot(dx, dy) or 1.0
@@ -150,10 +224,11 @@ def fix(net, lock=False):
                     if abs(sq) >= OUT_MIN:
                         side = math.copysign(1.0, sq)
                         break
-                lines.append((a, b, half(net.roads[road_of[ms[0]]]), side))
+                lines.append((a, b, hw, side))
+        others = [q for cl, _cc, _ro in _pads(net) if u in cl for q in cl if q != u]
         for _ in range(60):
             tx, ty = c[0] + ox * need, c[1] + oy * need
-            ok = True
+            ok = not any(_caps_touch(net, road_of, u, q, c, (tx, ty)) for q in others)
             for a, b, hw, side in lines:
                 dx, dy = b[0] - a[0], b[1] - a[1]
                 L = math.hypot(dx, dy) or 1.0

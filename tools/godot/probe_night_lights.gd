@@ -29,6 +29,11 @@ func _check(ok: bool, what: String) -> void:
 		fails += 1
 
 func _day_night() -> Node: return root.get_node_or_null("DayNight")
+func _wait_seconds(t: float) -> void:
+	var t0 := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t0 < int(t * 1000.0):
+		await process_frame
+
 func _lamps() -> Node: return root.get_node_or_null("StreetLights")
 
 func _batches(asset: String) -> Array:
@@ -115,9 +120,8 @@ func _initialize() -> void:
 	_check(noon_elev > 10.0 and noon_night < 0.05, "noon reads as day")
 	_check(night_elev < -8.0 and night_night > 0.95, "midnight reads as night")
 
-	# --- 2. the lamp pool
-	for f in 20:
-		await process_frame
+	# --- 2. the lamp pool (waited in TIME: it re-assigns every 0.25 s, longer than 20 headless frames)
+	await _wait_seconds(0.8)
 	var lit: int = sl.call("lit_lamps_now")
 	var nearest: float = sl.call("nearest_lamp_now")
 	var head: Vector3 = sl.call("lit_lamp_position_now", 0) if lit > 0 else Vector3.ZERO
@@ -131,9 +135,9 @@ func _initialize() -> void:
 			"the light sits at the luminaire, %.2f m up" % LAMP_HEAD_Y)
 
 	# out of range: no lamp near, nothing lit
-	_camera_at(lamp + Vector3(300, 60, 300), Vector3.DOWN)
-	for f in 20:
-		await process_frame
+	# out over the water north of the west island (DebugWorld, tools/debug_world_layout.py): no road within 180 m
+	_camera_at(Vector3(lamp.x, 60.0, -420.0), Vector3.DOWN)
+	await _wait_seconds(0.8)
 	_check(int(sl.call("lit_lamps_now")) == 0, "a camera 400 m from every lamp lights none")
 
 	# --- 3. a lamp that is down is dark

@@ -27,8 +27,8 @@ folder and matched to a CREDITS.md row; a folder with no row was opened and trac
 | `assets/world_source/kits/quaternius_*` | kits | Quaternius, CC0, credited | ok |
 | `assets/world_source/kits/quaternius_stylized_nature` | vegetation kit | Quaternius Stylized Nature MegaKit (Standard), CC0 1.0 (`License.txt` kept at the kit root), credited | ok |
 | `assets/world_source/kits/road_kit`, `pieces/`, road glTFs in `src/.../pieces/` | ours | this project | ok |
-| `assets/world_source/kits/library` | 24 re-textured base meshes (elbolilloduro models, CC0), our modelled pieces, ambientCG CC0 textures, generated textures | credited; the packs' own textures are NOT used and the downloads are not in the repo | ok (resolved 2026-09-18) |
-| `assets/vehicles` | SPC1 (project author's model); PIT1, POC1 (elbolilloduro "Vegetation" pack models, CC0), all flat materials of our own | credited; the Vegetation pack's textures (`Car_ex`, `Car_in`, `Car_sheriff*`, `Tire`) are NOT used: its page licenses only "the models" | ok (2026-09-19) |
+| `assets/world_source/kits/library` | our modelled pieces, 21 placeholder boxes, ambientCG CC0 textures, generated textures | ours / ambientCG CC0 (`textures/SOURCES.md`) | ok. **2026-09-28: the 21 elbolilloduro-derived base meshes were REMOVED** (provenance not confirmable) and are same-size placeholders listed in `placeholders.json` |
+| `assets/vehicles` | SPC1 (project author's model); PIT1, POC1 placeholder blocks (ours) | ours | ok. **2026-09-28: the PIT1/POC1 geometry from elbolilloduro's "Vegetation" pack was REMOVED** and replaced by placeholders of the same size and component split |
 | elbolilloduro downloads | 7 packs (incl. Vegetation, 2026-09-19) | models CC0, textures partly Textures.com/Pexels | **removed** from the repo folder; `.gitignore` refuses `kits/elbolilloduro*/` |
 | all PLATEAU-derived files: `assets/world_source/plateau/` (42 precincts), `PLATEAU_RainbowBridge/HanedaTerminal/TokyoTower.blend`, `RecycledBuildingKit.blend`, `plateau_reference/`, `archive/world_6x6/` | PLATEAU CC BY (Tokyo Tower was ours) | **deleted** (owner, 2026-09-18) after the landmarks were rebuilt as our own base models (`kits/library/`, `TokyoStation`, `AirportTerminal` and the rest) from PLATEAU measurements; nothing used them |
 | `archive/retired_road_model`, `assets/world_source/island_v3*.blend` | ours | this project | ok |
@@ -45,3 +45,17 @@ Removed from the tree (still in history): the Guns & Explosives download `assets
 `retarget_ual.py`), `quaternius_downtown_city/source/` (raw download, the kit `.blend` owns the pieces) and a stray
 PLATEAU extractor log. The UAL folders got `.gdignore` (Blender-only sources). The `.bin` buffers of every committed
 glTF are now committed through LFS (they were caught by `*.bin` in `.gitignore`).
+
+## Audit 2026-09-28 (owner: "remove anything from elbolilloduro; keep only sources we can confirm")
+
+File-level, not folder-level. Checked: every image file on disk under `assets/`, `src/`, `addons/`; every image
+referenced by a Godot `.tres`/`.tscn`; every image embedded in or referenced by all 664 `.glb`/`.gltf`; and every
+image datablock (packed or external) in all 62 `.blend` files. **No elbolilloduro texture was found anywhere**; each
+image traces to a row above. What remained from elbolilloduro was GEOMETRY: 21 library base meshes (and their copies
+inside `kits/shops/Shop_*.blend`) and the PIT1/POC1 car models. All were replaced by same-size placeholders.
+
+Left for the owner to decide: `assets/world_source/store/6a8fbe75-...jpeg` is a floor-plan brief with no metadata
+(it appears generated); it is design input, not shipped. Several weapon `.blend`s still carry DANGLING image paths
+to the deleted download folders (`//free-cc0-melee-weapons-pack/...`, a `/Blender/DavidThorn/Library/Large/Texture.png`
+in REV1/SMG1/SNR1): the files are not in the repo and nothing uses them (each weapon's material uses
+`weapons/textures/<id>_base_color.png`), so they are harmless leftovers of the imports.

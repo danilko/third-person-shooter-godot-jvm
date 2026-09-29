@@ -1,0 +1,1396 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/MilitaryBase_mesh.res" id="1_djgq6"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/MilitaryBase_collision.res" id="2_15bp8"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_ogwvi"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_bwbtn"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_kepc0"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_jodqn"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="7_6f6s1"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4qcrg"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_itysb"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mmvy2"]
+size = Vector3(1.2, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5oagp"]
+size = Vector3(1.2, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6xkj8"]
+size = Vector3(1.8, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_71qp3"]
+size = Vector3(1.2, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0ttmy"]
+size = Vector3(1.2, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wpe2j"]
+size = Vector3(1.6, 2.4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2stfu"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yl7le"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0d1n2"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ui0eq"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_3b8q4"]
+size = Vector3(16, 6.4, 6.15)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lpoei"]
+size = Vector3(41, 5.45, 15)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_m8kwy"]
+size = Vector3(20, 8.2, 28)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_huvqb"]
+size = Vector3(0.65, 2.8677, 280.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sw4pv"]
+size = Vector3(100.1, 2.8677, 0.65)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5476j"]
+size = Vector3(130.1, 2.8677, 0.65)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tsxc0"]
+size = Vector3(100.1, 2.8677, 0.65)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_r8qt4"]
+size = Vector3(50.1, 2.8677, 0.65)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2kh3o"]
+size = Vector3(230, 0.1, 285)
+
+[node name="MilitaryBase" type="Node3D" unique_id=806323327]
+metadata/building = {
+"aabb": [Vector3(-115.05, -1.2, -142.05), Vector3(230.15, 27.2, 284.65002)],
+"clear_probes": [],
+"composite": true,
+"door_style": "swing",
+"doors": [{
+"center": [59.0, 0.0, 103.73],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "MilHQ_exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [53.1, 0.0, 94.93],
+"height": 2.1,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "MilHQ_exit",
+"style": "swing",
+"width": 1.2
+}, {
+"center": [96.9, 0.0, 94.93],
+"height": 2.1,
+"module": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"side": "MilHQ_exit",
+"style": "swing",
+"width": 1.2
+}, {
+"center": [48.0, 0.0, 37.895],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "MilBarracks_exit",
+"style": "swing",
+"width": 1.8
+}, {
+"center": [36.1, 0.0, 28.995],
+"height": 2.1,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "MilBarracks_exit",
+"style": "swing",
+"width": 1.2
+}, {
+"center": [83.9, 0.0, 28.995],
+"height": 2.1,
+"module": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"side": "MilBarracks_exit",
+"style": "swing",
+"width": 1.2
+}, {
+"center": [90.0, 0.0, -102.25],
+"height": 2.4,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "MilArmoury_exit",
+"style": "swing",
+"width": 1.6
+}, {
+"center": [-46.795, 0.0, -118.305],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "MilControlTower_exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [-47.7, 0.0, 8.1],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "MilHangar_exit",
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-47.7, 0.0, 51.9],
+"height": 2.1,
+"module": 1.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "MilHangar_exit",
+"style": "swing",
+"width": 0.9
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"facade_surfaces": {},
+"footprint_m": [230.0, 285.0],
+"has_interior": true,
+"height_m": 27.2,
+"id": "MilitaryBase",
+"inner_doors": [{
+"center": [72.4, 8.0, 94.07],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [72.0, 0.0, 95.83],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [84.0, 0.0, 95.83],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [93.0, 0.0, 95.83],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [54.6, 0.0, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [59.5, 0.0, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [67.0, 0.0, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [72.4, 0.0, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [77.5, 0.0, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [85.0, 0.0, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [93.0, 0.0, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [63.0, 4.2, 95.83],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [72.0, 4.2, 95.83],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [87.0, 4.2, 95.83],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [54.6, 4.2, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [59.5, 4.2, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [67.0, 4.2, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [72.4, 4.2, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [77.5, 4.2, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [85.0, 4.2, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [93.0, 4.2, 94.03],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [65.0, 0.0, 29.795],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [77.0, 0.0, 29.795],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [60.0, 0.0, 32.995],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [37.6, 0.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [43.0, 0.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [51.0, 0.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [58.0, 0.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [66.0, 0.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [75.0, 0.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [82.4, 0.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [42.1, 4.0, 29.795],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [54.0, 4.0, 29.795],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [66.0, 4.0, 29.795],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [77.9, 4.0, 29.795],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [37.6, 4.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [43.0, 4.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [51.0, 4.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [58.0, 4.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [66.0, 4.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [75.0, 4.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [82.4, 4.0, 28.195],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [84.0, 0.0, -106.0],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-38.795, 0.0, -123.205],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-48.2, 0.0, 15.0],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-48.2, 0.0, 27.0],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-48.2, 0.0, 39.0],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-48.2, 4.0, 48.5],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}],
+"jp": {
+"name": "航空・海上基地 (compact placeholder)"
+},
+"kit": "library",
+"lifts": [{
+"center": [70.0, 0.0, 93.155],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 4.2,
+"stops": "0,4.2",
+"w": 1.6,
+"yaw": 90.0
+}, {
+"center": [79.9, 0.0, 27.32],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 4.0,
+"stops": "0,4",
+"w": 1.6,
+"yaw": 90.0
+}, {
+"center": [-32.895, 0.0, -124.505],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 20.0,
+"stops": "0,4,8,12,16,20",
+"w": 1.6,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [70.8, 0.0, 99.83],
+"props": {
+"kind": "objective",
+"note": "the operations room (作戦室)"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_02",
+"pos": [66.0, 4.2, 102.43],
+"props": {
+"kind": "objective",
+"note": "the commander's safe"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [59.0, 0.0, 97.83],
+"props": {
+"kind": "spawn",
+"note": "the duty guard",
+"team": "soldier"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [60.0, 4.2, 101.63],
+"props": {
+"kind": "spawn",
+"note": "the base commander",
+"team": "vip"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [87.0, 4.2, 97.83],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_01",
+"pos": [75.0, 0.0, 87.63],
+"props": {
+"kind": "weapon",
+"weapon": "PIS1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_02",
+"pos": [78.0, 0.0, 87.63],
+"props": {
+"kind": "weapon",
+"weapon": "ASR1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [48.0, 0.0, 30.995],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [40.1, 4.0, 33.395],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [52.0, 4.0, 33.395],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [64.0, 4.0, 33.395],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_05",
+"pos": [75.9, 4.0, 33.395],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [92.0, 0.0, -106.7],
+"props": {
+"kind": "spawn",
+"note": "the armourer, behind the cage",
+"team": "soldier"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_01",
+"pos": [79.6, 0.0, -107.6],
+"props": {
+"kind": "weapon",
+"weapon": "ASR1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_02",
+"pos": [100.4, 0.0, -107.6],
+"props": {
+"kind": "weapon",
+"weapon": "SHG1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_03",
+"pos": [79.6, 0.0, -109.7],
+"props": {
+"kind": "weapon",
+"weapon": "ASR1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_04",
+"pos": [100.4, 0.0, -109.7],
+"props": {
+"kind": "weapon",
+"weapon": "SNR1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_05",
+"pos": [79.6, 0.0, -111.8],
+"props": {
+"kind": "weapon",
+"weapon": "ASR2"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_06",
+"pos": [100.4, 0.0, -111.8],
+"props": {
+"kind": "weapon",
+"weapon": "ATL1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_07",
+"pos": [79.6, 0.0, -113.9],
+"props": {
+"kind": "weapon",
+"weapon": "SMG1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_08",
+"pos": [100.4, 0.0, -113.9],
+"props": {
+"kind": "weapon",
+"weapon": "ATL1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_09",
+"pos": [79.6, 0.0, -116.0],
+"props": {
+"kind": "weapon",
+"weapon": "SMG1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_weapon_10",
+"pos": [100.4, 0.0, -116.0],
+"props": {
+"kind": "weapon",
+"weapon": "SHG1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_weapon_11",
+"pos": [85.6, 0.0, -116.3],
+"props": {
+"kind": "weapon",
+"weapon": "PIS1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_12",
+"pos": [86.5, 0.0, -116.3],
+"props": {
+"kind": "weapon",
+"weapon": "PIS2"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_13",
+"pos": [87.4, 0.0, -116.3],
+"props": {
+"kind": "weapon",
+"weapon": "REV1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_14",
+"pos": [88.3, 0.0, -116.3],
+"props": {
+"kind": "weapon",
+"weapon": "DUP1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_weapon_15",
+"pos": [88.8, 0.0, -108.6],
+"props": {
+"kind": "weapon",
+"weapon": "FRG1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_16",
+"pos": [91.2, 0.0, -108.6],
+"props": {
+"kind": "weapon",
+"weapon": "FRG1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_17",
+"pos": [88.8, 0.0, -109.9],
+"props": {
+"kind": "weapon",
+"weapon": "PIB1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_18",
+"pos": [91.2, 0.0, -109.9],
+"props": {
+"kind": "weapon",
+"weapon": "FLA1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_19",
+"pos": [88.8, 0.0, -111.2],
+"props": {
+"kind": "weapon",
+"weapon": "SMO1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_20",
+"pos": [91.2, 0.0, -111.2],
+"props": {
+"kind": "weapon",
+"weapon": "REC1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_weapon_21",
+"pos": [88.8, 0.0, -112.5],
+"props": {
+"kind": "weapon",
+"weapon": "MEW1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_cover_01",
+"pos": [-31.795, 20.0, -130.205],
+"props": {
+"kind": "cover",
+"note": "a sniper's view over the airfield"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [-44.795, 0.0, -121.705],
+"props": {
+"kind": "spawn",
+"team": "soldier"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-33.295, 20.0, -126.205],
+"props": {
+"kind": "spawn",
+"note": "the controller in the cab",
+"team": "soldier"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_cover_01",
+"pos": [-65.7, 0.0, 30.0],
+"props": {
+"kind": "cover"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [-49.7, 0.0, 27.0],
+"props": {
+"kind": "spawn",
+"note": "ground crew",
+"team": "soldier"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-46.7, 4.0, 30.0],
+"props": {
+"kind": "spawn",
+"note": "the flight office",
+"team": "soldier"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_01",
+"pos": [-62.7, 0.0, 20.5],
+"props": {
+"faction": "military",
+"kind": "vehicle",
+"vehicle": "FIJ1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_02",
+"pos": [-62.7, 0.0, 39.5],
+"props": {
+"faction": "military",
+"kind": "vehicle",
+"vehicle": "FIJ1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_CRT1_42",
+"pos": [68.0, 0.0, -30.0],
+"props": {
+"faction": "military",
+"kind": "vehicle",
+"vehicle": "CRT1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_CRT1_43",
+"pos": [80.0, 0.0, -30.0],
+"props": {
+"faction": "military",
+"kind": "vehicle",
+"vehicle": "CRT1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_CRT1_44",
+"pos": [92.0, 0.0, -30.0],
+"props": {
+"faction": "military",
+"kind": "vehicle",
+"vehicle": "CRT1"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_FIJ1_45",
+"pos": [-100.0, 0.0, -60.0],
+"props": {
+"faction": "military",
+"kind": "vehicle",
+"vehicle": "FIJ1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_FIJ1_46",
+"pos": [-100.0, 0.0, -90.0],
+"props": {
+"faction": "military",
+"kind": "vehicle",
+"vehicle": "FIJ1"
+},
+"yaw": 90.0
+}],
+"piece_count": 85,
+"probe_xz": [0.0, 0.0],
+"props_top_m": 12.0,
+"roofline_m": 27.2,
+"solid_probes": [],
+"use": "a COMPACT air/naval base (user, 2026-09-28): gate + guardhouse on the +Z side (the gate road), HQ, barracks, parade ground, motor pool with trucks, fuel depot, armoury bunker, helipad, control tower, one fighter hangar (two jets) and an apron row (two jets) on the -X side where the runway (MilitaryAirfield) abuts, the pier (MilitaryPier) through the gap in the -Z fence. Everything within ~300 m. The HQ, barracks, armoury, hangar and control tower are walkable mission buildings (kits/interiors/Mil*.blend); the jets (FIJ1) and trucks (CRT1) are drivable parked vehicles. PLACEHOLDER (library_civic.py, kits/interiors)",
+"wall_top_m": 0.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=313511387]
+visibility_range_end = 612.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_djgq6")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1821799337]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=241065887]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 59.45, 1.05, 103.73)
+shape = SubResource("BoxShape3D_4qcrg")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1891304488]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.55, 1.05, 103.73)
+shape = SubResource("BoxShape3D_itysb")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=805329463]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 53.1, 1.05, 94.93)
+shape = SubResource("BoxShape3D_mmvy2")
+
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=1617262445]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 96.9, 1.05, 94.93)
+shape = SubResource("BoxShape3D_5oagp")
+
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=645266777]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 1.05, 37.895)
+shape = SubResource("BoxShape3D_6xkj8")
+
+[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=1177282909]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 36.1, 1.05, 28.995)
+shape = SubResource("BoxShape3D_71qp3")
+
+[node name="DoorLeaf6" type="CollisionShape3D" parent="Collision" unique_id=1757728261]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 83.9, 1.05, 28.995)
+shape = SubResource("BoxShape3D_0ttmy")
+
+[node name="DoorLeaf7" type="CollisionShape3D" parent="Collision" unique_id=652680884]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 90, 1.2, -102.25)
+shape = SubResource("BoxShape3D_wpe2j")
+
+[node name="DoorLeaf8" type="CollisionShape3D" parent="Collision" unique_id=1395224064]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.344997, 1.05, -118.305)
+shape = SubResource("BoxShape3D_2stfu")
+
+[node name="DoorLeaf9" type="CollisionShape3D" parent="Collision" unique_id=1165527345]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -47.245, 1.05, -118.305)
+shape = SubResource("BoxShape3D_yl7le")
+
+[node name="DoorLeaf10" type="CollisionShape3D" parent="Collision" unique_id=626914802]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -47.7, 1.05, 8.1)
+shape = SubResource("BoxShape3D_0d1n2")
+
+[node name="DoorLeaf11" type="CollisionShape3D" parent="Collision" unique_id=1402624903]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -47.7, 1.05, 51.9)
+shape = SubResource("BoxShape3D_ui0eq")
+
+[node name="Box12" type="CollisionShape3D" parent="Collision" unique_id=1911423247]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.2, 139.075)
+shape = SubResource("BoxShape3D_3b8q4")
+
+[node name="Box13" type="CollisionShape3D" parent="Collision" unique_id=1220968390]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 2.675, -30)
+shape = SubResource("BoxShape3D_lpoei")
+
+[node name="Box14" type="CollisionShape3D" parent="Collision" unique_id=671531258]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 97, 4.1, -60)
+shape = SubResource("BoxShape3D_m8kwy")
+
+[node name="Box15" type="CollisionShape3D" parent="Collision" unique_id=1387011727]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 114.775, 1.43385, -2)
+shape = SubResource("BoxShape3D_huvqb")
+
+[node name="Box16" type="CollisionShape3D" parent="Collision" unique_id=349637930]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -65, 1.43385, 142.275)
+shape = SubResource("BoxShape3D_sw4pv")
+
+[node name="Box17" type="CollisionShape3D" parent="Collision" unique_id=116746893]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 1.43385, -141.725)
+shape = SubResource("BoxShape3D_5476j")
+
+[node name="Box18" type="CollisionShape3D" parent="Collision" unique_id=226274389]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65, 1.43385, 142.275)
+shape = SubResource("BoxShape3D_tsxc0")
+
+[node name="Box19" type="CollisionShape3D" parent="Collision" unique_id=1458908115]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 90, 1.43385, -141.725)
+shape = SubResource("BoxShape3D_r8qt4")
+
+[node name="Box20" type="CollisionShape3D" parent="Collision" unique_id=1572807457]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_2kh3o")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=484708803]
+shape = ExtResource("2_15bp8")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=1839184338]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=1638826873]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 70, 0, 93.155)
+script = ExtResource("3_ogwvi")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 4.2
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_bwbtn")
+glass_material = ExtResource("5_kepc0")
+floor_material = ExtResource("6_jodqn")
+in_service = true
+stop_heights = "0,4.2"
+faces = 1
+
+[node name="Lift1" type="Node3D" parent="Lifts" unique_id=529469739]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 79.9, 0, 27.32)
+script = ExtResource("3_ogwvi")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 4.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_bwbtn")
+glass_material = ExtResource("5_kepc0")
+floor_material = ExtResource("6_jodqn")
+in_service = true
+stop_heights = "0,4"
+faces = 1
+
+[node name="Lift2" type="Node3D" parent="Lifts" unique_id=44101647]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -32.895, 0, -124.505)
+script = ExtResource("3_ogwvi")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 20.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_bwbtn")
+glass_material = ExtResource("5_kepc0")
+floor_material = ExtResource("6_jodqn")
+in_service = true
+stop_heights = "0,4,8,12,16,20"
+faces = 1
+
+[node name="Door_MilHQ_exit_0" type="Marker3D" parent="." unique_id=183759295]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 59, 0, 103.73)
+
+[node name="Door_MilHQ_exit_1" type="Marker3D" parent="." unique_id=1798784495]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 53.1, 0, 94.93)
+
+[node name="Door_MilHQ_exit_2" type="Marker3D" parent="." unique_id=873874523]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 96.9, 0, 94.93)
+
+[node name="Door_MilBarracks_exit_0" type="Marker3D" parent="." unique_id=109077707]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 48, 0, 37.895)
+
+[node name="Door_MilBarracks_exit_1" type="Marker3D" parent="." unique_id=543963585]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 36.1, 0, 28.995)
+
+[node name="Door_MilBarracks_exit_2" type="Marker3D" parent="." unique_id=1727753787]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 83.9, 0, 28.995)
+
+[node name="Door_MilArmoury_exit_0" type="Marker3D" parent="." unique_id=956886629]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 90, 0, -102.25)
+
+[node name="Door_MilControlTower_exit_0" type="Marker3D" parent="." unique_id=1045699558]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -46.795, 0, -118.305)
+
+[node name="Door_MilHangar_exit_0" type="Marker3D" parent="." unique_id=492505226]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -47.7, 0, 8.1)
+
+[node name="Door_MilHangar_exit_1" type="Marker3D" parent="." unique_id=1942056111]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -47.7, 0, 51.9)
+
+[node name="Markers" type="Node3D" parent="." unique_id=611124130]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=1500028714 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 70.8, 0, 99.83)
+metadata/note = "the operations room (作戦室)"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=258528253 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 66, 4.2, 102.43)
+metadata/note = "the commander's safe"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1363811774 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 59, 0, 97.83)
+metadata/team = "soldier"
+metadata/note = "the duty guard"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1657317848 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 60, 4.2, 101.63)
+metadata/team = "vip"
+metadata/note = "the base commander"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1980781975 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 87, 4.2, 97.83)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=155635844 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 75, 0, 87.63)
+metadata/weapon = "PIS1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=863331868 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 78, 0, 87.63)
+metadata/weapon = "ASR1"
+metadata/kind = "weapon"
+
+[node name="@Marker3D@2" type="Marker3D" parent="Markers" unique_id=1043466713 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 30.995)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="@Marker3D@3" type="Marker3D" parent="Markers" unique_id=1153243683 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.1, 4, 33.395)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="@Marker3D@4" type="Marker3D" parent="Markers" unique_id=2139486609 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52, 4, 33.395)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=993493280 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64, 4, 33.395)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=619852553 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75.9, 4, 33.395)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="@Marker3D@5" type="Marker3D" parent="Markers" unique_id=1821507585 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 92, 0, -106.7)
+metadata/team = "soldier"
+metadata/note = "the armourer, behind the cage"
+metadata/kind = "spawn"
+
+[node name="@Marker3D@6" type="Marker3D" parent="Markers" unique_id=892308104 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 79.6, 0, -107.6)
+metadata/weapon = "ASR1"
+metadata/kind = "weapon"
+
+[node name="@Marker3D@7" type="Marker3D" parent="Markers" unique_id=831826188 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 100.4, 0, -107.6)
+metadata/weapon = "SHG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_03" type="Marker3D" parent="Markers" unique_id=562755095 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 79.6, 0, -109.7)
+metadata/weapon = "ASR1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_04" type="Marker3D" parent="Markers" unique_id=602535557 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 100.4, 0, -109.7)
+metadata/weapon = "SNR1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_05" type="Marker3D" parent="Markers" unique_id=513852712 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 79.6, 0, -111.8)
+metadata/weapon = "ASR2"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_06" type="Marker3D" parent="Markers" unique_id=776088610 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 100.4, 0, -111.8)
+metadata/weapon = "ATL1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_07" type="Marker3D" parent="Markers" unique_id=1116198865 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 79.6, 0, -113.9)
+metadata/weapon = "SMG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_08" type="Marker3D" parent="Markers" unique_id=671788077 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 100.4, 0, -113.9)
+metadata/weapon = "ATL1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_09" type="Marker3D" parent="Markers" unique_id=892056441 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 79.6, 0, -116)
+metadata/weapon = "SMG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_10" type="Marker3D" parent="Markers" unique_id=2111933175 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 100.4, 0, -116)
+metadata/weapon = "SHG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_11" type="Marker3D" parent="Markers" unique_id=1929539777 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 85.6, 0, -116.3)
+metadata/weapon = "PIS1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_12" type="Marker3D" parent="Markers" unique_id=1250347145 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 86.5, 0, -116.3)
+metadata/weapon = "PIS2"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_13" type="Marker3D" parent="Markers" unique_id=81340673 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 87.4, 0, -116.3)
+metadata/weapon = "REV1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_14" type="Marker3D" parent="Markers" unique_id=2033894620 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 88.3, 0, -116.3)
+metadata/weapon = "DUP1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_15" type="Marker3D" parent="Markers" unique_id=916656472 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 88.8, 0, -108.6)
+metadata/weapon = "FRG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_16" type="Marker3D" parent="Markers" unique_id=681539591 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 91.2, 0, -108.6)
+metadata/weapon = "FRG1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_17" type="Marker3D" parent="Markers" unique_id=1579252659 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 88.8, 0, -109.9)
+metadata/weapon = "PIB1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_18" type="Marker3D" parent="Markers" unique_id=1624872591 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 91.2, 0, -109.9)
+metadata/weapon = "FLA1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_19" type="Marker3D" parent="Markers" unique_id=552188072 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 88.8, 0, -111.2)
+metadata/weapon = "SMO1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_20" type="Marker3D" parent="Markers" unique_id=1620982852 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 91.2, 0, -111.2)
+metadata/weapon = "REC1"
+metadata/kind = "weapon"
+
+[node name="MARK_weapon_21" type="Marker3D" parent="Markers" unique_id=1638055335 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 88.8, 0, -112.5)
+metadata/weapon = "MEW1"
+metadata/kind = "weapon"
+
+[node name="MARK_cover_01" type="Marker3D" parent="Markers" unique_id=1999977475 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31.795, 20, -130.205)
+metadata/note = "a sniper's view over the airfield"
+metadata/kind = "cover"
+
+[node name="@Marker3D@8" type="Marker3D" parent="Markers" unique_id=125298625 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -44.795, 0, -121.705)
+metadata/team = "soldier"
+metadata/kind = "spawn"
+
+[node name="@Marker3D@9" type="Marker3D" parent="Markers" unique_id=1026787253 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -33.295, 20, -126.205)
+metadata/team = "soldier"
+metadata/note = "the controller in the cab"
+metadata/kind = "spawn"
+
+[node name="@Marker3D@10" type="Marker3D" parent="Markers" unique_id=831273616 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -65.7, 0, 30)
+metadata/kind = "cover"
+
+[node name="@Marker3D@11" type="Marker3D" parent="Markers" unique_id=225191579 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -49.7, 0, 27)
+metadata/team = "soldier"
+metadata/note = "ground crew"
+metadata/kind = "spawn"
+
+[node name="@Marker3D@12" type="Marker3D" parent="Markers" unique_id=895867566 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -46.7, 4, 30)
+metadata/team = "soldier"
+metadata/note = "the flight office"
+metadata/kind = "spawn"
+
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=1865792211 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -62.7, 0, 20.5)
+script = ExtResource("7_6f6s1")
+vehicle_id = "FIJ1"
+faction = "military"
+drop_height = 0.3
+metadata/vehicle = "FIJ1"
+metadata/faction = "military"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=1385715537 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -62.7, 0, 39.5)
+script = ExtResource("7_6f6s1")
+vehicle_id = "FIJ1"
+faction = "military"
+drop_height = 0.3
+metadata/vehicle = "FIJ1"
+metadata/faction = "military"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_CRT1_42" type="Node3D" parent="Markers" unique_id=576153622 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 68, 0, -30)
+script = ExtResource("7_6f6s1")
+vehicle_id = "CRT1"
+faction = "military"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "CRT1"
+metadata/faction = "military"
+
+[node name="MARK_vehicle_CRT1_43" type="Node3D" parent="Markers" unique_id=472287896 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, -30)
+script = ExtResource("7_6f6s1")
+vehicle_id = "CRT1"
+faction = "military"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "CRT1"
+metadata/faction = "military"
+
+[node name="MARK_vehicle_CRT1_44" type="Node3D" parent="Markers" unique_id=609656108 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 92, 0, -30)
+script = ExtResource("7_6f6s1")
+vehicle_id = "CRT1"
+faction = "military"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "CRT1"
+metadata/faction = "military"
+
+[node name="MARK_vehicle_FIJ1_45" type="Node3D" parent="Markers" unique_id=1753733077 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -100, 0, -60)
+script = ExtResource("7_6f6s1")
+vehicle_id = "FIJ1"
+faction = "military"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "FIJ1"
+metadata/faction = "military"
+
+[node name="MARK_vehicle_FIJ1_46" type="Node3D" parent="Markers" unique_id=1318029905 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -100, 0, -90)
+script = ExtResource("7_6f6s1")
+vehicle_id = "FIJ1"
+faction = "military"
+drop_height = 0.3
+metadata/kind = "vehicle"
+metadata/vehicle = "FIJ1"
+metadata/faction = "military"

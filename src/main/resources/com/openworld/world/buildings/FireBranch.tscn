@@ -1,0 +1,183 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/FireBranch_mesh.res" id="1_5jtib"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/FireBranch_collision.res" id="2_dy2tf"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="3_vuh3c"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4jie8"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ne3hl"]
+size = Vector3(0.94, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_16dwi"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[node name="FireBranch" type="Node3D" unique_id=1961608088]
+metadata/building = {
+"aabb": [Vector3(-10, -0.2, -12.5), Vector3(20, 6.8999996, 25)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [4.5, 0.0, 9.9],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [-3.8, 0.0, -7.9],
+"height": 2.1,
+"module": 1.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [20.0, 25.0],
+"height_m": 6.9,
+"id": "FireBranch",
+"inner_doors": [{
+"center": [0.0, 0.0, 7.0],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [0.0, 0.0, 1.0],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [6.0, 0.0, 3.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [2.2, 0.0, -2.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [6.5, 0.0, -2.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.8
+}],
+"kit": "interiors",
+"landmark": false,
+"marks": [{
+"name": "MARK_spawn_01",
+"pos": [-4.0, 0.0, 8.5],
+"props": {
+"kind": "spawn",
+"team": "fire"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [3.4, 0.0, 6.5],
+"props": {
+"kind": "spawn",
+"team": "fire"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_vehicle_01",
+"pos": [-5.9, 0.0, 4.0],
+"props": {
+"kind": "vehicle",
+"vehicle": "FIE1"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_02",
+"pos": [-2.2, 0.0, 4.9],
+"props": {
+"kind": "vehicle",
+"vehicle": "AMB1"
+},
+"yaw": 180.0
+}],
+"piece_count": 1,
+"probe_xz": [-4.0, 8.5],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "消防出張所, the SMALL fire station: one storey 16 x 18 m on a 20 x 25 plot -- two open apparatus bays (a pumper, an ambulance), gear racks, the office with its counter, the crew room and kitchen, bunks, WC, the equipment store and back door. kits/interiors/FireBranch.blend (the artist's)",
+"wall_top_m": 6.9
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1421051655]
+visibility_range_end = 380.4
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_5jtib")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1933178452]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=2057036239]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.9500003, 1.05, 9.9)
+shape = SubResource("BoxShape3D_4jie8")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1564894097]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 1.05, 9.9)
+shape = SubResource("BoxShape3D_ne3hl")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=509004586]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -3.8, 1.05, -7.9)
+shape = SubResource("BoxShape3D_16dwi")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1216727364]
+shape = ExtResource("2_dy2tf")
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1117247622]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 4.5, 0, 9.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=27060005]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.8, 0, -7.9)
+
+[node name="Markers" type="Node3D" parent="." unique_id=312129913]
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=466737364 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -4, 0, 8.5)
+metadata/team = "fire"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1333627200 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.4, 0, 6.5)
+metadata/team = "fire"
+metadata/kind = "spawn"
+
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=1031922853 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -5.9, 0, 4)
+script = ExtResource("3_vuh3c")
+vehicle_id = "FIE1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "FIE1"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=618916586 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.2, 0, 4.9)
+script = ExtResource("3_vuh3c")
+vehicle_id = "AMB1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "AMB1"
+metadata/kind = "vehicle"

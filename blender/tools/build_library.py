@@ -1,6 +1,6 @@
 """Build library.blend: the project's own central library of Japanese building parts, interiors and props.
 
-    blender -b --python-exit-code 1 --python blender/tools/build_library.py -- [--extract] [--procedural] [--force]
+    blender -b --python-exit-code 1 --python blender/tools/build_library.py -- [--procedural] [--force]
 
 library.blend OWNS its pieces (the building-kit rule): after this has run, edit a piece in the .blend and run
 `tools/building_kit/build_buildings.sh`, which exports them through `export_building_kit.py`.
@@ -11,12 +11,10 @@ library.blend OWNS its pieces (the building-kit rule): after this has run, edit 
   has been hand-edited and is KEPT (and reported), becoming the artist's. `--force`, or `--only=Name,Name`, regenerates
   such a piece on purpose. Every piece carries an `edit_note` (Object/Collection properties) saying what the game
   assumes about it, and the file carries a `README_artist` text; see also `kits/library/ARTIST_NOTES.md`.
-  Everything else in the file is left alone, so hand edits to extracted pieces survive.
-* `--extract` cuts the pieces listed in `assets/world_source/kits/library/extract.json` out of the elbolilloduro
-  downloads (CC0 models; their textures are NOT cleared and are never used), resizes and faces them, and gives
-  every face a palette material. It needs the downloads, which are deleted afterwards, so it refuses to replace
-  an extracted piece that already exists unless `--force`.
-* no flag: both.
+  Everything else in the file is left alone, so hand edits and the placeholder pieces survive.
+* The pieces once cut from elbolilloduro's packs are GONE (2026-09-28, owner decision: provenance not confirmable);
+  they are same-size placeholder boxes listed in `kits/library/placeholders.json`, owned by library.blend like any
+  hand-modelled piece (`blender/tools/replace_removed_meshes.py` is the record). This script never touches them.
 
 Every piece is a collection named after it holding one object; the collection's `instance_offset` is its grid spot
 (export moves it back to the origin). Piece frame: Z up, origin at the footprint centre on the floor, the side a
@@ -39,10 +37,7 @@ BLEND = os.path.join(KIT, "library.blend")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-_any = {"--extract", "--procedural", "--reframe"} & set(argv)
-DO_EXTRACT = "--extract" in argv or not _any
-DO_PROC = "--procedural" in argv or not _any
-DO_REFRAME = "--reframe" in argv or not _any
+DO_PROC = True    # the only job left: --procedural is accepted for old command lines
 FORCE = "--force" in argv
 ONLY = {n for a in argv if a.startswith("--only=") for n in a[len("--only="):].split(",") if n}
 GRID = 6.0          # metres between piece spots in the file
@@ -130,154 +125,12 @@ def relayout():
         col.instance_offset = spot
 
 
-# ── extraction (one-time, from local downloads) ──────────────────────────────────────────────────────────────
-
-def _import(path):
-    before = set(bpy.data.objects)
-    if path.endswith(".fbx"):
-        bpy.ops.import_scene.fbx(filepath=path)
-    else:
-        bpy.ops.import_scene.gltf(filepath=path)
-    return [o for o in bpy.data.objects if o not in before]
-
-
-def _palette_for(spec, src_mat):
-    low = (src_mat or "").lower()
-    for key, target in (spec.get("mat") or {}).items():
-        if key in low:
-            return target
-    for key, target in (("glass", "MI_GlassClear"), ("light", "MI_Light"), ("emissor", "MI_Light"),
-                        ("mirror", "MI_Steel")):
-        if key in low:
-            return target
-    return spec["default"]
-
-
-def _joined_mesh(spec, objs):
-    """One mesh from the listed source objects, world transforms applied, faces on palette materials."""
-    bm = bmesh.new()
-    mats = []
-    for o in objs:
-        me = o.data.copy()
-        me.transform(o.matrix_world)
-        remap = []
-        for slot in (o.material_slots or []):
-            target = _palette_for(spec, slot.material.name if slot.material else "")
-            if target not in mats:
-                mats.append(target)
-            remap.append(mats.index(target))
-        if not remap:
-            if spec["default"] not in mats:
-                mats.append(spec["default"])
-            remap = [mats.index(spec["default"])]
-        for p in me.polygons:
-            p.material_index = remap[min(p.material_index, len(remap) - 1)]
-        bm.from_mesh(me)
-        bpy.data.meshes.remove(me)
-    mesh = bpy.data.meshes.new(spec["name"])
-    bm.to_mesh(mesh)
-    bm.free()
-    for name in mats:
-        mesh.materials.append(material(name))
-    for attr in list(mesh.color_attributes):
-        mesh.color_attributes.remove(attr)
-    return mesh
-
-
-def _frame(mesh, spec):
-    """Rotate about Z, fit to the Japanese size, and put the origin at the footprint centre on the floor."""
-    rot = mathutils.Matrix.Rotation(math.radians(spec.get("rot_z", 0)), 4, "Z")
-    mesh.transform(rot)
-    lo = mathutils.Vector((min(v.co[i] for v in mesh.vertices) for i in range(3)))
-    hi = mathutils.Vector((max(v.co[i] for v in mesh.vertices) for i in range(3)))
-    s = 1.0
-    if spec.get("fit"):
-        axis, size = spec["fit"]
-        k = "xyz".index(axis)
-        s = size / (hi[k] - lo[k])
-    base = float(spec.get("base", 0.0))
-    move = mathutils.Matrix.Translation((0, 0, base)) @ mathutils.Matrix.Scale(s, 4) @ \
-        mathutils.Matrix.Translation((-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z))
-    mesh.transform(move)
-    mesh.update()
-    return s
-
-
-def extract():
-    spec = json.load(open(os.path.join(KIT, "extract.json")))
-    by_src = {}
-    for p in spec["pieces"]:
-        by_src.setdefault(p["src"], []).append(p)
-    report = []
-    for src, pieces in by_src.items():
-        path = os.path.join(KITS, spec["sources"][src])
-        todo = [p for p in pieces if FORCE or bpy.data.collections.get(p["name"]) is None]
-        if not todo:
-            continue
-        if not os.path.exists(path):
-            raise SystemExit("build_library --extract: %s is gone (the downloads are deleted after extraction);"
-                             " the pieces already in library.blend are the owners" % spec["sources"][src])
-        imported = _import(path)
-        by_name = {o.name: o for o in imported}
-        for p in todo:
-            missing = [n for n in p["objects"] if n not in by_name]
-            if missing:
-                raise SystemExit("build_library: %s: no object(s) %s in %s" % (p["name"], missing, src))
-            mesh = _joined_mesh(p, [by_name[n] for n in p["objects"]])
-            s = _frame(mesh, p)
-            note = "elbolilloduro %s (%s), objects %s, scaled %.3f, re-textured" % (
-                src, os.path.basename(spec["sources"][src]), ", ".join(p["objects"]), s)
-            install_piece(p["name"], p["cat"], mesh, note, procedural=False)
-            d = mesh_dims(mesh)
-            report.append("%-24s %-10s %5.2f x %5.2f x %5.2f m  %5d tris  scale %.3f" % (
-                p["name"], p["cat"], d[0], d[1], d[2], sum(len(f.vertices) - 2 for f in mesh.polygons), s))
-        for o in imported:
-            me = o.data if o.type == "MESH" else None
-            bpy.data.objects.remove(o, do_unlink=True)
-            if me is not None and me.users == 0:
-                bpy.data.meshes.remove(me)
-        for block in (bpy.data.meshes, bpy.data.materials, bpy.data.images, bpy.data.textures):
-            for d in list(block):
-                if d.users == 0 and not d.name.startswith("MI_"):
-                    block.remove(d)
-    for line in report:
-        print("[build_library] extract " + line)
-
-
-def reframe():
-    """Apply extract.json's `fit_box` (a non-uniform resize to a real Japanese size) and its `jp` review to the
-    extracted pieces ALREADY in the file. Idempotent: a piece at its size is left alone."""
-    spec = json.load(open(os.path.join(KIT, "extract.json")))
-    for p in spec["pieces"]:
-        col = bpy.data.collections.get(p["name"])
-        if col is None:
-            continue
-        review = p.get("jp", {})
-        col["lib_review"] = "%s: %s" % (review.get("status", "?"), review.get("note", ""))
-        if not p.get("fit_box"):
-            continue
-        obj = col.objects[0]
-        me = obj.data
-        dims = mesh_dims(me)
-        k = [p["fit_box"][i] / dims[i] for i in range(3)]
-        if all(abs(v - 1.0) < 1e-4 for v in k):
-            continue
-        me.transform(mathutils.Matrix.Diagonal((k[0], k[1], k[2], 1.0)))
-        me.update()
-        print("[build_library] reframe %-24s %.2f x %.2f x %.2f -> %s m" % (p["name"], dims[0], dims[1], dims[2],
-                                                                           p["fit_box"]))
-
-
 def mesh_dims(mesh):
     return [max(v.co[i] for v in mesh.vertices) - min(v.co[i] for v in mesh.vertices) for i in range(3)]
 
 
 def main():
     open_library()
-    if DO_EXTRACT:
-        extract()
-    if DO_REFRAME:
-        reframe()
     if DO_PROC:
         import library_procedural as proc
         built = proc.build_all(material)

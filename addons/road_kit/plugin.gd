@@ -1276,7 +1276,11 @@ func _selftest_run(scene_path: String, record_res: String, backups: Dictionary) 
 		if terrains.is_empty():
 			break
 		var h0: float = Ground.natural_height(net, terrains[0], src, p.global_position)
-		for c in [Vector3(12, 0, 9), Vector3(-12, 0, -9), Vector3(12, 0, -9), Vector3(-12, 0, 9), Vector3(15, 0, 0), Vector3(-15, 0, 0), Vector3(0, 0, 15), Vector3(0, 0, -15)]:
+		# Up to 45 m: DebugWorld is derived as a flat plain (5.6 m) with one hill, so a 15 m move from most
+		# mouths crosses no ground at all.
+		for c in [Vector3(12, 0, 9), Vector3(-12, 0, -9), Vector3(12, 0, -9), Vector3(-12, 0, 9), Vector3(15, 0, 0), Vector3(-15, 0, 0), Vector3(0, 0, 15), Vector3(0, 0, -15),
+				Vector3(30, 0, 0), Vector3(-30, 0, 0), Vector3(0, 0, 30), Vector3(0, 0, -30),
+				Vector3(45, 0, 0), Vector3(-45, 0, 0), Vector3(0, 0, 45), Vector3(0, 0, -45)]:
 			var hc: float = Ground.natural_height(net, terrains[0], src, p.global_position + c)
 			if not is_nan(hc) and absf(hc - h0) > best:
 				best = absf(hc - h0)
@@ -1351,8 +1355,8 @@ func _selftest_run(scene_path: String, record_res: String, backups: Dictionary) 
 	if draft_surface.button_pressed:
 		_refresh(net)
 		await _live_idle()
-		ok = _check(net.get_node("_RoadKitOverlay").get_children().filter(func(c): return String(c.name).begins_with(OverlayScript.JCT_LABEL)).size() == 2,
-				"a label floats over each of the network's 2 junctions") and ok
+		ok = _check(net.get_node("_RoadKitOverlay").get_children().filter(func(c): return String(c.name).begins_with(OverlayScript.JCT_LABEL)).size() == 6,
+				"a label floats over each of the network's 6 junctions") and ok
 		draft = net.get_node_or_null("_RoadKitOverlay/" + OverlayScript.DRAFT_NAME)
 		var mats := []
 		if draft != null:

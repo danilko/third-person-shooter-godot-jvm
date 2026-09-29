@@ -6,8 +6,8 @@
     StanceTransition["Upright"] <- RelaxedTransition { Raised  <- UprightMovementBlend (the ring, as before)
                                                        Relaxed <- UprightRelaxedBlend }
 
-UprightRelaxedBlend is a 1D blend by movement id -- idle 0, `upright_walk_relaxed` 1, run 2 -- because out
-of combat the body faces its travel, so only forward exists. `upright_walk_relaxed` is a GAIT clip
+UprightRelaxedBlend is a 1D blend by movement id -- idle 0, `upright_walk` 1, run 2 -- because out
+of combat the body faces its travel, so only forward exists. `upright_walk` is a GAIT clip
 (src/main/resources/com/openworld/character/anim/character_gaits.json): a male body strolls on the
 ordinary walk, a female one on blender/tools/derive_gait.py's relaxed walk, which lets the upper body
 move. Anything that faces the aim walks the steady ring, so that sway never reaches a gun.
@@ -30,7 +30,7 @@ def main():
     if "RelaxedTransition" in s:
         print("[relaxed] already patched")
         return
-    pts = [(0.0, "upright_idle"), (1.0, "upright_walk_relaxed"), (2.0, "upright_run_forward")]
+    pts = [(0.0, "upright_idle"), (1.0, "upright_walk"), (2.0, "upright_run_forward")]
     subs = []
     for i, (_, clip) in enumerate(pts):
         subs.append(f'[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_rlx{i}"]\n'

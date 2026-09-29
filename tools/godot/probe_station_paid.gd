@@ -2,9 +2,9 @@ extends SceneTree
 ## THE PAID AREA (PLAN.md P3, 2026-09-27): a station's platforms are reached ONLY through the ticket gates.
 ##   stdbuf -oL <godot> --headless --path . --script tools/godot/probe_station_paid.gd [-- --only=<Station>] [--control]
 ##
-## For every open-air station of the rail reserve (IslandRailReserve.json; the hub is 3.36's), on the real World.tscn
+## For every station of the rail reserve (IslandRailReserve.json; every one a kit station since PLAN.md step 7), on the real World.tscn
 ## with the real ZoneManager: stream the station in, then FLOOD-FILL where a standing character can be -- a grid of
-## 0.25 m cells, every walkable surface in each cell (so a stair, a platform and a footbridge deck over the bed are all
+## 0.25 m cells, every walkable surface in each cell (so a stair, a platform and a concourse deck over the bed are all
 ## nodes), a step of at most 0.4 m between neighbours, and a capsule that must fit standing at each node.
 ##   1. from the street in front of each station building, with the gate flaps SHUT, no platform is reached;
 ##   2. from the track bed past a platform end (a trespasser who walked in at a 踏切), no platform is reached;
@@ -23,8 +23,6 @@ const STEP := 0.4
 ## the most a STEP-FREE route (a wheelchair on the entry slope) may rise between two 0.25 m cells: the slope is 1:12
 ## (0.021 m a cell); its step colliders stand 0.042 m apart every 0.5 m
 var max_step := STEP
-const PLATFORM_W := {8.0: 3.0, 10.0: 4.0, 15.0: 5.0, 20.0: 5.0}
-const EDGE := 3.55
 
 var fails := 0
 var trace := OS.get_cmdline_user_args().has("--trace")
@@ -72,7 +70,17 @@ func _surfaces(c: Vector2i, top: float, bottom: float) -> PackedFloat32Array:
 			out.append(y)
 			from = y - 0.05
 		else:
-			from = y - 0.25          # a graze down a face or an underside: step past it
+			# a graze down a face or an underside. A floor whose EDGE lies on the cell centre (a landing ending exactly
+			# on the grid: Castle Town's entry slope, 2026-09-28) grazes its own side face and would read as a one-cell
+			# gap across the slope, so look a few cm aside for a floor at that height before stepping past it
+			var q2 := PhysicsRayQueryParameters3D.create(Vector3(x + 0.03, y + 0.05, z + 0.03),
+				Vector3(x + 0.03, y - 0.25, z + 0.03), 1)
+			var h2 := space.intersect_ray(q2)
+			if not h2.is_empty() and (h2["normal"] as Vector3).y > 0.6 and absf(h2["position"].y - y) < 0.1:
+				out.append(h2["position"].y)
+				from = h2["position"].y - 0.05
+			else:
+				from = y - 0.25
 	levels[c] = out
 	return out
 
@@ -85,6 +93,21 @@ func _fits(p: Vector3) -> bool:
 	# as impassable: the elevated stations' "unreachable even with the gates open" on the island, 2026-09-27)
 	q.transform = Transform3D(Basis.IDENTITY, p + Vector3(0, STEP + H / 2.0 + R, 0))
 	return space.intersect_shape(q, 1).is_empty()
+
+## What a standing capsule collides with at `p` and at the four cells round it (a flood that dies at its start).
+func _blockers(p: Vector3) -> Array:
+	var out := []
+	for d in [Vector3.ZERO, Vector3(CELL, 0, 0), Vector3(-CELL, 0, 0), Vector3(0, 0, CELL), Vector3(0, 0, -CELL)]:
+		var q := PhysicsShapeQueryParameters3D.new()
+		q.shape = shape
+		q.collision_mask = 1
+		q.transform = Transform3D(Basis.IDENTITY, p + d + Vector3(0, STEP + H / 2.0 + R, 0))
+		for h in space.intersect_shape(q, 4):
+			var n := str((h["collider"] as Node).get_path()).replace("/root/World/", "")
+			if not out.has(n):
+				out.append(n)
+	return out
+
 
 ## Breadth-first over (cell, level) from `start`; `is_goal(p)` ends it. Returns [reached goal, nodes visited].
 func _flood(start: Vector3, lo: Vector2, hi: Vector2, top: float, bottom: float, is_goal: Callable) -> Array:
@@ -169,6 +192,52 @@ func _run_stand(path: String, control: bool) -> void:
 	# scene, so the stand builds it along each lane (the bed past a platform end is ON it)
 	var street := float(st.get("street", 0.0))
 	gs.position = Vector3(0, street - 0.5, 0)
+	# an OPEN-AIR station's two streets need not be one height: each side's entry (stair + slope) is sized from ITS
+	# street (`entry_rise`), and each entrance point carries that street's height. A flat stand at one of them buries
+	# the other side's slope foot under the stand (Castle Town, 2026-09-28: 0.55 m), so the stand's ground is the
+	# plane through the entrances' own heights across the axis -- a real street rising a few percent round the station.
+	var tilt_a := street
+	var tilt_b := 0.0
+	var tilt_z := Vector2(-1e9, 1e9)
+	var ents: Array = st.get("entrances", [])
+	if str(st.get("form", "")) == "open_air" and ents.size() >= 2:
+		var n := float(ents.size())
+		var sz := 0.0
+		var sy := 0.0
+		var szz := 0.0
+		var szy := 0.0
+		for e in ents:
+			sz += float(e[2])
+			sy += float(e[1])
+			szz += float(e[2]) * float(e[2])
+			szy += float(e[2]) * float(e[1])
+		var den := n * szz - sz * sz
+		if absf(den) > 1e-6:
+			tilt_b = (n * szy - sz * sy) / den
+			tilt_a = (sy - tilt_b * sz) / n
+			# tilted only BETWEEN the entrances; past each one the street stays at that entrance's own height (a
+			# tilt carried on dropped the ground away from the far end of the lower side's slope)
+			var zlo := 1e9
+			var zhi := -1e9
+			for e in ents:
+				zlo = minf(zlo, float(e[2]))
+				zhi = maxf(zhi, float(e[2]))
+			tilt_z = Vector2(zlo, zhi)
+			var ang := atan(tilt_b)
+			var zm := 0.5 * (zlo + zhi)
+			gb.size = Vector3(400, 1, (zhi - zlo) / cos(ang))
+			gs.rotation = Vector3(-ang, 0, 0)
+			gs.position = Vector3(0, tilt_a + tilt_b * zm - 0.5 / cos(ang), zm)
+			for side in [[zlo - 200.0, zlo], [zhi, zhi + 200.0]]:
+				var fs := CollisionShape3D.new()
+				var fb := BoxShape3D.new()
+				fb.size = Vector3(400, 1, side[1] - side[0])
+				fs.shape = fb
+				var edge: float = zlo if side[1] == zlo else zhi
+				fs.position = Vector3(0, tilt_a + tilt_b * edge - 0.5, 0.5 * (side[0] + side[1]))
+				ground.add_child(fs)
+	var street_at := func(z: float) -> float:
+		return tilt_a + tilt_b * clampf(z, tilt_z.x, tilt_z.y)
 	var deck: Array = st.get("deck", [])
 	if deck.size() == 2:
 		for ln in st["lanes"]:
@@ -197,7 +266,21 @@ func _run_stand(path: String, control: bool) -> void:
 	check("%s: the scene has ticket-gate flaps" % st["name"], flaps.size() > 0, "%d" % flaps.size())
 	# across: the station's own footprint (a ground hub's cap and annex reach ~40 m off the axis) plus the street
 	var across := maxf(40.0, float(meta.get("footprint_m", [0, 0])[1]) / 2.0 + 15.0)
-	var aabb := AABB(Vector3(-half - 40, street - 2, -across), Vector3(2 * half + 80, 20, 2 * across))
+	var along := half + 40.0
+	# ...and every collider the scene carries, plus room to step off it: an entry slope runs along the building's
+	# front and can end past the drawn footprint (Castle Town's 11-riser slope ends ~40 m off the axis, 2026-09-28,
+	# and a flood bounded at 40 m never reached its foot)
+	var shapes: Array = []
+	_nodes_of(sc, func(n): return n is CollisionShape3D and (n as CollisionShape3D).shape != null, shapes)
+	for cs in shapes:
+		var bb: AABB = (cs as CollisionShape3D).global_transform * (cs as CollisionShape3D).shape.get_debug_mesh().get_aabb()
+		across = maxf(across, maxf(absf(bb.position.z), absf(bb.end.z)) + 5.0)
+		along = maxf(along, maxf(absf(bb.position.x), absf(bb.end.x)) + 5.0)
+	# ...and along, past every collider and street entrance (an open-air entry ramp runs ~48 m past the platform's
+	# end since 2026-09-28; a bound at 40 m put its street start outside the flood)
+	for e in ents:
+		along = maxf(along, absf(float(e[0])) + 5.0)
+	var aabb := AABB(Vector3(-along, street - 2, -across), Vector3(2 * along, 20, 2 * across))
 	var lo := Vector2(aabb.position.x, aabb.position.z)
 	var hi := Vector2(aabb.end.x, aabb.end.z)
 	var on_platform := func(p: Vector3) -> bool:
@@ -209,9 +292,9 @@ func _run_stand(path: String, control: bool) -> void:
 		return false
 	var starts: Array = []
 	for e in st["entrances"]:
-		starts.append(["the street outside an entrance", Vector3(e[0], street, e[2])])
+		starts.append(["the street outside an entrance", Vector3(e[0], street_at.call(float(e[2])), e[2])])
 	for e in st["bed_points"]:
-		starts.append(["the track bed past a platform end", Vector3(e[0], 0.0, e[2])])
+		starts.append(["the track bed past a platform end", Vector3(e[0], street_at.call(float(e[2])), e[2])])
 	for f in flaps:
 		(f as CollisionObject3D).collision_layer = 0 if control else 1
 	for sp in starts:
@@ -223,7 +306,7 @@ func _run_stand(path: String, control: bool) -> void:
 		(f as CollisionObject3D).collision_layer = 0
 	for e in st["entrances"]:
 		levels.clear()
-		var r2 := _flood(Vector3(e[0], street, e[2]), lo, hi, 12.0, street - 2.0, on_platform)
+		var r2 := _flood(Vector3(e[0], street_at.call(float(e[2])), e[2]), lo, hi, 12.0, street - 2.0, on_platform)
 		check("%s: gates open, a platform is reached from %s" % [st["name"], str(e)], r2[0], "visited %d" % r2[1])
 	# ...and EVERY platform from EVERY entrance, not just the nearest one: an island platform's stair (Central's, in
 	# the gap between two decks; a ground hub's, down from the concourse) is its own route and must work on its own,
@@ -236,7 +319,7 @@ func _run_stand(path: String, control: bool) -> void:
 				return absf(p.x) <= half - 5.0 and p.y >= ptop - 0.3 and p.y <= ptop + 0.5 \
 					and p.z > z0 + 0.2 and p.z < z1 - 0.2
 			levels.clear()
-			var r3 := _flood(Vector3(e[0], street, e[2]), lo, hi, 12.0, street - 2.0, on_this)
+			var r3 := _flood(Vector3(e[0], street_at.call(float(e[2])), e[2]), lo, hi, 12.0, street - 2.0, on_this)
 			check("%s: gates open, from %s the platform at z %.2f..%.2f is reached" % [st["name"], str(e), z0, z1],
 				r3[0], "visited %d" % r3[1])
 	# an OPEN-AIR station has no lift: its entry SLOPE is the accessible route (user, 2026-09-27), so every platform
@@ -252,7 +335,7 @@ func _run_stand(path: String, control: bool) -> void:
 					return absf(p.x) <= half - 5.0 and p.y >= ptop - 0.3 and p.y <= ptop + 0.5 \
 						and p.z > z0b + 0.2 and p.z < z1b - 0.2
 				levels.clear()
-				var r4 := _flood(Vector3(e[0], street, e[2]), lo, hi, 12.0, street - 2.0, on_b)
+				var r4 := _flood(Vector3(e[0], street_at.call(float(e[2])), e[2]), lo, hi, 12.0, street - 2.0, on_b)
 				ok = ok and r4[0]
 			check("%s: step-free (the slope), every platform reached from %s" % [st["name"], str(e)], ok, "")
 		max_step = STEP
@@ -294,7 +377,11 @@ func _island_open_air(w: Node, player: Node3D, name: String, st: Dictionary, con
 		elif bool(d.get("auto_open")) and not bool(d.get("locked")):
 			(d as CollisionObject3D).collision_layer = 0
 	check("%s: the scene has ticket-gate flaps" % name, flaps.size() > 0, "%d" % flaps.size())
+	# along: past every street entrance too (an open-air entry ramp runs ~48 m past the platform's end since
+	# 2026-09-28; at half + 40 every open-air station's street start lay OUTSIDE the flood's box and it visited 1 cell)
 	var span := half + 40.0
+	for e in sm["entrances"]:
+		span = maxf(span, absf(float(e[0])) + 20.0)
 	var lo := Vector2(INF, INF)
 	var hi := Vector2(-INF, -INF)
 	for sg in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
@@ -341,6 +428,11 @@ func _island_open_air(w: Node, player: Node3D, name: String, st: Dictionary, con
 			continue
 		var r2 := _flood(sp[1], lo, hi, top, bottom, on_platform)
 		check("%s: gates open, a platform is reached from %s" % [name, str(sp[1])], r2[0], "visited %d" % r2[1])
+		if not r2[0] and int(r2[1]) <= 3:
+			print("    blocked at its start by: %s" % str(_blockers(sp[1])))
+			var c0 := Vector2i(floori(sp[1].x / CELL), floori(sp[1].z / CELL))
+			for d in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				print("    floors at %s: %s" % [str(c0 + d), str(_surfaces(c0 + d, top, bottom))])
 	for f in flaps:
 		(f as CollisionObject3D).collision_layer = 1
 
@@ -365,6 +457,9 @@ func _run() -> void:
 	var player := w.get_node_or_null("Characters/Player") as CharacterBody3D
 	player.set_physics_process(false)
 	player.collision_layer = 0
+	# the WHOLE body stands still: MovementController is its own node and kept moving it, so the teleported player fell
+	# through ground that had not streamed yet, died, and the stations after it never streamed (2026-09-28)
+	player.process_mode = Node.PROCESS_MODE_DISABLED
 	space = w.get_world_3d().direct_space_state
 	shape = CapsuleShape3D.new()
 	shape.radius = R
@@ -385,76 +480,8 @@ func _run() -> void:
 			n_st += 1
 			await _island_open_air(w, player, name, st, control)
 			continue
-		if not boxes.has("building:" + name):
-			continue
-		n_st += 1
-		var c := Vector3(float(st["x"]), 0.0, -float(st["y"]))
-		var u := Vector3(float(st["ux"]), 0.0, -float(st["uy"]))
-		var nrm := Vector3(-u.z, 0.0, u.x)          # the record's (-uy, ux), turned into Godot
-		var bed := float(st["z"]) + NET_Y
-		var hw := float(st["h_across"])
-		var half := float(st["h_along"])
-		var pw: float = PLATFORM_W.get(hw, 4.0)
-		player.global_position = c + Vector3(0, bed + 3.0, 0)
-		await _settle(90.0)
-		levels.clear()
-		# every door that opens by itself stands open; the gate flaps are what is under test
-		var doors: Array = []
-		_nodes_of(w, func(n): return n is StaticBody3D and n.get("open_mode") != null, doors)
-		var flaps: Array = []
-		for d in doors:
-			var near: bool = (d as Node3D).global_position.distance_to(c + Vector3(0, bed, 0)) < half + 40.0
-			if not near:
-				continue
-			if str(d.get_script().resource_path).ends_with("TicketGate.java"):
-				flaps.append(d)
-			elif bool(d.get("auto_open")) and not bool(d.get("locked")):
-				(d as CollisionObject3D).collision_layer = 0
-		var span := half + 12.0
-		var lo := Vector2(minf(c.x - u.x * span - nrm.x * 26.0, c.x + u.x * span + nrm.x * 26.0),
-			minf(c.z - u.z * span - nrm.z * 26.0, c.z + u.z * span + nrm.z * 26.0))
-		var hi := Vector2(maxf(c.x - u.x * span - nrm.x * 26.0, c.x + u.x * span + nrm.x * 26.0),
-			maxf(c.z - u.z * span - nrm.z * 26.0, c.z + u.z * span + nrm.z * 26.0))
-		# rotated boxes: widen the axis-aligned bounds to cover the whole rectangle
-		for sgn in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
-			var q: Vector3 = c + u * span * sgn.x + nrm * 26.0 * sgn.y
-			lo = Vector2(minf(lo.x, q.x), minf(lo.y, q.z))
-			hi = Vector2(maxf(hi.x, q.x), maxf(hi.y, q.z))
-		var top := bed + 12.0
-		var bottom := bed - 12.0
-		var on_platform := func(p: Vector3) -> bool:
-			var rel := p - c
-			var along := absf(rel.dot(u))
-			var lat := absf(rel.dot(nrm))
-			return along < half - 5.0 and lat > EDGE + 0.2 and lat < EDGE + pw - 0.2 and p.y > bed + 0.9
-		var starts: Array = []
-		for key in ["building:" + name, "building_far:" + name]:
-			if boxes.has(key):
-				var b: Dictionary = boxes[key]
-				var bc := Vector3(float(b["x"]), 0.0, -float(b["y"]))
-				var bn := Vector3(float(b["nx"]), 0.0, -float(b["ny"]))
-				var p := bc + bn * (float(b["h_across"]) + 3.0)
-				var s := _surfaces(Vector2i(floori(p.x / CELL), floori(p.z / CELL)), top, bottom)
-				if s.size() > 0:
-					starts.append(["the street in front of the %s building" % key.get_slice(":", 0), Vector3(p.x, s[s.size() - 1], p.z)])
-		var bedp := c + u * (half + 8.0)
-		var sb := _surfaces(Vector2i(floori(bedp.x / CELL), floori(bedp.z / CELL)), top, bottom)
-		if sb.size() > 0:
-			starts.append(["the track bed past the platform end", Vector3(bedp.x, sb[sb.size() - 1], bedp.z)])
-		for f in flaps:
-			(f as CollisionObject3D).collision_layer = 0 if control else 1
-		for sp in starts:
-			var r := _flood(sp[1], lo, hi, top, bottom, on_platform)
-			check("%s: from %s, gates shut, no platform" % [name, sp[0]], not r[0],
-				"visited %d%s" % [r[1], (", reached %s" % str(r[2])) if r[0] else ""])
-		for f in flaps:
-			(f as CollisionObject3D).collision_layer = 0
-		if starts.size() > 0 and str(starts[0][0]).contains("building"):
-			var r2 := _flood(starts[0][1], lo, hi, top, bottom, on_platform)
-			check("%s: gates open, the platform is reached from the street" % name, r2[0],
-				"visited %d, %d flaps" % [r2[1], flaps.size()])
-		for f in flaps:
-			(f as CollisionObject3D).collision_layer = 1
+		# every station is a KIT station (PLAN.md step 7): one with no form is a stale reserve
+		check("%s: a kit station (its reserve names a form)" % name, false, str(st.get("form", "")))
 	check("stations checked", n_st > 0, "%d" % n_st)
 	print("RESULT %s (%d failures)" % ["PASS" if fails == 0 else "FAIL", fails])
 	quit(0 if fails == 0 else 1)

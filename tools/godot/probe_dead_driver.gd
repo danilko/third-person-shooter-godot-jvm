@@ -1,5 +1,5 @@
 extends SceneTree
-## PLAN.md 0.2 -- an AI car whose driver is killed stops driving, and the body stays in the seat (GTA).
+## PLAN.md 0.2 -- an AI car whose driver is killed brakes to a stop, and the body stays in the seat (GTA).
 ##
 ##   stdbuf -oL godot --headless --fixed-fps 60 --path . --script tools/godot/probe_dead_driver.gd
 ##
@@ -8,10 +8,10 @@ extends SceneTree
 ## WARMUP seconds the VICTIM's driver is killed; the CONTROL's is not. Then one of the zone's own ambient
 ## cars has its driver killed too, to see ZoneManager reclaim it once it has come to rest.
 ##
-## Asserted, victim: the brain is dropped the tick the driver dies; the carrier nameplate goes neutral;
-## the car is at rest (< 1 m/s) within REST_SECONDS; the corpse is still in the seat the whole time; it is
-## a seated corpse (bones NOT simulating) and slumped -- its chest leaning toward the car's nose at least
-## SLUMP_MIN_DEG more than while alive; a carjack pulls it out as a ragdoll (bones simulating) and seats the player.
+## Asserted, victim: the brain is dropped the tick the driver dies; the carrier nameplate goes neutral; the car
+## brakes to rest (< 1 m/s) within REST_SECONDS; the corpse is still in the seat the whole time; it is a seated
+## corpse (bones NOT simulating) and slumped -- its chest leaning toward the car's nose at least SLUMP_MIN_DEG more
+## than while alive; a carjack pulls it out as a ragdoll (bones simulating) and seats the player.
 ## Control: brain kept, still driving at speed, driver alive. Ambient: reclaimed as abandoned, at rest.
 
 const WORLD := "res://src/main/resources/com/openworld/world/DebugWorld.tscn"
@@ -22,7 +22,7 @@ const HELPER := "res://src/main/java/com/openworld/debug/VehicleProbeHelper.java
 const PARK := Vector3(10, 400, 10)
 const DRIVE_SPEED := 20.0
 const WARMUP := 3.0
-const REST_SECONDS := 20.0
+const REST_SECONDS := 6.0         # braking from DRIVE_SPEED (Vehicle.hasDefeatedDriver)
 const SLUMP_MIN_DEG := 15.0
 const SEAT_TOL := 0.05             # plus one tick of travel: the seat pin runs before the physics step moves the car
 
@@ -91,10 +91,10 @@ func _initialize() -> void:
 	player.global_position = PARK
 	for i in range(600):
 		await physics_frame
-		if _lane("east_R1") != null and _lane("loop_F1") != null:
+		if _lane("e_ring_F1") != null and _lane("e_ring_F0") != null:
 			break
-	var v := _traffic_car("east_R1")
-	var c := _traffic_car("loop_F1")
+	var v := _traffic_car("e_ring_F1")
+	var c := _traffic_car("e_ring_F0")
 	var car: RigidBody3D = v[0]
 	var ctl_car: RigidBody3D = c[0]
 	var driver: Node3D = v[1]
@@ -112,6 +112,7 @@ func _initialize() -> void:
 	_check("victim is AI-driven before the kill", helper.call("is_ai_driven", car), "")
 	_check("nameplate not neutral while the driver lives", not helper.call("nameplate_is_neutral", car), "")
 
+	var kill_at := car.global_position
 	helper.call("kill", driver)
 	await physics_frame
 	await physics_frame
@@ -128,14 +129,15 @@ func _initialize() -> void:
 		var seat_point: Vector3 = seat.global_position - car.global_transform.basis.y * seat_drop
 		worst_seat = maxf(worst_seat, driver.global_position.distance_to(seat_point)
 				- car.linear_velocity.length() / 60.0)
-		if i >= 30 and i < 60:          # measured while still coasting straight, before any crash can move it
+		if i >= 30 and i < 60:
 			lean_dead += _chest_lean(car, v[2]) / 30.0
 		ever_simulating = ever_simulating or _simulating(driver)
 		if rest_at < 0.0 and car.linear_velocity.length() < 1.0:
 			rest_at = i / 60.0
-		if i % 120 == 0:
+		if i % 60 == 0:
 			print("    t+%4.1f  victim %.1f m/s   control %.1f m/s" % [i / 60.0, car.linear_velocity.length(), ctl_car.linear_velocity.length()])
-	_check("victim comes to rest", rest_at >= 0.0, "from %.1f m/s, at rest after %.1f s" % [speed_at_kill, rest_at])
+	var slide := Vector2(car.global_position.x - kill_at.x, car.global_position.z - kill_at.z).length()
+	_check("victim brakes to a stop", rest_at >= 0.0, "from %.1f m/s, at rest after %.1f s, %.0f m on" % [speed_at_kill, rest_at, slide])
 	_check("corpse held in the seat throughout", worst_seat <= SEAT_TOL, "worst %.2f m from Seat0" % worst_seat)
 	_check("seated corpse is not a simulating ragdoll", not ever_simulating, "")
 	_check("corpse slumped forward over the wheel", lean_dead - lean_alive >= SLUMP_MIN_DEG,
@@ -155,6 +157,7 @@ func _initialize() -> void:
 		await physics_frame
 	_check("carjack seats the player", helper.call("occupant_of", car) == player, "")
 	_check("pulled-out corpse ragdolls", _simulating(driver), "")
+	_check("...and the car is no longer driverless", not helper.call("has_defeated_driver", car), "")
 	# Out again, or the car's seat pin keeps the player 250 m east -- far enough to unload zone debug_a
 	# and every ambient car in it.
 	helper.call("exit_driver", car)
@@ -184,7 +187,9 @@ func _initialize() -> void:
 		helper.call("kill", helper.call("occupant_of", amb))
 		var gone_at := -1.0
 		var last_speed := 99.0
-		for i in range(40 * 60):
+		# 90 s: on DebugWorld's flat ring road (tools/debug_world_layout.py) nothing stops a coasting car but its own
+		# rolling resistance -- the old curvy road ran it into the verge within seconds
+		for i in range(90 * 60):
 			await physics_frame
 			if not is_instance_valid(amb):
 				gone_at = i / 60.0

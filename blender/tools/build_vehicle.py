@@ -43,17 +43,20 @@ ids = [a for i, a in enumerate(argv) if not a.startswith("--") and (i == 0 or ar
 # ── the source layout: which authoring objects make which component ─────────────────────────────
 SOURCE_GROUPS = {
     "chassis":    ["back.side", "top", "Interior", "back.glass", "backdoorglass", "door frame.back",
-                   "front.windo.rubber", "back.side.exhaust", "exhaust", "front.light", "back.light", "door"],
+                   "front.windo.rubber", "back.side.exhaust", "exhaust", "door", "steering.wheel"],
     "bonnet":     ["front.top"],
     "boot":       ["back"],
-    "bump_front": ["front", "front_grill_down", "front_grill_top", "grail.holder", "grail.inside.1", "front.plate"],
-    "bump_rear":  ["Bumper", "back.plate"],
-    "windscreen": ["door.001"],
+    "bump_front": ["front", "front_grill_down", "front_grill_top", "grail.holder", "grail.inside.1", "front.plate",
+                   "front.lamp.light", "front.lamp.cover", "front.lamp.holder"],
+    "bump_rear":  ["back.quarter", "back.plate", "back.lamp.light", "back.lamp.cover", "back.lamp.holder"],
+    "windscreen": ["windscreen"],
 }
-SPLIT_BY_SIDE = {"door": ["door.003", "door.window", "FrontBackGlass"], "wing": ["front.side"]}
+SPLIT_BY_SIDE = {"door": ["door.front", "door.window", "door.edge", "door.trim", "side.mirror", "side.mirror.glass",
+                          "FrontBackGlass"],
+                 "wing": ["front.side"]}
 TYRES = "Tires"
 HELPERS = ("HoneyComb",)                     # Boolean operands: consumed by the evaluation, never shipped
-OPTIONAL_SOURCE = {"exhaust", "back.side.exhaust"}
+OPTIONAL_SOURCE = {"exhaust", "back.side.exhaust", "FrontBackGlass"}
 # Honeycomb grilles are a Boolean of a 61 k-vertex sheet: ~20 k vertices each, doubled again by the `dam` morph.
 # They ship as a PLACEHOLDER PLANE for now - a quad grid covering the evaluated grille, facing forward, same
 # material - until a baked alpha-cut honeycomb texture replaces it (VEHICLE_AUTHORING.md, "Grilles").
@@ -63,7 +66,7 @@ DAMAGEABLE = ["chassis", "bonnet", "boot", "bump_front", "bump_rear", "door_lf",
               "wing_lf", "wing_rf", "windscreen"]
 REQUIRED = ["chassis"]                   # every other damageable part is optional: a pickup has no boot
 # Vehicles whose .blend is an artist's AUTHORING layout, split by the tables above. Any other vehicle's .blend is
-# already in component form (named parts + seat_* Empties, e.g. the pack cars from import_pack_vehicles.py).
+# already in component form (named parts + seat_* Empties, e.g. the placeholders from make_placeholder_cars.py).
 SOURCE_LAYOUT = {"SPC1"}
 WHEELS = ["wheel_lf", "wheel_rf", "wheel_lb", "wheel_rb"]
 HULL_EXCLUDE = WHEELS + ["windscreen"]
@@ -178,6 +181,31 @@ def components_in_memory(vid):
     return {o.name: o for o in meshes}, seats
 
 
+# A lamp is authored as faces wearing one of these MATERIAL names (any part may carry them). The runtime lights those
+# very surfaces (Vehicle.refreshLights), and the lamp's light source is placed at their centre, measured here.
+LAMP_MATERIALS = {"head": "front.lamp.light", "tail": "back.lamp.light", "reverse": "back.lamp.reverse"}
+
+
+def lamp_centres(parts):
+    """{lamp: [x, y, z]} - the centre of the RIGHT-hand (+X) faces wearing that lamp's material, Godot axes (the
+    left lamp is the mirror). A car that authors no such faces gets no entry, and the scene builder falls back to
+    deriving the lamp from the bounds."""
+    out = {}
+    for lamp, mat in LAMP_MATERIALS.items():
+        acc, area = Vector(), 0.0
+        for o in parts.values():
+            me = o.data
+            slots = [s.material.name if s.material else "" for s in o.material_slots]
+            for poly in me.polygons:
+                if poly.material_index < len(slots) and slots[poly.material_index] == mat:
+                    c = o.matrix_world @ poly.center
+                    if c.x > 0.0:
+                        acc += c * poly.area; area += poly.area
+        if area > 0.0:
+            out[lamp] = godot(acc / area)
+    return out
+
+
 def split_in_memory(vid):
     OBJ = bpy.data.objects
     known = {n for g in SOURCE_GROUPS.values() for n in g} | {n for g in SPLIT_BY_SIDE.values() for n in g} | {TYRES}
@@ -237,6 +265,17 @@ def split_in_memory(vid):
             p.inputs['Alpha'].default_value = 0.4
             m.node_tree.links.new(p.outputs['BSDF'], out.inputs['Surface'])
             m.surface_render_method = 'BLENDED'
+        # a lamp COVER is a Transparent BSDF: clear glass over the lamp, tinted by its authored colour
+        elif any(n.type == 'BSDF_TRANSPARENT' for n in nodes) and not any(n.type == 'BSDF_PRINCIPLED' for n in nodes):
+            col = tuple(next(n for n in nodes if n.type == 'BSDF_TRANSPARENT').inputs['Color'].default_value)
+            nodes.clear()
+            out = nodes.new('ShaderNodeOutputMaterial'); out.target = 'ALL'
+            p = nodes.new('ShaderNodeBsdfPrincipled')
+            p.inputs['Base Color'].default_value = (col[0], col[1], col[2], 1)
+            p.inputs['Roughness'].default_value = 0.05
+            p.inputs['Alpha'].default_value = 0.2
+            m.node_tree.links.new(p.outputs['BSDF'], out.inputs['Surface'])
+            m.surface_render_method = 'BLENDED'
 
     # 2. split by side / corner, then join into components
     def split(name, key_of):
@@ -260,7 +299,7 @@ def split_in_memory(vid):
     side = lambda c: "l" if c.x < 0 else "r"                      # facing +Y, left is -X
     groups = {k: [n for n in v if n in OBJ] for k, v in SOURCE_GROUPS.items()}
     for kind, names in SPLIT_BY_SIDE.items():
-        parts = [split(n, side) for n in names]
+        parts = [split(n, side) for n in names if n in OBJ]
         for s in "lr":
             groups[f"{kind}_{s}f"] = [p[s].name for p in parts if s in p]
     for k, o in split(TYRES, lambda c: side(c) + ("f" if c.y > 0 else "b")).items():
@@ -424,6 +463,7 @@ def build(vid):
 
     facts = {
         "id": vid,
+        "lamps": lamp_centres(parts),
         "note": f"MEASURED by blender/tools/build_vehicle.py from assets/vehicles/{vid}.blend - Godot axes. Do not edit.",
         "bounds": {"min": godot(Vector((lo.x, hi.y, lo.z))), "max": godot(Vector((hi.x, lo.y, hi.z)))},
         "wheels": wheels,

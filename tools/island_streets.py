@@ -195,6 +195,21 @@ def _sites():
                 sx, sy = (st.get("size") or [0.0, 0.0])[:2]
                 _SITES.append((st["id"], st["x"], st["y"], math.cos(a), math.sin(a),
                                sx / 2.0 + SITE_CLEAR, sy / 2.0 + SITE_CLEAR))
+        # the MILITARY reserves (the compact base, its runway and pier; island_plan.RESERVES military_*): no street
+        # runs across a runway or through a fenced base -- nor through a resort hotel or the logistics hub's yards
+        for rid, (x0, z0, x1, z1) in _PL.RESERVES:
+            if rid.startswith(("military", "resort_hotel", "logistics", "central_forecourt", "airport_")):
+                _SITES.append(("reserve:" + rid, (x0 + x1) / 2.0, -(z0 + z1) / 2.0, 1.0, 0.0,
+                               (x1 - x0) / 2.0 + SITE_CLEAR, (z1 - z0) / 2.0 + SITE_CLEAR))
+        # the CIVIC PLOTS (user, 2026-09-28; tools/island_civic_sites.py): ground held for a police / fire station, a
+        # hospital, a school ... -- a street keeps out of one exactly as out of a site
+        path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandCivicSites.json")
+        if os.path.exists(path):
+            for st in json.load(open(path)).get("plots", []):
+                a = math.radians(st["yaw"])
+                sx, sy = st["size"]
+                _SITES.append(("civic:" + st["id"], st["x"], st["y"], math.cos(a), math.sin(a),
+                               sx / 2.0 + SITE_CLEAR, sy / 2.0 + SITE_CLEAR))
     return _SITES
 
 
@@ -223,8 +238,12 @@ def _rail():
             for bx in d["boxes"]:
                 if bx.get("street_under"):
                     continue
+                # an OPEN-AIR station's ramps come down to a street crossing its line, and its car park's entrance
+                # opens onto that street (island_rail_layout STATION_FRONT): along the axis a street may run right
+                # past either box, so it keeps its clearance only ACROSS the axis
+                front = bx.get("form") == "open_air" or bool(bx.get("entrance"))
                 _RAIL["boxes"].append((bx["id"], bx["x"], bx["y"], bx["ux"], bx["uy"],
-                                       bx["h_along"] + SITE_CLEAR, bx["h_across"] + SITE_CLEAR))
+                                       bx["h_along"] + (0.0 if front else SITE_CLEAR), bx["h_across"] + SITE_CLEAR))
     return _RAIL
 
 
@@ -459,7 +478,17 @@ def plan_region(net, ground, region):
                     continue
                 if M[3] is not None and not M[3][0] <= L[1] <= M[3][1]:
                     continue
-                cross[(i, j)] = (L[1], M[1])
+                # a crossing with another NEW line may EXTEND a line past the span its site check covered (its
+                # crossings with existing roads): that extension must not run through a site either -- a civic
+                # plot (2026-09-28) had two streets through it that way, and any frozen site could
+                x, y = L[1], M[1]
+                ly = [p[1] for p, _r in L[2]]
+                mx = [p[0] for p, _r in M[2]]
+                if ((y < min(ly) and _site_hit((x, y), (x, min(ly)))) or (y > max(ly) and _site_hit((x, max(ly)), (x, y)))
+                        or (x < min(mx) and _site_hit((x, y), (min(mx), y)))
+                        or (x > max(mx) and _site_hit((max(mx), y), (x, y)))):
+                    continue
+                cross[(i, j)] = (x, y)
     alive = set(range(len(kept)))
     active = set(cross)
     while True:

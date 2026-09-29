@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/DetachedHouseB_mesh.res" id="1_0m1sr"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/DetachedHouseB_collision.res" id="2_hpni3"]
+
+[node name="DetachedHouseB" type="Node3D" unique_id=1063934095]
+metadata/building = {
+"aabb": [Vector3(-5.5249996, 0, -5.275), Vector3(11.049999, 8.1, 10.55)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [11.05, 10.55],
+"height_m": 8.1,
+"id": "DetachedHouseB",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "detached house (PLATEAU 2-storey 一戸建て 7.1-7.5 x 10.2-10.4 m, 7.4 m): brown roof, white siding, carport left; PLACEHOLDER (library_civic.py), shut",
+"wall_top_m": 8.1
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1793184937]
+visibility_range_end = 397.2
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_0m1sr")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1706715518]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1425092425]
+shape = ExtResource("2_hpni3")

@@ -1,9 +1,7 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Apartment_W10.tscn" id="1"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse.tscn" id="2"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool2.tres" id="tone0_3"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone1_3"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/Clinic.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/FireBranch.tscn" id="2"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_12_11.res" id="hlod"]
 
@@ -14,13 +12,13 @@ material = ExtResource("lotmat")
 transform_format = 1
 instance_count = 2
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(18.7000, 0.0000, 0.0000, 1010.5360, 0.0000, 0.6290, 0.0000, 5.4735, -0.0000, 0.0000, 9.9424, 786.9793, -8.3779, 0.0000, 0.0000, 1019.0330, 0.0000, 0.6260, 0.0000, 5.4720, -0.0000, 0.0000, -11.7173, 813.9086)
+buffer = PackedFloat32Array(20.5000, 0.0000, 0.0000, 1011.0800, 0.0000, 0.5750, 0.0000, 5.7185, -0.0000, 0.0000, 25.5000, 779.5000, -12.5600, 0.0000, -0.0000, 1011.0800, 0.0000, 0.5750, 0.0000, 5.7185, 0.0000, 0.0000, -13.6800, 815.4400)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(18.700, 0.629, 9.942)
+size = Vector3(20.500, 0.575, 25.500)
 
 [sub_resource type="BoxShape3D" id="LotShape1"]
-size = Vector3(8.378, 0.626, 11.717)
+size = Vector3(12.560, 0.575, 13.680)
 
 [node name="Bld_island_12_11" type="Node3D"]
 
@@ -31,20 +29,16 @@ visibility_range_begin = 450.0
 visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
-[node name="Apartment_W10_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1010.536, 5.803, 787.107)
+[node name="FireBranch_000" parent="." instance=ExtResource("2")]
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1011.080, 6.021, 779.500)
 
-[node name="Mesh" parent="./Apartment_W10_000" index="0"]
-surface_material_override/0 = ExtResource("tone0_3")
-surface_material_override/2 = ExtResource("tone1_3")
+[node name="Mesh" parent="./FireBranch_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_001" parent="." instance=ExtResource("2")]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, 1019.033, 5.800, 814.019)
+[node name="Clinic_001" parent="." instance=ExtResource("1")]
+transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, 1011.080, 6.021, 817.000)
 
-[node name="Mesh" parent="./ShopHouse_001" index="0"]
-surface_material_override/5 = ExtResource("tone0_3")
-surface_material_override/1 = ExtResource("tone1_3")
+[node name="Mesh" parent="./Clinic_001" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Plinths" type="MultiMeshInstance3D" parent="."]
@@ -54,9 +48,9 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1010.536, 5.474, 786.979)
+transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1011.080, 5.719, 779.500)
 shape = SubResource("LotShape0")
 
 [node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, -1.000000, 1019.033, 5.472, 813.909)
+transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, 1011.080, 5.719, 815.440)
 shape = SubResource("LotShape1")

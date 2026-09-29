@@ -34,6 +34,7 @@ the axis (the direction `u` the rail plan's line runs at the station), `c` acros
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import sys
@@ -53,8 +54,19 @@ PLATFORM_H = IRR.PLATFORM_H        # platform top over the BED (1.1 m over the r
 PLATFORM_W = IRR.PLATFORM_W        # side platform width by station kind
 ISLAND_MAX = 13.0                  # the widest gap between two lanes' facing tracks that one ISLAND platform fills
 #: the train's gauge, as probe_rail_track check 5 sweeps it: 2.7 m wide, 0.5-4.2 m over the bed
-GAUGE_HALF = 1.35
-GAUGE_H = (0.5, 4.2)
+# the train's gauge, off the TRAIN (blender/tools/make_train.py's EMU1.train.json: the largest standard 1067 mm car,
+# 2.98 m over its doors, 4.05 m to its folded pantograph over the rail head), rounded up to the conventional-line
+# vehicle gauge's 3.0 x 4.1 m; over the BED (the rail head is 0.16 m above it)
+def _train_gauge():
+    try:
+        with open(os.path.join(ROOT, "assets", "vehicles", "trains", "EMU1.train.json")) as fh:
+            t = json.load(fh)
+        return math.ceil(t["half_width_m"] * 20.0) / 20.0, (0.5, math.ceil((t["height_m"] + 0.16) * 20.0) / 20.0)
+    except (OSError, KeyError, ValueError):
+        return 1.5, (0.5, 4.25)
+
+
+GAUGE_HALF, GAUGE_H = _train_gauge()
 #: a turnout's throat: the stretch of the station's line, beyond the end of a branch, where the branch will diverge
 #: (a No. 10 turnout plus the curve out to a 20 m track spacing)
 THROAT_LEN = 60.0
@@ -88,13 +100,18 @@ ENTRANCE_STEP = 0.8               # the street outside a door may stand this far
 WC_L = 8.6
 WC_D = 5.0
 COUNTER_L = 3.0                    # the service counter's box (有人改札 / 駅務室 window), along the fare line's axis
-# THE ENTRANCE STAIR + SLOPE (`OA_Entry_<n>_<hand>`): a landing outside the door, a stair of n risers straight out, and
-# a smooth 1:15 slope (its collider the wedge itself) along the building's front AWAY from the rail, a 1.5 m landing every 0.75 m of rise (the barrier-free
-# standard). One piece per riser count; the layout picks the count nearest the street's real height.
-ENTRY_RISE = 0.165                 # one riser of an entry piece
-ENTRY_N = (3, 14)                  # the riser counts the kit carries (0.5 .. 2.3 m)
-ENTRY_KINDS = ("side", "out")      # the slope ALONG the front away from the rail, or straight OUT beside the stair
-ENTRY_LAND = 2.0                   # the landing outside the door, out from the street face
+# THE ENTRANCE RAMP (`OA_Ramp_<n>`, user 2026-09-28: "remove the stairs, and have the slope in line with the
+# entrance, so the station can move close to the sidewalk"): ONE straight slope out of the street door, as wide as the
+# door and in line with it -- a RAMP_LAND landing at the sill, then 1:RAMP_SLOPE legs with a RAMP_LAND landing every
+# RAMP_SEG_RISE of rise (the barrier-free standard), down to the street. No stair: the slope IS the way in. Its foot
+# stops FOOT_GAP short of the street's footway (a paved apron: the 踏切's warning unit stands there when the street
+# crosses the line beside the station). One piece per riser count; the layout picks the count nearest the street's
+# real height. (The ground hub's annex keeps its stair + slope entry, `GH_Entry_*`.)
+ENTRY_RISE = 0.165                 # one riser step of the rise table (the ramp's height is n x this)
+ENTRY_N = (3, 14)                  # the rise counts the kit carries (0.5 .. 2.3 m)
+ENTRY_KINDS = ("side", "out")      # the GROUND HUB's entry: the slope along the front, or straight out beside the stair
+ENTRY_LAND = 2.0                   # the ground hub entry's landing outside the door
+FOOT_GAP = 1.5                     # the open-air ramp's foot this far short of the street's paved edge (an apron)
 RAMP_W = 1.5
 RAMP_SLOPE = 15.0                  # 1:15, the Japanese OUTDOOR barrier-free guideline (1:12 is the most any ramp may
                                    # be; user, 2026-09-27: "ideally 1/20 or gentler for a long, busy public path" --
@@ -321,6 +338,12 @@ def ramp_len(n):
     return sum(r for r, _h in segs) + RAMP_LAND * (len(segs) - 1)
 
 
+def ramp_run(n):
+    """The open-air entrance ramp's whole length out from the door (`OA_Ramp_<n>`): the landing at the sill, then the
+    legs and the landings between them."""
+    return RAMP_LAND + ramp_len(n)
+
+
 def godot_yaw(ux, uy):
     """The scene yaw (radians, Godot's Y rotation) that turns local +X onto the record axis (ux, uy): Godot's plan is
     (x, -y) of the record, and a yaw t sends +X to (cos t, 0, -sin t)."""
@@ -389,22 +412,12 @@ def elements(st: Station):
             cc = inner + sg * (BUILDING_T + 0.8 + (i + 0.5) * (GATE_W + 0.25))
             out.append(Box("gate", ga - 0.05, ga + 0.05, cc - GATE_W / 2, cc + GATE_W / 2, top, top + 1.0,
                            "%s_%d" % (side, i)))
-        # the entry outside the door: the landing and stair straight out, the slope along the front away from the rail
-        rise = st.entry_rise.get(side, PLATFORM_H)
-        n = entry_n(rise)
+        # the entry outside the door: ONE straight ramp, door-wide, in line with the door, down to the street
+        n = entry_n(st.entry_rise.get(side, PLATFORM_H))
         a_door = end * (half + BUILDING_LEN)
         dc = inner + sg * DOOR_OFF
-        a_out = a_door + end * (ENTRY_LAND + (n - 1) * STAIR_RUN)
-        out.append(Box("entry", *sorted((a_door, a_out)), *sorted((dc - DOOR_W / 2, dc + DOOR_W / 2)),
-                       top - n * ENTRY_RISE, top, side))
-        r0 = dc + sg * DOOR_W / 2
-        if st.entry_kind.get(side, "side") == "out":
-            out.append(Box("entry", *sorted((a_door, a_door + end * (ENTRY_LAND + ramp_len(n)))),
-                           *sorted((r0 + sg * 0.2, r0 + sg * (0.2 + RAMP_W))), top - n * ENTRY_RISE, top,
-                           side + "_ramp"))
-        else:
-            out.append(Box("entry", *sorted((a_door, a_door + end * (RAMP_W + 0.2))),
-                           *sorted((r0, r0 + sg * ramp_len(n))), top - n * ENTRY_RISE, top, side + "_ramp"))
+        out.append(Box("entry", *sorted((a_door, a_door + end * ramp_run(n))),
+                       *sorted((dc - DOOR_W / 2, dc + DOOR_W / 2)), top - n * ENTRY_RISE, top, side))
     return out
 
 
@@ -971,9 +984,8 @@ def props(st: Station):
         bc = inner + sg * BUILDING_D / 2.0
         out += _piece_props("OA_Building_%s_%s" % (ws, hand), end * (half + BUILDING_LEN / 2.0), bc, 0.0, byaw)
         risers = entry_n(st.entry_rise.get(side, PLATFORM_H))
-        kind = "Entry" if st.entry_kind.get(side, "side") == "side" else "EntryOut"
-        out += _piece_props("OA_%s_%d_%s" % (kind, risers, hand), end * (half + BUILDING_LEN), inner + sg * DOOR_OFF,
-                            PLATFORM_H, byaw)
+        out += _piece_props("OA_Ramp_%d" % risers, end * (half + BUILDING_LEN), inner + sg * DOOR_OFF, PLATFORM_H,
+                            byaw)
     return out
 
 
@@ -1040,24 +1052,19 @@ def end_building(st: Station, side, end, kind=None):
             continue
         sg = 1.0 if side == "left" else -1.0
         inner = c0 if side == "left" else c1
-        # the building AND its entry (stair out from the door, the slope along the front) -- the whole of what must
-        # clear the roads; the slope is taken at a typical rise (PLATFORM_H over the street)
-        kind = kind or st.entry_kind.get(side, "side")
+        # the building AND its entry ramp (straight out from the door, in line with it) and the apron at its foot --
+        # the whole of what must clear the roads; the ramp is taken at a typical rise (PLATFORM_H over the street)
         n = entry_n(st.entry_rise.get(side, PLATFORM_H + 0.14))
-        if kind == "out":
-            along = BUILDING_LEN + ENTRY_LAND + max((n - 1) * STAIR_RUN, ramp_len(n))
-            across = BUILDING_D
-        else:
-            along = BUILDING_LEN + ENTRY_LAND + (n - 1) * STAIR_RUN
-            across = max(BUILDING_D, DOOR_OFF + DOOR_W / 2 + ramp_len(n))
+        along = BUILDING_LEN + ramp_run(n) + FOOT_GAP
+        across = BUILDING_D
         bc = sorted((inner, inner + sg * across))
         return (end * (half + along / 2.0), 0.5 * (bc[0] + bc[1]), along / 2.0, 0.5 * (bc[1] - bc[0]))
     raise KeyError(side)
 
 
 def entrance(st: Station, side, end, kind=None):
-    """(a, c) of the street outside `side`'s end building at end `end`: on its door's centre line, 3 m past the foot
-    of its entry stair."""
+    """(a, c) of the street outside `side`'s end building at end `end`: on its door's centre line, 3 m past the apron
+    at the foot of its entry ramp."""
     a, _c, ha, _hc = end_building(st, side, end, kind)
     inner = next((c0 if side == "left" else c1) for c0, c1, _f in platforms(st) if ("left" if c0 > 0 else "right")
                  == side)
@@ -1076,29 +1083,35 @@ def extent(st: Station):
     return st.length / 2.0 + 2 * end_building(st, "left", 1)[2], hc
 
 
-def choose_ends(st: Station, clear, cost):
-    """{side: +1 | -1}: for each platform, the end its building stands at -- among the ends where `clear(cx, cy, ux,
-    uy, half along, half across)` (record frame) says the building AND its entry stand clear, the one whose street
-    entrance has the lower `cost(x, y)` (the town is nearer). The entry's slope runs along the front ('side') if it
-    fits anywhere, else straight out beside the stair ('out'); the kind chosen is written to `st.entry_kind`. A side
-    with no clear end is left out, and the caller reports it."""
+def choose_ends(st: Station, clear, cost, front=None):
+    """{side: +1 | -1}: for each platform, the end its building stands at. `front` (the rail plan's authored front
+    end, `island_rail_layout.STATION_FRONT`: the end whose ramp comes down to its street) wins when its BUILDING
+    stands clear -- the ramp's foot is meant to meet the street, so it is not asked to clear it. Else, among the ends
+    where `clear(cx, cy, ux, uy, half along, half across)` (record frame) says the building AND its entry ramp stand
+    clear, the one whose street entrance has the lower `cost(x, y)` (the town is nearer). A side with no clear end is
+    left out, and the caller reports it."""
     out = {}
+    half = st.length / 2.0
     for side in ("left", "right"):
+        if front:
+            _a, c, _ha, hc = end_building(st, side, front)
+            cx, cy = to_record(st, front * (half + BUILDING_LEN / 2.0), c)
+            if clear(cx, cy, st.ux, st.uy, BUILDING_LEN / 2.0 + 0.5, hc + 0.5):
+                out[side] = front
+                st.entry_kind[side] = "ramp"
+                continue
         best = None
-        for kind in ENTRY_KINDS:
-            for end in (1, -1):
-                a, c, ha, hc = end_building(st, side, end, kind)
-                cx, cy = to_record(st, a, c)
-                if not clear(cx, cy, st.ux, st.uy, ha + 0.5, hc + 0.5):
-                    continue
-                k = cost(*to_record(st, *entrance(st, side, end, kind)))
-                if best is None or k < best[0]:
-                    best = (k, end, kind)
-            if best is not None:
-                break
+        for end in (1, -1):
+            a, c, ha, hc = end_building(st, side, end)
+            cx, cy = to_record(st, a, c)
+            if not clear(cx, cy, st.ux, st.uy, ha + 0.5, hc + 0.5):
+                continue
+            k = cost(*to_record(st, *entrance(st, side, end)))
+            if best is None or k < best[0]:
+                best = (k, end)
         if best is not None:
             out[side] = best[1]
-            st.entry_kind[side] = best[2]
+            st.entry_kind[side] = "ramp"
     return out
 
 
@@ -1358,7 +1371,9 @@ def self_test():
     rises = [b[1] - a[1] for a, b in zip([(0, -EH_LIFT)] + steps, steps + [(x_top, PLATFORM_H)])]
     assert max(rises) <= STAIR_RISE + 1e-9 and abs(sum(rises) - (EH_LIFT + PLATFORM_H)) < 1e-9, rises
     assert x_top > -EH_STAIR_LEN / 2 + 1.0, x_top
-    assert eh_band(st8)[0] - GAUGE_HALF - TRACK_HALF > 0.1
+    # the platform edge stands outside the train's gauge (since 2026-09-29 the real train's: 3.0 m, so 5 cm); the gap to
+    # the car itself (0.11 m at the platform's top) is probe_train_fit.gd's
+    assert eh_band(st8)[0] - GAUGE_HALF - TRACK_HALF > 0.0
     mods, sc = eh_modules(st8)
     vals = list(mods.values())
     assert vals.count("gate_lo") == 1 and vals.count("gate_hi") == 1 and vals.count("entrance") == 2, mods

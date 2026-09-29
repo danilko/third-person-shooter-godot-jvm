@@ -173,7 +173,7 @@ func _initialize() -> void:
 	var scene: Node = (load(WORLD) as PackedScene).instantiate()
 	var net: Node3D = null
 	for c in scene.find_children("*", "Node3D", true, false):
-		if c.get_script() == NetworkScript:
+		if c.get_script() == NetworkScript and str(c.get("record_path")).contains("DebugRoads"):
 			net = c
 	check(net != null, "DebugWorld has the DebugRoads network")
 	net.load_record()
@@ -184,7 +184,7 @@ func _initialize() -> void:
 	check(not bands.get("failed", false), "roadkit_cli bands answers", str(bands.get("error", "")))
 	check(wall < 300, "bands on DebugRoads inside the 300 ms budget", "%d ms wall (solve %.1f ms)" % [wall, float(bands.get("ms", -1))])
 	var counts: Dictionary = bands.get("counts", {})
-	check(counts.get("roads", 0) == 4 and counts.get("pads", 0) == 2, "4 runs and 2 pads solved", str(counts))
+	check(counts.get("roads", 0) == 12 and counts.get("pads", 0) == 6, "12 runs and 6 pads solved", str(counts))
 
 	var lanes := []
 	var grid := _built_triangles(lanes)
@@ -224,13 +224,13 @@ func _initialize() -> void:
 	var draft := ov.get_node_or_null(OverlayScript.DRAFT_NAME) as MeshInstance3D
 	var tris := int(bands["surface"]["road"].size() + bands["surface"]["pad"].size() + bands["surface"]["gore"].size()) / 9
 	check(draft != null and dc["tris"] == tris and dc["kerb_lines"] == bands["kerbs"].size(), "the overlay uploads every triangle and kerb line", str(dc))
-	# DebugRoads has no footway, so two layers (tarmac, kerb lines) -- each with the kit's own material.
+	# DebugRoads' redesigned streets have footways: tarmac, footway and kerb lines, each with the kit's own material.
 	var surf_mats := []
 	if draft != null:
 		for si in draft.mesh.get_surface_count():
 			var m := draft.mesh.surface_get_material(si)
 			surf_mats.append(m.resource_name if m != null else "<default>")
-	check(dc["materials"] == draft.mesh.get_surface_count() and surf_mats == ["M_Asphalt", "M_LineW"], "the draft wears the kit's materials from the base meshes", str(surf_mats))
+	check(dc["materials"] == draft.mesh.get_surface_count() and surf_mats == ["M_Asphalt", "M_ConcreteTile", "M_LineW"], "the draft wears the kit's materials from the base meshes", str(surf_mats))
 	check(draft != null and draft.owner == null, "the draft is unowned")
 	var ps := PackedScene.new()
 	ps.pack(scene)
@@ -246,7 +246,9 @@ func _initialize() -> void:
 	var rec = JSON.parse_string(FileAccess.get_file_as_string(net.record_path))
 	var pts: Array = rec["points"]
 	var moved: Dictionary = pts[pts.size() / 2]
+	# diagonally: a station moved only ALONG a straight road leaves the road where it was
 	moved["pos"][0] = float(moved["pos"][0]) + 10.0
+	moved["pos"][1] = float(moved["pos"][1]) + 10.0
 	var f := FileAccess.open(copy, FileAccess.WRITE)
 	f.store_string(JSON.stringify(rec))
 	f.close()

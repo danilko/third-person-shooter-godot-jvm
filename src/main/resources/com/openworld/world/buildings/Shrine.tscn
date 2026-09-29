@@ -1,0 +1,40 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Shrine_mesh.res" id="1_ywjt3"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Shrine_collision.res" id="2_mxi7b"]
+
+[node name="Shrine" type="Node3D" unique_id=173730587]
+metadata/building = {
+"aabb": [Vector3(-25, 0, -29.5), Vector3(50, 8.620001, 59.5)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [50.0, 59.5],
+"height_m": 8.62,
+"id": "Shrine",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"probe_xz": [0.0, -17.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "neighbourhood shrine: 鳥居, 拝殿, 本殿, 手水舎, 玉垣, 50 x 60 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+"wall_top_m": 8.62
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1718322793]
+visibility_range_end = 403.44
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_ywjt3")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=249228229]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=895236512]
+shape = ExtResource("2_mxi7b")

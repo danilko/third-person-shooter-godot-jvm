@@ -6,8 +6,8 @@ import godot.api.Node3D;
 /**
  * One flap of a station's automatic ticket gate (自動改札機, PLAN.md P3 "the paid area"): a {@link Door} that swings
  * aside for a character walking through the lane from either side and shuts behind them. A station's platforms are a
- * closed PAID AREA -- platform, stair / footbridge, gates, street -- and this flap is the only way through the fare
- * barrier inside the station building.
+ * closed PAID AREA -- platform, stair / lift, gates, street, all one kit station scene -- and this flap is the only way
+ * through the fare barrier inside the station building.
  *
  * <p>The fare is FREE for now: {@link #admits(Node3D)} lets every character through. It is the one place a fare
  * (an IC card, a ticket, a wanted level) will be asked, and it is asked on the sensor's enter AND exit, so a later

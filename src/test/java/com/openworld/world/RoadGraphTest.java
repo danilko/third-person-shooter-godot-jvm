@@ -71,25 +71,26 @@ class RoadGraphTest {
     @Test
     void aRouteAcrossTheJunctionFollowsTheConnectorIntoTheNextZone() throws IOException {
         RoadGraph g = debugRoads();
-        assertEquals(38, g.laneCount());
-        // From the middle of `link` (zone debug_a) to the far end of `spur` (zone debug_b).
-        RoadGraph.Route r = g.route(-10, 10.5, 35, 290, 10, -84);
+        assertEquals(99, g.laneCount());
+        // From the west island's inner E-W street (zone debug_a) over the bridge (`link`) to the far side of the east
+        // island's ring (zone debug_b) -- DebugWorld as derived by tools/debug_world_layout.py.
+        RoadGraph.Route r = g.route(-170, 5.8, -2, 375, 5.8, 0);
         assertNotNull(r);
         assertLegal(r);
         List<String> ids = r.laneIds();
-        assertTrue(ids.get(0).startsWith("link_F"), "starts eastbound on link: " + ids);
-        assertTrue(ids.stream().anyMatch(s -> s.contains("__spur_R")), "turns into spur: " + ids);
-        assertTrue(ids.get(ids.size() - 1).startsWith("spur_R"), "ends on spur: " + ids);
-        // The route bends through the junction, so it is longer than the straight line.
-        double straight = Math.hypot(290 + 10, -84 - 35);
+        assertTrue(ids.get(0).startsWith("w_ew_e_F"), "starts eastbound on the E-W street: " + ids);
+        assertTrue(ids.stream().anyMatch(s -> s.startsWith("link_F")), "crosses the bridge: " + ids);
+        assertTrue(ids.get(ids.size() - 1).startsWith("e_ring"), "ends on the east ring: " + ids);
+        // The route goes round the ring, so it is longer than the straight line.
+        double straight = Math.hypot(375 + 170, 0 + 2);
         assertTrue(r.length > straight, r.length + " vs " + straight);
     }
 
     @Test
     void theRouteEndsOnTheLaneNearestTheWaypoint() throws IOException {
         RoadGraph g = debugRoads();
-        double[] wp = {150, 10, 30};   // beside `east`
-        RoadGraph.Route r = g.route(-10, 10.5, 35, wp[0], wp[1], wp[2]);
+        double[] wp = {240, 6, 160};   // outside the east ring's south side
+        RoadGraph.Route r = g.route(-170, 5.8, -2, wp[0], wp[1], wp[2]);
         assertNotNull(r);
         assertLegal(r);
         double nearest = g.snaps(wp[0], wp[1], wp[2], 0).get(0).distance;
@@ -105,19 +106,19 @@ class RoadGraphTest {
     void aGoalAheadOnTheSameLaneIsOneLeg() throws IOException {
         RoadGraph g = debugRoads();
         RoadGraph.Lane l = g.lane("link_F0");
-        double[] a = l.at(20), b = l.at(120);
+        double[] a = l.at(20), b = l.at(100);
         RoadGraph.Route r = g.route(a[0], a[1], a[2], b[0], b[1], b[2]);
         assertNotNull(r);
         assertEquals(1, r.legs.size(), r.laneIds().toString());
-        assertEquals(100, r.length, 0.5);
+        assertEquals(80, r.length, 0.5);
     }
 
     @Test
     void steerPointLiesAheadOnTheRoute() throws IOException {
         RoadGraph g = debugRoads();
-        RoadGraph.Route r = g.route(-10, 10.5, 35, 290, 10, -84);
-        double s0 = r.progressOf(-10, 35);
-        double[] p = r.steerPoint(-10, 35, 30);
+        RoadGraph.Route r = g.route(-170, 5.8, -2, 375, 5.8, 0);
+        double s0 = r.progressOf(-170, -2);
+        double[] p = r.steerPoint(-170, -2, 30);
         assertEquals(s0 + 30, r.progressOf(p[0], p[2]), 0.5);
         assertTrue(r.distanceXZ(p[0], p[2]) < 1e-6);
     }

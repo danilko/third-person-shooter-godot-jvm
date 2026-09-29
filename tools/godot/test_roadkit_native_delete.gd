@@ -98,12 +98,13 @@ func _initialize() -> void:
 	check(net.all_points().filter(func(p): return String(p.name).ends_with("_jct")).size() \
 			== net.all_points().filter(func(p): return p.fields["role"] == "INTERSECTION").size(),
 			"every INTERSECTION point's name carries _jct")
-	var spur: Node = net.get_node("spur")
-	check(String(spur.points()[0].name) == "spur_p000_end", "a road end that joins nothing is tagged _end", String(spur.points()[0].name))
-	var loop: Node = net.get_node("loop")
-	check(String(loop.points()[1].name) == "loop_p001", "a plain station carries no tag", String(loop.points()[1].name))
+	# the redesigned DebugRoads (two rings joined by a link) has no open end, so nothing may carry the _end tag
+	check(net.all_points().filter(func(p): return String(p.name).ends_with("_end")).is_empty(),
+			"a network with no open end tags nothing _end")
+	var loop: Node = net.get_node("w_ring__x1")
+	check(String(loop.points()[1].name) == "w_ring__x1_p001", "a plain station carries no tag", String(loop.points()[1].name))
 	check(loop.points()[0].editor_description.contains("JUNCTION -> "), "a mouth's Scene-dock tooltip lists its junction links", loop.points()[0].editor_description.replace("\n", " | "))
-	var runs0 := _runs_of(net, "loop")
+	var runs0 := _runs_of(net, "w_ring__x1")
 
 	# ── one interior station ──
 	var pts: Array = loop.points()
@@ -115,13 +116,13 @@ func _initialize() -> void:
 	check(_links_to(rec, victim.uid) == 0, "no link names the deleted station")
 	check(_linked(rec, a, b, "SEGMENT"), "its two neighbours are joined by a SEGMENT")
 	check(_gate(net) == 0, "the gate stays at 0 errors")
-	check(_runs_of(net, "loop") == runs0, "the road is not cut (%d run(s))" % runs0)
+	check(_runs_of(net, "w_ring__x1") == runs0, "the road is not cut (%d run(s))" % runs0)
 	net.renumber()
-	check(loop.points().size() == pts.size() - 1 and String(loop.points()[3].name) == "loop_p003", "names renumber along the chain")
+	check(loop.points().size() == pts.size() - 1 and String(loop.points()[3].name) == "w_ring__x1_p003", "names renumber along the chain")
 	_undelete(d)
 	net.renumber()
 	check(net.to_record() == original, "putting it back restores the record exactly")
-	check(String(victim.name) == "loop_p003", "and its name")
+	check(String(victim.name) == "w_ring__x1_p003", "and its name")
 
 	# ── two consecutive interior stations ──
 	pts = loop.points()
@@ -145,7 +146,7 @@ func _initialize() -> void:
 	# ── junction mouths ──
 	var mouth: Node = loop.points()[0]
 	var members: Array = Gestures.junction_members(mouth)
-	check(members.size() == 3, "loop's head is a mouth of a 3-way junction", str(members.map(func(m): return m.name)))
+	check(members.size() == 3, "w_ring__x1's head is a mouth of a 3-way junction", str(members.map(func(m): return m.name)))
 	var others: Array = members.filter(func(m): return m != mouth)
 	d1 = _delete(mouth)
 	rec = net.to_record()
@@ -161,7 +162,8 @@ func _initialize() -> void:
 	check(_same(net.to_record(), original) and String(mouth.name).ends_with("_jct"), "both put back: record identical, tags back")
 
 	# ── a whole road ──
-	var link: Node = net.get_node("link")
+	# a road whose two pads keep three arms each without it (deleting `link` would leave a 2-arm pad)
+	var link: Node = net.get_node("w_ew_e")
 	var uids: Array = link.points().map(func(p): return p.uid)
 	d = _delete(link)
 	rec = net.to_record()

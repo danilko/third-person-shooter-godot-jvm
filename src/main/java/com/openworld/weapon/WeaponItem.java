@@ -457,8 +457,13 @@ public class WeaponItem extends Pickup implements WeaponAction {
     final Node node;
     final Vector3 point;
     final Vector3 normal;
+    /** The damage the round still carries when it gets here (a window's armour took the rest); -1 = all of it. */
+    final float damage;
     TraceHit(Node node, Vector3 point, Vector3 normal) {
-      this.node = node; this.point = point; this.normal = normal;
+      this(node, point, normal, -1f);
+    }
+    TraceHit(Node node, Vector3 point, Vector3 normal, float damage) {
+      this.node = node; this.point = point; this.normal = normal; this.damage = damage;
     }
   }
 
@@ -481,7 +486,13 @@ public class WeaponItem extends Pickup implements WeaponAction {
   /** One ray query from {@code from} to {@code to} with the AimRay's settings; distances measured from {@code origin}. */
   private static TraceHit query(godot.api.PhysicsDirectSpaceState3D space, RayCast3D ray, Vector3 origin,
                                 Vector3 from, Vector3 to) {
+    return query(space, ray, origin, from, to, null);
+  }
+
+  private static TraceHit query(godot.api.PhysicsDirectSpaceState3D space, RayCast3D ray, Vector3 origin,
+                                Vector3 from, Vector3 to, godot.core.RID alsoExclude) {
     godot.core.VariantArray<godot.core.RID> exclude = com.openworld.util.RayExclusions.of(ray);
+    if (alsoExclude != null) exclude.add(alsoExclude);
     if (ray.getExcludeParentBody() && ray.getParent() instanceof godot.api.CollisionObject3D parent) {
       exclude.add(parent.getRid());
     }
@@ -497,6 +508,47 @@ public class WeaponItem extends Pickup implements WeaponAction {
     if (point.minus(origin).length() <= MUZZLE_MIN_DISTANCE) return null;
     Vector3 normal = hit.get("normal") instanceof Vector3 n ? n : Vector3.Companion.getZERO();
     return new TraceHit(hit.get("collider") instanceof Node nd ? nd : null, point, normal);
+  }
+
+  /** Control knob for probes: off = a car's windows are steel, as before they could break (the hull stops every shot). */
+  @Visible public boolean shootThroughGlass = true;
+
+  /**
+   * A shot that struck a car: did it strike a WINDOW? Each window has an armour pool (VehicleConfig.glassArmor, 0 on
+   * ordinary cars): a round takes it down and stops in the glass until it runs out, and the round that exhausts it
+   * shatters the window and CARRIES ON with the damage it had left (the returned hit's {@code damage}). So ordinary
+   * glass lets every round through at full damage, police glass stops a few pistol rounds, and a heavy round breaks
+   * armour and still hurts. A car's hull is one convex collider with no openings, so the window is found on the
+   * mesh's own glass triangles instead: no extra collider, and the test runs only for a shot that already hit a car.
+   * Only the authoritative peer wears the armour down; a client predicts from what it has seen.
+   */
+  protected TraceHit throughGlass(RayCast3D ray, Vector3 origin, Vector3 dir, TraceHit hit, boolean authority,
+                                  float damage) {
+    if (!shootThroughGlass || hit == null || hit.node == null || ray == null || ray.getWorld3d() == null) return hit;
+    com.openworld.carrier.vehicle.Vehicle car = null;
+    for (Node n = hit.node; n != null && car == null; n = n.getParent()) {
+      if (n instanceof com.openworld.carrier.vehicle.Vehicle v) car = v;
+      else if (n instanceof com.openworld.carrier.vehicle.VehicleWheel) return hit;        // a tyre, not a window
+    }
+    if (car == null || car.getDamageModel() == null) return hit;
+    var dm = car.getDamageModel();
+    var glass = dm.paneOnRay(origin, dir, hit.point);
+    if (glass == null) return hit;
+    float carry = damage;
+    if (!dm.paneOpen(glass)) {
+      carry = authority ? dm.hitPane(glass, damage, dir) : dm.carriedThrough(glass, damage);
+      if (carry <= 0f) return new TraceHit(hit.node, glass.point(), hit.normal);       // the glass took it (the car does)
+    }
+    godot.api.PhysicsDirectSpaceState3D space = ray.getWorld3d().getDirectSpaceState();
+    if (space == null) return hit;
+    Vector3 from = glass.point().plus(dir.times(0.01));
+    double across = dm.exitDistance(from, dir);
+    if (across <= 0.0) return hit;
+    Vector3 far = from.plus(dir.times(across));
+    TraceHit inside = query(space, ray, origin, from, far, car.getRid());
+    float left = carry < damage ? carry : -1f;
+    if (inside != null) return new TraceHit(inside.node, inside.point, inside.normal, left);
+    return new TraceHit(car, far, dir.times(-1.0), left);                             // out the far side: stops in it
   }
 
   /** The precise small-shape pass below; registered only so a probe can switch it off as its control

@@ -24,7 +24,7 @@ extends SceneTree
 
 const CLIPS := {
 	"idle": "upright_idle_relaxed",
-	"walk": "upright_walk_relaxed",      # a gait clip: the male library aliases it to the ordinary walk
+	"walk": "upright_walk",              # the NORMAL walk, a gait clip: each gait library holds its own
 	"run": "upright_sprint_forward",
 	"cower": "crouch_idle",
 	"phone": "upright_phone",

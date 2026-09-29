@@ -32,12 +32,90 @@ public final class VehicleDamageRules {
      */
     public static final String[] SLOTS = {
             "bonnet", "boot", "bump_front", "bump_rear", "door_lf", "door_rf", "door_lr", "door_rr",
-            "wing_lf", "wing_rf", "windscreen"};
+            "wing_lf", "wing_rf", "windscreen",
+            // the windows (panes), appended 2026-09-28: each door's window and the body's own glass (rear window,
+            // quarter lights; on a placeholder car the whole greenhouse). The windscreen keeps its part slot.
+            "win_lf", "win_rf", "win_lr", "win_rr", "win_body"};
 
     /** Damage points at which a part dents (starts blending its {@code dam} key), comes loose, and comes off. */
     public static final double DENT_AT = 15.0, LOOSE_AT = 55.0, OFF_AT = 110.0;
     /** A windscreen cracks early and shatters at the point a panel would only come loose. */
     public static final double GLASS_OFF_AT = 50.0;
+
+    /**
+     * A window (user 2026-09-28). ORDINARY glass (every car, {@code armor} 0) gives ONE hit of protection: the first
+     * light round, a melee blow, a crash or a blast shatters it and stops there, and after that the opening lets
+     * everything through. A round of at least {@link #PANE_PIERCE_AT} (a rifle, the large pistol, the revolver, the
+     * sniper rifle) breaks it and carries on at full damage. A shotgun at close range puts its first pellet into the
+     * glass and the rest through the hole it made.
+     * ARMOURED glass (a special vehicle's {@code VehicleConfig.glassArmor} > 0) is a pool of weapon damage instead:
+     * rounds stop in it until it is used up, and the round that uses it up carries on with what it had left.
+     */
+    public static final double PANE_PIERCE_AT = 20.0;
+
+    public static int paneStateFor(double damage, double armor) {
+        if (armor <= 0.0) return damage > 0.0 ? OFF : OK;          // ordinary glass: one hit breaks it
+        if (damage >= armor) return OFF;                            // armour used up
+        return damage > 0.0 ? DENTED : OK;
+    }
+
+    /**
+     * The damage a round carries through a window that has taken {@code taken} so far (it is still standing): 0 means
+     * the glass stopped it.
+     */
+    public static double carriedThrough(double taken, double armor, double round) {
+        if (armor <= 0.0) return round >= PANE_PIERCE_AT ? round : 0.0;
+        double left = Math.max(0.0, armor - taken);
+        return Math.max(0.0, round - left);
+    }
+
+    /** Crash points at a window that shatter it, on top of its armour: the point a door would come loose. */
+    public static final double PANE_CRASH_AT = LOOSE_AT;
+
+    /** The mask slot of the window in a part: a door's own window, the body's glass, or the windscreen's slot. */
+    public static int paneSlotOf(String partName) {
+        if (partName == null) return -1;
+        if (partName.startsWith("door_")) return slotOf("win_" + partName.substring(5));
+        if (partName.equals("chassis")) return slotOf("win_body");
+        if (partName.equals("windscreen")) return slotOf("windscreen");
+        return -1;
+    }
+
+    /**
+     * Where a ray from {@code o} along {@code d} meets the triangle (a, b, c): the distance along the ray, or -1.
+     * Both faces count (Möller–Trumbore, no culling): a bullet meets a window from either side.
+     */
+    public static double rayTriangle(double[] o, double[] d, double[] a, double[] b, double[] c) {
+        double[] e1 = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+        double[] e2 = {c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+        double[] pv = cross(d, e2);
+        double det = dot(e1, pv);
+        if (Math.abs(det) < 1e-12) return -1;
+        double inv = 1.0 / det;
+        double[] tv = {o[0] - a[0], o[1] - a[1], o[2] - a[2]};
+        double u = dot(tv, pv) * inv;
+        if (u < 0 || u > 1) return -1;
+        double[] qv = cross(tv, e1);
+        double v = dot(d, qv) * inv;
+        if (v < 0 || u + v > 1) return -1;
+        double t = dot(e2, qv) * inv;
+        return t >= 0 ? t : -1;
+    }
+
+    /** Distance along a ray (local frame) at which it leaves the box {@code min}/{@code max}; 0 if it misses. */
+    public static double boxExit(double[] o, double[] d, double[] min, double[] max) {
+        double tNear = -1e18, tFar = 1e18;
+        for (int k = 0; k < 3; k++) {
+            if (Math.abs(d[k]) < 1e-12) {
+                if (o[k] < min[k] || o[k] > max[k]) return 0.0;
+                continue;
+            }
+            double t1 = (min[k] - o[k]) / d[k], t2 = (max[k] - o[k]) / d[k];
+            tNear = Math.max(tNear, Math.min(t1, t2));
+            tFar = Math.min(tFar, Math.max(t1, t2));
+        }
+        return tFar >= Math.max(tNear, 0.0) ? tFar : 0.0;
+    }
 
     /** Below this change of velocity (m/s) a contact is a scrape, not a crash: no part damage. */
     public static final double MIN_IMPACT_DV = 2.5;

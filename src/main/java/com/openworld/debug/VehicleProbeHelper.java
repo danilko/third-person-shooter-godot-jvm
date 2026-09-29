@@ -188,4 +188,19 @@ public class VehicleProbeHelper extends Node {
         ai.activateForSpawn(at);
         ai.attachController(k);
     }
+
+    /**
+     * Drive a vehicle / boat / aircraft with a constant command (probe_craft.gd): throttle, steering, and the
+     * aircraft's stick back (the handbrake). The same attachController a traffic car gets.
+     */
+    @Register
+    public void driveCraft(Node v, double motor, double steering, boolean pitchUp) {
+        if (!(v instanceof Vehicle car)) return;
+        ScriptedInputController c = car.getController() instanceof ScriptedInputController s
+                ? s : new ScriptedInputController();
+        c.motor = (float) motor;
+        c.steering = (float) steering;
+        c.handbrake = pitchUp;
+        if (car.getController() != c) car.attachController(c);
+    }
 }

@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Park_mesh.res" id="1_7nlll"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Park_collision.res" id="2_g5814"]
+
+[node name="Park" type="Node3D" unique_id=1022249188]
+metadata/building = {
+"aabb": [Vector3(-30, -0.24277201, -30), Vector3(60, 9.42519, 60)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [60.0, 60.0],
+"height_m": 9.43,
+"id": "Park",
+"kit": "library",
+"landmark": false,
+"piece_count": 7,
+"probe_xz": [22.0, 23.0],
+"props_top_m": 9.1824,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "neighbourhood park, 60 x 60 m plot; PLACEHOLDER (library_civic.py) + nature-kit trees",
+"wall_top_m": 3.5231
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1163478052]
+visibility_range_end = 410.18903
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_7nlll")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1677750156]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=914114266]
+shape = ExtResource("2_g5814")

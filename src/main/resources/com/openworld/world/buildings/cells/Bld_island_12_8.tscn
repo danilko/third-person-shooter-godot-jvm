@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/GasStation_Shop.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/FamilyRestaurant_Shop.tscn" id="1"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_MidWarm.tres" id="tone0_6"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_12_8.res" id="hlod"]
@@ -12,10 +12,10 @@ material = ExtResource("lotmat")
 transform_format = 1
 instance_count = 1
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-0.0044, 0.0000, -25.9800, 1008.0000, 0.0000, 0.6250, 0.0000, 5.5125, 31.4400, 0.0000, -0.0036, 153.4430)
+buffer = PackedFloat32Array(0.0129, 0.0000, -30.1382, 1010.0800, 0.0000, 0.6250, 0.0000, 5.5125, 21.0378, 0.0000, 0.0184, 158.4320)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(31.440, 0.625, 25.980)
+size = Vector3(21.038, 0.625, 30.138)
 
 [node name="Bld_island_12_8" type="Node3D"]
 
@@ -26,10 +26,10 @@ visibility_range_begin = 450.0
 visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
-[node name="GasStation_Shop_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(-0.000140, 0, -1.000000, 0, 1, 0, 1.000000, 0, -0.000140, 1008.000, 5.840, 153.443)
+[node name="FamilyRestaurant_Shop_000" parent="." instance=ExtResource("1")]
+transform = Transform3D(0.000611, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000611, 1010.080, 5.840, 158.432)
 
-[node name="Mesh" parent="./GasStation_Shop_000" index="0"]
+[node name="Mesh" parent="./FamilyRestaurant_Shop_000" index="0"]
 surface_material_override/1 = ExtResource("tone0_6")
 visibility_parent = NodePath("../../HLOD")
 
@@ -40,5 +40,5 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-0.000140, 0, -1.000000, 0, 1, 0, 1.000000, 0, -0.000140, 1008.000, 5.513, 153.443)
+transform = Transform3D(0.000611, 0, -1.000000, 0, 1, 0, 1.000000, 0, 0.000611, 1010.080, 5.513, 158.432)
 shape = SubResource("LotShape0")

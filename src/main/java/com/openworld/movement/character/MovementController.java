@@ -2,11 +2,13 @@ package com.openworld.movement.character;
 
 import godot.api.CharacterBody3D;
 import godot.api.KinematicCollision3D;
+import godot.api.RigidBody3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.core.Transform3D;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -446,9 +448,19 @@ public class MovementController extends Node {
    *
    * Not run while swimming: a wall met in water is a wall.
    */
+  /** Control knob for tools/godot/probe_car_push.gd: true puts back the step onto a car, which shoves it. */
+  @Visible public boolean stepPushesBodies = false;
+
   private boolean stepUpLedge(double vx, double vz, double delta) {
     if (stepHeight <= 0.0 || player == null) return false;
     if (!player.isOnFloor() || !player.isOnWall()) return false;
+    // A car is not a kerb. The "wall" is a dynamic body (a parked car's nose, a crate): stepping onto its sloped front
+    // put the capsule on the hull every tick, and a character is a kinematic body, so each step shoved the car --
+    // measured, a sprint into SPC-1's bumper 0.6 m off centre pushed the 1300 kg car 20 m at up to 5.2 m/s.
+    for (int i = 0; i < player.getSlideCollisionCount(); i++) {
+      KinematicCollision3D c = player.getSlideCollision(i);
+      if (c != null && c.getCollider() instanceof RigidBody3D && !stepPushesBodies) return false;
+    }
 
     double len = Math.sqrt(vx * vx + vz * vz);
     if (len < 1e-3) return false;                       // standing still: nothing to step onto
@@ -465,7 +477,8 @@ public class MovementController extends Node {
     player.setGlobalTransform(start.translated(lift));
     player.moveAndCollide(ahead);
     KinematicCollision3D landed = player.moveAndCollide(new Vector3(0.0, -(stepHeight + 0.02), 0.0));
-    if (landed == null || landed.getNormal().getY() < floorNormalMin()) {
+    if (landed == null || landed.getNormal().getY() < floorNormalMin()
+        || (landed.getCollider() instanceof RigidBody3D && !stepPushesBodies)) {
       player.setGlobalTransform(start);
       return false;
     }

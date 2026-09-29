@@ -35,6 +35,8 @@ public class ScriptedInputController extends Controller {
     public float motor = 0f;
     public float steering = 0f;
     public boolean brake = false;
+    /** An aircraft's pitch-up (Airplane.java reads the handbrake as the stick back). */
+    public boolean handbrake = false;
 
     // ── Pose / aim intent, for a stand that poses a body instead of driving one ──────────────
     /** Combat pose: what turns the aim modifiers on (AnimationController.onSetCombatState). */
@@ -78,6 +80,7 @@ public class ScriptedInputController extends Controller {
         cmd.motor = motor;
         cmd.steering = steering;
         cmd.brake = brake;
+        cmd.handbrake = handbrake;
         cmd.enterExit = enterExitPending;
         cmd.wantCombat = wantCombat;
         cmd.desiredStance = desiredStance;

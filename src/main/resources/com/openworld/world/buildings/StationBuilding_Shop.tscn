@@ -1,11 +1,11 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cmk1apja4pre6"]
 
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/StationBuilding_Open_mesh.res" id="1_w50m0"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Door.java" id="2_kbab1"]
+[ext_resource type="Script" uid="uid://beme1nfo7d6pc" path="res://src/main/java/com/openworld/world/Door.java" id="2_kbab1"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/GlassLeaf_0850_2100_mesh.res" id="3_sskli"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_DoorLeaf_White.tres" id="4_s7g71"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/DoorLeaf_mesh.res" id="5_vdtju"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/TicketGate.java" id="6_lte0o"]
+[ext_resource type="Script" uid="uid://btojs6xv6c0jp" path="res://src/main/java/com/openworld/world/TicketGate.java" id="6_lte0o"]
 [ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_CraneRed.tres" id="7_y1wcr"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_5c3ao"]
@@ -277,22 +277,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.85, 0, 3.64)
 collision_mask = 0
 script = ExtResource("2_kbab1")
 open_mode = "SLIDE"
-open_angle_deg = 90.0
 slide_offset = Vector3(0.85, 0, 0)
-open_speed = 4.0
-auto_open = true
 sensor_path = NodePath("Sensor")
-locked = false
-unlock_key_id = ""
-unlock_mission_id = ""
-breakable = false
-swing_both_ways = true
-breakable_id = ""
-health = 30.0
-restore_delay = 0.0
-spawn_debris = true
-break_min_damage = 0.0
-surface_type = "DEFAULT"
 
 [node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door0" unique_id=1686518132]
 mesh = ExtResource("3_sskli")
@@ -314,22 +300,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 3.64)
 collision_mask = 0
 script = ExtResource("2_kbab1")
 open_mode = "SLIDE"
-open_angle_deg = 90.0
 slide_offset = Vector3(-0.85, 0, 0)
-open_speed = 4.0
-auto_open = true
 sensor_path = NodePath("Sensor")
-locked = false
-unlock_key_id = ""
-unlock_mission_id = ""
-breakable = false
-swing_both_ways = true
-breakable_id = ""
-health = 30.0
-restore_delay = 0.0
-spawn_debris = true
-break_min_damage = 0.0
-surface_type = "DEFAULT"
 
 [node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door1" unique_id=768152412]
 mesh = ExtResource("3_sskli")
@@ -350,23 +322,7 @@ shape = SubResource("BoxShape3D_lcdgt")
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.455, 0, -3.55)
 collision_mask = 0
 script = ExtResource("2_kbab1")
-open_mode = "ROTATE"
-open_angle_deg = 90.0
-slide_offset = Vector3(0, 0, 1)
-open_speed = 4.0
-auto_open = true
 sensor_path = NodePath("Sensor")
-locked = false
-unlock_key_id = ""
-unlock_mission_id = ""
-breakable = false
-swing_both_ways = true
-breakable_id = ""
-health = 30.0
-restore_delay = 0.0
-spawn_debris = true
-break_min_damage = 0.0
-surface_type = "DEFAULT"
 
 [node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door2" unique_id=2099605650]
 material_override = ExtResource("4_s7g71")
@@ -397,23 +353,7 @@ shape = SubResource("BoxShape3D_gdw3n")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 0, -1.6)
 collision_mask = 0
 script = ExtResource("6_lte0o")
-open_mode = "ROTATE"
-open_angle_deg = 90.0
-slide_offset = Vector3(0, 0, 1)
-open_speed = 8.0
-auto_open = true
 sensor_path = NodePath("../GateSensor3")
-locked = false
-unlock_key_id = ""
-unlock_mission_id = ""
-breakable = false
-swing_both_ways = true
-breakable_id = ""
-health = 30.0
-restore_delay = 0.0
-spawn_debris = true
-break_min_damage = 0.0
-surface_type = "DEFAULT"
 
 [node name="IntactVisual" type="MeshInstance3D" parent="Doors/Gate3" unique_id=1360324090]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.225, 0.7, 0)
@@ -428,23 +368,7 @@ shape = SubResource("BoxShape3D_sbw02")
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.45, 0, -1.6)
 collision_mask = 0
 script = ExtResource("6_lte0o")
-open_mode = "ROTATE"
-open_angle_deg = 90.0
-slide_offset = Vector3(0, 0, 1)
-open_speed = 8.0
-auto_open = true
 sensor_path = NodePath("../GateSensor3")
-locked = false
-unlock_key_id = ""
-unlock_mission_id = ""
-breakable = false
-swing_both_ways = true
-breakable_id = ""
-health = 30.0
-restore_delay = 0.0
-spawn_debris = true
-break_min_damage = 0.0
-surface_type = "DEFAULT"
 
 [node name="IntactVisual" type="MeshInstance3D" parent="Doors/Gate4" unique_id=1552895218]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.225, 0.7, 0)

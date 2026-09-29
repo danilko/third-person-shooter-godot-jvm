@@ -126,7 +126,6 @@ the collider.
 |---|---|---|
 | RainbowBridge | suspension structure only; the two decks are Road Kit roads (upper 52.5 m, lower 44.5 m, corridor 15 m either side) | 849 × 48 × 129 |
 | TokyoTower | splayed legs, orange/white bands, two decks, antenna | 95 × 95 × 334 |
-| TokyoStation | red-brick Marunouchi building; the two domed halls are hollow ticket-gate concourses | 320 × 30 × 36 |
 | OsakaCastle | stone bases, five tiers, copper roofs, gold top | 41 × 69 × 55 |
 | AirportTerminal | one compact terminal (GTA-style scale): hollow furnished hall and concourse, piers, drive, control tower | 242 × 170 × 47 |
 

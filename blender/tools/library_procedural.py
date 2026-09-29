@@ -582,74 +582,6 @@ def gas_island(material):
     return "Gas_Island", "gas", b.mesh()
 
 
-# ── rural station ────────────────────────────────────────────────────────────────────────────────────────────
-
-PLATFORM_H = 1.3
-
-
-def platform_module(material):
-    b = Builder("Platform_Module", material)
-    L, D, h = 1.82, 3.64, PLATFORM_H
-    b.box((-L / 2, -D / 2, 0), (L / 2, D / 2, h), "MI_ConcreteSmooth")
-    b.box((-L / 2, -D / 2, h), (L / 2, -D / 2 + 0.08, h + 0.004), "MI_PaintWhite")          # edge line
-    b.box((-L / 2, -D / 2 + 0.8, h), (L / 2, -D / 2 + 1.1, h + 0.006), "MI_Tactile")         # 0.8 m in
-    b.box((-L / 2, -D / 2 - 0.02, h - 0.12), (L / 2, -D / 2, h), "MI_PaintYellow")           # coping face
-    return "Platform_Module", "station", b.mesh()
-
-
-def platform_ramp(material):
-    """The platform's end: a 1:2.8 slope down to the ground over two ken, the width of a module."""
-    b = Builder("Platform_Ramp", material)
-    L, D, h = 3.64, 3.64, PLATFORM_H
-    b.wedge_x(-L / 2, L / 2, -D / 2, D / 2, h, 0.02, "MI_ConcreteSmooth")
-    return "Platform_Ramp", "station", b.mesh()
-
-
-def platform_fence(material):
-    b = Builder("Platform_Fence", material)
-    for x in (-0.89, 0.89):
-        b.box((x - 0.03, -0.03, 0), (x + 0.03, 0.03, 1.2), "MI_PaintedMetal")
-    for z in (0.35, 0.75, 1.15):
-        b.box((-0.91, -0.02, z), (0.91, 0.02, z + 0.05), "MI_PaintedMetal")
-    return "Platform_Fence", "station", b.mesh()
-
-
-def platform_shelter(material):
-    """A platform shelter (上屋): corrugated roof on two posts at the back, 3.64 m long, 2.7 m to the eaves."""
-    b = Builder("Platform_Shelter", material)
-    L, D = 3.64, 2.4
-    for x in (-1.3, 1.3):
-        b.box((x - 0.06, 0.55, 0), (x + 0.06, 0.67, 2.75), "MI_PaintedMetal")
-    b.box((-L / 2, -D / 2, 2.75), (L / 2, D / 2, 2.82), "MI_Corrugated")
-    b.box((-L / 2, -D / 2, 2.7), (L / 2, -D / 2 + 0.05, 2.82), "MI_PaintedMetal")
-    b.box((-0.6, -D / 2 + 0.3, 2.62), (0.6, -D / 2 + 0.5, 2.7), "MI_Light")
-    return "Platform_Shelter", "station", b.mesh()
-
-
-def name_board(material):
-    """The station name board (駅名標): white, a coloured band along the bottom, on two posts."""
-    b = Builder("Station_NameBoard", material)
-    for x in (-0.65, 0.65):
-        b.box((x - 0.03, -0.03, 0), (x + 0.03, 0.03, 1.6), "MI_PaintedMetal")
-    b.box((-0.8, -0.04, 1.6), (0.8, 0.02, 2.1), "MI_PaintWhite")
-    b.box((-0.8, -0.05, 1.6), (0.8, -0.04, 1.7), "MI_Sign")
-    return "Station_NameBoard", "station", b.mesh()
-
-
-def track_module(material):
-    b = Builder("Track_Module", material)
-    L = 1.82
-    b.box((-L / 2, -1.4, 0), (L / 2, 1.4, 0.1), "MI_Ballast")
-    for k in range(3):
-        x = -L / 2 + L * (k + 0.5) / 3
-        b.box((x - 0.1, -1.0, 0.1), (x + 0.1, 1.0, 0.22), "MI_ConcreteSmooth")
-    g = 1.067 / 2
-    for s in (-1, 1):
-        y = s * (g + 0.035)
-        b.box((-L / 2, y - 0.035, 0.22), (L / 2, y + 0.035, 0.36), "MI_Steel")
-    return "Track_Module", "station", b.mesh()
-
-
 # ── paving ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 def apron_tile(material):
@@ -750,7 +682,7 @@ def harbour_apron(material):
 #: real size unless the note says otherwise; then run tools/building_kit/build_buildings.sh.
 EDIT_NOTE_DEFAULT = ("Placeholder, ours (CC0). Keep the frame: Z up, origin at the footprint centre on the ground, the side "
                      "a person uses facing -Y; real size in metres. After editing: tools/building_kit/build_buildings.sh.")
-EDIT_NOTES = {
+EDIT_NOTES = {  # (+ library_civic.CIVIC_NOTES, merged below)
     "Wall_PartitionDoorWide": "Placeholder accessible doorway: one ken, a 1.0 x 2.0 m hole in the middle. The SLIDING "
                               "leaf is built at runtime and runs 1.0 m along the wall on the prop's `slide_dir` side "
                               "(building_types.json), so the wall must continue there. Its collider is the jamb boxes "
@@ -784,6 +716,10 @@ EDIT_NOTES = {
                    "tall because the measured site's ground rises 24 m under it (tools/island_sites.py); its top must "
                    "clear the uphill ground. The Seiden faces -Y (the front, towards downtown). Collider = its mesh.",
 }
+
+
+EDIT_NOTES.update(__import__("library_civic").CIVIC_NOTES)
+EDIT_NOTES.update(__import__("library_interiors").notes())
 
 
 def crossing_signal(material):
@@ -872,12 +808,6 @@ def build_all(material):
         gas_canopy(material),
         gas_column(material),
         gas_island(material),
-        platform_module(material),
-        platform_ramp(material),
-        platform_fence(material),
-        platform_shelter(material),
-        name_board(material),
-        track_module(material),
         crossing_signal(material),
         pedestrian_signal(material),
         apron_tile(material),
@@ -888,4 +818,6 @@ def build_all(material):
         harbour_fender(material),
         harbour_light_mast(material),
         harbour_apron(material),
-    ] + __import__("library_landmarks").build_all(material, Builder)
+    ] + __import__("library_landmarks").build_all(material, Builder) + __import__("library_civic").build_all(material,
+                                                                                                          Builder) + \
+        __import__("library_interiors").build_all(material, Builder)

@@ -416,6 +416,7 @@ public class MeleeItem extends WeaponItem {
         }
       }
       if (info != null) {
+        if (authoritative) smashGlass(chest, info, st);
         hitSet.add(e.getKey());
         if (hitsOut != null) hitsOut.add(ImpactManager.resolveTarget(info.hitNode).getName().toString());
         connect(im, info, st, authoritative, feel);
@@ -431,6 +432,26 @@ public class MeleeItem extends WeaponItem {
         im.processVisualHit(new HitInfo(wall.node, wall.point, wall.normal));
       }
     }
+  }
+
+  /**
+   * A blow that lands on a car's WINDOW breaks it (host): ordinary glass takes one blow and the blow stops in it
+   * (VehicleDamageModel.strikePane), and the panel behind the glass takes nothing. A melee weapon never reaches the
+   * person inside through intact glass: the trace from the chest meets the car's hull first.
+   */
+  private void smashGlass(Vector3 chest, HitInfo info, MeleeAttackStep st) {
+    com.openworld.carrier.vehicle.Vehicle car = null;
+    for (Node n = info.hitNode; n != null && car == null; n = n.getParent()) {
+      if (n instanceof com.openworld.carrier.vehicle.Vehicle v) car = v;
+      else if (n instanceof com.openworld.carrier.vehicle.VehicleWheel) return;
+    }
+    if (car == null || car.getDamageModel() == null || !shootThroughGlass) return;
+    Vector3 to = info.hitPoint.minus(chest);
+    if (to.length() < 1e-3) return;
+    Vector3 dir = to.normalized();
+    var dm = car.getDamageModel();
+    var glass = dm.paneOnRay(chest, dir, info.hitPoint);
+    if (glass != null && !dm.paneOpen(glass)) dm.strikePane(glass, st.damage, dir);
   }
 
   private void connect(ImpactManager im, HitInfo info, MeleeAttackStep st, boolean authoritative, boolean feel) {

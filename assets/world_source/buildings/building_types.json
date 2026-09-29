@@ -78,6 +78,15 @@
      "suffix": "H8",
      "upper": 8
     }
+   ],
+   "props": [
+    {
+     "piece": "library:Sign_Sodekanban",
+     "front": true,
+     "right": 0.5,
+     "collide": "none",
+     "facade": true
+    }
    ]
   },
   {
@@ -639,147 +648,6 @@
    "shop_band": "MI_ShopStripe_Blue"
   },
   {
-   "id": "StationBuilding",
-   "jp": {
-    "name": "駅舎 (小規模)",
-    "frontage_m": 12.7,
-    "depth_m": 7.3,
-    "measured": "PLATEAU 1-2 storey transport buildings 30-400 m2: p50 6.9-7.4 x 12.6-13.4 m, height 5.6-6.7 m"
-   },
-   "use": "a small station building: the unpaid hall at the street door (ticket machines, a bench, a vending machine), a fare barrier across the building with one automatic gate lane (world.TicketGate), and the paid side at the back door, which opens onto the platform yard",
-   "kit": "quaternius_downtown_city",
-   "modules": [
-    7,
-    4
-   ],
-   "floors": [
-    {
-     "count": 1,
-     "front": "shopfront",
-     "sides": "metal_banded",
-     "back": "shop_back"
-    }
-   ],
-   "doors": {
-    "front": [
-     3
-    ],
-    "back": [
-     3
-    ]
-   },
-   "parapet": "plain",
-   "props": [
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      -0.9,
-      -1.6
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      0.9,
-      -1.6
-     ],
-     "yaw": 90
-    },
-    {
-     "door": {
-      "kind": "gate",
-      "w": 0.9,
-      "h": 1.0
-     },
-     "at": [
-      0.0,
-      -1.6
-     ]
-    },
-    {
-     "piece": "library:Platform_Fence",
-     "at": [
-      2.27,
-      -1.6
-     ]
-    },
-    {
-     "piece": "library:Platform_Fence",
-     "at": [
-      4.11,
-      -1.6
-     ]
-    },
-    {
-     "piece": "library:Platform_Fence",
-     "at": [
-      5.4,
-      -1.6
-     ]
-    },
-    {
-     "piece": "library:Platform_Fence",
-     "at": [
-      -2.27,
-      -1.6
-     ]
-    },
-    {
-     "piece": "library:Platform_Fence",
-     "at": [
-      -4.11,
-      -1.6
-     ]
-    },
-    {
-     "piece": "library:Platform_Fence",
-     "at": [
-      -5.4,
-      -1.6
-     ]
-    },
-    {
-     "piece": "library:Station_TicketMachine",
-     "at": [
-      -5.85,
-      0.5
-     ],
-     "yaw": 90,
-     "repeat": [
-      2,
-      0,
-      1.0
-     ]
-    },
-    {
-     "piece": "library:Station_Bench",
-     "at": [
-      5.9,
-      1.0
-     ],
-     "yaw": 270
-    },
-    {
-     "piece": "library:Station_VendingMachine",
-     "at": [
-      4.5,
-      2.98
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "library:Station_Bin",
-     "at": [
-      3.2,
-      3.0
-     ]
-    }
-   ],
-   "door_style": "slide",
-   "shop_band": "MI_ShopStripe_Amber"
-  },
-  {
    "id": "FamilyRestaurant",
    "jp": {
     "name": "ファミリーレストラン",
@@ -787,7 +655,7 @@
     "depth_m": 29.1,
     "measured": "PLATEAU single-storey commercial 350-900 m2: p50 19.0-21.2 x 27.5-29.5 m, height 6.0-7.5 m (a raised roof or sign the kit cannot build yet)"
    },
-   "use": "family restaurant. INTERIOR = kits/shops/Shop_FamilyRestaurant.blend (piece FamilyRestaurant_Interior, the artist's): the kitchen across the back (cooking line, prep island, sinks, cold store), a pass window (lower wall, pass shelf, glass) over the service counter, a store room / staff room / staff accessible restroom column with the staff exit (hinged doors, the restroom sliding), a customer restroom block (accessible / women / men, solid sliding doors) with the tray return, booths down both walls and tables in the middle",
+   "use": "family restaurant. INTERIOR = kits/shops/Shop_FamilyRestaurant.blend (piece FamilyRestaurant_Interior, the artist's; user layout 2026-09-28): the kitchen across the back-left (4 grills, 4 fryers, 3 prep islands, 3 sinks, fridges), a pass window over the service counter and a swing door beside it, a walk-in COOLER / supply room behind the kitchen, the manager's office, staff room and staff accessible restroom off the STAFF AISLE, which is also the delivery corridor: the back door opens into the aisle, never into the kitchen; two customer accessible restrooms with the tray return; booths down both walls and tables in the middle. The side walls along the kitchen, the back of house and the restrooms are solid (`modules_rows`), the dining room is shop glass",
    "kit": "quaternius_downtown_city",
    "modules": [
     11,
@@ -798,7 +666,23 @@
      "count": 1,
      "front": "shopfront",
      "sides": "shopfront",
-     "back": "shop_back"
+     "back": "shop_back",
+     "modules_rows": {
+      "right": [
+       [
+        7,
+        15,
+        "shop_back"
+       ]
+      ],
+      "left": [
+       [
+        10,
+        15,
+        "shop_back"
+       ]
+      ]
+     }
     }
    ],
    "doors": {
@@ -822,6 +706,77 @@
    ],
    "door_style": "slide",
    "shop_band": "MI_ShopStripe_Red"
+  },
+  {
+   "id": "Supermarket",
+   "jp": {
+    "name": "食品スーパー",
+    "frontage_m": 32.76,
+    "depth_m": 40.04,
+    "measured": "a neighbourhood food supermarket (食品スーパー): ~1,300 m2 on one floor, the sales floor ~870 m2 and a バックヤード (backyard) across the back, on the ken grid (18 x 22). A design size in the class's usual 1,000-1,500 m2 range, not a PLATEAU measurement (PLATEAU records use, not the shop)"
+   },
+   "use": "food supermarket that is also a konbini (user, 2026-09-28): INTERIOR = kits/shops/Shop_Supermarket.blend (piece Supermarket_Interior, the artist's): the sales floor (produce, six gondola runs, a frozen island, dairy / drinks cases, the deli counters fed by the kitchen's pass windows, meat and fish cases, six checkout lanes and bagging tables, a konbini corner with the service counter, hot snacks, coffee, ATM, copier and an eat-in counter, two customer accessible restrooms); the BACKYARD (receiving with the delivery doors, the back corridor, walk-in cooler and freezer, meat & fish prep, the deli kitchen where the food is made, the office with the safe, lockers, the staff restroom off the staff aisle and its exit). The loading yard (荷捌き場) is the SupermarketSite composite.",
+   "kit": "quaternius_downtown_city",
+   "modules": [
+    18,
+    22
+   ],
+   "floors": [
+    {
+     "count": 1,
+     "front": "shopfront",
+     "sides": "metal_banded",
+     "back": "shop_back",
+     "modules_rows": {
+      "front": [
+       [
+        0,
+        3,
+        "shop_back"
+       ]
+      ]
+     }
+    }
+   ],
+   "doors": {
+    "front": [
+     4,
+     13
+    ],
+    "back": [
+     0,
+     13,
+     14
+    ]
+   },
+   "parapet": "plain",
+   "roof_units": 6,
+   "door_style": "slide",
+   "shop_band": "MI_ShopStripe_Green",
+   "props": [
+    {
+     "piece": "library:Fascia_Shop",
+     "at": [
+      -15.47,
+      20.02
+     ],
+     "y": 2.74,
+     "collide": "none",
+     "repeat": [
+      18,
+      1.82,
+      0
+     ]
+    },
+    {
+     "piece": "shops:Supermarket_Interior",
+     "at": [
+      0.0,
+      0.0
+     ],
+     "collide": "piece"
+    }
+   ]
   },
   {
    "id": "StationMall",
@@ -864,6 +819,159 @@
     ]
    },
    "shop_band": "MI_ShopStripe_Green"
+  },
+  {
+   "id": "AkibaElectric",
+   "jp": {
+    "name": "秋葉原の家電・ホビービル",
+    "frontage_m": 14.6,
+    "depth_m": 18.2,
+    "height_m": 23
+   },
+   "use": "秋葉原 electric-town building: a glass shopfront, seven sales floors behind a glass face, stacked 袖看板 up the corner and a billboard on the roof; stands shoulder to shoulder",
+   "kit": "quaternius_downtown_city",
+   "modules": [
+    8,
+    10
+   ],
+   "floors": [
+    {
+     "count": 1,
+     "front": "shopfront",
+     "sides": "metal_banded",
+     "back": "shop_back"
+    },
+    {
+     "count": 7,
+     "front": "glass_floor",
+     "sides": "tile_plain",
+     "back": "residential_windows"
+    }
+   ],
+   "parapet": "metal",
+   "attached": [
+    "left",
+    "right"
+   ],
+   "roof_units": 0,
+   "stair_house": false,
+   "door_style": "slide",
+   "shop_band": "MI_ShopStripe_Blue",
+   "props": [
+    {
+     "piece": "library:Sign_AkibaVertical",
+     "front": true,
+     "right": 0.9,
+     "collide": "none",
+     "facade": true
+    },
+    {
+     "piece": "library:Sign_AkibaVertical",
+     "front": true,
+     "left": 0.9,
+     "collide": "none",
+     "facade": true
+    },
+    {
+     "piece": "library:Sign_AkibaBillboard",
+     "at": [
+      0.0,
+      2.0
+     ],
+     "y": "roof",
+     "collide": "none",
+     "facade": true
+    }
+   ],
+   "variants": [
+    {
+     "suffix": "W6",
+     "modules": [
+      6,
+      10
+     ]
+    },
+    {
+     "suffix": "H5",
+     "upper": 5
+    }
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "YokochoRow",
+   "jp": {
+    "name": "横丁の飲み屋",
+    "frontage_m": 3.6,
+    "depth_m": 9.1,
+    "height_m": 6.4
+   },
+   "use": "横丁 (side-street) izakaya: a narrow two-storey front shoulder to shoulder, a red 赤提灯 lantern, a 暖簾 over the door, a small vertical sign",
+   "kit": "quaternius_downtown_city",
+   "modules": [
+    2,
+    5
+   ],
+   "floors": [
+    {
+     "count": 1,
+     "front": "shopfront",
+     "sides": "tile_plain",
+     "back": "shop_back"
+    },
+    {
+     "count": 1,
+     "front": "residential_windows",
+     "sides": "tile_plain",
+     "back": "residential_windows"
+    }
+   ],
+   "parapet": "plain",
+   "attached": [
+    "left",
+    "right"
+   ],
+   "door_style": "slide",
+   "shop_band": "MI_ShopStripe_Red",
+   "props": [
+    {
+     "piece": "library:Prop_Chochin",
+     "front": true,
+     "left": 0.6,
+     "y": 3.0,
+     "collide": "none",
+     "facade": true
+    },
+    {
+     "piece": "library:Prop_Noren",
+     "front": true,
+     "at": [
+      0.3,
+      0
+     ],
+     "y": 2.15,
+     "collide": "none",
+     "facade": true
+    },
+    {
+     "piece": "library:Sign_ShopVertical",
+     "front": true,
+     "right": 0.3,
+     "y": 3.4,
+     "collide": "none",
+     "facade": true
+    }
+   ],
+   "variants": [
+    {
+     "suffix": "W3",
+     "modules": [
+      3,
+      5
+     ]
+    }
+   ],
+   "placeholder": true
   }
  ],
  "examples": [
@@ -1010,134 +1118,40 @@
    ]
   },
   {
-   "id": "StationRural",
+   "id": "ParkingLot4",
    "footprint_m": [
-    32.76,
-    16.38
+    12.74,
+    12.74
    ],
    "jp": {
-    "name": "小さな地上駅 (田園)",
-    "note": "a one-platform country station: the station building on the road side, a 21.8 m platform 0.94 m above the rail (JR 920 mm class) with a ramp at each end, two shelters, 1067 mm track"
+    "name": "駐車場 (4台)",
+    "note": "a car park as an ADDITION placed beside a building (PLAN.md C0/C1), not a store's composite: Japanese standard bay 2.5 x 5.0 m (駐車場法 guidance), 90-degree parking with an aisle of at least 6 m; front (+Z) faces the street, the bays nose in toward the back. The kerb gap into it is the road's (B9)."
    },
-   "use": "small at-grade station near farmland: station building, platform with shelters, benches and a name board, a single track",
-   "parts": [
-    {
-     "type": "StationBuilding",
-     "at": [
-      0,
-      4.55
-     ]
-    }
-   ],
+   "use": "a four-bay car park beside a small building",
+   "parts": [],
    "props": [
     {
-     "piece": "library:Platform_Module",
+     "piece": "library:Parking_Line",
      "at": [
-      -10.01,
-      -1.91
+      -5.0,
+      -3.87
      ],
-     "yaw": 180,
+     "collide": "none",
      "repeat": [
-      12,
-      1.82,
+      5,
+      2.5,
       0
      ]
     },
     {
-     "piece": "library:Platform_Ramp",
+     "piece": "library:Parking_Stop",
      "at": [
-      12.74,
-      -1.91
-     ],
-     "collide": "hull"
-    },
-    {
-     "piece": "library:Platform_Ramp",
-     "at": [
-      -12.74,
-      -1.91
-     ],
-     "yaw": 180,
-     "collide": "hull"
-    },
-    {
-     "piece": "library:Platform_Fence",
-     "at": [
-      -10.01,
-      -0.12
-     ],
-     "y": 1.3,
-     "repeat": [
-      12,
-      1.82,
-      0
-     ]
-    },
-    {
-     "piece": "library:Platform_Shelter",
-     "at": [
-      -1.82,
-      -1.91
-     ],
-     "y": 1.3,
-     "yaw": 180,
-     "collide": "none"
-    },
-    {
-     "piece": "library:Platform_Shelter",
-     "at": [
-      1.82,
-      -1.91
-     ],
-     "y": 1.3,
-     "yaw": 180,
-     "collide": "none"
-    },
-    {
-     "piece": "library:Station_Bench",
-     "at": [
-      -1.82,
-      -1.3
-     ],
-     "y": 1.3,
-     "yaw": 180
-    },
-    {
-     "piece": "library:Station_Bench",
-     "at": [
-      1.82,
-      -1.3
-     ],
-     "y": 1.3,
-     "yaw": 180
-    },
-    {
-     "piece": "library:Station_NameBoard",
-     "at": [
-      7.3,
-      -2.6
-     ],
-     "y": 1.3,
-     "yaw": 180,
-     "collide": "none"
-    },
-    {
-     "piece": "library:Station_Bin",
-     "at": [
-      -6.0,
-      -1.0
-     ],
-     "y": 1.3
-    },
-    {
-     "piece": "library:Track_Module",
-     "at": [
-      -15.47,
-      -5.23
+      -3.75,
+      -5.67
      ],
      "repeat": [
-      18,
-      1.82,
+      4,
+      2.5,
       0
      ]
     }
@@ -1145,7 +1159,3901 @@
    "apron": "library:Apron_Tile",
    "probe_xz": [
     0.3,
-    4.85
+    3.0
+   ]
+  },
+  {
+   "id": "ParkingLot8",
+   "footprint_m": [
+    21.84,
+    12.74
+   ],
+   "jp": {
+    "name": "駐車場 (8台)",
+    "note": "a car park as an ADDITION placed beside a building (PLAN.md C0/C1), not a store's composite: Japanese standard bay 2.5 x 5.0 m (駐車場法 guidance), 90-degree parking with an aisle of at least 6 m; front (+Z) faces the street, the bays nose in toward the back. The kerb gap into it is the road's (B9)."
+   },
+   "use": "an eight-bay car park beside a store",
+   "parts": [],
+   "props": [
+    {
+     "piece": "library:Parking_Line",
+     "at": [
+      -10.0,
+      -3.87
+     ],
+     "collide": "none",
+     "repeat": [
+      9,
+      2.5,
+      0
+     ]
+    },
+    {
+     "piece": "library:Parking_Stop",
+     "at": [
+      -8.75,
+      -5.67
+     ],
+     "repeat": [
+      8,
+      2.5,
+      0
+     ]
+    }
+   ],
+   "apron": "library:Apron_Tile",
+   "probe_xz": [
+    0.3,
+    3.0
+   ]
+  },
+  {
+   "id": "ParkingLot14",
+   "footprint_m": [
+    21.84,
+    18.2
+   ],
+   "jp": {
+    "name": "駐車場 (14台)",
+    "note": "a car park as an ADDITION placed beside a building (PLAN.md C0/C1), not a store's composite: Japanese standard bay 2.5 x 5.0 m (駐車場法 guidance), 90-degree parking with an aisle of at least 6 m; front (+Z) faces the street, the bays nose in toward the back. The kerb gap into it is the road's (B9). Two rows: eight against the back, six against the front with a 5 m entrance gap at the right."
+   },
+   "use": "a fourteen-bay car park beside a larger store",
+   "parts": [],
+   "props": [
+    {
+     "piece": "library:Parking_Line",
+     "at": [
+      -10.0,
+      -6.6
+     ],
+     "collide": "none",
+     "repeat": [
+      9,
+      2.5,
+      0
+     ]
+    },
+    {
+     "piece": "library:Parking_Stop",
+     "at": [
+      -8.75,
+      -8.4
+     ],
+     "repeat": [
+      8,
+      2.5,
+      0
+     ]
+    },
+    {
+     "piece": "library:Parking_Line",
+     "at": [
+      -10.0,
+      6.6
+     ],
+     "collide": "none",
+     "repeat": [
+      7,
+      2.5,
+      0
+     ]
+    },
+    {
+     "piece": "library:Parking_Stop",
+     "at": [
+      -8.75,
+      8.4
+     ],
+     "repeat": [
+      6,
+      2.5,
+      0
+     ]
+    }
+   ],
+   "apron": "library:Apron_Tile",
+   "probe_xz": [
+    0.3,
+    0.0
+   ]
+  },
+  {
+   "id": "MilitaryBase",
+   "footprint_m": [
+    230.0,
+    285.0
+   ],
+   "jp": {
+    "name": "航空・海上基地 (compact placeholder)"
+   },
+   "use": "a COMPACT air/naval base (user, 2026-09-28): gate + guardhouse on the +Z side (the gate road), HQ, barracks, parade ground, motor pool with trucks, fuel depot, armoury bunker, helipad, control tower, one fighter hangar (two jets) and an apron row (two jets) on the -X side where the runway (MilitaryAirfield) abuts, the pier (MilitaryPier) through the gap in the -Z fence. Everything within ~300 m. The HQ, barracks, armoury, hangar and control tower are walkable mission buildings (kits/interiors/Mil*.blend); the jets (FIJ1) and trucks (CRT1) are drivable parked vehicles. PLACEHOLDER (library_civic.py, kits/interiors)",
+   "parts": [
+    {
+     "type": "MilHQ",
+     "at": [
+      75,
+      95
+     ]
+    },
+    {
+     "type": "MilBarracks",
+     "at": [
+      60,
+      30
+     ]
+    },
+    {
+     "type": "MilArmoury",
+     "at": [
+      90,
+      -110
+     ]
+    },
+    {
+     "type": "MilControlTower",
+     "at": [
+      -40,
+      -125
+     ]
+    },
+    {
+     "type": "MilHangar",
+     "at": [
+      -60,
+      30
+     ],
+     "yaw": 270
+    }
+   ],
+   "props": [
+    {
+     "piece": "library:Mil_Gate",
+     "at": [
+      0,
+      139
+     ]
+    },
+    {
+     "piece": "library:Mil_ParadeGround",
+     "at": [
+      30,
+      62
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Mil_MotorPool",
+     "at": [
+      80,
+      -30
+     ]
+    },
+    {
+     "piece": "library:Mil_FuelDepot",
+     "at": [
+      95,
+      -60
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Helipad",
+     "at": [
+      20,
+      -70
+     ],
+     "collide": "none"
+    },
+    {
+     "vehicle": "CRT1",
+     "faction": "military",
+     "at": [
+      68,
+      -30
+     ],
+     "yaw": 0.0
+    },
+    {
+     "vehicle": "CRT1",
+     "faction": "military",
+     "at": [
+      80,
+      -30
+     ],
+     "yaw": 0.0
+    },
+    {
+     "vehicle": "CRT1",
+     "faction": "military",
+     "at": [
+      92,
+      -30
+     ],
+     "yaw": 0.0
+    },
+    {
+     "vehicle": "FIJ1",
+     "faction": "military",
+     "at": [
+      -100,
+      -60
+     ],
+     "yaw": 90.0
+    },
+    {
+     "vehicle": "FIJ1",
+     "faction": "military",
+     "at": [
+      -100,
+      -90
+     ],
+     "yaw": 90.0
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -137
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -127
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -117
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -107
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -97
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -87
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -77
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -67
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -57
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -47
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -37
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -27
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -17
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      -7
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      3
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      13
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      23
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      33
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      43
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      53
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      63
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      73
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      83
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      93
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      103
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      113
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      123
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      114.5,
+      133
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -110,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -110,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -100,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -100,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -90,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -90,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -80,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -80,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -70,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -70,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -60,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -60,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -50,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -50,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -40,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -40,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -30,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -30,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -20,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -20,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      -10,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      0,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      10,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      20,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      30,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      40,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      50,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      60,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      70,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      70,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      80,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      80,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      90,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      90,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      100,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      100,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      110,
+      142
+     ]
+    },
+    {
+     "piece": "library:Mil_Fence",
+     "at": [
+      110,
+      -142
+     ]
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      -120
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      -90
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      -60
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      -30
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      30
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      60
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      90
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -100,
+      120
+     ],
+     "collide": "none"
+    }
+   ],
+   "ground_box": true,
+   "probe_xz": [
+    0.0,
+    0.0
+   ],
+   "placeholder": true
+  },
+  {
+   "id": "MilitaryAirfield",
+   "footprint_m": [
+    540.0,
+    45.0
+   ],
+   "jp": {
+    "name": "基地の滑走路 (compact placeholder)"
+   },
+   "use": "the base's runway: 540 x 45 m on a reclaimed strip running WEST from the base into the sea (user, 2026-09-29: fully inside the military area, like the pier), its east end beside the base's apron. 540 m matches the civilian airport; FIJ1 lifts off after ~130 m",
+   "parts": [],
+   "props": [
+    {
+     "piece": "library:Airport_RunwayEnd",
+     "at": [
+      -240,
+      -5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_RunwayEnd",
+     "at": [
+      240,
+      -5
+     ],
+     "yaw": 180,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      -180,
+      -5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      -120,
+      -5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      -60,
+      -5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      0,
+      -5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      60,
+      -5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      120,
+      -5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      180,
+      -5
+     ],
+     "collide": "none"
+    }
+   ],
+   "ground_box": true,
+   "probe_xz": [
+    0.0,
+    0.0
+   ],
+   "height_m": 0.06,
+   "placeholder": true
+  },
+  {
+   "id": "AirportAirside",
+   "footprint_m": [
+    540.0,
+    160.5
+   ],
+   "jp": {
+    "name": "空港 エアサイド (placeholder)"
+   },
+   "use": "the airport's airside: a 540 m runway (GTA scale) on the north edge, the parallel taxiway, the apron in front of the terminal with three narrow-bodies, and a maintenance hangar holding a fourth",
+   "parts": [
+    {
+     "type": "AirportHangar",
+     "at": [
+      -190,
+      53
+     ],
+     "yaw": 180
+    }
+   ],
+   "props": [
+    {
+     "piece": "library:Airport_RunwayEnd",
+     "at": [
+      -240,
+      -55
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_RunwayEnd",
+     "at": [
+      240,
+      -55
+     ],
+     "yaw": 180,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      -180,
+      -55
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      -120,
+      -55
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      -60,
+      -55
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      0,
+      -55
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      60,
+      -55
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      120,
+      -55
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Runway",
+     "at": [
+      180,
+      -55
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      -240,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      -180,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      -120,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      -60,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      0,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      60,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      120,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      180,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Taxiway",
+     "at": [
+      240,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -105,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -105,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -75,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -75,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -45,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -45,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -15,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -15,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      15,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      15,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      45,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      45,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      75,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      75,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      105,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      105,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      135,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      135,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      165,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      165,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      195,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      195,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      225,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      225,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      255,
+      27
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      255,
+      57
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Airliner",
+     "at": [
+      -190,
+      53
+     ],
+     "yaw": 180,
+     "collide": {
+      "boxes": [
+       [
+        0,
+        3.3,
+        0,
+        4,
+        4,
+        39
+       ],
+       [
+        0,
+        2.6,
+        1.5,
+        35,
+        0.6,
+        6
+       ]
+      ]
+     }
+    },
+    {
+     "piece": "library:Airport_Airliner",
+     "at": [
+      40,
+      52
+     ],
+     "yaw": 0,
+     "collide": {
+      "boxes": [
+       [
+        0,
+        3.3,
+        0,
+        4,
+        4,
+        39
+       ],
+       [
+        0,
+        2.6,
+        1.5,
+        35,
+        0.6,
+        6
+       ]
+      ]
+     }
+    },
+    {
+     "piece": "library:Airport_Airliner",
+     "at": [
+      120,
+      52
+     ],
+     "yaw": 0,
+     "collide": {
+      "boxes": [
+       [
+        0,
+        3.3,
+        0,
+        4,
+        4,
+        39
+       ],
+       [
+        0,
+        2.6,
+        1.5,
+        35,
+        0.6,
+        6
+       ]
+      ]
+     }
+    },
+    {
+     "piece": "library:Airport_Airliner",
+     "at": [
+      200,
+      52
+     ],
+     "yaw": 0,
+     "collide": {
+      "boxes": [
+       [
+        0,
+        3.3,
+        0,
+        4,
+        4,
+        39
+       ],
+       [
+        0,
+        2.6,
+        1.5,
+        35,
+        0.6,
+        6
+       ]
+      ]
+     }
+    }
+   ],
+   "probe_xz": [
+    0.0,
+    -20.0
+   ],
+   "placeholder": true,
+   "ground_box": true
+  },
+  {
+   "id": "MilitaryPier",
+   "footprint_m": [
+    70.3,
+    251.4
+   ],
+   "jp": {
+    "name": "基地の港湾ターミナル (placeholder)"
+   },
+   "use": "the base's one pier: the harbour terminal at the root (-Z), bollards down both edges, light masts, a patrol ship berthed along its +X side (its waterline 9.6 m under the pier deck -- the pier's land height). PLACEHOLDER",
+   "parts": [],
+   "props": [
+    {
+     "piece": "library:Mil_PierTerminal",
+     "at": [
+      -11,
+      -118
+     ]
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      -95
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      -95
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      -75
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      -75
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      -55
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      -55
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      -35
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      -35
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      -15
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      -15
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      5
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      5
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      25
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      25
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      45
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      45
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      65
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      65
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      85
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      85
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      105
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      105
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      -35,
+      125
+     ],
+     "yaw": 270,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_Bollard",
+     "at": [
+      13,
+      125
+     ],
+     "yaw": 90,
+     "collide": "none"
+    },
+    {
+     "piece": "library:Harbour_LightMast",
+     "at": [
+      -31,
+      -60
+     ]
+    },
+    {
+     "piece": "library:Harbour_LightMast",
+     "at": [
+      9,
+      -60
+     ]
+    },
+    {
+     "piece": "library:Harbour_LightMast",
+     "at": [
+      -31,
+      40
+     ]
+    },
+    {
+     "piece": "library:Harbour_LightMast",
+     "at": [
+      9,
+      40
+     ]
+    },
+    {
+     "piece": "library:Mil_PatrolShip",
+     "at": [
+      29,
+      30
+     ],
+     "y": -9.6
+    },
+    {
+     "vehicle": "WOB1",
+     "faction": "military",
+     "at": [
+      22.0,
+      -80.0
+     ],
+     "y": -9.6,
+     "yaw": 0.0
+    }
+   ],
+   "probe_xz": [
+    0.0,
+    0.0
+   ],
+   "placeholder": true,
+   "height_m": 42.9,
+   "ground_box": [
+    -36.0,
+    -125.7,
+    14.0,
+    125.7
+   ]
+  },
+  {
+   "id": "LogisticsTruckTerminal",
+   "footprint_m": [
+    225.0,
+    150.0
+   ],
+   "jp": {
+    "name": "トラックターミナル (placeholder)"
+   },
+   "use": "the island's ONE truck terminal (user, 2026-09-28: one compact logistics hub, not repeated warehouses): a 180 x 30 m cross-dock shed with trucks backed onto both faces, a trailer park behind, the gate on the front (+Z, the logistics road). PLACEHOLDER (library_civic.py logi_*)",
+   "parts": [],
+   "ground_box": true,
+   "probe_xz": [
+    0.0,
+    45.0
+   ],
+   "placeholder": true,
+   "props": [
+    {
+     "piece": "library:Logi_YardTruckTerminal",
+     "at": [
+      0,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Logi_TruckTerminal",
+     "at": [
+      0,
+      0
+     ],
+     "collide": {
+      "boxes": [
+       [
+        -7.0,
+        4.0,
+        0.0,
+        166.0,
+        8.0,
+        30.0
+       ],
+       [
+        83.0,
+        7.2,
+        0.0,
+        14.0,
+        14.4,
+        30.0
+       ]
+      ]
+     }
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -80,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -63,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -46,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -29,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -12,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      5,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      22,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      39,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      56,
+      21.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -76,
+      -21.5
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -52,
+      -21.5
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -28,
+      -21.5
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -4,
+      -21.5
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      20,
+      -21.5
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      44,
+      -21.5
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      -90,
+      -59.0
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      -66,
+      -59.0
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      -42,
+      -59.0
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      -18,
+      -59.0
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      6,
+      -59.0
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      30,
+      -59.0
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      54,
+      -59.0
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      78,
+      -59.0
+     ],
+     "yaw": 180
+    },
+    {
+     "piece": "library:Logi_GateHouse",
+     "at": [
+      60,
+      68
+     ],
+     "collide": {
+      "boxes": [
+       [
+        0.0,
+        1.55,
+        0.0,
+        4.4,
+        3.1,
+        3.4
+       ]
+      ]
+     }
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -107.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -107.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -97.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -97.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -87.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -87.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -77.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -77.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -67.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -67.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -57.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -57.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -47.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -47.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -37.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -37.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -27.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -27.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -17.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -17.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -7.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -7.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      2.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      2.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      12.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      12.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      22.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      22.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      32.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      32.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      42.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      42.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      52.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      62.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      72.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      72.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      82.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      82.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      92.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      92.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      102.5,
+      74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      102.5,
+      -74.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -70.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -70.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -60.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -60.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -50.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -50.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -40.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -40.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -30.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -30.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -20.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -20.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -10.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -10.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      0.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      0.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      10.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      10.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      20.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      20.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      30.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      30.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      40.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      40.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      50.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      50.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      60.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      60.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      70.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      70.0
+     ],
+     "yaw": 90
+    }
+   ]
+  },
+  {
+   "id": "LogisticsDistributionCentre",
+   "footprint_m": [
+    225.0,
+    240.0
+   ],
+   "jp": {
+    "name": "物流センター (placeholder)"
+   },
+   "use": "the island's ONE distribution centre: a 120 x 70 x 14 m warehouse with 16 dock doors, trucks at the dock, a trailer park, a small container stack, a staff car park and the gate on the front (+Z, the logistics road). PLACEHOLDER (library_civic.py logi_*)",
+   "parts": [],
+   "ground_box": true,
+   "probe_xz": [
+    0.0,
+    60.0
+   ],
+   "placeholder": true,
+   "props": [
+    {
+     "piece": "library:Logi_YardDistribution",
+     "at": [
+      0,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Logi_DistributionCentre",
+     "at": [
+      -20,
+      -80
+     ],
+     "collide": {
+      "boxes": [
+       [
+        0.0,
+        7.2,
+        0.0,
+        120.0,
+        14.4,
+        70.0
+       ]
+      ]
+     }
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -58,
+      -38.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -46,
+      -38.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -34,
+      -38.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -22,
+      -38.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      -10,
+      -38.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      2,
+      -38.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      14,
+      -38.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Truck",
+     "at": [
+      26,
+      -38.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      42,
+      -29.0
+     ]
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      50,
+      -29.0
+     ]
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      58,
+      -29.0
+     ]
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      66,
+      -29.0
+     ]
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      74,
+      -29.0
+     ]
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      82,
+      -29.0
+     ]
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      90,
+      -29.0
+     ]
+    },
+    {
+     "piece": "library:Logi_Trailer",
+     "at": [
+      98,
+      -29.0
+     ]
+    },
+    {
+     "piece": "quaternius_zombie_apocalypse:Container_40_Green",
+     "at": [
+      70,
+      40
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "quaternius_zombie_apocalypse:Container_40_Red",
+     "at": [
+      70,
+      43
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "quaternius_zombie_apocalypse:Container_40_Green",
+     "at": [
+      70,
+      46
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "quaternius_zombie_apocalypse:Container_40_Red",
+     "at": [
+      86,
+      40
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "quaternius_zombie_apocalypse:Container_40_Green",
+     "at": [
+      86,
+      43
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "quaternius_zombie_apocalypse:Container_40_Red",
+     "at": [
+      70,
+      43
+     ],
+     "y": 2.59,
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_GateHouse",
+     "at": [
+      0,
+      113
+     ],
+     "collide": {
+      "boxes": [
+       [
+        0.0,
+        1.55,
+        0.0,
+        4.4,
+        3.1,
+        3.4
+       ]
+      ]
+     }
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -107.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -107.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -97.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -97.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -87.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -87.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -77.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -77.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -67.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -67.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -57.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -57.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -47.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -47.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -37.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -37.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -27.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -27.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -17.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -17.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -7.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      2.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      12.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      12.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      22.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      22.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      32.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      32.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      42.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      42.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      52.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      52.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      62.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      62.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      72.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      72.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      82.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      82.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      92.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      92.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      102.5,
+      119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      102.5,
+      -119.5
+     ]
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -115.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -115.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -105.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -105.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -95.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -95.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -85.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -85.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -75.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -75.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -65.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -65.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -55.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -55.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -45.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -45.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -35.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -35.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -25.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -25.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -15.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -15.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      -5.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      -5.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      5.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      5.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      15.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      15.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      25.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      25.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      35.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      35.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      45.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      45.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      55.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      55.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      65.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      65.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      75.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      75.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      85.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      85.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      95.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      95.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      105.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      105.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      -112.0,
+      115.0
+     ],
+     "yaw": 90
+    },
+    {
+     "piece": "library:Logi_Fence",
+     "at": [
+      112.0,
+      115.0
+     ],
+     "yaw": 90
+    }
+   ]
+  },
+  {
+   "id": "CentralForecourt",
+   "footprint_m": [
+    337.0,
+    61.0
+   ],
+   "jp": {
+    "name": "駅前広場 (セントラル駅)",
+    "note": "The central station's forecourt round the one-way ekimae_rotary: bus berths under a covered walk on the station-side kerb, the taxi rank on the east leg, the 立体駐車場, the 交番, 駐輪場, the clock. PLACEHOLDER props (library_civic.py plaza_*). Written by tools/building_kit/site_central_forecourt.py -- edit that, not this entry."
+   },
+   "use": "the central station's 駅前広場, derived from the central_forecourt reserve and the ekimae_rotary",
+   "parts": [],
+   "placeholder": true,
+   "reserve": true,
+   "ground_box": [
+    -168.5,
+    -30.5,
+    168.5,
+    -13.5
+   ],
+   "probe_xz": [
+    60.0,
+    -22.0
+   ],
+   "props": [
+    {
+     "piece": "library:Parking_Multistorey",
+     "at": [
+      -140.5,
+      2.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "piece": "library:Plaza_BikeRack",
+     "at": [
+      -152.9,
+      25.5
+     ],
+     "repeat": [
+      4,
+      6.2,
+      0
+     ]
+    },
+    {
+     "piece": "library:BusStop_Shelter",
+     "at": [
+      -72.0,
+      -14.7
+     ]
+    },
+    {
+     "piece": "library:BusStop_Sign",
+     "at": [
+      -69.0,
+      -12.9
+     ]
+    },
+    {
+     "piece": "library:BusStop_Shelter",
+     "at": [
+      -48.0,
+      -14.7
+     ]
+    },
+    {
+     "piece": "library:BusStop_Sign",
+     "at": [
+      -45.0,
+      -12.9
+     ]
+    },
+    {
+     "piece": "library:BusStop_Shelter",
+     "at": [
+      -24.0,
+      -14.7
+     ]
+    },
+    {
+     "piece": "library:BusStop_Sign",
+     "at": [
+      -21.0,
+      -12.9
+     ]
+    },
+    {
+     "piece": "library:BusStop_Shelter",
+     "at": [
+      0.0,
+      -14.7
+     ]
+    },
+    {
+     "piece": "library:BusStop_Sign",
+     "at": [
+      3.0,
+      -12.9
+     ]
+    },
+    {
+     "piece": "library:Plaza_Canopy",
+     "at": [
+      -80.0,
+      -18.0
+     ],
+     "collide": "none",
+     "repeat": [
+      9,
+      10.0,
+      0
+     ]
+    },
+    {
+     "piece": "library:Taxi_Sign",
+     "at": [
+      103.5,
+      7.5
+     ],
+     "yaw": 90.0
+    },
+    {
+     "piece": "library:Station_Bench",
+     "at": [
+      107.5,
+      11.5
+     ],
+     "yaw": 90.0
+    },
+    {
+     "piece": "library:Civic_Koban",
+     "at": [
+      137.0,
+      -23.5
+     ]
+    },
+    {
+     "piece": "library:Plaza_BikeRack",
+     "at": [
+      117.5,
+      25.5
+     ],
+     "repeat": [
+      4,
+      6.2,
+      0
+     ]
+    },
+    {
+     "piece": "library:Plaza_Clock",
+     "at": [
+      40.0,
+      -22.0
+     ]
+    },
+    {
+     "piece": "library:Station_Bench",
+     "at": [
+      20.0,
+      -22.0
+     ]
+    },
+    {
+     "piece": "library:Station_Bench",
+     "at": [
+      55.0,
+      -22.0
+     ]
+    },
+    {
+     "piece": "library:Station_Bench",
+     "at": [
+      70.0,
+      -22.0
+     ]
+    },
+    {
+     "piece": "library:Station_VendingMachine",
+     "at": [
+      -112.5,
+      -26.5
+     ],
+     "yaw": 90.0,
+     "repeat": [
+      3,
+      0,
+      1.1
+     ]
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -75.0,
+      16.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -53.0,
+      16.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -31.0,
+      16.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -9.0,
+      16.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      13.0,
+      16.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      35.0,
+      16.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      57.0,
+      16.0
+     ],
+     "collide": "none"
+    }
+   ]
+  },
+  {
+   "id": "SupermarketSite",
+   "footprint_m": [
+    36.4,
+    60.06
+   ],
+   "jp": {
+    "name": "食品スーパー + 荷捌き場",
+    "note": "the store at the street with its loading yard (荷捌き場) behind: a truck at the covered dock by the receiving doors, roll cages and pallets; the yard's depth (19 m) is a design choice that turns a 12 m truck. The canopy is a placeholder with no collider (its posts are walked through until modelled)"
+   },
+   "use": "the supermarket with its loading yard: the store's front on the street (+Z), the 荷捌き場 behind it (a covered dock at the receiving doors, a delivery truck, roll cages, pallets)",
+   "parts": [
+    {
+     "type": "Supermarket",
+     "at": [
+      0.0,
+      9.2
+     ]
+    }
+   ],
+   "props": [
+    {
+     "piece": "library:Plaza_Canopy",
+     "at": [
+      -9.1,
+      -12.9
+     ],
+     "collide": "none"
+    },
+    {
+     "vehicle": "CRT1",
+     "at": [
+      -9.1,
+      -16.5
+     ],
+     "yaw": 0.0
+    },
+    {
+     "piece": "library:Warehouse_RollCage",
+     "at": [
+      -3.0,
+      -12.2
+     ],
+     "repeat": [
+      5,
+      0.95,
+      0
+     ]
+    },
+    {
+     "piece": "library:Warehouse_Pallet",
+     "at": [
+      4.0,
+      -13.0
+     ],
+     "repeat": [
+      3,
+      1.5,
+      0
+     ]
+    },
+    {
+     "piece": "library:Station_Bin",
+     "at": [
+      15.0,
+      -12.5
+     ]
+    }
+   ],
+   "apron": "library:Apron_Tile",
+   "probe_xz": [
+    8.0,
+    -22.0
+   ]
+  },
+  {
+   "id": "AirportForecourt",
+   "footprint_m": [
+    188.0,
+    116.0
+   ],
+   "jp": {
+    "name": "空港 駅前 / 車寄せ (placeholder)",
+    "note": "The airport's forecourt round the one-way kuko_rotary, between the Airport station and the terminal's curb: bus stops on the terminal kerb, the taxi rank on the station kerb, the inner island planted. PLACEHOLDER props. Written by tools/building_kit/site_airport_forecourt.py -- edit that, not this entry."
+   },
+   "use": "the airport's forecourt, derived from the airport_forecourt reserve and the kuko_rotary loop",
+   "parts": [],
+   "placeholder": true,
+   "reserve": true,
+   "ground_box": [
+    -77.0,
+    -42.0,
+    74.0,
+    39.0
+   ],
+   "probe_xz": [
+    28.5,
+    -1.5
+   ],
+   "props": [
+    {
+     "piece": "library:BusStop_Shelter",
+     "at": [
+      -54.0,
+      52.8
+     ],
+     "yaw": 180.0
+    },
+    {
+     "piece": "library:BusStop_Shelter",
+     "at": [
+      -24.0,
+      52.8
+     ],
+     "yaw": 180.0
+    },
+    {
+     "piece": "library:BusStop_Sign",
+     "at": [
+      -50.0,
+      50.5
+     ]
+    },
+    {
+     "piece": "library:BusStop_Sign",
+     "at": [
+      -20.0,
+      50.5
+     ]
+    },
+    {
+     "piece": "library:BusStop_Sign",
+     "at": [
+      10.0,
+      50.5
+     ]
+    },
+    {
+     "piece": "library:Taxi_Sign",
+     "at": [
+      87.0,
+      -24.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "piece": "library:Station_Bench",
+     "at": [
+      87.8,
+      -18.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -59.0,
+      -13.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -48.0,
+      10.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -37.0,
+      -13.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -26.0,
+      10.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -15.0,
+      -13.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -4.0,
+      10.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      7.0,
+      -13.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      18.0,
+      10.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      29.0,
+      -13.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      40.0,
+      10.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      51.0,
+      -13.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      62.0,
+      10.5
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Plaza_Clock",
+     "at": [
+      -1.5,
+      -1.5
+     ]
+    }
    ]
   },
   {
@@ -3033,6 +6941,30 @@
       0.8,
       0.0
      ]
+    },
+    {
+     "vehicle": "COT1",
+     "at": [
+      -28.0,
+      91.96000000000001
+     ],
+     "yaw": 90.0
+    },
+    {
+     "vehicle": "COT1",
+     "at": [
+      52.0,
+      91.96000000000001
+     ],
+     "yaw": 270.0
+    },
+    {
+     "vehicle": "COT1",
+     "at": [
+      -100.0,
+      -96.0
+     ],
+     "yaw": 0.0
     }
    ],
    "apron": "library:Harbour_Apron",
@@ -3058,166 +6990,6 @@
      91.96000000000001
     ]
    ]
-  },
-  {
-   "id": "ParkingLot4",
-   "footprint_m": [
-    12.74,
-    12.74
-   ],
-   "jp": {
-    "name": "駐車場 (4台)",
-    "note": "a car park as an ADDITION placed beside a building (PLAN.md C0/C1), not a store's composite: Japanese standard bay 2.5 x 5.0 m (駐車場法 guidance), 90-degree parking with an aisle of at least 6 m; front (+Z) faces the street, the bays nose in toward the back. The kerb gap into it is the road's (B9)."
-   },
-   "use": "a four-bay car park beside a small building",
-   "parts": [],
-   "props": [
-    {
-     "piece": "library:Parking_Line",
-     "at": [
-      -5.0,
-      -3.87
-     ],
-     "collide": "none",
-     "repeat": [
-      5,
-      2.5,
-      0
-     ]
-    },
-    {
-     "piece": "library:Parking_Stop",
-     "at": [
-      -3.75,
-      -5.67
-     ],
-     "repeat": [
-      4,
-      2.5,
-      0
-     ]
-    }
-   ],
-   "apron": "library:Apron_Tile",
-   "probe_xz": [
-    0.3,
-    3.0
-   ]
-  },
-  {
-   "id": "ParkingLot8",
-   "footprint_m": [
-    21.84,
-    12.74
-   ],
-   "jp": {
-    "name": "駐車場 (8台)",
-    "note": "a car park as an ADDITION placed beside a building (PLAN.md C0/C1), not a store's composite: Japanese standard bay 2.5 x 5.0 m (駐車場法 guidance), 90-degree parking with an aisle of at least 6 m; front (+Z) faces the street, the bays nose in toward the back. The kerb gap into it is the road's (B9)."
-   },
-   "use": "an eight-bay car park beside a store",
-   "parts": [],
-   "props": [
-    {
-     "piece": "library:Parking_Line",
-     "at": [
-      -10.0,
-      -3.87
-     ],
-     "collide": "none",
-     "repeat": [
-      9,
-      2.5,
-      0
-     ]
-    },
-    {
-     "piece": "library:Parking_Stop",
-     "at": [
-      -8.75,
-      -5.67
-     ],
-     "repeat": [
-      8,
-      2.5,
-      0
-     ]
-    }
-   ],
-   "apron": "library:Apron_Tile",
-   "probe_xz": [
-    0.3,
-    3.0
-   ]
-  },
-  {
-   "id": "ParkingLot14",
-   "footprint_m": [
-    21.84,
-    18.2
-   ],
-   "jp": {
-    "name": "駐車場 (14台)",
-    "note": "a car park as an ADDITION placed beside a building (PLAN.md C0/C1), not a store's composite: Japanese standard bay 2.5 x 5.0 m (駐車場法 guidance), 90-degree parking with an aisle of at least 6 m; front (+Z) faces the street, the bays nose in toward the back. The kerb gap into it is the road's (B9). Two rows: eight against the back, six against the front with a 5 m entrance gap at the right."
-   },
-   "use": "a fourteen-bay car park beside a larger store",
-   "parts": [],
-   "props": [
-    {
-     "piece": "library:Parking_Line",
-     "at": [
-      -10.0,
-      -6.6
-     ],
-     "collide": "none",
-     "repeat": [
-      9,
-      2.5,
-      0
-     ]
-    },
-    {
-     "piece": "library:Parking_Stop",
-     "at": [
-      -8.75,
-      -8.4
-     ],
-     "repeat": [
-      8,
-      2.5,
-      0
-     ]
-    },
-    {
-     "piece": "library:Parking_Line",
-     "at": [
-      -10.0,
-      6.6
-     ],
-     "collide": "none",
-     "repeat": [
-      7,
-      2.5,
-      0
-     ]
-    },
-    {
-     "piece": "library:Parking_Stop",
-     "at": [
-      -8.75,
-      8.4
-     ],
-     "repeat": [
-      6,
-      2.5,
-      0
-     ]
-    }
-   ],
-   "apron": "library:Apron_Tile",
-   "probe_xz": [
-    0.3,
-    0.0
-   ]
   }
  ],
  "custom": [
@@ -3240,1214 +7012,6 @@
    "landmark": true
   },
   {
-   "id": "TokyoStation",
-   "kit": "library",
-   "piece": "TokyoStation",
-   "probe_xz": [
-    131.0,
-    7.5
-   ],
-   "use": "Tokyo Station (Marunouchi) base model: the main block clad with the downtown kit's brick-and-glass wall modules; the two domed halls are hollow ticket-gate concourses furnished from the library",
-   "props": [
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      -131.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      -129.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      -127.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      -123.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      -121.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      -119.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketMachine",
-     "at": [
-      -137.9,
-      2.0
-     ],
-     "yaw": 90,
-     "repeat": [
-      4,
-      0,
-      0.9
-     ]
-    },
-    {
-     "piece": "library:Station_Bench",
-     "at": [
-      -112.6,
-      3.0
-     ],
-     "yaw": 270
-    },
-    {
-     "piece": "library:Station_Bench",
-     "at": [
-      -112.6,
-      6.0
-     ],
-     "yaw": 270
-    },
-    {
-     "piece": "library:Station_Bin",
-     "at": [
-      -115.0,
-      9.0
-     ]
-    },
-    {
-     "piece": "library:Station_VendingMachine",
-     "at": [
-      -135.0,
-      10.0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      119.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      121.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      123.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      127.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      129.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketGate",
-     "at": [
-      131.0,
-      -4.0
-     ],
-     "yaw": 90
-    },
-    {
-     "piece": "library:Station_TicketMachine",
-     "at": [
-      112.1,
-      2.0
-     ],
-     "yaw": 90,
-     "repeat": [
-      4,
-      0,
-      0.9
-     ]
-    },
-    {
-     "piece": "library:Station_Bench",
-     "at": [
-      137.4,
-      3.0
-     ],
-     "yaw": 270
-    },
-    {
-     "piece": "library:Station_Bench",
-     "at": [
-      137.4,
-      6.0
-     ],
-     "yaw": 270
-    },
-    {
-     "piece": "library:Station_Bin",
-     "at": [
-      135.0,
-      9.0
-     ]
-    },
-    {
-     "piece": "library:Station_VendingMachine",
-     "at": [
-      115.0,
-      10.0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -158.6,
-      11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -156.78,
-      11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -158.6,
-      -11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -156.78,
-      -11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -158.6,
-      11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 2.73
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -158.6,
-      -11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 2.73,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -158.6,
-      11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "y": 5.46
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -156.78,
-      11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "y": 5.46
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -158.6,
-      -11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "y": 5.46,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -156.78,
-      -11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "y": 5.46,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -158.6,
-      11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 8.19
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -158.6,
-      -11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 8.19,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -158.6,
-      11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "y": 10.92
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -156.78,
-      11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "y": 10.92
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -158.6,
-      -11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "y": 10.92,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -156.78,
-      -11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "y": 10.92,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -158.6,
-      11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 13.65
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -158.6,
-      -11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 13.65,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -110.0,
-      11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -108.18,
-      11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -110.0,
-      -11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -108.18,
-      -11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -110.0,
-      11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 2.73
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -110.0,
-      -11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 2.73,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -110.0,
-      11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "y": 5.46
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -108.18,
-      11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "y": 5.46
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -110.0,
-      -11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "y": 5.46,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -108.18,
-      -11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "y": 5.46,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -110.0,
-      11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 8.19
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -110.0,
-      -11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 8.19,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -110.0,
-      11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "y": 10.92
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -108.18,
-      11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "y": 10.92
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      -110.0,
-      -11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "y": 10.92,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -108.18,
-      -11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "y": 10.92,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -110.0,
-      11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 13.65
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      -110.0,
-      -11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 13.65,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      19.0,
-      11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      20.82,
-      11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      19.0,
-      -11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      20.82,
-      -11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      19.0,
-      11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 2.73
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      19.0,
-      -11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 2.73,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      19.0,
-      11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "y": 5.46
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      20.82,
-      11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "y": 5.46
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      19.0,
-      -11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "y": 5.46,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      20.82,
-      -11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "y": 5.46,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      19.0,
-      11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 8.19
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      19.0,
-      -11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 8.19,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      19.0,
-      11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "y": 10.92
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      20.82,
-      11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "y": 10.92
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      19.0,
-      -11.02
-     ],
-     "repeat": [
-      26,
-      3.64,
-      0
-     ],
-     "y": 10.92,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      20.82,
-      -11.02
-     ],
-     "repeat": [
-      25,
-      3.64,
-      0
-     ],
-     "y": 10.92,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      19.0,
-      11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 13.65
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      19.0,
-      -11.02
-     ],
-     "repeat": [
-      51,
-      1.82,
-      0
-     ],
-     "y": 13.65,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      140.4,
-      11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      142.22,
-      11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      140.4,
-      -11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      142.22,
-      -11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      140.4,
-      11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 2.73
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      140.4,
-      -11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 2.73,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      140.4,
-      11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "y": 5.46
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      142.22,
-      11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "y": 5.46
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      140.4,
-      -11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "y": 5.46,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      142.22,
-      -11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "y": 5.46,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      140.4,
-      11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 8.19
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      140.4,
-      -11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 8.19,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      140.4,
-      11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "y": 10.92
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      142.22,
-      11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "y": 10.92
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Window_Square_Single",
-     "at": [
-      140.4,
-      -11.02
-     ],
-     "repeat": [
-      6,
-      3.64,
-      0
-     ],
-     "y": 10.92,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      142.22,
-      -11.02
-     ],
-     "repeat": [
-      5,
-      3.64,
-      0
-     ],
-     "y": 10.92,
-     "yaw": 180
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      140.4,
-      11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 13.65
-    },
-    {
-     "piece": "quaternius_downtown_city:Brick_Plain_3",
-     "at": [
-      140.4,
-      -11.02
-     ],
-     "repeat": [
-      11,
-      1.82,
-      0
-     ],
-     "y": 13.65,
-     "yaw": 180
-    }
-   ],
-   "doors": [
-    {
-     "name": "north_street",
-     "at": [
-      -125.0,
-      14.0
-     ],
-     "outward": [
-      0,
-      1
-     ],
-     "width": 6.0,
-     "height": 7.0
-    },
-    {
-     "name": "north_platforms",
-     "at": [
-      -125.0,
-      -14.0
-     ],
-     "outward": [
-      0,
-      -1
-     ],
-     "width": 6.0,
-     "height": 7.0
-    },
-    {
-     "name": "south_street",
-     "at": [
-      125.0,
-      14.0
-     ],
-     "outward": [
-      0,
-      1
-     ],
-     "width": 6.0,
-     "height": 7.0
-    },
-    {
-     "name": "south_platforms",
-     "at": [
-      125.0,
-      -14.0
-     ],
-     "outward": [
-      0,
-      -1
-     ],
-     "width": 6.0,
-     "height": 7.0
-    }
-   ],
-   "landmark": true,
-   "door_style": "slide"
-  },
-  {
    "id": "OsakaCastle",
    "kit": "library",
    "piece": "OsakaCastle",
@@ -4455,698 +7019,701 @@
   },
   {
    "id": "AirportTerminal",
-   "kit": "library",
-   "piece": "AirportTerminal",
-   "probe_xz": [
-    0.3,
-    37.0
-   ],
-   "use": "the island's airport terminal, GTA scale: a hollow furnished departure hall behind clear glass, its sides and the concourse's apron face clad with the downtown kit's metal and glass modules; runways from Airport_Runway / Airport_RunwayEnd",
-   "props": [
-    {
-     "piece": "library:Shop_Counter",
-     "at": [
-      -60.0,
-      12.0
-     ],
-     "repeat": [
-      7,
-      20.0,
-      0
-     ]
-    },
-    {
-     "piece": "library:Shop_Counter",
-     "at": [
-      -60.0,
-      -8.0
-     ],
-     "repeat": [
-      7,
-      20.0,
-      0
-     ]
-    },
-    {
-     "piece": "library:Station_Bench",
-     "at": [
-      -70.0,
-      22.0
-     ],
-     "repeat": [
-      24,
-      6.0,
-      0
-     ]
-    },
-    {
-     "piece": "library:Station_VendingMachine",
-     "at": [
-      -70.0,
-      -28.9
-     ],
-     "repeat": [
-      4,
-      1.1,
-      0
-     ]
-    },
-    {
-     "piece": "library:Station_VendingMachine",
-     "at": [
-      60.0,
-      -28.9
-     ],
-     "repeat": [
-      4,
-      1.1,
-      0
-     ]
-    },
-    {
-     "piece": "library:Shop_FridgeDoor",
-     "at": [
-      -73.9,
-      -20.0
-     ],
-     "yaw": 90,
-     "repeat": [
-      8,
-      0,
-      0.91
-     ]
-    },
-    {
-     "piece": "library:Shop_GondolaShort",
-     "at": [
-      -68.0,
-      -15.0
-     ]
-    },
-    {
-     "piece": "library:Shop_GondolaShort",
-     "at": [
-      -68.0,
-      -11.0
-     ]
-    },
-    {
-     "piece": "library:Station_Bin",
-     "at": [
-      -40.0,
-      18.0
-     ],
-     "repeat": [
-      3,
-      40.0,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "y": 2.73,
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "y": 5.46,
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "y": 8.19,
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Window_Half",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "y": 10.92,
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "y": 13.65,
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "y": 16.38,
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "y": 19.11,
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      75.02,
-      -28.21
-     ],
-     "y": 21.84,
-     "yaw": 90,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "y": 2.73,
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "y": 5.46,
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "y": 8.19,
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Window_Half",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "y": 10.92,
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "y": 13.65,
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "y": 16.38,
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "y": 19.11,
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -75.02,
-      -28.21
-     ],
-     "y": 21.84,
-     "yaw": 270,
-     "repeat": [
-      32,
-      0,
-      1.82
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_FullWindow",
-     "at": [
-      -118.53,
-      -60.02
-     ],
-     "yaw": 180,
-     "repeat": [
-      5,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -116.71,
-      -60.02
-     ],
-     "yaw": 180,
-     "repeat": [
-      4,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_FullWindow",
-     "at": [
-      -118.53,
-      -60.02
-     ],
-     "y": 2.73,
-     "yaw": 180,
-     "repeat": [
-      5,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -116.71,
-      -60.02
-     ],
-     "y": 2.73,
-     "yaw": 180,
-     "repeat": [
-      4,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -118.53,
-      -60.02
-     ],
-     "y": 5.46,
-     "yaw": 180,
-     "repeat": [
-      9,
-      1.82,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -118.53,
-      -60.02
-     ],
-     "y": 8.19,
-     "yaw": 180,
-     "repeat": [
-      9,
-      1.82,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_FullWindow",
-     "at": [
-      -76.44,
-      -60.02
-     ],
-     "yaw": 180,
-     "repeat": [
-      43,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -74.62,
-      -60.02
-     ],
-     "yaw": 180,
-     "repeat": [
-      42,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_FullWindow",
-     "at": [
-      -76.44,
-      -60.02
-     ],
-     "y": 2.73,
-     "yaw": 180,
-     "repeat": [
-      43,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -74.62,
-      -60.02
-     ],
-     "y": 2.73,
-     "yaw": 180,
-     "repeat": [
-      42,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -76.44,
-      -60.02
-     ],
-     "y": 5.46,
-     "yaw": 180,
-     "repeat": [
-      85,
-      1.82,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      -76.44,
-      -60.02
-     ],
-     "y": 8.19,
-     "yaw": 180,
-     "repeat": [
-      85,
-      1.82,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_FullWindow",
-     "at": [
-      103.97,
-      -60.02
-     ],
-     "yaw": 180,
-     "repeat": [
-      5,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      105.79,
-      -60.02
-     ],
-     "yaw": 180,
-     "repeat": [
-      4,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_FullWindow",
-     "at": [
-      103.97,
-      -60.02
-     ],
-     "y": 2.73,
-     "yaw": 180,
-     "repeat": [
-      5,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      105.79,
-      -60.02
-     ],
-     "y": 2.73,
-     "yaw": 180,
-     "repeat": [
-      4,
-      3.64,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      103.97,
-      -60.02
-     ],
-     "y": 5.46,
-     "yaw": 180,
-     "repeat": [
-      9,
-      1.82,
-      0
-     ]
-    },
-    {
-     "piece": "quaternius_downtown_city:Metal_Plain_3",
-     "at": [
-      103.97,
-      -60.02
-     ],
-     "y": 8.19,
-     "yaw": 180,
-     "repeat": [
-      9,
-      1.82,
-      0
-     ]
-    }
-   ],
-   "doors": [
-    {
-     "name": "departures",
-     "at": [
-      -45.0,
-      30.0
-     ],
-     "outward": [
-      0,
-      1
-     ],
-     "width": 4.0,
-     "height": 3.5
-    },
-    {
-     "name": "departures",
-     "at": [
-      -15.0,
-      30.0
-     ],
-     "outward": [
-      0,
-      1
-     ],
-     "width": 4.0,
-     "height": 3.5
-    },
-    {
-     "name": "departures",
-     "at": [
-      15.0,
-      30.0
-     ],
-     "outward": [
-      0,
-      1
-     ],
-     "width": 4.0,
-     "height": 3.5
-    },
-    {
-     "name": "departures",
-     "at": [
-      45.0,
-      30.0
-     ],
-     "outward": [
-      0,
-      1
-     ],
-     "width": 4.0,
-     "height": 3.5
-    },
-    {
-     "name": "airside",
-     "at": [
-      -40.0,
-      -30.0
-     ],
-     "outward": [
-      0,
-      -1
-     ],
-     "width": 8.0,
-     "height": 4.0
-    },
-    {
-     "name": "airside",
-     "at": [
-      40.0,
-      -30.0
-     ],
-     "outward": [
-      0,
-      -1
-     ],
-     "width": 8.0,
-     "height": 4.0
-    }
-   ],
    "landmark": true,
-   "door_style": "slide"
+   "kit": "interiors",
+   "piece": "AirportTerminal",
+   "wall_top_m": 12.0,
+   "probe_xz": [
+    10.0,
+    -10.0
+   ],
+   "use": "空港ターミナル: a regional terminal, 150 x 50 m, two 6 m storeys: F1 arrivals (baggage hall with two carousels, car hire, konbini, the airport police box with light arms), F2 departures (check-in islands, self check-in, the security line, the airside lounge, four gates on boarding bridges with a stair down to the apron); the curb canopy landside (+Z), the apron airside (-Z). kits/interiors/AirportTerminal.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)"
   },
   {
    "id": "ShuriCastle",
    "kit": "library",
    "piece": "ShuriCastle",
    "landmark": true
+  },
+  {
+   "id": "PoliceStation",
+   "kit": "interiors",
+   "piece": "PoliceStation",
+   "plot_origin": true,
+   "wall_top_m": 8.0,
+   "probe_xz": [
+    -9.0,
+    7.0
+   ],
+   "use": "警察署, the LARGE police station: two storeys 30 x 17 m on its plot -- public counters and waiting, duty office, the complete ARMOURY (gun racks, pistol lockers, shields; MARK_weapon per slot), holding cells, two interrogation rooms, lockers; upstairs the CID office, the chief, the incident room, bunks; two stairs, a lift. kits/interiors/PoliceStation.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "警察署"
+   }
+  },
+  {
+   "id": "Koban",
+   "kit": "interiors",
+   "piece": "Koban",
+   "use": "交番, the SMALL police station: one storey 6 x 7 m on its 8 x 10 plot -- front office with the public counter, rest room with the pistol locker (LIGHT weapons: MARK_weapon PIS1 x2), toilet, back door. kits/interiors/Koban.blend (the artist's)",
+   "plot_origin": true,
+   "probe_xz": [
+    -1.2,
+    1.2
+   ],
+   "jp": {
+    "name": "交番"
+   }
+  },
+  {
+   "id": "FireStation",
+   "kit": "interiors",
+   "piece": "FireStation",
+   "plot_origin": true,
+   "wall_top_m": 9.4,
+   "probe_xz": [
+    -10.8,
+    11.0
+   ],
+   "use": "消防署, the LARGE fire station: two storeys 32 x 21 m -- four open bays (ladder truck, two pumpers, ambulance), gear racks, office and counter, lockers, store, mess; upstairs bunk rooms, briefing room, prevention office, the chief; two stairs, a roof stair house; the 訓練塔 behind. kits/interiors/FireStation.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "消防署"
+   }
+  },
+  {
+   "id": "FireBranch",
+   "kit": "interiors",
+   "piece": "FireBranch",
+   "use": "消防出張所, the SMALL fire station: one storey 16 x 18 m on a 20 x 25 plot -- two open apparatus bays (a pumper, an ambulance), gear racks, the office with its counter, the crew room and kitchen, bunks, WC, the equipment store and back door. kits/interiors/FireBranch.blend (the artist's)",
+   "plot_origin": true,
+   "probe_xz": [
+    -4.0,
+    8.5
+   ],
+   "jp": {
+    "name": "消防出張所"
+   }
+  },
+  {
+   "id": "PostOffice",
+   "kit": "library",
+   "piece": "Civic_PostOffice",
+   "jp": {
+    "name": "郵便局"
+   },
+   "use": "main post office, 40 x 40 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true
+  },
+  {
+   "id": "PostOfficeSmall",
+   "kit": "library",
+   "piece": "Civic_PostOfficeSmall",
+   "jp": {
+    "name": "郵便局 (分局)"
+   },
+   "use": "branch post office, 15 x 20 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true
+  },
+  {
+   "id": "WardOffice",
+   "kit": "library",
+   "piece": "Civic_WardOffice",
+   "jp": {
+    "name": "区役所"
+   },
+   "use": "ward office: a 10-storey tower on a counter podium, 60 x 60 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true
+  },
+  {
+   "id": "Hospital",
+   "kit": "interiors",
+   "piece": "Hospital",
+   "plot_origin": true,
+   "wall_top_m": 12.5,
+   "probe_xz": [
+    -14.0,
+    8.0
+   ],
+   "use": "病院 (one type, medium / large, compact): three storeys 44 x 20 m + a roof helipad -- entrance hall, reception and pharmacy counters, four consulting rooms, X-ray, the ER with its own ambulance door; two operating theatres and the ICU; the ward (four 4-bed rooms, three private rooms, day room, nurse station); a bed lift to the roof, two stairs. kits/interiors/Hospital.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "総合病院"
+   }
+  },
+  {
+   "id": "HospitalSmall",
+   "kit": "interiors",
+   "piece": "Hospital",
+   "plot_origin": true,
+   "wall_top_m": 12.5,
+   "probe_xz": [
+    -14.0,
+    8.0
+   ],
+   "use": "the island's second hospital plot (55 x 60): the same one hospital type as `Hospital` (user, 2026-09-28: one type, medium / large). kits/interiors/Hospital.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "病院"
+   }
+  },
+  {
+   "id": "Clinic",
+   "kit": "library",
+   "piece": "Civic_Clinic",
+   "jp": {
+    "name": "診療所"
+   },
+   "use": "street clinic with the doctor's home above, 14 x 18 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true
+  },
+  {
+   "id": "SchoolElementary",
+   "kit": "library",
+   "piece": "Civic_SchoolElementary",
+   "jp": {
+    "name": "小学校"
+   },
+   "use": "elementary school: 校舎, 体育館, pool, 校庭, fence, 100 x 110 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true,
+   "probe_xz": [
+    -19,
+    -45
+   ]
+  },
+  {
+   "id": "SchoolJuniorHigh",
+   "kit": "library",
+   "piece": "Civic_SchoolJuniorHigh",
+   "jp": {
+    "name": "中学校"
+   },
+   "use": "junior high school, 110 x 130 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true,
+   "probe_xz": [
+    -21,
+    -54
+   ]
+  },
+  {
+   "id": "Shrine",
+   "kit": "library",
+   "piece": "Shrine",
+   "jp": {
+    "name": "神社"
+   },
+   "use": "neighbourhood shrine: 鳥居, 拝殿, 本殿, 手水舎, 玉垣, 50 x 60 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true,
+   "probe_xz": [
+    0,
+    -17
+   ]
+  },
+  {
+   "id": "Temple",
+   "kit": "library",
+   "piece": "Temple",
+   "jp": {
+    "name": "寺"
+   },
+   "use": "temple: 山門, 本堂, 鐘楼, 塀, 50 x 50 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true,
+   "probe_xz": [
+    0,
+    -8
+   ]
+  },
+  {
+   "id": "WaterResort",
+   "kit": "library",
+   "piece": "WaterResort",
+   "jp": {
+    "name": "温浴・プールリゾート"
+   },
+   "use": "indoor spa + pool hall, outdoor wave pool, lazy river, slide tower, 150 x 120 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "plot_origin": true,
+   "probe_xz": [
+    0,
+    30
+   ]
+  },
+  {
+   "id": "ResortHotel",
+   "kit": "interiors",
+   "piece": "ResortHotel",
+   "wall_top_m": 14.1,
+   "probe_xz": [
+    0.0,
+    -2.5
+   ],
+   "use": "リゾートホテル: four storeys 48 x 16 m, 24 sea-view rooms (balconies and the pool terrace on the FRONT, the scene's +Z), restaurant, lobby, lounge-bar, kitchen, lift, two stairs; the porte-cochère on the land side. Sited on the resort reserves (island_sites.py). kits/interiors/ResortHotel.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "リゾートホテル"
+   }
+  },
+  {
+   "id": "FishMarket",
+   "kit": "library",
+   "piece": "FishMarket",
+   "jp": {
+    "name": "魚市場"
+   },
+   "use": "fish market: sawtooth auction hall open to the quay, ice plant, office, truck bays; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+   "placeholder": true,
+   "probe_xz": [
+    0,
+    10
+   ],
+   "props": [
+    {
+     "vehicle": "FIB1",
+     "at": [
+      -20.0,
+      60.0
+     ],
+     "y": -5.6,
+     "yaw": 90.0
+    },
+    {
+     "vehicle": "FIB1",
+     "at": [
+      20.0,
+      60.0
+     ],
+     "y": -5.6,
+     "yaw": 90.0
+    }
+   ]
+  },
+  {
+   "id": "Park",
+   "kit": "library",
+   "piece": "Park",
+   "jp": {
+    "name": "公園"
+   },
+   "use": "neighbourhood park, 60 x 60 m plot; PLACEHOLDER (library_civic.py) + nature-kit trees",
+   "props": [
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -22,
+      -22
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      22,
+      -22
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -22,
+      22
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      22,
+      22
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -22,
+      0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      22,
+      0
+     ],
+     "collide": "none"
+    }
+   ],
+   "placeholder": true,
+   "plot_origin": true,
+   "probe_xz": [
+    22,
+    23
+   ],
+   "height_m": 9.43
+  },
+  {
+   "id": "DetachedHouse",
+   "kit": "library",
+   "piece": "House_Detached",
+   "jp": {
+    "name": "一戸建て"
+   },
+   "use": "detached house (PLATEAU 2-storey 一戸建て 7.1-7.5 x 10.2-10.4 m, 7.4 m): slate roof, beige siding, carport right; PLACEHOLDER (library_civic.py), shut",
+   "placeholder": true
+  },
+  {
+   "id": "DetachedHouseB",
+   "kit": "library",
+   "piece": "House_DetachedB",
+   "jp": {
+    "name": "一戸建て"
+   },
+   "use": "detached house (PLATEAU 2-storey 一戸建て 7.1-7.5 x 10.2-10.4 m, 7.4 m): brown roof, white siding, carport left; PLACEHOLDER (library_civic.py), shut",
+   "placeholder": true
+  },
+  {
+   "id": "OfficeHQ",
+   "kit": "interiors",
+   "piece": "OfficeHQ",
+   "wall_top_m": 15.6,
+   "probe_xz": [
+    -1.5,
+    4.0
+   ],
+   "use": "オフィスビル: four storeys 24 x 18 m on its entrance plaza -- lobby and security, a lift to every floor, two stairs (A to the roof), 島型 open offices, meeting rooms, the server room (F3), the president, boardroom and strong room (F4). Not placed on the island: a level designer's building. kits/interiors/OfficeHQ.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)"
+  },
+  {
+   "id": "WarehouseYard",
+   "kit": "interiors",
+   "piece": "WarehouseYard",
+   "wall_top_m": 9.0,
+   "probe_xz": [
+    -10.5,
+    -2.99
+   ],
+   "use": "倉庫 + ヤード: a 40 x 24 x 9 m warehouse (pallet racks, forklifts, three open docks, a two-storey corner office up a stair) on a 44 x 26 m fenced yard with a trailer, a truck and a guard booth. Not placed on the island: a level designer's building. kits/interiors/WarehouseYard.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)"
+  },
+  {
+   "id": "MilHQ",
+   "kit": "interiors",
+   "piece": "MilHQ",
+   "wall_top_m": 8.0,
+   "probe_xz": [
+    -16.0,
+    -5.0
+   ],
+   "use": "司令部庁舎 (base HQ): 44 x 18 m, two storeys: the operations and comms rooms, a small ready-arms locker; upstairs the commander's office (a safe) and the briefing room. A part of the MilitaryBase site. kits/interiors/MilHQ.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)"
+  },
+  {
+   "id": "MilBarracks",
+   "kit": "interiors",
+   "piece": "MilBarracks",
+   "wall_top_m": 8.0,
+   "probe_xz": [
+    -12.0,
+    -4.0
+   ],
+   "use": "隊舎 (barracks): 48 x 16 m, two storeys: the mess hall, kitchen and recreation room; four 8-bunk rooms upstairs. A part of the MilitaryBase site. kits/interiors/MilBarracks.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)"
+  },
+  {
+   "id": "MilArmoury",
+   "kit": "interiors",
+   "piece": "MilArmoury",
+   "wall_top_m": 4.6,
+   "probe_xz": [
+    0.0,
+    -6.0
+   ],
+   "use": "武器庫 (armoury bunker): 24 x 16 m, 0.5 m walls, an issue cage and the COMPLETE military armoury on MARK_weapon markers. A part of the MilitaryBase site. kits/interiors/MilArmoury.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)"
+  },
+  {
+   "id": "MilHangar",
+   "kit": "interiors",
+   "piece": "MilHangar",
+   "wall_top_m": 12.0,
+   "probe_xz": [
+    0.0,
+    -8.0
+   ],
+   "use": "格納庫 (fighter hangar): 44 x 36 x 12 m, an open 30 m door, two flyable FIJ1 jets on MARK_vehicle, workshops and a mezzanine flight office. A part of the MilitaryBase site. kits/interiors/MilHangar.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)"
+  },
+  {
+   "id": "MilControlTower",
+   "kit": "interiors",
+   "piece": "MilControlTower",
+   "wall_top_m": 4.2,
+   "probe_xz": [
+    -4.0,
+    -4.0
+   ],
+   "use": "管制塔 (control tower): an operations room and a stair shaft to a glass cab at 20 m (a sniper spot). A part of the MilitaryBase site. kits/interiors/MilControlTower.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)"
+  },
+  {
+   "id": "AirportHangar",
+   "kit": "interiors",
+   "piece": "AirportHangar",
+   "wall_top_m": 22.0,
+   "probe_xz": [
+    0.0,
+    10.0
+   ],
+   "use": "整備格納庫 (maintenance hangar): 70 x 60 x 22 m, the front open 56 m wide for a narrow-body (the AirportAirside site's airliner prop stands inside), a flyable LIP1 on MARK_vehicle, workshops, parts store, crew room, the engineering office upstairs. A part of AirportAirside. kits/interiors/AirportHangar.blend"
+  },
+  {
+   "id": "CargoShip",
+   "kit": "interiors",
+   "piece": "CargoShip",
+   "wall_top_m": 22.2,
+   "probe_xz": [
+    3.0,
+    -60.0
+   ],
+   "use": "コンテナ船 (a coastal container feeder, 150 x 24 m): a STATIC walkable level, not controllable -- holds of stacked containers, two deck cranes, the forecastle, the aft accommodation house (mess, cabins, the captain's safe and a weapon cache, the wheelhouse with wings) over the engine room. Origin on the WATERLINE at midships (place it with y = the sea surface), the bow toward +Z (Blender -Y). Not placed on the island: a level designer's building. kits/interiors/CargoShip.blend"
+  },
+  {
+   "id": "SafeHouseSmall",
+   "kit": "interiors",
+   "piece": "SafeHouseSmall",
+   "plot_origin": true,
+   "wall_top_m": 2.5,
+   "probe_xz": [
+    -2.1,
+    5.3
+   ],
+   "use": "隠れ家 (small safe house): a two-storey 3.5 x 5 間 wooden house on an 8 x 12.7 plot -- genkan (doma + the 0.30 m agarikamachi step up to the 0.45 m house floor, shoe cabinet), LDK, 洗面所 + unit bath and a SEPARATE WC; upstairs a 洋室 and a 和室 with 押入れ (続き間 behind a fusuma), the 納戸 stash (MARK_weapon); stone boundary wall. probe_xz is under the door hood. kits/interiors/SafeHouseSmall.blend (the artist's)",
+   "jp": {
+    "name": "隠れ家"
+   }
+  },
+  {
+   "id": "SafeHouseLarge",
+   "kit": "interiors",
+   "piece": "SafeHouseLarge",
+   "plot_origin": true,
+   "wall_top_m": 2.55,
+   "probe_xz": [
+    -0.35,
+    5.5
+   ],
+   "use": "隠れ家 (large safe house): a 7 x 5.5 間 two-storey 注文住宅 with a built-in two-car garage on a 17 x 17.5 walled lot -- genkan, a リビング階段 LDK with a 対面 kitchen, a 6-畳 和室, WC, 洗面所 + unit bath; upstairs the master bedroom with a balcony, the study (safe, gun locker: MARK_weapon), two rooms, WC, storeroom; 1.6 m block wall, a car gate, cameras. probe_xz is under the door hood. kits/interiors/SafeHouseLarge.blend (the artist's)",
+   "jp": {
+    "name": "隠れ家 (一戸建て)"
+   }
+  },
+  {
+   "id": "Izakaya",
+   "kit": "interiors",
+   "piece": "Izakaya",
+   "plot_origin": true,
+   "wall_top_m": 2.6,
+   "probe_xz": [
+    2.3,
+    7.0
+   ],
+   "use": "居酒屋: a 3 x 7 間 two-storey izakaya, enterable (its _Shop variant) -- noren, red lanterns, a sliding front door; the L counter with 9 stools and the open kitchen, the 小上がり tatami platform with two low tables, WC, the back door to the side alley; upstairs a 座敷 banquet room (床の間) and the staff room with the safe. probe_xz is under the front 庇. kits/interiors/Izakaya.blend (the artist's)",
+   "jp": {
+    "name": "居酒屋"
+   }
+  },
+  {
+   "id": "SafeHouseCitySmall",
+   "kit": "interiors",
+   "piece": "SafeHouseCitySmall",
+   "plot_origin": true,
+   "wall_top_m": 8.5,
+   "probe_xz": [
+    -1.0,
+    2.0
+   ],
+   "use": "隠れ家 (city, small): a three-storey 狭小住宅 townhouse on a 3 x 5 間 downtown lot -- F1 a built-in garage (kei car), the workroom with a gun locker and a WC, the genkan with its agarikamachi step; F2 the LDK and a WC; F3 the bedroom, 洗面所 + unit bath and the stash. probe_xz is in the garage. kits/interiors/SafeHouseCitySmall.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "隠れ家 (狭小住宅)"
+   }
+  },
+  {
+   "id": "SafeHouseCityLarge",
+   "kit": "interiors",
+   "piece": "SafeHouseCityLarge",
+   "plot_origin": true,
+   "wall_top_m": 17.2,
+   "probe_xz": [
+    -2.0,
+    5.5
+   ],
+   "use": "隠れ家 (city, large): a five-storey 4 x 8 間 雑居ビル downtown -- F1 a one-car garage behind a shutter and the entrance lobby (mailboxes, a doorman), a side fire exit; F2-F3 the front company's office; F4 the penthouse LDK; F5 the master bedroom and the panic room (gun rack, lockers, safe, monitors: MARK_weapon); a lift to every floor, one stair to the roof terrace. probe_xz is in the garage. kits/interiors/SafeHouseCityLarge.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "隠れ家 (雑居ビル)"
+   }
+  },
+  {
+   "id": "MaidCafe",
+   "kit": "interiors",
+   "piece": "MaidCafe",
+   "plot_origin": true,
+   "wall_top_m": 13.9,
+   "probe_xz": [
+    -1.8,
+    4.0
+   ],
+   "use": "メイドカフェ (Akihabara): a four-storey 3.5 x 8 間 雑居ビル, enterable (_Shop) -- F1 the merch shop (goods, capsule-toy machines, the register); F2 the cafe (six tables, the counter, a small stage at the window); F3 the event hall (stage, backdrop, stools); F4 the staff floor (changing lockers, the manager's desk, the takings safe). A lift, one stair to the roof, a tall pink 袖看板 and floor signs. probe_xz is on the shop floor. kits/interiors/MaidCafe.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "メイドカフェ"
+   }
+  },
+  {
+   "id": "AdultServices",
+   "kit": "interiors",
+   "piece": "AdultServices",
+   "plot_origin": true,
+   "wall_top_m": 17.2,
+   "probe_xz": [
+    1.5,
+    5.5
+   ],
+   "use": "風俗ビル (a grey-zone adult-entertainment building in the 歓楽街; non-explicit): a five-storey 4 x 9 間 雑居ビル -- F1 reception (counter, lit menu board) and the waiting room; F2 a host club lounge (box seats, the bar, the bottle wall); F3-F4 four private rooms a floor off a corridor; F5 the back office (takings safes, camera monitors, the manager). Lift, one stair, a bouncer spawn, pink and red 袖看板. probe_xz is on the ground floor. kits/interiors/AdultServices.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "風俗ビル"
+   }
+  },
+  {
+   "id": "BankSmall",
+   "kit": "interiors",
+   "piece": "BankSmall",
+   "plot_origin": true,
+   "wall_top_m": 4.5,
+   "probe_xz": [
+    5.5,
+    1.5
+   ],
+   "use": "銀行 (small): a one-storey 14 x 12 m bank branch -- the ATM corner with its own door (open after hours), the 風除室, the lobby (ticket machine, sofas), the teller counter with its glass screen and the staff gate, the back office, the VAULT (0.45 m walls, a steel door, safes), the staff room with lockers and WC, the manager, the 通用口 staff door. probe_xz is in the lobby. kits/interiors/BankSmall.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "銀行 (出張所)"
+   }
+  },
+  {
+   "id": "BankLarge",
+   "kit": "interiors",
+   "piece": "BankLarge",
+   "plot_origin": true,
+   "wall_top_m": 13.0,
+   "probe_xz": [
+    0.0,
+    5.0
+   ],
+   "use": "銀行 (large): a three-storey 36 x 22 m main branch -- F1 the ATM corner, the 風除室, the banking hall, high and low teller counters, the back office, the MAIN VAULT (safes, cash cages), 貸金庫 (safe-deposit room), the cash-in-transit bay behind a shutter (MARK_vehicle); F2 consultation booths, the manager's office with its safe, a meeting room, WCs; F3 offices, the server room, lockers, the canteen. Two stairs (A to the roof), a lift. probe_xz is in the hall. kits/interiors/BankLarge.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "銀行"
+   }
+  },
+  {
+   "id": "ParkingGarage",
+   "kit": "interiors",
+   "piece": "ParkingGarage",
+   "plot_origin": true,
+   "wall_top_m": 9.0,
+   "probe_xz": [
+    0.0,
+    0.0
+   ],
+   "use": "立体駐車場 (自走式, self-park): a 23 x 40 m car park, ground + three decks (the top one open to the sky), 3.0 m storeys -- up ramps on the west, down ramps on the east (20 m each, 15 %: under the 17 % 駐車場法 limit, ramps 3.5 m wide), 2.5 x 5.0 m bays either side of a 6 m two-way aisle, wheel stops, parapets, a gate booth and arm at the south entrance, a stair tower on the south-east corner. Parked cars on MARK_vehicle. probe_xz is the aisle. kits/interiors/ParkingGarage.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "立体駐車場"
+   }
+  },
+  {
+   "id": "AirportControlTower",
+   "kit": "interiors",
+   "piece": "AirportControlTower",
+   "plot_origin": true,
+   "wall_top_m": 9.0,
+   "probe_xz": [
+    -9.5,
+    5.0
+   ],
+   "use": "空港管制塔 (civil airport control tower): a 24 x 14 m two-storey operations block (lobby with security, operations office, the approach-radar room, briefing) and an 8 x 8 m tower whose LIFT and stair climb eight levels to a 14 x 14 m glass cab at 36 m (consoles all round, the radar on its roof; a sniper's view). For the airport airside. probe_xz is on the block. kits/interiors/AirportControlTower.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "空港管制塔"
+   }
+  },
+  {
+   "id": "FashionBuilding",
+   "kit": "interiors",
+   "piece": "FashionBuilding",
+   "plot_origin": true,
+   "wall_top_m": 22.5,
+   "probe_xz": [
+    0.0,
+    1.5
+   ],
+   "use": "ファッションビル (a station-front fashion building, PARCO / マルイ class): 30 x 24 m, five storeys of 4.5 m, enterable (_Shop) -- F1 cosmetics and goods with two register counters, F2-F3 fashion (clothes rails), F4 electronics, F5 the restaurant floor; an escalator atrium (an up and a down escalator, walkable), a bank of two lifts, four corner stairs (二方向避難, one to the roof), men's / women's / accessible WCs each floor; three entrances. probe_xz is the atrium floor. kits/interiors/FashionBuilding.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "ファッションビル"
+   }
+  },
+  {
+   "id": "DepartmentStore",
+   "kit": "interiors",
+   "piece": "DepartmentStore",
+   "plot_origin": true,
+   "wall_top_m": 32.0,
+   "probe_xz": [
+    14.0,
+    2.0
+   ],
+   "use": "百貨店 / 駅ビル (Shinjuku class): 72 x 48 m, seven storeys, enterable (_Shop) -- F1 the food hall (デパ地下 brought up: the island has no basement below sea level), F2 cosmetics, F3-F4 fashion, F5 household goods, F6 books, F7 the restaurant floor, a roof garden; two escalator atriums, two lift banks (back and front), four corner stairs, WC blocks each floor, five entrances and a long street canopy. probe_xz is between the east atrium's escalators. kits/interiors/DepartmentStore.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "百貨店"
+   }
+  },
+  {
+   "id": "CivicCenter",
+   "kit": "interiors",
+   "piece": "CivicCenter",
+   "plot_origin": true,
+   "wall_top_m": 16.5,
+   "probe_xz": [
+    0.0,
+    12.0
+   ],
+   "use": "区民センター (a downtown civic centre, busy): four storeys 48 x 32 m -- F1 two entrances with 風除室, the information desk, the 窓口 counters (住民票 / 戸籍) with the ticket machine and waiting rows, a cafe corner; F2 the multi-purpose hall (0.9 m stage, rows of seats) and four meeting rooms; F3 the library (stacks, reading tables); F4 the offices, the director, the 防災センター (monitors). Four corner stairs (one to the roof), a lift bank, WC blocks per floor. A smaller one for the residential districts is the library's Civic_WardOffice placeholder. probe_xz is on the plaza side of the hall. kits/interiors/CivicCenter.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "区民センター"
+   }
+  },
+  {
+   "id": "OnsenRyokan",
+   "kit": "interiors",
+   "piece": "OnsenRyokan",
+   "plot_origin": true,
+   "wall_top_m": 3.55,
+   "probe_xz": [
+    2.5,
+    12.0
+   ],
+   "use": "温泉旅館 (a hot-spring inn in the snow mountains): two storeys 36 x 20 m, enterable (_Shop) -- the 玄関 with shoes off (a stone doma, 下足箱, the agarikamachi up to the 0.3 m floor), the 帳場 front desk, the lobby and the 売店; the 大浴場 split 男湯 / 女湯 behind 暖簾 (脱衣所 with basket shelves, a hinoki 内湯, the wash row) each with a door out to its bamboo-fenced 露天風呂 on a stone terrace; the tatami 宴会場 and the kitchen (its own back door); upstairs eleven 和室 guest rooms (tatami, a low table, the 広縁 window strip) off a central corridor; two stairs, a lift; snow on the roof, the porch and the drive. The bath water is a solid placeholder surface. probe_xz is under the porch roof. kits/interiors/OnsenRyokan.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "温泉旅館"
+   }
+  },
+  {
+   "id": "SecureMansion",
+   "kit": "interiors",
+   "piece": "SecureMansion",
+   "plot_origin": true,
+   "wall_top_m": 3.25,
+   "probe_xz": [
+    1.5,
+    4.5
+   ],
+   "use": "邸宅 (a high-security estate, a tycoon's or an 組長's): a 64 x 50 m walled lot -- a 3 m wall with a tiled cap and cameras, the pedestrian gate (a locked EXIT_ in _Open) and the vehicle gate under a barrier, both watched from the 詰所 guard post; the 32 x 16 m two-storey main house on a raised floor behind a porte-cochère: the grand genkan, the guards' room, 待合, the 警備室 (monitors), the 応接間, the tatami 大広間 with 床の間 and 神棚, bath and WC, the kitchen-dining and a back door; upstairs the study (safe, gun locker: MARK_weapon), the PANIC ROOM (0.45 m steel walls), bedrooms, a bath; a three-car garage (MARK_vehicle); a garden with a pond; wall-patrol spawns. probe_xz is under the porte-cochère. kits/interiors/SecureMansion.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+   "jp": {
+    "name": "邸宅"
+   }
   }
  ]
 }

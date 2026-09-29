@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/PostOffice_mesh.res" id="1_n3y04"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/PostOffice_collision.res" id="2_sr2hv"]
+
+[node name="PostOffice" type="Node3D" unique_id=1836991318]
+metadata/building = {
+"aabb": [Vector3(-15.03, 0, -8.03), Vector3(30.06, 22.9, 22.029999)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [30.06, 22.03],
+"height_m": 22.9,
+"id": "PostOffice",
+"kit": "library",
+"landmark": false,
+"piece_count": 1,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "main post office, 40 x 40 m plot; PLACEHOLDER massing (blender/tools/library_civic.py), shut",
+"wall_top_m": 22.9
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1251374759]
+visibility_range_end = 574.8
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_n3y04")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1704567649]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=604217371]
+shape = ExtResource("2_sr2hv")

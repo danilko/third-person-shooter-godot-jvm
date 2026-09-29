@@ -1,0 +1,144 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/YokochoRow_W3_mesh.res" id="1_h3yp1"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_moypq"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ujg5t"]
+size = Vector3(0.89, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_6dbei"]
+size = Vector3(5.46, 3.64, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_nje44"]
+size = Vector3(1.88, 3.64, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_i4br1"]
+size = Vector3(1.7, 1.54, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wfxe3"]
+size = Vector3(1.88, 3.64, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xtuqm"]
+size = Vector3(0.2355, 7.28, 9.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mq5iq"]
+size = Vector3(5.46, 7.28, 0.2355)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_46oq4"]
+size = Vector3(0.2355, 7.28, 9.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_nkilb"]
+size = Vector3(5.46, 0.1, 9.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_nvbax"]
+size = Vector3(5.46, 0.2, 9.1)
+
+[node name="YokochoRow_W3" type="Node3D" unique_id=2085941954]
+metadata/building = {
+"aabb": [Vector3(-2.9888966, -0.091, -4.588229), Vector3(5.718898, 7.371, 9.98823)],
+"door_style": "slide",
+"doors": [{
+"center": [0.0, 0.0, 4.55],
+"height": 2.1,
+"module": 1.0,
+"outward": [0.0, 0.0, 1.0],
+"shopfront": {
+"module": 1.82,
+"storey": 3.64
+},
+"side": "front",
+"style": "slide",
+"width": 1.7
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"facade_surfaces": {
+"MI_Trim": 5,
+"MI_Trim_MetalConcrete": 1
+},
+"footprint_m": [5.46, 9.1],
+"forecourt_m": 0.85,
+"has_interior": false,
+"height_m": 7.28,
+"id": "YokochoRow_W3",
+"jp": {
+"name": "横丁の飲み屋"
+},
+"kit": "quaternius_downtown_city",
+"module_m": 1.82,
+"modules": [3.0, 5.0],
+"piece_count": 111,
+"props_top_m": 5.6,
+"roofline_m": 7.28,
+"setback_m": 0.0,
+"shop_band": "MI_ShopStripe_Red",
+"solid_probes": [{
+"center": [-1.82, 0.0, 4.55],
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "front"
+}],
+"storeys": [3.64, 2.73],
+"terrace_m": null,
+"use": "横丁 (side-street) izakaya: a narrow two-storey front shoulder to shoulder, a red 赤提灯 lantern, a 暖簾 over the door, a small vertical sign",
+"wall_top_m": 6.37
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1781495905]
+visibility_range_end = 387.36
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_h3yp1")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=844356376]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1222143453]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.425, 1.05, 4.55)
+shape = SubResource("BoxShape3D_moypq")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=421932416]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.425, 1.05, 4.55)
+shape = SubResource("BoxShape3D_ujg5t")
+
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=152741489]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.46, 4.43225)
+shape = SubResource("BoxShape3D_6dbei")
+
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=1717701762]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.79, 1.82, 4.43225)
+shape = SubResource("BoxShape3D_nje44")
+
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=952125987]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.87, 4.43225)
+shape = SubResource("BoxShape3D_i4br1")
+
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=1070446347]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.79, 1.82, 4.43225)
+shape = SubResource("BoxShape3D_wfxe3")
+
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=2007574338]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.61225, 3.64, 0)
+shape = SubResource("BoxShape3D_xtuqm")
+
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=1770382499]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.64, -4.43225)
+shape = SubResource("BoxShape3D_mq5iq")
+
+[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=478376873]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.61225, 3.64, 0)
+shape = SubResource("BoxShape3D_46oq4")
+
+[node name="Box9" type="CollisionShape3D" parent="Collision" unique_id=622087114]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_nkilb")
+
+[node name="Box10" type="CollisionShape3D" parent="Collision" unique_id=1178265007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.27, 0)
+shape = SubResource("BoxShape3D_nvbax")
+
+[node name="Door_front_1" type="Marker3D" parent="." unique_id=497577875]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 4.55)
