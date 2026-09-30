@@ -399,7 +399,13 @@ def pier_extent(pier):
 
 
 FOOT_REACH = 1.5
-FOOT_OFFSETS = ((0.0, 0.0), (FOOT_REACH, 0.0), (-FOOT_REACH, 0.0), (0.0, FOOT_REACH), (0.0, -FOOT_REACH))
+#: The centre, the four sides AND the four diagonals, all FOOT_REACH out. The diagonals were missing, so over a vertical
+#: quay a shaft corner stopped at the lowest SIDE sample while the seabed a diagonal step away was 2 m deeper
+#: (probe_road_ground, the Wangan's west viaduct at (-901, 1129), 2026-09-29) -- "the lowest ground within FOOT_REACH"
+#: means every direction, and the probe asks exactly these nine.
+_D = FOOT_REACH * 0.7071
+FOOT_OFFSETS = ((0.0, 0.0), (FOOT_REACH, 0.0), (-FOOT_REACH, 0.0), (0.0, FOOT_REACH), (0.0, -FOOT_REACH),
+                (_D, _D), (-_D, _D), (_D, -_D), (-_D, -_D))
 
 
 def place_pier(pier, top, height, fwd, zb=None, ground=None):

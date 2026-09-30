@@ -334,12 +334,14 @@ def reshape(base):
 #: air base's runway strip (user, 2026-09-26: "a small airlane/terminal for standard fighter flight/landing") now
 #: takes that water.
 MILITARY_PIERS = ((-1020.0, -740.0, 1300.0, 1350.0),
-                  (-1265.0, -740.0, 1478.0, 1540.0))     # the RUNWAY strip (below)
+                  (-1030.0, -740.0, 1478.0, 1540.0))     # the RUNWAY strip (below): its west half only
 # THE RUNWAY IS OFFSHORE, FROM THE BASE INTO THE SEA (user, 2026-09-29: "the military's runway should be fully covered
 # by the military ... start the military base into the ocean like the pier"; Iwakuni / Haneda D are the precedent). The
 # second rectangle is a reclaimed strip 525 x 62 m running WEST from the base's south-west corner, the platform's
 # height, 110 m south of the pier's berth. 540 m of runway is plenty: FIJ1 lifts off after ~130 m (probe_craft.gd), and
 # it matches the civilian airport's 540 m.
+# 2026-09-29 (later): the runway moved 245 m EAST so it runs right along the base's apron (x -1015..-475, see
+# island_plan military_airfield); only its west half needs the strip, so the strip stops 15 m past the runway's end.
 # COMPACT BASE (user, 2026-09-28: "so the player does not need to wander around, but still has every component"):
 # ONE pier (a finger pier berths a ship each side); the runway was on the platform's own south band until 2026-09-29. The 1 210 m reclaimed strip off the south-west coast and the second pier
 # are gone -- 1.4 km of empty paving between the pier and the runway's far end.

@@ -1,0 +1,240 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/MaidCafe_mesh.res" id="1_dbtdt"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/MaidCafe_collision.res" id="2_gy5uy"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_oev74"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_7ko2u"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_nivo8"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_hskaf"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_awfwo"]
+size = Vector3(0.84, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1rkd2"]
+size = Vector3(0.84, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_j1vo0"]
+size = Vector3(0.9, 2, 0.14)
+
+[node name="MaidCafe" type="Node3D" unique_id=86071433]
+metadata/building = {
+"aabb": [Vector3(-3.4, -1.2, -7.5), Vector3(7.135, 18.1, 16.5)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [-1.6, 0.0, 7.18],
+"height": 2.2,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.6
+}, {
+"center": [-3.085, 0.0, -0.59],
+"height": 2.0,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [7.135, 16.5],
+"height_m": 18.1,
+"id": "MaidCafe",
+"inner_doors": [{
+"center": [1.885, 13.9, -1.14],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-2.05, 0.0, -1.24],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-2.05, 4.0, -1.24],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-2.05, 7.3, -1.24],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-2.05, 10.6, -1.24],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [1.5, 10.6, 0.06],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [1.5, 10.6, 3.8],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [-0.165, 0.0, -2.14],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 10.6,
+"stops": "0,4,7.3,10.6",
+"w": 1.6,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [0.0, 4.3, 6.38],
+"props": {
+"kind": "objective",
+"note": "the stage (a live song / photo spot)"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_objective_02",
+"pos": [-2.4, 10.6, 1.2],
+"props": {
+"kind": "objective",
+"note": "the takings safe"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [-1.5, 0.0, 8.78],
+"props": {
+"kind": "spawn",
+"note": "the maid handing out flyers",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-1.8, 4.0, 1.66],
+"props": {
+"kind": "spawn",
+"note": "the maid at the counter",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [1.2, 4.0, 2.0],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}],
+"piece_count": 1,
+"probe_xz": [-1.8, 4.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "メイドカフェ (Akihabara): a four-storey 3.5 x 8 間 雑居ビル, enterable (_Shop) -- F1 the merch shop (goods, capsule-toy machines, the register); F2 the cafe (six tables, the counter, a small stage at the window); F3 the event hall (stage, backdrop, stools); F4 the staff floor (changing lockers, the manager's desk, the takings safe). A lift, one stair to the roof, a tall pink 袖看板 and floor signs. probe_xz is on the shop floor. kits/interiors/MaidCafe.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 13.9
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=2077357273]
+visibility_range_end = 502.8
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_dbtdt")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=591833251]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1202241151]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 1.1, 7.18)
+shape = SubResource("BoxShape3D_awfwo")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=30026742]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.1, 7.18)
+shape = SubResource("BoxShape3D_1rkd2")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=2018888533]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -3.085, 1, -0.59)
+shape = SubResource("BoxShape3D_j1vo0")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1395864442]
+shape = ExtResource("2_gy5uy")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=1292491732]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=548190943]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.165, 0, -2.14)
+script = ExtResource("3_oev74")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 10.6
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_7ko2u")
+glass_material = ExtResource("5_nivo8")
+floor_material = ExtResource("6_hskaf")
+in_service = true
+stop_heights = "0,4,7.3,10.6"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=302188209]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -1.6, 0, 7.18)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1327939085]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -3.085, 0, -0.59)
+
+[node name="Markers" type="Node3D" parent="." unique_id=732651015]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=282069293 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 4.3, 6.38)
+metadata/note = "the stage (a live song / photo spot)"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1888420684 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 10.6, 1.2)
+metadata/note = "the takings safe"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1456920110 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.5, 0, 8.78)
+metadata/team = "staff"
+metadata/note = "the maid handing out flyers"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1977948531 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.8, 4, 1.66)
+metadata/team = "staff"
+metadata/note = "the maid at the counter"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=461002158 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2, 4, 2)
+metadata/team = "civilian"
+metadata/kind = "spawn"

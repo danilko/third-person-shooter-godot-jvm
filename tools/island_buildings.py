@@ -382,6 +382,7 @@ SITE_PLACES = {       # a SiteZones / Landmarks child -> its label (a landmark: 
     "Reserve_fish_market": ("Fish Market", 2),
     "Reserve_airport_airfield": ("Airport Apron", 2),
     "Reserve_military_airfield": ("Air Base Runway", 2),
+    "Reserve_waterfront_park": ("Ferris Wheel Park", 2),
     "Reserve_military_pier": ("Base Harbour Terminal", 2),
     "Reserve_resort_hotel_1": ("Resort Hotel", 2),
     "Reserve_resort_hotel_2": ("Resort Hotel", 2),

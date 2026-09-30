@@ -76,11 +76,13 @@ AUX_CLOSE = (320.0, 440.0)   # no spur station in this arclength range: the loop
                        # entrance at s 190) end at the first span long enough for their taper, and at the spur's
                        # ~60 m station spacing none was -- they ran all 2 km, four lanes over the bridge
 BRIDGE_Z = 24.0        # the Rainbow Bridge's upper deck (library_landmarks.RB_ROAD_UPPER; 32 until 2026-09-29)
-# THE SPUR (2026-09-29, user: "combine early as one road to reach the bridge ... the rail below the bridge"): two
-# one-way carriageways from the JCT to SPUR_JOINT_X on the east leg (the loop JCT's merge and the Wangan's two ramps
-# need one-way carriageways), ONE divided road from there across the bridge, and on the airport island a peel off the
-# rail, a descent, a U-turn and the forecourt loop (see `build`).
-SPUR_JOINT_X = 1130.0       # the joint: 130 m past the Wangan's S (x 1000), where the corner onto the bridge axis starts
+# THE SPUR (2026-09-29, user: "combine early as one road to reach the bridge ... the rail below the bridge", then
+# "combine them as much as possible"): ONE divided road from the C1 JCT across the bridge -- the loop's merge and the
+# Wangan's two ramps are aux lanes on its carriageways, and at the JCT end it splits at a joint into the two C1 ramps --
+# and on the airport island a peel off the rail, a descent, a U-turn and the forecourt loop (see `build`).
+SPUR_JOINT_X = 1130.0       # where the corner onto the bridge axis starts (the carriageways used to join here)
+WANGAN_DIVERGE_DX = 10.0    # the westbound exit to the Wangan leaves 10 m east of the eastbound entrance: one ramp per
+                            # station (the diamond's rule), the two aux slots on opposite carriageways
 SPUR_JOIN_OFF = 0.5         # the one-way carriageways' offset at the joint: half the expressway preset's 1.0 m median
 JOINT_CORNER_R = 120.0      # the corner onto the bridge axis (SPUR_JOINT_X = axis x - this)
 SPUR_TOP_S = 480.0          # arclength where the hump over the Wangan's underpass reaches SPUR_HUMP_Z
@@ -195,14 +197,11 @@ def build(net, ground):
     def A(x, y, z):            # JCT-relative -> record
         return (JCT_X + x, C1_Y + y, z)
 
-    # --- the spur's plan. TWO one-way carriageways from the JCT south, then east along y -500 past the Wangan's
-    # junction S, JOINED at SPUR_JOINT_X into ONE divided road (user, 2026-09-29: "let the ramp combine early as one
-    # road to reach the bridge, the rail below the bridge"): round the corner onto the bridge axis, across the Rainbow
+    # --- the spur's plan. ONE divided road from the JCT south, then east along y -500 past the Wangan's ramps
+    # (user, 2026-09-29), round the corner onto the bridge axis, across the Rainbow
     # Bridge's upper deck (24 m, the rail on the lower deck at 16 m right under its median), then on the airport island
     # it peels WEST off the rail, descends to the island's ground, U-turns and ends in the forecourt loop beside the
-    # station (`airport_forecourt`). The carriageways converge from SPUR_OFF to half the divided road's median over the
-    # straight between S and the joint (the Wangan precedent: a one-way station laid half a median to its own side
-    # lands its lanes exactly where the divided road's are).
+    # station (`airport_forecourt`).
     import island_rainbow_bridge as rb
     centre, axis = rb.crossing_plan()
     half = rb.HALF_LENGTH
@@ -227,9 +226,10 @@ def build(net, ground):
             if d < best:
                 best, bs = d, cum[i] + t * L
         return bs
-    # the Wangan's two spur stations (wangan_east): its ramps' station S, and a joint J on spur_out before it
+    # the Wangan's spur stations (wangan_east): the entrance's S, the exit's 10 m east of it, and a joint J before S
     s_wj, s_ws = s_of((PL.WANGAN_J_X, east_y)), s_of((PL.WANGAN_S_X, east_y))
-    ss = station_at(cl, ccum, False, [0.0, 190.0, s_wj, s_ws], loose=[ccum[-1]])
+    s_wi = s_of((PL.WANGAN_S_X + WANGAN_DIVERGE_DX, east_y))
+    ss = station_at(cl, ccum, False, [0.0, 190.0, s_wj, s_ws, s_wi], loose=[ccum[-1]])
     ss = [v for v in ss if v <= ccum[-1] + 1e-6 and not (AUX_CLOSE[0] < v < AUX_CLOSE[1])]
     # the divided road's plan (record frame)
     d_plan = [(SPUR_JOINT_X, east_y), (sa[0], east_y), (sa[0], PEEL_Y), (U_X, PEEL_Y), (U_X, FORE_Y),
@@ -267,45 +267,18 @@ def build(net, ground):
         if vd <= d_ground:
             return BRIDGE_Z + (AIR_Z - BRIDGE_Z) * (vd - d_hold) / (d_ground - d_hold)
         return AIR_Z
-    cpts = [at_s(cl, ccum, v, False) for v in ss]
-
-    def off_d(v):
-        """Each carriageway's centre off the spur's centreline: SPUR_OFF up to S, converging to half the divided
-        road's median at the joint."""
-        if v <= s_ws:
-            return SPUR_OFF
-        f = min(1.0, (v - s_ws) / max(1e-6, ccum[-1] - s_ws))
-        return SPUR_OFF + (SPUR_JOIN_OFF - SPUR_OFF) * f
-
-    def offset(i, side):
-        a = cpts[max(0, i - 1)]
-        b = cpts[min(len(cpts) - 1, i + 1)]
-        if i == len(cpts) - 1:
-            a, b = cpts[i - 1], cpts[i]                # the joint: square to the straight, not to the converging line
-        dx, dy = b[0] - a[0], b[1] - a[1]
-        L = math.hypot(dx, dy)
-        nx, ny = -dy / L, dx / L                     # the LEFT of travel
-        p = cpts[i]
-        d = off_d(ss[i])
-        return (p[0] + nx * d * side, p[1] + ny * d * side, round(zat(ss[i]), 2))
-    out_pts = [offset(i, 1) for i in range(len(cpts))]
-    in_pts = [offset(i, -1) for i in range(len(cpts))][::-1]
-    spur_out = chain_road(net, PREFIX + "spur_out", out_pts, one_way=True)
-    spur_in = chain_road(net, PREFIX + "spur_in", in_pts, one_way=True)
-    for r in (spur_out, spur_in):
-        for u in r.points:
-            net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
-    merge_uid = spur_out.points[ss.index(190.0)]
-    # the divided road, and the JOINT: both one-way ends SEGMENT-linked to its first station, one facing (east) on
-    # all three -- spur_in runs AGAINST it, so its station faces west
+    # ONE divided road from the JCT all the way to the forecourt (user, 2026-09-29: "combine them as much as possible";
+    # the two one-way carriageways used to run 11 m apart from the JCT to x 1130, each with its own piers and a gap
+    # between). The loop's merge and the Wangan's ramps are aux lanes on its carriageways; at the JCT end it SPLITS at
+    # a joint into the C1 ramps (wb_out in, in_wb out), the Wangan split's pattern.
+    cpts = [at_s(cl, ccum, v, False) + (round(zat(v), 2),) for v in ss]
     dpts = [at_s(dl, dcum, v, False) + (round(zat(ccum[-1] + v), 2),) for v in ds]
-    spur = chain_road(net, PREFIX + "spur", dpts)
-    east = (1.0, 0.0)
-    freeze(net, spur.points[0], east)
-    freeze(net, spur_out.points[-1], east)
-    freeze(net, spur_in.points[0], (-1.0, 0.0))
-    net.link(spur.points[0], spur_out.points[-1])
-    net.link(spur.points[0], spur_in.points[0])
+    spur = chain_road(net, PREFIX + "spur", cpts + dpts[1:])
+    merge_uid = spur.points[ss.index(190.0)]
+    head = spur.points[0]
+    half = net.resolved(head).median_width / 2.0
+    h0, h1 = net.points[spur.points[0]].pos, net.points[spur.points[1]].pos
+    south = (h1[0] - h0[0], h1[1] - h0[1])
 
     # the expressway's taper factor BEFORE its ramps: `open_aux_slot` sizes each aux slot's taper from the road's own
     # factor, and set only after the build (as it was) every slot here was sized for the book's 432 m, so the loop's
@@ -321,15 +294,18 @@ def build(net, ground):
     net.roads[PREFIX + "wb_out"].points.remove(end)
     for p_ in net.points.values():
         p_.unlink(end)
-    net.link(net.roads[PREFIX + "wb_out"].points[-1], spur_out.points[0])
-    # wb_out's last station and spur_out's first are the JOINT: make them one position, one facing
-    last = net.roads[PREFIX + "wb_out"].points[-1]
-    net.points[last].pos = net.points[spur_out.points[0]].pos
-    # ...and one FACING: a joint's two end stations must share a tangent (CLAUDE.md, 3.13), or the outer lane ends
-    # beside the successor's head -- after the land redo the ramp met the spur at a 41 deg kink and wb_out_F1 was broken
-    s0, s1 = net.points[spur_out.points[0]].pos, net.points[spur_out.points[1]].pos
-    for u in (last, spur_out.points[0]):
-        freeze(net, u, (s1[0] - s0[0], s1[1] - s0[1]))
+    wbo = net.roads[PREFIX + "wb_out"]
+    last = wbo.points[-1]
+    net.link(last, head)
+    # the JOINT: wb_out's last station HALF A MEDIAN to its own (left, east) side of the divided road's head, so its
+    # one-way lanes land exactly on the southbound carriageway's -- and one FACING on both (a joint's stations must
+    # share a tangent, CLAUDE.md 3.13, or the outer lane ends beside the successor's head)
+    L_ = math.hypot(*south) or 1.0
+    lx, ly = -south[1] / L_, south[0] / L_                    # the LEFT of travel (south -> east)
+    hp = net.points[head].pos
+    net.points[last].pos = (hp[0] + lx * half, hp[1] + ly * half, hp[2])
+    freeze(net, head, south)
+    freeze(net, last, south)
     ro.branch_ramp(net, at["eb_loop"], name=PREFIX + "eb_loop", aux_lanes=RAMP_LANES, carriageway="FWD", length=80.0,
                    spread=8.0, drop=0.5)
     pts = [A(150.0, 45.0, z1)] + [A(x - JCT_X, y - C1_Y, z) for (x, y, z) in
@@ -343,13 +319,22 @@ def build(net, ground):
     in_wb.road_class = "ramp"
     for u in in_wb.points:
         net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
-    net.points[in_wb.points[0]].pos = net.points[spur_in.points[-1]].pos
-    net.link(spur_in.points[-1], in_wb.points[0])
+    net.points[in_wb.points[0]].pos = (hp[0] - lx * half, hp[1] - ly * half, hp[2])
+    net.link(head, in_wb.points[0])
+    freeze(net, in_wb.points[0], (-south[0], -south[1]))       # it runs AGAINST the divided road
+    # no pier on the split's first span of either ramp: three hammerheads would stand on top of each other (the
+    # Wangan split's rule); a station SPLIT_CLEAR out ends the skipped span
+    def _lerp(u0, u1, d):
+        p0, p1 = net.points[u0].pos, net.points[u1].pos
+        Lp = math.hypot(p1[0] - p0[0], p1[1] - p0[1]) or 1.0
+        f = min(1.0, d / Lp)
+        return tuple(p0[k] + (p1[k] - p0[k]) * f for k in range(3))
+    q_ = insert_after(net, wbo, wbo.points[-2], _lerp(wbo.points[-1], wbo.points[-2], SPLIT_CLEAR))
+    net.points[q_].pillar_skip = True
+    insert_after(net, in_wb, in_wb.points[0], _lerp(in_wb.points[0], in_wb.points[1], SPLIT_CLEAR))
+    net.points[in_wb.points[0]].pillar_skip = True
     ro.make_ramp(net, at["in_wb"], in_wb.points[-1], lanes=2)
     diamond(net, at)
-    for a_, b_ in ((net.roads[PREFIX + "wb_out"].points[-2], spur_out.points[1]),
-                   (spur_in.points[-2], in_wb.points[1])):
-        pass
 
     # --- the AIRPORT FORECOURT (user, 2026-09-29: "forecourt like central station"): the divided spur ends at FORE_J,
     # the middle of the west side of a ONE-WAY loop, two lanes, clockwise (Japan keeps left, as the Central rotary):
@@ -371,8 +356,8 @@ def build(net, ground):
     for u in loop.points:
         net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
     make_junction(net, [spur.points[-1], loop.points[0], loop.points[-1]])
-    # last: it cuts spur_out at a joint, and everything above reads spur_out's own ends
-    wangan_east(net, spur_out, spur_in, ground)
+    # last: it cuts the spur at a joint, and everything above reads the spur's own stations
+    wangan_east(net, spur, ground)
 
 
 def _g(x, z, h=0.0):
@@ -405,20 +390,20 @@ def _profile(pts, anchors):
 SPLIT_CLEAR = 15.0     # the unpiered span at the Wangan's split (m)
 
 
-def wangan_east(net, spur_out, spur_in, ground=None):
+def wangan_east(net, spur, ground=None):
     """THE WANGAN (PLAN.md 3.30 L2; `island_plan.WANGAN_*`): ONE divided 2+2 expressway with C1's centre wall (user,
     2026-09-25), from ONE T on the west-coast ring, offshore round the south-west corner and along the south
     waterfront, parting at `WANGAN_SPLIT_X` (where the two really diverge) into two one-way carriageways for a PARTIAL JCT on the spur's east leg:
 
-    * airport -> Wangan: `shuto_wangan_w` LEAVES spur_in (westbound there) at S to its own left (south), descends
+    * airport -> Wangan: `shuto_wangan_w` LEAVES the spur's westbound carriageway 10 m east of S to its own left (south), descends
       south-west into the corridor's south lane line, and runs west to the split;
     * Wangan -> airport: `shuto_wangan_e` leaves the split, runs the corridor's north lane line, passes UNDER both
-      spur carriageways west of S (the spur is ~26.6 m there, this ~19 m) and joins spur_out from its own left
-      (north) at S. spur_out is cut at a joint J before S, because the loop JCT's acceleration lane is on spur_out too
+      spur west of S (the spur is ~26.6 m there, this ~19 m) and joins its eastbound carriageway from its own left
+      (north) at S. The spur is cut at a joint J before S, because the loop JCT's acceleration lane is eastbound too
       and one run carries one aux slot.
     Wangan <-> C1 is not a movement here (two loops); it is reached through the ring and the city."""
-    u_out_s = _nearest(net, spur_out, _g(PL.WANGAN_S_X, 494.0))
-    u_in_s = _nearest(net, spur_in, _g(PL.WANGAN_S_X, 506.0))
+    u_out_s = _nearest(net, spur, _g(PL.WANGAN_S_X, -PL.SPUR_EAST_Y))
+    u_in_s = _nearest(net, spur, _g(PL.WANGAN_S_X + WANGAN_DIVERGE_DX, -PL.SPUR_EAST_Y))
     y_out = net.points[u_out_s].pos
     z_s = y_out[2]
     gz = (lambda x, y: max(0.0, ground.z(x, y) or 0.0)) if ground is not None else (lambda x, y: 0.0)
@@ -468,25 +453,30 @@ def wangan_east(net, spur_out, spur_in, ground=None):
     k_top = len(e_plan) - 1
     e_plan += [(815.0, -512.0), (838.0, -478.0), (872.0, -464.0), (925.0, -463.0), (965.0, -472.0)]
     k_under = k_top + 1
-    e_plan.append((PL.WANGAN_S_X, y_out[1] + 8.0))
+    e_plan.append((PL.WANGAN_S_X, y_out[1] + 8.0 + SPUR_OFF))     # 8 m past the eastbound lanes' old centre
     e = _profile(e_plan, {0: PL.WANGAN_SPLIT_Z, k_top: max(14.0, PL.WANGAN_SPLIT_Z), k_under: 18.5, k_under + 1: 19.0,
                           len(e_plan) - 1: z_s})
     we = chain_road(net, PREFIX + "wangan_e", e, one_way=True)
     for u in we.points:
         net.points[u].lanes_fwd, net.points[u].lanes_bwd = 2, 0
     ro.make_ramp(net, u_out_s, we.points[-1], lanes=RAMP_LANES)
-    # --- westbound: off spur_in at S -> down into the corridor -> west -> the split
-    _m, info = ro.branch_ramp(net, u_in_s, name=PREFIX + "wangan_w", aux_lanes=RAMP_LANES, carriageway="FWD",
-                              length=90.0, spread=10.0, drop=-0.5)
-    far = net.points[info["far"]].pos
+    # --- westbound: off the spur 10 m east of S -> down into the corridor -> west -> the split
+    # Built as its own road and attached by `make_ramp`, like wangan_e: `branch_ramp` starts the mouth ON the spur's
+    # centreline, and on a DIVIDED road which carriageway it is on is then a tie -- it landed on the eastbound side and
+    # claimed the entrance's aux slots (aux_slot_shared). A mouth that starts south of the spur is unambiguously the
+    # westbound carriageway's.
+    sp = net.points[u_in_s].pos
+    mouth = (sp[0], sp[1] - SPUR_OFF - 4.0)
+    far = (sp[0] - 90.0, sp[1] - SPUR_OFF - 14.0)
     rw = [right[i] for i in range(top, i_split, -1)]
-    w_plan = [(far[0], far[1]), (872.0, -540.0)] + rw + [off(i_split, -1, half)]
-    # one steady climb from the split to spur_in: the carriageways leave the split level (one deck)
-    w = _profile(w_plan, {0: far[2], len(w_plan) - 1: PL.WANGAN_SPLIT_Z})
-    extend(net, PREFIX + "wangan_w", w[1:])
-    wr = net.roads[PREFIX + "wangan_w"]
-    for u in wr.points[1:]:
+    w_plan = [mouth, far, (872.0, -540.0)] + rw + [off(i_split, -1, half)]
+    # one steady climb from the split to the spur: the carriageways leave the split level (one deck)
+    w = _profile(w_plan, {0: sp[2], 1: sp[2] - 0.5, len(w_plan) - 1: PL.WANGAN_SPLIT_Z})
+    wr = chain_road(net, PREFIX + "wangan_w", w, one_way=True)
+    wr.road_class = "ramp"
+    for u in wr.points:
         net.points[u].lanes_fwd, net.points[u].lanes_bwd = RAMP_LANES, 0
+    ro.make_ramp(net, u_in_s, wr.points[0], lanes=RAMP_LANES)
     # it is born a RAMP (`branch_ramp`), so it never took the expressway preset's pier: stand its partner's. A plain
     # box pillar is sized from the ground at the deck's centreline only, and on a steep seabed two stopped 19 m short
     # of it (probe_road_ground); an asset pier founds each shaft vertex on the ground under itself.
@@ -513,8 +503,8 @@ def wangan_east(net, spur_out, spur_in, ground=None):
     net.points[we.points[0]].pillar_skip = True
     qw = insert_after(net, wr, wr.points[-2], lerp(wr.points[-1], wr.points[-2], SPLIT_CLEAR))
     net.points[qw].pillar_skip = True
-    # --- the joint on spur_out between the loop JCT's merge and the Wangan's
-    ro.split_at_joint(net, _nearest(net, spur_out, _g(PL.WANGAN_J_X, 494.0)), name=PREFIX + "spur_out_w")
+    # --- the joint on the spur between the loop JCT's merge and the Wangan's
+    ro.split_at_joint(net, _nearest(net, spur, _g(PL.WANGAN_J_X, -PL.SPUR_EAST_Y)), name=PREFIX + "spur_e")
 
 
 def bridge_skip(net):

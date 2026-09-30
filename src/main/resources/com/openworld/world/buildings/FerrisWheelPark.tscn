@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark_mesh.res" id="1_2qoji"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark_collision.res" id="2_ugyit"]
+
+[node name="FerrisWheelPark" type="Node3D" unique_id=483459802]
+metadata/building = {
+"aabb": [Vector3(-55, -0.24277201, -100), Vector3(110, 111.10517, 200)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [110.0, 200.0],
+"height_m": 111.11,
+"id": "FerrisWheelPark",
+"kit": "library",
+"landmark": true,
+"piece_count": 14,
+"probe_xz": [25.0, -45.0],
+"props_top_m": 9.1824,
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "waterfront park with a 100 m Ferris wheel (110 m to the top) on a 110 x 200 m plot on the gulf's east shore, beside the resort hotels: Odaiba's Palette Town / Kasai Rinkai Park precedent (user, 2026-09-29). Its entrance plaza faces the street (ring_kita, north), the wheel stands in the water corner, visible from the Wangan and the Rainbow Bridge. PLACEHOLDER (library_civic.py) + nature-kit trees; the wheel does not turn yet",
+"wall_top_m": 110.8624
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=186667478]
+mesh = ExtResource("1_2qoji")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1703110258]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1474255535]
+shape = ExtResource("2_ugyit")

@@ -6,12 +6,10 @@ import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.AudioStreamPlayer;
-import godot.api.AudioStreamWAV;
 import godot.api.Control;
 import godot.api.Node;
 import godot.core.Color;
 import godot.core.MethodCallable;
-import godot.core.PackedByteArray;
 import godot.core.Vector2;
 
 /**
@@ -62,7 +60,7 @@ public class HitMarker extends Control {
                     godot.api.Object.ConnectFlags.DEFAULT);
         }
         tick = new AudioStreamPlayer();
-        tick.setStream(buildTick());
+        tick.setStream(com.openworld.audio.Sounds.stream(com.openworld.audio.Sound.HIT_MARKER));   // null = missing file = silent
         tick.setVolumeDb(-8f);
         addChild(tick);
     }
@@ -83,7 +81,7 @@ public class HitMarker extends Control {
         shown++;
         setVisible(true);
         queueRedraw();
-        if (playSound && tick != null && tick.isInsideTree()) tick.play();
+        if (playSound && tick != null && tick.getStream() != null && tick.isInsideTree()) tick.play();
     }
 
     /** Confirmations shown since start — the gate reads it. */
@@ -124,26 +122,6 @@ public class HitMarker extends Control {
                         c, lw, true);
             }
         }
-    }
-
-    /** A 45 ms 2.2 kHz tick with a fast decay — generated, so there is no audio asset to ship. */
-    private static AudioStreamWAV buildTick() {
-        int rate = 22050;
-        int n = (int) (rate * 0.045);
-        byte[] pcm = new byte[n * 2];
-        for (int i = 0; i < n; i++) {
-            double t = i / (double) rate;
-            double env = Math.exp(-t * 90.0);
-            short v = (short) (Math.sin(2 * Math.PI * 2200.0 * t) * env * 12000);
-            pcm[2 * i] = (byte) (v & 0xff);
-            pcm[2 * i + 1] = (byte) ((v >> 8) & 0xff);
-        }
-        AudioStreamWAV wav = new AudioStreamWAV();
-        wav.setFormat(AudioStreamWAV.Format.FORMAT_16_BITS);
-        wav.setMixRate(rate);
-        wav.setStereo(false);
-        wav.setData(new PackedByteArray(pcm));
-        return wav;
     }
 
     public Color getHitColor() { return hitColor; }

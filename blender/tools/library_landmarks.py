@@ -51,15 +51,20 @@ def shell(b, x0, x1, y0, y1, h, t, wall, openings=None, floor="MI_Terrazzo", cei
 # two-level suspension bridge, the Shuto expressway above, road + Yurikamome + walkways below, white.
 RB_MAIN = 575.0
 RB_SIDE = 115.0
-# The ROAD LEVELS are this island's (PLAN.md 3.8): the lower deck carries the airport road (`kuko_dori`, its deck at
-# 24 m) and, later, the metro; the upper deck is reserved for the expressway spur from C1 (the loop JCT template).
+# The ROAD LEVELS are this island's (PLAN.md 3.8): the lower deck carries the Main line's rail (R7), the upper deck
+# the expressway spur from C1 (the loop JCT template), ONE divided road.
 # Everything vertical is derived from them with the real bridge's proportions (PLATEAU: towers 75.3 m above the upper
 # deck, cables sagging to 16.5 m above it), so the bridge fits any crossing by changing these two numbers.
-RB_ROAD_LOWER = 24.0
-RB_ROAD_UPPER = 32.0
+# (2026-09-29, user: the rail runs UNDER the road, one divided road on top, and the airport station stands right
+# behind the bridge) both decks moved 8 m down: the lower deck is the RAIL at 16 m -- exactly an elevated station's
+# rail head on the airport island (ground 8 m + the rail plan's ELEVATED_Z 8), so the line comes off the bridge level
+# into the station -- and the upper deck is the spur at 24 m, 8 m over the rail (the EMU1 gauge, 4.25 m over the bed,
+# clears the upper deck's soffit by ~2.5 m). The towers keep their height (107.3 m): the landmark is its towers.
+RB_ROAD_LOWER = 16.0
+RB_ROAD_UPPER = 24.0
 RB_DECK_TOP = RB_ROAD_UPPER
 RB_DECK_BOTTOM = RB_ROAD_LOWER - 1.5
-RB_TOWER_TOP = RB_ROAD_UPPER + 75.3
+RB_TOWER_TOP = 32.0 + 75.3
 RB_SAG = RB_ROAD_UPPER + 16.5
 RB_BASE_Z = -30.0         # towers and anchorages stand on the seabed (-24 m), not on the water
 RB_HALF_W = 15.5          # the side trusses stand here: the clear ROAD CORRIDOR is |y| < 15 (a 29 m T2 fits)

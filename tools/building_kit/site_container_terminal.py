@@ -75,6 +75,10 @@ def entry():
     props.append({"piece": Z + "TrafficCone", "at": [-120.0, -104.0], "repeat": [12, 6.0, 0.0], "collide": "none"})
     props.append({"piece": Z + "PlasticBarrier", "at": [100.0, -104.0], "repeat": [10, 1.1, 0.0]})
     props.append({"piece": Z + "TyreStack", "at": [170.0, -100.0], "repeat": [3, 0.8, 0.0]})
+    # container trucks (COT1, the 20 ft ISO box on a tractor + chassis, drivable; user 2026-09-29): two in the truck
+    # lane under the cranes, one queued at the gate. Runtime vehicles (world.ParkedVehicle), not solid props.
+    for x, z, yaw in ((-28.0, crane_z, 90.0), (52.0, crane_z, 270.0), (-100.0, -96.0, 0.0)):
+        props.append({"vehicle": "COT1", "at": [x, z], "yaw": yaw})
     return {
         "id": "ContainerTerminal",
         "footprint_m": [W, D],

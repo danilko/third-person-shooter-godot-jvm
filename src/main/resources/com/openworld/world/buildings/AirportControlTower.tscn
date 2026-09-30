@@ -1,0 +1,214 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/AirportControlTower_mesh.res" id="1_n1mde"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/AirportControlTower_collision.res" id="2_1wb3w"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_gffpq"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_c3xja"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_kdkap"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_t0adv"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_bysvt"]
+size = Vector3(0.94, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tk1u4"]
+size = Vector3(0.94, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_tn20v"]
+size = Vector3(1, 2.1, 0.14)
+
+[node name="AirportControlTower" type="Node3D" unique_id=366666009]
+metadata/building = {
+"aabb": [Vector3(-16, -1.2, -10.8), Vector3(32, 46.5, 22.8)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [-6.0, 0.0, 6.9],
+"height": 2.2,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [-11.9, 0.0, -3.0],
+"height": 2.1,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 1.0
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [32.0, 22.8],
+"height_m": 46.5,
+"id": "AirportControlTower",
+"inner_doors": [{
+"center": [4.6, 0.0, 1.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [4.6, 4.5, 1.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [4.6, 36.0, 1.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [8.3, 0.0, -1.7],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 36.0,
+"stops": "0,4.5,9,13.5,18,22.5,27,31.5,36",
+"w": 1.6,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_cover_01",
+"pos": [1.0, 36.0, -9.2],
+"props": {
+"kind": "cover",
+"note": "a sniper's view over the runway"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_01",
+"pos": [7.0, 36.0, 3.3],
+"props": {
+"kind": "objective",
+"note": "the tower's radio console"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [-6.0, 0.0, 2.8],
+"props": {
+"kind": "spawn",
+"note": "the lobby security desk",
+"team": "guard"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-7.0, 4.5, -4.8],
+"props": {
+"kind": "spawn",
+"note": "the approach controllers (radar room)",
+"team": "worker"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [5.5, 36.0, 2.2],
+"props": {
+"kind": "spawn",
+"note": "the tower controllers",
+"team": "worker"
+},
+"yaw": 180.0
+}],
+"piece_count": 1,
+"probe_xz": [-9.5, 5.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "空港管制塔 (civil airport control tower): a 24 x 14 m two-storey operations block (lobby with security, operations office, the approach-radar room, briefing) and an 8 x 8 m tower whose LIFT and stair climb eight levels to a 14 x 14 m glass cab at 36 m (consoles all round, the radar on its roof; a sniper's view). For the airport airside. probe_xz is on the block. kits/interiors/AirportControlTower.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 9.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=6474054]
+visibility_range_end = 843.6
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_n1mde")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=352777586]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1777666683]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.5499997, 1.1, 6.9)
+shape = SubResource("BoxShape3D_bysvt")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1976149925]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.45, 1.1, 6.9)
+shape = SubResource("BoxShape3D_tk1u4")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=550946730]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -11.9, 1.05, -3)
+shape = SubResource("BoxShape3D_tn20v")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=513737913]
+shape = ExtResource("2_1wb3w")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=1332223577]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=2116379179]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 8.3, 0, -1.7)
+script = ExtResource("3_gffpq")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 36.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_c3xja")
+glass_material = ExtResource("5_kdkap")
+floor_material = ExtResource("6_t0adv")
+in_service = true
+stop_heights = "0,4.5,9,13.5,18,22.5,27,31.5,36"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=120588390]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -6, 0, 6.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=35979000]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.9, 0, -3)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1378196343]
+
+[node name="MARK_cover_01" type="Marker3D" parent="Markers" unique_id=1788319742 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 36, -9.2)
+metadata/note = "a sniper's view over the runway"
+metadata/kind = "cover"
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=499186814 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 7, 36, 3.3)
+metadata/note = "the tower's radio console"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1312290173 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -6, 0, 2.8)
+metadata/team = "guard"
+metadata/note = "the lobby security desk"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=404876212 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 4.5, -4.8)
+metadata/team = "worker"
+metadata/note = "the approach controllers (radar room)"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=731360676 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 5.5, 36, 2.2)
+metadata/team = "worker"
+metadata/note = "the tower controllers"
+metadata/kind = "spawn"

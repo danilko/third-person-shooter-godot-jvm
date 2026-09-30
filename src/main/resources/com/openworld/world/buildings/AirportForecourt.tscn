@@ -1,0 +1,105 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/AirportForecourt_mesh.res" id="1_rs73o"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_y5gx6"]
+size = Vector3(4.0112, 2.6, 1.5446)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_oiijq"]
+size = Vector3(4.0112, 2.6, 1.5446)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_w3r2w"]
+size = Vector3(0.0638, 2.5, 0.4766)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_l4ii1"]
+size = Vector3(0.0638, 2.5, 0.4766)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hmvko"]
+size = Vector3(0.0638, 2.5, 0.4766)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_m3p45"]
+size = Vector3(0.4, 2.8, 0.9)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wud07"]
+size = Vector3(0.5214, 0.85, 1.2976)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_l4dm7"]
+size = Vector3(1.2, 4.5, 1.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_rsxf7"]
+size = Vector3(151, 0.1, 81)
+
+[node name="AirportForecourt" type="Node3D" unique_id=1858854615]
+metadata/building = {
+"aabb": [Vector3(-60.986465, -0.24277201, -24.45), Vector3(149.04712, 9.42519, 78.02226)],
+"clear_probes": [],
+"composite": true,
+"door_style": "swing",
+"doors": [],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"facade_surfaces": {},
+"footprint_m": [188.0, 116.0],
+"has_interior": true,
+"height_m": 9.1824,
+"id": "AirportForecourt",
+"jp": {
+"name": "空港 駅前 / 車寄せ (placeholder)",
+"note": "The airport's forecourt round the one-way kuko_rotary, between the Airport station and the terminal's curb: bus stops on the terminal kerb, the taxi rank on the station kerb, the inner island planted. PLACEHOLDER props. Written by tools/building_kit/site_airport_forecourt.py -- edit that, not this entry."
+},
+"kit": "library",
+"piece_count": 20,
+"probe_xz": [28.5, -1.5],
+"props_top_m": 9.1824,
+"reserve": true,
+"roofline_m": 9.1824,
+"solid_probes": [],
+"use": "the airport's forecourt, derived from the airport_forecourt reserve and the kuko_rotary loop",
+"wall_top_m": 0.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=935968484]
+visibility_range_end = 434.11676
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_rs73o")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=906701020]
+collision_mask = 0
+
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=449532785]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -54, 1.3, 52.8)
+shape = SubResource("BoxShape3D_y5gx6")
+
+[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=1400138546]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 1.3, 52.8)
+shape = SubResource("BoxShape3D_oiijq")
+
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=947055227]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 1.25, 50.5)
+shape = SubResource("BoxShape3D_w3r2w")
+
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=133922105]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 1.25, 50.5)
+shape = SubResource("BoxShape3D_l4ii1")
+
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=2092512545]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1.25, 50.5)
+shape = SubResource("BoxShape3D_hmvko")
+
+[node name="Box5" type="CollisionShape3D" parent="Collision" unique_id=921773170]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 87, 1.4, -24)
+shape = SubResource("BoxShape3D_m3p45")
+
+[node name="Box6" type="CollisionShape3D" parent="Collision" unique_id=1815246040]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 87.8, 0.425, -18)
+shape = SubResource("BoxShape3D_wud07")
+
+[node name="Box7" type="CollisionShape3D" parent="Collision" unique_id=2139093046]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 2.25, -1.5)
+shape = SubResource("BoxShape3D_l4dm7")
+
+[node name="Box8" type="CollisionShape3D" parent="Collision" unique_id=985895393]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, -0.05, -1.5)
+shape = SubResource("BoxShape3D_rsxf7")

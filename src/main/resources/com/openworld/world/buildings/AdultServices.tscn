@@ -1,0 +1,368 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/AdultServices_mesh.res" id="1_wrsw5"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/AdultServices_collision.res" id="2_108nw"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_mfkig"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_t5wc8"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_f6pcp"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_n6sla"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_mx6si"]
+size = Vector3(0.84, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2deho"]
+size = Vector3(0.84, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_p0vhf"]
+size = Vector3(0.9, 2, 0.14)
+
+[node name="AdultServices" type="Node3D" unique_id=2122419792]
+metadata/building = {
+"aabb": [Vector3(-3.8, -1.2, -8.5), Vector3(7.6, 19.7, 18.5)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [0.0, 0.0, 8.09],
+"height": 2.2,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.6
+}, {
+"center": [-3.54, 0.0, -1.5],
+"height": 2.0,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [7.6, 18.5],
+"height_m": 19.7,
+"id": "AdultServices",
+"inner_doors": [{
+"center": [-2.05, 0.0, -2.15],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-2.05, 4.0, -2.15],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-2.05, 7.3, -2.15],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-2.05, 10.6, -2.15],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-2.05, 13.9, -2.15],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [1.8, 0.0, 3.5],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [1.8, 0.0, -0.85],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [1.8, 4.0, -0.85],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-0.6, 7.3, 5.78],
+"height": 2.0,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-0.6, 7.3, 1.36],
+"height": 2.0,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [0.6, 7.3, 5.78],
+"height": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [0.6, 7.3, 1.36],
+"height": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-0.6, 10.6, 5.78],
+"height": 2.0,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [-0.6, 10.6, 1.36],
+"height": 2.0,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [0.6, 10.6, 5.78],
+"height": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [0.6, 10.6, 1.36],
+"height": 2.0,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.8
+}, {
+"center": [1.8, 13.9, -0.85],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [0.29, 0.0, -3.05],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 13.9,
+"stops": "0,4,7.3,10.6,13.9",
+"w": 1.6,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [1.7, 4.0, 3.9],
+"props": {
+"kind": "objective",
+"note": "the champagne tower"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_02",
+"pos": [2.1, 13.9, 6.99],
+"props": {
+"kind": "objective",
+"note": "the takings safes"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [2.0, 0.0, 9.39],
+"props": {
+"kind": "spawn",
+"note": "the tout / bouncer at the door",
+"team": "guard"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-1.2, 0.0, 3.9],
+"props": {
+"kind": "spawn",
+"note": "reception",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [2.0, 4.0, 1.5],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [0.0, 7.3, 3.57],
+"props": {
+"kind": "spawn",
+"note": "the corridor",
+"team": "staff"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_05",
+"pos": [0.0, 10.6, 3.57],
+"props": {
+"kind": "spawn",
+"note": "the corridor",
+"team": "staff"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_06",
+"pos": [-1.2, 13.9, 4.5],
+"props": {
+"kind": "spawn",
+"note": "the manager",
+"team": "vip"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_07",
+"pos": [0.5, 13.9, 1.5],
+"props": {
+"kind": "spawn",
+"team": "guard"
+},
+"yaw": 0.0
+}],
+"piece_count": 1,
+"probe_xz": [1.5, 5.5],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "風俗ビル (a grey-zone adult-entertainment building in the 歓楽街; non-explicit): a five-storey 4 x 9 間 雑居ビル -- F1 reception (counter, lit menu board) and the waiting room; F2 a host club lounge (box seats, the bar, the bottle wall); F3-F4 four private rooms a floor off a corridor; F5 the back office (takings safes, camera monitors, the manager). Lift, one stair, a bouncer spawn, pink and red 袖看板. probe_xz is on the ground floor. kits/interiors/AdultServices.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 17.2
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=488573181]
+visibility_range_end = 522.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_wrsw5")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1800337277]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1602694786]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 1.1, 8.09)
+shape = SubResource("BoxShape3D_mx6si")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1822650188]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.4, 1.1, 8.09)
+shape = SubResource("BoxShape3D_2deho")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1353940324]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -3.54, 1, -1.5)
+shape = SubResource("BoxShape3D_p0vhf")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1552312343]
+shape = ExtResource("2_108nw")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=1005425373]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=2120423499]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.29, 0, -3.05)
+script = ExtResource("3_mfkig")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 13.9
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_t5wc8")
+glass_material = ExtResource("5_f6pcp")
+floor_material = ExtResource("6_n6sla")
+in_service = true
+stop_heights = "0,4,7.3,10.6,13.9"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=411799080]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 8.09)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1974472764]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -3.54, 0, -1.5)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1108517726]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=437406316 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7, 4, 3.9)
+metadata/note = "the champagne tower"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1375701538 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 13.9, 6.99)
+metadata/note = "the takings safes"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=663927614 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 2, 0, 9.39)
+metadata/team = "guard"
+metadata/note = "the tout / bouncer at the door"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=282133044 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.2, 0, 3.9)
+metadata/team = "staff"
+metadata/note = "reception"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1997583532 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 2, 4, 1.5)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=454647198 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 7.3, 3.57)
+metadata/team = "staff"
+metadata/note = "the corridor"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=1608456879 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10.6, 3.57)
+metadata/team = "staff"
+metadata/note = "the corridor"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_06" type="Marker3D" parent="Markers" unique_id=755070107 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.2, 13.9, 4.5)
+metadata/team = "vip"
+metadata/note = "the manager"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_07" type="Marker3D" parent="Markers" unique_id=19429072 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 13.9, 1.5)
+metadata/team = "guard"
+metadata/kind = "spawn"

@@ -5233,7 +5233,7 @@ asked for first.
   predicted. The attacker id is threaded `WeaponItem.resolveAttackerId()` → `ImpactManager.processHit`
   → `Health.takeDamage` (new overloads; the old ones pass ""). Explosions still pass no id (no marker
   for a rocket kill yet). `ui.HitMarker` (self-gated, not in `BASE_LAYOUT`) draws an X at screen centre,
-  red and held twice as long on a kill, larger on a headshot, with a generated 45 ms tick (no asset).
+  red and held twice as long on a kill, larger on a headshot, with a tick sound (`assets/audio/hit_marker`, silent until the file exists).
 
 - **`weapon.WeaponState` (item 2)** — `fireTimer` meant four things (fire interval, draw settle, pickup
   equip block, merge-pickup block) and the scope keyed off all of them. `startFireLock(seconds, reason)`
@@ -10684,6 +10684,15 @@ that `probe_road_clear` or the layout gates measured.
   PIECES.md`). An artist marks a finished model in `kits/library/status.json`. `--check` fails on a piece with no
   recorded source.
 
+## Audio: every sound is a file (2026-09-29)
+
+No sound is synthesised in code (`SoundTest` refuses `new AudioStreamWAV(` / `AudioStreamGenerator` under
+`src/main/java`). A non-weapon sound is a `com.openworld.audio.Sound` entry naming `assets/audio/<file>.ogg|.wav`,
+played through `audio.Sounds` (`stream` / `play3D`); a missing file is silence plus one `[Sounds] missing audio`
+line. Weapons keep `fire_audio` / `reload_audio` in their scenes. `assets/audio/README.md` is the list of what
+ships, what is wired but missing a file (`glass_shatter`, `hit_marker`) and what is not wired yet; `SoundTest`
+checks its "Wired in code" table against the enum. Licence rule as for art: CC0 / MIT / public domain, credited.
+
 ## Known Quirks / Gotchas
 
 - **godot-jvm rc1: `Transform3D.times(Transform3D)` MUTATES its receiver** (`val t = this`, then writes into it) and
@@ -11279,6 +11288,47 @@ clear the large train"; "use the latest Blender-authored pieces, not the old pla
 - **No building stands on a road band at any height**: `island_buildings.py roads` (in the `buildings` stage) checks
   every placed footprint against every solved band in plan (shapely), elevated decks included — the user saw tall
   buildings under C1's deck at the higashi_hondori crossing.
+
+## Rail order at Central, one divided spur, runways on their aprons, a Ferris wheel (2026-09-29, later; user-asked)
+
+- **Main and Harbour swapped sides at Central** (`island_rail_layout`, `_R0`): north to south Blue 229 / Harbour 215 /
+  Main 201. As Blue / Main / Harbour the Main line (southbound run at x 205, EAST of Harbour's x 185) curved THROUGH
+  the Harbour line west of the core, two double tracks 2-8 m apart, a flat crossing on the viaduct. Nested, Main turns
+  innermost and the three never cross (14-24 m apart). Central is anchored on the MIDDLE lane (`("Harbour line", 782,
+  215)`): `SHARE_M` (22 m) gathers the lines, and a centre on Main at 201 would leave Blue 28 m out. As the SOUTHERN
+  lane Main's curve north turns toward the island platform, so it starts 18 m past the platform end (radius `R_MIN`
+  160, tangent x 950; at 180 m it began at x 930 and a car straddling the platform end closed the 0.06 m gap,
+  `probe_train_fit`).
+- **The spur is ONE divided road from the C1 JCT** (`island_expressway.build`): the two one-way carriageways that ran
+  11 m apart to x 1130 are gone. At the JCT end it splits at a joint into `wb_out` / `in_wb` (each half a median to
+  its own side, one facing, the first span of each ramp `pillar_skip` -- the Wangan split's pattern). The loop's
+  merge and both Wangan ramps are aux lanes on it; the Wangan EXIT leaves 10 m east of its entrance
+  (`WANGAN_DIVERGE_DX`, one ramp per station) and the joint at x 890 (`shuto_spur_e`) stays, because the loop's and
+  the Wangan's acceleration lanes are both eastbound. **`branch_ramp` cannot place a ramp on a DIVIDED road's far
+  carriageway**: it starts the mouth on the centreline, so which carriageway it is on is a tie, and it took the
+  eastbound slot (`aux_slot_shared`). Build the ramp as its own road with its mouth off the correct side and attach it
+  with `make_ramp`, which reads the carriageway from where the mouth is.
+- **`kogai_loop`'s east leg meets the ring from the south-east** (the (1215, -705) corner, `island_core_streets`):
+  straight north it left the pad 40 deg from `ring_kita__6`, its mouth 46 m out, and the kerb corner between the two
+  lay across `ring_kita__6_F1` (`probe_road_clear`).
+- **A pier shaft is founded on the lowest ground within 1.5 m in NINE directions** (`point_mesh.FOOT_OFFSETS`, the
+  diagonals added): over a vertical quay a corner stopped 2 m over the seabed a diagonal step away
+  (`probe_road_ground`, the Wangan's west viaduct).
+- **Runways meet their aprons.** The base's runway moved to x -1015..-475, directly south of the apron, its east end in
+  line with the east fence (`island_plan.RESERVES` `military_airfield`; the reclaimed strip trimmed to x -1030). The
+  civilian `AirportAirside` is one paved surface: the reserve reaches the terminal's airside face (z 1784), aprons
+  from there to a taxiway flush against the runway, two airliners nose-in at gates 1 and 3 (adjacent gates are 35 m
+  apart, under a 35.8 m span), one on a remote stand, the hangar opening onto the apron. Before, the gate bridges
+  ended 8.6 m short of the apron, no airliner stood at a gate and 21 m of open ground separated taxiway and runway.
+- **`FerrisWheelPark`** (library piece `Park_FerrisWheel`, `library_civic.py`): a 100 m wheel on a 60 m hub (110.9 m
+  to the top), boarding hall, promenade and plaza on the corrected `waterfront_park` reserve (x 765..875, z 690..890,
+  the gulf's east shore beside the resort hotels -- Odaiba's Palette Town / Kasai Rinkai precedent), load 2500 m,
+  collision = its own mesh, map label "Ferris Wheel Park" (tier 2). The wheel does not turn yet.
+- Probes: `ParkedVehicle`'s vehicles join group `parked_vehicle` and `probe_traffic_spawn` skips them (placed, not
+  traffic); `probe_road_ground` counts an ELEVATED station's reserve (its site zone's `site_reserve`, placed > 8 m) as
+  carrying the deck; `probe_gps_route` uses the waypoint the player HAS (a click on a place blip takes its door).
+- **A concurrent session in the same checkout ran `git stash` / `pop`** (reflog `reset: moving to HEAD`), and a file
+  read inside that window looks reverted. Check `git reflog` before concluding edits were lost.
 
 ## More enterable buildings, Japanese convention (2026-09-29, user-asked)
 

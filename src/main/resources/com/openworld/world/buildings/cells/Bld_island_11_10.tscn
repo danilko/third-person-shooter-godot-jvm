@@ -1,4 +1,42 @@
 [gd_scene format=3]
 
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/DetachedHouse.tscn" id="1"]
+[ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_11_10.res" id="hlod"]
+
+[sub_resource type="BoxMesh" id="LotBox"]
+material = ExtResource("lotmat")
+
+[sub_resource type="MultiMesh" id="Lots"]
+transform_format = 1
+instance_count = 1
+mesh = SubResource("LotBox")
+buffer = PackedFloat32Array(-11.5500, 0.0000, -0.0083, 844.2770, 0.0000, 0.6250, 0.0000, 5.5125, 0.0087, 0.0000, -11.0500, 527.6060)
+
+[sub_resource type="BoxShape3D" id="LotShape0"]
+size = Vector3(11.550, 0.625, 11.050)
 
 [node name="Bld_island_11_10" type="Node3D"]
+
+[node name="HLOD" type="MeshInstance3D" parent="."]
+mesh = ExtResource("hlod")
+cast_shadow = 0
+visibility_range_begin = 450.0
+visibility_range_begin_margin = 40.0
+visibility_range_fade_mode = 1
+
+[node name="DetachedHouse_000" parent="." instance=ExtResource("1")]
+transform = Transform3D(-1.000000, 0, -0.000750, 0, 1, 0, 0.000750, 0, -1.000000, 844.277, 5.840, 527.606)
+
+[node name="Mesh" parent="./DetachedHouse_000" index="0"]
+visibility_parent = NodePath("../../HLOD")
+
+[node name="Plinths" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("Lots")
+
+[node name="PlinthCollision" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-1.000000, 0, -0.000750, 0, 1, 0, 0.000750, 0, -1.000000, 844.277, 5.513, 527.606)
+shape = SubResource("LotShape0")

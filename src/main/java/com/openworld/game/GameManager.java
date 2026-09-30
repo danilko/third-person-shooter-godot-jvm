@@ -164,6 +164,7 @@ public class GameManager extends Node {
         IconRegistry.clear();
         com.openworld.carrier.vehicle.Vehicle.clearLampCaches();
         com.openworld.carrier.vehicle.Glass.clearCaches();
+        com.openworld.audio.Sounds.clear();
         com.openworld.carrier.vehicle.VehicleDamageModel.clearCaches();
         com.openworld.character.ToonLook.clear();
         com.openworld.ui.IconFit.clear();

@@ -11,8 +11,8 @@ import java.util.Random;
 /**
  * What a car window looks and sounds like when it cracks and shatters (VehicleDamageModel's panes). Everything here
  * is built in code, once, and shared by every car in the game: one cracked copy per glass material, one invisible
- * material for a broken window, one shard mesh, one crack texture, one shatter sound. So a broken window costs no
- * extra draw call, no extra texture and no asset.
+ * material for a broken window, one shard mesh, one crack texture. So a broken window costs no extra draw call and
+ * no extra texture. The shatter SOUND is a file, {@code assets/audio/glass_shatter} (audio.Sound.GLASS_SHATTER).
  */
 public final class Glass {
     private Glass() {}
@@ -21,7 +21,6 @@ public final class Glass {
     private static Material hidden;
     private static ImageTexture crackTexture;
     private static Mesh shardMesh;
-    private static AudioStreamWAV shatterSound;
 
     /** The world never holds more shard bursts than this at once; the oldest goes first. */
     private static final int MAX_BURSTS = 8;
@@ -135,14 +134,7 @@ public final class Glass {
         p.setGlobalPosition(at);
         p.setEmitting(true);
 
-        AudioStreamPlayer3D snd = new AudioStreamPlayer3D();
-        snd.setName(new StringName("GlassSound"));
-        snd.setStream(shatterSound());
-        snd.setUnitSize(6f);
-        snd.setPitchScale((float) GD.randfRange(0.9f, 1.12f));
-        p.addChild(snd);
-        snd.play();
-        snd.connect(new StringName("tree_exiting"), MethodCallable.createUnsafe(snd, "stop"));   // CLAUDE.md audio rule
+        com.openworld.audio.Sounds.play3D(scene, com.openworld.audio.Sound.GLASS_SHATTER, at, 6f, 0.1f);
 
         SceneTreeTimer t = scene.getTree().createTimer(2.2, false, true, false);
         t.connect(new StringName("timeout"), MethodCallable.createUnsafe(p, "queue_free"));
@@ -168,53 +160,12 @@ public final class Glass {
         return shardMesh;
     }
 
-    /**
-     * The shatter, synthesised once (no asset): a sharp burst of high-passed noise that dies in a few hundredths of
-     * a second, then a scatter of short high pings — the shards landing.
-     */
-    private static AudioStreamWAV shatterSound() {
-        if (shatterSound != null) return shatterSound;
-        final int rate = 22050, len = (int) (rate * 0.7);
-        double[] s = new double[len];
-        Random r = new Random(11);
-        double prev = 0;
-        for (int i = 0; i < len; i++) {
-            double t = (double) i / rate;
-            double noise = r.nextDouble() * 2 - 1;
-            double hp = noise - prev;                                  // first difference: a crude high-pass
-            prev = noise;
-            s[i] = hp * 0.55 * Math.exp(-t / 0.045) + noise * 0.12 * Math.exp(-t / 0.18);
-        }
-        for (int k = 0; k < 26; k++) {                                 // tinkles
-            int start = (int) (rate * (0.02 + Math.pow(r.nextDouble(), 1.6) * 0.55));
-            double f = 2800 + r.nextDouble() * 4200, amp = 0.08 + r.nextDouble() * 0.12, tau = 0.012 + r.nextDouble() * 0.03;
-            for (int i = start; i < len && i < start + rate / 8; i++) {
-                double t = (double) (i - start) / rate;
-                s[i] += amp * Math.sin(2 * Math.PI * f * t) * Math.exp(-t / tau);
-            }
-        }
-        byte[] data = new byte[len * 2];
-        for (int i = 0; i < len; i++) {
-            int v = (int) Math.round(Math.max(-1, Math.min(1, s[i])) * 30000);
-            data[i * 2] = (byte) (v & 0xff);
-            data[i * 2 + 1] = (byte) ((v >> 8) & 0xff);
-        }
-        AudioStreamWAV w = new AudioStreamWAV();
-        w.setFormat(AudioStreamWAV.Format.FORMAT_16_BITS);
-        w.setMixRate(rate);
-        w.setStereo(false);
-        w.setData(new PackedByteArray(data));
-        shatterSound = w;
-        return w;
-    }
-
     /** Engine-owned statics: dropped when the game closes (GameManager._exitTree), the IconRegistry rule. */
     public static void clearCaches() {
         CRACKED.clear();
         hidden = null;
         crackTexture = null;
         shardMesh = null;
-        shatterSound = null;
         BURSTS.clear();
     }
 }

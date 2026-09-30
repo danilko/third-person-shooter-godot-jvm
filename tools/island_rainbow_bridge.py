@@ -29,7 +29,7 @@ RECORD = os.path.join(ROOT, "assets/world_source/pieces/IslandRoads.roads.json")
 SCENE = os.path.join(ROOT, "src/main/resources/com/openworld/world/World.tscn")
 BRIDGE_SCENE = "res://src/main/resources/com/openworld/world/buildings/RainbowBridge.tscn"
 HALF_LENGTH = 575.0 / 2 + 115.0 + 22.0      # library_landmarks: RB_MAIN / 2 + RB_SIDE + the anchorage block
-DECK_MIN_Z = 20.0                            # a station "on the deck" (the crossing's deck is at 24 m)
+DECK_MIN_Z = 14.0                            # a station "on a deck" (the rail's lower deck is at 16 m, the spur's 24)
 
 
 def crossing_plan():
@@ -82,7 +82,7 @@ def scene_block(centre, axis, y):
 
 
 CORRIDOR = 15.0          # library_landmarks: the clear road corridor, |local z| < 15
-ROAD_LOWER = 32.0        # library_landmarks.RB_ROAD_UPPER: the SPUR's deck (the lower deck, 24 m, is rail -- R7)
+ROAD_LOWER = 24.0        # library_landmarks.RB_ROAD_UPPER: the SPUR's deck (the lower deck, 16 m, is rail -- R7)
 SPAN = 575.0 / 2 + 115.0 # the suspension span, towers to anchorages
 
 

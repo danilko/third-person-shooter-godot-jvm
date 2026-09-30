@@ -1988,7 +1988,7 @@
    "jp": {
     "name": "基地の滑走路 (compact placeholder)"
    },
-   "use": "the base's runway: 540 x 45 m on a reclaimed strip running WEST from the base into the sea (user, 2026-09-29: fully inside the military area, like the pier), its east end beside the base's apron. 540 m matches the civilian airport; FIJ1 lifts off after ~130 m",
+   "use": "the base's runway: 540 x 45 m right along the base's apron (user, 2026-09-29: a jet rolls straight off the apron onto it, no open ground between), its east end in line with the base's east fence, its west half on a reclaimed strip into the sea. 540 m matches the civilian airport; FIJ1 lifts off after ~130 m",
    "parts": [],
    "props": [
     {
@@ -2077,18 +2077,18 @@
    "id": "AirportAirside",
    "footprint_m": [
     540.0,
-    160.5
+    188.0
    ],
    "jp": {
     "name": "空港 エアサイド (placeholder)"
    },
-   "use": "the airport's airside: a 540 m runway (GTA scale) on the north edge, the parallel taxiway, the apron in front of the terminal with three narrow-bodies, and a maintenance hangar holding a fourth",
+   "use": "the airport's airside, ONE continuous paved surface (user, 2026-09-29: a plane must not cross open ground between the gates, the taxiway and the runway): the apron from the terminal's airside face (under the four gate bridges) down to the parallel taxiway, the taxiway flush against the 540 m runway (GTA scale) on the south edge; two narrow-bodies nose-in at gates 1 and 3 (adjacent gates are 35 m apart, under a 35.8 m span), a third on a remote stand, and the maintenance hangar opening onto the apron with a fourth inside",
    "parts": [
     {
      "type": "AirportHangar",
      "at": [
       -190,
-      53
+      33.1
      ],
      "yaw": 180
     }
@@ -2098,7 +2098,7 @@
      "piece": "library:Airport_RunwayEnd",
      "at": [
       -240,
-      -55
+      -72.4
      ],
      "collide": "none"
     },
@@ -2106,7 +2106,7 @@
      "piece": "library:Airport_RunwayEnd",
      "at": [
       240,
-      -55
+      -72.4
      ],
      "yaw": 180,
      "collide": "none"
@@ -2115,7 +2115,7 @@
      "piece": "library:Airport_Runway",
      "at": [
       -180,
-      -55
+      -72.4
      ],
      "collide": "none"
     },
@@ -2123,7 +2123,7 @@
      "piece": "library:Airport_Runway",
      "at": [
       -120,
-      -55
+      -72.4
      ],
      "collide": "none"
     },
@@ -2131,7 +2131,7 @@
      "piece": "library:Airport_Runway",
      "at": [
       -60,
-      -55
+      -72.4
      ],
      "collide": "none"
     },
@@ -2139,7 +2139,7 @@
      "piece": "library:Airport_Runway",
      "at": [
       0,
-      -55
+      -72.4
      ],
      "collide": "none"
     },
@@ -2147,7 +2147,7 @@
      "piece": "library:Airport_Runway",
      "at": [
       60,
-      -55
+      -72.4
      ],
      "collide": "none"
     },
@@ -2155,7 +2155,7 @@
      "piece": "library:Airport_Runway",
      "at": [
       120,
-      -55
+      -72.4
      ],
      "collide": "none"
     },
@@ -2163,7 +2163,7 @@
      "piece": "library:Airport_Runway",
      "at": [
       180,
-      -55
+      -72.4
      ],
      "collide": "none"
     },
@@ -2171,7 +2171,7 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       -240,
-      0
+      -38.4
      ],
      "collide": "none"
     },
@@ -2179,7 +2179,7 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       -180,
-      0
+      -38.4
      ],
      "collide": "none"
     },
@@ -2187,7 +2187,7 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       -120,
-      0
+      -38.4
      ],
      "collide": "none"
     },
@@ -2195,7 +2195,7 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       -60,
-      0
+      -38.4
      ],
      "collide": "none"
     },
@@ -2203,7 +2203,7 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       0,
-      0
+      -38.4
      ],
      "collide": "none"
     },
@@ -2211,7 +2211,7 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       60,
-      0
+      -38.4
      ],
      "collide": "none"
     },
@@ -2219,7 +2219,7 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       120,
-      0
+      -38.4
      ],
      "collide": "none"
     },
@@ -2227,7 +2227,7 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       180,
-      0
+      -38.4
      ],
      "collide": "none"
     },
@@ -2235,7 +2235,47 @@
      "piece": "library:Airport_Taxiway",
      "at": [
       240,
-      0
+      -38.4
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -255,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -225,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -195,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -165,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -135,
+      -11.9
      ],
      "collide": "none"
     },
@@ -2243,7 +2283,111 @@
      "piece": "library:Airport_Apron",
      "at": [
       -105,
-      27
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -75,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -45,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -15,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      15,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      45,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      75,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      105,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      135,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      165,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      195,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      225,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      255,
+      -11.9
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -135,
+      18.1
      ],
      "collide": "none"
     },
@@ -2251,7 +2395,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       -105,
-      57
+      18.1
      ],
      "collide": "none"
     },
@@ -2259,7 +2403,111 @@
      "piece": "library:Airport_Apron",
      "at": [
       -75,
-      27
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -45,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -15,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      15,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      45,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      75,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      105,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      135,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      165,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      195,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      225,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      255,
+      18.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -135,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -105,
+      48.1
      ],
      "collide": "none"
     },
@@ -2267,7 +2515,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       -75,
-      57
+      48.1
      ],
      "collide": "none"
     },
@@ -2275,7 +2523,111 @@
      "piece": "library:Airport_Apron",
      "at": [
       -45,
-      27
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -15,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      15,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      45,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      75,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      105,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      135,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      165,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      195,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      225,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      255,
+      48.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -135,
+      78.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -105,
+      78.1
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "library:Airport_Apron",
+     "at": [
+      -75,
+      78.1
      ],
      "collide": "none"
     },
@@ -2283,7 +2635,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       -45,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2291,15 +2643,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       -15,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      -15,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2307,15 +2651,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       15,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      15,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2323,15 +2659,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       45,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      45,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2339,15 +2667,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       75,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      75,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2355,15 +2675,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       105,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      105,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2371,15 +2683,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       135,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      135,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2387,15 +2691,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       165,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      165,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2403,15 +2699,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       195,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      195,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2419,15 +2707,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       225,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      225,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2435,15 +2715,7 @@
      "piece": "library:Airport_Apron",
      "at": [
       255,
-      27
-     ],
-     "collide": "none"
-    },
-    {
-     "piece": "library:Airport_Apron",
-     "at": [
-      255,
-      57
+      78.1
      ],
      "collide": "none"
     },
@@ -2451,7 +2723,7 @@
      "piece": "library:Airport_Airliner",
      "at": [
       -190,
-      53
+      33.1
      ],
      "yaw": 180,
      "collide": {
@@ -2478,8 +2750,8 @@
     {
      "piece": "library:Airport_Airliner",
      "at": [
-      40,
-      52
+      -77,
+      45.4
      ],
      "yaw": 0,
      "collide": {
@@ -2506,8 +2778,8 @@
     {
      "piece": "library:Airport_Airliner",
      "at": [
-      120,
-      52
+      -8,
+      45.4
      ],
      "yaw": 0,
      "collide": {
@@ -2534,8 +2806,8 @@
     {
      "piece": "library:Airport_Airliner",
      "at": [
-      200,
-      52
+      100,
+      45.4
      ],
      "yaw": 0,
      "collide": {
@@ -7714,6 +7986,130 @@
    "jp": {
     "name": "邸宅"
    }
+  },
+  {
+   "id": "FerrisWheelPark",
+   "kit": "library",
+   "piece": "Park_FerrisWheel",
+   "jp": {
+    "name": "観覧車のある臨海公園"
+   },
+   "use": "waterfront park with a 100 m Ferris wheel (110 m to the top) on a 110 x 200 m plot on the gulf's east shore, beside the resort hotels: Odaiba's Palette Town / Kasai Rinkai Park precedent (user, 2026-09-29). Its entrance plaza faces the street (ring_kita, north), the wheel stands in the water corner, visible from the Wangan and the Rainbow Bridge. PLACEHOLDER (library_civic.py) + nature-kit trees; the wheel does not turn yet",
+   "props": [
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -45.0,
+      -80.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -45.0,
+      -55.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -45.0,
+      -30.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -45.0,
+      -5.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -45.0,
+      20.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -45.0,
+      45.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -45.0,
+      70.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -20.0,
+      -80.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -20.0,
+      -55.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -20.0,
+      -30.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -20.0,
+      -5.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -20.0,
+      20.0
+     ],
+     "collide": "none"
+    },
+    {
+     "piece": "quaternius_stylized_nature:CommonTree_3",
+     "at": [
+      -20.0,
+      45.0
+     ],
+     "collide": "none"
+    }
+   ],
+   "placeholder": true,
+   "plot_origin": true,
+   "trimesh_pieces": 1,
+   "landmark": true,
+   "probe_xz": [
+    25.0,
+    -45.0
+   ],
+   "height_m": 111.11
   }
  ]
 }

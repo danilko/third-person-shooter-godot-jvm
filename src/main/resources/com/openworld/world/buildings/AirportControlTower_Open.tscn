@@ -1,0 +1,478 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/AirportControlTower_Open_mesh.res" id="1_8bv0s"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/AirportControlTower_Open_collision.res" id="2_elvsa"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_5fwkj"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_76jj2"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_4dk6r"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_uk0w3"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Door.java" id="7_ndi0t"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/GlassLeaf_0900_2200_mesh.res" id="8_kyiyr"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_DoorLeaf_White.tres" id="9_7es1v"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_gjur4"]
+size = Vector3(0.94, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_728vk"]
+size = Vector3(3.2, 2.4, 2.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ep2y5"]
+size = Vector3(0.94, 2.2, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_x05k0"]
+size = Vector3(3.2, 2.4, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_rek58"]
+size = Vector3(1, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1h0mq"]
+size = Vector3(1, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_150bb"]
+size = Vector3(2.4, 2.3, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_6jfjm"]
+size = Vector3(1, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wrlab"]
+size = Vector3(1, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_c2nn1"]
+size = Vector3(2.4, 2.3, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_3f0yc"]
+size = Vector3(1, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4rsd6"]
+size = Vector3(1, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_iluoc"]
+size = Vector3(2.4, 2.3, 2.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_3sqn2"]
+size = Vector3(1, 2.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5s0iu"]
+size = Vector3(1, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_n5ugi"]
+size = Vector3(2.4, 2.3, 2.4)
+
+[node name="AirportControlTower_Open" type="Node3D" unique_id=174353996]
+metadata/building = {
+"aabb": [Vector3(-16, -1.2, -10.8), Vector3(32, 46.5, 22.8)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [-6.0, 0.0, 6.9],
+"height": 2.2,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [-11.9, 0.0, -3.0],
+"height": 2.1,
+"module": 1.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 1.0
+}],
+"doors_closed": false,
+"doors_locked": true,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [32.0, 22.8],
+"height_m": 46.5,
+"id": "AirportControlTower",
+"inner_doors": [{
+"center": [4.6, 0.0, 1.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [4.6, 4.5, 1.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [4.6, 36.0, 1.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [8.3, 0.0, -1.7],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 36.0,
+"stops": "0,4.5,9,13.5,18,22.5,27,31.5,36",
+"w": 1.6,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_cover_01",
+"pos": [1.0, 36.0, -9.2],
+"props": {
+"kind": "cover",
+"note": "a sniper's view over the runway"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_01",
+"pos": [7.0, 36.0, 3.3],
+"props": {
+"kind": "objective",
+"note": "the tower's radio console"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [-6.0, 0.0, 2.8],
+"props": {
+"kind": "spawn",
+"note": "the lobby security desk",
+"team": "guard"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [-7.0, 4.5, -4.8],
+"props": {
+"kind": "spawn",
+"note": "the approach controllers (radar room)",
+"team": "worker"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [5.5, 36.0, 2.2],
+"props": {
+"kind": "spawn",
+"note": "the tower controllers",
+"team": "worker"
+},
+"yaw": 180.0
+}],
+"piece_count": 1,
+"probe_xz": [-9.5, 5.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "空港管制塔 (civil airport control tower): a 24 x 14 m two-storey operations block (lobby with security, operations office, the approach-radar room, briefing) and an 8 x 8 m tower whose LIFT and stair climb eight levels to a 14 x 14 m glass cab at 36 m (consoles all round, the radar on its roof; a sniper's view). For the airport airside. probe_xz is on the block. kits/interiors/AirportControlTower.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 9.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=43298393]
+visibility_range_end = 843.6
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_8bv0s")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=601561538]
+collision_mask = 0
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=571421083]
+shape = ExtResource("2_elvsa")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=84026316]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=469798919]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 8.3, 0, -1.7)
+script = ExtResource("3_5fwkj")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 36.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_76jj2")
+glass_material = ExtResource("5_4dk6r")
+floor_material = ExtResource("6_uk0w3")
+in_service = true
+stop_heights = "0,4.5,9,13.5,18,22.5,27,31.5,36"
+faces = 1
+
+[node name="Doors" type="Node3D" parent="." unique_id=413540590]
+
+[node name="Door0" type="StaticBody3D" parent="Doors" unique_id=45725017]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.1, 0, 6.9)
+collision_mask = 0
+script = ExtResource("7_ndi0t")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0.9, 0, 0)
+open_speed = 4.0
+auto_open = false
+sensor_path = NodePath("../Sensor0")
+locked = true
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door0" unique_id=1388775673]
+mesh = ExtResource("8_kyiyr")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door0" unique_id=937868373]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.1, 0)
+shape = SubResource("BoxShape3D_gjur4")
+
+[node name="Sensor0" type="Area3D" parent="Doors" unique_id=117623988]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.1, 0, 6.9)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor0" unique_id=641105905]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 1.1, 0)
+shape = SubResource("BoxShape3D_728vk")
+
+[node name="Door1" type="StaticBody3D" parent="Doors" unique_id=967367327]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, 6.9)
+collision_mask = 0
+script = ExtResource("7_ndi0t")
+open_mode = "SLIDE"
+open_angle_deg = 90.0
+slide_offset = Vector3(-0.9, 0, 0)
+open_speed = 4.0
+auto_open = false
+sensor_path = NodePath("../Sensor1")
+locked = true
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door1" unique_id=284916093]
+mesh = ExtResource("8_kyiyr")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door1" unique_id=1637744087]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.1, 0)
+shape = SubResource("BoxShape3D_ep2y5")
+
+[node name="Sensor1" type="Area3D" parent="Doors" unique_id=277638025]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, 6.9)
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Sensor1" unique_id=1461987990]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, 0)
+shape = SubResource("BoxShape3D_x05k0")
+
+[node name="Door2" type="StaticBody3D" parent="Doors" unique_id=211307858]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -11.9, 0, -2.5)
+collision_mask = 0
+script = ExtResource("7_ndi0t")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = false
+sensor_path = NodePath("Sensor")
+locked = true
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door2" unique_id=1677625895]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+material_override = ExtResource("9_7es1v")
+mesh = SubResource("BoxMesh_rek58")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2" unique_id=73328582]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+shape = SubResource("BoxShape3D_1h0mq")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door2" unique_id=32563367]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door2/Sensor" unique_id=502454062]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+shape = SubResource("BoxShape3D_150bb")
+
+[node name="Door3" type="StaticBody3D" parent="Doors" unique_id=1424098888]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, 1)
+collision_mask = 0
+script = ExtResource("7_ndi0t")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door3" unique_id=737967526]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+material_override = ExtResource("9_7es1v")
+mesh = SubResource("BoxMesh_6jfjm")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3" unique_id=1867354023]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+shape = SubResource("BoxShape3D_wrlab")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door3" unique_id=561396907]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door3/Sensor" unique_id=808752424]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+shape = SubResource("BoxShape3D_c2nn1")
+
+[node name="Door4" type="StaticBody3D" parent="Doors" unique_id=1124558510]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 4.5, 1)
+collision_mask = 0
+script = ExtResource("7_ndi0t")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door4" unique_id=831734703]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+material_override = ExtResource("9_7es1v")
+mesh = SubResource("BoxMesh_3f0yc")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door4" unique_id=1127774644]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+shape = SubResource("BoxShape3D_4rsd6")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door4" unique_id=361279825]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door4/Sensor" unique_id=1538372279]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+shape = SubResource("BoxShape3D_iluoc")
+
+[node name="Door5" type="StaticBody3D" parent="Doors" unique_id=1633379277]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 36, 1.2)
+collision_mask = 0
+script = ExtResource("7_ndi0t")
+open_mode = "ROTATE"
+open_angle_deg = 90.0
+slide_offset = Vector3(0, 0, 1)
+open_speed = 4.0
+auto_open = true
+sensor_path = NodePath("Sensor")
+locked = false
+unlock_key_id = ""
+unlock_mission_id = ""
+breakable = false
+swing_both_ways = true
+breakable_id = ""
+health = 30.0
+restore_delay = 0.0
+spawn_debris = true
+break_min_damage = 0.0
+surface_type = "DEFAULT"
+
+[node name="IntactVisual" type="MeshInstance3D" parent="Doors/Door5" unique_id=677854942]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+material_override = ExtResource("9_7es1v")
+mesh = SubResource("BoxMesh_3sqn2")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door5" unique_id=985134371]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+shape = SubResource("BoxShape3D_5s0iu")
+
+[node name="Sensor" type="Area3D" parent="Doors/Door5" unique_id=343279128]
+collision_layer = 0
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Doors/Door5/Sensor" unique_id=1337739405]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 1.05, 0)
+shape = SubResource("BoxShape3D_n5ugi")
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1758799555]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -6, 0, 6.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=117882274]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.9, 0, -3)
+
+[node name="Markers" type="Node3D" parent="." unique_id=187938133]
+
+[node name="MARK_cover_01" type="Marker3D" parent="Markers" unique_id=562856315 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 36, -9.2)
+metadata/note = "a sniper's view over the runway"
+metadata/kind = "cover"
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=1218395859 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 7, 36, 3.3)
+metadata/note = "the tower's radio console"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=25553154 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -6, 0, 2.8)
+metadata/team = "guard"
+metadata/note = "the lobby security desk"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=975726756 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 4.5, -4.8)
+metadata/team = "worker"
+metadata/note = "the approach controllers (radar room)"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=567126477 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 5.5, 36, 2.2)
+metadata/team = "worker"
+metadata/note = "the tower controllers"
+metadata/kind = "spawn"

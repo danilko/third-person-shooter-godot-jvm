@@ -1253,3 +1253,76 @@ _BUILD_ALL_LOGI = build_all
 def build_all(material, Builder):
     return _BUILD_ALL_LOGI(material, Builder) + [f(material, Builder) for f in (
         parking_multistorey, plaza_clock, plaza_bike_rack, taxi_sign, plaza_canopy)]
+
+
+# ── the waterfront park's Ferris wheel (user, 2026-09-29: "the Ferris wheel was discussed and never placed") ─────────
+# Tokyo Bay's big wheels stand in a waterfront leisure park beside the seaside hotels and a station, and read from the
+# expressway: Palette Town (Odaiba, 115 m tall, 100 m across) and Kasai Rinkai Park (117 m, 111 m). This one is 100 m
+# across on a 60 m hub (110 m to the top), on the gulf's east shore beside the resort hotels.
+
+def ferris_wheel_park(material, Builder):
+    """観覧車のある臨海公園 on a 110 x 200 plot (X across, Y along; the street side -Y, the bay +Y, the gulf +X): grass,
+    a 6 m promenade along the two waterfront edges, an entrance plaza on the street side with a path to the wheel, and
+    the wheel itself in the plot's water corner -- a 100 m rim (two rings 6 m apart, spokes, 32 gondolas) turning in the
+    Y-Z plane so its full circle faces the gulf and the Wangan (west) and the Rainbow Bridge (east), on two A-frame legs,
+    with a boarding hall under its low point."""
+    b = Builder("Park_FerrisWheel", material)
+    hx, hy = 55.0, 100.0
+    ground(b, -hx, hx, -hy, hy, "MI_Grass")
+    b.box((hx - 6.0, -hy, 0.0), (hx, hy, 0.05), "MI_ConcreteSmooth")          # promenade, gulf side
+    b.box((-hx, hy - 6.0, 0.0), (hx, hy, 0.05), "MI_ConcreteSmooth")          # promenade, bay side
+    b.box((hx - 0.1, -hy, 0.05), (hx, hy, 1.1), "MI_PaintedMetal")               # the waterfront railing
+    b.box((-hx, hy - 0.1, 0.05), (hx, hy, 1.1), "MI_PaintedMetal")
+    b.box((-20.0, -hy, 0.0), (20.0, -hy + 22.0, 0.06), "MI_ConcreteSmooth")   # entrance plaza (street side)
+    b.box((-3.0, -hy + 22.0, 0.0), (3.0, 12.0, 0.05), "MI_ConcreteSmooth")    # path to the wheel
+    b.box((3.0, 6.0, 0.0), (hx - 6.0, 18.0, 0.05), "MI_ConcreteSmooth")       # ...and on to the promenade
+    cx, cy, hub, R = 22.0, 20.0, 60.0, 50.0                                   # the wheel: centre (x, y), hub z, radius
+    n = 48
+    for side in (-3.0, 3.0):                                                  # two rims, 6 m apart across X
+        x = cx + side
+        pts = [(x, cy + R * math.cos(2 * math.pi * k / n), hub + R * math.sin(2 * math.pi * k / n)) for k in range(n)]
+        for k in range(n):
+            b.beam(pts[k], pts[(k + 1) % n], 0.9, "MI_PaintWhite")
+        for k in range(0, n, 3):                                              # spokes
+            b.beam((x, cy, hub), pts[k], 0.25, "MI_Steel")
+    for k in range(0, n, 3):                                                  # cross ties between the rims
+        a = 2 * math.pi * k / n
+        y, z = cy + R * math.cos(a), hub + R * math.sin(a)
+        b.beam((cx - 3.0, y, z), (cx + 3.0, y, z), 0.35, "MI_PaintWhite")
+    b.beam((cx - 5.0, cy, hub), (cx + 5.0, cy, hub), 2.4, "MI_Steel")          # the axle and hub
+    for k in range(32):                                                       # gondolas hang below the rim
+        a = 2 * math.pi * k / 32
+        y, z = cy + (R + 1.5) * math.cos(a), hub + (R + 1.5) * math.sin(a) - 2.2
+        colour = ("MI_CraneRed", "MI_SignCyan", "MI_PaintYellow", "MI_SignPink")[k % 4]
+        b.box((cx - 1.4, y - 1.2, z - 1.2), (cx + 1.4, y + 1.2, z + 1.2), colour)
+        b.box((cx - 1.45, y - 1.25, z + 0.1), (cx + 1.45, y + 1.25, z + 0.9), "MI_GlassClear")
+    for side in (-1, 1):                                                      # A-frame legs, splayed across X
+        top = (cx + side * 5.0, cy, hub)
+        for dy in (-18.0, 18.0):
+            b.beam((cx + side * 16.0, cy + dy, 0.0), top, 1.6, "MI_PaintWhite")
+        b.box((cx + side * 16.0 - 2.0, cy - 20.0, 0.0), (cx + side * 16.0 + 2.0, cy + 20.0, 0.8), "MI_ConcreteSmooth")
+    lo = hub - R - 3.7                                                        # the boarding hall under the low point
+    b.box((cx - 12.0, cy - 9.0, 0.0), (cx + 12.0, cy + 9.0, 0.3), "MI_ConcreteSmooth")
+    b.box((cx - 12.0, cy - 9.0, 0.3), (cx + 12.0, cy - 8.8, lo - 0.5), "MI_GlassClear")
+    b.box((cx - 12.0, cy + 8.8, 0.3), (cx + 12.0, cy + 9.0, lo - 0.5), "MI_GlassClear")
+    b.box((cx - 12.5, cy - 9.5, lo - 0.5), (cx + 12.5, cy + 9.5, lo - 0.2), "MI_PaintedMetal")
+    b.box((cx + 12.0, cy - 9.0, 0.3), (cx + 12.2, cy + 9.0, lo - 0.5), "MI_TileWhite")
+    b.box((cx + 12.1, cy - 4.0, 2.2), (cx + 12.3, cy + 4.0, 3.6), "MI_SignPink")   # the ticket-hall sign
+    for (x, y) in ((-30.0, -60.0), (-30.0, -30.0), (-30.0, 0.0), (-30.0, 30.0), (0.0, 60.0), (30.0, 60.0),
+                   (hx - 9.0, -40.0), (hx - 9.0, -10.0), (hx - 9.0, 50.0), (-10.0, hy - 9.0), (20.0, hy - 9.0)):
+        b.box((x - 0.9, y - 0.25, 0.4), (x + 0.9, y + 0.25, 0.5), "MI_Wood")       # benches
+        b.box((x - 0.8, y - 0.2, 0.0), (x - 0.6, y + 0.2, 0.4), "MI_PaintedMetal")
+        b.box((x + 0.6, y - 0.2, 0.0), (x + 0.8, y + 0.2, 0.4), "MI_PaintedMetal")
+    return "Park_FerrisWheel", "civic", b.mesh()
+
+
+CIVIC_NOTES["Park_FerrisWheel"] = (
+    "Placeholder 観覧車 waterfront park, 110 x 200 plot (street -Y, bay +Y, gulf +X): a 100 m wheel on a 60 m hub "
+    "(two white rims, 32 gondolas, A-frame legs) in the water corner, a boarding hall under its low point, a promenade "
+    "along both waterfront edges. The game assumes: the wheel's plane is Y-Z (its circle faces +-X), the wheel does not "
+    "turn yet (a later runtime job: rotate a separate rim + gondola object), and the collider is the mesh itself.")
+_BUILD_ALL_PLAZA = build_all
+
+
+def build_all(material, Builder):
+    return _BUILD_ALL_PLAZA(material, Builder) + [ferris_wheel_park(material, Builder)]

@@ -1,0 +1,536 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/BankLarge_mesh.res" id="1_4ee3q"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/BankLarge_collision.res" id="2_jjuy5"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_3kgqu"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_cerh0"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_ko87s"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_krww1"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="7_sow64"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pbtwu"]
+size = Vector3(0.94, 2.4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1qqkj"]
+size = Vector3(0.94, 2.4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fra4v"]
+size = Vector3(1.24, 2.6, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_kjpr1"]
+size = Vector3(1.24, 2.6, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_jdksi"]
+size = Vector3(1, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_anyxk"]
+size = Vector3(1, 2.1, 0.14)
+
+[node name="BankLarge" type="Node3D" unique_id=1802734415]
+metadata/building = {
+"aabb": [Vector3(-20, -1.2, -14), Vector3(40, 17.2, 30)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [-14.4, 0.0, 10.9],
+"height": 2.4,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.8
+}, {
+"center": [0.0, 0.0, 10.9],
+"height": 2.6,
+"module": 1.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 2.4
+}, {
+"center": [-11.6, 0.0, -10.9],
+"height": 2.1,
+"module": 2.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-17.9, 0.0, 2.0],
+"height": 2.1,
+"module": 3.0,
+"outward": [-1.0, 0.0, 0.0],
+"side": "exit",
+"style": "swing",
+"width": 1.0
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [40.0, 30.0],
+"height_m": 17.2,
+"id": "BankLarge",
+"inner_doors": [{
+"center": [10.5, 13.0, -4.3],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-11.0, 0.0, 9.0],
+"height": 2.1,
+"outward": [1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [-16.66667, 0.0, 2.9],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-14.4, 0.0, 2.9],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-12.13333, 0.0, 2.9],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [0.0, 0.0, 8.6],
+"height": 2.2,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 2.0
+}, {
+"center": [13.0, 0.0, 1.25],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-12.0, 0.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [15.0, 0.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-4.0, 0.0, -4.825],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [2.2, 0.0, -5.5],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-10.0, 5.0, 3.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-4.0, 5.0, 3.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [2.0, 5.0, 3.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [8.0, 5.0, 3.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [14.0, 5.0, 3.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-12.0, 5.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-8.33333, 5.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-5.4, 5.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-2.46667, 5.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}, {
+"center": [4.0, 5.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-6.0, 9.0, 3.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [6.0, 9.0, 3.0],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-12.0, 9.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 1.0
+}, {
+"center": [-8.33333, 9.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-5.4, 9.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-2.46667, 9.0, -4.2],
+"height": 2.1,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.0
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [-14.3, 0.0, -5.3],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 9.0,
+"stops": "0,5,9",
+"w": 1.8,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [-14.4, 0.0, 6.2],
+"props": {
+"kind": "objective",
+"note": "the ATM corner"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_objective_02",
+"pos": [-4.0, 0.0, -7.5],
+"props": {
+"kind": "objective",
+"note": "the main vault (金庫室)"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_03",
+"pos": [6.0, 0.0, -8.0],
+"props": {
+"kind": "objective",
+"note": "貸金庫 (the safe-deposit boxes)"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_04",
+"pos": [5.5, 9.0, 6.5],
+"props": {
+"kind": "objective",
+"note": "the server room"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [0.0, 0.0, 5.0],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [8.0, 0.0, 7.5],
+"props": {
+"kind": "spawn",
+"note": "the hall guard",
+"team": "guard"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [-6.5, 0.0, 0.4],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [-2.5, 0.0, 0.4],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_05",
+"pos": [1.5, 0.0, 0.4],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_06",
+"pos": [5.5, 0.0, 0.4],
+"props": {
+"kind": "spawn",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_07",
+"pos": [14.0, 0.0, -5.5],
+"props": {
+"kind": "spawn",
+"note": "the transit guards",
+"team": "guard"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_08",
+"pos": [8.0, 5.0, 8.3],
+"props": {
+"kind": "spawn",
+"note": "the branch manager (支店長室)",
+"team": "vip"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_01",
+"pos": [14.9, 0.0, -8.0],
+"props": {
+"kind": "vehicle",
+"note": "the cash-in-transit bay (現金輸送車)",
+"vehicle": "CRT1"
+},
+"yaw": 0.0
+}],
+"piece_count": 1,
+"probe_xz": [0.0, 5.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "銀行 (large): a three-storey 36 x 22 m main branch -- F1 the ATM corner, the 風除室, the banking hall, high and low teller counters, the back office, the MAIN VAULT (safes, cash cages), 貸金庫 (safe-deposit room), the cash-in-transit bay behind a shutter (MARK_vehicle); F2 consultation booths, the manager's office with its safe, a meeting room, WCs; F3 offices, the server room, lockers, the canteen. Two stairs (A to the roof), a lift. probe_xz is in the hall. kits/interiors/BankLarge.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 13.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=976711489]
+visibility_range_end = 492.0
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_4ee3q")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=504012214]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=777061582]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.95, 1.2, 10.9)
+shape = SubResource("BoxShape3D_pbtwu")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=459489634]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.849999, 1.2, 10.9)
+shape = SubResource("BoxShape3D_1qqkj")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1137152919]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 1.3, 10.9)
+shape = SubResource("BoxShape3D_fra4v")
+
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=45331140]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 1.3, 10.9)
+shape = SubResource("BoxShape3D_kjpr1")
+
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=1736791887]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -11.6, 1.05, -10.9)
+shape = SubResource("BoxShape3D_jdksi")
+
+[node name="DoorLeaf5" type="CollisionShape3D" parent="Collision" unique_id=1351721175]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -17.9, 1.05, 2)
+shape = SubResource("BoxShape3D_anyxk")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1880075391]
+shape = ExtResource("2_jjuy5")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=1442143033]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=1970627340]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -14.3, 0, -5.3)
+script = ExtResource("3_3kgqu")
+shaft_width = 1.8
+shaft_depth = 1.6
+rise = 9.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_cerh0")
+glass_material = ExtResource("5_ko87s")
+floor_material = ExtResource("6_krww1")
+in_service = true
+stop_heights = "0,5,9"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=694782973]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -14.4, 0, 10.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=984410486]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 10.9)
+
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=289371455]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.6, 0, -10.9)
+
+[node name="Door_exit_3" type="Marker3D" parent="." unique_id=181439698]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -17.9, 0, 2)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1433625088]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=1796094171 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -14.4, 0, 6.2)
+metadata/note = "the ATM corner"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=157511660 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, -7.5)
+metadata/note = "the main vault (金庫室)"
+metadata/kind = "objective"
+
+[node name="MARK_objective_03" type="Marker3D" parent="Markers" unique_id=984536406 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, -8)
+metadata/note = "貸金庫 (the safe-deposit boxes)"
+metadata/kind = "objective"
+
+[node name="MARK_objective_04" type="Marker3D" parent="Markers" unique_id=1412437255 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 9, 6.5)
+metadata/note = "the server room"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=85698526 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=40068051 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 8, 0, 7.5)
+metadata/team = "guard"
+metadata/note = "the hall guard"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1548827313 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -6.5, 0, 0.4)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=860414469 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.5, 0, 0.4)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=1804775595 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.5, 0, 0.4)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_06" type="Marker3D" parent="Markers" unique_id=28025018 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 5.5, 0, 0.4)
+metadata/team = "staff"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_07" type="Marker3D" parent="Markers" unique_id=90195264 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 14, 0, -5.5)
+metadata/team = "guard"
+metadata/note = "the transit guards"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_08" type="Marker3D" parent="Markers" unique_id=82508726 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 8, 5, 8.3)
+metadata/team = "vip"
+metadata/note = "the branch manager (支店長室)"
+metadata/kind = "spawn"
+
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=481288327 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.9, 0, -8)
+script = ExtResource("7_sow64")
+vehicle_id = "CRT1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "CRT1"
+metadata/note = "the cash-in-transit bay (現金輸送車)"
+metadata/kind = "vehicle"

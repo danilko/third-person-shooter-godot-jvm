@@ -1,0 +1,188 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ParkingGarage_mesh.res" id="1_u5iya"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ParkingGarage_collision.res" id="2_6i43c"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_vpomr"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_nhcge"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_4dryt"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_yfb4s"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="7_ke3os"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ggc7b"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[node name="ParkingGarage" type="Node3D" unique_id=1612572615]
+metadata/building = {
+"aabb": [Vector3(-14, -1.2, -22), Vector3(31.5, 13.65, 48)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [13.35, 0.0, 19.7],
+"height": 2.1,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [31.5, 48.0],
+"height_m": 13.65,
+"id": "ParkingGarage",
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [12.8, 0.0, 12.9],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 1.0,
+"rise": 9.0,
+"stops": "0,3,6,9",
+"w": 1.6,
+"yaw": 0.0
+}],
+"marks": [{
+"name": "MARK_spawn_01",
+"pos": [0.0, 0.0, 22.0],
+"props": {
+"kind": "spawn",
+"note": "the attendant in the booth",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_vehicle_01",
+"pos": [-5.5, 0.0, 8.75],
+"props": {
+"kind": "vehicle",
+"note": "a parked car",
+"vehicle": "KEC1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_02",
+"pos": [5.5, 3.0, -1.25],
+"props": {
+"kind": "vehicle",
+"note": "a parked car",
+"vehicle": "SPC1"
+},
+"yaw": 270.0
+}, {
+"name": "MARK_vehicle_03",
+"pos": [-5.5, 6.0, -6.25],
+"props": {
+"kind": "vehicle",
+"note": "a parked car",
+"vehicle": "TAX1"
+},
+"yaw": 90.0
+}, {
+"name": "MARK_vehicle_04",
+"pos": [5.5, 9.0, 11.25],
+"props": {
+"kind": "vehicle",
+"note": "a parked car",
+"vehicle": "CLC1"
+},
+"yaw": 270.0
+}],
+"piece_count": 1,
+"probe_xz": [0.0, 0.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "立体駐車場 (自走式, self-park): a 23 x 40 m car park, ground + three decks (the top one open to the sky), 3.0 m storeys -- up ramps on the west, down ramps on the east (20 m each, 15 %: under the 17 % 駐車場法 limit, ramps 3.5 m wide), 2.5 x 5.0 m bays either side of a 6 m two-way aisle, wheel stops, parapets, a gate booth and arm at the south entrance, a stair tower on the south-east corner. Parked cars on MARK_vehicle. probe_xz is the aisle. kits/interiors/ParkingGarage.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 9.0
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=757382121]
+visibility_range_end = 449.4
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_u5iya")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1677647367]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1722970955]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.35, 1.05, 19.7)
+shape = SubResource("BoxShape3D_ggc7b")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=762106629]
+shape = ExtResource("2_6i43c")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=647151998]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=1430202693]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.8, 0, 12.9)
+script = ExtResource("3_vpomr")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 9.0
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_nhcge")
+glass_material = ExtResource("5_4dryt")
+floor_material = ExtResource("6_yfb4s")
+in_service = true
+stop_heights = "0,3,6,9"
+faces = 1
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1358673149]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 13.35, 0, 19.7)
+
+[node name="Markers" type="Node3D" parent="." unique_id=1292738318]
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=996831370 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 22)
+metadata/team = "staff"
+metadata/note = "the attendant in the booth"
+metadata/kind = "spawn"
+
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=332167412 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -5.5, 0, 8.75)
+script = ExtResource("7_ke3os")
+vehicle_id = "KEC1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "KEC1"
+metadata/note = "a parked car"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=1227121166 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 5.5, 3, -1.25)
+script = ExtResource("7_ke3os")
+vehicle_id = "SPC1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "SPC1"
+metadata/note = "a parked car"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_03" type="Node3D" parent="Markers" unique_id=112566656 groups=["mission_marker"]]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -5.5, 6, -6.25)
+script = ExtResource("7_ke3os")
+vehicle_id = "TAX1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "TAX1"
+metadata/note = "a parked car"
+metadata/kind = "vehicle"
+
+[node name="MARK_vehicle_04" type="Node3D" parent="Markers" unique_id=751040042 groups=["mission_marker"]]
+transform = Transform3D(1.1924881e-08, 0, -1, 0, 1, 0, 1, 0, 1.1924881e-08, 5.5, 9, 11.25)
+script = ExtResource("7_ke3os")
+vehicle_id = "CLC1"
+faction = "neutral"
+drop_height = 0.3
+metadata/vehicle = "CLC1"
+metadata/note = "a parked car"
+metadata/kind = "vehicle"

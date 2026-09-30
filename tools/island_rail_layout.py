@@ -604,10 +604,28 @@ _R0["lines"]["Harbour line"] = dict(_TS["lines"]["Harbour line"],
 # (the user's elevated-hub sketch: every lane through the building) would have stood platforms beside a missing deck
 # in the east half. Both now start ~20 m past Central's east platform end (x 932), a buffer stop like the Main line's
 # termini; the Main line only starts curving north at x 930, so it is 8 m clear of the Blue line's gauge there.
-for _ln, _y in (("Blue line", 229.0), ("Harbour line", 201.0)):
+# MAIN AND HARBOUR SWAP SIDES AT CENTRAL (user, 2026-09-29, "option A"): north to south the lanes were Blue 229 /
+# Main 215 / Harbour 201, but on the southbound run west of the core the Main line (x 205) is EAST of the Harbour line
+# (x 185) -- so the Main line's curve south ran THROUGH the Harbour line's, the two double tracks 2-8 m apart and
+# swapping sides on the viaduct (x 330..290): a flat crossing. With the order Blue / Harbour / Main the lines turn south
+# nested -- Main innermost (it leaves y 201 first), Harbour next, Blue outermost -- and never cross: 14-24 m apart the
+# whole way round. At the east end the Main line's 180 m curve north passes x 952 at y 202.4, 12.6 m from the Harbour
+# buffer (the margin Blue had). Central stands on the MIDDLE lane (SHARE_M 22: a centre on the Main line at y 201 would
+# leave Blue 28 m out).
+_R0["lines"]["Main line"]["corners"] = [(1110.0, 1385.0), (1110.0, 201.0), (205.0, 201.0)] + \
+    _R0["lines"]["Main line"]["corners"][3:]
+# ...and Main's curve north starts 18 m PAST the platform end (x 950, the line's minimum 160 m radius): as Central's
+# SOUTHERN lane it curves toward the island platform between it and Harbour, and at 180 m the curve began at x 930,
+# right at the platform end (x 932) -- a 20 m car straddling the end was already on the curve and its body closed the
+# 0.06 m platform gap (probe_train_fit). From x 950 a car's rear is past the platform (933) before its front bogie turns.
+_R0["lines"]["Main line"]["radii"] = {1: R_MIN, 3: R_THROAT}
+_R0["lines"]["Harbour line"]["corners"] = [(782.0, 215.0), (185.0, 215.0)] + _R0["lines"]["Harbour line"]["corners"][2:]
+_R0["lines"]["Harbour line"]["form"] = [(782.0, 215.0, "elev")] + _R0["lines"]["Harbour line"]["form"][1:]
+for _ln, _y in (("Blue line", 229.0), ("Harbour line", 215.0)):
     _R0["lines"][_ln]["corners"] = [(CENTRAL_END_X, _y)] + _R0["lines"][_ln]["corners"]
     _R0["lines"][_ln]["form"] = [(CENTRAL_END_X, _y, "elev")] + _R0["lines"][_ln]["form"][1:]
 _R0["stations"] = dict(_TS["stations"])
+_R0["stations"]["Central"] = ("Harbour line", 782.0, 215.0) + tuple(_TS["stations"]["Central"][3:])   # the middle lane
 _R0["stations"]["City West"] = ("Blue line", -100.0, -160.0, "standard", 90.0, "small_lot",
                                 "at grade on the westbound leg, between chuo_dori and nishi_dori")
 _R0["stations"]["Castle Town"] = ("Blue line", -540.0, -160.0, "standard", 90.0, "park_and_ride",

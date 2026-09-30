@@ -461,6 +461,7 @@ RESERVE_SITES = {
     "military_base": ("MilitaryBase", 90.0, 1200.0),      # the gate (its front) east to the gate road, apron south
     "military_pier": ("MilitaryPier", 270.0, 1000.0),     # its +Z (the pier head) west, the terminal at the root
     "military_airfield": ("MilitaryAirfield", 0.0, 1500.0),
+    "waterfront_park": ("FerrisWheelPark", 180.0, 2500.0),   # the entrance plaza (its front) north to ring_kita; a landmark
     "airport_airfield": ("AirportAirside", 180.0, 1500.0),  # the apron north by the terminal, the runway south
     "central_forecourt": ("CentralForecourt", 0.0, 1200.0),
     "airport_forecourt": ("AirportForecourt", 0.0, 1500.0),  # round the kuko_rotary loop, beside the Airport station  # the 駅前広場: its front (+Z) south to ekimae_dori

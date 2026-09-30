@@ -78,8 +78,12 @@ STREETS = [
     # on the ring. A U off the ring's two junctions either side of it: down x 886, along y -800, up x 1160; the dike
     # stage ramps both legs up onto the crest (island_dike raise, 5 %). The legs are ramps, so the grid planner's rows
     # cannot T onto them: the suburb's buildings front the loop itself (its 270 m bottom leg, both sides).
+    # The EAST leg bends south-east before it meets the ring (the (1215, -705) corner, 2026-09-29): straight north it
+    # left the pad 40 deg from ring_kita__6's own arm, its mouth solved 46 m out, and the kerb corner between the two
+    # lay across ring_kita__6_F1 (probe_road_clear). From the south-east the arm is ~70 deg from ring_kita__6 and ~125
+    # from ring_kita__5; the elevated Main line (x 1250) passes over it 35 m on.
     dict(name="kogai_loop", first="ring_kita", corners=[(886.0, -672.0), (886.0, -800.0), (1160.0, -800.0),
-                                                       (1161.0, -610.0)],
+                                                       (1215.0, -705.0), (1161.0, -610.0)],
          last="ring_kita"),
     # THE CENTRAL STATION'S 駅前ロータリー (user, 2026-09-28: the Tokyo Station placeholder is retired -- Central is the
     # kit's elevated hub -- and its forecourt gets "parking entrance / bus stop etc like a Japanese central hub"). A

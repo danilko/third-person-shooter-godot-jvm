@@ -140,12 +140,14 @@ func _initialize() -> void:
 		if f % 30 == 0:
 			health.call("heal", 1000000.0)
 		for v in get_nodes_in_group(STREAMED):
+			if v.is_in_group("parked_vehicle"):
+				continue      # a mission / site's PARKED vehicle (world.ParkedVehicle) is placed, not traffic
 			var id := v.get_instance_id()
 			var p: Vector3 = (v as Node3D).global_position
 			if not cars.has(id):
 				var gap := INF
 				for o in get_nodes_in_group(STREAMED):
-					if o != v:
+					if o != v and not o.is_in_group("parked_vehicle"):
 						gap = min(gap, (o as Node3D).global_position.distance_to(p))
 				var early: bool = _lanes().is_empty()
 				var heading := _yaw(-(v as Node3D).global_basis.z)

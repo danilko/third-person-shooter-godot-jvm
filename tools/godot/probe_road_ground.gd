@@ -100,6 +100,20 @@ func _initialize() -> void:
 		for c in lm.get_children():
 			if c is Node3D and c.has_meta("building"):
 				carriers.append(c)
+	# ...and so does an ELEVATED STATION: its F1 building stands under the viaduct wall to wall and its columns carry the
+	# deck (the rail record puts `pillar_skip` on every station of its span), so a track sample over its reserve is
+	# carried. (Until the Main/Harbour swap, 2026-09-29, the outer lanes passed only because at-grade streets beside the
+	# station counted as column feet; the middle lane, 25 m from any street, had five misses.)
+	for m in _markers(world):
+		var z = m.get("zone")
+		if z == null or not z.has_meta("site_reserve"):
+			continue
+		if not str(z.get("geometry_path")).contains("/Station_"):
+			continue
+		var gt: Transform3D = z.get("geometry_world_transform")
+		if gt.origin.y < 8.0:
+			continue
+		station_rects.append(z.get_meta("site_reserve"))
 	var carried := 0
 	var spanned := 0
 	var span_worst := 0.0
@@ -218,7 +232,16 @@ func _over_road(w: Vector3) -> float:
 	return best
 
 
+var station_rects := []   # [x, z, yaw, half x, half z] of each elevated station's reserve (godot)
+
 func _carried(carriers: Array, w: Vector3) -> bool:
+	for r in station_rects:
+		var dx := w.x - float(r[0])
+		var dz := w.z - float(r[1])
+		var cy := cos(float(r[2]))
+		var sy := sin(float(r[2]))
+		if absf(dx * cy - dz * sy) <= float(r[3]) and absf(dx * sy + dz * cy) <= float(r[4]):
+			return true
 	for c in carriers:
 		var fp: Array = (c.get_meta("building") as Dictionary)["footprint_m"]
 		var l: Vector3 = (c as Node3D).global_transform.affine_inverse() * w

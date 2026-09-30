@@ -290,10 +290,17 @@ RESERVES = (
     # side facing the gate road (kichi_mon_michi, x -460), the runway along the platform's own south band abutting the
     # core's apron, the one pier (with its berth) at the core's west edge -- everything within ~300 m
     ("military_base", (-760.0, 1250.0, -475.0, 1480.0)),
-    ("military_airfield", (-1260.0, 1485.0, -720.0, 1535.0)),   # offshore, west of the base (island_reshape)
+    # the runway lies right along the base's apron (user, 2026-09-29: "pull the runway back east toward the fence, so a
+    # jet reaches it from the hangar without crossing open ground"): its east end in line with the base's east fence
+    # (x -475), on the platform's own south band, its west half on the reclaimed strip (island_reshape)
+    ("military_airfield", (-1015.0, 1485.0, -475.0, 1535.0)),
     ("military_pier", (-1020.0, 1301.0, -740.0, 1371.0)),     # the pier (z 1300..1350) + the ship's berth south of it
                                                                # (centred on z 1336: the MilitaryPier composite's frame)
-    ("waterfront_park", (760.0, 700.0, 1000.0, 960.0)),       # the Bay Quarter: park, Ferris wheel, arena
+    # the Bay Quarter's waterfront park and its FERRIS WHEEL (user, 2026-09-29): the gulf's east shore between ring_kita
+    # (z 672) and the suburb loop's west leg (x 886, the resort hotels beyond) -- a bayside leisure park beside the
+    # seaside hotels, Odaiba's Palette Town / Kasai Rinkai Park precedent. (It used to be drawn over x 760..1000, z 700..960,
+    # which the loop and hotels 1-2 were later laid through.)
+    ("waterfront_park", (765.0, 690.0, 875.0, 890.0)),
     # three resort hotels INSIDE the suburb loop (kogai_loop: legs x 886 / 1160, its bottom leg along z 800), fronting
     # that leg -- the flat ground there is 78 m deep. (2026-09-28: they had been laid across the loop's bottom leg and
     # #3 across the elevated Main line at x 1250; street sites now, so no street is planned through them)
@@ -319,7 +326,9 @@ RESERVES = (
     # the apron against its airside face (boarding bridges to z 1811.6), then the taxiway and the 540 x 45 m runway
     # along the island's SOUTH edge (the island reaches z 2040 for it, island_reshape AIRPORT_SOUTH). It stood between
     # the bridge's landing and the terminal, under the spur and the rail.
-    ("airport_airfield", (940.0, 1812.0, 1480.0, 1972.5)),
+    # the airside reaches north to the terminal's airside face (z 1785.9) so the apron runs under the gate bridges (user,
+    # 2026-09-29: the planes stood 8.6 m of open ground from the gates and 21 m from the runway)
+    ("airport_airfield", (940.0, 1784.0, 1480.0, 1974.0)),
     # the airport's FORECOURT (user, 2026-09-29: "forecourt like central station"): the one-way loop kuko_rotary
     # (island_expressway FORE_BOX) with its lanes and footways, between the Airport station's west wall and the
     # terminal's curb canopy; the AirportForecourt composite dresses it (tools/building_kit/site_airport_forecourt.py)

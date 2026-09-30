@@ -6,13 +6,14 @@ extends SceneTree
 ## A daylight sky and sun, a ground plane, the building at the origin and a 1.49 m capsule (the character's
 ## height) outside its first door, so the scale reads. Writes <out_dir>/<Id>_<view>.png. A view: `front` 3/4 from the
 ## front-left, `back` 3/4 from the back-right, `door` close on the first door at eye height, `plan` straight down from
-## just under the ceiling (orthographic, the roof behind the camera, shadows off) -- the floor plan, which is the only
+## just under the ceiling (`--plan-z=<m>`, default 3.2; orthographic, the roof behind the camera, shadows off) -- the floor plan, which is the only
 ## way to check an interior's layout (which way a counter faces, whether a room has its door); not in the default set.
 
 const DIR := "res://src/main/resources/com/openworld/world/buildings"
 
 var _out := ""
 var _jobs := []
+var _plan_z := 3.2      # --plan-z=: the plan camera's height (just under the ceiling of the floor to look at)
 
 
 func _initialize() -> void:
@@ -25,6 +26,8 @@ func _initialize() -> void:
 			only = a.substr(7).split(",")
 		if a.begins_with("--views="):
 			views = Array(a.substr(8).split(","))
+		if a.begins_with("--plan-z="):
+			_plan_z = float(a.substr(9))
 	DirAccess.make_dir_recursive_absolute(_out)
 	for f in DirAccess.get_files_at(DIR):
 		if not f.ends_with(".tscn") or f in ["Door.tscn", "Breakable.tscn"]:
@@ -120,7 +123,7 @@ func _run() -> void:
 			"plan":
 				cam.projection = Camera3D.PROJECTION_ORTHOGONAL
 				cam.size = max(fp[0], fp[1]) * 1.1
-				cam.position = Vector3(0, 3.2, 0)
+				cam.position = Vector3(0, _plan_z, 0)
 				cam.near = 0.05
 				cam.rotation_degrees = Vector3(-90, 0, 0)
 				sun.shadow_enabled = false

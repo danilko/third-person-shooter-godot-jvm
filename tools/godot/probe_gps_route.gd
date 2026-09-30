@@ -158,6 +158,10 @@ func _initialize() -> void:
 	_mouse(MOUSE_BUTTON_LEFT, true, px)
 	_mouse(MOUSE_BUTTON_LEFT, false, px)
 	var wp: Vector3 = worldmap.call("screen_to_world_now", px)       # what the map itself computes from that pixel
+	# ...unless the click landed on a PLACE blip, which takes that place's door instead (the airport's places sit
+	# right where the goal falls since 2026-09-29): every check below is about the waypoint the player HAS
+	if bool(player.call("has_waypoint_now")):
+		wp = player.call("waypoint_now")
 	_action("map")                   # close it again
 	await process_frame
 

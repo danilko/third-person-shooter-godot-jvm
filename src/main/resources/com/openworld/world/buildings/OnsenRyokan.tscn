@@ -1,0 +1,469 @@
+[gd_scene format=3]
+
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/OnsenRyokan_mesh.res" id="1_3oqce"]
+[ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/OnsenRyokan_collision.res" id="2_v51bu"]
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/Elevator.java" id="3_xhnqf"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_PaintedMetal.tres" id="4_y6dvs"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_GlassClear.tres" id="5_p1sl2"]
+[ext_resource type="Material" path="res://assets/world_source/kits/library/materials/MI_Terrazzo.tres" id="6_cbcek"]
+[ext_resource type="Material" path="res://assets/vfx/water/material/water_onsen.tres" id="7_5tqdc"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1ptb4"]
+size = Vector3(1.24, 2.4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_eif01"]
+size = Vector3(1.24, 2.4, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_jn4o2"]
+size = Vector3(1, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ti3jx"]
+size = Vector3(1, 2.1, 0.14)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_kakux"]
+size = Vector3(0.9, 2.1, 0.14)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_xw78y"]
+size = Vector2(2.8, 2.2)
+subdivide_width = 4
+subdivide_depth = 4
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_7rm05"]
+size = Vector2(2.8, 2.2)
+subdivide_width = 4
+subdivide_depth = 4
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_v26t5"]
+size = Vector2(4.5, 5.5)
+subdivide_width = 4
+subdivide_depth = 4
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_0ycu2"]
+size = Vector2(4.5, 5.5)
+subdivide_width = 4
+subdivide_depth = 4
+
+[node name="OnsenRyokan" type="Node3D" unique_id=173731054]
+metadata/building = {
+"aabb": [Vector3(-21, -0.9, -22.5), Vector3(42, 11.45, 38.5)],
+"collision": "trimesh",
+"door_style": "swing",
+"doors": [{
+"center": [0.0, 0.0, 9.9],
+"height": 2.4,
+"module": 0.0,
+"outward": [0.0, 0.0, 1.0],
+"side": "exit",
+"style": "slide",
+"width": 2.4
+}, {
+"center": [-11.2, 0.3, -9.9],
+"height": 2.1,
+"module": 1.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.0
+}, {
+"center": [11.2, 0.3, -9.9],
+"height": 2.1,
+"module": 2.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "slide",
+"width": 1.0
+}, {
+"center": [6.0, 0.3, -9.9],
+"height": 2.1,
+"module": 3.0,
+"outward": [0.0, 0.0, -1.0],
+"side": "exit",
+"style": "swing",
+"width": 0.9
+}],
+"doors_closed": true,
+"doors_locked": false,
+"doors_shop": false,
+"example": true,
+"facade_surfaces": {},
+"footprint_m": [42.0, 38.5],
+"height_m": 11.45,
+"id": "OnsenRyokan",
+"inner_doors": [{
+"center": [-4.0, 0.3, -1.8],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.8
+}, {
+"center": [6.0, 0.3, -1.8],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [13.4, 0.3, -5.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.4
+}, {
+"center": [13.4, 0.3, -5.4],
+"height": 2.1,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 1.4
+}, {
+"center": [3.0, 0.3, -4.8],
+"height": 2.1,
+"outward": [-1.0, 0.0, 0.0],
+"slide_dir": 1.0,
+"style": "swing",
+"width": 0.9
+}, {
+"center": [-12.0, 3.8, 1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-6.0, 3.8, 1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [0.0, 3.8, 1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [5.4, 3.8, 1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [12.0, 3.8, 1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, 1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-15.0, 3.8, -1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-9.0, 3.8, -1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [-3.0, 3.8, -1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [3.0, 3.8, -1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [9.0, 3.8, -1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}, {
+"center": [15.0, 3.8, -1.0],
+"height": 2.0,
+"outward": [0.0, 0.0, -1.0],
+"slide_dir": 1.0,
+"style": "slide",
+"width": 0.9
+}],
+"kit": "interiors",
+"landmark": false,
+"lifts": [{
+"center": [7.5, 0.3, 1.95],
+"d": 1.6,
+"door_h": 2.1,
+"door_w": 0.9,
+"faces": 2.0,
+"rise": 3.5,
+"stops": "0,3.5",
+"w": 1.6,
+"yaw": 90.0
+}],
+"marks": [{
+"name": "MARK_objective_01",
+"pos": [-3.0, 0.3, -6.0],
+"props": {
+"kind": "objective",
+"note": "the 宴会場 (a dinner meeting)"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_02",
+"pos": [-12.75, 0.3, -16.0],
+"props": {
+"kind": "objective",
+"note": "the 露天風呂 (outdoor bath) in the snow"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_03",
+"pos": [12.75, 0.3, -16.0],
+"props": {
+"kind": "objective",
+"note": "the 露天風呂 (outdoor bath) in the snow"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_objective_04",
+"pos": [0.0, 3.8, 6.0],
+"props": {
+"kind": "objective",
+"note": "a guest's room"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_01",
+"pos": [11.5, 0.3, 6.2],
+"props": {
+"kind": "spawn",
+"note": "the 女将 at the 帳場",
+"team": "staff"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_02",
+"pos": [0.0, 0.3, 6.0],
+"props": {
+"kind": "spawn",
+"team": "civilian"
+},
+"yaw": 180.0
+}, {
+"name": "MARK_spawn_03",
+"pos": [-13.4, 0.3, -6.5],
+"props": {
+"kind": "spawn",
+"note": "男湯",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_spawn_04",
+"pos": [13.4, 0.3, -6.5],
+"props": {
+"kind": "spawn",
+"note": "女湯",
+"team": "civilian"
+},
+"yaw": 0.0
+}, {
+"name": "MARK_water_01",
+"pos": [-15.3, 0.45, -8.2],
+"props": {
+"d": 2.2,
+"kind": "water",
+"material": "onsen",
+"note": "the 内湯's water surface (no collider)",
+"w": 2.8
+},
+"yaw": 0.0
+}, {
+"name": "MARK_water_02",
+"pos": [15.3, 0.45, -8.2],
+"props": {
+"d": 2.2,
+"kind": "water",
+"material": "onsen",
+"note": "the 内湯's water surface (no collider)",
+"w": 2.8
+},
+"yaw": 0.0
+}, {
+"name": "MARK_water_03",
+"pos": [-12.75, 0.45, -16.25],
+"props": {
+"d": 5.5,
+"kind": "water",
+"material": "onsen",
+"note": "the 露天風呂's water surface (no collider)",
+"w": 4.5
+},
+"yaw": 0.0
+}, {
+"name": "MARK_water_04",
+"pos": [12.75, 0.45, -16.25],
+"props": {
+"d": 5.5,
+"kind": "water",
+"material": "onsen",
+"note": "the 露天風呂's water surface (no collider)",
+"w": 4.5
+},
+"yaw": 0.0
+}],
+"piece_count": 1,
+"probe_xz": [2.5, 12.0],
+"solid_probes": [],
+"trimesh_pieces": 1.0,
+"use": "温泉旅館 (a hot-spring inn in the snow mountains): two storeys 36 x 20 m, enterable (_Shop) -- the 玄関 with shoes off (a stone doma, 下足箱, the agarikamachi up to the 0.3 m floor), the 帳場 front desk, the lobby and the 売店; the 大浴場 split 男湯 / 女湯 behind 暖簾 (脱衣所 with basket shelves, a hinoki 内湯, the wash row) each with a door out to its bamboo-fenced 露天風呂 on a stone terrace; the tatami 宴会場 and the kitchen (its own back door); upstairs eleven 和室 guest rooms (tatami, a low table, the 広縁 window strip) off a central corridor; two stairs, a lift; snow on the roof, the porch and the drive. The bath water is a solid placeholder surface. probe_xz is under the porch roof. kits/interiors/OnsenRyokan.blend (the artist's; a PLACEHOLDER shell and fit-out, ARTIST_NOTES.md lists what to replace)",
+"wall_top_m": 3.55
+}
+
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=872056483]
+visibility_range_end = 426.6
+visibility_range_end_margin = 40.0
+visibility_range_fade_mode = 1
+mesh = ExtResource("1_3oqce")
+
+[node name="Collision" type="StaticBody3D" parent="." unique_id=177286150]
+collision_mask = 0
+
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=384234849]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 1.2, 9.9)
+shape = SubResource("BoxShape3D_1ptb4")
+
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=945039191]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 1.2, 9.9)
+shape = SubResource("BoxShape3D_eif01")
+
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=586779844]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -11.2, 1.3499999, -9.9)
+shape = SubResource("BoxShape3D_jn4o2")
+
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=1744511344]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 11.2, 1.3499999, -9.9)
+shape = SubResource("BoxShape3D_ti3jx")
+
+[node name="DoorLeaf4" type="CollisionShape3D" parent="Collision" unique_id=477894933]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 6, 1.3499999, -9.9)
+shape = SubResource("BoxShape3D_kakux")
+
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1622844727]
+shape = ExtResource("2_v51bu")
+
+[node name="Lifts" type="Node3D" parent="." unique_id=884662507]
+
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=2088174986]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 7.5, 0.3, 1.95)
+script = ExtResource("3_xhnqf")
+shaft_width = 1.6
+shaft_depth = 1.6
+rise = 3.5
+door_width = 0.9
+door_height = 2.1
+speed = 1.5
+door_seconds = 1.2
+dwell_seconds = 3.0
+frame_material = ExtResource("4_y6dvs")
+glass_material = ExtResource("5_p1sl2")
+floor_material = ExtResource("6_cbcek")
+in_service = true
+stop_heights = "0,3.5"
+faces = 2
+
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1594083508]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 9.9)
+
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1933582039]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.2, 0.3, -9.9)
+
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=401671286]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.2, 0.3, -9.9)
+
+[node name="Door_exit_3" type="Marker3D" parent="." unique_id=1125901774]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.3, -9.9)
+
+[node name="Markers" type="Node3D" parent="." unique_id=111229349]
+
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=2084310684 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.3, -6)
+metadata/note = "the 宴会場 (a dinner meeting)"
+metadata/kind = "objective"
+
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=579595866 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.75, 0.3, -16)
+metadata/note = "the 露天風呂 (outdoor bath) in the snow"
+metadata/kind = "objective"
+
+[node name="MARK_objective_03" type="Marker3D" parent="Markers" unique_id=1170557804 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.75, 0.3, -16)
+metadata/note = "the 露天風呂 (outdoor bath) in the snow"
+metadata/kind = "objective"
+
+[node name="MARK_objective_04" type="Marker3D" parent="Markers" unique_id=407983010 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.8, 6)
+metadata/note = "a guest's room"
+metadata/kind = "objective"
+
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=475693547 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 11.5, 0.3, 6.2)
+metadata/team = "staff"
+metadata/note = "the 女将 at the 帳場"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1312465446 groups=["mission_marker"]]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0.3, 6)
+metadata/team = "civilian"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1744609511 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.4, 0.3, -6.5)
+metadata/team = "civilian"
+metadata/note = "男湯"
+metadata/kind = "spawn"
+
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=168916708 groups=["mission_marker"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.4, 0.3, -6.5)
+metadata/team = "civilian"
+metadata/note = "女湯"
+metadata/kind = "spawn"
+
+[node name="MARK_water_01" type="MeshInstance3D" parent="Markers" unique_id=715938355]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.3, 0.45, -8.2)
+material_override = ExtResource("7_5tqdc")
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_xw78y")
+
+[node name="MARK_water_02" type="MeshInstance3D" parent="Markers" unique_id=1345223904]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.3, 0.45, -8.2)
+material_override = ExtResource("7_5tqdc")
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_7rm05")
+
+[node name="MARK_water_03" type="MeshInstance3D" parent="Markers" unique_id=35776237]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.75, 0.45, -16.25)
+material_override = ExtResource("7_5tqdc")
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_v26t5")
+
+[node name="MARK_water_04" type="MeshInstance3D" parent="Markers" unique_id=1096851241]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.75, 0.45, -16.25)
+material_override = ExtResource("7_5tqdc")
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_0ycu2")

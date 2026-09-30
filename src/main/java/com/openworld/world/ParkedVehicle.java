@@ -90,9 +90,14 @@ public class ParkedVehicle extends Node3D {
         scene.addChild(v);
         v.setGlobalTransform(new Transform3D(at.getBasis().orthonormalized(), o.plus(new Vector3(0, dropHeight, 0))));
         v.addToGroup(new StringName(Vehicle.STREAMED_GROUP));
+        v.addToGroup(new StringName(GROUP));
         if (nm != null) nm.announceVehicleSpawn(v);
         SPAWNED.put(key, v);
     }
+
+    /** Every vehicle a marker spawned is in this group besides {@link Vehicle#STREAMED_GROUP} (which the network baseline
+     *  needs): it is PLACED, not ambient traffic, so a traffic probe must not judge it by traffic's spawn rules. */
+    public static final String GROUP = "parked_vehicle";
 
     /** The vehicle this marker spawned, if it still exists (probe readout). */
     @Register
