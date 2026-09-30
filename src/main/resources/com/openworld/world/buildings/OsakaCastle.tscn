@@ -3,9 +3,10 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/OsakaCastle_mesh.res" id="1_d0auk"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/OsakaCastle_collision.res" id="2_jopup"]
 
-[node name="OsakaCastle" type="Node3D" unique_id=668359506]
+[node name="OsakaCastle" type="Node3D" unique_id=1713210685]
 metadata/building = {
 "aabb": [Vector3(-20.3, 0, -34.65), Vector3(40.6, 55.2, 69.3)],
+"base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -26,11 +27,11 @@ metadata/building = {
 "wall_top_m": 55.2
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1523766213]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1483930712]
 mesh = ExtResource("1_d0auk")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=868224035]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1348067330]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1433166890]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=2128586844]
 shape = ExtResource("2_jopup")

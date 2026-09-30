@@ -17,6 +17,7 @@ navmesh. What the file carries, and the rules for each:
     prism (smooth shading across hard 90 degree edges, then an inverted extrude) -- so `normals_report` is the gate:
     every vertex normal within the angle of its face, none inverted.
 """
+import hashlib
 import json
 import math
 import os
@@ -185,7 +186,11 @@ def write(objects, kit, path, node_order=None, markers=()):
     while len(blob) % 4:
         blob.append(0)
     bin_name = os.path.splitext(os.path.basename(path))[0] + ".bin"
-    doc = {"asset": {"generator": GENERATOR, "version": "2.0"}, "scene": 0,
+    # the BUFFER'S hash, in the JSON: Godot decides whether to re-import a glTF from the .gltf file's md5 alone and
+    # never looks at its .bin, so a geometry change that leaves every accessor's count, offset and bounds the same
+    # (a rail pier dropped where the deck's bounds do not move) wrote a new .bin and baked the OLD import
+    doc = {"asset": {"generator": GENERATOR, "version": "2.0",
+                     "extras": {"bin_sha1": hashlib.sha1(bytes(blob)).hexdigest()}}, "scene": 0,
            "scenes": [{"name": "Scene", "nodes": list(range(len(nodes)))}], "nodes": nodes, "meshes": meshes,
            "accessors": accessors, "bufferViews": buffer_views,
            "buffers": [{"byteLength": len(blob), "uri": bin_name}]}

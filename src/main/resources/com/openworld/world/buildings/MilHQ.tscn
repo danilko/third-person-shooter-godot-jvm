@@ -19,9 +19,10 @@ size = Vector3(1.2, 2.1, 0.14)
 [sub_resource type="BoxShape3D" id="BoxShape3D_5umgs"]
 size = Vector3(1.2, 2.1, 0.14)
 
-[node name="MilHQ" type="Node3D" unique_id=1165074451]
+[node name="MilHQ" type="Node3D" unique_id=55631993]
 metadata/building = {
 "aabb": [Vector3(-22.01, -1.2, -9.18), Vector3(44.02, 19.2, 18.360003)],
+"base_m": -1.2,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [{
@@ -285,37 +286,37 @@ metadata/building = {
 "wall_top_m": 8.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=359780411]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1268463184]
 visibility_range_end = 516.0
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_1ph50")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=615201938]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1361082252]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=747489834]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=10071914]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.55, 1.05, 8.73)
 shape = SubResource("BoxShape3D_jl5us")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=841164622]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1419581482]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.45, 1.05, 8.73)
 shape = SubResource("BoxShape3D_763px")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1736869227]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1781458764]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -21.9, 1.05, -0.07)
 shape = SubResource("BoxShape3D_k388b")
 
-[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=1739980724]
+[node name="DoorLeaf3" type="CollisionShape3D" parent="Collision" unique_id=201619601]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 21.9, 1.05, -0.07)
 shape = SubResource("BoxShape3D_5umgs")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=808654505]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1317409315]
 shape = ExtResource("2_wanho")
 
-[node name="Lifts" type="Node3D" parent="." unique_id=2096180302]
+[node name="Lifts" type="Node3D" parent="." unique_id=1351969477]
 
-[node name="Lift0" type="Node3D" parent="Lifts" unique_id=366724582]
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=75953017]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -5, 0, -1.845)
 script = ExtResource("3_hvhgw")
 shaft_width = 1.6
@@ -333,50 +334,50 @@ in_service = true
 stop_heights = "0,4.2"
 faces = 1
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=216768198]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=863287704]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -16, 0, 8.73)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1938759047]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1249366950]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -21.9, 0, -0.07)
 
-[node name="Door_exit_2" type="Marker3D" parent="." unique_id=889553960]
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=1313400438]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 21.9, 0, -0.07)
 
-[node name="Markers" type="Node3D" parent="." unique_id=1712799252]
+[node name="Markers" type="Node3D" parent="." unique_id=831745955]
 
-[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=504114505 groups=["mission_marker"]]
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=558956168 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2, 0, 4.83)
 metadata/note = "the operations room (作戦室)"
 metadata/kind = "objective"
 
-[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1551785007 groups=["mission_marker"]]
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1757366098 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -9, 4.2, 7.43)
 metadata/note = "the commander's safe"
 metadata/kind = "objective"
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=874903468 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1977488827 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -16, 0, 2.83)
 metadata/team = "soldier"
 metadata/note = "the duty guard"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=414295541 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1878256838 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -15, 4.2, 6.63)
 metadata/team = "vip"
 metadata/note = "the base commander"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1315674601 groups=["mission_marker"]]
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=499486968 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 4.2, 2.83)
 metadata/team = "soldier"
 metadata/kind = "spawn"
 
-[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=518825989 groups=["mission_marker"]]
+[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=958440617 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, -7.37)
 metadata/weapon = "PIS1"
 metadata/kind = "weapon"
 
-[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=1456447658 groups=["mission_marker"]]
+[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=2055987312 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 3, 0, -7.37)
 metadata/weapon = "ASR1"
 metadata/kind = "weapon"

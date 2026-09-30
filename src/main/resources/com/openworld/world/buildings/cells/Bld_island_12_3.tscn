@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_H8.tscn" id="1"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_BB.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_W5.tscn" id="3"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_WhiteWarm.tres" id="tone2_2"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MidWarm.tres" id="tone0_6"]
@@ -43,10 +43,10 @@ visibility_range_begin = 450.0
 visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
-[node name="ShopHouse_000" parent="." instance=ExtResource("2")]
+[node name="ShopHouse_BB_000" parent="." instance=ExtResource("2")]
 transform = Transform3D(1.000000, 0, 0.000000, 0, 1, 0, -0.000000, 0, 1.000000, 1018.000, 5.690, -1231.019)
 
-[node name="Mesh" parent="./ShopHouse_000" index="0"]
+[node name="Mesh" parent="./ShopHouse_BB_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="PencilBuilding_H8_001" parent="." instance=ExtResource("1")]

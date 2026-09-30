@@ -297,7 +297,8 @@ def ring(net, name, plan, ground, marks=(), cut_marks=()):
     cum = arclen(plan, True)
     L = cum[-1]
     start = cut_marks[0] if cut_marks else 0.0
-    ss = station_at(plan, cum, True, list(marks) + list(cut_marks))
+    # a cut (a joint) is not a taper: it needs only a 15 m clear, so its marks do not chord a corner's arc away
+    ss = station_at(plan, cum, True, list(marks), loose=list(cut_marks))
     ss = [(v - start) % L for v in ss]
     ss = sorted(set(round(v, 3) for v in ss))
     pts = [at_s(plan, cum, v + start, True) for v in ss]

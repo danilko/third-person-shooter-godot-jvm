@@ -3,9 +3,10 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/ShuriCastle_mesh.res" id="1_bpncn"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/ShuriCastle_collision.res" id="2_0230k"]
 
-[node name="ShuriCastle" type="Node3D" unique_id=362769775]
+[node name="ShuriCastle" type="Node3D" unique_id=1263496669]
 metadata/building = {
 "aabb": [Vector3(-79, 0, -64), Vector3(158, 47, 128)],
+"base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -26,11 +27,11 @@ metadata/building = {
 "wall_top_m": 47.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=51226748]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1337550835]
 mesh = ExtResource("1_bpncn")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1544780286]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=187102133]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=893896958]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=685264682]
 shape = ExtResource("2_0230k")

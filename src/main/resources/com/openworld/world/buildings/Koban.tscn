@@ -12,9 +12,10 @@ size = Vector3(0.94, 2.1, 0.14)
 [sub_resource type="BoxShape3D" id="BoxShape3D_m2154"]
 size = Vector3(0.9, 2.1, 0.14)
 
-[node name="Koban" type="Node3D" unique_id=1313624685]
+[node name="Koban" type="Node3D" unique_id=256259038]
 metadata/building = {
 "aabb": [Vector3(-3.5, -0.2, -3.4), Vector3(7, 4.8999996, 8.4)],
+"base_m": -0.2,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [{
@@ -108,55 +109,55 @@ metadata/building = {
 "wall_top_m": 4.9
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=654329080]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1890893566]
 visibility_range_end = 356.4
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_e0ain")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=2065414509]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1111429462]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=320075612]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=185437152]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75000006, 1.05, 3.9)
 shape = SubResource("BoxShape3D_f04qc")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=214030845]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1994450511]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6500001, 1.05, 3.9)
 shape = SubResource("BoxShape3D_fmywp")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1406819188]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=626775212]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.9, 1.05, -0.15)
 shape = SubResource("BoxShape3D_m2154")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=515921338]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1397428618]
 shape = ExtResource("2_jusew")
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=351173085]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=621621960]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -1.2, 0, 3.9)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1202668271]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1291756176]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 2.9, 0, -0.15)
 
-[node name="Markers" type="Node3D" parent="." unique_id=1773551161]
+[node name="Markers" type="Node3D" parent="." unique_id=840334529]
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=181892497 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=349943460 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, 1.2)
 metadata/team = "police"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=650900791 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1156402729 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, -1.5)
 metadata/team = "police"
 metadata/kind = "spawn"
 
-[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=1877248314 groups=["mission_marker"]]
+[node name="MARK_weapon_01" type="Marker3D" parent="Markers" unique_id=1546762040 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2, 0, -1.9)
 metadata/weapon = "PIS1"
 metadata/note = "the koban's pistol locker: light weapons only"
 metadata/kind = "weapon"
 
-[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=1014041443 groups=["mission_marker"]]
+[node name="MARK_weapon_02" type="Marker3D" parent="Markers" unique_id=1346820518 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.6, 0, -1.9)
 metadata/weapon = "PIS1"
 metadata/kind = "weapon"

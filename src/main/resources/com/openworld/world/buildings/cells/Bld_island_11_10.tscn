@@ -1,6 +1,12 @@
 [gd_scene format=3]
 
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/DetachedHouse.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_W3_BB.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_W3.tscn" id="3"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool2.tres" id="tone2_3"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_CharcoalCool.tres" id="tone0_7"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone3_3"]
+[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_CharcoalCool.tres" id="tone1_7"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_11_10.res" id="hlod"]
 
@@ -9,12 +15,18 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Lots"]
 transform_format = 1
-instance_count = 1
+instance_count = 3
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-11.5500, 0.0000, -0.0083, 844.2770, 0.0000, 0.6250, 0.0000, 5.5125, 0.0087, 0.0000, -11.0500, 527.6060)
+buffer = PackedFloat32Array(-11.5500, 0.0000, -0.0083, 844.2770, 0.0000, 0.6250, 0.0000, 5.5125, 0.0087, 0.0000, -11.0500, 527.6060, -5.8591, 0.0000, 5.3227, 889.8749, 0.0000, 0.6250, 0.0000, 5.5125, -2.3423, 0.0000, -13.3144, 506.0315, -6.1022, 0.0000, 3.6250, 897.1474, 0.0000, 0.6250, 0.0000, 5.5125, -2.4019, 0.0000, -9.2096, 506.5402)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
 size = Vector3(11.550, 0.625, 11.050)
+
+[sub_resource type="BoxShape3D" id="LotShape1"]
+size = Vector3(6.310, 0.625, 14.339)
+
+[sub_resource type="BoxShape3D" id="LotShape2"]
+size = Vector3(6.558, 0.625, 9.897)
 
 [node name="Bld_island_11_10" type="Node3D"]
 
@@ -31,6 +43,22 @@ transform = Transform3D(-1.000000, 0, -0.000750, 0, 1, 0, 0.000750, 0, -1.000000
 [node name="Mesh" parent="./DetachedHouse_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
+[node name="PencilBuilding_W3_BB_001" parent="." instance=ExtResource("2")]
+transform = Transform3D(-0.928551, 0, 0.371206, 0, 1, 0, -0.371206, 0, -0.928551, 889.704, 5.840, 506.233)
+
+[node name="Mesh" parent="./PencilBuilding_W3_BB_001" index="0"]
+surface_material_override/5 = ExtResource("tone0_7")
+surface_material_override/1 = ExtResource("tone1_7")
+visibility_parent = NodePath("../../HLOD")
+
+[node name="ShopHouse_W3_002" parent="." instance=ExtResource("3")]
+transform = Transform3D(-0.930513, 0, 0.366258, 0, 1, 0, -0.366258, 0, -0.930513, 897.107, 5.840, 506.643)
+
+[node name="Mesh" parent="./ShopHouse_W3_002" index="0"]
+surface_material_override/5 = ExtResource("tone2_3")
+surface_material_override/1 = ExtResource("tone3_3")
+visibility_parent = NodePath("../../HLOD")
+
 [node name="Plinths" type="MultiMeshInstance3D" parent="."]
 multimesh = SubResource("Lots")
 
@@ -40,3 +68,11 @@ collision_mask = 0
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
 transform = Transform3D(-1.000000, 0, -0.000750, 0, 1, 0, 0.000750, 0, -1.000000, 844.277, 5.513, 527.606)
 shape = SubResource("LotShape0")
+
+[node name="Plinth1" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.928551, 0, 0.371206, 0, 1, 0, -0.371206, 0, -0.928551, 889.875, 5.513, 506.032)
+shape = SubResource("LotShape1")
+
+[node name="Plinth2" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(-0.930513, 0, 0.366258, 0, 1, 0, -0.366258, 0, -0.930513, 897.147, 5.513, 506.540)
+shape = SubResource("LotShape2")

@@ -669,6 +669,26 @@ def mil_gate(material, Builder):
     return "Mil_Gate", "military", b.mesh()
 
 
+def airport_service_gate(material, Builder):
+    """The airport's landside SERVICE GATE (user, 2026-09-29: "a vehicle service gate, locked"): an 8 m sliding
+    chain-link gate, CLOSED, between two 0.3 m posts, 2.4 m tall with the perimeter fence's barbed outrigger, a small
+    guard booth beside it on the landside (+Y is the airside; the street at -Y). The gate is part of the fence line:
+    its collider (the piece's bounds) keeps everyone out; a mission opens it later."""
+    b = Builder("Airport_ServiceGate", material)
+    for x in (-4.3, 4.0):
+        b.box((x, -0.15, 0.0), (x + 0.3, 0.15, 2.8), "MI_PaintedMetal")
+    b.box((-4.0, -0.03, 0.1), (4.0, 0.03, 2.35), "MI_Steel")                  # the leaf (chain-link)
+    for z in (0.15, 1.2, 2.3):
+        b.box((-4.0, -0.05, z), (4.0, 0.05, z + 0.08), "MI_PaintedMetal")    # its rails
+    for z in (2.55, 2.7, 2.85):
+        b.box((-4.3, -0.3 - (z - 2.55), z - 0.01), (4.3, -0.28 - (z - 2.55), z + 0.01), "MI_Steel")
+    b.box((-1.0, -0.06, 1.2), (1.0, -0.04, 1.8), "MI_SignRed")                 # 関係者以外立入禁止 plate
+    b.box((7.5, -3.2, 0.0), (9.5, -1.2, 2.6), "MI_TileWhite")                 # the guard booth, landside, clear of
+    b.box((7.48, -2.8, 1.0), (7.5, -1.6, 2.0), "MI_Window")                   # the service road's footway
+    b.box((7.3, -3.4, 2.6), (9.7, -1.0, 2.8), "MI_PaintedMetal")
+    return "Airport_ServiceGate", "airport", b.mesh()
+
+
 def taxiway(material, Builder):
     """A 60 m taxiway section along X: 23 m of asphalt, yellow centreline, edge lines (runways: Airport_Runway)."""
     b = Builder("Airport_Taxiway", material)
@@ -758,6 +778,33 @@ def akiba_billboard(material, Builder):
     return "Sign_AkibaBillboard", "street", b.mesh()
 
 
+ROOF_SIGN_COLOURS = (("Red", "MI_SignRed"), ("Cyan", "MI_SignCyan"), ("Yellow", "MI_SignYellow"),
+                     ("Green", "MI_SignGreen"))
+ROOF_SIGN_SIZES = {"S": (4.4, 2.6, 3.0), "L": (9.0, 4.4, 4.0)}    # face width, face height, stand height (m)
+
+
+def _roof_billboard(material, Builder, size, colour, mat):
+    """A brand-neutral ROOFTOP BILLBOARD (屋上看板, user 2026-09-29: "rooftop billboards across downtown, not only the
+    electric street"): a lit panel in a dark frame on a two-leg steel stand, its face -Y (the street). `S` (a 4.4 m face)
+    fits a pencil building or a shop-house, `L` (9 m) an office or a mansion. Origin: the stand's foot centre on the
+    roof, 0.6 m BEHIND the face so the frame's front is at y -0.35. A panel colour per piece; the face is plain colour
+    (a real ad replaces the material)."""
+    fw, fh, sh = ROOF_SIGN_SIZES[size]
+    name = "Sign_RoofBillboard_%s_%s" % (size, colour)
+    b = Builder(name, material)
+    for x in (-fw * 0.32, fw * 0.32):
+        b.box((x - 0.12, 0.25, 0.0), (x + 0.12, 0.55, sh + fh * 0.5), "MI_Steel")      # the legs
+        b.box((x - 0.08, 0.3, 0.0), (x + 0.08, 1.6, 0.2), "MI_Steel")                    # the back strut foot
+    b.box((-fw / 2.0 - 0.2, -0.3, sh - 0.2), (fw / 2.0 + 0.2, 0.25, sh + fh + 0.2), "MI_PlasticDark")
+    b.box((-fw / 2.0, -0.33, sh), (fw / 2.0, -0.3, sh + fh), mat)
+    b.box((-fw / 2.0, -0.62, sh + fh + 0.15), (fw / 2.0, -0.3, sh + fh + 0.25), "MI_Steel")  # the lamp rail
+    return name, "street", b.mesh()
+
+
+def roof_billboards(material, Builder):
+    return [_roof_billboard(material, Builder, sz, c, m) for sz in ROOF_SIGN_SIZES for c, m in ROOF_SIGN_COLOURS]
+
+
 def chochin(material, Builder):
     """A red paper lantern (赤提灯) on a bracket: 0.45 m across, 0.75 m tall, lit, hanging 0.6 m out from a facade at
     -Y. Origin: the bracket on the facade."""
@@ -836,12 +883,12 @@ def build_all(material, Builder):
     fns = (police_station, koban, fire_station, fire_branch, post_office, post_office_small, ward_office,
            hospital, hospital_small, clinic, school_elementary, school_junior_high,
            shrine, temple, park, water_resort, resort_hotel, fish_market,
-           mil_hq, mil_barracks, mil_hangar, mil_control_tower, fighter_jet, mil_fence, mil_gate,
+           mil_hq, mil_barracks, mil_hangar, mil_control_tower, fighter_jet, mil_fence, mil_gate, airport_service_gate,
            taxiway, apron_slab, airliner, airliner_hangar,
            akiba_vertical_sign, akiba_billboard, chochin, noren, shop_vertical_sign,
            detached_house, detached_house_b, sode_kanban, mil_pier_terminal,
            mil_armoury, mil_motor_pool, mil_truck, mil_parade_ground, mil_helipad, mil_fuel_depot, mil_patrol_ship)
-    return [f(material, Builder) for f in fns]
+    return [f(material, Builder) for f in fns] + roof_billboards(material, Builder)
 
 
 # ── the Japanese house and the 雑居ビル's sign (JAPAN_ART_REVIEW.md §3: "the whole residential texture of Japan is

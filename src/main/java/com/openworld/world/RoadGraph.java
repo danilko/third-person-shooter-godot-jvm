@@ -99,6 +99,24 @@ public final class RoadGraph {
                     z[i] + (z[i + 1] - z[i]) * t};
         }
 
+        /** Arc length of the point on this lane nearest {@code (px, pz)} in plan. */
+        public double alongXZ(double px, double pz) {
+            double best = Double.MAX_VALUE, bestS = 0;
+            for (int i = 0; i + 1 < x.length; i++) {
+                double dx = x[i + 1] - x[i], dz = z[i + 1] - z[i], l2 = dx * dx + dz * dz;
+                double t = l2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((px - x[i]) * dx + (pz - z[i]) * dz) / l2));
+                double qx = x[i] + dx * t - px, qz = z[i] + dz * t - pz, d = qx * qx + qz * qz;
+                if (d < best) { best = d; bestS = cum[i] + (cum[i + 1] - cum[i]) * t; }
+            }
+            return bestS;
+        }
+
+        /** How far along THIS lane a lane change onto {@code side} is made: where the neighbour starts. An aux
+         *  lane opens part-way along its run, so a change onto it is a stretch of this lane plus the jump. */
+        public double leadTo(Lane side) {
+            return alongXZ(side.x[0], side.z[0]);
+        }
+
         private int segmentAt(double s) {
             int lo = 0, hi = cum.length - 2;
             while (lo < hi) {
@@ -423,7 +441,7 @@ public final class RoadGraph {
             double c = (Double) top[0];
             if (c > E.getOrDefault(l, Double.MAX_VALUE)) continue;
             for (Lane n : l.succ) relax(E, prev, viaSide, pq, n, c + l.length(), l, false);
-            for (Lane n : l.side) relax(E, prev, viaSide, pq, n, c + LANE_CHANGE_COST, l, true);
+            for (Lane n : l.side) relax(E, prev, viaSide, pq, n, c + LANE_CHANGE_COST + l.leadTo(n), l, true);
         }
 
         // Pick the goal: reached from a lane start (E), or on a seed lane ahead of the start.
@@ -464,9 +482,10 @@ public final class RoadGraph {
                 }
                 Lane pl = (Lane) p;
                 if (side) {
-                    // A lane change is a jump, not a stretch of road: record a zero-length leg so
-                    // the lane list still says which lane the change was made from.
-                    legs.add(new Leg(pl, 0, 0));
+                    // A lane change: this lane is driven up to where the neighbour starts (an aux lane
+                    // opens part-way along its run; 0 when both start together), then a jump across. The
+                    // leg stays in the list even at zero length, so it names the lane changed from.
+                    legs.add(new Leg(pl, 0, pl.leadTo(cur)));
                 } else {
                     legs.add(new Leg(pl, 0, pl.length()));
                 }

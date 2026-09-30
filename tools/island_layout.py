@@ -454,6 +454,126 @@ def chain_folds(path):
     return out
 
 
+PHASE2_ALONG = 60.0   # m: a road may cross the held phase-2 corridor (it will pass UNDER the elevated Wangan), not run in it
+
+
+def phase2_intrusions(path):
+    """What stands in the held PHASE-2 ground (island_plan.PHASE2_*, PLAN.md NEXT): [(what, name, detail)].
+    * a road running ALONG the corridor or through the T's footprint for more than PHASE2_ALONG (a crossing is allowed:
+      the Wangan will be elevated over it); the spur itself is the T's mainline and is allowed there;
+    * a station of the spur's own inside `SPUR_T_CLEAR` (the T's aux slots and taper spans need that stretch clear);
+    * a frozen site or a civic plot overlapping it."""
+    import island_plan as PL
+    import island_core_streets as CS
+    authored = {st["name"] for st in CS.STREETS}           # the core's AUTHORED streets (the suburb loop) are there too
+    net = pm.load_network(path)
+    boxes = PL.phase2_boxes()
+
+    def inside(x, y, box):
+        cx, cy, c, s_, ha, hc = box
+        u, v = (x - cx) * c + (y - cy) * s_, -(x - cx) * s_ + (y - cy) * c
+        return abs(u) <= ha and abs(v) <= hc
+    out = []
+    for name, r in net.roads.items():
+        # what may NOT stand in it is what a later layout can put there: a generated block street, or another
+        # expressway road. The roads already there (the ring on its dike, the suburb loop, the arterials) pass UNDER
+        # the elevated phase-2 Wangan and are its business to clear, as the spur's are today.
+        if name.startswith("shuto_spur") or not name.split("__")[0].startswith(GENERATED_STREETS + ("shuto_",)) \
+                or name.split("__")[0] in authored:
+            continue
+        ps = [net.points[u].pos for u in r.points if u in net.points]
+        for box in boxes:
+            run = 0.0
+            for a, b in zip(ps, ps[1:]):
+                L = math.dist(a[:2], b[:2])
+                n = max(1, int(L // 4.0))
+                for k in range(n):
+                    t = (k + 0.5) / n
+                    if inside(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, box):
+                        run += L / n
+            if run > PHASE2_ALONG:
+                out.append(("road", name, "%.0f m inside" % run))
+                break
+    y0, y1 = sorted(PL.SPUR_T_CLEAR)
+    for name, r in net.roads.items():
+        if not name.startswith("shuto_spur"):
+            continue
+        for u in r.points:
+            p = net.points[u]
+            if abs(p.pos[0] - PL.BRIDGE_X) < 30.0 and y0 + 1.0 < p.pos[1] < y1 - 1.0:
+                out.append(("spur station", name, "%s at y %.0f" % (u, p.pos[1])))
+    for fn, key in (("IslandSites.json", "sites"), ("IslandCivicSites.json", "plots")):
+        fp = os.path.join(ROOT, "assets", "world_source", "buildings", fn)
+        if not os.path.exists(fp):
+            continue
+        for st in json.load(open(fp)).get(key, []):
+            sx, sy = (st.get("size") or [0.0, 0.0])[:2]
+            a = math.radians(st.get("yaw", 0.0))
+            for gx in (-0.5, 0.0, 0.5):
+                for gy in (-0.5, 0.0, 0.5):
+                    lx, ly = gx * sx, gy * sy
+                    x = st["x"] + lx * math.cos(a) - ly * math.sin(a)
+                    y = st["y"] + lx * math.sin(a) + ly * math.cos(a)
+                    if any(inside(x, y, b) for b in boxes):
+                        out.append(("site", st.get("id", "?"), "at (%.0f, %.0f)" % (st["x"], st["y"])))
+                        break
+                else:
+                    continue
+                break
+    return out
+
+
+def one_way_stretches(path, near=25.0):
+    """Every JOINT where a divided expressway parts into two one-way roads (a JCT's split): [(parallel m, divided road,
+    one-way pair)] -- how far back from the joint the two one-way roads still run within `near` m of each other. The
+    rule (user, 2026-09-29 night): "keep it one highway as soon as possible" -- a long parallel pair is two long ramps
+    doing the divided road's job. REPORTED, not asserted."""
+    net = pm.load_network(path)
+    road_of = {u: n for n, r in net.roads.items() for u in r.points}
+    out = []
+    for u, p in net.points.items():
+        n = road_of.get(u)
+        if not n or not n.startswith("shuto_"):
+            continue
+        r = net.roads[n]
+        if r.base.lanes_bwd == 0 or r.base.lanes_fwd == 0 or u not in (r.points[0], r.points[-1]):
+            continue
+        halves = [road_of[l.target] for l in p.links if l.type == pm.LINK_SEGMENT and road_of.get(l.target) != n]
+        halves = [h for h in halves if net.roads[h].base.lanes_bwd == 0 or net.roads[h].base.lanes_fwd == 0]
+        if len(halves) != 2:
+            continue
+
+        def poly(h):
+            ch = net.roads[h].points
+            ps = [net.points[q].pos[:2] for q in ch]
+            return ps if math.dist(ps[0], p.pos[:2]) < math.dist(ps[-1], p.pos[:2]) else ps[::-1]
+        A, B = poly(halves[0]), poly(halves[1])
+
+        def dist_to(q, P):
+            best = 1e18
+            for a, b in zip(P, P[1:]):
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                L2 = dx * dx + dy * dy or 1e-9
+                t = max(0.0, min(1.0, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2))
+                best = min(best, math.hypot(a[0] + dx * t - q[0], a[1] + dy * t - q[1]))
+            return best
+        run = 0.0
+        for a, b in zip(A, A[1:]):
+            L = math.dist(a, b)
+            n_ = max(1, int(L // 4.0))
+            stop = False
+            for k in range(n_):
+                t = (k + 0.5) / n_
+                if dist_to((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t), B) > near:
+                    stop = True
+                    break
+                run += L / n_
+            if stop:
+                break
+        out.append((run, n, tuple(sorted(halves))))
+    return sorted(out, reverse=True)
+
+
 def main(argv):
     global CACHE
     if "--no-cache" in argv:
@@ -522,9 +642,17 @@ def main(argv):
     print("island_layout: %d lane hand-over(s) across a joint, worst %.3f m%s" % (
         len(gaps), gaps[0][0] if gaps else 0.0, "" if not wide else "; %d OVER %.2f m: %s" % (
             len(wide), JOINT_GAP, ", ".join("%s -> %s %.2f m" % (a, b, g) for g, a, b in wide[:6]))))
+    t0 = time.monotonic()
+    ows = one_way_stretches(OUTPUT)
+    print("island_layout: %d expressway split(s); one-way pairs run parallel %s" % (
+        len(ows), ", ".join("%.0f m (%s -> %s)" % (m, d, " / ".join(h)) for m, d, h in ows)))
+    p2 = phase2_intrusions(OUTPUT)
+    TIMES["check: expressway splits + phase 2"] = time.monotonic() - t0
+    print("island_layout: phase-2 Wangan ground held%s" % ("" if not p2 else "; %d INTRUSION(S): %s" % (
+        len(p2), ", ".join("%s %s %s" % x for x in p2[:10]))))
     print("island_layout: time " + ", ".join("%s %.0f s" % kv for kv in sorted(TIMES.items(), key=lambda kv: -kv[1])))
     print("island_layout: %d step(s) replayed from the cache%s" % (len(HITS), "" if not HITS else " (%s)" % ", ".join(HITS)))
-    if rep["errors"] or any(bad.values()) or low or steep or folds:
+    if rep["errors"] or any(bad.values()) or low or steep or folds or p2:
         sys.exit(1)
 
 

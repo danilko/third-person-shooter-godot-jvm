@@ -71,7 +71,9 @@ FLOOR_Z = 0.6                 # the city plain
 # --- the coast edits (v1, v6, v7, v9, v10) ---
 GULF_FILL = (300.0, 280.0, 900.0, 760.0)          # x0, z0, x1, z1: the gulf HEAD, filled
 HARBOUR_TRIM = (-820.0, 300.0)                    # x range of the harbour peninsula...
-HARBOUR_TRIM_Z = 1540.0                           # ...trimmed south of this
+HARBOUR_TRIM_Z = 1492.0                           # ...trimmed south of this (1540 until 2026-09-29 night: the
+                                                  # military area and the container terminal now share ONE straight
+                                                  # south quay line, the runway's outer edge + a 4 m verge)
 # THE CONTAINER QUAY IS STRAIGHT (user, 2026-09-25: "straighten up the harbour, so it is square"). The base's east quay
 # ran from x 248 (z 1050) to x 204 (z 1500), 5.6 deg off north, and the terminal was fitted to it at yaw 85. Here it is a
 # straight seawall at x = 250, in line with the coast north of it (no step): land east of the line becomes quay water (at the seabed, a berth), water
@@ -334,7 +336,7 @@ def reshape(base):
 #: air base's runway strip (user, 2026-09-26: "a small airlane/terminal for standard fighter flight/landing") now
 #: takes that water.
 MILITARY_PIERS = ((-1020.0, -740.0, 1300.0, 1350.0),
-                  (-1030.0, -740.0, 1478.0, 1540.0))     # the RUNWAY strip (below): its west half only
+                  (-1030.0, -740.0, 1438.0, 1492.0))     # the RUNWAY strip (below): its west half only
 # THE RUNWAY IS OFFSHORE, FROM THE BASE INTO THE SEA (user, 2026-09-29: "the military's runway should be fully covered
 # by the military ... start the military base into the ocean like the pier"; Iwakuni / Haneda D are the precedent). The
 # second rectangle is a reclaimed strip 525 x 62 m running WEST from the base's south-west corner, the platform's

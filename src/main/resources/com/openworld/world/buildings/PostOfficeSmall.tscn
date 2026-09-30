@@ -3,9 +3,10 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_mesh.res" id="1_17g1s"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/PostOfficeSmall_collision.res" id="2_6re83"]
 
-[node name="PostOfficeSmall" type="Node3D" unique_id=1298356014]
+[node name="PostOfficeSmall" type="Node3D" unique_id=441623398]
 metadata/building = {
 "aabb": [Vector3(-5, 0, -6), Vector3(10, 8.3, 15.6)],
+"base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -26,14 +27,14 @@ metadata/building = {
 "wall_top_m": 8.3
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=584874899]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1238980111]
 visibility_range_end = 399.6
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_17g1s")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=963847852]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=788016765]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1550427407]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1191588493]
 shape = ExtResource("2_6re83")

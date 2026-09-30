@@ -13,9 +13,10 @@ size = Vector3(0.94, 2.1, 0.14)
 [sub_resource type="BoxShape3D" id="BoxShape3D_16dwi"]
 size = Vector3(0.9, 2.1, 0.14)
 
-[node name="FireBranch" type="Node3D" unique_id=1961608088]
+[node name="FireBranch" type="Node3D" unique_id=1334679169]
 metadata/building = {
 "aabb": [Vector3(-10, -0.2, -12.5), Vector3(20, 6.8999996, 25)],
+"base_m": -0.2,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [{
@@ -122,49 +123,49 @@ metadata/building = {
 "wall_top_m": 6.9
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1421051655]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=632134651]
 visibility_range_end = 380.4
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_5jtib")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1933178452]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=515784017]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=2057036239]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=874489679]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.9500003, 1.05, 9.9)
 shape = SubResource("BoxShape3D_4jie8")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1564894097]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1313255340]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.05, 1.05, 9.9)
 shape = SubResource("BoxShape3D_ne3hl")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=509004586]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=285284286]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -3.8, 1.05, -7.9)
 shape = SubResource("BoxShape3D_16dwi")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1216727364]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=345594699]
 shape = ExtResource("2_dy2tf")
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1117247622]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1178738952]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 4.5, 0, 9.9)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=27060005]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=690469112]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.8, 0, -7.9)
 
-[node name="Markers" type="Node3D" parent="." unique_id=312129913]
+[node name="Markers" type="Node3D" parent="." unique_id=607432162]
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=466737364 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=707996980 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -4, 0, 8.5)
 metadata/team = "fire"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1333627200 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1854408375 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.4, 0, 6.5)
 metadata/team = "fire"
 metadata/kind = "spawn"
 
-[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=1031922853 groups=["mission_marker"]]
+[node name="MARK_vehicle_01" type="Node3D" parent="Markers" unique_id=308974688 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -5.9, 0, 4)
 script = ExtResource("3_vuh3c")
 vehicle_id = "FIE1"
@@ -173,7 +174,7 @@ drop_height = 0.3
 metadata/vehicle = "FIE1"
 metadata/kind = "vehicle"
 
-[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=618916586 groups=["mission_marker"]]
+[node name="MARK_vehicle_02" type="Node3D" parent="Markers" unique_id=1707203046 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.2, 0, 4.9)
 script = ExtResource("3_vuh3c")
 vehicle_id = "AMB1"

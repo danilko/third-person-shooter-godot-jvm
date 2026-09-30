@@ -4,9 +4,10 @@
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/FishMarket_collision.res" id="2_02faf"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/world/ParkedVehicle.java" id="3_4fenj"]
 
-[node name="FishMarket" type="Node3D" unique_id=1411670701]
+[node name="FishMarket" type="Node3D" unique_id=1663645923]
 metadata/building = {
 "aabb": [Vector3(-205, 0, -48), Vector3(410, 11.42, 96)],
+"base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -45,21 +46,21 @@ metadata/building = {
 "wall_top_m": 11.42
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1457883226]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=643848150]
 visibility_range_end = 560.54456
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_arpke")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=293110200]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=1267372333]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=274901412]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1172537481]
 shape = ExtResource("2_02faf")
 
-[node name="Markers" type="Node3D" parent="." unique_id=2126322470]
+[node name="Markers" type="Node3D" parent="." unique_id=903868365]
 
-[node name="MARK_vehicle_FIB1_0" type="Node3D" parent="Markers" unique_id=1460715048 groups=["mission_marker"]]
+[node name="MARK_vehicle_FIB1_0" type="Node3D" parent="Markers" unique_id=914642335 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -20, -5.6, 60)
 script = ExtResource("3_4fenj")
 vehicle_id = "FIB1"
@@ -68,7 +69,7 @@ drop_height = 0.3
 metadata/kind = "vehicle"
 metadata/vehicle = "FIB1"
 
-[node name="MARK_vehicle_FIB1_1" type="Node3D" parent="Markers" unique_id=1807680895 groups=["mission_marker"]]
+[node name="MARK_vehicle_FIB1_1" type="Node3D" parent="Markers" unique_id=651964592 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 20, -5.6, 60)
 script = ExtResource("3_4fenj")
 vehicle_id = "FIB1"

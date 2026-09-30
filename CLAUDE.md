@@ -10684,6 +10684,84 @@ that `probe_road_clear` or the layout gates measured.
   PIECES.md`). An artist marks a finished model in `kits/library/status.json`. `--check` fails on a piece with no
   recorded source.
 
+## Hand-authoring the island after generation (2026-09-30)
+
+`assets/world_source/HAND_AUTHORING.md` is the how-to for level designers and artists: which record owns each thing,
+the Road Kit workflow for roads, lanes and ramps, placing and moving buildings, terrain, and what to re-run after each
+edit. The handover itself (freezing the generated records, a stamp that cooperates with the block ground, a Downstream
+button, an editor building placer) is PLAN.md NEXT item 12, the last piece of that batch. Until then the generators still own the island's roads and
+buildings.
+
+## Four access points on C1, billboards, fenced airside + air base, mission buildings placed, running trains (2026-09-29 night)
+
+PLAN.md "NEXT (2026-09-29 night)", one `island_world.sh --from land` rebuild.
+- **The expressway is rebuilt round FOUR ACCESS POINTS on C1** (`tools/island_plan.py` numbers,
+  `tools/island_expressway.py` builds). **Removed:** `shuto_eb_loop`, the old south JCT at x 655, the Wangan-spur Y,
+  the spur's 27.5 m hump, and the x-890 joint.
+  - **N diamond** (`DIAMOND_X` 335/345/855/865, a tight diamond down to `DIAMOND_J`). Each end has an exit on one
+    carriageway and an entrance on the other, 10 m apart.
+  - **W JCT**: the Wangan with all 4 movements. The Wangan's leg runs north beside the rail at `W_LEG_X` 370
+    (record). Its two C1 ramps are joints; the `w_fwd_off` flyover and the `w_fwd_on` ramp use `make_ramp`.
+  - **E JCT**: the airport. The spur is ONE divided road from its joint at `E_JOINT_Y` and runs straight south down
+    x 1250 onto the Rainbow Bridge's upper deck. It has 3 movements; spur -> C1 FWD is not built.
+  - **The Wangan's west T is on the straight west coast** (`WANGAN_T` (-1161, 860) Godot).
+  - **The S diamond was NOT built.** C1's south side is 790 m and already carries both JCTs' ramps.
+  - `island_layout` reports every one-way stretch between a split and its joint (measured: 100 m and 87 m).
+- **Phase 2 (a Wangan waterfront continuation to a T on the spur) is HELD, not built.** `island_plan.PHASE2_CORRIDOR`
+  (record, half width `PHASE2_HALF` 17.5) and `PHASE2_T_BOX` are street sites (`island_streets`) and building
+  reserves (`island_buildings.plan_reserves`). The spur keeps no station inside `SPUR_T_CLEAR`.
+  `island_layout.phase2_intrusions` asserts it ("phase-2 Wangan ground held").
+- **Two kit fixes the new ramps needed**:
+  - `road_points._neighbour_map` takes each aux slot's neighbours from the widest station where THAT slot is live.
+    Without it, an entrance's acceleration lane had no receiver when the exit and the entrance on opposite
+    carriageways sit at different stations.
+  - `island_dike.cmd_raise` re-runs `align_ramp` on every AUX pair after lifting a crossing (ramp_edge_residual
+    1.14 m).
+- **Rooftop billboards**: every `roof_sign` type (PencilBuilding, ShopHouse, Mansion, OfficeMid, OfficeBlock) gets a
+  `<Id>_BB` twin with a `Sign_RoofBillboard_{S,L}_{Red,Cyan,Yellow,Green}` library piece on its top roof, at its
+  front edge. The twin is made by `layout_buildings.roof_sign_types`, and the prop uses `"roof_front": d`.
+  `island_buildings.sign_pick` swaps a slot to its twin by a hash, per region (`SIGN_REGIONS`: downtown 0.33,
+  nightlife 0.45, akiba 0.4, the station fronts ~0.3).
+- **The airside is fenced** (`tools/building_kit/site_airport_fence.py`): Mil_Fence bays run round the
+  `AirportAirside` footprint. The terminal's span is the only opening. `Airport_ServiceGate` (locked, booth
+  landside) stands where `kuko_service` (island_site_access) ends. The civil `AirportControlTower` is a part of the
+  composite.
+- **The air base is compact** (`tools/building_kit/site_military.py`). Base z 1250..1444.4, runway z 1443..1491,
+  the land strip trimmed to 1492, one pier. One fence runs round both, open only at the east gate and the pier gap.
+- **Fence rule:** a Mil_Fence bay's outrigger leans 0.6 m to its local +Z. So every line stands 0.7 m inside the
+  footprint, and its yaw points the outrigger OUT (a run along local Z takes yaw 90/270).
+- **Composite size rule** (`layout_buildings.layout_composite`, read by probe_buildings):
+  - a composite PROP past the front counts toward `forecourt_m` (the gate booth);
+  - a part set into the ground (`"y"` < 0, the CargoShip in ContainerTerminal) counts its own `base_m` (the hull
+    under its waterline origin) in the composite's height.
+- **Mission buildings are placed**: 16 `mission_*` civic plots (`island_civic_sites.py`) carry the kits/interiors
+  buildings. A shop gets `_Shop` (izakaya, maid cafe, department store, fashion, onsen); every other plot gets
+  `_Open`, locked (`island_buildings.CIVIC_SCENE`). CargoShip is berthed in ContainerTerminal, and the
+  multistorey car park in CentralForecourt is the walkable `ParkingGarage`.
+- **Re-site after every layout:** a layout moves streets, and plots lose their road. After this rebuild 6 plots lost
+  their road and `jhs_west` stood 2.8 m onto a band; the civic check misses band overlap, and
+  `island_buildings.py roads` found it. Fix with `--resite=<ids> --avoid-streets`, then re-run from `terrain`.
+  `--from buildings` refuses once the block ground is laid.
+- **Three runtime fixes the gates found**:
+  - `RoadGraph` charges a lane change onto an aux lane that opens mid-run for the stretch of the old lane driven
+    up to where the neighbour starts (`Lane.leadTo`). It had been a free jump to the neighbour's start, which
+    undercounted routes (`RoadGraphTest`).
+  - `ZoneManager.zoneStillEntering`: a lane whose own piece is still in GEO_ENTER is not a traffic spawn point.
+  - `probe_road_clear` turns `TrainSystem` off.
+- **E/W JCT flyovers must cross the Wangan leg HIGH**: `island_grades.level_gores` holds a ramp at its mainline's
+  height until the two paved bands part. A ramp running close beside its mainline therefore never climbs, and it
+  crossed the leg at grade through the median wall. W3's parallel run is 28 m off the leg, and W4 climbs on the
+  west side before turning across. Expressway ramps stand on `RKA_PIER_round`.
+- **Running trains** (`world.TrainSystem`, AutoLoad; engine-free `world.TrainTimetable`, `TrainTimetableTest` 4):
+  - The tracks are the rail lanekits chained by `next`. One EMU1 4-car set per track shuttles stop to stop:
+    trapezoid runs at 0.9 m/s², 25 s dwell, 45 s at a terminus, capped by the lane limit and a curve's sqrt(0.8 R).
+  - It runs on the system clock like `SignalTiming`, so there is no message; `game_clock` is for probes.
+  - Level crossings close from the timetable (`crossingClosed`). Their units come from `<prefix>.crossings.json`,
+    which `roadkit_cli gltf` now writes beside the lanekits. The lamps flash while a crossing is closed, and
+    `VehicleAIController.signalSpeedLimit` stops a car at a closed crossing (`TrainSystem.stopDistance`).
+  - Cars (AnimatableBody3D) exist only within 650 m of the camera.
+  - Gate `tools/godot/probe_trains.gd [--world=island] [--control]`.
+
 ## Audio: every sound is a file (2026-09-29)
 
 No sound is synthesised in code (`SoundTest` refuses `new AudioStreamWAV(` / `AudioStreamGenerator` under
@@ -10695,6 +10773,14 @@ checks its "Wired in code" table against the enum. Licence rule as for art: CC0 
 
 ## Known Quirks / Gotchas
 
+- **Godot re-imports a glTF only when the `.gltf` FILE changes; it never hashes the `.bin`** (2026-09-29). A
+  geometry change that leaves every accessor's count, offset and bounds identical rewrites the `.bin`, and the
+  next bake silently uses the OLD import. Measured: 27 of the island's road and rail pieces had been baked from
+  stale imports, some for 8 days. The visible symptom was a rail pier standing in a street that `pier_on_road`
+  had dropped from the current glTF. `point_gltf.write` now puts the buffer's sha1 in `asset.extras.bin_sha1`,
+  so the JSON changes whenever the geometry does. The same risk applies to any other glTF writer (the Blender
+  exports of kit pieces and bodies); to check one, compare `.godot/imported/<name>*.scn`'s mtime against its
+  `.bin`.
 - **godot-jvm rc1: `Transform3D.times(Transform3D)` MUTATES its receiver** (`val t = this`, then writes into it) and
   returns it. `a.times(b)` in a loop accumulates every product into `a` (every car part's box sat ~1 m above the
   last). Always call it on a fresh getter result (`getGlobalTransform().affineInverse().times(x)`); `times(Vector3)`

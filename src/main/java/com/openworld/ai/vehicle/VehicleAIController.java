@@ -320,8 +320,12 @@ public class VehicleAIController extends Controller {
         heldAtSignal = false;
         if (racing || route == null || !(route instanceof godot.api.Node rn)) return Float.MAX_VALUE;
         com.openworld.world.TrafficSignals ts = com.openworld.world.TrafficSignals.get();
-        if (ts == null) return Float.MAX_VALUE;
-        double d = ts.stopDistance(rn.getName().toString(), routeProgress, route.total(), currentSpeed());
+        String lane = rn.getName().toString();
+        double d = ts == null ? -1.0 : ts.stopDistance(lane, routeProgress, route.total(), currentSpeed());
+        // a LEVEL CROSSING (踏切) closed for a train is a red light at its hold line (world.TrainSystem)
+        com.openworld.world.TrainSystem trains = com.openworld.world.TrainSystem.get();
+        double dx = trains == null ? -1.0 : trains.stopDistance(lane, routeProgress);
+        if (dx >= 0.0 && (d < 0.0 || dx < d)) d = dx;
         if (d < 0.0) return Float.MAX_VALUE;
         heldAtSignal = true;
         return (float) Math.sqrt(2.0 * SIGNAL_DECEL * Math.max(0.0, d - 0.3));

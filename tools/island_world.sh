@@ -73,6 +73,9 @@ if want layout; then
     # the station forecourt's composite is derived from the rotary and its reserve: it must match them
     python3 tools/building_kit/site_central_forecourt.py --check || echo "WARNING: CentralForecourt is stale -- run tools/building_kit/site_central_forecourt.py and build_buildings.sh"
     python3 tools/building_kit/site_airport_forecourt.py --check || echo "WARNING: AirportForecourt is stale -- run tools/building_kit/site_airport_forecourt.py and build_buildings.sh"
+    # the airside fence (closed against the terminal) and the compact military area's fence, derived from the reserves
+    python3 tools/building_kit/site_airport_fence.py --check || echo "WARNING: AirportAirside's fence is stale -- run tools/building_kit/site_airport_fence.py and build_buildings.sh"
+    python3 tools/building_kit/site_military.py --check || echo "WARNING: the military composites are stale -- run tools/building_kit/site_military.py and build_buildings.sh"
     # every street's real Japanese name (the signal plates, the minimap), and the font subset that draws them
     python3 tools/island_street_names.py | tail -1
     python3 tools/make_jp_font.py --check >/dev/null 2>&1 || python3 tools/make_jp_font.py | tail -1

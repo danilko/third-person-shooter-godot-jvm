@@ -406,6 +406,31 @@ VARIANTS = _variants()
 BASE_OF = {v: b for b, vs in VARIANTS.items() for v in vs}
 
 
+def _signs():
+    """{type or footprint variant: its rooftop-billboard twin} (layout_buildings.roof_sign_types)."""
+    sys.path.insert(0, os.path.join(HERE, "building_kit"))
+    import layout_buildings as _lb
+    return _lb.sign_ids()
+
+
+SIGNS = _signs()
+SIGN_OF = {v: k for k, v in SIGNS.items()}
+BASE_OF.update({v: BASE_OF.get(k, k) for k, v in SIGNS.items()})
+#: How many of the tall buildings carry a rooftop billboard, by region (user, 2026-09-29: "rooftop billboards across
+#: downtown ... perhaps 1 in 3"). A region not listed carries none.
+SIGN_REGIONS = {"downtown": 0.33, "nightlife": 0.45, "akiba": 0.4, "west_ekimae": 0.33, "ekimae": 0.3}
+
+
+def sign_pick(t, key, region):
+    """The rooftop-billboard twin of `t` for a slot in `region`, by the region's weight and a hash of the slot's key
+    (so an unchanged record rebuilds byte-identically); else `t`."""
+    s = SIGNS.get(t)
+    w = SIGN_REGIONS.get(region, 0.0)
+    if not s or w <= 0.0:
+        return t
+    return s if (zlib.crc32(("sign|%s|%s" % (key, t)).encode()) % 1000) / 1000.0 < w else t
+
+
 def variant_pick(t, key):
     """The type actually built for a slot drawn as `t`: the base or one of its footprint variants, by a hash of the
     slot's key, so an unchanged record rebuilds byte-identically and neighbours differ."""
@@ -418,6 +443,7 @@ def variant_pick(t, key):
 
 TYPES = sorted({t for r in REGIONS for t in r[4]} | set(PARKING.values()) | CAR_PARKS
                | {v for r in REGIONS for t in r[4] for v in VARIANTS.get(t, ())})   # + the safe house's car park
+TYPES = sorted(set(TYPES) | {SIGNS[t] for t in TYPES if t in SIGNS})
 
 # --- the ambient crowd (PLAN.md 3.6d). A pedestrian zone is derived from the SAME footways the buildings front,
 # on the SAME 252 m cell grid, so "where do people walk" has one owner. What a zone carries is a
@@ -809,6 +835,10 @@ def plan_reserves(field):
     import island_plan as PL
     for name, (x0, z0, x1, z1) in PL.RESERVES:
         field.block_box((x0 + x1) / 2.0, (z0 + z1) / 2.0, 0.0, (x1 - x0) / 2.0, (z1 - z0) / 2.0, hold=True)
+    # the PHASE-2 WANGAN corridor + its T (record-frame oriented boxes -> the Godot frame: z = -y, and a box's local x
+    # along (cos, sin) in the record is (cos yaw, -sin yaw) in Godot (x, z), i.e. yaw = atan2(sin, cos))
+    for cx, cy, c, s_, ha, hc in PL.phase2_boxes():
+        field.block_box(cx, -cy, math.atan2(s_, c), ha, hc, hold=True)
     print("island_buildings: %d reserve(s) held for later: %s" % (len(PL.RESERVES),
                                                                 ", ".join(n for n, _b in PL.RESERVES)))
 
@@ -850,13 +880,33 @@ def civic_plots(field, frontage):
 CIVIC_TYPES = {"police_station": "PoliceStation", "koban": "Koban", "fire_station": "FireStation",
                "fire_branch": "FireBranch", "ward_office": "WardOffice", "clinic": "Clinic",
                "elementary_school": "SchoolElementary", "junior_high_school": "SchoolJuniorHigh",
-               "water_resort": "WaterResort", "shrine": "Shrine", "temple": "Temple", "park": "Park"}
+               "water_resort": "WaterResort", "shrine": "Shrine", "temple": "Temple", "park": "Park",
+               # the MISSION BUILDINGS (kits/interiors, 2026-09-29 night; island_civic_sites.PLOTS mission_*)
+               "bank_large": "BankLarge", "office_hq": "OfficeHQ", "department_store": "DepartmentStore",
+               "civic_center": "CivicCenter", "fashion_building": "FashionBuilding",
+               "safehouse_city_large": "SafeHouseCityLarge", "izakaya": "Izakaya", "maid_cafe": "MaidCafe",
+               "adult_services": "AdultServices", "safehouse_city_small": "SafeHouseCitySmall",
+               "bank_small": "BankSmall", "safehouse_small": "SafeHouseSmall", "safehouse_large": "SafeHouseLarge",
+               "secure_mansion": "SecureMansion", "warehouse_yard": "WarehouseYard", "onsen_ryokan": "OnsenRyokan"}
+#: which variant a civic building stands as: a MISSION building is enterable but LOCKED (`_Open`, a mission unlocks
+#: it), a shop is always open (`_Shop`); anything not listed ships shut (a placeholder civic building).
+CIVIC_SCENE = {"BankLarge": "_Open", "OfficeHQ": "_Open", "SafeHouseCityLarge": "_Open", "AdultServices": "_Open",
+               "SafeHouseCitySmall": "_Open", "BankSmall": "_Open", "SafeHouseSmall": "_Open",
+               "SafeHouseLarge": "_Open", "SecureMansion": "_Open", "WarehouseYard": "_Open",
+               "DepartmentStore": "_Shop", "FashionBuilding": "_Shop", "CivicCenter": "_Shop", "Izakaya": "_Shop",
+               "MaidCafe": "_Shop", "OnsenRyokan": "_Shop"}
 CIVIC_LABELS = {"PoliceStation": ("Police Station", 1), "Koban": ("Police Box", 1), "FireStation": ("Fire Station", 1),
                 "FireBranch": ("Fire Station", 1), "PostOffice": ("Post Office", 1),
                 "PostOfficeSmall": ("Post Office", 1), "WardOffice": ("Ward Office", 1), "Hospital": ("Hospital", 1),
                 "HospitalSmall": ("Hospital", 1), "Clinic": ("Clinic", 1), "SchoolElementary": ("School", 1),
                 "SchoolJuniorHigh": ("School", 1), "WaterResort": ("Water Resort", 2), "Shrine": ("Shrine", 1),
-                "Temple": ("Temple", 1), "Park": ("Park", 1)}
+                "Temple": ("Temple", 1), "Park": ("Park", 1),
+                "BankLarge": ("Bank", 1), "BankSmall": ("Bank", 1), "OfficeHQ": ("Head Office", 2),
+                "DepartmentStore": ("Department Store", 1), "CivicCenter": ("Civic Centre", 1),
+                "FashionBuilding": ("Fashion Building", 1), "Izakaya": ("Izakaya", 2), "MaidCafe": ("Maid Cafe", 2),
+                "AdultServices": ("Club", 2), "SafeHouseCityLarge": ("Hideout", 2), "SafeHouseCitySmall": ("Hideout", 2),
+                "SafeHouseSmall": ("Hideout", 2), "SafeHouseLarge": ("Residence", 2),
+                "SecureMansion": ("Mansion", 1), "WarehouseYard": ("Warehouse", 2), "OnsenRyokan": ("Onsen Ryokan", 1)}
 
 
 def civic_type(p):
@@ -1605,7 +1655,7 @@ def derive(heights_path):
                         order.append(names.pop(pick))
                         weights.pop(pick)
                     for t in order:
-                        t = variant_pick(t, key)
+                        t = sign_pick(variant_pick(t, key), key, reg[0])
                         # the row line is where the front stands; sample the lot's centre along the row
                         w = aabbs[t][2] - aabbs[t][0]
                         adv = w / 2.0 + alley_of(reg)
@@ -1673,9 +1723,11 @@ def derive(heights_path):
     # the CIVIC buildings stand on their plots (their plots were blocked for everything else above)
     for c in civic:
         reg = region_of(c["pos"][0], -c["pos"][2])
-        placed.append({"type": c["type"], "region": reg[0] if reg else "civic", "key": "civic|" + c["id"],
-                       "civic": c["id"], "pos": list(c["pos"]), "yaw": c["yaw"], "lot": list(c["lot"]),
-                       "lot_depth": 0.5})
+        row = {"type": c["type"], "region": reg[0] if reg else "civic", "key": "civic|" + c["id"],
+               "civic": c["id"], "pos": list(c["pos"]), "yaw": c["yaw"], "lot": list(c["lot"]), "lot_depth": 0.5}
+        if c["type"] in CIVIC_SCENE:
+            row["scene"] = c["type"] + CIVIC_SCENE[c["type"]]
+        placed.append(row)
     # ...and only THEN are lots separated: a neighbour's rectangle can overhang a civic plot's edge exactly as it can a
     # neighbour's (38 pairs, 175 m2 when this pass ran before the civic buildings joined, 2026-09-28)
     separate_lots(placed, aabbs)
@@ -2307,7 +2359,7 @@ def anchors_only(check):
     for b in doc["buildings"]:
         b.pop("role", None)
         sc = b.get("scene", b["type"])
-        if sc.endswith("_Open") or (sc.endswith("_Shop") and b["type"] not in SHOP_TYPES):
+        if not b.get("civic") and (sc.endswith("_Open") or (sc.endswith("_Shop") and b["type"] not in SHOP_TYPES)):
             b.pop("scene", None)
     doc["anchored_missions"], doc["roles"] = apply_anchors(doc["buildings"])
     changed = json.dumps(doc, sort_keys=True) != before
@@ -2521,7 +2573,8 @@ def write(check):
         for b in blds:
             t = b["type"]
             if t not in aabbs:
-                aabbs[t] = type_aabb(t)
+                # a billboard twin's far box is its building's (the sign on the roof is not a storey)
+                aabbs[t] = type_aabb(SIGN_OF.get(t, t))
             x0, z0, x1, z1, h = aabbs[t]
             tone = int(b.get("tone", 0))
             rgb = HLOD_GLASS.get(BASE_OF.get(t, t)) or (levels[tone]["srgb"] if tone < len(levels) else (150.0, 150.0, 150.0))

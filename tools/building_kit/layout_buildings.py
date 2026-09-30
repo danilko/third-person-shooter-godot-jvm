@@ -392,6 +392,8 @@ def layout_type(t, root):
             at[0] = W / 2 - float(p["right"])
         if "left" in p:
             at[0] = -W / 2 + float(p["left"])
+        if "roof_front" in p:          # at the front edge of the TOP roof: behind a setback, d in from its parapet
+            at[1] = D / 2 - out["setback_m"] - float(p["roof_front"])
         p["at"] = at
         return p
     t = dict(t, props=[_resolve(p) for p in t.get("props", [])])
@@ -659,16 +661,18 @@ def layout_composite(c, built, root):
            "pieces": [], "boxes": [], "hulls": [], "doors": [], "solid_probes": []}
     rects = []
     height = 0.0
+    low = 0.0
     for part in c.get("parts", []):
         b = built.get(part["type"])
         if b is None:
             raise SystemExit(f"{c['id']}: part {part['type']} is not a building type")
         yaw = float(part.get("yaw", 0.0))
         ox, oz = part["at"]
+        oy = float(part.get("y", 0.0))      # a part may stand lower (a ship at a quay: its origin is its waterline)
 
         def mv(p):
             x, z = rot_xz(yaw, p[0], p[2])
-            return [round(x + ox, 5), p[1], round(z + oz, 5)]
+            return [round(x + ox, 5), round(p[1] + oy, 5), round(z + oz, 5)]
 
         def turn(v):
             x, z = rot_xz(yaw, v[0], v[2])
@@ -707,8 +711,21 @@ def layout_composite(c, built, root):
         if round(yaw) % 180 == 90:
             fw, fd = fd, fw
         rects.append((ox - fw / 2, ox + fw / 2, oz - fd / 2, oz + fd / 2))
-        height = max(height, b["height_m"])
+        height = max(height, b["height_m"] + oy)
+        if "y" in part:                  # a part SET INTO the ground (the ship): its hull below the site's ground
+            low = min(low, oy + b.get("base_m", 0.0))
+        # a part standing out past the site's FRONT (the ship at the container quay) makes the mesh deeper on that side
+        # only, the way a shop's forecourt props do (probe_buildings' size rule)
+        out["forecourt_m"] = round(max(out.get("forecourt_m", 0.0), oz + fd / 2 - D / 2), 4)
     out["has_interior"] = bool(c.get("props")) or out.get("has_interior", False)
+    # ...and so does a composite PROP past the front (a gate's guard booth on the landside of a perimeter fence)
+    for p in c.get("props", []):
+        if "piece" not in p or not isinstance(p.get("at"), list) or p.get("repeat"):
+            continue
+        e = lib_piece(p["piece"], root)[1]
+        a = math.radians(float(p.get("yaw", 0.0)))
+        zs = [-x * math.sin(a) + z * math.cos(a) for x in (e["min"][0], e["max"][0]) for z in (e["min"][2], e["max"][2])]
+        out["forecourt_m"] = round(max(out.get("forecourt_m", 0.0), float(p["at"][1]) + max(zs) - D / 2), 4)
     if c.get("reserve"):
         # the footprint is a RESERVE the site dresses (a station forecourt round its roads), not a paved slab the
         # mesh fills: the probe's size rule does not apply (probe_buildings.gd)
@@ -742,6 +759,8 @@ def layout_composite(c, built, root):
     out["clear_probes"] = [list(map(float, q)) for q in c.get("clear_probes", [])]
     out["wall_top_m"] = round(max(tops), 4)
     out["height_m"] = round(float(c.get("height_m", max(height, out.get("props_top_m", 0.0)))), 4)
+    # a part set BELOW the site's ground (the ship's hull under the quay) makes the mesh taller by that much
+    out["height_m"] = round(out["height_m"] - low, 4)
     out["roofline_m"] = out["height_m"]
     # a prop on the roof (a billboard) stands above the roofline: it is part of the mesh's height
     out["height_m"] = round(max(out["height_m"], out.get("props_top_m", 0.0)), 4)
@@ -779,6 +798,9 @@ def layout_example(e, root):
            "trimesh_pieces": 1}
     if "probe_xz" in e:
         out["probe_xz"] = e["probe_xz"]
+    # how far the mesh reaches BELOW the scene origin (a ship's hull under its waterline origin): a composite that
+    # sets this piece into the ground counts it in its own height
+    out["base_m"] = round(min(0.0, pos[1] + lo[1]), 4)
     moved = []
     for pr in e.get("props", []):
         q = dict(pr)
@@ -857,7 +879,43 @@ def expand_variants(types):
             if "doors" in v:              # a narrower variant whose base doors no longer fit
                 c["doors"] = v["doors"]
             out.append(c)
+    return out + roof_sign_types(out)
+
+
+ROOF_SIGN_COLOURS = ("Red", "Cyan", "Yellow", "Green")      # library_civic.ROOF_SIGN_COLOURS
+ROOF_SIGN_SUFFIX = "BB"
+
+
+def roof_sign_types(types):
+    """ROOFTOP BILLBOARDS (user, 2026-09-29: "across downtown, not only the electric street"): every type carrying
+    `roof_sign` (and each of its footprint variants) gets a `<id>_BB` twin with a brand-neutral billboard on its roof,
+    facing its street, at the front edge of its top roof (behind a setback). A 4.4 m sign on a front under 9.5 m, a
+    9 m one otherwise; the colour by a hash of the id, so the twins differ. `island_buildings` draws the twin by a
+    region weight (`SIGN_REGIONS`) -- it is not one of the footprint variants a slot draws from."""
+    import zlib
+    out = []
+    for t in types:
+        rs = t.get("roof_sign")
+        if not rs:
+            continue
+        c = json.loads(json.dumps(t))
+        c["id"] = "%s_%s" % (t["id"], ROOF_SIGN_SUFFIX)
+        c["sign_of"] = t["id"]
+        c.pop("roof_sign", None)
+        w = t["modules"][0] * 1.82
+        size = "S" if w < 9.5 else "L"
+        colour = ROOF_SIGN_COLOURS[zlib.crc32(c["id"].encode()) % len(ROOF_SIGN_COLOURS)]
+        c["props"] = list(c.get("props", [])) + [{"piece": "library:Sign_RoofBillboard_%s_%s" % (size, colour),
+                                                  "y": "roof", "roof_front": float(rs.get("inset", 1.2)),
+                                                  "collide": "none", "facade": True}]
+        out.append(c)
     return out
+
+
+def sign_ids(types_path=None):
+    """{type id: its rooftop-billboard twin's id} over every type and footprint variant carrying `roof_sign`."""
+    doc = json.load(open(types_path or TYPES_PATH))
+    return {t["sign_of"]: t["id"] for t in expand_variants(doc["types"]) if t.get("sign_of")}
 
 
 def variant_ids(types_path=None):

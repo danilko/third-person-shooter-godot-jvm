@@ -476,6 +476,7 @@ def cmd_gltf(a):
     for lk in sorted(glob.glob(glob.escape(kc) + "*.lanekit.json")) if kc else ():
         with open(lk) as fh:
             keep_clear += json.load(fh).get("lanes", [])
+    crossing_plan = {}
     for zone in sorted(part.pieces()):
         piece = pz.piece_name(a.prefix, zone)
         if only and piece not in only:
@@ -489,7 +490,17 @@ def cmd_gltf(a):
                         mark_mat, grid, keep_clear)
         if table is not None:
             # this piece's own level crossings (the rows its build just reported) get their signals (R4)
+            n_units = len(fur.placements)
             pfu.crossing_signals(fur, table, report.get("crossings", [])[n_cross:])
+            # ...and both go into the CROSSING PLAN the train runtime reads (world.TrainSystem): where each 踏切 is,
+            # and where its signal units stand, in the lanekit's frame (Godot axes), per piece
+            crossing_plan[piece] = {
+                "crossings": [[c[0], c[1], round(c[2], 3), round(c[4], 3), round(-c[3], 3)]
+                              + ([round(c[5], 5), round(-c[6], 5), round(c[7], 5), round(-c[8], 5)]
+                                 if len(c) >= 9 else []) for c in report.get("crossings", [])[n_cross:]],
+                "units": [{"pos": [round(u["pos"][0], 3), round(u["pos"][2], 3), round(-u["pos"][1], 3)],
+                           "fwd": [round(u["fwd"][0], 5), 0.0, round(-u["fwd"][1], 5)]}
+                          for u in fur.placements[n_units:] if u["asset"] == "crossing_signal"]}
         for mat, tris in fur.paint.items():
             objs.setdefault(pfu.PAINT_OBJECT, {}).setdefault(mat, []).extend(tris)
         if fur.collision:
@@ -498,6 +509,22 @@ def cmd_gltf(a):
         row = dict(pgl.write(objs, kit, path, markers=fur.placements), zone=zone, piece=piece, gltf=path,
                    furniture=dict(sorted(fur.counts.items())))
         pieces.append(row)
+    # the CROSSING PLAN (world.TrainSystem): merged per piece -- a DIRTY_ONLY build rebuilds some pieces, and the rest
+    # keep what their last build wrote. Only a network that HAS level crossings (the rail) writes one.
+    if any(v["crossings"] for v in crossing_plan.values()) or os.path.exists(
+            os.path.join(lanekit_dir, a.prefix + ".crossings.json")):
+        cpath = os.path.join(lanekit_dir, a.prefix + ".crossings.json")
+        doc = {"schema": 1, "note": "level crossings (踏切) and their signal units per piece, the lanekit's frame "
+                                    "(Godot axes): crossing [rail, road, x, y, z, tx, tz, rx, rz]; written by "
+                                    "roadkit_cli gltf", "pieces": {}}
+        if os.path.exists(cpath):
+            with open(cpath) as fh:
+                doc["pieces"] = json.load(fh).get("pieces", {})
+        live = {pz.piece_name(a.prefix, z) for z in part.pieces()}
+        doc["pieces"] = {k: v for k, v in doc["pieces"].items() if k in live}
+        doc["pieces"].update(crossing_plan)
+        with open(cpath, "w") as fh:
+            fh.write(json.dumps(doc, indent=1, sort_keys=True, ensure_ascii=False) + "\n")
     # the SIGNAL PLAN (world.TrafficSignals): the whole network's, every build, beside the lanekits
     signals = None
     if table is not None and lanes_doc["lanes"]:

@@ -2172,6 +2172,16 @@ public class ZoneManager extends Node {
 	 *  passes: a live node, not a turn connector (spawning mid-junction would drop a car inside
 	 *  the box), and — when a zone/distance context is given — within {@code maxDist} of
 	 *  {@code center}. */
+	/** Is the zone {@code zoneId}'s geometry still being streamed in (a load task before its SPAWN phase)? */
+	private boolean zoneStillEntering(String zoneId) {
+		if (zoneId == null || zoneId.isEmpty() || tasks.isEmpty()) return false;
+		for (StreamTask t : tasks.values()) {
+			if (t.isLoad && t.phase.ordinal() <= Phase.GEO_ENTER.ordinal() && t.marker.zone != null
+					&& zoneId.equals(t.marker.zone.zoneId)) return true;
+		}
+		return false;
+	}
+
 	private boolean isSpawnCandidate(Lane r, Vector3 center, float maxDist) {
 		if (!(r instanceof Node3D n) || !GD.isInstanceValid(n)) return false;
 		// .lanekit v2 says so EXPLICITLY. The old rule below — "spawnable iff the turn letter is
@@ -2185,6 +2195,10 @@ public class ZoneManager extends Node {
 			String turn = r.getTurn();
 			if (turn != null && !turn.isEmpty()) return false;
 		}
+		// a lane whose OWN piece is still entering the tree is not driveable yet: GEO_ENTER re-enters a piece's
+		// children a budget slice per frame, so a lane registers a frame or more before the surface collider
+		// beside it, and a car another zone set down there fell through the world (probe_traffic_spawn, fell-out)
+		if (r instanceof PathLaneRoute p && zoneStillEntering(p.zoneId)) return false;
 		Vector3 sp = r.entryPoint();
 		if (sp == null) return false;
 		if (center != null && maxDist > 0) {

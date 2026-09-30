@@ -79,6 +79,11 @@ ACCESS = [
     # truck yards between the base and the container terminal.
     dict(name="kichi_mon_michi", site="military_base", from_road="kichi_dori", at=(-460.0, -1229.0),
          end=(-460.0, -1440.0), parking="ParkingLot14"),
+    # the AIRPORT'S SERVICE ROAD (user, 2026-09-29: the airside is fenced all round; "a vehicle service gate on the
+    # landside for the hangar, off a service road -- it needs one"): a T off the forecourt loop's south leg, west of
+    # the terminal, south to the locked gate in the airside fence (site_airport_fence.py GATE_GX)
+    dict(name="kuko_service", site="airport_airfield", from_road="kuko_rotary", at=(1130.0, -1710.0),
+         end=(1130.0, -1777.0), parking=None),
     dict(name="butsuryu_michi", site="logistics_yard", from_road="kichi_dori", at=(-280.0, -1230.0),
          end=(-280.0, -1440.0), parking="ParkingLot14"),     # its car park short of the runway band (z 1480)
 ]

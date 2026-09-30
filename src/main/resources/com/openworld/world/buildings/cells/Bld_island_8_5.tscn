@@ -25,13 +25,11 @@
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool2.tres" id="tone0_3"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MidCool.tres" id="tone6_4"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_WhiteWarm2.tres" id="tone8_5"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_CharcoalCool.tres" id="tone10_7"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool.tres" id="tone5_1"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_WhiteWarm.tres" id="tone3_2"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_DarkCool2.tres" id="tone1_3"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_MidCool.tres" id="tone7_4"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_WhiteWarm2.tres" id="tone9_5"]
-[ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_MetalConcrete_CharcoalCool.tres" id="tone11_7"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_8_5.res" id="hlod"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/item/WeaponPad.java" id="pad"]
@@ -41,9 +39,9 @@ material = ExtResource("lotmat")
 
 [sub_resource type="MultiMesh" id="Lots"]
 transform_format = 1
-instance_count = 31
+instance_count = 32
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-1.8612, 0.0000, -9.8931, 0.4401, 0.0000, 0.6250, 0.0000, 5.5125, 18.6071, 0.0000, -0.9896, -522.7883, -0.6280, 0.0000, -14.2677, 3.9301, 0.0000, 0.6250, 0.0000, 5.5125, 6.2786, 0.0000, -1.4271, -535.5885, -1.0150, 0.0000, -11.6591, 4.2091, 0.0000, 0.6250, 0.0000, 5.5125, 10.1473, 0.0000, -1.1662, -551.5560, -1.8612, 0.0000, -9.9571, 4.9511, 0.0000, 0.6250, 0.0000, 5.5125, 18.6071, 0.0000, -0.9960, -567.5615, -1.1366, 0.0000, -8.0821, 8.6911, 0.0000, 0.6250, 0.0000, 5.5125, 11.3633, 0.0000, -0.8084, -614.4223, -0.8092, 0.0000, -14.2677, 8.5081, 0.0000, 0.6250, 0.0000, 5.5125, 8.0895, 0.0000, -1.4271, -581.3595, -0.9903, 0.0000, -16.0787, 10.4081, 0.0000, 0.6250, 0.0000, 5.5125, 9.9005, 0.0000, -1.6083, -591.2195, -0.9903, 0.0000, -16.0787, 11.5031, 0.0000, 0.6250, 0.0000, 5.5125, 9.9005, 0.0000, -1.6083, -602.1655, -1.8612, 0.0000, -9.8931, 15.1401, 0.0000, 0.6250, 0.0000, 5.5125, 18.6071, 0.0000, -0.9896, -669.7543, -0.8092, 0.0000, -14.2677, 15.8421, 0.0000, 0.6250, 0.0000, 5.5125, 8.0895, 0.0000, -1.4271, -654.6935, 8.3240, 0.0000, 1.3270, 29.4695, 0.0000, 0.6250, 0.0000, 5.5125, -0.9488, 0.0000, 11.6419, -736.6113, -18.5790, 0.0000, -1.1364, 38.2839, 0.0000, 0.6250, 0.0000, 5.5125, 2.1237, 0.0000, -9.9420, -694.3771, 14.9625, 0.0000, 1.1366, 42.4801, 0.0000, 0.6250, 0.0000, 5.5125, -1.7106, 0.0000, 9.9420, -737.2379, -11.4761, 0.0000, -1.2482, 54.2360, 0.0000, 0.6250, 0.0000, 5.5125, 1.3047, 0.0000, -10.9793, -695.6750, 11.3538, 0.0000, 0.8733, 70.4363, 0.0000, 0.6250, 0.0000, 5.5125, -1.2278, 0.0000, 8.0754, -739.4240, -13.4208, 0.0000, -2.0928, 75.6600, 0.0000, 0.6250, 0.0000, 5.5125, 1.4504, 0.0000, -19.3655, -693.8208, -22.2309, 0.0000, -1.3067, 94.0400, 0.0000, 0.6250, 0.0000, 5.5125, 2.2048, 0.0000, -13.1754, -698.8480, 14.9841, 0.0000, 0.8146, 168.4452, 0.0000, 0.6250, 0.0000, 5.5125, -1.5104, 0.0000, 8.0815, -749.3141, -22.4850, 0.0000, -2.3186, 179.3286, 0.0000, 0.6250, 0.0000, 5.5125, 2.2665, 0.0000, -23.0017, -702.4491, 11.4918, 0.0000, 1.1082, 183.2220, 0.0000, 0.6250, 0.0000, 5.5125, -1.1584, 0.0000, 10.9943, -752.2750, -22.2274, 0.0000, -1.8755, 202.8580, 0.0000, 0.6250, 0.0000, 5.5125, 2.2405, 0.0000, -18.6057, -707.0410, 11.4918, 0.0000, 1.1082, 208.0960, 0.0000, 0.5250, 0.0000, 5.5625, -1.1584, 0.0000, 10.9943, -754.7820, -11.4918, 0.0000, -1.1082, 220.3830, 0.0000, 0.6250, 0.0000, 5.5125, 1.1584, 0.0000, -10.9943, -712.6520, -11.4918, 0.0000, -1.1082, 233.3180, 0.0000, 0.6250, 0.0000, 5.5125, 1.1584, 0.0000, -10.9943, -713.9560, 0.0000, 0.0000, 30.1058, 239.8972, 0.0000, 0.5250, 0.0000, 5.5625, -41.0254, 0.0000, 0.0000, -625.3778, -11.4918, 0.0000, -1.1082, 246.2520, 0.0000, 0.6250, 0.0000, 5.5125, 1.1584, 0.0000, -10.9943, -715.2590, 0.0000, 0.0000, 14.3389, 247.7805, 0.0000, 0.5250, 0.0000, 5.5625, -6.3099, 0.0000, 0.0000, -649.3101, 0.0000, 0.0000, 14.3389, 247.7805, 0.0000, 0.5250, 0.0000, 5.5625, -6.3099, 0.0000, 0.0000, -599.3101, 0.0000, 0.0000, 14.3389, 247.7805, 0.0000, 0.5250, 0.0000, 5.5625, -8.1299, 0.0000, 0.0000, -538.3101, 0.0000, 0.0000, 11.7173, 249.0914, 0.0000, 0.5250, 0.0000, 5.5625, -10.1979, 0.0000, 0.0000, -702.6000, 0.0000, 0.0000, 11.7173, 249.0914, 0.0000, 0.6250, 0.0000, 5.5125, -8.3779, 0.0000, 0.0000, -657.3940)
+buffer = PackedFloat32Array(-1.8612, 0.0000, -9.8931, 0.4401, 0.0000, 0.6250, 0.0000, 5.5125, 18.6071, 0.0000, -0.9896, -522.7883, -0.6280, 0.0000, -14.2677, 3.9301, 0.0000, 0.6250, 0.0000, 5.5125, 6.2786, 0.0000, -1.4271, -535.5885, -1.0150, 0.0000, -11.6591, 4.2091, 0.0000, 0.6250, 0.0000, 5.5125, 10.1473, 0.0000, -1.1662, -551.5560, -1.8612, 0.0000, -9.9571, 4.9511, 0.0000, 0.6250, 0.0000, 5.5125, 18.6071, 0.0000, -0.9960, -567.5615, -1.1366, 0.0000, -8.0821, 8.6911, 0.0000, 0.6250, 0.0000, 5.5125, 11.3633, 0.0000, -0.8084, -614.4223, -0.8092, 0.0000, -14.2677, 8.5081, 0.0000, 0.6250, 0.0000, 5.5125, 8.0895, 0.0000, -1.4271, -581.3595, -0.9903, 0.0000, -16.0787, 10.4081, 0.0000, 0.6250, 0.0000, 5.5125, 9.9005, 0.0000, -1.6083, -591.2195, -0.9903, 0.0000, -16.0787, 11.5031, 0.0000, 0.6250, 0.0000, 5.5125, 9.9005, 0.0000, -1.6083, -602.1655, -1.8612, 0.0000, -9.8931, 15.1401, 0.0000, 0.6250, 0.0000, 5.5125, 18.6071, 0.0000, -0.9896, -669.7543, -0.8092, 0.0000, -14.2677, 15.8421, 0.0000, 0.6250, 0.0000, 5.5125, 8.0895, 0.0000, -1.4271, -654.6935, 8.3240, 0.0000, 1.3270, 29.4695, 0.0000, 0.6250, 0.0000, 5.5125, -0.9488, 0.0000, 11.6419, -736.6113, -18.5790, 0.0000, -1.1364, 38.2839, 0.0000, 0.6250, 0.0000, 5.5125, 2.1237, 0.0000, -9.9420, -694.3771, 14.9625, 0.0000, 1.1366, 42.4801, 0.0000, 0.6250, 0.0000, 5.5125, -1.7106, 0.0000, 9.9420, -737.2379, -11.4761, 0.0000, -1.2482, 54.2360, 0.0000, 0.6250, 0.0000, 5.5125, 1.3047, 0.0000, -10.9793, -695.6750, 11.3538, 0.0000, 0.8733, 70.4363, 0.0000, 0.6250, 0.0000, 5.5125, -1.2278, 0.0000, 8.0754, -739.4240, -13.4208, 0.0000, -2.0928, 75.6600, 0.0000, 0.6250, 0.0000, 5.5125, 1.4504, 0.0000, -19.3655, -693.8208, -22.2309, 0.0000, -1.3067, 94.0400, 0.0000, 0.6250, 0.0000, 5.5125, 2.2048, 0.0000, -13.1754, -698.8480, 14.9841, 0.0000, 0.8146, 168.4452, 0.0000, 0.6250, 0.0000, 5.5125, -1.5104, 0.0000, 8.0815, -749.3141, -22.4850, 0.0000, -2.3186, 179.3286, 0.0000, 0.6250, 0.0000, 5.5125, 2.2665, 0.0000, -23.0017, -702.4491, 11.4918, 0.0000, 1.1082, 183.2220, 0.0000, 0.6250, 0.0000, 5.5125, -1.1584, 0.0000, 10.9943, -752.2750, -22.2274, 0.0000, -1.8755, 202.8580, 0.0000, 0.6250, 0.0000, 5.5125, 2.2405, 0.0000, -18.6057, -707.0410, 11.4918, 0.0000, 1.1082, 208.0960, 0.0000, 0.5250, 0.0000, 5.5625, -1.1584, 0.0000, 10.9943, -754.7820, -11.4918, 0.0000, -1.1082, 220.3830, 0.0000, 0.6250, 0.0000, 5.5125, 1.1584, 0.0000, -10.9943, -712.6520, -11.4918, 0.0000, -1.1082, 233.3180, 0.0000, 0.6250, 0.0000, 5.5125, 1.1584, 0.0000, -10.9943, -713.9560, 0.0000, 0.0000, 30.1058, 239.8972, 0.0000, 0.5250, 0.0000, 5.5625, -41.0254, 0.0000, 0.0000, -625.3778, -11.4918, 0.0000, -1.1082, 246.2520, 0.0000, 0.6250, 0.0000, 5.5125, 1.1584, 0.0000, -10.9943, -715.2590, 0.0000, 0.0000, 16.1589, 246.8705, 0.0000, 0.5250, 0.0000, 5.5625, -9.9499, 0.0000, 0.0000, -592.3101, 0.0000, 0.0000, 14.3389, 247.7805, 0.0000, 0.5250, 0.0000, 5.5625, -6.3099, 0.0000, 0.0000, -649.3101, 0.0000, 0.0000, 14.3389, 247.7805, 0.0000, 0.5250, 0.0000, 5.5625, -8.1299, 0.0000, 0.0000, -538.3101, 0.0000, 0.0000, 11.7173, 249.0914, 0.0000, 0.5250, 0.0000, 5.5625, -10.1979, 0.0000, 0.0000, -702.6000, 0.0000, 0.0000, 11.7173, 249.0914, 0.0000, 0.6250, 0.0000, 5.5125, -8.3779, 0.0000, 0.0000, -657.3940, 0.0000, 0.0000, 11.7173, 249.0914, 0.0000, 0.5250, 0.0000, 5.5625, -10.1979, 0.0000, 0.0000, -548.3940)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
 size = Vector3(18.700, 0.625, 9.942)
@@ -124,7 +122,7 @@ size = Vector3(41.025, 0.525, 30.106)
 size = Vector3(11.550, 0.625, 11.050)
 
 [sub_resource type="BoxShape3D" id="LotShape26"]
-size = Vector3(6.310, 0.525, 14.339)
+size = Vector3(9.950, 0.525, 16.159)
 
 [sub_resource type="BoxShape3D" id="LotShape27"]
 size = Vector3(6.310, 0.525, 14.339)
@@ -137,6 +135,9 @@ size = Vector3(10.198, 0.525, 11.717)
 
 [sub_resource type="BoxShape3D" id="LotShape30"]
 size = Vector3(8.378, 0.625, 11.717)
+
+[sub_resource type="BoxShape3D" id="LotShape31"]
+size = Vector3(10.198, 0.525, 11.717)
 
 [sub_resource type="StandardMaterial3D" id="DriveMat"]
 albedo_color = Color(0.16, 0.16, 0.17, 1)
@@ -448,20 +449,20 @@ transform = Transform3D(-0.994958, 0, -0.100292, 0, 1, 0, 0.100292, 0, -0.994958
 [node name="Mesh" parent="./DetachedHouseB_025" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="PencilBuilding_W3_026" parent="." instance=ExtResource("16")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 247.530, 5.840, -649.394)
+[node name="PencilBuilding_W5_026" parent="." instance=ExtResource("17")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 246.620, 5.840, -592.394)
 
-[node name="Mesh" parent="./PencilBuilding_W3_026" index="0"]
-surface_material_override/5 = ExtResource("tone4_1")
-surface_material_override/1 = ExtResource("tone5_1")
+[node name="Mesh" parent="./PencilBuilding_W5_026" index="0"]
+surface_material_override/5 = ExtResource("tone6_4")
+surface_material_override/1 = ExtResource("tone7_4")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="PencilBuilding_W3_027" parent="." instance=ExtResource("16")]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 247.530, 5.840, -599.394)
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 247.530, 5.840, -649.394)
 
 [node name="Mesh" parent="./PencilBuilding_W3_027" index="0"]
-surface_material_override/5 = ExtResource("tone10_7")
-surface_material_override/1 = ExtResource("tone11_7")
+surface_material_override/5 = ExtResource("tone4_1")
+surface_material_override/1 = ExtResource("tone5_1")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="PencilBuilding_028" parent="." instance=ExtResource("14")]
@@ -484,6 +485,14 @@ transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 
 [node name="Mesh" parent="./ShopHouse_H3_030" index="0"]
 surface_material_override/5 = ExtResource("tone8_5")
 surface_material_override/1 = ExtResource("tone9_5")
+visibility_parent = NodePath("../../HLOD")
+
+[node name="ShopHouse_W5_031" parent="." instance=ExtResource("20")]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 248.981, 5.840, -548.394)
+
+[node name="Mesh" parent="./ShopHouse_W5_031" index="0"]
+surface_material_override/5 = ExtResource("tone4_1")
+surface_material_override/1 = ExtResource("tone5_1")
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Drives" type="MultiMeshInstance3D" parent="."]
@@ -611,11 +620,11 @@ transform = Transform3D(-0.994958, 0, -0.100292, 0, 1, 0, 0.100292, 0, -0.994958
 shape = SubResource("LotShape25")
 
 [node name="Plinth26" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 247.781, 5.562, -649.310)
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 246.871, 5.562, -592.310)
 shape = SubResource("LotShape26")
 
 [node name="Plinth27" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 247.781, 5.562, -599.310)
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 247.781, 5.562, -649.310)
 shape = SubResource("LotShape27")
 
 [node name="Plinth28" type="CollisionShape3D" parent="PlinthCollision"]
@@ -629,3 +638,7 @@ shape = SubResource("LotShape29")
 [node name="Plinth30" type="CollisionShape3D" parent="PlinthCollision"]
 transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 249.091, 5.513, -657.394)
 shape = SubResource("LotShape30")
+
+[node name="Plinth31" type="CollisionShape3D" parent="PlinthCollision"]
+transform = Transform3D(0.000000, 0, 1.000000, 0, 1, 0, -1.000000, 0, 0.000000, 249.091, 5.562, -548.394)
+shape = SubResource("LotShape31")

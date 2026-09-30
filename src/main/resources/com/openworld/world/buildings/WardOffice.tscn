@@ -3,9 +3,10 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/WardOffice_mesh.res" id="1_6wrgh"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/WardOffice_collision.res" id="2_f0hqg"]
 
-[node name="WardOffice" type="Node3D" unique_id=1337303203]
+[node name="WardOffice" type="Node3D" unique_id=1971595853]
 metadata/building = {
 "aabb": [Vector3(-28, 0, -20), Vector3(56, 47.32, 50)],
+"base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -26,14 +27,14 @@ metadata/building = {
 "wall_top_m": 47.32
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1713823550]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1112027208]
 visibility_range_end = 867.83997
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_6wrgh")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1641112813]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=624978846]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1206596659]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1764699942]
 shape = ExtResource("2_f0hqg")

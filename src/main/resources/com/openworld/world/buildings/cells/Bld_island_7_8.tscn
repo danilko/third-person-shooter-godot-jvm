@@ -15,13 +15,16 @@
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot4.tscn" id="13"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ParkingLot8.tscn" id="14"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding.tscn" id="15"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_H4.tscn" id="16"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_W3.tscn" id="17"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_W5.tscn" id="18"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse.tscn" id="19"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_H3.tscn" id="20"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_W3.tscn" id="21"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_W5.tscn" id="22"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_BB.tscn" id="16"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_H4_BB.tscn" id="17"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_W3.tscn" id="18"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/PencilBuilding_W5.tscn" id="19"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse.tscn" id="20"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_BB.tscn" id="21"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_H3.tscn" id="22"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_W3.tscn" id="23"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_W5.tscn" id="24"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/ShopHouse_W5_BB.tscn" id="25"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool.tres" id="tone0_1"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_WhiteWarm.tres" id="tone2_2"]
 [ext_resource type="Material" path="res://assets/world_source/kits/quaternius_downtown_city/materials/MI_Trim_DarkCool2.tres" id="tone4_3"]
@@ -336,7 +339,7 @@ visibility_range_begin = 450.0
 visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
-[node name="ShopHouse_H3_000" parent="." instance=ExtResource("20")]
+[node name="ShopHouse_H3_000" parent="." instance=ExtResource("22")]
 transform = Transform3D(-0.827796, 0, -0.561029, 0, 1, 0, 0.561029, 0, -0.827796, -248.611, 5.840, 120.598)
 
 [node name="Mesh" parent="./ShopHouse_H3_000" index="0"]
@@ -344,7 +347,7 @@ surface_material_override/5 = ExtResource("tone0_1")
 surface_material_override/1 = ExtResource("tone1_1")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W5_001" parent="." instance=ExtResource("22")]
+[node name="ShopHouse_W5_001" parent="." instance=ExtResource("24")]
 transform = Transform3D(0.511098, 0, 0.859522, 0, 1, 0, -0.859522, 0, 0.511098, -243.104, 5.840, 54.394)
 
 [node name="Mesh" parent="./ShopHouse_W5_001" index="0"]
@@ -352,13 +355,13 @@ surface_material_override/5 = ExtResource("tone2_2")
 surface_material_override/1 = ExtResource("tone3_2")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_002" parent="." instance=ExtResource("19")]
+[node name="ShopHouse_002" parent="." instance=ExtResource("20")]
 transform = Transform3D(-0.805887, 0, -0.592069, 0, 1, 0, 0.592069, 0, -0.805887, -241.071, 5.840, 115.297)
 
 [node name="Mesh" parent="./ShopHouse_002" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W5_003" parent="." instance=ExtResource("22")]
+[node name="ShopHouse_W5_003" parent="." instance=ExtResource("24")]
 transform = Transform3D(0.447463, 0, 0.894303, 0, 1, 0, -0.894303, 0, 0.447463, -238.082, 5.840, 45.079)
 
 [node name="Mesh" parent="./ShopHouse_W5_003" index="0"]
@@ -366,7 +369,7 @@ surface_material_override/5 = ExtResource("tone4_3")
 surface_material_override/1 = ExtResource("tone5_3")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="PencilBuilding_W3_004" parent="." instance=ExtResource("17")]
+[node name="PencilBuilding_W3_004" parent="." instance=ExtResource("18")]
 transform = Transform3D(-0.778451, 0, -0.627705, 0, 1, 0, 0.627705, 0, -0.778451, -233.617, 5.840, 111.392)
 
 [node name="Mesh" parent="./PencilBuilding_W3_004" index="0"]
@@ -374,7 +377,7 @@ surface_material_override/5 = ExtResource("tone0_1")
 surface_material_override/1 = ExtResource("tone1_1")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W5_005" parent="." instance=ExtResource("22")]
+[node name="ShopHouse_W5_005" parent="." instance=ExtResource("24")]
 transform = Transform3D(0.422919, 0, 0.906168, 0, 1, 0, -0.906168, 0, 0.422919, -232.981, 5.840, 34.390)
 
 [node name="Mesh" parent="./ShopHouse_W5_005" index="0"]
@@ -382,7 +385,7 @@ surface_material_override/5 = ExtResource("tone6_5")
 surface_material_override/1 = ExtResource("tone7_5")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_H3_006" parent="." instance=ExtResource("20")]
+[node name="ShopHouse_H3_006" parent="." instance=ExtResource("22")]
 transform = Transform3D(0.437665, 0, 0.899138, 0, 1, 0, -0.899138, 0, 0.437665, -227.821, 5.840, 23.453)
 
 [node name="Mesh" parent="./ShopHouse_H3_006" index="0"]
@@ -398,7 +401,7 @@ surface_material_override/5 = ExtResource("tone0_1")
 surface_material_override/1 = ExtResource("tone1_1")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W5_008" parent="." instance=ExtResource("22")]
+[node name="ShopHouse_W5_008" parent="." instance=ExtResource("24")]
 transform = Transform3D(-0.685907, 0, -0.727689, 0, 1, 0, 0.727689, 0, -0.685907, -220.705, 5.840, 97.573)
 
 [node name="Mesh" parent="./ShopHouse_W5_008" index="0"]
@@ -412,7 +415,7 @@ transform = Transform3D(0.467189, 0, 0.884157, 0, 1, 0, -0.884157, 0, 0.467189, 
 [node name="Mesh" parent="./DetachedHouse_009" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_010" parent="." instance=ExtResource("19")]
+[node name="ShopHouse_010" parent="." instance=ExtResource("20")]
 transform = Transform3D(0.998815, 0, 0.048675, 0, 1, 0, -0.048675, 0, 0.998815, -216.184, 5.840, 251.400)
 
 [node name="Mesh" parent="./ShopHouse_010" index="0"]
@@ -420,7 +423,7 @@ surface_material_override/5 = ExtResource("tone2_2")
 surface_material_override/1 = ExtResource("tone3_2")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_H3_011" parent="." instance=ExtResource("20")]
+[node name="ShopHouse_H3_011" parent="." instance=ExtResource("22")]
 transform = Transform3D(-0.613789, 0, -0.789470, 0, 1, 0, 0.789470, 0, -0.613789, -213.833, 5.840, 89.583)
 
 [node name="Mesh" parent="./ShopHouse_H3_011" index="0"]
@@ -428,7 +431,7 @@ surface_material_override/5 = ExtResource("tone8_4")
 surface_material_override/1 = ExtResource("tone9_4")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W5_012" parent="." instance=ExtResource("22")]
+[node name="ShopHouse_W5_012" parent="." instance=ExtResource("24")]
 transform = Transform3D(0.998982, 0, 0.045101, 0, 1, 0, -0.045101, 0, 0.998982, -206.174, 5.840, 250.945)
 
 [node name="Mesh" parent="./ShopHouse_W5_012" index="0"]
@@ -436,7 +439,7 @@ surface_material_override/5 = ExtResource("tone6_5")
 surface_material_override/1 = ExtResource("tone7_5")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="PencilBuilding_W5_013" parent="." instance=ExtResource("18")]
+[node name="PencilBuilding_W5_013" parent="." instance=ExtResource("19")]
 transform = Transform3D(-0.540475, 0, -0.841360, 0, 1, 0, 0.841360, 0, -0.540475, -205.789, 5.840, 82.270)
 
 [node name="Mesh" parent="./PencilBuilding_W5_013" index="0"]
@@ -444,7 +447,7 @@ surface_material_override/5 = ExtResource("tone6_5")
 surface_material_override/1 = ExtResource("tone7_5")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W5_014" parent="." instance=ExtResource("22")]
+[node name="ShopHouse_W5_014" parent="." instance=ExtResource("24")]
 transform = Transform3D(-0.481432, 0, -0.876483, 0, 1, 0, 0.876483, 0, -0.481432, -202.494, 5.840, 72.046)
 
 [node name="Mesh" parent="./ShopHouse_W5_014" index="0"]
@@ -452,13 +455,13 @@ surface_material_override/5 = ExtResource("tone2_2")
 surface_material_override/1 = ExtResource("tone3_2")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_H3_015" parent="." instance=ExtResource("20")]
+[node name="ShopHouse_H3_015" parent="." instance=ExtResource("22")]
 transform = Transform3D(0.998443, 0, 0.055787, 0, 1, 0, -0.055787, 0, 0.998443, -196.247, 5.840, 250.458)
 
 [node name="Mesh" parent="./ShopHouse_H3_015" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_016" parent="." instance=ExtResource("19")]
+[node name="ShopHouse_016" parent="." instance=ExtResource("20")]
 transform = Transform3D(-0.428730, 0, -0.903433, 0, 1, 0, 0.903433, 0, -0.428730, -195.577, 5.840, 58.358)
 
 [node name="Mesh" parent="./ShopHouse_016" index="0"]
@@ -466,7 +469,7 @@ surface_material_override/5 = ExtResource("tone4_3")
 surface_material_override/1 = ExtResource("tone5_3")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W3_017" parent="." instance=ExtResource("21")]
+[node name="ShopHouse_W3_017" parent="." instance=ExtResource("23")]
 transform = Transform3D(0.997196, 0, 0.074839, 0, 1, 0, -0.074839, 0, 0.997196, -188.304, 5.840, 250.860)
 
 [node name="Mesh" parent="./ShopHouse_W3_017" index="0"]
@@ -487,7 +490,7 @@ transform = Transform3D(-0.433596, 0, -0.901107, 0, 1, 0, 0.901107, 0, -0.433596
 surface_material_override/1 = ExtResource("tone5_3")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W5_020" parent="." instance=ExtResource("22")]
+[node name="ShopHouse_W5_020" parent="." instance=ExtResource("24")]
 transform = Transform3D(0.994140, 0, 0.108103, 0, 1, 0, -0.108103, 0, 0.994140, -179.599, 5.840, 249.165)
 
 [node name="Mesh" parent="./ShopHouse_W5_020" index="0"]
@@ -501,7 +504,7 @@ transform = Transform3D(-0.460680, 0, -0.887566, 0, 1, 0, 0.887566, 0, -0.460680
 [node name="Mesh" parent="./DetachedHouseB_021" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W3_022" parent="." instance=ExtResource("21")]
+[node name="ShopHouse_W3_022" parent="." instance=ExtResource("23")]
 transform = Transform3D(0.988615, 0, 0.150467, 0, 1, 0, -0.150467, 0, 0.988615, -170.782, 5.840, 248.926)
 
 [node name="Mesh" parent="./ShopHouse_W3_022" index="0"]
@@ -515,7 +518,7 @@ transform = Transform3D(-0.434508, 0, -0.900668, 0, 1, 0, 0.900668, 0, -0.434508
 [node name="Mesh" parent="./DetachedHouse_023" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W3_024" parent="." instance=ExtResource("21")]
+[node name="ShopHouse_W3_024" parent="." instance=ExtResource("23")]
 transform = Transform3D(0.984149, 0, 0.177342, 0, 1, 0, -0.177342, 0, 0.984149, -164.007, 5.840, 247.793)
 
 [node name="Mesh" parent="./ShopHouse_W3_024" index="0"]
@@ -523,23 +526,23 @@ surface_material_override/5 = ExtResource("tone0_1")
 surface_material_override/1 = ExtResource("tone1_1")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="PencilBuilding_H4_025" parent="." instance=ExtResource("16")]
+[node name="PencilBuilding_H4_BB_025" parent="." instance=ExtResource("17")]
 transform = Transform3D(0.980116, 0, 0.198427, 0, 1, 0, -0.198427, 0, 0.980116, -156.722, 5.840, 243.985)
 
-[node name="Mesh" parent="./PencilBuilding_H4_025" index="0"]
+[node name="Mesh" parent="./PencilBuilding_H4_BB_025" index="0"]
 surface_material_override/5 = ExtResource("tone10_6")
 surface_material_override/1 = ExtResource("tone11_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="PencilBuilding_026" parent="." instance=ExtResource("15")]
+[node name="PencilBuilding_BB_026" parent="." instance=ExtResource("16")]
 transform = Transform3D(0.977497, 0, 0.210949, 0, 1, 0, -0.210949, 0, 0.977497, -148.004, 5.840, 242.152)
 
-[node name="Mesh" parent="./PencilBuilding_026" index="0"]
+[node name="Mesh" parent="./PencilBuilding_BB_026" index="0"]
 surface_material_override/5 = ExtResource("tone8_4")
 surface_material_override/1 = ExtResource("tone9_4")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W3_027" parent="." instance=ExtResource("21")]
+[node name="ShopHouse_W3_027" parent="." instance=ExtResource("23")]
 transform = Transform3D(0.977153, 0, 0.212536, 0, 1, 0, -0.212536, 0, 0.977153, -139.697, 5.840, 242.759)
 
 [node name="Mesh" parent="./ShopHouse_W3_027" index="0"]
@@ -547,13 +550,13 @@ surface_material_override/5 = ExtResource("tone10_6")
 surface_material_override/1 = ExtResource("tone11_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_H3_028" parent="." instance=ExtResource("20")]
+[node name="ShopHouse_H3_028" parent="." instance=ExtResource("22")]
 transform = Transform3D(0.978631, 0, 0.205623, 0, 1, 0, -0.205623, 0, 0.978631, -132.029, 5.840, 240.181)
 
 [node name="Mesh" parent="./ShopHouse_H3_028" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="PencilBuilding_W5_029" parent="." instance=ExtResource("18")]
+[node name="PencilBuilding_W5_029" parent="." instance=ExtResource("19")]
 transform = Transform3D(0.277700, 0, 0.960668, 0, 1, 0, -0.960668, 0, 0.277700, -75.607, 5.840, 120.198)
 
 [node name="Mesh" parent="./PencilBuilding_W5_029" index="0"]
@@ -567,15 +570,15 @@ transform = Transform3D(0.282124, 0, 0.959378, 0, 1, 0, -0.959378, 0, 0.282124, 
 [node name="Mesh" parent="./Koban_030" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W5_031" parent="." instance=ExtResource("22")]
+[node name="ShopHouse_W5_BB_031" parent="." instance=ExtResource("25")]
 transform = Transform3D(0.225478, 0, 0.974248, 0, 1, 0, -0.974248, 0, 0.225478, -67.642, 5.840, 98.893)
 
-[node name="Mesh" parent="./ShopHouse_W5_031" index="0"]
+[node name="Mesh" parent="./ShopHouse_W5_BB_031" index="0"]
 surface_material_override/5 = ExtResource("tone10_6")
 surface_material_override/1 = ExtResource("tone11_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="PencilBuilding_W3_032" parent="." instance=ExtResource("17")]
+[node name="PencilBuilding_W3_032" parent="." instance=ExtResource("18")]
 transform = Transform3D(0.212297, 0, 0.977205, 0, 1, 0, -0.977205, 0, 0.212297, -67.104, 5.840, 89.879)
 
 [node name="Mesh" parent="./PencilBuilding_W3_032" index="0"]
@@ -603,10 +606,10 @@ transform = Transform3D(0.102411, 0, 0.994742, 0, 1, 0, -0.994742, 0, 0.102411, 
 [node name="Mesh" parent="./ParkingLot4_035" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_036" parent="." instance=ExtResource("19")]
+[node name="ShopHouse_BB_036" parent="." instance=ExtResource("21")]
 transform = Transform3D(-0.290034, 0, -0.957016, 0, 1, 0, 0.957016, 0, -0.290034, -57.040, 5.840, 218.683)
 
-[node name="Mesh" parent="./ShopHouse_036" index="0"]
+[node name="Mesh" parent="./ShopHouse_BB_036" index="0"]
 surface_material_override/5 = ExtResource("tone4_3")
 surface_material_override/1 = ExtResource("tone5_3")
 visibility_parent = NodePath("../../HLOD")
@@ -641,7 +644,7 @@ surface_material_override/0 = ExtResource("tone10_6")
 surface_material_override/2 = ExtResource("tone11_6")
 visibility_parent = NodePath("../../HLOD")
 
-[node name="ShopHouse_W3_041" parent="." instance=ExtResource("21")]
+[node name="ShopHouse_W3_041" parent="." instance=ExtResource("23")]
 transform = Transform3D(-0.287461, 0, -0.957792, 0, 1, 0, 0.957792, 0, -0.287461, -44.335, 5.840, 173.409)
 
 [node name="Mesh" parent="./ShopHouse_W3_041" index="0"]

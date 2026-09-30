@@ -101,6 +101,11 @@ func _initialize() -> void:
 	var control := "--control" in args
 	var no_buildings := "--no-buildings" in args
 	var only := str(_arg("only"))
+	# a running TRAIN is not road geometry: a set standing on a level crossing blocks the road on purpose, and the
+	# crossing closes for it (world.TrainSystem). This gate measures what is BUILT, so trains are off.
+	var trains: Node = root.get_node_or_null("TrainSystem")
+	if trains != null:
+		trains.set("enabled", false)
 	world = (load(scene) as PackedScene).instantiate()
 	root.add_child(world)
 	await process_frame

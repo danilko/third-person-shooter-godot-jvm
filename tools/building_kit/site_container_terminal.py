@@ -39,6 +39,10 @@ CRANE_BOXES = ([[sx * _S, 0.6, sz * _G, 2.0, 1.2, 3.0] for sx in (-1, 1) for sz 
 MAST_BOXES = [[0.0, 0.2, 0.0, 1.2, 0.4, 1.2], [0.0, 15.2, 0.0, 0.7, 29.6, 0.7]]                    # base, pole
 
 
+SHIP_HALF_BEAM = 12.0      # CargoShip: 24 m beam (kits/interiors pieces.json)
+SHIP_Y = -9.6              # the quay deck over the water (CLAUDE.md: the quay stands 9.6 m above the sea)
+
+
 def entry():
     props = []
     crane_z = EDGE - QUAY_SETBACK - GAUGE / 2
@@ -86,7 +90,10 @@ def entry():
                "note": "ISO boxes and a 30.48 m gauge ship-to-shore crane at real size; booms raised (idle berth)"},
         "use": "container terminal: four gantry cranes on the quay (+Z, the sea), a yard of 40 ft and 20 ft stacks with "
                "truck lanes, bollards on the edge, light masts",
-        "parts": [],
+        # the FEEDER SHIP at the berth (user, 2026-09-29: "CargoShip, a part of ContainerTerminal"): the walkable
+        # kits/interiors ship, its long axis along the quay, 1.5 m of fender off the edge, its origin (the waterline)
+        # SHIP_Y under the quay deck
+        "parts": [{"type": "CargoShip", "at": [0.0, round(EDGE + 1.5 + SHIP_HALF_BEAM, 3)], "yaw": 90.0, "y": SHIP_Y}],
         "props": props,
         "apron": "library:Harbour_Apron",
         "probe_xz": [0.0, -95.0],

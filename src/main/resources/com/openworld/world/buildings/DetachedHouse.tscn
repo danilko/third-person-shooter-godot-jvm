@@ -3,9 +3,10 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/DetachedHouse_mesh.res" id="1_om70c"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/DetachedHouse_collision.res" id="2_rwqw1"]
 
-[node name="DetachedHouse" type="Node3D" unique_id=679462170]
+[node name="DetachedHouse" type="Node3D" unique_id=1171831871]
 metadata/building = {
 "aabb": [Vector3(-5.5249996, 0, -5.275), Vector3(11.049999, 8.1, 10.55)],
+"base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -26,14 +27,14 @@ metadata/building = {
 "wall_top_m": 8.1
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1253165250]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=783676777]
 visibility_range_end = 397.2
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_om70c")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=345824364]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=2018825367]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1216932587]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1782730430]
 shape = ExtResource("2_rwqw1")

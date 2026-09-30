@@ -201,6 +201,10 @@ def _sites():
             if rid.startswith(("military", "resort_hotel", "logistics", "central_forecourt", "airport_")):
                 _SITES.append(("reserve:" + rid, (x0 + x1) / 2.0, -(z0 + z1) / 2.0, 1.0, 0.0,
                                (x1 - x0) / 2.0 + SITE_CLEAR, (z1 - z0) / 2.0 + SITE_CLEAR))
+        # the PHASE-2 WANGAN corridor and its T beside the spur (island_plan.PHASE2_*, PLAN.md NEXT 2026-09-29): held
+        # for the Wangan's waterfront continuation -- the street planner routes round it
+        for k, box in enumerate(_PL.phase2_boxes(SITE_CLEAR)):
+            _SITES.append(("reserve:phase2_wangan_%d" % k,) + tuple(box))
         # the CIVIC PLOTS (user, 2026-09-28; tools/island_civic_sites.py): ground held for a police / fire station, a
         # hospital, a school ... -- a street keeps out of one exactly as out of a site
         path = os.path.join(ROOT, "assets", "world_source", "buildings", "IslandCivicSites.json")

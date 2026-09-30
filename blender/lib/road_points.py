@@ -345,18 +345,31 @@ class LaneRoute(object):
 
 
 def _neighbour_map(profiles):
-    """`slot_id -> (inboard_id, outboard_id)` using the widest station's ordering.
+    """`slot_id -> (inboard_id, outboard_id)`, each slot's from the WIDEST station AT WHICH THAT SLOT IS LIVE.
 
     The widest station is used because a slot that is zero-width everywhere else still has to know
-    who it merges into, and the station where every slot is present is the one that says."""
+    who it merges into, and the station where every slot is present is the one that says. But one
+    station need not hold every slot: a run with an exit on one carriageway and an entrance on the
+    other at DIFFERENT stations (the Wangan's leg, 2026-09-29: the Wangan -> C1 exit's slot open
+    only at one station, the C1 -> Wangan entrance's only at another 300 m on) has two widest
+    stations, each missing the other's aux slot. Taking ONE of them left the other's slot with no
+    neighbour at all, so its acceleration lane found no receiver, ran on to the end of the run at
+    zero width and came out `broken` at the junction there. Slots live nowhere fall back to the
+    overall widest station, as before."""
     best, best_n = None, -1
+    best_for = {}
     for p in profiles:
         live = [s for s in p.slots if s.width > lp.LANE_MIN_WIDTH]
         if len(live) > best_n:
             best, best_n = p, len(live)
-    order = [s.id for s in (best.slots if best else [])]
+        for s in live:
+            if len(live) > best_for.get(s.id, (-1, None))[0]:
+                best_for[s.id] = (len(live), p)
     out = {}
-    for k, sid in enumerate(order):
+    fallback = [s.id for s in (best.slots if best else [])]
+    for sid in set(fallback) | set(best_for):
+        order = [s.id for s in best_for[sid][1].slots] if sid in best_for else fallback
+        k = order.index(sid)
         out[sid] = (order[k - 1] if k > 0 else None,
                     order[k + 1] if k + 1 < len(order) else None)
     return out

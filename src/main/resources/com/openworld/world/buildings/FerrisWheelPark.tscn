@@ -3,9 +3,10 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark_mesh.res" id="1_2qoji"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/FerrisWheelPark_collision.res" id="2_ugyit"]
 
-[node name="FerrisWheelPark" type="Node3D" unique_id=483459802]
+[node name="FerrisWheelPark" type="Node3D" unique_id=3133857]
 metadata/building = {
 "aabb": [Vector3(-55, -0.24277201, -100), Vector3(110, 111.10517, 200)],
+"base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -28,11 +29,11 @@ metadata/building = {
 "wall_top_m": 110.8624
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=186667478]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1772535320]
 mesh = ExtResource("1_2qoji")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1703110258]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=136589207]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1474255535]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=652511427]
 shape = ExtResource("2_ugyit")

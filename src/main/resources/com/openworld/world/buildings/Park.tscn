@@ -3,9 +3,10 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/Park_mesh.res" id="1_7nlll"]
 [ext_resource type="Shape3D" path="res://src/main/resources/com/openworld/world/buildings/Park_collision.res" id="2_g5814"]
 
-[node name="Park" type="Node3D" unique_id=1022249188]
+[node name="Park" type="Node3D" unique_id=424988006]
 metadata/building = {
 "aabb": [Vector3(-30, -0.24277201, -30), Vector3(60, 9.42519, 60)],
+"base_m": 0.0,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [],
@@ -28,14 +29,14 @@ metadata/building = {
 "wall_top_m": 3.5231
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1163478052]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=422575909]
 visibility_range_end = 410.18903
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_7nlll")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=1677750156]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=897218932]
 collision_mask = 0
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=914114266]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=565386445]
 shape = ExtResource("2_g5814")

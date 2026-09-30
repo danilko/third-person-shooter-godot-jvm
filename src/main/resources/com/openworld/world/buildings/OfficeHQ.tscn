@@ -16,9 +16,10 @@ size = Vector3(0.94, 2.1, 0.14)
 [sub_resource type="BoxShape3D" id="BoxShape3D_5getg"]
 size = Vector3(1, 2.1, 0.14)
 
-[node name="OfficeHQ" type="Node3D" unique_id=821616515]
+[node name="OfficeHQ" type="Node3D" unique_id=1052721288]
 metadata/building = {
 "aabb": [Vector3(-14, -1.2, -13), Vector3(28, 19.800001, 26)],
+"base_m": -1.2,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [{
@@ -378,33 +379,33 @@ metadata/building = {
 "wall_top_m": 15.6
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1344713287]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=572695941]
 visibility_range_end = 523.2
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_yf6op")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=600012470]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=657099937]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1494246969]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1267276707]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 1.05, 6.9)
 shape = SubResource("BoxShape3D_xrnyi")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1106615271]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=79375981]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.45, 1.05, 6.9)
 shape = SubResource("BoxShape3D_pm2cg")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1408359940]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=472676752]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -11.9, 1.05, -1.4)
 shape = SubResource("BoxShape3D_5getg")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=282759829]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=1987945549]
 shape = ExtResource("2_2w4qp")
 
-[node name="Lifts" type="Node3D" parent="." unique_id=265326467]
+[node name="Lifts" type="Node3D" parent="." unique_id=1709076774]
 
-[node name="Lift0" type="Node3D" parent="Lifts" unique_id=234573260]
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=234077027]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1.75, 0, -3.41)
 script = ExtResource("3_anqvn")
 shaft_width = 1.8
@@ -422,53 +423,53 @@ in_service = true
 stop_heights = "0,4.2,8,11.8"
 faces = 1
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=2061852413]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=908028513]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 6.9)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=1844620567]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=101342162]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.9, 0, -1.4)
 
-[node name="Markers" type="Node3D" parent="." unique_id=1042922271]
+[node name="Markers" type="Node3D" parent="." unique_id=923369584]
 
-[node name="MARK_cover_01" type="Marker3D" parent="Markers" unique_id=1846553502 groups=["mission_marker"]]
+[node name="MARK_cover_01" type="Marker3D" parent="Markers" unique_id=746200229 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.8, 4.2, 3.2)
 metadata/kind = "cover"
 
-[node name="MARK_cover_02" type="Marker3D" parent="Markers" unique_id=215489757 groups=["mission_marker"]]
+[node name="MARK_cover_02" type="Marker3D" parent="Markers" unique_id=1315396946 groups=["mission_marker"]]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.8, 8, 3.2)
 metadata/kind = "cover"
 
-[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=934464559 groups=["mission_marker"]]
+[node name="MARK_objective_01" type="Marker3D" parent="Markers" unique_id=220489959 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.65, 8, -8)
 metadata/note = "the server room"
 metadata/kind = "objective"
 
-[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=1440037119 groups=["mission_marker"]]
+[node name="MARK_objective_02" type="Marker3D" parent="Markers" unique_id=63520301 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 11.8, -9)
 metadata/note = "the strong room (金庫室)"
 metadata/kind = "objective"
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1441391410 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=141803635 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 4.5, 0, 0.8)
 metadata/team = "guard"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=349273977 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=90404506 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 1)
 metadata/team = "guard"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=221358084 groups=["mission_marker"]]
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1672696093 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8, 4.2, 3.2)
 metadata/team = "worker"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=955086975 groups=["mission_marker"]]
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=2076988997 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.8, 8, 3.2)
 metadata/team = "worker"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=1269312909 groups=["mission_marker"]]
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=172161554 groups=["mission_marker"]]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 8.4, 11.8, 4.8)
 metadata/team = "vip"
 metadata/note = "the president"

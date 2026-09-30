@@ -1,8 +1,8 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/WaterResort.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/buildings/OnsenRyokan_Shop.tscn" id="1"]
 [ext_resource type="Material" path="res://assets/world_source/buildings/materials/M_LotConcrete.tres" id="lotmat"]
-[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_9_10.res" id="hlod"]
+[ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/cells/hlod/Bld_island_5_3.res" id="hlod"]
 
 [sub_resource type="BoxMesh" id="LotBox"]
 material = ExtResource("lotmat")
@@ -11,12 +11,12 @@ material = ExtResource("lotmat")
 transform_format = 1
 instance_count = 1
 mesh = SubResource("LotBox")
-buffer = PackedFloat32Array(-149.5800, 0.0000, -0.0000, 430.3500, 0.0000, 0.5750, 0.0000, 5.5375, 0.0000, 0.0000, -119.5800, 510.0000)
+buffer = PackedFloat32Array(-30.0520, 0.0000, -27.5772, -657.1019, 0.0000, 0.5750, 0.0000, 5.5375, 30.0520, 0.0000, -27.5772, -1099.4019)
 
 [sub_resource type="BoxShape3D" id="LotShape0"]
-size = Vector3(149.580, 0.575, 119.580)
+size = Vector3(42.500, 0.575, 39.000)
 
-[node name="Bld_island_9_10" type="Node3D"]
+[node name="Bld_island_5_3" type="Node3D"]
 
 [node name="HLOD" type="MeshInstance3D" parent="."]
 mesh = ExtResource("hlod")
@@ -25,10 +25,10 @@ visibility_range_begin = 450.0
 visibility_range_begin_margin = 40.0
 visibility_range_fade_mode = 1
 
-[node name="WaterResort_000" parent="." instance=ExtResource("1")]
-transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, 430.350, 5.840, 510.000)
+[node name="OnsenRyokan_Shop_000" parent="." instance=ExtResource("1")]
+transform = Transform3D(-0.707107, 0, -0.707107, 0, 1, 0, 0.707107, 0, -0.707107, -659.400, 5.840, -1101.700)
 
-[node name="Mesh" parent="./WaterResort_000" index="0"]
+[node name="Mesh" parent="./OnsenRyokan_Shop_000" index="0"]
 visibility_parent = NodePath("../../HLOD")
 
 [node name="Plinths" type="MultiMeshInstance3D" parent="."]
@@ -38,5 +38,5 @@ multimesh = SubResource("Lots")
 collision_mask = 0
 
 [node name="Plinth0" type="CollisionShape3D" parent="PlinthCollision"]
-transform = Transform3D(-1.000000, 0, -0.000000, 0, 1, 0, 0.000000, 0, -1.000000, 430.350, 5.538, 510.000)
+transform = Transform3D(-0.707107, 0, -0.707107, 0, 1, 0, 0.707107, 0, -0.707107, -657.102, 5.538, -1099.402)
 shape = SubResource("LotShape0")

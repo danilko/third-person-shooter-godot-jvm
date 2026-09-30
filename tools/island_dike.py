@@ -802,8 +802,16 @@ def cmd_raise(path):
     for x, y, z in rail_lifts(net, dike):
         print("island_dike: the ring bridges the rail at (%.0f, %.0f), crest to %.1f m" % (x, y, z + rg.NET_Y))
     rs = ramps(net, dike)
-    for name, lift in clear_crossings(net):
+    lifted = clear_crossings(net)
+    for name, lift in lifted:
         print("island_dike: %s lifted up to %.1f m to clear the dike road" % (name, lift))
+    if lifted:
+        # a lift moves the mainline under a ramp's mouth (or the ramp without its mainline): every mouth goes back on
+        # its gore line, or the gate reads the mismatch as `ramp_edge_residual` (C1 lifted 0.3 m over the east side's
+        # dike ramp left the E JCT's exit mouth 1.14 m off it, 2026-09-29)
+        import point_record_ops as ro
+        for a, b in net.aux_pairs():
+            ro.align_ramp(net, a, b)
     n = write_corridor(net, dike)
     pm.save_network(net, path)
     zs = [net.points[u].pos[2] + rg.NET_Y for u in dike]

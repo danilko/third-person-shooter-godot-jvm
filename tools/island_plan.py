@@ -289,11 +289,14 @@ RESERVES = (
     # the COMPACT air/naval base (user, 2026-09-28): the core at the platform's south-west corner, its gate on the east
     # side facing the gate road (kichi_mon_michi, x -460), the runway along the platform's own south band abutting the
     # core's apron, the one pier (with its berth) at the core's west edge -- everything within ~300 m
-    ("military_base", (-760.0, 1250.0, -475.0, 1480.0)),
+    # (2026-09-29 night: the base core compressed NORTH to z 1440 and the runway pulled up onto the platform's south
+    # quay line, the container terminal's south edge z 1488 -- one fence round the whole area, tools/building_kit/
+    # site_military.py)
+    ("military_base", (-760.0, 1250.0, -475.0, 1444.4)),
     # the runway lies right along the base's apron (user, 2026-09-29: "pull the runway back east toward the fence, so a
     # jet reaches it from the hangar without crossing open ground"): its east end in line with the base's east fence
     # (x -475), on the platform's own south band, its west half on the reclaimed strip (island_reshape)
-    ("military_airfield", (-1015.0, 1485.0, -475.0, 1535.0)),
+    ("military_airfield", (-1015.0, 1443.0, -475.0, 1491.0)),
     ("military_pier", (-1020.0, 1301.0, -740.0, 1371.0)),     # the pier (z 1300..1350) + the ship's berth south of it
                                                                # (centred on z 1336: the MilitaryPier composite's frame)
     # the Bay Quarter's waterfront park and its FERRIS WHEEL (user, 2026-09-29): the gulf's east shore between ring_kita
@@ -319,7 +322,8 @@ RESERVES = (
     # rebuild. Each is already reached by a road: the ring / dike side road, the airport's own loop roads, yamate_dori.
     # (The bay MARKET needs no reserve: the gulf head between wangan_dori and the ring's dike is one 84 m block fronting
     # both, and Waterpark station's 駅前 row already lines it with shop-houses -- the market's types replace them there.)
-    ("fish_market", (300.0, 676.0, 716.0, 775.0)),             # the 魚市場 + small-boat quay outside the dike, reached
+    ("fish_market", (420.0, 676.0, 716.0, 775.0)),             # (x 300 -> 420, 2026-09-29: the Wangan's leg and
+                                                               # the W JCT's flyovers pass over x 350..420)             # the 魚市場 + small-boat quay outside the dike, reached
                                                                # from the ring / dike side road (hatoba_dori is gone)
                                                                # (3.18(h), the Tsukiji/Toyosu pattern)
     # the airport's AIRSIDE (user, 2026-09-29: the runway "on a different side from the bridge"): behind the terminal,
@@ -366,53 +370,91 @@ STREET_NAMES = {"city": ("machi", "cho"), "sw": ("nishi_machi", "nishi_cho"), "f
 #: -> 600, its junctions y 615 / 815 -> 465 / 665, its ramp stations x 345 / 465 / 985 / 1105 -> -125.
 C1_CORNERS = [(25.0, -110.0), (1175.0, -110.0), (1175.0, 570.0), (25.0, 570.0)]
 C1_SIDE_CUT_Y = 150.0              # C1 is cut into roads half way up each side (pre-redo y 300)
-JCT_X = 655.0
-# THE DIAMOND IS SYMMETRIC (user, 2026-09-29: "top of the c1 highway should be much simplified between both ways ...
-# equivalent lanes on both ways and similar exit behaviour"). The ramps stood at 220 / 340 / 860 / 980: each carriageway
-# exited 380 m before the crossing and entered 260 m after, so the two carriageways' aux lanes lay over DIFFERENT
-# stretches (the westbound one 4 lanes where the eastbound was 2, and the other way round at the far end). Now each end
-# has its two ramps together -- an exit on one carriageway and an entrance on the other, 10 m apart (one ramp per
-# station) -- so both carriageways widen over the same stretch, 345-355 m either side of naka_hondori.
-DIAMOND_X = {"d_bwd_off": 245.0, "d_fwd_on": 255.0, "d_bwd_on": 945.0, "d_fwd_off": 955.0}
+C1_SOUTH_CUT_X = 775.0             # ...and on its south side between the W and E JCTs' aux lanes (the ring starts here)
+# THE FOUR-POINT C1 (PLAN.md "NEXT", user + review 2026-09-29 night): one access point per side --
+#   N a TIGHT diamond onto naka_hondori (the ramps hug the viaduct and land right beside it),
+#   W the Wangan JCT (all four movements, the Wangan's north leg up beside the rail corridor),
+#   E the airport JCT (the spur straight down x 1250 onto the Rainbow Bridge's upper deck),
+# and NO south diamond: C1's south side (x 205..995, 790 m) carries both JCTs' ramp pairs (W: BWD exit + FWD
+# entrance, x 300..760; E: FWD exit + BWD entrance, x 790..910), and a diamond's four ramps need ~2 x 265 m more.
+# All x / y below are the RECORD frame (x east, y north = -Godot z). C1 runs COUNTER-clockwise in the record: FWD is
+# the inner carriageway (eastbound on the south side), BWD the outer (westbound on the south side).
+#
+# the N TIGHT DIAMOND (each end: an exit on one carriageway and an entrance on the other 10 m apart, one ramp per
+# station, so both carriageways widen over the same stretch; the ramps run parallel to C1 and land ~45 m off it)
+DIAMOND_X = {"d_bwd_off": 335.0, "d_fwd_on": 345.0, "d_bwd_on": 855.0, "d_fwd_off": 865.0}
 DIAMOND_ROAD = ("naka_hondori", 600.0)
-DIAMOND_J = (465.0, 665.0)
+DIAMOND_J = (525.0, 615.0)         # its two junctions on naka_hondori (inside C1, outside C1), C1 at y 570
+# the W JCT (the Wangan)
+W_LEG_X = 370.0                    # the Wangan's north leg: a divided road up x 370, east of the rail (x 185 / 205), the
+                                   # Bay station's box (x <= 250) and nishi_hondori (x 275), west of Waterpark (x 424)
+W_JOINT_Y = -230.0                 # where the leg parts into its two one-way C1 ramps (a joint)
+W_BWD_ON_X = 300.0                 # leg NB -> C1 BWD (westbound, outer): merges from the south, 95 m before the SW arc
+W_BWD_OFF_X = 520.0                # C1 BWD -> leg SB: leaves to the south and swings down onto the leg's SB half
+W_FWD_ON_X = 650.0                 # leg -> C1 FWD (eastbound, inner): a flyover off the leg NB, over the leg and C1
+W_FWD_OFF_Y = 250.0                # C1 FWD -> leg: exits on C1's WEST side (heading south, inside), a flyover
+                                   # diagonally over the SW corner and the leg, onto the leg's SB half from the east
+W_FLY_Z = 18.5                     # both flyovers: over C1 (11) and over the leg (12.5) by 5.5 m + margin
+W_LEG_Z = 12.5                     # the leg: over ring_kita (the dike, 6.4 m at y -672) by 5.5 m
+# the E JCT (the airport)
+E_JOINT_Y = -230.0                 # where the spur (x 1250) parts into its two one-way C1 ramps (a joint)
+E_BWD_OFF_Y = 230.0                # C1 BWD (southbound on the east side, outer) -> the spur SB: out east and straight
+                                   # down x 1250.5 (over ring_kita, the dike at x ~1235, 6.4-8 m)
+E_BWD_ON_X = 910.0                 # the spur NB -> C1 BWD (westbound on the south side): merges from the south
+E_FWD_OFF_X = 900.0                # C1 FWD (eastbound, inner) -> the spur: a flyover east over the SE corner and the
+                                   # SB ramp, round onto x 1268 and down onto the spur's SB half from the east
+E_FWD_MERGE_Y = -375.0             # ...where it merges
+E_JOINT_Z = 14.0                   # the joint: the two C1 ramps cross ring_kita (7-8 m on the dike) by 5.5 m
+E_FLY_Z = 20.0                     # the flyover: over the SB ramp (~13-14 m) and C1 by 5.5 m + margin
+# PHASE 2 is held (the Wangan's waterfront continuation to a directional T on the spur): the spur has no station of its
+# own between the FWD merge's taper end and the bridge's north anchorage
+SPUR_T_CLEAR = (-500.0, -696.0)    # record y range on the spur kept free of stations, joints and ramps
 
 #: THE RAINBOW BRIDGE on the final plan's crossing (v9): the spur and the airport road come down the resort's new
 #: south-east corner and cross at x 1250 (the water there is 852..1392 m south, 540 m against the bridge's 575 m main
 #: span, so the towers stand at the water's edges). The lower deck is RAIL (R7); cars cross on the UPPER deck, the spur.
 BRIDGE_X = 1250.0
 BRIDGE_SEARCH_Y = (-500.0, -1700.0)    # record y range the water gap is looked for in
-SPUR_EAST_Y = -500.0                   # the spur runs south from the JCT, then east at this y to the bridge axis
 
 
-# ------------------------------------------------------------------ the Wangan (PLAN.md 3.30 L2)
-#: GODOT (x, z). The plan's orange line: from the spur JCT along the south waterfront offshore of the park, over the
-#: gulf and the ring's port-corner bend, west along the port platform's north strip, then -- instead of stopping at the
-#: harbour (user, 2026-09-25) -- on PAST the port as ONE PAIR on a low sea viaduct round the south-west corner and up the
-#: west shore offshore, where each carriageway leaves the pair and comes ashore to its own T on the coast ring. The
-#: carriageways never part in mid-air over the water; the only split is the spur JCT at the east end, over land.
-#: The spur JCT is PARTIAL -- Wangan <-> airport only (the racing route, "off the airport spur"): the Wangan meets the
-#: spur's east leg from the south-west, where airport -> Wangan leaves spur_in to its own left and Wangan -> airport
-#: passes under both spur carriageways to join spur_out from its left. Wangan <-> C1 would need two loops.
-WANGAN_S_X = 1000.0            # the spur station the two Wangan ramps leave / join (spur_in diverge, spur_out merge)
-WANGAN_J_X = 890.0             # a joint on spur_out before it: the loop JCT's acceleration lane and the Wangan's
-                               # entrance are both on spur_out, and one run carries one aux slot
-WANGAN_CENTRE = [(-1320.0, 700.0), (-1320.0, 900.0), (-1180.0, 1110.0), (-900.0, 1128.0), (-100.0, 1128.0),
-                 (120.0, 1060.0), (300.0, 900.0), (430.0, 800.0), (600.0, 800.0),
-                 (780.0, 585.0)]   # the shared corridor, north-west end -> east
-WANGAN_RADII = [0.0, 160.0, 160.0, 160.0, 160.0, 160.0, 160.0, 120.0, 120.0, 0.0]
-WANGAN_T = (-1177.0, 755.0)    # the ONE west-coast ring point the Wangan meets, a T from the sea side (user, 2026-09-25:
-                               # one divided road like C1, not two carriageways each to its own T)
-WANGAN_JOIN_Z = 860.0          # the Wangan's approach from that T joins the corridor here (godot z, west shore)
-WANGAN_SPLIT_X = 740.0         # east of this the divided road parts into its two carriageways for the spur JCT --
-                               # where they REALLY go different ways (user, 2026-09-28: at shuto_wangan_e point 7 /
-                               # shuto_wangan_w point 5; at 520 they ran as two ramp-looking roads side by side for
-                               # ~250 m). Past it the eastbound climbs under the spur and the westbound up to spur_in.
-WANGAN_RISE_X = 560.0          # the divided road leaves its 11 m deck here and climbs to WANGAN_SPLIT_Z at the split
-WANGAN_SPLIT_Z = 14.5          # the split's deck height: both carriageways leave it level (a divided road is one deck);
-                               # the westbound then climbs ~12 m to spur_in over ~185 m (~6.7 %)
+# ------------------------------------------------------------------ the Wangan (PLAN.md 3.30 L2; NEXT 2026-09-29)
+#: GODOT (x, z). ONE divided road from a T on the west-coast ring's straight (moved SOUTH, user 2026-09-29 night, onto
+#: the ring's straight x ~-1161 between z 725 and 900, a mouth clearance short of its corner), due west offshore,
+#: round the south-west corner, east along the south waterfront past the port platform, then NORTH up the leg
+#: (`W_LEG_X`) beside the rail corridor to its joint below C1 (`W_JOINT_Y`): the W JCT. Its old east end -- the
+#: partial Y onto the airport spur (the underpass, the spur's 27.5 m hump) -- is removed: Wangan <-> airport goes
+#: THROUGH C1, JCT to JCT. The waterfront continuation east to the spur is PHASE 2 (a held corridor, see RESERVES).
+WANGAN_T = (-1161.0, 860.0)    # the west-coast ring point the Wangan meets, a T from the sea side
+WANGAN_CENTRE = [(-1187.0, 860.0), (-1345.0, 860.0), (-1180.0, 1110.0), (-900.0, 1128.0), (-100.0, 1128.0),
+                 (120.0, 1060.0), (370.0, 840.0), (370.0, 230.0)]
+WANGAN_RADII = [0.0, 85.0, 160.0, 160.0, 160.0, 160.0, 160.0, 0.0]
 WANGAN_LOW = 4.0               # the low sea viaduct: west of the port the Wangan crosses no road, so it need not fly
-WANGAN_LOW_FROM_X = -900.0     # west of this (the shoreline past the port platform) the deck is WANGAN_LOW; east of it
-                               # the pair holds a road's clearance over the platform while it comes down from 11 m
-WANGAN_DECK_FROM_X = -700.0     # the deck is at full height (11 m) east of this, over the whole port platform; west of it
-                                # both carriageways come down to WANGAN_LOW over the platform's west end
+WANGAN_LOW_FROM_X = -900.0     # west of this (the shoreline past the port platform) the deck is WANGAN_LOW
+WANGAN_DECK_FROM_X = -700.0    # the deck is at full height (11 m) east of this, over the whole port platform
+WANGAN_RING_X = 150.0          # east of this the Wangan climbs to 14 m: it crosses ring_kita at the ring's corner
+                               # (x ~236, 7.8 m on the dike) and north of it the leg holds W_LEG_Z
+
+#: PHASE 2 HELD (PLAN.md NEXT, user 2026-09-29 night: "let the C1 plans occupy enough space for the spur"): the
+#: Wangan's continuation EAST along the south waterfront -- off its corner below the leg, past the fish market, the
+#: Ferris wheel park and the resort hotels -- to ONE directional T on the airport spur north of the Rainbow Bridge.
+#: Record frame. The corridor is a divided expressway's width plus its piers and barriers; the T's footprint is its
+#: flyover's arc and both ramps' tapers, beside the spur (whose own stations keep out of `SPUR_T_CLEAR`). Nothing but
+#: the future Wangan may stand in either: no generated building (island_buildings), no site and no street running
+#: ALONG it (island_streets treats each segment as a site); an existing road may cross UNDER it (it will be elevated).
+PHASE2_CORRIDOR = [(370.0, -840.0), (470.0, -805.0), (640.0, -795.0), (780.0, -655.0), (900.0, -600.0),
+                   (1165.0, -598.0)]
+PHASE2_HALF = 17.5
+PHASE2_T_BOX = (1150.0, -700.0, 1330.0, -500.0)    # x0, y0, x1, y1 (record)
+
+
+def phase2_boxes(grow=0.0):
+    """The held phase-2 ground as oriented boxes (record frame): [(cx, cy, cos, sin, half along, half across)] -- one
+    per corridor segment (grown `grow` all round) and the T's footprint."""
+    import math as _m
+    out = []
+    for (x0, y0), (x1, y1) in zip(PHASE2_CORRIDOR, PHASE2_CORRIDOR[1:]):
+        L = _m.hypot(x1 - x0, y1 - y0)
+        out.append(((x0 + x1) / 2.0, (y0 + y1) / 2.0, (x1 - x0) / L, (y1 - y0) / L, L / 2.0 + grow, PHASE2_HALF + grow))
+    bx0, by0, bx1, by1 = PHASE2_T_BOX
+    out.append(((bx0 + bx1) / 2.0, (by0 + by1) / 2.0, 1.0, 0.0, (bx1 - bx0) / 2.0 + grow, (by1 - by0) / 2.0 + grow))
+    return out

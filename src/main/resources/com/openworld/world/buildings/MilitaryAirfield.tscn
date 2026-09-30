@@ -3,11 +3,23 @@
 [ext_resource type="ArrayMesh" path="res://src/main/resources/com/openworld/world/buildings/MilitaryAirfield_mesh.res" id="1_06th4"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hof4t"]
-size = Vector3(540, 0.1, 45)
+size = Vector3(538.7, 2.8677, 0.65)
 
-[node name="MilitaryAirfield" type="Node3D" unique_id=1771356205]
+[sub_resource type="BoxShape3D" id="BoxShape3D_6th7m"]
+size = Vector3(0.65, 2.8677, 46.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xbicm"]
+size = Vector3(0.65, 2.8677, 46.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_qrimp"]
+size = Vector3(256.9, 2.8677, 0.65)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_7nttj"]
+size = Vector3(540, 0.1, 48)
+
+[node name="MilitaryAirfield" type="Node3D" unique_id=1501694378]
 metadata/building = {
-"aabb": [Vector3(-270, -0.05, -27.500002), Vector3(540, 0.060000002, 45.000004)],
+"aabb": [Vector3(-270, -0.05, -24.000002), Vector3(540, 2.9176776, 47.9)],
 "clear_probes": [],
 "composite": true,
 "door_style": "swing",
@@ -16,32 +28,49 @@ metadata/building = {
 "doors_locked": false,
 "doors_shop": false,
 "facade_surfaces": {},
-"footprint_m": [540.0, 45.0],
+"footprint_m": [540.0, 48.0],
+"forecourt_m": 0.0,
 "has_interior": true,
-"height_m": 0.06,
+"height_m": 2.8677,
 "id": "MilitaryAirfield",
 "jp": {
 "name": "基地の滑走路 (compact placeholder)"
 },
 "kit": "library",
-"piece_count": 9,
+"piece_count": 99,
 "probe_xz": [0.0, 0.0],
-"props_top_m": 0.01,
+"props_top_m": 2.8677,
 "roofline_m": 0.06,
 "solid_probes": [],
 "use": "the base's runway: 540 x 45 m right along the base's apron (user, 2026-09-29: a jet rolls straight off the apron onto it, no open ground between), its east end in line with the base's east fence, its west half on a reclaimed strip into the sea. 540 m matches the civilian airport; FIJ1 lifts off after ~130 m",
 "wall_top_m": 0.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=338875618]
-visibility_range_end = 620.9359
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1119592524]
+visibility_range_end = 621.0602
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_06th4")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=545814983]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=464765808]
 collision_mask = 0
 
-[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=1450964721]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+[node name="Box0" type="CollisionShape3D" parent="Collision" unique_id=887793000]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.43385, 23.575)
 shape = SubResource("BoxShape3D_hof4t")
+
+[node name="Box1" type="CollisionShape3D" parent="Collision" unique_id=173757374]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -269.575, 1.43385, 0)
+shape = SubResource("BoxShape3D_6th7m")
+
+[node name="Box2" type="CollisionShape3D" parent="Collision" unique_id=1084028073]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 269.575, 1.43385, 0)
+shape = SubResource("BoxShape3D_xbicm")
+
+[node name="Box3" type="CollisionShape3D" parent="Collision" unique_id=116409842]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -140.9, 1.43385, -23.575)
+shape = SubResource("BoxShape3D_qrimp")
+
+[node name="Box4" type="CollisionShape3D" parent="Collision" unique_id=1830452839]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_7nttj")

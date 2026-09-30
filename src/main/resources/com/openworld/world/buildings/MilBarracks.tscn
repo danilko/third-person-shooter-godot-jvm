@@ -16,9 +16,10 @@ size = Vector3(1.2, 2.1, 0.14)
 [sub_resource type="BoxShape3D" id="BoxShape3D_kh74i"]
 size = Vector3(1.2, 2.1, 0.14)
 
-[node name="MilBarracks" type="Node3D" unique_id=1377139367]
+[node name="MilBarracks" type="Node3D" unique_id=630387601]
 metadata/building = {
 "aabb": [Vector3(-24.01, -1.2, -8.005), Vector3(48.02, 10.5, 16.01)],
+"base_m": -1.2,
 "collision": "trimesh",
 "door_style": "swing",
 "doors": [{
@@ -264,33 +265,33 @@ metadata/building = {
 "wall_top_m": 8.0
 }
 
-[node name="Mesh" type="MeshInstance3D" parent="." unique_id=590658306]
+[node name="Mesh" type="MeshInstance3D" parent="." unique_id=1291302111]
 visibility_range_end = 411.6
 visibility_range_end_margin = 40.0
 visibility_range_fade_mode = 1
 mesh = ExtResource("1_nls52")
 
-[node name="Collision" type="StaticBody3D" parent="." unique_id=325670081]
+[node name="Collision" type="StaticBody3D" parent="." unique_id=186708333]
 collision_mask = 0
 
-[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1571371135]
+[node name="DoorLeaf0" type="CollisionShape3D" parent="Collision" unique_id=1750245923]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1.05, 7.895)
 shape = SubResource("BoxShape3D_552h5")
 
-[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=873241529]
+[node name="DoorLeaf1" type="CollisionShape3D" parent="Collision" unique_id=1250060135]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -23.9, 1.05, -1.005)
 shape = SubResource("BoxShape3D_srldm")
 
-[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1106766570]
+[node name="DoorLeaf2" type="CollisionShape3D" parent="Collision" unique_id=1986849774]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 23.9, 1.05, -1.005)
 shape = SubResource("BoxShape3D_kh74i")
 
-[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=478362438]
+[node name="Trimesh" type="CollisionShape3D" parent="Collision" unique_id=987975408]
 shape = ExtResource("2_8tbtn")
 
-[node name="Lifts" type="Node3D" parent="." unique_id=1699636815]
+[node name="Lifts" type="Node3D" parent="." unique_id=466424571]
 
-[node name="Lift0" type="Node3D" parent="Lifts" unique_id=519731265]
+[node name="Lift0" type="Node3D" parent="Lifts" unique_id=1447103591]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 19.9, 0, -2.68)
 script = ExtResource("3_excab")
 shaft_width = 1.6
@@ -308,38 +309,38 @@ in_service = true
 stop_heights = "0,4"
 faces = 1
 
-[node name="Door_exit_0" type="Marker3D" parent="." unique_id=1359270935]
+[node name="Door_exit_0" type="Marker3D" parent="." unique_id=788468215]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -12, 0, 7.895)
 
-[node name="Door_exit_1" type="Marker3D" parent="." unique_id=738234182]
+[node name="Door_exit_1" type="Marker3D" parent="." unique_id=952497921]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -23.9, 0, -1.005)
 
-[node name="Door_exit_2" type="Marker3D" parent="." unique_id=942966702]
+[node name="Door_exit_2" type="Marker3D" parent="." unique_id=980837537]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 23.9, 0, -1.005)
 
-[node name="Markers" type="Node3D" parent="." unique_id=855480757]
+[node name="Markers" type="Node3D" parent="." unique_id=1348756273]
 
-[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=1907865620 groups=["mission_marker"]]
+[node name="MARK_spawn_01" type="Marker3D" parent="Markers" unique_id=2144117936 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, 0.995)
 metadata/team = "soldier"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1730138339 groups=["mission_marker"]]
+[node name="MARK_spawn_02" type="Marker3D" parent="Markers" unique_id=1081382477 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -19.9, 4, 3.395)
 metadata/team = "soldier"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=1387602906 groups=["mission_marker"]]
+[node name="MARK_spawn_03" type="Marker3D" parent="Markers" unique_id=863108971 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 4, 3.395)
 metadata/team = "soldier"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=431081171 groups=["mission_marker"]]
+[node name="MARK_spawn_04" type="Marker3D" parent="Markers" unique_id=320899043 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 4, 3.395)
 metadata/team = "soldier"
 metadata/kind = "spawn"
 
-[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=487616117 groups=["mission_marker"]]
+[node name="MARK_spawn_05" type="Marker3D" parent="Markers" unique_id=343918892 groups=["mission_marker"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.9, 4, 3.395)
 metadata/team = "soldier"
 metadata/kind = "spawn"

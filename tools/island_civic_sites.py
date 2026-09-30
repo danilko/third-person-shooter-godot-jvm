@@ -94,6 +94,29 @@ PLOTS = (
     ("park_west", "park", "公園", 60.0, 60.0, 1, (-800.0, -800.0)),
     ("park_north", "park", "公園", 60.0, 60.0, 1, (900.0, 850.0)),
     ("park_city", "park", "公園", 60.0, 60.0, 1, (100.0, -150.0)),
+    # THE MISSION BUILDINGS (user, 2026-09-29 night: "place every interiors building ... assume the current vacancy on
+    # the maps is for these"): the enterable kits/interiors buildings, each on a plot its footprint + 2 m all round
+    # (`island_buildings.CIVIC_TYPES` / `CIVIC_SCENE`: locked `_Open` for a mission building, `_Shop` for a shop).
+    # downtown (C1's south half, round the Central station) -- the bank, the HQ, the department store, the civic centre
+    ("mission_bank_large", "bank_large", "銀行 (本店)", 44.0, 34.0, 2, (450.0, 50.0)),
+    ("mission_office_hq", "office_hq", "本社ビル", 32.0, 30.0, 1, (300.0, 150.0)),
+    ("mission_department_store", "department_store", "百貨店", 84.0, 64.0, 2, (800.0, 60.0)),
+    ("mission_civic_center", "civic_center", "区民センター", 60.0, 50.0, 2, (1050.0, -50.0)),
+    ("mission_fashion", "fashion_building", "ファッションビル", 38.0, 36.0, 1, (680.0, 20.0)),
+    ("mission_safehouse_city_large", "safehouse_city_large", "雑居ビル (隠れ家)", 10.0, 21.0, 1, (220.0, 350.0)),
+    # the nightlife quarter and 秋葉原
+    ("mission_izakaya", "izakaya", "居酒屋", 9.0, 19.0, 1, (620.0, 420.0)),
+    ("mission_maid_cafe", "maid_cafe", "メイドカフェ", 10.0, 20.0, 1, (1080.0, 250.0)),
+    ("mission_adult", "adult_services", "風俗ビル", 10.0, 22.0, 1, (850.0, 480.0)),
+    ("mission_safehouse_city_small", "safehouse_city_small", "狭小住宅 (隠れ家)", 8.0, 15.0, 1, (700.0, 520.0)),
+    # the west's 駅前
+    ("mission_bank_small", "bank_small", "銀行 (支店)", 20.0, 20.0, 1, (-730.0, -520.0)),
+    # the housing, the hill edge, the industry, the mountain
+    ("mission_safehouse_small", "safehouse_small", "一戸建て (隠れ家)", 12.0, 17.0, 1, (-900.0, -700.0)),
+    ("mission_safehouse_large", "safehouse_large", "邸宅 (隠れ家)", 21.0, 22.0, 1, (600.0, 820.0)),
+    ("mission_secure_mansion", "secure_mansion", "要塞邸宅", 68.0, 55.0, 1, (-450.0, 300.0)),
+    ("mission_warehouse_yard", "warehouse_yard", "倉庫", 48.0, 54.0, 1, (-300.0, -800.0)),
+    ("mission_onsen_ryokan", "onsen_ryokan", "温泉旅館", 46.0, 43.0, 1, (-675.0, 1125.0), {"front": ("shrine_touge",)}),
 )
 
 
@@ -188,12 +211,17 @@ class RoadDist(object):
         return False
 
 
-def frontage_samples(net, g, min_lanes):
-    """(x, y, ux, uy, half, road) every STEP along every road a plot may front, at grade."""
+def frontage_samples(net, g, min_lanes, allow=()):
+    """(x, y, ux, uy, half, road) every STEP along every road a plot may front, at grade. `allow`: road-name prefixes a
+    plot may front although NO_FRONT excludes them (the onsen on the mountain road)."""
     out = []
     for name, r in net.roads.items():
         name = str(name)
-        if IS.is_block_street(name) or name.startswith(NO_FRONT) or len(r.points) < 2:
+        if IS.is_block_street(name) or len(r.points) < 2:
+            continue
+        if name.startswith(NO_FRONT) and not (allow and name.startswith(tuple(allow))):
+            continue
+        if allow and not name.startswith(tuple(allow)):
             continue
         b = r.base
         if min(b.lanes_fwd, b.lanes_bwd) < min_lanes and max(b.lanes_fwd, b.lanes_bwd) < min_lanes:
@@ -217,7 +245,7 @@ def frontage_samples(net, g, min_lanes):
 
 
 def search(spec, g, net, clear, samples, targets, placed):
-    pid, kind, jp, fw, dp, lanes, target = spec
+    pid, kind, jp, fw, dp, lanes, target = spec[:7]
     if isinstance(target, str):
         st = targets.get(target.split(":", 1)[1])
         if st is None:
@@ -266,7 +294,7 @@ def main(argv):
     resite = None
     for a in argv:
         if a.startswith("--resite"):
-            resite = set(a.split("=", 1)[1].split(",")) if "=" in a else {s[0] for s in PLOTS}
+            resite = set(a.split("=", 1)[1].split(",")) if "=" in a else {s_[0] for s_ in PLOTS}
     doc = load()
     have = {p["id"]: p for p in doc["plots"]}
     if check:
@@ -314,9 +342,10 @@ def main(argv):
         if any(p["id"] == spec[0] for p in placed):
             continue
         lanes = spec[5]
-        if lanes not in samples:
-            samples[lanes] = frontage_samples(net, g, lanes)
-        got, why = search(spec, g, net, clear, samples[lanes], targets, placed)
+        allow = tuple((spec[7] if len(spec) > 7 else {}).get("front", ()))
+        if (lanes, allow) not in samples:
+            samples[(lanes, allow)] = frontage_samples(net, g, lanes, allow)
+        got, why = search(spec, g, net, clear, samples[(lanes, allow)], targets, placed)
         if got is None:
             misses.append("%s (%s)" % (spec[0], why))
             continue
