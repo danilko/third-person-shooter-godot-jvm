@@ -220,6 +220,9 @@ def _nearest(poly, x, y):
     return best
 
 
+GORE_VERTICAL = 2.0    # m: a ramp this far above or below its mainline's surface is on its own level, not in a gore
+
+
 def level_gores(net):
     """A RAMP IS LEVEL WITH ITS MAINLINE UNTIL THE TWO PAVED BANDS HAVE PARTED (PLAN.md 0.10(b)).
 
@@ -273,8 +276,12 @@ def level_gores(net):
             for k in range(1, n + 1):
                 t = k / n
                 x, y = pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t
-                if main_at(x, y)[0] >= need:
-                    clear = (a, b, t, x, y)
+                md, mz = main_at(x, y)
+                # parted SIDEWAYS, or VERTICALLY: a ramp that runs beside its mainline and then crosses over (or under)
+                # it is on another level there, and holding it at the mainline's height flattened the Wangan's T1
+                # into the airport spur it flies over (27.9 m -> 21.2 m, a flat crossing, probe_road_clear)
+                if md >= need or abs(pa[2] + (pb[2] - pa[2]) * t - mz) > GORE_VERTICAL:
+                    clear = (a, b, t if md >= need else 0.0, x, y)   # parted vertically: hold only up to `a`
                     break
             if clear:
                 break
@@ -397,12 +404,47 @@ def smooth_corridor(nodes, length=LENGTH):
     return moved, worst, b, i
 
 
+PAIR_DZ = 0.3          # m: two expressway roads running side by side at one height (a lane-split pair)
+
+
+def pair_held(net):
+    """TWO RAMPS SIDE BY SIDE AT ONE HEIGHT STAY AT ONE HEIGHT. A lane split (the Wangan's T4 + T2) peels two ramps off
+    together at one level; the 80 m average then lifted one of them by the climb that starts just past the pair
+    (T2 0.8 m over T4, 4.3 m apart: its edge a wall in T4's lane, probe_road_clear). Every station of an expressway
+    road (shuto_*) whose bands overlap another one's within PAIR_DZ is held. Returns the number held."""
+    roads = [r for n, r in net.roads.items() if str(n).startswith("shuto_") and len(r.points) > 1]
+    polys = {r.name: [net.points[q].pos for q in r.points] for r in roads}
+    # a ramp and the mainline it leaves or joins are level_gores' business, not a pair: holding the MAINLINE there
+    # pinned the Wangan's crest at Y3's gore and left Y3 0.3 m under its paving (probe_road_clear)
+    road_of = {q: str(n) for n, r in net.roads.items() for q in r.points}
+    gore = set()
+    for u, p in net.points.items():
+        for l in p.links:
+            if str(l.type) == "AUX" and u in road_of and l.target in road_of:
+                gore.add(frozenset((road_of[u], road_of[l.target])))
+    n = 0
+    for r in roads:
+        for q in r.points:
+            P = net.points[q].pos
+            for o in roads:
+                if o is r or frozenset((str(r.name), str(o.name))) in gore:
+                    continue
+                d, z = _nearest(polys[o.name], P[0], P[1])
+                if d < _road_half(r) + _road_half(o) + GORE_MARGIN and abs(z - P[2]) < PAIR_DZ:
+                    if q not in _GORE_HELD:
+                        _GORE_HELD.add(q)
+                        n += 1
+                    break
+    return n
+
+
 def cmd_smooth(argv):
     rec = argv[0]
     length = float(argv[argv.index("--length") + 1]) if "--length" in argv else LENGTH
     net = pm.load_network(rec)
     for line in level_gores(net):
         print("island_grades: gore " + line)
+    print("island_grades: %d station(s) held beside a parallel expressway road at one height" % pair_held(net))
     runs = corridors(net)
     total, worst_move, rough = 0, ("", 0.0), []
     for name, nodes in runs:

@@ -1034,6 +1034,23 @@ def _is_expressway(lane):
     return lane.get("road_class") in ("expressway", "ramp")
 
 
+def _leftmost_edge(lanes, q, d, half):
+    """How far left of `q` (kit frame, travel direction `d`) the outer edge of the leftmost lane running beside it is:
+    every lane with a sample within 6 m along and 3 m in height of `q`, left of it, counts; at least `half`."""
+    lft = _left(d)
+    best = half
+    for l in lanes.values():
+        hw = 0.5 * float(l.get("lane_width", 4.5))
+        for p in _lane_kit(l):
+            vx, vy = p[0] - q[0], p[1] - q[1]
+            if abs(vx * d[0] + vy * d[1]) > 6.0 or abs(p[2] - q[2]) > 3.0:
+                continue
+            lat = vx * lft[0] + vy * lft[1]
+            if 0.0 < lat < 15.0:
+                best = max(best, lat + hw)
+    return best
+
+
 def _walk(lanes, preds, lane, dist, back):
     """The point `dist` m from `lane`'s start (`back` = False: along it and on through its first successor of the same
     road class) or from its start BACKWARD through its first predecessor (`back` = True), in the KIT frame, with the
@@ -1135,7 +1152,10 @@ def expressway_sign_sites(table, lanes):
             q, d, at = w
             half = 0.5 * float(lanes[at].get("lane_width", 4.5))
             lft = _left(d)
-            pos = (q[0] + lft[0] * (half + edge), q[1] + lft[1] * (half + edge), q[2])
+            # the post stands outside the LEFTMOST lane at this cross-section, not just the lane walked back along: a
+            # lane carried across a joint (lane balance) runs left of it, and the post stood in that lane
+            off = _leftmost_edge(lanes, q, d, half) + edge
+            pos = (q[0] + lft[0] * off, q[1] + lft[1] * off, q[2])
             out.append({"asset": "expwy_sign", "pos": pos, "fwd": d, "road": m.get("road_name", ""), "lane": m["id"],
                         "sign": "jct" if dest_expwy else "exit", "dest": dest, "route": m.get("road_name", "")})
             done.add(road)

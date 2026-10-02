@@ -554,6 +554,14 @@ PORT_OFF_X = -200.0
 PORT_T = (-494.0, -1190.0)
 WG_CUT4_X = -10.0
 SB_JUNCTION = (848.0, -490.0)
+#: R1 (review 2026-10-02): the port's EASTBOUND entrance. At the port itself the dike road (ring_kita) runs 25 m north
+#: of the mainline and Y3/Y4 fill the strip east of chuo_dori, so it leaves a new T on the dike road WEST of the port
+#: (PORT_ON_T, ~55 m from the mainline there) and merges onto the EB carriageway's left at PORT_ON_X. Its added lane is
+#: carried across a mainline joint at WG_CUT5_X into Y1 and leaves with it (lane balance): port -> C1 through Y1,
+#: port -> the airport straight on. With the WB exit (PORT_OFF_X) the port has both directions.
+PORT_ON_X = -750.0
+PORT_ON_T = (-990.0, -1004.0)
+WG_CUT5_X = -675.0
 WG_CUT3_X = 400.0
 Y3_ON_Y = -700.0
 #: THE CONNECTOR (R3): the Wangan's last stretch runs north OVER chuo_dori's median (piers in the median) from
@@ -566,8 +574,9 @@ CONN_Z = 13.0               # over ring_kita's dike (6.4 m) by 5.5 + margin
 #: every 25-60 m here: no room for slip ramps onto its kerb lanes). A connector joint at CONN_CUT_Y keeps both off
 #: Y3's and Y4's runs. Gores at the deck's height (13 m) right over the Blue line's at-grade track (y -160).
 CONN_CUT_Y = -280.0
-CONN_EXIT_Y = -100.0        # the SB exit's gore (its deceleration lane opens toward the W joint at -25)
-CONN_ENT_Y = -150.0         # the NB entrance's gore; its added lane is carried into W1
+CONN_EXIT_Y = -150.0        # the SB exit's gore (review R3, 2026-10-02: 125 m after the W joint at -25, was 75)
+CONN_ENT_Y = -200.0         # the NB entrance's gore (moved with the exit: one ramp per station); its lane is carried
+                            # into W1
 CONN_EXIT_T = (90.0, -427.0)    # the T on wangan_dori the exit lands at (from the north)
 CONN_ENT_T = (-330.0, -285.0)   # the T on rinkai_dori the entrance leaves from (to the north)
 CONN_MEDIAN = 4.0           # chuo_dori's raised median under the connector (a hammerhead's 2.6 m column + margins)

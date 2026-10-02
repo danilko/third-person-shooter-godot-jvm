@@ -755,6 +755,7 @@ def build(net, ground):
     suburb_exit(net, wat["sb"], ground)
     suburb_entrance(net)
     port_exit(net)
+    port_entrance(net, wat["pe"])
 
     diamond(net, at)
     s_diamond(net, at)
@@ -1020,7 +1021,7 @@ def part_distance(net, main_road, ramp_lanes):
 
 
 def ground_ramp(net, at_uid, name, cw, ent, end_xy, end_dir, mouths, lanes=1, grade=GROUND_GRADE, landing=15.0,
-                avoid=None, reach=400.0):
+                avoid=None, reach=400.0, side=None, path=None):
     """A ramp between the expressway station `at_uid` and a GROUND junction (P2-5, P2-6, P3-8): `branch_ramp` opens
     the aux slot and places the mouth level with the mainline; then two equal arcs and a straight (`two_arc`) to
     `end_xy`, the ramp's last station, arriving along `end_dir` (its chain's direction there); level until its band has
@@ -1044,7 +1045,16 @@ def ground_ramp(net, at_uid, name, cw, ent, end_xy, end_dir, mouths, lanes=1, gr
         t0 = (-t0[0], -t0[1])
     el = math.hypot(*end_dir)
     te = (end_dir[0] / el, end_dir[1] / el)
-    p, R = two_arc(m, t0, end_xy, te, avoid=avoid, reach=reach)
+    if path is not None:
+        p, R = path(m, t0), None
+        R = _min_radius(p)
+    elif side is None:
+        p, R = two_arc(m, t0, end_xy, te, avoid=avoid, reach=reach)
+    else:
+        # a gentle diverge to `side` first (designed_ramp): in a narrow corridor two_arc's corner sits on the
+        # mainline's own line, so the ramp would never part from it before its last turn (R1: 8 m off for 240 m)
+        p3, R = designed_ramp(m, t0, end_xy, te, side, avoid=avoid)
+        p = [q[:2] for q in p3]
     zj = sum(net.points[u].pos[2] for u in mouths) / len(mouths)
     mline = [net.points[u].pos[:2] for u in road.points]
     need = part_distance(net, road, lanes)
@@ -1076,7 +1086,7 @@ def _thin_near(net, road, keep_uids, clear=MARK_CLEAR):
             net.link(a_, b_)
 
 
-def _t_arm(net, a, b, toward):
+def _t_arm(net, a, b, toward, mouth=MOUTH):
     """Where a T's new arm's mouth stands, and the direction a ramp arrives in to reach it: MOUTH from the centre of
     the cut (`a`, `b`, the road's two mouths), square to the road, on the side of `toward` (a point)."""
     pa, pb = net.points[a].pos, net.points[b].pos
@@ -1086,7 +1096,7 @@ def _t_arm(net, a, b, toward):
     nx, ny = -dy / L, dx / L
     if nx * (toward[0] - cx) + ny * (toward[1] - cy) < 0:
         nx, ny = -nx, -ny
-    return (cx + nx * MOUTH, cy + ny * MOUTH), (-nx, -ny)
+    return (cx + nx * mouth, cy + ny * mouth), (-nx, -ny)
 
 
 def station_by_x(net, road, x):
@@ -1129,6 +1139,59 @@ def port_exit(net):
     end, te = _t_arm(net, a, b, (PL.PORT_T[0] + 100.0, PL.PORT_T[1]))
     L, g, R = ground_ramp(net, st, "port_off", "BWD", False, end, te, [a, b], lanes=EXIT_GROUND_LANES)
     print("island_expressway: port WB exit %.0f m %.1f %% R %.0f" % (L, g * 100.0, R))
+
+
+PORT_ON_MOUTH = 16.0   # the T's arm on the dike road: short, so the arc into it has room in the corridor
+PORT_ON_OFF = 22.0     # how far off the mainline's centreline the entrance runs while it climbs
+PORT_ON_R = 30.0       # its arc into the T (a ground ramp's own turn, 30 km/h)
+
+
+def port_entrance(net, st):
+    """R1 (review 2026-10-02): the port's EASTBOUND entrance, from a new T on the dike road west of the port
+    (PORT_ON_T), merging onto the EB carriageway's left (north) at PORT_ON_X. Its added lane is carried across the
+    WG_CUT5_X joint into Y1 and leaves with it (lane balance, AUX_CARRY's shape): port -> C1 by Y1, port -> the airport
+    straight on."""
+    road = next(r for r in net.roads.values() if st in r.points)
+    a, b = cut_road(net, PL.PORT_ON_T, "ring_kita", PORT_ON_MOUTH)
+    end, te = _t_arm(net, a, b, (PL.PORT_ON_T[0], PL.PORT_ON_T[1] - 100.0), mouth=PORT_ON_MOUTH)
+
+    def path(m, t0):
+        # the corridor between the mainline and the dike road is ~55 m wide: a short diverge, a run PORT_ON_OFF m
+        # off the mainline (parted from it, so the climb can start), then one arc into the T
+        nl = (-t0[1], t0[0])                                            # left of t0 (west) is south: north = -nl
+        nn = (-nl[0], -nl[1]) if (end[0] - m[0]) * nl[0] + (end[1] - m[1]) * nl[1] < 0 else nl
+        A = (m[0] + t0[0] * 25.0, m[1] + t0[1] * 25.0)
+        B = (A[0] + t0[0] * 70.0 + nn[0] * PORT_ON_OFF, A[1] + t0[1] * 70.0 + nn[1] * PORT_ON_OFF)
+        # the run's line meets the arrival line (through `end` along te) at C
+        den = t0[0] * te[1] - t0[1] * te[0]
+        f = ((end[0] - B[0]) * te[1] - (end[1] - B[1]) * te[0]) / den
+        C = (B[0] + t0[0] * f, B[1] + t0[1] * f)
+        rr = min(PORT_ON_R, 0.95 * math.dist(C, end[:2]), 0.45 * math.dist(B, C))
+        pl = rounded_polygon([m[:2], A, B, C, end[:2]], [0.0, 120.0, 120.0, rr, 0.0], closed=False, full_ends=True,
+                             arc_step=4.0)
+        cum = arclen(pl, False)
+        n = max(2, int(math.ceil(cum[-1] / 8.0)))
+        return [at_s(pl, cum, cum[-1] * k / n, False) for k in range(n + 1)]
+    L, g, R = ground_ramp(net, st, "port_on", "FWD", True, end, te, [a, b], lanes=ENTRY_LANES, path=path)
+    # the added lane on to the joint, and from the joint to Y1's gore (Y1's second lane opens over that one span)
+    k = road.points.index(st)
+    for u in road.points[k:]:
+        _raise_aux(net, u, "aux_fwd", ENTRY_LANES)
+    nxt = net.roads[PREFIX + "wangan__1b"]
+    y1 = _main_of(net, "y1", nxt)
+    for u in nxt.points[:nxt.points.index(y1) + 1]:
+        _raise_aux(net, u, "aux_fwd", ENTRY_LANES)
+    # Y2's westbound merge lane (2 lanes on wangan__1b) used to close before the next joint 1 km west; now it meets
+    # the WG_CUT5_X joint, so it is carried across into wangan__1 and dropped there with a full taper
+    w1 = road
+    res = net.resolved(w1.points[-1])
+    want = pv.taper_min_length(RAMP_LANES * res.lane_width, res.design_speed, TAPER) + 2.0
+    held = _carry(net, w1, len(w1.points) - 1, -1, "aux_bwd", RAMP_LANES, 75.0, taper=want)
+    print("island_expressway: Y2's added lanes carried %.0f m into wangan__1 before their taper" % held)
+    print("island_expressway: port EB entrance %.0f m %.1f %% R %.0f, its lane carried %.0f m into Y1"
+          % (L, g * 100.0, R, math.dist(net.points[st].pos[:2], net.points[y1].pos[:2])))
+    if nxt.points.index(y1) != 1:
+        print("island_expressway: WARN a station between the WG_CUT5 joint and Y1 (%d)" % nxt.points.index(y1))
 
 
 def connector_half_ic(net, conn):
@@ -1248,15 +1311,16 @@ def wangan_main(net, ground):
                 return cum[i] + f * (cum[i + 1] - cum[i])
         raise SystemExit("island_expressway: the Wangan does not reach x %.0f" % x)
     marks = {"y1": s_at_x(PL.Y1_OFF_X), "y2": s_at_x(PL.Y2_ON_X), "y4": s_at_x(PL.Y4_ON_X),
-             "y3": s_at_x(PL.Y3_OFF_X), "sb": s_at_x(PL.SB_OFF_X)}
+             "y3": s_at_x(PL.Y3_OFF_X), "sb": s_at_x(PL.SB_OFF_X), "pe": s_at_x(PL.PORT_ON_X)}
     cut_s = s_at_x(PL.WG_CUT_X)
+    cut5_s = s_at_x(PL.WG_CUT5_X)
     cut2_s = s_at_x(PL.WG_CUT2_X)
     cut3_s = s_at_x(PL.WG_CUT3_X)
     n = max(2, int(round(cum[-1] / 45.0)))
     base = [cum[-1] * k / n for k in range(n + 1)]
     ss = [c for c in base if all(abs(c - m) > MARK_CLEAR for m in marks.values())
-          and all(abs(c - v) > 15.0 for v in (cut_s, cut2_s, cut3_s))]
-    ss = sorted(set(round(v, 3) for v in ss + list(marks.values()) + [cut_s, cut2_s, cut3_s]))
+          and all(abs(c - v) > 15.0 for v in (cut_s, cut2_s, cut3_s, cut5_s))]
+    ss = sorted(set(round(v, 3) for v in ss + list(marks.values()) + [cut_s, cut2_s, cut3_s, cut5_s]))
     pts = [at_s(cl, cum, v, False) for v in ss]
     # a FIXED coastal profile, not `deck_profile`: that reads the coastal dike's crest within the deck's half width as
     # ground and put the whole coast at 17 m, leaving Y2 no room to fly over it; the crossings are gated instead
@@ -1280,6 +1344,8 @@ def wangan_main(net, ground):
     # and one between Y4 (EB merge) and the Suburb exit, and one between the Suburb exit and T3 (all three on EB)
     ro.split_at_joint(net, cut3_u, name=PREFIX + "wangan__3")
     ro.split_at_joint(net, cut2_u, name=PREFIX + "wangan__4")
+    # R1: and one between the port's EB entrance and Y1, so the entrance's added lane hands over to Y1 at a joint
+    ro.split_at_joint(net, w.points[ss.index(round(cut5_s, 3))], name=PREFIX + "wangan__1b")
     # P1-3: the west end (the T, its descent and the R100 corner over the sea) is its own road, posted for that corner;
     # the coast straight after it keeps the mainline's speed
     ro.split_at_joint(net, west_u, name=PREFIX + "wangan__1")
@@ -1327,7 +1393,8 @@ def y_ramps(net, wat, conn):
     # the corner SOUTH of the mainline, on the joint's own line: Y2 then rises straight north into the connector's east
     # half and never crosses Y1 (a corner further west put the crossing right at the joint, 4.6 m above it)
     p, _r = best_corner(m, (cp[0] + 0.5, cp[1]), lambda v: (cp[0] + 0.5, v), -1230.0, -1160.0)
-    wl = [net.points[u].pos[:2] for n_ in (PREFIX + "wangan", PREFIX + "wangan__1", PREFIX + "wangan__2")
+    wl = [net.points[u].pos[:2] for n_ in (PREFIX + "wangan", PREFIX + "wangan__1", PREFIX + "wangan__1b",
+                                                         PREFIX + "wangan__2")
           for u in net.roads[n_].points]
     spans = [(v - 20.0, v + 20.0) for v in (s_cross(p, wl), s_cross(p, p_y1)) if v is not None]
     run_on(net, PREFIX + "y2", on_curve(net, PREFIX + "y2", fly_heights(p, m[2], cp[2], PL.Y2_Z, spans)))

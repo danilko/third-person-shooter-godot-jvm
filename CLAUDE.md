@@ -11592,6 +11592,30 @@ stacked 15 % ramps: up west, down east), `AirportControlTower` (civil, lift to a
   `_t_arm`), level until the band parts (`part_distance`), one straight grade <= `GROUND_GRADE` 6 %. Built: the
   connector's half IC (SB exit -> wangan_dori, NB entrance <- rinkai_dori; chuo_dori itself has a junction every
   25-60 m), the Suburb WB entrance (<- ring_kita east of the crossing), the port WB exit (-> the port loop's west leg).
+  `ground_ramp(path=)` takes an explicit plan polyline where two arcs cannot separate the ramp from the mainline.
+- **The port's EB entrance (review R1, 2026-10-02)**: from a T on ring_kita at `PORT_ON_T`, it runs west of the port
+  and merges at `PORT_ON_X`. The ramp diverges, runs 22 m off the mainline, then turns in one arc (explicit path, 2.1 %).
+  Its lane is carried into Y1, so port -> C1 and port -> airport both exist. The new joint `WG_CUT5_X` makes
+  `shuto_wangan__1b` (Y1 + Y2) separate from `shuto_wangan__1` (the entrance), and Y2's added WB lanes are carried
+  75 m across it before their taper. The WB port exit stays: it is the only way into the port from the east. An EB
+  port exit does not fit (the dike road and Y3/Y4 fill the strip), and R2 was measured impossible (PLAN.md
+  "REVIEW OUTCOME"). R3: the connector's SB exit gore is 125 m past the W joint (`CONN_EXIT_Y` -150). R5: the
+  Suburb exit lands at 6 % (`island_dike.SIDE_EXTRA` 60).
+- **Five rules the 2026-10-02 rebuild's gates taught** (`probe_road_clear` / `probe_road_stamp` / civic `--check`):
+  * `island_grades.level_gores` counts a ramp as parted from its mainline when it is `GORE_VERTICAL` (2 m) above or
+    below it, not only sideways: T1 runs beside the spur and then flies over it, and holding it at the spur's height
+    flattened it into a flat crossing (27.9 -> 21.2 m).
+  * `island_grades.pair_held`: two expressway roads side by side at one height (a lane-split pair, T2 + T4) keep
+    their stations through the smoothing; a ramp and its own mainline at a gore are excluded (that pinned the
+    Wangan's crest at Y3's gore and left Y3 0.3 m under its paving). `island_dike.PLANNED_GRADE["shuto_t2"]` 6 %
+    keeps a dike-clearance lift from reaching back into the pair.
+  * An expressway guide sign's post stands outside the LEFTMOST lane at its cross-section
+    (`point_furniture._leftmost_edge`): a carried aux lane runs left of the lane walked back along.
+  * A civic plot's road check covers junction PADS (each pair of a clique's mouths is a segment): a koban stood
+    across a crossing.
+  * `road_kit_stamp.height_at`: where an ELEVATED road (UNDERPASS over both the lower road and the natural ground)
+    passes over a road whose verge reaches the vertex, the lower road decides the ground (the Wangan's deck left the
+    dike road's fill 0.84 m short).
 - **Lane-designation gantries** before a lane split (`point_furniture.lane_gantry_sites`, sign kind "lanes", one column
   + ↓ per lane, `TrafficSignals`).
 - **Kit fix:** a REV lane's taper receiver is `opens_from` in chain order (`point_export.build_run`).

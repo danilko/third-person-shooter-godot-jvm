@@ -161,10 +161,26 @@ static func height_at(index: Dictionary, params: Dictionary, x: float, z: float,
 			per[c] = [sd, lerpf(a.y, b.y, t) - CLEARANCE, fk == 1 or (fk == 2 and natural >= LAND_Z), rise]
 	if per.is_empty():
 		return NAN
+	# A road passing OVER another does not decide the ground under it: where a surface more than UNDERPASS
+	# lower is within its own verge here, that lower road is the one on the ground (the Wangan's deck 9 m
+	# over the dike road was "nearest" under its centreline, and as a PIER it left the dike's fill 0.84 m
+	# short -- probe_road_stamp). Mirrors the cap below, which already lets a road passing UNDER decide.
+	var low := INF
+	for c in per:
+		if per[c][0] <= VERGE:
+			low = minf(low, per[c][1])
 	var near: Array = []
 	for c in per:
+		# ...only an ELEVATED one (its surface also UNDERPASS over the natural ground): a hairpin's upper leg at
+		# grade keeps deciding its own ground, or the lower leg would cut under it
+		if per[c][1] > low + UNDERPASS and per[c][1] > natural + UNDERPASS:
+			continue
 		if near.is_empty() or per[c][0] < near[0]:
 			near = per[c]
+	if near.is_empty():
+		for c in per:
+			if near.is_empty() or per[c][0] < near[0]:
+				near = per[c]
 	if near[0] <= VERGE:
 		var cap: float = near[1]
 		for c in per:

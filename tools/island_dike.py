@@ -517,7 +517,9 @@ OVER_CLEAR = 7.5          # an expressway deck's surface over the dike road's (r
 PLANNED_OVER = {"shuto_sb_off": 6.0}
 #: ...and a lift it still needs (island_grades smoothing lowers a crossing a little) is coned at the road's OWN design
 #: grade: at the general 4 % a 0.5 m top-up over the dike was carried down the whole 7 % descent to the mouth
-PLANNED_GRADE = {"shuto_sb_off": 0.07}
+#: (shuto_t2, 2026-10-02: a 2.2 m lift over the ring's rail bridge, coned at 4 %, reached back 190 m down T2's 4.7 %
+#: descent and lifted it 0.4 m above T4 where the two run side by side -- a step in T4's lane, probe_road_clear)
+PLANNED_GRADE = {"shuto_sb_off": 0.07, "shuto_t2": 0.06}
 
 
 def clear_crossings(net):
@@ -644,7 +646,7 @@ JOIN_GAP = 120.0             # m: two ring corridors across one junction pad
 #: eased in and out with a cosine over the reach. By the Suburb exit (island_expressway.suburb_exit) the side road and
 #: its kogai_michi junction move 25 m inland, so the exit has room to come down off the dike at 7 % (it measured 7.4 %
 #: into the junction where the rule left it, 158 m from the ring).
-SIDE_EXTRA = [(820.0, -672.0, 260.0, 25.0)]
+SIDE_EXTRA = [(820.0, -672.0, 260.0, 60.0)]   # R5 (2026-10-02): 25 -> 60, the exit at <= 6 %
 
 
 def side_extra(x, y):

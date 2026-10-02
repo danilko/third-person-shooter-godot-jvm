@@ -199,6 +199,21 @@ class RoadDist(object):
                                    int((max(a[1], b[1]) + pad) // self.CELL) + 1):
                         self.grid[(i, j)].append(seg)
 
+        # a junction PAD lies between its mouths, which are the ends of separate roads -- no segment above covers it
+        # (a koban was placed across wangan_dori's crossing): each pair of mouths is a segment too, as wide as the wider
+        for clique in net.junction_cliques():
+            ms = [(net.points[u].pos, IS.road_half(net.road_of(u)), str(net.road_of(u).name)) for u in clique
+                  if net.road_of(u) is not None and not skip(str(net.road_of(u).name))]
+            for k, (a, ha, na) in enumerate(ms):
+                for b, hb, nb in ms[k + 1:]:
+                    seg = (a[0], a[1], b[0], b[1], max(ha, hb), "pad:" + na)
+                    pad = max(ha, hb) + 30.0
+                    for i in range(int((min(a[0], b[0]) - pad) // self.CELL),
+                                   int((max(a[0], b[0]) + pad) // self.CELL) + 1):
+                        for j in range(int((min(a[1], b[1]) - pad) // self.CELL),
+                                       int((max(a[1], b[1]) + pad) // self.CELL) + 1):
+                            self.grid[(i, j)].append(seg)
+
     def near(self, x, y, R, but=None):
         for ax, ay, bx, by, h, name in self.grid.get((int(x // self.CELL), int(y // self.CELL)), ()):
             if name == but:
